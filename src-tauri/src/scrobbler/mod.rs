@@ -379,6 +379,7 @@ pub fn spawn(app: AppHandle) {
                 };
                 *app.state::<PlaybackState>().0.lock().unwrap() = now.clone();
                 let _ = app.emit("now-playing", &now);
+                crate::discord::sync(&app, now.as_ref());
             }
 
             drive_session(&app).await;

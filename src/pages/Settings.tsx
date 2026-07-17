@@ -18,7 +18,79 @@ export default function Settings() {
       <h1 className="text-2xl font-bold">Einstellungen</h1>
       <AccountSection />
       <ScrobbleSection />
+      <DiscordSection />
     </div>
+  );
+}
+
+interface DiscordSettings {
+  enabled: boolean;
+  appId: string;
+}
+
+function DiscordSection() {
+  const [settings, setSettings] = useState<DiscordSettings | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    if (!api.isTauri) return;
+    import("@tauri-apps/api/core").then(({ invoke }) =>
+      invoke<DiscordSettings>("get_discord_settings").then(setSettings),
+    );
+  }, []);
+
+  if (!settings) return null;
+
+  const save = async (next: DiscordSettings) => {
+    setSettings(next);
+    const { invoke } = await import("@tauri-apps/api/core");
+    await invoke("set_discord_settings", {
+      enabled: next.enabled,
+      appId: next.appId,
+    });
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1500);
+  };
+
+  return (
+    <Card>
+      <CardTitle>Discord Rich Presence</CardTitle>
+      <div className="mt-3 space-y-3">
+        <Toggle
+          checked={settings.enabled}
+          onChange={(v) => save({ ...settings, enabled: v })}
+          label="In Discord anzeigen, was du schaust"
+          hint="Braucht eine eigene Discord-Application-ID (einmalig anlegen, dauert 30 Sekunden)."
+        />
+        <p className="text-xs leading-relaxed text-ink-600">
+          Erstelle im{" "}
+          <button
+            onClick={() =>
+              openUrl("https://discord.com/developers/applications")
+            }
+            className="text-accent-400 hover:underline"
+          >
+            Discord Developer Portal
+          </button>{" "}
+          eine neue Application namens „Karasu" und füge ihre Application-ID
+          hier ein.
+        </p>
+        <div className="flex gap-2">
+          <Input
+            value={settings.appId}
+            onChange={(e) =>
+              setSettings({ ...settings, appId: e.target.value })
+            }
+            placeholder="Application-ID"
+            className="max-w-60"
+            inputMode="numeric"
+          />
+          <Button variant="secondary" onClick={() => save(settings)}>
+            {saved ? "Gespeichert ✓" : "Speichern"}
+          </Button>
+        </div>
+      </div>
+    </Card>
   );
 }
 

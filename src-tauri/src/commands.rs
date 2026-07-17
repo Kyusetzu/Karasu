@@ -4,7 +4,7 @@ use crate::anilist::{
 };
 use crate::db::Db;
 use serde_json::{json, Value};
-use tauri::State;
+use tauri::{Manager, State};
 
 const VIEWER_QUERY: &str = "
 query {
@@ -348,6 +348,41 @@ pub fn set_scrobble_settings(
     db.kv_set("scrobble_enabled", if enabled { "1" } else { "0" })?;
     db.kv_set("scrobble_confirm", if confirm { "1" } else { "0" })?;
     db.kv_set("scrobble_delay_min", &delay_min.to_string())
+}
+
+#[derive(serde::Serialize)]
+pub struct DiscordSettings {
+    pub enabled: bool,
+    #[serde(rename = "appId")]
+    pub app_id: String,
+}
+
+#[tauri::command]
+pub fn get_discord_settings(db: State<'_, Db>) -> DiscordSettings {
+    DiscordSettings {
+        enabled: db.kv_get("discord_enabled").as_deref() == Some("1"),
+        app_id: db.kv_get("discord_app_id").unwrap_or_default(),
+    }
+}
+
+#[tauri::command]
+pub fn set_discord_settings(
+    app: tauri::AppHandle,
+    db: State<'_, Db>,
+    enabled: bool,
+    app_id: String,
+) -> Result<(), String> {
+    db.kv_set("discord_enabled", if enabled { "1" } else { "0" })?;
+    db.kv_set("discord_app_id", app_id.trim())?;
+    // Presence sofort an den neuen Zustand anpassen
+    let now = app
+        .state::<crate::scrobbler::PlaybackState>()
+        .0
+        .lock()
+        .unwrap()
+        .clone();
+    crate::discord::sync(&app, now.as_ref());
+    Ok(())
 }
 
 /// Bestätigt das anstehende Auto-Update sofort (auch bei Blocked).

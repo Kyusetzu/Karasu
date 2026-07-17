@@ -2,6 +2,7 @@ mod anilist;
 mod commands;
 mod db;
 mod detection;
+mod discord;
 mod recognition;
 mod relations;
 mod scrobbler;
@@ -34,6 +35,7 @@ pub fn run() {
             app.manage(scrobbler::PlaybackState(std::sync::Mutex::new(None)));
             app.manage(scrobbler::ScrobbleSession(std::sync::Mutex::new(None)));
             app.manage(relations::Relations(std::sync::RwLock::new(Vec::new())));
+            app.manage(discord::Discord(std::sync::Mutex::new(None)));
             relations::spawn_loader(app.handle().clone());
             scrobbler::spawn(app.handle().clone());
 
@@ -89,6 +91,8 @@ pub fn run() {
             commands::set_scrobble_settings,
             commands::scrobble_now,
             commands::scrobble_cancel,
+            commands::get_discord_settings,
+            commands::set_discord_settings,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

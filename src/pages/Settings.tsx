@@ -19,7 +19,41 @@ export default function Settings() {
       <AccountSection />
       <ScrobbleSection />
       <DiscordSection />
+      <AppSection />
     </div>
+  );
+}
+
+function AppSection() {
+  const [autostart, setAutostart] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!api.isTauri) return;
+    import("@tauri-apps/api/core").then(({ invoke }) =>
+      invoke<boolean>("get_autostart").then(setAutostart),
+    );
+  }, []);
+
+  if (autostart === null) return null;
+
+  const toggle = async (enabled: boolean) => {
+    setAutostart(enabled);
+    const { invoke } = await import("@tauri-apps/api/core");
+    await invoke("set_autostart", { enabled });
+  };
+
+  return (
+    <Card>
+      <CardTitle>App</CardTitle>
+      <div className="mt-3">
+        <Toggle
+          checked={autostart}
+          onChange={toggle}
+          label="Mit Windows starten"
+          hint="Karasu beim Anmelden automatisch im Hintergrund starten."
+        />
+      </div>
+    </Card>
   );
 }
 

@@ -385,6 +385,24 @@ pub fn set_discord_settings(
     Ok(())
 }
 
+#[tauri::command]
+pub fn get_autostart(app: tauri::AppHandle) -> bool {
+    use tauri_plugin_autostart::ManagerExt;
+    app.autolaunch().is_enabled().unwrap_or(false)
+}
+
+#[tauri::command]
+pub fn set_autostart(app: tauri::AppHandle, enabled: bool) -> Result<(), String> {
+    use tauri_plugin_autostart::ManagerExt;
+    let manager = app.autolaunch();
+    if enabled {
+        manager.enable()
+    } else {
+        manager.disable()
+    }
+    .map_err(|e| e.to_string())
+}
+
 /// Bestätigt das anstehende Auto-Update sofort (auch bei Blocked).
 #[tauri::command]
 pub async fn scrobble_now(app: tauri::AppHandle) -> Result<(), String> {

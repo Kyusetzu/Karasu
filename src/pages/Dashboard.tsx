@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { CalendarClock, Play, Plus } from "lucide-react";
+import { BarChart3, CalendarClock, Play, Plus } from "lucide-react";
 import { fetchAnimeList } from "@/api/anilist";
 import { displayTitle, type MediaListEntry } from "@/api/types";
 import { useAuth } from "@/stores/auth";
@@ -103,6 +103,13 @@ function DashboardContent({ userId }: { userId: number }) {
         )}
       </section>
 
+      <Stats
+        entries={
+          data?.lists.filter((g) => !g.isCustomList).flatMap((g) => g.entries) ??
+          []
+        }
+      />
+
       <section>
         <h2 className="flex items-center gap-2 text-lg font-semibold">
           <CalendarClock size={18} className="text-accent-400" /> Demnächst
@@ -120,6 +127,60 @@ function DashboardContent({ userId }: { userId: number }) {
         )}
       </section>
     </div>
+  );
+}
+
+function Stats({ entries }: { entries: MediaListEntry[] }) {
+  const stats = useMemo(() => {
+    const unique = new Map(entries.map((e) => [e.mediaId, e]));
+    const list = [...unique.values()];
+    const episodes = list.reduce((sum, e) => sum + e.progress, 0);
+    const minutes = list.reduce(
+      (sum, e) => sum + e.progress * (e.media.duration ?? 24),
+      0,
+    );
+    const scored = list.filter((e) => e.score > 0);
+    const meanScore =
+      scored.length > 0
+        ? scored.reduce((sum, e) => sum + e.score, 0) / scored.length
+        : null;
+    return {
+      anime: list.length,
+      episodes,
+      days: minutes / 60 / 24,
+      meanScore,
+    };
+  }, [entries]);
+
+  if (stats.anime === 0) return null;
+
+  const items = [
+    { label: "Anime", value: String(stats.anime) },
+    { label: "Episoden", value: stats.episodes.toLocaleString("de-DE") },
+    { label: "Tage geschaut", value: stats.days.toFixed(1) },
+    {
+      label: "Ø Bewertung",
+      value: stats.meanScore !== null ? stats.meanScore.toFixed(1) : "–",
+    },
+  ];
+
+  return (
+    <section>
+      <h2 className="flex items-center gap-2 text-lg font-semibold">
+        <BarChart3 size={18} className="text-accent-400" /> Statistik
+      </h2>
+      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {items.map((item) => (
+          <div
+            key={item.label}
+            className="rounded-xl border border-surface-800 bg-surface-900 px-4 py-3"
+          >
+            <p className="text-xl font-bold tabular-nums">{item.value}</p>
+            <p className="text-xs text-ink-600">{item.label}</p>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 

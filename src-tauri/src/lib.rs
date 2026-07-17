@@ -28,6 +28,10 @@ pub fn run() {
             show_main_window(app);
         }))
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            None,
+        ))
         .setup(|app| {
             let data_dir = app.path().app_data_dir()?;
             app.manage(db::Db::open(data_dir).map_err(std::io::Error::other)?);
@@ -93,6 +97,8 @@ pub fn run() {
             commands::scrobble_cancel,
             commands::get_discord_settings,
             commands::set_discord_settings,
+            commands::get_autostart,
+            commands::set_autostart,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

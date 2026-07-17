@@ -25,6 +25,7 @@ export interface Media {
   coverImage: { large: string | null; extraLarge: string | null };
   bannerImage: string | null;
   episodes: number | null;
+  duration?: number | null;
   format: string | null;
   status: string | null;
   season: string | null;

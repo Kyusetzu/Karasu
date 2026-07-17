@@ -117,6 +117,7 @@ query ($userId: Int!) {
           coverImage { large extraLarge }
           bannerImage
           episodes
+          duration
           format
           status
           season
@@ -200,8 +201,34 @@ pub async fn fetch_anime_list(
 #[derive(serde::Serialize)]
 pub struct MutationResult {
     /// true, wenn die Änderung offline in die Queue gelegt wurde
-    queued: bool,
-    entry: Option<Value>,
+    pub(crate) queued: bool,
+    pub(crate) entry: Option<Value>,
+}
+
+/// Kern des Listen-Speicherns, auch vom Scrobbler genutzt: online direkt,
+/// offline in die Queue (Reihenfolge bleibt erhalten).
+pub(crate) async fn save_entry_core(
+    db: &Db,
+    api: &AniList,
+    token: &str,
+    input: Value,
+) -> Result<MutationResult, String> {
+    if db.queue_len() > 0 && process_queue(db, api, Some(token)).await.is_err() {
+        db.queue_push("save", &input.to_string())?;
+        return Ok(MutationResult { queued: true, entry: None });
+    }
+
+    match api.query(Some(token), SAVE_MUTATION, input.clone()).await {
+        Ok(data) => Ok(MutationResult {
+            queued: false,
+            entry: data.get("SaveMediaListEntry").cloned(),
+        }),
+        Err(ApiError::Network(_)) => {
+            db.queue_push("save", &input.to_string())?;
+            Ok(MutationResult { queued: true, entry: None })
+        }
+        Err(e) => Err(e.into()),
+    }
 }
 
 /// Speichert einen Listeneintrag (Status/Fortschritt/Score). Offline wird
@@ -213,24 +240,7 @@ pub async fn save_list_entry(
     input: Value,
 ) -> Result<MutationResult, String> {
     let token = auth::load_token().ok_or("Nicht mit AniList verbunden")?;
-
-    // Reihenfolge wahren: solange die Queue nicht leer ist, hinten anstellen.
-    if db.queue_len() > 0 && process_queue(&db, &api, Some(&token)).await.is_err() {
-        db.queue_push("save", &input.to_string())?;
-        return Ok(MutationResult { queued: true, entry: None });
-    }
-
-    match api.query(Some(&token), SAVE_MUTATION, input.clone()).await {
-        Ok(data) => Ok(MutationResult {
-            queued: false,
-            entry: data.get("SaveMediaListEntry").cloned(),
-        }),
-        Err(ApiError::Network(_)) => {
-            db.queue_push("save", &input.to_string())?;
-            Ok(MutationResult { queued: true, entry: None })
-        }
-        Err(e) => Err(e.into()),
-    }
+    save_entry_core(&db, &api, &token, input).await
 }
 
 #[tauri::command]
@@ -298,4 +308,56 @@ pub fn get_now_playing(
     state: State<'_, crate::scrobbler::PlaybackState>,
 ) -> Option<crate::scrobbler::NowPlaying> {
     state.0.lock().unwrap().clone()
+}
+
+// --- Scrobbler-Einstellungen und -Steuerung ---------------------------------
+
+#[derive(serde::Serialize)]
+pub struct ScrobbleSettings {
+    pub enabled: bool,
+    /// true = vor dem Update Bestätigung in der UI verlangen
+    pub confirm: bool,
+    /// Schwelle in Minuten; 0 = automatisch (2/3 der Episodenlänge)
+    #[serde(rename = "delayMin")]
+    pub delay_min: u32,
+}
+
+pub(crate) fn read_scrobble_settings(db: &Db) -> ScrobbleSettings {
+    ScrobbleSettings {
+        enabled: db.kv_get("scrobble_enabled").as_deref() != Some("0"),
+        confirm: db.kv_get("scrobble_confirm").as_deref() == Some("1"),
+        delay_min: db
+            .kv_get("scrobble_delay_min")
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(0),
+    }
+}
+
+#[tauri::command]
+pub fn get_scrobble_settings(db: State<'_, Db>) -> ScrobbleSettings {
+    read_scrobble_settings(&db)
+}
+
+#[tauri::command]
+pub fn set_scrobble_settings(
+    db: State<'_, Db>,
+    enabled: bool,
+    confirm: bool,
+    delay_min: u32,
+) -> Result<(), String> {
+    db.kv_set("scrobble_enabled", if enabled { "1" } else { "0" })?;
+    db.kv_set("scrobble_confirm", if confirm { "1" } else { "0" })?;
+    db.kv_set("scrobble_delay_min", &delay_min.to_string())
+}
+
+/// Bestätigt das anstehende Auto-Update sofort (auch bei Blocked).
+#[tauri::command]
+pub async fn scrobble_now(app: tauri::AppHandle) -> Result<(), String> {
+    crate::scrobbler::confirm_pending(app, true).await
+}
+
+/// Verwirft das anstehende Auto-Update für diese Episode.
+#[tauri::command]
+pub async fn scrobble_cancel(app: tauri::AppHandle) -> Result<(), String> {
+    crate::scrobbler::confirm_pending(app, false).await
 }

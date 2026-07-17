@@ -10,6 +10,8 @@ pub struct Candidate {
     pub media_id: i64,
     pub titles: Vec<String>,
     pub episodes: Option<u32>,
+    /// Episodenlänge in Minuten (für die Scrobble-Schwelle)
+    pub duration_min: Option<u32>,
     pub progress: u32,
     pub status: String,
 }
@@ -129,6 +131,7 @@ mod tests {
                     "Frieren: Beyond Journey's End".into(),
                 ],
                 episodes: Some(28),
+                duration_min: Some(24),
                 progress: 27,
                 status: "CURRENT".into(),
             },
@@ -136,6 +139,7 @@ mod tests {
                 media_id: 21,
                 titles: vec!["One Piece".into()],
                 episodes: None,
+                duration_min: Some(24),
                 progress: 1070,
                 status: "CURRENT".into(),
             },
@@ -146,6 +150,7 @@ mod tests {
                     "The Apothecary Diaries Season 2".into(),
                 ],
                 episodes: Some(24),
+                duration_min: Some(24),
                 progress: 4,
                 status: "CURRENT".into(),
             },

@@ -6,13 +6,112 @@ import { Input } from "@/components/ui/input";
 import { Card, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/stores/auth";
 import * as api from "@/api/anilist";
+import {
+  getScrobbleSettings,
+  setScrobbleSettings,
+  type ScrobbleSettings,
+} from "@/stores/nowPlaying";
 
 export default function Settings() {
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-8">
       <h1 className="text-2xl font-bold">Einstellungen</h1>
       <AccountSection />
+      <ScrobbleSection />
     </div>
+  );
+}
+
+function Toggle({
+  checked,
+  onChange,
+  label,
+  hint,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+  hint?: string;
+}) {
+  return (
+    <label className="flex cursor-pointer items-start justify-between gap-4 py-1">
+      <span>
+        <span className="block text-sm text-ink-100">{label}</span>
+        {hint && <span className="block text-xs text-ink-600">{hint}</span>}
+      </span>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        onClick={() => onChange(!checked)}
+        className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${
+          checked ? "bg-accent-600" : "bg-surface-700"
+        }`}
+      >
+        <span
+          className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all ${
+            checked ? "left-4.5" : "left-0.5"
+          }`}
+        />
+      </button>
+    </label>
+  );
+}
+
+function ScrobbleSection() {
+  const [settings, setSettings] = useState<ScrobbleSettings | null>(null);
+
+  useEffect(() => {
+    if (!api.isTauri) return;
+    getScrobbleSettings().then(setSettings);
+  }, []);
+
+  if (!settings) return null;
+
+  const update = (patch: Partial<ScrobbleSettings>) => {
+    const next = { ...settings, ...patch };
+    setSettings(next);
+    setScrobbleSettings(next);
+  };
+
+  return (
+    <Card>
+      <CardTitle>Automatisches Tracking</CardTitle>
+      <div className="mt-3 space-y-3">
+        <Toggle
+          checked={settings.enabled}
+          onChange={(v) => update({ enabled: v })}
+          label="Fortschritt automatisch aktualisieren"
+          hint="Erkannte Episoden nach Ablauf der Schwelle auf AniList als gesehen markieren."
+        />
+        <Toggle
+          checked={settings.confirm}
+          onChange={(v) => update({ confirm: v })}
+          label="Vorher nachfragen"
+          hint="Vor jedem Update eine Bestätigung in der App anzeigen."
+        />
+        <label className="flex items-center justify-between gap-4 py-1 text-sm">
+          <span>
+            <span className="block text-ink-100">Schwelle (Minuten)</span>
+            <span className="block text-xs text-ink-600">
+              0 = automatisch (zwei Drittel der Episodenlänge)
+            </span>
+          </span>
+          <Input
+            type="number"
+            min={0}
+            max={120}
+            value={settings.delayMin}
+            onChange={(e) =>
+              update({
+                delayMin: Math.max(0, Math.min(120, Number(e.target.value))),
+              })
+            }
+            className="w-20"
+          />
+        </label>
+      </div>
+    </Card>
   );
 }
 

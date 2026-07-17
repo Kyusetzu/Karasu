@@ -3,6 +3,7 @@ mod commands;
 mod db;
 mod detection;
 mod recognition;
+mod relations;
 mod scrobbler;
 
 use tauri::{
@@ -31,6 +32,9 @@ pub fn run() {
             app.manage(db::Db::open(data_dir).map_err(std::io::Error::other)?);
             app.manage(anilist::client::AniList::new());
             app.manage(scrobbler::PlaybackState(std::sync::Mutex::new(None)));
+            app.manage(scrobbler::ScrobbleSession(std::sync::Mutex::new(None)));
+            app.manage(relations::Relations(std::sync::RwLock::new(Vec::new())));
+            relations::spawn_loader(app.handle().clone());
             scrobbler::spawn(app.handle().clone());
 
             let show = MenuItem::with_id(app, "show", "Karasu öffnen", true, None::<&str>)?;
@@ -81,6 +85,10 @@ pub fn run() {
             commands::delete_list_entry,
             commands::flush_queue,
             commands::get_now_playing,
+            commands::get_scrobble_settings,
+            commands::set_scrobble_settings,
+            commands::scrobble_now,
+            commands::scrobble_cancel,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

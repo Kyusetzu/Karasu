@@ -1,15 +1,24 @@
-//! Erkennungs-Loop: Fenster beobachten, Titel parsen, gegen die Liste
-//! matchen und den Zustand ans Frontend melden. (Auto-Update folgt in M6.)
+//! Erkennungs- und Scrobble-Loop: Fenster beobachten, Titel parsen, gegen
+//! die Liste matchen und den Fortschritt nach Schwelle automatisch auf
+//! AniList aktualisieren.
+//!
+//! Zustandsmaschine pro erkannter Episode:
+//! `Watching → (Pending →) Updating → Updated`, mit `Blocked` bei
+//! Plausibilitätsproblemen (Episodensprung, bereits gesehen) und
+//! `Cancelled` nach Nutzer-Abbruch.
 
 use crate::db::Db;
 use crate::detection;
 use crate::recognition::{matcher, parser};
-use serde_json::Value;
+use crate::relations::{self, Relations};
+use serde_json::{json, Value};
 use std::sync::Mutex;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, Manager};
 
 pub const POLL_INTERVAL: Duration = Duration::from_secs(5);
+/// Fallback-Schwelle, wenn keine Episodenlänge bekannt ist.
+const DEFAULT_THRESHOLD: Duration = Duration::from_secs(15 * 60);
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct NowPlaying {
@@ -31,8 +40,79 @@ pub struct NowPlaying {
     pub total_episodes: Option<u32>,
 }
 
-/// Aktuell erkannte Wiedergabe, für Commands und den M6-Scrobbler.
+/// Aktuell erkannte Wiedergabe, für Commands und den Scrobbler.
 pub struct PlaybackState(pub Mutex<Option<NowPlaying>>);
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Phase {
+    Watching,
+    Pending,
+    Updating,
+    Updated,
+    Blocked(String),
+    Cancelled,
+}
+
+#[derive(Debug, Clone)]
+pub struct Session {
+    pub media_id: i64,
+    pub episode: u32,
+    pub total: Option<u32>,
+    /// Listen-Status des Eintrags bei Erkennungsbeginn
+    pub list_status: String,
+    /// Wann das Auto-Update fällig ist (None = Auto-Update deaktiviert)
+    pub update_at: Option<Instant>,
+    pub update_at_epoch_ms: Option<u64>,
+    pub phase: Phase,
+}
+
+/// Laufende Scrobble-Session (geteilt zwischen Loop und Commands).
+pub struct ScrobbleSession(pub Mutex<Option<Session>>);
+
+#[derive(Clone, serde::Serialize)]
+struct ScrobbleEvent {
+    phase: String,
+    reason: Option<String>,
+    #[serde(rename = "mediaId")]
+    media_id: Option<i64>,
+    episode: Option<u32>,
+    #[serde(rename = "updateAtMs")]
+    update_at_ms: Option<u64>,
+}
+
+fn emit_session(app: &AppHandle, session: Option<&Session>) {
+    let event = match session {
+        None => ScrobbleEvent {
+            phase: "idle".into(),
+            reason: None,
+            media_id: None,
+            episode: None,
+            update_at_ms: None,
+        },
+        Some(s) => ScrobbleEvent {
+            phase: match &s.phase {
+                Phase::Watching => "watching",
+                Phase::Pending => "pending",
+                Phase::Updating => "updating",
+                Phase::Updated => "updated",
+                Phase::Blocked(_) => "blocked",
+                Phase::Cancelled => "cancelled",
+            }
+            .into(),
+            reason: match &s.phase {
+                Phase::Blocked(r) => Some(r.clone()),
+                _ => None,
+            },
+            media_id: Some(s.media_id),
+            episode: Some(s.episode),
+            update_at_ms: match s.phase {
+                Phase::Watching => s.update_at_epoch_ms,
+                _ => None,
+            },
+        },
+    };
+    let _ = app.emit("scrobble-state", &event);
+}
 
 /// Baut Matching-Kandidaten aus dem SQLite-Listen-Cache.
 pub fn candidates_from_cache(db: &Db) -> Vec<matcher::Candidate> {
@@ -101,6 +181,10 @@ pub fn candidates_from_cache(db: &Db) -> Vec<matcher::Candidate> {
                     .get("episodes")
                     .and_then(|v| v.as_u64())
                     .map(|n| n as u32),
+                duration_min: media
+                    .get("duration")
+                    .and_then(|v| v.as_u64())
+                    .map(|n| n as u32),
                 progress: entry
                     .get("progress")
                     .and_then(|v| v.as_u64())
@@ -116,22 +200,38 @@ pub fn candidates_from_cache(db: &Db) -> Vec<matcher::Candidate> {
     out
 }
 
-fn build_now_playing(db: &Db, playback: detection::Playback) -> NowPlaying {
+fn build_now_playing(
+    db: &Db,
+    rules: &[relations::Rule],
+    playback: detection::Playback,
+) -> NowPlaying {
     let parsed = parser::parse(&playback.media_title);
     let candidates = candidates_from_cache(db);
     let matched = matcher::best_match(&parsed, &candidates);
 
-    let (media_id, matched_title, progress, total) = match matched {
-        Some(m) => {
-            let c = candidates.iter().find(|c| c.media_id == m.media_id);
+    // Episoden-Redirect (anime-relations): z. B. Combined-Release "Ep 25"
+    // → Staffel 2, Episode 1 eines anderen AniList-Eintrags
+    let matched = matched.map(|m| {
+        if let Some(ep) = parsed.episode {
+            if let Some((new_id, new_ep)) = relations::redirect(rules, m.media_id, ep) {
+                return (new_id, Some(new_ep));
+            }
+        }
+        (m.media_id, parsed.episode)
+    });
+
+    let (media_id, episode, matched_title, progress, total) = match matched {
+        Some((mid, ep)) => {
+            let c = candidates.iter().find(|c| c.media_id == mid);
             (
-                Some(m.media_id),
+                Some(mid),
+                ep,
                 c.map(|c| c.titles[0].clone()),
                 c.map(|c| c.progress),
                 c.and_then(|c| c.episodes),
             )
         }
-        None => (None, None, None, None),
+        None => (None, parsed.episode, None, None, None),
     };
 
     NowPlaying {
@@ -139,7 +239,7 @@ fn build_now_playing(db: &Db, playback: detection::Playback) -> NowPlaying {
         streaming: playback.streaming,
         raw_title: playback.media_title,
         parsed_title: parsed.title,
-        episode: parsed.episode,
+        episode,
         media_id,
         matched_title,
         progress,
@@ -147,7 +247,119 @@ fn build_now_playing(db: &Db, playback: detection::Playback) -> NowPlaying {
     }
 }
 
-/// Startet den Erkennungs-Loop (läuft für die Lebensdauer der App).
+/// Schwelle bis zum Auto-Update: Einstellung in Minuten oder 2/3 der
+/// Episodenlänge, sonst 15 Minuten.
+fn threshold(now: &NowPlaying, db: &Db, delay_min: u32) -> Duration {
+    if delay_min > 0 {
+        return Duration::from_secs(u64::from(delay_min) * 60);
+    }
+    let duration = now.media_id.and_then(|mid| {
+        candidates_from_cache(db)
+            .iter()
+            .find(|c| c.media_id == mid)
+            .and_then(|c| c.duration_min)
+    });
+    match duration {
+        Some(min) => Duration::from_secs(u64::from(min) * 60 * 2 / 3),
+        None => DEFAULT_THRESHOLD,
+    }
+}
+
+fn epoch_ms_in(d: Duration) -> u64 {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    (SystemTime::now() + d)
+        .duration_since(UNIX_EPOCH)
+        .map(|t| t.as_millis() as u64)
+        .unwrap_or(0)
+}
+
+/// Führt das Listen-Update aus (inkl. Status-Logik und Cache-Patch).
+async fn perform_update(
+    app: &AppHandle,
+    media_id: i64,
+    episode: u32,
+    total: Option<u32>,
+    list_status: &str,
+) -> Result<(), String> {
+    let token =
+        crate::anilist::auth::load_token().ok_or("Nicht mit AniList verbunden")?;
+    let done = total == Some(episode);
+    let status = match (done, list_status) {
+        (true, _) => "COMPLETED",
+        (false, "REPEATING") => "REPEATING",
+        _ => "CURRENT",
+    };
+    let input = json!({ "mediaId": media_id, "progress": episode, "status": status });
+
+    let db = app.state::<Db>();
+    let api = app.state::<crate::anilist::client::AniList>();
+    crate::commands::save_entry_core(&db, &api, &token, input).await?;
+
+    // Lokalen Cache patchen, damit die nächste Erkennung den neuen Stand sieht
+    if let Some(user_id) = db
+        .kv_get("anilist_viewer")
+        .and_then(|s| serde_json::from_str::<Value>(&s).ok())
+        .and_then(|v| v.get("id").and_then(|i| i.as_i64()))
+    {
+        db.update_cached_progress(user_id, media_id, episode, Some(status));
+    }
+    // Now-Playing-Anzeige aktualisieren
+    {
+        let state = app.state::<PlaybackState>();
+        let mut guard = state.0.lock().unwrap();
+        if let Some(np) = guard.as_mut() {
+            if np.media_id == Some(media_id) {
+                np.progress = Some(episode);
+            }
+        }
+        let _ = app.emit("now-playing", &guard.clone());
+    }
+    let _ = app.emit(
+        "scrobble-done",
+        json!({ "mediaId": media_id, "episode": episode }),
+    );
+    Ok(())
+}
+
+/// Bestätigt (oder verwirft) das anstehende Update — vom Frontend über
+/// die Commands `scrobble_now` / `scrobble_cancel` aufgerufen.
+pub async fn confirm_pending(app: AppHandle, accept: bool) -> Result<(), String> {
+    let data = {
+        let state = app.state::<ScrobbleSession>();
+        let mut guard = state.0.lock().unwrap();
+        let Some(session) = guard.as_mut() else {
+            return Err("Keine laufende Wiedergabe".into());
+        };
+        if !accept {
+            session.phase = Phase::Cancelled;
+            emit_session(&app, Some(session));
+            return Ok(());
+        }
+        session.phase = Phase::Updating;
+        let d = (
+            session.media_id,
+            session.episode,
+            session.total,
+            session.list_status.clone(),
+        );
+        emit_session(&app, Some(session));
+        d
+    };
+
+    let result = perform_update(&app, data.0, data.1, data.2, &data.3).await;
+    let state = app.state::<ScrobbleSession>();
+    let mut guard = state.0.lock().unwrap();
+    if let Some(session) = guard.as_mut() {
+        session.phase = match &result {
+            Ok(()) => Phase::Updated,
+            Err(e) => Phase::Blocked(e.clone()),
+        };
+        emit_session(&app, Some(session));
+    }
+    result
+}
+
+/// Startet den Erkennungs- und Scrobble-Loop (läuft für die App-Lebensdauer).
 pub fn spawn(app: AppHandle) {
     tauri::async_runtime::spawn(async move {
         let mut last_raw: Option<(String, String)> = None;
@@ -159,12 +371,123 @@ pub fn spawn(app: AppHandle) {
 
             if raw != last_raw {
                 last_raw = raw;
-                let db = app.state::<Db>();
-                let now = playback.map(|p| build_now_playing(&db, p));
+                let now = {
+                    let db = app.state::<Db>();
+                    let rules = app.state::<Relations>();
+                    let rules = rules.0.read().unwrap().clone();
+                    playback.map(|p| build_now_playing(&db, &rules, p))
+                };
                 *app.state::<PlaybackState>().0.lock().unwrap() = now.clone();
                 let _ = app.emit("now-playing", &now);
             }
+
+            drive_session(&app).await;
             tokio::time::sleep(POLL_INTERVAL).await;
         }
     });
+}
+
+/// Ein Tick der Scrobble-Zustandsmaschine.
+async fn drive_session(app: &AppHandle) {
+    let now_playing = app.state::<PlaybackState>().0.lock().unwrap().clone();
+    let settings = {
+        let db = app.state::<Db>();
+        crate::commands::read_scrobble_settings(&db)
+    };
+
+    // Phase-Entscheidung unter dem Lock, Update selbst danach (kein await
+    // mit gehaltenem Mutex).
+    let update_data = {
+        let state = app.state::<ScrobbleSession>();
+        let mut guard = state.0.lock().unwrap();
+
+        match now_playing {
+            Some(np) if np.media_id.is_some() && np.episode.is_some() => {
+                let (mid, ep) = (np.media_id.unwrap(), np.episode.unwrap());
+                let is_same = guard
+                    .as_ref()
+                    .is_some_and(|s| s.media_id == mid && s.episode == ep);
+
+                if !is_same {
+                    // Neue Session beginnen
+                    let db = app.state::<Db>();
+                    let threshold = threshold(&np, &db, settings.delay_min);
+                    let progress = np.progress.unwrap_or(0);
+                    let phase = if ep <= progress {
+                        Phase::Blocked(format!(
+                            "Episode {ep} ist laut Liste schon gesehen (Fortschritt {progress})"
+                        ))
+                    } else if ep > progress + 1 {
+                        Phase::Blocked(format!(
+                            "Episodensprung: erkannt {ep}, dein Fortschritt ist {progress}"
+                        ))
+                    } else {
+                        Phase::Watching
+                    };
+                    let auto = settings.enabled && phase == Phase::Watching;
+                    let session = Session {
+                        media_id: mid,
+                        episode: ep,
+                        total: np.total_episodes,
+                        list_status: candidates_from_cache(&db)
+                            .iter()
+                            .find(|c| c.media_id == mid)
+                            .map(|c| c.status.clone())
+                            .unwrap_or_default(),
+                        update_at: auto.then(|| Instant::now() + threshold),
+                        update_at_epoch_ms: auto.then(|| epoch_ms_in(threshold)),
+                        phase,
+                    };
+                    emit_session(app, Some(&session));
+                    *guard = Some(session);
+                    None
+                } else {
+                    // Bestehende Session: Schwelle prüfen
+                    let session = guard.as_mut().unwrap();
+                    let due = session.phase == Phase::Watching
+                        && session
+                            .update_at
+                            .is_some_and(|at| Instant::now() >= at);
+                    if !due {
+                        None
+                    } else if settings.confirm {
+                        session.phase = Phase::Pending;
+                        emit_session(app, Some(session));
+                        None
+                    } else {
+                        session.phase = Phase::Updating;
+                        emit_session(app, Some(session));
+                        Some((
+                            session.media_id,
+                            session.episode,
+                            session.total,
+                            session.list_status.clone(),
+                        ))
+                    }
+                }
+            }
+            _ => {
+                if guard.is_some() {
+                    *guard = None;
+                    emit_session(app, None);
+                }
+                None
+            }
+        }
+    };
+
+    if let Some((mid, ep, total, status)) = update_data {
+        let result = perform_update(app, mid, ep, total, &status).await;
+        let state = app.state::<ScrobbleSession>();
+        let mut guard = state.0.lock().unwrap();
+        if let Some(session) = guard.as_mut() {
+            if session.media_id == mid && session.episode == ep {
+                session.phase = match result {
+                    Ok(()) => Phase::Updated,
+                    Err(e) => Phase::Blocked(e),
+                };
+                emit_session(app, Some(session));
+            }
+        }
+    }
 }

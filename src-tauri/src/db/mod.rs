@@ -83,6 +83,39 @@ impl Db {
         .ok()
     }
 
+    /// Patcht Fortschritt/Status eines Eintrags direkt im Listen-Cache,
+    /// damit die Erkennung nach einem Scrobble sofort den neuen Stand sieht.
+    pub fn update_cached_progress(
+        &self,
+        user_id: i64,
+        media_id: i64,
+        progress: u32,
+        status: Option<&str>,
+    ) {
+        let Some(payload) = self.cached_list(user_id) else {
+            return;
+        };
+        let Ok(mut lists) = serde_json::from_str::<serde_json::Value>(&payload) else {
+            return;
+        };
+        for group in lists.as_array_mut().into_iter().flatten() {
+            for entry in group
+                .get_mut("entries")
+                .and_then(|v| v.as_array_mut())
+                .into_iter()
+                .flatten()
+            {
+                if entry.get("mediaId").and_then(|v| v.as_i64()) == Some(media_id) {
+                    entry["progress"] = progress.into();
+                    if let Some(s) = status {
+                        entry["status"] = s.into();
+                    }
+                }
+            }
+        }
+        let _ = self.cache_list(user_id, &lists.to_string());
+    }
+
     // --- Offline-Queue ------------------------------------------------------
 
     pub fn queue_push(&self, kind: &str, payload: &str) -> Result<(), String> {

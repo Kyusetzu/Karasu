@@ -107,7 +107,14 @@ impl AniList {
             if let Some(errors) = body.get("errors").and_then(|e| e.as_array()) {
                 let msg = errors
                     .iter()
-                    .filter_map(|e| e.get("message").and_then(|m| m.as_str()))
+                    .filter_map(|e| {
+                        let m = e.get("message").and_then(|m| m.as_str())?;
+                        // "validation" allein sagt nichts — Details anhängen
+                        match e.get("validation") {
+                            Some(v) if m == "validation" => Some(format!("{m}: {v}")),
+                            _ => Some(m.to_string()),
+                        }
+                    })
                     .collect::<Vec<_>>()
                     .join("; ");
                 return Err(ApiError::Api(if msg.is_empty() {

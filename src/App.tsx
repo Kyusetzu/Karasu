@@ -1,4 +1,6 @@
+import { useEffect } from "react";
 import { Routes, Route } from "react-router-dom";
+import { useAuth } from "@/stores/auth";
 import Titlebar from "@/components/Titlebar";
 import Sidebar from "@/components/Sidebar";
 import Dashboard from "@/pages/Dashboard";
@@ -9,6 +11,11 @@ import AnimeDetail from "@/pages/AnimeDetail";
 import Settings from "@/pages/Settings";
 
 export default function App() {
+  const init = useAuth((s) => s.init);
+  useEffect(() => {
+    init();
+  }, [init]);
+
   return (
     <div className="flex h-full flex-col">
       <Titlebar />

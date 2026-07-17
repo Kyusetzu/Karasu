@@ -1,3 +1,7 @@
+mod anilist;
+mod commands;
+mod db;
+
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
@@ -20,6 +24,10 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
+            let data_dir = app.path().app_data_dir()?;
+            app.manage(db::Db::open(data_dir).map_err(std::io::Error::other)?);
+            app.manage(anilist::client::AniList::new());
+
             let show = MenuItem::with_id(app, "show", "Karasu öffnen", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Beenden", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show, &quit])?;
@@ -55,7 +63,15 @@ pub fn run() {
                 let _ = window.hide();
             }
         })
-        .invoke_handler(tauri::generate_handler![])
+        .invoke_handler(tauri::generate_handler![
+            commands::get_client_id,
+            commands::set_client_id,
+            commands::anilist_login_url,
+            commands::anilist_connect,
+            commands::anilist_session,
+            commands::anilist_logout,
+            commands::anilist_query,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

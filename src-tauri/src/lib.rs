@@ -1,6 +1,9 @@
 mod anilist;
 mod commands;
 mod db;
+mod detection;
+mod recognition;
+mod scrobbler;
 
 use tauri::{
     menu::{Menu, MenuItem},
@@ -27,6 +30,8 @@ pub fn run() {
             let data_dir = app.path().app_data_dir()?;
             app.manage(db::Db::open(data_dir).map_err(std::io::Error::other)?);
             app.manage(anilist::client::AniList::new());
+            app.manage(scrobbler::PlaybackState(std::sync::Mutex::new(None)));
+            scrobbler::spawn(app.handle().clone());
 
             let show = MenuItem::with_id(app, "show", "Karasu öffnen", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Beenden", true, None::<&str>)?;
@@ -75,6 +80,7 @@ pub fn run() {
             commands::save_list_entry,
             commands::delete_list_entry,
             commands::flush_queue,
+            commands::get_now_playing,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -7,6 +7,7 @@ import { displayTitle, type MediaListEntry } from "@/api/types";
 import { useAuth } from "@/stores/auth";
 import { useListMutations } from "@/hooks/useListMutations";
 import { Button } from "@/components/ui/button";
+import NowPlayingCard from "@/components/NowPlayingCard";
 
 export default function Dashboard() {
   const viewer = useAuth((s) => s.viewer);
@@ -71,6 +72,7 @@ function DashboardContent({ userId }: { userId: number }) {
 
   return (
     <div className="space-y-8 p-8">
+      <NowPlayingCard />
       <section>
         <h2 className="flex items-center gap-2 text-lg font-semibold">
           <Play size={18} className="text-accent-400" /> Weiterschauen

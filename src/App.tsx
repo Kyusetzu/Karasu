@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Routes, Route } from "react-router-dom";
 import { useAuth } from "@/stores/auth";
+import { useNowPlaying } from "@/stores/nowPlaying";
 import Titlebar from "@/components/Titlebar";
 import Sidebar from "@/components/Sidebar";
 import Dashboard from "@/pages/Dashboard";
@@ -12,9 +13,11 @@ import Settings from "@/pages/Settings";
 
 export default function App() {
   const init = useAuth((s) => s.init);
+  const initNowPlaying = useNowPlaying((s) => s.init);
   useEffect(() => {
     init();
-  }, [init]);
+    initNowPlaying();
+  }, [init, initNowPlaying]);
 
   return (
     <div className="flex h-full flex-col">

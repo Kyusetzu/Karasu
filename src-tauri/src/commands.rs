@@ -291,3 +291,11 @@ pub async fn flush_queue(
     let token = auth::load_token().ok_or("Nicht mit AniList verbunden")?;
     process_queue(&db, &api, Some(&token)).await
 }
+
+/// Aktuell erkannte Wiedergabe (Poll-Loop-Zustand).
+#[tauri::command]
+pub fn get_now_playing(
+    state: State<'_, crate::scrobbler::PlaybackState>,
+) -> Option<crate::scrobbler::NowPlaying> {
+    state.0.lock().unwrap().clone()
+}

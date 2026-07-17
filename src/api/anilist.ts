@@ -1,5 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { MediaListGroup, Viewer } from "./types";
+import type {
+  ListResult,
+  MutationResult,
+  SaveEntryInput,
+  Viewer,
+} from "./types";
 
 export const isTauri = "__TAURI_INTERNALS__" in window;
 
@@ -20,45 +25,15 @@ export function gql<T>(query: string, variables?: object): Promise<T> {
   return invoke<T>("anilist_query", { query, variables });
 }
 
-const MEDIA_FIELDS = `
-  id
-  title { romaji english native }
-  coverImage { large extraLarge }
-  bannerImage
-  episodes
-  format
-  status
-  season
-  seasonYear
-  averageScore
-  genres
-  synonyms
-  nextAiringEpisode { episode airingAt }
-`;
+// --- Anime-Liste (Laden über Rust: Cache + Offline-Queue) ------------------
 
-const LIST_QUERY = `
-query ($userId: Int!) {
-  MediaListCollection(userId: $userId, type: ANIME) {
-    lists {
-      name
-      status
-      entries {
-        id
-        mediaId
-        status
-        score(format: POINT_10)
-        progress
-        repeat
-        updatedAt
-        media { ${MEDIA_FIELDS} }
-      }
-    }
-  }
-}`;
+export const fetchAnimeList = (userId: number) =>
+  invoke<ListResult>("fetch_anime_list", { userId });
 
-export async function fetchAnimeList(userId: number): Promise<MediaListGroup[]> {
-  const data = await gql<{
-    MediaListCollection: { lists: MediaListGroup[] };
-  }>(LIST_QUERY, { userId });
-  return data.MediaListCollection.lists;
-}
+export const saveListEntry = (input: SaveEntryInput) =>
+  invoke<MutationResult>("save_list_entry", { input });
+
+export const deleteListEntry = (id: number) =>
+  invoke<MutationResult>("delete_list_entry", { id });
+
+export const flushQueue = () => invoke<number>("flush_queue");

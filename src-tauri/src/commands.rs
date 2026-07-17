@@ -1,4 +1,7 @@
-use crate::anilist::{auth, client::AniList};
+use crate::anilist::{
+    auth,
+    client::{AniList, ApiError},
+};
 use crate::db::Db;
 use serde_json::{json, Value};
 use tauri::State;
@@ -82,10 +85,209 @@ pub async fn anilist_query(
     variables: Option<Value>,
 ) -> Result<Value, String> {
     let token = auth::load_token();
-    api.query(
-        token.as_deref(),
-        &query,
-        variables.unwrap_or_else(|| json!({})),
-    )
-    .await
+    Ok(api
+        .query(
+            token.as_deref(),
+            &query,
+            variables.unwrap_or_else(|| json!({})),
+        )
+        .await?)
+}
+
+// --- Anime-Liste: Laden mit Cache, Mutations mit Offline-Queue --------------
+
+const LIST_QUERY: &str = "
+query ($userId: Int!) {
+  MediaListCollection(userId: $userId, type: ANIME) {
+    lists {
+      name
+      status
+      isCustomList
+      entries {
+        id
+        mediaId
+        status
+        score(format: POINT_10)
+        progress
+        repeat
+        updatedAt
+        media {
+          id
+          title { romaji english native }
+          coverImage { large extraLarge }
+          bannerImage
+          episodes
+          format
+          status
+          season
+          seasonYear
+          averageScore
+          genres
+          synonyms
+          nextAiringEpisode { episode airingAt }
+        }
+      }
+    }
+  }
+}";
+
+const SAVE_MUTATION: &str = "
+mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int, $score: Float, $repeat: Int) {
+  SaveMediaListEntry(mediaId: $mediaId, status: $status, progress: $progress, score: $score, repeat: $repeat) {
+    id mediaId status progress repeat updatedAt
+    score(format: POINT_10)
+  }
+}";
+
+const DELETE_MUTATION: &str = "
+mutation ($id: Int) {
+  DeleteMediaListEntry(id: $id) { deleted }
+}";
+
+#[derive(serde::Serialize)]
+pub struct ListResult {
+    /// true, wenn die Daten aus dem lokalen Cache stammen (offline)
+    #[serde(rename = "fromCache")]
+    from_cache: bool,
+    /// Anzahl noch nicht synchronisierter Änderungen
+    pending: usize,
+    lists: Value,
+}
+
+/// Lädt die Anime-Liste; offline wird der letzte Stand aus SQLite geliefert.
+/// Vor dem Laden wird versucht, die Offline-Queue abzuarbeiten, damit der
+/// Server-Stand die eigenen Änderungen enthält.
+#[tauri::command]
+pub async fn fetch_anime_list(
+    db: State<'_, Db>,
+    api: State<'_, AniList>,
+    user_id: i64,
+) -> Result<ListResult, String> {
+    let token = auth::load_token();
+    let _ = process_queue(&db, &api, token.as_deref()).await;
+
+    match api
+        .query(token.as_deref(), LIST_QUERY, json!({ "userId": user_id }))
+        .await
+    {
+        Ok(data) => {
+            let lists = data
+                .pointer("/MediaListCollection/lists")
+                .cloned()
+                .unwrap_or_else(|| json!([]));
+            let _ = db.cache_list(user_id, &lists.to_string());
+            Ok(ListResult {
+                from_cache: false,
+                pending: db.queue_len(),
+                lists,
+            })
+        }
+        Err(ApiError::Network(_)) => {
+            let cached = db
+                .cached_list(user_id)
+                .ok_or("Offline und noch kein lokaler Listen-Cache vorhanden")?;
+            Ok(ListResult {
+                from_cache: true,
+                pending: db.queue_len(),
+                lists: serde_json::from_str(&cached)
+                    .map_err(|e| format!("Cache beschädigt: {e}"))?,
+            })
+        }
+        Err(e) => Err(e.into()),
+    }
+}
+
+#[derive(serde::Serialize)]
+pub struct MutationResult {
+    /// true, wenn die Änderung offline in die Queue gelegt wurde
+    queued: bool,
+    entry: Option<Value>,
+}
+
+/// Speichert einen Listeneintrag (Status/Fortschritt/Score). Offline wird
+/// die Änderung in die Queue gelegt und später synchronisiert.
+#[tauri::command]
+pub async fn save_list_entry(
+    db: State<'_, Db>,
+    api: State<'_, AniList>,
+    input: Value,
+) -> Result<MutationResult, String> {
+    let token = auth::load_token().ok_or("Nicht mit AniList verbunden")?;
+
+    // Reihenfolge wahren: solange die Queue nicht leer ist, hinten anstellen.
+    if db.queue_len() > 0 && process_queue(&db, &api, Some(&token)).await.is_err() {
+        db.queue_push("save", &input.to_string())?;
+        return Ok(MutationResult { queued: true, entry: None });
+    }
+
+    match api.query(Some(&token), SAVE_MUTATION, input.clone()).await {
+        Ok(data) => Ok(MutationResult {
+            queued: false,
+            entry: data.get("SaveMediaListEntry").cloned(),
+        }),
+        Err(ApiError::Network(_)) => {
+            db.queue_push("save", &input.to_string())?;
+            Ok(MutationResult { queued: true, entry: None })
+        }
+        Err(e) => Err(e.into()),
+    }
+}
+
+#[tauri::command]
+pub async fn delete_list_entry(
+    db: State<'_, Db>,
+    api: State<'_, AniList>,
+    id: i64,
+) -> Result<MutationResult, String> {
+    let token = auth::load_token().ok_or("Nicht mit AniList verbunden")?;
+    let input = json!({ "id": id });
+
+    if db.queue_len() > 0 && process_queue(&db, &api, Some(&token)).await.is_err() {
+        db.queue_push("delete", &input.to_string())?;
+        return Ok(MutationResult { queued: true, entry: None });
+    }
+
+    match api.query(Some(&token), DELETE_MUTATION, input.clone()).await {
+        Ok(_) => Ok(MutationResult { queued: false, entry: None }),
+        Err(ApiError::Network(_)) => {
+            db.queue_push("delete", &input.to_string())?;
+            Ok(MutationResult { queued: true, entry: None })
+        }
+        Err(e) => Err(e.into()),
+    }
+}
+
+/// Arbeitet die Offline-Queue in Reihenfolge ab. Netzwerkfehler brechen ab
+/// (Rest bleibt liegen), API-Fehler verwerfen den Eintrag, damit die Queue
+/// nicht dauerhaft blockiert.
+async fn process_queue(
+    db: &Db,
+    api: &AniList,
+    token: Option<&str>,
+) -> Result<usize, String> {
+    let mut flushed = 0;
+    for (id, kind, payload) in db.queue_all() {
+        let variables: Value =
+            serde_json::from_str(&payload).unwrap_or_else(|_| json!({}));
+        let mutation = if kind == "delete" { DELETE_MUTATION } else { SAVE_MUTATION };
+        match api.query(token, mutation, variables).await {
+            Ok(_) => {
+                db.queue_remove(id);
+                flushed += 1;
+            }
+            Err(ApiError::Network(m)) => return Err(m),
+            Err(ApiError::Api(_)) => db.queue_remove(id),
+        }
+    }
+    Ok(flushed)
+}
+
+/// Manuell auslösbarer Sync der Offline-Queue (z. B. Button in der UI).
+#[tauri::command]
+pub async fn flush_queue(
+    db: State<'_, Db>,
+    api: State<'_, AniList>,
+) -> Result<usize, String> {
+    let token = auth::load_token().ok_or("Nicht mit AniList verbunden")?;
+    process_queue(&db, &api, Some(&token)).await
 }

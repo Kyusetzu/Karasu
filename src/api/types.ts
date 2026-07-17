@@ -48,9 +48,55 @@ export interface MediaListEntry {
 
 export interface MediaListGroup {
   name: string;
-  status: MediaListStatus;
+  status: MediaListStatus | null;
+  isCustomList: boolean;
   entries: MediaListEntry[];
 }
+
+export interface ListResult {
+  fromCache: boolean;
+  pending: number;
+  lists: MediaListGroup[];
+}
+
+export interface SaveEntryInput {
+  mediaId: number;
+  status?: MediaListStatus;
+  progress?: number;
+  score?: number;
+  repeat?: number;
+}
+
+export interface MutationResult {
+  queued: boolean;
+  entry: {
+    id: number;
+    mediaId: number;
+    status: MediaListStatus;
+    progress: number;
+    score: number;
+    repeat: number;
+    updatedAt: number;
+  } | null;
+}
+
+export const STATUS_LABELS: Record<MediaListStatus, string> = {
+  CURRENT: "Schaue",
+  REPEATING: "Rewatch",
+  COMPLETED: "Abgeschlossen",
+  PAUSED: "Pausiert",
+  DROPPED: "Abgebrochen",
+  PLANNING: "Geplant",
+};
+
+export const STATUS_ORDER: MediaListStatus[] = [
+  "CURRENT",
+  "REPEATING",
+  "COMPLETED",
+  "PAUSED",
+  "DROPPED",
+  "PLANNING",
+];
 
 /** Bevorzugter Anzeigetitel: Englisch, sonst Romaji, sonst Nativ. */
 export function displayTitle(title: MediaTitle): string {

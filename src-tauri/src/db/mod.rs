@@ -17,6 +17,12 @@ CREATE TABLE IF NOT EXISTS list_cache (
     fetched_at INTEGER NOT NULL,
     PRIMARY KEY (user_id)
 );
+CREATE TABLE IF NOT EXISTS offline_queue (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind       TEXT NOT NULL,
+    payload    TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+);
 ";
 
 impl Db {
@@ -50,5 +56,70 @@ impl Db {
     pub fn kv_delete(&self, key: &str) {
         let conn = self.0.lock().unwrap();
         let _ = conn.execute("DELETE FROM kv WHERE key = ?1", [key]);
+    }
+
+    // --- Listen-Cache -----------------------------------------------------
+
+    pub fn cache_list(&self, user_id: i64, payload: &str) -> Result<(), String> {
+        let conn = self.0.lock().unwrap();
+        conn.execute(
+            "INSERT INTO list_cache (user_id, payload, fetched_at)
+             VALUES (?1, ?2, strftime('%s','now'))
+             ON CONFLICT(user_id) DO UPDATE
+                SET payload = excluded.payload, fetched_at = excluded.fetched_at",
+            rusqlite::params![user_id, payload],
+        )
+        .map(|_| ())
+        .map_err(|e| format!("Cache-Schreiben fehlgeschlagen: {e}"))
+    }
+
+    pub fn cached_list(&self, user_id: i64) -> Option<String> {
+        let conn = self.0.lock().unwrap();
+        conn.query_row(
+            "SELECT payload FROM list_cache WHERE user_id = ?1",
+            [user_id],
+            |r| r.get(0),
+        )
+        .ok()
+    }
+
+    // --- Offline-Queue ------------------------------------------------------
+
+    pub fn queue_push(&self, kind: &str, payload: &str) -> Result<(), String> {
+        let conn = self.0.lock().unwrap();
+        conn.execute(
+            "INSERT INTO offline_queue (kind, payload, created_at)
+             VALUES (?1, ?2, strftime('%s','now'))",
+            [kind, payload],
+        )
+        .map(|_| ())
+        .map_err(|e| format!("Queue-Schreiben fehlgeschlagen: {e}"))
+    }
+
+    pub fn queue_all(&self) -> Vec<(i64, String, String)> {
+        let conn = self.0.lock().unwrap();
+        let mut stmt = match conn
+            .prepare("SELECT id, kind, payload FROM offline_queue ORDER BY id")
+        {
+            Ok(s) => s,
+            Err(_) => return Vec::new(),
+        };
+        stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
+            .map(|rows| rows.filter_map(Result::ok).collect())
+            .unwrap_or_default()
+    }
+
+    pub fn queue_remove(&self, id: i64) {
+        let conn = self.0.lock().unwrap();
+        let _ = conn.execute("DELETE FROM offline_queue WHERE id = ?1", [id]);
+    }
+
+    pub fn queue_len(&self) -> usize {
+        let conn = self.0.lock().unwrap();
+        conn.query_row("SELECT COUNT(*) FROM offline_queue", [], |r| {
+            r.get::<_, i64>(0)
+        })
+        .map(|n| n as usize)
+        .unwrap_or(0)
     }
 }

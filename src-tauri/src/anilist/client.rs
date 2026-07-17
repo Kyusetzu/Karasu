@@ -4,6 +4,22 @@ use tokio::sync::Mutex;
 
 const API_URL: &str = "https://graphql.anilist.co";
 
+/// Netzwerkfehler (offline, Timeout) sind queue-bar, API-Fehler nicht.
+#[derive(Debug)]
+pub enum ApiError {
+    Network(String),
+    Api(String),
+}
+
+impl From<ApiError> for String {
+    fn from(e: ApiError) -> Self {
+        match e {
+            ApiError::Network(m) => format!("Netzwerkfehler: {m}"),
+            ApiError::Api(m) => m,
+        }
+    }
+}
+
 /// GraphQL-Client für AniList mit zentralem Rate-Limiting.
 ///
 /// AniList erlaubt nominell 90 Requests/Minute (derzeit serverseitig auf 30
@@ -36,7 +52,7 @@ impl AniList {
         token: Option<&str>,
         query: &str,
         variables: Value,
-    ) -> Result<Value, String> {
+    ) -> Result<Value, ApiError> {
         // Puffer lassen: Wenn fast nichts mehr übrig ist, kurz durchatmen,
         // statt in den 429 zu laufen.
         {
@@ -59,7 +75,7 @@ impl AniList {
             let resp = req
                 .send()
                 .await
-                .map_err(|e| format!("Netzwerkfehler: {e}"))?;
+                .map_err(|e| ApiError::Network(e.to_string()))?;
 
             if let Some(rem) = resp
                 .headers()
@@ -86,7 +102,7 @@ impl AniList {
             let body: Value = resp
                 .json()
                 .await
-                .map_err(|e| format!("Antwort nicht lesbar (HTTP {status}): {e}"))?;
+                .map_err(|e| ApiError::Api(format!("Antwort nicht lesbar (HTTP {status}): {e}")))?;
 
             if let Some(errors) = body.get("errors").and_then(|e| e.as_array()) {
                 let msg = errors
@@ -94,19 +110,21 @@ impl AniList {
                     .filter_map(|e| e.get("message").and_then(|m| m.as_str()))
                     .collect::<Vec<_>>()
                     .join("; ");
-                return Err(if msg.is_empty() {
+                return Err(ApiError::Api(if msg.is_empty() {
                     format!("AniList-Fehler (HTTP {status})")
                 } else {
                     msg
-                });
+                }));
             }
 
             return body
                 .get("data")
                 .cloned()
-                .ok_or_else(|| format!("Leere Antwort von AniList (HTTP {status})"));
+                .ok_or_else(|| ApiError::Api(format!("Leere Antwort von AniList (HTTP {status})")));
         }
 
-        Err("AniList-Rate-Limit erreicht, bitte später erneut versuchen".into())
+        Err(ApiError::Api(
+            "AniList-Rate-Limit erreicht, bitte später erneut versuchen".into(),
+        ))
     }
 }

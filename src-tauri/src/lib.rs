@@ -71,6 +71,10 @@ pub fn run() {
             commands::anilist_session,
             commands::anilist_logout,
             commands::anilist_query,
+            commands::fetch_anime_list,
+            commands::save_list_entry,
+            commands::delete_list_entry,
+            commands::flush_queue,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

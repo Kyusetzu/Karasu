@@ -69,7 +69,8 @@ pub async fn anilist_connect(
     api: State<'_, AniList>,
     token: String,
 ) -> Result<Value, String> {
-    let token = token.trim().to_string();
+    // Akzeptiert rohen Token ebenso wie die komplette Redirect-URL
+    let token = auth::extract_token(&token);
     if token.is_empty() {
         return Err("Please paste the token from the AniList page".into());
     }

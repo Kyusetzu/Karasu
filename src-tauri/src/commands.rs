@@ -9,7 +9,7 @@ use tauri::{Manager, State};
 /// Eingebaute AniList-Client-ID (Taiga-Prinzip: eine geteilte App für alle
 /// Nutzer; die ID ist öffentlich, kein Secret). Leer = Nutzer brauchen eine
 /// eigene Client-ID. Wird vom Maintainer einmalig eingetragen.
-pub const BUILTIN_ANILIST_CLIENT_ID: &str = "";
+pub const BUILTIN_ANILIST_CLIENT_ID: &str = "46231";
 
 const VIEWER_QUERY: &str = "
 query {

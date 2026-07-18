@@ -14,7 +14,7 @@ use tauri::{AppHandle, Manager};
 /// Eingebaute Discord-Application-ID (öffentlich, kein Secret) — eine
 /// geteilte App für alle Nutzer, wie bei Taiga. Leer = Feature erfordert
 /// eine eigene ID in den Settings. Wird vom Maintainer einmalig eingetragen.
-pub const BUILTIN_DISCORD_APP_ID: &str = "";
+pub const BUILTIN_DISCORD_APP_ID: &str = "1527934275356332133";
 
 pub struct Discord(pub Mutex<Option<DiscordIpcClient>>);
 

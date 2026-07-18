@@ -1,15 +1,15 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { deleteListEntry, saveListEntry } from "@/api/anilist";
-import type { ListResult, SaveEntryInput } from "@/api/types";
+import type { ListResult, MediaType, SaveEntryInput } from "@/api/types";
 
 /**
- * Mutations auf die Anime-Liste mit optimistischem Cache-Update.
- * Statuswechsel verschieben den Eintrag lokal in die passende Gruppe,
- * damit kein teurer Refetch (Rate-Limit!) nötig ist.
+ * Mutations auf eine Medienliste (Anime oder Manga) mit optimistischem
+ * Cache-Update. Statuswechsel verschieben den Eintrag lokal in die passende
+ * Gruppe, damit kein teurer Refetch (Rate-Limit!) nötig ist.
  */
-export function useListMutations(userId: number) {
+export function useListMutations(userId: number, mediaType: MediaType) {
   const qc = useQueryClient();
-  const key = ["animeList", userId];
+  const key = ["mediaList", mediaType, userId];
 
   const patchCache = (input: SaveEntryInput) => {
     qc.setQueryData<ListResult>(key, (old) => {

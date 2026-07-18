@@ -25,10 +25,12 @@ pub struct WindowInfo {
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct Playback {
     pub process: String,
-    /// Bereinigter Medientitel (Dateiname bzw. Streaming-Titel)
+    /// Bereinigter Medientitel (Dateiname bzw. Streaming-/Lese-Titel)
     pub media_title: String,
     /// true, wenn aus einem Browser-/Streaming-Fenster erkannt
     pub streaming: bool,
+    /// true, wenn es sich um Manga-Lesen handelt (Kapitel statt Episoden)
+    pub manga: bool,
 }
 
 /// Listet alle sichtbaren Top-Level-Fenster mit Titel und Prozessnamen.
@@ -104,16 +106,17 @@ mod live_tests {
     }
 }
 
-/// Sucht in allen Fenstern nach laufender Anime-Wiedergabe.
+/// Sucht in allen Fenstern nach laufender Anime-Wiedergabe oder Manga-Lesen.
 pub fn detect_playback() -> Option<Playback> {
     let windows = enumerate_windows();
-    // Lokale Player haben Vorrang vor Browser-Streaming
+    // Lokale Player haben Vorrang vor Browser-Erkennung
     for w in &windows {
         if let Some(media) = profiles::match_player(&w.process, &w.title) {
             return Some(Playback {
                 process: w.process.clone(),
                 media_title: media,
                 streaming: false,
+                manga: false,
             });
         }
     }
@@ -123,6 +126,17 @@ pub fn detect_playback() -> Option<Playback> {
                 process: w.process.clone(),
                 media_title: media,
                 streaming: true,
+                manga: false,
+            });
+        }
+    }
+    for w in &windows {
+        if let Some(media) = profiles::match_manga(&w.process, &w.title) {
+            return Some(Playback {
+                process: w.process.clone(),
+                media_title: media,
+                streaming: true,
+                manga: true,
             });
         }
     }

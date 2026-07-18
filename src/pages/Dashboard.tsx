@@ -1,9 +1,9 @@
-import { useMemo } from "react";
+﻿import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { BarChart3, CalendarClock, Play, Plus } from "lucide-react";
-import { fetchAnimeList } from "@/api/anilist";
+import { fetchMediaList } from "@/api/anilist";
 import { displayTitle, type MediaListEntry } from "@/api/types";
 import { useAuth } from "@/stores/auth";
 import { useListMutations } from "@/hooks/useListMutations";
@@ -39,10 +39,10 @@ export default function Dashboard() {
 function DashboardContent({ userId }: { userId: number }) {
   const { t } = useTranslation();
   const { data } = useQuery({
-    queryKey: ["animeList", userId],
-    queryFn: () => fetchAnimeList(userId),
+    queryKey: ["mediaList", "ANIME", userId],
+    queryFn: () => fetchMediaList(userId, "ANIME"),
   });
-  const { save } = useListMutations(userId);
+  const { save } = useListMutations(userId, "ANIME");
 
   const watching = useMemo(() => {
     const entries =
@@ -208,7 +208,7 @@ function ContinueCard({
   return (
     <div className="group w-36 shrink-0">
       <div className="relative aspect-[2/3] overflow-hidden rounded-lg bg-surface-800">
-        <Link to={`/anime/${media.id}`}>
+        <Link to={`/media/${media.id}`}>
           {media.coverImage.large && (
             <img
               src={media.coverImage.large}
@@ -237,7 +237,7 @@ function ContinueCard({
           </div>
         )}
       </div>
-      <Link to={`/anime/${media.id}`}>
+      <Link to={`/media/${media.id}`}>
         <p className="mt-2 line-clamp-2 text-xs font-medium text-ink-300 group-hover:text-ink-100">
           {displayTitle(media.title)}
         </p>
@@ -267,7 +267,7 @@ function AiringRow({ entry }: { entry: MediaListEntry }) {
 
   return (
     <Link
-      to={`/anime/${entry.media.id}`}
+      to={`/media/${entry.media.id}`}
       className="flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-surface-900"
     >
       <img

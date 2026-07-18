@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
+  CheckCheck,
   CloudOff,
   LayoutGrid,
   List as ListIcon,
@@ -11,26 +12,31 @@ import {
   RefreshCw,
   Search as SearchIcon,
   Star,
-  Trash2,
 } from "lucide-react";
 import { useAuth } from "@/stores/auth";
-import { fetchAnimeList, flushQueue } from "@/api/anilist";
+import { fetchMediaList, flushQueue } from "@/api/anilist";
 import {
   displayTitle,
+  maxProgress,
   STATUS_ORDER,
   type MediaListEntry,
   type MediaListStatus,
+  type MediaType,
 } from "@/api/types";
 import { useListMutations } from "@/hooks/useListMutations";
+import EntryEditModal from "@/components/EntryEditModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Modal } from "@/components/ui/modal";
 import { cn } from "@/lib/utils";
 
 type SortKey = "updated" | "title" | "score" | "progress";
 const SORT_KEYS: SortKey[] = ["updated", "title", "score", "progress"];
 
-export default function AnimeList() {
+/// Fortschritts-Dropdowns nur bis zu dieser Länge (Langläufer wie One Piece
+/// bekommen weiterhin +1/Modal statt eines 1000-Einträge-Dropdowns)
+const PROGRESS_DROPDOWN_LIMIT = 600;
+
+export default function MediaList({ type }: { type: MediaType }) {
   const { t } = useTranslation();
   const viewer = useAuth((s) => s.viewer);
   const loading = useAuth((s) => s.loading);
@@ -50,10 +56,10 @@ export default function AnimeList() {
     );
   }
 
-  return <ListView userId={viewer.id} />;
+  return <ListView userId={viewer.id} type={type} />;
 }
 
-function ListView({ userId }: { userId: number }) {
+function ListView({ userId, type }: { userId: number; type: MediaType }) {
   const { t } = useTranslation();
   const [tab, setTab] = useState<MediaListStatus>("CURRENT");
   const [filter, setFilter] = useState("");
@@ -62,10 +68,10 @@ function ListView({ userId }: { userId: number }) {
   const [editing, setEditing] = useState<MediaListEntry | null>(null);
 
   const { data, isLoading, error, refetch, isRefetching } = useQuery({
-    queryKey: ["animeList", userId],
-    queryFn: () => fetchAnimeList(userId),
+    queryKey: ["mediaList", type, userId],
+    queryFn: () => fetchMediaList(userId, type),
   });
-  const { save, remove } = useListMutations(userId);
+  const { save, remove } = useListMutations(userId, type);
 
   const byStatus = useMemo(() => {
     const map = new Map<MediaListStatus, MediaListEntry[]>();
@@ -122,8 +128,18 @@ function ListView({ userId }: { userId: number }) {
     );
   }
 
-  const plusOne = (entry: MediaListEntry) =>
-    save.mutate({ mediaId: entry.mediaId, progress: entry.progress + 1 });
+  const quickSave = (
+    entry: MediaListEntry,
+    patch: Partial<{ progress: number; score: number; status: MediaListStatus }>,
+  ) => save.mutate({ mediaId: entry.mediaId, ...patch });
+
+  const complete = (entry: MediaListEntry) => {
+    const max = maxProgress(entry.media);
+    quickSave(entry, {
+      status: "COMPLETED",
+      ...(max !== null ? { progress: max } : {}),
+    });
+  };
 
   return (
     <div className="flex h-full flex-col">
@@ -149,7 +165,9 @@ function ListView({ userId }: { userId: number }) {
 
       <div className="space-y-4 px-8 pt-6">
         <div className="flex items-center justify-between gap-4">
-          <h1 className="text-2xl font-bold">{t("list.title")}</h1>
+          <h1 className="text-2xl font-bold">
+            {type === "ANIME" ? t("list.animeTitle") : t("list.mangaTitle")}
+          </h1>
           <Button
             variant="ghost"
             size="icon"
@@ -175,7 +193,7 @@ function ListView({ userId }: { userId: number }) {
                     : "text-ink-500 hover:bg-surface-800 hover:text-ink-100",
                 )}
               >
-                {t(`status.${status}`)}
+                {t(`status.${type}.${status}`)}
                 {count > 0 && (
                   <span className="ml-1.5 text-xs opacity-70">{count}</span>
                 )}
@@ -242,7 +260,11 @@ function ListView({ userId }: { userId: number }) {
               <GridCard
                 key={entry.id}
                 entry={entry}
-                onPlusOne={() => plusOne(entry)}
+                unit={type === "ANIME" ? t("common.episodes") : t("common.chapters")}
+                onPlusOne={() =>
+                  quickSave(entry, { progress: entry.progress + 1 })
+                }
+                onComplete={() => complete(entry)}
                 onEdit={() => setEditing(entry)}
               />
             ))}
@@ -253,7 +275,8 @@ function ListView({ userId }: { userId: number }) {
               <ListRow
                 key={entry.id}
                 entry={entry}
-                onPlusOne={() => plusOne(entry)}
+                onQuickSave={(patch) => quickSave(entry, patch)}
+                onComplete={() => complete(entry)}
                 onEdit={() => setEditing(entry)}
               />
             ))}
@@ -262,7 +285,8 @@ function ListView({ userId }: { userId: number }) {
       </div>
 
       {editing && (
-        <EditModal
+        <EntryEditModal
+          media={{ ...editing.media, type }}
           entry={editing}
           onClose={() => setEditing(null)}
           onSave={(input) => {
@@ -279,24 +303,32 @@ function ListView({ userId }: { userId: number }) {
   );
 }
 
-interface CardProps {
-  entry: MediaListEntry;
-  onPlusOne: () => void;
-  onEdit: () => void;
-}
-
 function canIncrement(entry: MediaListEntry) {
-  return entry.media.episodes === null || entry.progress < entry.media.episodes;
+  const max = maxProgress(entry.media);
+  return max === null || entry.progress < max;
 }
 
-function GridCard({ entry, onPlusOne, onEdit }: CardProps) {
+function GridCard({
+  entry,
+  unit,
+  onPlusOne,
+  onComplete,
+  onEdit,
+}: {
+  entry: MediaListEntry;
+  unit: string;
+  onPlusOne: () => void;
+  onComplete: () => void;
+  onEdit: () => void;
+}) {
   const { t } = useTranslation();
   const { media } = entry;
-  const pct = media.episodes ? (entry.progress / media.episodes) * 100 : 0;
+  const max = maxProgress(media);
+  const pct = max ? (entry.progress / max) * 100 : 0;
   return (
     <div className="group">
       <div className="relative aspect-[2/3] overflow-hidden rounded-lg bg-surface-800">
-        <Link to={`/anime/${media.id}`}>
+        <Link to={`/media/${media.id}`}>
           {media.coverImage.large && (
             <img
               src={media.coverImage.large}
@@ -312,14 +344,26 @@ function GridCard({ entry, onPlusOne, onEdit }: CardProps) {
             onClick={onEdit}
             className="grid h-8 w-8 place-items-center rounded-full bg-surface-900/90 text-ink-300 hover:bg-surface-800 hover:text-ink-100"
             aria-label={t("common.edit")}
+            title={t("common.edit")}
           >
             <Pencil size={14} />
           </button>
+          {entry.status !== "COMPLETED" && (
+            <button
+              onClick={onComplete}
+              className="grid h-8 w-8 place-items-center rounded-full bg-emerald-700/90 text-white hover:bg-emerald-600"
+              aria-label={t("common.complete")}
+              title={t("common.complete")}
+            >
+              <CheckCheck size={14} />
+            </button>
+          )}
           {canIncrement(entry) && (
             <button
               onClick={onPlusOne}
               className="grid h-8 w-8 place-items-center rounded-full bg-accent-600 text-white hover:bg-accent-500"
               aria-label={t("common.plusOne")}
+              title={t("common.plusOne")}
             >
               <Plus size={16} />
             </button>
@@ -330,7 +374,7 @@ function GridCard({ entry, onPlusOne, onEdit }: CardProps) {
             <Star size={11} fill="currentColor" /> {entry.score}
           </span>
         )}
-        {media.episodes !== null && (
+        {max !== null && (
           <div className="absolute inset-x-0 bottom-0 h-1 bg-black/50">
             <div
               className="h-full bg-accent-500"
@@ -339,25 +383,38 @@ function GridCard({ entry, onPlusOne, onEdit }: CardProps) {
           </div>
         )}
       </div>
-      <Link to={`/anime/${media.id}`}>
+      <Link to={`/media/${media.id}`}>
         <p className="mt-2 line-clamp-2 text-xs font-medium text-ink-300 group-hover:text-ink-100">
           {displayTitle(media.title)}
         </p>
       </Link>
       <p className="text-xs text-ink-600">
         {entry.progress}
-        {media.episodes ? ` / ${media.episodes}` : ""} {t("common.episodes")}
+        {max ? ` / ${max}` : ""} {unit}
       </p>
     </div>
   );
 }
 
-function ListRow({ entry, onPlusOne, onEdit }: CardProps) {
+function ListRow({
+  entry,
+  onQuickSave,
+  onComplete,
+  onEdit,
+}: {
+  entry: MediaListEntry;
+  onQuickSave: (patch: { progress?: number; score?: number }) => void;
+  onComplete: () => void;
+  onEdit: () => void;
+}) {
   const { t } = useTranslation();
   const { media } = entry;
+  const max = maxProgress(media);
+  const dropdown = max !== null && max <= PROGRESS_DROPDOWN_LIMIT;
+
   return (
-    <div className="flex items-center gap-4 bg-surface-900 px-4 py-2.5 first:rounded-t-xl last:rounded-b-xl hover:bg-surface-850">
-      <Link to={`/anime/${media.id}`} className="shrink-0">
+    <div className="flex items-center gap-3 bg-surface-900 px-4 py-2.5 first:rounded-t-xl last:rounded-b-xl hover:bg-surface-850">
+      <Link to={`/media/${media.id}`} className="shrink-0">
         <img
           src={media.coverImage.large ?? ""}
           alt=""
@@ -365,7 +422,7 @@ function ListRow({ entry, onPlusOne, onEdit }: CardProps) {
           className="h-14 w-10 rounded object-cover"
         />
       </Link>
-      <Link to={`/anime/${media.id}`} className="min-w-0 flex-1">
+      <Link to={`/media/${media.id}`} className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-ink-100">
           {displayTitle(media.title)}
         </p>
@@ -374,141 +431,78 @@ function ListRow({ entry, onPlusOne, onEdit }: CardProps) {
           {media.seasonYear ? ` · ${media.seasonYear}` : ""}
         </p>
       </Link>
-      <span className="flex w-16 items-center gap-1 text-sm text-amber-300">
-        {entry.score > 0 && (
-          <>
-            <Star size={13} fill="currentColor" /> {entry.score}
-          </>
-        )}
-      </span>
-      <span className="w-24 text-right text-sm tabular-nums text-ink-300">
-        {entry.progress}
-        {media.episodes ? ` / ${media.episodes}` : ""}
-      </span>
+
+      {/* Schnell-Bewertung */}
+      <select
+        value={entry.score}
+        onChange={(e) => onQuickSave({ score: Number(e.target.value) })}
+        className="h-8 rounded-lg border border-surface-700 bg-surface-900 px-1.5 text-sm text-amber-300 focus:border-accent-500 focus:outline-none"
+        aria-label={t("common.score")}
+        title={t("common.score")}
+      >
+        <option value={0}>–</option>
+        {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+          <option key={n} value={n}>
+            ★ {n}
+          </option>
+        ))}
+      </select>
+
+      {/* Schnell-Fortschritt */}
+      {dropdown ? (
+        <select
+          value={entry.progress}
+          onChange={(e) => onQuickSave({ progress: Number(e.target.value) })}
+          className="h-8 w-24 rounded-lg border border-surface-700 bg-surface-900 px-1.5 text-sm tabular-nums text-ink-300 focus:border-accent-500 focus:outline-none"
+          aria-label={t("common.progress")}
+          title={t("common.progress")}
+        >
+          {Array.from({ length: max + 1 }, (_, n) => (
+            <option key={n} value={n}>
+              {n} / {max}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <span className="w-24 text-right text-sm tabular-nums text-ink-300">
+          {entry.progress}
+          {max ? ` / ${max}` : ""}
+        </span>
+      )}
+
       <div className="flex gap-1">
+        <Button
+          variant="secondary"
+          size="icon"
+          onClick={() => onQuickSave({ progress: entry.progress + 1 })}
+          disabled={!canIncrement(entry)}
+          aria-label={t("common.plusOne")}
+          title={t("common.plusOne")}
+        >
+          <Plus size={15} />
+        </Button>
+        {entry.status !== "COMPLETED" && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-emerald-400"
+            onClick={onComplete}
+            aria-label={t("common.complete")}
+            title={t("common.complete")}
+          >
+            <CheckCheck size={15} />
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="icon"
           onClick={onEdit}
           aria-label={t("common.edit")}
+          title={t("common.edit")}
         >
           <Pencil size={14} />
         </Button>
-        <Button
-          variant="secondary"
-          size="icon"
-          onClick={onPlusOne}
-          disabled={!canIncrement(entry)}
-          aria-label={t("common.plusOne")}
-        >
-          <Plus size={15} />
-        </Button>
       </div>
     </div>
-  );
-}
-
-function EditModal({
-  entry,
-  onClose,
-  onSave,
-  onDelete,
-}: {
-  entry: MediaListEntry;
-  onClose: () => void;
-  onSave: (input: {
-    mediaId: number;
-    status: MediaListStatus;
-    progress: number;
-    score: number;
-  }) => void;
-  onDelete: () => void;
-}) {
-  const { t } = useTranslation();
-  const [status, setStatus] = useState<MediaListStatus>(entry.status);
-  const [progress, setProgress] = useState(entry.progress);
-  const [score, setScore] = useState(entry.score);
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const max = entry.media.episodes ?? 9999;
-
-  return (
-    <Modal title={displayTitle(entry.media.title)} onClose={onClose}>
-      <div className="space-y-4">
-        <label className="block text-sm">
-          <span className="mb-1 block text-ink-500">{t("common.status")}</span>
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value as MediaListStatus)}
-            className="h-9 w-full rounded-lg border border-surface-700 bg-surface-900 px-2 text-sm focus:border-accent-500 focus:outline-none"
-          >
-            {STATUS_ORDER.map((s) => (
-              <option key={s} value={s}>
-                {t(`status.${s}`)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <div className="grid grid-cols-2 gap-3">
-          <label className="block text-sm">
-            <span className="mb-1 block text-ink-500">
-              {entry.media.episodes
-                ? t("list.progressMax", { max })
-                : t("common.progress")}
-            </span>
-            <Input
-              type="number"
-              min={0}
-              max={max}
-              value={progress}
-              onChange={(e) =>
-                setProgress(Math.max(0, Math.min(max, Number(e.target.value))))
-              }
-            />
-          </label>
-          <label className="block text-sm">
-            <span className="mb-1 block text-ink-500">
-              {t("list.scoreRange")}
-            </span>
-            <Input
-              type="number"
-              min={0}
-              max={10}
-              value={score}
-              onChange={(e) =>
-                setScore(Math.max(0, Math.min(10, Number(e.target.value))))
-              }
-            />
-          </label>
-        </div>
-        <div className="flex items-center justify-between pt-2">
-          {confirmDelete ? (
-            <Button variant="danger" size="sm" onClick={onDelete}>
-              {t("common.confirmRemove")}
-            </Button>
-          ) : (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-red-400"
-              onClick={() => setConfirmDelete(true)}
-            >
-              <Trash2 size={14} /> {t("common.remove")}
-            </Button>
-          )}
-          <div className="flex gap-2">
-            <Button variant="secondary" onClick={onClose}>
-              {t("common.cancel")}
-            </Button>
-            <Button
-              onClick={() =>
-                onSave({ mediaId: entry.mediaId, status, progress, score })
-              }
-            >
-              {t("common.save")}
-            </Button>
-          </div>
-        </div>
-      </div>
-    </Modal>
   );
 }

@@ -8,8 +8,10 @@ import { animeDetail } from "@/api/queries";
 import { isTauri, saveListEntry } from "@/api/anilist";
 import {
   displayTitle,
+  maxProgress,
   STATUS_ORDER,
   type MediaListStatus,
+  type MediaType,
 } from "@/api/types";
 import { useAuth } from "@/stores/auth";
 import { Button } from "@/components/ui/button";
@@ -30,7 +32,7 @@ export default function AnimeDetail() {
   const mediaId = Number(id);
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ["animeDetail", mediaId],
+    queryKey: ["mediaDetail", mediaId],
     queryFn: () => animeDetail(mediaId),
     enabled: isTauri && Number.isFinite(mediaId),
   });
@@ -95,6 +97,16 @@ export default function AnimeDetail() {
                   {data.episodes} {t("common.episodes")}
                 </span>
               )}
+              {data.chapters && (
+                <span>
+                  {data.chapters} {t("common.chapters")}
+                </span>
+              )}
+              {data.volumes && (
+                <span>
+                  {data.volumes} {t("common.volumes")}
+                </span>
+              )}
               {data.duration && (
                 <span>{t("detail.minutes", { n: data.duration })}</span>
               )}
@@ -137,7 +149,11 @@ export default function AnimeDetail() {
               </p>
             )}
             <button
-              onClick={() => openUrl(`https://anilist.co/anime/${data.id}`)}
+              onClick={() =>
+                openUrl(
+                  `https://anilist.co/${data.type === "MANGA" ? "manga" : "anime"}/${data.id}`,
+                )
+              }
               className="mt-2 flex items-center gap-1 text-xs text-ink-500 hover:text-accent-400"
             >
               {t("detail.openOnAniList")} <ExternalLink size={11} />
@@ -147,7 +163,8 @@ export default function AnimeDetail() {
 
         <ListEditor
           mediaId={data.id}
-          episodes={data.episodes}
+          mediaType={data.type}
+          max={maxProgress(data)}
           entry={data.mediaListEntry}
         />
 
@@ -163,17 +180,18 @@ export default function AnimeDetail() {
           </Card>
         )}
 
-        {data.relations.edges.filter((e) => e.node.type === "ANIME").length >
-          0 && (
+        {data.relations.edges.filter(
+          (e) => e.node.type === "ANIME" || e.node.type === "MANGA",
+        ).length > 0 && (
           <div className="mt-6">
             <CardTitle>{t("detail.related")}</CardTitle>
             <div className="mt-3 flex gap-4 overflow-x-auto pb-2">
               {data.relations.edges
-                .filter((e) => e.node.type === "ANIME")
+                .filter((e) => e.node.type === "ANIME" || e.node.type === "MANGA")
                 .map((e) => (
                   <Link
                     key={`${e.relationType}-${e.node.id}`}
-                    to={`/anime/${e.node.id}`}
+                    to={`/media/${e.node.id}`}
                     className="w-28 shrink-0"
                   >
                     <img
@@ -202,11 +220,13 @@ export default function AnimeDetail() {
 
 function ListEditor({
   mediaId,
-  episodes,
+  mediaType,
+  max: maxTotal,
   entry,
 }: {
   mediaId: number;
-  episodes: number | null;
+  mediaType: MediaType;
+  max: number | null;
   entry: {
     id: number;
     status: MediaListStatus;
@@ -235,13 +255,13 @@ function ListEditor({
     onSuccess: () => {
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
-      qc.invalidateQueries({ queryKey: ["animeList"] });
-      qc.invalidateQueries({ queryKey: ["animeDetail", mediaId] });
+      qc.invalidateQueries({ queryKey: ["mediaList"] });
+      qc.invalidateQueries({ queryKey: ["mediaDetail", mediaId] });
     },
   });
 
   if (!viewer) return null;
-  const max = episodes ?? 9999;
+  const max = maxTotal ?? 99999;
 
   return (
     <Card className="mt-6">
@@ -258,7 +278,7 @@ function ListEditor({
           >
             {STATUS_ORDER.map((s) => (
               <option key={s} value={s}>
-                {t(`status.${s}`)}
+                {t(`status.${mediaType}.${s}`)}
               </option>
             ))}
           </select>

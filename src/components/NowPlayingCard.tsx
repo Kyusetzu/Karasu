@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { listen } from "@tauri-apps/api/event";
-import { Check, MonitorPlay, Tv, X } from "lucide-react";
+import { BookOpen, Check, MonitorPlay, Tv, X } from "lucide-react";
 import {
   scrobbleCancel,
   scrobbleNow,
@@ -43,7 +43,7 @@ export default function NowPlayingCard() {
     if (!isTauri) return;
     let unlisten: (() => void) | undefined;
     listen("scrobble-done", () => {
-      qc.invalidateQueries({ queryKey: ["animeList"] });
+      qc.invalidateQueries({ queryKey: ["mediaList"] });
     }).then((fn) => (unlisten = fn));
     return () => unlisten?.();
   }, [qc]);
@@ -51,22 +51,29 @@ export default function NowPlayingCard() {
   if (!current) return null;
 
   const title = current.matchedTitle ?? current.parsedTitle;
+  const isManga = current.mediaType === "MANGA";
 
   return (
     <div className="rounded-xl border border-accent-600/40 bg-gradient-to-r from-accent-600/15 to-transparent p-4">
       <div className="flex items-center gap-4">
         <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-accent-600/25 text-accent-400">
-          {current.streaming ? <Tv size={20} /> : <MonitorPlay size={20} />}
+          {isManga ? (
+            <BookOpen size={20} />
+          ) : current.streaming ? (
+            <Tv size={20} />
+          ) : (
+            <MonitorPlay size={20} />
+          )}
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-xs font-medium uppercase tracking-wide text-accent-400">
-            {t("nowPlaying.heading", {
+            {t(isManga ? "nowPlaying.headingManga" : "nowPlaying.heading", {
               process: current.process.replace(".exe", ""),
             })}
           </p>
           <p className="truncate font-semibold">
             {current.mediaId ? (
-              <Link to={`/anime/${current.mediaId}`} className="hover:underline">
+              <Link to={`/media/${current.mediaId}`} className="hover:underline">
                 {title}
               </Link>
             ) : (
@@ -75,7 +82,10 @@ export default function NowPlayingCard() {
             {current.episode !== null && (
               <span className="text-ink-300">
                 {" "}
-                — {t("common.episode", { n: current.episode })}
+                —{" "}
+                {t(isManga ? "common.chapter" : "common.episode", {
+                  n: current.episode,
+                })}
               </span>
             )}
           </p>
@@ -98,13 +108,22 @@ function ScrobbleStatus({ countdown }: { countdown: string | null }) {
         <p className="text-xs text-ink-500">
           {countdown
             ? t("nowPlaying.updateIn", { time: countdown })
-            : t("nowPlaying.watching")}
+            : t(
+                current?.mediaType === "MANGA"
+                  ? "nowPlaying.reading"
+                  : "nowPlaying.watching",
+              )}
         </p>
       );
     case "pending":
       return (
         <p className="text-xs font-medium text-amber-300">
-          {t("nowPlaying.confirmPrompt", { n: scrobble.episode })}
+          {t(
+            current?.mediaType === "MANGA"
+              ? "nowPlaying.confirmPromptManga"
+              : "nowPlaying.confirmPrompt",
+            { n: scrobble.episode },
+          )}
         </p>
       );
     case "updating":
@@ -112,7 +131,15 @@ function ScrobbleStatus({ countdown }: { countdown: string | null }) {
     case "updated":
       return (
         <p className="flex items-center gap-1 text-xs font-medium text-emerald-400">
-          <Check size={12} /> {t("nowPlaying.updated", { n: scrobble.episode })}
+          <Check size={12} />{" "}
+          {t("nowPlaying.updated", {
+            n: t(
+              current?.mediaType === "MANGA"
+                ? "common.chapter"
+                : "common.episode",
+              { n: scrobble.episode },
+            ),
+          })}
         </p>
       );
     case "blocked":

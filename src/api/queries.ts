@@ -1,13 +1,16 @@
 import { gql } from "./anilist";
-import type { Media, MediaListStatus } from "./types";
+import type { Media, MediaListStatus, MediaType } from "./types";
 
-/** Media-Felder für Discovery-Grids, inkl. eigenem Listen-Status. */
+/** Media-Felder für Discovery-Grids, inkl. eigenem Listen-Eintrag. */
 const MEDIA_FIELDS = `
   id
+  type
   title { romaji english native }
   coverImage { large extraLarge }
   bannerImage
   episodes
+  chapters
+  volumes
   format
   status
   season
@@ -16,25 +19,33 @@ const MEDIA_FIELDS = `
   genres
   synonyms
   nextAiringEpisode { episode airingAt }
-  mediaListEntry { id status }
+  mediaListEntry { id status progress score(format: POINT_10) }
 `;
 
+export interface ListEntryStub {
+  id: number;
+  status: MediaListStatus;
+  progress: number;
+  score: number;
+}
+
 export interface MediaWithListStatus extends Media {
-  mediaListEntry: { id: number; status: MediaListStatus } | null;
+  type: MediaType;
+  mediaListEntry: ListEntryStub | null;
 }
 
 const SEARCH_QUERY = `
-query ($search: String!, $page: Int) {
+query ($search: String!, $type: MediaType!, $page: Int) {
   Page(page: $page, perPage: 30) {
     pageInfo { hasNextPage }
-    media(search: $search, type: ANIME, sort: SEARCH_MATCH) { ${MEDIA_FIELDS} }
+    media(search: $search, type: $type, sort: SEARCH_MATCH) { ${MEDIA_FIELDS} }
   }
 }`;
 
-export async function searchAnime(search: string, page = 1) {
+export async function searchMedia(search: string, type: MediaType, page = 1) {
   const data = await gql<{
     Page: { pageInfo: { hasNextPage: boolean }; media: MediaWithListStatus[] };
-  }>(SEARCH_QUERY, { search, page });
+  }>(SEARCH_QUERY, { search, type, page });
   return data.Page;
 }
 
@@ -92,13 +103,7 @@ export interface MediaDetail extends MediaWithListStatus {
   description: string | null;
   duration: number | null;
   studios: { nodes: { name: string }[] };
-  mediaListEntry:
-    | ({ id: number; status: MediaListStatus } & {
-        progress: number;
-        repeat: number;
-        score: number;
-      })
-    | null;
+  mediaListEntry: (ListEntryStub & { repeat: number }) | null;
   relations: {
     edges: {
       relationType: string;

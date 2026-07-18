@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
   ListResult,
+  MediaType,
   MutationResult,
   SaveEntryInput,
   Viewer,
@@ -30,10 +31,10 @@ export function gql<T>(query: string, variables?: object): Promise<T> {
   return invoke<T>("anilist_query", { query, variables });
 }
 
-// --- Anime-Liste (Laden über Rust: Cache + Offline-Queue) ------------------
+// --- Anime-/Manga-Liste (Laden über Rust: Cache + Offline-Queue) -----------
 
-export const fetchAnimeList = (userId: number) =>
-  invoke<ListResult>("fetch_anime_list", { userId });
+export const fetchMediaList = (userId: number, mediaType: MediaType) =>
+  invoke<ListResult>("fetch_media_list", { userId, mediaType });
 
 export const saveListEntry = (input: SaveEntryInput) =>
   invoke<MutationResult>("save_list_entry", { input });

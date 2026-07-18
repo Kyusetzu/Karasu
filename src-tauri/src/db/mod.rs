@@ -11,18 +11,26 @@ CREATE TABLE IF NOT EXISTS kv (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
 );
-CREATE TABLE IF NOT EXISTS list_cache (
-    user_id    INTEGER NOT NULL,
-    payload    TEXT NOT NULL,
-    fetched_at INTEGER NOT NULL,
-    PRIMARY KEY (user_id)
-);
 CREATE TABLE IF NOT EXISTS offline_queue (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     kind       TEXT NOT NULL,
     payload    TEXT NOT NULL,
     created_at INTEGER NOT NULL
 );
+";
+
+/// Schema v2: list_cache pro Medientyp (ANIME/MANGA). Ältere Caches werden
+/// verworfen und beim nächsten Laden neu befüllt.
+const MIGRATION_V2: &str = "
+DROP TABLE IF EXISTS list_cache;
+CREATE TABLE list_cache (
+    user_id    INTEGER NOT NULL,
+    media_type TEXT NOT NULL,
+    payload    TEXT NOT NULL,
+    fetched_at INTEGER NOT NULL,
+    PRIMARY KEY (user_id, media_type)
+);
+PRAGMA user_version = 2;
 ";
 
 impl Db {
@@ -33,6 +41,13 @@ impl Db {
             .map_err(|e| format!("Could not open database: {e}"))?;
         conn.execute_batch(MIGRATIONS)
             .map_err(|e| format!("Migration failed: {e}"))?;
+        let version: i64 = conn
+            .query_row("PRAGMA user_version", [], |r| r.get(0))
+            .unwrap_or(0);
+        if version < 2 {
+            conn.execute_batch(MIGRATION_V2)
+                .map_err(|e| format!("Migration v2 failed: {e}"))?;
+        }
         Ok(Db(Mutex::new(conn)))
     }
 
@@ -60,24 +75,29 @@ impl Db {
 
     // --- Listen-Cache -----------------------------------------------------
 
-    pub fn cache_list(&self, user_id: i64, payload: &str) -> Result<(), String> {
+    pub fn cache_list(
+        &self,
+        user_id: i64,
+        media_type: &str,
+        payload: &str,
+    ) -> Result<(), String> {
         let conn = self.0.lock().unwrap();
         conn.execute(
-            "INSERT INTO list_cache (user_id, payload, fetched_at)
-             VALUES (?1, ?2, strftime('%s','now'))
-             ON CONFLICT(user_id) DO UPDATE
+            "INSERT INTO list_cache (user_id, media_type, payload, fetched_at)
+             VALUES (?1, ?2, ?3, strftime('%s','now'))
+             ON CONFLICT(user_id, media_type) DO UPDATE
                 SET payload = excluded.payload, fetched_at = excluded.fetched_at",
-            rusqlite::params![user_id, payload],
+            rusqlite::params![user_id, media_type, payload],
         )
         .map(|_| ())
         .map_err(|e| format!("Cache write failed: {e}"))
     }
 
-    pub fn cached_list(&self, user_id: i64) -> Option<String> {
+    pub fn cached_list(&self, user_id: i64, media_type: &str) -> Option<String> {
         let conn = self.0.lock().unwrap();
         conn.query_row(
-            "SELECT payload FROM list_cache WHERE user_id = ?1",
-            [user_id],
+            "SELECT payload FROM list_cache WHERE user_id = ?1 AND media_type = ?2",
+            rusqlite::params![user_id, media_type],
             |r| r.get(0),
         )
         .ok()
@@ -88,11 +108,12 @@ impl Db {
     pub fn update_cached_progress(
         &self,
         user_id: i64,
+        media_type: &str,
         media_id: i64,
         progress: u32,
         status: Option<&str>,
     ) {
-        let Some(payload) = self.cached_list(user_id) else {
+        let Some(payload) = self.cached_list(user_id, media_type) else {
             return;
         };
         let Ok(mut lists) = serde_json::from_str::<serde_json::Value>(&payload) else {
@@ -113,7 +134,7 @@ impl Db {
                 }
             }
         }
-        let _ = self.cache_list(user_id, &lists.to_string());
+        let _ = self.cache_list(user_id, media_type, &lists.to_string());
     }
 
     // --- Offline-Queue ------------------------------------------------------

@@ -2,15 +2,18 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Search as SearchIcon } from "lucide-react";
-import { searchAnime } from "@/api/queries";
+import { searchMedia } from "@/api/queries";
+import type { MediaType } from "@/api/types";
 import { Input } from "@/components/ui/input";
 import MediaCard from "@/components/MediaCard";
 import { isTauri } from "@/api/anilist";
+import { cn } from "@/lib/utils";
 
 export default function Search() {
   const { t } = useTranslation();
   const [input, setInput] = useState("");
   const [term, setTerm] = useState("");
+  const [type, setType] = useState<MediaType>("ANIME");
 
   // Debounce: erst nach 500 ms Tipppause suchen (Rate-Limit schonen)
   useEffect(() => {
@@ -19,8 +22,8 @@ export default function Search() {
   }, [input]);
 
   const { data, isFetching, error } = useQuery({
-    queryKey: ["search", term],
-    queryFn: () => searchAnime(term),
+    queryKey: ["search", type, term],
+    queryFn: () => searchMedia(term, type),
     enabled: isTauri && term.length >= 2,
   });
 
@@ -28,18 +31,36 @@ export default function Search() {
     <div className="flex h-full flex-col">
       <div className="px-8 pt-6">
         <h1 className="text-2xl font-bold">{t("search.title")}</h1>
-        <div className="relative mt-4 max-w-md">
-          <SearchIcon
-            size={15}
-            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-600"
-          />
-          <Input
-            autoFocus
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder={t("search.placeholder")}
-            className="h-10 pl-9"
-          />
+        <div className="mt-4 flex items-center gap-2">
+          <div className="relative max-w-md flex-1">
+            <SearchIcon
+              size={15}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-600"
+            />
+            <Input
+              autoFocus
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder={t("search.placeholder")}
+              className="h-10 pl-9"
+            />
+          </div>
+          <div className="flex rounded-lg border border-surface-700">
+            {(["ANIME", "MANGA"] as const).map((tp) => (
+              <button
+                key={tp}
+                onClick={() => setType(tp)}
+                className={cn(
+                  "h-10 px-4 text-sm font-medium first:rounded-l-lg last:rounded-r-lg",
+                  type === tp
+                    ? "bg-accent-600 text-white"
+                    : "text-ink-500 hover:bg-surface-800 hover:text-ink-100",
+                )}
+              >
+                {tp === "ANIME" ? t("search.anime") : t("search.manga")}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 

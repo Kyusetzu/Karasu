@@ -5,7 +5,7 @@ import { useNowPlaying } from "@/stores/nowPlaying";
 import Titlebar from "@/components/Titlebar";
 import Sidebar from "@/components/Sidebar";
 import Dashboard from "@/pages/Dashboard";
-import AnimeList from "@/pages/AnimeList";
+import MediaList from "@/pages/MediaList";
 import Search from "@/pages/Search";
 import Seasonal from "@/pages/Seasonal";
 import AnimeDetail from "@/pages/AnimeDetail";
@@ -27,9 +27,12 @@ export default function App() {
         <main className="min-w-0 flex-1 overflow-y-auto">
           <Routes>
             <Route path="/" element={<Dashboard />} />
-            <Route path="/list" element={<AnimeList />} />
+            <Route path="/list" element={<MediaList type="ANIME" />} />
+            <Route path="/manga" element={<MediaList type="MANGA" />} />
             <Route path="/search" element={<Search />} />
             <Route path="/seasonal" element={<Seasonal />} />
+            <Route path="/media/:id" element={<AnimeDetail />} />
+            {/* Alias für alte Links */}
             <Route path="/anime/:id" element={<AnimeDetail />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>

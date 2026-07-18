@@ -13,6 +13,8 @@ export type MediaListStatus =
   | "PAUSED"
   | "REPEATING";
 
+export type MediaType = "ANIME" | "MANGA";
+
 export interface MediaTitle {
   romaji: string | null;
   english: string | null;
@@ -21,10 +23,13 @@ export interface MediaTitle {
 
 export interface Media {
   id: number;
+  type?: MediaType;
   title: MediaTitle;
   coverImage: { large: string | null; extraLarge: string | null };
   bannerImage: string | null;
   episodes: number | null;
+  chapters?: number | null;
+  volumes?: number | null;
   duration?: number | null;
   format: string | null;
   status: string | null;
@@ -92,5 +97,13 @@ export const STATUS_ORDER: MediaListStatus[] = [
 
 /** Bevorzugter Anzeigetitel: Englisch, sonst Romaji, sonst Nativ. */
 export function displayTitle(title: MediaTitle): string {
-  return title.english ?? title.romaji ?? title.native ?? "Unbekannt";
+  return title.english ?? title.romaji ?? title.native ?? "?";
+}
+
+/** Maximaler Fortschritt: Episoden (Anime) bzw. Kapitel (Manga). */
+export function maxProgress(media: {
+  episodes: number | null;
+  chapters?: number | null;
+}): number | null {
+  return media.episodes ?? media.chapters ?? null;
 }

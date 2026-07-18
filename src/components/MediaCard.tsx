@@ -1,34 +1,45 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { Check, Plus, Star } from "lucide-react";
+import { Check, Pencil, Plus, Star } from "lucide-react";
 import { saveListEntry } from "@/api/anilist";
 import { displayTitle } from "@/api/types";
 import type { MediaWithListStatus } from "@/api/queries";
 import { useAuth } from "@/stores/auth";
+import EntryEditModal, { type EntrySaveInput } from "@/components/EntryEditModal";
 
-/** Karte für Discovery-Grids (Suche, Saison) mit Schnell-Hinzufügen. */
+/**
+ * Karte für Discovery-Grids (Suche, Saison): Schnell-Hinzufügen und
+ * vollständige Bearbeitung (Status/Fortschritt/Bewertung) direkt aus
+ * den Suchergebnissen.
+ */
 export default function MediaCard({ media }: { media: MediaWithListStatus }) {
   const { t } = useTranslation();
   const viewer = useAuth((s) => s.viewer);
   const qc = useQueryClient();
+  const [editing, setEditing] = useState(false);
 
-  const addToList = useMutation({
-    mutationFn: () =>
-      saveListEntry({ mediaId: media.id, status: "PLANNING" }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["animeList"] });
-      // Discovery-Caches nur lokal patchen statt neu zu laden
-      media.mediaListEntry = { id: 0, status: "PLANNING" };
+  const saveEntry = useMutation({
+    mutationFn: saveListEntry,
+    onSuccess: (result, input) => {
+      qc.invalidateQueries({ queryKey: ["mediaList"] });
+      // Discovery-Cache lokal patchen statt neu zu laden (Rate-Limit)
+      media.mediaListEntry = {
+        id: result.entry?.id ?? media.mediaListEntry?.id ?? 0,
+        status: input.status ?? media.mediaListEntry?.status ?? "PLANNING",
+        progress: input.progress ?? media.mediaListEntry?.progress ?? 0,
+        score: input.score ?? media.mediaListEntry?.score ?? 0,
+      };
     },
   });
 
-  const onList = media.mediaListEntry !== null || addToList.isSuccess;
+  const entry = media.mediaListEntry;
 
   return (
     <div className="group">
       <div className="relative aspect-[2/3] overflow-hidden rounded-lg bg-surface-800">
-        <Link to={`/anime/${media.id}`}>
+        <Link to={`/media/${media.id}`}>
           {media.coverImage.large && (
             <img
               src={media.coverImage.large}
@@ -43,31 +54,40 @@ export default function MediaCard({ media }: { media: MediaWithListStatus }) {
             <Star size={11} fill="currentColor" /> {media.averageScore}%
           </span>
         )}
-        {viewer &&
-          (onList ? (
-            <span
-              className="absolute bottom-2 right-2 grid h-8 w-8 place-items-center rounded-full bg-emerald-700/90 text-white"
-              title={
-                media.mediaListEntry
-                  ? t(`status.${media.mediaListEntry.status}`)
-                  : t("media.onList")
-              }
-            >
-              <Check size={15} />
-            </span>
-          ) : (
+        {viewer && (
+          <div className="absolute bottom-2 right-2 flex gap-1.5">
             <button
-              onClick={() => addToList.mutate()}
-              disabled={addToList.isPending}
-              className="absolute bottom-2 right-2 grid h-8 w-8 place-items-center rounded-full bg-accent-600 text-white opacity-0 transition-opacity hover:bg-accent-500 group-hover:opacity-100 disabled:opacity-50"
-              aria-label={t("media.addPlanning")}
-              title={t("media.addPlanning")}
+              onClick={() => setEditing(true)}
+              className="grid h-8 w-8 place-items-center rounded-full bg-surface-900/90 text-ink-300 opacity-0 transition-opacity hover:bg-surface-800 hover:text-ink-100 group-hover:opacity-100"
+              aria-label={t("common.edit")}
+              title={t("common.edit")}
             >
-              <Plus size={16} />
+              <Pencil size={14} />
             </button>
-          ))}
+            {entry ? (
+              <span
+                className="grid h-8 w-8 place-items-center rounded-full bg-emerald-700/90 text-white"
+                title={t(`status.${media.type}.${entry.status}`)}
+              >
+                <Check size={15} />
+              </span>
+            ) : (
+              <button
+                onClick={() =>
+                  saveEntry.mutate({ mediaId: media.id, status: "PLANNING" })
+                }
+                disabled={saveEntry.isPending}
+                className="grid h-8 w-8 place-items-center rounded-full bg-accent-600 text-white opacity-0 transition-opacity hover:bg-accent-500 group-hover:opacity-100 disabled:opacity-50"
+                aria-label={t("media.addPlanning")}
+                title={t("media.addPlanning")}
+              >
+                <Plus size={16} />
+              </button>
+            )}
+          </div>
+        )}
       </div>
-      <Link to={`/anime/${media.id}`}>
+      <Link to={`/media/${media.id}`}>
         <p className="mt-2 line-clamp-2 text-xs font-medium text-ink-300 group-hover:text-ink-100">
           {displayTitle(media.title)}
         </p>
@@ -75,6 +95,18 @@ export default function MediaCard({ media }: { media: MediaWithListStatus }) {
       <p className="text-xs text-ink-600">
         {[media.format, media.seasonYear].filter(Boolean).join(" · ")}
       </p>
+
+      {editing && (
+        <EntryEditModal
+          media={media}
+          entry={entry}
+          onClose={() => setEditing(false)}
+          onSave={(input: EntrySaveInput) => {
+            saveEntry.mutate(input);
+            setEditing(false);
+          }}
+        />
+      )}
     </div>
   );
 }

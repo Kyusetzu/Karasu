@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import {
   LayoutDashboard,
   Library,
+  BookOpen,
   Search,
   CalendarDays,
   Settings,
@@ -12,6 +13,7 @@ import { cn } from "@/lib/utils";
 const items = [
   { to: "/", key: "nav.dashboard", icon: LayoutDashboard, end: true },
   { to: "/list", key: "nav.list", icon: Library },
+  { to: "/manga", key: "nav.manga", icon: BookOpen },
   { to: "/search", key: "nav.search", icon: Search },
   { to: "/seasonal", key: "nav.seasonal", icon: CalendarDays },
 ] as const;

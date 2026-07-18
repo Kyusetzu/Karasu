@@ -57,6 +57,18 @@ const STREAMING_MARKERS: &[(&str, &[&str])] = &[
     ("Netflix", &[" - Netflix", " | Netflix"]),
 ];
 
+/// Manga-Leseseiten: gleiche Mechanik wie Streaming, aber der Titel enthält
+/// eine Kapitelnummer ("Ch. 45", "Chapter 45").
+const MANGA_MARKERS: &[(&str, &[&str])] = &[
+    ("MangaDex", &[" - MangaDex", " – MangaDex"]),
+    ("MANGA Plus", &[" - MANGA Plus by SHUEISHA", " | MANGA Plus", " - MANGA Plus"]),
+    ("Comick", &[" - Comick", " | Comick"]),
+    ("Bato.To", &[" - Bato.To"]),
+    ("Bato.to", &[" - Bato.to"]),
+    ("MangaFire", &[" - MangaFire"]),
+    ("Asura Scans", &[" - Asura Scans"]),
+];
+
 /// Extrahiert den Dateinamen aus einem Player-Fenster, falls der Prozess ein
 /// bekannter Player ist und der Titel nach Videodatei aussieht.
 pub fn match_player(process: &str, title: &str) -> Option<String> {
@@ -90,12 +102,7 @@ pub fn match_player(process: &str, title: &str) -> Option<String> {
     None
 }
 
-/// Erkennt Streaming-Wiedergabe in Browser-Tabs anhand des Fenstertitels.
-pub fn match_streaming(process: &str, title: &str) -> Option<String> {
-    if !BROWSERS.contains(&process) {
-        return None;
-    }
-
+fn strip_browser_suffix(title: &str) -> Option<String> {
     let mut media = title.to_string();
     for suffix in BROWSER_SUFFIXES {
         if let Some(stripped) = media.strip_suffix(suffix) {
@@ -103,6 +110,15 @@ pub fn match_streaming(process: &str, title: &str) -> Option<String> {
             break;
         }
     }
+    Some(media)
+}
+
+/// Erkennt Streaming-Wiedergabe in Browser-Tabs anhand des Fenstertitels.
+pub fn match_streaming(process: &str, title: &str) -> Option<String> {
+    if !BROWSERS.contains(&process) {
+        return None;
+    }
+    let mut media = strip_browser_suffix(title)?;
 
     let (_, site_suffixes) = STREAMING_MARKERS
         .iter()
@@ -120,6 +136,33 @@ pub fn match_streaming(process: &str, title: &str) -> Option<String> {
     // Nur akzeptieren, wenn eine Episodennummer erkennbar ist — sonst ist es
     // nur eine Übersichtsseite.
     if crate::recognition::parser::parse(media).episode.is_some() {
+        Some(media.to_string())
+    } else {
+        None
+    }
+}
+
+/// Erkennt Manga-Lesen in Browser-Tabs (MangaDex & Co.).
+pub fn match_manga(process: &str, title: &str) -> Option<String> {
+    if !BROWSERS.contains(&process) {
+        return None;
+    }
+    let mut media = strip_browser_suffix(title)?;
+
+    let (_, site_suffixes) = MANGA_MARKERS
+        .iter()
+        .find(|(marker, _)| media.contains(marker))?;
+
+    for suffix in *site_suffixes {
+        if let Some(stripped) = media.strip_suffix(suffix) {
+            media = stripped.to_string();
+            break;
+        }
+    }
+    let media = media.trim();
+
+    // Nur akzeptieren, wenn eine Kapitelnummer erkennbar ist
+    if crate::recognition::parser::parse_manga(media).episode.is_some() {
         Some(media.to_string())
     } else {
         None
@@ -176,5 +219,29 @@ mod tests {
             match_streaming("chrome.exe", "Crunchyroll - Watch Anime - Google Chrome"),
             None
         );
+    }
+
+    #[test]
+    fn manga_mangadex_chapter() {
+        assert_eq!(
+            match_manga(
+                "firefox.exe",
+                "Kusuriya no Hitorigoto - Ch. 45 - MangaDex — Mozilla Firefox"
+            ),
+            Some("Kusuriya no Hitorigoto - Ch. 45".to_string())
+        );
+    }
+
+    #[test]
+    fn manga_overview_page_ignored() {
+        assert_eq!(
+            match_manga("chrome.exe", "MangaDex - Google Chrome"),
+            None
+        );
+    }
+
+    #[test]
+    fn manga_non_browser_ignored() {
+        assert_eq!(match_manga("mpv.exe", "Something Ch. 4 - MangaDex"), None);
     }
 }

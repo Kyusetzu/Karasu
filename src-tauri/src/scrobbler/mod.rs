@@ -19,11 +19,16 @@ use tauri::{AppHandle, Emitter, Manager};
 pub const POLL_INTERVAL: Duration = Duration::from_secs(5);
 /// Fallback-Schwelle, wenn keine Episodenlänge bekannt ist.
 const DEFAULT_THRESHOLD: Duration = Duration::from_secs(15 * 60);
+/// Schwelle für Manga-Kapitel (Lesen ist schneller als Schauen).
+const MANGA_THRESHOLD: Duration = Duration::from_secs(5 * 60);
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct NowPlaying {
     pub process: String,
     pub streaming: bool,
+    /// "ANIME" oder "MANGA" — bei Manga trägt `episode` die Kapitelnummer
+    #[serde(rename = "mediaType")]
+    pub media_type: String,
     #[serde(rename = "rawTitle")]
     pub raw_title: String,
     #[serde(rename = "parsedTitle")]
@@ -56,6 +61,9 @@ pub enum Phase {
 #[derive(Debug, Clone)]
 pub struct Session {
     pub media_id: i64,
+    /// "ANIME" oder "MANGA"
+    pub media_type: String,
+    /// Episoden- bzw. Kapitelnummer
     pub episode: u32,
     pub total: Option<u32>,
     /// Listen-Status des Eintrags bei Erkennungsbeginn
@@ -114,19 +122,20 @@ fn emit_session(app: &AppHandle, session: Option<&Session>) {
     let _ = app.emit("scrobble-state", &event);
 }
 
-/// Baut Matching-Kandidaten aus dem SQLite-Listen-Cache.
-pub fn candidates_from_cache(db: &Db) -> Vec<matcher::Candidate> {
-    let Some(viewer) = db
-        .kv_get("anilist_viewer")
+fn cached_user_id(db: &Db) -> Option<i64> {
+    db.kv_get("anilist_viewer")
         .and_then(|s| serde_json::from_str::<Value>(&s).ok())
-    else {
-        return Vec::new();
-    };
-    let Some(user_id) = viewer.get("id").and_then(|v| v.as_i64()) else {
+        .and_then(|v| v.get("id").and_then(|i| i.as_i64()))
+}
+
+/// Baut Matching-Kandidaten aus dem SQLite-Listen-Cache.
+/// Bei MANGA trägt `episodes` die Kapitelanzahl.
+pub fn candidates_from_cache(db: &Db, media_type: &str) -> Vec<matcher::Candidate> {
+    let Some(user_id) = cached_user_id(db) else {
         return Vec::new();
     };
     let Some(lists) = db
-        .cached_list(user_id)
+        .cached_list(user_id, media_type)
         .and_then(|s| serde_json::from_str::<Value>(&s).ok())
     else {
         return Vec::new();
@@ -174,11 +183,12 @@ pub fn candidates_from_cache(db: &Db) -> Vec<matcher::Candidate> {
             if titles.is_empty() {
                 continue;
             }
+            let total_key = if media_type == "MANGA" { "chapters" } else { "episodes" };
             out.push(matcher::Candidate {
                 media_id,
                 titles,
                 episodes: media
-                    .get("episodes")
+                    .get(total_key)
                     .and_then(|v| v.as_u64())
                     .map(|n| n as u32),
                 duration_min: media
@@ -205,16 +215,24 @@ fn build_now_playing(
     rules: &[relations::Rule],
     playback: detection::Playback,
 ) -> NowPlaying {
-    let parsed = parser::parse(&playback.media_title);
-    let candidates = candidates_from_cache(db);
+    let media_type = if playback.manga { "MANGA" } else { "ANIME" };
+    let parsed = if playback.manga {
+        parser::parse_manga(&playback.media_title)
+    } else {
+        parser::parse(&playback.media_title)
+    };
+    let candidates = candidates_from_cache(db, media_type);
     let matched = matcher::best_match(&parsed, &candidates);
 
     // Episoden-Redirect (anime-relations): z. B. Combined-Release "Ep 25"
-    // → Staffel 2, Episode 1 eines anderen AniList-Eintrags
+    // → Staffel 2, Episode 1 eines anderen AniList-Eintrags. Nur Anime.
     let matched = matched.map(|m| {
-        if let Some(ep) = parsed.episode {
-            if let Some((new_id, new_ep)) = relations::redirect(rules, m.media_id, ep) {
-                return (new_id, Some(new_ep));
+        if !playback.manga {
+            if let Some(ep) = parsed.episode {
+                if let Some((new_id, new_ep)) = relations::redirect(rules, m.media_id, ep)
+                {
+                    return (new_id, Some(new_ep));
+                }
             }
         }
         (m.media_id, parsed.episode)
@@ -237,6 +255,7 @@ fn build_now_playing(
     NowPlaying {
         process: playback.process,
         streaming: playback.streaming,
+        media_type: media_type.to_string(),
         raw_title: playback.media_title,
         parsed_title: parsed.title,
         episode,
@@ -248,13 +267,16 @@ fn build_now_playing(
 }
 
 /// Schwelle bis zum Auto-Update: Einstellung in Minuten oder 2/3 der
-/// Episodenlänge, sonst 15 Minuten.
+/// Episodenlänge (Anime) bzw. 5 Minuten (Manga), sonst 15 Minuten.
 fn threshold(now: &NowPlaying, db: &Db, delay_min: u32) -> Duration {
     if delay_min > 0 {
         return Duration::from_secs(u64::from(delay_min) * 60);
     }
+    if now.media_type == "MANGA" {
+        return MANGA_THRESHOLD;
+    }
     let duration = now.media_id.and_then(|mid| {
-        candidates_from_cache(db)
+        candidates_from_cache(db, &now.media_type)
             .iter()
             .find(|c| c.media_id == mid)
             .and_then(|c| c.duration_min)
@@ -277,6 +299,7 @@ fn epoch_ms_in(d: Duration) -> u64 {
 async fn perform_update(
     app: &AppHandle,
     media_id: i64,
+    media_type: &str,
     episode: u32,
     total: Option<u32>,
     list_status: &str,
@@ -296,12 +319,8 @@ async fn perform_update(
     crate::commands::save_entry_core(&db, &api, &token, input).await?;
 
     // Lokalen Cache patchen, damit die nächste Erkennung den neuen Stand sieht
-    if let Some(user_id) = db
-        .kv_get("anilist_viewer")
-        .and_then(|s| serde_json::from_str::<Value>(&s).ok())
-        .and_then(|v| v.get("id").and_then(|i| i.as_i64()))
-    {
-        db.update_cached_progress(user_id, media_id, episode, Some(status));
+    if let Some(user_id) = cached_user_id(&db) {
+        db.update_cached_progress(user_id, media_type, media_id, episode, Some(status));
     }
     // Now-Playing-Anzeige aktualisieren
     {
@@ -338,6 +357,7 @@ pub async fn confirm_pending(app: AppHandle, accept: bool) -> Result<(), String>
         session.phase = Phase::Updating;
         let d = (
             session.media_id,
+            session.media_type.clone(),
             session.episode,
             session.total,
             session.list_status.clone(),
@@ -346,7 +366,7 @@ pub async fn confirm_pending(app: AppHandle, accept: bool) -> Result<(), String>
         d
     };
 
-    let result = perform_update(&app, data.0, data.1, data.2, &data.3).await;
+    let result = perform_update(&app, data.0, &data.1, data.2, data.3, &data.4).await;
     let state = app.state::<ScrobbleSession>();
     let mut guard = state.0.lock().unwrap();
     if let Some(session) = guard.as_mut() {
@@ -428,9 +448,10 @@ async fn drive_session(app: &AppHandle) {
                     let auto = settings.enabled && phase == Phase::Watching;
                     let session = Session {
                         media_id: mid,
+                        media_type: np.media_type.clone(),
                         episode: ep,
                         total: np.total_episodes,
-                        list_status: candidates_from_cache(&db)
+                        list_status: candidates_from_cache(&db, &np.media_type)
                             .iter()
                             .find(|c| c.media_id == mid)
                             .map(|c| c.status.clone())
@@ -460,6 +481,7 @@ async fn drive_session(app: &AppHandle) {
                         emit_session(app, Some(session));
                         Some((
                             session.media_id,
+                            session.media_type.clone(),
                             session.episode,
                             session.total,
                             session.list_status.clone(),
@@ -477,8 +499,8 @@ async fn drive_session(app: &AppHandle) {
         }
     };
 
-    if let Some((mid, ep, total, status)) = update_data {
-        let result = perform_update(app, mid, ep, total, &status).await;
+    if let Some((mid, mtype, ep, total, status)) = update_data {
+        let result = perform_update(app, mid, &mtype, ep, total, &status).await;
         let state = app.state::<ScrobbleSession>();
         let mut guard = state.0.lock().unwrap();
         if let Some(session) = guard.as_mut() {

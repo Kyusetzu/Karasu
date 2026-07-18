@@ -146,6 +146,62 @@ pub fn parse(input: &str) -> Parsed {
     }
 }
 
+fn chapter_regexes() -> &'static [Regex; 3] {
+    static RE: OnceLock<[Regex; 3]> = OnceLock::new();
+    RE.get_or_init(|| {
+        [
+            // "Ch. 45", "Chapter 45", "Kapitel 45" (Dezimalteil wird ignoriert)
+            Regex::new(r"(?i)\b(?:ch(?:apter)?\.?|kapitel)\s*(\d{1,5})(?:\.\d+)?\b").unwrap(),
+            // " - 45" am Ende
+            Regex::new(r"[\-–—]\s*(\d{1,5})(?:\.\d+)?\s*$").unwrap(),
+            // "#45"
+            Regex::new(r"#(\d{1,5})\b").unwrap(),
+        ]
+    })
+}
+
+/// Parser für Manga-Titel aus Browser-Tabs: extrahiert Serientitel und
+/// Kapitelnummer (im `episode`-Feld).
+pub fn parse_manga(input: &str) -> Parsed {
+    let mut work = input.trim().to_string();
+
+    // "Read "-Präfix vieler Leseseiten entfernen
+    if let Some(stripped) = work.strip_prefix("Read ") {
+        work = stripped.to_string();
+    }
+
+    let bracket_re = {
+        static RE: OnceLock<Regex> = OnceLock::new();
+        RE.get_or_init(|| Regex::new(r"[\[(][^\])]*[\])]").unwrap())
+    };
+    work = bracket_re.replace_all(&work, " ").to_string();
+    work = work.replace('_', " ");
+    work = work.split_whitespace().collect::<Vec<_>>().join(" ");
+
+    let mut chapter = None;
+    let mut title_end = work.len();
+    for re in chapter_regexes() {
+        if let Some(caps) = re.captures(&work) {
+            if let Some(n) = caps.get(1).and_then(|g| g.as_str().parse().ok()) {
+                chapter = Some(n);
+                title_end = caps.get(0).unwrap().start();
+                break;
+            }
+        }
+    }
+
+    let title = work[..title_end]
+        .trim_matches(|c: char| c == '-' || c == '–' || c == '—' || c == ':' || c.is_whitespace())
+        .to_string();
+
+    Parsed {
+        title,
+        episode: chapter,
+        season: None,
+        release_group: None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -243,5 +299,41 @@ mod tests {
         let r = p("Some Title 1080p WEB - 03.mkv");
         assert_eq!(r.title, "Some Title");
         assert_eq!(r.episode, Some(3));
+    }
+
+    // --- Manga --------------------------------------------------------------
+
+    #[test]
+    fn manga_chapter_abbreviated() {
+        let r = parse_manga("Kusuriya no Hitorigoto - Ch. 45");
+        assert_eq!(r.title, "Kusuriya no Hitorigoto");
+        assert_eq!(r.episode, Some(45));
+    }
+
+    #[test]
+    fn manga_chapter_full_word_with_read_prefix() {
+        let r = parse_manga("Read One Piece Chapter 1100");
+        assert_eq!(r.title, "One Piece");
+        assert_eq!(r.episode, Some(1100));
+    }
+
+    #[test]
+    fn manga_chapter_german() {
+        let r = parse_manga("Berserk Kapitel 380");
+        assert_eq!(r.title, "Berserk");
+        assert_eq!(r.episode, Some(380));
+    }
+
+    #[test]
+    fn manga_decimal_chapter_floored() {
+        let r = parse_manga("Some Series - Ch. 45.5");
+        assert_eq!(r.title, "Some Series");
+        assert_eq!(r.episode, Some(45));
+    }
+
+    #[test]
+    fn manga_no_chapter() {
+        let r = parse_manga("MangaDex Homepage");
+        assert_eq!(r.episode, None);
     }
 }

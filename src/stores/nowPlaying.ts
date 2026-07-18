@@ -6,6 +6,7 @@ import { isTauri } from "@/api/anilist";
 export interface NowPlaying {
   process: string;
   streaming: boolean;
+  mediaType: "ANIME" | "MANGA";
   rawTitle: string;
   parsedTitle: string;
   episode: number | null;

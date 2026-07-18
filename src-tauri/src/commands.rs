@@ -121,8 +121,8 @@ pub async fn anilist_query(
 // --- Anime-Liste: Laden mit Cache, Mutations mit Offline-Queue --------------
 
 const LIST_QUERY: &str = "
-query ($userId: Int!) {
-  MediaListCollection(userId: $userId, type: ANIME) {
+query ($userId: Int!, $type: MediaType!) {
+  MediaListCollection(userId: $userId, type: $type) {
     lists {
       name
       status
@@ -137,10 +137,13 @@ query ($userId: Int!) {
         updatedAt
         media {
           id
+          type
           title { romaji english native }
           coverImage { large extraLarge }
           bannerImage
           episodes
+          chapters
+          volumes
           duration
           format
           status
@@ -155,6 +158,13 @@ query ($userId: Int!) {
     }
   }
 }";
+
+fn validate_media_type(media_type: &str) -> Result<&str, String> {
+    match media_type {
+        "ANIME" | "MANGA" => Ok(media_type),
+        _ => Err(format!("Invalid media type: {media_type}")),
+    }
+}
 
 const SAVE_MUTATION: &str = "
 mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int, $score: Float, $repeat: Int) {
@@ -179,20 +189,26 @@ pub struct ListResult {
     lists: Value,
 }
 
-/// Lädt die Anime-Liste; offline wird der letzte Stand aus SQLite geliefert.
-/// Vor dem Laden wird versucht, die Offline-Queue abzuarbeiten, damit der
-/// Server-Stand die eigenen Änderungen enthält.
+/// Lädt die Anime-/Manga-Liste; offline wird der letzte Stand aus SQLite
+/// geliefert. Vor dem Laden wird versucht, die Offline-Queue abzuarbeiten,
+/// damit der Server-Stand die eigenen Änderungen enthält.
 #[tauri::command]
-pub async fn fetch_anime_list(
+pub async fn fetch_media_list(
     db: State<'_, Db>,
     api: State<'_, AniList>,
     user_id: i64,
+    media_type: String,
 ) -> Result<ListResult, String> {
+    let media_type = validate_media_type(&media_type)?;
     let token = auth::load_token();
     let _ = process_queue(&db, &api, token.as_deref()).await;
 
     match api
-        .query(token.as_deref(), LIST_QUERY, json!({ "userId": user_id }))
+        .query(
+            token.as_deref(),
+            LIST_QUERY,
+            json!({ "userId": user_id, "type": media_type }),
+        )
         .await
     {
         Ok(data) => {
@@ -200,7 +216,7 @@ pub async fn fetch_anime_list(
                 .pointer("/MediaListCollection/lists")
                 .cloned()
                 .unwrap_or_else(|| json!([]));
-            let _ = db.cache_list(user_id, &lists.to_string());
+            let _ = db.cache_list(user_id, media_type, &lists.to_string());
             Ok(ListResult {
                 from_cache: false,
                 pending: db.queue_len(),
@@ -209,7 +225,7 @@ pub async fn fetch_anime_list(
         }
         Err(ApiError::Network(_)) => {
             let cached = db
-                .cached_list(user_id)
+                .cached_list(user_id, media_type)
                 .ok_or("Offline and no local list cache available yet")?;
             Ok(ListResult {
                 from_cache: true,

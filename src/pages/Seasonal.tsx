@@ -1,12 +1,8 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import {
-  currentSeason,
-  SEASON_LABELS,
-  seasonalAnime,
-  type Season,
-} from "@/api/queries";
+import { currentSeason, seasonalAnime, type Season } from "@/api/queries";
 import { isTauri } from "@/api/anilist";
 import MediaCard from "@/components/MediaCard";
 import { Button } from "@/components/ui/button";
@@ -22,6 +18,7 @@ function shift(season: Season, year: number, dir: 1 | -1) {
 }
 
 export default function Seasonal() {
+  const { t } = useTranslation();
   const [{ season, year }, setPeriod] = useState(currentSeason());
 
   const { data, isLoading, error } = useQuery({
@@ -35,24 +32,24 @@ export default function Seasonal() {
     <div className="flex h-full flex-col">
       <div className="px-8 pt-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">Saison</h1>
+          <h1 className="text-2xl font-bold">{t("seasonal.title")}</h1>
           <div className="flex items-center gap-2">
             <Button
               variant="ghost"
               size="icon"
               onClick={() => setPeriod((p) => shift(p.season, p.year, -1))}
-              aria-label="Vorherige Saison"
+              aria-label={t("seasonal.prev")}
             >
               <ChevronLeft size={18} />
             </Button>
             <span className="w-36 text-center text-sm font-semibold">
-              {SEASON_LABELS[season]} {year}
+              {t(`season.${season}`)} {year}
             </span>
             <Button
               variant="ghost"
               size="icon"
               onClick={() => setPeriod((p) => shift(p.season, p.year, 1))}
-              aria-label="Nächste Saison"
+              aria-label={t("seasonal.next")}
             >
               <ChevronRight size={18} />
             </Button>
@@ -70,15 +67,21 @@ export default function Seasonal() {
                   : "text-ink-500 hover:bg-surface-800 hover:text-ink-100",
               )}
             >
-              {SEASON_LABELS[s]}
+              {t(`season.${s}`)}
             </button>
           ))}
         </div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-8 py-6">
-        {error && <p className="text-sm text-red-300">Fehler: {String(error)}</p>}
-        {isLoading && <p className="text-sm text-ink-600">Lade Saison …</p>}
+        {error && (
+          <p className="text-sm text-red-300">
+            {t("common.error", { message: String(error) })}
+          </p>
+        )}
+        {isLoading && (
+          <p className="text-sm text-ink-600">{t("seasonal.loading")}</p>
+        )}
         {data && (
           <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-x-4 gap-y-6">
             {data.media.map((m) => (

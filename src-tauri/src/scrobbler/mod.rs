@@ -282,7 +282,7 @@ async fn perform_update(
     list_status: &str,
 ) -> Result<(), String> {
     let token =
-        crate::anilist::auth::load_token().ok_or("Nicht mit AniList verbunden")?;
+        crate::anilist::auth::load_token().ok_or("Not connected to AniList")?;
     let done = total == Some(episode);
     let status = match (done, list_status) {
         (true, _) => "COMPLETED",
@@ -328,7 +328,7 @@ pub async fn confirm_pending(app: AppHandle, accept: bool) -> Result<(), String>
         let state = app.state::<ScrobbleSession>();
         let mut guard = state.0.lock().unwrap();
         let Some(session) = guard.as_mut() else {
-            return Err("Keine laufende Wiedergabe".into());
+            return Err("Nothing is currently playing".into());
         };
         if !accept {
             session.phase = Phase::Cancelled;
@@ -416,11 +416,11 @@ async fn drive_session(app: &AppHandle) {
                     let progress = np.progress.unwrap_or(0);
                     let phase = if ep <= progress {
                         Phase::Blocked(format!(
-                            "Episode {ep} ist laut Liste schon gesehen (Fortschritt {progress})"
+                            "Episode {ep} is already watched according to your list (progress {progress})"
                         ))
                     } else if ep > progress + 1 {
                         Phase::Blocked(format!(
-                            "Episodensprung: erkannt {ep}, dein Fortschritt ist {progress}"
+                            "Episode gap: detected {ep}, but your progress is {progress}"
                         ))
                     } else {
                         Phase::Watching

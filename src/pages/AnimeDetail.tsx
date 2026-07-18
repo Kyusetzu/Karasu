@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { ArrowLeft, ExternalLink, Star } from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { animeDetail } from "@/api/queries";
 import { isTauri, saveListEntry } from "@/api/anilist";
 import {
   displayTitle,
-  STATUS_LABELS,
   STATUS_ORDER,
   type MediaListStatus,
 } from "@/api/types";
@@ -23,21 +23,8 @@ function sanitizeDescription(html: string): string {
     .replace(/<(?!\/?(b|i|em|strong|br)\b)[^>]*>/gi, "");
 }
 
-const RELATION_LABELS: Record<string, string> = {
-  PREQUEL: "Vorgänger",
-  SEQUEL: "Fortsetzung",
-  SIDE_STORY: "Side Story",
-  SPIN_OFF: "Spin-off",
-  PARENT: "Hauptserie",
-  ALTERNATIVE: "Alternative",
-  SUMMARY: "Zusammenfassung",
-  CHARACTER: "Charaktere",
-  OTHER: "Sonstiges",
-  ADAPTATION: "Adaption",
-  SOURCE: "Vorlage",
-};
-
 export default function AnimeDetail() {
+  const { t, i18n } = useTranslation();
   const { id } = useParams();
   const navigate = useNavigate();
   const mediaId = Number(id);
@@ -48,9 +35,13 @@ export default function AnimeDetail() {
     enabled: isTauri && Number.isFinite(mediaId),
   });
 
-  if (isLoading) return <p className="p-8 text-ink-500">Lade …</p>;
+  if (isLoading) return <p className="p-8 text-ink-500">{t("common.loading")}</p>;
   if (error)
-    return <p className="p-8 text-red-300">Fehler: {String(error)}</p>;
+    return (
+      <p className="p-8 text-red-300">
+        {t("common.error", { message: String(error) })}
+      </p>
+    );
   if (!data) return null;
 
   const title = displayTitle(data.title);
@@ -74,7 +65,7 @@ export default function AnimeDetail() {
         <Button
           variant="secondary"
           size="icon"
-          aria-label="Zurück"
+          aria-label={t("detail.back")}
           className="absolute -top-36 left-4 z-10"
           onClick={() => navigate(-1)}
         >
@@ -99,11 +90,17 @@ export default function AnimeDetail() {
                 </span>
               )}
               {data.format && <span>{data.format}</span>}
-              {data.episodes && <span>{data.episodes} Episoden</span>}
-              {data.duration && <span>{data.duration} min</span>}
+              {data.episodes && (
+                <span>
+                  {data.episodes} {t("common.episodes")}
+                </span>
+              )}
+              {data.duration && (
+                <span>{t("detail.minutes", { n: data.duration })}</span>
+              )}
               {data.seasonYear && (
                 <span>
-                  {data.season ? `${data.season} ` : ""}
+                  {data.season ? `${t(`season.${data.season}`)} ` : ""}
                   {data.seasonYear}
                 </span>
               )}
@@ -125,15 +122,17 @@ export default function AnimeDetail() {
             </div>
             {data.nextAiringEpisode && (
               <p className="mt-2 text-sm text-accent-400">
-                Episode {data.nextAiringEpisode.episode} am{" "}
-                {new Date(
-                  data.nextAiringEpisode.airingAt * 1000,
-                ).toLocaleString("de-DE", {
-                  weekday: "short",
-                  day: "2-digit",
-                  month: "2-digit",
-                  hour: "2-digit",
-                  minute: "2-digit",
+                {t("detail.nextEpisode", {
+                  n: data.nextAiringEpisode.episode,
+                  date: new Date(
+                    data.nextAiringEpisode.airingAt * 1000,
+                  ).toLocaleString(i18n.language, {
+                    weekday: "short",
+                    day: "2-digit",
+                    month: "2-digit",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  }),
                 })}
               </p>
             )}
@@ -141,7 +140,7 @@ export default function AnimeDetail() {
               onClick={() => openUrl(`https://anilist.co/anime/${data.id}`)}
               className="mt-2 flex items-center gap-1 text-xs text-ink-500 hover:text-accent-400"
             >
-              Auf AniList öffnen <ExternalLink size={11} />
+              {t("detail.openOnAniList")} <ExternalLink size={11} />
             </button>
           </div>
         </div>
@@ -154,7 +153,7 @@ export default function AnimeDetail() {
 
         {data.description && (
           <Card className="mt-6">
-            <CardTitle>Beschreibung</CardTitle>
+            <CardTitle>{t("detail.description")}</CardTitle>
             <p
               className="mt-3 select-text text-sm leading-relaxed text-ink-300"
               dangerouslySetInnerHTML={{
@@ -167,7 +166,7 @@ export default function AnimeDetail() {
         {data.relations.edges.filter((e) => e.node.type === "ANIME").length >
           0 && (
           <div className="mt-6">
-            <CardTitle>Verwandte Anime</CardTitle>
+            <CardTitle>{t("detail.related")}</CardTitle>
             <div className="mt-3 flex gap-4 overflow-x-auto pb-2">
               {data.relations.edges
                 .filter((e) => e.node.type === "ANIME")
@@ -184,7 +183,9 @@ export default function AnimeDetail() {
                       className="aspect-[2/3] w-full rounded-lg object-cover"
                     />
                     <p className="mt-1 text-xs text-accent-400">
-                      {RELATION_LABELS[e.relationType] ?? e.relationType}
+                      {t(`relation.${e.relationType}`, {
+                        defaultValue: e.relationType,
+                      })}
                     </p>
                     <p className="line-clamp-2 text-xs text-ink-300">
                       {displayTitle(e.node.title)}
@@ -213,6 +214,7 @@ function ListEditor({
     score: number;
   } | null;
 }) {
+  const { t } = useTranslation();
   const viewer = useAuth((s) => s.viewer);
   const qc = useQueryClient();
   const [status, setStatus] = useState<MediaListStatus>(
@@ -243,10 +245,12 @@ function ListEditor({
 
   return (
     <Card className="mt-6">
-      <CardTitle>{entry ? "Mein Eintrag" : "Zur Liste hinzufügen"}</CardTitle>
+      <CardTitle>
+        {entry ? t("detail.myEntry") : t("detail.addToList")}
+      </CardTitle>
       <div className="mt-3 flex flex-wrap items-end gap-3">
         <label className="text-sm">
-          <span className="mb-1 block text-ink-500">Status</span>
+          <span className="mb-1 block text-ink-500">{t("common.status")}</span>
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value as MediaListStatus)}
@@ -254,13 +258,15 @@ function ListEditor({
           >
             {STATUS_ORDER.map((s) => (
               <option key={s} value={s}>
-                {STATUS_LABELS[s]}
+                {t(`status.${s}`)}
               </option>
             ))}
           </select>
         </label>
         <label className="text-sm">
-          <span className="mb-1 block text-ink-500">Fortschritt</span>
+          <span className="mb-1 block text-ink-500">
+            {t("common.progress")}
+          </span>
           <Input
             type="number"
             min={0}
@@ -273,7 +279,7 @@ function ListEditor({
           />
         </label>
         <label className="text-sm">
-          <span className="mb-1 block text-ink-500">Bewertung</span>
+          <span className="mb-1 block text-ink-500">{t("common.score")}</span>
           <Input
             type="number"
             min={0}
@@ -286,7 +292,11 @@ function ListEditor({
           />
         </label>
         <Button onClick={() => save.mutate()} disabled={save.isPending}>
-          {saved ? "Gespeichert ✓" : entry ? "Speichern" : "Hinzufügen"}
+          {saved
+            ? t("common.saved")
+            : entry
+              ? t("common.save")
+              : t("common.add")}
         </Button>
         {save.error && (
           <p className="text-sm text-red-300">{String(save.error)}</p>

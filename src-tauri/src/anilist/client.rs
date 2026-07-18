@@ -14,7 +14,7 @@ pub enum ApiError {
 impl From<ApiError> for String {
     fn from(e: ApiError) -> Self {
         match e {
-            ApiError::Network(m) => format!("Netzwerkfehler: {m}"),
+            ApiError::Network(m) => format!("Network error: {m}"),
             ApiError::Api(m) => m,
         }
     }
@@ -102,7 +102,7 @@ impl AniList {
             let body: Value = resp
                 .json()
                 .await
-                .map_err(|e| ApiError::Api(format!("Antwort nicht lesbar (HTTP {status}): {e}")))?;
+                .map_err(|e| ApiError::Api(format!("Unreadable response (HTTP {status}): {e}")))?;
 
             if let Some(errors) = body.get("errors").and_then(|e| e.as_array()) {
                 let msg = errors
@@ -118,7 +118,7 @@ impl AniList {
                     .collect::<Vec<_>>()
                     .join("; ");
                 return Err(ApiError::Api(if msg.is_empty() {
-                    format!("AniList-Fehler (HTTP {status})")
+                    format!("AniList error (HTTP {status})")
                 } else {
                     msg
                 }));
@@ -127,11 +127,11 @@ impl AniList {
             return body
                 .get("data")
                 .cloned()
-                .ok_or_else(|| ApiError::Api(format!("Leere Antwort von AniList (HTTP {status})")));
+                .ok_or_else(|| ApiError::Api(format!("Empty response from AniList (HTTP {status})")));
         }
 
         Err(ApiError::Api(
-            "AniList-Rate-Limit erreicht, bitte später erneut versuchen".into(),
+            "AniList rate limit reached, please try again later".into(),
         ))
     }
 }

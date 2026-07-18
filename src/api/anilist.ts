@@ -10,7 +10,12 @@ export const isTauri = "__TAURI_INTERNALS__" in window;
 
 // --- Account / Auth -------------------------------------------------------
 
-export const getClientId = () => invoke<string | null>("get_client_id");
+export interface AuthInfo {
+  hasBuiltinClientId: boolean;
+  customClientId: string | null;
+}
+
+export const authInfo = () => invoke<AuthInfo>("anilist_auth_info");
 export const setClientId = (clientId: string) =>
   invoke<void>("set_client_id", { clientId });
 export const loginUrl = () => invoke<string>("anilist_login_url");

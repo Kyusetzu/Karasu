@@ -1,13 +1,15 @@
 import { Link } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { Check, Plus, Star } from "lucide-react";
 import { saveListEntry } from "@/api/anilist";
-import { displayTitle, STATUS_LABELS } from "@/api/types";
+import { displayTitle } from "@/api/types";
 import type { MediaWithListStatus } from "@/api/queries";
 import { useAuth } from "@/stores/auth";
 
 /** Karte für Discovery-Grids (Suche, Saison) mit Schnell-Hinzufügen. */
 export default function MediaCard({ media }: { media: MediaWithListStatus }) {
+  const { t } = useTranslation();
   const viewer = useAuth((s) => s.viewer);
   const qc = useQueryClient();
 
@@ -47,8 +49,8 @@ export default function MediaCard({ media }: { media: MediaWithListStatus }) {
               className="absolute bottom-2 right-2 grid h-8 w-8 place-items-center rounded-full bg-emerald-700/90 text-white"
               title={
                 media.mediaListEntry
-                  ? STATUS_LABELS[media.mediaListEntry.status]
-                  : "Auf der Liste"
+                  ? t(`status.${media.mediaListEntry.status}`)
+                  : t("media.onList")
               }
             >
               <Check size={15} />
@@ -58,8 +60,8 @@ export default function MediaCard({ media }: { media: MediaWithListStatus }) {
               onClick={() => addToList.mutate()}
               disabled={addToList.isPending}
               className="absolute bottom-2 right-2 grid h-8 w-8 place-items-center rounded-full bg-accent-600 text-white opacity-0 transition-opacity hover:bg-accent-500 group-hover:opacity-100 disabled:opacity-50"
-              aria-label="Zu Geplant hinzufügen"
-              title="Zu Geplant hinzufügen"
+              aria-label={t("media.addPlanning")}
+              title={t("media.addPlanning")}
             >
               <Plus size={16} />
             </button>

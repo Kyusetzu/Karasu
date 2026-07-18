@@ -1,4 +1,5 @@
 import { NavLink } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   LayoutDashboard,
   Library,
@@ -9,17 +10,18 @@ import {
 import { cn } from "@/lib/utils";
 
 const items = [
-  { to: "/", label: "Übersicht", icon: LayoutDashboard, end: true },
-  { to: "/list", label: "Meine Liste", icon: Library },
-  { to: "/search", label: "Suche", icon: Search },
-  { to: "/seasonal", label: "Saison", icon: CalendarDays },
+  { to: "/", key: "nav.dashboard", icon: LayoutDashboard, end: true },
+  { to: "/list", key: "nav.list", icon: Library },
+  { to: "/search", key: "nav.search", icon: Search },
+  { to: "/seasonal", key: "nav.seasonal", icon: CalendarDays },
 ] as const;
 
 export default function Sidebar() {
+  const { t } = useTranslation();
   return (
     <nav className="flex w-56 shrink-0 flex-col border-r border-surface-800 bg-surface-900 py-3">
       <div className="flex flex-1 flex-col gap-1 px-3">
-        {items.map(({ to, label, icon: Icon, ...rest }) => (
+        {items.map(({ to, key, icon: Icon, ...rest }) => (
           <NavLink
             key={to}
             to={to}
@@ -33,7 +35,7 @@ export default function Sidebar() {
             }
           >
             <Icon size={18} />
-            {label}
+            {t(key)}
           </NavLink>
         ))}
       </div>
@@ -49,7 +51,7 @@ export default function Sidebar() {
           }
         >
           <Settings size={18} />
-          Einstellungen
+          {t("nav.settings")}
         </NavLink>
       </div>
     </nav>

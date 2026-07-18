@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { BarChart3, CalendarClock, Play, Plus } from "lucide-react";
 import { fetchAnimeList } from "@/api/anilist";
 import { displayTitle, type MediaListEntry } from "@/api/types";
@@ -10,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import NowPlayingCard from "@/components/NowPlayingCard";
 
 export default function Dashboard() {
+  const { t } = useTranslation();
   const viewer = useAuth((s) => s.viewer);
   const loading = useAuth((s) => s.loading);
 
@@ -19,13 +21,12 @@ export default function Dashboard() {
     return (
       <div className="grid h-full place-items-center p-8">
         <div className="max-w-md text-center">
-          <h1 className="text-3xl font-bold">Willkommen bei Karasu 🐦‍⬛</h1>
+          <h1 className="text-3xl font-bold">{t("dashboard.welcomeTitle")}</h1>
           <p className="mt-3 text-sm leading-relaxed text-ink-500">
-            Dein Anime-Tracker für AniList. Verbinde deinen Account, um deine
-            Liste zu verwalten und deinen Fortschritt automatisch zu tracken.
+            {t("dashboard.welcomeText")}
           </p>
           <Link to="/settings">
-            <Button className="mt-5">Mit AniList verbinden</Button>
+            <Button className="mt-5">{t("dashboard.connect")}</Button>
           </Link>
         </div>
       </div>
@@ -36,6 +37,7 @@ export default function Dashboard() {
 }
 
 function DashboardContent({ userId }: { userId: number }) {
+  const { t } = useTranslation();
   const { data } = useQuery({
     queryKey: ["animeList", userId],
     queryFn: () => fetchAnimeList(userId),
@@ -75,13 +77,14 @@ function DashboardContent({ userId }: { userId: number }) {
       <NowPlayingCard />
       <section>
         <h2 className="flex items-center gap-2 text-lg font-semibold">
-          <Play size={18} className="text-accent-400" /> Weiterschauen
+          <Play size={18} className="text-accent-400" />{" "}
+          {t("dashboard.continueWatching")}
         </h2>
         {watching.length === 0 ? (
           <p className="mt-3 text-sm text-ink-600">
-            Du schaust gerade nichts — stöbere in der{" "}
+            {t("dashboard.nothingWatching")}{" "}
             <Link to="/seasonal" className="text-accent-400 hover:underline">
-              aktuellen Saison
+              {t("dashboard.currentSeason")}
             </Link>
             .
           </p>
@@ -112,11 +115,12 @@ function DashboardContent({ userId }: { userId: number }) {
 
       <section>
         <h2 className="flex items-center gap-2 text-lg font-semibold">
-          <CalendarClock size={18} className="text-accent-400" /> Demnächst
+          <CalendarClock size={18} className="text-accent-400" />{" "}
+          {t("dashboard.upcoming")}
         </h2>
         {upcoming.length === 0 ? (
           <p className="mt-3 text-sm text-ink-600">
-            Keine anstehenden Episoden in deiner Liste.
+            {t("dashboard.noUpcoming")}
           </p>
         ) : (
           <div className="mt-4 space-y-1">
@@ -131,6 +135,7 @@ function DashboardContent({ userId }: { userId: number }) {
 }
 
 function Stats({ entries }: { entries: MediaListEntry[] }) {
+  const { t, i18n } = useTranslation();
   const stats = useMemo(() => {
     const unique = new Map(entries.map((e) => [e.mediaId, e]));
     const list = [...unique.values()];
@@ -155,11 +160,14 @@ function Stats({ entries }: { entries: MediaListEntry[] }) {
   if (stats.anime === 0) return null;
 
   const items = [
-    { label: "Anime", value: String(stats.anime) },
-    { label: "Episoden", value: stats.episodes.toLocaleString("de-DE") },
-    { label: "Tage geschaut", value: stats.days.toFixed(1) },
+    { label: t("dashboard.statAnime"), value: String(stats.anime) },
     {
-      label: "Ø Bewertung",
+      label: t("dashboard.statEpisodes"),
+      value: stats.episodes.toLocaleString(i18n.language),
+    },
+    { label: t("dashboard.statDays"), value: stats.days.toFixed(1) },
+    {
+      label: t("dashboard.statMeanScore"),
       value: stats.meanScore !== null ? stats.meanScore.toFixed(1) : "–",
     },
   ];
@@ -167,7 +175,8 @@ function Stats({ entries }: { entries: MediaListEntry[] }) {
   return (
     <section>
       <h2 className="flex items-center gap-2 text-lg font-semibold">
-        <BarChart3 size={18} className="text-accent-400" /> Statistik
+        <BarChart3 size={18} className="text-accent-400" />{" "}
+        {t("dashboard.stats")}
       </h2>
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {items.map((item) => (
@@ -191,6 +200,7 @@ function ContinueCard({
   entry: MediaListEntry;
   onPlusOne: () => void;
 }) {
+  const { t } = useTranslation();
   const { media } = entry;
   const canPlus = media.episodes === null || entry.progress < media.episodes;
   const pct = media.episodes ? (entry.progress / media.episodes) * 100 : 0;
@@ -212,8 +222,8 @@ function ContinueCard({
           <button
             onClick={onPlusOne}
             className="absolute bottom-2 right-2 grid h-8 w-8 place-items-center rounded-full bg-accent-600 text-white opacity-0 transition-opacity hover:bg-accent-500 group-hover:opacity-100"
-            aria-label="Episode +1"
-            title={`Episode ${entry.progress + 1} gesehen`}
+            aria-label={t("common.plusOne")}
+            title={t("dashboard.markWatched", { n: entry.progress + 1 })}
           >
             <Plus size={16} />
           </button>
@@ -240,18 +250,21 @@ function ContinueCard({
   );
 }
 
-function formatAiring(airingAt: number): string {
-  const diff = airingAt * 1000 - Date.now();
-  if (diff <= 0) return "jetzt";
-  const hours = Math.floor(diff / 3_600_000);
-  const days = Math.floor(hours / 24);
-  if (days > 0) return `in ${days} T ${hours % 24} Std`;
-  const minutes = Math.floor((diff % 3_600_000) / 60_000);
-  return `in ${hours} Std ${minutes} min`;
-}
-
 function AiringRow({ entry }: { entry: MediaListEntry }) {
+  const { t } = useTranslation();
   const airing = entry.media.nextAiringEpisode!;
+
+  const formatAiring = (airingAt: number): string => {
+    const diff = airingAt * 1000 - Date.now();
+    if (diff <= 0) return t("dashboard.airingNow");
+    const hours = Math.floor(diff / 3_600_000);
+    const days = Math.floor(hours / 24);
+    if (days > 0)
+      return t("dashboard.airingInDays", { d: days, h: hours % 24 });
+    const minutes = Math.floor((diff % 3_600_000) / 60_000);
+    return t("dashboard.airingInHours", { h: hours, m: minutes });
+  };
+
   return (
     <Link
       to={`/anime/${entry.media.id}`}
@@ -268,9 +281,9 @@ function AiringRow({ entry }: { entry: MediaListEntry }) {
           {displayTitle(entry.media.title)}
         </p>
         <p className="text-xs text-ink-600">
-          Episode {airing.episode}
+          {t("common.episode", { n: airing.episode })}
           {entry.progress < airing.episode - 1 &&
-            ` · du bist bei ${entry.progress}`}
+            ` · ${t("dashboard.youAreAt", { n: entry.progress })}`}
         </p>
       </div>
       <span className="shrink-0 text-sm tabular-nums text-accent-400">

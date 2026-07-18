@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { listen } from "@tauri-apps/api/event";
 import { Check, MonitorPlay, Tv, X } from "lucide-react";
 import {
@@ -12,15 +13,16 @@ import { isTauri } from "@/api/anilist";
 import { Button } from "@/components/ui/button";
 
 function useCountdown(targetMs: number | null): string | null {
+  const { t } = useTranslation();
   const [, tick] = useState(0);
   useEffect(() => {
     if (targetMs === null) return;
-    const t = setInterval(() => tick((n) => n + 1), 1000);
-    return () => clearInterval(t);
+    const timer = setInterval(() => tick((n) => n + 1), 1000);
+    return () => clearInterval(timer);
   }, [targetMs]);
   if (targetMs === null) return null;
   const diff = targetMs - Date.now();
-  if (diff <= 0) return "gleich";
+  if (diff <= 0) return t("nowPlaying.soon");
   const min = Math.floor(diff / 60_000);
   const sec = Math.floor((diff % 60_000) / 1000);
   return min > 0 ? `${min} min ${sec} s` : `${sec} s`;
@@ -34,6 +36,7 @@ export default function NowPlayingCard() {
     scrobble.phase === "watching" ? scrobble.updateAtMs : null,
   );
   const qc = useQueryClient();
+  const { t } = useTranslation();
 
   // Nach erfolgreichem Auto-Update die Liste neu laden
   useEffect(() => {
@@ -57,7 +60,9 @@ export default function NowPlayingCard() {
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-xs font-medium uppercase tracking-wide text-accent-400">
-            Läuft gerade · {current.process.replace(".exe", "")}
+            {t("nowPlaying.heading", {
+              process: current.process.replace(".exe", ""),
+            })}
           </p>
           <p className="truncate font-semibold">
             {current.mediaId ? (
@@ -68,7 +73,10 @@ export default function NowPlayingCard() {
               title
             )}
             {current.episode !== null && (
-              <span className="text-ink-300"> — Episode {current.episode}</span>
+              <span className="text-ink-300">
+                {" "}
+                — {t("common.episode", { n: current.episode })}
+              </span>
             )}
           </p>
           <ScrobbleStatus countdown={countdown} />
@@ -80,6 +88,7 @@ export default function NowPlayingCard() {
 }
 
 function ScrobbleStatus({ countdown }: { countdown: string | null }) {
+  const { t } = useTranslation();
   const current = useNowPlaying((s) => s.current);
   const scrobble = useNowPlaying((s) => s.scrobble);
 
@@ -88,51 +97,50 @@ function ScrobbleStatus({ countdown }: { countdown: string | null }) {
       return (
         <p className="text-xs text-ink-500">
           {countdown
-            ? `Fortschritt wird in ${countdown} aktualisiert`
-            : "Wird geschaut …"}
+            ? t("nowPlaying.updateIn", { time: countdown })
+            : t("nowPlaying.watching")}
         </p>
       );
     case "pending":
       return (
         <p className="text-xs font-medium text-amber-300">
-          Episode {scrobble.episode} als gesehen markieren?
+          {t("nowPlaying.confirmPrompt", { n: scrobble.episode })}
         </p>
       );
     case "updating":
-      return <p className="text-xs text-ink-500">Aktualisiere …</p>;
+      return <p className="text-xs text-ink-500">{t("nowPlaying.updating")}</p>;
     case "updated":
       return (
         <p className="flex items-center gap-1 text-xs font-medium text-emerald-400">
-          <Check size={12} /> Fortschritt aktualisiert (Episode{" "}
-          {scrobble.episode})
+          <Check size={12} /> {t("nowPlaying.updated", { n: scrobble.episode })}
         </p>
       );
     case "blocked":
       return (
         <p className="text-xs text-amber-300">
-          {scrobble.reason ?? "Auto-Update nicht möglich"}
+          {scrobble.reason ?? t("nowPlaying.blocked")}
         </p>
       );
     case "cancelled":
-      return <p className="text-xs text-ink-500">Update übersprungen.</p>;
+      return <p className="text-xs text-ink-500">{t("nowPlaying.skipped")}</p>;
     default:
       if (current?.mediaId) {
         return (
           <p className="text-xs text-ink-500">
-            Dein Fortschritt: {current.progress}
-            {current.totalEpisodes ? ` / ${current.totalEpisodes}` : ""}
+            {t("nowPlaying.yourProgress", {
+              progress: `${current.progress}${
+                current.totalEpisodes ? ` / ${current.totalEpisodes}` : ""
+              }`,
+            })}
           </p>
         );
       }
-      return (
-        <p className="text-xs text-ink-500">
-          Kein Eintrag deiner Liste erkannt.
-        </p>
-      );
+      return <p className="text-xs text-ink-500">{t("nowPlaying.noMatch")}</p>;
   }
 }
 
 function ScrobbleActions() {
+  const { t } = useTranslation();
   const scrobble = useNowPlaying((s) => s.scrobble);
   const [busy, setBusy] = useState(false);
 
@@ -157,9 +165,9 @@ function ScrobbleActions() {
           size="sm"
           disabled={busy}
           onClick={() => act(scrobbleNow)}
-          title="Fortschritt jetzt aktualisieren"
+          title={t("nowPlaying.updateNowTitle")}
         >
-          <Check size={14} /> Jetzt
+          <Check size={14} /> {t("nowPlaying.updateNow")}
         </Button>
         {scrobble.phase !== "cancelled" && scrobble.phase !== "blocked" && (
           <Button
@@ -167,7 +175,7 @@ function ScrobbleActions() {
             variant="secondary"
             disabled={busy}
             onClick={() => act(scrobbleCancel)}
-            title="Diese Episode nicht aktualisieren"
+            title={t("nowPlaying.skipTitle")}
           >
             <X size={14} />
           </Button>

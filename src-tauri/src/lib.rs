@@ -43,8 +43,8 @@ pub fn run() {
             relations::spawn_loader(app.handle().clone());
             scrobbler::spawn(app.handle().clone());
 
-            let show = MenuItem::with_id(app, "show", "Karasu öffnen", true, None::<&str>)?;
-            let quit = MenuItem::with_id(app, "quit", "Beenden", true, None::<&str>)?;
+            let show = MenuItem::with_id(app, "show", "Open Karasu", true, None::<&str>)?;
+            let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show, &quit])?;
 
             TrayIconBuilder::with_id("main-tray")
@@ -79,7 +79,7 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
-            commands::get_client_id,
+            commands::anilist_auth_info,
             commands::set_client_id,
             commands::anilist_login_url,
             commands::anilist_connect,

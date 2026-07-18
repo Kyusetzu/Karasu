@@ -1,10 +1,15 @@
-use crate::anilist::{
+﻿use crate::anilist::{
     auth,
     client::{AniList, ApiError},
 };
 use crate::db::Db;
 use serde_json::{json, Value};
 use tauri::{Manager, State};
+
+/// Eingebaute AniList-Client-ID (Taiga-Prinzip: eine geteilte App für alle
+/// Nutzer; die ID ist öffentlich, kein Secret). Leer = Nutzer brauchen eine
+/// eigene Client-ID. Wird vom Maintainer einmalig eingetragen.
+pub const BUILTIN_ANILIST_CLIENT_ID: &str = "";
 
 const VIEWER_QUERY: &str = "
 query {
@@ -16,16 +21,30 @@ query {
   }
 }";
 
+#[derive(serde::Serialize)]
+pub struct AuthInfo {
+    /// true, wenn eine Client-ID einkompiliert ist (Login ohne Setup möglich)
+    #[serde(rename = "hasBuiltinClientId")]
+    pub has_builtin_client_id: bool,
+    #[serde(rename = "customClientId")]
+    pub custom_client_id: Option<String>,
+}
+
 #[tauri::command]
-pub fn get_client_id(db: State<'_, Db>) -> Option<String> {
-    db.kv_get("anilist_client_id")
+pub fn anilist_auth_info(db: State<'_, Db>) -> AuthInfo {
+    AuthInfo {
+        has_builtin_client_id: !BUILTIN_ANILIST_CLIENT_ID.is_empty(),
+        custom_client_id: db.kv_get("anilist_client_id"),
+    }
 }
 
 #[tauri::command]
 pub fn set_client_id(db: State<'_, Db>, client_id: String) -> Result<(), String> {
     let trimmed = client_id.trim();
     if trimmed.is_empty() || !trimmed.chars().all(|c| c.is_ascii_digit()) {
-        return Err("Die Client-ID ist die Zahl aus deinen AniList-Developer-Einstellungen".into());
+        return Err(
+            "The client ID is the number from your AniList developer settings".into(),
+        );
     }
     db.kv_set("anilist_client_id", trimmed)
 }
@@ -34,7 +53,11 @@ pub fn set_client_id(db: State<'_, Db>, client_id: String) -> Result<(), String>
 pub fn anilist_login_url(db: State<'_, Db>) -> Result<String, String> {
     let client_id = db
         .kv_get("anilist_client_id")
-        .ok_or("Bitte zuerst die Client-ID speichern")?;
+        .filter(|id| !id.is_empty())
+        .unwrap_or_else(|| BUILTIN_ANILIST_CLIENT_ID.to_string());
+    if client_id.is_empty() {
+        return Err("No AniList client ID configured".into());
+    }
     Ok(auth::authorize_url(&client_id))
 }
 
@@ -48,14 +71,14 @@ pub async fn anilist_connect(
 ) -> Result<Value, String> {
     let token = token.trim().to_string();
     if token.is_empty() {
-        return Err("Bitte den Token von der AniList-Seite einfügen".into());
+        return Err("Please paste the token from the AniList page".into());
     }
     let data = api.query(Some(&token), VIEWER_QUERY, json!({})).await?;
     let viewer = data
         .get("Viewer")
         .filter(|v| !v.is_null())
         .cloned()
-        .ok_or("Token ungültig oder abgelaufen")?;
+        .ok_or("Token invalid or expired")?;
     auth::save_token(&token)?;
     db.kv_set("anilist_viewer", &viewer.to_string())?;
     Ok(viewer)
@@ -186,12 +209,12 @@ pub async fn fetch_anime_list(
         Err(ApiError::Network(_)) => {
             let cached = db
                 .cached_list(user_id)
-                .ok_or("Offline und noch kein lokaler Listen-Cache vorhanden")?;
+                .ok_or("Offline and no local list cache available yet")?;
             Ok(ListResult {
                 from_cache: true,
                 pending: db.queue_len(),
                 lists: serde_json::from_str(&cached)
-                    .map_err(|e| format!("Cache beschädigt: {e}"))?,
+                    .map_err(|e| format!("Cache corrupted: {e}"))?,
             })
         }
         Err(e) => Err(e.into()),
@@ -239,7 +262,7 @@ pub async fn save_list_entry(
     api: State<'_, AniList>,
     input: Value,
 ) -> Result<MutationResult, String> {
-    let token = auth::load_token().ok_or("Nicht mit AniList verbunden")?;
+    let token = auth::load_token().ok_or("Not connected to AniList")?;
     save_entry_core(&db, &api, &token, input).await
 }
 
@@ -249,7 +272,7 @@ pub async fn delete_list_entry(
     api: State<'_, AniList>,
     id: i64,
 ) -> Result<MutationResult, String> {
-    let token = auth::load_token().ok_or("Nicht mit AniList verbunden")?;
+    let token = auth::load_token().ok_or("Not connected to AniList")?;
     let input = json!({ "id": id });
 
     if db.queue_len() > 0 && process_queue(&db, &api, Some(&token)).await.is_err() {
@@ -298,7 +321,7 @@ pub async fn flush_queue(
     db: State<'_, Db>,
     api: State<'_, AniList>,
 ) -> Result<usize, String> {
-    let token = auth::load_token().ok_or("Nicht mit AniList verbunden")?;
+    let token = auth::load_token().ok_or("Not connected to AniList")?;
     process_queue(&db, &api, Some(&token)).await
 }
 
@@ -355,6 +378,9 @@ pub struct DiscordSettings {
     pub enabled: bool,
     #[serde(rename = "appId")]
     pub app_id: String,
+    /// true, wenn eine Application-ID einkompiliert ist
+    #[serde(rename = "hasBuiltinAppId")]
+    pub has_builtin_app_id: bool,
 }
 
 #[tauri::command]
@@ -362,6 +388,7 @@ pub fn get_discord_settings(db: State<'_, Db>) -> DiscordSettings {
     DiscordSettings {
         enabled: db.kv_get("discord_enabled").as_deref() == Some("1"),
         app_id: db.kv_get("discord_app_id").unwrap_or_default(),
+        has_builtin_app_id: !crate::discord::BUILTIN_DISCORD_APP_ID.is_empty(),
     }
 }
 

@@ -81,15 +81,6 @@ export interface MutationResult {
   } | null;
 }
 
-export const STATUS_LABELS: Record<MediaListStatus, string> = {
-  CURRENT: "Schaue",
-  REPEATING: "Rewatch",
-  COMPLETED: "Abgeschlossen",
-  PAUSED: "Pausiert",
-  DROPPED: "Abgebrochen",
-  PLANNING: "Geplant",
-};
-
 export const STATUS_ORDER: MediaListStatus[] = [
   "CURRENT",
   "REPEATING",

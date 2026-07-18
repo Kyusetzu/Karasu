@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   CloudOff,
   LayoutGrid,
@@ -16,7 +17,6 @@ import { useAuth } from "@/stores/auth";
 import { fetchAnimeList, flushQueue } from "@/api/anilist";
 import {
   displayTitle,
-  STATUS_LABELS,
   STATUS_ORDER,
   type MediaListEntry,
   type MediaListStatus,
@@ -28,15 +28,10 @@ import { Modal } from "@/components/ui/modal";
 import { cn } from "@/lib/utils";
 
 type SortKey = "updated" | "title" | "score" | "progress";
-
-const SORT_LABELS: Record<SortKey, string> = {
-  updated: "Zuletzt aktualisiert",
-  title: "Titel",
-  score: "Bewertung",
-  progress: "Fortschritt",
-};
+const SORT_KEYS: SortKey[] = ["updated", "title", "score", "progress"];
 
 export default function AnimeList() {
+  const { t } = useTranslation();
   const viewer = useAuth((s) => s.viewer);
   const loading = useAuth((s) => s.loading);
 
@@ -46,11 +41,9 @@ export default function AnimeList() {
     return (
       <div className="grid h-full place-items-center p-8">
         <div className="text-center">
-          <p className="text-ink-500">
-            Verbinde dich mit AniList, um deine Liste zu sehen.
-          </p>
+          <p className="text-ink-500">{t("list.connectPrompt")}</p>
           <Link to="/settings">
-            <Button className="mt-4">Zu den Einstellungen</Button>
+            <Button className="mt-4">{t("list.toSettings")}</Button>
           </Link>
         </div>
       </div>
@@ -61,6 +54,7 @@ export default function AnimeList() {
 }
 
 function ListView({ userId }: { userId: number }) {
+  const { t } = useTranslation();
   const [tab, setTab] = useState<MediaListStatus>("CURRENT");
   const [filter, setFilter] = useState("");
   const [sort, setSort] = useState<SortKey>("updated");
@@ -90,8 +84,8 @@ function ListView({ userId }: { userId: number }) {
     if (filter.trim()) {
       const q = filter.trim().toLowerCase();
       list = list.filter((e) => {
-        const t = e.media.title;
-        return [t.romaji, t.english, t.native, ...e.media.synonyms]
+        const ti = e.media.title;
+        return [ti.romaji, ti.english, ti.native, ...e.media.synonyms]
           .filter(Boolean)
           .some((s) => s!.toLowerCase().includes(q));
       });
@@ -113,14 +107,16 @@ function ListView({ userId }: { userId: number }) {
   }, [byStatus, tab, filter, sort]);
 
   if (isLoading) {
-    return <p className="p-8 text-ink-500">Lade deine Liste …</p>;
+    return <p className="p-8 text-ink-500">{t("list.loading")}</p>;
   }
   if (error) {
     return (
       <div className="p-8">
-        <p className="text-red-300">Fehler beim Laden: {String(error)}</p>
+        <p className="text-red-300">
+          {t("list.loadError", { message: String(error) })}
+        </p>
         <Button className="mt-4" variant="secondary" onClick={() => refetch()}>
-          Erneut versuchen
+          {t("common.retry")}
         </Button>
       </div>
     );
@@ -135,8 +131,8 @@ function ListView({ userId }: { userId: number }) {
         <div className="flex items-center gap-3 border-b border-surface-800 bg-amber-950/40 px-8 py-2 text-xs text-amber-300">
           <CloudOff size={14} />
           {data?.fromCache
-            ? "Offline — zeige lokalen Stand."
-            : `${data?.pending} Änderung(en) warten auf Synchronisation.`}
+            ? t("list.offline")
+            : t("list.pending", { count: data?.pending ?? 0 })}
           <Button
             variant="ghost"
             size="sm"
@@ -146,20 +142,20 @@ function ListView({ userId }: { userId: number }) {
               refetch();
             }}
           >
-            <RefreshCw size={13} /> Jetzt synchronisieren
+            <RefreshCw size={13} /> {t("list.syncNow")}
           </Button>
         </div>
       )}
 
       <div className="space-y-4 px-8 pt-6">
         <div className="flex items-center justify-between gap-4">
-          <h1 className="text-2xl font-bold">Meine Liste</h1>
+          <h1 className="text-2xl font-bold">{t("list.title")}</h1>
           <Button
             variant="ghost"
             size="icon"
             onClick={() => refetch()}
             disabled={isRefetching}
-            aria-label="Neu laden"
+            aria-label={t("common.reload")}
           >
             <RefreshCw size={16} className={cn(isRefetching && "animate-spin")} />
           </Button>
@@ -179,8 +175,10 @@ function ListView({ userId }: { userId: number }) {
                     : "text-ink-500 hover:bg-surface-800 hover:text-ink-100",
                 )}
               >
-                {STATUS_LABELS[status]}
-                {count > 0 && <span className="ml-1.5 text-xs opacity-70">{count}</span>}
+                {t(`status.${status}`)}
+                {count > 0 && (
+                  <span className="ml-1.5 text-xs opacity-70">{count}</span>
+                )}
               </button>
             );
           })}
@@ -195,7 +193,7 @@ function ListView({ userId }: { userId: number }) {
             <Input
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
-              placeholder="In der Liste suchen …"
+              placeholder={t("list.filterPlaceholder")}
               className="pl-8"
             />
           </div>
@@ -204,9 +202,9 @@ function ListView({ userId }: { userId: number }) {
             onChange={(e) => setSort(e.target.value as SortKey)}
             className="h-9 rounded-lg border border-surface-700 bg-surface-900 px-2 text-sm text-ink-300 focus:border-accent-500 focus:outline-none"
           >
-            {Object.entries(SORT_LABELS).map(([k, label]) => (
+            {SORT_KEYS.map((k) => (
               <option key={k} value={k}>
-                {label}
+                {t(`sort.${k}`)}
               </option>
             ))}
           </select>
@@ -217,7 +215,7 @@ function ListView({ userId }: { userId: number }) {
                 "grid h-9 w-9 place-items-center rounded-l-lg",
                 grid ? "bg-surface-700 text-ink-100" : "text-ink-600 hover:text-ink-300",
               )}
-              aria-label="Rasteransicht"
+              aria-label={t("list.gridView")}
             >
               <LayoutGrid size={15} />
             </button>
@@ -227,7 +225,7 @@ function ListView({ userId }: { userId: number }) {
                 "grid h-9 w-9 place-items-center rounded-r-lg",
                 !grid ? "bg-surface-700 text-ink-100" : "text-ink-600 hover:text-ink-300",
               )}
-              aria-label="Listenansicht"
+              aria-label={t("list.listView")}
             >
               <ListIcon size={15} />
             </button>
@@ -237,7 +235,7 @@ function ListView({ userId }: { userId: number }) {
 
       <div className="min-h-0 flex-1 overflow-y-auto px-8 py-6">
         {entries.length === 0 ? (
-          <p className="text-sm text-ink-600">Keine Einträge.</p>
+          <p className="text-sm text-ink-600">{t("list.empty")}</p>
         ) : grid ? (
           <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-x-4 gap-y-6">
             {entries.map((entry) => (
@@ -292,6 +290,7 @@ function canIncrement(entry: MediaListEntry) {
 }
 
 function GridCard({ entry, onPlusOne, onEdit }: CardProps) {
+  const { t } = useTranslation();
   const { media } = entry;
   const pct = media.episodes ? (entry.progress / media.episodes) * 100 : 0;
   return (
@@ -312,7 +311,7 @@ function GridCard({ entry, onPlusOne, onEdit }: CardProps) {
           <button
             onClick={onEdit}
             className="grid h-8 w-8 place-items-center rounded-full bg-surface-900/90 text-ink-300 hover:bg-surface-800 hover:text-ink-100"
-            aria-label="Bearbeiten"
+            aria-label={t("common.edit")}
           >
             <Pencil size={14} />
           </button>
@@ -320,7 +319,7 @@ function GridCard({ entry, onPlusOne, onEdit }: CardProps) {
             <button
               onClick={onPlusOne}
               className="grid h-8 w-8 place-items-center rounded-full bg-accent-600 text-white hover:bg-accent-500"
-              aria-label="Episode +1"
+              aria-label={t("common.plusOne")}
             >
               <Plus size={16} />
             </button>
@@ -347,13 +346,14 @@ function GridCard({ entry, onPlusOne, onEdit }: CardProps) {
       </Link>
       <p className="text-xs text-ink-600">
         {entry.progress}
-        {media.episodes ? ` / ${media.episodes}` : ""} Episoden
+        {media.episodes ? ` / ${media.episodes}` : ""} {t("common.episodes")}
       </p>
     </div>
   );
 }
 
 function ListRow({ entry, onPlusOne, onEdit }: CardProps) {
+  const { t } = useTranslation();
   const { media } = entry;
   return (
     <div className="flex items-center gap-4 bg-surface-900 px-4 py-2.5 first:rounded-t-xl last:rounded-b-xl hover:bg-surface-850">
@@ -386,7 +386,12 @@ function ListRow({ entry, onPlusOne, onEdit }: CardProps) {
         {media.episodes ? ` / ${media.episodes}` : ""}
       </span>
       <div className="flex gap-1">
-        <Button variant="ghost" size="icon" onClick={onEdit} aria-label="Bearbeiten">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onEdit}
+          aria-label={t("common.edit")}
+        >
           <Pencil size={14} />
         </Button>
         <Button
@@ -394,7 +399,7 @@ function ListRow({ entry, onPlusOne, onEdit }: CardProps) {
           size="icon"
           onClick={onPlusOne}
           disabled={!canIncrement(entry)}
-          aria-label="Episode +1"
+          aria-label={t("common.plusOne")}
         >
           <Plus size={15} />
         </Button>
@@ -419,6 +424,7 @@ function EditModal({
   }) => void;
   onDelete: () => void;
 }) {
+  const { t } = useTranslation();
   const [status, setStatus] = useState<MediaListStatus>(entry.status);
   const [progress, setProgress] = useState(entry.progress);
   const [score, setScore] = useState(entry.score);
@@ -429,7 +435,7 @@ function EditModal({
     <Modal title={displayTitle(entry.media.title)} onClose={onClose}>
       <div className="space-y-4">
         <label className="block text-sm">
-          <span className="mb-1 block text-ink-500">Status</span>
+          <span className="mb-1 block text-ink-500">{t("common.status")}</span>
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value as MediaListStatus)}
@@ -437,7 +443,7 @@ function EditModal({
           >
             {STATUS_ORDER.map((s) => (
               <option key={s} value={s}>
-                {STATUS_LABELS[s]}
+                {t(`status.${s}`)}
               </option>
             ))}
           </select>
@@ -445,7 +451,9 @@ function EditModal({
         <div className="grid grid-cols-2 gap-3">
           <label className="block text-sm">
             <span className="mb-1 block text-ink-500">
-              Fortschritt{entry.media.episodes ? ` (max. ${max})` : ""}
+              {entry.media.episodes
+                ? t("list.progressMax", { max })
+                : t("common.progress")}
             </span>
             <Input
               type="number"
@@ -458,7 +466,9 @@ function EditModal({
             />
           </label>
           <label className="block text-sm">
-            <span className="mb-1 block text-ink-500">Bewertung (0–10)</span>
+            <span className="mb-1 block text-ink-500">
+              {t("list.scoreRange")}
+            </span>
             <Input
               type="number"
               min={0}
@@ -473,7 +483,7 @@ function EditModal({
         <div className="flex items-center justify-between pt-2">
           {confirmDelete ? (
             <Button variant="danger" size="sm" onClick={onDelete}>
-              Wirklich entfernen?
+              {t("common.confirmRemove")}
             </Button>
           ) : (
             <Button
@@ -482,19 +492,19 @@ function EditModal({
               className="text-red-400"
               onClick={() => setConfirmDelete(true)}
             >
-              <Trash2 size={14} /> Entfernen
+              <Trash2 size={14} /> {t("common.remove")}
             </Button>
           )}
           <div className="flex gap-2">
             <Button variant="secondary" onClick={onClose}>
-              Abbrechen
+              {t("common.cancel")}
             </Button>
             <Button
               onClick={() =>
                 onSave({ mediaId: entry.mediaId, status, progress, score })
               }
             >
-              Speichern
+              {t("common.save")}
             </Button>
           </div>
         </div>

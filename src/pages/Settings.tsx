@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { ExternalLink, LogOut, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,120 +12,25 @@ import {
   setScrobbleSettings,
   type ScrobbleSettings,
 } from "@/stores/nowPlaying";
+import {
+  getLanguageSetting,
+  setLanguageSetting,
+  SUPPORTED_LANGUAGES,
+  type LanguageSetting,
+} from "@/i18n";
+
+const PIN_URL = "https://anilist.co/api/v2/oauth/pin";
 
 export default function Settings() {
+  const { t } = useTranslation();
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-8">
-      <h1 className="text-2xl font-bold">Einstellungen</h1>
+      <h1 className="text-2xl font-bold">{t("settings.title")}</h1>
       <AccountSection />
       <ScrobbleSection />
       <DiscordSection />
       <AppSection />
     </div>
-  );
-}
-
-function AppSection() {
-  const [autostart, setAutostart] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    if (!api.isTauri) return;
-    import("@tauri-apps/api/core").then(({ invoke }) =>
-      invoke<boolean>("get_autostart").then(setAutostart),
-    );
-  }, []);
-
-  if (autostart === null) return null;
-
-  const toggle = async (enabled: boolean) => {
-    setAutostart(enabled);
-    const { invoke } = await import("@tauri-apps/api/core");
-    await invoke("set_autostart", { enabled });
-  };
-
-  return (
-    <Card>
-      <CardTitle>App</CardTitle>
-      <div className="mt-3">
-        <Toggle
-          checked={autostart}
-          onChange={toggle}
-          label="Mit Windows starten"
-          hint="Karasu beim Anmelden automatisch im Hintergrund starten."
-        />
-      </div>
-    </Card>
-  );
-}
-
-interface DiscordSettings {
-  enabled: boolean;
-  appId: string;
-}
-
-function DiscordSection() {
-  const [settings, setSettings] = useState<DiscordSettings | null>(null);
-  const [saved, setSaved] = useState(false);
-
-  useEffect(() => {
-    if (!api.isTauri) return;
-    import("@tauri-apps/api/core").then(({ invoke }) =>
-      invoke<DiscordSettings>("get_discord_settings").then(setSettings),
-    );
-  }, []);
-
-  if (!settings) return null;
-
-  const save = async (next: DiscordSettings) => {
-    setSettings(next);
-    const { invoke } = await import("@tauri-apps/api/core");
-    await invoke("set_discord_settings", {
-      enabled: next.enabled,
-      appId: next.appId,
-    });
-    setSaved(true);
-    setTimeout(() => setSaved(false), 1500);
-  };
-
-  return (
-    <Card>
-      <CardTitle>Discord Rich Presence</CardTitle>
-      <div className="mt-3 space-y-3">
-        <Toggle
-          checked={settings.enabled}
-          onChange={(v) => save({ ...settings, enabled: v })}
-          label="In Discord anzeigen, was du schaust"
-          hint="Braucht eine eigene Discord-Application-ID (einmalig anlegen, dauert 30 Sekunden)."
-        />
-        <p className="text-xs leading-relaxed text-ink-600">
-          Erstelle im{" "}
-          <button
-            onClick={() =>
-              openUrl("https://discord.com/developers/applications")
-            }
-            className="text-accent-400 hover:underline"
-          >
-            Discord Developer Portal
-          </button>{" "}
-          eine neue Application namens „Karasu" und füge ihre Application-ID
-          hier ein.
-        </p>
-        <div className="flex gap-2">
-          <Input
-            value={settings.appId}
-            onChange={(e) =>
-              setSettings({ ...settings, appId: e.target.value })
-            }
-            placeholder="Application-ID"
-            className="max-w-60"
-            inputMode="numeric"
-          />
-          <Button variant="secondary" onClick={() => save(settings)}>
-            {saved ? "Gespeichert ✓" : "Speichern"}
-          </Button>
-        </div>
-      </div>
-    </Card>
   );
 }
 
@@ -164,65 +70,10 @@ function Toggle({
   );
 }
 
-function ScrobbleSection() {
-  const [settings, setSettings] = useState<ScrobbleSettings | null>(null);
-
-  useEffect(() => {
-    if (!api.isTauri) return;
-    getScrobbleSettings().then(setSettings);
-  }, []);
-
-  if (!settings) return null;
-
-  const update = (patch: Partial<ScrobbleSettings>) => {
-    const next = { ...settings, ...patch };
-    setSettings(next);
-    setScrobbleSettings(next);
-  };
-
-  return (
-    <Card>
-      <CardTitle>Automatisches Tracking</CardTitle>
-      <div className="mt-3 space-y-3">
-        <Toggle
-          checked={settings.enabled}
-          onChange={(v) => update({ enabled: v })}
-          label="Fortschritt automatisch aktualisieren"
-          hint="Erkannte Episoden nach Ablauf der Schwelle auf AniList als gesehen markieren."
-        />
-        <Toggle
-          checked={settings.confirm}
-          onChange={(v) => update({ confirm: v })}
-          label="Vorher nachfragen"
-          hint="Vor jedem Update eine Bestätigung in der App anzeigen."
-        />
-        <label className="flex items-center justify-between gap-4 py-1 text-sm">
-          <span>
-            <span className="block text-ink-100">Schwelle (Minuten)</span>
-            <span className="block text-xs text-ink-600">
-              0 = automatisch (zwei Drittel der Episodenlänge)
-            </span>
-          </span>
-          <Input
-            type="number"
-            min={0}
-            max={120}
-            value={settings.delayMin}
-            onChange={(e) =>
-              update({
-                delayMin: Math.max(0, Math.min(120, Number(e.target.value))),
-              })
-            }
-            className="w-20"
-          />
-        </label>
-      </div>
-    </Card>
-  );
-}
-
 function AccountSection() {
+  const { t } = useTranslation();
   const { viewer, connect, logout } = useAuth();
+  const [info, setInfo] = useState<api.AuthInfo | null>(null);
   const [clientId, setClientIdState] = useState("");
   const [clientIdSaved, setClientIdSaved] = useState(false);
   const [token, setToken] = useState("");
@@ -231,9 +82,10 @@ function AccountSection() {
 
   useEffect(() => {
     if (!api.isTauri) return;
-    api.getClientId().then((id) => {
-      if (id) {
-        setClientIdState(id);
+    api.authInfo().then((i) => {
+      setInfo(i);
+      if (i.customClientId) {
+        setClientIdState(i.customClientId);
         setClientIdSaved(true);
       }
     });
@@ -242,7 +94,7 @@ function AccountSection() {
   if (viewer) {
     return (
       <Card>
-        <CardTitle>AniList-Account</CardTitle>
+        <CardTitle>{t("settings.account")}</CardTitle>
         <div className="mt-4 flex items-center gap-4">
           {viewer.avatar?.large ? (
             <img
@@ -261,16 +113,20 @@ function AccountSection() {
               onClick={() => openUrl(viewer.siteUrl)}
               className="flex items-center gap-1 text-xs text-accent-400 hover:underline"
             >
-              Profil auf AniList <ExternalLink size={12} />
+              {t("settings.profileLink")} <ExternalLink size={12} />
             </button>
           </div>
           <Button variant="danger" onClick={() => logout()}>
-            <LogOut size={16} /> Abmelden
+            <LogOut size={16} /> {t("settings.logout")}
           </Button>
         </div>
       </Card>
     );
   }
+
+  // Login ist möglich, sobald eine Client-ID existiert (eingebaut oder eigene)
+  const canLogin =
+    (info?.hasBuiltinClientId ?? false) || clientIdSaved;
 
   const saveClientId = async () => {
     setError(null);
@@ -306,73 +162,236 @@ function AccountSection() {
 
   return (
     <Card>
-      <CardTitle>Mit AniList verbinden</CardTitle>
-      <ol className="mt-4 space-y-5 text-sm text-ink-300">
-        <li className="space-y-2">
-          <p>
-            <span className="font-semibold text-ink-100">1.</span> Erstelle
-            einmalig einen API-Client in deinen AniList-Einstellungen. Trage
-            als Redirect-URL{" "}
-            <code className="select-text rounded bg-surface-800 px-1.5 py-0.5 text-xs">
-              https://anilist.co/api/v2/oauth/pin
-            </code>{" "}
-            ein.
-          </p>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => openUrl("https://anilist.co/settings/developer")}
-          >
-            Developer-Einstellungen öffnen <ExternalLink size={14} />
-          </Button>
-        </li>
-        <li className="space-y-2">
-          <p>
-            <span className="font-semibold text-ink-100">2.</span> Trage die
-            Client-ID des erstellten Clients hier ein.
-          </p>
-          <div className="flex gap-2">
-            <Input
-              value={clientId}
-              onChange={(e) => {
-                setClientIdState(e.target.value);
-                setClientIdSaved(false);
-              }}
-              placeholder="z. B. 12345"
-              className="max-w-40"
-              inputMode="numeric"
-            />
-            <Button variant="secondary" onClick={saveClientId}>
-              {clientIdSaved ? "Gespeichert ✓" : "Speichern"}
+      <CardTitle>{t("settings.connectTitle")}</CardTitle>
+      <div className="mt-4 space-y-4 text-sm text-ink-300">
+        {!canLogin && (
+          <div className="space-y-2 rounded-lg bg-surface-850 p-3">
+            <p>{t("settings.stepClientId", { url: PIN_URL })}</p>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => openUrl("https://anilist.co/settings/developer")}
+            >
+              {t("settings.openDeveloper")} <ExternalLink size={14} />
             </Button>
+            <div className="flex gap-2">
+              <Input
+                value={clientId}
+                onChange={(e) => {
+                  setClientIdState(e.target.value);
+                  setClientIdSaved(false);
+                }}
+                placeholder={t("settings.clientIdPlaceholder")}
+                className="max-w-40"
+                inputMode="numeric"
+              />
+              <Button variant="secondary" onClick={saveClientId}>
+                {clientIdSaved ? t("common.saved") : t("common.save")}
+              </Button>
+            </div>
           </div>
-        </li>
-        <li className="space-y-2">
-          <p>
-            <span className="font-semibold text-ink-100">3.</span> Melde dich
-            im Browser an und kopiere den angezeigten Token hierher.
-          </p>
-          <Button onClick={openLogin} disabled={!clientIdSaved}>
-            Login-Seite öffnen <ExternalLink size={14} />
+        )}
+        <p>{t("settings.stepLogin")}</p>
+        <Button onClick={openLogin} disabled={!canLogin}>
+          {t("settings.openLogin")} <ExternalLink size={14} />
+        </Button>
+        <div className="flex gap-2 pt-1">
+          <Input
+            type="password"
+            value={token}
+            onChange={(e) => setToken(e.target.value)}
+            placeholder={t("settings.tokenPlaceholder")}
+          />
+          <Button onClick={submitToken} disabled={busy || !token.trim()}>
+            {busy ? t("settings.checking") : t("settings.connect")}
           </Button>
-          <div className="flex gap-2 pt-1">
-            <Input
-              type="password"
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
-              placeholder="Access-Token einfügen"
-            />
-            <Button onClick={submitToken} disabled={busy || !token.trim()}>
-              {busy ? "Prüfe …" : "Verbinden"}
-            </Button>
-          </div>
-        </li>
-      </ol>
+        </div>
+      </div>
       {error && (
         <p className="mt-4 rounded-lg bg-red-950/60 px-3 py-2 text-sm text-red-300">
           {error}
         </p>
       )}
+    </Card>
+  );
+}
+
+function ScrobbleSection() {
+  const { t } = useTranslation();
+  const [settings, setSettings] = useState<ScrobbleSettings | null>(null);
+
+  useEffect(() => {
+    if (!api.isTauri) return;
+    getScrobbleSettings().then(setSettings);
+  }, []);
+
+  if (!settings) return null;
+
+  const update = (patch: Partial<ScrobbleSettings>) => {
+    const next = { ...settings, ...patch };
+    setSettings(next);
+    setScrobbleSettings(next);
+  };
+
+  return (
+    <Card>
+      <CardTitle>{t("settings.tracking")}</CardTitle>
+      <div className="mt-3 space-y-3">
+        <Toggle
+          checked={settings.enabled}
+          onChange={(v) => update({ enabled: v })}
+          label={t("settings.trackingEnable")}
+          hint={t("settings.trackingEnableHint")}
+        />
+        <Toggle
+          checked={settings.confirm}
+          onChange={(v) => update({ confirm: v })}
+          label={t("settings.trackingConfirm")}
+          hint={t("settings.trackingConfirmHint")}
+        />
+        <label className="flex items-center justify-between gap-4 py-1 text-sm">
+          <span>
+            <span className="block text-ink-100">{t("settings.threshold")}</span>
+            <span className="block text-xs text-ink-600">
+              {t("settings.thresholdHint")}
+            </span>
+          </span>
+          <Input
+            type="number"
+            min={0}
+            max={120}
+            value={settings.delayMin}
+            onChange={(e) =>
+              update({
+                delayMin: Math.max(0, Math.min(120, Number(e.target.value))),
+              })
+            }
+            className="w-20"
+          />
+        </label>
+      </div>
+    </Card>
+  );
+}
+
+interface DiscordSettings {
+  enabled: boolean;
+  appId: string;
+  hasBuiltinAppId: boolean;
+}
+
+function DiscordSection() {
+  const { t } = useTranslation();
+  const [settings, setSettings] = useState<DiscordSettings | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    if (!api.isTauri) return;
+    import("@tauri-apps/api/core").then(({ invoke }) =>
+      invoke<DiscordSettings>("get_discord_settings").then(setSettings),
+    );
+  }, []);
+
+  if (!settings) return null;
+
+  const save = async (next: DiscordSettings) => {
+    setSettings(next);
+    const { invoke } = await import("@tauri-apps/api/core");
+    await invoke("set_discord_settings", {
+      enabled: next.enabled,
+      appId: next.appId,
+    });
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1500);
+  };
+
+  return (
+    <Card>
+      <CardTitle>{t("settings.discord")}</CardTitle>
+      <div className="mt-3 space-y-3">
+        <Toggle
+          checked={settings.enabled}
+          onChange={(v) => save({ ...settings, enabled: v })}
+          label={t("settings.discordEnable")}
+          hint={settings.hasBuiltinAppId ? t("settings.discordEnableHint") : undefined}
+        />
+        <p className="text-xs leading-relaxed text-ink-600">
+          {t("settings.discordCustomId")}
+        </p>
+        <div className="flex gap-2">
+          <Input
+            value={settings.appId}
+            onChange={(e) =>
+              setSettings({ ...settings, appId: e.target.value })
+            }
+            placeholder={t("settings.discordAppIdPlaceholder")}
+            className="max-w-60"
+            inputMode="numeric"
+          />
+          <Button variant="secondary" onClick={() => save(settings)}>
+            {saved ? t("common.saved") : t("common.save")}
+          </Button>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function AppSection() {
+  const { t } = useTranslation();
+  const [autostart, setAutostart] = useState<boolean | null>(null);
+  const [lang, setLang] = useState<LanguageSetting>(getLanguageSetting());
+
+  useEffect(() => {
+    if (!api.isTauri) return;
+    import("@tauri-apps/api/core").then(({ invoke }) =>
+      invoke<boolean>("get_autostart").then(setAutostart),
+    );
+  }, []);
+
+  const toggleAutostart = async (enabled: boolean) => {
+    setAutostart(enabled);
+    const { invoke } = await import("@tauri-apps/api/core");
+    await invoke("set_autostart", { enabled });
+  };
+
+  const changeLanguage = (setting: LanguageSetting) => {
+    setLang(setting);
+    setLanguageSetting(setting);
+  };
+
+  return (
+    <Card>
+      <CardTitle>{t("settings.app")}</CardTitle>
+      <div className="mt-3 space-y-3">
+        <label className="flex items-center justify-between gap-4 py-1 text-sm">
+          <span>
+            <span className="block text-ink-100">{t("settings.language")}</span>
+            <span className="block text-xs text-ink-600">
+              {t("settings.languageHint")}
+            </span>
+          </span>
+          <select
+            value={lang}
+            onChange={(e) => changeLanguage(e.target.value as LanguageSetting)}
+            className="h-9 rounded-lg border border-surface-700 bg-surface-900 px-2 text-sm focus:border-accent-500 focus:outline-none"
+          >
+            {SUPPORTED_LANGUAGES.map((l) => (
+              <option key={l.value} value={l.value}>
+                {l.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        {autostart !== null && (
+          <Toggle
+            checked={autostart}
+            onChange={toggleAutostart}
+            label={t("settings.autostart")}
+            hint={t("settings.autostartHint")}
+          />
+        )}
+      </div>
     </Card>
   );
 }

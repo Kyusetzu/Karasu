@@ -1,4 +1,4 @@
-use rusqlite::Connection;
+﻿use rusqlite::Connection;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
@@ -28,11 +28,11 @@ CREATE TABLE IF NOT EXISTS offline_queue (
 impl Db {
     pub fn open(data_dir: PathBuf) -> Result<Self, String> {
         std::fs::create_dir_all(&data_dir)
-            .map_err(|e| format!("App-Datenordner nicht anlegbar: {e}"))?;
+            .map_err(|e| format!("Could not create app data folder: {e}"))?;
         let conn = Connection::open(data_dir.join("karasu.db"))
-            .map_err(|e| format!("Datenbank nicht öffenbar: {e}"))?;
+            .map_err(|e| format!("Could not open database: {e}"))?;
         conn.execute_batch(MIGRATIONS)
-            .map_err(|e| format!("Migration fehlgeschlagen: {e}"))?;
+            .map_err(|e| format!("Migration failed: {e}"))?;
         Ok(Db(Mutex::new(conn)))
     }
 
@@ -50,7 +50,7 @@ impl Db {
             [key, value],
         )
         .map(|_| ())
-        .map_err(|e| format!("Speichern fehlgeschlagen: {e}"))
+        .map_err(|e| format!("Save failed: {e}"))
     }
 
     pub fn kv_delete(&self, key: &str) {
@@ -70,7 +70,7 @@ impl Db {
             rusqlite::params![user_id, payload],
         )
         .map(|_| ())
-        .map_err(|e| format!("Cache-Schreiben fehlgeschlagen: {e}"))
+        .map_err(|e| format!("Cache write failed: {e}"))
     }
 
     pub fn cached_list(&self, user_id: i64) -> Option<String> {
@@ -126,7 +126,7 @@ impl Db {
             [kind, payload],
         )
         .map(|_| ())
-        .map_err(|e| format!("Queue-Schreiben fehlgeschlagen: {e}"))
+        .map_err(|e| format!("Queue write failed: {e}"))
     }
 
     pub fn queue_all(&self) -> Vec<(i64, String, String)> {

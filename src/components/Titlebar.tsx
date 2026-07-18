@@ -1,4 +1,5 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { useTranslation } from "react-i18next";
 import { Minus, Square, X } from "lucide-react";
 
 // Im reinen Browser (vite dev ohne Tauri-Shell) gibt es keine Fenster-API
@@ -6,6 +7,7 @@ const appWindow =
   "__TAURI_INTERNALS__" in window ? getCurrentWindow() : null;
 
 export default function Titlebar() {
+  const { t } = useTranslation();
   return (
     <header
       data-tauri-drag-region
@@ -20,21 +22,21 @@ export default function Titlebar() {
         <button
           onClick={() => appWindow?.minimize()}
           className="grid h-full w-12 place-items-center text-ink-500 hover:bg-surface-800 hover:text-ink-100"
-          aria-label="Minimieren"
+          aria-label={t("window.minimize")}
         >
           <Minus size={14} />
         </button>
         <button
           onClick={() => appWindow?.toggleMaximize()}
           className="grid h-full w-12 place-items-center text-ink-500 hover:bg-surface-800 hover:text-ink-100"
-          aria-label="Maximieren"
+          aria-label={t("window.maximize")}
         >
           <Square size={12} />
         </button>
         <button
           onClick={() => appWindow?.hide()}
           className="grid h-full w-12 place-items-center text-ink-500 hover:bg-red-600 hover:text-white"
-          aria-label="Schließen (in den Tray)"
+          aria-label={t("window.closeToTray")}
         >
           <X size={16} />
         </button>

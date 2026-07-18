@@ -50,13 +50,6 @@ query ($season: MediaSeason!, $year: Int!, $page: Int) {
 
 export type Season = "WINTER" | "SPRING" | "SUMMER" | "FALL";
 
-export const SEASON_LABELS: Record<Season, string> = {
-  WINTER: "Winter",
-  SPRING: "Frühling",
-  SUMMER: "Sommer",
-  FALL: "Herbst",
-};
-
 export function currentSeason(): { season: Season; year: number } {
   const now = new Date();
   const month = now.getMonth() + 1;

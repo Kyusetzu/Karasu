@@ -5,13 +5,13 @@ const SERVICE: &str = "dev.kyu.karasu";
 const USER: &str = "anilist";
 
 fn entry() -> Result<keyring::Entry, String> {
-    keyring::Entry::new(SERVICE, USER).map_err(|e| format!("Credential-Store: {e}"))
+    keyring::Entry::new(SERVICE, USER).map_err(|e| format!("Credential store: {e}"))
 }
 
 pub fn save_token(token: &str) -> Result<(), String> {
     entry()?
         .set_password(token)
-        .map_err(|e| format!("Token konnte nicht gespeichert werden: {e}"))
+        .map_err(|e| format!("Could not save token: {e}"))
 }
 
 pub fn load_token() -> Option<String> {

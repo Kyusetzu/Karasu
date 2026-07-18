@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { Search as SearchIcon } from "lucide-react";
 import { searchAnime } from "@/api/queries";
 import { Input } from "@/components/ui/input";
@@ -7,13 +8,14 @@ import MediaCard from "@/components/MediaCard";
 import { isTauri } from "@/api/anilist";
 
 export default function Search() {
+  const { t } = useTranslation();
   const [input, setInput] = useState("");
   const [term, setTerm] = useState("");
 
   // Debounce: erst nach 500 ms Tipppause suchen (Rate-Limit schonen)
   useEffect(() => {
-    const t = setTimeout(() => setTerm(input.trim()), 500);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setTerm(input.trim()), 500);
+    return () => clearTimeout(timer);
   }, [input]);
 
   const { data, isFetching, error } = useQuery({
@@ -25,7 +27,7 @@ export default function Search() {
   return (
     <div className="flex h-full flex-col">
       <div className="px-8 pt-6">
-        <h1 className="text-2xl font-bold">Suche</h1>
+        <h1 className="text-2xl font-bold">{t("search.title")}</h1>
         <div className="relative mt-4 max-w-md">
           <SearchIcon
             size={15}
@@ -35,7 +37,7 @@ export default function Search() {
             autoFocus
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Anime auf AniList suchen …"
+            placeholder={t("search.placeholder")}
             className="h-10 pl-9"
           />
         </div>
@@ -43,11 +45,17 @@ export default function Search() {
 
       <div className="min-h-0 flex-1 overflow-y-auto px-8 py-6">
         {error && (
-          <p className="text-sm text-red-300">Fehler: {String(error)}</p>
+          <p className="text-sm text-red-300">
+            {t("common.error", { message: String(error) })}
+          </p>
         )}
-        {isFetching && <p className="text-sm text-ink-600">Suche …</p>}
+        {isFetching && (
+          <p className="text-sm text-ink-600">{t("search.searching")}</p>
+        )}
         {!isFetching && term.length >= 2 && data?.media.length === 0 && (
-          <p className="text-sm text-ink-600">Keine Treffer für „{term}".</p>
+          <p className="text-sm text-ink-600">
+            {t("search.noResults", { term })}
+          </p>
         )}
         {data && data.media.length > 0 && (
           <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-x-4 gap-y-6">

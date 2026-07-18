@@ -11,7 +11,22 @@ use discord_rich_presence::{
 use std::sync::Mutex;
 use tauri::{AppHandle, Manager};
 
+/// Eingebaute Discord-Application-ID (öffentlich, kein Secret) — eine
+/// geteilte App für alle Nutzer, wie bei Taiga. Leer = Feature erfordert
+/// eine eigene ID in den Settings. Wird vom Maintainer einmalig eingetragen.
+pub const BUILTIN_DISCORD_APP_ID: &str = "";
+
 pub struct Discord(pub Mutex<Option<DiscordIpcClient>>);
+
+/// Effektive App-ID: Nutzer-Override aus den Settings oder die eingebaute.
+pub fn effective_app_id(custom: &str) -> String {
+    let custom = custom.trim();
+    if custom.is_empty() {
+        BUILTIN_DISCORD_APP_ID.to_string()
+    } else {
+        custom.to_string()
+    }
+}
 
 fn disconnect(guard: &mut Option<DiscordIpcClient>) {
     if let Some(mut client) = guard.take() {
@@ -25,12 +40,12 @@ fn disconnect(guard: &mut Option<DiscordIpcClient>) {
 pub fn sync(app: &AppHandle, now: Option<&NowPlaying>) {
     let db = app.state::<Db>();
     let enabled = db.kv_get("discord_enabled").as_deref() == Some("1");
-    let app_id = db.kv_get("discord_app_id").unwrap_or_default();
+    let app_id = effective_app_id(&db.kv_get("discord_app_id").unwrap_or_default());
 
     let state = app.state::<Discord>();
     let mut guard = state.0.lock().unwrap();
 
-    if !enabled || app_id.trim().is_empty() {
+    if !enabled || app_id.is_empty() {
         disconnect(&mut guard);
         return;
     }
@@ -45,7 +60,7 @@ pub fn sync(app: &AppHandle, now: Option<&NowPlaying>) {
     };
 
     if guard.is_none() {
-        let Ok(mut client) = DiscordIpcClient::new(app_id.trim()) else {
+        let Ok(mut client) = DiscordIpcClient::new(&app_id) else {
             return;
         };
         if client.connect().is_ok() {
@@ -62,7 +77,7 @@ pub fn sync(app: &AppHandle, now: Option<&NowPlaying>) {
     let episode = np
         .episode
         .map(|e| format!("Episode {e}"))
-        .unwrap_or_else(|| "Schaut Anime".to_string());
+        .unwrap_or_else(|| "Watching anime".to_string());
     let start = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_secs() as i64)

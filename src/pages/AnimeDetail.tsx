@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardTitle } from "@/components/ui/card";
 
-/** AniList-Beschreibungen: Spoiler entfernen, nur harmlose Tags erlauben. */
+/** AniList descriptions: strip spoilers, allow only harmless tags. */
 function sanitizeDescription(html: string): string {
   return html
     .replace(/~!([\s\S]*?)!~/g, "")

@@ -1,5 +1,5 @@
-//! Erkennung laufender Medienwiedergabe über sichtbare Fenster
-//! (Karasus Gegenstück zu Taigas Anisthesia).
+//! Detection of running media playback via visible windows
+//! (Karasu's counterpart to Taiga's Anisthesia).
 
 pub mod profiles;
 
@@ -16,24 +16,24 @@ use windows::Win32::UI::WindowsAndMessaging::{
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct WindowInfo {
-    /// Prozessname in Kleinbuchstaben, z. B. "mpv.exe"
+    /// Lower-case process name, e.g. "mpv.exe"
     pub process: String,
     pub title: String,
 }
 
-/// Kandidat aus einem Player- oder Browser-Fenster.
+/// Candidate from a player or browser window.
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct Playback {
     pub process: String,
-    /// Bereinigter Medientitel (Dateiname bzw. Streaming-/Lese-Titel)
+    /// Cleaned media title (file name or streaming/reading title)
     pub media_title: String,
-    /// true, wenn aus einem Browser-/Streaming-Fenster erkannt
+    /// true if detected from a browser/streaming window
     pub streaming: bool,
-    /// true, wenn es sich um Manga-Lesen handelt (Kapitel statt Episoden)
+    /// true if this is manga reading (chapters instead of episodes)
     pub manga: bool,
 }
 
-/// Listet alle sichtbaren Top-Level-Fenster mit Titel und Prozessnamen.
+/// Lists all visible top-level windows with title and process name.
 pub fn enumerate_windows() -> Vec<WindowInfo> {
     let mut result: Vec<WindowInfo> = Vec::new();
     unsafe {
@@ -92,8 +92,8 @@ fn process_name(pid: u32) -> Option<String> {
     }
 }
 
-/// Manueller Live-Test: `cargo test live_detect -- --ignored --nocapture`
-/// bei laufendem Player zeigt alle Fenster und das Erkennungsergebnis.
+/// Manual live test: `cargo test live_detect -- --ignored --nocapture`
+/// with a player running prints all windows and the detection result.
 #[cfg(test)]
 mod live_tests {
     #[test]
@@ -106,10 +106,10 @@ mod live_tests {
     }
 }
 
-/// Sucht in allen Fenstern nach laufender Anime-Wiedergabe oder Manga-Lesen.
+/// Scans all windows for running anime playback or manga reading.
 pub fn detect_playback() -> Option<Playback> {
     let windows = enumerate_windows();
-    // Lokale Player haben Vorrang vor Browser-Erkennung
+    // Local players take precedence over browser detection
     for w in &windows {
         if let Some(media) = profiles::match_player(&w.process, &w.title) {
             return Some(Playback {

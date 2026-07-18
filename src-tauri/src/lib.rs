@@ -72,7 +72,7 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| {
-            // Schließen minimiert in den Tray statt zu beenden (Beenden über Tray-Menü)
+            // Closing minimizes to the tray instead of quitting (quit via tray menu)
             if let WindowEvent::CloseRequested { api, .. } = event {
                 api.prevent_close();
                 let _ = window.hide();
@@ -82,6 +82,7 @@ pub fn run() {
             commands::anilist_auth_info,
             commands::set_client_id,
             commands::anilist_login_url,
+            commands::anilist_start_login,
             commands::anilist_connect,
             commands::anilist_session,
             commands::anilist_logout,

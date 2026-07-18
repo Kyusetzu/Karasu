@@ -4,7 +4,7 @@ use tokio::sync::Mutex;
 
 const API_URL: &str = "https://graphql.anilist.co";
 
-/// Netzwerkfehler (offline, Timeout) sind queue-bar, API-Fehler nicht.
+/// Network errors (offline, timeout) are queueable, API errors are not.
 #[derive(Debug)]
 pub enum ApiError {
     Network(String),
@@ -20,18 +20,18 @@ impl From<ApiError> for String {
     }
 }
 
-/// GraphQL-Client für AniList mit zentralem Rate-Limiting.
+/// GraphQL client for AniList with centralized rate limiting.
 ///
-/// AniList erlaubt nominell 90 Requests/Minute (derzeit serverseitig auf 30
-/// gedrosselt). Wir werten die X-RateLimit-Header aus und pausieren, bevor
-/// wir ins Limit laufen; auf 429 wird einmal mit Retry-After gewartet.
+/// AniList nominally allows 90 requests/minute (currently throttled to 30
+/// server-side). We track the X-RateLimit headers and pause before running
+/// into the limit; on a 429 we wait once for Retry-After.
 pub struct AniList {
     http: reqwest::Client,
     rate: Mutex<RateState>,
 }
 
 struct RateState {
-    /// Verbleibende Requests laut letztem X-RateLimit-Remaining-Header.
+    /// Remaining requests according to the last X-RateLimit-Remaining header.
     remaining: u32,
 }
 
@@ -53,8 +53,8 @@ impl AniList {
         query: &str,
         variables: Value,
     ) -> Result<Value, ApiError> {
-        // Puffer lassen: Wenn fast nichts mehr übrig ist, kurz durchatmen,
-        // statt in den 429 zu laufen.
+        // Keep a buffer: when almost nothing is left, take a short breather
+        // instead of running into the 429.
         {
             let rate = self.rate.lock().await;
             if rate.remaining <= 1 {
@@ -109,7 +109,7 @@ impl AniList {
                     .iter()
                     .filter_map(|e| {
                         let m = e.get("message").and_then(|m| m.as_str())?;
-                        // "validation" allein sagt nichts — Details anhängen
+                        // "validation" alone says nothing — append the details
                         match e.get("validation") {
                             Some(v) if m == "validation" => Some(format!("{m}: {v}")),
                             _ => Some(m.to_string()),

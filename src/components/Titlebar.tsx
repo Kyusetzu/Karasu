@@ -2,7 +2,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useTranslation } from "react-i18next";
 import { Minus, Square, X } from "lucide-react";
 
-// Im reinen Browser (vite dev ohne Tauri-Shell) gibt es keine Fenster-API
+// In a plain browser (vite dev without the Tauri shell) there is no window API
 const appWindow =
   "__TAURI_INTERNALS__" in window ? getCurrentWindow() : null;
 

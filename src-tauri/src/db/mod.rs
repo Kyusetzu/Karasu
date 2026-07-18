@@ -2,8 +2,8 @@
 use std::path::PathBuf;
 use std::sync::Mutex;
 
-/// SQLite-Datenbank im App-Data-Verzeichnis: Key-Value-Settings,
-/// Listen-Cache und (ab M3) die Offline-Update-Queue.
+/// SQLite database in the app data directory: key-value settings, the
+/// list cache and the offline update queue.
 pub struct Db(pub Mutex<Connection>);
 
 const MIGRATIONS: &str = "
@@ -19,8 +19,8 @@ CREATE TABLE IF NOT EXISTS offline_queue (
 );
 ";
 
-/// Schema v2: list_cache pro Medientyp (ANIME/MANGA). Ältere Caches werden
-/// verworfen und beim nächsten Laden neu befüllt.
+/// Schema v2: list_cache per media type (ANIME/MANGA). Older caches are
+/// dropped and repopulated on the next load.
 const MIGRATION_V2: &str = "
 DROP TABLE IF EXISTS list_cache;
 CREATE TABLE list_cache (
@@ -73,7 +73,7 @@ impl Db {
         let _ = conn.execute("DELETE FROM kv WHERE key = ?1", [key]);
     }
 
-    // --- Listen-Cache -----------------------------------------------------
+    // --- List cache ---------------------------------------------------------
 
     pub fn cache_list(
         &self,
@@ -103,8 +103,8 @@ impl Db {
         .ok()
     }
 
-    /// Patcht Fortschritt/Status eines Eintrags direkt im Listen-Cache,
-    /// damit die Erkennung nach einem Scrobble sofort den neuen Stand sieht.
+    /// Patches an entry's progress/status directly in the list cache so
+    /// that detection sees the new state right after a scrobble.
     pub fn update_cached_progress(
         &self,
         user_id: i64,
@@ -137,7 +137,7 @@ impl Db {
         let _ = self.cache_list(user_id, media_type, &lists.to_string());
     }
 
-    // --- Offline-Queue ------------------------------------------------------
+    // --- Offline queue ------------------------------------------------------
 
     pub fn queue_push(&self, kind: &str, payload: &str) -> Result<(), String> {
         let conn = self.0.lock().unwrap();

@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { ExternalLink, LogOut, User } from "lucide-react";
+import { listen } from "@tauri-apps/api/event";
+import { ChevronRight, ExternalLink, LogIn, LogOut, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardTitle } from "@/components/ui/card";
@@ -19,7 +20,8 @@ import {
   type LanguageSetting,
 } from "@/i18n";
 
-const PIN_URL = "https://anilist.co/api/v2/oauth/pin";
+/** Redirect URL that must be registered on the AniList API client. */
+const CALLBACK_URL = "http://localhost:46231/callback";
 
 export default function Settings() {
   const { t } = useTranslation();
@@ -78,6 +80,8 @@ function AccountSection() {
   const [clientIdSaved, setClientIdSaved] = useState(false);
   const [token, setToken] = useState("");
   const [busy, setBusy] = useState(false);
+  const [waiting, setWaiting] = useState(false);
+  const [showManual, setShowManual] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -89,6 +93,13 @@ function AccountSection() {
         setClientIdSaved(true);
       }
     });
+    // Surface failures from the one-click login (invalid token etc.)
+    let unlisten: (() => void) | undefined;
+    listen<string>("anilist-auth-error", (e) => {
+      setWaiting(false);
+      setError(e.payload);
+    }).then((fn) => (unlisten = fn));
+    return () => unlisten?.();
   }, []);
 
   if (viewer) {
@@ -124,7 +135,7 @@ function AccountSection() {
     );
   }
 
-  // Login ist möglich, sobald eine Client-ID existiert (eingebaut oder eigene)
+  // Logging in is possible as soon as a client ID exists (built-in or custom)
   const canLogin =
     (info?.hasBuiltinClientId ?? false) || clientIdSaved;
 
@@ -138,12 +149,17 @@ function AccountSection() {
     }
   };
 
+  // One-click flow: start the callback server, then hand off to the browser.
+  // The backend finishes the login and pushes the viewer via "anilist-auth".
   const openLogin = async () => {
     setError(null);
     try {
-      await openUrl(await api.loginUrl());
+      const url = await api.startLogin();
+      await openUrl(url);
+      setWaiting(true);
     } catch (e) {
       setError(String(e));
+      setShowManual(true);
     }
   };
 
@@ -166,7 +182,7 @@ function AccountSection() {
       <div className="mt-4 space-y-4 text-sm text-ink-300">
         {!canLogin && (
           <div className="space-y-2 rounded-lg bg-surface-850 p-3">
-            <p>{t("settings.stepClientId", { url: PIN_URL })}</p>
+            <p>{t("settings.stepClientId", { url: CALLBACK_URL })}</p>
             <Button
               variant="secondary"
               size="sm"
@@ -193,18 +209,39 @@ function AccountSection() {
         )}
         <p>{t("settings.stepLogin")}</p>
         <Button onClick={openLogin} disabled={!canLogin}>
-          {t("settings.openLogin")} <ExternalLink size={14} />
+          <LogIn size={16} /> {t("settings.loginButton")}
         </Button>
-        <div className="flex gap-2 pt-1">
-          <Input
-            type="password"
-            value={token}
-            onChange={(e) => setToken(e.target.value)}
-            placeholder={t("settings.tokenPlaceholder")}
-          />
-          <Button onClick={submitToken} disabled={busy || !token.trim()}>
-            {busy ? t("settings.checking") : t("settings.connect")}
-          </Button>
+        {waiting && (
+          <p className="text-xs text-accent-400">{t("settings.loginWaiting")}</p>
+        )}
+        <div>
+          <button
+            type="button"
+            onClick={() => setShowManual((v) => !v)}
+            className="flex items-center gap-1 text-xs text-ink-500 hover:text-ink-300"
+          >
+            <ChevronRight
+              size={12}
+              className={`transition-transform ${showManual ? "rotate-90" : ""}`}
+            />
+            {t("settings.manualFallback")}
+          </button>
+          {showManual && (
+            <div className="mt-2 space-y-2">
+              <p className="text-xs text-ink-500">{t("settings.manualHint")}</p>
+              <div className="flex gap-2">
+                <Input
+                  type="password"
+                  value={token}
+                  onChange={(e) => setToken(e.target.value)}
+                  placeholder={t("settings.tokenPlaceholder")}
+                />
+                <Button onClick={submitToken} disabled={busy || !token.trim()}>
+                  {busy ? t("settings.checking") : t("settings.connect")}
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
       {error && (

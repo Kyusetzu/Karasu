@@ -15,7 +15,7 @@ export default function Search() {
   const [term, setTerm] = useState("");
   const [type, setType] = useState<MediaType>("ANIME");
 
-  // Debounce: erst nach 500 ms Tipppause suchen (Rate-Limit schonen)
+  // Debounce: search only after 500 ms of typing pause (spare the rate limit)
   useEffect(() => {
     const timer = setTimeout(() => setTerm(input.trim()), 500);
     return () => clearTimeout(timer);

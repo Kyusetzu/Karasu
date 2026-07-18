@@ -6,9 +6,9 @@ use crate::db::Db;
 use serde_json::{json, Value};
 use tauri::{Manager, State};
 
-/// Eingebaute AniList-Client-ID (Taiga-Prinzip: eine geteilte App für alle
-/// Nutzer; die ID ist öffentlich, kein Secret). Leer = Nutzer brauchen eine
-/// eigene Client-ID. Wird vom Maintainer einmalig eingetragen.
+/// Built-in AniList client ID (Taiga principle: one shared app for all
+/// users; the ID is public, not a secret). Empty = users need their own
+/// client ID. Set once by the maintainer.
 pub const BUILTIN_ANILIST_CLIENT_ID: &str = "46231";
 
 const VIEWER_QUERY: &str = "
@@ -23,7 +23,7 @@ query {
 
 #[derive(serde::Serialize)]
 pub struct AuthInfo {
-    /// true, wenn eine Client-ID einkompiliert ist (Login ohne Setup möglich)
+    /// true if a client ID is compiled in (login works without any setup)
     #[serde(rename = "hasBuiltinClientId")]
     pub has_builtin_client_id: bool,
     #[serde(rename = "customClientId")]
@@ -61,16 +61,12 @@ pub fn anilist_login_url(db: State<'_, Db>) -> Result<String, String> {
     Ok(auth::authorize_url(&client_id))
 }
 
-/// Validiert den eingefügten Token gegen die Viewer-Query und speichert ihn
-/// im Windows Credential Manager. Gibt das Viewer-Objekt zurück.
-#[tauri::command]
-pub async fn anilist_connect(
-    db: State<'_, Db>,
-    api: State<'_, AniList>,
-    token: String,
-) -> Result<Value, String> {
-    // Akzeptiert rohen Token ebenso wie die komplette Redirect-URL
-    let token = auth::extract_token(&token);
+/// Validates a token against the Viewer query, stores it in the Windows
+/// Credential Manager and caches the viewer. Shared by the manual paste flow
+/// and the one-click callback server.
+pub async fn connect_with_token(db: &Db, api: &AniList, input: &str) -> Result<Value, String> {
+    // Accepts a raw token as well as the full redirect URL
+    let token = auth::extract_token(input);
     if token.is_empty() {
         return Err("Please paste the token from the AniList page".into());
     }
@@ -85,8 +81,29 @@ pub async fn anilist_connect(
     Ok(viewer)
 }
 
-/// Gibt den gecachten Viewer zurück, wenn ein Token gespeichert ist —
-/// ohne API-Call, damit der App-Start offline und ratelimit-schonend ist.
+#[tauri::command]
+pub async fn anilist_connect(
+    db: State<'_, Db>,
+    api: State<'_, AniList>,
+    token: String,
+) -> Result<Value, String> {
+    connect_with_token(&db, &api, &token).await
+}
+
+/// Starts the one-click login: spins up the localhost callback server and
+/// returns the AniList authorize URL for the frontend to open in the browser.
+#[tauri::command]
+pub fn anilist_start_login(
+    app: tauri::AppHandle,
+    db: State<'_, Db>,
+) -> Result<String, String> {
+    let url = anilist_login_url(db)?;
+    crate::anilist::login::start(app)?;
+    Ok(url)
+}
+
+/// Returns the cached viewer if a token is stored — without an API call,
+/// so app startup works offline and doesn't burn rate limit.
 #[tauri::command]
 pub fn anilist_session(db: State<'_, Db>) -> Option<Value> {
     auth::load_token()?;
@@ -100,8 +117,8 @@ pub fn anilist_logout(db: State<'_, Db>) {
     db.kv_delete("anilist_viewer");
 }
 
-/// Generischer GraphQL-Proxy: Das Frontend definiert Query + Variablen,
-/// das Backend hängt den Token an und übernimmt das Rate-Limiting.
+/// Generic GraphQL proxy: the frontend supplies query + variables, the
+/// backend attaches the token and handles rate limiting.
 #[tauri::command]
 pub async fn anilist_query(
     api: State<'_, AniList>,
@@ -118,7 +135,7 @@ pub async fn anilist_query(
         .await?)
 }
 
-// --- Anime-Liste: Laden mit Cache, Mutations mit Offline-Queue --------------
+// --- Media list: loading with cache, mutations with offline queue -----------
 
 const LIST_QUERY: &str = "
 query ($userId: Int!, $type: MediaType!) {
@@ -181,17 +198,17 @@ mutation ($id: Int) {
 
 #[derive(serde::Serialize)]
 pub struct ListResult {
-    /// true, wenn die Daten aus dem lokalen Cache stammen (offline)
+    /// true if the data comes from the local cache (offline)
     #[serde(rename = "fromCache")]
     from_cache: bool,
-    /// Anzahl noch nicht synchronisierter Änderungen
+    /// number of changes not yet synced
     pending: usize,
     lists: Value,
 }
 
-/// Lädt die Anime-/Manga-Liste; offline wird der letzte Stand aus SQLite
-/// geliefert. Vor dem Laden wird versucht, die Offline-Queue abzuarbeiten,
-/// damit der Server-Stand die eigenen Änderungen enthält.
+/// Loads the anime/manga list; offline, the last known state is served
+/// from SQLite. The offline queue is drained first so that the server
+/// response already includes the user's own pending changes.
 #[tauri::command]
 pub async fn fetch_media_list(
     db: State<'_, Db>,
@@ -240,13 +257,13 @@ pub async fn fetch_media_list(
 
 #[derive(serde::Serialize)]
 pub struct MutationResult {
-    /// true, wenn die Änderung offline in die Queue gelegt wurde
+    /// true if the change was queued offline
     pub(crate) queued: bool,
     pub(crate) entry: Option<Value>,
 }
 
-/// Kern des Listen-Speicherns, auch vom Scrobbler genutzt: online direkt,
-/// offline in die Queue (Reihenfolge bleibt erhalten).
+/// Core of list saving, also used by the scrobbler: straight to the API
+/// when online, into the queue when offline (order is preserved).
 pub(crate) async fn save_entry_core(
     db: &Db,
     api: &AniList,
@@ -271,8 +288,8 @@ pub(crate) async fn save_entry_core(
     }
 }
 
-/// Speichert einen Listeneintrag (Status/Fortschritt/Score). Offline wird
-/// die Änderung in die Queue gelegt und später synchronisiert.
+/// Saves a list entry (status/progress/score). Offline, the change is
+/// queued and synced later.
 #[tauri::command]
 pub async fn save_list_entry(
     db: State<'_, Db>,
@@ -307,9 +324,8 @@ pub async fn delete_list_entry(
     }
 }
 
-/// Arbeitet die Offline-Queue in Reihenfolge ab. Netzwerkfehler brechen ab
-/// (Rest bleibt liegen), API-Fehler verwerfen den Eintrag, damit die Queue
-/// nicht dauerhaft blockiert.
+/// Drains the offline queue in order. Network errors abort (the rest stays
+/// queued); API errors drop the entry so the queue can never get stuck.
 async fn process_queue(
     db: &Db,
     api: &AniList,
@@ -332,7 +348,7 @@ async fn process_queue(
     Ok(flushed)
 }
 
-/// Manuell auslösbarer Sync der Offline-Queue (z. B. Button in der UI).
+/// Manually triggered sync of the offline queue (e.g. a button in the UI).
 #[tauri::command]
 pub async fn flush_queue(
     db: State<'_, Db>,
@@ -342,7 +358,7 @@ pub async fn flush_queue(
     process_queue(&db, &api, Some(&token)).await
 }
 
-/// Aktuell erkannte Wiedergabe (Poll-Loop-Zustand).
+/// Currently detected playback (poll loop state).
 #[tauri::command]
 pub fn get_now_playing(
     state: State<'_, crate::scrobbler::PlaybackState>,
@@ -350,14 +366,14 @@ pub fn get_now_playing(
     state.0.lock().unwrap().clone()
 }
 
-// --- Scrobbler-Einstellungen und -Steuerung ---------------------------------
+// --- Scrobbler settings and control ------------------------------------------
 
 #[derive(serde::Serialize)]
 pub struct ScrobbleSettings {
     pub enabled: bool,
-    /// true = vor dem Update Bestätigung in der UI verlangen
+    /// true = require confirmation in the UI before updating
     pub confirm: bool,
-    /// Schwelle in Minuten; 0 = automatisch (2/3 der Episodenlänge)
+    /// threshold in minutes; 0 = automatic (2/3 of the episode length)
     #[serde(rename = "delayMin")]
     pub delay_min: u32,
 }
@@ -395,7 +411,7 @@ pub struct DiscordSettings {
     pub enabled: bool,
     #[serde(rename = "appId")]
     pub app_id: String,
-    /// true, wenn eine Application-ID einkompiliert ist
+    /// true if an application ID is compiled in
     #[serde(rename = "hasBuiltinAppId")]
     pub has_builtin_app_id: bool,
 }
@@ -418,7 +434,7 @@ pub fn set_discord_settings(
 ) -> Result<(), String> {
     db.kv_set("discord_enabled", if enabled { "1" } else { "0" })?;
     db.kv_set("discord_app_id", app_id.trim())?;
-    // Presence sofort an den neuen Zustand anpassen
+    // Apply the new state to the presence immediately
     let now = app
         .state::<crate::scrobbler::PlaybackState>()
         .0
@@ -447,13 +463,13 @@ pub fn set_autostart(app: tauri::AppHandle, enabled: bool) -> Result<(), String>
     .map_err(|e| e.to_string())
 }
 
-/// Bestätigt das anstehende Auto-Update sofort (auch bei Blocked).
+/// Confirms the pending auto-update immediately (also from Blocked).
 #[tauri::command]
 pub async fn scrobble_now(app: tauri::AppHandle) -> Result<(), String> {
     crate::scrobbler::confirm_pending(app, true).await
 }
 
-/// Verwirft das anstehende Auto-Update für diese Episode.
+/// Discards the pending auto-update for this episode.
 #[tauri::command]
 pub async fn scrobble_cancel(app: tauri::AppHandle) -> Result<(), String> {
     crate::scrobbler::confirm_pending(app, false).await

@@ -35,9 +35,8 @@ export interface EntrySaveInput {
 }
 
 /**
- * Gemeinsamer Bearbeiten-Dialog für Listeneinträge — aus der Liste, der
- * Suche und dem Saison-Browser nutzbar. `entry === null` bedeutet
- * "neu zur Liste hinzufügen".
+ * Shared edit dialog for list entries — usable from the list, the search
+ * and the season browser. `entry === null` means "add to list".
  */
 export default function EntryEditModal({
   media,

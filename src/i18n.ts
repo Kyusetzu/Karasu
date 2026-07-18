@@ -213,8 +213,12 @@ const en = {
     logout: "Log out",
     connectTitle: "Connect with AniList",
     stepLogin:
-      "Log in on the AniList page that opens and copy the token shown there.",
-    openLogin: "Open login page",
+      "One click: your browser opens AniList, you approve access, and Karasu logs you in automatically.",
+    loginButton: "Log in with AniList",
+    loginWaiting: "Waiting for AniList — finish the login in your browser …",
+    manualFallback: "Having trouble? Enter the token manually",
+    manualHint:
+      "Paste the access token or the full redirect URL from your browser's address bar.",
     tokenPlaceholder: "Paste access token",
     connect: "Connect",
     checking: "Checking …",
@@ -418,8 +422,12 @@ const de: typeof en = {
     logout: "Abmelden",
     connectTitle: "Mit AniList verbinden",
     stepLogin:
-      "Melde dich auf der AniList-Seite an, die sich öffnet, und kopiere den angezeigten Token hierher.",
-    openLogin: "Login-Seite öffnen",
+      "Ein Klick: Dein Browser öffnet AniList, du erlaubst den Zugriff, und Karasu meldet dich automatisch an.",
+    loginButton: "Mit AniList anmelden",
+    loginWaiting: "Warte auf AniList — schließe den Login im Browser ab …",
+    manualFallback: "Probleme? Token manuell eingeben",
+    manualHint:
+      "Füge den Access-Token oder die komplette Redirect-URL aus der Adressleiste deines Browsers ein.",
     tokenPlaceholder: "Access-Token einfügen",
     connect: "Verbinden",
     checking: "Prüfe …",

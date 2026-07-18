@@ -1,24 +1,24 @@
-//! Episoden-Redirects aus erengy/anime-relations (gleiche Datenquelle wie
-//! Taiga): mappt z. B. "Episode 25" eines Combined-Releases auf S2E1 des
-//! richtigen AniList-Eintrags.
+//! Episode redirects from erengy/anime-relations (the same data source
+//! Taiga uses): maps e.g. "episode 25" of a combined release to S2E1 of
+//! the correct AniList entry.
 //!
-//! Zeilenformat:
+//! Line format:
 //! `- MAL|Kitsu|AniList:26-51 -> MAL|Kitsu|AniList:1-26[!]`
-//! IDs können `?` (unbekannt) oder `~` (wie links) sein; `!` bedeutet,
-//! dass die Regel auch für die Ziel-ID selbst gilt.
+//! IDs may be `?` (unknown) or `~` (same as the left side); `!` means the
+//! rule also applies to the destination ID itself.
 
 use std::sync::RwLock;
 
 const SOURCE_URL: &str =
     "https://raw.githubusercontent.com/erengy/anime-relations/master/anime-relations.txt";
-/// Cache-Lebensdauer: 7 Tage
+/// Cache lifetime: 7 days
 const MAX_AGE_SECS: u64 = 7 * 24 * 60 * 60;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Rule {
     pub src_id: i64,
     pub src_start: u32,
-    /// None = offenes Ende ("26-?")
+    /// None = open end ("26-?")
     pub src_end: Option<u32>,
     pub dst_id: i64,
     pub dst_start: u32,
@@ -45,7 +45,7 @@ fn parse_range(field: &str) -> Option<(u32, Option<u32>)> {
     }
 }
 
-/// Parst eine Regelzeile; `0` als Episodenangabe (ganze Serie) wird als 1 behandelt.
+/// Parses one rule line; `0` as an episode spec (whole series) is treated as 1.
 fn parse_line(line: &str) -> Option<Vec<Rule>> {
     let line = line.trim().strip_prefix("- ")?;
     let (src, dst) = line.split_once("->")?;
@@ -101,7 +101,7 @@ pub fn parse_rules(text: &str) -> Vec<Rule> {
     out
 }
 
-/// Wendet den ersten passenden Redirect an.
+/// Applies the first matching redirect.
 pub fn redirect(rules: &[Rule], media_id: i64, episode: u32) -> Option<(i64, u32)> {
     rules.iter().find_map(|r| {
         let in_range = media_id == r.src_id
@@ -111,8 +111,8 @@ pub fn redirect(rules: &[Rule], media_id: i64, episode: u32) -> Option<(i64, u32
     })
 }
 
-/// Lädt Regeln aus dem Datei-Cache und aktualisiert sie bei Bedarf im
-/// Hintergrund aus dem GitHub-Repo.
+/// Loads rules from the file cache and refreshes them from the GitHub
+/// repo in the background when they are stale.
 pub fn spawn_loader(app: tauri::AppHandle) {
     use tauri::Manager;
     tauri::async_runtime::spawn(async move {
@@ -121,13 +121,13 @@ pub fn spawn_loader(app: tauri::AppHandle) {
         };
         let path = dir.join("anime-relations.txt");
 
-        // 1) Vorhandenen Cache sofort laden
+        // 1) Load the existing cache immediately
         if let Ok(text) = std::fs::read_to_string(&path) {
             let rules = parse_rules(&text);
             *app.state::<Relations>().0.write().unwrap() = rules;
         }
 
-        // 2) Bei veraltetem/fehlendem Cache neu laden
+        // 2) Refetch when the cache is stale or missing
         let stale = std::fs::metadata(&path)
             .and_then(|m| m.modified())
             .ok()
@@ -169,7 +169,7 @@ mod tests {
 - 200|200|600:25-48 -> 201|201|601:1-24!
 # Same id (~)
 - 300|300|700:14 -> ~|~|~:1
-# Unknown AniList id wird ignoriert
+# Unknown AniList id is ignored
 - 400|400|?:1-12 -> 401|401|?:1-12
 ";
 
@@ -204,7 +204,7 @@ mod tests {
     #[test]
     fn self_redirect_flag() {
         let rules = parse_rules(SAMPLE);
-        // Regel gilt auch für die Ziel-ID selbst
+        // Rule also applies to the destination ID itself
         assert_eq!(redirect(&rules, 601, 25), Some((601, 1)));
     }
 

@@ -1,6 +1,5 @@
-//! Discord Rich Presence: zeigt den aktuell geschauten Anime an.
-//! Braucht eine eigene Discord-Application-ID (Settings), da Karasu keine
-//! zentral registrierte App ist.
+//! Discord Rich Presence: shows the currently watched anime.
+//! Uses the built-in application ID or a user override from the settings.
 
 use crate::db::Db;
 use crate::scrobbler::NowPlaying;
@@ -11,14 +10,14 @@ use discord_rich_presence::{
 use std::sync::Mutex;
 use tauri::{AppHandle, Manager};
 
-/// Eingebaute Discord-Application-ID (öffentlich, kein Secret) — eine
-/// geteilte App für alle Nutzer, wie bei Taiga. Leer = Feature erfordert
-/// eine eigene ID in den Settings. Wird vom Maintainer einmalig eingetragen.
+/// Built-in Discord application ID (public, not a secret) — one shared
+/// app for all users, as in Taiga. Empty = the feature requires a custom
+/// ID in the settings. Set once by the maintainer.
 pub const BUILTIN_DISCORD_APP_ID: &str = "1527934275356332133";
 
 pub struct Discord(pub Mutex<Option<DiscordIpcClient>>);
 
-/// Effektive App-ID: Nutzer-Override aus den Settings oder die eingebaute.
+/// Effective app ID: user override from the settings or the built-in one.
 pub fn effective_app_id(custom: &str) -> String {
     let custom = custom.trim();
     if custom.is_empty() {
@@ -35,8 +34,8 @@ fn disconnect(guard: &mut Option<DiscordIpcClient>) {
     }
 }
 
-/// Gleicht die Presence mit der aktuellen Wiedergabe ab. Wird bei jeder
-/// Änderung der Erkennung und nach Settings-Änderungen aufgerufen.
+/// Syncs the presence with the current playback. Called on every change
+/// of the detection result and after settings changes.
 pub fn sync(app: &AppHandle, now: Option<&NowPlaying>) {
     let db = app.state::<Db>();
     let enabled = db.kv_get("discord_enabled").as_deref() == Some("1");
@@ -66,7 +65,7 @@ pub fn sync(app: &AppHandle, now: Option<&NowPlaying>) {
         if client.connect().is_ok() {
             *guard = Some(client);
         } else {
-            return; // Discord läuft nicht — still bleiben
+            return; // Discord is not running — stay quiet
         }
     }
 

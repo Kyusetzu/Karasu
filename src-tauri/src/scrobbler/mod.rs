@@ -1,11 +1,11 @@
-//! Erkennungs- und Scrobble-Loop: Fenster beobachten, Titel parsen, gegen
-//! die Liste matchen und den Fortschritt nach Schwelle automatisch auf
-//! AniList aktualisieren.
+//! Detection and scrobble loop: watch windows, parse titles, match them
+//! against the list and update progress on AniList automatically once the
+//! threshold has passed.
 //!
-//! Zustandsmaschine pro erkannter Episode:
-//! `Watching → (Pending →) Updating → Updated`, mit `Blocked` bei
-//! Plausibilitätsproblemen (Episodensprung, bereits gesehen) und
-//! `Cancelled` nach Nutzer-Abbruch.
+//! State machine per detected episode:
+//! `Watching → (Pending →) Updating → Updated`, with `Blocked` on
+//! plausibility problems (episode gap, already watched) and `Cancelled`
+//! after user abort.
 
 use crate::db::Db;
 use crate::detection;
@@ -17,16 +17,16 @@ use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, Manager};
 
 pub const POLL_INTERVAL: Duration = Duration::from_secs(5);
-/// Fallback-Schwelle, wenn keine Episodenlänge bekannt ist.
+/// Fallback threshold when no episode length is known.
 const DEFAULT_THRESHOLD: Duration = Duration::from_secs(15 * 60);
-/// Schwelle für Manga-Kapitel (Lesen ist schneller als Schauen).
+/// Threshold for manga chapters (reading is faster than watching).
 const MANGA_THRESHOLD: Duration = Duration::from_secs(5 * 60);
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct NowPlaying {
     pub process: String,
     pub streaming: bool,
-    /// "ANIME" oder "MANGA" — bei Manga trägt `episode` die Kapitelnummer
+    /// "ANIME" or "MANGA" — for manga, `episode` carries the chapter number
     #[serde(rename = "mediaType")]
     pub media_type: String,
     #[serde(rename = "rawTitle")]
@@ -34,18 +34,18 @@ pub struct NowPlaying {
     #[serde(rename = "parsedTitle")]
     pub parsed_title: String,
     pub episode: Option<u32>,
-    /// AniList-Media-ID bei erfolgreichem Match gegen die Liste
+    /// AniList media ID on a successful match against the list
     #[serde(rename = "mediaId")]
     pub media_id: Option<i64>,
     #[serde(rename = "matchedTitle")]
     pub matched_title: Option<String>,
-    /// Aktueller Listen-Fortschritt des gematchten Eintrags
+    /// Current list progress of the matched entry
     pub progress: Option<u32>,
     #[serde(rename = "totalEpisodes")]
     pub total_episodes: Option<u32>,
 }
 
-/// Aktuell erkannte Wiedergabe, für Commands und den Scrobbler.
+/// Currently detected playback, shared by commands and the scrobbler.
 pub struct PlaybackState(pub Mutex<Option<NowPlaying>>);
 
 #[derive(Debug, Clone, PartialEq)]
@@ -61,20 +61,20 @@ pub enum Phase {
 #[derive(Debug, Clone)]
 pub struct Session {
     pub media_id: i64,
-    /// "ANIME" oder "MANGA"
+    /// "ANIME" or "MANGA"
     pub media_type: String,
-    /// Episoden- bzw. Kapitelnummer
+    /// Episode or chapter number
     pub episode: u32,
     pub total: Option<u32>,
-    /// Listen-Status des Eintrags bei Erkennungsbeginn
+    /// List status of the entry when detection started
     pub list_status: String,
-    /// Wann das Auto-Update fällig ist (None = Auto-Update deaktiviert)
+    /// When the auto-update is due (None = auto-update disabled)
     pub update_at: Option<Instant>,
     pub update_at_epoch_ms: Option<u64>,
     pub phase: Phase,
 }
 
-/// Laufende Scrobble-Session (geteilt zwischen Loop und Commands).
+/// Running scrobble session (shared between the loop and commands).
 pub struct ScrobbleSession(pub Mutex<Option<Session>>);
 
 #[derive(Clone, serde::Serialize)]
@@ -128,8 +128,8 @@ fn cached_user_id(db: &Db) -> Option<i64> {
         .and_then(|v| v.get("id").and_then(|i| i.as_i64()))
 }
 
-/// Baut Matching-Kandidaten aus dem SQLite-Listen-Cache.
-/// Bei MANGA trägt `episodes` die Kapitelanzahl.
+/// Builds matching candidates from the SQLite list cache.
+/// For MANGA, `episodes` carries the chapter count.
 pub fn candidates_from_cache(db: &Db, media_type: &str) -> Vec<matcher::Candidate> {
     let Some(user_id) = cached_user_id(db) else {
         return Vec::new();
@@ -224,8 +224,8 @@ fn build_now_playing(
     let candidates = candidates_from_cache(db, media_type);
     let matched = matcher::best_match(&parsed, &candidates);
 
-    // Episoden-Redirect (anime-relations): z. B. Combined-Release "Ep 25"
-    // → Staffel 2, Episode 1 eines anderen AniList-Eintrags. Nur Anime.
+    // Episode redirect (anime-relations): e.g. combined release "Ep 25"
+    // → season 2, episode 1 of a different AniList entry. Anime only.
     let matched = matched.map(|m| {
         if !playback.manga {
             if let Some(ep) = parsed.episode {
@@ -266,8 +266,8 @@ fn build_now_playing(
     }
 }
 
-/// Schwelle bis zum Auto-Update: Einstellung in Minuten oder 2/3 der
-/// Episodenlänge (Anime) bzw. 5 Minuten (Manga), sonst 15 Minuten.
+/// Threshold until the auto-update: setting in minutes, or 2/3 of the
+/// episode length (anime), or 5 minutes (manga), otherwise 15 minutes.
 fn threshold(now: &NowPlaying, db: &Db, delay_min: u32) -> Duration {
     if delay_min > 0 {
         return Duration::from_secs(u64::from(delay_min) * 60);
@@ -295,7 +295,7 @@ fn epoch_ms_in(d: Duration) -> u64 {
         .unwrap_or(0)
 }
 
-/// Führt das Listen-Update aus (inkl. Status-Logik und Cache-Patch).
+/// Performs the list update (including status logic and cache patch).
 async fn perform_update(
     app: &AppHandle,
     media_id: i64,
@@ -318,11 +318,11 @@ async fn perform_update(
     let api = app.state::<crate::anilist::client::AniList>();
     crate::commands::save_entry_core(&db, &api, &token, input).await?;
 
-    // Lokalen Cache patchen, damit die nächste Erkennung den neuen Stand sieht
+    // Patch the local cache so the next detection sees the new state
     if let Some(user_id) = cached_user_id(&db) {
         db.update_cached_progress(user_id, media_type, media_id, episode, Some(status));
     }
-    // Now-Playing-Anzeige aktualisieren
+    // Refresh the now-playing display
     {
         let state = app.state::<PlaybackState>();
         let mut guard = state.0.lock().unwrap();
@@ -340,8 +340,8 @@ async fn perform_update(
     Ok(())
 }
 
-/// Bestätigt (oder verwirft) das anstehende Update — vom Frontend über
-/// die Commands `scrobble_now` / `scrobble_cancel` aufgerufen.
+/// Confirms (or discards) the pending update — invoked by the frontend
+/// through the `scrobble_now` / `scrobble_cancel` commands.
 pub async fn confirm_pending(app: AppHandle, accept: bool) -> Result<(), String> {
     let data = {
         let state = app.state::<ScrobbleSession>();
@@ -379,7 +379,7 @@ pub async fn confirm_pending(app: AppHandle, accept: bool) -> Result<(), String>
     result
 }
 
-/// Startet den Erkennungs- und Scrobble-Loop (läuft für die App-Lebensdauer).
+/// Starts the detection and scrobble loop (runs for the app's lifetime).
 pub fn spawn(app: AppHandle) {
     tauri::async_runtime::spawn(async move {
         let mut last_raw: Option<(String, String)> = None;
@@ -408,7 +408,7 @@ pub fn spawn(app: AppHandle) {
     });
 }
 
-/// Ein Tick der Scrobble-Zustandsmaschine.
+/// One tick of the scrobble state machine.
 async fn drive_session(app: &AppHandle) {
     let now_playing = app.state::<PlaybackState>().0.lock().unwrap().clone();
     let settings = {
@@ -416,8 +416,8 @@ async fn drive_session(app: &AppHandle) {
         crate::commands::read_scrobble_settings(&db)
     };
 
-    // Phase-Entscheidung unter dem Lock, Update selbst danach (kein await
-    // mit gehaltenem Mutex).
+    // Phase decision under the lock, the update itself afterwards (no
+    // await while holding the mutex).
     let update_data = {
         let state = app.state::<ScrobbleSession>();
         let mut guard = state.0.lock().unwrap();
@@ -430,7 +430,7 @@ async fn drive_session(app: &AppHandle) {
                     .is_some_and(|s| s.media_id == mid && s.episode == ep);
 
                 if !is_same {
-                    // Neue Session beginnen
+                    // Start a new session
                     let db = app.state::<Db>();
                     let threshold = threshold(&np, &db, settings.delay_min);
                     let progress = np.progress.unwrap_or(0);
@@ -464,7 +464,7 @@ async fn drive_session(app: &AppHandle) {
                     *guard = Some(session);
                     None
                 } else {
-                    // Bestehende Session: Schwelle prüfen
+                    // Existing session: check the threshold
                     let session = guard.as_mut().unwrap();
                     let due = session.phase == Phase::Watching
                         && session

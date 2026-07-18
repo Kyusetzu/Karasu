@@ -95,12 +95,12 @@ export const STATUS_ORDER: MediaListStatus[] = [
   "PLANNING",
 ];
 
-/** Bevorzugter Anzeigetitel: Englisch, sonst Romaji, sonst Nativ. */
+/** Preferred display title: English, else romaji, else native. */
 export function displayTitle(title: MediaTitle): string {
   return title.english ?? title.romaji ?? title.native ?? "?";
 }
 
-/** Maximaler Fortschritt: Episoden (Anime) bzw. Kapitel (Manga). */
+/** Maximum progress: episodes (anime) or chapters (manga). */
 export function maxProgress(media: {
   episodes: number | null;
   chapters?: number | null;

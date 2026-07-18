@@ -32,7 +32,7 @@ export default function App() {
             <Route path="/search" element={<Search />} />
             <Route path="/seasonal" element={<Seasonal />} />
             <Route path="/media/:id" element={<AnimeDetail />} />
-            {/* Alias für alte Links */}
+            {/* Alias for old links */}
             <Route path="/anime/:id" element={<AnimeDetail />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>

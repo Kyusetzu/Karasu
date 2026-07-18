@@ -1,5 +1,5 @@
-//! Token-Speicherung im Windows Credential Manager (via keyring/DPAPI).
-//! Der Access-Token verlässt das Rust-Backend nie Richtung WebView.
+//! Token storage in the Windows Credential Manager (via keyring/DPAPI).
+//! The access token never leaves the Rust backend towards the WebView.
 
 const SERVICE: &str = "dev.kyu.karasu";
 const USER: &str = "anilist";
@@ -28,8 +28,8 @@ pub fn authorize_url(client_id: &str) -> String {
     format!("https://anilist.co/api/v2/oauth/authorize?client_id={client_id}&response_type=token")
 }
 
-/// Extrahiert den Access-Token aus beliebiger Nutzereingabe: roher Token,
-/// komplette Redirect-URL (`…#access_token=…&token_type=…`) oder Fragment.
+/// Extracts the access token from any user input: raw token, complete
+/// redirect URL (`…#access_token=…&token_type=…`) or bare fragment.
 pub fn extract_token(input: &str) -> String {
     let input = input.trim();
     match input.find("access_token=") {

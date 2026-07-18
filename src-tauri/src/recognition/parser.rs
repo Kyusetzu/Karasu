@@ -1,6 +1,6 @@
-//! Parser für Anime-Dateinamen und Streaming-Titel
-//! (Karasus Gegenstück zu Taigas Anitomy) — extrahiert Serientitel,
-//! Episodennummer, Staffel und Release-Gruppe.
+//! Parser for anime file names and streaming titles
+//! (Karasu's counterpart to Taiga's Anitomy) — extracts series title,
+//! episode number, season and release group.
 
 use regex::Regex;
 use std::sync::OnceLock;
@@ -17,7 +17,7 @@ const VIDEO_EXTENSIONS: &[&str] = &[
     "mkv", "mp4", "avi", "m4v", "webm", "ts", "m2ts", "ogm", "wmv", "flv",
 ];
 
-/// Technik-Schlagwörter, die kein Teil des Titels sind.
+/// Technical keywords that are not part of the title.
 const KEYWORDS: &[&str] = &[
     "1080p", "720p", "480p", "2160p", "4k", "bd", "bdrip", "bluray", "blu-ray",
     "web", "webrip", "web-dl", "webdl", "hdtv", "dvdrip", "x264", "x265",
@@ -31,15 +31,15 @@ fn regexes() -> &'static [Regex; 5] {
     static RE: OnceLock<[Regex; 5]> = OnceLock::new();
     RE.get_or_init(|| {
         [
-            // S01E05, s2e12, Staffel/Season-Episode kombiniert
+            // S01E05, s2e12 — combined season/episode markers
             Regex::new(r"(?i)\bs(\d{1,2})\s*[.\-_ ]?\s*e[p]?(\d{1,4})\b").unwrap(),
             // "Episode 28", "Ep 28", "Ep. 28", "E28", "Folge 28"
             Regex::new(r"(?i)\b(?:episode|folge|ep\.?|e)\s*(\d{1,4})(?:\s*v\d)?\b").unwrap(),
-            // Klassisches Fansub-Format: " - 28", " – 28v2"
+            // Classic fansub format: " - 28", " – 28v2"
             Regex::new(r"[\-–—]\s*(\d{1,4})(?:\s*v\d)?\s*$").unwrap(),
             // "#28"
             Regex::new(r"#(\d{1,4})\b").unwrap(),
-            // Nackte Zahl am Ende ("One Piece 1071")
+            // Bare trailing number ("One Piece 1071")
             Regex::new(r"\s(\d{1,4})(?:\s*v\d)?\s*$").unwrap(),
         ]
     })
@@ -57,14 +57,14 @@ pub fn parse(input: &str) -> Parsed {
     let mut work = input.trim().to_string();
     let mut release_group = None;
 
-    // Dateierweiterung abschneiden
+    // Strip the file extension
     if let Some((stem, ext)) = work.rsplit_once('.') {
         if VIDEO_EXTENSIONS.contains(&ext.to_ascii_lowercase().as_str()) {
             work = stem.to_string();
         }
     }
 
-    // Führende [Release-Gruppe]
+    // Leading [release group]
     if work.starts_with('[') {
         if let Some(end) = work.find(']') {
             release_group = Some(work[1..end].to_string());
@@ -72,21 +72,21 @@ pub fn parse(input: &str) -> Parsed {
         }
     }
 
-    // Restliche [Tags] und (Tags) entfernen
+    // Remove remaining [tags] and (tags)
     let bracket_re = {
         static RE: OnceLock<Regex> = OnceLock::new();
         RE.get_or_init(|| Regex::new(r"[\[(][^\])]*[\])]").unwrap())
     };
     work = bracket_re.replace_all(&work, " ").to_string();
 
-    // Unterstriche sind immer Trenner; Punkte nur bei Punkt-Namen ohne Leerzeichen
+    // Underscores are always separators; dots only in dot-names without spaces
     work = work.replace('_', " ");
     if !work.contains(' ') {
         work = work.replace('.', " ");
     }
     work = work.split_whitespace().collect::<Vec<_>>().join(" ");
 
-    // Episodennummer suchen (Prioritätsreihenfolge der Muster)
+    // Find the episode number (patterns in priority order)
     let mut episode = None;
     let mut season = None;
     let mut title_end = work.len();
@@ -96,7 +96,7 @@ pub fn parse(input: &str) -> Parsed {
             let m = caps.get(0).unwrap();
             let ep_group = if i == 0 { 2 } else { 1 };
             if let Some(ep) = caps.get(ep_group).and_then(|g| g.as_str().parse().ok()) {
-                // Jahreszahlen (1950–2030) am Ende sind keine Episoden
+                // Trailing years (1950–2030) are not episodes
                 if i == 4 && (1950..=2030).contains(&ep) {
                     continue;
                 }
@@ -112,7 +112,7 @@ pub fn parse(input: &str) -> Parsed {
 
     let mut title = work[..title_end].to_string();
 
-    // Staffel aus dem Titel ziehen (bleibt für Matching-Varianten erhalten)
+    // Pull the season out of the title (kept for matching variants)
     if season.is_none() {
         if let Some(caps) = season_regex().captures(&title) {
             season = caps
@@ -124,7 +124,7 @@ pub fn parse(input: &str) -> Parsed {
         }
     }
 
-    // Technik-Schlagwörter am Titelende entfernen
+    // Remove technical keywords from the end of the title
     let mut words: Vec<&str> = title.split_whitespace().collect();
     while let Some(last) = words.last() {
         if KEYWORDS.contains(&last.to_ascii_lowercase().as_str()) {
@@ -150,9 +150,9 @@ fn chapter_regexes() -> &'static [Regex; 3] {
     static RE: OnceLock<[Regex; 3]> = OnceLock::new();
     RE.get_or_init(|| {
         [
-            // "Ch. 45", "Chapter 45", "Kapitel 45" (Dezimalteil wird ignoriert)
+            // "Ch. 45", "Chapter 45", "Kapitel 45" (decimal part is ignored)
             Regex::new(r"(?i)\b(?:ch(?:apter)?\.?|kapitel)\s*(\d{1,5})(?:\.\d+)?\b").unwrap(),
-            // " - 45" am Ende
+            // Trailing " - 45"
             Regex::new(r"[\-–—]\s*(\d{1,5})(?:\.\d+)?\s*$").unwrap(),
             // "#45"
             Regex::new(r"#(\d{1,5})\b").unwrap(),
@@ -160,12 +160,12 @@ fn chapter_regexes() -> &'static [Regex; 3] {
     })
 }
 
-/// Parser für Manga-Titel aus Browser-Tabs: extrahiert Serientitel und
-/// Kapitelnummer (im `episode`-Feld).
+/// Parser for manga titles from browser tabs: extracts series title and
+/// chapter number (carried in the `episode` field).
 pub fn parse_manga(input: &str) -> Parsed {
     let mut work = input.trim().to_string();
 
-    // "Read "-Präfix vieler Leseseiten entfernen
+    // Strip the "Read " prefix used by many reading sites
     if let Some(stripped) = work.strip_prefix("Read ") {
         work = stripped.to_string();
     }
@@ -258,7 +258,7 @@ mod tests {
 
     #[test]
     fn ep_keyword_streaming() {
-        // Season-Marker bleibt im Titel — der Matcher probiert Varianten
+        // The season marker stays in the title — the matcher tries variants
         let r = p("Frieren: Beyond Journey's End Season 1 Ep 28");
         assert_eq!(r.title, "Frieren: Beyond Journey's End Season 1");
         assert_eq!(r.episode, Some(28));
@@ -281,7 +281,7 @@ mod tests {
 
     #[test]
     fn number_in_title_not_episode() {
-        // Kein Trenner → Zahl gehört zum Titel? Mit " - " ist es die Episode.
+        // No separator → the number belongs to the title? With " - " it is the episode.
         let r = p("Mob Psycho 100 - 05.mkv");
         assert_eq!(r.title, "Mob Psycho 100");
         assert_eq!(r.episode, Some(5));

@@ -20,6 +20,8 @@ export const authInfo = () => invoke<AuthInfo>("anilist_auth_info");
 export const setClientId = (clientId: string) =>
   invoke<void>("set_client_id", { clientId });
 export const loginUrl = () => invoke<string>("anilist_login_url");
+/** Starts the localhost callback server and returns the authorize URL. */
+export const startLogin = () => invoke<string>("anilist_start_login");
 export const connect = (token: string) =>
   invoke<Viewer>("anilist_connect", { token });
 export const session = () => invoke<Viewer | null>("anilist_session");
@@ -31,7 +33,7 @@ export function gql<T>(query: string, variables?: object): Promise<T> {
   return invoke<T>("anilist_query", { query, variables });
 }
 
-// --- Anime-/Manga-Liste (Laden über Rust: Cache + Offline-Queue) -----------
+// --- Anime/manga list (loaded via Rust: cache + offline queue) -------------
 
 export const fetchMediaList = (userId: number, mediaType: MediaType) =>
   invoke<ListResult>("fetch_media_list", { userId, mediaType });

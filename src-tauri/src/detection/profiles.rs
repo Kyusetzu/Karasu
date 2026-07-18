@@ -1,8 +1,8 @@
-//! Player- und Streaming-Profile: Welche Prozesse sind interessant und wie
-//! wird der Medientitel aus dem Fenstertitel extrahiert?
+//! Player and streaming profiles: which processes are interesting and how
+//! the media title is extracted from the window title.
 
-/// Bekannte Videoplayer: (Prozessnamen, Suffixe, die vom Fenstertitel
-/// abgeschnitten werden). Titel muss wie eine Videodatei aussehen.
+/// Known video players: (process names, suffixes stripped from the window
+/// title). The title must look like a video file.
 const PLAYERS: &[(&[&str], &[&str])] = &[
     (&["mpv.exe", "mpvnet.exe"], &[" - mpv", " - mpv.net"]),
     (&["vlc.exe"], &[" - VLC media player", " - VLC Media Player"]),
@@ -33,7 +33,7 @@ const BROWSERS: &[&str] = &[
     "librewolf.exe",
 ];
 
-/// Browser-Fenstertitel enden mit dem Browsernamen — abschneiden.
+/// Browser window titles end with the browser name — strip it.
 const BROWSER_SUFFIXES: &[&str] = &[
     " - Google Chrome",
     " — Mozilla Firefox",
@@ -47,18 +47,18 @@ const BROWSER_SUFFIXES: &[&str] = &[
     " - LibreWolf",
 ];
 
-/// Streaming-Seiten: (Erkennungsmerkmal im Titel, Suffixe, die entfernt
-/// werden, um den Serientitel + Episode zu erhalten).
-/// Crunchyroll-Tab: "Frieren: Beyond Journey's End Season 1 Ep 28 Watch on Crunchyroll"
-/// bzw. "Watching Frieren Episode 28 - Crunchyroll".
+/// Streaming sites: (marker in the title, suffixes removed to obtain the
+/// series title + episode).
+/// Crunchyroll tab: "Frieren: Beyond Journey's End Season 1 Ep 28 Watch on Crunchyroll"
+/// or "Watching Frieren Episode 28 - Crunchyroll".
 const STREAMING_MARKERS: &[(&str, &[&str])] = &[
     ("Crunchyroll", &[" Watch on Crunchyroll", " - Watch on Crunchyroll", " - Crunchyroll"]),
     ("ADN", &[" - ADN", " en streaming - ADN"]),
     ("Netflix", &[" - Netflix", " | Netflix"]),
 ];
 
-/// Manga-Leseseiten: gleiche Mechanik wie Streaming, aber der Titel enthält
-/// eine Kapitelnummer ("Ch. 45", "Chapter 45").
+/// Manga reading sites: same mechanics as streaming, but the title carries
+/// a chapter number ("Ch. 45", "Chapter 45").
 const MANGA_MARKERS: &[(&str, &[&str])] = &[
     ("MangaDex", &[" - MangaDex", " – MangaDex"]),
     ("MANGA Plus", &[" - MANGA Plus by SHUEISHA", " | MANGA Plus", " - MANGA Plus"]),
@@ -69,8 +69,8 @@ const MANGA_MARKERS: &[(&str, &[&str])] = &[
     ("Asura Scans", &[" - Asura Scans"]),
 ];
 
-/// Extrahiert den Dateinamen aus einem Player-Fenster, falls der Prozess ein
-/// bekannter Player ist und der Titel nach Videodatei aussieht.
+/// Extracts the file name from a player window if the process is a known
+/// player and the title looks like a video file.
 pub fn match_player(process: &str, title: &str) -> Option<String> {
     let (_, suffixes) = PLAYERS
         .iter()
@@ -88,14 +88,14 @@ pub fn match_player(process: &str, title: &str) -> Option<String> {
         return None;
     }
 
-    // Player zeigen oft Menü-/Leerlauf-Titel ("VLC media player") — nur
-    // akzeptieren, was nach Videodatei aussieht.
+    // Players often show menu/idle titles ("VLC media player") — only
+    // accept what looks like a video file.
     let lower = media.to_lowercase();
     if VIDEO_EXTENSIONS.iter().any(|ext| lower.ends_with(ext)) {
         return Some(media.to_string());
     }
-    // MPC/mpv können die Erweiterung ausblenden: heuristisch akzeptieren,
-    // wenn eine Episodennummer erkennbar ist.
+    // MPC/mpv may hide the file extension: accept heuristically when an
+    // episode number is recognizable.
     if crate::recognition::parser::parse(media).episode.is_some() {
         return Some(media.to_string());
     }
@@ -113,7 +113,7 @@ fn strip_browser_suffix(title: &str) -> Option<String> {
     Some(media)
 }
 
-/// Erkennt Streaming-Wiedergabe in Browser-Tabs anhand des Fenstertitels.
+/// Detects streaming playback in browser tabs from the window title.
 pub fn match_streaming(process: &str, title: &str) -> Option<String> {
     if !BROWSERS.contains(&process) {
         return None;
@@ -130,11 +130,11 @@ pub fn match_streaming(process: &str, title: &str) -> Option<String> {
             break;
         }
     }
-    // "Watching " Präfix (Crunchyroll) entfernen
+    // Strip the "Watching " prefix (Crunchyroll)
     let media = media.strip_prefix("Watching ").unwrap_or(&media).trim();
 
-    // Nur akzeptieren, wenn eine Episodennummer erkennbar ist — sonst ist es
-    // nur eine Übersichtsseite.
+    // Only accept when an episode number is recognizable — otherwise it is
+    // just an overview page.
     if crate::recognition::parser::parse(media).episode.is_some() {
         Some(media.to_string())
     } else {
@@ -142,7 +142,7 @@ pub fn match_streaming(process: &str, title: &str) -> Option<String> {
     }
 }
 
-/// Erkennt Manga-Lesen in Browser-Tabs (MangaDex & Co.).
+/// Detects manga reading in browser tabs (MangaDex and friends).
 pub fn match_manga(process: &str, title: &str) -> Option<String> {
     if !BROWSERS.contains(&process) {
         return None;
@@ -161,7 +161,7 @@ pub fn match_manga(process: &str, title: &str) -> Option<String> {
     }
     let media = media.trim();
 
-    // Nur akzeptieren, wenn eine Kapitelnummer erkennbar ist
+    // Only accept when a chapter number is recognizable
     if crate::recognition::parser::parse_manga(media).episode.is_some() {
         Some(media.to_string())
     } else {

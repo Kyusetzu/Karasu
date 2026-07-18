@@ -1,7 +1,7 @@
 import { gql } from "./anilist";
 import type { Media, MediaListStatus, MediaType } from "./types";
 
-/** Media-Felder für Discovery-Grids, inkl. eigenem Listen-Eintrag. */
+/** Media fields for discovery grids, including the user's own list entry. */
 const MEDIA_FIELDS = `
   id
   type

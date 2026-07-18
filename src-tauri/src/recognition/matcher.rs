@@ -1,16 +1,16 @@
-//! Matching erkannter Titel gegen die AniList-Einträge des Users.
-//! Normalisierung + Trigramm-Dice-Ähnlichkeit, Season-Varianten inklusive.
+//! Matching of detected titles against the user's AniList entries.
+//! Normalization + trigram Dice similarity, season variants included.
 
 use super::parser::Parsed;
 use std::collections::HashSet;
 
-/// Ein Anime aus der User-Liste mit allen bekannten Titeln.
+/// One entry from the user's list with all known titles.
 #[derive(Debug, Clone)]
 pub struct Candidate {
     pub media_id: i64,
     pub titles: Vec<String>,
     pub episodes: Option<u32>,
-    /// Episodenlänge in Minuten (für die Scrobble-Schwelle)
+    /// Episode length in minutes (for the scrobble threshold)
     pub duration_min: Option<u32>,
     pub progress: u32,
     pub status: String,
@@ -35,7 +35,7 @@ fn trigrams(s: &str) -> HashSet<[u8; 3]> {
         .collect()
 }
 
-/// Dice-Koeffizient über Trigramme (0.0–1.0).
+/// Dice coefficient over trigrams (0.0–1.0).
 pub fn similarity(a: &str, b: &str) -> f64 {
     if a == b {
         return 1.0;
@@ -48,14 +48,14 @@ pub fn similarity(a: &str, b: &str) -> f64 {
     (2.0 * common as f64) / (ta.len() + tb.len()) as f64
 }
 
-/// Titelvarianten des erkannten Namens, um Season-Schreibweisen abzudecken:
+/// Title variants of the detected name to cover season spellings:
 /// "Title S2" ↔ "Title 2nd Season" ↔ "Title Season 2".
 fn variants(parsed: &Parsed) -> Vec<String> {
     let base = normalize(&parsed.title);
     let mut out = vec![base.clone()];
 
     if let Some(season) = parsed.season {
-        // Season-Marker aus dem normalisierten Titel entfernen
+        // Strip the season marker from the normalized title
         let stripped = base
             .replace(&format!("season {season}"), "")
             .replace(&format!("{season}nd season"), "")
@@ -88,8 +88,8 @@ pub struct Match {
     pub score: f64,
 }
 
-/// Bester Kandidat aus der Liste für einen erkannten Titel.
-/// Mindest-Score 0.7; exakte Treffer gewinnen sofort.
+/// Best candidate from the list for a detected title.
+/// Minimum score 0.7; exact matches win immediately.
 pub fn best_match(parsed: &Parsed, candidates: &[Candidate]) -> Option<Match> {
     let needles = variants(parsed);
     let mut best: Option<Match> = None;

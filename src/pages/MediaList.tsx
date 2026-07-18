@@ -32,8 +32,8 @@ import { cn } from "@/lib/utils";
 type SortKey = "updated" | "title" | "score" | "progress";
 const SORT_KEYS: SortKey[] = ["updated", "title", "score", "progress"];
 
-/// Fortschritts-Dropdowns nur bis zu dieser Länge (Langläufer wie One Piece
-/// bekommen weiterhin +1/Modal statt eines 1000-Einträge-Dropdowns)
+// Progress dropdowns only up to this length (long-runners like One Piece
+// keep +1/modal instead of a 1000-entry dropdown)
 const PROGRESS_DROPDOWN_LIMIT = 600;
 
 export default function MediaList({ type }: { type: MediaType }) {
@@ -432,7 +432,7 @@ function ListRow({
         </p>
       </Link>
 
-      {/* Schnell-Bewertung */}
+      {/* Quick score */}
       <select
         value={entry.score}
         onChange={(e) => onQuickSave({ score: Number(e.target.value) })}
@@ -448,7 +448,7 @@ function ListRow({
         ))}
       </select>
 
-      {/* Schnell-Fortschritt */}
+      {/* Quick progress */}
       {dropdown ? (
         <select
           value={entry.progress}

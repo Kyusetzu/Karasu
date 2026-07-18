@@ -3,9 +3,9 @@ import { deleteListEntry, saveListEntry } from "@/api/anilist";
 import type { ListResult, MediaType, SaveEntryInput } from "@/api/types";
 
 /**
- * Mutations auf eine Medienliste (Anime oder Manga) mit optimistischem
- * Cache-Update. Statuswechsel verschieben den Eintrag lokal in die passende
- * Gruppe, damit kein teurer Refetch (Rate-Limit!) nötig ist.
+ * Mutations on a media list (anime or manga) with optimistic cache
+ * updates. Status changes move the entry locally into the matching group
+ * so no expensive refetch (rate limit!) is needed.
  */
 export function useListMutations(userId: number, mediaType: MediaType) {
   const qc = useQueryClient();
@@ -28,7 +28,7 @@ export function useListMutations(userId: number, mediaType: MediaType) {
                 }
               : e,
           )
-          // Bei Statuswechsel aus der alten Status-Gruppe entfernen
+          // On a status change, remove from the old status group
           .filter(
             (e) =>
               e.mediaId !== input.mediaId ||
@@ -37,7 +37,7 @@ export function useListMutations(userId: number, mediaType: MediaType) {
               group.status === input.status,
           ),
       }));
-      // In die Zielgruppe einsortieren, falls sie existiert
+      // Insert into the target group if it exists
       if (input.status) {
         const entry = old.lists
           .flatMap((g) => g.entries)

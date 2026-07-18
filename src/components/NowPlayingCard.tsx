@@ -28,7 +28,7 @@ function useCountdown(targetMs: number | null): string | null {
   return min > 0 ? `${min} min ${sec} s` : `${sec} s`;
 }
 
-/** Banner für die aktuell erkannte Wiedergabe inkl. Scrobble-Status. */
+/** Banner for the currently detected playback, including scrobble state. */
 export default function NowPlayingCard() {
   const current = useNowPlaying((s) => s.current);
   const scrobble = useNowPlaying((s) => s.scrobble);
@@ -38,7 +38,7 @@ export default function NowPlayingCard() {
   const qc = useQueryClient();
   const { t } = useTranslation();
 
-  // Nach erfolgreichem Auto-Update die Liste neu laden
+  // Reload the list after a successful auto-update
   useEffect(() => {
     if (!isTauri) return;
     let unlisten: (() => void) | undefined;

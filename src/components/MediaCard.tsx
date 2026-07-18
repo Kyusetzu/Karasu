@@ -10,9 +10,8 @@ import { useAuth } from "@/stores/auth";
 import EntryEditModal, { type EntrySaveInput } from "@/components/EntryEditModal";
 
 /**
- * Karte für Discovery-Grids (Suche, Saison): Schnell-Hinzufügen und
- * vollständige Bearbeitung (Status/Fortschritt/Bewertung) direkt aus
- * den Suchergebnissen.
+ * Card for discovery grids (search, season): quick add and full editing
+ * (status/progress/score) straight from the results.
  */
 export default function MediaCard({ media }: { media: MediaWithListStatus }) {
   const { t } = useTranslation();
@@ -24,7 +23,7 @@ export default function MediaCard({ media }: { media: MediaWithListStatus }) {
     mutationFn: saveListEntry,
     onSuccess: (result, input) => {
       qc.invalidateQueries({ queryKey: ["mediaList"] });
-      // Discovery-Cache lokal patchen statt neu zu laden (Rate-Limit)
+      // Patch the discovery cache locally instead of refetching (rate limit)
       media.mediaListEntry = {
         id: result.entry?.id ?? media.mediaListEntry?.id ?? 0,
         status: input.status ?? media.mediaListEntry?.status ?? "PLANNING",

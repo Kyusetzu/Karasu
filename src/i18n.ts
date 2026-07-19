@@ -298,6 +298,13 @@ const en = {
     progress: "Merging {{done}} / {{total}} …",
     done: "Merge complete ({{count}} entries).",
   },
+  franchise: {
+    title: "Franchise",
+    view: "View franchise",
+    none: "No related titles found.",
+    truncated: "Large franchise — showing the closest relations only.",
+    notOnList: "Not on your list",
+  },
   media: {
     addPlanning: "Add to Planning",
     onList: "On your list",
@@ -659,6 +666,13 @@ const de: typeof en = {
     later: "Später",
     progress: "Führe zusammen {{done}} / {{total}} …",
     done: "Zusammenführung abgeschlossen ({{count}} Einträge).",
+  },
+  franchise: {
+    title: "Franchise",
+    view: "Franchise ansehen",
+    none: "Keine verwandten Titel gefunden.",
+    truncated: "Großes Franchise — es werden nur die nächsten Beziehungen gezeigt.",
+    notOnList: "Nicht auf deiner Liste",
   },
   media: {
     addPlanning: "Zu Geplant hinzufügen",

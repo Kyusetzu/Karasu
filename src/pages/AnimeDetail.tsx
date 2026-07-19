@@ -202,7 +202,15 @@ export default function AnimeDetail() {
           (e) => e.node.type === "ANIME" || e.node.type === "MANGA",
         ).length > 0 && (
           <div className="mt-6">
-            <CardTitle>{t("detail.related")}</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle>{t("detail.related")}</CardTitle>
+              <Link
+                to={`/franchise/${data.id}`}
+                className="text-xs text-accent-400 hover:underline"
+              >
+                {t("franchise.view")}
+              </Link>
+            </div>
             <div className="mt-3 flex gap-4 overflow-x-auto pb-2">
               {data.relations.edges
                 .filter((e) => e.node.type === "ANIME" || e.node.type === "MANGA")

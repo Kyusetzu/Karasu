@@ -1,0 +1,151 @@
+import { gql } from "./anilist";
+import type { MediaListStatus, MediaTitle, MediaType } from "./types";
+
+/**
+ * Loads a media's franchise as a small relation graph via a bounded,
+ * batched breadth-first walk over AniList's `relations`. Only same-medium
+ * story relations are followed (adaptations/characters/etc. are ignored so
+ * the graph stays a franchise, not the whole universe), and the walk is
+ * depth- and node-capped so deep or cyclic graphs can't blow up.
+ */
+
+const FRANCHISE_QUERY = `
+query ($ids: [Int]) {
+  Page(perPage: 50) {
+    media(id_in: $ids) {
+      id
+      type
+      title { romaji english native }
+      coverImage { large }
+      format
+      mediaListEntry { status }
+      relations {
+        edges {
+          relationType
+          node {
+            id
+            type
+            title { romaji english native }
+            coverImage { large }
+            format
+            mediaListEntry { status }
+          }
+        }
+      }
+    }
+  }
+}`;
+
+const FOLLOW = new Set([
+  "PREQUEL",
+  "SEQUEL",
+  "SIDE_STORY",
+  "PARENT",
+  "ALTERNATIVE",
+  "SPIN_OFF",
+]);
+
+const MAX_DEPTH = 2;
+const MAX_NODES = 30;
+
+export interface FranchiseNode {
+  id: number;
+  type: MediaType;
+  title: MediaTitle;
+  coverImage: { large: string | null };
+  format: string | null;
+  listStatus: MediaListStatus | null;
+}
+
+export interface FranchiseEdge {
+  from: number;
+  to: number;
+  relation: string;
+}
+
+export interface FranchiseGraph {
+  rootId: number;
+  nodes: FranchiseNode[];
+  edges: FranchiseEdge[];
+  /** true if a cap stopped the walk before the graph was exhausted */
+  truncated: boolean;
+}
+
+interface RawMedia {
+  id: number;
+  type: MediaType;
+  title: MediaTitle;
+  coverImage: { large: string | null } | null;
+  format: string | null;
+  mediaListEntry: { status: MediaListStatus } | null;
+}
+
+export async function loadFranchise(rootId: number): Promise<FranchiseGraph> {
+  const nodes = new Map<number, FranchiseNode>();
+  const edges: FranchiseEdge[] = [];
+  const visited = new Set<number>();
+  let frontier = [rootId];
+  let truncated = false;
+
+  const addNode = (m: RawMedia | null | undefined) => {
+    if (!m || (m.type !== "ANIME" && m.type !== "MANGA")) return;
+    if (!nodes.has(m.id)) {
+      nodes.set(m.id, {
+        id: m.id,
+        type: m.type,
+        title: m.title,
+        coverImage: m.coverImage ?? { large: null },
+        format: m.format ?? null,
+        listStatus: m.mediaListEntry?.status ?? null,
+      });
+    }
+  };
+
+  const hasEdge = (a: number, b: number) =>
+    edges.some(
+      (e) =>
+        (e.from === a && e.to === b) || (e.from === b && e.to === a),
+    );
+
+  for (let depth = 0; depth <= MAX_DEPTH && frontier.length; depth++) {
+    const ids = frontier.filter((id) => !visited.has(id)).slice(0, 50);
+    if (ids.length === 0) break;
+    ids.forEach((id) => visited.add(id));
+
+    const data = await gql<{
+      Page: {
+        media: (RawMedia & {
+          relations: { edges: { relationType: string; node: RawMedia }[] };
+        })[];
+      };
+    }>(FRANCHISE_QUERY, { ids });
+
+    const next: number[] = [];
+    for (const media of data.Page.media) {
+      addNode(media);
+      for (const edge of media.relations.edges) {
+        if (!FOLLOW.has(edge.relationType)) continue;
+        const node = edge.node;
+        if (!node || (node.type !== "ANIME" && node.type !== "MANGA")) continue;
+        addNode(node);
+        // Keep a single edge per pair (SEQUEL/PREQUEL are reciprocal).
+        if (!hasEdge(media.id, node.id)) {
+          edges.push({
+            from: media.id,
+            to: node.id,
+            relation: edge.relationType,
+          });
+        }
+        if (depth < MAX_DEPTH && !visited.has(node.id)) next.push(node.id);
+      }
+    }
+
+    if (nodes.size >= MAX_NODES) {
+      truncated = true;
+      break;
+    }
+    frontier = next;
+  }
+
+  return { rootId, nodes: [...nodes.values()], edges, truncated };
+}

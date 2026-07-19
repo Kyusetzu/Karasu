@@ -172,6 +172,15 @@ const en = {
     chaptersShort: "{{n}} ch",
     showAll: "Show all ({{n}})",
     showLess: "Show less",
+    activityEmpty:
+      "No playback tracked yet. Start watching and Karasu will log it here.",
+    episodesTracked: "Episodes tracked",
+    hoursTracked: "Hours tracked",
+    activeDays: "Active days",
+    longestStreak: "Longest streak",
+    streakDays: "{{n}} days",
+    whenYouWatch: "When you watch",
+    calendarTitle: "Last 12 months",
   },
   list: {
     connectPrompt: "Connect with AniList to see your list.",
@@ -412,6 +421,15 @@ const de: typeof en = {
     chaptersShort: "{{n}} Kap.",
     showAll: "Alle anzeigen ({{n}})",
     showLess: "Weniger anzeigen",
+    activityEmpty:
+      "Noch nichts erfasst. Fang an zu schauen — Karasu protokolliert es hier.",
+    episodesTracked: "Episoden erfasst",
+    hoursTracked: "Stunden erfasst",
+    activeDays: "Aktive Tage",
+    longestStreak: "Längste Serie",
+    streakDays: "{{n}} Tage",
+    whenYouWatch: "Wann du schaust",
+    calendarTitle: "Letzte 12 Monate",
   },
   list: {
     connectPrompt: "Verbinde dich mit AniList, um deine Liste zu sehen.",

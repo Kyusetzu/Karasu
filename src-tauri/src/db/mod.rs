@@ -33,6 +33,40 @@ CREATE TABLE list_cache (
 PRAGMA user_version = 2;
 ";
 
+/// Schema v3: local playback history. Every scrobbled episode/chapter is
+/// logged with real wall-clock timestamps — the raw material for the
+/// Activity analytics the AniList website cannot offer.
+const MIGRATION_V3: &str = "
+CREATE TABLE IF NOT EXISTS history (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    media_id   INTEGER NOT NULL,
+    media_type TEXT NOT NULL,
+    title      TEXT NOT NULL,
+    episode    INTEGER NOT NULL,
+    started_ms INTEGER NOT NULL,
+    ended_ms   INTEGER NOT NULL,
+    seconds    INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS history_ended ON history (ended_ms);
+PRAGMA user_version = 3;
+";
+
+/// One logged playback event, serialized to the frontend (camelCase).
+#[derive(serde::Serialize)]
+pub struct HistoryRow {
+    #[serde(rename = "mediaId")]
+    pub media_id: i64,
+    #[serde(rename = "mediaType")]
+    pub media_type: String,
+    pub title: String,
+    pub episode: u32,
+    #[serde(rename = "startedMs")]
+    pub started_ms: i64,
+    #[serde(rename = "endedMs")]
+    pub ended_ms: i64,
+    pub seconds: i64,
+}
+
 impl Db {
     pub fn open(data_dir: PathBuf) -> Result<Self, String> {
         std::fs::create_dir_all(&data_dir)
@@ -47,6 +81,10 @@ impl Db {
         if version < 2 {
             conn.execute_batch(MIGRATION_V2)
                 .map_err(|e| format!("Migration v2 failed: {e}"))?;
+        }
+        if version < 3 {
+            conn.execute_batch(MIGRATION_V3)
+                .map_err(|e| format!("Migration v3 failed: {e}"))?;
         }
         Ok(Db(Mutex::new(conn)))
     }
@@ -137,6 +175,52 @@ impl Db {
         let _ = self.cache_list(user_id, media_type, &lists.to_string());
     }
 
+    // --- Playback history ---------------------------------------------------
+
+    pub fn history_insert(
+        &self,
+        media_id: i64,
+        media_type: &str,
+        title: &str,
+        episode: u32,
+        started_ms: i64,
+        ended_ms: i64,
+    ) {
+        let seconds = ((ended_ms - started_ms) / 1000).max(0);
+        let conn = self.0.lock().unwrap();
+        let _ = conn.execute(
+            "INSERT INTO history
+                (media_id, media_type, title, episode, started_ms, ended_ms, seconds)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            rusqlite::params![media_id, media_type, title, episode, started_ms, ended_ms, seconds],
+        );
+    }
+
+    /// All history rows with `ended_ms >= from_ms`, newest first.
+    pub fn history_since(&self, from_ms: i64) -> Vec<HistoryRow> {
+        let conn = self.0.lock().unwrap();
+        let mut stmt = match conn.prepare(
+            "SELECT media_id, media_type, title, episode, started_ms, ended_ms, seconds
+             FROM history WHERE ended_ms >= ?1 ORDER BY ended_ms DESC",
+        ) {
+            Ok(s) => s,
+            Err(_) => return Vec::new(),
+        };
+        stmt.query_map([from_ms], |r| {
+            Ok(HistoryRow {
+                media_id: r.get(0)?,
+                media_type: r.get(1)?,
+                title: r.get(2)?,
+                episode: r.get::<_, i64>(3)? as u32,
+                started_ms: r.get(4)?,
+                ended_ms: r.get(5)?,
+                seconds: r.get(6)?,
+            })
+        })
+        .map(|rows| rows.filter_map(Result::ok).collect())
+        .unwrap_or_default()
+    }
+
     // --- Offline queue ------------------------------------------------------
 
     pub fn queue_push(&self, kind: &str, payload: &str) -> Result<(), String> {
@@ -175,5 +259,41 @@ impl Db {
         })
         .map(|n| n as usize)
         .unwrap_or(0)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Db;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn temp_db() -> Db {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("karasu-db-test-{nanos}"));
+        Db::open(dir).expect("open db")
+    }
+
+    #[test]
+    fn history_round_trip_and_window() {
+        let db = temp_db();
+        // seconds = (ended - started) / 1000
+        db.history_insert(1, "ANIME", "Frieren", 28, 10_000, 1_510_000);
+        db.history_insert(2, "MANGA", "Berserk", 364, 2_000_000, 2_003_000);
+
+        let all = db.history_since(0);
+        assert_eq!(all.len(), 2);
+        // Newest first (higher ended_ms).
+        assert_eq!(all[0].media_id, 2);
+        assert_eq!(all[0].seconds, 3);
+        assert_eq!(all[1].episode, 28);
+        assert_eq!(all[1].seconds, 1500);
+
+        // Window filter excludes older rows.
+        let recent = db.history_since(1_600_000);
+        assert_eq!(recent.len(), 1);
+        assert_eq!(recent[0].title, "Berserk");
     }
 }

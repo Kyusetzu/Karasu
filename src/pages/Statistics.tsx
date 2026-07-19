@@ -16,7 +16,9 @@ import { useAuth } from "@/stores/auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Tabs, type TabOption } from "@/components/ui/tabs";
+import ActivityStats from "@/components/ActivityStats";
 
+type View = MediaType | "ACTIVITY";
 type Category = "overview" | "genres" | "tags" | "voiceActors" | "studios" | "staff";
 type SortKey = "count" | "time" | "score";
 
@@ -75,22 +77,25 @@ function StatisticsContent({
   avatar: string | null;
 }) {
   const { t } = useTranslation();
-  const [type, setType] = useState<MediaType>("ANIME");
+  const [view, setView] = useState<View>("ANIME");
   const [category, setCategory] = useState<Category>("overview");
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["userStats", userId],
     queryFn: () => userStatistics(userId),
-    enabled: isTauri,
+    enabled: isTauri && view !== "ACTIVITY",
   });
 
+  const isActivity = view === "ACTIVITY";
+  const type: MediaType = view === "MANGA" ? "MANGA" : "ANIME";
   const categories = type === "ANIME" ? ANIME_CATEGORIES : MANGA_CATEGORIES;
   // Keep the selected sub-tab valid when switching media type.
   const activeCategory = categories.includes(category) ? category : "overview";
 
-  const typeOptions: TabOption<MediaType>[] = [
+  const viewOptions: TabOption<View>[] = [
     { value: "ANIME", label: t("nav.list") },
     { value: "MANGA", label: t("nav.manga") },
+    { value: "ACTIVITY", label: t("stats.activity") },
   ];
   const categoryOptions: TabOption<Category>[] = categories.map((c) => ({
     value: c,
@@ -123,27 +128,34 @@ function StatisticsContent({
       </header>
 
       <div className="space-y-3">
-        <Tabs options={typeOptions} value={type} onChange={setType} />
-        <Tabs
-          options={categoryOptions}
-          value={activeCategory}
-          onChange={setCategory}
-        />
+        <Tabs options={viewOptions} value={view} onChange={setView} />
+        {!isActivity && (
+          <Tabs
+            options={categoryOptions}
+            value={activeCategory}
+            onChange={setCategory}
+          />
+        )}
       </div>
 
-      {isLoading && <p className="text-ink-500">{t("common.loading")}</p>}
-      {error && (
-        <p className="text-red-300">
-          {t("common.error", { message: String(error) })}
-        </p>
+      {isActivity ? (
+        <ActivityStats />
+      ) : (
+        <>
+          {isLoading && <p className="text-ink-500">{t("common.loading")}</p>}
+          {error && (
+            <p className="text-red-300">
+              {t("common.error", { message: String(error) })}
+            </p>
+          )}
+          {stats &&
+            (type === "ANIME" ? (
+              <AnimeView stats={stats.anime} category={activeCategory} />
+            ) : (
+              <MangaView stats={stats.manga} category={activeCategory} />
+            ))}
+        </>
       )}
-
-      {stats &&
-        (type === "ANIME" ? (
-          <AnimeView stats={stats.anime} category={activeCategory} />
-        ) : (
-          <MangaView stats={stats.manga} category={activeCategory} />
-        ))}
     </div>
   );
 }

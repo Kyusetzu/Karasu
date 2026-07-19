@@ -68,6 +68,10 @@ pub struct Session {
     pub total: Option<u32>,
     /// List status of the entry when detection started
     pub list_status: String,
+    /// Display title, kept for the playback-history log
+    pub title: String,
+    /// Wall-clock start of this session (ms since epoch), for history
+    pub started_ms: i64,
     /// When the auto-update is due (None = auto-update disabled)
     pub update_at: Option<Instant>,
     pub update_at_epoch_ms: Option<u64>,
@@ -295,6 +299,27 @@ fn epoch_ms_in(d: Duration) -> u64 {
         .unwrap_or(0)
 }
 
+fn now_ms() -> i64 {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|t| t.as_millis() as i64)
+        .unwrap_or(0)
+}
+
+/// Logs a scrobbled episode/chapter to the local playback history.
+fn log_history(app: &AppHandle, session: &Session) {
+    let db = app.state::<Db>();
+    db.history_insert(
+        session.media_id,
+        &session.media_type,
+        &session.title,
+        session.episode,
+        session.started_ms,
+        now_ms(),
+    );
+}
+
 /// Performs the list update (including status logic and cache patch).
 async fn perform_update(
     app: &AppHandle,
@@ -370,6 +395,9 @@ pub async fn confirm_pending(app: AppHandle, accept: bool) -> Result<(), String>
     let state = app.state::<ScrobbleSession>();
     let mut guard = state.0.lock().unwrap();
     if let Some(session) = guard.as_mut() {
+        if result.is_ok() {
+            log_history(&app, session);
+        }
         session.phase = match &result {
             Ok(()) => Phase::Updated,
             Err(e) => Phase::Blocked(e.clone()),
@@ -456,6 +484,11 @@ async fn drive_session(app: &AppHandle) {
                             .find(|c| c.media_id == mid)
                             .map(|c| c.status.clone())
                             .unwrap_or_default(),
+                        title: np
+                            .matched_title
+                            .clone()
+                            .unwrap_or_else(|| np.parsed_title.clone()),
+                        started_ms: now_ms(),
                         update_at: auto.then(|| Instant::now() + threshold),
                         update_at_epoch_ms: auto.then(|| epoch_ms_in(threshold)),
                         phase,
@@ -505,6 +538,9 @@ async fn drive_session(app: &AppHandle) {
         let mut guard = state.0.lock().unwrap();
         if let Some(session) = guard.as_mut() {
             if session.media_id == mid && session.episode == ep {
+                if result.is_ok() {
+                    log_history(app, session);
+                }
                 session.phase = match result {
                     Ok(()) => Phase::Updated,
                     Err(e) => Phase::Blocked(e),

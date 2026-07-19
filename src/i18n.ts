@@ -134,6 +134,8 @@ const en = {
     currentSeason: "current season",
     upcoming: "Airing soon",
     noUpcoming: "No upcoming episodes on your list.",
+    thisWeek: "This week",
+    thisWeekSummary: "{{count}} episodes across {{shows}} shows air this week.",
     stats: "Statistics",
     statAnime: "Anime",
     statEpisodes: "Episodes",
@@ -470,6 +472,9 @@ const de: typeof en = {
     currentSeason: "aktuellen Saison",
     upcoming: "Demnächst",
     noUpcoming: "Keine anstehenden Episoden in deiner Liste.",
+    thisWeek: "Diese Woche",
+    thisWeekSummary:
+      "{{count}} Episoden aus {{shows}} Serien laufen diese Woche.",
     stats: "Statistik",
     statAnime: "Anime",
     statEpisodes: "Episoden",

@@ -2,7 +2,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { BarChart3, CalendarClock, Play, Plus } from "lucide-react";
+import { BarChart3, CalendarClock, CalendarDays, Play, Plus } from "lucide-react";
 import { fetchMediaList } from "@/api/anilist";
 import { displayTitle, type MediaListEntry } from "@/api/types";
 import { useAuth } from "@/stores/auth";
@@ -72,9 +72,16 @@ function DashboardContent({ userId }: { userId: number }) {
     );
   }, [data]);
 
+  const allAnime = useMemo(
+    () =>
+      data?.lists.filter((g) => !g.isCustomList).flatMap((g) => g.entries) ?? [],
+    [data],
+  );
+
   return (
     <div className="space-y-8 p-8">
       <NowPlayingCard />
+      <WeeklyDigest entries={allAnime} />
       <section>
         <h2 className="flex items-center gap-2 text-lg font-semibold">
           <Play size={18} className="text-accent-400" />{" "}
@@ -106,12 +113,7 @@ function DashboardContent({ userId }: { userId: number }) {
         )}
       </section>
 
-      <Stats
-        entries={
-          data?.lists.filter((g) => !g.isCustomList).flatMap((g) => g.entries) ??
-          []
-        }
-      />
+      <Stats entries={allAnime} />
 
       <section>
         <h2 className="flex items-center gap-2 text-lg font-semibold">
@@ -131,6 +133,87 @@ function DashboardContent({ userId }: { userId: number }) {
         )}
       </section>
     </div>
+  );
+}
+
+const WEEK_SECS = 7 * 24 * 3600;
+
+/**
+ * "This week" digest: episodes of the shows you're watching that air within
+ * the next seven days, grouped by local weekday. Sourced entirely from the
+ * cached list (each entry carries `nextAiringEpisode`), so it works offline.
+ *
+ * Manga is intentionally absent: AniList exposes no chapter-release schedule,
+ * so there is no truthful "new chapters this week" to show.
+ */
+function WeeklyDigest({ entries }: { entries: MediaListEntry[] }) {
+  const { t, i18n } = useTranslation();
+
+  const thisWeek = useMemo(() => {
+    const now = Date.now() / 1000;
+    const end = now + WEEK_SECS;
+    return entries
+      .filter(
+        (e) =>
+          (e.status === "CURRENT" || e.status === "REPEATING") &&
+          e.media.nextAiringEpisode &&
+          e.media.nextAiringEpisode.airingAt >= now &&
+          e.media.nextAiringEpisode.airingAt <= end,
+      )
+      .sort(
+        (a, b) =>
+          a.media.nextAiringEpisode!.airingAt -
+          b.media.nextAiringEpisode!.airingAt,
+      );
+  }, [entries]);
+
+  if (thisWeek.length === 0) return null;
+
+  const shows = new Set(thisWeek.map((e) => e.mediaId)).size;
+
+  return (
+    <section>
+      <h2 className="flex items-center gap-2 text-lg font-semibold">
+        <CalendarDays size={18} className="text-accent-400" />{" "}
+        {t("dashboard.thisWeek")}
+      </h2>
+      <p className="mt-1 text-sm text-ink-500">
+        {t("dashboard.thisWeekSummary", { count: thisWeek.length, shows })}
+      </p>
+      <div className="mt-4 space-y-1">
+        {thisWeek.map((entry) => (
+          <Link
+            key={entry.id}
+            to={`/media/${entry.media.id}`}
+            className="flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-surface-900"
+          >
+            <img
+              src={entry.media.coverImage.large ?? ""}
+              alt=""
+              loading="lazy"
+              className="h-12 w-9 rounded object-cover"
+            />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium text-ink-100">
+                {displayTitle(entry.media.title)}
+              </p>
+              <p className="text-xs text-ink-600">
+                {t("common.episode", { n: entry.media.nextAiringEpisode!.episode })}
+              </p>
+            </div>
+            <span className="shrink-0 text-sm tabular-nums text-accent-400">
+              {new Date(
+                entry.media.nextAiringEpisode!.airingAt * 1000,
+              ).toLocaleString(i18n.language, {
+                weekday: "short",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </span>
+          </Link>
+        ))}
+      </div>
+    </section>
   );
 }
 

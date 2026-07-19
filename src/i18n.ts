@@ -271,6 +271,8 @@ const en = {
     rewatches: "Rewatches",
     rereads: "Rereads",
     addRepeat: "+1",
+    notes: "Notes",
+    notesPlaceholder: "Private notes (only you can see these)",
   },
   media: {
     addPlanning: "Add to Planning",
@@ -593,6 +595,8 @@ const de: typeof en = {
     rewatches: "Wiederholungen",
     rereads: "Wiederholungen",
     addRepeat: "+1",
+    notes: "Notizen",
+    notesPlaceholder: "Private Notizen (nur du siehst diese)",
   },
   media: {
     addPlanning: "Zu Geplant hinzufügen",

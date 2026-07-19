@@ -25,6 +25,7 @@ export function useListMutations(userId: number, mediaType: MediaType) {
                   score: input.score ?? e.score,
                   status: input.status ?? e.status,
                   repeat: input.repeat ?? e.repeat,
+                  notes: input.notes ?? e.notes,
                   updatedAt: Math.floor(Date.now() / 1000),
                 }
               : e,

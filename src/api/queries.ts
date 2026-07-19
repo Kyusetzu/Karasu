@@ -19,7 +19,7 @@ const MEDIA_FIELDS = `
   genres
   synonyms
   nextAiringEpisode { episode airingAt }
-  mediaListEntry { id status progress score(format: POINT_10) repeat }
+  mediaListEntry { id status progress score(format: POINT_10) repeat notes }
 `;
 
 export interface ListEntryStub {
@@ -28,6 +28,7 @@ export interface ListEntryStub {
   progress: number;
   score: number;
   repeat: number;
+  notes: string | null;
 }
 
 export interface MediaWithListStatus extends Media {

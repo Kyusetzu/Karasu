@@ -249,6 +249,7 @@ function ListEditor({
     progress: number;
     score: number;
     repeat: number;
+    notes: string | null;
   } | null;
 }) {
   const { t } = useTranslation();
@@ -260,6 +261,7 @@ function ListEditor({
   const [progress, setProgress] = useState(entry?.progress ?? 0);
   const [score, setScore] = useState(entry?.score ?? 0);
   const [repeat, setRepeat] = useState(entry?.repeat ?? 0);
+  const [notes, setNotes] = useState(entry?.notes ?? "");
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
@@ -267,10 +269,12 @@ function ListEditor({
     setProgress(entry?.progress ?? 0);
     setScore(entry?.score ?? 0);
     setRepeat(entry?.repeat ?? 0);
+    setNotes(entry?.notes ?? "");
   }, [entry]);
 
   const save = useMutation({
-    mutationFn: () => saveListEntry({ mediaId, status, progress, score, repeat }),
+    mutationFn: () =>
+      saveListEntry({ mediaId, status, progress, score, repeat, notes }),
     onSuccess: () => {
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -364,6 +368,16 @@ function ListEditor({
           <p className="text-sm text-red-300">{String(save.error)}</p>
         )}
       </div>
+      <label className="mt-3 block text-sm">
+        <span className="mb-1 block text-ink-500">{t("entry.notes")}</span>
+        <textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          rows={3}
+          placeholder={t("entry.notesPlaceholder")}
+          className="w-full resize-y rounded-lg border border-surface-700 bg-surface-900 px-2 py-1.5 text-sm focus:border-accent-500 focus:outline-none"
+        />
+      </label>
     </Card>
   );
 }

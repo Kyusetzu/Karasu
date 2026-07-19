@@ -26,6 +26,7 @@ export interface EditableEntry {
   progress: number;
   score: number;
   repeat: number;
+  notes: string | null;
 }
 
 export interface EntrySaveInput {
@@ -34,6 +35,7 @@ export interface EntrySaveInput {
   progress: number;
   score: number;
   repeat: number;
+  notes: string;
 }
 
 /**
@@ -60,6 +62,7 @@ export default function EntryEditModal({
   const [progress, setProgress] = useState(entry?.progress ?? 0);
   const [score, setScore] = useState(entry?.score ?? 0);
   const [repeat, setRepeat] = useState(entry?.repeat ?? 0);
+  const [notes, setNotes] = useState(entry?.notes ?? "");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const max = maxProgress(media) ?? 99999;
   const rewatchLabel =
@@ -134,6 +137,16 @@ export default function EntryEditModal({
             </Button>
           </div>
         </label>
+        <label className="block text-sm">
+          <span className="mb-1 block text-ink-500">{t("entry.notes")}</span>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={3}
+            placeholder={t("entry.notesPlaceholder")}
+            className="w-full resize-y rounded-lg border border-surface-700 bg-surface-900 px-2 py-1.5 text-sm focus:border-accent-500 focus:outline-none"
+          />
+        </label>
         <div className="flex items-center justify-between pt-2">
           {onDelete ? (
             confirmDelete ? (
@@ -159,7 +172,14 @@ export default function EntryEditModal({
             </Button>
             <Button
               onClick={() =>
-                onSave({ mediaId: media.id, status, progress, score, repeat })
+                onSave({
+                  mediaId: media.id,
+                  status,
+                  progress,
+                  score,
+                  repeat,
+                  notes,
+                })
               }
             >
               {entry ? t("common.save") : t("common.add")}

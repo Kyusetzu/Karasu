@@ -48,6 +48,7 @@ export interface MediaListEntry {
   score: number;
   progress: number;
   repeat: number;
+  notes: string | null;
   updatedAt: number;
   media: Media;
 }
@@ -71,6 +72,7 @@ export interface SaveEntryInput {
   progress?: number;
   score?: number;
   repeat?: number;
+  notes?: string;
 }
 
 export interface MutationResult {
@@ -82,6 +84,7 @@ export interface MutationResult {
     progress: number;
     score: number;
     repeat: number;
+    notes: string | null;
     updatedAt: number;
   } | null;
 }

@@ -151,6 +151,7 @@ query ($userId: Int!, $type: MediaType!) {
         score(format: POINT_10)
         progress
         repeat
+        notes
         updatedAt
         media {
           id
@@ -184,9 +185,9 @@ fn validate_media_type(media_type: &str) -> Result<&str, String> {
 }
 
 const SAVE_MUTATION: &str = "
-mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int, $score: Float, $repeat: Int) {
-  SaveMediaListEntry(mediaId: $mediaId, status: $status, progress: $progress, score: $score, repeat: $repeat) {
-    id mediaId status progress repeat updatedAt
+mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int, $score: Float, $repeat: Int, $notes: String) {
+  SaveMediaListEntry(mediaId: $mediaId, status: $status, progress: $progress, score: $score, repeat: $repeat, notes: $notes) {
+    id mediaId status progress repeat notes updatedAt
     score(format: POINT_10)
   }
 }";

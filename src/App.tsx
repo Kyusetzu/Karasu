@@ -7,6 +7,7 @@ import { useLibrary } from "@/stores/library";
 import { isTauri } from "@/api/anilist";
 import Titlebar from "@/components/Titlebar";
 import Sidebar from "@/components/Sidebar";
+import CommandPalette from "@/components/CommandPalette";
 import Dashboard from "@/pages/Dashboard";
 import MediaList from "@/pages/MediaList";
 import Search from "@/pages/Search";
@@ -29,6 +30,7 @@ export default function App() {
   return (
     <div className="flex h-full flex-col">
       <PresenceReporter />
+      <CommandPalette />
       <Titlebar />
       <div className="flex min-h-0 flex-1">
         <Sidebar />

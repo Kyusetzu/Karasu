@@ -251,6 +251,11 @@ const en = {
     confirmDelete: "Delete {{count}}?",
     done: "Done",
   },
+  palette: {
+    placeholder: "Jump to a page or title …",
+    empty: "No matches.",
+    page: "Page",
+  },
   detail: {
     back: "Back",
     minutes: "{{n}} min",
@@ -553,6 +558,11 @@ const de: typeof en = {
     setScore: "Bewertung setzen …",
     confirmDelete: "{{count}} löschen?",
     done: "Fertig",
+  },
+  palette: {
+    placeholder: "Zu Seite oder Titel springen …",
+    empty: "Keine Treffer.",
+    page: "Seite",
   },
   detail: {
     back: "Zurück",

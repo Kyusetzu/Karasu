@@ -4,6 +4,7 @@ mod commands;
 mod db;
 mod detection;
 mod discord;
+mod library;
 mod recognition;
 mod relations;
 mod scrobbler;
@@ -30,6 +31,7 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
@@ -43,6 +45,7 @@ pub fn run() {
             app.manage(relations::Relations(std::sync::RwLock::new(Vec::new())));
             app.manage(discord::Discord(std::sync::Mutex::new(None)));
             app.manage(discord::UiPage::default());
+            app.manage(library::LibraryIndex::default());
             relations::spawn_loader(app.handle().clone());
             scrobbler::spawn(app.handle().clone());
             airing::spawn(app.handle().clone());
@@ -111,6 +114,12 @@ pub fn run() {
             commands::get_airing_notify,
             commands::set_airing_notify,
             commands::check_for_updates,
+            library::get_library_path,
+            library::set_library_path,
+            library::pick_library_folder,
+            library::get_library_index,
+            library::scan_library,
+            library::play_next,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

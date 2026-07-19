@@ -13,7 +13,7 @@ pub struct Parsed {
     pub release_group: Option<String>,
 }
 
-const VIDEO_EXTENSIONS: &[&str] = &[
+pub(crate) const VIDEO_EXTENSIONS: &[&str] = &[
     "mkv", "mp4", "avi", "m4v", "webm", "ts", "m2ts", "ogm", "wmv", "flv",
 ];
 

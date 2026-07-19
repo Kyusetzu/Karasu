@@ -2,12 +2,22 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { listen } from "@tauri-apps/api/event";
-import { ChevronRight, ExternalLink, LogIn, LogOut, User } from "lucide-react";
+import {
+  ChevronRight,
+  ExternalLink,
+  FolderOpen,
+  LogIn,
+  LogOut,
+  RefreshCw,
+  User,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/stores/auth";
+import { useLibrary } from "@/stores/library";
 import * as api from "@/api/anilist";
+import * as library from "@/api/library";
 import {
   getScrobbleSettings,
   setScrobbleSettings,
@@ -30,9 +40,74 @@ export default function Settings() {
       <h1 className="text-2xl font-bold">{t("settings.title")}</h1>
       <AccountSection />
       <ScrobbleSection />
+      <LibrarySection />
       <DiscordSection />
       <AppSection />
     </div>
+  );
+}
+
+function LibrarySection() {
+  const { t } = useTranslation();
+  const refreshLibrary = useLibrary((s) => s.refresh);
+  const [path, setPath] = useState<string | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const [matched, setMatched] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!api.isTauri) return;
+    library.getLibraryPath().then(setPath);
+  }, []);
+
+  const choose = async () => {
+    setError(null);
+    const picked = await library.pickLibraryFolder();
+    if (!picked) return;
+    await library.setLibraryPath(picked);
+    setPath(picked);
+    await scan();
+  };
+
+  const scan = async () => {
+    setScanning(true);
+    setError(null);
+    try {
+      const summary = await library.scanLibrary();
+      setMatched(summary.matched);
+      await refreshLibrary();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardTitle>{t("settings.library")}</CardTitle>
+      <p className="mt-2 text-sm text-ink-500">{t("settings.libraryHint")}</p>
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <Button variant="secondary" onClick={choose}>
+          <FolderOpen size={16} /> {t("settings.libraryChoose")}
+        </Button>
+        {path && (
+          <Button onClick={scan} disabled={scanning}>
+            <RefreshCw size={16} className={scanning ? "animate-spin" : ""} />{" "}
+            {scanning ? t("settings.libraryScanning") : t("settings.libraryScan")}
+          </Button>
+        )}
+      </div>
+      {path && (
+        <p className="mt-3 break-all text-xs text-ink-600">{path}</p>
+      )}
+      {matched !== null && (
+        <p className="mt-1 text-sm text-emerald-400">
+          {t("settings.libraryMatched", { n: matched })}
+        </p>
+      )}
+      {error && <p className="mt-2 text-sm text-red-300">{error}</p>}
+    </Card>
   );
 }
 

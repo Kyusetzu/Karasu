@@ -8,12 +8,14 @@ import {
   LayoutGrid,
   List as ListIcon,
   Pencil,
+  Play,
   Plus,
   RefreshCw,
   Search as SearchIcon,
   Star,
 } from "lucide-react";
 import { useAuth } from "@/stores/auth";
+import { useLibrary } from "@/stores/library";
 import { fetchMediaList, flushQueue } from "@/api/anilist";
 import {
   displayTitle,
@@ -411,6 +413,9 @@ function ListRow({
   const { media } = entry;
   const max = maxProgress(media);
   const dropdown = max !== null && max <= PROGRESS_DROPDOWN_LIMIT;
+  const hasNext = useLibrary((s) => s.hasNext);
+  const play = useLibrary((s) => s.play);
+  const canPlayNext = media.type === "ANIME" && hasNext(media.id, entry.progress);
 
   return (
     <div className="flex items-center gap-3 bg-surface-900 px-4 py-2.5 first:rounded-t-xl last:rounded-b-xl hover:bg-surface-850">
@@ -471,6 +476,18 @@ function ListRow({
       )}
 
       <div className="flex gap-1">
+        {canPlayNext && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-accent-400"
+            onClick={() => play(media.id).catch(() => {})}
+            aria-label={t("common.playNext")}
+            title={t("common.playNext")}
+          >
+            <Play size={15} />
+          </Button>
+        )}
         <Button
           variant="secondary"
           size="icon"

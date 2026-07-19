@@ -3,6 +3,7 @@ import { Routes, Route, useLocation } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { useAuth } from "@/stores/auth";
 import { useNowPlaying } from "@/stores/nowPlaying";
+import { useLibrary } from "@/stores/library";
 import { isTauri } from "@/api/anilist";
 import Titlebar from "@/components/Titlebar";
 import Sidebar from "@/components/Sidebar";
@@ -18,10 +19,12 @@ import About from "@/pages/About";
 export default function App() {
   const init = useAuth((s) => s.init);
   const initNowPlaying = useNowPlaying((s) => s.init);
+  const refreshLibrary = useLibrary((s) => s.refresh);
   useEffect(() => {
     init();
     initNowPlaying();
-  }, [init, initNowPlaying]);
+    refreshLibrary();
+  }, [init, initNowPlaying, refreshLibrary]);
 
   return (
     <div className="flex h-full flex-col">

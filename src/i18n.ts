@@ -79,6 +79,7 @@ const en = {
     edit: "Edit",
     plusOne: "+1",
     complete: "Mark as completed",
+    playNext: "Play next episode",
   },
   status: {
     ANIME: {
@@ -293,6 +294,13 @@ const en = {
     airingNotify: "New-episode notifications",
     airingNotifyHint:
       "Desktop notification when a new episode of a show you are watching airs.",
+    library: "Local library",
+    libraryHint:
+      "Point Karasu at your anime folder to play the next episode with one click, straight from your list.",
+    libraryChoose: "Choose folder",
+    libraryScan: "Rescan",
+    libraryScanning: "Scanning …",
+    libraryMatched: "{{n}} titles matched on disk.",
     discord: "Discord Rich Presence",
     discordEnable: "Show what you are watching on Discord",
     discordEnableHint: "Uses the built-in Karasu Discord application.",
@@ -347,6 +355,7 @@ const de: typeof en = {
     edit: "Bearbeiten",
     plusOne: "+1",
     complete: "Als abgeschlossen markieren",
+    playNext: "Nächste Folge abspielen",
   },
   status: {
     ANIME: {
@@ -562,6 +571,13 @@ const de: typeof en = {
     airingNotify: "Benachrichtigung bei neuer Folge",
     airingNotifyHint:
       "Desktop-Benachrichtigung, wenn eine neue Folge einer laufenden Serie erscheint.",
+    library: "Lokale Bibliothek",
+    libraryHint:
+      "Zeige Karasu deinen Anime-Ordner, um die nächste Folge mit einem Klick direkt aus deiner Liste zu starten.",
+    libraryChoose: "Ordner wählen",
+    libraryScan: "Neu scannen",
+    libraryScanning: "Scanne …",
+    libraryMatched: "{{n}} Titel auf der Platte zugeordnet.",
     discord: "Discord Rich Presence",
     discordEnable: "In Discord anzeigen, was du schaust",
     discordEnableHint: "Nutzt die eingebaute Karasu-Discord-Application.",

@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
+  Bookmark,
   CheckCheck,
   CloudOff,
   Dices,
@@ -29,6 +30,8 @@ import {
 import { useListMutations } from "@/hooks/useListMutations";
 import EntryEditModal from "@/components/EntryEditModal";
 import RandomPickModal from "@/components/RandomPickModal";
+import PresetModal from "@/components/PresetModal";
+import { loadPresets, savePresets, type Preset } from "@/lib/presets";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -71,6 +74,31 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
   const [grid, setGrid] = useState(true);
   const [editing, setEditing] = useState<MediaListEntry | null>(null);
   const [showRandom, setShowRandom] = useState(false);
+  const [presets, setPresets] = useState<Preset[]>(() => loadPresets(type));
+  const [showPresetSave, setShowPresetSave] = useState(false);
+
+  const applyPreset = (name: string) => {
+    const p = presets.find((x) => x.name === name);
+    if (!p) return;
+    setTab(p.tab as MediaListStatus);
+    setFilter(p.filter);
+    setSort(p.sort as SortKey);
+  };
+
+  const addPreset = (name: string) => {
+    const next = [
+      ...presets.filter((p) => p.name !== name),
+      { name, tab, filter, sort },
+    ];
+    setPresets(next);
+    savePresets(type, next);
+  };
+
+  const deletePreset = (name: string) => {
+    const next = presets.filter((p) => p.name !== name);
+    setPresets(next);
+    savePresets(type, next);
+  };
 
   const { data, isLoading, error, refetch, isRefetching } = useQuery({
     queryKey: ["mediaList", type, userId],
@@ -231,6 +259,30 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
               </option>
             ))}
           </select>
+          {presets.length > 0 && (
+            <select
+              value=""
+              onChange={(e) => e.target.value && applyPreset(e.target.value)}
+              className="h-9 max-w-32 rounded-lg border border-surface-700 bg-surface-900 px-2 text-sm text-ink-300 focus:border-accent-500 focus:outline-none"
+              aria-label={t("presets.apply")}
+            >
+              <option value="">{t("presets.apply")}</option>
+              {presets.map((p) => (
+                <option key={p.name} value={p.name}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          )}
+          <Button
+            variant="secondary"
+            size="icon"
+            onClick={() => setShowPresetSave(true)}
+            aria-label={t("presets.save")}
+            title={t("presets.save")}
+          >
+            <Bookmark size={16} />
+          </Button>
           <Button
             variant="secondary"
             size="icon"
@@ -318,6 +370,15 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
         <RandomPickModal
           pool={byStatus.get("PLANNING") ?? []}
           onClose={() => setShowRandom(false)}
+        />
+      )}
+
+      {showPresetSave && (
+        <PresetModal
+          presets={presets}
+          onSave={addPreset}
+          onDelete={deletePreset}
+          onClose={() => setShowPresetSave(false)}
         />
       )}
     </div>

@@ -237,6 +237,12 @@ const en = {
     reroll: "Reroll",
     empty: "Nothing matches — adjust the cap or add Plan-to-Watch entries.",
   },
+  presets: {
+    apply: "Presets …",
+    save: "Save current view as preset",
+    title: "Filter presets",
+    namePlaceholder: "Preset name",
+  },
   detail: {
     back: "Back",
     minutes: "{{n}} min",
@@ -520,6 +526,12 @@ const de: typeof en = {
     open: "Öffnen",
     reroll: "Neu würfeln",
     empty: "Nichts passt — Cap anpassen oder Einträge zu Planen hinzufügen.",
+  },
+  presets: {
+    apply: "Presets …",
+    save: "Aktuelle Ansicht als Preset speichern",
+    title: "Filter-Presets",
+    namePlaceholder: "Preset-Name",
   },
   detail: {
     back: "Zurück",

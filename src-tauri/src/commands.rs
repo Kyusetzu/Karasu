@@ -460,6 +460,17 @@ pub fn set_ui_page(app: tauri::AppHandle, page: String) {
     crate::discord::sync_current(&app);
 }
 
+/// Whether new-episode desktop notifications are enabled (default on).
+#[tauri::command]
+pub fn get_airing_notify(db: State<'_, Db>) -> bool {
+    db.kv_get("airing_notify").as_deref() != Some("0")
+}
+
+#[tauri::command]
+pub fn set_airing_notify(db: State<'_, Db>, enabled: bool) -> Result<(), String> {
+    db.kv_set("airing_notify", if enabled { "1" } else { "0" })
+}
+
 #[tauri::command]
 pub fn get_autostart(app: tauri::AppHandle) -> bool {
     use tauri_plugin_autostart::ManagerExt;

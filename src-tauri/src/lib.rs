@@ -1,3 +1,4 @@
+mod airing;
 mod anilist;
 mod commands;
 mod db;
@@ -28,6 +29,7 @@ pub fn run() {
             show_main_window(app);
         }))
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
@@ -43,6 +45,7 @@ pub fn run() {
             app.manage(discord::UiPage::default());
             relations::spawn_loader(app.handle().clone());
             scrobbler::spawn(app.handle().clone());
+            airing::spawn(app.handle().clone());
             // Show the idle presence right away (if Discord is enabled).
             discord::sync_current(app.handle());
 
@@ -105,6 +108,8 @@ pub fn run() {
             commands::set_ui_page,
             commands::get_autostart,
             commands::set_autostart,
+            commands::get_airing_notify,
+            commands::set_airing_notify,
             commands::check_for_updates,
         ])
         .run(tauri::generate_context!())

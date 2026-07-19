@@ -72,3 +72,9 @@ export interface UpdateInfo {
 }
 
 export const checkForUpdates = () => invoke<UpdateInfo>("check_for_updates");
+
+// --- Airing notifications --------------------------------------------------
+
+export const getAiringNotify = () => invoke<boolean>("get_airing_notify");
+export const setAiringNotify = (enabled: boolean) =>
+  invoke<void>("set_airing_notify", { enabled });

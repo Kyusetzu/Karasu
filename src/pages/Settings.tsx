@@ -256,10 +256,12 @@ function AccountSection() {
 function ScrobbleSection() {
   const { t } = useTranslation();
   const [settings, setSettings] = useState<ScrobbleSettings | null>(null);
+  const [airing, setAiring] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (!api.isTauri) return;
     getScrobbleSettings().then(setSettings);
+    api.getAiringNotify().then(setAiring);
   }, []);
 
   if (!settings) return null;
@@ -268,6 +270,11 @@ function ScrobbleSection() {
     const next = { ...settings, ...patch };
     setSettings(next);
     setScrobbleSettings(next);
+  };
+
+  const updateAiring = (v: boolean) => {
+    setAiring(v);
+    api.setAiringNotify(v);
   };
 
   return (
@@ -306,6 +313,14 @@ function ScrobbleSection() {
             className="w-20"
           />
         </label>
+        {airing !== null && (
+          <Toggle
+            checked={airing}
+            onChange={updateAiring}
+            label={t("settings.airingNotify")}
+            hint={t("settings.airingNotifyHint")}
+          />
+        )}
       </div>
     </Card>
   );

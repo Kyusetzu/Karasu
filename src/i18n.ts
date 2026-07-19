@@ -290,6 +290,9 @@ const en = {
     trackingConfirmHint: "Show a confirmation in the app before every update.",
     threshold: "Threshold (minutes)",
     thresholdHint: "0 = automatic (two thirds of the episode length)",
+    airingNotify: "New-episode notifications",
+    airingNotifyHint:
+      "Desktop notification when a new episode of a show you are watching airs.",
     discord: "Discord Rich Presence",
     discordEnable: "Show what you are watching on Discord",
     discordEnableHint: "Uses the built-in Karasu Discord application.",
@@ -556,6 +559,9 @@ const de: typeof en = {
       "Vor jedem Update eine Bestätigung in der App anzeigen.",
     threshold: "Schwelle (Minuten)",
     thresholdHint: "0 = automatisch (zwei Drittel der Episodenlänge)",
+    airingNotify: "Benachrichtigung bei neuer Folge",
+    airingNotifyHint:
+      "Desktop-Benachrichtigung, wenn eine neue Folge einer laufenden Serie erscheint.",
     discord: "Discord Rich Presence",
     discordEnable: "In Discord anzeigen, was du schaust",
     discordEnableHint: "Nutzt die eingebaute Karasu-Discord-Application.",

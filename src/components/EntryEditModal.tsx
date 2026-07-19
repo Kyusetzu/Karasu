@@ -12,6 +12,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
+import TagEditor from "@/components/TagEditor";
+import { parseNotes, serializeNotes } from "@/lib/tags";
 
 export interface EditableMedia {
   id: number;
@@ -48,21 +50,25 @@ export default function EntryEditModal({
   onClose,
   onSave,
   onDelete,
+  tagSuggestions = [],
 }: {
   media: EditableMedia;
   entry: EditableEntry | null;
   onClose: () => void;
   onSave: (input: EntrySaveInput) => void;
   onDelete?: () => void;
+  tagSuggestions?: string[];
 }) {
   const { t } = useTranslation();
+  const initial = parseNotes(entry?.notes);
   const [status, setStatus] = useState<MediaListStatus>(
     entry?.status ?? "PLANNING",
   );
   const [progress, setProgress] = useState(entry?.progress ?? 0);
   const [score, setScore] = useState(entry?.score ?? 0);
   const [repeat, setRepeat] = useState(entry?.repeat ?? 0);
-  const [notes, setNotes] = useState(entry?.notes ?? "");
+  const [notes, setNotes] = useState(initial.notes);
+  const [tags, setTags] = useState(initial.tags);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const max = maxProgress(media) ?? 99999;
   const rewatchLabel =
@@ -138,6 +144,14 @@ export default function EntryEditModal({
           </div>
         </label>
         <label className="block text-sm">
+          <span className="mb-1 block text-ink-500">{t("tags.label")}</span>
+          <TagEditor
+            tags={tags}
+            onChange={setTags}
+            suggestions={tagSuggestions}
+          />
+        </label>
+        <label className="block text-sm">
           <span className="mb-1 block text-ink-500">{t("entry.notes")}</span>
           <textarea
             value={notes}
@@ -178,7 +192,7 @@ export default function EntryEditModal({
                   progress,
                   score,
                   repeat,
-                  notes,
+                  notes: serializeNotes(notes, tags),
                 })
               }
             >

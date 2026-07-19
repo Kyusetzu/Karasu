@@ -36,6 +36,7 @@ import EntryEditModal from "@/components/EntryEditModal";
 import RandomPickModal from "@/components/RandomPickModal";
 import PresetModal from "@/components/PresetModal";
 import { loadPresets, savePresets, type Preset } from "@/lib/presets";
+import { collectTags, tagsOf } from "@/lib/tags";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -74,6 +75,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
   const { t } = useTranslation();
   const [tab, setTab] = useState<MediaListStatus>("CURRENT");
   const [filter, setFilter] = useState("");
+  const [tagFilter, setTagFilter] = useState("");
   const [sort, setSort] = useState<SortKey>("updated");
   const [grid, setGrid] = useState(true);
   const [editing, setEditing] = useState<MediaListEntry | null>(null);
@@ -135,6 +137,21 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
     return map;
   }, [data]);
 
+  // Union of tags across the whole list, for the filter + editor autocomplete.
+  const allTags = useMemo(
+    () =>
+      collectTags(
+        [...byStatus.values()].flat().map((e) => e.notes),
+      ),
+    [byStatus],
+  );
+
+  // A tag that no longer exists anywhere must not keep the list empty.
+  useEffect(() => {
+    if (tagFilter && !allTags.some((x) => x.toLowerCase() === tagFilter.toLowerCase()))
+      setTagFilter("");
+  }, [allTags, tagFilter]);
+
   const entries = useMemo(() => {
     let list = byStatus.get(tab) ?? [];
     if (filter.trim()) {
@@ -145,6 +162,12 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
           .filter(Boolean)
           .some((s) => s!.toLowerCase().includes(q));
       });
+    }
+    if (tagFilter) {
+      const q = tagFilter.toLowerCase();
+      list = list.filter((e) =>
+        tagsOf(e.notes).some((x) => x.toLowerCase() === q),
+      );
     }
     return [...list].sort((a, b) => {
       switch (sort) {
@@ -160,7 +183,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
           return b.updatedAt - a.updatedAt;
       }
     });
-  }, [byStatus, tab, filter, sort]);
+  }, [byStatus, tab, filter, tagFilter, sort]);
 
   if (isLoading) {
     return <p className="p-8 text-ink-500">{t("list.loading")}</p>;
@@ -301,6 +324,21 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
               </option>
             ))}
           </select>
+          {allTags.length > 0 && (
+            <select
+              value={tagFilter}
+              onChange={(e) => setTagFilter(e.target.value)}
+              className="h-9 max-w-32 rounded-lg border border-surface-700 bg-surface-900 px-2 text-sm text-ink-300 focus:border-accent-500 focus:outline-none"
+              aria-label={t("tags.filter")}
+            >
+              <option value="">{t("tags.allTags")}</option>
+              {allTags.map((tag) => (
+                <option key={tag} value={tag}>
+                  {tag}
+                </option>
+              ))}
+            </select>
+          )}
           {presets.length > 0 && (
             <select
               value=""
@@ -413,6 +451,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
         <EntryEditModal
           media={{ ...editing.media, type }}
           entry={editing}
+          tagSuggestions={allTags}
           onClose={() => setEditing(null)}
           onSave={(input) => {
             save.mutate(input);
@@ -688,6 +727,28 @@ function GridCard({
         {entry.progress}
         {max ? ` / ${max}` : ""} {unit}
       </p>
+      <TagChips notes={entry.notes} />
+    </div>
+  );
+}
+
+/** Read-only tag chips derived from an entry's notes (capped for layout). */
+function TagChips({ notes, max = 3 }: { notes: string | null; max?: number }) {
+  const tags = tagsOf(notes);
+  if (tags.length === 0) return null;
+  return (
+    <div className="mt-1 flex flex-wrap gap-1">
+      {tags.slice(0, max).map((tag) => (
+        <span
+          key={tag}
+          className="rounded-full bg-surface-800 px-1.5 py-0.5 text-[10px] text-accent-300"
+        >
+          {tag}
+        </span>
+      ))}
+      {tags.length > max && (
+        <span className="text-[10px] text-ink-600">+{tags.length - max}</span>
+      )}
     </div>
   );
 }
@@ -744,6 +805,7 @@ function ListRow({
           {media.format ?? ""}
           {media.seasonYear ? ` · ${media.seasonYear}` : ""}
         </p>
+        <TagChips notes={entry.notes} max={4} />
       </Link>
 
       {selectMode ? null : (

@@ -18,6 +18,8 @@ import { useAuth } from "@/stores/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardTitle } from "@/components/ui/card";
+import TagEditor from "@/components/TagEditor";
+import { parseNotes, serializeNotes } from "@/lib/tags";
 
 /** AniList descriptions: strip spoilers, allow only harmless tags. */
 function sanitizeDescription(html: string): string {
@@ -261,7 +263,9 @@ function ListEditor({
   const [progress, setProgress] = useState(entry?.progress ?? 0);
   const [score, setScore] = useState(entry?.score ?? 0);
   const [repeat, setRepeat] = useState(entry?.repeat ?? 0);
-  const [notes, setNotes] = useState(entry?.notes ?? "");
+  const parsed = parseNotes(entry?.notes);
+  const [notes, setNotes] = useState(parsed.notes);
+  const [tags, setTags] = useState(parsed.tags);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
@@ -269,12 +273,21 @@ function ListEditor({
     setProgress(entry?.progress ?? 0);
     setScore(entry?.score ?? 0);
     setRepeat(entry?.repeat ?? 0);
-    setNotes(entry?.notes ?? "");
+    const p = parseNotes(entry?.notes);
+    setNotes(p.notes);
+    setTags(p.tags);
   }, [entry]);
 
   const save = useMutation({
     mutationFn: () =>
-      saveListEntry({ mediaId, status, progress, score, repeat, notes }),
+      saveListEntry({
+        mediaId,
+        status,
+        progress,
+        score,
+        repeat,
+        notes: serializeNotes(notes, tags),
+      }),
     onSuccess: () => {
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -367,6 +380,12 @@ function ListEditor({
         {save.error && (
           <p className="text-sm text-red-300">{String(save.error)}</p>
         )}
+      </div>
+      <div className="mt-3">
+        <span className="mb-1 block text-sm text-ink-500">
+          {t("tags.label")}
+        </span>
+        <TagEditor tags={tags} onChange={setTags} />
       </div>
       <label className="mt-3 block text-sm">
         <span className="mb-1 block text-ink-500">{t("entry.notes")}</span>

@@ -274,6 +274,13 @@ const en = {
     notes: "Notes",
     notesPlaceholder: "Private notes (only you can see these)",
   },
+  tags: {
+    label: "Tags",
+    placeholder: "Add a tag …",
+    remove: "Remove {{tag}}",
+    filter: "Filter by tag",
+    allTags: "All tags",
+  },
   media: {
     addPlanning: "Add to Planning",
     onList: "On your list",
@@ -597,6 +604,13 @@ const de: typeof en = {
     addRepeat: "+1",
     notes: "Notizen",
     notesPlaceholder: "Private Notizen (nur du siehst diese)",
+  },
+  tags: {
+    label: "Tags",
+    placeholder: "Tag hinzufügen …",
+    remove: "{{tag}} entfernen",
+    filter: "Nach Tag filtern",
+    allTags: "Alle Tags",
   },
   media: {
     addPlanning: "Zu Geplant hinzufügen",

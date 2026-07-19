@@ -40,8 +40,11 @@ pub fn run() {
             app.manage(scrobbler::ScrobbleSession(std::sync::Mutex::new(None)));
             app.manage(relations::Relations(std::sync::RwLock::new(Vec::new())));
             app.manage(discord::Discord(std::sync::Mutex::new(None)));
+            app.manage(discord::UiPage::default());
             relations::spawn_loader(app.handle().clone());
             scrobbler::spawn(app.handle().clone());
+            // Show the idle presence right away (if Discord is enabled).
+            discord::sync_current(app.handle());
 
             let show = MenuItem::with_id(app, "show", "Open Karasu", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
@@ -99,6 +102,7 @@ pub fn run() {
             commands::scrobble_cancel,
             commands::get_discord_settings,
             commands::set_discord_settings,
+            commands::set_ui_page,
             commands::get_autostart,
             commands::set_autostart,
         ])

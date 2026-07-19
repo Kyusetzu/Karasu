@@ -1,10 +1,13 @@
-//! Discord Rich Presence: shows the currently watched anime.
+//! Discord Rich Presence. Stays active the whole time Karasu runs: when
+//! nothing is playing it shows the page the user is looking at, and when
+//! detection fires it switches to the title with an episode progress bar.
+//! Every state carries a "Get Karasu here" button.
 //! Uses the built-in application ID or a user override from the settings.
 
 use crate::db::Db;
-use crate::scrobbler::NowPlaying;
+use crate::scrobbler::{NowPlaying, PlaybackState, ScrobbleSession};
 use discord_rich_presence::{
-    activity::{Activity, Timestamps},
+    activity::{Activity, Button, Timestamps},
     DiscordIpc, DiscordIpcClient,
 };
 use std::sync::Mutex;
@@ -15,7 +18,18 @@ use tauri::{AppHandle, Manager};
 /// ID in the settings. Set once by the maintainer.
 pub const BUILTIN_DISCORD_APP_ID: &str = "1527934275356332133";
 
+const REPO_URL: &str = "https://github.com/Kyusetzu/Karasu";
+
 pub struct Discord(pub Mutex<Option<DiscordIpcClient>>);
+
+/// The page the user is currently looking at, shown as the idle presence.
+pub struct UiPage(pub Mutex<String>);
+
+impl Default for UiPage {
+    fn default() -> Self {
+        UiPage(Mutex::new("Overview".to_string()))
+    }
+}
 
 /// Effective app ID: user override from the settings or the built-in one.
 pub fn effective_app_id(custom: &str) -> String {
@@ -34,8 +48,43 @@ fn disconnect(guard: &mut Option<DiscordIpcClient>) {
     }
 }
 
-/// Syncs the presence with the current playback. Called on every change
-/// of the detection result and after settings changes.
+fn now_secs() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0)
+}
+
+/// Start of the running session (epoch seconds) if it matches the playback,
+/// else now — so the elapsed timer starts fresh.
+fn session_start(app: &AppHandle, np: &NowPlaying) -> i64 {
+    let state = app.state::<ScrobbleSession>();
+    let guard = state.0.lock().unwrap();
+    match guard.as_ref() {
+        Some(s) if Some(s.media_id) == np.media_id => s.started_ms / 1000,
+        _ => now_secs(),
+    }
+}
+
+/// Episode length in minutes for the matched entry, if known.
+fn episode_duration(app: &AppHandle, np: &NowPlaying) -> Option<u32> {
+    let media_id = np.media_id?;
+    let db = app.state::<Db>();
+    crate::scrobbler::candidates_from_cache(&db, &np.media_type)
+        .iter()
+        .find(|c| c.media_id == media_id)
+        .and_then(|c| c.duration_min)
+}
+
+/// Re-syncs the presence using the current playback state (used after a UI
+/// page change, where the caller has no NowPlaying at hand).
+pub fn sync_current(app: &AppHandle) {
+    let now = app.state::<PlaybackState>().0.lock().unwrap().clone();
+    sync(app, now.as_ref());
+}
+
+/// Syncs the presence with the current playback (or the idle page). Called
+/// on every detection change, page change and settings change.
 pub fn sync(app: &AppHandle, now: Option<&NowPlaying>) {
     let db = app.state::<Db>();
     let enabled = db.kv_get("discord_enabled").as_deref() == Some("1");
@@ -49,15 +98,7 @@ pub fn sync(app: &AppHandle, now: Option<&NowPlaying>) {
         return;
     }
 
-    let Some(np) = now else {
-        if let Some(client) = guard.as_mut() {
-            if client.clear_activity().is_err() {
-                disconnect(&mut guard);
-            }
-        }
-        return;
-    };
-
+    // Connect lazily; if Discord is not running, stay quiet and retry later.
     if guard.is_none() {
         let Ok(mut client) = DiscordIpcClient::new(&app_id) else {
             return;
@@ -65,27 +106,49 @@ pub fn sync(app: &AppHandle, now: Option<&NowPlaying>) {
         if client.connect().is_ok() {
             *guard = Some(client);
         } else {
-            return; // Discord is not running — stay quiet
+            return;
         }
     }
 
-    let title = np
-        .matched_title
-        .clone()
-        .unwrap_or_else(|| np.parsed_title.clone());
-    let episode = np
-        .episode
-        .map(|e| format!("Episode {e}"))
-        .unwrap_or_else(|| "Watching anime".to_string());
-    let start = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs() as i64)
-        .unwrap_or(0);
+    // Build the two presence strings and the timestamps.
+    let (details, state_text, timestamps) = match now {
+        Some(np) => {
+            let title = np
+                .matched_title
+                .clone()
+                .unwrap_or_else(|| np.parsed_title.clone());
+            let is_manga = np.media_type == "MANGA";
+            let state_text = match np.episode {
+                Some(e) if is_manga => format!("Chapter {e}"),
+                Some(e) => match np.total_episodes {
+                    Some(total) => format!("Episode {e} / {total}"),
+                    None => format!("Episode {e}"),
+                },
+                None if is_manga => "Reading".to_string(),
+                None => "Watching".to_string(),
+            };
+            // Elapsed timer, plus a progress bar when the episode length is
+            // known (approximates how far into the episode you are).
+            let start = session_start(app, np);
+            let timestamps = match (is_manga, episode_duration(app, np)) {
+                (false, Some(min)) => Timestamps::new()
+                    .start(start)
+                    .end(start + i64::from(min) * 60),
+                _ => Timestamps::new().start(start),
+            };
+            (title, state_text, timestamps)
+        }
+        None => {
+            let page = app.state::<UiPage>().0.lock().unwrap().clone();
+            (format!("Looking at {page}"), "Idle".to_string(), Timestamps::new())
+        }
+    };
 
     let activity = Activity::new()
-        .details(&title)
-        .state(&episode)
-        .timestamps(Timestamps::new().start(start));
+        .details(&details)
+        .state(&state_text)
+        .timestamps(timestamps)
+        .buttons(vec![Button::new("Get Karasu here", REPO_URL)]);
 
     if let Some(client) = guard.as_mut() {
         if client.set_activity(activity).is_err() {

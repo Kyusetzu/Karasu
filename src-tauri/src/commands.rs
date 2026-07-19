@@ -452,6 +452,14 @@ pub fn set_discord_settings(
     Ok(())
 }
 
+/// Reports the page the user is currently on, so the idle Discord presence
+/// can show "Looking at <page>".
+#[tauri::command]
+pub fn set_ui_page(app: tauri::AppHandle, page: String) {
+    *app.state::<crate::discord::UiPage>().0.lock().unwrap() = page;
+    crate::discord::sync_current(&app);
+}
+
 #[tauri::command]
 pub fn get_autostart(app: tauri::AppHandle) -> bool {
     use tauri_plugin_autostart::ManagerExt;

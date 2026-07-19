@@ -1,7 +1,9 @@
 import { useEffect } from "react";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, useLocation } from "react-router-dom";
+import { invoke } from "@tauri-apps/api/core";
 import { useAuth } from "@/stores/auth";
 import { useNowPlaying } from "@/stores/nowPlaying";
+import { isTauri } from "@/api/anilist";
 import Titlebar from "@/components/Titlebar";
 import Sidebar from "@/components/Sidebar";
 import Dashboard from "@/pages/Dashboard";
@@ -22,6 +24,7 @@ export default function App() {
 
   return (
     <div className="flex h-full flex-col">
+      <PresenceReporter />
       <Titlebar />
       <div className="flex min-h-0 flex-1">
         <Sidebar />
@@ -42,4 +45,31 @@ export default function App() {
       </div>
     </div>
   );
+}
+
+/** Friendly page name shown in the idle Discord presence. */
+const PAGE_LABELS: Record<string, string> = {
+  "/": "Overview",
+  "/list": "Anime",
+  "/manga": "Manga",
+  "/search": "Search",
+  "/seasonal": "Seasonal",
+  "/stats": "Statistics",
+  "/settings": "Settings",
+  "/about": "About",
+};
+
+/** Reports the current route to the backend for the Discord presence. */
+function PresenceReporter() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    if (!isTauri) return;
+    const label =
+      PAGE_LABELS[pathname] ??
+      (pathname.startsWith("/media/") || pathname.startsWith("/anime/")
+        ? "Details"
+        : "Karasu");
+    invoke("set_ui_page", { page: label }).catch(() => {});
+  }, [pathname]);
+  return null;
 }

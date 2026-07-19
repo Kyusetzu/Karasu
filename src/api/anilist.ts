@@ -132,3 +132,7 @@ export const getStaleSettings = () =>
   invoke<StaleSettings>("get_stale_settings");
 export const setStaleSettings = (enabled: boolean, months: number) =>
   invoke<void>("set_stale_settings", { enabled, months });
+
+export const getSequelNotify = () => invoke<boolean>("get_sequel_notify");
+export const setSequelNotify = (enabled: boolean) =>
+  invoke<void>("set_sequel_notify", { enabled });

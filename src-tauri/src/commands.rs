@@ -682,6 +682,17 @@ pub fn set_stale_settings(
     db.kv_set("stale_months", &months.clamp(1, 24).to_string())
 }
 
+/// Whether sequel-announcement notifications are enabled (default off).
+#[tauri::command]
+pub fn get_sequel_notify(db: State<'_, Db>) -> bool {
+    db.kv_get("sequel_notify").as_deref() == Some("1")
+}
+
+#[tauri::command]
+pub fn set_sequel_notify(db: State<'_, Db>, enabled: bool) -> Result<(), String> {
+    db.kv_set("sequel_notify", if enabled { "1" } else { "0" })
+}
+
 #[tauri::command]
 pub fn get_autostart(app: tauri::AppHandle) -> bool {
     use tauri_plugin_autostart::ManagerExt;

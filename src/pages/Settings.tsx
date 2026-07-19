@@ -409,12 +409,14 @@ function ScrobbleSection() {
   const [settings, setSettings] = useState<ScrobbleSettings | null>(null);
   const [airing, setAiring] = useState<boolean | null>(null);
   const [stale, setStale] = useState<api.StaleSettings | null>(null);
+  const [sequel, setSequel] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (!api.isTauri) return;
     getScrobbleSettings().then(setSettings);
     api.getAiringNotify().then(setAiring);
     api.getStaleSettings().then(setStale);
+    api.getSequelNotify().then(setSequel);
   }, []);
 
   if (!settings) return null;
@@ -428,6 +430,11 @@ function ScrobbleSection() {
   const updateAiring = (v: boolean) => {
     setAiring(v);
     api.setAiringNotify(v);
+  };
+
+  const updateSequel = (v: boolean) => {
+    setSequel(v);
+    api.setSequelNotify(v);
   };
 
   const updateStale = (patch: Partial<api.StaleSettings>) => {
@@ -479,6 +486,14 @@ function ScrobbleSection() {
             onChange={updateAiring}
             label={t("settings.airingNotify")}
             hint={t("settings.airingNotifyHint")}
+          />
+        )}
+        {sequel !== null && (
+          <Toggle
+            checked={sequel}
+            onChange={updateSequel}
+            label={t("settings.sequelNotify")}
+            hint={t("settings.sequelNotifyHint")}
           />
         )}
         {stale && (

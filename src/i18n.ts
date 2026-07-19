@@ -352,6 +352,9 @@ const en = {
     airingNotify: "New-episode notifications",
     airingNotifyHint:
       "Desktop notification when a new episode of a show you are watching airs.",
+    sequelNotify: "Sequel announcements",
+    sequelNotifyHint:
+      "Notify me when a sequel or side story is announced for something on my list.",
     staleNotify: "On-hold reminders",
     staleNotifyHint:
       "Remind me about titles I paused and haven't touched in a while.",
@@ -712,6 +715,9 @@ const de: typeof en = {
     airingNotify: "Benachrichtigung bei neuer Folge",
     airingNotifyHint:
       "Desktop-Benachrichtigung, wenn eine neue Folge einer laufenden Serie erscheint.",
+    sequelNotify: "Fortsetzungs-Ankündigungen",
+    sequelNotifyHint:
+      "Benachrichtige mich, wenn eine Fortsetzung oder Nebengeschichte zu etwas auf meiner Liste angekündigt wird.",
     staleNotify: "Erinnerung an Pausiertes",
     staleNotifyHint:
       "Erinnere mich an Titel, die ich pausiert und länger nicht angefasst habe.",

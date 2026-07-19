@@ -122,3 +122,115 @@ export async function animeDetail(id: number) {
   const data = await gql<{ Media: MediaDetail }>(DETAIL_QUERY, { id });
   return data.Media;
 }
+
+// --- User statistics (Statistics tab) --------------------------------------
+
+/** A ranked category row (genre/tag/voice actor/studio/staff). */
+export interface StatEntry {
+  count: number;
+  meanScore: number;
+  /** Watch time in minutes (anime); 0 for manga. */
+  minutesWatched: number;
+  /** Chapters read (manga); 0 for anime. */
+  chaptersRead: number;
+  /** Display name resolved per category by `statEntryLabel`. */
+  genre?: string;
+  tag?: { id: number; name: string };
+  voiceActor?: NamedPerson;
+  studio?: { id: number; name: string };
+  staff?: NamedPerson;
+}
+
+export interface NamedPerson {
+  id: number;
+  name: { full: string };
+  image: { large: string | null } | null;
+}
+
+export interface Distribution {
+  count: number;
+  format?: string;
+  status?: string;
+  score?: number;
+  releaseYear?: number;
+}
+
+interface CommonStats {
+  count: number;
+  meanScore: number;
+  standardDeviation: number;
+  genres: StatEntry[];
+  tags: StatEntry[];
+  staff: StatEntry[];
+  formats: Distribution[];
+  statuses: Distribution[];
+  scores: Distribution[];
+  releaseYears: Distribution[];
+}
+
+export interface AnimeStats extends CommonStats {
+  minutesWatched: number;
+  episodesWatched: number;
+  voiceActors: StatEntry[];
+  studios: StatEntry[];
+}
+
+export interface MangaStats extends CommonStats {
+  chaptersRead: number;
+  volumesRead: number;
+}
+
+export interface UserStats {
+  id: number;
+  name: string;
+  statistics: { anime: AnimeStats; manga: MangaStats };
+}
+
+// Shared fields on every ranked category row. Both time metrics are requested
+// so a single TS shape covers anime (minutesWatched) and manga (chaptersRead).
+const STAT_ROW = "count meanScore minutesWatched chaptersRead";
+
+const USER_STATS_QUERY = `
+query ($id: Int!) {
+  User(id: $id) {
+    id
+    name
+    statistics {
+      anime {
+        count
+        meanScore
+        standardDeviation
+        minutesWatched
+        episodesWatched
+        genres(sort: COUNT_DESC) { genre ${STAT_ROW} }
+        tags(sort: COUNT_DESC) { tag { id name } ${STAT_ROW} }
+        voiceActors(sort: COUNT_DESC) { voiceActor { id name { full } image { large } } ${STAT_ROW} }
+        studios(sort: COUNT_DESC) { studio { id name } ${STAT_ROW} }
+        staff(sort: COUNT_DESC) { staff { id name { full } image { large } } ${STAT_ROW} }
+        formats { format count }
+        statuses { status count }
+        scores(sort: MEAN_SCORE) { score count }
+        releaseYears(sort: ID_DESC) { releaseYear count }
+      }
+      manga {
+        count
+        meanScore
+        standardDeviation
+        chaptersRead
+        volumesRead
+        genres(sort: COUNT_DESC) { genre ${STAT_ROW} }
+        tags(sort: COUNT_DESC) { tag { id name } ${STAT_ROW} }
+        staff(sort: COUNT_DESC) { staff { id name { full } image { large } } ${STAT_ROW} }
+        formats { format count }
+        statuses { status count }
+        scores(sort: MEAN_SCORE) { score count }
+        releaseYears(sort: ID_DESC) { releaseYear count }
+      }
+    }
+  }
+}`;
+
+export async function userStatistics(userId: number) {
+  const data = await gql<{ User: UserStats }>(USER_STATS_QUERY, { id: userId });
+  return data.User;
+}

@@ -8,6 +8,7 @@ import Dashboard from "@/pages/Dashboard";
 import MediaList from "@/pages/MediaList";
 import Search from "@/pages/Search";
 import Seasonal from "@/pages/Seasonal";
+import Statistics from "@/pages/Statistics";
 import AnimeDetail from "@/pages/AnimeDetail";
 import Settings from "@/pages/Settings";
 
@@ -31,6 +32,7 @@ export default function App() {
             <Route path="/manga" element={<MediaList type="MANGA" />} />
             <Route path="/search" element={<Search />} />
             <Route path="/seasonal" element={<Seasonal />} />
+            <Route path="/stats" element={<Statistics />} />
             <Route path="/media/:id" element={<AnimeDetail />} />
             {/* Alias for old links */}
             <Route path="/anime/:id" element={<AnimeDetail />} />

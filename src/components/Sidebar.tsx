@@ -6,6 +6,7 @@ import {
   BookOpen,
   Search,
   CalendarDays,
+  BarChart3,
   Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -16,6 +17,7 @@ const items = [
   { to: "/manga", key: "nav.manga", icon: BookOpen },
   { to: "/search", key: "nav.search", icon: Search },
   { to: "/seasonal", key: "nav.seasonal", icon: CalendarDays },
+  { to: "/stats", key: "nav.stats", icon: BarChart3 },
 ] as const;
 
 export default function Sidebar() {

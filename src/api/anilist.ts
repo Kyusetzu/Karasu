@@ -61,3 +61,14 @@ export interface HistoryRow {
 /** Local playback history since `fromMs` (0 = all), newest first. */
 export const getHistory = (fromMs = 0) =>
   invoke<HistoryRow[]>("get_history", { fromMs });
+
+// --- Update check ----------------------------------------------------------
+
+export interface UpdateInfo {
+  current: string;
+  latest: string | null;
+  url: string | null;
+  isNewer: boolean;
+}
+
+export const checkForUpdates = () => invoke<UpdateInfo>("check_for_updates");

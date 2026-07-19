@@ -7,9 +7,17 @@ import {
   Search,
   CalendarDays,
   BarChart3,
+  Info,
   Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+const bottomClass = ({ isActive }: { isActive: boolean }) =>
+  cn(
+    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-ink-300 transition-colors",
+    "hover:bg-surface-800 hover:text-ink-100",
+    isActive && "bg-surface-800 text-accent-400",
+  );
 
 const items = [
   { to: "/", key: "nav.dashboard", icon: LayoutDashboard, end: true },
@@ -43,17 +51,12 @@ export default function Sidebar() {
           </NavLink>
         ))}
       </div>
-      <div className="px-3">
-        <NavLink
-          to="/settings"
-          className={({ isActive }) =>
-            cn(
-              "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-ink-300 transition-colors",
-              "hover:bg-surface-800 hover:text-ink-100",
-              isActive && "bg-surface-800 text-accent-400",
-            )
-          }
-        >
+      <div className="flex flex-col gap-1 px-3">
+        <NavLink to="/about" className={bottomClass}>
+          <Info size={18} />
+          {t("nav.about")}
+        </NavLink>
+        <NavLink to="/settings" className={bottomClass}>
           <Settings size={18} />
           {t("nav.settings")}
         </NavLink>

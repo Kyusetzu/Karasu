@@ -478,6 +478,86 @@ pub fn set_autostart(app: tauri::AppHandle, enabled: bool) -> Result<(), String>
     .map_err(|e| e.to_string())
 }
 
+// --- Update check ------------------------------------------------------------
+
+#[derive(serde::Serialize)]
+pub struct UpdateInfo {
+    /// The running app version.
+    pub current: String,
+    /// Latest published release tag (without a leading "v"), if any.
+    pub latest: Option<String>,
+    /// Release page URL.
+    pub url: Option<String>,
+    #[serde(rename = "isNewer")]
+    pub is_newer: bool,
+}
+
+/// Compares the running version against the latest GitHub release.
+#[tauri::command]
+pub async fn check_for_updates() -> Result<UpdateInfo, String> {
+    let current = env!("CARGO_PKG_VERSION").to_string();
+    let resp = reqwest::Client::new()
+        .get("https://api.github.com/repos/Kyusetzu/Karasu/releases/latest")
+        .header("User-Agent", concat!("Karasu/", env!("CARGO_PKG_VERSION")))
+        .header("Accept", "application/vnd.github+json")
+        .send()
+        .await
+        .map_err(|e| format!("Update check failed: {e}"))?;
+
+    // No releases published yet — treat as "up to date".
+    if resp.status() == reqwest::StatusCode::NOT_FOUND {
+        return Ok(UpdateInfo { current, latest: None, url: None, is_newer: false });
+    }
+    if !resp.status().is_success() {
+        return Err(format!("Update check failed: HTTP {}", resp.status()));
+    }
+
+    let body: Value = resp.json().await.map_err(|e| e.to_string())?;
+    let tag = body.get("tag_name").and_then(|v| v.as_str()).unwrap_or("");
+    let url = body
+        .get("html_url")
+        .and_then(|v| v.as_str())
+        .map(str::to_string);
+    let latest = tag.trim_start_matches('v').to_string();
+    let is_newer = version_gt(&latest, &current);
+    Ok(UpdateInfo { current, latest: Some(latest), url, is_newer })
+}
+
+/// True if dotted-numeric version `a` is strictly greater than `b`.
+fn version_gt(a: &str, b: &str) -> bool {
+    let parse = |s: &str| {
+        s.split('.')
+            .map(|p| p.parse::<u32>().unwrap_or(0))
+            .collect::<Vec<_>>()
+    };
+    let (va, vb) = (parse(a), parse(b));
+    for i in 0..va.len().max(vb.len()) {
+        let x = va.get(i).copied().unwrap_or(0);
+        let y = vb.get(i).copied().unwrap_or(0);
+        if x != y {
+            return x > y;
+        }
+    }
+    false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::version_gt;
+
+    #[test]
+    fn version_comparison() {
+        assert!(version_gt("0.2.0", "0.1.0"));
+        assert!(version_gt("1.0.0", "0.9.9"));
+        assert!(version_gt("0.1.1", "0.1.0"));
+        assert!(!version_gt("0.1.0", "0.1.0"));
+        assert!(!version_gt("0.1.0", "0.2.0"));
+        // Shorter vs longer: 0.1 == 0.1.0
+        assert!(!version_gt("0.1", "0.1.0"));
+        assert!(version_gt("0.1.0.1", "0.1.0"));
+    }
+}
+
 /// Confirms the pending auto-update immediately (also from Blocked).
 #[tauri::command]
 pub async fn scrobble_now(app: tauri::AppHandle) -> Result<(), String> {

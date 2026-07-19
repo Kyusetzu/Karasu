@@ -47,6 +47,7 @@ const en = {
     search: "Search",
     seasonal: "Seasonal",
     stats: "Statistics",
+    about: "About",
     settings: "Settings",
   },
   window: {
@@ -182,6 +183,21 @@ const en = {
     whenYouWatch: "When you watch",
     calendarTitle: "Last 12 months",
   },
+  about: {
+    title: "About Karasu",
+    tagline: "Anime & manga tracker for AniList",
+    description:
+      "Karasu is a desktop tracker for your AniList anime and manga. It detects what you watch in your player or browser and what you read on manga sites, updates your progress automatically, keeps a local history for richer stats than the website offers, and shows your activity on Discord — all from your PC.",
+    updates: "Updates",
+    checkUpdates: "Check for updates",
+    checking: "Checking …",
+    upToDate: "You're on the latest version ({{version}}).",
+    updateAvailable: "Version {{version}} available",
+    contact: "Contact",
+    discord: "Discord",
+    email: "Email",
+    repo: "Source",
+  },
   list: {
     connectPrompt: "Connect with AniList to see your list.",
     toSettings: "Go to Settings",
@@ -296,6 +312,7 @@ const de: typeof en = {
     search: "Suche",
     seasonal: "Saison",
     stats: "Statistik",
+    about: "Über",
     settings: "Einstellungen",
   },
   window: {
@@ -430,6 +447,21 @@ const de: typeof en = {
     streakDays: "{{n}} Tage",
     whenYouWatch: "Wann du schaust",
     calendarTitle: "Letzte 12 Monate",
+  },
+  about: {
+    title: "Über Karasu",
+    tagline: "Anime- & Manga-Tracker für AniList",
+    description:
+      "Karasu ist ein Desktop-Tracker für deine AniList-Anime und -Manga. Er erkennt, was du im Player oder Browser schaust und auf Manga-Seiten liest, aktualisiert deinen Fortschritt automatisch, führt eine lokale Historie für Statistiken jenseits der Website und zeigt deine Aktivität auf Discord — alles direkt vom PC.",
+    updates: "Updates",
+    checkUpdates: "Nach Updates suchen",
+    checking: "Prüfe …",
+    upToDate: "Du hast die neueste Version ({{version}}).",
+    updateAvailable: "Version {{version}} verfügbar",
+    contact: "Kontakt",
+    discord: "Discord",
+    email: "E-Mail",
+    repo: "Quellcode",
   },
   list: {
     connectPrompt: "Verbinde dich mit AniList, um deine Liste zu sehen.",

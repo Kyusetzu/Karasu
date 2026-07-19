@@ -13,6 +13,7 @@ import Seasonal from "@/pages/Seasonal";
 import Statistics from "@/pages/Statistics";
 import AnimeDetail from "@/pages/AnimeDetail";
 import Settings from "@/pages/Settings";
+import About from "@/pages/About";
 
 export default function App() {
   const init = useAuth((s) => s.init);
@@ -40,6 +41,7 @@ export default function App() {
             {/* Alias for old links */}
             <Route path="/anime/:id" element={<AnimeDetail />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/about" element={<About />} />
           </Routes>
         </main>
       </div>

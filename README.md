@@ -38,9 +38,6 @@ Because a desktop app can do things anilist.co simply can't:
   unwatched episode with one click, straight from your list.
 - **It tells you when something airs.** Native desktop notifications the moment a
   new episode of a show you follow is out.
-- **It keeps stats the website doesn't have.** A local history of your real
-  viewing turns into a weekday × hour heatmap, a 12-month calendar and watch
-  streaks.
 - **It shows up on Discord.** Rich Presence that reflects what you're doing,
   always on.
 
@@ -65,7 +62,7 @@ Because a desktop app can do things anilist.co simply can't:
 - **Local library** with *play next episode* in your default player
 - **New-episode desktop notifications** for the shows you're watching
 - **Statistics tab** — AniList profile stats (genres, tags, voice actors, studios,
-  staff) plus a Karasu-only **Activity** view built from your real playback history
+  staff) for both anime and manga
 - **Discord Rich Presence**, always on, with a link back to the project
 
 **Quality of life**
@@ -95,7 +92,7 @@ npm run tauri build  # release build + NSIS installer
 ```
 
 Run the Rust test suite (title & chapter parser, matcher, relations, detection
-profiles, login callback server, history, library):
+profiles, login callback server, library):
 
 ```sh
 cargo test --manifest-path src-tauri/Cargo.toml
@@ -108,7 +105,7 @@ cargo test --manifest-path src-tauri/Cargo.toml
 | Shell | Tauri 2 (Rust backend, WebView2) |
 | Frontend | React 19 + TypeScript + Vite + Tailwind CSS v4 |
 | State | TanStack Query (server), Zustand (client), i18next (i18n) |
-| Storage | SQLite via rusqlite (cache, offline queue, history, settings); tokens in the Windows Credential Manager |
+| Storage | SQLite via rusqlite (cache, offline queue, settings); tokens in the Windows Credential Manager |
 | Detection | Win32 window enumeration + custom release-name parser (Anitomy equivalent) |
 
 ### Shared application IDs

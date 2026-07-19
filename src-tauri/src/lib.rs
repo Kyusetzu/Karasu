@@ -101,7 +101,6 @@ pub fn run() {
             commands::delete_list_entry,
             commands::flush_queue,
             commands::get_now_playing,
-            commands::get_history,
             commands::get_scrobble_settings,
             commands::set_scrobble_settings,
             commands::scrobble_now,

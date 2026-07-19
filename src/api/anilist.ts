@@ -46,22 +46,6 @@ export const deleteListEntry = (id: number) =>
 
 export const flushQueue = () => invoke<number>("flush_queue");
 
-// --- Playback history (Activity analytics) ---------------------------------
-
-export interface HistoryRow {
-  mediaId: number;
-  mediaType: MediaType;
-  title: string;
-  episode: number;
-  startedMs: number;
-  endedMs: number;
-  seconds: number;
-}
-
-/** Local playback history since `fromMs` (0 = all), newest first. */
-export const getHistory = (fromMs = 0) =>
-  invoke<HistoryRow[]>("get_history", { fromMs });
-
 // --- Update check ----------------------------------------------------------
 
 export interface UpdateInfo {

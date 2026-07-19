@@ -366,13 +366,6 @@ pub fn get_now_playing(
     state.0.lock().unwrap().clone()
 }
 
-/// Local playback history since `from_ms` (epoch ms), newest first — the
-/// data behind the Activity analytics.
-#[tauri::command]
-pub fn get_history(db: State<'_, Db>, from_ms: i64) -> Vec<crate::db::HistoryRow> {
-    db.history_since(from_ms)
-}
-
 // --- Scrobbler settings and control ------------------------------------------
 
 #[derive(serde::Serialize)]

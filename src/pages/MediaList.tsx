@@ -51,11 +51,12 @@ const PROGRESS_DROPDOWN_LIMIT = 600;
 export default function MediaList({ type }: { type: MediaType }) {
   const { t } = useTranslation();
   const viewer = useAuth((s) => s.viewer);
+  const mode = useAuth((s) => s.mode);
   const loading = useAuth((s) => s.loading);
 
   if (loading) return null;
 
-  if (!viewer) {
+  if (!viewer && mode !== "local") {
     return (
       <div className="grid h-full place-items-center p-8">
         <div className="text-center">
@@ -68,7 +69,8 @@ export default function MediaList({ type }: { type: MediaType }) {
     );
   }
 
-  return <ListView userId={viewer.id} type={type} />;
+  // Local mode has no AniList user id; 0 is a stable local-list key.
+  return <ListView userId={viewer?.id ?? 0} type={type} />;
 }
 
 function ListView({ userId, type }: { userId: number; type: MediaType }) {

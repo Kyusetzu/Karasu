@@ -78,6 +78,9 @@ pub async fn connect_with_token(db: &Db, api: &AniList, input: &str) -> Result<V
         .ok_or("Token invalid or expired")?;
     auth::save_token(&token)?;
     db.kv_set("anilist_viewer", &viewer.to_string())?;
+    // A successful connection makes AniList the active profile. Any local
+    // entries stay untouched until an explicit merge (see local_merge_*).
+    db.kv_set("profile_mode", "anilist")?;
     Ok(viewer)
 }
 
@@ -323,6 +326,145 @@ pub async fn delete_list_entry(
         }
         Err(e) => Err(e.into()),
     }
+}
+
+// --- Local-only profile mode ------------------------------------------------
+
+fn now_ms() -> i64 {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0)
+}
+
+/// Current profile mode: "anilist" (default) or "local".
+#[tauri::command]
+pub fn get_profile_mode(db: State<'_, Db>) -> String {
+    db.kv_get("profile_mode")
+        .unwrap_or_else(|| "anilist".to_string())
+}
+
+/// Switches into account-free local mode. Connecting AniList later flips it
+/// back to "anilist" (and offers to merge — see the frontend merge flow).
+#[tauri::command]
+pub fn enable_local_mode(db: State<'_, Db>) -> Result<(), String> {
+    db.kv_set("profile_mode", "local")
+}
+
+/// Loads the local list for a media type, shaped exactly like the online
+/// `ListResult` so the UI is identical.
+#[tauri::command]
+pub fn local_fetch_list(
+    db: State<'_, Db>,
+    media_type: String,
+) -> Result<ListResult, String> {
+    let media_type = validate_media_type(&media_type)?;
+    let lists: Value = serde_json::from_str(&db.local_list_json(media_type))
+        .unwrap_or_else(|_| json!([]));
+    Ok(ListResult {
+        from_cache: false,
+        pending: 0,
+        lists,
+    })
+}
+
+/// Saves a local entry. On a first add the caller supplies `media` (the
+/// AniList media object) so the list renders offline; field-only edits may
+/// omit it and the stored metadata is kept.
+#[tauri::command]
+pub fn local_save_entry(
+    db: State<'_, Db>,
+    input: Value,
+) -> Result<MutationResult, String> {
+    let media_id = input
+        .get("mediaId")
+        .and_then(|v| v.as_i64())
+        .ok_or("mediaId required")?;
+    let media_type = input
+        .get("mediaType")
+        .and_then(|v| v.as_str())
+        .or_else(|| input.pointer("/media/type").and_then(|v| v.as_str()))
+        .map(str::to_string)
+        .or_else(|| db.local_find_type(media_id))
+        .ok_or("mediaType required for a new local entry")?;
+    validate_media_type(&media_type)?;
+
+    let status = input.get("status").and_then(|v| v.as_str()).unwrap_or("PLANNING");
+    let progress = input.get("progress").and_then(|v| v.as_i64()).unwrap_or(0);
+    let score = input.get("score").and_then(|v| v.as_f64()).unwrap_or(0.0);
+    let repeat = input.get("repeat").and_then(|v| v.as_i64()).unwrap_or(0);
+    let notes = input.get("notes").and_then(|v| v.as_str()).unwrap_or("");
+    let media_json = input
+        .get("media")
+        .filter(|m| !m.is_null())
+        .map(|m| m.to_string());
+    let ts = now_ms();
+
+    db.local_upsert(
+        media_id,
+        &media_type,
+        status,
+        progress,
+        score,
+        repeat,
+        notes,
+        media_json.as_deref(),
+        ts,
+    )?;
+
+    Ok(MutationResult {
+        queued: false,
+        entry: Some(json!({
+            "id": media_id,
+            "mediaId": media_id,
+            "status": status,
+            "progress": progress,
+            "score": score,
+            "repeat": repeat,
+            "notes": notes,
+            "updatedAt": ts / 1000,
+        })),
+    })
+}
+
+/// Deletes a local entry. In local mode the frontend entry id equals the
+/// media id.
+#[tauri::command]
+pub fn local_delete_entry(db: State<'_, Db>, id: i64) -> Result<MutationResult, String> {
+    if let Some(media_type) = db.local_find_type(id) {
+        db.local_delete(id, &media_type)?;
+    }
+    Ok(MutationResult { queued: false, entry: None })
+}
+
+/// All local rows across both media types, for the sign-in merge. Each row
+/// carries its media metadata so the frontend can present a conflict prompt.
+#[tauri::command]
+pub fn local_all_entries(db: State<'_, Db>) -> Value {
+    let rows: Vec<Value> = db
+        .local_all()
+        .into_iter()
+        .map(|r| {
+            let media: Value = r
+                .media_json
+                .as_deref()
+                .and_then(|s| serde_json::from_str(s).ok())
+                .unwrap_or(Value::Null);
+            json!({
+                "mediaId": r.media_id,
+                "mediaType": r.media_type,
+                "status": r.status,
+                "progress": r.progress,
+                "score": r.score,
+                "repeat": r.repeat,
+                "notes": r.notes,
+                "updatedAt": r.updated_ms / 1000,
+                "media": media,
+            })
+        })
+        .collect();
+    json!(rows)
 }
 
 /// Drains the offline queue in order. Network errors abort (the rest stays

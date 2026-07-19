@@ -61,7 +61,7 @@ export function useListMutations(userId: number, mediaType: MediaType) {
   };
 
   const save = useMutation({
-    mutationFn: saveListEntry,
+    mutationFn: (input: SaveEntryInput) => saveListEntry(input),
     onMutate: async (input) => {
       await qc.cancelQueries({ queryKey: key });
       const previous = qc.getQueryData<ListResult>(key);

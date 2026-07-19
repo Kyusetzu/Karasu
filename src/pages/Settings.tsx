@@ -208,7 +208,7 @@ function Toggle({
 
 function AccountSection() {
   const { t } = useTranslation();
-  const { viewer, connect, logout } = useAuth();
+  const { viewer, mode, connect, logout, enableLocal } = useAuth();
   const [info, setInfo] = useState<api.AuthInfo | null>(null);
   const [clientId, setClientIdState] = useState("");
   const [clientIdSaved, setClientIdSaved] = useState(false);
@@ -348,6 +348,23 @@ function AccountSection() {
         {waiting && (
           <p className="text-xs text-accent-400">{t("settings.loginWaiting")}</p>
         )}
+        <div className="border-t border-surface-800 pt-3">
+          {mode === "local" ? (
+            <p className="text-xs text-ink-500">{t("settings.localActive")}</p>
+          ) : (
+            <>
+              <p className="text-xs text-ink-500">{t("settings.localHint")}</p>
+              <Button
+                variant="secondary"
+                size="sm"
+                className="mt-2"
+                onClick={() => enableLocal()}
+              >
+                {t("settings.localStart")}
+              </Button>
+            </>
+          )}
+        </div>
         <div>
           <button
             type="button"

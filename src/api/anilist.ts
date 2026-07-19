@@ -1,6 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
   ListResult,
+  Media,
+  MediaListStatus,
   MediaType,
   MutationResult,
   SaveEntryInput,
@@ -33,18 +35,76 @@ export function gql<T>(query: string, variables?: object): Promise<T> {
   return invoke<T>("anilist_query", { query, variables });
 }
 
+// --- Profile mode (AniList account vs. account-free local list) ------------
+
+export type ProfileMode = "anilist" | "local" | "none";
+
+// Cached so the list functions below can route without an async lookup each
+// call. Kept in sync by the auth store.
+let profileMode: ProfileMode = "anilist";
+export const setProfileModeCache = (mode: ProfileMode) => {
+  profileMode = mode;
+};
+export const isLocalMode = () => profileMode === "local";
+
+export const getProfileMode = () => invoke<ProfileMode>("get_profile_mode");
+export const enableLocalMode = () => invoke<void>("enable_local_mode");
+
 // --- Anime/manga list (loaded via Rust: cache + offline queue) -------------
 
 export const fetchMediaList = (userId: number, mediaType: MediaType) =>
-  invoke<ListResult>("fetch_media_list", { userId, mediaType });
+  profileMode === "local"
+    ? invoke<ListResult>("local_fetch_list", { mediaType })
+    : invoke<ListResult>("fetch_media_list", { userId, mediaType });
 
-export const saveListEntry = (input: SaveEntryInput) =>
-  invoke<MutationResult>("save_list_entry", { input });
+/**
+ * Saves an entry. In local mode the change goes to the local SQLite list; on
+ * a first add pass `media` so the entry renders offline (field-only edits may
+ * omit it). AniList mode ignores `media`.
+ */
+export const saveListEntry = (input: SaveEntryInput, media?: Media) =>
+  profileMode === "local"
+    ? invoke<MutationResult>("local_save_entry", {
+        input: { ...input, media, mediaType: media?.type },
+      })
+    : invoke<MutationResult>("save_list_entry", { input });
 
 export const deleteListEntry = (id: number) =>
-  invoke<MutationResult>("delete_list_entry", { id });
+  profileMode === "local"
+    ? invoke<MutationResult>("local_delete_entry", { id })
+    : invoke<MutationResult>("delete_list_entry", { id });
 
 export const flushQueue = () => invoke<number>("flush_queue");
+
+// --- Sign-in merge (local list -> AniList) ---------------------------------
+
+export interface LocalEntryRow {
+  mediaId: number;
+  mediaType: MediaType;
+  status: MediaListStatus;
+  progress: number;
+  score: number;
+  repeat: number;
+  notes: string;
+  updatedAt: number;
+  media: Media;
+}
+
+/** Every local row (both media types) — for the merge after connecting. */
+export const localAllEntries = () =>
+  invoke<LocalEntryRow[]>("local_all_entries");
+
+/** Clears one local row regardless of the active profile mode. */
+export const localClearEntry = (mediaId: number) =>
+  invoke<MutationResult>("local_delete_entry", { id: mediaId });
+
+/** Pushes an entry to AniList, bypassing the local dispatch. */
+export const anilistSaveEntry = (input: SaveEntryInput) =>
+  invoke<MutationResult>("save_list_entry", { input });
+
+/** Fetches an AniList list, bypassing the local dispatch (merge only). */
+export const anilistFetchList = (userId: number, mediaType: MediaType) =>
+  invoke<ListResult>("fetch_media_list", { userId, mediaType });
 
 // --- Update check ----------------------------------------------------------
 

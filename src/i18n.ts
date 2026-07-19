@@ -283,6 +283,21 @@ const en = {
     filter: "Filter by tag",
     allTags: "All tags",
   },
+  merge: {
+    title: "Merge your local list",
+    summary:
+      "{{total}} local entries: {{add}} new, {{conflicts}} already on AniList.",
+    conflictPrompt: "For entries on both sides, keep:",
+    strategy: {
+      newest: "The most recently changed version",
+      local: "The local version",
+      anilist: "The AniList version",
+    },
+    run: "Merge now",
+    later: "Not now",
+    progress: "Merging {{done}} / {{total}} …",
+    done: "Merge complete ({{count}} entries).",
+  },
   media: {
     addPlanning: "Add to Planning",
     onList: "On your list",
@@ -342,6 +357,11 @@ const en = {
       "Remind me about titles I paused and haven't touched in a while.",
     staleMonths: "Remind after (months)",
     staleMonthsHint: "How long a paused title may sit before a reminder.",
+    localActive:
+      "You're using Karasu without an account. Connect AniList above to sync and back up your list — your local entries will be merged.",
+    localHint:
+      "No AniList account? Track locally on this device; you can connect and merge later.",
+    localStart: "Use without an account",
     library: "Local library",
     libraryHint:
       "Point Karasu at your anime folder to play the next episode with one click, straight from your list.",
@@ -622,6 +642,21 @@ const de: typeof en = {
     filter: "Nach Tag filtern",
     allTags: "Alle Tags",
   },
+  merge: {
+    title: "Lokale Liste zusammenführen",
+    summary:
+      "{{total}} lokale Einträge: {{add}} neu, {{conflicts}} bereits auf AniList.",
+    conflictPrompt: "Für Einträge auf beiden Seiten behalten:",
+    strategy: {
+      newest: "Die zuletzt geänderte Version",
+      local: "Die lokale Version",
+      anilist: "Die AniList-Version",
+    },
+    run: "Jetzt zusammenführen",
+    later: "Später",
+    progress: "Führe zusammen {{done}} / {{total}} …",
+    done: "Zusammenführung abgeschlossen ({{count}} Einträge).",
+  },
   media: {
     addPlanning: "Zu Geplant hinzufügen",
     onList: "Auf deiner Liste",
@@ -682,6 +717,11 @@ const de: typeof en = {
       "Erinnere mich an Titel, die ich pausiert und länger nicht angefasst habe.",
     staleMonths: "Erinnern nach (Monaten)",
     staleMonthsHint: "Wie lange ein pausierter Titel ruhen darf, bis erinnert wird.",
+    localActive:
+      "Du nutzt Karasu ohne Konto. Verbinde oben AniList, um deine Liste zu synchronisieren und zu sichern — deine lokalen Einträge werden zusammengeführt.",
+    localHint:
+      "Kein AniList-Konto? Tracke lokal auf diesem Gerät; du kannst später verbinden und zusammenführen.",
+    localStart: "Ohne Konto nutzen",
     library: "Lokale Bibliothek",
     libraryHint:
       "Zeige Karasu deinen Anime-Ordner, um die nächste Folge mit einem Klick direkt aus deiner Liste zu starten.",

@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { ArrowLeft, Clock, ExternalLink, Star } from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { animeDetail } from "@/api/queries";
+import { animeDetail, type MediaDetail } from "@/api/queries";
 import { formatMinutes, remainingMinutes } from "@/lib/estimate";
 import { isTauri, saveListEntry } from "@/api/anilist";
 import {
@@ -180,7 +180,7 @@ export default function AnimeDetail() {
         </div>
 
         <ListEditor
-          mediaId={data.id}
+          media={data}
           mediaType={data.type}
           max={maxProgress(data)}
           entry={data.mediaListEntry}
@@ -237,12 +237,12 @@ export default function AnimeDetail() {
 }
 
 function ListEditor({
-  mediaId,
+  media,
   mediaType,
   max: maxTotal,
   entry,
 }: {
-  mediaId: number;
+  media: MediaDetail;
   mediaType: MediaType;
   max: number | null;
   entry: {
@@ -255,7 +255,9 @@ function ListEditor({
   } | null;
 }) {
   const { t } = useTranslation();
+  const mediaId = media.id;
   const viewer = useAuth((s) => s.viewer);
+  const mode = useAuth((s) => s.mode);
   const qc = useQueryClient();
   const [status, setStatus] = useState<MediaListStatus>(
     entry?.status ?? "PLANNING",
@@ -280,14 +282,17 @@ function ListEditor({
 
   const save = useMutation({
     mutationFn: () =>
-      saveListEntry({
-        mediaId,
-        status,
-        progress,
-        score,
-        repeat,
-        notes: serializeNotes(notes, tags),
-      }),
+      saveListEntry(
+        {
+          mediaId,
+          status,
+          progress,
+          score,
+          repeat,
+          notes: serializeNotes(notes, tags),
+        },
+        media,
+      ),
     onSuccess: () => {
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -296,7 +301,7 @@ function ListEditor({
     },
   });
 
-  if (!viewer) return null;
+  if (!viewer && mode !== "local") return null;
   const max = maxTotal ?? 99999;
 
   return (

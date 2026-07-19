@@ -50,6 +50,53 @@ CREATE TABLE IF NOT EXISTS history (
 PRAGMA user_version = 3;
 ";
 
+/// Schema v4: a fully local media list for account-free ("local-only") use.
+/// `media_json` caches the AniList media metadata so the list renders
+/// offline; `tags` is reserved (tags currently ride inside `notes`, matching
+/// the AniList path, so the UI stays mode-agnostic).
+const MIGRATION_V4: &str = "
+CREATE TABLE IF NOT EXISTS local_list (
+    media_id   INTEGER NOT NULL,
+    media_type TEXT NOT NULL,
+    status     TEXT NOT NULL,
+    progress   INTEGER NOT NULL DEFAULT 0,
+    score      REAL NOT NULL DEFAULT 0,
+    repeat     INTEGER NOT NULL DEFAULT 0,
+    notes      TEXT NOT NULL DEFAULT '',
+    tags       TEXT NOT NULL DEFAULT '',
+    updated_ms INTEGER NOT NULL,
+    media_json TEXT,
+    PRIMARY KEY (media_id, media_type)
+);
+PRAGMA user_version = 4;
+";
+
+/// Statuses emitted as list groups in local mode. Emitting all of them
+/// (even when empty) mirrors the AniList response shape so the shared
+/// optimistic-cache logic finds a target group on every status change.
+const LOCAL_STATUSES: [&str; 6] = [
+    "CURRENT",
+    "PLANNING",
+    "COMPLETED",
+    "DROPPED",
+    "PAUSED",
+    "REPEATING",
+];
+
+/// One row of the local list (used for the merge into AniList).
+#[derive(Debug, Clone)]
+pub struct LocalRow {
+    pub media_id: i64,
+    pub media_type: String,
+    pub status: String,
+    pub progress: i64,
+    pub score: f64,
+    pub repeat: i64,
+    pub notes: String,
+    pub updated_ms: i64,
+    pub media_json: Option<String>,
+}
+
 impl Db {
     pub fn open(data_dir: PathBuf) -> Result<Self, String> {
         std::fs::create_dir_all(&data_dir)
@@ -68,6 +115,10 @@ impl Db {
         if version < 3 {
             conn.execute_batch(MIGRATION_V3)
                 .map_err(|e| format!("Migration v3 failed: {e}"))?;
+        }
+        if version < 4 {
+            conn.execute_batch(MIGRATION_V4)
+                .map_err(|e| format!("Migration v4 failed: {e}"))?;
         }
         Ok(Db(Mutex::new(conn)))
     }
@@ -196,6 +247,225 @@ impl Db {
         })
         .map(|n| n as usize)
         .unwrap_or(0)
+    }
+
+    // --- Local-only list ----------------------------------------------------
+
+    /// Insert or update a local entry. `media_json` is kept from the existing
+    /// row when `None`, so field-only edits (progress/status) don't need to
+    /// re-supply the media metadata.
+    #[allow(clippy::too_many_arguments)]
+    pub fn local_upsert(
+        &self,
+        media_id: i64,
+        media_type: &str,
+        status: &str,
+        progress: i64,
+        score: f64,
+        repeat: i64,
+        notes: &str,
+        media_json: Option<&str>,
+        updated_ms: i64,
+    ) -> Result<(), String> {
+        let conn = self.0.lock().unwrap();
+        conn.execute(
+            "INSERT INTO local_list
+                (media_id, media_type, status, progress, score, repeat, notes, tags, updated_ms, media_json)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, '', ?8, ?9)
+             ON CONFLICT(media_id, media_type) DO UPDATE SET
+                status = excluded.status,
+                progress = excluded.progress,
+                score = excluded.score,
+                repeat = excluded.repeat,
+                notes = excluded.notes,
+                updated_ms = excluded.updated_ms,
+                media_json = COALESCE(excluded.media_json, local_list.media_json)",
+            rusqlite::params![
+                media_id, media_type, status, progress, score, repeat, notes,
+                updated_ms, media_json
+            ],
+        )
+        .map(|_| ())
+        .map_err(|e| format!("Local save failed: {e}"))
+    }
+
+    /// Media type of an existing local row (media ids are globally unique on
+    /// AniList, so the id alone identifies the row).
+    pub fn local_find_type(&self, media_id: i64) -> Option<String> {
+        let conn = self.0.lock().unwrap();
+        conn.query_row(
+            "SELECT media_type FROM local_list WHERE media_id = ?1",
+            [media_id],
+            |r| r.get(0),
+        )
+        .ok()
+    }
+
+    pub fn local_delete(&self, media_id: i64, media_type: &str) -> Result<(), String> {
+        let conn = self.0.lock().unwrap();
+        conn.execute(
+            "DELETE FROM local_list WHERE media_id = ?1 AND media_type = ?2",
+            rusqlite::params![media_id, media_type],
+        )
+        .map(|_| ())
+        .map_err(|e| format!("Local delete failed: {e}"))
+    }
+
+    fn local_rows(&self, media_type: Option<&str>) -> Vec<LocalRow> {
+        let conn = self.0.lock().unwrap();
+        let sql = "SELECT media_id, media_type, status, progress, score, repeat, \
+                   notes, updated_ms, media_json FROM local_list";
+        let map = |r: &rusqlite::Row| {
+            Ok(LocalRow {
+                media_id: r.get(0)?,
+                media_type: r.get(1)?,
+                status: r.get(2)?,
+                progress: r.get(3)?,
+                score: r.get(4)?,
+                repeat: r.get(5)?,
+                notes: r.get(6)?,
+                updated_ms: r.get(7)?,
+                media_json: r.get(8)?,
+            })
+        };
+        let collect = |mut stmt: rusqlite::Statement, params: &[&dyn rusqlite::ToSql]| {
+            stmt.query_map(params, map)
+                .map(|rows| rows.filter_map(Result::ok).collect::<Vec<_>>())
+                .unwrap_or_default()
+        };
+        match media_type {
+            Some(mt) => {
+                let stmt = match conn.prepare(&format!("{sql} WHERE media_type = ?1")) {
+                    Ok(s) => s,
+                    Err(_) => return Vec::new(),
+                };
+                collect(stmt, &[&mt])
+            }
+            None => {
+                let stmt = match conn.prepare(sql) {
+                    Ok(s) => s,
+                    Err(_) => return Vec::new(),
+                };
+                collect(stmt, &[])
+            }
+        }
+    }
+
+    /// Every local row across both media types (for the sign-in merge).
+    pub fn local_all(&self) -> Vec<LocalRow> {
+        self.local_rows(None)
+    }
+
+    /// The local list for one media type as an AniList-shaped `lists` array
+    /// (JSON string), so the frontend `ListResult` is identical to online.
+    pub fn local_list_json(&self, media_type: &str) -> String {
+        use serde_json::{json, Value};
+        let mut buckets: std::collections::HashMap<&str, Vec<Value>> =
+            LOCAL_STATUSES.iter().map(|s| (*s, Vec::new())).collect();
+        for row in self.local_rows(Some(media_type)) {
+            let media: Value = row
+                .media_json
+                .as_deref()
+                .and_then(|s| serde_json::from_str(s).ok())
+                .unwrap_or(Value::Null);
+            let entry = json!({
+                "id": row.media_id,
+                "mediaId": row.media_id,
+                "status": row.status,
+                "score": row.score,
+                "progress": row.progress,
+                "repeat": row.repeat,
+                "notes": row.notes,
+                "updatedAt": row.updated_ms / 1000,
+                "media": media,
+            });
+            buckets
+                .entry(
+                    LOCAL_STATUSES
+                        .iter()
+                        .find(|s| **s == row.status)
+                        .copied()
+                        .unwrap_or("CURRENT"),
+                )
+                .or_default()
+                .push(entry);
+        }
+        let groups: Vec<Value> = LOCAL_STATUSES
+            .iter()
+            .map(|s| {
+                json!({
+                    "name": s,
+                    "status": s,
+                    "isCustomList": false,
+                    "entries": buckets.remove(s).unwrap_or_default(),
+                })
+            })
+            .collect();
+        serde_json::to_string(&groups).unwrap_or_else(|_| "[]".into())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::Value;
+
+    fn mem_db() -> Db {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(MIGRATIONS).unwrap();
+        conn.execute_batch(MIGRATION_V2).unwrap();
+        conn.execute_batch(MIGRATION_V3).unwrap();
+        conn.execute_batch(MIGRATION_V4).unwrap();
+        Db(Mutex::new(conn))
+    }
+
+    #[test]
+    fn local_upsert_and_render() {
+        let db = mem_db();
+        db.local_upsert(
+            5, "ANIME", "CURRENT", 3, 8.0, 1, "note",
+            Some(r#"{"id":5,"title":{"romaji":"X"}}"#), 2_000,
+        )
+        .unwrap();
+        let lists: Value =
+            serde_json::from_str(&db.local_list_json("ANIME")).unwrap();
+        let current = lists
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|g| g["status"] == "CURRENT")
+            .unwrap();
+        let entries = current["entries"].as_array().unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0]["mediaId"], 5);
+        assert_eq!(entries[0]["progress"], 3);
+        assert_eq!(entries[0]["updatedAt"], 2); // ms -> s
+        assert_eq!(entries[0]["media"]["title"]["romaji"], "X");
+        // All six groups are present so status moves always find a target.
+        assert_eq!(lists.as_array().unwrap().len(), 6);
+    }
+
+    #[test]
+    fn local_upsert_keeps_media_json_on_field_edit() {
+        let db = mem_db();
+        db.local_upsert(1, "MANGA", "PLANNING", 0, 0.0, 0, "", Some("{\"id\":1}"), 1_000)
+            .unwrap();
+        // Edit without re-supplying media metadata.
+        db.local_upsert(1, "MANGA", "CURRENT", 2, 0.0, 0, "", None, 3_000)
+            .unwrap();
+        let rows = db.local_all();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].status, "CURRENT");
+        assert_eq!(rows[0].media_json.as_deref(), Some("{\"id\":1}"));
+    }
+
+    #[test]
+    fn local_delete_removes_row() {
+        let db = mem_db();
+        db.local_upsert(9, "ANIME", "COMPLETED", 12, 10.0, 0, "", Some("{}"), 1)
+            .unwrap();
+        db.local_delete(9, "ANIME").unwrap();
+        assert!(db.local_all().is_empty());
     }
 }
 

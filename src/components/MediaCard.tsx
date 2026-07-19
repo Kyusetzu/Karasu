@@ -16,11 +16,14 @@ import EntryEditModal, { type EntrySaveInput } from "@/components/EntryEditModal
 export default function MediaCard({ media }: { media: MediaWithListStatus }) {
   const { t } = useTranslation();
   const viewer = useAuth((s) => s.viewer);
+  const mode = useAuth((s) => s.mode);
+  const hasProfile = viewer !== null || mode === "local";
   const qc = useQueryClient();
   const [editing, setEditing] = useState(false);
 
   const saveEntry = useMutation({
-    mutationFn: saveListEntry,
+    mutationFn: (input: Parameters<typeof saveListEntry>[0]) =>
+      saveListEntry(input, media),
     onSuccess: (result, input) => {
       qc.invalidateQueries({ queryKey: ["mediaList"] });
       // Patch the discovery cache locally instead of refetching (rate limit)
@@ -55,7 +58,7 @@ export default function MediaCard({ media }: { media: MediaWithListStatus }) {
             <Star size={11} fill="currentColor" /> {media.averageScore}%
           </span>
         )}
-        {viewer && (
+        {hasProfile && (
           <div className="absolute bottom-2 right-2 flex gap-1.5">
             <button
               onClick={() => setEditing(true)}

@@ -13,11 +13,12 @@ import NowPlayingCard from "@/components/NowPlayingCard";
 export default function Dashboard() {
   const { t } = useTranslation();
   const viewer = useAuth((s) => s.viewer);
+  const mode = useAuth((s) => s.mode);
   const loading = useAuth((s) => s.loading);
 
   if (loading) return null;
 
-  if (!viewer) {
+  if (!viewer && mode !== "local") {
     return (
       <div className="grid h-full place-items-center p-8">
         <div className="max-w-md text-center">
@@ -33,7 +34,7 @@ export default function Dashboard() {
     );
   }
 
-  return <DashboardContent userId={viewer.id} />;
+  return <DashboardContent userId={viewer?.id ?? 0} />;
 }
 
 function DashboardContent({ userId }: { userId: number }) {

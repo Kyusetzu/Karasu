@@ -5,6 +5,7 @@ mod db;
 mod detection;
 mod discord;
 mod library;
+mod portable;
 mod recognition;
 mod relations;
 mod scrobbler;
@@ -37,7 +38,7 @@ pub fn run() {
             None,
         ))
         .setup(|app| {
-            let data_dir = app.path().app_data_dir()?;
+            let data_dir = portable::data_dir(app.path().app_data_dir()?);
             app.manage(db::Db::open(data_dir).map_err(std::io::Error::other)?);
             app.manage(anilist::client::AniList::new());
             app.manage(scrobbler::PlaybackState(std::sync::Mutex::new(None)));
@@ -113,6 +114,9 @@ pub fn run() {
             commands::get_airing_notify,
             commands::set_airing_notify,
             commands::check_for_updates,
+            commands::get_portable_status,
+            commands::enable_portable,
+            commands::disable_portable,
             library::get_library_path,
             library::set_library_path,
             library::pick_library_folder,

@@ -45,7 +45,64 @@ export default function Settings() {
       <LibrarySection />
       <DiscordSection />
       <AppSection />
+      <PortableSection />
     </div>
+  );
+}
+
+interface PortableStatus {
+  portable: boolean;
+  dir: string;
+}
+
+function PortableSection() {
+  const { t } = useTranslation();
+  const [status, setStatus] = useState<PortableStatus | null>(null);
+  const [restart, setRestart] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!api.isTauri) return;
+    import("@tauri-apps/api/core").then(({ invoke }) =>
+      invoke<PortableStatus>("get_portable_status").then(setStatus),
+    );
+  }, []);
+
+  if (!status) return null;
+
+  const toggle = async () => {
+    setError(null);
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke(status.portable ? "disable_portable" : "enable_portable");
+      setRestart(true);
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
+  return (
+    <Card>
+      <CardTitle>{t("settings.portable")}</CardTitle>
+      <p className="mt-2 text-sm text-ink-500">{t("settings.portableHint")}</p>
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <span className="text-sm text-ink-300">
+          {status.portable ? t("settings.portableOn") : t("settings.portableOff")}
+        </span>
+        <Button variant="secondary" onClick={toggle}>
+          {status.portable
+            ? t("settings.portableDisable")
+            : t("settings.portableEnable")}
+        </Button>
+      </div>
+      <p className="mt-2 break-all text-xs text-ink-600">
+        {t("settings.portableLocation")}: {status.dir}
+      </p>
+      {restart && (
+        <p className="mt-2 text-sm text-amber-300">{t("settings.portableRestart")}</p>
+      )}
+      {error && <p className="mt-2 text-sm text-red-300">{error}</p>}
+    </Card>
   );
 }
 

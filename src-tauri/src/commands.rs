@@ -453,6 +453,56 @@ pub fn set_ui_page(app: tauri::AppHandle, page: String) {
     crate::discord::sync_current(&app);
 }
 
+// --- Portable mode -----------------------------------------------------------
+
+#[derive(serde::Serialize)]
+pub struct PortableStatus {
+    pub portable: bool,
+    /// Absolute path where the database currently lives.
+    pub dir: String,
+}
+
+#[tauri::command]
+pub fn get_portable_status(app: tauri::AppHandle) -> PortableStatus {
+    let portable = crate::portable::is_portable();
+    let dir = if portable {
+        crate::portable::portable_data_dir()
+    } else {
+        app.path().app_data_dir().ok()
+    }
+    .map(|p| p.to_string_lossy().to_string())
+    .unwrap_or_default();
+    PortableStatus { portable, dir }
+}
+
+/// Enables portable mode: writes the marker, copies the current database
+/// next to the exe and moves the token into the encrypted portable file.
+/// Takes effect after a restart.
+#[tauri::command]
+pub fn enable_portable(app: tauri::AppHandle) -> Result<(), String> {
+    crate::portable::create_marker()?;
+    let dest_dir = crate::portable::portable_data_dir().ok_or("No portable path")?;
+    std::fs::create_dir_all(&dest_dir).map_err(|e| e.to_string())?;
+
+    let src = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("karasu.db");
+    let dest = dest_dir.join("karasu.db");
+    if src.exists() && !dest.exists() {
+        std::fs::copy(&src, &dest).map_err(|e| e.to_string())?;
+    }
+    crate::anilist::auth::migrate_to_portable_file()?;
+    Ok(())
+}
+
+/// Disables portable mode (removes the marker). Takes effect after a restart.
+#[tauri::command]
+pub fn disable_portable() -> Result<(), String> {
+    crate::portable::remove_marker()
+}
+
 /// Whether new-episode desktop notifications are enabled (default on).
 #[tauri::command]
 pub fn get_airing_notify(db: State<'_, Db>) -> bool {

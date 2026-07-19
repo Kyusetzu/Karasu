@@ -127,6 +127,7 @@ pub fn run() {
             commands::set_stale_settings,
             commands::get_sequel_notify,
             commands::set_sequel_notify,
+            commands::save_png,
             commands::check_for_updates,
             commands::get_portable_status,
             commands::enable_portable,

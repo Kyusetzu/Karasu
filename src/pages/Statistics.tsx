@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { BarChart3, ExternalLink } from "lucide-react";
+import { BarChart3, ExternalLink, Sparkles } from "lucide-react";
 import {
   userStatistics,
   type AnimeStats,
@@ -121,6 +121,11 @@ function StatisticsContent({
             {name} <ExternalLink size={11} />
           </a>
         </div>
+        <Link to="/wrapped">
+          <Button variant="secondary" size="sm">
+            <Sparkles size={14} /> {t("wrapped.title")}
+          </Button>
+        </Link>
       </header>
 
       <div className="space-y-3">

@@ -693,6 +693,30 @@ pub fn set_sequel_notify(db: State<'_, Db>, enabled: bool) -> Result<(), String>
     db.kv_set("sequel_notify", if enabled { "1" } else { "0" })
 }
 
+/// Opens a native save dialog and writes PNG bytes (e.g. the yearly wrap-up
+/// card). Returns false if the user cancelled.
+#[tauri::command]
+pub fn save_png(
+    app: tauri::AppHandle,
+    data: Vec<u8>,
+    default_name: String,
+) -> Result<bool, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let path = app
+        .dialog()
+        .file()
+        .set_file_name(&default_name)
+        .add_filter("PNG image", &["png"])
+        .blocking_save_file()
+        .and_then(|p| p.into_path().ok());
+    match path {
+        Some(p) => std::fs::write(&p, &data)
+            .map(|_| true)
+            .map_err(|e| format!("Could not save image: {e}")),
+        None => Ok(false),
+    }
+}
+
 #[tauri::command]
 pub fn get_autostart(app: tauri::AppHandle) -> bool {
     use tauri_plugin_autostart::ManagerExt;

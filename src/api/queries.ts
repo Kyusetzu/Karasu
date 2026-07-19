@@ -1,5 +1,5 @@
 import { gql } from "./anilist";
-import type { Media, MediaListStatus, MediaType } from "./types";
+import type { Media, MediaListStatus, MediaTitle, MediaType } from "./types";
 
 /** Media fields for discovery grids, including the user's own list entry. */
 const MEDIA_FIELDS = `
@@ -235,4 +235,81 @@ query ($id: Int!) {
 export async function userStatistics(userId: number) {
   const data = await gql<{ User: UserStats }>(USER_STATS_QUERY, { id: userId });
   return data.User;
+}
+
+// --- Yearly wrap-up --------------------------------------------------------
+
+const WRAPPED_QUERY = `
+query ($userId: Int!, $type: MediaType!) {
+  MediaListCollection(userId: $userId, type: $type, status: COMPLETED) {
+    lists {
+      isCustomList
+      entries {
+        progress
+        score(format: POINT_10)
+        completedAt { year }
+        media {
+          id
+          duration
+          genres
+          title { romaji english native }
+        }
+      }
+    }
+  }
+}`;
+
+export interface WrappedEntry {
+  mediaId: number;
+  progress: number;
+  score: number;
+  year: number | null;
+  duration: number | null;
+  genres: string[];
+  title: MediaTitle;
+}
+
+/** Completed entries of one media type, de-duplicated across custom lists. */
+export async function wrappedEntries(
+  userId: number,
+  type: MediaType,
+): Promise<WrappedEntry[]> {
+  const data = await gql<{
+    MediaListCollection: {
+      lists: {
+        isCustomList: boolean;
+        entries: {
+          progress: number;
+          score: number;
+          completedAt: { year: number | null } | null;
+          media: {
+            id: number;
+            duration: number | null;
+            genres: string[];
+            title: MediaTitle;
+          };
+        }[];
+      }[];
+    };
+  }>(WRAPPED_QUERY, { userId, type });
+
+  const seen = new Set<number>();
+  const out: WrappedEntry[] = [];
+  for (const list of data.MediaListCollection.lists) {
+    if (list.isCustomList) continue;
+    for (const e of list.entries) {
+      if (seen.has(e.media.id)) continue;
+      seen.add(e.media.id);
+      out.push({
+        mediaId: e.media.id,
+        progress: e.progress,
+        score: e.score,
+        year: e.completedAt?.year ?? null,
+        duration: e.media.duration,
+        genres: e.media.genres,
+        title: e.media.title,
+      });
+    }
+  }
+  return out;
 }

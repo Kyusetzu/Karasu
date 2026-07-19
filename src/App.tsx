@@ -16,6 +16,7 @@ import Seasonal from "@/pages/Seasonal";
 import Statistics from "@/pages/Statistics";
 import AnimeDetail from "@/pages/AnimeDetail";
 import Franchise from "@/pages/Franchise";
+import Wrapped from "@/pages/Wrapped";
 import Settings from "@/pages/Settings";
 import About from "@/pages/About";
 
@@ -45,6 +46,7 @@ export default function App() {
             <Route path="/search" element={<Search />} />
             <Route path="/seasonal" element={<Seasonal />} />
             <Route path="/stats" element={<Statistics />} />
+            <Route path="/wrapped" element={<Wrapped />} />
             <Route path="/media/:id" element={<AnimeDetail />} />
             <Route path="/franchise/:id" element={<Franchise />} />
             {/* Alias for old links */}

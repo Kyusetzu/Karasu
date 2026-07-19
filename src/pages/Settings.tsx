@@ -14,8 +14,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import { useAuth } from "@/stores/auth";
 import { useLibrary } from "@/stores/library";
+import { ACCENTS, useTheme, type ThemeMode } from "@/stores/theme";
 import * as api from "@/api/anilist";
 import * as library from "@/api/library";
 import {
@@ -464,10 +466,16 @@ function DiscordSection() {
   );
 }
 
+const THEME_MODES: ThemeMode[] = ["system", "light", "dark"];
+
 function AppSection() {
   const { t } = useTranslation();
   const [autostart, setAutostart] = useState<boolean | null>(null);
   const [lang, setLang] = useState<LanguageSetting>(getLanguageSetting());
+  const themeMode = useTheme((s) => s.mode);
+  const accent = useTheme((s) => s.accent);
+  const setThemeMode = useTheme((s) => s.setMode);
+  const setAccent = useTheme((s) => s.setAccent);
 
   useEffect(() => {
     if (!api.isTauri) return;
@@ -510,6 +518,41 @@ function AppSection() {
             ))}
           </select>
         </label>
+
+        <label className="flex items-center justify-between gap-4 py-1 text-sm">
+          <span className="block text-ink-100">{t("settings.theme")}</span>
+          <select
+            value={themeMode}
+            onChange={(e) => setThemeMode(e.target.value as ThemeMode)}
+            className="h-9 rounded-lg border border-surface-700 bg-surface-900 px-2 text-sm focus:border-accent-500 focus:outline-none"
+          >
+            {THEME_MODES.map((m) => (
+              <option key={m} value={m}>
+                {t(`settings.theme_${m}`)}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <div className="flex items-center justify-between gap-4 py-1 text-sm">
+          <span className="block text-ink-100">{t("settings.accent")}</span>
+          <div className="flex gap-2">
+            {Object.entries(ACCENTS).map(([key, shades]) => (
+              <button
+                key={key}
+                onClick={() => setAccent(key)}
+                className={cn(
+                  "h-6 w-6 rounded-full ring-offset-2 ring-offset-surface-900 transition",
+                  accent === key && "ring-2 ring-ink-100",
+                )}
+                style={{ backgroundColor: shades[1] }}
+                aria-label={key}
+                title={key}
+              />
+            ))}
+          </div>
+        </div>
+
         {autostart !== null && (
           <Toggle
             checked={autostart}

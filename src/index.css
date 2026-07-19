@@ -20,6 +20,27 @@
   --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
 }
 
+/* Light theme: override the surface/ink tokens; accent is set at runtime. */
+:root[data-theme="light"] {
+  --color-surface-950: #f4f6f9;
+  --color-surface-900: #ffffff;
+  --color-surface-850: #eef1f5;
+  --color-surface-800: #e4e8ee;
+  --color-surface-700: #d2d8e2;
+  --color-surface-600: #b6bece;
+
+  --color-ink-100: #1a1e27;
+  --color-ink-300: #39414f;
+  --color-ink-500: #697184;
+  --color-ink-600: #8b93a4;
+
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+
 html,
 body,
 #root {

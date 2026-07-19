@@ -1,10 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
   Bookmark,
   CheckCheck,
+  CheckSquare,
   CloudOff,
   Dices,
   LayoutGrid,
@@ -14,7 +15,10 @@ import {
   Plus,
   RefreshCw,
   Search as SearchIcon,
+  Square,
   Star,
+  Trash2,
+  X,
 } from "lucide-react";
 import { useAuth } from "@/stores/auth";
 import { useLibrary } from "@/stores/library";
@@ -76,6 +80,19 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
   const [showRandom, setShowRandom] = useState(false);
   const [presets, setPresets] = useState<Preset[]>(() => loadPresets(type));
   const [showPresetSave, setShowPresetSave] = useState(false);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+
+  // Clear the selection whenever the pool it refers to changes.
+  useEffect(() => setSelected(new Set()), [tab]);
+
+  const toggleSelect = (mediaId: number) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(mediaId)) next.delete(mediaId);
+      else next.add(mediaId);
+      return next;
+    });
 
   const applyPreset = (name: string) => {
     const p = presets.find((x) => x.name === name);
@@ -174,6 +191,20 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
     });
   };
 
+  const selectedEntries = entries.filter((e) => selected.has(e.mediaId));
+  const bulkStatus = (status: MediaListStatus) =>
+    selectedEntries.forEach((e) => save.mutate({ mediaId: e.mediaId, status }));
+  const bulkScore = (score: number) =>
+    selectedEntries.forEach((e) => save.mutate({ mediaId: e.mediaId, score }));
+  const bulkDelete = () => {
+    selectedEntries.forEach((e) => remove.mutate(e.id));
+    setSelected(new Set());
+  };
+  const exitSelect = () => {
+    setSelectMode(false);
+    setSelected(new Set());
+  };
+
   return (
     <div className="flex h-full flex-col">
       {(data?.fromCache || (data?.pending ?? 0) > 0) && (
@@ -201,15 +232,26 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
           <h1 className="text-2xl font-bold">
             {type === "ANIME" ? t("list.animeTitle") : t("list.mangaTitle")}
           </h1>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => refetch()}
-            disabled={isRefetching}
-            aria-label={t("common.reload")}
-          >
-            <RefreshCw size={16} className={cn(isRefetching && "animate-spin")} />
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button
+              variant={selectMode ? "secondary" : "ghost"}
+              size="icon"
+              onClick={() => (selectMode ? exitSelect() : setSelectMode(true))}
+              aria-label={t("bulk.select")}
+              title={t("bulk.select")}
+            >
+              <CheckSquare size={16} />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => refetch()}
+              disabled={isRefetching}
+              aria-label={t("common.reload")}
+            >
+              <RefreshCw size={16} className={cn(isRefetching && "animate-spin")} />
+            </Button>
+          </div>
         </div>
 
         <div className="flex flex-wrap gap-1">
@@ -332,6 +374,9 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
                 }
                 onComplete={() => complete(entry)}
                 onEdit={() => setEditing(entry)}
+                selectMode={selectMode}
+                selected={selected.has(entry.mediaId)}
+                onToggleSelect={() => toggleSelect(entry.mediaId)}
               />
             ))}
           </div>
@@ -344,11 +389,25 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
                 onQuickSave={(patch) => quickSave(entry, patch)}
                 onComplete={() => complete(entry)}
                 onEdit={() => setEditing(entry)}
+                selectMode={selectMode}
+                selected={selected.has(entry.mediaId)}
+                onToggleSelect={() => toggleSelect(entry.mediaId)}
               />
             ))}
           </div>
         )}
       </div>
+
+      {selectMode && (
+        <BulkBar
+          type={type}
+          count={selected.size}
+          onStatus={bulkStatus}
+          onScore={bulkScore}
+          onDelete={bulkDelete}
+          onClear={exitSelect}
+        />
+      )}
 
       {editing && (
         <EntryEditModal
@@ -390,18 +449,139 @@ function canIncrement(entry: MediaListEntry) {
   return max === null || entry.progress < max;
 }
 
+/** Sticky action bar for bulk edits over the current selection. */
+function BulkBar({
+  type,
+  count,
+  onStatus,
+  onScore,
+  onDelete,
+  onClear,
+}: {
+  type: MediaType;
+  count: number;
+  onStatus: (s: MediaListStatus) => void;
+  onScore: (n: number) => void;
+  onDelete: () => void;
+  onClear: () => void;
+}) {
+  const { t } = useTranslation();
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const disabled = count === 0;
+
+  return (
+    <div className="flex flex-wrap items-center gap-3 border-t border-surface-700 bg-surface-900 px-8 py-3">
+      <span className="text-sm font-medium text-ink-100">
+        {t("bulk.selected", { count })}
+      </span>
+
+      <select
+        value=""
+        disabled={disabled}
+        onChange={(e) => e.target.value && onStatus(e.target.value as MediaListStatus)}
+        className="h-9 rounded-lg border border-surface-700 bg-surface-900 px-2 text-sm text-ink-300 focus:border-accent-500 focus:outline-none disabled:opacity-50"
+        aria-label={t("bulk.setStatus")}
+      >
+        <option value="">{t("bulk.setStatus")}</option>
+        {STATUS_ORDER.map((s) => (
+          <option key={s} value={s}>
+            {t(`status.${type}.${s}`)}
+          </option>
+        ))}
+      </select>
+
+      <select
+        value=""
+        disabled={disabled}
+        onChange={(e) => e.target.value !== "" && onScore(Number(e.target.value))}
+        className="h-9 rounded-lg border border-surface-700 bg-surface-900 px-2 text-sm text-amber-300 focus:border-accent-500 focus:outline-none disabled:opacity-50"
+        aria-label={t("bulk.setScore")}
+      >
+        <option value="">{t("bulk.setScore")}</option>
+        <option value={0}>–</option>
+        {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+          <option key={n} value={n}>
+            ★ {n}
+          </option>
+        ))}
+      </select>
+
+      {confirmDelete ? (
+        <Button variant="danger" size="sm" disabled={disabled} onClick={onDelete}>
+          {t("bulk.confirmDelete", { count })}
+        </Button>
+      ) : (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-red-400"
+          disabled={disabled}
+          onClick={() => setConfirmDelete(true)}
+        >
+          <Trash2 size={14} /> {t("common.remove")}
+        </Button>
+      )}
+
+      <Button
+        variant="ghost"
+        size="sm"
+        className="ml-auto"
+        onClick={onClear}
+      >
+        <X size={14} /> {t("bulk.done")}
+      </Button>
+    </div>
+  );
+}
+
+/** Selection checkbox shared by the grid and list rows. */
+function SelectBox({
+  checked,
+  onToggle,
+  className,
+}: {
+  checked: boolean;
+  onToggle: () => void;
+  className?: string;
+}) {
+  const { t } = useTranslation();
+  return (
+    <button
+      onClick={onToggle}
+      className={cn(
+        "grid h-6 w-6 shrink-0 place-items-center rounded-md border transition-colors",
+        checked
+          ? "border-accent-500 bg-accent-600 text-white"
+          : "border-surface-600 bg-surface-900/80 text-transparent hover:border-accent-500",
+        className,
+      )}
+      role="checkbox"
+      aria-checked={checked}
+      aria-label={t("bulk.select")}
+    >
+      {checked ? <CheckSquare size={14} /> : <Square size={14} />}
+    </button>
+  );
+}
+
 function GridCard({
   entry,
   unit,
   onPlusOne,
   onComplete,
   onEdit,
+  selectMode,
+  selected,
+  onToggleSelect,
 }: {
   entry: MediaListEntry;
   unit: string;
   onPlusOne: () => void;
   onComplete: () => void;
   onEdit: () => void;
+  selectMode: boolean;
+  selected: boolean;
+  onToggleSelect: () => void;
 }) {
   const { t } = useTranslation();
   const { media } = entry;
@@ -409,19 +589,53 @@ function GridCard({
   const pct = max ? (entry.progress / max) * 100 : 0;
   return (
     <div className="group">
-      <div className="relative aspect-[2/3] overflow-hidden rounded-lg bg-surface-800">
-        <Link to={`/media/${media.id}`}>
-          {media.coverImage.large && (
-            <img
-              src={media.coverImage.large}
-              alt=""
-              loading="lazy"
-              className="h-full w-full object-cover"
-            />
-          )}
-        </Link>
+      <div
+        className={cn(
+          "relative aspect-[2/3] overflow-hidden rounded-lg bg-surface-800",
+          selected && "ring-2 ring-accent-500",
+        )}
+      >
+        {selectMode ? (
+          <button
+            onClick={onToggleSelect}
+            className="absolute inset-0 z-10 bg-black/30"
+            aria-label={t("bulk.select")}
+          >
+            {media.coverImage.large && (
+              <img
+                src={media.coverImage.large}
+                alt=""
+                loading="lazy"
+                className="h-full w-full object-cover"
+              />
+            )}
+          </button>
+        ) : (
+          <Link to={`/media/${media.id}`}>
+            {media.coverImage.large && (
+              <img
+                src={media.coverImage.large}
+                alt=""
+                loading="lazy"
+                className="h-full w-full object-cover"
+              />
+            )}
+          </Link>
+        )}
+        {selectMode && (
+          <SelectBox
+            checked={selected}
+            onToggle={onToggleSelect}
+            className="absolute left-2 top-2 z-20"
+          />
+        )}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/80 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
-        <div className="absolute bottom-2 right-2 flex gap-1.5 opacity-0 transition-opacity group-hover:opacity-100">
+        <div
+          className={cn(
+            "absolute bottom-2 right-2 flex gap-1.5 opacity-0 transition-opacity group-hover:opacity-100",
+            selectMode && "hidden",
+          )}
+        >
           <button
             onClick={onEdit}
             className="grid h-8 w-8 place-items-center rounded-full bg-surface-900/90 text-ink-300 hover:bg-surface-800 hover:text-ink-100"
@@ -483,11 +697,17 @@ function ListRow({
   onQuickSave,
   onComplete,
   onEdit,
+  selectMode,
+  selected,
+  onToggleSelect,
 }: {
   entry: MediaListEntry;
   onQuickSave: (patch: { progress?: number; score?: number }) => void;
   onComplete: () => void;
   onEdit: () => void;
+  selectMode: boolean;
+  selected: boolean;
+  onToggleSelect: () => void;
 }) {
   const { t } = useTranslation();
   const { media } = entry;
@@ -495,10 +715,19 @@ function ListRow({
   const dropdown = max !== null && max <= PROGRESS_DROPDOWN_LIMIT;
   const hasNext = useLibrary((s) => s.hasNext);
   const play = useLibrary((s) => s.play);
-  const canPlayNext = media.type === "ANIME" && hasNext(media.id, entry.progress);
+  const canPlayNext =
+    !selectMode && media.type === "ANIME" && hasNext(media.id, entry.progress);
 
   return (
-    <div className="flex items-center gap-3 bg-surface-900 px-4 py-2.5 first:rounded-t-xl last:rounded-b-xl hover:bg-surface-850">
+    <div
+      className={cn(
+        "flex items-center gap-3 px-4 py-2.5 first:rounded-t-xl last:rounded-b-xl",
+        selected ? "bg-accent-600/10" : "bg-surface-900 hover:bg-surface-850",
+      )}
+    >
+      {selectMode && (
+        <SelectBox checked={selected} onToggle={onToggleSelect} />
+      )}
       <Link to={`/media/${media.id}`} className="shrink-0">
         <img
           src={media.coverImage.large ?? ""}
@@ -517,6 +746,8 @@ function ListRow({
         </p>
       </Link>
 
+      {selectMode ? null : (
+        <>
       {/* Quick score */}
       <select
         value={entry.score}
@@ -600,6 +831,8 @@ function ListRow({
           <Pencil size={14} />
         </Button>
       </div>
+        </>
+      )}
     </div>
   );
 }

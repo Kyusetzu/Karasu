@@ -243,6 +243,14 @@ const en = {
     title: "Filter presets",
     namePlaceholder: "Preset name",
   },
+  bulk: {
+    select: "Select",
+    selected: "{{count}} selected",
+    setStatus: "Set status …",
+    setScore: "Set score …",
+    confirmDelete: "Delete {{count}}?",
+    done: "Done",
+  },
   detail: {
     back: "Back",
     minutes: "{{n}} min",
@@ -532,6 +540,14 @@ const de: typeof en = {
     save: "Aktuelle Ansicht als Preset speichern",
     title: "Filter-Presets",
     namePlaceholder: "Preset-Name",
+  },
+  bulk: {
+    select: "Auswählen",
+    selected: "{{count}} ausgewählt",
+    setStatus: "Status setzen …",
+    setScore: "Bewertung setzen …",
+    confirmDelete: "{{count}} löschen?",
+    done: "Fertig",
   },
   detail: {
     back: "Zurück",

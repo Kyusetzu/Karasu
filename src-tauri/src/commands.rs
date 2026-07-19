@@ -515,6 +515,31 @@ pub fn set_airing_notify(db: State<'_, Db>, enabled: bool) -> Result<(), String>
     db.kv_set("airing_notify", if enabled { "1" } else { "0" })
 }
 
+#[derive(serde::Serialize)]
+pub struct StaleSettings {
+    enabled: bool,
+    months: i64,
+}
+
+/// On-hold reminder settings (disabled by default).
+#[tauri::command]
+pub fn get_stale_settings(db: State<'_, Db>) -> StaleSettings {
+    StaleSettings {
+        enabled: db.kv_get("stale_notify").as_deref() == Some("1"),
+        months: crate::stale::stale_months(&db),
+    }
+}
+
+#[tauri::command]
+pub fn set_stale_settings(
+    db: State<'_, Db>,
+    enabled: bool,
+    months: i64,
+) -> Result<(), String> {
+    db.kv_set("stale_notify", if enabled { "1" } else { "0" })?;
+    db.kv_set("stale_months", &months.clamp(1, 24).to_string())
+}
+
 #[tauri::command]
 pub fn get_autostart(app: tauri::AppHandle) -> bool {
     use tauri_plugin_autostart::ManagerExt;

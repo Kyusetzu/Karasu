@@ -391,11 +391,13 @@ function ScrobbleSection() {
   const { t } = useTranslation();
   const [settings, setSettings] = useState<ScrobbleSettings | null>(null);
   const [airing, setAiring] = useState<boolean | null>(null);
+  const [stale, setStale] = useState<api.StaleSettings | null>(null);
 
   useEffect(() => {
     if (!api.isTauri) return;
     getScrobbleSettings().then(setSettings);
     api.getAiringNotify().then(setAiring);
+    api.getStaleSettings().then(setStale);
   }, []);
 
   if (!settings) return null;
@@ -409,6 +411,13 @@ function ScrobbleSection() {
   const updateAiring = (v: boolean) => {
     setAiring(v);
     api.setAiringNotify(v);
+  };
+
+  const updateStale = (patch: Partial<api.StaleSettings>) => {
+    if (!stale) return;
+    const next = { ...stale, ...patch };
+    setStale(next);
+    api.setStaleSettings(next.enabled, next.months);
   };
 
   return (
@@ -454,6 +463,40 @@ function ScrobbleSection() {
             label={t("settings.airingNotify")}
             hint={t("settings.airingNotifyHint")}
           />
+        )}
+        {stale && (
+          <>
+            <Toggle
+              checked={stale.enabled}
+              onChange={(v) => updateStale({ enabled: v })}
+              label={t("settings.staleNotify")}
+              hint={t("settings.staleNotifyHint")}
+            />
+            {stale.enabled && (
+              <label className="flex items-center justify-between gap-4 py-1 text-sm">
+                <span>
+                  <span className="block text-ink-100">
+                    {t("settings.staleMonths")}
+                  </span>
+                  <span className="block text-xs text-ink-600">
+                    {t("settings.staleMonthsHint")}
+                  </span>
+                </span>
+                <Input
+                  type="number"
+                  min={1}
+                  max={24}
+                  value={stale.months}
+                  onChange={(e) =>
+                    updateStale({
+                      months: Math.max(1, Math.min(24, Number(e.target.value))),
+                    })
+                  }
+                  className="w-20"
+                />
+              </label>
+            )}
+          </>
         )}
       </div>
     </Card>

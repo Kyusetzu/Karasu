@@ -335,6 +335,11 @@ const en = {
     airingNotify: "New-episode notifications",
     airingNotifyHint:
       "Desktop notification when a new episode of a show you are watching airs.",
+    staleNotify: "On-hold reminders",
+    staleNotifyHint:
+      "Remind me about titles I paused and haven't touched in a while.",
+    staleMonths: "Remind after (months)",
+    staleMonthsHint: "How long a paused title may sit before a reminder.",
     library: "Local library",
     libraryHint:
       "Point Karasu at your anime folder to play the next episode with one click, straight from your list.",
@@ -667,6 +672,11 @@ const de: typeof en = {
     airingNotify: "Benachrichtigung bei neuer Folge",
     airingNotifyHint:
       "Desktop-Benachrichtigung, wenn eine neue Folge einer laufenden Serie erscheint.",
+    staleNotify: "Erinnerung an Pausiertes",
+    staleNotifyHint:
+      "Erinnere mich an Titel, die ich pausiert und länger nicht angefasst habe.",
+    staleMonths: "Erinnern nach (Monaten)",
+    staleMonthsHint: "Wie lange ein pausierter Titel ruhen darf, bis erinnert wird.",
     library: "Lokale Bibliothek",
     libraryHint:
       "Zeige Karasu deinen Anime-Ordner, um die nächste Folge mit einem Klick direkt aus deiner Liste zu starten.",

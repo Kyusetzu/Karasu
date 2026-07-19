@@ -9,6 +9,7 @@ mod portable;
 mod recognition;
 mod relations;
 mod scrobbler;
+mod stale;
 
 use tauri::{
     menu::{Menu, MenuItem},
@@ -50,6 +51,7 @@ pub fn run() {
             relations::spawn_loader(app.handle().clone());
             scrobbler::spawn(app.handle().clone());
             airing::spawn(app.handle().clone());
+            stale::spawn(app.handle().clone());
             // Show the idle presence right away (if Discord is enabled).
             discord::sync_current(app.handle());
 
@@ -113,6 +115,8 @@ pub fn run() {
             commands::set_autostart,
             commands::get_airing_notify,
             commands::set_airing_notify,
+            commands::get_stale_settings,
+            commands::set_stale_settings,
             commands::check_for_updates,
             commands::get_portable_status,
             commands::enable_portable,

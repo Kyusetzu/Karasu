@@ -62,3 +62,13 @@ export const checkForUpdates = () => invoke<UpdateInfo>("check_for_updates");
 export const getAiringNotify = () => invoke<boolean>("get_airing_notify");
 export const setAiringNotify = (enabled: boolean) =>
   invoke<void>("set_airing_notify", { enabled });
+
+export interface StaleSettings {
+  enabled: boolean;
+  months: number;
+}
+
+export const getStaleSettings = () =>
+  invoke<StaleSettings>("get_stale_settings");
+export const setStaleSettings = (enabled: boolean, months: number) =>
+  invoke<void>("set_stale_settings", { enabled, months });

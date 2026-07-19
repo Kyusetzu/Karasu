@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import {
   CheckCheck,
   CloudOff,
+  Dices,
   LayoutGrid,
   List as ListIcon,
   Pencil,
@@ -27,6 +28,7 @@ import {
 } from "@/api/types";
 import { useListMutations } from "@/hooks/useListMutations";
 import EntryEditModal from "@/components/EntryEditModal";
+import RandomPickModal from "@/components/RandomPickModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -68,6 +70,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
   const [sort, setSort] = useState<SortKey>("updated");
   const [grid, setGrid] = useState(true);
   const [editing, setEditing] = useState<MediaListEntry | null>(null);
+  const [showRandom, setShowRandom] = useState(false);
 
   const { data, isLoading, error, refetch, isRefetching } = useQuery({
     queryKey: ["mediaList", type, userId],
@@ -228,6 +231,15 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
               </option>
             ))}
           </select>
+          <Button
+            variant="secondary"
+            size="icon"
+            onClick={() => setShowRandom(true)}
+            aria-label={t("random.pick")}
+            title={t("random.pick")}
+          >
+            <Dices size={16} />
+          </Button>
           <div className="ml-auto flex rounded-lg border border-surface-700">
             <button
               onClick={() => setGrid(true)}
@@ -299,6 +311,13 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
             remove.mutate(editing.id);
             setEditing(null);
           }}
+        />
+      )}
+
+      {showRandom && (
+        <RandomPickModal
+          pool={byStatus.get("PLANNING") ?? []}
+          onClose={() => setShowRandom(false)}
         />
       )}
     </div>

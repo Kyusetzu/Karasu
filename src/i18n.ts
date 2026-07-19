@@ -228,6 +228,15 @@ const en = {
     hm: "{{h}}h {{m}}m",
     dh: "{{d}}d {{h}}h",
   },
+  random: {
+    pick: "Random pick",
+    title: "Random pick",
+    capLabel: "Max. episodes",
+    capAny: "any",
+    open: "Open",
+    reroll: "Reroll",
+    empty: "Nothing matches — adjust the cap or add Plan-to-Watch entries.",
+  },
   detail: {
     back: "Back",
     minutes: "{{n}} min",
@@ -502,6 +511,15 @@ const de: typeof en = {
     m: "{{m}} min",
     hm: "{{h}} Std {{m}} min",
     dh: "{{d}} T {{h}} Std",
+  },
+  random: {
+    pick: "Zufallsauswahl",
+    title: "Zufallsauswahl",
+    capLabel: "Max. Episoden",
+    capAny: "beliebig",
+    open: "Öffnen",
+    reroll: "Neu würfeln",
+    empty: "Nichts passt — Cap anpassen oder Einträge zu Planen hinzufügen.",
   },
   detail: {
     back: "Zurück",

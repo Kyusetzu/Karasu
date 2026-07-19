@@ -24,6 +24,7 @@ export function useListMutations(userId: number, mediaType: MediaType) {
                   progress: input.progress ?? e.progress,
                   score: input.score ?? e.score,
                   status: input.status ?? e.status,
+                  repeat: input.repeat ?? e.repeat,
                   updatedAt: Math.floor(Date.now() / 1000),
                 }
               : e,

@@ -29,6 +29,7 @@ export default function MediaCard({ media }: { media: MediaWithListStatus }) {
         status: input.status ?? media.mediaListEntry?.status ?? "PLANNING",
         progress: input.progress ?? media.mediaListEntry?.progress ?? 0,
         score: input.score ?? media.mediaListEntry?.score ?? 0,
+        repeat: input.repeat ?? media.mediaListEntry?.repeat ?? 0,
       };
     },
   });

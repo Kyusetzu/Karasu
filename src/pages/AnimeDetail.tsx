@@ -248,6 +248,7 @@ function ListEditor({
     status: MediaListStatus;
     progress: number;
     score: number;
+    repeat: number;
   } | null;
 }) {
   const { t } = useTranslation();
@@ -258,16 +259,18 @@ function ListEditor({
   );
   const [progress, setProgress] = useState(entry?.progress ?? 0);
   const [score, setScore] = useState(entry?.score ?? 0);
+  const [repeat, setRepeat] = useState(entry?.repeat ?? 0);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     setStatus(entry?.status ?? "PLANNING");
     setProgress(entry?.progress ?? 0);
     setScore(entry?.score ?? 0);
+    setRepeat(entry?.repeat ?? 0);
   }, [entry]);
 
   const save = useMutation({
-    mutationFn: () => saveListEntry({ mediaId, status, progress, score }),
+    mutationFn: () => saveListEntry({ mediaId, status, progress, score, repeat }),
     onSuccess: () => {
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -326,6 +329,29 @@ function ListEditor({
             }
             className="w-20"
           />
+        </label>
+        <label className="text-sm">
+          <span className="mb-1 block text-ink-500">
+            {mediaType === "MANGA" ? t("entry.rereads") : t("entry.rewatches")}
+          </span>
+          <div className="flex items-center gap-1.5">
+            <Input
+              type="number"
+              min={0}
+              value={repeat}
+              onChange={(e) => setRepeat(Math.max(0, Number(e.target.value)))}
+              className="w-20"
+            />
+            <Button
+              variant="secondary"
+              size="icon"
+              aria-label={t("entry.addRepeat")}
+              title={t("entry.addRepeat")}
+              onClick={() => setRepeat((r) => r + 1)}
+            >
+              +1
+            </Button>
+          </div>
         </label>
         <Button onClick={() => save.mutate()} disabled={save.isPending}>
           {saved

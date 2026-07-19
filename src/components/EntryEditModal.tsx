@@ -25,6 +25,7 @@ export interface EditableEntry {
   status: MediaListStatus;
   progress: number;
   score: number;
+  repeat: number;
 }
 
 export interface EntrySaveInput {
@@ -32,6 +33,7 @@ export interface EntrySaveInput {
   status: MediaListStatus;
   progress: number;
   score: number;
+  repeat: number;
 }
 
 /**
@@ -57,8 +59,11 @@ export default function EntryEditModal({
   );
   const [progress, setProgress] = useState(entry?.progress ?? 0);
   const [score, setScore] = useState(entry?.score ?? 0);
+  const [repeat, setRepeat] = useState(entry?.repeat ?? 0);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const max = maxProgress(media) ?? 99999;
+  const rewatchLabel =
+    media.type === "MANGA" ? t("entry.rereads") : t("entry.rewatches");
 
   return (
     <Modal title={displayTitle(media.title)} onClose={onClose}>
@@ -109,6 +114,26 @@ export default function EntryEditModal({
             />
           </label>
         </div>
+        <label className="block text-sm">
+          <span className="mb-1 block text-ink-500">{rewatchLabel}</span>
+          <div className="flex items-center gap-2">
+            <Input
+              type="number"
+              min={0}
+              value={repeat}
+              onChange={(e) => setRepeat(Math.max(0, Number(e.target.value)))}
+              className="w-24"
+            />
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => setRepeat((r) => r + 1)}
+            >
+              {t("entry.addRepeat")}
+            </Button>
+          </div>
+        </label>
         <div className="flex items-center justify-between pt-2">
           {onDelete ? (
             confirmDelete ? (
@@ -133,7 +158,9 @@ export default function EntryEditModal({
               {t("common.cancel")}
             </Button>
             <Button
-              onClick={() => onSave({ mediaId: media.id, status, progress, score })}
+              onClick={() =>
+                onSave({ mediaId: media.id, status, progress, score, repeat })
+              }
             >
               {entry ? t("common.save") : t("common.add")}
             </Button>

@@ -267,6 +267,11 @@ const en = {
     description: "Description",
     related: "Related anime",
   },
+  entry: {
+    rewatches: "Rewatches",
+    rereads: "Rereads",
+    addRepeat: "+1",
+  },
   media: {
     addPlanning: "Add to Planning",
     onList: "On your list",
@@ -583,6 +588,11 @@ const de: typeof en = {
     addToList: "Zur Liste hinzufügen",
     description: "Beschreibung",
     related: "Verwandte Anime",
+  },
+  entry: {
+    rewatches: "Wiederholungen",
+    rereads: "Wiederholungen",
+    addRepeat: "+1",
   },
   media: {
     addPlanning: "Zu Geplant hinzufügen",

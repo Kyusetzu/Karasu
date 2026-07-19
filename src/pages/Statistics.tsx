@@ -10,8 +10,9 @@ import {
   type MangaStats,
   type StatEntry,
 } from "@/api/queries";
-import { isTauri } from "@/api/anilist";
+import { fetchMediaList, isTauri } from "@/api/anilist";
 import type { MediaType } from "@/api/types";
+import { formatMinutes, remainingMinutes } from "@/lib/estimate";
 import { useAuth } from "@/stores/auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
@@ -143,7 +144,44 @@ function StatisticsContent({
         ) : (
           <MangaView stats={stats.manga} category={activeCategory} />
         ))}
+
+      {stats && type === "ANIME" && activeCategory === "overview" && (
+        <WatchTimeEstimate userId={userId} />
+      )}
     </div>
+  );
+}
+
+/** "Time to finish your watching list", summed from the cached anime list. */
+function WatchTimeEstimate({ userId }: { userId: number }) {
+  const { t } = useTranslation();
+  const { data } = useQuery({
+    queryKey: ["mediaList", "ANIME", userId],
+    queryFn: () => fetchMediaList(userId, "ANIME"),
+    enabled: isTauri,
+  });
+  const total = useMemo(() => {
+    let sum = 0;
+    for (const group of data?.lists ?? []) {
+      if (group.isCustomList) continue;
+      for (const e of group.entries) {
+        if (e.status !== "CURRENT" && e.status !== "REPEATING") continue;
+        const rem = remainingMinutes(e.media, e.progress);
+        if (rem) sum += rem;
+      }
+    }
+    return sum;
+  }, [data]);
+
+  if (total <= 0) return null;
+  return (
+    <Card>
+      <CardTitle>{t("stats.timeToFinish")}</CardTitle>
+      <p className="mt-2 text-2xl font-bold tabular-nums">
+        {formatMinutes(total, t)}
+      </p>
+      <p className="text-xs text-ink-600">{t("stats.timeToFinishHint")}</p>
+    </Card>
   );
 }
 

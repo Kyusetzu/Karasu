@@ -2,9 +2,10 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { ArrowLeft, ExternalLink, Star } from "lucide-react";
+import { ArrowLeft, Clock, ExternalLink, Star } from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { animeDetail } from "@/api/queries";
+import { formatMinutes, remainingMinutes } from "@/lib/estimate";
 import { isTauri, saveListEntry } from "@/api/anilist";
 import {
   displayTitle,
@@ -132,6 +133,21 @@ export default function AnimeDetail() {
                 </span>
               ))}
             </div>
+            {data.type === "ANIME" &&
+              (() => {
+                const remaining = remainingMinutes(
+                  data,
+                  data.mediaListEntry?.progress ?? 0,
+                );
+                return remaining !== null && remaining > 0 ? (
+                  <p className="mt-2 flex items-center gap-1.5 text-sm text-ink-300">
+                    <Clock size={14} className="text-ink-500" />
+                    {t("detail.timeLeft", {
+                      time: formatMinutes(remaining, t),
+                    })}
+                  </p>
+                ) : null;
+              })()}
             {data.nextAiringEpisode && (
               <p className="mt-2 text-sm text-accent-400">
                 {t("detail.nextEpisode", {

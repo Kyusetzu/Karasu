@@ -117,6 +117,9 @@ export interface UpdateInfo {
 
 export const checkForUpdates = () => invoke<UpdateInfo>("check_for_updates");
 
+/** Full four-part app version (MAJOR.MINOR.PATCH.COMMIT#) for the About page. */
+export const appVersion = () => invoke<string>("app_version");
+
 // --- Airing notifications --------------------------------------------------
 
 export const getAiringNotify = () => invoke<boolean>("get_airing_notify");

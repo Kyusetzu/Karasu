@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
@@ -9,7 +9,12 @@ import {
   CheckCircle2,
   Download,
 } from "lucide-react";
-import { checkForUpdates, isTauri, type UpdateInfo } from "@/api/anilist";
+import {
+  appVersion,
+  checkForUpdates,
+  isTauri,
+  type UpdateInfo,
+} from "@/api/anilist";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 
@@ -19,6 +24,12 @@ const EMAIL = "contact@kyusetzu.de";
 
 export default function About() {
   const { t } = useTranslation();
+  const [version, setVersion] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isTauri) appVersion().then(setVersion).catch(() => {});
+  }, []);
+
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-8">
       <header className="flex items-center gap-4">
@@ -26,6 +37,11 @@ export default function About() {
         <div>
           <h1 className="text-2xl font-bold">Karasu</h1>
           <p className="text-sm text-ink-500">{t("about.tagline")}</p>
+          {version && (
+            <p className="mt-0.5 text-xs text-ink-600">
+              {t("about.version", { version })}
+            </p>
+          )}
         </div>
       </header>
 

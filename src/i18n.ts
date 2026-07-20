@@ -181,6 +181,7 @@ const en = {
   about: {
     title: "About Karasu",
     tagline: "Anime & manga tracker for AniList",
+    version: "Version {{version}}",
     description:
       "Karasu is a desktop tracker for your AniList anime and manga. It detects what you watch in your player or browser and what you read on manga sites, updates your progress automatically, plays the next episode from your local library, and shows your activity on Discord — all from your PC.",
     updates: "Updates",
@@ -563,6 +564,7 @@ const de: typeof en = {
   about: {
     title: "Über Karasu",
     tagline: "Anime- & Manga-Tracker für AniList",
+    version: "Version {{version}}",
     description:
       "Karasu ist ein Desktop-Tracker für deine AniList-Anime und -Manga. Er erkennt, was du im Player oder Browser schaust und auf Manga-Seiten liest, aktualisiert deinen Fortschritt automatisch, startet die nächste Folge aus deiner lokalen Bibliothek und zeigt deine Aktivität auf Discord — alles direkt vom PC.",
     updates: "Updates",

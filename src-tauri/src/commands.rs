@@ -735,6 +735,24 @@ pub fn set_autostart(app: tauri::AppHandle, enabled: bool) -> Result<(), String>
     .map_err(|e| e.to_string())
 }
 
+// --- Version -----------------------------------------------------------------
+
+/// Monotonic commit counter — the 4th version segment
+/// (`MAJOR.MINOR.PATCH.COMMIT#`). Bumped by one on every commit.
+pub const COMMIT_NUMBER: u32 = 38;
+
+/// Full four-part display version, e.g. `0.1.1.38`. The `MAJOR.MINOR.PATCH`
+/// core comes from the crate version (kept in sync across the manifests).
+pub fn app_version_string() -> String {
+    format!("{}.{}", env!("CARGO_PKG_VERSION"), COMMIT_NUMBER)
+}
+
+/// The running four-part version, shown in the About window.
+#[tauri::command]
+pub fn app_version() -> String {
+    app_version_string()
+}
+
 // --- Update check ------------------------------------------------------------
 
 #[derive(serde::Serialize)]
@@ -752,7 +770,9 @@ pub struct UpdateInfo {
 /// Compares the running version against the latest GitHub release.
 #[tauri::command]
 pub async fn check_for_updates() -> Result<UpdateInfo, String> {
-    let current = env!("CARGO_PKG_VERSION").to_string();
+    // Compare the full four-part version so a release tagged with the commit
+    // number lines up with what's running.
+    let current = app_version_string();
     let resp = reqwest::Client::new()
         .get("https://api.github.com/repos/Kyusetzu/Karasu/releases/latest")
         .header("User-Agent", concat!("Karasu/", env!("CARGO_PKG_VERSION")))

@@ -128,6 +128,7 @@ pub fn run() {
             commands::get_sequel_notify,
             commands::set_sequel_notify,
             commands::save_png,
+            commands::app_version,
             commands::check_for_updates,
             commands::get_portable_status,
             commands::enable_portable,

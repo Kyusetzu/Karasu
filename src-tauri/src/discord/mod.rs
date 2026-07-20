@@ -100,9 +100,8 @@ pub fn sync(app: &AppHandle, now: Option<&NowPlaying>) {
 
     // Connect lazily; if Discord is not running, stay quiet and retry later.
     if guard.is_none() {
-        let Ok(mut client) = DiscordIpcClient::new(&app_id) else {
-            return;
-        };
+        // discord-rich-presence 1.x returns the client directly (no Result).
+        let mut client = DiscordIpcClient::new(&app_id);
         if client.connect().is_ok() {
             *guard = Some(client);
         } else {

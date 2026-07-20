@@ -143,3 +143,23 @@ export const setSequelNotify = (enabled: boolean) =>
 /** Opens a save dialog and writes PNG bytes; false if cancelled. */
 export const savePng = (data: number[], defaultName: string) =>
   invoke<boolean>("save_png", { data, defaultName });
+
+// --- Notification centre ---------------------------------------------------
+
+export interface AppNotification {
+  id: number;
+  kind: string;
+  title: string;
+  body: string;
+  createdMs: number;
+  read: boolean;
+}
+
+export const getNotifications = () =>
+  invoke<AppNotification[]>("get_notifications");
+export const unreadNotificationCount = () =>
+  invoke<number>("unread_notification_count");
+export const markNotificationRead = (id: number) =>
+  invoke<void>("mark_notification_read", { id });
+export const markAllNotificationsRead = () =>
+  invoke<void>("mark_all_notifications_read");

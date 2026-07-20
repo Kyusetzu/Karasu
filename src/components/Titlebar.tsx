@@ -1,6 +1,7 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useTranslation } from "react-i18next";
 import { Minus, Square, X } from "lucide-react";
+import Bell from "@/components/Bell";
 
 // In a plain browser (vite dev without the Tauri shell) there is no window API
 const appWindow =
@@ -18,7 +19,8 @@ export default function Titlebar() {
           Karasu
         </span>
       </div>
-      <div className="flex h-full">
+      <div className="flex h-full items-center">
+        <Bell />
         <button
           onClick={() => appWindow?.minimize()}
           className="grid h-full w-12 place-items-center text-ink-500 hover:bg-surface-800 hover:text-ink-100"

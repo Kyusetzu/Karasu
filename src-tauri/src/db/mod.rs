@@ -71,6 +71,33 @@ CREATE TABLE IF NOT EXISTS local_list (
 PRAGMA user_version = 4;
 ";
 
+/// Schema v5: an in-app notification centre. Every desktop toast (airing,
+/// on-hold, sequel) is also recorded here so the user has one bundled place
+/// to review them, with a read/unread state.
+const MIGRATION_V5: &str = "
+CREATE TABLE IF NOT EXISTS notifications (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind       TEXT NOT NULL,
+    title      TEXT NOT NULL,
+    body       TEXT NOT NULL,
+    created_ms INTEGER NOT NULL,
+    read       INTEGER NOT NULL DEFAULT 0
+);
+PRAGMA user_version = 5;
+";
+
+/// One in-app notification (mirrors a shown desktop toast).
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct NotificationRow {
+    pub id: i64,
+    pub kind: String,
+    pub title: String,
+    pub body: String,
+    #[serde(rename = "createdMs")]
+    pub created_ms: i64,
+    pub read: bool,
+}
+
 /// Statuses emitted as list groups in local mode. Emitting all of them
 /// (even when empty) mirrors the AniList response shape so the shared
 /// optimistic-cache logic finds a target group on every status change.
@@ -119,6 +146,10 @@ impl Db {
         if version < 4 {
             conn.execute_batch(MIGRATION_V4)
                 .map_err(|e| format!("Migration v4 failed: {e}"))?;
+        }
+        if version < 5 {
+            conn.execute_batch(MIGRATION_V5)
+                .map_err(|e| format!("Migration v5 failed: {e}"))?;
         }
         Ok(Db(Mutex::new(conn)))
     }
@@ -403,6 +434,73 @@ impl Db {
             .collect();
         serde_json::to_string(&groups).unwrap_or_else(|_| "[]".into())
     }
+
+    // --- Notification centre ------------------------------------------------
+
+    pub fn notif_insert(
+        &self,
+        kind: &str,
+        title: &str,
+        body: &str,
+        created_ms: i64,
+    ) -> Result<(), String> {
+        let conn = self.0.lock().unwrap();
+        conn.execute(
+            "INSERT INTO notifications (kind, title, body, created_ms)
+             VALUES (?1, ?2, ?3, ?4)",
+            rusqlite::params![kind, title, body, created_ms],
+        )
+        .map(|_| ())
+        .map_err(|e| format!("Notification write failed: {e}"))
+    }
+
+    /// Most recent notifications first, capped at `limit`.
+    pub fn notif_all(&self, limit: i64) -> Vec<NotificationRow> {
+        let conn = self.0.lock().unwrap();
+        let mut stmt = match conn.prepare(
+            "SELECT id, kind, title, body, created_ms, read
+             FROM notifications ORDER BY id DESC LIMIT ?1",
+        ) {
+            Ok(s) => s,
+            Err(_) => return Vec::new(),
+        };
+        stmt.query_map([limit], |r| {
+            Ok(NotificationRow {
+                id: r.get(0)?,
+                kind: r.get(1)?,
+                title: r.get(2)?,
+                body: r.get(3)?,
+                created_ms: r.get(4)?,
+                read: r.get::<_, i64>(5)? != 0,
+            })
+        })
+        .map(|rows| rows.filter_map(Result::ok).collect())
+        .unwrap_or_default()
+    }
+
+    pub fn notif_mark_read(&self, id: i64) -> Result<(), String> {
+        let conn = self.0.lock().unwrap();
+        conn.execute("UPDATE notifications SET read = 1 WHERE id = ?1", [id])
+            .map(|_| ())
+            .map_err(|e| format!("Notification update failed: {e}"))
+    }
+
+    pub fn notif_mark_all_read(&self) -> Result<(), String> {
+        let conn = self.0.lock().unwrap();
+        conn.execute("UPDATE notifications SET read = 1 WHERE read = 0", [])
+            .map(|_| ())
+            .map_err(|e| format!("Notification update failed: {e}"))
+    }
+
+    pub fn notif_unread_count(&self) -> i64 {
+        let conn = self.0.lock().unwrap();
+        conn.query_row(
+            "SELECT COUNT(*) FROM notifications WHERE read = 0",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap_or(0)
+    }
 }
 
 #[cfg(test)]
@@ -416,6 +514,7 @@ mod tests {
         conn.execute_batch(MIGRATION_V2).unwrap();
         conn.execute_batch(MIGRATION_V3).unwrap();
         conn.execute_batch(MIGRATION_V4).unwrap();
+        conn.execute_batch(MIGRATION_V5).unwrap();
         Db(Mutex::new(conn))
     }
 
@@ -466,6 +565,35 @@ mod tests {
             .unwrap();
         db.local_delete(9, "ANIME").unwrap();
         assert!(db.local_all().is_empty());
+    }
+
+    #[test]
+    fn notifications_insert_list_and_read() {
+        let db = mem_db();
+        db.notif_insert("airing", "New episode", "Ep 5 is out", 1_000).unwrap();
+        db.notif_insert("sequel", "Sequel announced", "A sequel", 2_000).unwrap();
+
+        let all = db.notif_all(50);
+        assert_eq!(all.len(), 2);
+        // Newest first.
+        assert_eq!(all[0].kind, "sequel");
+        assert_eq!(db.notif_unread_count(), 2);
+
+        db.notif_mark_read(all[0].id).unwrap();
+        assert_eq!(db.notif_unread_count(), 1);
+
+        db.notif_mark_all_read().unwrap();
+        assert_eq!(db.notif_unread_count(), 0);
+        assert!(db.notif_all(50).iter().all(|n| n.read));
+    }
+
+    #[test]
+    fn notif_all_respects_limit() {
+        let db = mem_db();
+        for i in 0..5 {
+            db.notif_insert("airing", "t", "b", i).unwrap();
+        }
+        assert_eq!(db.notif_all(3).len(), 3);
     }
 }
 

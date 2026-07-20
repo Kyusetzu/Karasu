@@ -56,6 +56,12 @@ const en = {
     closeToTray: "Close (to tray)",
     close: "Close",
   },
+  notif: {
+    title: "Notifications",
+    empty: "You're all caught up.",
+    markAll: "Mark all read",
+    now: "now",
+  },
   common: {
     save: "Save",
     saved: "Saved ✓",
@@ -451,6 +457,12 @@ const de: typeof en = {
     maximize: "Maximieren",
     closeToTray: "Schließen (in den Tray)",
     close: "Schließen",
+  },
+  notif: {
+    title: "Benachrichtigungen",
+    empty: "Alles gelesen.",
+    markAll: "Alle als gelesen",
+    now: "jetzt",
   },
   common: {
     save: "Speichern",

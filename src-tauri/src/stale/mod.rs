@@ -7,7 +7,6 @@ use crate::db::Db;
 use serde_json::Value;
 use std::time::Duration;
 use tauri::{AppHandle, Manager};
-use tauri_plugin_notification::NotificationExt;
 
 const CHECK_INTERVAL: Duration = Duration::from_secs(6 * 3600);
 /// Let the list cache populate before the first check.
@@ -116,14 +115,12 @@ fn check(app: &AppHandle) {
             if db.kv_get(&key).and_then(|s| s.parse::<i64>().ok()) == Some(updated) {
                 continue;
             }
-            let _ = app
-                .notification()
-                .builder()
-                .title("On-hold reminder")
-                .body(format!(
-                    "{title} has been paused for over {months} month(s)."
-                ))
-                .show();
+            crate::notify::notify(
+                app,
+                "stale",
+                "On-hold reminder",
+                &format!("{title} has been paused for over {months} month(s)."),
+            );
             let _ = db.kv_set(&key, &updated.to_string());
         }
     }

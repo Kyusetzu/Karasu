@@ -735,11 +735,34 @@ pub fn set_autostart(app: tauri::AppHandle, enabled: bool) -> Result<(), String>
     .map_err(|e| e.to_string())
 }
 
+// --- Notification centre -----------------------------------------------------
+
+/// Recent notifications, newest first (for the bell dropdown).
+#[tauri::command]
+pub fn get_notifications(db: State<'_, Db>) -> Vec<crate::db::NotificationRow> {
+    db.notif_all(100)
+}
+
+#[tauri::command]
+pub fn unread_notification_count(db: State<'_, Db>) -> i64 {
+    db.notif_unread_count()
+}
+
+#[tauri::command]
+pub fn mark_notification_read(db: State<'_, Db>, id: i64) -> Result<(), String> {
+    db.notif_mark_read(id)
+}
+
+#[tauri::command]
+pub fn mark_all_notifications_read(db: State<'_, Db>) -> Result<(), String> {
+    db.notif_mark_all_read()
+}
+
 // --- Version -----------------------------------------------------------------
 
 /// Monotonic commit counter — the 4th version segment
 /// (`MAJOR.MINOR.PATCH.COMMIT#`). Bumped by one on every commit.
-pub const COMMIT_NUMBER: u32 = 45;
+pub const COMMIT_NUMBER: u32 = 46;
 
 /// Full four-part display version, e.g. `0.1.1.38`. The `MAJOR.MINOR.PATCH`
 /// core comes from the crate version (kept in sync across the manifests).

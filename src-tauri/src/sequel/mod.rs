@@ -10,7 +10,6 @@ use serde_json::{json, Value};
 use std::collections::HashSet;
 use std::time::Duration;
 use tauri::{AppHandle, Manager};
-use tauri_plugin_notification::NotificationExt;
 
 const CHECK_INTERVAL: Duration = Duration::from_secs(12 * 3600);
 const STARTUP_DELAY: Duration = Duration::from_secs(120);
@@ -164,12 +163,12 @@ async fn check(app: &AppHandle) {
                     }
                     let title = pick_title(edge.pointer("/node/title"));
                     let label = if rel == "SEQUEL" { "Sequel" } else { "Side story" };
-                    let _ = app
-                        .notification()
-                        .builder()
-                        .title(format!("{label} announced"))
-                        .body(format!("{title} — related to something on your list."))
-                        .show();
+                    crate::notify::notify(
+                        app,
+                        "sequel",
+                        &format!("{label} announced"),
+                        &format!("{title} — related to something on your list."),
+                    );
                 }
             }
         }

@@ -7,7 +7,6 @@ use crate::db::Db;
 use serde_json::{json, Value};
 use std::time::Duration;
 use tauri::{AppHandle, Manager};
-use tauri_plugin_notification::NotificationExt;
 
 const CHECK_INTERVAL: Duration = Duration::from_secs(20 * 60);
 /// Let the list cache populate before the first check.
@@ -127,12 +126,12 @@ async fn check(app: &AppHandle) {
             continue; // already notified
         }
         let title = pick_title(sched.pointer("/media/title"));
-        let _ = app
-            .notification()
-            .builder()
-            .title("New episode aired")
-            .body(format!("{title} — episode {episode} is out"))
-            .show();
+        crate::notify::notify(
+            app,
+            "airing",
+            "New episode aired",
+            &format!("{title} — episode {episode} is out"),
+        );
         let _ = db.kv_set(&key, "1");
     }
 

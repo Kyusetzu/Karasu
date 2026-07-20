@@ -4,6 +4,7 @@ mod commands;
 mod db;
 mod detection;
 mod discord;
+mod notify;
 mod library;
 mod portable;
 mod recognition;
@@ -127,6 +128,10 @@ pub fn run() {
             commands::set_stale_settings,
             commands::get_sequel_notify,
             commands::set_sequel_notify,
+            commands::get_notifications,
+            commands::unread_notification_count,
+            commands::mark_notification_read,
+            commands::mark_all_notifications_read,
             commands::save_png,
             commands::app_version,
             commands::check_for_updates,

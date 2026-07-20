@@ -1,33 +1,44 @@
 import { create } from "zustand";
+import { accentShades } from "@/lib/contrast";
 
 export type ThemeMode = "system" | "light" | "dark";
 
-/** Accent presets: [accent-400, accent-500, accent-600]. */
-export const ACCENTS: Record<string, [string, string, string]> = {
-  indigo: ["#8b9dff", "#6c7fff", "#5563e8"], // default
-  blue: ["#5eb0ef", "#3b93e6", "#2f77c4"],
-  emerald: ["#5bd6a0", "#34c78a", "#2aa876"],
-  rose: ["#ff8fab", "#f56c92", "#e04d78"],
-  amber: ["#ffc04d", "#ffab2e", "#e8890f"],
-  violet: ["#c08bff", "#a56cff", "#8b4de8"],
-};
+/** Default accent + a few quick-pick swatches alongside the colour picker. */
+export const DEFAULT_ACCENT = "#6c7fff";
+export const ACCENT_PRESETS = [
+  "#6c7fff", // indigo
+  "#3b93e6", // blue
+  "#34c78a", // emerald
+  "#f56c92", // rose
+  "#ffab2e", // amber
+  "#a56cff", // violet
+];
 
 const MODE_KEY = "karasu-theme";
 const ACCENT_KEY = "karasu-accent";
+
+const isHex = (s: string) => /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(s);
 
 function systemDark(): boolean {
   return window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? true;
 }
 
-/** Writes the theme + accent to the document root (Tailwind reads the vars). */
+/**
+ * Writes the theme + accent to the document root (Tailwind reads the vars).
+ * The 400/500/600 ramp and a readable `--color-accent-ink` are derived from
+ * the single chosen colour, so any accent — however light or dark — keeps
+ * accent-filled controls legible.
+ */
 function apply(mode: ThemeMode, accent: string): void {
   const dark = mode === "dark" || (mode === "system" && systemDark());
   document.documentElement.dataset.theme = dark ? "dark" : "light";
-  const [a400, a500, a600] = ACCENTS[accent] ?? ACCENTS.indigo;
+  const base = isHex(accent) ? accent : DEFAULT_ACCENT;
+  const { a400, a500, a600, ink } = accentShades(base);
   const root = document.documentElement.style;
   root.setProperty("--color-accent-400", a400);
   root.setProperty("--color-accent-500", a500);
   root.setProperty("--color-accent-600", a600);
+  root.setProperty("--color-accent-ink", ink);
 }
 
 interface ThemeState {
@@ -40,7 +51,7 @@ interface ThemeState {
 
 export const useTheme = create<ThemeState>((set, get) => ({
   mode: (localStorage.getItem(MODE_KEY) as ThemeMode) || "dark",
-  accent: localStorage.getItem(ACCENT_KEY) || "indigo",
+  accent: localStorage.getItem(ACCENT_KEY) || DEFAULT_ACCENT,
 
   setMode: (mode) => {
     localStorage.setItem(MODE_KEY, mode);

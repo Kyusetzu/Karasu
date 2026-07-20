@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { parseHex, readableInk, relativeLuminance } from "./contrast";
+import {
+  accentShades,
+  mix,
+  parseHex,
+  readableInk,
+  relativeLuminance,
+} from "./contrast";
 
 describe("parseHex", () => {
   it("parses long and short forms", () => {
@@ -26,5 +32,27 @@ describe("readableInk", () => {
   it("uses white on dark backgrounds", () => {
     expect(readableInk("#000000")).toBe("#ffffff");
     expect(readableInk("#1e3a8a")).toBe("#ffffff"); // deep blue
+  });
+});
+
+describe("mix", () => {
+  it("blends toward the target by the amount", () => {
+    expect(mix("#000000", "#ffffff", 0.5)).toBe("#808080");
+    expect(mix("#000000", "#ffffff", 0)).toBe("#000000");
+    expect(mix("#000000", "#ffffff", 1)).toBe("#ffffff");
+  });
+});
+
+describe("accentShades", () => {
+  it("keeps 500 as the base and darkens 600, lightens 400", () => {
+    const s = accentShades("#6c7fff");
+    expect(s.a500).toBe("#6c7fff");
+    expect(relativeLuminance(s.a600)).toBeLessThan(relativeLuminance(s.a500));
+    expect(relativeLuminance(s.a400)).toBeGreaterThan(relativeLuminance(s.a500));
+  });
+
+  it("picks ink for contrast against the accent", () => {
+    expect(accentShades("#ffe100").ink).toBe("#000000"); // bright → black
+    expect(accentShades("#3a1d6e").ink).toBe("#ffffff"); // dark → white
   });
 });

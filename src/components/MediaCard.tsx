@@ -82,7 +82,7 @@ export default function MediaCard({ media }: { media: MediaWithListStatus }) {
                   saveEntry.mutate({ mediaId: media.id, status: "PLANNING" })
                 }
                 disabled={saveEntry.isPending}
-                className="grid h-8 w-8 place-items-center rounded-full bg-accent-600 text-white opacity-0 transition-opacity hover:bg-accent-500 group-hover:opacity-100 disabled:opacity-50"
+                className="grid h-8 w-8 place-items-center rounded-full bg-accent-600 text-accent-ink opacity-0 transition-opacity hover:bg-accent-500 group-hover:opacity-100 disabled:opacity-50"
                 aria-label={t("media.addPlanning")}
                 title={t("media.addPlanning")}
               >

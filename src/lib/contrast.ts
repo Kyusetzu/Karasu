@@ -29,3 +29,38 @@ export function relativeLuminance(hex: string): number {
 export function readableInk(hexBg: string): "#000000" | "#ffffff" {
   return relativeLuminance(hexBg) > 0.45 ? "#000000" : "#ffffff";
 }
+
+const clamp = (n: number) => Math.max(0, Math.min(255, Math.round(n)));
+
+function toHex([r, g, b]: [number, number, number]): string {
+  return `#${[r, g, b].map((x) => clamp(x).toString(16).padStart(2, "0")).join("")}`;
+}
+
+/** Blend `hex` toward `target` by `amount` (0…1). */
+export function mix(hex: string, target: string, amount: number): string {
+  const a = parseHex(hex);
+  const b = parseHex(target);
+  return toHex([
+    a[0] + (b[0] - a[0]) * amount,
+    a[1] + (b[1] - a[1]) * amount,
+    a[2] + (b[2] - a[2]) * amount,
+  ]);
+}
+
+export interface AccentShades {
+  a400: string;
+  a500: string;
+  a600: string;
+  /** Readable text colour for accent-filled surfaces. */
+  ink: string;
+}
+
+/** Derive the 400/500/600 accent ramp + a readable ink from a base colour. */
+export function accentShades(base: string): AccentShades {
+  return {
+    a400: mix(base, "#ffffff", 0.2),
+    a500: base,
+    a600: mix(base, "#000000", 0.16),
+    ink: readableInk(base),
+  };
+}

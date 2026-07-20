@@ -27,7 +27,7 @@ export function Tabs<T extends string>({
           className={cn(
             "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
             value === o.value
-              ? "bg-accent-600 text-white"
+              ? "bg-accent-600 text-accent-ink"
               : "text-ink-500 hover:bg-surface-800 hover:text-ink-100",
           )}
         >

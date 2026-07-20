@@ -289,7 +289,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
                 className={cn(
                   "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
                   tab === status
-                    ? "bg-accent-600 text-white"
+                    ? "bg-accent-600 text-accent-ink"
                     : "text-ink-500 hover:bg-surface-800 hover:text-ink-100",
                 )}
               >
@@ -592,7 +592,7 @@ function SelectBox({
       className={cn(
         "grid h-6 w-6 shrink-0 place-items-center rounded-md border transition-colors",
         checked
-          ? "border-accent-500 bg-accent-600 text-white"
+          ? "border-accent-500 bg-accent-600 text-accent-ink"
           : "border-surface-600 bg-surface-900/80 text-transparent hover:border-accent-500",
         className,
       )}
@@ -698,7 +698,7 @@ function GridCard({
           {canIncrement(entry) && (
             <button
               onClick={onPlusOne}
-              className="grid h-8 w-8 place-items-center rounded-full bg-accent-600 text-white hover:bg-accent-500"
+              className="grid h-8 w-8 place-items-center rounded-full bg-accent-600 text-accent-ink hover:bg-accent-500"
               aria-label={t("common.plusOne")}
               title={t("common.plusOne")}
             >

@@ -305,7 +305,7 @@ function ContinueCard({
         {canPlus && (
           <button
             onClick={onPlusOne}
-            className="absolute bottom-2 right-2 grid h-8 w-8 place-items-center rounded-full bg-accent-600 text-white opacity-0 transition-opacity hover:bg-accent-500 group-hover:opacity-100"
+            className="absolute bottom-2 right-2 grid h-8 w-8 place-items-center rounded-full bg-accent-600 text-accent-ink opacity-0 transition-opacity hover:bg-accent-500 group-hover:opacity-100"
             aria-label={t("common.plusOne")}
             title={t("dashboard.markWatched", { n: entry.progress + 1 })}
           >

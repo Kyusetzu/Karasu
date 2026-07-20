@@ -16,6 +16,8 @@
   --color-accent-400: #8b9dff;
   --color-accent-500: #6c7fff;
   --color-accent-600: #5563e8;
+  /* Readable text on accent-filled controls; recomputed at runtime per accent. */
+  --color-accent-ink: #ffffff;
 
   --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
 }

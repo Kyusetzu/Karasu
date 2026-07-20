@@ -53,7 +53,7 @@ export default function Search() {
                 className={cn(
                   "h-10 px-4 text-sm font-medium first:rounded-l-lg last:rounded-r-lg",
                   type === tp
-                    ? "bg-accent-600 text-white"
+                    ? "bg-accent-600 text-accent-ink"
                     : "text-ink-500 hover:bg-surface-800 hover:text-ink-100",
                 )}
               >

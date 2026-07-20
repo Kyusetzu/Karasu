@@ -8,6 +8,7 @@ import {
   FolderOpen,
   LogIn,
   LogOut,
+  Palette,
   RefreshCw,
   User,
 } from "lucide-react";
@@ -17,7 +18,7 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/stores/auth";
 import { useLibrary } from "@/stores/library";
-import { ACCENTS, useTheme, type ThemeMode } from "@/stores/theme";
+import { ACCENT_PRESETS, useTheme, type ThemeMode } from "@/stores/theme";
 import * as api from "@/api/anilist";
 import * as library from "@/api/library";
 import {
@@ -648,20 +649,33 @@ function AppSection() {
 
         <div className="flex items-center justify-between gap-4 py-1 text-sm">
           <span className="block text-ink-100">{t("settings.accent")}</span>
-          <div className="flex gap-2">
-            {Object.entries(ACCENTS).map(([key, shades]) => (
+          <div className="flex items-center gap-2">
+            {ACCENT_PRESETS.map((hex) => (
               <button
-                key={key}
-                onClick={() => setAccent(key)}
+                key={hex}
+                onClick={() => setAccent(hex)}
                 className={cn(
                   "h-6 w-6 rounded-full ring-offset-2 ring-offset-surface-900 transition",
-                  accent === key && "ring-2 ring-ink-100",
+                  accent.toLowerCase() === hex.toLowerCase() && "ring-2 ring-ink-100",
                 )}
-                style={{ backgroundColor: shades[1] }}
-                aria-label={key}
-                title={key}
+                style={{ backgroundColor: hex }}
+                aria-label={hex}
+                title={hex}
               />
             ))}
+            <label
+              className="grid h-6 w-6 cursor-pointer place-items-center overflow-hidden rounded-full border border-surface-600"
+              title={t("settings.accentCustom")}
+            >
+              <Palette size={13} className="text-ink-500" />
+              <input
+                type="color"
+                value={/^#[0-9a-f]{6}$/i.test(accent) ? accent : "#6c7fff"}
+                onChange={(e) => setAccent(e.target.value)}
+                className="sr-only"
+                aria-label={t("settings.accentCustom")}
+              />
+            </label>
           </div>
         </div>
 

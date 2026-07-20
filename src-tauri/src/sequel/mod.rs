@@ -79,6 +79,14 @@ fn list_ids(db: &Db, user_id: i64, media_type: &str, statuses: Option<&[&str]>) 
     ids
 }
 
+/// Whether a relation edge should raise an alert: a sequel or side story that
+/// is upcoming or currently releasing and isn't already on the user's list.
+fn is_alertable(rel: &str, status: &str, node_id: i64, on_list: &HashSet<i64>) -> bool {
+    matches!(rel, "SEQUEL" | "SIDE_STORY")
+        && matches!(status, "NOT_YET_RELEASED" | "RELEASING")
+        && !on_list.contains(&node_id)
+}
+
 fn pick_title(title: Option<&Value>) -> String {
     let get = |k: &str| {
         title
@@ -136,20 +144,14 @@ async fn check(app: &AppHandle) {
                     .flatten()
                 {
                     let rel = edge.get("relationType").and_then(|v| v.as_str()).unwrap_or("");
-                    if rel != "SEQUEL" && rel != "SIDE_STORY" {
-                        continue;
-                    }
                     let status =
                         edge.pointer("/node/status").and_then(|v| v.as_str()).unwrap_or("");
-                    if status != "NOT_YET_RELEASED" && status != "RELEASING" {
-                        continue;
-                    }
                     let Some(node_id) =
                         edge.pointer("/node/id").and_then(|v| v.as_i64())
                     else {
                         continue;
                     };
-                    if on_list.contains(&node_id) {
+                    if !is_alertable(rel, status, node_id, &on_list) {
                         continue;
                     }
                     let key = format!("sequel_seen:{node_id}");
@@ -175,5 +177,32 @@ async fn check(app: &AppHandle) {
 
     if seeding {
         let _ = db.kv_set("sequel_seeded", "1");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_alertable;
+    use std::collections::HashSet;
+
+    #[test]
+    fn alerts_on_upcoming_sequel_not_on_list() {
+        let on_list = HashSet::new();
+        assert!(is_alertable("SEQUEL", "NOT_YET_RELEASED", 10, &on_list));
+        assert!(is_alertable("SIDE_STORY", "RELEASING", 11, &on_list));
+    }
+
+    #[test]
+    fn ignores_finished_or_other_relations() {
+        let on_list = HashSet::new();
+        assert!(!is_alertable("SEQUEL", "FINISHED", 10, &on_list));
+        assert!(!is_alertable("PREQUEL", "RELEASING", 10, &on_list));
+        assert!(!is_alertable("ADAPTATION", "NOT_YET_RELEASED", 10, &on_list));
+    }
+
+    #[test]
+    fn ignores_nodes_already_on_the_list() {
+        let on_list = HashSet::from([10]);
+        assert!(!is_alertable("SEQUEL", "RELEASING", 10, &on_list));
     }
 }

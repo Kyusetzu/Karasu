@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { ArrowLeft, Clock, ExternalLink, Star } from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { animeDetail, type MediaDetail } from "@/api/queries";
+import { formatLabel } from "@/lib/format";
 import { formatMinutes, remainingMinutes } from "@/lib/estimate";
 import { isTauri, saveListEntry } from "@/api/anilist";
 import {
@@ -94,7 +95,7 @@ export default function AnimeDetail() {
                   <Star size={14} fill="currentColor" /> {data.averageScore}%
                 </span>
               )}
-              {data.format && <span>{data.format}</span>}
+              {data.format && <span>{formatLabel(data.format, t)}</span>}
               {data.episodes && (
                 <span>
                   {data.episodes} {t("common.episodes")}

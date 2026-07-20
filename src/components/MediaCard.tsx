@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { Check, Pencil, Plus, Star } from "lucide-react";
 import { saveListEntry } from "@/api/anilist";
 import { displayTitle } from "@/api/types";
+import { formatLabel } from "@/lib/format";
 import type { MediaWithListStatus } from "@/api/queries";
 import { useAuth } from "@/stores/auth";
 import EntryEditModal, { type EntrySaveInput } from "@/components/EntryEditModal";
@@ -97,7 +98,9 @@ export default function MediaCard({ media }: { media: MediaWithListStatus }) {
         </p>
       </Link>
       <p className="text-xs text-ink-600">
-        {[media.format, media.seasonYear].filter(Boolean).join(" · ")}
+        {[formatLabel(media.format, t), media.seasonYear]
+          .filter(Boolean)
+          .join(" · ")}
       </p>
 
       {editing && (

@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { ArrowLeft } from "lucide-react";
 import { loadFranchise, type FranchiseNode } from "@/api/franchise";
 import { isTauri } from "@/api/anilist";
+import { formatLabel } from "@/lib/format";
 import { displayTitle, type MediaListStatus } from "@/api/types";
 import { Button } from "@/components/ui/button";
 
@@ -206,7 +207,10 @@ export default function Franchise() {
                         className="select-none"
                         style={{ fill: "var(--color-ink-500)", fontSize: 10 }}
                       >
-                        {[n.type === "MANGA" ? t("common.manga") : t("common.anime"), n.format]
+                        {[
+                          n.type === "MANGA" ? t("common.manga") : t("common.anime"),
+                          formatLabel(n.format, t),
+                        ]
                           .filter(Boolean)
                           .join(" · ")}
                       </text>

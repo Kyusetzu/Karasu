@@ -80,6 +80,20 @@ const en = {
     plusOne: "+1",
     complete: "Mark as completed",
     playNext: "Play next episode",
+    anime: "Anime",
+    manga: "Manga",
+  },
+  format: {
+    TV: "TV",
+    TV_SHORT: "TV Short",
+    MOVIE: "Movie",
+    SPECIAL: "Special",
+    OVA: "OVA",
+    ONA: "ONA",
+    MUSIC: "Music",
+    MANGA: "Manga",
+    NOVEL: "Light Novel",
+    ONE_SHOT: "One-shot",
   },
   status: {
     ANIME: {
@@ -462,6 +476,20 @@ const de: typeof en = {
     plusOne: "+1",
     complete: "Als abgeschlossen markieren",
     playNext: "Nächste Folge abspielen",
+    anime: "Anime",
+    manga: "Manga",
+  },
+  format: {
+    TV: "TV",
+    TV_SHORT: "TV-Kurz",
+    MOVIE: "Film",
+    SPECIAL: "Special",
+    OVA: "OVA",
+    ONA: "ONA",
+    MUSIC: "Musikvideo",
+    MANGA: "Manga",
+    NOVEL: "Light Novel",
+    ONE_SHOT: "One-Shot",
   },
   status: {
     ANIME: {

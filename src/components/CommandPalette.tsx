@@ -44,8 +44,14 @@ export default function CommandPalette() {
         setOpen((o) => !o);
       }
     };
+    // Also openable from the in-app context menu.
+    const onOpen = () => setOpen(true);
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("open-command-palette", onOpen);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("open-command-palette", onOpen);
+    };
   }, []);
 
   useEffect(() => {

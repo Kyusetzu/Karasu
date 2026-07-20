@@ -629,7 +629,7 @@ function GridCard({
   const max = maxProgress(media);
   const pct = max ? (entry.progress / max) * 100 : 0;
   return (
-    <div className="group">
+    <div className="group" data-media-id={media.id} data-media-type={media.type}>
       <div
         className={cn(
           "relative aspect-[2/3] overflow-hidden rounded-lg bg-surface-800",
@@ -783,6 +783,8 @@ function ListRow({
 
   return (
     <div
+      data-media-id={media.id}
+      data-media-type={media.type}
       className={cn(
         "flex items-center gap-3 px-4 py-2.5 first:rounded-t-xl last:rounded-b-xl",
         selected ? "bg-accent-600/10" : "bg-surface-900 hover:bg-surface-850",

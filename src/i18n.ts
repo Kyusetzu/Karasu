@@ -62,6 +62,16 @@ const en = {
     markAll: "Mark all read",
     now: "now",
   },
+  ctx: {
+    open: "Open",
+    openAniList: "Open on AniList",
+    copy: "Copy",
+    back: "Back",
+    forward: "Forward",
+    reload: "Reload",
+    palette: "Command palette",
+    settings: "Settings",
+  },
   common: {
     save: "Save",
     saved: "Saved ✓",
@@ -463,6 +473,16 @@ const de: typeof en = {
     empty: "Alles gelesen.",
     markAll: "Alle als gelesen",
     now: "jetzt",
+  },
+  ctx: {
+    open: "Öffnen",
+    openAniList: "Auf AniList öffnen",
+    copy: "Kopieren",
+    back: "Zurück",
+    forward: "Vorwärts",
+    reload: "Neu laden",
+    palette: "Befehlspalette",
+    settings: "Einstellungen",
   },
   common: {
     save: "Speichern",

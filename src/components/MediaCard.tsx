@@ -42,7 +42,7 @@ export default function MediaCard({ media }: { media: MediaWithListStatus }) {
   const entry = media.mediaListEntry;
 
   return (
-    <div className="group">
+    <div className="group" data-media-id={media.id} data-media-type={media.type}>
       <div className="relative aspect-[2/3] overflow-hidden rounded-lg bg-surface-800">
         <Link to={`/media/${media.id}`}>
           {media.coverImage.large && (

@@ -8,6 +8,7 @@ import { isTauri } from "@/api/anilist";
 import Titlebar from "@/components/Titlebar";
 import Sidebar from "@/components/Sidebar";
 import CommandPalette from "@/components/CommandPalette";
+import ContextMenu from "@/components/ContextMenu";
 import SignInMerge from "@/components/SignInMerge";
 import Dashboard from "@/pages/Dashboard";
 import MediaList from "@/pages/MediaList";
@@ -34,6 +35,7 @@ export default function App() {
     <div className="flex h-full flex-col">
       <PresenceReporter />
       <CommandPalette />
+      <ContextMenu />
       <SignInMerge />
       <Titlebar />
       <div className="flex min-h-0 flex-1">

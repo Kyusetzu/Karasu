@@ -544,7 +544,6 @@ interface DiscordSettings {
 function DiscordSection() {
   const { t } = useTranslation();
   const [settings, setSettings] = useState<DiscordSettings | null>(null);
-  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     if (!api.isTauri) return;
@@ -562,8 +561,6 @@ function DiscordSection() {
       enabled: next.enabled,
       appId: next.appId,
     });
-    setSaved(true);
-    setTimeout(() => setSaved(false), 1500);
   };
 
   return (
@@ -574,25 +571,8 @@ function DiscordSection() {
           checked={settings.enabled}
           onChange={(v) => save({ ...settings, enabled: v })}
           label={t("settings.discordEnable")}
-          hint={settings.hasBuiltinAppId ? t("settings.discordEnableHint") : undefined}
+          hint={t("settings.discordEnableHint")}
         />
-        <p className="text-xs leading-relaxed text-ink-600">
-          {t("settings.discordCustomId")}
-        </p>
-        <div className="flex gap-2">
-          <Input
-            value={settings.appId}
-            onChange={(e) =>
-              setSettings({ ...settings, appId: e.target.value })
-            }
-            placeholder={t("settings.discordAppIdPlaceholder")}
-            className="max-w-60"
-            inputMode="numeric"
-          />
-          <Button variant="secondary" onClick={() => save(settings)}>
-            {saved ? t("common.saved") : t("common.save")}
-          </Button>
-        </div>
       </div>
     </Card>
   );

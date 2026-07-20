@@ -421,9 +421,6 @@ const en = {
     discord: "Discord Rich Presence",
     discordEnable: "Show what you are watching on Discord",
     discordEnableHint: "Uses the built-in Karasu Discord application.",
-    discordCustomId:
-      "Optional: use your own Discord application ID instead of the built-in one.",
-    discordAppIdPlaceholder: "Application ID (optional)",
     app: "App",
     theme: "Theme",
     theme_system: "System",
@@ -821,9 +818,6 @@ const de: typeof en = {
     discord: "Discord Rich Presence",
     discordEnable: "In Discord anzeigen, was du schaust",
     discordEnableHint: "Nutzt die eingebaute Karasu-Discord-Application.",
-    discordCustomId:
-      "Optional: eigene Discord-Application-ID statt der eingebauten verwenden.",
-    discordAppIdPlaceholder: "Application-ID (optional)",
     app: "App",
     theme: "Design",
     theme_system: "System",

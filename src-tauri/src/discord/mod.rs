@@ -7,7 +7,7 @@
 use crate::db::Db;
 use crate::scrobbler::{NowPlaying, PlaybackState, ScrobbleSession};
 use discord_rich_presence::{
-    activity::{Activity, Button, Timestamps},
+    activity::{Activity, Assets, Button, Timestamps},
     DiscordIpc, DiscordIpcClient,
 };
 use std::sync::Mutex;
@@ -143,9 +143,13 @@ pub fn sync(app: &AppHandle, now: Option<&NowPlaying>) {
         }
     };
 
+    // A large image asset makes the presence card look complete in every
+    // state. The "logo" key must be uploaded as an art asset in the Discord
+    // developer portal for the built-in application id.
     let activity = Activity::new()
         .details(&details)
         .state(&state_text)
+        .assets(Assets::new().large_image("logo").large_text("Karasu"))
         .timestamps(timestamps)
         .buttons(vec![Button::new("Get Karasu here", REPO_URL)]);
 

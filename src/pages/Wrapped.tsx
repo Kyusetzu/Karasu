@@ -1,158 +1,256 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { Download, Sparkles } from "lucide-react";
 import { wrappedEntries, type WrappedEntry } from "@/api/queries";
 import { isTauri, savePng } from "@/api/anilist";
-import { displayTitle } from "@/api/types";
+import { readableInk } from "@/lib/contrast";
+import {
+  aggregate,
+  availableYears,
+  type MediaYearStats,
+  type WrappedStats,
+} from "@/lib/wrapped";
 import { useAuth } from "@/stores/auth";
 import { Button } from "@/components/ui/button";
 
-const SIZE = 1080;
-
-interface YearStats {
-  animeCount: number;
-  episodes: number;
-  minutes: number;
-  meanScore: number;
-  topGenres: { name: string; count: number }[];
-  topTitles: string[];
-  mangaCount: number;
-  chapters: number;
-}
-
-function aggregate(
-  anime: WrappedEntry[],
-  manga: WrappedEntry[],
-  year: number,
-): YearStats {
-  const a = anime.filter((e) => e.year === year);
-  const m = manga.filter((e) => e.year === year);
-
-  const genres = new Map<string, number>();
-  for (const e of a) for (const g of e.genres) genres.set(g, (genres.get(g) ?? 0) + 1);
-
-  const scored = a.filter((e) => e.score > 0);
-  return {
-    animeCount: a.length,
-    episodes: a.reduce((s, e) => s + e.progress, 0),
-    minutes: a.reduce((s, e) => s + e.progress * (e.duration ?? 24), 0),
-    meanScore: scored.length
-      ? scored.reduce((s, e) => s + e.score, 0) / scored.length
-      : 0,
-    topGenres: [...genres.entries()]
-      .sort((x, y) => y[1] - x[1])
-      .slice(0, 5)
-      .map(([name, count]) => ({ name, count })),
-    topTitles: [...a]
-      .filter((e) => e.score > 0)
-      .sort((x, y) => y.score - x.score)
-      .slice(0, 3)
-      .map((e) => displayTitle(e.title)),
-    mangaCount: m.length,
-    chapters: m.reduce((s, e) => s + e.progress, 0),
-  };
-}
+const W = 1080;
+const P = 72;
 
 function cssVar(name: string, fallback: string): string {
   const v = getComputedStyle(document.documentElement).getPropertyValue(name);
   return v.trim() || fallback;
 }
 
-function drawCard(
+function roundRect(
   ctx: CanvasRenderingContext2D,
-  s: YearStats,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number,
+) {
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, r);
+  ctx.fill();
+}
+
+function round1(n: number): string {
+  return (Math.round(n * 10) / 10).toString();
+}
+
+interface Tile {
+  value: string;
+  label: string;
+}
+interface Section {
+  height: number;
+  paint: (y: number) => void;
+}
+
+/**
+ * Draws the year-in-review card. Sections are laid out with a running cursor
+ * (each contributes a fixed height), so nothing can overlap, and the canvas
+ * height is computed to fit the content exactly — no clipping, no dead space.
+ */
+function drawCard(
+  canvas: HTMLCanvasElement,
+  stats: WrappedStats,
   year: number,
   name: string,
-  t: (k: string, o?: Record<string, unknown>) => string,
+  t: TFunction,
 ) {
-  const accent = cssVar("--color-accent-500", "#6366f1");
-  const pad = 84;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
 
-  const bg = ctx.createLinearGradient(0, 0, 0, SIZE);
-  bg.addColorStop(0, "#0b0d12");
-  bg.addColorStop(1, "#151b26");
-  ctx.fillStyle = bg;
-  ctx.fillRect(0, 0, SIZE, SIZE);
+  const accent = cssVar("--color-accent-500", "#6c7fff");
+  const accent600 = cssVar("--color-accent-600", accent);
+  const headerInk = readableInk(accent600);
 
-  // Accent side bar
-  ctx.fillStyle = accent;
-  ctx.fillRect(0, 0, 12, SIZE);
+  const sections: Section[] = [];
 
-  ctx.textBaseline = "alphabetic";
-  ctx.textAlign = "left";
-
-  ctx.fillStyle = "#94a3b8";
-  ctx.font = "500 34px system-ui, sans-serif";
-  ctx.fillText(name.toUpperCase(), pad, 150);
-
-  ctx.fillStyle = accent;
-  ctx.font = "800 150px system-ui, sans-serif";
-  ctx.fillText(String(year), pad, 300);
-
-  ctx.fillStyle = "#eef1f6";
-  ctx.font = "600 44px system-ui, sans-serif";
-  ctx.fillText(t("wrapped.inAnime"), pad, 360);
-
-  // Metrics row
-  const metrics: [string, string][] = [
-    [s.animeCount.toLocaleString(), t("wrapped.completed")],
-    [s.episodes.toLocaleString(), t("common.episodes")],
-    [Math.round(s.minutes / 60).toLocaleString(), t("wrapped.hours")],
-    [s.meanScore ? s.meanScore.toFixed(1) : "–", t("wrapped.meanScore")],
-  ];
-  const colW = (SIZE - pad * 2) / metrics.length;
-  metrics.forEach(([value, label], i) => {
-    const x = pad + i * colW;
-    ctx.fillStyle = "#f8fafc";
-    ctx.font = "800 66px system-ui, sans-serif";
-    ctx.fillText(value, x, 500);
+  const subhead = (text: string, y: number) => {
+    ctx.textAlign = "left";
     ctx.fillStyle = "#94a3b8";
-    ctx.font = "500 26px system-ui, sans-serif";
-    ctx.fillText(label, x, 540);
+    ctx.font = "700 26px system-ui, sans-serif";
+    ctx.fillText(text.toUpperCase(), P, y + 34);
+  };
+
+  // --- Header band --------------------------------------------------------
+  sections.push({
+    height: 268,
+    paint: (y) => {
+      const g = ctx.createLinearGradient(0, y, W, y + 268);
+      g.addColorStop(0, accent600);
+      g.addColorStop(1, accent);
+      ctx.fillStyle = g;
+      ctx.fillRect(0, y, W, 268);
+
+      ctx.textAlign = "left";
+      ctx.textBaseline = "alphabetic";
+      ctx.fillStyle = headerInk;
+      ctx.globalAlpha = 0.85;
+      ctx.font = "600 30px system-ui, sans-serif";
+      ctx.fillText(name.toUpperCase(), P, y + 88);
+      ctx.globalAlpha = 1;
+      ctx.font = "800 132px system-ui, sans-serif";
+      ctx.fillText(String(year), P, y + 202);
+      const yearW = ctx.measureText(String(year)).width;
+      ctx.font = "600 40px system-ui, sans-serif";
+      ctx.fillText(t("wrapped.inReview"), P + yearW + 24, y + 202);
+    },
+  });
+  sections.push({ height: 28, paint: () => {} });
+
+  // --- One medium block ---------------------------------------------------
+  const addBlock = (label: string, s: MediaYearStats, tiles: Tile[]) => {
+    sections.push({
+      height: 66,
+      paint: (y) => {
+        ctx.textAlign = "left";
+        ctx.fillStyle = accent;
+        ctx.font = "800 46px system-ui, sans-serif";
+        ctx.fillText(label, P, y + 50);
+      },
+    });
+
+    if (s.count === 0) {
+      sections.push({
+        height: 64,
+        paint: (y) => {
+          ctx.textAlign = "left";
+          ctx.fillStyle = "#64748b";
+          ctx.font = "500 30px system-ui, sans-serif";
+          ctx.fillText(t("wrapped.noneThisYear"), P, y + 40);
+        },
+      });
+      sections.push({ height: 28, paint: () => {} });
+      return;
+    }
+
+    // Stat tiles
+    sections.push({
+      height: 140,
+      paint: (y) => {
+        const gap = 20;
+        const tw = (W - P * 2 - gap * (tiles.length - 1)) / tiles.length;
+        tiles.forEach((tile, i) => {
+          const x = P + i * (tw + gap);
+          ctx.fillStyle = "#171e2a";
+          roundRect(ctx, x, y, tw, 116, 16);
+          ctx.textAlign = "left";
+          ctx.fillStyle = "#f1f5f9";
+          ctx.font = "800 46px system-ui, sans-serif";
+          ctx.fillText(tile.value, x + 22, y + 62);
+          ctx.fillStyle = "#94a3b8";
+          ctx.font = "500 23px system-ui, sans-serif";
+          ctx.fillText(tile.label, x + 22, y + 96);
+        });
+      },
+    });
+
+    // Top genres (mini-bars)
+    if (s.topGenres.length) {
+      sections.push({
+        height: 48,
+        paint: (y) => subhead(t("wrapped.topGenres"), y),
+      });
+      const max = s.topGenres[0].count || 1;
+      for (const gv of s.topGenres) {
+        sections.push({
+          height: 48,
+          paint: (y) => {
+            ctx.textAlign = "left";
+            ctx.fillStyle = "#e2e8f0";
+            ctx.font = "600 28px system-ui, sans-serif";
+            ctx.fillText(gv.name, P, y + 30);
+            const barX = W / 2;
+            const barW = W / 2 - P;
+            ctx.fillStyle = "#232c3a";
+            roundRect(ctx, barX, y + 8, barW, 24, 12);
+            ctx.fillStyle = accent;
+            roundRect(ctx, barX, y + 8, Math.max(24, (barW * gv.count) / max), 24, 12);
+            ctx.fillStyle = "#94a3b8";
+            ctx.textAlign = "right";
+            ctx.font = "600 22px system-ui, sans-serif";
+            ctx.fillText(String(gv.count), W - P, y + 27);
+          },
+        });
+      }
+    }
+
+    // Top rated titles
+    if (s.topTitles.length) {
+      sections.push({
+        height: 48,
+        paint: (y) => subhead(t("wrapped.topRated"), y),
+      });
+      s.topTitles.forEach((title, i) => {
+        sections.push({
+          height: 46,
+          paint: (y) => {
+            ctx.textAlign = "left";
+            ctx.fillStyle = "#e2e8f0";
+            ctx.font = "600 30px system-ui, sans-serif";
+            const clipped = title.length > 38 ? `${title.slice(0, 37)}…` : title;
+            ctx.fillText(`${i + 1}.  ${clipped}`, P, y + 34);
+          },
+        });
+      });
+    }
+
+    sections.push({ height: 44, paint: () => {} });
+  };
+
+  addBlock(t("common.anime"), stats.anime, [
+    { value: stats.anime.count.toLocaleString(), label: t("wrapped.completed") },
+    { value: stats.anime.units.toLocaleString(), label: t("common.episodes") },
+    {
+      value: Math.round(stats.anime.minutes / 60).toLocaleString(),
+      label: t("wrapped.hours"),
+    },
+    {
+      value: stats.anime.meanScore ? round1(stats.anime.meanScore) : "–",
+      label: t("wrapped.meanScore"),
+    },
+  ]);
+
+  addBlock(t("common.manga"), stats.manga, [
+    { value: stats.manga.count.toLocaleString(), label: t("wrapped.completed") },
+    { value: stats.manga.units.toLocaleString(), label: t("common.chapters") },
+    {
+      value: stats.manga.meanScore ? round1(stats.manga.meanScore) : "–",
+      label: t("wrapped.meanScore"),
+    },
+  ]);
+
+  // Footer
+  sections.push({
+    height: 96,
+    paint: (y) => {
+      ctx.textAlign = "left";
+      ctx.fillStyle = "#64748b";
+      ctx.font = "500 26px system-ui, sans-serif";
+      ctx.fillText("Karasu · github.com/Kyusetzu/Karasu", P, y + 52);
+    },
   });
 
-  ctx.strokeStyle = "#26303f";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(pad, 600);
-  ctx.lineTo(SIZE - pad, 600);
-  ctx.stroke();
+  const totalH = sections.reduce((sum, s) => sum + s.height, 0);
+  canvas.width = W;
+  canvas.height = totalH;
 
-  // Top genres
-  ctx.fillStyle = "#94a3b8";
-  ctx.font = "600 30px system-ui, sans-serif";
-  ctx.fillText(t("wrapped.topGenres").toUpperCase(), pad, 665);
-  ctx.fillStyle = "#eef1f6";
-  ctx.font = "600 40px system-ui, sans-serif";
-  s.topGenres.forEach((g, i) => {
-    ctx.fillText(`${i + 1}. ${g.name}`, pad, 730 + i * 58);
-  });
+  const bg = ctx.createLinearGradient(0, 0, 0, totalH);
+  bg.addColorStop(0, "#0b0d12");
+  bg.addColorStop(1, "#141b26");
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, totalH);
 
-  // Top titles
-  const rx = SIZE / 2 + 30;
-  ctx.fillStyle = "#94a3b8";
-  ctx.font = "600 30px system-ui, sans-serif";
-  ctx.fillText(t("wrapped.topRated").toUpperCase(), rx, 665);
-  ctx.fillStyle = "#eef1f6";
-  ctx.font = "600 34px system-ui, sans-serif";
-  s.topTitles.forEach((title, i) => {
-    const clipped = title.length > 26 ? `${title.slice(0, 25)}…` : title;
-    ctx.fillText(`${i + 1}. ${clipped}`, rx, 730 + i * 58);
-  });
-
-  // Manga line + footer
-  ctx.fillStyle = accent;
-  ctx.font = "600 34px system-ui, sans-serif";
-  ctx.fillText(
-    t("wrapped.plusManga", { count: s.mangaCount, chapters: s.chapters }),
-    pad,
-    980,
-  );
-
-  ctx.fillStyle = "#64748b";
-  ctx.font = "500 28px system-ui, sans-serif";
-  ctx.fillText("Karasu · github.com/Kyusetzu/Karasu", pad, SIZE - 60);
+  let y = 0;
+  for (const s of sections) {
+    s.paint(y);
+    y += s.height;
+  }
 }
 
 export default function Wrapped() {
@@ -179,11 +277,7 @@ export default function Wrapped() {
       .finally(() => setLoading(false));
   }, [viewer]);
 
-  const years = useMemo(() => {
-    const set = new Set<number>();
-    for (const e of [...anime, ...manga]) if (e.year) set.add(e.year);
-    return [...set].sort((a, b) => b - a);
-  }, [anime, manga]);
+  const years = useMemo(() => availableYears(anime, manga), [anime, manga]);
 
   useEffect(() => {
     if (year === null && years.length) setYear(years[0]);
@@ -197,8 +291,7 @@ export default function Wrapped() {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !stats || year === null) return;
-    const ctx = canvas.getContext("2d");
-    if (ctx) drawCard(ctx, stats, year, viewer?.name ?? "", t);
+    drawCard(canvas, stats, year, viewer?.name ?? "", t);
   }, [stats, year, viewer, t]);
 
   if (!viewer) {
@@ -261,9 +354,7 @@ export default function Wrapped() {
       ) : (
         <canvas
           ref={canvasRef}
-          width={SIZE}
-          height={SIZE}
-          className="w-full max-w-md rounded-2xl border border-surface-800 shadow-xl"
+          className="w-full max-w-sm rounded-2xl border border-surface-800 shadow-xl"
         />
       )}
     </div>

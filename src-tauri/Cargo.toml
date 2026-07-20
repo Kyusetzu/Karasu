@@ -1,6 +1,6 @@
 [package]
 name = "karasu"
-version = "0.1.1"
+version = "0.1.2"
 description = "A modern anime and manga tracker for Windows, built exclusively for AniList"
 authors = ["Kyu"]
 license = "MIT"
@@ -27,6 +27,8 @@ tauri-plugin-notification = "2"
 tauri-plugin-dialog = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+# reqwest 0.13 already defaults to rustls (pure-Rust TLS, no OpenSSL/schannel),
+# which is leaner to build and cross-platform for the Linux groundwork.
 reqwest = { version = "0.13", features = ["json"] }
 tokio = { version = "1", features = ["time", "sync", "macros"] }
 keyring = { version = "3", features = ["windows-native"] }
@@ -39,4 +41,18 @@ windows = { version = "0.62", features = [
     "Win32_System_Threading",
     "Win32_Security_Cryptography",
 ] }
+
+# --- Build-speed tuning -----------------------------------------------------
+# Dev: keep incremental on and trim debug info to the minimum needed for
+# backtraces — the link step is the slow part of each rebuild.
+[profile.dev]
+incremental = true
+debug = "line-tables-only"
+
+# Release: default codegen-units (16) already parallelises; skip LTO so the
+# bundle build stays fast (this app is I/O-bound, not CPU-bound).
+[profile.release]
+lto = false
+codegen-units = 16
+strip = true
 

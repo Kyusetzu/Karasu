@@ -1,0 +1,17 @@
+# Optional local build-speed opt-ins. These are commented out because they
+# need extra tooling that isn't guaranteed on every machine — enable whichever
+# you have installed for faster (re)builds.
+
+# 1) LLD linker (linking is the slowest part of a Windows rebuild).
+#    Install once:  rustup component add llvm-tools
+#    then point the MSVC target at the bundled rust-lld:
+#
+# [target.x86_64-pc-windows-msvc]
+# linker = "rust-lld.exe"
+
+# 2) sccache — caches compiled crates across clean builds / branches.
+#    Install once:  cargo install sccache
+#    then uncomment:
+#
+# [build]
+# rustc-wrapper = "sccache"

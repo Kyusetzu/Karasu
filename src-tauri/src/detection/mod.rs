@@ -3,12 +3,16 @@
 
 pub mod profiles;
 
+#[cfg(windows)]
 use windows::core::BOOL;
+#[cfg(windows)]
 use windows::Win32::Foundation::{CloseHandle, HWND, LPARAM};
+#[cfg(windows)]
 use windows::Win32::System::Threading::{
     OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32,
     PROCESS_QUERY_LIMITED_INFORMATION,
 };
+#[cfg(windows)]
 use windows::Win32::UI::WindowsAndMessaging::{
     EnumWindows, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId,
     IsWindowVisible,
@@ -34,6 +38,7 @@ pub struct Playback {
 }
 
 /// Lists all visible top-level windows with title and process name.
+#[cfg(windows)]
 pub fn enumerate_windows() -> Vec<WindowInfo> {
     let mut result: Vec<WindowInfo> = Vec::new();
     unsafe {
@@ -45,6 +50,14 @@ pub fn enumerate_windows() -> Vec<WindowInfo> {
     result
 }
 
+/// Non-Windows groundwork: window enumeration isn't wired up yet (it needs an
+/// X11/Wayland backend), so detection is a no-op here for now.
+#[cfg(not(windows))]
+pub fn enumerate_windows() -> Vec<WindowInfo> {
+    Vec::new()
+}
+
+#[cfg(windows)]
 unsafe extern "system" fn enum_callback(hwnd: HWND, lparam: LPARAM) -> BOOL {
     let result = unsafe { &mut *(lparam.0 as *mut Vec<WindowInfo>) };
 
@@ -74,6 +87,7 @@ unsafe extern "system" fn enum_callback(hwnd: HWND, lparam: LPARAM) -> BOOL {
     BOOL(1)
 }
 
+#[cfg(windows)]
 fn process_name(pid: u32) -> Option<String> {
     unsafe {
         let handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).ok()?;

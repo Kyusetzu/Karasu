@@ -1,7 +1,10 @@
-//! Token storage. In normal installs the token lives in the Windows
-//! Credential Manager (keyring). In portable mode it is stored in a
-//! DPAPI-encrypted file next to the executable so it travels with the
-//! folder. Either way the token never leaves the Rust backend.
+//! Token storage. In normal installs the token lives in the OS credential
+//! store (keyring — Windows Credential Manager, or the Secret Service on
+//! Linux). In portable mode it is stored in a file next to the executable so
+//! it travels with the folder: DPAPI-encrypted on Windows; on other platforms
+//! (Linux groundwork) it is currently stored unencrypted — a future
+//! platform-keystore/passphrase step is needed there. Either way the token
+//! never leaves the Rust backend.
 
 const SERVICE: &str = "dev.kyu.karasu";
 const USER: &str = "anilist";
@@ -52,18 +55,40 @@ fn save_token_file(token: &str) -> Result<(), String> {
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
     }
-    let encrypted = dpapi_protect(token.as_bytes())?;
-    std::fs::write(path, encrypted).map_err(|e| format!("Could not save token: {e}"))
+    let bytes = protect(token.as_bytes())?;
+    std::fs::write(path, bytes).map_err(|e| format!("Could not save token: {e}"))
 }
 
 fn load_token_file() -> Option<String> {
     let path = crate::portable::token_file()?;
-    let encrypted = std::fs::read(path).ok()?;
-    let plain = dpapi_unprotect(&encrypted).ok()?;
+    let raw = std::fs::read(path).ok()?;
+    let plain = unprotect(&raw).ok()?;
     String::from_utf8(plain).ok()
 }
 
+/// Per-platform at-rest protection for the portable token file.
+#[cfg(windows)]
+fn protect(data: &[u8]) -> Result<Vec<u8>, String> {
+    dpapi_protect(data)
+}
+#[cfg(windows)]
+fn unprotect(data: &[u8]) -> Result<Vec<u8>, String> {
+    dpapi_unprotect(data)
+}
+
+// Non-Windows groundwork: store as-is for now. NOT encrypted — a platform
+// keystore or passphrase should back this before portable mode ships on Linux.
+#[cfg(not(windows))]
+fn protect(data: &[u8]) -> Result<Vec<u8>, String> {
+    Ok(data.to_vec())
+}
+#[cfg(not(windows))]
+fn unprotect(data: &[u8]) -> Result<Vec<u8>, String> {
+    Ok(data.to_vec())
+}
+
 /// Encrypts bytes with the Windows Data Protection API (per-user).
+#[cfg(windows)]
 fn dpapi_protect(data: &[u8]) -> Result<Vec<u8>, String> {
     use windows::Win32::Foundation::{LocalFree, HLOCAL};
     use windows::Win32::Security::Cryptography::{CryptProtectData, CRYPT_INTEGER_BLOB};
@@ -91,6 +116,7 @@ fn dpapi_protect(data: &[u8]) -> Result<Vec<u8>, String> {
 }
 
 /// Decrypts bytes previously produced by `dpapi_protect`.
+#[cfg(windows)]
 fn dpapi_unprotect(data: &[u8]) -> Result<Vec<u8>, String> {
     use windows::Win32::Foundation::{LocalFree, HLOCAL};
     use windows::Win32::Security::Cryptography::{CryptUnprotectData, CRYPT_INTEGER_BLOB};
@@ -117,7 +143,7 @@ fn dpapi_unprotect(data: &[u8]) -> Result<Vec<u8>, String> {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, windows))]
 mod dpapi_tests {
     use super::{dpapi_protect, dpapi_unprotect};
 

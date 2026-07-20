@@ -1,7 +1,7 @@
 [package]
 name = "karasu"
-version = "0.7.0"
-description = "A modern anime and manga tracker for Windows, built exclusively for AniList"
+version = "0.8.0"
+description = "A modern anime and manga tracker built exclusively for AniList (Windows; Linux experimental)"
 authors = ["Kyu"]
 license = "MIT"
 edition = "2021"
@@ -31,16 +31,24 @@ serde_json = "1"
 # which is leaner to build and cross-platform for the Linux groundwork.
 reqwest = { version = "0.13", features = ["json"] }
 tokio = { version = "1", features = ["time", "sync", "macros"] }
-keyring = { version = "3", features = ["windows-native"] }
 rusqlite = { version = "0.40", features = ["bundled"] }
 regex = "1"
 discord-rich-presence = "1"
+
+# --- Platform-specific -------------------------------------------------------
+# Windows: Credential Manager keyring + DPAPI (via the `windows` crate).
+[target.'cfg(windows)'.dependencies]
+keyring = { version = "3", features = ["windows-native"] }
 windows = { version = "0.62", features = [
     "Win32_Foundation",
     "Win32_UI_WindowsAndMessaging",
     "Win32_System_Threading",
     "Win32_Security_Cryptography",
 ] }
+
+# Linux groundwork: keyring via the Secret Service (libsecret/D-Bus).
+[target.'cfg(unix)'.dependencies]
+keyring = { version = "3", features = ["sync-secret-service", "crypto-rust"] }
 
 # --- Build-speed tuning -----------------------------------------------------
 # Dev: keep incremental on and trim debug info to the minimum needed for

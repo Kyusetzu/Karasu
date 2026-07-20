@@ -3,17 +3,12 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { ArrowLeft } from "lucide-react";
-import { loadFranchise, type FranchiseNode } from "@/api/franchise";
+import { loadFranchise } from "@/api/franchise";
 import { isTauri } from "@/api/anilist";
 import { formatLabel } from "@/lib/format";
+import { layoutFranchise, NODE_H, NODE_W } from "@/lib/franchiseLayout";
 import { displayTitle, type MediaListStatus } from "@/api/types";
 import { Button } from "@/components/ui/button";
-
-const NODE_W = 168;
-const NODE_H = 62;
-const COL_STEP = 244;
-const ROW_STEP = 86;
-const PAD = 28;
 
 /** List-status → accent colour for a node's outline + dot. */
 const STATUS_COLOR: Record<MediaListStatus, string> = {
@@ -43,58 +38,12 @@ export default function Franchise() {
 
   const layout = useMemo(() => {
     if (!data) return null;
-    // Layer every node by its BFS distance from the root (undirected).
-    const adj = new Map<number, number[]>();
-    data.nodes.forEach((n) => adj.set(n.id, []));
-    data.edges.forEach((e) => {
-      adj.get(e.from)?.push(e.to);
-      adj.get(e.to)?.push(e.from);
-    });
-    const layer = new Map<number, number>();
-    const queue: number[] = [];
-    if (data.nodes.some((n) => n.id === data.rootId)) {
-      layer.set(data.rootId, 0);
-      queue.push(data.rootId);
-    }
-    while (queue.length) {
-      const cur = queue.shift()!;
-      const l = layer.get(cur)!;
-      for (const nb of adj.get(cur) ?? []) {
-        if (!layer.has(nb)) {
-          layer.set(nb, l + 1);
-          queue.push(nb);
-        }
-      }
-    }
-    data.nodes.forEach((n) => {
-      if (!layer.has(n.id)) layer.set(n.id, 0);
-    });
-
-    const cols = new Map<number, FranchiseNode[]>();
-    for (const n of data.nodes) {
-      const l = layer.get(n.id)!;
-      if (!cols.has(l)) cols.set(l, []);
-      cols.get(l)!.push(n);
-    }
-    const maxLayer = Math.max(...[...cols.keys()], 0);
-    const maxRows = Math.max(...[...cols.values()].map((c) => c.length), 1);
-    const contentH = maxRows * ROW_STEP;
-
-    const pos = new Map<number, { x: number; y: number }>();
-    for (const [l, list] of cols) {
-      const startY = (contentH - list.length * ROW_STEP) / 2;
-      list.forEach((n, i) => {
-        pos.set(n.id, {
-          x: PAD + l * COL_STEP,
-          y: PAD + startY + i * ROW_STEP,
-        });
-      });
-    }
-    return {
-      pos,
-      width: maxLayer * COL_STEP + NODE_W + PAD * 2,
-      height: contentH + PAD * 2,
-    };
+    const { positions, width, height } = layoutFranchise(
+      data.nodes,
+      data.edges,
+      data.rootId,
+    );
+    return { pos: positions, width, height };
   }, [data]);
 
   return (

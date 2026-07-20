@@ -2,11 +2,13 @@ import { gql } from "./anilist";
 import type { MediaListStatus, MediaTitle, MediaType } from "./types";
 
 /**
- * Loads a media's franchise as a small relation graph via a bounded,
- * batched breadth-first walk over AniList's `relations`. Only same-medium
- * story relations are followed (adaptations/characters/etc. are ignored so
- * the graph stays a franchise, not the whole universe), and the walk is
- * depth- and node-capped so deep or cyclic graphs can't blow up.
+ * Loads a media's franchise as a relation graph via a bounded, batched
+ * breadth-first walk over AniList's `relations`. Every relation shown under
+ * AniList's "Relations" heading is displayed (both media types), and the walk
+ * follows the franchise-structural relations — including cross-medium
+ * adaptation/source links — to assemble the whole franchise. Loose links
+ * (character/other/summary) are shown but not expanded through, and the walk
+ * is depth- and node-capped so deep or cyclic graphs can't blow up.
  */
 
 const FRANCHISE_QUERY = `
@@ -36,17 +38,24 @@ query ($ids: [Int]) {
   }
 }`;
 
-const FOLLOW = new Set([
+// Relation types we walk *through* to complete the franchise (cross-medium
+// adaptation/source included). Everything else (character/summary/other) is
+// still shown as a node, just not expanded from.
+const TRAVERSE = new Set([
+  "ADAPTATION",
+  "SOURCE",
   "PREQUEL",
   "SEQUEL",
-  "SIDE_STORY",
   "PARENT",
-  "ALTERNATIVE",
+  "SIDE_STORY",
   "SPIN_OFF",
+  "ALTERNATIVE",
+  "COMPILATION",
+  "CONTAINS",
 ]);
 
-const MAX_DEPTH = 2;
-const MAX_NODES = 30;
+const MAX_DEPTH = 3;
+const MAX_NODES = 60;
 
 export interface FranchiseNode {
   id: number;
@@ -124,9 +133,9 @@ export async function loadFranchise(rootId: number): Promise<FranchiseGraph> {
     for (const media of data.Page.media) {
       addNode(media);
       for (const edge of media.relations.edges) {
-        if (!FOLLOW.has(edge.relationType)) continue;
         const node = edge.node;
         if (!node || (node.type !== "ANIME" && node.type !== "MANGA")) continue;
+        // Show every relation…
         addNode(node);
         // Keep a single edge per pair (SEQUEL/PREQUEL are reciprocal).
         if (!hasEdge(media.id, node.id)) {
@@ -136,7 +145,14 @@ export async function loadFranchise(rootId: number): Promise<FranchiseGraph> {
             relation: edge.relationType,
           });
         }
-        if (depth < MAX_DEPTH && !visited.has(node.id)) next.push(node.id);
+        // …but only walk deeper through the franchise-structural ones.
+        if (
+          depth < MAX_DEPTH &&
+          TRAVERSE.has(edge.relationType) &&
+          !visited.has(node.id)
+        ) {
+          next.push(node.id);
+        }
       }
     }
 

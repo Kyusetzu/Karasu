@@ -137,6 +137,8 @@ const en = {
     OTHER: "Other",
     ADAPTATION: "Adaptation",
     SOURCE: "Source",
+    COMPILATION: "Compilation",
+    CONTAINS: "Contains",
   },
   dashboard: {
     welcomeTitle: "Welcome to Karasu 🐦‍⬛",
@@ -533,6 +535,8 @@ const de: typeof en = {
     OTHER: "Sonstiges",
     ADAPTATION: "Adaption",
     SOURCE: "Vorlage",
+    COMPILATION: "Zusammenstellung",
+    CONTAINS: "Enthält",
   },
   dashboard: {
     welcomeTitle: "Willkommen bei Karasu 🐦‍⬛",

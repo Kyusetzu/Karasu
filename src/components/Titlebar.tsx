@@ -1,7 +1,9 @@
+import { useEffect, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useTranslation } from "react-i18next";
 import { Minus, Square, X } from "lucide-react";
 import Bell from "@/components/Bell";
+import { appVersion, isTauri } from "@/api/anilist";
 
 // In a plain browser (vite dev without the Tauri shell) there is no window API
 const appWindow =
@@ -9,6 +11,12 @@ const appWindow =
 
 export default function Titlebar() {
   const { t } = useTranslation();
+  const [version, setVersion] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isTauri) appVersion().then(setVersion).catch(() => {});
+  }, []);
+
   return (
     <header
       data-tauri-drag-region
@@ -18,6 +26,9 @@ export default function Titlebar() {
         <span className="text-sm font-semibold tracking-wide text-ink-300">
           Karasu
         </span>
+        {version && (
+          <span className="text-xs text-ink-600">v{version}</span>
+        )}
       </div>
       <div className="flex h-full items-center">
         <Bell />

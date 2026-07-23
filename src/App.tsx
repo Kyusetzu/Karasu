@@ -4,7 +4,12 @@ import { invoke } from "@tauri-apps/api/core";
 import { useAuth } from "@/stores/auth";
 import { useNowPlaying } from "@/stores/nowPlaying";
 import { useLibrary } from "@/stores/library";
-import { isTauri } from "@/api/anilist";
+import {
+  isTauri,
+  checkForUpdates,
+  downloadPendingUpdate,
+  getUpdateCheckAuto,
+} from "@/api/anilist";
 import Titlebar from "@/components/Titlebar";
 import Sidebar from "@/components/Sidebar";
 import CommandPalette from "@/components/CommandPalette";
@@ -30,6 +35,21 @@ export default function App() {
     initNowPlaying();
     refreshLibrary();
   }, [init, initNowPlaying, refreshLibrary]);
+
+  // At most once/day: check for an update and, if one is found, start
+  // downloading it in the background. Installing still needs a separate,
+  // explicit confirmation from the About page (see UpdateSection there).
+  useEffect(() => {
+    if (!isTauri) return;
+    getUpdateCheckAuto().then((enabled) => {
+      if (!enabled) return;
+      checkForUpdates(false)
+        .then((info) => {
+          if (info.isNewer) downloadPendingUpdate().catch(() => {});
+        })
+        .catch(() => {});
+    });
+  }, []);
 
   return (
     <div className="flex h-full flex-col">

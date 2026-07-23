@@ -8,11 +8,16 @@ import {
   RefreshCw,
   CheckCircle2,
   Download,
+  ExternalLink,
+  RotateCw,
 } from "lucide-react";
 import {
   appVersion,
   checkForUpdates,
+  downloadPendingUpdate,
+  installPendingUpdate,
   isTauri,
+  type DownloadedUpdate,
   type UpdateInfo,
 } from "@/api/anilist";
 import { Button } from "@/components/ui/button";
@@ -109,13 +114,31 @@ function UpdateSection() {
   const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
   const [info, setInfo] = useState<UpdateInfo | null>(null);
+  const [downloading, setDownloading] = useState(false);
+  const [downloaded, setDownloaded] = useState<DownloadedUpdate | null>(null);
+  const [installing, setInstalling] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const startDownload = async () => {
+    setDownloading(true);
+    setError(null);
+    try {
+      const update = await downloadPendingUpdate();
+      setDownloaded(update);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   const check = async () => {
     setBusy(true);
     setError(null);
     try {
-      setInfo(await checkForUpdates(true));
+      const result = await checkForUpdates(true);
+      setInfo(result);
+      if (result.isNewer) await startDownload();
     } catch (e) {
       setError(String(e));
     } finally {
@@ -123,27 +146,73 @@ function UpdateSection() {
     }
   };
 
+  const confirmInstall = async () => {
+    setInstalling(true);
+    setError(null);
+    try {
+      // On success this restarts the app and never returns.
+      await installPendingUpdate();
+    } catch (e) {
+      setError(String(e));
+      setInstalling(false);
+    }
+  };
+
   return (
     <Card>
       <CardTitle>{t("about.updates")}</CardTitle>
       <div className="mt-3 flex flex-wrap items-center gap-3">
-        <Button onClick={check} disabled={busy || !isTauri}>
+        <Button onClick={check} disabled={busy || downloading || !isTauri}>
           <RefreshCw size={16} className={busy ? "animate-spin" : ""} />{" "}
           {busy ? t("about.checking") : t("about.checkUpdates")}
         </Button>
-        {info &&
-          (info.isNewer && info.url ? (
-            <Button variant="secondary" onClick={() => openUrl(info.url!)}>
-              <Download size={16} />{" "}
+
+        {downloading && (
+          <span className="flex items-center gap-1.5 text-sm text-ink-500">
+            <Download size={16} className="animate-bounce" />{" "}
+            {t("about.downloading")}
+          </span>
+        )}
+
+        {!downloading && downloaded && (
+          <Button
+            variant="secondary"
+            onClick={confirmInstall}
+            disabled={installing}
+          >
+            <RotateCw size={16} className={installing ? "animate-spin" : ""} />{" "}
+            {installing ? t("about.installing") : t("about.restartUpdate")}
+          </Button>
+        )}
+
+        {!downloading &&
+          !downloaded &&
+          info &&
+          (info.isNewer ? (
+            <span className="flex items-center gap-1.5 text-sm text-ink-500">
               {t("about.updateAvailable", { version: info.latest })}
-            </Button>
+            </span>
           ) : (
             <span className="flex items-center gap-1.5 text-sm text-emerald-400">
               <CheckCircle2 size={16} />{" "}
               {t("about.upToDate", { version: info.current })}
             </span>
           ))}
+
+        {info?.url && (
+          <button
+            onClick={() => openUrl(info.url!)}
+            className="flex items-center gap-1 text-sm text-accent-400 hover:underline"
+          >
+            <ExternalLink size={14} /> {t("about.viewRelease")}
+          </button>
+        )}
       </div>
+      {downloaded && (
+        <p className="mt-3 text-sm text-ink-300">
+          {t("about.updateReady", { version: downloaded.version })}
+        </p>
+      )}
       {error && <p className="mt-3 text-sm text-red-300">{error}</p>}
     </Card>
   );

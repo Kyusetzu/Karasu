@@ -119,6 +119,30 @@ export interface UpdateInfo {
 export const checkForUpdates = (force: boolean) =>
   invoke<UpdateInfo>("check_for_updates", { force });
 
+export type UpdateChannel = "prerelease" | "stable";
+
+export const getUpdateChannel = () =>
+  invoke<UpdateChannel>("get_update_channel");
+export const setUpdateChannel = (channel: UpdateChannel) =>
+  invoke<void>("set_update_channel", { channel });
+
+export const getUpdateCheckAuto = () => invoke<boolean>("get_update_check_auto");
+export const setUpdateCheckAuto = (enabled: boolean) =>
+  invoke<void>("set_update_check_auto", { enabled });
+
+export interface DownloadedUpdate {
+  version: string;
+  notes: string | null;
+}
+
+/** Downloads the update for the selected channel, if one is newer than the running version. */
+export const downloadPendingUpdate = () =>
+  invoke<DownloadedUpdate | null>("download_pending_update");
+
+/** Installs the previously-downloaded update and restarts the app. */
+export const installPendingUpdate = () =>
+  invoke<void>("install_pending_update");
+
 /** Full four-part app version (MAJOR.MINOR.PATCH.COMMIT#) for the About page. */
 export const appVersion = () => invoke<string>("app_version");
 

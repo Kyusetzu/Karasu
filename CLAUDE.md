@@ -8,7 +8,7 @@ verified by a human maintainer before it lands.
 ## Project
 
 **Karasu** is a modern desktop anime & manga tracker built **exclusively for
-[AniList](https://anilist.co)** — a spiritual successor to the unmaintained
+[AniList](https://anilist.co)**, inspired by the wonderful
 [Taiga](https://github.com/erengy/taiga). It detects what you play/read locally
 and in the browser and scrobbles your AniList progress automatically.
 

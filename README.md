@@ -26,8 +26,7 @@ progress automatically — no buttons to press. It lives in your system tray,
 speaks English and German, and is built as a small native app with Tauri, React
 and Rust.
 
-It is a modern successor to the wonderful — but no longer maintained —
-[Taiga](https://github.com/erengy/taiga).
+It's inspired by the wonderful [Taiga](https://github.com/erengy/taiga).
 
 ## Why use it over the website?
 

@@ -27,12 +27,15 @@ interface Preset {
   maxGenres: number;
   includeTitles: boolean;
   maxTitles: number;
+  /** Force the exported image to an exact 1:1 square, scaling the naturally
+   *  taller content to fit rather than letting height drift with content. */
+  square?: boolean;
 }
 
 /** Shape + content-density presets, in the order shown to the user. */
 const PRESETS: Preset[] = [
   { key: "banner", labelKey: "wrapped.presetBanner", W: 1600, includeGenres: false, maxGenres: 0, includeTitles: false, maxTitles: 0 },
-  { key: "square", labelKey: "wrapped.presetSquare", W: 1080, includeGenres: true, maxGenres: 3, includeTitles: false, maxTitles: 0 },
+  { key: "square", labelKey: "wrapped.presetSquare", W: 1080, includeGenres: true, maxGenres: 3, includeTitles: false, maxTitles: 0, square: true },
   { key: "page", labelKey: "wrapped.presetPage", W: 1080, includeGenres: true, maxGenres: 5, includeTitles: true, maxTitles: 3 },
   { key: "compressed", labelKey: "wrapped.presetCompressed", W: 780, includeGenres: false, maxGenres: 0, includeTitles: false, maxTitles: 0 },
   { key: "detailed", labelKey: "wrapped.presetDetailed", W: 1200, includeGenres: true, maxGenres: 5, includeTitles: true, maxTitles: 5 },
@@ -60,6 +63,38 @@ function round1(n: number): string {
   return (Math.round(n * 10) / 10).toString();
 }
 
+/**
+ * Shrinks `weight size`px system-ui text down toward `minSize` until it fits
+ * `maxWidth`. If it still doesn't fit at the floor size, `allowTruncate`
+ * clips it with an ellipsis (never used for numeric values). Leaves
+ * `ctx.font` set to the resolved size as a side effect.
+ */
+function fitText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number,
+  weight: number,
+  startSize: number,
+  minSize: number,
+  allowTruncate: boolean,
+): { text: string; size: number } {
+  let size = startSize;
+  while (size > minSize) {
+    ctx.font = `${weight} ${size}px system-ui, sans-serif`;
+    if (ctx.measureText(text).width <= maxWidth) return { text, size };
+    size -= 2;
+  }
+  ctx.font = `${weight} ${size}px system-ui, sans-serif`;
+  if (!allowTruncate || ctx.measureText(text).width <= maxWidth) {
+    return { text, size };
+  }
+  let clipped = text;
+  while (clipped.length > 1 && ctx.measureText(`${clipped}…`).width > maxWidth) {
+    clipped = clipped.slice(0, -1);
+  }
+  return { text: `${clipped}…`, size };
+}
+
 interface Tile {
   value: string;
   label: string;
@@ -83,7 +118,12 @@ function drawCard(
   lang: string,
   preset: Preset,
 ) {
-  const ctx = canvas.getContext("2d");
+  // Sections are painted onto an offscreen buffer sized to their natural
+  // content height first; the visible canvas is only assigned at the end,
+  // so square-preset scaling (below) can compose the finished buffer rather
+  // than needing to know the final size up front.
+  const work = document.createElement("canvas");
+  const ctx = work.getContext("2d");
   if (!ctx) return;
 
   const W = preset.W;
@@ -159,17 +199,18 @@ function drawCard(
       paint: (y) => {
         const gap = 20;
         const tw = (W - P * 2 - gap * (tiles.length - 1)) / tiles.length;
+        const maxTextW = tw - 48;
         tiles.forEach((tile, i) => {
           const x = P + i * (tw + gap);
           ctx.fillStyle = "#171e2a";
           roundRect(ctx, x, y, tw, 150, 18);
           ctx.textAlign = "left";
           ctx.fillStyle = "#f1f5f9";
-          ctx.font = "800 64px system-ui, sans-serif";
-          ctx.fillText(tile.value, x + 24, y + 80);
+          const value = fitText(ctx, tile.value, maxTextW, 800, 64, 36, false);
+          ctx.fillText(value.text, x + 24, y + 80);
           ctx.fillStyle = "#94a3b8";
-          ctx.font = "500 28px system-ui, sans-serif";
-          ctx.fillText(tile.label, x + 24, y + 124);
+          const label = fitText(ctx, tile.label, maxTextW, 500, 28, 16, true);
+          ctx.fillText(label.text, x + 24, y + 124);
         });
       },
     });
@@ -192,14 +233,23 @@ function drawCard(
             ctx.fillText(gv.name, P, y + 32);
             const barX = W / 2;
             const barW = W / 2 - P;
+            const fillW = Math.max(24, (barW * gv.count) / max);
             ctx.fillStyle = "#232c3a";
             roundRect(ctx, barX, y + 8, barW, 24, 12);
             ctx.fillStyle = accent;
-            roundRect(ctx, barX, y + 8, Math.max(24, (barW * gv.count) / max), 24, 12);
-            ctx.fillStyle = "#94a3b8";
-            ctx.textAlign = "right";
+            roundRect(ctx, barX, y + 8, fillW, 24, 12);
+
+            // The count sits at the bar's right edge, which is fully covered
+            // by the accent fill whenever this genre is the max (always true
+            // for the top genre) — use a contrasting ink there instead of
+            // the fixed gray, which can wash out against a light accent.
+            const countText = String(gv.count);
             ctx.font = "600 24px system-ui, sans-serif";
-            ctx.fillText(String(gv.count), W - P, y + 27);
+            const countW = ctx.measureText(countText).width;
+            const overlapsFill = barX + fillW > W - P - countW;
+            ctx.fillStyle = overlapsFill ? readableInk(accent) : "#94a3b8";
+            ctx.textAlign = "right";
+            ctx.fillText(countText, W - P, y + 27);
           },
         });
       }
@@ -263,8 +313,8 @@ function drawCard(
   });
 
   const totalH = sections.reduce((sum, s) => sum + s.height, 0);
-  canvas.width = W;
-  canvas.height = totalH;
+  work.width = W;
+  work.height = totalH;
 
   const bg = ctx.createLinearGradient(0, 0, 0, totalH);
   bg.addColorStop(0, "#0b0d12");
@@ -277,6 +327,31 @@ function drawCard(
     s.paint(y);
     y += s.height;
   }
+
+  if (!preset.square) {
+    canvas.width = W;
+    canvas.height = totalH;
+    const outCtx = canvas.getContext("2d");
+    outCtx?.drawImage(work, 0, 0);
+    return;
+  }
+
+  // Square preset: content is naturally taller than it is wide, so scale it
+  // down (never up — canvas text would blur) to fit an exact W×W frame,
+  // centered, with the same background filling any letterboxed edge.
+  canvas.width = W;
+  canvas.height = W;
+  const outCtx = canvas.getContext("2d");
+  if (!outCtx) return;
+  const outBg = outCtx.createLinearGradient(0, 0, 0, W);
+  outBg.addColorStop(0, "#0b0d12");
+  outBg.addColorStop(1, "#141b26");
+  outCtx.fillStyle = outBg;
+  outCtx.fillRect(0, 0, W, W);
+  const scale = Math.min(1, W / totalH);
+  const drawW = W * scale;
+  const drawH = totalH * scale;
+  outCtx.drawImage(work, (W - drawW) / 2, (W - drawH) / 2, drawW, drawH);
 }
 
 export default function Wrapped() {

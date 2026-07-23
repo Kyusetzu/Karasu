@@ -43,6 +43,28 @@ Because a desktop app can do things anilist.co simply can't:
 - **It works without an account, too.** A fully local list on your device, with
   a one-time merge into AniList whenever you decide to connect.
 
+## Screenshots
+
+<p align="center">
+  <img src="assets/screenshots/welcome.jpg" alt="First launch" width="70%" /><br />
+  <sub>First launch — connect with AniList, or start local-only</sub>
+</p>
+
+<table>
+<tr>
+<td width="50%"><img src="assets/screenshots/overview.jpg" alt="Dashboard overview" /><br /><sub>Overview — this week's airing, continue watching, stats at a glance</sub></td>
+<td width="50%"><img src="assets/screenshots/anime-list.jpg" alt="Anime list" /><br /><sub>Anime list — grid view with status tabs and filters</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src="assets/screenshots/season-overview.jpg" alt="Seasonal chart" /><br /><sub>Seasonal — browse a season's chart</sub></td>
+<td width="50%"><img src="assets/screenshots/statistics.jpg" alt="Statistics page" /><br /><sub>Statistics — genres, tags, voice actors, studios and more</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src="assets/screenshots/year-in-review.jpg" alt="Year in review card" /><br /><sub>Year in review — a shareable card, exportable as a PNG</sub></td>
+<td width="50%"><img src="assets/screenshots/settings.jpg" alt="Settings page" /><br /><sub>Settings — themes, accent colours, detection and update preferences</sub></td>
+</tr>
+</table>
+
 ## Features
 
 **Tracking &amp; scrobbling**
@@ -102,6 +124,17 @@ On first start, open **Settings → Log in with AniList** — your browser opens
 AniList, you approve access, and Karasu logs you in automatically. (A manual
 token paste is available as a fallback.) You can also pick **Use without an
 account** to track locally and connect later.
+
+> **About the SmartScreen warning.** The installer is **unsigned** — Karasu
+> is a small solo-maintained project, and a Windows code-signing certificate
+> costs money that doesn't currently make sense here. On first run, Windows
+> SmartScreen may show a "Windows protected your PC" prompt (**More info →
+> Run anyway** to continue). If you want to verify the download before
+> running it, every release ships a `SHA256SUMS.txt` checksum and a
+> [VirusTotal](https://www.virustotal.com) scan result linked right in its
+> release notes. Karasu's own built-in updater (Settings, or the About page)
+> independently verifies every update it installs against its own signing
+> key, regardless of SmartScreen.
 
 > **Platforms.** Windows is the supported target. Linux (Ubuntu) support is
 > experimental groundwork: the app compiles and its tests run on Linux in CI,

@@ -52,27 +52,39 @@ export default function AnimeDetail() {
 
   const title = displayTitle(data.title);
 
+  const coverSrc = data.coverImage.extraLarge ?? data.coverImage.large ?? "";
+
   return (
     <div>
-      {data.bannerImage ? (
-        <div className="relative h-44">
+      {/* Fixed-height banner slot regardless of whether AniList has a real
+          bannerImage (common for manga) — the back button and cover below
+          overlap into its bottom edge by a fixed amount, so a shorter slot
+          here would push them off the top of the page. */}
+      <div className="relative h-64">
+        {data.bannerImage ? (
           <img
             src={data.bannerImage}
             alt=""
             className="h-full w-full object-cover"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-surface-950 to-transparent" />
-        </div>
-      ) : (
-        <div className="h-10" />
-      )}
+        ) : (
+          coverSrc && (
+            <img
+              src={coverSrc}
+              alt=""
+              className="h-full w-full scale-110 object-cover opacity-40 blur-2xl"
+            />
+          )
+        )}
+        <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-surface-950 to-transparent" />
+      </div>
 
       <div className="relative mx-auto max-w-4xl px-8 pb-10">
         <Button
           variant="secondary"
           size="icon"
           aria-label={t("detail.back")}
-          className="absolute -top-36 left-4 z-10"
+          className="absolute -top-56 left-4 z-10"
           onClick={() => navigate(-1)}
         >
           <ArrowLeft size={16} />
@@ -80,7 +92,7 @@ export default function AnimeDetail() {
 
         <div className="-mt-16 flex gap-6">
           <img
-            src={data.coverImage.extraLarge ?? data.coverImage.large ?? ""}
+            src={coverSrc}
             alt=""
             className="h-56 w-40 shrink-0 rounded-xl border border-surface-700 object-cover shadow-xl"
           />

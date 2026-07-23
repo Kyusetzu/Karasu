@@ -350,6 +350,11 @@ const en = {
     save: "Save image",
     empty: "No completed titles with a finish date yet.",
     connectPrompt: "Connect your AniList account to see your year in review.",
+    presetBanner: "Banner",
+    presetSquare: "Square",
+    presetPage: "Page",
+    presetCompressed: "Compressed",
+    presetDetailed: "Detailed",
   },
   media: {
     addPlanning: "Add to Planning",
@@ -763,6 +768,11 @@ const de: typeof en = {
     save: "Bild speichern",
     empty: "Noch keine abgeschlossenen Titel mit Abschlussdatum.",
     connectPrompt: "Verbinde dein AniList-Konto, um deinen Jahresrückblick zu sehen.",
+    presetBanner: "Banner",
+    presetSquare: "Quadrat",
+    presetPage: "Seite",
+    presetCompressed: "Kompakt",
+    presetDetailed: "Detailliert",
   },
   media: {
     addPlanning: "Zu Geplant hinzufügen",

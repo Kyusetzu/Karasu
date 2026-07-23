@@ -15,8 +15,28 @@ import {
 import { useAuth } from "@/stores/auth";
 import { Button } from "@/components/ui/button";
 
-const W = 1080;
 const P = 72;
+
+type PresetKey = "banner" | "square" | "page" | "compressed" | "detailed";
+
+interface Preset {
+  key: PresetKey;
+  labelKey: string;
+  W: number;
+  includeGenres: boolean;
+  maxGenres: number;
+  includeTitles: boolean;
+  maxTitles: number;
+}
+
+/** Shape + content-density presets, in the order shown to the user. */
+const PRESETS: Preset[] = [
+  { key: "banner", labelKey: "wrapped.presetBanner", W: 1600, includeGenres: false, maxGenres: 0, includeTitles: false, maxTitles: 0 },
+  { key: "square", labelKey: "wrapped.presetSquare", W: 1080, includeGenres: true, maxGenres: 3, includeTitles: false, maxTitles: 0 },
+  { key: "page", labelKey: "wrapped.presetPage", W: 1080, includeGenres: true, maxGenres: 5, includeTitles: true, maxTitles: 3 },
+  { key: "compressed", labelKey: "wrapped.presetCompressed", W: 780, includeGenres: false, maxGenres: 0, includeTitles: false, maxTitles: 0 },
+  { key: "detailed", labelKey: "wrapped.presetDetailed", W: 1200, includeGenres: true, maxGenres: 5, includeTitles: true, maxTitles: 5 },
+];
 
 function cssVar(name: string, fallback: string): string {
   const v = getComputedStyle(document.documentElement).getPropertyValue(name);
@@ -61,10 +81,12 @@ function drawCard(
   name: string,
   t: TFunction,
   lang: string,
+  preset: Preset,
 ) {
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
 
+  const W = preset.W;
   const accent = cssVar("--color-accent-500", "#6c7fff");
   const accent600 = cssVar("--color-accent-600", accent);
   const headerInk = readableInk(accent600);
@@ -74,8 +96,8 @@ function drawCard(
   const subhead = (text: string, y: number) => {
     ctx.textAlign = "left";
     ctx.fillStyle = "#94a3b8";
-    ctx.font = "700 26px system-ui, sans-serif";
-    ctx.fillText(text.toUpperCase(), P, y + 34);
+    ctx.font = "700 28px system-ui, sans-serif";
+    ctx.fillText(text.toUpperCase(), P, y + 36);
   };
 
   // --- Header band --------------------------------------------------------
@@ -111,8 +133,8 @@ function drawCard(
       paint: (y) => {
         ctx.textAlign = "left";
         ctx.fillStyle = accent;
-        ctx.font = "800 46px system-ui, sans-serif";
-        ctx.fillText(label, P, y + 50);
+        ctx.font = "800 50px system-ui, sans-serif";
+        ctx.fillText(label, P, y + 52);
       },
     });
 
@@ -130,42 +152,44 @@ function drawCard(
       return;
     }
 
-    // Stat tiles
+    // Stat tiles — the numbers are the main "at a glance" content, so these
+    // get the biggest type on the card after the year itself.
     sections.push({
-      height: 140,
+      height: 174,
       paint: (y) => {
         const gap = 20;
         const tw = (W - P * 2 - gap * (tiles.length - 1)) / tiles.length;
         tiles.forEach((tile, i) => {
           const x = P + i * (tw + gap);
           ctx.fillStyle = "#171e2a";
-          roundRect(ctx, x, y, tw, 116, 16);
+          roundRect(ctx, x, y, tw, 150, 18);
           ctx.textAlign = "left";
           ctx.fillStyle = "#f1f5f9";
-          ctx.font = "800 46px system-ui, sans-serif";
-          ctx.fillText(tile.value, x + 22, y + 62);
+          ctx.font = "800 64px system-ui, sans-serif";
+          ctx.fillText(tile.value, x + 24, y + 80);
           ctx.fillStyle = "#94a3b8";
-          ctx.font = "500 23px system-ui, sans-serif";
-          ctx.fillText(tile.label, x + 22, y + 96);
+          ctx.font = "500 28px system-ui, sans-serif";
+          ctx.fillText(tile.label, x + 24, y + 124);
         });
       },
     });
 
     // Top genres (mini-bars)
-    if (s.topGenres.length) {
+    const genres = preset.includeGenres ? s.topGenres.slice(0, preset.maxGenres) : [];
+    if (genres.length) {
       sections.push({
         height: 48,
         paint: (y) => subhead(t("wrapped.topGenres"), y),
       });
-      const max = s.topGenres[0].count || 1;
-      for (const gv of s.topGenres) {
+      const max = genres[0].count || 1;
+      for (const gv of genres) {
         sections.push({
           height: 48,
           paint: (y) => {
             ctx.textAlign = "left";
             ctx.fillStyle = "#e2e8f0";
-            ctx.font = "600 28px system-ui, sans-serif";
-            ctx.fillText(gv.name, P, y + 30);
+            ctx.font = "600 30px system-ui, sans-serif";
+            ctx.fillText(gv.name, P, y + 32);
             const barX = W / 2;
             const barW = W / 2 - P;
             ctx.fillStyle = "#232c3a";
@@ -174,7 +198,7 @@ function drawCard(
             roundRect(ctx, barX, y + 8, Math.max(24, (barW * gv.count) / max), 24, 12);
             ctx.fillStyle = "#94a3b8";
             ctx.textAlign = "right";
-            ctx.font = "600 22px system-ui, sans-serif";
+            ctx.font = "600 24px system-ui, sans-serif";
             ctx.fillText(String(gv.count), W - P, y + 27);
           },
         });
@@ -182,12 +206,13 @@ function drawCard(
     }
 
     // Top rated titles
-    if (s.topTitles.length) {
+    const titles = preset.includeTitles ? s.topTitles.slice(0, preset.maxTitles) : [];
+    if (titles.length) {
       sections.push({
         height: 48,
         paint: (y) => subhead(t("wrapped.topRated"), y),
       });
-      s.topTitles.forEach((title, i) => {
+      titles.forEach((title, i) => {
         sections.push({
           height: 46,
           paint: (y) => {
@@ -263,6 +288,8 @@ export default function Wrapped() {
   const [year, setYear] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
+  const [presetKey, setPresetKey] = useState<PresetKey>("page");
+  const preset = PRESETS.find((p) => p.key === presetKey) ?? PRESETS[2];
 
   useEffect(() => {
     if (!isTauri || !viewer) return;
@@ -292,8 +319,8 @@ export default function Wrapped() {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !stats || year === null) return;
-    drawCard(canvas, stats, year, viewer?.name ?? "", t, i18n.language);
-  }, [stats, year, viewer, t, i18n.language]);
+    drawCard(canvas, stats, year, viewer?.name ?? "", t, i18n.language, preset);
+  }, [stats, year, viewer, t, i18n.language, preset]);
 
   if (!viewer) {
     return (
@@ -314,9 +341,10 @@ export default function Wrapped() {
     canvas.toBlob(async (blob) => {
       if (!blob) return;
       const bytes = Array.from(new Uint8Array(await blob.arrayBuffer()));
-      const ok = await savePng(bytes, `karasu-wrapped-${year}.png`).catch(
-        () => false,
-      );
+      const ok = await savePng(
+        bytes,
+        `karasu-wrapped-${year}-${presetKey}.png`,
+      ).catch(() => false);
       if (ok) {
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
@@ -325,7 +353,7 @@ export default function Wrapped() {
   };
 
   return (
-    <div className="mx-auto max-w-3xl p-8">
+    <div className="mx-auto max-w-4xl p-8">
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <h1 className="flex items-center gap-2 text-2xl font-bold">
           <Sparkles size={20} className="text-accent-400" /> {t("wrapped.title")}
@@ -348,6 +376,24 @@ export default function Wrapped() {
         </Button>
       </div>
 
+      {years.length > 0 && (
+        <div className="mb-4 flex flex-wrap gap-2">
+          {PRESETS.map((p) => (
+            <button
+              key={p.key}
+              onClick={() => setPresetKey(p.key)}
+              className={`rounded-lg border px-3 py-1.5 text-sm transition-colors ${
+                presetKey === p.key
+                  ? "border-accent-500 bg-accent-600 text-accent-ink"
+                  : "border-surface-700 bg-surface-900 text-ink-300 hover:border-surface-600"
+              }`}
+            >
+              {t(p.labelKey)}
+            </button>
+          ))}
+        </div>
+      )}
+
       {loading ? (
         <p className="text-ink-500">{t("common.loading")}</p>
       ) : years.length === 0 ? (
@@ -355,7 +401,7 @@ export default function Wrapped() {
       ) : (
         <canvas
           ref={canvasRef}
-          className="w-full max-w-sm rounded-2xl border border-surface-800 shadow-xl"
+          className="w-full max-w-2xl rounded-2xl border border-surface-800 shadow-xl"
         />
       )}
     </div>

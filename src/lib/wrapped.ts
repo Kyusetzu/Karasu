@@ -19,7 +19,7 @@ export interface WrappedStats {
 }
 
 const TOP_GENRES = 5;
-const TOP_TITLES = 3;
+const TOP_TITLES = 5;
 
 function statsFor(
   entries: WrappedEntry[],

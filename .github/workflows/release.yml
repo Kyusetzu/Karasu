@@ -38,6 +38,10 @@ jobs:
       - name: Build release (NSIS installer)
         run: npm run tauri build
 
+      - name: Rename installer to the full 4-part version
+        shell: pwsh
+        run: ./scripts/rename-installer.ps1
+
       - name: Generate checksum
         shell: pwsh
         run: |

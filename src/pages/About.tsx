@@ -35,7 +35,12 @@ export default function About() {
       <header className="flex items-center gap-4">
         <img src="/favicon.png" alt="" className="h-14 w-14 rounded-xl" />
         <div>
-          <h1 className="text-2xl font-bold">Karasu</h1>
+          <div className="flex items-baseline gap-2">
+            <h1 className="font-brand text-2xl font-bold">Karasu</h1>
+            <span className="font-brand-jp text-sm text-ink-500">
+              カラス
+            </span>
+          </div>
           <p className="text-sm text-ink-500">{t("about.tagline")}</p>
           {version && (
             <p className="mt-0.5 text-xs text-ink-600">

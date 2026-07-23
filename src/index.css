@@ -20,6 +20,9 @@
   --color-accent-ink: #ffffff;
 
   --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  /* Brand wordmark typography, matching the logo (design/Logo - Karasu Full Art.svg) */
+  --font-brand: "SN Pro", var(--font-sans);
+  --font-brand-jp: "Kosugi Maru", var(--font-brand);
 }
 
 /* Light theme: override the surface/ink tokens; accent is set at runtime. */

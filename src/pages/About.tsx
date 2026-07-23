@@ -115,7 +115,7 @@ function UpdateSection() {
     setBusy(true);
     setError(null);
     try {
-      setInfo(await checkForUpdates());
+      setInfo(await checkForUpdates(true));
     } catch (e) {
       setError(String(e));
     } finally {

@@ -33,6 +33,13 @@ $newPath = Join-Path $installer.DirectoryName $newName
 
 if ($installer.FullName -ne $newPath) {
     Rename-Item -Path $installer.FullName -NewName $newName
+
+    # createUpdaterArtifacts produces a sibling `<installer>.sig` -- keep it
+    # matched to the renamed installer if present.
+    $sigPath = "$($installer.FullName).sig"
+    if (Test-Path $sigPath) {
+        Rename-Item -Path $sigPath -NewName "$newName.sig"
+    }
 }
 
 Write-Output $newPath

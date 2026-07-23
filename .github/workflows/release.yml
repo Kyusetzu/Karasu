@@ -36,11 +36,18 @@ jobs:
         run: npm ci
 
       - name: Build release (NSIS installer)
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: npm run tauri build
 
       - name: Rename installer to the full 4-part version
         shell: pwsh
         run: ./scripts/rename-installer.ps1
+
+      - name: Generate update manifest (latest.json)
+        shell: pwsh
+        run: ./scripts/generate-update-manifest.ps1
 
       - name: Generate checksum
         shell: pwsh
@@ -61,6 +68,11 @@ jobs:
             This installer is **unsigned** — Windows SmartScreen may warn on
             first run. Verify the download against `SHA256SUMS.txt` if you
             want to confirm it wasn't tampered with in transit.
+
+            Karasu's built-in updater (About page, or automatic daily checks)
+            verifies updates against its own signing key regardless — see
+            `latest.json` for the update manifest.
           files: |
             src-tauri/target/release/bundle/nsis/*.exe
             SHA256SUMS.txt
+            latest.json

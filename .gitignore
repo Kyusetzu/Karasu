@@ -27,3 +27,7 @@ dist-ssr
 # assets derived from these are committed under assets/ and src-tauri/icons/
 design/*.ai
 design/*.svg
+
+# Release-build artifacts (generated fresh by release.yml, never committed)
+/latest.json
+/SHA256SUMS.txt

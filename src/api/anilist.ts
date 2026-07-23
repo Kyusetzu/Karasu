@@ -115,7 +115,9 @@ export interface UpdateInfo {
   isNewer: boolean;
 }
 
-export const checkForUpdates = () => invoke<UpdateInfo>("check_for_updates");
+/** `force: true` always hits the network; `false` respects the 24h background throttle. */
+export const checkForUpdates = (force: boolean) =>
+  invoke<UpdateInfo>("check_for_updates", { force });
 
 /** Full four-part app version (MAJOR.MINOR.PATCH.COMMIT#) for the About page. */
 export const appVersion = () => invoke<string>("app_version");

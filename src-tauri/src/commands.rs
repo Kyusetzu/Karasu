@@ -762,7 +762,7 @@ pub fn mark_all_notifications_read(db: State<'_, Db>) -> Result<(), String> {
 
 /// Monotonic commit counter — the 4th version segment
 /// (`MAJOR.MINOR.PATCH.COMMIT#`). Bumped by one on every commit.
-pub const COMMIT_NUMBER: u32 = 61;
+pub const COMMIT_NUMBER: u32 = 62;
 
 /// Full four-part display version, e.g. `0.1.1.38`. The `MAJOR.MINOR.PATCH`
 /// core comes from the crate version (kept in sync across the manifests).
@@ -790,21 +790,87 @@ pub struct UpdateInfo {
     pub is_newer: bool,
 }
 
-/// Compares the running version against the latest GitHub release.
+/// Update channel: `"prerelease"` (the rolling `latest` tag, default — the
+/// only channel with real releases today) or `"stable"` (GitHub's
+/// latest-non-prerelease alias, for whenever stable tags start being
+/// published).
 #[tauri::command]
-pub async fn check_for_updates() -> Result<UpdateInfo, String> {
+pub fn get_update_channel(db: State<'_, Db>) -> String {
+    db.kv_get("update_channel")
+        .unwrap_or_else(|| "prerelease".to_string())
+}
+
+#[tauri::command]
+pub fn set_update_channel(db: State<'_, Db>, channel: String) -> Result<(), String> {
+    if channel != "prerelease" && channel != "stable" {
+        return Err("Unknown update channel".into());
+    }
+    db.kv_set("update_channel", &channel)
+}
+
+/// Whether Karasu checks for updates automatically (once/day on startup).
+/// Manual checks from the About page always work regardless.
+#[tauri::command]
+pub fn get_update_check_auto(db: State<'_, Db>) -> bool {
+    db.kv_get("update_check_auto").as_deref() != Some("0")
+}
+
+#[tauri::command]
+pub fn set_update_check_auto(db: State<'_, Db>, enabled: bool) -> Result<(), String> {
+    db.kv_set("update_check_auto", if enabled { "1" } else { "0" })
+}
+
+fn update_channel_api_url(channel: &str) -> &'static str {
+    match channel {
+        "stable" => "https://api.github.com/repos/Kyusetzu/Karasu/releases/latest",
+        _ => "https://api.github.com/repos/Kyusetzu/Karasu/releases/tags/latest",
+    }
+}
+
+/// The `latest.json` manifest the in-app updater downloads from, matching `channel`.
+fn update_channel_manifest_url(channel: &str) -> &'static str {
+    match channel {
+        "stable" => "https://github.com/Kyusetzu/Karasu/releases/latest/download/latest.json",
+        _ => "https://github.com/Kyusetzu/Karasu/releases/download/latest/latest.json",
+    }
+}
+
+const UPDATE_CHECK_THROTTLE_MS: i64 = 24 * 60 * 60 * 1000;
+
+/// Compares the running version against the latest release on the selected
+/// channel. Background/automatic callers should pass `force: false` (respects
+/// a 24h throttle so startup checks don't hit the API every launch); the
+/// manual "Check for Updates" button always passes `force: true`.
+#[tauri::command]
+pub async fn check_for_updates(db: State<'_, Db>, force: bool) -> Result<UpdateInfo, String> {
     // Compare the full four-part version so a release tagged with the commit
     // number lines up with what's running.
     let current = app_version_string();
+    let channel = db
+        .kv_get("update_channel")
+        .unwrap_or_else(|| "prerelease".to_string());
+
+    if !force {
+        let last_check = db
+            .kv_get("last_update_check_ms")
+            .and_then(|s| s.parse::<i64>().ok());
+        if let Some(last) = last_check {
+            if now_ms() - last < UPDATE_CHECK_THROTTLE_MS {
+                return Ok(UpdateInfo { current, latest: None, url: None, is_newer: false });
+            }
+        }
+    }
+    let _ = db.kv_set("last_update_check_ms", &now_ms().to_string());
+
     let resp = reqwest::Client::new()
-        .get("https://api.github.com/repos/Kyusetzu/Karasu/releases/latest")
+        .get(update_channel_api_url(&channel))
         .header("User-Agent", concat!("Karasu/", env!("CARGO_PKG_VERSION")))
         .header("Accept", "application/vnd.github+json")
         .send()
         .await
         .map_err(|e| format!("Update check failed: {e}"))?;
 
-    // No releases published yet — treat as "up to date".
+    // No releases published yet on this channel — treat as "up to date".
     if resp.status() == reqwest::StatusCode::NOT_FOUND {
         return Ok(UpdateInfo { current, latest: None, url: None, is_newer: false });
     }
@@ -856,6 +922,81 @@ mod tests {
         assert!(!version_gt("0.1", "0.1.0"));
         assert!(version_gt("0.1.0.1", "0.1.0"));
     }
+}
+
+// --- In-app updater ------------------------------------------------------------
+
+/// Downloaded-but-not-yet-installed update, held between
+/// `download_pending_update` and `install_pending_update` so applying it is a
+/// separate, explicit user action (installing closes and restarts the app).
+#[derive(Default)]
+pub struct PendingUpdate(pub std::sync::Mutex<Option<(tauri_plugin_updater::Update, Vec<u8>)>>);
+
+#[derive(serde::Serialize)]
+pub struct DownloadedUpdate {
+    pub version: String,
+    pub notes: Option<String>,
+}
+
+/// Checks the selected channel's manifest and, if a newer version is
+/// available, downloads it and stashes it for `install_pending_update`.
+/// Notifies the user (kind: "update") once the download finishes.
+#[tauri::command]
+pub async fn download_pending_update(
+    app: tauri::AppHandle,
+    db: State<'_, Db>,
+    pending: State<'_, PendingUpdate>,
+) -> Result<Option<DownloadedUpdate>, String> {
+    use tauri_plugin_updater::UpdaterExt;
+
+    let channel = db
+        .kv_get("update_channel")
+        .unwrap_or_else(|| "prerelease".to_string());
+    let endpoint = reqwest::Url::parse(update_channel_manifest_url(&channel))
+        .map_err(|e| e.to_string())?;
+
+    let updater = app
+        .updater_builder()
+        .endpoints(vec![endpoint])
+        .map_err(|e| e.to_string())?
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let Some(update) = updater.check().await.map_err(|e| e.to_string())? else {
+        return Ok(None);
+    };
+
+    let version = update.version.clone();
+    let notes = update.body.clone();
+    let bytes = update
+        .download(|_, _| {}, || {})
+        .await
+        .map_err(|e| e.to_string())?;
+
+    *pending.0.lock().unwrap() = Some((update, bytes));
+    crate::notify::notify(
+        &app,
+        "update",
+        "Update ready",
+        &format!("Karasu {version} has been downloaded. Restart to install it."),
+    );
+
+    Ok(Some(DownloadedUpdate { version, notes }))
+}
+
+/// Installs the update stashed by `download_pending_update` and restarts the
+/// app. On Windows the NSIS installer requires the running process to exit,
+/// so this call does not return on success.
+#[tauri::command]
+pub fn install_pending_update(
+    app: tauri::AppHandle,
+    pending: State<'_, PendingUpdate>,
+) -> Result<(), String> {
+    let Some((update, bytes)) = pending.0.lock().unwrap().take() else {
+        return Err("No update has been downloaded yet".into());
+    };
+    update.install(bytes).map_err(|e| e.to_string())?;
+    app.restart();
 }
 
 /// Confirms the pending auto-update immediately (also from Blocked).

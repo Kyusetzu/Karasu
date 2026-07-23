@@ -36,6 +36,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
@@ -50,6 +51,7 @@ pub fn run() {
             app.manage(discord::Discord(std::sync::Mutex::new(None)));
             app.manage(discord::UiPage::default());
             app.manage(library::LibraryIndex::default());
+            app.manage(commands::PendingUpdate::default());
             relations::spawn_loader(app.handle().clone());
             scrobbler::spawn(app.handle().clone());
             airing::spawn(app.handle().clone());
@@ -135,6 +137,12 @@ pub fn run() {
             commands::save_png,
             commands::app_version,
             commands::check_for_updates,
+            commands::get_update_channel,
+            commands::set_update_channel,
+            commands::get_update_check_auto,
+            commands::set_update_check_auto,
+            commands::download_pending_update,
+            commands::install_pending_update,
             commands::get_portable_status,
             commands::enable_portable,
             commands::disable_portable,

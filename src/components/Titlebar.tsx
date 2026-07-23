@@ -23,6 +23,7 @@ export default function Titlebar() {
       className="flex h-9 shrink-0 items-center justify-between bg-surface-950"
     >
       <div data-tauri-drag-region className="flex items-center gap-2 pl-4">
+        <img src="/favicon.png" alt="" className="h-5 w-5" />
         <span className="text-sm font-semibold tracking-wide text-ink-300">
           Karasu
         </span>

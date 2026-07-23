@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Logo source art (Illustrator + SVG exports) — generated PNG/ICO/ICNS
+# assets derived from these are committed under assets/ and src-tauri/icons/
+design/*.ai
+design/*.svg

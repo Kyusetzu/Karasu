@@ -149,15 +149,30 @@ to register anything themselves. Discord uses the built-in application. If you
 build with your own AniList API client, set its redirect URL to
 `http://localhost:46231/callback` so the one-click login works.
 
+## Built with AI
+
+Karasu is developed with heavy assistance from AI coding tools — primarily
+[Claude Code](https://claude.com/claude-code) (Anthropic's Claude models). AI is
+used across the codebase: writing and refactoring features, tests and
+documentation, and reviewing changes. Every change is directed, reviewed and
+verified by a human maintainer before it lands, and the same checks apply to
+AI-written and hand-written code alike (`typecheck`, `vitest`, `cargo test`, and
+a build smoke check per commit). The repository-level [`CLAUDE.md`](CLAUDE.md)
+documents the conventions and guardrails these tools follow.
+
 ## Contact
 
 - Discord: **Kyusetzu**
 - Email: **contact@kyusetzu.de**
 
-## Star history
+## Star History
 
-<a href="https://star-history.com/#Kyusetzu/Karasu&Date">
-  <img src="https://api.star-history.com/svg?repos=Kyusetzu/Karasu&type=Date" alt="Star History Chart" width="600" />
+<a href="https://www.star-history.com/?type=date&repos=Kyusetzu%2FKarasu">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=Kyusetzu/Karasu&type=date&theme=dark&legend=top-left&sealed_token=Jj6NQBXfw0uCgsX0uOjYYviVyxJGU2VSphsY9y7GfRGt4XL9iKWk5UyamsuCP_pta5oWa_O-SpBO14_yzZ5mGs0K1BcXOc_S7t856ox8E_nTpBZ1KvwgjKNczjPo4B0eCET3tE1Iuieo_oGZ9_B2-u5Zk6b1V5aGx8F-qOBj9ZelUGqsE59CdhITcMZ4" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=Kyusetzu/Karasu&type=date&legend=top-left&sealed_token=Jj6NQBXfw0uCgsX0uOjYYviVyxJGU2VSphsY9y7GfRGt4XL9iKWk5UyamsuCP_pta5oWa_O-SpBO14_yzZ5mGs0K1BcXOc_S7t856ox8E_nTpBZ1KvwgjKNczjPo4B0eCET3tE1Iuieo_oGZ9_B2-u5Zk6b1V5aGx8F-qOBj9ZelUGqsE59CdhITcMZ4" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=Kyusetzu/Karasu&type=date&legend=top-left&sealed_token=Jj6NQBXfw0uCgsX0uOjYYviVyxJGU2VSphsY9y7GfRGt4XL9iKWk5UyamsuCP_pta5oWa_O-SpBO14_yzZ5mGs0K1BcXOc_S7t856ox8E_nTpBZ1KvwgjKNczjPo4B0eCET3tE1Iuieo_oGZ9_B2-u5Zk6b1V5aGx8F-qOBj9ZelUGqsE59CdhITcMZ4" />
+ </picture>
 </a>
 
 ## License

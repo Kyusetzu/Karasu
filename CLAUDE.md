@@ -57,9 +57,9 @@ src-tauri/src/       Rust backend
 ### Explicitly rejected — never implement (or propose)
 
 Activity/playback-history expansion, manga volume/cost tracking, settings
-cloud-sync, and anything that would require a hosted backend. **Backlog
-(parked):** friends feed. If a requested feature depends on any of these, flag
-the dependency rather than silently building around it.
+cloud-sync, and anything that would require a hosted backend. If a requested
+feature depends on any of these, flag the dependency rather than silently
+building around it.
 
 ## Versioning (every commit)
 

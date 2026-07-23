@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { listen } from "@tauri-apps/api/event";
@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { hexToHsv, hsvToHex, type Hsv } from "@/lib/contrast";
 import { useAuth } from "@/stores/auth";
 import { useLibrary } from "@/stores/library";
 import { ACCENT_PRESETS, useTheme, type ThemeMode } from "@/stores/theme";
@@ -204,6 +205,119 @@ function Toggle({
         />
       </button>
     </label>
+  );
+}
+
+/** Inline saturation/value + hue picker — replaces the native `<input type="color">`,
+ * which spawns an OS-level colour dialog that can misbehave inside the Tauri window. */
+function ColorPicker({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (hex: string) => void;
+}) {
+  const validValue = /^#[0-9a-f]{6}$/i.test(value) ? value : "#6c7fff";
+  const [hsv, setHsvState] = useState<Hsv>(() => hexToHsv(validValue));
+  const hsvRef = useRef(hsv);
+  const [hexInput, setHexInput] = useState(validValue);
+  const svRef = useRef<HTMLDivElement>(null);
+  const hueRef = useRef<HTMLDivElement>(null);
+
+  // Stay in sync if the accent changes from outside (e.g. a preset click).
+  useEffect(() => {
+    const next = hexToHsv(validValue);
+    hsvRef.current = next;
+    setHsvState(next);
+    setHexInput(validValue);
+  }, [validValue]);
+
+  const commit = (next: Hsv) => {
+    hsvRef.current = next;
+    setHsvState(next);
+    const hex = hsvToHex(next);
+    setHexInput(hex);
+    onChange(hex);
+  };
+
+  const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
+
+  const beginDrag = (
+    el: HTMLDivElement,
+    e: React.PointerEvent,
+    compute: (x: number, y: number, rect: DOMRect) => Hsv,
+  ) => {
+    el.setPointerCapture(e.pointerId);
+    const apply = (x: number, y: number) =>
+      commit(compute(x, y, el.getBoundingClientRect()));
+    apply(e.clientX, e.clientY);
+    const onMove = (ev: PointerEvent) => apply(ev.clientX, ev.clientY);
+    const onUp = () => {
+      el.removeEventListener("pointermove", onMove);
+      el.removeEventListener("pointerup", onUp);
+    };
+    el.addEventListener("pointermove", onMove);
+    el.addEventListener("pointerup", onUp);
+  };
+
+  return (
+    <div className="space-y-2 rounded-lg border border-surface-700 bg-surface-900 p-3">
+      <div
+        ref={svRef}
+        onPointerDown={(e) =>
+          svRef.current &&
+          beginDrag(svRef.current, e, (x, y, rect) => ({
+            h: hsvRef.current.h,
+            s: clamp01((x - rect.left) / rect.width) * 100,
+            v: 100 - clamp01((y - rect.top) / rect.height) * 100,
+          }))
+        }
+        className="relative h-28 w-full touch-none rounded-md"
+        style={{
+          background: `linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, hsl(${hsv.h}, 100%, 50%))`,
+        }}
+      >
+        <div
+          className="pointer-events-none absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow"
+          style={{ left: `${hsv.s}%`, top: `${100 - hsv.v}%` }}
+        />
+      </div>
+
+      <div
+        ref={hueRef}
+        onPointerDown={(e) =>
+          hueRef.current &&
+          beginDrag(hueRef.current, e, (x, _y, rect) => ({
+            h: clamp01((x - rect.left) / rect.width) * 360,
+            s: hsvRef.current.s,
+            v: hsvRef.current.v,
+          }))
+        }
+        className="relative h-3 w-full touch-none rounded-full"
+        style={{
+          background:
+            "linear-gradient(to right, red, yellow, lime, cyan, blue, magenta, red)",
+        }}
+      >
+        <div
+          className="pointer-events-none absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow"
+          style={{ left: `${(hsv.h / 360) * 100}%` }}
+        />
+      </div>
+
+      <input
+        type="text"
+        value={hexInput}
+        onChange={(e) => setHexInput(e.target.value)}
+        onBlur={() => {
+          if (/^#[0-9a-f]{6}$/i.test(hexInput)) commit(hexToHsv(hexInput));
+          else setHexInput(hsvToHex(hsv));
+        }}
+        spellCheck={false}
+        maxLength={7}
+        className="w-full rounded-md border border-surface-700 bg-surface-850 px-2 py-1 font-mono text-xs uppercase focus:border-accent-500 focus:outline-none"
+      />
+    </div>
   );
 }
 
@@ -588,6 +702,7 @@ function AppSection() {
   const [updateAuto, setUpdateAuto] = useState<boolean | null>(null);
   const [updateChannel, setUpdateChannelState] =
     useState<api.UpdateChannel>("prerelease");
+  const [showCustomAccent, setShowCustomAccent] = useState(false);
   const themeMode = useTheme((s) => s.mode);
   const accent = useTheme((s) => s.accent);
   const setThemeMode = useTheme((s) => s.setMode);
@@ -662,36 +777,41 @@ function AppSection() {
           </select>
         </label>
 
-        <div className="flex items-center justify-between gap-4 py-1 text-sm">
-          <span className="block text-ink-100">{t("settings.accent")}</span>
-          <div className="flex items-center gap-2">
-            {ACCENT_PRESETS.map((hex) => (
+        <div className="space-y-3 py-1">
+          <div className="flex items-center justify-between gap-4 text-sm">
+            <span className="block text-ink-100">{t("settings.accent")}</span>
+            <div className="flex items-center gap-2">
+              {ACCENT_PRESETS.map((hex) => (
+                <button
+                  key={hex}
+                  onClick={() => setAccent(hex)}
+                  className={cn(
+                    "h-6 w-6 rounded-full ring-offset-2 ring-offset-surface-900 transition",
+                    accent.toLowerCase() === hex.toLowerCase() && "ring-2 ring-ink-100",
+                  )}
+                  style={{ backgroundColor: hex }}
+                  aria-label={hex}
+                  title={hex}
+                />
+              ))}
               <button
-                key={hex}
-                onClick={() => setAccent(hex)}
+                type="button"
+                onClick={() => setShowCustomAccent((v) => !v)}
+                aria-expanded={showCustomAccent}
                 className={cn(
-                  "h-6 w-6 rounded-full ring-offset-2 ring-offset-surface-900 transition",
-                  accent.toLowerCase() === hex.toLowerCase() && "ring-2 ring-ink-100",
+                  "grid h-6 w-6 place-items-center rounded-full border border-surface-600 transition",
+                  showCustomAccent && "border-accent-500 text-accent-400",
                 )}
-                style={{ backgroundColor: hex }}
-                aria-label={hex}
-                title={hex}
-              />
-            ))}
-            <label
-              className="grid h-6 w-6 cursor-pointer place-items-center overflow-hidden rounded-full border border-surface-600"
-              title={t("settings.accentCustom")}
-            >
-              <Palette size={13} className="text-ink-500" />
-              <input
-                type="color"
-                value={/^#[0-9a-f]{6}$/i.test(accent) ? accent : "#6c7fff"}
-                onChange={(e) => setAccent(e.target.value)}
-                className="sr-only"
+                title={t("settings.accentCustom")}
                 aria-label={t("settings.accentCustom")}
-              />
-            </label>
+              >
+                <Palette size={13} className="text-current" />
+              </button>
+            </div>
           </div>
+          {showCustomAccent && (
+            <ColorPicker value={accent} onChange={setAccent} />
+          )}
         </div>
 
         {autostart !== null && (

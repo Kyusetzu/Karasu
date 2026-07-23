@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   accentShades,
+  hexToHsv,
+  hsvToHex,
   mix,
   parseHex,
   readableInk,
@@ -54,5 +56,30 @@ describe("accentShades", () => {
   it("picks ink for contrast against the accent", () => {
     expect(accentShades("#ffe100").ink).toBe("#000000"); // bright → black
     expect(accentShades("#3a1d6e").ink).toBe("#ffffff"); // dark → white
+  });
+});
+
+describe("hexToHsv / hsvToHex", () => {
+  it("round-trips primary colours", () => {
+    expect(hsvToHex(hexToHsv("#ff0000"))).toBe("#ff0000");
+    expect(hsvToHex(hexToHsv("#00ff00"))).toBe("#00ff00");
+    expect(hsvToHex(hexToHsv("#0000ff"))).toBe("#0000ff");
+  });
+
+  it("black and white have zero saturation", () => {
+    expect(hexToHsv("#000000")).toEqual({ h: 0, s: 0, v: 0 });
+    expect(hexToHsv("#ffffff").s).toBe(0);
+    expect(hexToHsv("#ffffff").v).toBe(100);
+  });
+
+  it("round-trips the default accent", () => {
+    expect(hsvToHex(hexToHsv("#6c7fff"))).toBe("#6c7fff");
+  });
+
+  it("changing only hue keeps saturation/value", () => {
+    const hsv = hexToHsv("#6c7fff");
+    const rotated = hsvToHex({ ...hsv, h: (hsv.h + 90) % 360 });
+    expect(hexToHsv(rotated).s).toBeCloseTo(hsv.s, 0);
+    expect(hexToHsv(rotated).v).toBeCloseTo(hsv.v, 0);
   });
 });

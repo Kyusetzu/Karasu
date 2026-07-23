@@ -42,6 +42,30 @@ jobs:
         shell: pwsh
         run: ./scripts/rename-installer.ps1
 
+      # Signing is opt-in: it only runs once SIGNPATH_* repo variables/secrets
+      # are configured (see SIGNING.md). Until then these steps are skipped
+      # and the release stays unsigned, same as before.
+      - name: Upload unsigned installer for signing
+        if: ${{ vars.SIGNPATH_ORGANIZATION_ID != '' }}
+        id: upload-unsigned-artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-installer
+          path: src-tauri/target/release/bundle/nsis/*.exe
+          retention-days: 1
+
+      - name: Submit signing request to SignPath
+        if: ${{ vars.SIGNPATH_ORGANIZATION_ID != '' }}
+        uses: signpath/github-action-submit-signing-request@v2
+        with:
+          api-token: "${{ secrets.SIGNPATH_API_TOKEN }}"
+          organization-id: "${{ vars.SIGNPATH_ORGANIZATION_ID }}"
+          project-slug: "${{ vars.SIGNPATH_PROJECT_SLUG }}"
+          signing-policy-slug: "${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}"
+          github-artifact-id: "${{ steps.upload-unsigned-artifact.outputs.artifact-id }}"
+          wait-for-completion: true
+          output-artifact-directory: "src-tauri/target/release/bundle/nsis"
+
       - name: Generate checksum
         shell: pwsh
         run: |
@@ -49,18 +73,28 @@ jobs:
           $hash = Get-FileHash -Algorithm SHA256 -Path $installer.FullName
           "$($hash.Hash.ToLower())  $($installer.Name)" | Out-File -FilePath SHA256SUMS.txt -Encoding utf8
 
+      - name: Prepare release notes
+        id: release-notes
+        shell: pwsh
+        run: |
+          $signed = "${{ vars.SIGNPATH_ORGANIZATION_ID }}" -ne ""
+          if ($signed) {
+            $note = "This installer is signed via SignPath. Verify against ``SHA256SUMS.txt`` if you'd like."
+          } else {
+            $note = "This installer is **unsigned** -- Windows SmartScreen may warn on first run. Verify the download against ``SHA256SUMS.txt`` if you want to confirm it wasn't tampered with in transit."
+          }
+          $body = "Automated build from the latest commit on ``main`` (${{ github.sha }}).`n`n$note"
+          Add-Content -Path $env:GITHUB_OUTPUT -Value "body<<EOF"
+          Add-Content -Path $env:GITHUB_OUTPUT -Value $body
+          Add-Content -Path $env:GITHUB_OUTPUT -Value "EOF"
+
       - name: Publish rolling prerelease
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
           name: Latest build
           prerelease: true
-          body: |
-            Automated build from the latest commit on `main` (${{ github.sha }}).
-
-            This installer is **unsigned** — Windows SmartScreen may warn on
-            first run. Verify the download against `SHA256SUMS.txt` if you
-            want to confirm it wasn't tampered with in transit.
+          body: ${{ steps.release-notes.outputs.body }}
           files: |
             src-tauri/target/release/bundle/nsis/*.exe
             SHA256SUMS.txt

@@ -39,7 +39,7 @@ jobs:
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: npm run tauri build
+        run: npx tauri build --config '{"bundle":{"createUpdaterArtifacts":true}}'
 
       - name: Rename installer to the full 4-part version
         shell: pwsh

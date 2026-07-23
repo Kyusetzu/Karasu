@@ -2161,7 +2161,7 @@ dependencies = [
 
 [[package]]
 name = "karasu"
-version = "0.8.2"
+version = "0.8.3"
 dependencies = [
  "discord-rich-presence",
  "keyring",

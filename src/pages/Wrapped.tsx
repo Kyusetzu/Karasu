@@ -60,6 +60,7 @@ function drawCard(
   year: number,
   name: string,
   t: TFunction,
+  lang: string,
 ) {
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
@@ -204,10 +205,10 @@ function drawCard(
   };
 
   addBlock(t("common.anime"), stats.anime, [
-    { value: stats.anime.count.toLocaleString(), label: t("wrapped.completed") },
-    { value: stats.anime.units.toLocaleString(), label: t("common.episodes") },
+    { value: stats.anime.count.toLocaleString(lang), label: t("wrapped.completed") },
+    { value: stats.anime.units.toLocaleString(lang), label: t("common.episodes") },
     {
-      value: Math.round(stats.anime.minutes / 60).toLocaleString(),
+      value: Math.round(stats.anime.minutes / 60).toLocaleString(lang),
       label: t("wrapped.hours"),
     },
     {
@@ -217,8 +218,8 @@ function drawCard(
   ]);
 
   addBlock(t("common.manga"), stats.manga, [
-    { value: stats.manga.count.toLocaleString(), label: t("wrapped.completed") },
-    { value: stats.manga.units.toLocaleString(), label: t("common.chapters") },
+    { value: stats.manga.count.toLocaleString(lang), label: t("wrapped.completed") },
+    { value: stats.manga.units.toLocaleString(lang), label: t("common.chapters") },
     {
       value: stats.manga.meanScore ? round1(stats.manga.meanScore) : "–",
       label: t("wrapped.meanScore"),
@@ -254,7 +255,7 @@ function drawCard(
 }
 
 export default function Wrapped() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const viewer = useAuth((s) => s.viewer);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [anime, setAnime] = useState<WrappedEntry[]>([]);
@@ -291,8 +292,8 @@ export default function Wrapped() {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !stats || year === null) return;
-    drawCard(canvas, stats, year, viewer?.name ?? "", t);
-  }, [stats, year, viewer, t]);
+    drawCard(canvas, stats, year, viewer?.name ?? "", t, i18n.language);
+  }, [stats, year, viewer, t, i18n.language]);
 
   if (!viewer) {
     return (

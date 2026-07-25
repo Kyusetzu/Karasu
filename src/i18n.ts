@@ -289,6 +289,7 @@ const en = {
     prev: "Previous season",
     next: "Next season",
     loading: "Loading season …",
+    empty: "No anime found for this season.",
   },
   time: {
     none: "done",
@@ -816,6 +817,7 @@ const de: typeof en = {
     prev: "Vorherige Saison",
     next: "Nächste Saison",
     loading: "Lade Saison …",
+    empty: "Keine Anime für diese Saison gefunden.",
   },
   time: {
     none: "fertig",

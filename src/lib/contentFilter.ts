@@ -59,6 +59,19 @@ export function adultQueryArg(level: ContentFilterLevel): boolean | undefined {
   return level === "off" ? undefined : false;
 }
 
+/**
+ * Turns that into the GraphQL variables fragment — an *empty object* when
+ * unfiltered, so `$isAdult` is left unset and the argument is absent.
+ *
+ * It has to be absent rather than null. AniList matches `isAdult: null`
+ * against media whose `isAdult` is null, and the field is never null, so a
+ * null argument returns **zero results** instead of meaning "no constraint" —
+ * which silently emptied Seasonal and Search whenever the filter was Off.
+ */
+export function adultVars(isAdult?: boolean): { isAdult?: boolean } {
+  return isAdult === undefined ? {} : { isAdult };
+}
+
 /** Narrows an unvalidated stored value to a level, defaulting to strict. */
 export function toLevel(value: string | null | undefined): ContentFilterLevel {
   return value === "off" || value === "moderate" || value === "strict"

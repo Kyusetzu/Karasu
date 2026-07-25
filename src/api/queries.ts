@@ -1,4 +1,5 @@
 import { gql } from "./anilist";
+import { adultVars } from "@/lib/contentFilter";
 import type { Media, MediaListStatus, MediaTitle, MediaType } from "./types";
 
 /** Media fields for discovery grids, including the user's own list entry. */
@@ -37,10 +38,9 @@ export interface MediaWithListStatus extends Media {
   mediaListEntry: ListEntryStub | null;
 }
 
-// `$isAdult: Boolean` is left null when the filter is off; AniList treats a
-// null argument as "no constraint", so one query serves both cases. Filtering
-// server-side matters here: a page filtered only after the fact can come back
-// almost empty and read as "no results".
+// `$isAdult` is filtered server-side rather than after the fact: a page
+// filtered only on arrival can come back almost empty and read as "no
+// results".
 const SEARCH_QUERY = `
 query ($search: String!, $type: MediaType!, $page: Int, $isAdult: Boolean) {
   Page(page: $page, perPage: 30) {
@@ -59,7 +59,7 @@ export async function searchMedia(
 ) {
   const data = await gql<{
     Page: { pageInfo: { hasNextPage: boolean }; media: MediaWithListStatus[] };
-  }>(SEARCH_QUERY, { search, type, page, isAdult: isAdult ?? null });
+  }>(SEARCH_QUERY, { search, type, page, ...adultVars(isAdult) });
   return data.Page;
 }
 
@@ -91,7 +91,7 @@ export async function seasonalAnime(
 ) {
   const data = await gql<{
     Page: { pageInfo: { hasNextPage: boolean }; media: MediaWithListStatus[] };
-  }>(SEASONAL_QUERY, { season, year, page, isAdult: isAdult ?? null });
+  }>(SEASONAL_QUERY, { season, year, page, ...adultVars(isAdult) });
   return data.Page;
 }
 

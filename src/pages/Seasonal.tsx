@@ -89,6 +89,9 @@ export default function Seasonal() {
         {isLoading && (
           <p className="text-sm text-ink-600">{t("seasonal.loading")}</p>
         )}
+        {!isLoading && !error && results.length === 0 && (
+          <p className="text-sm text-ink-600">{t("seasonal.empty")}</p>
+        )}
         {results.length > 0 && (
           <div className="media-grid gap-x-4 gap-y-6">
             {results.map((m) => (

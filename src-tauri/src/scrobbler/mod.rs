@@ -345,6 +345,10 @@ async fn perform_update(
         }
         let _ = app.emit("now-playing", &guard.clone());
     }
+    // The presence otherwise only refreshes when detection *changes*, so the
+    // "Episode 3 / 12" text would keep showing the pre-scrobble number until
+    // the user switched files.
+    crate::discord::sync_current(app);
     let _ = app.emit(
         "scrobble-done",
         json!({ "mediaId": media_id, "episode": episode }),

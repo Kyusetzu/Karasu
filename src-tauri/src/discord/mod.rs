@@ -1,13 +1,16 @@
 //! Discord Rich Presence. Stays active the whole time Karasu runs: when
 //! nothing is playing it shows the page the user is looking at, and when
 //! detection fires it switches to the title with an episode progress bar.
-//! Every state carries a "Get Karasu here" button.
+//! Every state carries a "Get Karasu here" button, plus a "View on AniList"
+//! one while a matched title is playing (Discord allows at most two). Note
+//! that Discord never shows *your own* buttons back to you — they are only
+//! visible to other people looking at your profile.
 //! Uses the built-in application ID or a user override from the settings.
 
 use crate::db::Db;
 use crate::scrobbler::{NowPlaying, PlaybackState, ScrobbleSession};
 use discord_rich_presence::{
-    activity::{Activity, Assets, Button, Timestamps},
+    activity::{Activity, ActivityType, Assets, Button, Timestamps},
     DiscordIpc, DiscordIpcClient,
 };
 use std::sync::Mutex;
@@ -120,7 +123,7 @@ pub fn sync(app: &AppHandle, now: Option<&NowPlaying>) {
     });
 
     // Build the two presence strings and the timestamps.
-    let (details, state_text, timestamps) = match now {
+    let (details, state_text, timestamps, kind) = match now {
         Some(np) => {
             let title = np
                 .matched_title
@@ -145,23 +148,49 @@ pub fn sync(app: &AppHandle, now: Option<&NowPlaying>) {
                     .end(start + i64::from(min) * 60),
                 _ => Timestamps::new().start(start),
             };
-            (title, state_text, timestamps)
+            // "Watching X" reads better than "Playing Karasu" for video;
+            // Discord has no Reading type, so manga keeps the default.
+            let kind = if is_manga {
+                ActivityType::Playing
+            } else {
+                ActivityType::Watching
+            };
+            (title, state_text, timestamps, kind)
         }
         None => {
             let page = app.state::<UiPage>().0.lock().unwrap().clone();
-            (format!("Looking at {page}"), "Idle".to_string(), Timestamps::new())
+            (
+                format!("Looking at {page}"),
+                "Idle".to_string(),
+                Timestamps::new(),
+                ActivityType::Playing,
+            )
         }
     };
+
+    // Up to two buttons; the crate skips an empty vec, since the API rejects
+    // it. The AniList one only appears when detection matched a real entry.
+    let anilist_url = now.and_then(|np| {
+        np.media_id.map(|id| {
+            let kind = if np.media_type == "MANGA" { "manga" } else { "anime" };
+            format!("https://anilist.co/{kind}/{id}")
+        })
+    });
+    let mut buttons = vec![Button::new("Get Karasu here", REPO_URL)];
+    if let Some(url) = anilist_url.as_deref() {
+        buttons.push(Button::new("View on AniList", url));
+    }
 
     // A large image asset makes the presence card look complete in every
     // state. The "logo" key must be uploaded as an art asset in the Discord
     // developer portal for the built-in application id.
     let activity = Activity::new()
+        .activity_type(kind)
         .details(&details)
         .state(&state_text)
         .assets(Assets::new().large_image("logo").large_text("Karasu"))
         .timestamps(timestamps)
-        .buttons(vec![Button::new("Get Karasu here", REPO_URL)]);
+        .buttons(buttons);
 
     if let Some(client) = guard.as_mut() {
         if client.set_activity(activity).is_err() {

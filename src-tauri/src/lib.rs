@@ -146,6 +146,7 @@ pub fn run() {
             commands::set_content_filter,
             commands::download_pending_update,
             commands::install_pending_update,
+            commands::get_text_scale,
             commands::get_portable_status,
             commands::enable_portable,
             commands::disable_portable,

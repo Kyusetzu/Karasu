@@ -597,6 +597,31 @@ pub fn set_ui_page(app: tauri::AppHandle, page: String) {
     crate::discord::sync_current(&app);
 }
 
+// --- Display scaling ---------------------------------------------------------
+
+/// Windows' Accessibility → Text size setting, as a multiplier (1.0 = 100%).
+///
+/// Display scaling needs nothing from us — WebView2 already applies it, so a
+/// CSS pixel is a scaled pixel. The text-size slider is separate and the
+/// WebView does *not* honour it, so the frontend reads this once at startup
+/// and sets the root font size. Anything unexpected returns 1.0: an
+/// accessibility preference is not worth failing a launch over.
+#[tauri::command]
+pub fn get_text_scale() -> f64 {
+    #[cfg(windows)]
+    {
+        use windows::UI::ViewManagement::UISettings;
+        if let Ok(settings) = UISettings::new() {
+            if let Ok(scale) = settings.TextScaleFactor() {
+                // The slider tops out at 225%; clamp anyway so a bogus value
+                // can't render the app unusable.
+                return scale.clamp(1.0, 2.25);
+            }
+        }
+    }
+    1.0
+}
+
 // --- Portable mode -----------------------------------------------------------
 
 #[derive(serde::Serialize)]
@@ -763,7 +788,7 @@ pub fn mark_all_notifications_read(db: State<'_, Db>) -> Result<(), String> {
 
 /// Monotonic commit counter — the 4th version segment
 /// (`MAJOR.MINOR.PATCH.COMMIT#`). Bumped by one on every commit.
-pub const COMMIT_NUMBER: u32 = 82;
+pub const COMMIT_NUMBER: u32 = 83;
 
 /// Full four-part display version, e.g. `0.1.1.38`. The `MAJOR.MINOR.PATCH`
 /// core comes from the crate version (kept in sync across the manifests).

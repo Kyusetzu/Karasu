@@ -312,7 +312,7 @@ function OverviewCharts({
     .sort((a, b) => (a.releaseYear ?? 0) - (b.releaseYear ?? 0))
     .slice(-16);
   return (
-    <div className="grid gap-4 sm:grid-cols-2 3xl:grid-cols-3">
+    <div className="grid gap-4 sm:grid-cols-2 3xl:grid-cols-4">
       <DistributionCard
         title={t("stats.formats")}
         data={stats.formats.map((d) => ({ label: d.format ?? "?", count: d.count }))}
@@ -341,7 +341,7 @@ function OverviewCharts({
 
 function TileGrid({ tiles }: { tiles: { label: string; value: string }[] }) {
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 3xl:grid-cols-6">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
       {tiles.map((tile) => (
         <div
           key={tile.label}

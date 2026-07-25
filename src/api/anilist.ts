@@ -150,6 +150,13 @@ export const installPendingUpdate = () =>
 /** Full four-part app version (MAJOR.MINOR.PATCH.COMMIT#) for the About page. */
 export const appVersion = () => invoke<string>("app_version");
 
+/**
+ * Windows' Accessibility → Text size multiplier (1.0 = 100%). Display scaling
+ * needs no help — WebView2 applies that itself — but the text-size slider is
+ * separate and the WebView ignores it, so App applies it to the root element.
+ */
+export const getTextScale = () => invoke<number>("get_text_scale");
+
 // --- Airing notifications --------------------------------------------------
 
 export const getAiringNotify = () => invoke<boolean>("get_airing_notify");

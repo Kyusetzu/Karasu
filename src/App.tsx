@@ -10,6 +10,7 @@ import {
   isTauri,
   checkForUpdates,
   downloadPendingUpdate,
+  getTextScale,
   getUpdateCheckAuto,
 } from "@/api/anilist";
 import Titlebar from "@/components/Titlebar";
@@ -40,6 +41,21 @@ export default function App() {
     refreshLibrary();
     initContentFilter();
   }, [init, initNowPlaying, refreshLibrary, initContentFilter]);
+
+  // Karasu takes its size from Windows, not from the window width. Display
+  // scaling arrives for free through WebView2; the Accessibility text-size
+  // slider does not, so apply it here. 100% (the default) leaves the root at
+  // the stylesheet's 16px and this is a no-op.
+  useEffect(() => {
+    if (!isTauri) return;
+    getTextScale()
+      .then((scale) => {
+        if (scale !== 1) {
+          document.documentElement.style.fontSize = `${16 * scale}px`;
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // At most once/day: check for an update and, if one is found, start
   // downloading it in the background. Installing still needs a separate,

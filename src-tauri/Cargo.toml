@@ -1,6 +1,6 @@
 [package]
 name = "karasu"
-version = "0.19.2"
+version = "0.19.3"
 description = "A modern anime and manga tracker built exclusively for AniList (Windows; Linux experimental)"
 authors = ["Kyu"]
 license = "MIT"
@@ -45,6 +45,8 @@ windows = { version = "0.62", features = [
     "Win32_UI_WindowsAndMessaging",
     "Win32_System_Threading",
     "Win32_Security_Cryptography",
+    # WinRT: Accessibility text scale (UI_ViewManagement).
+    "UI_ViewManagement",
 ] }
 
 # Linux groundwork: keyring via the Secret Service (libsecret/D-Bus).

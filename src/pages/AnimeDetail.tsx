@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { ArrowLeft, Clock, ExternalLink, Star } from "lucide-react";
+import { ArrowLeft, Clock, ExternalLink, Play, Star } from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { animeDetail, type MediaDetail } from "@/api/queries";
 import { formatLabel } from "@/lib/format";
@@ -16,6 +16,7 @@ import {
   type MediaType,
 } from "@/api/types";
 import { useAuth } from "@/stores/auth";
+import { useLibrary } from "@/stores/library";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardTitle } from "@/components/ui/card";
@@ -34,6 +35,8 @@ export default function AnimeDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const mediaId = Number(id);
+  const hasNext = useLibrary((s) => s.hasNext);
+  const play = useLibrary((s) => s.play);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["mediaDetail", mediaId],
@@ -179,6 +182,17 @@ export default function AnimeDetail() {
                 })}
               </p>
             )}
+            {data.type === "ANIME" &&
+              hasNext(data.id, data.mediaListEntry?.progress ?? 0) && (
+                <Button
+                  className="mt-3"
+                  onClick={() => play(data.id)}
+                  title={t("common.playNext")}
+                >
+                  <Play size={15} fill="currentColor" />
+                  {t("common.playNext")}
+                </Button>
+              )}
             <button
               onClick={() =>
                 openUrl(

@@ -858,7 +858,7 @@ function ListRow({
             variant="ghost"
             size="icon"
             className="text-accent-400"
-            onClick={() => play(media.id).catch(() => {})}
+            onClick={() => play(media.id)}
             aria-label={t("common.playNext")}
             title={t("common.playNext")}
           >

@@ -202,6 +202,24 @@ pub fn play_next(app: AppHandle, media_id: i64) -> Result<(), String> {
     open_path(&app, &path)
 }
 
+/// Opens one specific episode — the library page lets the user pick, which
+/// `play_next` cannot express.
+#[tauri::command]
+pub fn play_episode(app: AppHandle, media_id: i64, episode: u32) -> Result<(), String> {
+    let path = {
+        let state = app.state::<LibraryIndex>();
+        let guard = state.0.lock().unwrap();
+        guard
+            .by_media
+            .get(&media_id)
+            .and_then(|eps| eps.get(&episode))
+            .cloned()
+            .ok_or("That episode is not in your library")?
+    };
+
+    open_path(&app, &path)
+}
+
 /// Opens `path` in the default player, reporting a stale index clearly — the
 /// index is persisted now, so a file can legitimately have moved since the
 /// last scan.

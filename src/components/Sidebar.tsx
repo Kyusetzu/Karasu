@@ -7,6 +7,7 @@ import {
   Search,
   CalendarDays,
   BarChart3,
+  HardDrive,
   Info,
   Settings,
 } from "lucide-react";
@@ -26,6 +27,7 @@ const items = [
   { to: "/search", key: "nav.search", icon: Search },
   { to: "/seasonal", key: "nav.seasonal", icon: CalendarDays },
   { to: "/stats", key: "nav.stats", icon: BarChart3 },
+  { to: "/library", key: "nav.library", icon: HardDrive },
 ] as const;
 
 export default function Sidebar() {

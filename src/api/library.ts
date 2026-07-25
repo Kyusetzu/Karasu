@@ -1,8 +1,14 @@
 import { invoke } from "@tauri-apps/api/core";
 
+export interface LibraryFile {
+  episode: number;
+  path: string;
+}
+
 export interface LibraryEntry {
   mediaId: number;
   episodes: number[];
+  files: LibraryFile[];
 }
 
 export interface ScanSummary {
@@ -21,3 +27,5 @@ export const getLibraryIndex = () =>
 export const scanLibrary = () => invoke<ScanSummary>("scan_library");
 export const playNext = (mediaId: number) =>
   invoke<void>("play_next", { mediaId });
+export const playEpisode = (mediaId: number, episode: number) =>
+  invoke<void>("play_episode", { mediaId, episode });

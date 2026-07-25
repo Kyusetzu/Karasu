@@ -153,6 +153,7 @@ pub fn run() {
             library::get_library_index,
             library::scan_library,
             library::play_next,
+            library::play_episode,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

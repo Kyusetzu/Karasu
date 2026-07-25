@@ -47,6 +47,7 @@ const en = {
     search: "Search",
     seasonal: "Seasonal",
     stats: "Statistics",
+    library: "Local library",
     about: "About",
     settings: "Settings",
   },
@@ -307,6 +308,17 @@ const en = {
     description: "Description",
     related: "Related anime",
   },
+  library: {
+    title: "Local library",
+    matched: "{{n}} titles on disk.",
+    onDisk: "{{n}} episodes on disk",
+    watchedOf: "{{progress}} / {{total}} watched",
+    playEpisode: "Play episode {{n}}",
+    empty: "Nothing scanned yet.",
+    emptyHint:
+      "Point Karasu at your anime folder, then scan — matched episodes show up here, ready to play.",
+    toSettings: "Open settings",
+  },
   entry: {
     rewatches: "Rewatches",
     rereads: "Rereads",
@@ -475,6 +487,7 @@ const de: typeof en = {
     search: "Suche",
     seasonal: "Saison",
     stats: "Statistik",
+    library: "Lokale Bibliothek",
     about: "Über",
     settings: "Einstellungen",
   },
@@ -735,6 +748,17 @@ const de: typeof en = {
     addToList: "Zur Liste hinzufügen",
     description: "Beschreibung",
     related: "Verwandte Anime",
+  },
+  library: {
+    title: "Lokale Bibliothek",
+    matched: "{{n}} Titel auf der Platte.",
+    onDisk: "{{n}} Folgen auf der Platte",
+    watchedOf: "{{progress}} / {{total}} gesehen",
+    playEpisode: "Folge {{n}} abspielen",
+    empty: "Noch nichts gescannt.",
+    emptyHint:
+      "Wähle deinen Anime-Ordner und starte den Scan — zugeordnete Folgen erscheinen hier und lassen sich direkt abspielen.",
+    toSettings: "Einstellungen öffnen",
   },
   entry: {
     rewatches: "Wiederholungen",

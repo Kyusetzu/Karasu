@@ -25,11 +25,15 @@ import { ACCENT_PRESETS, useTheme, type ThemeMode } from "@/stores/theme";
 import * as api from "@/api/anilist";
 import * as library from "@/api/library";
 import {
+  getJellyfinSettings,
   getScrobbleSettings,
   getSmtcEnabled,
+  setJellyfinSettings,
   setScrobbleSettings,
   setSmtcEnabled,
   smtcSessions,
+  testJellyfin,
+  type JellyfinSettings,
   type ScrobbleSettings,
   type SmtcSession,
 } from "@/stores/nowPlaying";
@@ -55,6 +59,7 @@ export default function Settings() {
       <div className="mt-6 grid grid-cols-[repeat(auto-fit,minmax(26rem,1fr))] items-start gap-6">
         <AccountSection />
         <ScrobbleSection />
+        <JellyfinSection />
         <LibrarySection />
         <ContentSection />
         <DiscordSection />
@@ -802,6 +807,101 @@ function SmtcDiagnostic() {
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Optional Jellyfin server connection.
+ *
+ * The Windows media-session pass already covers Jellyfin Media Player with no
+ * setup. This is for when that isn't enough: the server reports the series,
+ * season and episode as separate fields — so nothing has to be parsed — and
+ * it sees every client, including a phone or a TV.
+ */
+function JellyfinSection() {
+  const { t } = useTranslation();
+  const [settings, setSettings] = useState<JellyfinSettings | null>(null);
+  const [url, setUrl] = useState("");
+  const [key, setKey] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!api.isTauri) return;
+    getJellyfinSettings().then((s) => {
+      setSettings(s);
+      setUrl(s.url);
+    });
+  }, []);
+
+  if (!settings) return null;
+
+  const save = async () => {
+    setError(null);
+    setResult(null);
+    try {
+      // An empty field means "leave the stored key alone", not "clear it" --
+      // the key is never shown, so there is nothing to re-type.
+      await setJellyfinSettings(url, key.trim() === "" ? null : key);
+      setKey("");
+      setSettings(await getJellyfinSettings());
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
+  const test = async () => {
+    setBusy(true);
+    setError(null);
+    setResult(null);
+    try {
+      setResult(await testJellyfin());
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardTitle>{t("settings.jellyfin")}</CardTitle>
+      <p className="mt-2 text-sm text-ink-500">{t("settings.jellyfinHint")}</p>
+      <div className="mt-3 space-y-2">
+        <Input
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          placeholder={t("settings.jellyfinUrlPlaceholder")}
+        />
+        <Input
+          type="password"
+          value={key}
+          onChange={(e) => setKey(e.target.value)}
+          placeholder={
+            settings.hasKey
+              ? t("settings.jellyfinKeyStored")
+              : t("settings.jellyfinKeyPlaceholder")
+          }
+        />
+        <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" onClick={save}>
+            {t("common.save")}
+          </Button>
+          <Button onClick={test} disabled={busy || !settings.hasKey}>
+            <RefreshCw className={cn("size-4", busy && "animate-spin")} />{" "}
+            {t("settings.jellyfinTest")}
+          </Button>
+        </div>
+      </div>
+      <p className="mt-2 text-xs text-ink-600">{t("settings.jellyfinKeyHelp")}</p>
+      {result && (
+        <p className="mt-2 text-sm text-emerald-400">
+          {t("settings.jellyfinPlaying", { title: result })}
+        </p>
+      )}
+      {error && <p className="mt-2 text-sm text-red-300">{error}</p>}
+    </Card>
   );
 }
 

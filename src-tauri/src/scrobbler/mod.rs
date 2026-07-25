@@ -219,10 +219,13 @@ fn build_now_playing(
     playback: detection::Playback,
 ) -> NowPlaying {
     let media_type = if playback.manga { "MANGA" } else { "ANIME" };
-    let parsed = if playback.manga {
-        parser::parse_manga(&playback.media_title)
-    } else {
-        parser::parse(&playback.media_title)
+    // A source that already knows the series and episode (the Jellyfin API)
+    // supplies them directly; guessing at a formatted string would only throw
+    // away information it handed us.
+    let parsed = match playback.parsed.clone() {
+        Some(p) => p,
+        None if playback.manga => parser::parse_manga(&playback.media_title),
+        None => parser::parse(&playback.media_title),
     };
     let candidates = candidates_from_cache(db, media_type);
     let matched = matcher::best_match(&parsed, &candidates);
@@ -400,13 +403,14 @@ pub fn spawn(app: AppHandle) {
     tauri::async_runtime::spawn(async move {
         let mut last_raw: Option<(String, String)> = None;
         loop {
-            // Both passes block -- a Win32 window sweep and a WinRT call --
-            // so keep them off the runtime's worker thread.
-            let smtc_enabled = crate::commands::read_smtc_enabled(&app.state::<Db>());
-            let playback =
-                tokio::task::spawn_blocking(move || detection::detect_playback(smtc_enabled))
-                    .await
-                    .unwrap_or(None);
+            let (smtc_enabled, jellyfin) = {
+                let db = app.state::<Db>();
+                (
+                    crate::commands::read_smtc_enabled(&db),
+                    crate::commands::jellyfin_credentials(&db),
+                )
+            };
+            let playback = detection::detect_playback(smtc_enabled, jellyfin).await;
             let raw = playback
                 .as_ref()
                 .map(|p| (p.process.clone(), p.media_title.clone()));

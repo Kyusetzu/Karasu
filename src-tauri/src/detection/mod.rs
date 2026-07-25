@@ -1,6 +1,7 @@
 //! Detection of running media playback via visible windows
 //! (Karasu's counterpart to Taiga's Anisthesia).
 
+pub mod jellyfin;
 pub mod profiles;
 pub mod smtc;
 
@@ -36,6 +37,10 @@ pub struct Playback {
     pub streaming: bool,
     /// true if this is manga reading (chapters instead of episodes)
     pub manga: bool,
+    /// Set when the source already knows the series and episode exactly, so
+    /// the release-name parser is skipped. Only the Jellyfin API can do this;
+    /// every window-title source leaves it `None`.
+    pub parsed: Option<crate::recognition::parser::Parsed>,
 }
 
 /// Lists all visible top-level windows with title and process name.
@@ -135,6 +140,7 @@ pub fn detect_windows() -> Option<Playback> {
                 media_title: media,
                 streaming: false,
                 manga: false,
+                parsed: None,
             });
         }
     }
@@ -145,6 +151,7 @@ pub fn detect_windows() -> Option<Playback> {
                 media_title: media,
                 streaming: true,
                 manga: false,
+                parsed: None,
             });
         }
     }
@@ -155,24 +162,35 @@ pub fn detect_windows() -> Option<Playback> {
                 media_title: media,
                 streaming: true,
                 manga: true,
+                parsed: None,
             });
         }
     }
     None
 }
 
-/// Full sweep: windows first, then the Windows media sessions.
+/// Full sweep, in order of how much each source actually knows.
 ///
-/// Order matters. A browser playing Crunchyroll appears in *both*, and the
-/// site-marker path produces a cleaner title, so SMTC only gets a look in
-/// when nothing recognised a window — which is exactly the Jellyfin Media
-/// Player case, where the title bar never changes.
-pub fn detect_playback(smtc_enabled: bool) -> Option<Playback> {
-    if let Some(p) = detect_windows() {
-        return Some(p);
+/// The Jellyfin API comes first when it is configured: it reports the series
+/// and episode as separate fields, so it beats anything derived from a
+/// string. Window titles come next. The Windows media sessions come last —
+/// a browser playing Crunchyroll appears in both, and the site-marker path
+/// produces a cleaner title, so SMTC only gets a look in when nothing
+/// recognised a window. That is exactly the Jellyfin Media Player case, where
+/// the title bar never changes.
+pub async fn detect_playback(
+    smtc_enabled: bool,
+    jellyfin: Option<(String, String)>,
+) -> Option<Playback> {
+    if let Some((base, key)) = jellyfin {
+        if let Some(p) = jellyfin::detect(&base, &key).await {
+            return Some(p);
+        }
     }
-    if smtc_enabled {
-        return smtc::detect();
-    }
-    None
+    // Blocking Win32 and WinRT work; keep it off the runtime's worker thread.
+    tokio::task::spawn_blocking(move || {
+        detect_windows().or_else(|| if smtc_enabled { smtc::detect() } else { None })
+    })
+    .await
+    .unwrap_or(None)
 }

@@ -130,6 +130,7 @@ pub fn detect() -> Option<Playback> {
         // for something we only know about through the OS.
         streaming: true,
         manga: false,
+        parsed: None,
     })
 }
 

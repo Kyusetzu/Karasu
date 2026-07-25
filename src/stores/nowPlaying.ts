@@ -105,3 +105,19 @@ export interface SmtcSession {
  * so this is the honest way to see why something was or wasn't detected.
  */
 export const smtcSessions = () => invoke<SmtcSession[]>("smtc_sessions");
+
+export interface JellyfinSettings {
+  url: string;
+  /** Whether a key is stored. The key itself never leaves the backend. */
+  hasKey: boolean;
+}
+
+export const getJellyfinSettings = () =>
+  invoke<JellyfinSettings>("get_jellyfin_settings");
+
+/** Pass `apiKey: null` to save the URL without touching the stored key. */
+export const setJellyfinSettings = (url: string, apiKey: string | null) =>
+  invoke<void>("set_jellyfin_settings", { url, apiKey });
+
+/** Resolves with what the server currently reports playing, or rejects. */
+export const testJellyfin = () => invoke<string>("test_jellyfin");

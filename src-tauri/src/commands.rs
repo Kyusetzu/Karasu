@@ -566,6 +566,63 @@ pub fn set_smtc_enabled(db: State<'_, Db>, enabled: bool) -> Result<(), String> 
     db.kv_set("smtc_enabled", if enabled { "1" } else { "0" })
 }
 
+/// Server URL + API key, or `None` when Jellyfin isn't configured.
+pub(crate) fn jellyfin_credentials(db: &Db) -> Option<(String, String)> {
+    let url = db.kv_get("jellyfin_url").filter(|u| !u.trim().is_empty())?;
+    let key = crate::detection::jellyfin::load_api_key()?;
+    Some((url, key))
+}
+
+#[derive(serde::Serialize)]
+pub struct JellyfinSettings {
+    pub url: String,
+    /// Whether an API key is stored. The key itself is never returned — it
+    /// stays in the credential store, like the AniList token.
+    #[serde(rename = "hasKey")]
+    pub has_key: bool,
+}
+
+#[tauri::command]
+pub fn get_jellyfin_settings(db: State<'_, Db>) -> JellyfinSettings {
+    JellyfinSettings {
+        url: db.kv_get("jellyfin_url").unwrap_or_default(),
+        has_key: crate::detection::jellyfin::load_api_key().is_some(),
+    }
+}
+
+/// `api_key: None` leaves the stored key untouched, so the UI can save a URL
+/// change without making the user re-enter the key it never showed them.
+#[tauri::command]
+pub fn set_jellyfin_settings(
+    db: State<'_, Db>,
+    url: String,
+    api_key: Option<String>,
+) -> Result<(), String> {
+    db.kv_set(
+        "jellyfin_url",
+        &crate::detection::jellyfin::normalize_base_url(&url),
+    )?;
+    if let Some(key) = api_key {
+        crate::detection::jellyfin::save_api_key(&key)?;
+    }
+    Ok(())
+}
+
+/// Confirms the server answers and reports what it currently sees playing, so
+/// a wrong URL or key fails loudly here rather than silently forever.
+#[tauri::command]
+pub async fn test_jellyfin(db: State<'_, Db>) -> Result<String, String> {
+    let Some((url, key)) = jellyfin_credentials(&db) else {
+        return Err("Enter your server URL and an API key first".into());
+    };
+    match crate::detection::jellyfin::detect(&url, &key).await {
+        Some(p) => Ok(p.media_title),
+        None => Err(
+            "Connected, but nothing is playing — or the URL or API key is wrong".into(),
+        ),
+    }
+}
+
 /// Every media session Windows currently knows about, for the Settings
 /// diagnostic. Players fill these fields inconsistently, so this is the only
 /// honest way to see why something was or wasn't detected.
@@ -815,7 +872,7 @@ pub fn mark_all_notifications_read(db: State<'_, Db>) -> Result<(), String> {
 
 /// Monotonic commit counter — the 4th version segment
 /// (`MAJOR.MINOR.PATCH.COMMIT#`). Bumped by one on every commit.
-pub const COMMIT_NUMBER: u32 = 85;
+pub const COMMIT_NUMBER: u32 = 86;
 
 /// Full four-part display version, e.g. `0.1.1.38`. The `MAJOR.MINOR.PATCH`
 /// core comes from the crate version (kept in sync across the manifests).

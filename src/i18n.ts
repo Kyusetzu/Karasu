@@ -487,6 +487,16 @@ const en = {
       "Every media session Windows knows about right now. Use this to see what a player publishes when it isn't being detected.",
     detectionDebugEmpty: "No media session is reporting anything right now.",
     refreshDebug: "Refresh",
+    jellyfin: "Jellyfin server",
+    jellyfinHint:
+      "Optional. Ask your server directly instead of guessing from a window title — it reports the series and episode exactly, and sees playback on your phone or TV too.",
+    jellyfinUrlPlaceholder: "http://192.168.1.10:8096",
+    jellyfinKeyPlaceholder: "API key",
+    jellyfinKeyStored: "API key saved — leave empty to keep it",
+    jellyfinKeyHelp:
+      "Create a key in Jellyfin under Dashboard → API Keys. It is stored in the Windows Credential Manager, never in the app window.",
+    jellyfinTest: "Test connection",
+    jellyfinPlaying: "Connected. Currently playing: {{title}}",
     threshold: "Threshold (minutes)",
     thresholdHint: "0 = automatic (two thirds of the episode length)",
     airingNotify: "New-episode notifications",
@@ -1005,6 +1015,16 @@ const de: typeof en = {
       "Alle Mediensitzungen, die Windows aktuell kennt. Damit siehst du, was ein Player veröffentlicht, wenn er nicht erkannt wird.",
     detectionDebugEmpty: "Zurzeit meldet keine Mediensitzung etwas.",
     refreshDebug: "Aktualisieren",
+    jellyfin: "Jellyfin-Server",
+    jellyfinHint:
+      "Optional. Frag deinen Server direkt, statt aus einem Fenstertitel zu raten — er meldet Serie und Folge exakt und sieht auch die Wiedergabe auf Handy oder TV.",
+    jellyfinUrlPlaceholder: "http://192.168.1.10:8096",
+    jellyfinKeyPlaceholder: "API-Schlüssel",
+    jellyfinKeyStored: "API-Schlüssel gespeichert — leer lassen zum Behalten",
+    jellyfinKeyHelp:
+      "Erstelle einen Schlüssel in Jellyfin unter Dashboard → API-Schlüssel. Er wird im Windows-Anmeldeinformationsmanager gespeichert, nie im App-Fenster.",
+    jellyfinTest: "Verbindung testen",
+    jellyfinPlaying: "Verbunden. Läuft gerade: {{title}}",
     threshold: "Schwelle (Minuten)",
     thresholdHint: "0 = automatisch (zwei Drittel der Episodenlänge)",
     airingNotify: "Benachrichtigung bei neuer Folge",

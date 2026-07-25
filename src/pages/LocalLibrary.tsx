@@ -123,7 +123,7 @@ function LibraryView({ userId }: { userId: number }) {
             </Link>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="grid gap-2 2xl:grid-cols-2">
             {rows.map(({ lib, entry }) => (
               <LibraryRow key={lib.mediaId} lib={lib} entry={entry} />
             ))}

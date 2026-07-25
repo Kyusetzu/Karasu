@@ -42,15 +42,21 @@ const CALLBACK_URL = "http://localhost:46231/callback";
 export default function Settings() {
   const { t } = useTranslation();
   return (
-    <div className="mx-auto max-w-2xl space-y-6 p-8 3xl:max-w-3xl">
+    <div className="mx-auto max-w-2xl p-8 2xl:max-w-none">
       <h1 className="text-2xl font-bold">{t("settings.title")}</h1>
-      <AccountSection />
-      <ScrobbleSection />
-      <LibrarySection />
-      <ContentSection />
-      <DiscordSection />
-      <AppSection />
-      <PortableSection />
+      {/* Every section is self-contained, so they can sit side by side once
+          there's room. A grid rather than CSS `columns` because that would
+          reorder them, and Account belongs first. `items-start` keeps each
+          card its natural height instead of stretching to the tallest. */}
+      <div className="mt-6 grid grid-cols-[repeat(auto-fit,minmax(26rem,1fr))] items-start gap-6">
+        <AccountSection />
+        <ScrobbleSection />
+        <LibrarySection />
+        <ContentSection />
+        <DiscordSection />
+        <AppSection />
+        <PortableSection />
+      </div>
     </div>
   );
 }

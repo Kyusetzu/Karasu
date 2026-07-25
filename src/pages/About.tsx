@@ -40,7 +40,7 @@ export default function About() {
   }, []);
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6 p-8 3xl:max-w-3xl">
+    <div className="mx-auto max-w-2xl p-8 2xl:max-w-none">
       <header className="flex items-center gap-4">
         <img src="/favicon.png" alt="" className="h-14 w-14 rounded-xl" />
         <div>
@@ -59,9 +59,11 @@ export default function About() {
         </div>
       </header>
 
+      {/* Three independent cards; side by side once there's room for them. */}
+      <div className="mt-6 grid grid-cols-[repeat(auto-fit,minmax(26rem,1fr))] items-start gap-6">
       <Card>
         <CardTitle>{t("about.title")}</CardTitle>
-        <p className="mt-3 text-sm leading-relaxed text-ink-300">
+        <p className="mt-3 max-w-[80ch] text-sm leading-relaxed text-ink-300">
           {t("about.description")}
         </p>
       </Card>
@@ -100,6 +102,7 @@ export default function About() {
           </Row>
         </div>
       </Card>
+      </div>
     </div>
   );
 }

@@ -113,7 +113,7 @@ function DashboardContent({ userId }: { userId: number }) {
             .
           </p>
         ) : (
-          <div className="mt-4 flex gap-4 overflow-x-auto pb-2">
+          <div className="mt-4 grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-4">
             {watching.map((entry) => (
               <ContinueCard
                 key={entry.id}
@@ -142,7 +142,7 @@ function DashboardContent({ userId }: { userId: number }) {
             {t("dashboard.noUpcoming")}
           </p>
         ) : (
-          <div className="mt-4 space-y-1">
+          <div className="mt-4 grid gap-1 2xl:grid-cols-2">
             {upcoming.slice(0, 10).map((entry) => (
               <AiringRow key={entry.id} entry={entry} />
             ))}
@@ -197,7 +197,7 @@ function WeeklyDigest({ entries }: { entries: MediaListEntry[] }) {
       <p className="mt-1 text-sm text-ink-500">
         {t("dashboard.thisWeekSummary", { count: thisWeek.length, shows })}
       </p>
-      <div className="mt-4 space-y-1">
+      <div className="mt-4 grid gap-1 2xl:grid-cols-2">
         {thisWeek.map((entry) => (
           <Link
             key={entry.id}
@@ -306,7 +306,7 @@ function ContinueCard({
   const pct = media.episodes ? (entry.progress / media.episodes) * 100 : 0;
 
   return (
-    <div className="group w-36 shrink-0">
+    <div className="group">
       <div className="relative aspect-[2/3] overflow-hidden rounded-lg bg-surface-800">
         <Link to={`/media/${media.id}`}>
           {media.coverImage.large && (

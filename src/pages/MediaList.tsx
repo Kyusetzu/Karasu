@@ -432,7 +432,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
             ))}
           </div>
         ) : (
-          <div className="divide-y divide-surface-800 rounded-xl border border-surface-800">
+          <div className="grid gap-px overflow-hidden rounded-xl border border-surface-800 bg-surface-800 2xl:grid-cols-2">
             {entries.map((entry) => (
               <ListRow
                 key={entry.id}
@@ -797,7 +797,7 @@ function ListRow({
       data-media-id={media.id}
       data-media-type={media.type}
       className={cn(
-        "flex items-center gap-3 px-4 py-2.5 first:rounded-t-xl last:rounded-b-xl",
+        "flex items-center gap-3 px-4 py-2.5",
         selected ? "bg-accent-600/10" : "bg-surface-900 hover:bg-surface-850",
       )}
     >

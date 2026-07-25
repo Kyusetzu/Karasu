@@ -107,7 +107,7 @@ function StatisticsContent({
   const stats = data?.statistics;
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 p-8 3xl:max-w-5xl">
+    <div className="mx-auto max-w-4xl space-y-6 p-8 2xl:max-w-none 3xl:max-w-[130rem]">
       <header className="flex items-center gap-4">
         {avatar ? (
           <img src={avatar} alt="" className="h-12 w-12 rounded-full object-cover" />
@@ -429,7 +429,9 @@ function RankedList({
   return (
     <div className="space-y-3">
       <Tabs options={sortOptions} value={sort} onChange={setSort} />
-      <div className="space-y-1.5">
+      {/* Self-contained rows, so a wide screen shows two or three at a time
+          instead of one very long bar per line. */}
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(22rem,1fr))] gap-1.5">
         {shown.map((e, i) => (
           <RankedRow
             key={entryKey(e, category)}

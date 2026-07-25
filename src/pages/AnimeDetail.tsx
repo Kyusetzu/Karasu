@@ -132,7 +132,7 @@ export default function AnimeDetail() {
         <BackButton className="absolute left-6 top-4 z-10" />
       </div>
 
-      <div className="relative mx-auto max-w-4xl px-8 pb-10 3xl:max-w-5xl">
+      <div className="relative mx-auto max-w-4xl px-8 pb-10 2xl:max-w-none">
         <div className="-mt-16 flex gap-6">
           <img
             src={coverSrc}
@@ -254,75 +254,84 @@ export default function AnimeDetail() {
           </div>
         </div>
 
-        <ListEditor
-          media={data}
-          mediaType={data.type}
-          max={maxProgress(data)}
-          entry={data.mediaListEntry}
-        />
-
-        {data.description && (
-          <Card className="mt-6">
-            <CardTitle>{t("detail.description")}</CardTitle>
-            <p
-              className="mt-3 text-sm leading-relaxed text-ink-300"
-              dangerouslySetInnerHTML={{
-                __html: sanitizeDescription(data.description),
-              }}
+        {/* Prose left, metadata right. The prose column is the *narrow* one
+            and capped at a reading measure — stretching a synopsis across
+            1400px would be worse than the gutters this replaces. The metadata
+            column takes the slack instead, because everything in it (the
+            information grid, tags, links) wraps and genuinely fills. */}
+        <div className="mt-6 grid gap-6 2xl:grid-cols-[minmax(0,48rem)_minmax(0,1fr)] 2xl:items-start">
+          <div className="min-w-0 space-y-6">
+            <ListEditor
+              media={data}
+              mediaType={data.type}
+              max={maxProgress(data)}
+              entry={data.mediaListEntry}
             />
-          </Card>
-        )}
 
-        {data.trailer?.thumbnail && (
-          <Card className="mt-6">
-            <CardTitle>{t("detail.trailer")}</CardTitle>
-            <button
-              onClick={() => openUrl(trailerUrl(data.trailer!))}
-              className="group relative mt-3 block w-full max-w-md overflow-hidden rounded-lg"
-            >
-              <img
-                src={data.trailer.thumbnail}
-                alt=""
-                className="w-full transition-transform group-hover:scale-105"
-              />
-              <span className="absolute inset-0 grid place-items-center bg-black/30 transition-colors group-hover:bg-black/15">
-                <span className="grid h-12 w-12 place-items-center rounded-full bg-black/70">
-                  <Play fill="currentColor" className="size-5 text-white" />
-                </span>
-              </span>
-            </button>
-          </Card>
-        )}
+            {data.description && (
+              <Card>
+                <CardTitle>{t("detail.description")}</CardTitle>
+                <p
+                  className="mt-3 text-sm leading-relaxed text-ink-300"
+                  dangerouslySetInnerHTML={{
+                    __html: sanitizeDescription(data.description),
+                  }}
+                />
+              </Card>
+            )}
 
-        <InformationCard
-          data={data}
-          mainStudios={mainStudios}
-          producers={producers}
-        />
+            {data.trailer?.thumbnail && (
+              <Card>
+                <CardTitle>{t("detail.trailer")}</CardTitle>
+                <button
+                  onClick={() => openUrl(trailerUrl(data.trailer!))}
+                  className="group relative mt-3 block w-full max-w-md overflow-hidden rounded-lg"
+                >
+                  <img
+                    src={data.trailer.thumbnail}
+                    alt=""
+                    className="w-full transition-transform group-hover:scale-105"
+                  />
+                  <span className="absolute inset-0 grid place-items-center bg-black/30 transition-colors group-hover:bg-black/15">
+                    <span className="grid h-12 w-12 place-items-center rounded-full bg-black/70">
+                      <Play fill="currentColor" className="size-5 text-white" />
+                    </span>
+                  </span>
+                </button>
+              </Card>
+            )}
 
-        <AlternativeTitles data={data} />
+          </div>
 
-        <TagList tags={data.tags ?? []} />
+          <div className="min-w-0 space-y-6">
+            <InformationCard
+              data={data}
+              mainStudios={mainStudios}
+              producers={producers}
+            />
+            <AlternativeTitles data={data} />
+            <TagList tags={data.tags ?? []} />
+            <LinkList links={data.externalLinks ?? []} />
+          </div>
 
-        <LinkList links={data.externalLinks ?? []} />
-
-        {relatedEdges.length > 0 && (
-          <div className="mt-6">
-            <div className="flex items-center justify-between">
-              <CardTitle>{t("detail.related")}</CardTitle>
-              <Link
-                to={`/franchise/${data.id}`}
-                className="text-xs text-accent-400 hover:underline"
-              >
-                {t("franchise.view")}
-              </Link>
-            </div>
-            <div className="mt-3 flex gap-4 overflow-x-auto pb-2">
-              {relatedEdges.map((e) => (
+          {relatedEdges.length > 0 && (
+            <div className="2xl:col-span-2">
+              <div className="flex items-center justify-between">
+                <CardTitle>{t("detail.related")}</CardTitle>
+                <Link
+                  to={`/franchise/${data.id}`}
+                  className="text-xs text-accent-400 hover:underline"
+                >
+                  {t("franchise.view")}
+                </Link>
+              </div>
+              {/* Wraps instead of scrolling sideways: across both columns
+                  there is room to show the whole franchise at once. */}
+              <div className="mt-3 grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-4">
+                {relatedEdges.map((e) => (
                   <Link
                     key={`${e.relationType}-${e.node.id}`}
                     to={`/media/${e.node.id}`}
-                    className="w-28 shrink-0"
                   >
                     <img
                       src={e.node.coverImage.large ?? ""}
@@ -340,9 +349,10 @@ export default function AnimeDetail() {
                     </p>
                   </Link>
                 ))}
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
@@ -380,10 +390,13 @@ function InformationCard({
     n === null || n === undefined ? "" : n.toLocaleString(i18n.language);
 
   return (
-    <Card className="mt-6">
+    <Card>
       <CardTitle>{t("detail.information")}</CardTitle>
       <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 3xl:grid-cols-4">
-        <Row label={t("common.status")} value={mediaStatusLabel(data.status, t)} />
+        <Row
+          label={t("common.status")}
+          value={mediaStatusLabel(data.status, t)}
+        />
         <Row label={t("detail.format")} value={formatLabel(data.format, t)} />
         <Row
           label={t("common.episodes")}
@@ -438,7 +451,7 @@ function AlternativeTitles({ data }: { data: MediaDetail }) {
     return null;
   }
   return (
-    <Card className="mt-6">
+    <Card>
       <CardTitle>{t("detail.titles")}</CardTitle>
       <dl className="mt-3 space-y-3">
         <Row label={t("detail.romaji")} value={data.title.romaji} />
@@ -480,7 +493,7 @@ function TagList({ tags }: { tags: MediaTag[] }) {
   const shown = showSpoilers ? [...safe, ...spoilers] : safe;
 
   return (
-    <Card className="mt-6">
+    <Card>
       <CardTitle>{t("detail.tags")}</CardTitle>
       <div className="mt-3 flex flex-wrap gap-1.5">
         {shown.map((tg) => (
@@ -511,7 +524,7 @@ function LinkList({ links }: { links: ExternalLinkData[] }) {
   const { t } = useTranslation();
   if (links.length === 0) return null;
   return (
-    <Card className="mt-6">
+    <Card>
       <CardTitle>{t("detail.links")}</CardTitle>
       <div className="mt-3 flex flex-wrap gap-2">
         {links.map((l) => (
@@ -602,7 +615,7 @@ function ListEditor({
   const max = maxTotal ?? 99999;
 
   return (
-    <Card className="mt-6">
+    <Card>
       <CardTitle>
         {entry ? t("detail.myEntry") : t("detail.addToList")}
       </CardTitle>

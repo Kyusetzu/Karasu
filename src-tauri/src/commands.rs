@@ -763,7 +763,7 @@ pub fn mark_all_notifications_read(db: State<'_, Db>) -> Result<(), String> {
 
 /// Monotonic commit counter — the 4th version segment
 /// (`MAJOR.MINOR.PATCH.COMMIT#`). Bumped by one on every commit.
-pub const COMMIT_NUMBER: u32 = 81;
+pub const COMMIT_NUMBER: u32 = 82;
 
 /// Full four-part display version, e.g. `0.1.1.38`. The `MAJOR.MINOR.PATCH`
 /// core comes from the crate version (kept in sync across the manifests).
@@ -899,10 +899,11 @@ pub fn set_update_check_auto(db: State<'_, Db>, enabled: bool) -> Result<(), Str
     db.kv_set("update_check_auto", if enabled { "1" } else { "0" })
 }
 
-fn update_channel_api_url(channel: &str) -> &'static str {
+/// Human-facing release page for `channel`, linked from the About card.
+fn update_channel_release_url(channel: &str) -> &'static str {
     match channel {
-        "stable" => "https://api.github.com/repos/Kyusetzu/Karasu/releases/latest",
-        _ => "https://api.github.com/repos/Kyusetzu/Karasu/releases/tags/latest",
+        "stable" => "https://github.com/Kyusetzu/Karasu/releases/latest",
+        _ => "https://github.com/Kyusetzu/Karasu/releases/tag/latest",
     }
 }
 
@@ -941,15 +942,20 @@ pub async fn check_for_updates(db: State<'_, Db>, force: bool) -> Result<UpdateI
     }
     let _ = db.kv_set("last_update_check_ms", &now_ms().to_string());
 
+    // Read the version from `latest.json`, not from the release's tag name.
+    // The prerelease channel publishes to a rolling tag literally called
+    // "latest", which `version_gt` parses as 0 — so a tag-based comparison can
+    // never report an update. The manifest carries the real four-part version
+    // (see scripts/generate-update-manifest.ps1) and is what the updater
+    // downloads from anyway.
     let resp = reqwest::Client::new()
-        .get(update_channel_api_url(&channel))
+        .get(update_channel_manifest_url(&channel))
         .header("User-Agent", concat!("Karasu/", env!("CARGO_PKG_VERSION")))
-        .header("Accept", "application/vnd.github+json")
         .send()
         .await
         .map_err(|e| format!("Update check failed: {e}"))?;
 
-    // No releases published yet on this channel — treat as "up to date".
+    // No release published yet on this channel — treat as "up to date".
     if resp.status() == reqwest::StatusCode::NOT_FOUND {
         return Ok(UpdateInfo { current, latest: None, url: None, is_newer: false });
     }
@@ -958,14 +964,19 @@ pub async fn check_for_updates(db: State<'_, Db>, force: bool) -> Result<UpdateI
     }
 
     let body: Value = resp.json().await.map_err(|e| e.to_string())?;
-    let tag = body.get("tag_name").and_then(|v| v.as_str()).unwrap_or("");
-    let url = body
-        .get("html_url")
+    let latest = body
+        .get("version")
         .and_then(|v| v.as_str())
-        .map(str::to_string);
-    let latest = tag.trim_start_matches('v').to_string();
+        .ok_or("Update manifest has no version")?
+        .trim_start_matches('v')
+        .to_string();
     let is_newer = version_gt(&latest, &current);
-    Ok(UpdateInfo { current, latest: Some(latest), url, is_newer })
+    Ok(UpdateInfo {
+        current,
+        latest: Some(latest),
+        url: Some(update_channel_release_url(&channel).to_string()),
+        is_newer,
+    })
 }
 
 /// True if dotted-numeric version `a` is strictly greater than `b`.
@@ -1000,6 +1011,17 @@ mod tests {
         // Shorter vs longer: 0.1 == 0.1.0
         assert!(!version_gt("0.1", "0.1.0"));
         assert!(version_gt("0.1.0.1", "0.1.0"));
+    }
+
+    /// Why `check_for_updates` reads the manifest instead of the release tag.
+    /// The prerelease channel publishes to a rolling tag literally named
+    /// "latest", which parses to 0 here — so a tag-based comparison silently
+    /// reported "up to date" forever. Feeding a version string in still has to
+    /// work, so both halves are pinned.
+    #[test]
+    fn non_numeric_tag_never_reports_an_update() {
+        assert!(!version_gt("latest", "0.19.2.82"));
+        assert!(version_gt("0.19.3.83", "0.19.2.82"));
     }
 
     /// Must stay in lockstep with `isBlocked` in src/lib/contentFilter.ts —

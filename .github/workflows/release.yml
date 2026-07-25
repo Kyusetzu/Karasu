@@ -42,6 +42,7 @@ jobs:
         run: npx tauri build --config '{"bundle":{"createUpdaterArtifacts":true}}'
 
       - name: Rename installer to the full 4-part version
+        id: installer
         shell: pwsh
         run: ./scripts/rename-installer.ps1
 
@@ -52,7 +53,9 @@ jobs:
       - name: Generate checksum
         shell: pwsh
         run: |
-          $installer = Get-ChildItem -Path "src-tauri/target/release/bundle/nsis" -Filter *.exe | Select-Object -First 1
+          $installer = Get-ChildItem -Path "src-tauri/target/release/bundle/nsis" -Filter *.exe |
+              Sort-Object LastWriteTime -Descending |
+              Select-Object -First 1
           $hash = Get-FileHash -Algorithm SHA256 -Path $installer.FullName
           "$($hash.Hash.ToLower())  $($installer.Name)" | Out-File -FilePath SHA256SUMS.txt -Encoding utf8
 
@@ -88,3 +91,23 @@ jobs:
             src-tauri/target/release/bundle/nsis/*.exe
             SHA256SUMS.txt
             latest.json
+
+      # The installer name carries the 4-part version, so every commit uploads
+      # a differently-named asset that the publish step has nothing to
+      # overwrite -- left alone, the rolling release accumulates one installer
+      # per commit forever. Prune *after* uploading, so the release is never
+      # momentarily without an installer for the updater to fetch.
+      - name: Prune stale release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $keep = @("${{ steps.installer.outputs.installer }}", "SHA256SUMS.txt", "latest.json")
+          Write-Host "Keeping: $($keep -join ', ')"
+          $assets = gh release view latest --json assets --jq '.assets[].name'
+          foreach ($name in $assets) {
+            if ($keep -notcontains $name) {
+              Write-Host "Deleting stale asset: $name"
+              gh release delete-asset latest $name --yes
+            }
+          }

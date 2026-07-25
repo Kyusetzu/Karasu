@@ -118,8 +118,9 @@ Because a desktop app can do things anilist.co simply can't:
 
 ## Installation
 
-Download the latest `Karasu_x64-setup.exe` from the
-[releases page](https://github.com/Kyusetzu/Karasu/releases) and run it.
+Download the installer (`Karasu_<version>_x64-setup.exe`) from the
+[releases page](https://github.com/Kyusetzu/Karasu/releases) and run it. Each
+release carries exactly one installer — the newest build.
 
 On first start, open **Settings → Log in with AniList** — your browser opens
 AniList, you approve access, and Karasu logs you in automatically. (A manual

@@ -42,4 +42,10 @@ if ($installer.FullName -ne $newPath) {
     }
 }
 
+# The release workflow needs the final name to know which asset to keep when
+# it prunes the rolling release.
+if ($env:GITHUB_OUTPUT) {
+    "installer=$newName" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+}
+
 Write-Output $newPath

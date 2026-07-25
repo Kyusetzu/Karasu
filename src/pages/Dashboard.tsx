@@ -17,6 +17,7 @@ export default function Dashboard() {
   const viewer = useAuth((s) => s.viewer);
   const mode = useAuth((s) => s.mode);
   const loading = useAuth((s) => s.loading);
+  const enableLocal = useAuth((s) => s.enableLocal);
 
   if (loading) return null;
 
@@ -31,6 +32,15 @@ export default function Dashboard() {
           <Link to="/settings">
             <Button className="mt-5">{t("dashboard.connect")}</Button>
           </Link>
+          {/* Switches to the account-free list in place — the store flips
+              `mode`, which re-renders straight into the dashboard below. */}
+          <button
+            type="button"
+            onClick={() => enableLocal()}
+            className="mt-3 block w-full text-xs text-ink-500 underline-offset-2 hover:text-ink-300 hover:underline"
+          >
+            {t("dashboard.startLocal")}
+          </button>
         </div>
       </div>
     );

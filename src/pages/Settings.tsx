@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { listen } from "@tauri-apps/api/event";
 import {
   ChevronRight,
   ExternalLink,
@@ -18,6 +17,7 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { hexToHsv, hsvToHex, type Hsv } from "@/lib/contrast";
 import { useAuth } from "@/stores/auth";
+import { useAniListLogin } from "@/hooks/useAniListLogin";
 import { useLibrary } from "@/stores/library";
 import { useContentFilter } from "@/stores/contentFilter";
 import { CONTENT_FILTER_LEVELS } from "@/lib/contentFilter";
@@ -388,9 +388,9 @@ function AccountSection() {
   const [clientIdSaved, setClientIdSaved] = useState(false);
   const [token, setToken] = useState("");
   const [busy, setBusy] = useState(false);
-  const [waiting, setWaiting] = useState(false);
   const [showManual, setShowManual] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const login = useAniListLogin();
 
   useEffect(() => {
     if (!api.isTauri) return;
@@ -401,13 +401,6 @@ function AccountSection() {
         setClientIdSaved(true);
       }
     });
-    // Surface failures from the one-click login (invalid token etc.)
-    let unlisten: (() => void) | undefined;
-    listen<string>("anilist-auth-error", (e) => {
-      setWaiting(false);
-      setError(e.payload);
-    }).then((fn) => (unlisten = fn));
-    return () => unlisten?.();
   }, []);
 
   if (viewer) {
@@ -457,18 +450,10 @@ function AccountSection() {
     }
   };
 
-  // One-click flow: start the callback server, then hand off to the browser.
-  // The backend finishes the login and pushes the viewer via "anilist-auth".
+  // If the one-click handoff can't even start, reveal the manual token paste.
   const openLogin = async () => {
     setError(null);
-    try {
-      const url = await api.startLogin();
-      await openUrl(url);
-      setWaiting(true);
-    } catch (e) {
-      setError(String(e));
-      setShowManual(true);
-    }
+    if (!(await login.start())) setShowManual(true);
   };
 
   const submitToken = async () => {
@@ -519,7 +504,7 @@ function AccountSection() {
         <Button onClick={openLogin} disabled={!canLogin}>
           <LogIn size={16} /> {t("settings.loginButton")}
         </Button>
-        {waiting && (
+        {login.waiting && (
           <p className="text-xs text-accent-400">{t("settings.loginWaiting")}</p>
         )}
         <div className="border-t border-surface-800 pt-3">
@@ -569,9 +554,9 @@ function AccountSection() {
           )}
         </div>
       </div>
-      {error && (
+      {(error ?? login.error) && (
         <p className="mt-4 rounded-lg bg-red-950/60 px-3 py-2 text-sm text-red-300">
-          {error}
+          {error ?? login.error}
         </p>
       )}
     </Card>

@@ -48,6 +48,7 @@ const en = {
     seasonal: "Seasonal",
     stats: "Statistics",
     library: "Local library",
+    linkAccount: "Link AniList account",
     about: "About",
     settings: "Settings",
   },
@@ -186,6 +187,7 @@ const en = {
     welcomeText:
       "Your anime tracker for AniList. Connect your account to manage your list and track your progress automatically.",
     connect: "Connect with AniList",
+    startLocal: "or start locally without an account",
     continueWatching: "Continue watching",
     nothingWatching: "You are not watching anything — browse the",
     currentSeason: "current season",
@@ -553,6 +555,7 @@ const de: typeof en = {
     seasonal: "Saison",
     stats: "Statistik",
     library: "Lokale Bibliothek",
+    linkAccount: "AniList-Konto verknüpfen",
     about: "Über",
     settings: "Einstellungen",
   },
@@ -691,6 +694,7 @@ const de: typeof en = {
     welcomeText:
       "Dein Anime-Tracker für AniList. Verbinde deinen Account, um deine Liste zu verwalten und deinen Fortschritt automatisch zu tracken.",
     connect: "Mit AniList verbinden",
+    startLocal: "oder ohne Konto lokal starten",
     continueWatching: "Weiterschauen",
     nothingWatching: "Du schaust gerade nichts — stöbere in der",
     currentSeason: "aktuellen Saison",

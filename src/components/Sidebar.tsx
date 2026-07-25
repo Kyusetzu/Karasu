@@ -1,4 +1,4 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
   LayoutDashboard,
@@ -9,9 +9,12 @@ import {
   BarChart3,
   HardDrive,
   Info,
+  LogIn,
   Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/stores/auth";
+import { useAniListLogin } from "@/hooks/useAniListLogin";
 
 const bottomClass = ({ isActive }: { isActive: boolean }) =>
   cn(
@@ -32,6 +35,16 @@ const items = [
 
 export default function Sidebar() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const mode = useAuth((s) => s.mode);
+  const login = useAniListLogin();
+
+  // If the browser handoff can't start, Settings is where the manual token
+  // paste lives — so send the user there rather than failing silently.
+  const linkAccount = async () => {
+    if (!(await login.start())) navigate("/settings");
+  };
+
   return (
     <nav className="flex w-56 shrink-0 flex-col border-r border-surface-800 bg-surface-900 py-3">
       <div className="flex flex-1 flex-col gap-1 px-3">
@@ -54,6 +67,18 @@ export default function Sidebar() {
         ))}
       </div>
       <div className="flex flex-col gap-1 px-3">
+        {/* A local profile is usable on its own, but linking AniList is the
+            one action it can't reach from anywhere else in one click. */}
+        {mode === "local" && (
+          <button
+            type="button"
+            onClick={linkAccount}
+            className={cn(bottomClass({ isActive: false }), "text-accent-400")}
+          >
+            <LogIn size={18} />
+            {t("nav.linkAccount")}
+          </button>
+        )}
         <NavLink to="/about" className={bottomClass}>
           <Info size={18} />
           {t("nav.about")}

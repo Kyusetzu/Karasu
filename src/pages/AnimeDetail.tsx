@@ -28,6 +28,8 @@ import {
 } from "@/api/types";
 import { useAuth } from "@/stores/auth";
 import { useLibrary } from "@/stores/library";
+import { useContentFilter } from "@/stores/contentFilter";
+import { isBlocked } from "@/lib/contentFilter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardTitle } from "@/components/ui/card";
@@ -48,6 +50,8 @@ export default function AnimeDetail() {
   const mediaId = Number(id);
   const hasNext = useLibrary((s) => s.hasNext);
   const play = useLibrary((s) => s.play);
+  const level = useContentFilter((s) => s.level);
+  const [revealed, setRevealed] = useState(false);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["mediaDetail", mediaId],
@@ -64,6 +68,22 @@ export default function AnimeDetail() {
     );
   if (!data) return null;
 
+  // Reachable by a direct link even when everything else is filtered, so it
+  // gets an explicit reveal rather than a blank page.
+  if (isBlocked(data, level) && !revealed) {
+    return (
+      <div className="grid h-full place-items-center p-8">
+        <div className="max-w-sm text-center">
+          <p className="text-sm text-ink-300">{t("detail.filtered")}</p>
+          <p className="mt-1 text-xs text-ink-600">{t("detail.filteredHint")}</p>
+          <Button className="mt-4" onClick={() => setRevealed(true)}>
+            {t("detail.filteredShow")}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   const title = displayTitle(data.title);
 
   const coverSrc = data.coverImage.extraLarge ?? data.coverImage.large ?? "";
@@ -74,6 +94,14 @@ export default function AnimeDetail() {
   const untilNext = data.nextAiringEpisode
     ? data.nextAiringEpisode.airingAt - Math.floor(Date.now() / 1000)
     : 0;
+
+  // AniList's relations connection takes no arguments, so an adult spin-off of
+  // an all-ages title can only be dropped here, client-side.
+  const relatedEdges = data.relations.edges.filter(
+    (e) =>
+      (e.node.type === "ANIME" || e.node.type === "MANGA") &&
+      !isBlocked(e.node, level),
+  );
 
   return (
     <div>
@@ -284,9 +312,7 @@ export default function AnimeDetail() {
 
         <LinkList links={data.externalLinks ?? []} />
 
-        {data.relations.edges.filter(
-          (e) => e.node.type === "ANIME" || e.node.type === "MANGA",
-        ).length > 0 && (
+        {relatedEdges.length > 0 && (
           <div className="mt-6">
             <div className="flex items-center justify-between">
               <CardTitle>{t("detail.related")}</CardTitle>
@@ -298,9 +324,7 @@ export default function AnimeDetail() {
               </Link>
             </div>
             <div className="mt-3 flex gap-4 overflow-x-auto pb-2">
-              {data.relations.edges
-                .filter((e) => e.node.type === "ANIME" || e.node.type === "MANGA")
-                .map((e) => (
+              {relatedEdges.map((e) => (
                   <Link
                     key={`${e.relationType}-${e.node.id}`}
                     to={`/media/${e.node.id}`}

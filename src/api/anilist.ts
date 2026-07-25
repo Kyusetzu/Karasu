@@ -126,6 +126,10 @@ export const getUpdateChannel = () =>
 export const setUpdateChannel = (channel: UpdateChannel) =>
   invoke<void>("set_update_channel", { channel });
 
+export const getContentFilter = () => invoke<string>("get_content_filter");
+export const setContentFilter = (level: string) =>
+  invoke<void>("set_content_filter", { level });
+
 export const getUpdateCheckAuto = () => invoke<boolean>("get_update_check_auto");
 export const setUpdateCheckAuto = (enabled: boolean) =>
   invoke<void>("set_update_check_auto", { enabled });

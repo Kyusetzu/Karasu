@@ -25,11 +25,13 @@ function statsFor(
   entries: WrappedEntry[],
   year: number,
   withMinutes: boolean,
+  hideGenre: (name: string) => boolean,
 ): MediaYearStats {
   const rows = entries.filter((e) => e.year === year);
 
   const genres = new Map<string, number>();
   for (const e of rows) for (const g of e.genres) {
+    if (hideGenre(g)) continue;
     genres.set(g, (genres.get(g) ?? 0) + 1);
   }
 
@@ -55,15 +57,20 @@ function statsFor(
   };
 }
 
-/** Aggregate a year across both media types. */
+/**
+ * Aggregate a year across both media types. `hideGenre` suppresses individual
+ * genre *names* from the top-genres bars — the card is exported and shared, so
+ * a filtered genre label must not survive even when its entries are gone.
+ */
 export function aggregate(
   anime: WrappedEntry[],
   manga: WrappedEntry[],
   year: number,
+  hideGenre: (name: string) => boolean = () => false,
 ): WrappedStats {
   return {
-    anime: statsFor(anime, year, true),
-    manga: statsFor(manga, year, false),
+    anime: statsFor(anime, year, true, hideGenre),
+    manga: statsFor(manga, year, false, hideGenre),
   };
 }
 

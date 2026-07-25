@@ -142,6 +142,8 @@ pub fn run() {
             commands::set_update_channel,
             commands::get_update_check_auto,
             commands::set_update_check_auto,
+            commands::get_content_filter,
+            commands::set_content_filter,
             commands::download_pending_update,
             commands::install_pending_update,
             commands::get_portable_status,

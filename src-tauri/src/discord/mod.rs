@@ -109,6 +109,16 @@ pub fn sync(app: &AppHandle, now: Option<&NowPlaying>) {
         }
     }
 
+    // Never broadcast a title the user's content filter hides — the presence
+    // is the one surface other people see, so it matters most here. Falls back
+    // to the idle presence rather than going silent.
+    let level = crate::commands::read_content_filter(&db);
+    let now = now.filter(|np| {
+        np.media_id
+            .map(|id| !crate::commands::media_id_blocked(&db, id, &level))
+            .unwrap_or(true)
+    });
+
     // Build the two presence strings and the timestamps.
     let (details, state_text, timestamps) = match now {
         Some(np) => {

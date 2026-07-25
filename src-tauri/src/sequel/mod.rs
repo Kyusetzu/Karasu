@@ -25,7 +25,7 @@ query ($ids: [Int], $type: MediaType) {
       relations {
         edges {
           relationType
-          node { id title { romaji english native } status }
+          node { id title { romaji english native } status isAdult genres }
         }
       }
     }
@@ -113,6 +113,7 @@ async fn check(app: &AppHandle) {
     // On the first enabled run, record everything currently found without
     // notifying, so we only announce genuinely new relations afterwards.
     let seeding = db.kv_get("sequel_seeded").is_none();
+    let level = crate::commands::read_content_filter(&db);
 
     for media_type in ["ANIME", "MANGA"] {
         // Everything on the list (any status) counts as "already have it".
@@ -152,6 +153,13 @@ async fn check(app: &AppHandle) {
                     };
                     if !is_alertable(rel, status, node_id, &on_list) {
                         continue;
+                    }
+                    // An announced sequel can be adult even when the source on
+                    // the user's list is not.
+                    if let Some(node) = edge.get("node") {
+                        if crate::commands::media_blocked(node, &level) {
+                            continue;
+                        }
                     }
                     let key = format!("sequel_seen:{node_id}");
                     if db.kv_get(&key).is_some() {

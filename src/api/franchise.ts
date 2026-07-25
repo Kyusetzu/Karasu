@@ -1,4 +1,5 @@
 import { gql } from "./anilist";
+import { isBlocked, type ContentFilterLevel } from "@/lib/contentFilter";
 import type { MediaListStatus, MediaTitle, MediaType } from "./types";
 
 /**
@@ -20,6 +21,8 @@ query ($ids: [Int]) {
       title { romaji english native }
       coverImage { large }
       format
+      isAdult
+      genres
       mediaListEntry { status }
       relations {
         edges {
@@ -30,6 +33,8 @@ query ($ids: [Int]) {
             title { romaji english native }
             coverImage { large }
             format
+            isAdult
+            genres
             mediaListEntry { status }
           }
         }
@@ -86,18 +91,29 @@ interface RawMedia {
   title: MediaTitle;
   coverImage: { large: string | null } | null;
   format: string | null;
+  isAdult: boolean | null;
+  genres: string[] | null;
   mediaListEntry: { status: MediaListStatus } | null;
 }
 
-export async function loadFranchise(rootId: number): Promise<FranchiseGraph> {
+export async function loadFranchise(
+  rootId: number,
+  level: ContentFilterLevel = "off",
+): Promise<FranchiseGraph> {
   const nodes = new Map<number, FranchiseNode>();
   const edges: FranchiseEdge[] = [];
   const visited = new Set<number>();
   let frontier = [rootId];
   let truncated = false;
 
+  // A filtered node is dropped entirely — no node, no edge, no traversal —
+  // so the graph never renders an edge pointing at something invisible.
+  const hidden = (m: RawMedia | null | undefined) =>
+    isBlocked(m ? { isAdult: m.isAdult, genres: m.genres } : null, level);
+
   const addNode = (m: RawMedia | null | undefined) => {
     if (!m || (m.type !== "ANIME" && m.type !== "MANGA")) return;
+    if (hidden(m)) return;
     if (!nodes.has(m.id)) {
       nodes.set(m.id, {
         id: m.id,
@@ -131,10 +147,12 @@ export async function loadFranchise(rootId: number): Promise<FranchiseGraph> {
 
     const next: number[] = [];
     for (const media of data.Page.media) {
+      if (hidden(media)) continue;
       addNode(media);
       for (const edge of media.relations.edges) {
         const node = edge.node;
         if (!node || (node.type !== "ANIME" && node.type !== "MANGA")) continue;
+        if (hidden(node)) continue;
         // Show every relation…
         addNode(node);
         // Keep a single edge per pair (SEQUEL/PREQUEL are reciprocal).

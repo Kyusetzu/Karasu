@@ -18,6 +18,7 @@ const MEDIA_FIELDS = `
   averageScore
   genres
   synonyms
+  isAdult
   nextAiringEpisode { episode airingAt }
   mediaListEntry { id status progress score(format: POINT_10) repeat notes }
 `;
@@ -36,26 +37,37 @@ export interface MediaWithListStatus extends Media {
   mediaListEntry: ListEntryStub | null;
 }
 
+// `$isAdult: Boolean` is left null when the filter is off; AniList treats a
+// null argument as "no constraint", so one query serves both cases. Filtering
+// server-side matters here: a page filtered only after the fact can come back
+// almost empty and read as "no results".
 const SEARCH_QUERY = `
-query ($search: String!, $type: MediaType!, $page: Int) {
+query ($search: String!, $type: MediaType!, $page: Int, $isAdult: Boolean) {
   Page(page: $page, perPage: 30) {
     pageInfo { hasNextPage }
-    media(search: $search, type: $type, sort: SEARCH_MATCH) { ${MEDIA_FIELDS} }
+    media(search: $search, type: $type, sort: SEARCH_MATCH, isAdult: $isAdult) {
+      ${MEDIA_FIELDS}
+    }
   }
 }`;
 
-export async function searchMedia(search: string, type: MediaType, page = 1) {
+export async function searchMedia(
+  search: string,
+  type: MediaType,
+  page = 1,
+  isAdult?: boolean,
+) {
   const data = await gql<{
     Page: { pageInfo: { hasNextPage: boolean }; media: MediaWithListStatus[] };
-  }>(SEARCH_QUERY, { search, type, page });
+  }>(SEARCH_QUERY, { search, type, page, isAdult: isAdult ?? null });
   return data.Page;
 }
 
 const SEASONAL_QUERY = `
-query ($season: MediaSeason!, $year: Int!, $page: Int) {
+query ($season: MediaSeason!, $year: Int!, $page: Int, $isAdult: Boolean) {
   Page(page: $page, perPage: 50) {
     pageInfo { hasNextPage }
-    media(season: $season, seasonYear: $year, type: ANIME, sort: POPULARITY_DESC) {
+    media(season: $season, seasonYear: $year, type: ANIME, sort: POPULARITY_DESC, isAdult: $isAdult) {
       ${MEDIA_FIELDS}
     }
   }
@@ -71,10 +83,15 @@ export function currentSeason(): { season: Season; year: number } {
   return { season, year: now.getFullYear() };
 }
 
-export async function seasonalAnime(season: Season, year: number, page = 1) {
+export async function seasonalAnime(
+  season: Season,
+  year: number,
+  page = 1,
+  isAdult?: boolean,
+) {
   const data = await gql<{
     Page: { pageInfo: { hasNextPage: boolean }; media: MediaWithListStatus[] };
-  }>(SEASONAL_QUERY, { season, year, page });
+  }>(SEASONAL_QUERY, { season, year, page, isAdult: isAdult ?? null });
   return data.Page;
 }
 
@@ -109,6 +126,8 @@ query ($id: Int!) {
           title { romaji english native }
           coverImage { large }
           format
+          isAdult
+          genres
         }
       }
     }
@@ -161,6 +180,8 @@ export interface MediaDetail extends MediaWithListStatus {
         title: Media["title"];
         coverImage: { large: string | null };
         format: string | null;
+        isAdult: boolean;
+        genres: string[];
       };
     }[];
   };
@@ -298,6 +319,7 @@ query ($userId: Int!, $type: MediaType!) {
           id
           duration
           genres
+          isAdult
           title { romaji english native }
         }
       }
@@ -312,6 +334,7 @@ export interface WrappedEntry {
   year: number | null;
   duration: number | null;
   genres: string[];
+  isAdult: boolean;
   title: MediaTitle;
 }
 
@@ -332,6 +355,7 @@ export async function wrappedEntries(
             id: number;
             duration: number | null;
             genres: string[];
+            isAdult: boolean;
             title: MediaTitle;
           };
         }[];
@@ -353,6 +377,7 @@ export async function wrappedEntries(
         year: e.completedAt?.year ?? null,
         duration: e.media.duration,
         genres: e.media.genres,
+        isAdult: e.media.isAdult,
         title: e.media.title,
       });
     }

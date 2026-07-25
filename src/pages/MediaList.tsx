@@ -22,6 +22,8 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/stores/auth";
 import { useLibrary } from "@/stores/library";
+import { useContentFilter } from "@/stores/contentFilter";
+import { isBlocked } from "@/lib/contentFilter";
 import { fetchMediaList, flushQueue } from "@/api/anilist";
 import {
   displayTitle,
@@ -127,17 +129,27 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
   });
   const { save, remove } = useListMutations(userId, type);
 
+  const level = useContentFilter((s) => s.level);
+
+  // The content filter is applied here rather than further down, so every
+  // consumer of byStatus — the tabs, the random pick, the tag union — is
+  // covered by one check instead of each remembering to repeat it.
+  //
+  // Deliberately not applied at the cache layer: that same cache feeds the
+  // scrobbler and the library matcher, which must keep recognising every
+  // title the user actually tracks.
   const byStatus = useMemo(() => {
     const map = new Map<MediaListStatus, MediaListEntry[]>();
     for (const status of STATUS_ORDER) map.set(status, []);
     for (const group of data?.lists ?? []) {
       if (group.isCustomList) continue;
       for (const entry of group.entries) {
+        if (isBlocked(entry.media, level)) continue;
         map.get(entry.status)?.push(entry);
       }
     }
     return map;
-  }, [data]);
+  }, [data, level]);
 
   // Union of tags across the whole list, for the filter + editor autocomplete.
   const allTags = useMemo(

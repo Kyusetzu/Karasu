@@ -7,6 +7,8 @@ import type { MediaType } from "@/api/types";
 import { Input } from "@/components/ui/input";
 import MediaCard from "@/components/MediaCard";
 import { isTauri } from "@/api/anilist";
+import { adultQueryArg, isBlocked } from "@/lib/contentFilter";
+import { useContentFilter } from "@/stores/contentFilter";
 import { cn } from "@/lib/utils";
 
 export default function Search() {
@@ -21,11 +23,20 @@ export default function Search() {
     return () => clearTimeout(timer);
   }, [input]);
 
+  const level = useContentFilter((s) => s.level);
+  const filterReady = useContentFilter((s) => s.ready);
+
   const { data, isFetching, error } = useQuery({
-    queryKey: ["search", type, term],
-    queryFn: () => searchMedia(term, type),
-    enabled: isTauri && term.length >= 2,
+    // The level is part of the key: changing it must refetch, since the
+    // filtering happens server-side.
+    queryKey: ["search", type, term, level],
+    queryFn: () => searchMedia(term, type, 1, adultQueryArg(level)),
+    enabled: isTauri && filterReady && term.length >= 2,
   });
+
+  // Server-side isAdult covers explicit works; the strict level additionally
+  // drops Ecchi, which AniList does not flag as adult.
+  const results = (data?.media ?? []).filter((m) => !isBlocked(m, level));
 
   return (
     <div className="flex h-full flex-col">
@@ -73,14 +84,14 @@ export default function Search() {
         {isFetching && (
           <p className="text-sm text-ink-600">{t("search.searching")}</p>
         )}
-        {!isFetching && term.length >= 2 && data?.media.length === 0 && (
+        {!isFetching && term.length >= 2 && results.length === 0 && (
           <p className="text-sm text-ink-600">
             {t("search.noResults", { term })}
           </p>
         )}
-        {data && data.media.length > 0 && (
+        {results.length > 0 && (
           <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-x-4 gap-y-6">
-            {data.media.map((m) => (
+            {results.map((m) => (
               <MediaCard key={m.id} media={m} />
             ))}
           </div>

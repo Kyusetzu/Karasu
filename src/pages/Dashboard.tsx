@@ -6,6 +6,8 @@ import { BarChart3, CalendarClock, CalendarDays, Play, Plus } from "lucide-react
 import { fetchMediaList } from "@/api/anilist";
 import { displayTitle, type MediaListEntry } from "@/api/types";
 import { useAuth } from "@/stores/auth";
+import { useContentFilter } from "@/stores/contentFilter";
+import { isBlocked } from "@/lib/contentFilter";
 import { useListMutations } from "@/hooks/useListMutations";
 import { Button } from "@/components/ui/button";
 import NowPlayingCard from "@/components/NowPlayingCard";
@@ -44,39 +46,43 @@ function DashboardContent({ userId }: { userId: number }) {
     queryFn: () => fetchMediaList(userId, "ANIME"),
   });
   const { save } = useListMutations(userId, "ANIME");
+  const level = useContentFilter((s) => s.level);
 
-  const watching = useMemo(() => {
-    const entries =
+  // One content-filtered base for every section below, so a new section can't
+  // accidentally skip the check.
+  const allAnime = useMemo(
+    () =>
       data?.lists
         .filter((g) => !g.isCustomList)
         .flatMap((g) => g.entries)
-        .filter((e) => e.status === "CURRENT" || e.status === "REPEATING") ??
-      [];
-    return [...entries].sort((a, b) => b.updatedAt - a.updatedAt);
-  }, [data]);
+        .filter((e) => !isBlocked(e.media, level)) ?? [],
+    [data, level],
+  );
 
-  const upcoming = useMemo(() => {
-    const entries =
-      data?.lists
-        .filter((g) => !g.isCustomList)
-        .flatMap((g) => g.entries)
+  const watching = useMemo(
+    () =>
+      allAnime
+        .filter((e) => e.status === "CURRENT" || e.status === "REPEATING")
+        .sort((a, b) => b.updatedAt - a.updatedAt),
+    [allAnime],
+  );
+
+  const upcoming = useMemo(
+    () =>
+      allAnime
         .filter(
           (e) =>
             e.media.nextAiringEpisode &&
             (e.status === "CURRENT" ||
               e.status === "REPEATING" ||
               e.status === "PLANNING"),
-        ) ?? [];
-    return [...entries].sort(
-      (a, b) =>
-        a.media.nextAiringEpisode!.airingAt - b.media.nextAiringEpisode!.airingAt,
-    );
-  }, [data]);
-
-  const allAnime = useMemo(
-    () =>
-      data?.lists.filter((g) => !g.isCustomList).flatMap((g) => g.entries) ?? [],
-    [data],
+        )
+        .sort(
+          (a, b) =>
+            a.media.nextAiringEpisode!.airingAt -
+            b.media.nextAiringEpisode!.airingAt,
+        ),
+    [allAnime],
   );
 
   return (

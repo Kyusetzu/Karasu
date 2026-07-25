@@ -9,6 +9,7 @@ const entry = (p: Partial<WrappedEntry> & { year: number }): WrappedEntry => ({
   year: p.year,
   duration: p.duration ?? 24,
   genres: p.genres ?? [],
+  isAdult: p.isAdult ?? false,
   title: p.title ?? { romaji: "T", english: null, native: null },
 });
 
@@ -35,6 +36,15 @@ describe("aggregate", () => {
   it("ranks top genres by frequency", () => {
     const s = aggregate(anime, manga, 2024);
     expect(s.anime.topGenres[0]).toEqual({ name: "Action", count: 2 });
+  });
+
+  it("suppresses hidden genre names from the exported card", () => {
+    const entries = [
+      entry({ year: 2024, genres: ["Action", "Ecchi"] }),
+      entry({ year: 2024, genres: ["Ecchi"] }),
+    ];
+    const s = aggregate(entries, [], 2024, (g) => g === "Ecchi");
+    expect(s.anime.topGenres.map((g) => g.name)).toEqual(["Action"]);
   });
 
   it("averages only scored entries", () => {

@@ -5,6 +5,8 @@ import { useTranslation } from "react-i18next";
 import { Search } from "lucide-react";
 import { displayTitle, type ListResult, type MediaType } from "@/api/types";
 import { useAuth } from "@/stores/auth";
+import { useContentFilter } from "@/stores/contentFilter";
+import { isBlocked } from "@/lib/contentFilter";
 
 interface Item {
   id: string;
@@ -33,6 +35,7 @@ export default function CommandPalette() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const viewer = useAuth((s) => s.viewer);
+  const level = useContentFilter((s) => s.level);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [sel, setSel] = useState(0);
@@ -64,6 +67,8 @@ export default function CommandPalette() {
   }, [open]);
 
   // Entries from the cached lists (searchable across all title variants).
+  // This reads the query cache directly rather than going through MediaList,
+  // so it needs its own content-filter check — MediaList's does not apply.
   const entries = useMemo(() => {
     if (!open || !viewer) return [];
     const out: { item: Item; haystack: string }[] = [];
@@ -74,6 +79,7 @@ export default function CommandPalette() {
         if (group.isCustomList) continue;
         for (const e of group.entries) {
           if (seen.has(e.mediaId)) continue;
+          if (isBlocked(e.media, level)) continue;
           seen.add(e.mediaId);
           const ti = e.media.title;
           out.push({
@@ -92,7 +98,7 @@ export default function CommandPalette() {
       }
     }
     return out;
-  }, [open, viewer, qc, t]);
+  }, [open, viewer, qc, t, level]);
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();

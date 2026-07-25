@@ -37,6 +37,7 @@ export interface Media {
   seasonYear: number | null;
   averageScore: number | null;
   genres: string[];
+  isAdult?: boolean | null;
   synonyms: string[];
   nextAiringEpisode: { episode: number; airingAt: number } | null;
 }

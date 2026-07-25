@@ -6,6 +6,8 @@ import { currentSeason, seasonalAnime, type Season } from "@/api/queries";
 import { isTauri } from "@/api/anilist";
 import MediaCard from "@/components/MediaCard";
 import { Button } from "@/components/ui/button";
+import { adultQueryArg, isBlocked } from "@/lib/contentFilter";
+import { useContentFilter } from "@/stores/contentFilter";
 import { cn } from "@/lib/utils";
 
 const SEASONS: Season[] = ["WINTER", "SPRING", "SUMMER", "FALL"];
@@ -21,12 +23,17 @@ export default function Seasonal() {
   const { t } = useTranslation();
   const [{ season, year }, setPeriod] = useState(currentSeason());
 
+  const level = useContentFilter((s) => s.level);
+  const filterReady = useContentFilter((s) => s.ready);
+
   const { data, isLoading, error } = useQuery({
-    queryKey: ["seasonal", season, year],
-    queryFn: () => seasonalAnime(season, year),
-    enabled: isTauri,
+    queryKey: ["seasonal", season, year, level],
+    queryFn: () => seasonalAnime(season, year, 1, adultQueryArg(level)),
+    enabled: isTauri && filterReady,
     staleTime: 30 * 60 * 1000,
   });
+
+  const results = (data?.media ?? []).filter((m) => !isBlocked(m, level));
 
   return (
     <div className="flex h-full flex-col">
@@ -82,9 +89,9 @@ export default function Seasonal() {
         {isLoading && (
           <p className="text-sm text-ink-600">{t("seasonal.loading")}</p>
         )}
-        {data && (
+        {results.length > 0 && (
           <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-x-4 gap-y-6">
-            {data.media.map((m) => (
+            {results.map((m) => (
               <MediaCard key={m.id} media={m} />
             ))}
           </div>

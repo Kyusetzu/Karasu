@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { ArrowLeft } from "lucide-react";
 import { loadFranchise } from "@/api/franchise";
+import { useContentFilter } from "@/stores/contentFilter";
 import { isTauri } from "@/api/anilist";
 import { formatLabel } from "@/lib/format";
 import { layoutFranchise, NODE_H, NODE_W } from "@/lib/franchiseLayout";
@@ -30,10 +31,13 @@ export default function Franchise() {
   const navigate = useNavigate();
   const rootId = Number(id);
 
+  const level = useContentFilter((s) => s.level);
+  const filterReady = useContentFilter((s) => s.ready);
+
   const { data, isLoading, error } = useQuery({
-    queryKey: ["franchise", rootId],
-    queryFn: () => loadFranchise(rootId),
-    enabled: isTauri && Number.isFinite(rootId),
+    queryKey: ["franchise", rootId, level],
+    queryFn: () => loadFranchise(rootId, level),
+    enabled: isTauri && filterReady && Number.isFinite(rootId),
   });
 
   const layout = useMemo(() => {

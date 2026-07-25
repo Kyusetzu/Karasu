@@ -13,6 +13,8 @@ import {
   type WrappedStats,
 } from "@/lib/wrapped";
 import { useAuth } from "@/stores/auth";
+import { useContentFilter } from "@/stores/contentFilter";
+import { isBlocked, isBlockedGenre } from "@/lib/contentFilter";
 import { Button } from "@/components/ui/button";
 
 const P = 72;
@@ -357,6 +359,7 @@ function drawCard(
 export default function Wrapped() {
   const { t, i18n } = useTranslation();
   const viewer = useAuth((s) => s.viewer);
+  const level = useContentFilter((s) => s.level);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [anime, setAnime] = useState<WrappedEntry[]>([]);
   const [manga, setManga] = useState<WrappedEntry[]>([]);
@@ -380,15 +383,35 @@ export default function Wrapped() {
       .finally(() => setLoading(false));
   }, [viewer]);
 
-  const years = useMemo(() => availableYears(anime, manga), [anime, manga]);
+  // This card gets exported as a PNG and shared, so filtered entries must not
+  // reach it — and neither must a filtered genre *name*, which would otherwise
+  // survive in the top-genres bars even with the entries removed.
+  const visibleAnime = useMemo(
+    () => anime.filter((e) => !isBlocked(e, level)),
+    [anime, level],
+  );
+  const visibleManga = useMemo(
+    () => manga.filter((e) => !isBlocked(e, level)),
+    [manga, level],
+  );
+
+  const years = useMemo(
+    () => availableYears(visibleAnime, visibleManga),
+    [visibleAnime, visibleManga],
+  );
 
   useEffect(() => {
     if (year === null && years.length) setYear(years[0]);
   }, [years, year]);
 
   const stats = useMemo(
-    () => (year !== null ? aggregate(anime, manga, year) : null),
-    [anime, manga, year],
+    () =>
+      year !== null
+        ? aggregate(visibleAnime, visibleManga, year, (g) =>
+            isBlockedGenre(g, level),
+          )
+        : null,
+    [visibleAnime, visibleManga, year, level],
   );
 
   useEffect(() => {

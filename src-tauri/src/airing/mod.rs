@@ -18,7 +18,7 @@ query ($ids: [Int], $from: Int, $to: Int) {
     airingSchedules(mediaId_in: $ids, airingAt_greater: $from, airingAt_lesser: $to, sort: TIME) {
       episode
       airingAt
-      media { id title { romaji english native } }
+      media { id title { romaji english native } isAdult genres }
     }
   }
 }";
@@ -113,6 +113,8 @@ async fn check(app: &AppHandle) {
         return; // network error — keep last_check, retry next round
     };
 
+    let level = crate::commands::read_content_filter(&db);
+
     for sched in data
         .pointer("/Page/airingSchedules")
         .and_then(|v| v.as_array())
@@ -124,6 +126,12 @@ async fn check(app: &AppHandle) {
         let key = format!("aired:{media_id}:{episode}");
         if db.kv_get(&key).is_some() {
             continue; // already notified
+        }
+        // A filtered title must not surface as a desktop toast either.
+        if let Some(media) = sched.get("media") {
+            if crate::commands::media_blocked(media, &level) {
+                continue;
+            }
         }
         let title = pick_title(sched.pointer("/media/title"));
         crate::notify::notify(

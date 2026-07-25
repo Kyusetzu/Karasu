@@ -173,6 +173,7 @@ query ($userId: Int!, $type: MediaType!) {
           averageScore
           genres
           synonyms
+          isAdult
           nextAiringEpisode { episode airingAt }
         }
       }
@@ -762,7 +763,7 @@ pub fn mark_all_notifications_read(db: State<'_, Db>) -> Result<(), String> {
 
 /// Monotonic commit counter — the 4th version segment
 /// (`MAJOR.MINOR.PATCH.COMMIT#`). Bumped by one on every commit.
-pub const COMMIT_NUMBER: u32 = 74;
+pub const COMMIT_NUMBER: u32 = 75;
 
 /// Full four-part display version, e.g. `0.1.1.38`. The `MAJOR.MINOR.PATCH`
 /// core comes from the crate version (kept in sync across the manifests).
@@ -806,6 +807,84 @@ pub fn set_update_channel(db: State<'_, Db>, channel: String) -> Result<(), Stri
         return Err("Unknown update channel".into());
     }
     db.kv_set("update_channel", &channel)
+}
+
+/// Content filter level: `"off"`, `"moderate"` (hide adult) or `"strict"`
+/// (also hide suggestive/Ecchi). Defaults to `"strict"`, so a missing key —
+/// a fresh install or an existing one upgrading — starts filtered.
+pub fn read_content_filter(db: &Db) -> String {
+    match db.kv_get("content_filter").as_deref() {
+        Some("off") => "off".to_string(),
+        Some("moderate") => "moderate".to_string(),
+        _ => "strict".to_string(),
+    }
+}
+
+/// Mirror of the frontend's `isBlocked` for the background passes (airing /
+/// sequel notifications, Discord presence), which never touch React. Takes a
+/// media JSON node so every caller can hand over whatever it already parsed.
+pub fn media_blocked(media: &serde_json::Value, level: &str) -> bool {
+    if level == "off" {
+        return false;
+    }
+    if media["isAdult"].as_bool() == Some(true) {
+        return true;
+    }
+    if level != "strict" {
+        return false;
+    }
+    media["genres"]
+        .as_array()
+        .map(|gs| {
+            gs.iter()
+                .filter_map(|g| g.as_str())
+                .any(|g| g.eq_ignore_ascii_case("ecchi"))
+        })
+        .unwrap_or(false)
+}
+
+/// Whether a media id on the user's cached list is filtered. Used by the
+/// Discord presence, which only knows the id of what is playing.
+pub fn media_id_blocked(db: &Db, media_id: i64, level: &str) -> bool {
+    if level == "off" {
+        return false;
+    }
+    let Some(user_id) = db
+        .kv_get("anilist_viewer")
+        .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
+        .and_then(|v| v["id"].as_i64())
+    else {
+        return false;
+    };
+    for media_type in ["ANIME", "MANGA"] {
+        let Some(payload) = db.cached_list(user_id, media_type) else {
+            continue;
+        };
+        let Ok(lists) = serde_json::from_str::<serde_json::Value>(&payload) else {
+            continue;
+        };
+        for group in lists.as_array().into_iter().flatten() {
+            for entry in group["entries"].as_array().into_iter().flatten() {
+                if entry["media"]["id"].as_i64() == Some(media_id) {
+                    return media_blocked(&entry["media"], level);
+                }
+            }
+        }
+    }
+    false
+}
+
+#[tauri::command]
+pub fn get_content_filter(db: State<'_, Db>) -> String {
+    read_content_filter(&db)
+}
+
+#[tauri::command]
+pub fn set_content_filter(db: State<'_, Db>, level: String) -> Result<(), String> {
+    if level != "off" && level != "moderate" && level != "strict" {
+        return Err("Unknown content filter level".into());
+    }
+    db.kv_set("content_filter", &level)
 }
 
 /// Whether Karasu checks for updates automatically (once/day on startup).
@@ -921,6 +1000,34 @@ mod tests {
         // Shorter vs longer: 0.1 == 0.1.0
         assert!(!version_gt("0.1", "0.1.0"));
         assert!(version_gt("0.1.0.1", "0.1.0"));
+    }
+
+    /// Must stay in lockstep with `isBlocked` in src/lib/contentFilter.ts —
+    /// the background passes would otherwise notify about titles the UI hides.
+    #[test]
+    fn content_filter_levels() {
+        use super::media_blocked;
+        use serde_json::json;
+
+        let adult = json!({ "isAdult": true, "genres": ["Hentai"] });
+        let ecchi = json!({ "isAdult": false, "genres": ["Comedy", "Ecchi"] });
+        let plain = json!({ "isAdult": false, "genres": ["Action"] });
+
+        for m in [&adult, &ecchi, &plain] {
+            assert!(!media_blocked(m, "off"));
+        }
+
+        assert!(media_blocked(&adult, "moderate"));
+        assert!(!media_blocked(&ecchi, "moderate"));
+        assert!(!media_blocked(&plain, "moderate"));
+
+        assert!(media_blocked(&adult, "strict"));
+        assert!(media_blocked(&ecchi, "strict"));
+        assert!(!media_blocked(&plain, "strict"));
+
+        // Case-insensitive, and missing fields must not block.
+        assert!(media_blocked(&json!({ "genres": ["ECCHI"] }), "strict"));
+        assert!(!media_blocked(&json!({}), "strict"));
     }
 }
 

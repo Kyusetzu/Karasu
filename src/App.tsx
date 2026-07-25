@@ -5,6 +5,7 @@ import { X } from "lucide-react";
 import { useAuth } from "@/stores/auth";
 import { useNowPlaying } from "@/stores/nowPlaying";
 import { useLibrary } from "@/stores/library";
+import { useContentFilter } from "@/stores/contentFilter";
 import {
   isTauri,
   checkForUpdates,
@@ -32,11 +33,13 @@ export default function App() {
   const init = useAuth((s) => s.init);
   const initNowPlaying = useNowPlaying((s) => s.init);
   const refreshLibrary = useLibrary((s) => s.refresh);
+  const initContentFilter = useContentFilter((s) => s.init);
   useEffect(() => {
     init();
     initNowPlaying();
     refreshLibrary();
-  }, [init, initNowPlaying, refreshLibrary]);
+    initContentFilter();
+  }, [init, initNowPlaying, refreshLibrary, initContentFilter]);
 
   // At most once/day: check for an update and, if one is found, start
   // downloading it in the background. Installing still needs a separate,

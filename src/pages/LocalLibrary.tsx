@@ -8,6 +8,8 @@ import { displayTitle, type MediaListEntry } from "@/api/types";
 import { scanLibrary } from "@/api/library";
 import { useAuth } from "@/stores/auth";
 import { useLibrary } from "@/stores/library";
+import { useContentFilter } from "@/stores/contentFilter";
+import { isBlocked } from "@/lib/contentFilter";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -44,6 +46,7 @@ function LibraryView({ userId }: { userId: number }) {
   const { t } = useTranslation();
   const entries = useLibrary((s) => s.entries);
   const refresh = useLibrary((s) => s.refresh);
+  const level = useContentFilter((s) => s.level);
   const [scanning, setScanning] = useState(false);
 
   const { data } = useQuery({
@@ -52,18 +55,24 @@ function LibraryView({ userId }: { userId: number }) {
   });
 
   // media_id → list entry, so each library row can show cover and progress.
+  // Filtered titles never enter the map, so they cannot be listed here even
+  // though the scanner still indexes them (playback itself stays intact).
   const byMedia = useMemo(() => {
     const map = new Map<number, MediaListEntry>();
     for (const group of data?.lists ?? []) {
       if (group.isCustomList) continue;
-      for (const e of group.entries) map.set(e.mediaId, e);
+      for (const e of group.entries) {
+        if (isBlocked(e.media, level)) continue;
+        map.set(e.mediaId, e);
+      }
     }
     return map;
-  }, [data]);
+  }, [data, level]);
 
   const rows = useMemo(
     () =>
       entries
+        .filter((e) => byMedia.has(e.mediaId))
         .map((e) => ({ lib: e, entry: byMedia.get(e.mediaId) }))
         .sort((a, b) => {
           const at = a.entry ? displayTitle(a.entry.media.title) : "";

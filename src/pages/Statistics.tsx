@@ -14,6 +14,12 @@ import { fetchMediaList, isTauri } from "@/api/anilist";
 import type { MediaType } from "@/api/types";
 import { formatMinutes, remainingMinutes } from "@/lib/estimate";
 import { useAuth } from "@/stores/auth";
+import { useContentFilter } from "@/stores/contentFilter";
+import {
+  isBlocked,
+  isBlockedGenre,
+  type ContentFilterLevel,
+} from "@/lib/contentFilter";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Tabs, type TabOption } from "@/components/ui/tabs";
@@ -160,6 +166,7 @@ function StatisticsContent({
 /** "Time to finish your watching list", summed from the cached anime list. */
 function WatchTimeEstimate({ userId }: { userId: number }) {
   const { t } = useTranslation();
+  const level = useContentFilter((s) => s.level);
   const { data } = useQuery({
     queryKey: ["mediaList", "ANIME", userId],
     queryFn: () => fetchMediaList(userId, "ANIME"),
@@ -171,12 +178,13 @@ function WatchTimeEstimate({ userId }: { userId: number }) {
       if (group.isCustomList) continue;
       for (const e of group.entries) {
         if (e.status !== "CURRENT" && e.status !== "REPEATING") continue;
+        if (isBlocked(e.media, level)) continue;
         const rem = remainingMinutes(e.media, e.progress);
         if (rem) sum += rem;
       }
     }
     return sum;
-  }, [data]);
+  }, [data, level]);
 
   if (total <= 0) return null;
   return (
@@ -198,6 +206,7 @@ function AnimeView({
   category: Category;
 }) {
   const { t, i18n } = useTranslation();
+  const level = useContentFilter((s) => s.level);
   if (stats.count === 0) return <Empty />;
 
   if (category === "overview") {
@@ -218,7 +227,7 @@ function AnimeView({
   }
   return (
     <RankedList
-      entries={rowsFor(stats, category)}
+      entries={rowsFor(stats, category, level)}
       category={category}
       type="ANIME"
     />
@@ -233,6 +242,7 @@ function MangaView({
   category: Category;
 }) {
   const { t, i18n } = useTranslation();
+  const level = useContentFilter((s) => s.level);
   if (stats.count === 0) return <Empty />;
 
   if (category === "overview") {
@@ -252,20 +262,32 @@ function MangaView({
   }
   return (
     <RankedList
-      entries={rowsFor(stats, category)}
+      entries={rowsFor(stats, category, level)}
       category={category}
       type="MANGA"
     />
   );
 }
 
-/** Picks the ranked array for a category (empty for categories a type lacks). */
-function rowsFor(stats: AnimeStats | MangaStats, category: Category): StatEntry[] {
+/**
+ * Picks the ranked array for a category (empty for categories a type lacks).
+ *
+ * These statistics are aggregated by AniList, so filtered titles cannot be
+ * subtracted from the totals client-side. What we *can* do is stop a filtered
+ * genre or tag name from being listed — see the note under the list.
+ */
+function rowsFor(
+  stats: AnimeStats | MangaStats,
+  category: Category,
+  level: ContentFilterLevel,
+): StatEntry[] {
   switch (category) {
     case "genres":
-      return stats.genres;
+      return stats.genres.filter((e) => !isBlockedGenre(e.genre ?? "", level));
     case "tags":
-      return stats.tags;
+      return stats.tags.filter(
+        (e) => !isBlockedGenre(e.tag?.name ?? "", level),
+      );
     case "staff":
       return stats.staff;
     case "voiceActors":

@@ -271,7 +271,7 @@ export default function AnimeDetail() {
           <Card className="mt-6">
             <CardTitle>{t("detail.description")}</CardTitle>
             <p
-              className="mt-3 select-text text-sm leading-relaxed text-ink-300"
+              className="mt-3 text-sm leading-relaxed text-ink-300"
               dangerouslySetInnerHTML={{
                 __html: sanitizeDescription(data.description),
               }}

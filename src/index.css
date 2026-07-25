@@ -53,8 +53,20 @@ body,
 }
 
 body {
-  @apply bg-surface-950 text-ink-100 font-sans antialiased select-none;
+  @apply bg-surface-950 text-ink-100 font-sans antialiased;
   overflow: hidden;
+}
+
+/* Text is selectable everywhere by default (titles, synopses, stats, file
+   paths). Only chrome that would otherwise turn a click or a window drag into
+   a text selection opts out -- `[data-tauri-drag-region]` especially, since
+   dragging the titlebar would select the wordmark. Card titles are plain
+   links, not `nav a`, so they stay copyable. */
+[data-tauri-drag-region],
+button,
+[role="button"],
+nav a {
+  user-select: none;
 }
 
 /* Scrollbars */

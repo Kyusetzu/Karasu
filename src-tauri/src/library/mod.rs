@@ -30,12 +30,22 @@ impl Default for LibraryIndex {
     }
 }
 
-/// Which episodes of a matched entry are present on disk.
+/// One episode present on disk.
+#[derive(Clone, serde::Serialize)]
+pub struct LibraryFile {
+    pub episode: u32,
+    pub path: String,
+}
+
+/// Which episodes of a matched entry are present on disk. `episodes` is kept
+/// as a bare sorted list so existing callers stay unchanged; `files` carries
+/// the paths for the library page.
 #[derive(Clone, serde::Serialize)]
 pub struct LibraryEntry {
     #[serde(rename = "mediaId")]
     pub media_id: i64,
     pub episodes: Vec<u32>,
+    pub files: Vec<LibraryFile>,
 }
 
 #[derive(serde::Serialize)]
@@ -108,21 +118,55 @@ pub fn scan_library(app: AppHandle) -> Result<ScanSummary, String> {
         }
     }
 
-    let mut summary: Vec<LibraryEntry> = by_media
+    let summary = build_summary(&by_media);
+
+    // Persist so the index survives a restart — without this every relaunch
+    // drops the library and the play buttons disappear until a manual rescan.
+    let rows: Vec<(i64, u32, String)> = by_media
         .iter()
-        .map(|(id, eps)| {
-            let mut episodes: Vec<u32> = eps.keys().copied().collect();
-            episodes.sort_unstable();
-            LibraryEntry { media_id: *id, episodes }
-        })
+        .flat_map(|(id, eps)| eps.iter().map(move |(ep, path)| (*id, *ep, path.clone())))
         .collect();
-    summary.sort_by_key(|e| e.media_id);
+    db.library_replace_all(&rows)?;
 
     let matched = summary.len();
     let state = app.state::<LibraryIndex>();
     *state.0.lock().unwrap() = LibraryData { by_media, summary: summary.clone() };
 
     Ok(ScanSummary { entries: summary, files: total, matched })
+}
+
+/// Builds the sorted, frontend-facing summary from the index map.
+fn build_summary(by_media: &HashMap<i64, HashMap<u32, String>>) -> Vec<LibraryEntry> {
+    let mut summary: Vec<LibraryEntry> = by_media
+        .iter()
+        .map(|(id, eps)| {
+            let mut files: Vec<LibraryFile> = eps
+                .iter()
+                .map(|(episode, path)| LibraryFile { episode: *episode, path: path.clone() })
+                .collect();
+            files.sort_unstable_by_key(|f| f.episode);
+            let episodes = files.iter().map(|f| f.episode).collect();
+            LibraryEntry { media_id: *id, episodes, files }
+        })
+        .collect();
+    summary.sort_by_key(|e| e.media_id);
+    summary
+}
+
+/// Restores the index from the database at startup (no disk walk).
+pub fn hydrate(app: &AppHandle) {
+    let db = app.state::<Db>();
+    let rows = db.library_all();
+    if rows.is_empty() {
+        return;
+    }
+    let mut by_media: HashMap<i64, HashMap<u32, String>> = HashMap::new();
+    for (media_id, episode, path) in rows {
+        by_media.entry(media_id).or_default().insert(episode, path);
+    }
+    let summary = build_summary(&by_media);
+    let state = app.state::<LibraryIndex>();
+    *state.0.lock().unwrap() = LibraryData { by_media, summary };
 }
 
 /// Opens the next unwatched episode of `media_id` in the default player.
@@ -155,6 +199,16 @@ pub fn play_next(app: AppHandle, media_id: i64) -> Result<(), String> {
             .ok_or("No unwatched episode on disk")?
     };
 
+    open_path(&app, &path)
+}
+
+/// Opens `path` in the default player, reporting a stale index clearly — the
+/// index is persisted now, so a file can legitimately have moved since the
+/// last scan.
+fn open_path(app: &AppHandle, path: &str) -> Result<(), String> {
+    if !Path::new(path).exists() {
+        return Err("That file is no longer on disk — rescan your library".into());
+    }
     use tauri_plugin_opener::OpenerExt;
     app.opener()
         .open_path(path, None::<&str>)

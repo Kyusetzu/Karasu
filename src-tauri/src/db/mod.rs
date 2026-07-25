@@ -86,6 +86,20 @@ CREATE TABLE IF NOT EXISTS notifications (
 PRAGMA user_version = 5;
 ";
 
+/// Schema v6: the local library index. The scan used to live only in memory,
+/// so every restart dropped it and the play buttons vanished until the user
+/// rescanned by hand. Persisting it means the index survives a restart; stale
+/// paths are caught at play time instead.
+const MIGRATION_V6: &str = "
+CREATE TABLE IF NOT EXISTS library_files (
+    media_id INTEGER NOT NULL,
+    episode  INTEGER NOT NULL,
+    path     TEXT NOT NULL,
+    PRIMARY KEY (media_id, episode)
+);
+PRAGMA user_version = 6;
+";
+
 /// One in-app notification (mirrors a shown desktop toast).
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct NotificationRow {
@@ -150,6 +164,10 @@ impl Db {
         if version < 5 {
             conn.execute_batch(MIGRATION_V5)
                 .map_err(|e| format!("Migration v5 failed: {e}"))?;
+        }
+        if version < 6 {
+            conn.execute_batch(MIGRATION_V6)
+                .map_err(|e| format!("Migration v6 failed: {e}"))?;
         }
         Ok(Db(Mutex::new(conn)))
     }
@@ -501,6 +519,40 @@ impl Db {
         )
         .unwrap_or(0)
     }
+
+    // --- Local library ------------------------------------------------------
+
+    /// Replaces the whole library index in one transaction — a scan always
+    /// produces the complete picture, so a diff would only add failure modes.
+    pub fn library_replace_all(&self, rows: &[(i64, u32, String)]) -> Result<(), String> {
+        let mut conn = self.0.lock().unwrap();
+        let tx = conn
+            .transaction()
+            .map_err(|e| format!("Library write failed: {e}"))?;
+        tx.execute("DELETE FROM library_files", [])
+            .map_err(|e| format!("Library write failed: {e}"))?;
+        {
+            let mut stmt = tx
+                .prepare("INSERT INTO library_files (media_id, episode, path) VALUES (?1, ?2, ?3)")
+                .map_err(|e| format!("Library write failed: {e}"))?;
+            for (media_id, episode, path) in rows {
+                stmt.execute(rusqlite::params![media_id, episode, path])
+                    .map_err(|e| format!("Library write failed: {e}"))?;
+            }
+        }
+        tx.commit()
+            .map_err(|e| format!("Library write failed: {e}"))
+    }
+
+    pub fn library_all(&self) -> Vec<(i64, u32, String)> {
+        let conn = self.0.lock().unwrap();
+        conn.prepare("SELECT media_id, episode, path FROM library_files")
+            .and_then(|mut stmt| {
+                stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
+                    .map(|rows| rows.filter_map(Result::ok).collect())
+            })
+            .unwrap_or_default()
+    }
 }
 
 #[cfg(test)]
@@ -515,7 +567,31 @@ mod tests {
         conn.execute_batch(MIGRATION_V3).unwrap();
         conn.execute_batch(MIGRATION_V4).unwrap();
         conn.execute_batch(MIGRATION_V5).unwrap();
+        conn.execute_batch(MIGRATION_V6).unwrap();
         Db(Mutex::new(conn))
+    }
+
+    /// The index must survive a write/read round-trip, and a rescan must
+    /// replace the previous contents rather than accumulate them.
+    #[test]
+    fn library_round_trip_and_replace() {
+        let db = mem_db();
+        assert!(db.library_all().is_empty());
+
+        db.library_replace_all(&[
+            (154587, 13, "C:/anime/frieren-13.mkv".into()),
+            (154587, 14, "C:/anime/frieren-14.mkv".into()),
+        ])
+        .unwrap();
+        let mut rows = db.library_all();
+        rows.sort_by_key(|(_, ep, _)| *ep);
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0], (154587, 13, "C:/anime/frieren-13.mkv".into()));
+
+        db.library_replace_all(&[(1, 1, "C:/anime/other-01.mkv".into())])
+            .unwrap();
+        let rows = db.library_all();
+        assert_eq!(rows, vec![(1, 1, "C:/anime/other-01.mkv".to_string())]);
     }
 
     #[test]

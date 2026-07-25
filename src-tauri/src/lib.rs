@@ -52,6 +52,7 @@ pub fn run() {
             app.manage(discord::UiPage::default());
             app.manage(library::LibraryIndex::default());
             app.manage(commands::PendingUpdate::default());
+            library::hydrate(app.handle());
             relations::spawn_loader(app.handle().clone());
             scrobbler::spawn(app.handle().clone());
             airing::spawn(app.handle().clone());

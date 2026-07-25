@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Routes, Route, useLocation } from "react-router-dom";
+import { Routes, Route, useLocation } from "react-router";
 import { invoke } from "@tauri-apps/api/core";
 import { X } from "lucide-react";
 import { useAuth } from "@/stores/auth";

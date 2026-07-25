@@ -145,7 +145,7 @@ account** to track locally and connect later.
 
 ## Development
 
-Prerequisites: [Node.js](https://nodejs.org) ≥ 20, [Rust](https://rustup.rs)
+Prerequisites: [Node.js](https://nodejs.org) ≥ 22.22, [Rust](https://rustup.rs)
 (MSVC toolchain on Windows), VS Build Tools with the C++ workload, WebView2
 (included in Windows 11). On Ubuntu, install `libwebkit2gtk-4.1-dev`,
 `libgtk-3-dev`, `libayatana-appindicator3-dev` and `librsvg2-dev`.

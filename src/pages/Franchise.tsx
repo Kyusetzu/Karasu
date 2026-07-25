@@ -2,14 +2,13 @@ import { useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { ArrowLeft } from "lucide-react";
 import { loadFranchise } from "@/api/franchise";
 import { useContentFilter } from "@/stores/contentFilter";
 import { isTauri } from "@/api/anilist";
 import { formatLabel } from "@/lib/format";
 import { layoutFranchise, NODE_H, NODE_W } from "@/lib/franchiseLayout";
 import { displayTitle, type MediaListStatus } from "@/api/types";
-import { Button } from "@/components/ui/button";
+import BackButton from "@/components/BackButton";
 
 /** List-status → accent colour for a node's outline + dot. */
 const STATUS_COLOR: Record<MediaListStatus, string> = {
@@ -51,16 +50,9 @@ export default function Franchise() {
   }, [data]);
 
   return (
-    <div className="mx-auto max-w-5xl p-8">
+    <div className="mx-auto max-w-5xl p-8 3xl:max-w-7xl">
       <div className="mb-4 flex items-center gap-3">
-        <Button
-          variant="secondary"
-          size="icon"
-          aria-label={t("detail.back")}
-          onClick={() => navigate(-1)}
-        >
-          <ArrowLeft className="size-4" />
-        </Button>
+        <BackButton />
         <h1 className="text-xl font-bold">{t("franchise.title")}</h1>
       </div>
 
@@ -77,10 +69,15 @@ export default function Franchise() {
             <p className="text-sm text-ink-600">{t("franchise.none")}</p>
           ) : (
             <div className="overflow-x-auto rounded-xl border border-surface-800 bg-surface-900 p-2">
+              {/* The layout is computed in px, but sized here in rem so the
+                  graph rides the root scale like the rest of the UI instead of
+                  shrinking into a corner on a large display. */}
               <svg
-                width={layout.width}
-                height={layout.height}
                 viewBox={`0 0 ${layout.width} ${layout.height}`}
+                style={{
+                  width: `${layout.width / 16}rem`,
+                  height: `${layout.height / 16}rem`,
+                }}
                 className="max-w-none"
               >
                 {data.edges.map((e, i) => {

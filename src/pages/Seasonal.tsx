@@ -90,7 +90,7 @@ export default function Seasonal() {
           <p className="text-sm text-ink-600">{t("seasonal.loading")}</p>
         )}
         {results.length > 0 && (
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-x-4 gap-y-6">
+          <div className="media-grid gap-x-4 gap-y-6">
             {results.map((m) => (
               <MediaCard key={m.id} media={m} />
             ))}

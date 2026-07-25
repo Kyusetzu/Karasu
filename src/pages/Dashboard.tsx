@@ -278,7 +278,7 @@ function Stats({ entries }: { entries: MediaListEntry[] }) {
         <BarChart3 className="size-4.5 text-accent-400" />{" "}
         {t("dashboard.stats")}
       </h2>
-      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4 3xl:grid-cols-6">
         {items.map((item) => (
           <div
             key={item.label}

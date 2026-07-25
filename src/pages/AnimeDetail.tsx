@@ -1,8 +1,8 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { ArrowLeft, Clock, ExternalLink, Play, Star } from "lucide-react";
+import { Clock, ExternalLink, Play, Star } from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   animeDetail,
@@ -30,6 +30,7 @@ import { useAuth } from "@/stores/auth";
 import { useLibrary } from "@/stores/library";
 import { useContentFilter } from "@/stores/contentFilter";
 import { isBlocked } from "@/lib/contentFilter";
+import BackButton from "@/components/BackButton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardTitle } from "@/components/ui/card";
@@ -46,7 +47,6 @@ function sanitizeDescription(html: string): string {
 export default function AnimeDetail() {
   const { t, i18n } = useTranslation();
   const { id } = useParams();
-  const navigate = useNavigate();
   const mediaId = Number(id);
   const hasNext = useLibrary((s) => s.hasNext);
   const play = useLibrary((s) => s.play);
@@ -106,9 +106,9 @@ export default function AnimeDetail() {
   return (
     <div>
       {/* Fixed-height banner slot regardless of whether AniList has a real
-          bannerImage (common for manga) — the back button and cover below
-          overlap into its bottom edge by a fixed amount, so a shorter slot
-          here would push them off the top of the page. */}
+          bannerImage (common for manga) — the cover below overlaps into its
+          bottom edge by a fixed amount, so a shorter slot here would push it
+          off the top of the page. */}
       <div className="relative h-64">
         {data.bannerImage ? (
           <img
@@ -126,19 +126,13 @@ export default function AnimeDetail() {
           )
         )}
         <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-surface-950 to-transparent" />
+        {/* Anchored to the banner, not to the centred column below — otherwise
+            it drifts inward with the gutter and strands itself mid-artwork on
+            a wide display. */}
+        <BackButton className="absolute left-6 top-4 z-10" />
       </div>
 
-      <div className="relative mx-auto max-w-4xl px-8 pb-10">
-        <Button
-          variant="secondary"
-          size="icon"
-          aria-label={t("detail.back")}
-          className="absolute -top-56 left-4 z-10"
-          onClick={() => navigate(-1)}
-        >
-          <ArrowLeft className="size-4" />
-        </Button>
-
+      <div className="relative mx-auto max-w-4xl px-8 pb-10 3xl:max-w-5xl">
         <div className="-mt-16 flex gap-6">
           <img
             src={coverSrc}
@@ -388,7 +382,7 @@ function InformationCard({
   return (
     <Card className="mt-6">
       <CardTitle>{t("detail.information")}</CardTitle>
-      <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
+      <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 3xl:grid-cols-4">
         <Row label={t("common.status")} value={mediaStatusLabel(data.status, t)} />
         <Row label={t("detail.format")} value={formatLabel(data.format, t)} />
         <Row

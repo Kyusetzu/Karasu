@@ -42,7 +42,7 @@ const CALLBACK_URL = "http://localhost:46231/callback";
 export default function Settings() {
   const { t } = useTranslation();
   return (
-    <div className="mx-auto max-w-2xl space-y-6 p-8">
+    <div className="mx-auto max-w-2xl space-y-6 p-8 3xl:max-w-3xl">
       <h1 className="text-2xl font-bold">{t("settings.title")}</h1>
       <AccountSection />
       <ScrobbleSection />

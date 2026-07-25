@@ -414,7 +414,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
         {entries.length === 0 ? (
           <p className="text-sm text-ink-600">{t("list.empty")}</p>
         ) : grid ? (
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-x-4 gap-y-6">
+          <div className="media-grid gap-x-4 gap-y-6">
             {entries.map((entry) => (
               <GridCard
                 key={entry.id}

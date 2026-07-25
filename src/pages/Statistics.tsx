@@ -107,7 +107,7 @@ function StatisticsContent({
   const stats = data?.statistics;
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 p-8">
+    <div className="mx-auto max-w-4xl space-y-6 p-8 3xl:max-w-5xl">
       <header className="flex items-center gap-4">
         {avatar ? (
           <img src={avatar} alt="" className="h-12 w-12 rounded-full object-cover" />
@@ -312,7 +312,7 @@ function OverviewCharts({
     .sort((a, b) => (a.releaseYear ?? 0) - (b.releaseYear ?? 0))
     .slice(-16);
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
+    <div className="grid gap-4 sm:grid-cols-2 3xl:grid-cols-3">
       <DistributionCard
         title={t("stats.formats")}
         data={stats.formats.map((d) => ({ label: d.format ?? "?", count: d.count }))}
@@ -341,7 +341,7 @@ function OverviewCharts({
 
 function TileGrid({ tiles }: { tiles: { label: string; value: string }[] }) {
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 3xl:grid-cols-6">
       {tiles.map((tile) => (
         <div
           key={tile.label}

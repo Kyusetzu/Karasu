@@ -78,14 +78,28 @@ export async function seasonalAnime(season: Season, year: number, page = 1) {
   return data.Page;
 }
 
+// The extra selections live here rather than in MEDIA_FIELDS on purpose:
+// MEDIA_FIELDS is shared with search (30/page) and seasonal (50/page), where
+// this metadata would be dead weight. Detail is a single Media(id:) call, so
+// widening it costs no extra request.
 const DETAIL_QUERY = `
 query ($id: Int!) {
   Media(id: $id) {
     ${MEDIA_FIELDS}
     description
     duration
-    studios(isMain: true) { nodes { name } }
-    mediaListEntry { id status progress repeat score(format: POINT_10) }
+    meanScore
+    popularity
+    favourites
+    hashtag
+    source
+    countryOfOrigin
+    startDate { year month day }
+    endDate { year month day }
+    trailer { id site thumbnail }
+    studios { edges { isMain node { id name } } }
+    tags { name rank isMediaSpoiler }
+    externalLinks { id site url type color }
     relations {
       edges {
         relationType
@@ -101,10 +115,42 @@ query ($id: Int!) {
   }
 }`;
 
+export interface FuzzyDate {
+  year: number | null;
+  month: number | null;
+  day: number | null;
+}
+
+export interface MediaTag {
+  name: string;
+  rank: number | null;
+  isMediaSpoiler: boolean;
+}
+
+export interface ExternalLink {
+  id: number;
+  site: string;
+  url: string;
+  /** SOCIAL | INFO | STREAMING */
+  type: string | null;
+  color: string | null;
+}
+
 export interface MediaDetail extends MediaWithListStatus {
   description: string | null;
   duration: number | null;
-  studios: { nodes: { name: string }[] };
+  meanScore: number | null;
+  popularity: number | null;
+  favourites: number | null;
+  hashtag: string | null;
+  source: string | null;
+  countryOfOrigin: string | null;
+  startDate: FuzzyDate | null;
+  endDate: FuzzyDate | null;
+  trailer: { id: string; site: string; thumbnail: string | null } | null;
+  studios: { edges: { isMain: boolean; node: { id: number; name: string } }[] };
+  tags: MediaTag[];
+  externalLinks: ExternalLink[];
   mediaListEntry: ListEntryStub | null;
   relations: {
     edges: {

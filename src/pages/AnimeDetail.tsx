@@ -1,11 +1,22 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { ArrowLeft, Clock, ExternalLink, Play, Star } from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { animeDetail, type MediaDetail } from "@/api/queries";
-import { formatLabel } from "@/lib/format";
+import {
+  animeDetail,
+  type ExternalLink as ExternalLinkData,
+  type MediaDetail,
+  type MediaTag,
+} from "@/api/queries";
+import {
+  countdown,
+  formatLabel,
+  fuzzyDate,
+  mediaStatusLabel,
+  sourceLabel,
+} from "@/lib/format";
 import { formatMinutes, remainingMinutes } from "@/lib/estimate";
 import { isTauri, saveListEntry } from "@/api/anilist";
 import {
@@ -56,6 +67,13 @@ export default function AnimeDetail() {
   const title = displayTitle(data.title);
 
   const coverSrc = data.coverImage.extraLarge ?? data.coverImage.large ?? "";
+
+  const studioEdges = data.studios?.edges ?? [];
+  const mainStudios = studioEdges.filter((e) => e.isMain).map((e) => e.node);
+  const producers = studioEdges.filter((e) => !e.isMain).map((e) => e.node);
+  const untilNext = data.nextAiringEpisode
+    ? data.nextAiringEpisode.airingAt - Math.floor(Date.now() / 1000)
+    : 0;
 
   return (
     <div>
@@ -111,6 +129,9 @@ export default function AnimeDetail() {
                 </span>
               )}
               {data.format && <span>{formatLabel(data.format, t)}</span>}
+              {data.status && (
+                <span>{mediaStatusLabel(data.status, t)}</span>
+              )}
               {data.episodes && (
                 <span>
                   {data.episodes} {t("common.episodes")}
@@ -135,9 +156,9 @@ export default function AnimeDetail() {
                   {data.seasonYear}
                 </span>
               )}
-              {data.studios.nodes[0] && (
+              {mainStudios.length > 0 && (
                 <span className="text-ink-500">
-                  {data.studios.nodes.map((s) => s.name).join(", ")}
+                  {mainStudios.map((s) => s.name).join(", ")}
                 </span>
               )}
             </div>
@@ -180,6 +201,11 @@ export default function AnimeDetail() {
                     minute: "2-digit",
                   }),
                 })}
+                {untilNext && (
+                  <span className="ml-2 text-ink-500">
+                    ({countdown(untilNext, t)})
+                  </span>
+                )}
               </p>
             )}
             {data.type === "ANIME" &&
@@ -225,6 +251,39 @@ export default function AnimeDetail() {
           </Card>
         )}
 
+        {data.trailer?.thumbnail && (
+          <Card className="mt-6">
+            <CardTitle>{t("detail.trailer")}</CardTitle>
+            <button
+              onClick={() => openUrl(trailerUrl(data.trailer!))}
+              className="group relative mt-3 block w-full max-w-md overflow-hidden rounded-lg"
+            >
+              <img
+                src={data.trailer.thumbnail}
+                alt=""
+                className="w-full transition-transform group-hover:scale-105"
+              />
+              <span className="absolute inset-0 grid place-items-center bg-black/30 transition-colors group-hover:bg-black/15">
+                <span className="grid h-12 w-12 place-items-center rounded-full bg-black/70">
+                  <Play size={20} fill="currentColor" className="text-white" />
+                </span>
+              </span>
+            </button>
+          </Card>
+        )}
+
+        <InformationCard
+          data={data}
+          mainStudios={mainStudios}
+          producers={producers}
+        />
+
+        <AlternativeTitles data={data} />
+
+        <TagList tags={data.tags ?? []} />
+
+        <LinkList links={data.externalLinks ?? []} />
+
         {data.relations.edges.filter(
           (e) => e.node.type === "ANIME" || e.node.type === "MANGA",
         ).length > 0 && (
@@ -268,6 +327,191 @@ export default function AnimeDetail() {
         )}
       </div>
     </div>
+  );
+}
+
+/** AniList only ever reports youtube/dailymotion here. */
+function trailerUrl(trailer: { id: string; site: string }): string {
+  return trailer.site === "dailymotion"
+    ? `https://www.dailymotion.com/video/${trailer.id}`
+    : `https://www.youtube.com/watch?v=${trailer.id}`;
+}
+
+/** One label/value row; renders nothing when there is no value. */
+function Row({ label, value }: { label: string; value: ReactNode }) {
+  if (value === null || value === undefined || value === "") return null;
+  return (
+    <div>
+      <dt className="text-xs text-ink-600">{label}</dt>
+      <dd className="mt-0.5 text-sm text-ink-200">{value}</dd>
+    </div>
+  );
+}
+
+function InformationCard({
+  data,
+  mainStudios,
+  producers,
+}: {
+  data: MediaDetail;
+  mainStudios: { id: number; name: string }[];
+  producers: { id: number; name: string }[];
+}) {
+  const { t, i18n } = useTranslation();
+  const num = (n: number | null) =>
+    n === null || n === undefined ? "" : n.toLocaleString(i18n.language);
+
+  return (
+    <Card className="mt-6">
+      <CardTitle>{t("detail.information")}</CardTitle>
+      <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
+        <Row label={t("common.status")} value={mediaStatusLabel(data.status, t)} />
+        <Row label={t("detail.format")} value={formatLabel(data.format, t)} />
+        <Row
+          label={t("common.episodes")}
+          value={data.episodes ? num(data.episodes) : ""}
+        />
+        <Row
+          label={t("detail.episodeDuration")}
+          value={data.duration ? t("detail.minutes", { n: data.duration }) : ""}
+        />
+        <Row
+          label={t("detail.startDate")}
+          value={fuzzyDate(data.startDate, i18n.language)}
+        />
+        <Row
+          label={t("detail.endDate")}
+          value={fuzzyDate(data.endDate, i18n.language)}
+        />
+        <Row
+          label={t("detail.season")}
+          value={
+            data.seasonYear
+              ? `${data.season ? `${t(`season.${data.season}`)} ` : ""}${data.seasonYear}`
+              : ""
+          }
+        />
+        <Row
+          label={t("detail.meanScore")}
+          value={data.meanScore ? `${data.meanScore}%` : ""}
+        />
+        <Row label={t("detail.popularity")} value={num(data.popularity)} />
+        <Row label={t("detail.favorites")} value={num(data.favourites)} />
+        <Row label={t("detail.source")} value={sourceLabel(data.source, t)} />
+        <Row label={t("detail.country")} value={data.countryOfOrigin} />
+        <Row
+          label={t("detail.studios")}
+          value={mainStudios.map((s) => s.name).join(", ")}
+        />
+        <Row
+          label={t("detail.producers")}
+          value={producers.map((s) => s.name).join(", ")}
+        />
+        <Row label={t("detail.hashtag")} value={data.hashtag} />
+      </dl>
+    </Card>
+  );
+}
+
+function AlternativeTitles({ data }: { data: MediaDetail }) {
+  const { t } = useTranslation();
+  const synonyms = data.synonyms ?? [];
+  if (!data.title.native && !data.title.romaji && synonyms.length === 0) {
+    return null;
+  }
+  return (
+    <Card className="mt-6">
+      <CardTitle>{t("detail.titles")}</CardTitle>
+      <dl className="mt-3 space-y-3">
+        <Row label={t("detail.romaji")} value={data.title.romaji} />
+        <Row label={t("detail.english")} value={data.title.english} />
+        <Row label={t("detail.native")} value={data.title.native} />
+        {synonyms.length > 0 && (
+          <Row
+            label={t("detail.synonyms")}
+            value={
+              <span className="flex flex-wrap gap-1.5">
+                {synonyms.map((s) => (
+                  <span
+                    key={s}
+                    className="rounded-md bg-surface-800 px-2 py-0.5 text-xs"
+                  >
+                    {s}
+                  </span>
+                ))}
+              </span>
+            }
+          />
+        )}
+      </dl>
+    </Card>
+  );
+}
+
+/**
+ * Media tags with their community rank. Spoiler tags stay collapsed behind an
+ * explicit reveal — the whole point of the flag.
+ */
+function TagList({ tags }: { tags: MediaTag[] }) {
+  const { t } = useTranslation();
+  const [showSpoilers, setShowSpoilers] = useState(false);
+  if (tags.length === 0) return null;
+
+  const safe = tags.filter((tg) => !tg.isMediaSpoiler);
+  const spoilers = tags.filter((tg) => tg.isMediaSpoiler);
+  const shown = showSpoilers ? [...safe, ...spoilers] : safe;
+
+  return (
+    <Card className="mt-6">
+      <CardTitle>{t("detail.tags")}</CardTitle>
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {shown.map((tg) => (
+          <span
+            key={tg.name}
+            className="flex items-center gap-1.5 rounded-full bg-surface-800 px-2.5 py-0.5 text-xs text-ink-300"
+          >
+            {tg.name}
+            {tg.rank !== null && (
+              <span className="text-ink-600">{tg.rank}%</span>
+            )}
+          </span>
+        ))}
+      </div>
+      {spoilers.length > 0 && !showSpoilers && (
+        <button
+          onClick={() => setShowSpoilers(true)}
+          className="mt-3 text-xs text-ink-500 hover:text-accent-400"
+        >
+          {t("detail.showSpoilerTags", { n: spoilers.length })}
+        </button>
+      )}
+    </Card>
+  );
+}
+
+function LinkList({ links }: { links: ExternalLinkData[] }) {
+  const { t } = useTranslation();
+  if (links.length === 0) return null;
+  return (
+    <Card className="mt-6">
+      <CardTitle>{t("detail.links")}</CardTitle>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {links.map((l) => (
+          <button
+            key={l.id}
+            onClick={() => openUrl(l.url)}
+            className="flex items-center gap-1.5 rounded-lg border border-surface-700 bg-surface-850 px-3 py-1.5 text-xs text-ink-200 transition-colors hover:border-surface-600 hover:text-ink-100"
+          >
+            <span
+              className="h-2 w-2 shrink-0 rounded-full"
+              style={{ backgroundColor: l.color ?? "#64748b" }}
+            />
+            {l.site}
+            <ExternalLink size={10} className="text-ink-600" />
+          </button>
+        ))}
+      </div>
+    </Card>
   );
 }
 

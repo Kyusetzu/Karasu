@@ -550,6 +550,33 @@ pub fn set_scrobble_settings(
     db.kv_set("scrobble_delay_min", &delay_min.to_string())
 }
 
+/// Whether the Windows media-session detection pass runs. Default on, same
+/// opt-out idiom as the other detection settings.
+pub(crate) fn read_smtc_enabled(db: &Db) -> bool {
+    db.kv_get("smtc_enabled").as_deref() != Some("0")
+}
+
+#[tauri::command]
+pub fn get_smtc_enabled(db: State<'_, Db>) -> bool {
+    read_smtc_enabled(&db)
+}
+
+#[tauri::command]
+pub fn set_smtc_enabled(db: State<'_, Db>, enabled: bool) -> Result<(), String> {
+    db.kv_set("smtc_enabled", if enabled { "1" } else { "0" })
+}
+
+/// Every media session Windows currently knows about, for the Settings
+/// diagnostic. Players fill these fields inconsistently, so this is the only
+/// honest way to see why something was or wasn't detected.
+#[tauri::command]
+pub async fn smtc_sessions() -> Vec<crate::detection::smtc::SmtcSession> {
+    // Blocking WinRT work: off the main thread, like the detection loop.
+    tokio::task::spawn_blocking(crate::detection::smtc::sessions)
+        .await
+        .unwrap_or_default()
+}
+
 #[derive(serde::Serialize)]
 pub struct DiscordSettings {
     pub enabled: bool,
@@ -788,7 +815,7 @@ pub fn mark_all_notifications_read(db: State<'_, Db>) -> Result<(), String> {
 
 /// Monotonic commit counter — the 4th version segment
 /// (`MAJOR.MINOR.PATCH.COMMIT#`). Bumped by one on every commit.
-pub const COMMIT_NUMBER: u32 = 84;
+pub const COMMIT_NUMBER: u32 = 85;
 
 /// Full four-part display version, e.g. `0.1.1.38`. The `MAJOR.MINOR.PATCH`
 /// core comes from the crate version (kept in sync across the manifests).

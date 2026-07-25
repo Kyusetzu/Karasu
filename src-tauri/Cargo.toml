@@ -1,6 +1,6 @@
 [package]
 name = "karasu"
-version = "0.20.0"
+version = "0.21.0"
 description = "A modern anime and manga tracker built exclusively for AniList (Windows; Linux experimental)"
 authors = ["Kyu"]
 license = "MIT"
@@ -45,9 +45,17 @@ windows = { version = "0.62", features = [
     "Win32_UI_WindowsAndMessaging",
     "Win32_System_Threading",
     "Win32_Security_Cryptography",
-    # WinRT: Accessibility text scale (UI_ViewManagement).
+    # WinRT: Accessibility text scale (UI_ViewManagement) and the global media
+    # session list (Media_Control) used as a detection source.
     "UI_ViewManagement",
+    "Media",
+    "Media_Control",
+    "Foundation",
+    "Foundation_Collections",
+    "Win32_System_Com",
 ] }
+# The blocking `join()` on WinRT async operations lives here, not in `windows`.
+windows-future = "0.3"
 
 # Linux groundwork: keyring via the Secret Service (libsecret/D-Bus).
 [target.'cfg(unix)'.dependencies]

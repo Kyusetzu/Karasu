@@ -2191,7 +2191,7 @@ dependencies = [
 
 [[package]]
 name = "karasu"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "discord-rich-presence",
  "keyring",
@@ -2210,6 +2210,7 @@ dependencies = [
  "tauri-plugin-updater",
  "tokio",
  "windows 0.62.2",
+ "windows-future 0.3.2",
 ]
 
 [[package]]

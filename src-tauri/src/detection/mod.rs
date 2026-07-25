@@ -2,6 +2,7 @@
 //! (Karasu's counterpart to Taiga's Anisthesia).
 
 pub mod profiles;
+pub mod smtc;
 
 #[cfg(windows)]
 use windows::core::BOOL;
@@ -116,12 +117,15 @@ mod live_tests {
         for w in super::enumerate_windows() {
             println!("FENSTER: {} | {}", w.process, w.title);
         }
-        println!("ERKANNT: {:?}", super::detect_playback());
+        println!("ERKANNT: {:?}", super::detect_windows());
     }
 }
 
-/// Scans all windows for running anime playback or manga reading.
-pub fn detect_playback() -> Option<Playback> {
+/// Scans visible windows for running anime playback or manga reading.
+///
+/// The SMTC pass is deliberately *not* here: it is async, and it must run
+/// after this one. See `detect_playback` in the scrobbler loop.
+pub fn detect_windows() -> Option<Playback> {
     let windows = enumerate_windows();
     // Local players take precedence over browser detection
     for w in &windows {
@@ -153,6 +157,22 @@ pub fn detect_playback() -> Option<Playback> {
                 manga: true,
             });
         }
+    }
+    None
+}
+
+/// Full sweep: windows first, then the Windows media sessions.
+///
+/// Order matters. A browser playing Crunchyroll appears in *both*, and the
+/// site-marker path produces a cleaner title, so SMTC only gets a look in
+/// when nothing recognised a window — which is exactly the Jellyfin Media
+/// Player case, where the title bar never changes.
+pub fn detect_playback(smtc_enabled: bool) -> Option<Playback> {
+    if let Some(p) = detect_windows() {
+        return Some(p);
+    }
+    if smtc_enabled {
+        return smtc::detect();
     }
     None
 }

@@ -479,6 +479,14 @@ const en = {
       "Mark detected episodes as watched on AniList after the threshold.",
     trackingConfirm: "Ask before updating",
     trackingConfirmHint: "Show a confirmation in the app before every update.",
+    smtc: "Use Windows media info",
+    smtcHint:
+      "Also detect players that report to Windows' media controls instead of putting the title in their window. Covers Jellyfin Media Player, Plex and browser video.",
+    detectionDebug: "What Windows currently reports",
+    detectionDebugHint:
+      "Every media session Windows knows about right now. Use this to see what a player publishes when it isn't being detected.",
+    detectionDebugEmpty: "No media session is reporting anything right now.",
+    refreshDebug: "Refresh",
     threshold: "Threshold (minutes)",
     thresholdHint: "0 = automatic (two thirds of the episode length)",
     airingNotify: "New-episode notifications",
@@ -989,6 +997,14 @@ const de: typeof en = {
     trackingConfirm: "Vorher nachfragen",
     trackingConfirmHint:
       "Vor jedem Update eine Bestätigung in der App anzeigen.",
+    smtc: "Windows-Medieninfos nutzen",
+    smtcHint:
+      "Erkennt zusätzlich Player, die ihren Titel an die Windows-Mediensteuerung melden statt ins Fenster zu schreiben. Deckt Jellyfin Media Player, Plex und Browser-Videos ab.",
+    detectionDebug: "Was Windows gerade meldet",
+    detectionDebugHint:
+      "Alle Mediensitzungen, die Windows aktuell kennt. Damit siehst du, was ein Player veröffentlicht, wenn er nicht erkannt wird.",
+    detectionDebugEmpty: "Zurzeit meldet keine Mediensitzung etwas.",
+    refreshDebug: "Aktualisieren",
     threshold: "Schwelle (Minuten)",
     thresholdHint: "0 = automatisch (zwei Drittel der Episodenlänge)",
     airingNotify: "Benachrichtigung bei neuer Folge",

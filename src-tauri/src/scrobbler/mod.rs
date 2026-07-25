@@ -400,7 +400,13 @@ pub fn spawn(app: AppHandle) {
     tauri::async_runtime::spawn(async move {
         let mut last_raw: Option<(String, String)> = None;
         loop {
-            let playback = detection::detect_playback();
+            // Both passes block -- a Win32 window sweep and a WinRT call --
+            // so keep them off the runtime's worker thread.
+            let smtc_enabled = crate::commands::read_smtc_enabled(&app.state::<Db>());
+            let playback =
+                tokio::task::spawn_blocking(move || detection::detect_playback(smtc_enabled))
+                    .await
+                    .unwrap_or(None);
             let raw = playback
                 .as_ref()
                 .map(|p| (p.process.clone(), p.media_title.clone()));

@@ -26,8 +26,12 @@ import * as api from "@/api/anilist";
 import * as library from "@/api/library";
 import {
   getScrobbleSettings,
+  getSmtcEnabled,
   setScrobbleSettings,
+  setSmtcEnabled,
+  smtcSessions,
   type ScrobbleSettings,
+  type SmtcSession,
 } from "@/stores/nowPlaying";
 import {
   getLanguageSetting,
@@ -574,6 +578,7 @@ function ScrobbleSection() {
   const [airing, setAiring] = useState<boolean | null>(null);
   const [stale, setStale] = useState<api.StaleSettings | null>(null);
   const [sequel, setSequel] = useState<boolean | null>(null);
+  const [smtc, setSmtc] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (!api.isTauri) return;
@@ -581,6 +586,7 @@ function ScrobbleSection() {
     api.getAiringNotify().then(setAiring);
     api.getStaleSettings().then(setStale);
     api.getSequelNotify().then(setSequel);
+    getSmtcEnabled().then(setSmtc);
   }, []);
 
   if (!settings) return null;
@@ -624,6 +630,17 @@ function ScrobbleSection() {
           label={t("settings.trackingConfirm")}
           hint={t("settings.trackingConfirmHint")}
         />
+        {smtc !== null && (
+          <Toggle
+            checked={smtc}
+            onChange={(v) => {
+              setSmtc(v);
+              setSmtcEnabled(v);
+            }}
+            label={t("settings.smtc")}
+            hint={t("settings.smtcHint")}
+          />
+        )}
         <label className="flex items-center justify-between gap-4 py-1 text-sm">
           <span>
             <span className="block text-ink-100">{t("settings.threshold")}</span>
@@ -694,8 +711,97 @@ function ScrobbleSection() {
             )}
           </>
         )}
+        <SmtcDiagnostic />
       </div>
     </Card>
+  );
+}
+
+/**
+ * Shows what Windows currently reports for every media session.
+ *
+ * Players disagree about which field carries the show and which carries the
+ * episode, and some publish nothing at all. Without this there is no way to
+ * tell "Karasu ignored it" from "the player never told Windows" — which is
+ * exactly the question when a title isn't picked up.
+ */
+function SmtcDiagnostic() {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const [sessions, setSessions] = useState<SmtcSession[] | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const refresh = async () => {
+    setBusy(true);
+    try {
+      setSessions(await smtcSessions());
+    } catch {
+      setSessions([]);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const toggle = () => {
+    const next = !open;
+    setOpen(next);
+    if (next && sessions === null) refresh();
+  };
+
+  return (
+    <div className="border-t border-surface-800 pt-3">
+      <button
+        type="button"
+        onClick={toggle}
+        className="flex items-center gap-1 text-xs text-ink-500 hover:text-ink-300"
+      >
+        <ChevronRight
+          className={cn("size-3 transition-transform", open && "rotate-90")}
+        />
+        {t("settings.detectionDebug")}
+      </button>
+      {open && (
+        <div className="mt-2 space-y-2">
+          <p className="text-xs text-ink-600">
+            {t("settings.detectionDebugHint")}
+          </p>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={refresh}
+            disabled={busy}
+          >
+            <RefreshCw className={cn("size-3.5", busy && "animate-spin")} />{" "}
+            {t("settings.refreshDebug")}
+          </Button>
+          {sessions?.length === 0 && (
+            <p className="text-xs text-ink-600">
+              {t("settings.detectionDebugEmpty")}
+            </p>
+          )}
+          {sessions?.map((s, i) => (
+            <div
+              key={`${s.appId}-${i}`}
+              className="rounded-lg bg-surface-850 p-2 text-xs"
+            >
+              <p className="break-all font-medium text-ink-100">{s.appId}</p>
+              <dl className="mt-1 grid grid-cols-[5rem_1fr] gap-x-2 gap-y-0.5 text-ink-500">
+                <dt>title</dt>
+                <dd className="break-all text-ink-300">{s.title || "—"}</dd>
+                <dt>artist</dt>
+                <dd className="break-all text-ink-300">{s.artist || "—"}</dd>
+                <dt>album</dt>
+                <dd className="break-all text-ink-300">{s.album || "—"}</dd>
+                <dt>type</dt>
+                <dd className="text-ink-300">{s.playbackType}</dd>
+                <dt>status</dt>
+                <dd className="text-ink-300">{s.status}</dd>
+              </dl>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

@@ -10,6 +10,7 @@ import {
   Download,
   ExternalLink,
   RotateCw,
+  Users,
 } from "lucide-react";
 import {
   appVersion,
@@ -25,6 +26,8 @@ import { Card, CardTitle } from "@/components/ui/card";
 
 const REPO_URL = "https://github.com/Kyusetzu/Karasu";
 const DISCORD_HANDLE = "Kyusetzu";
+const DISCORD_INVITE = "https://discord.gg/yeHNSGyM8F";
+const DISCORD_SERVER = "Kyu's Cozy Corner";
 const EMAIL = "contact@kyusetzu.de";
 
 export default function About() {
@@ -67,6 +70,14 @@ export default function About() {
       <Card>
         <CardTitle>{t("about.contact")}</CardTitle>
         <div className="mt-3 space-y-2 text-sm">
+          <Row icon={<Users size={16} />} label={t("about.community")}>
+            <button
+              onClick={() => openUrl(DISCORD_INVITE)}
+              className="text-accent-400 hover:underline"
+            >
+              {DISCORD_SERVER}
+            </button>
+          </Row>
           <Row icon={<MessageCircle size={16} />} label={t("about.discord")}>
             <span className="text-ink-100">{DISCORD_HANDLE}</span>
           </Row>

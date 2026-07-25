@@ -14,6 +14,7 @@
   <img src="https://img.shields.io/badge/Linux-experimental-FCC624?logo=linux&logoColor=black" alt="Linux (experimental)" />
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT" /></a>
   <img src="https://img.shields.io/github/v/release/Kyusetzu/Karasu?include_prereleases&label=release" alt="Release" />
+  <a href="https://discord.gg/yeHNSGyM8F"><img src="https://img.shields.io/badge/Discord-Kyu's%20Cozy%20Corner-5865F2?logo=discord&logoColor=white" alt="Discord" /></a>
 </p>
 
 ---
@@ -194,8 +195,16 @@ documents the conventions and guardrails these tools follow.
 
 ## Contact
 
+Bug reports and pull requests belong on
+[GitHub Issues](https://github.com/Kyusetzu/Karasu/issues) — that's where they
+get tracked. For everything else:
+
+- Discord server: [**Kyu's Cozy Corner**](https://discord.gg/yeHNSGyM8F)
 - Discord: **Kyusetzu**
 - Email: **contact@kyusetzu.de**
+
+Security issues go to the email above, privately — see
+[SECURITY.md](SECURITY.md).
 
 ## Star History
 

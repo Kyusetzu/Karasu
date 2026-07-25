@@ -1,0 +1,12 @@
+# Issues are the place for bugs and feature requests. These links catch the
+# things that aren't either, so they don't end up filed as issues.
+blank_issues_enabled: true
+contact_links:
+  - name: Questions, help and general chat
+    url: https://discord.gg/yeHNSGyM8F
+    about: Join Kyu's Cozy Corner on Discord — best for setup help, detection
+      quirks and anything that isn't a confirmed bug.
+  - name: Report a security vulnerability
+    url: https://github.com/Kyusetzu/Karasu/blob/main/SECURITY.md
+    about: Please report security issues privately by email rather than opening
+      a public issue.

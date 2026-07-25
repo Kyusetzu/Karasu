@@ -27,7 +27,18 @@ interface MenuItem {
   onClick: () => void;
 }
 
-const MENU_W = 220;
+/**
+ * Menu geometry in rem, so it rides the fluid root scale like everything else.
+ * The clamping below has to agree with the rendered width, so both the class
+ * and the maths read these — a literal `w-[220px]` plus a JS `220` would drift
+ * apart the moment the root font size moves, and the menu would open partly
+ * off-screen.
+ */
+const MENU_W_REM = 13.75;
+const MENU_ROW_H_REM = 2.125;
+
+const rootFontSize = () =>
+  parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
 
 /**
  * Replaces the browser's default right-click menu with app-appropriate
@@ -89,12 +100,12 @@ export default function ContextMenu() {
   if (ctx.mediaId) {
     items.push({
       label: t("ctx.open"),
-      icon: <SquareArrowOutUpRight size={14} />,
+      icon: <SquareArrowOutUpRight className="size-3.5" />,
       onClick: run(() => navigate(`/media/${ctx.mediaId}`)),
     });
     items.push({
       label: t("ctx.openAniList"),
-      icon: <ExternalLink size={14} />,
+      icon: <ExternalLink className="size-3.5" />,
       onClick: run(() =>
         openUrl(
           `https://anilist.co/${ctx.mediaType === "MANGA" ? "manga" : "anime"}/${ctx.mediaId}`,
@@ -106,7 +117,7 @@ export default function ContextMenu() {
   if (ctx.selection) {
     items.push({
       label: t("ctx.copy"),
-      icon: <Copy size={14} />,
+      icon: <Copy className="size-3.5" />,
       onClick: run(() => {
         navigator.clipboard?.writeText(ctx.selection ?? "").catch(() => {});
       }),
@@ -116,42 +127,46 @@ export default function ContextMenu() {
   items.push(
     {
       label: t("ctx.back"),
-      icon: <ArrowLeft size={14} />,
+      icon: <ArrowLeft className="size-3.5" />,
       onClick: run(() => navigate(-1)),
     },
     {
       label: t("ctx.forward"),
-      icon: <ArrowRight size={14} />,
+      icon: <ArrowRight className="size-3.5" />,
       onClick: run(() => navigate(1)),
     },
     {
       label: t("ctx.reload"),
-      icon: <RefreshCw size={14} />,
+      icon: <RefreshCw className="size-3.5" />,
       onClick: run(() => window.location.reload()),
     },
     {
       label: t("ctx.palette"),
-      icon: <Command size={14} />,
+      icon: <Command className="size-3.5" />,
       onClick: run(() =>
         window.dispatchEvent(new Event("open-command-palette")),
       ),
     },
     {
       label: t("ctx.settings"),
-      icon: <Settings size={14} />,
+      icon: <Settings className="size-3.5" />,
       onClick: run(() => navigate("/settings")),
     },
   );
 
   // Keep the menu inside the viewport.
-  const x = Math.min(ctx.x, window.innerWidth - MENU_W - 8);
-  const rowH = 34;
-  const y = Math.min(ctx.y, window.innerHeight - items.length * rowH - 8);
+  const rem = rootFontSize();
+  const gap = 0.5 * rem;
+  const x = Math.min(ctx.x, window.innerWidth - MENU_W_REM * rem - gap);
+  const y = Math.min(
+    ctx.y,
+    window.innerHeight - items.length * MENU_ROW_H_REM * rem - gap,
+  );
 
   return (
     <div
       ref={ref}
-      className="fixed z-[100] w-[220px] overflow-hidden rounded-lg border border-surface-700 bg-surface-900 py-1 shadow-2xl"
+      className="fixed z-[100] w-55 overflow-hidden rounded-lg border border-surface-700 bg-surface-900 py-1 shadow-2xl"
       style={{ left: x, top: y }}
       onMouseDown={(e) => e.stopPropagation()}
     >

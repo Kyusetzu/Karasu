@@ -1,6 +1,16 @@
 @import "tailwindcss";
 
 @theme {
+  /* Above the 1920 baseline, so a maximised 1080p window is never affected.
+     Used for the handful of layout caps that can't just scale (container
+     widths, column counts) — everything else rides the root scale below. */
+  --breakpoint-3xl: 2000px;
+
+  /* Smaller than text-xs, for notification badges and tag chips. Exists so
+     those stop reaching for arbitrary px values, which don't scale. */
+  --text-2xs: 0.625rem;
+  --text-2xs--line-height: 1.4;
+
   --color-surface-950: #0b0d12;
   --color-surface-900: #11141b;
   --color-surface-850: #161a23;
@@ -44,6 +54,19 @@
 
 :root[data-theme="dark"] {
   color-scheme: dark;
+}
+
+/* The one lever the whole layout hangs off. Tailwind derives --spacing, the
+   text sizes, the max-w containers and the radii from rem, so scaling the root
+   scales all of them together — a 1440p display gets a proportionally larger
+   app rather than the same app marooned in empty gutters.
+
+   Flat at exactly 16px up to 1920 wide (4 + 0.625*19.2 = 16), so 1080p is
+   pixel-identical to a build without this rule, then rising to 20px at 2560.
+   Windows display scaling already shrinks the reported CSS width, so a scaled
+   high-DPI screen correctly stays at the baseline. */
+html {
+  font-size: clamp(16px, calc(4px + 0.625vw), 20px);
 }
 
 html,

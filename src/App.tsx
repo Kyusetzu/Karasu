@@ -111,7 +111,7 @@ function PlaybackError() {
         className="shrink-0 text-ink-500 hover:text-ink-200"
         aria-label="Dismiss"
       >
-        <X size={15} />
+        <X className="size-3.75" />
       </button>
     </div>
   );

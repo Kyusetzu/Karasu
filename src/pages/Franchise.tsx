@@ -59,7 +59,7 @@ export default function Franchise() {
           aria-label={t("detail.back")}
           onClick={() => navigate(-1)}
         >
-          <ArrowLeft size={16} />
+          <ArrowLeft className="size-4" />
         </Button>
         <h1 className="text-xl font-bold">{t("franchise.title")}</h1>
       </div>

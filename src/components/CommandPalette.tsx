@@ -150,7 +150,7 @@ export default function CommandPalette() {
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-2 border-b border-surface-800 px-3">
-          <Search size={16} className="text-ink-600" />
+          <Search className="size-4 text-ink-600" />
           <input
             ref={inputRef}
             value={query}

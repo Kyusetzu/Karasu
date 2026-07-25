@@ -76,11 +76,11 @@ export default function RandomPickModal({
               <div className="mt-auto flex gap-2 pt-3">
                 <Link to={`/media/${picked.media.id}`} onClick={onClose}>
                   <Button>
-                    {t("random.open")} <ExternalLink size={14} />
+                    {t("random.open")} <ExternalLink className="size-3.5" />
                   </Button>
                 </Link>
                 <Button variant="secondary" onClick={() => setNonce((n) => n + 1)}>
-                  <Dices size={15} /> {t("random.reroll")}
+                  <Dices className="size-3.75" /> {t("random.reroll")}
                 </Button>
               </div>
             </div>

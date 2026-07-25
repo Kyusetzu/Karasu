@@ -56,7 +56,7 @@ export default function MediaCard({ media }: { media: MediaWithListStatus }) {
         </Link>
         {media.averageScore !== null && (
           <span className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-black/70 px-2 py-0.5 text-xs font-medium text-amber-300">
-            <Star size={11} fill="currentColor" /> {media.averageScore}%
+            <Star className="size-2.75" fill="currentColor" /> {media.averageScore}%
           </span>
         )}
         {hasProfile && (
@@ -67,14 +67,14 @@ export default function MediaCard({ media }: { media: MediaWithListStatus }) {
               aria-label={t("common.edit")}
               title={t("common.edit")}
             >
-              <Pencil size={14} />
+              <Pencil className="size-3.5" />
             </button>
             {entry ? (
               <span
                 className="grid h-8 w-8 place-items-center rounded-full bg-emerald-700/90 text-white"
                 title={t(`status.${media.type}.${entry.status}`)}
               >
-                <Check size={15} />
+                <Check className="size-3.75" />
               </span>
             ) : (
               <button
@@ -86,7 +86,7 @@ export default function MediaCard({ media }: { media: MediaWithListStatus }) {
                 aria-label={t("media.addPlanning")}
                 title={t("media.addPlanning")}
               >
-                <Plus size={16} />
+                <Plus className="size-4" />
               </button>
             )}
           </div>

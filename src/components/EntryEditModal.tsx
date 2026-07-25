@@ -174,7 +174,7 @@ export default function EntryEditModal({
                 className="text-red-400"
                 onClick={() => setConfirmDelete(true)}
               >
-                <Trash2 size={14} /> {t("common.remove")}
+                <Trash2 className="size-3.5" /> {t("common.remove")}
               </Button>
             )
           ) : (

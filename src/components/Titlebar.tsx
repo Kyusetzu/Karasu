@@ -38,21 +38,21 @@ export default function Titlebar() {
           className="grid h-full w-12 place-items-center text-ink-500 hover:bg-surface-800 hover:text-ink-100"
           aria-label={t("window.minimize")}
         >
-          <Minus size={14} />
+          <Minus className="size-3.5" />
         </button>
         <button
           onClick={() => appWindow?.toggleMaximize()}
           className="grid h-full w-12 place-items-center text-ink-500 hover:bg-surface-800 hover:text-ink-100"
           aria-label={t("window.maximize")}
         >
-          <Square size={12} />
+          <Square className="size-3" />
         </button>
         <button
           onClick={() => appWindow?.hide()}
           className="grid h-full w-12 place-items-center text-ink-500 hover:bg-red-600 hover:text-white"
           aria-label={t("window.closeToTray")}
         >
-          <X size={16} />
+          <X className="size-4" />
         </button>
       </div>
     </header>

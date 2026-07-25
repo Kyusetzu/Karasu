@@ -136,7 +136,7 @@ export default function AnimeDetail() {
           className="absolute -top-56 left-4 z-10"
           onClick={() => navigate(-1)}
         >
-          <ArrowLeft size={16} />
+          <ArrowLeft className="size-4" />
         </Button>
 
         <div className="-mt-16 flex gap-6">
@@ -153,7 +153,7 @@ export default function AnimeDetail() {
             <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-300">
               {data.averageScore !== null && (
                 <span className="flex items-center gap-1 text-amber-300">
-                  <Star size={14} fill="currentColor" /> {data.averageScore}%
+                  <Star className="size-3.5" fill="currentColor" /> {data.averageScore}%
                 </span>
               )}
               {data.format && <span>{formatLabel(data.format, t)}</span>}
@@ -208,7 +208,7 @@ export default function AnimeDetail() {
                 );
                 return remaining !== null && remaining > 0 ? (
                   <p className="mt-2 flex items-center gap-1.5 text-sm text-ink-300">
-                    <Clock size={14} className="text-ink-500" />
+                    <Clock className="size-3.5 text-ink-500" />
                     {t("detail.timeLeft", {
                       time: formatMinutes(remaining, t),
                     })}
@@ -243,7 +243,7 @@ export default function AnimeDetail() {
                   onClick={() => play(data.id)}
                   title={t("common.playNext")}
                 >
-                  <Play size={15} fill="currentColor" />
+                  <Play className="size-3.75" fill="currentColor" />
                   {t("common.playNext")}
                 </Button>
               )}
@@ -255,7 +255,7 @@ export default function AnimeDetail() {
               }
               className="mt-2 flex items-center gap-1 text-xs text-ink-500 hover:text-accent-400"
             >
-              {t("detail.openOnAniList")} <ExternalLink size={11} />
+              {t("detail.openOnAniList")} <ExternalLink className="size-2.75" />
             </button>
           </div>
         </div>
@@ -293,7 +293,7 @@ export default function AnimeDetail() {
               />
               <span className="absolute inset-0 grid place-items-center bg-black/30 transition-colors group-hover:bg-black/15">
                 <span className="grid h-12 w-12 place-items-center rounded-full bg-black/70">
-                  <Play size={20} fill="currentColor" className="text-white" />
+                  <Play fill="currentColor" className="size-5 text-white" />
                 </span>
               </span>
             </button>
@@ -531,7 +531,7 @@ function LinkList({ links }: { links: ExternalLinkData[] }) {
               style={{ backgroundColor: l.color ?? "#64748b" }}
             />
             {l.site}
-            <ExternalLink size={10} className="text-ink-600" />
+            <ExternalLink className="size-2.5 text-ink-600" />
           </button>
         ))}
       </div>

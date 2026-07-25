@@ -56,7 +56,7 @@ export default function PresetModal({
                   className="text-ink-600 hover:text-red-400"
                   aria-label={t("common.remove")}
                 >
-                  <Trash2 size={14} />
+                  <Trash2 className="size-3.5" />
                 </button>
               </li>
             ))}

@@ -58,11 +58,11 @@ export default function NowPlayingCard() {
       <div className="flex items-center gap-4">
         <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-accent-600/25 text-accent-400">
           {isManga ? (
-            <BookOpen size={20} />
+            <BookOpen className="size-5" />
           ) : current.streaming ? (
-            <Tv size={20} />
+            <Tv className="size-5" />
           ) : (
-            <MonitorPlay size={20} />
+            <MonitorPlay className="size-5" />
           )}
         </span>
         <div className="min-w-0 flex-1">
@@ -131,7 +131,7 @@ function ScrobbleStatus({ countdown }: { countdown: string | null }) {
     case "updated":
       return (
         <p className="flex items-center gap-1 text-xs font-medium text-emerald-400">
-          <Check size={12} />{" "}
+          <Check className="size-3" />{" "}
           {t("nowPlaying.updated", {
             n: t(
               current?.mediaType === "MANGA"
@@ -194,7 +194,7 @@ function ScrobbleActions() {
           onClick={() => act(scrobbleNow)}
           title={t("nowPlaying.updateNowTitle")}
         >
-          <Check size={14} /> {t("nowPlaying.updateNow")}
+          <Check className="size-3.5" /> {t("nowPlaying.updateNow")}
         </Button>
         {scrobble.phase !== "cancelled" && scrobble.phase !== "blocked" && (
           <Button
@@ -204,7 +204,7 @@ function ScrobbleActions() {
             onClick={() => act(scrobbleCancel)}
             title={t("nowPlaying.skipTitle")}
           >
-            <X size={14} />
+            <X className="size-3.5" />
           </Button>
         )}
       </div>

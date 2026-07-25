@@ -209,11 +209,11 @@ function LibrarySection() {
       <p className="mt-2 text-sm text-ink-500">{t("settings.libraryHint")}</p>
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <Button variant="secondary" onClick={choose}>
-          <FolderOpen size={16} /> {t("settings.libraryChoose")}
+          <FolderOpen className="size-4" /> {t("settings.libraryChoose")}
         </Button>
         {path && (
           <Button onClick={scan} disabled={scanning}>
-            <RefreshCw size={16} className={scanning ? "animate-spin" : ""} />{" "}
+            <RefreshCw className={cn("size-4", scanning && "animate-spin")} />{" "}
             {scanning ? t("settings.libraryScanning") : t("settings.libraryScan")}
           </Button>
         )}
@@ -425,11 +425,11 @@ function AccountSection() {
               onClick={() => openUrl(viewer.siteUrl)}
               className="flex items-center gap-1 text-xs text-accent-400 hover:underline"
             >
-              {t("settings.profileLink")} <ExternalLink size={12} />
+              {t("settings.profileLink")} <ExternalLink className="size-3" />
             </button>
           </div>
           <Button variant="danger" onClick={() => logout()}>
-            <LogOut size={16} /> {t("settings.logout")}
+            <LogOut className="size-4" /> {t("settings.logout")}
           </Button>
         </div>
       </Card>
@@ -481,7 +481,7 @@ function AccountSection() {
               size="sm"
               onClick={() => openUrl("https://anilist.co/settings/developer")}
             >
-              {t("settings.openDeveloper")} <ExternalLink size={14} />
+              {t("settings.openDeveloper")} <ExternalLink className="size-3.5" />
             </Button>
             <div className="flex gap-2">
               <Input
@@ -502,7 +502,7 @@ function AccountSection() {
         )}
         <p>{t("settings.stepLogin")}</p>
         <Button onClick={openLogin} disabled={!canLogin}>
-          <LogIn size={16} /> {t("settings.loginButton")}
+          <LogIn className="size-4" /> {t("settings.loginButton")}
         </Button>
         {login.waiting && (
           <p className="text-xs text-accent-400">{t("settings.loginWaiting")}</p>
@@ -531,8 +531,7 @@ function AccountSection() {
             className="flex items-center gap-1 text-xs text-ink-500 hover:text-ink-300"
           >
             <ChevronRight
-              size={12}
-              className={`transition-transform ${showManual ? "rotate-90" : ""}`}
+              className={cn("size-3 transition-transform", showManual && "rotate-90")}
             />
             {t("settings.manualFallback")}
           </button>
@@ -849,7 +848,7 @@ function AppSection() {
                 title={t("settings.accentCustom")}
                 aria-label={t("settings.accentCustom")}
               >
-                <Palette size={13} className="text-current" />
+                <Palette className="size-3.25 text-current" />
               </button>
             </div>
           </div>

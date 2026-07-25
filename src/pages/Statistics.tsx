@@ -113,7 +113,7 @@ function StatisticsContent({
           <img src={avatar} alt="" className="h-12 w-12 rounded-full object-cover" />
         ) : (
           <span className="grid h-12 w-12 place-items-center rounded-full bg-surface-800 text-accent-400">
-            <BarChart3 size={20} />
+            <BarChart3 className="size-5" />
           </span>
         )}
         <div className="min-w-0 flex-1">
@@ -124,12 +124,12 @@ function StatisticsContent({
             rel="noreferrer"
             className="flex items-center gap-1 text-xs text-accent-400 hover:underline"
           >
-            {name} <ExternalLink size={11} />
+            {name} <ExternalLink className="size-2.75" />
           </a>
         </div>
         <Link to="/wrapped">
           <Button variant="secondary" size="sm">
-            <Sparkles size={14} /> {t("wrapped.title")}
+            <Sparkles className="size-3.5" /> {t("wrapped.title")}
           </Button>
         </Link>
       </header>

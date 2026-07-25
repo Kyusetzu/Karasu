@@ -84,9 +84,9 @@ export default function Bell() {
         aria-label={t("notif.title")}
         title={t("notif.title")}
       >
-        <BellIcon size={15} />
+        <BellIcon className="size-3.75" />
         {unread > 0 && (
-          <span className="absolute right-1.5 top-1.5 grid h-3.5 min-w-3.5 place-items-center rounded-full bg-accent-500 px-1 text-[9px] font-bold text-accent-ink">
+          <span className="absolute right-1.5 top-1.5 grid h-3.5 min-w-3.5 place-items-center rounded-full bg-accent-500 px-1 text-2xs font-bold text-accent-ink">
             {unread > 9 ? "9+" : unread}
           </span>
         )}
@@ -125,7 +125,7 @@ export default function Bell() {
                       }`}
                     >
                       <span className="mt-0.5 text-accent-400">
-                        <Icon size={15} />
+                        <Icon className="size-3.75" />
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="flex items-center gap-2">
@@ -139,7 +139,7 @@ export default function Bell() {
                         <span className="mt-0.5 block text-xs text-ink-400">
                           {n.body}
                         </span>
-                        <span className="mt-0.5 block text-[10px] text-ink-600">
+                        <span className="mt-0.5 block text-2xs text-ink-600">
                           {relTime(n.createdMs, i18n.language, t("notif.now"))}
                         </span>
                       </span>

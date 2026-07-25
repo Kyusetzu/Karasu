@@ -106,7 +106,7 @@ function LibraryView({ userId }: { userId: number }) {
           )}
         </div>
         <Button variant="ghost" onClick={rescan} disabled={scanning}>
-          <RefreshCw size={15} className={cn(scanning && "animate-spin")} />
+          <RefreshCw className={cn("size-3.75", scanning && "animate-spin")} />
           {scanning ? t("settings.libraryScanning") : t("settings.libraryScan")}
         </Button>
       </div>
@@ -191,7 +191,7 @@ function LibraryRow({
                     : "bg-accent-600/15 text-accent-300 hover:bg-accent-600/30",
                 )}
               >
-                <Play size={10} fill="currentColor" />
+                <Play className="size-2.5" fill="currentColor" />
                 {ep}
               </button>
             );

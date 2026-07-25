@@ -246,7 +246,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
     <div className="flex h-full flex-col">
       {(data?.fromCache || (data?.pending ?? 0) > 0) && (
         <div className="flex items-center gap-3 border-b border-surface-800 bg-amber-950/40 px-8 py-2 text-xs text-amber-300">
-          <CloudOff size={14} />
+          <CloudOff className="size-3.5" />
           {data?.fromCache
             ? t("list.offline")
             : t("list.pending", { count: data?.pending ?? 0 })}
@@ -259,7 +259,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
               refetch();
             }}
           >
-            <RefreshCw size={13} /> {t("list.syncNow")}
+            <RefreshCw className="size-3.25" /> {t("list.syncNow")}
           </Button>
         </div>
       )}
@@ -277,7 +277,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
               aria-label={t("bulk.select")}
               title={t("bulk.select")}
             >
-              <CheckSquare size={16} />
+              <CheckSquare className="size-4" />
             </Button>
             <Button
               variant="ghost"
@@ -286,7 +286,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
               disabled={isRefetching}
               aria-label={t("common.reload")}
             >
-              <RefreshCw size={16} className={cn(isRefetching && "animate-spin")} />
+              <RefreshCw className={cn("size-4", isRefetching && "animate-spin")} />
             </Button>
           </div>
         </div>
@@ -317,8 +317,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
         <div className="flex items-center gap-2">
           <div className="relative max-w-xs flex-1">
             <SearchIcon
-              size={14}
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-600"
+              className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-ink-600"
             />
             <Input
               value={filter}
@@ -375,7 +374,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
             aria-label={t("presets.save")}
             title={t("presets.save")}
           >
-            <Bookmark size={16} />
+            <Bookmark className="size-4" />
           </Button>
           <Button
             variant="secondary"
@@ -384,7 +383,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
             aria-label={t("random.pick")}
             title={t("random.pick")}
           >
-            <Dices size={16} />
+            <Dices className="size-4" />
           </Button>
           <div className="ml-auto flex rounded-lg border border-surface-700">
             <button
@@ -395,7 +394,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
               )}
               aria-label={t("list.gridView")}
             >
-              <LayoutGrid size={15} />
+              <LayoutGrid className="size-3.75" />
             </button>
             <button
               onClick={() => setGrid(false)}
@@ -405,7 +404,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
               )}
               aria-label={t("list.listView")}
             >
-              <ListIcon size={15} />
+              <ListIcon className="size-3.75" />
             </button>
           </div>
         </div>
@@ -571,7 +570,7 @@ function BulkBar({
           disabled={disabled}
           onClick={() => setConfirmDelete(true)}
         >
-          <Trash2 size={14} /> {t("common.remove")}
+          <Trash2 className="size-3.5" /> {t("common.remove")}
         </Button>
       )}
 
@@ -581,7 +580,7 @@ function BulkBar({
         className="ml-auto"
         onClick={onClear}
       >
-        <X size={14} /> {t("bulk.done")}
+        <X className="size-3.5" /> {t("bulk.done")}
       </Button>
     </div>
   );
@@ -612,7 +611,7 @@ function SelectBox({
       aria-checked={checked}
       aria-label={t("bulk.select")}
     >
-      {checked ? <CheckSquare size={14} /> : <Square size={14} />}
+      {checked ? <CheckSquare className="size-3.5" /> : <Square className="size-3.5" />}
     </button>
   );
 }
@@ -695,7 +694,7 @@ function GridCard({
             aria-label={t("common.edit")}
             title={t("common.edit")}
           >
-            <Pencil size={14} />
+            <Pencil className="size-3.5" />
           </button>
           {entry.status !== "COMPLETED" && (
             <button
@@ -704,7 +703,7 @@ function GridCard({
               aria-label={t("common.complete")}
               title={t("common.complete")}
             >
-              <CheckCheck size={14} />
+              <CheckCheck className="size-3.5" />
             </button>
           )}
           {canIncrement(entry) && (
@@ -714,13 +713,13 @@ function GridCard({
               aria-label={t("common.plusOne")}
               title={t("common.plusOne")}
             >
-              <Plus size={16} />
+              <Plus className="size-4" />
             </button>
           )}
         </div>
         {entry.score > 0 && (
           <span className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-black/70 px-2 py-0.5 text-xs font-medium text-amber-300">
-            <Star size={11} fill="currentColor" /> {entry.score}
+            <Star className="size-2.75" fill="currentColor" /> {entry.score}
           </span>
         )}
         {max !== null && (
@@ -755,13 +754,13 @@ function TagChips({ notes, max = 3 }: { notes: string | null; max?: number }) {
       {tags.slice(0, max).map((tag) => (
         <span
           key={tag}
-          className="rounded-full bg-surface-800 px-1.5 py-0.5 text-[10px] text-accent-300"
+          className="rounded-full bg-surface-800 px-1.5 py-0.5 text-2xs text-accent-300"
         >
           {tag}
         </span>
       ))}
       {tags.length > max && (
-        <span className="text-[10px] text-ink-600">+{tags.length - max}</span>
+        <span className="text-2xs text-ink-600">+{tags.length - max}</span>
       )}
     </div>
   );
@@ -874,7 +873,7 @@ function ListRow({
             aria-label={t("common.playNext")}
             title={t("common.playNext")}
           >
-            <Play size={15} />
+            <Play className="size-3.75" />
           </Button>
         )}
         <Button
@@ -885,7 +884,7 @@ function ListRow({
           aria-label={t("common.plusOne")}
           title={t("common.plusOne")}
         >
-          <Plus size={15} />
+          <Plus className="size-3.75" />
         </Button>
         {entry.status !== "COMPLETED" && (
           <Button
@@ -896,7 +895,7 @@ function ListRow({
             aria-label={t("common.complete")}
             title={t("common.complete")}
           >
-            <CheckCheck size={15} />
+            <CheckCheck className="size-3.75" />
           </Button>
         )}
         <Button
@@ -906,7 +905,7 @@ function ListRow({
           aria-label={t("common.edit")}
           title={t("common.edit")}
         >
-          <Pencil size={14} />
+          <Pencil className="size-3.5" />
         </Button>
       </div>
         </>

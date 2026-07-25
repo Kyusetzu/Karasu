@@ -23,6 +23,7 @@ import {
 } from "@/api/anilist";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 const REPO_URL = "https://github.com/Kyusetzu/Karasu";
 const DISCORD_HANDLE = "Kyusetzu";
@@ -70,7 +71,7 @@ export default function About() {
       <Card>
         <CardTitle>{t("about.contact")}</CardTitle>
         <div className="mt-3 space-y-2 text-sm">
-          <Row icon={<Users size={16} />} label={t("about.community")}>
+          <Row icon={<Users className="size-4" />} label={t("about.community")}>
             <button
               onClick={() => openUrl(DISCORD_INVITE)}
               className="text-accent-400 hover:underline"
@@ -78,10 +79,10 @@ export default function About() {
               {DISCORD_SERVER}
             </button>
           </Row>
-          <Row icon={<MessageCircle size={16} />} label={t("about.discord")}>
+          <Row icon={<MessageCircle className="size-4" />} label={t("about.discord")}>
             <span className="text-ink-100">{DISCORD_HANDLE}</span>
           </Row>
-          <Row icon={<Mail size={16} />} label={t("about.email")}>
+          <Row icon={<Mail className="size-4" />} label={t("about.email")}>
             <a
               href={`mailto:${EMAIL}`}
               className="text-accent-400 hover:underline"
@@ -89,7 +90,7 @@ export default function About() {
               {EMAIL}
             </a>
           </Row>
-          <Row icon={<Code2 size={16} />} label={t("about.repo")}>
+          <Row icon={<Code2 className="size-4" />} label={t("about.repo")}>
             <button
               onClick={() => openUrl(REPO_URL)}
               className="text-accent-400 hover:underline"
@@ -174,13 +175,13 @@ function UpdateSection() {
       <CardTitle>{t("about.updates")}</CardTitle>
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <Button onClick={check} disabled={busy || downloading || !isTauri}>
-          <RefreshCw size={16} className={busy ? "animate-spin" : ""} />{" "}
+          <RefreshCw className={cn("size-4", busy && "animate-spin")} />{" "}
           {busy ? t("about.checking") : t("about.checkUpdates")}
         </Button>
 
         {downloading && (
           <span className="flex items-center gap-1.5 text-sm text-ink-500">
-            <Download size={16} className="animate-bounce" />{" "}
+            <Download className="size-4 animate-bounce" />{" "}
             {t("about.downloading")}
           </span>
         )}
@@ -191,7 +192,7 @@ function UpdateSection() {
             onClick={confirmInstall}
             disabled={installing}
           >
-            <RotateCw size={16} className={installing ? "animate-spin" : ""} />{" "}
+            <RotateCw className={cn("size-4", installing && "animate-spin")} />{" "}
             {installing ? t("about.installing") : t("about.restartUpdate")}
           </Button>
         )}
@@ -205,7 +206,7 @@ function UpdateSection() {
             </span>
           ) : (
             <span className="flex items-center gap-1.5 text-sm text-emerald-400">
-              <CheckCircle2 size={16} />{" "}
+              <CheckCircle2 className="size-4" />{" "}
               {t("about.upToDate", { version: info.current })}
             </span>
           ))}
@@ -215,7 +216,7 @@ function UpdateSection() {
             onClick={() => openUrl(info.url!)}
             className="flex items-center gap-1 text-sm text-accent-400 hover:underline"
           >
-            <ExternalLink size={14} /> {t("about.viewRelease")}
+            <ExternalLink className="size-3.5" /> {t("about.viewRelease")}
           </button>
         )}
       </div>

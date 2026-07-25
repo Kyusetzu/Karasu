@@ -454,7 +454,7 @@ export default function Wrapped() {
     <div className="mx-auto max-w-4xl p-8">
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <h1 className="flex items-center gap-2 text-2xl font-bold">
-          <Sparkles size={20} className="text-accent-400" /> {t("wrapped.title")}
+          <Sparkles className="size-5 text-accent-400" /> {t("wrapped.title")}
         </h1>
         {years.length > 0 && (
           <select
@@ -470,7 +470,7 @@ export default function Wrapped() {
           </select>
         )}
         <Button className="ml-auto" onClick={save} disabled={!stats}>
-          <Download size={16} /> {saved ? t("common.saved") : t("wrapped.save")}
+          <Download className="size-4" /> {saved ? t("common.saved") : t("wrapped.save")}
         </Button>
       </div>
 

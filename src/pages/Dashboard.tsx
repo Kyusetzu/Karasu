@@ -101,7 +101,7 @@ function DashboardContent({ userId }: { userId: number }) {
       <WeeklyDigest entries={allAnime} />
       <section>
         <h2 className="flex items-center gap-2 text-lg font-semibold">
-          <Play size={18} className="text-accent-400" />{" "}
+          <Play className="size-4.5 text-accent-400" />{" "}
           {t("dashboard.continueWatching")}
         </h2>
         {watching.length === 0 ? (
@@ -134,7 +134,7 @@ function DashboardContent({ userId }: { userId: number }) {
 
       <section>
         <h2 className="flex items-center gap-2 text-lg font-semibold">
-          <CalendarClock size={18} className="text-accent-400" />{" "}
+          <CalendarClock className="size-4.5 text-accent-400" />{" "}
           {t("dashboard.upcoming")}
         </h2>
         {upcoming.length === 0 ? (
@@ -191,7 +191,7 @@ function WeeklyDigest({ entries }: { entries: MediaListEntry[] }) {
   return (
     <section>
       <h2 className="flex items-center gap-2 text-lg font-semibold">
-        <CalendarDays size={18} className="text-accent-400" />{" "}
+        <CalendarDays className="size-4.5 text-accent-400" />{" "}
         {t("dashboard.thisWeek")}
       </h2>
       <p className="mt-1 text-sm text-ink-500">
@@ -275,7 +275,7 @@ function Stats({ entries }: { entries: MediaListEntry[] }) {
   return (
     <section>
       <h2 className="flex items-center gap-2 text-lg font-semibold">
-        <BarChart3 size={18} className="text-accent-400" />{" "}
+        <BarChart3 className="size-4.5 text-accent-400" />{" "}
         {t("dashboard.stats")}
       </h2>
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -325,7 +325,7 @@ function ContinueCard({
             aria-label={t("common.plusOne")}
             title={t("dashboard.markWatched", { n: entry.progress + 1 })}
           >
-            <Plus size={16} />
+            <Plus className="size-4" />
           </button>
         )}
         {media.episodes !== null && (

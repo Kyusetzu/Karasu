@@ -57,7 +57,7 @@ export default function TagEditor({
             className="text-accent-300/70 hover:text-accent-200"
             aria-label={t("tags.remove", { tag })}
           >
-            <X size={11} />
+            <X className="size-2.75" />
           </button>
         </span>
       ))}

@@ -45,8 +45,7 @@ export default function Search() {
         <div className="mt-4 flex items-center gap-2">
           <div className="relative max-w-md flex-1">
             <SearchIcon
-              size={15}
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-600"
+              className="pointer-events-none absolute left-3 top-1/2 size-3.75 -translate-y-1/2 text-ink-600"
             />
             <Input
               autoFocus

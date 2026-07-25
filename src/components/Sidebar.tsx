@@ -61,7 +61,7 @@ export default function Sidebar() {
               )
             }
           >
-            <Icon size={18} />
+            <Icon className="size-4.5" />
             {t(key)}
           </NavLink>
         ))}
@@ -75,16 +75,16 @@ export default function Sidebar() {
             onClick={linkAccount}
             className={cn(bottomClass({ isActive: false }), "text-accent-400")}
           >
-            <LogIn size={18} />
+            <LogIn className="size-4.5" />
             {t("nav.linkAccount")}
           </button>
         )}
         <NavLink to="/about" className={bottomClass}>
-          <Info size={18} />
+          <Info className="size-4.5" />
           {t("nav.about")}
         </NavLink>
         <NavLink to="/settings" className={bottomClass}>
-          <Settings size={18} />
+          <Settings className="size-4.5" />
           {t("nav.settings")}
         </NavLink>
       </div>

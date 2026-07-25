@@ -19,6 +19,28 @@ Karasu ships as a single rolling `latest` prerelease — there's no separate
 LTS/stable branch to track yet. Please report issues against the current
 `latest` release.
 
+## Dependency advisories
+
+Karasu's public dependency alerts include advisories against the **GTK stack**
+(`glib`, `gtk`, `atk` and friends). These are worth explaining rather than
+leaving to look ignored.
+
+That stack is **Linux-only groundwork and is not in the published Windows
+build**. `cargo tree -i glib --target x86_64-pc-windows-msvc` finds nothing —
+the crates only enter the graph for Linux targets, and no Linux build is
+published (see the platforms note in the README). The shipped installer never
+contains this code.
+
+It is also not fixable here. The versions are pinned upstream by Tauri's Linux
+backend — `glib` ← `atk` ← `gtk 0.18` ← `tao`/`tray-icon` ← `tauri` — and
+`gtk 0.18` requires `glib ^0.18`, so a newer `glib` is out of range no matter
+what this repo does. It resolves when Tauri moves to a newer gtk-rs, and we
+pick that up with the next Tauri release.
+
+Advisories against anything that *does* ship — the Rust crates compiled into
+the Windows binary, or the frontend dependencies bundled into it — are treated
+as real and acted on.
+
 ## Reporting a vulnerability
 
 Please **don't** open a public issue for anything security-sensitive. Email

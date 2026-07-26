@@ -200,6 +200,11 @@ const en = {
     statEpisodes: "Episodes",
     statDays: "Days watched",
     statMeanScore: "Mean score",
+    recommendedAnime: "Recommended anime",
+    recommendedManga: "Recommended manga",
+    recommendedHint:
+      "Based on what you've finished — the higher you scored something, the more its suggestions count. Nothing already on your list appears here.",
+    becauseYouFinished: "Because you finished {{title}}",
     youAreAt: "you are at {{n}}",
     airingNow: "now",
     airingInDays: "in {{d}}d {{h}}h",
@@ -741,6 +746,11 @@ const de: typeof en = {
     statEpisodes: "Episoden",
     statDays: "Tage geschaut",
     statMeanScore: "Ø Bewertung",
+    recommendedAnime: "Empfohlene Anime",
+    recommendedManga: "Empfohlene Manga",
+    recommendedHint:
+      "Basierend auf dem, was du abgeschlossen hast — je höher deine Bewertung, desto mehr zählen die Vorschläge. Was schon auf deiner Liste steht, taucht hier nicht auf.",
+    becauseYouFinished: "Weil du {{title}} abgeschlossen hast",
     youAreAt: "du bist bei {{n}}",
     airingNow: "jetzt",
     airingInDays: "in {{d}} T {{h}} Std",

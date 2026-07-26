@@ -95,6 +95,70 @@ export async function seasonalAnime(
   return data.Page;
 }
 
+// --- Recommendations -------------------------------------------------------
+
+// One request covers every seed: `id_in` batches the completed entries and
+// each carries its own recommendation list. Verified against the live schema —
+// 25 seeds x 8 recommendations returns ~116 nodes without tripping AniList's
+// query-complexity limit, so the whole feature costs one request per type.
+const RECOMMENDATIONS_QUERY = `
+query ($ids: [Int]) {
+  Page(perPage: 50) {
+    media(id_in: $ids) {
+      id
+      recommendations(sort: RATING_DESC, perPage: 8) {
+        nodes {
+          rating
+          mediaRecommendation { ${MEDIA_FIELDS} }
+        }
+      }
+    }
+  }
+}`;
+
+export interface RawRecommendationNode {
+  seedId: number;
+  rating: number;
+  media: MediaWithListStatus;
+}
+
+/**
+ * Community recommendations for a batch of media, flattened and paired with
+ * the seed that produced each one. Ranking happens in `lib/recommend.ts`.
+ */
+export async function recommendationsFor(
+  ids: number[],
+): Promise<RawRecommendationNode[]> {
+  if (ids.length === 0) return [];
+  const data = await gql<{
+    Page: {
+      media: {
+        id: number;
+        recommendations: {
+          nodes: {
+            rating: number | null;
+            mediaRecommendation: MediaWithListStatus | null;
+          }[];
+        } | null;
+      }[];
+    };
+  }>(RECOMMENDATIONS_QUERY, { ids });
+
+  const out: RawRecommendationNode[] = [];
+  for (const seed of data.Page.media ?? []) {
+    for (const node of seed.recommendations?.nodes ?? []) {
+      // A recommendation whose target was deleted comes back as null.
+      if (!node.mediaRecommendation) continue;
+      out.push({
+        seedId: seed.id,
+        rating: node.rating ?? 0,
+        media: node.mediaRecommendation,
+      });
+    }
+  }
+  return out;
+}
+
 // The extra selections live here rather than in MEDIA_FIELDS on purpose:
 // MEDIA_FIELDS is shared with search (30/page) and seasonal (50/page), where
 // this metadata would be dead weight. Detail is a single Media(id:) call, so

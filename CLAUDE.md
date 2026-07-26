@@ -29,7 +29,8 @@ src/                 React frontend
   components/        UI components (Bell, ContextMenu, EntryEditModal, …)
   pages/             Route pages (Dashboard, MediaList, Franchise, Wrapped, …)
   stores/            Zustand stores (auth, theme, library, nowPlaying)
-  lib/               Pure logic + its *.test.ts (tags, contrast, format, wrapped, …)
+  lib/               Pure logic + its *.test.ts (tags, contrast, format, wrapped,
+                     recommend, contentFilter, …)
   i18n.ts            en (primary) + de; `de: typeof en` enforces key parity
 src-tauri/src/       Rust backend
   commands.rs        Tauri commands, AniList list/save mutations, version

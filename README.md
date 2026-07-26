@@ -94,6 +94,9 @@ Because a desktop app can do things anilist.co simply can't:
 
 **Discovery**
 - Search with an anime/manga toggle, seasonal charts, rich detail pages
+- **Recommendations** for anime and manga on the dashboard, built from the
+  titles you've completed — the higher you scored something, the more its
+  suggestions count, and anything already on your list is left out
 - **Franchise graph** — the whole franchise as a relation map (sequels, side
   stories, cross-medium sources/adaptations), each node coloured by your status
 

@@ -11,6 +11,7 @@ import { isBlocked } from "@/lib/contentFilter";
 import { useListMutations } from "@/hooks/useListMutations";
 import { Button } from "@/components/ui/button";
 import NowPlayingCard from "@/components/NowPlayingCard";
+import RecommendedSection from "@/components/RecommendedSection";
 
 export default function Dashboard() {
   const { t } = useTranslation();
@@ -55,6 +56,12 @@ function DashboardContent({ userId }: { userId: number }) {
     queryKey: ["mediaList", "ANIME", userId],
     queryFn: () => fetchMediaList(userId, "ANIME"),
   });
+  // Only the recommendation section needs the manga list; it is served from
+  // the same Rust-side cache the manga list page already fills.
+  const { data: mangaData } = useQuery({
+    queryKey: ["mediaList", "MANGA", userId],
+    queryFn: () => fetchMediaList(userId, "MANGA"),
+  });
   const { save } = useListMutations(userId, "ANIME");
   const level = useContentFilter((s) => s.level);
 
@@ -67,6 +74,15 @@ function DashboardContent({ userId }: { userId: number }) {
         .flatMap((g) => g.entries)
         .filter((e) => !isBlocked(e.media, level)) ?? [],
     [data, level],
+  );
+
+  const allManga = useMemo(
+    () =>
+      mangaData?.lists
+        .filter((g) => !g.isCustomList)
+        .flatMap((g) => g.entries)
+        .filter((e) => !isBlocked(e.media, level)) ?? [],
+    [mangaData, level],
   );
 
   const watching = useMemo(
@@ -131,6 +147,9 @@ function DashboardContent({ userId }: { userId: number }) {
       </section>
 
       <Stats entries={allAnime} />
+
+      <RecommendedSection type="ANIME" entries={allAnime} />
+      <RecommendedSection type="MANGA" entries={allManga} />
 
       <section>
         <h2 className="flex items-center gap-2 text-lg font-semibold">

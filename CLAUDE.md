@@ -16,7 +16,8 @@ and in the browser and scrobbles your AniList progress automatically.
 - **Frontend:** React 19 + TypeScript + Vite + Tailwind CSS v4
 - **State:** TanStack Query (server), Zustand (client), i18next (i18n)
 - **Storage:** SQLite via rusqlite (bundled); tokens in the OS credential store
-- **Detection:** Win32 window enumeration + a custom release-name parser
+- **Detection:** Win32 window enumeration + Windows media sessions (SMTC) +
+  an optional Jellyfin `/Sessions` source, with a custom release-name parser
 - **Platforms:** Windows is supported. Linux (Ubuntu) is experimental
   compile-only groundwork — do not assume feature parity there.
 
@@ -34,7 +35,9 @@ src-tauri/src/       Rust backend
   commands.rs        Tauri commands, AniList list/save mutations, version
   db/                SQLite: PRAGMA user_version migrations + row helpers
   anilist/           auth (token handling), API glue
-  detection/         Win32 window enumeration (cfg-gated for Windows)
+  detection/         mod.rs (Win32 window enumeration, cfg-gated for Windows),
+                     profiles.rs (player/site matching), smtc.rs (Windows media
+                     sessions), jellyfin.rs (optional /Sessions source)
   discord/           Discord Rich Presence
   notify/            notify(app, kind, title, body) → row + toast + event
   airing/ stale/ sequel/   background alert passes

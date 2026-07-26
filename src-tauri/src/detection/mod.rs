@@ -171,19 +171,22 @@ pub fn detect_windows() -> Option<Playback> {
 
 /// Full sweep, in order of how much each source actually knows.
 ///
-/// The Jellyfin API comes first when it is configured: it reports the series
-/// and episode as separate fields, so it beats anything derived from a
-/// string. Window titles come next. The Windows media sessions come last —
+/// The Jellyfin API comes first when it is configured (server URL, API key
+/// *and* a user — see `jellyfin`): it reports the series and episode as
+/// separate fields, so it beats anything derived from a string. Window titles
+/// come next. The Windows media sessions come last —
 /// a browser playing Crunchyroll appears in both, and the site-marker path
 /// produces a cleaner title, so SMTC only gets a look in when nothing
 /// recognised a window. That is exactly the Jellyfin Media Player case, where
 /// the title bar never changes.
 pub async fn detect_playback(
     smtc_enabled: bool,
-    jellyfin: Option<(String, String)>,
+    jellyfin: Option<jellyfin::JellyfinConfig>,
 ) -> Option<Playback> {
-    if let Some((base, key)) = jellyfin {
-        if let Some(p) = jellyfin::detect(&base, &key).await {
+    if let Some(cfg) = jellyfin {
+        if let Some(p) =
+            jellyfin::detect(&cfg.url, &cfg.key, &cfg.user_id, &cfg.device).await
+        {
             return Some(p);
         }
     }

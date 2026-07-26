@@ -72,6 +72,13 @@ Because a desktop app can do things anilist.co simply can't:
 - Automatic detection in local players (mpv, VLC, MPC-HC/BE, PotPlayer, SMPlayer)
   and in the browser (Crunchyroll and more)
 - Manga reading detection (MangaDex, MANGA Plus, Comick, Bato, MangaFire, Asura Scans)
+- **Windows media-session detection** for players that report to the system
+  media controls instead of writing the title into their window — Jellyfin
+  Media Player, Plex and browser video
+- **Jellyfin server integration** (optional) — ask your server instead of
+  guessing from a window title, and it reports the series, season and episode
+  as exact fields rather than a filename to parse. Scoped to the user and
+  device you pick, so nobody else on the server ends up on your list
 - Automatic scrobbling after a configurable threshold, with optional
   confirmation, episode-gap protection and
   [anime-relations](https://github.com/erengy/anime-relations) episode redirects
@@ -172,7 +179,7 @@ running version is shown in the About window.
 | Frontend | React 19 + TypeScript + Vite + Tailwind CSS v4 |
 | State | TanStack Query (server), Zustand (client), i18next (i18n) |
 | Storage | SQLite via rusqlite (cache, offline queue, local list, notifications, settings); tokens in the OS credential store (Windows Credential Manager, Secret Service on Linux) |
-| Detection | Win32 window enumeration (Windows) + a custom release-name parser (Anitomy equivalent) |
+| Detection | Win32 window enumeration + Windows media sessions (SMTC), with an optional Jellyfin `/Sessions` source; titles resolved by a custom release-name parser (Anitomy equivalent) |
 
 ### Shared application IDs
 

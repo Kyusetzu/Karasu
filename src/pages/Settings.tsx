@@ -28,12 +28,15 @@ import {
   getJellyfinSettings,
   getScrobbleSettings,
   getSmtcEnabled,
+  jellyfinUsers,
   setJellyfinSettings,
   setScrobbleSettings,
   setSmtcEnabled,
   smtcSessions,
   testJellyfin,
+  type JellyfinSession,
   type JellyfinSettings,
+  type JellyfinUser,
   type ScrobbleSettings,
   type SmtcSession,
 } from "@/stores/nowPlaying";
@@ -815,23 +818,43 @@ function SmtcDiagnostic() {
  *
  * The Windows media-session pass already covers Jellyfin Media Player with no
  * setup. This is for when that isn't enough: the server reports the series,
- * season and episode as separate fields — so nothing has to be parsed — and
- * it sees every client, including a phone or a TV.
+ * season and episode as separate fields, so nothing has to be parsed.
+ *
+ * The scoping controls are not optional extras. `/Sessions` reports the whole
+ * server, so without a user this would scrobble whatever anyone in the
+ * household is watching — hence the required user picker, and a device filter
+ * defaulting to this machine. Test connection lists every session, matching or
+ * not, because a device name that is one character off is otherwise
+ * indistinguishable from "nothing is playing".
  */
 function JellyfinSection() {
   const { t } = useTranslation();
   const [settings, setSettings] = useState<JellyfinSettings | null>(null);
   const [url, setUrl] = useState("");
   const [key, setKey] = useState("");
+  const [userId, setUserId] = useState("");
+  const [device, setDevice] = useState("");
+  const [users, setUsers] = useState<JellyfinUser[]>([]);
   const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<string | null>(null);
+  const [sessions, setSessions] = useState<JellyfinSession[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const loadUsers = () => {
+    // Silent on failure: an unreachable server is already reported by Test,
+    // and an empty picker says the same thing without a second error line.
+    jellyfinUsers()
+      .then(setUsers)
+      .catch(() => setUsers([]));
+  };
 
   useEffect(() => {
     if (!api.isTauri) return;
     getJellyfinSettings().then((s) => {
       setSettings(s);
       setUrl(s.url);
+      setUserId(s.userId);
+      setDevice(s.device);
+      if (s.hasKey && s.url) loadUsers();
     });
   }, []);
 
@@ -839,13 +862,19 @@ function JellyfinSection() {
 
   const save = async () => {
     setError(null);
-    setResult(null);
+    setSessions(null);
     try {
       // An empty field means "leave the stored key alone", not "clear it" --
       // the key is never shown, so there is nothing to re-type.
-      await setJellyfinSettings(url, key.trim() === "" ? null : key);
+      await setJellyfinSettings(
+        url,
+        key.trim() === "" ? null : key,
+        userId,
+        device,
+      );
       setKey("");
       setSettings(await getJellyfinSettings());
+      loadUsers();
     } catch (e) {
       setError(String(e));
     }
@@ -854,9 +883,9 @@ function JellyfinSection() {
   const test = async () => {
     setBusy(true);
     setError(null);
-    setResult(null);
+    setSessions(null);
     try {
-      setResult(await testJellyfin());
+      setSessions(await testJellyfin());
     } catch (e) {
       setError(String(e));
     } finally {
@@ -884,6 +913,33 @@ function JellyfinSection() {
               : t("settings.jellyfinKeyPlaceholder")
           }
         />
+        <select
+          value={userId}
+          onChange={(e) => setUserId(e.target.value)}
+          disabled={users.length === 0}
+          className="h-9 w-full rounded-lg border border-surface-700 bg-surface-900 px-2 text-sm focus:border-accent-500 focus:outline-none disabled:opacity-50"
+        >
+          <option value="">
+            {users.length === 0
+              ? t("settings.jellyfinUserUnavailable")
+              : t("settings.jellyfinUserNone")}
+          </option>
+          {/* A stored user stays selectable even if /Users can't be reached
+              right now, so saving other fields can't silently clear it. */}
+          {users.length === 0 && userId !== "" && (
+            <option value={userId}>{userId}</option>
+          )}
+          {users.map((u) => (
+            <option key={u.id} value={u.id}>
+              {u.name}
+            </option>
+          ))}
+        </select>
+        <Input
+          value={device}
+          onChange={(e) => setDevice(e.target.value)}
+          placeholder={settings.localDevice || t("settings.jellyfinDeviceAny")}
+        />
         <div className="flex flex-wrap gap-2">
           <Button variant="secondary" onClick={save}>
             {t("common.save")}
@@ -895,13 +951,72 @@ function JellyfinSection() {
         </div>
       </div>
       <p className="mt-2 text-xs text-ink-600">{t("settings.jellyfinKeyHelp")}</p>
-      {result && (
-        <p className="mt-2 text-sm text-emerald-400">
-          {t("settings.jellyfinPlaying", { title: result })}
+      <p className="mt-1 text-xs text-ink-600">
+        {t("settings.jellyfinDeviceHelp")}
+      </p>
+      {settings.hasKey && settings.userId === "" && (
+        <p className="mt-2 text-sm text-amber-300">
+          {t("settings.jellyfinNoUser")}
         </p>
       )}
+      {sessions && <SessionList sessions={sessions} />}
       {error && <p className="mt-2 text-sm text-red-300">{error}</p>}
     </Card>
+  );
+}
+
+/** The Test-connection result: what the server sees, and what we accept. */
+function SessionList({ sessions }: { sessions: JellyfinSession[] }) {
+  const { t } = useTranslation();
+
+  if (sessions.length === 0) {
+    return (
+      <p className="mt-3 text-sm text-ink-500">
+        {t("settings.jellyfinNoSessions")}
+      </p>
+    );
+  }
+
+  return (
+    <div className="mt-3 space-y-1.5">
+      {sessions.map((s, i) => (
+        <div
+          key={`${s.device}-${s.user}-${i}`}
+          className={cn(
+            "rounded-lg border px-3 py-2 text-sm",
+            s.matched
+              ? "border-emerald-700/60 bg-emerald-950/30"
+              : "border-surface-800 bg-surface-900",
+          )}
+        >
+          <p className="flex flex-wrap items-center gap-x-2">
+            <span className="font-medium text-ink-200">
+              {s.user || t("settings.jellyfinUnknownUser")}
+            </span>
+            <span className="text-ink-600">·</span>
+            <span className="text-ink-400">
+              {s.device || t("settings.jellyfinUnknownDevice")}
+            </span>
+            {s.client && (
+              <span className="text-xs text-ink-600">({s.client})</span>
+            )}
+            {s.matched && (
+              <span className="rounded-full bg-emerald-700/40 px-2 py-0.5 text-xs text-emerald-200">
+                {t("settings.jellyfinMatched")}
+              </span>
+            )}
+          </p>
+          <p className="mt-0.5 text-xs text-ink-500">
+            {s.playing ?? t("settings.jellyfinIdle")}
+          </p>
+        </div>
+      ))}
+      {!sessions.some((s) => s.matched) && (
+        <p className="pt-1 text-xs text-amber-300">
+          {t("settings.jellyfinNoMatch")}
+        </p>
+      )}
+    </div>
   );
 }
 

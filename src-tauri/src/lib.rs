@@ -152,6 +152,7 @@ pub fn run() {
             commands::smtc_sessions,
             commands::get_jellyfin_settings,
             commands::set_jellyfin_settings,
+            commands::jellyfin_users,
             commands::test_jellyfin,
             commands::get_portable_status,
             commands::enable_portable,

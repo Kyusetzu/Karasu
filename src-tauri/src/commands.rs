@@ -566,20 +566,55 @@ pub fn set_smtc_enabled(db: State<'_, Db>, enabled: bool) -> Result<(), String> 
     db.kv_set("smtc_enabled", if enabled { "1" } else { "0" })
 }
 
-/// Server URL + API key, or `None` when Jellyfin isn't configured.
-pub(crate) fn jellyfin_credentials(db: &Db) -> Option<(String, String)> {
+/// Everything the Jellyfin source needs, or `None` when it isn't fully
+/// configured. A missing user is treated as "not configured" on purpose:
+/// `/Sessions` reports the whole server, so without a user this source would
+/// scrobble whatever anyone in the household happens to be watching.
+pub(crate) fn jellyfin_credentials(
+    db: &Db,
+) -> Option<crate::detection::jellyfin::JellyfinConfig> {
     let url = db.kv_get("jellyfin_url").filter(|u| !u.trim().is_empty())?;
     let key = crate::detection::jellyfin::load_api_key()?;
-    Some((url, key))
+    let user_id = db
+        .kv_get("jellyfin_user_id")
+        .filter(|u| !u.trim().is_empty())?;
+    Some(crate::detection::jellyfin::JellyfinConfig {
+        url,
+        key,
+        user_id,
+        device: db.kv_get("jellyfin_device").unwrap_or_default(),
+    })
+}
+
+/// This machine's name, used to prefill the device filter. Jellyfin Media
+/// Player reports the Windows computer name by default, so this is usually
+/// the right answer — but it is configurable in JMP, and a browser session
+/// reports the browser instead, which is why the field stays editable and the
+/// Test button lists what the server actually sees.
+pub fn local_device_name() -> String {
+    #[cfg(windows)]
+    {
+        std::env::var("COMPUTERNAME").unwrap_or_default()
+    }
+    #[cfg(not(windows))]
+    {
+        std::fs::read_to_string("/etc/hostname")
+            .map(|s| s.trim().to_string())
+            .unwrap_or_default()
+    }
 }
 
 #[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct JellyfinSettings {
     pub url: String,
     /// Whether an API key is stored. The key itself is never returned — it
     /// stays in the credential store, like the AniList token.
-    #[serde(rename = "hasKey")]
     pub has_key: bool,
+    pub user_id: String,
+    pub device: String,
+    /// This machine's name, so the UI can offer it as the default.
+    pub local_device: String,
 }
 
 #[tauri::command]
@@ -587,6 +622,11 @@ pub fn get_jellyfin_settings(db: State<'_, Db>) -> JellyfinSettings {
     JellyfinSettings {
         url: db.kv_get("jellyfin_url").unwrap_or_default(),
         has_key: crate::detection::jellyfin::load_api_key().is_some(),
+        user_id: db.kv_get("jellyfin_user_id").unwrap_or_default(),
+        device: db
+            .kv_get("jellyfin_device")
+            .unwrap_or_else(local_device_name),
+        local_device: local_device_name(),
     }
 }
 
@@ -597,30 +637,48 @@ pub fn set_jellyfin_settings(
     db: State<'_, Db>,
     url: String,
     api_key: Option<String>,
+    user_id: String,
+    device: String,
 ) -> Result<(), String> {
     db.kv_set(
         "jellyfin_url",
         &crate::detection::jellyfin::normalize_base_url(&url),
     )?;
+    db.kv_set("jellyfin_user_id", user_id.trim())?;
+    db.kv_set("jellyfin_device", device.trim())?;
     if let Some(key) = api_key {
         crate::detection::jellyfin::save_api_key(&key)?;
     }
     Ok(())
 }
 
-/// Confirms the server answers and reports what it currently sees playing, so
-/// a wrong URL or key fails loudly here rather than silently forever.
+/// The server's users, for the picker. Needs only a URL and key — the point is
+/// to run *before* a user has been chosen.
 #[tauri::command]
-pub async fn test_jellyfin(db: State<'_, Db>) -> Result<String, String> {
-    let Some((url, key)) = jellyfin_credentials(&db) else {
-        return Err("Enter your server URL and an API key first".into());
-    };
-    match crate::detection::jellyfin::detect(&url, &key).await {
-        Some(p) => Ok(p.media_title),
-        None => Err(
-            "Connected, but nothing is playing — or the URL or API key is wrong".into(),
-        ),
-    }
+pub async fn jellyfin_users(
+    db: State<'_, Db>,
+) -> Result<Vec<crate::detection::jellyfin::JellyfinUser>, String> {
+    let url = db.kv_get("jellyfin_url").unwrap_or_default();
+    let key = crate::detection::jellyfin::load_api_key().unwrap_or_default();
+    crate::detection::jellyfin::list_users(&url, &key).await
+}
+
+/// Lists every session the server reports, flagging which ones the configured
+/// user/device filter accepts.
+///
+/// This deliberately shows sessions that *don't* match, including other
+/// people's. Without that the filter is undiagnosable: a device name that is
+/// one character off looks identical to "nothing is playing", and the user has
+/// no other way to discover what Jellyfin calls their machine.
+#[tauri::command]
+pub async fn test_jellyfin(
+    db: State<'_, Db>,
+) -> Result<Vec<crate::detection::jellyfin::SessionSummary>, String> {
+    let url = db.kv_get("jellyfin_url").unwrap_or_default();
+    let key = crate::detection::jellyfin::load_api_key().unwrap_or_default();
+    let user_id = db.kv_get("jellyfin_user_id").unwrap_or_default();
+    let device = db.kv_get("jellyfin_device").unwrap_or_default();
+    crate::detection::jellyfin::list_sessions(&url, &key, &user_id, &device).await
 }
 
 /// Every media session Windows currently knows about, for the Settings
@@ -872,7 +930,7 @@ pub fn mark_all_notifications_read(db: State<'_, Db>) -> Result<(), String> {
 
 /// Monotonic commit counter — the 4th version segment
 /// (`MAJOR.MINOR.PATCH.COMMIT#`). Bumped by one on every commit.
-pub const COMMIT_NUMBER: u32 = 90;
+pub const COMMIT_NUMBER: u32 = 91;
 
 /// Full four-part display version, e.g. `0.1.1.38`. The `MAJOR.MINOR.PATCH`
 /// core comes from the crate version (kept in sync across the manifests).

@@ -4,11 +4,22 @@
 
 Karasu is a local desktop app with **no hosted backend** — it talks directly
 to the AniList GraphQL API from your machine. There's no server of ours to
-compromise; the realistic attack surface is the app itself, and the AniList
-OAuth token it stores in your OS credential store (Windows Credential
-Manager, or the Secret Service on Linux).
+compromise; the realistic attack surface is the app itself and the secrets it
+holds in your OS credential store (Windows Credential Manager, or the Secret
+Service on Linux):
 
-Things worth reporting: the app mishandling or leaking that token, a way to
+- your **AniList OAuth token**, and
+- your **Jellyfin API key**, if you connected a Jellyfin server.
+
+Neither is ever handed to the WebView — the UI only ever learns *whether* one
+is stored.
+
+Karasu contacts AniList, GitHub (update checks and downloads) and a localhost
+callback during login. A Jellyfin server you configure yourself is contacted
+too; that is your machine, not ours, and the "no hosted backend" guarantee is
+unaffected.
+
+Things worth reporting: the app mishandling or leaking either secret, a way to
 execute arbitrary code via a malicious media title/filename/response, or a
 flaw in the update mechanism (Karasu verifies every downloaded update
 against its own signing key — a way to bypass that would be serious).

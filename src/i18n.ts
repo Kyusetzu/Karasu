@@ -490,14 +490,27 @@ const en = {
     refreshDebug: "Refresh",
     jellyfin: "Jellyfin server",
     jellyfinHint:
-      "Optional. Ask your server directly instead of guessing from a window title — it reports the series and episode exactly, and sees playback on your phone or TV too.",
+      "Optional. Ask your server directly instead of guessing from a window title — it reports the series and episode exactly.",
     jellyfinUrlPlaceholder: "http://192.168.1.10:8096",
     jellyfinKeyPlaceholder: "API key",
     jellyfinKeyStored: "API key saved — leave empty to keep it",
     jellyfinKeyHelp:
       "Create a key in Jellyfin under Dashboard → API Keys. It is stored in the Windows Credential Manager, never in the app window.",
+    jellyfinUserNone: "Pick your user…",
+    jellyfinUserUnavailable: "Save a server URL and API key first",
+    jellyfinNoUser:
+      "Pick your user to switch Jellyfin detection on. Until then it stays off, so nobody else's playback lands on your list.",
+    jellyfinDeviceAny: "Any device",
+    jellyfinDeviceHelp:
+      "Only this device counts. Clear the field to track any of your devices, including your phone or TV. Use Test connection to see what your device is actually called.",
     jellyfinTest: "Test connection",
-    jellyfinPlaying: "Connected. Currently playing: {{title}}",
+    jellyfinNoSessions: "Connected. Nobody is playing anything right now.",
+    jellyfinMatched: "tracked",
+    jellyfinIdle: "idle",
+    jellyfinUnknownUser: "Unknown user",
+    jellyfinUnknownDevice: "Unknown device",
+    jellyfinNoMatch:
+      "None of these match your user and device, so nothing is being tracked. Copy the device name from the row that is yours into the device field.",
     threshold: "Threshold (minutes)",
     thresholdHint: "0 = automatic (two thirds of the episode length)",
     airingNotify: "New-episode notifications",
@@ -1019,14 +1032,27 @@ const de: typeof en = {
     refreshDebug: "Aktualisieren",
     jellyfin: "Jellyfin-Server",
     jellyfinHint:
-      "Optional. Frag deinen Server direkt, statt aus einem Fenstertitel zu raten — er meldet Serie und Folge exakt und sieht auch die Wiedergabe auf Handy oder TV.",
+      "Optional. Frag deinen Server direkt, statt aus einem Fenstertitel zu raten — er meldet Serie und Folge exakt.",
     jellyfinUrlPlaceholder: "http://192.168.1.10:8096",
     jellyfinKeyPlaceholder: "API-Schlüssel",
     jellyfinKeyStored: "API-Schlüssel gespeichert — leer lassen zum Behalten",
     jellyfinKeyHelp:
       "Erstelle einen Schlüssel in Jellyfin unter Dashboard → API-Schlüssel. Er wird im Windows-Anmeldeinformationsmanager gespeichert, nie im App-Fenster.",
+    jellyfinUserNone: "Benutzer auswählen…",
+    jellyfinUserUnavailable: "Erst Server-URL und API-Schlüssel speichern",
+    jellyfinNoUser:
+      "Wähle deinen Benutzer, um die Jellyfin-Erkennung einzuschalten. Bis dahin bleibt sie aus, damit nichts von anderen auf deiner Liste landet.",
+    jellyfinDeviceAny: "Beliebiges Gerät",
+    jellyfinDeviceHelp:
+      "Es zählt nur dieses Gerät. Leere das Feld, um alle deine Geräte zu erfassen, auch Handy oder TV. Mit „Verbindung testen“ siehst du, wie dein Gerät tatsächlich heißt.",
     jellyfinTest: "Verbindung testen",
-    jellyfinPlaying: "Verbunden. Läuft gerade: {{title}}",
+    jellyfinNoSessions: "Verbunden. Gerade spielt niemand etwas ab.",
+    jellyfinMatched: "wird erfasst",
+    jellyfinIdle: "inaktiv",
+    jellyfinUnknownUser: "Unbekannter Benutzer",
+    jellyfinUnknownDevice: "Unbekanntes Gerät",
+    jellyfinNoMatch:
+      "Keine dieser Sitzungen passt zu deinem Benutzer und Gerät, es wird also nichts erfasst. Übernimm den Gerätenamen aus deiner Zeile ins Gerätefeld.",
     threshold: "Schwelle (Minuten)",
     thresholdHint: "0 = automatisch (zwei Drittel der Episodenlänge)",
     airingNotify: "Benachrichtigung bei neuer Folge",

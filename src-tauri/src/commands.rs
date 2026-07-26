@@ -567,23 +567,47 @@ pub fn set_smtc_enabled(db: State<'_, Db>, enabled: bool) -> Result<(), String> 
 }
 
 /// Everything the Jellyfin source needs, or `None` when it isn't fully
-/// configured. A missing user is treated as "not configured" on purpose:
-/// `/Sessions` reports the whole server, so without a user this source would
-/// scrobble whatever anyone in the household happens to be watching.
-pub(crate) fn jellyfin_credentials(
+/// configured. A missing user id is treated as "not configured" on purpose,
+/// so the source fails closed rather than falling back to something broader.
+pub(crate) fn jellyfin_config(
     db: &Db,
 ) -> Option<crate::detection::jellyfin::JellyfinConfig> {
     let url = db.kv_get("jellyfin_url").filter(|u| !u.trim().is_empty())?;
-    let key = crate::detection::jellyfin::load_api_key()?;
+    let token = crate::detection::jellyfin::load_token()?;
     let user_id = db
         .kv_get("jellyfin_user_id")
         .filter(|u| !u.trim().is_empty())?;
     Some(crate::detection::jellyfin::JellyfinConfig {
         url,
-        key,
+        token,
         user_id,
         device: db.kv_get("jellyfin_device").unwrap_or_default(),
+        device_name: local_device_name(),
+        device_id: jellyfin_device_id(db),
     })
+}
+
+/// A stable per-install id for the `DeviceId` Jellyfin wants on every request.
+///
+/// Generated once and kept: a fresh one per launch would register a new entry
+/// in the server's device list every time Karasu started. There's no `uuid`
+/// crate here and no need for one — this only has to be stable and unlikely to
+/// collide, not unguessable.
+fn jellyfin_device_id(db: &Db) -> String {
+    if let Some(existing) = db.kv_get("jellyfin_device_id").filter(|s| !s.is_empty()) {
+        return existing;
+    }
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    local_device_name().hash(&mut hasher);
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0)
+        .hash(&mut hasher);
+    let id = format!("karasu-{:016x}", hasher.finish());
+    let _ = db.kv_set("jellyfin_device_id", &id);
+    id
 }
 
 /// This machine's name, used to prefill the device filter. Jellyfin Media
@@ -608,10 +632,11 @@ pub fn local_device_name() -> String {
 #[serde(rename_all = "camelCase")]
 pub struct JellyfinSettings {
     pub url: String,
-    /// Whether an API key is stored. The key itself is never returned — it
-    /// stays in the credential store, like the AniList token.
-    pub has_key: bool,
-    pub user_id: String,
+    /// Whether an access token is stored. The token itself is never returned —
+    /// it stays in the credential store, like the AniList token.
+    pub connected: bool,
+    /// The signed-in account, so Settings can show who that is.
+    pub user_name: String,
     pub device: String,
     /// This machine's name, so the UI can offer it as the default.
     pub local_device: String,
@@ -621,8 +646,11 @@ pub struct JellyfinSettings {
 pub fn get_jellyfin_settings(db: State<'_, Db>) -> JellyfinSettings {
     JellyfinSettings {
         url: db.kv_get("jellyfin_url").unwrap_or_default(),
-        has_key: crate::detection::jellyfin::load_api_key().is_some(),
-        user_id: db.kv_get("jellyfin_user_id").unwrap_or_default(),
+        connected: crate::detection::jellyfin::load_token().is_some()
+            && db
+                .kv_get("jellyfin_user_id")
+                .is_some_and(|u| !u.trim().is_empty()),
+        user_name: db.kv_get("jellyfin_user_name").unwrap_or_default(),
         device: db
             .kv_get("jellyfin_device")
             .unwrap_or_else(local_device_name),
@@ -630,55 +658,82 @@ pub fn get_jellyfin_settings(db: State<'_, Db>) -> JellyfinSettings {
     }
 }
 
-/// `api_key: None` leaves the stored key untouched, so the UI can save a URL
-/// change without making the user re-enter the key it never showed them.
+/// Saves the settings that aren't part of signing in.
 #[tauri::command]
 pub fn set_jellyfin_settings(
     db: State<'_, Db>,
     url: String,
-    api_key: Option<String>,
-    user_id: String,
     device: String,
 ) -> Result<(), String> {
     db.kv_set(
         "jellyfin_url",
         &crate::detection::jellyfin::normalize_base_url(&url),
     )?;
-    db.kv_set("jellyfin_user_id", user_id.trim())?;
     db.kv_set("jellyfin_device", device.trim())?;
-    if let Some(key) = api_key {
-        crate::detection::jellyfin::save_api_key(&key)?;
-    }
     Ok(())
 }
 
-/// The server's users, for the picker. Needs only a URL and key — the point is
-/// to run *before* a user has been chosen.
+/// Exchanges a username and password for an access token.
+///
+/// The password is used for this one request and then dropped — only the token
+/// and the account's own id are stored. Signing in as a user rather than with
+/// an admin API key is what makes the server scope `/Sessions` to this account
+/// (see the module docs in `detection::jellyfin`).
 #[tauri::command]
-pub async fn jellyfin_users(
+pub async fn jellyfin_sign_in(
     db: State<'_, Db>,
-) -> Result<Vec<crate::detection::jellyfin::JellyfinUser>, String> {
-    let url = db.kv_get("jellyfin_url").unwrap_or_default();
-    let key = crate::detection::jellyfin::load_api_key().unwrap_or_default();
-    crate::detection::jellyfin::list_users(&url, &key).await
+    url: String,
+    username: String,
+    password: String,
+) -> Result<JellyfinSettings, String> {
+    let base = crate::detection::jellyfin::normalize_base_url(&url);
+    let (device_name, device_id) = {
+        (local_device_name(), jellyfin_device_id(&db))
+    };
+
+    let session = crate::detection::jellyfin::authenticate(
+        &base,
+        &username,
+        &password,
+        &device_name,
+        &device_id,
+    )
+    .await?;
+
+    db.kv_set("jellyfin_url", &base)?;
+    db.kv_set("jellyfin_user_id", &session.user_id)?;
+    db.kv_set("jellyfin_user_name", &session.user_name)?;
+    crate::detection::jellyfin::save_token(&session.token)?;
+    // The old admin API key is useless now and grants far more on the server
+    // than Karasu needs; don't leave it sitting in the credential store.
+    crate::detection::jellyfin::delete_legacy_api_key();
+
+    Ok(get_jellyfin_settings(db))
 }
 
-/// Lists every session the server reports, flagging which ones the configured
-/// user/device filter accepts.
+#[tauri::command]
+pub fn jellyfin_sign_out(db: State<'_, Db>) -> Result<JellyfinSettings, String> {
+    crate::detection::jellyfin::delete_token()?;
+    crate::detection::jellyfin::delete_legacy_api_key();
+    db.kv_delete("jellyfin_user_id");
+    db.kv_delete("jellyfin_user_name");
+    Ok(get_jellyfin_settings(db))
+}
+
+/// Lists the sessions the server reports, flagging which ones the device
+/// filter accepts.
 ///
-/// This deliberately shows sessions that *don't* match, including other
-/// people's. Without that the filter is undiagnosable: a device name that is
-/// one character off looks identical to "nothing is playing", and the user has
-/// no other way to discover what Jellyfin calls their machine.
+/// The server now returns only the signed-in account's own sessions, so this
+/// no longer shows anyone else's playback. It still shows *non-matching* ones,
+/// because the device filter is otherwise undiagnosable: a device name one
+/// character off looks identical to "nothing is playing", and this is the only
+/// way to discover what Jellyfin calls a machine.
 #[tauri::command]
 pub async fn test_jellyfin(
     db: State<'_, Db>,
 ) -> Result<Vec<crate::detection::jellyfin::SessionSummary>, String> {
-    let url = db.kv_get("jellyfin_url").unwrap_or_default();
-    let key = crate::detection::jellyfin::load_api_key().unwrap_or_default();
-    let user_id = db.kv_get("jellyfin_user_id").unwrap_or_default();
-    let device = db.kv_get("jellyfin_device").unwrap_or_default();
-    crate::detection::jellyfin::list_sessions(&url, &key, &user_id, &device).await
+    let cfg = jellyfin_config(&db).ok_or("Sign in to your Jellyfin server first")?;
+    crate::detection::jellyfin::list_sessions(&cfg).await
 }
 
 /// Every media session Windows currently knows about, for the Settings
@@ -930,7 +985,7 @@ pub fn mark_all_notifications_read(db: State<'_, Db>) -> Result<(), String> {
 
 /// Monotonic commit counter — the 4th version segment
 /// (`MAJOR.MINOR.PATCH.COMMIT#`). Bumped by one on every commit.
-pub const COMMIT_NUMBER: u32 = 92;
+pub const COMMIT_NUMBER: u32 = 93;
 
 /// Full four-part display version, e.g. `0.1.1.38`. The `MAJOR.MINOR.PATCH`
 /// core comes from the crate version (kept in sync across the manifests).

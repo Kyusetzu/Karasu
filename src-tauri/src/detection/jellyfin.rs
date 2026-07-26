@@ -7,59 +7,88 @@
 //! Asking the server instead is exact. `NowPlayingItem` carries the series
 //! name, season and episode as separate fields, so nothing has to be parsed.
 //!
-//! The catch is that `/Sessions` reports the *whole server* — every user on
-//! every device. Scrobbling the first thing it returns means a housemate
-//! watching something on their own account lands on your AniList list. So a
-//! session only counts when it matches the configured user, and (unless the
-//! device field is cleared) the configured device. Nothing is configured by
-//! default, and an unconfigured user means this source is off entirely: it
-//! fails closed, because the failure mode of guessing is writing to someone
-//! else's list.
+//! Karasu signs in as *a user*, not with an admin API key, and that choice is
+//! load-bearing rather than cosmetic. `GET /Sessions` is only `[Authorize]`,
+//! and hands the caller's identity to Jellyfin's `SessionManager::GetSessions`,
+//! which branches on it:
 //!
-//! The cost is configuration: a server URL, an API key and a user. That's why
-//! this is opt-in and silent when unconfigured.
+//! - an **API key** sets `userIsAdmin = true` and returns *every* session on
+//!   the server — which is exactly how an earlier version of this file ended
+//!   up scrobbling a housemate's playback;
+//! - a **user token** gets `result.Where(i => i.UserId.IsEmpty() ||
+//!   i.ContainsUser(userId))` — the server hands back only that user's own
+//!   sessions.
+//!
+//! So the scoping is enforced server-side, and an ordinary account is enough:
+//! creating an API key needs admin rights that most users of a shared server
+//! do not have. Jellyfin has no OAuth, so `POST /Users/AuthenticateByName` is
+//! the standard sign-in for third-party clients. The password is exchanged
+//! once for an access token and never stored.
+//!
+//! `session_matches` still checks the user id on top of that. The server's own
+//! filter lets through sessions with an *empty* `UserId`, so this is a real
+//! backstop rather than belt-and-braces, and it is where the optional
+//! "only this device" narrowing lives.
 
 use super::Playback;
 use crate::recognition::parser::Parsed;
 
 const SERVICE: &str = "dev.kyu.karasu";
-const USER: &str = "jellyfin";
+/// Credential-store entry for the Jellyfin access token.
+const TOKEN_USER: &str = "jellyfin_token";
+/// The pre-0.26 entry, which held an admin API key. Deleted on sign-in — a
+/// dead secret has no business lingering in the user's credential store.
+const LEGACY_KEY_USER: &str = "jellyfin";
 
 /// Everything the source needs to poll one user's playback on one device.
 pub struct JellyfinConfig {
     pub url: String,
-    pub key: String,
+    pub token: String,
     pub user_id: String,
     /// Empty means "any device of that user".
     pub device: String,
+    pub device_name: String,
+    pub device_id: String,
 }
 
-fn entry() -> Result<keyring::Entry, String> {
-    keyring::Entry::new(SERVICE, USER).map_err(|e| format!("Credential store: {e}"))
+fn entry(user: &str) -> Result<keyring::Entry, String> {
+    keyring::Entry::new(SERVICE, user).map_err(|e| format!("Credential store: {e}"))
 }
 
-/// The API key lives in the OS credential store, next to the AniList token,
-/// and is never handed back to the WebView — the UI only ever learns whether
-/// one is configured.
-pub fn save_api_key(key: &str) -> Result<(), String> {
-    let key = key.trim();
-    if key.is_empty() {
-        return delete_api_key();
+/// The access token lives in the OS credential store, next to the AniList
+/// token, and is never handed back to the WebView — the UI only ever learns
+/// whether one is stored and which account it belongs to.
+pub fn save_token(token: &str) -> Result<(), String> {
+    let token = token.trim();
+    if token.is_empty() {
+        return delete_token();
     }
-    entry()?
-        .set_password(key)
-        .map_err(|e| format!("Could not save the API key: {e}"))
+    entry(TOKEN_USER)?
+        .set_password(token)
+        .map_err(|e| format!("Could not save the access token: {e}"))
 }
 
-pub fn load_api_key() -> Option<String> {
-    entry().ok()?.get_password().ok().filter(|k| !k.is_empty())
+pub fn load_token() -> Option<String> {
+    entry(TOKEN_USER)
+        .ok()?
+        .get_password()
+        .ok()
+        .filter(|k| !k.is_empty())
 }
 
-pub fn delete_api_key() -> Result<(), String> {
-    if let Ok(e) = entry() {
+pub fn delete_token() -> Result<(), String> {
+    if let Ok(e) = entry(TOKEN_USER) {
         let _ = e.delete_credential();
     }
     Ok(())
+}
+
+/// Removes the admin API key stored by earlier versions. It is useless now,
+/// and it grants more on the server than Karasu ever needs.
+pub fn delete_legacy_api_key() {
+    if let Ok(e) = entry(LEGACY_KEY_USER) {
+        let _ = e.delete_credential();
+    }
 }
 
 /// Trims a user-entered server URL into a base we can append paths to.
@@ -102,26 +131,79 @@ pub fn session_matches(session: &serde_json::Value, user_id: &str, device: &str)
     session_device.trim().eq_ignore_ascii_case(device)
 }
 
-/// GET a JSON endpoint on the configured server.
+/// Jellyfin identifies the calling client through this header, and requires it
+/// on `AuthenticateByName`. A *stable* `DeviceId` matters: with a fresh one per
+/// launch, Karasu would pile up a new entry in the server's device list every
+/// time it started.
+fn auth_header(device: &str, device_id: &str, token: Option<&str>) -> String {
+    let version = env!("CARGO_PKG_VERSION");
+    let mut header = format!(
+        "MediaBrowser Client=\"Karasu\", Device=\"{}\", DeviceId=\"{}\", Version=\"{version}\"",
+        escape(device),
+        escape(device_id),
+    );
+    if let Some(t) = token {
+        header.push_str(&format!(", Token=\"{}\"", escape(t)));
+    }
+    header
+}
+
+/// The header is a quoted-string list, so a stray quote or backslash in a
+/// hostname would corrupt every field after it.
+fn escape(value: &str) -> String {
+    value.replace('\\', "").replace('"', "")
+}
+
+/// Reads a field by its PascalCase name, falling back to camelCase.
+///
+/// Jellyfin serialises PascalCase, but this cannot be checked against a live
+/// server from the machine this was written on, and a casing mismatch would
+/// fail as a silent "nothing is playing" rather than an error. Accepting both
+/// costs one lookup and removes the whole failure mode.
+fn get_ci<'a>(v: &'a serde_json::Value, name: &str) -> Option<&'a serde_json::Value> {
+    v.get(name).or_else(|| {
+        let mut chars = name.chars();
+        let lower: String = chars
+            .next()
+            .map(|c| c.to_lowercase().to_string())?
+            .chars()
+            .chain(chars)
+            .collect();
+        v.get(&lower)
+    })
+}
+
+fn str_field(v: &serde_json::Value, name: &str) -> String {
+    get_ci(v, name)
+        .and_then(|x| x.as_str())
+        .unwrap_or("")
+        .to_string()
+}
+
+/// GET a JSON endpoint on the configured server, as the signed-in user.
 async fn get_json(
-    base: &str,
+    cfg: &JellyfinConfig,
     path: &str,
-    api_key: &str,
 ) -> Result<serde_json::Value, String> {
-    let base = normalize_base_url(base);
-    if base.is_empty() || api_key.is_empty() {
-        return Err("Enter your server URL and an API key first".into());
+    let base = normalize_base_url(&cfg.url);
+    if base.is_empty() || cfg.token.is_empty() {
+        return Err("Sign in to your Jellyfin server first".into());
     }
     let resp = reqwest::Client::new()
         .get(format!("{base}{path}"))
-        .header("Authorization", format!("MediaBrowser Token=\"{api_key}\""))
+        .header(
+            "Authorization",
+            auth_header(&cfg.device_name, &cfg.device_id, Some(&cfg.token)),
+        )
         .header("Accept", "application/json")
         .timeout(std::time::Duration::from_secs(4))
         .send()
         .await
         .map_err(|e| format!("Could not reach the server: {e}"))?;
     if resp.status() == reqwest::StatusCode::UNAUTHORIZED {
-        return Err("The server rejected the API key".into());
+        // Jellyfin's "sign out all devices" revokes tokens, and a silent
+        // failure here would look exactly like "nothing is playing" forever.
+        return Err("Jellyfin rejected the saved sign-in — sign in again".into());
     }
     if !resp.status().is_success() {
         return Err(format!("Server responded with HTTP {}", resp.status()));
@@ -131,28 +213,74 @@ async fn get_json(
         .map_err(|e| format!("Could not read the server's reply: {e}"))
 }
 
-#[derive(serde::Serialize)]
-pub struct JellyfinUser {
-    pub id: String,
-    pub name: String,
+/// A completed sign-in. The password is not part of this — it is exchanged
+/// once, here, and never stored.
+#[derive(Debug, PartialEq)]
+pub struct AuthSession {
+    pub token: String,
+    pub user_id: String,
+    pub user_name: String,
 }
 
-/// The server's user list, for the picker in Settings.
-pub async fn list_users(base: &str, api_key: &str) -> Result<Vec<JellyfinUser>, String> {
-    let users = get_json(base, "/Users", api_key).await?;
-    Ok(users
-        .as_array()
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|u| {
-                    Some(JellyfinUser {
-                        id: u.get("Id")?.as_str()?.to_string(),
-                        name: u.get("Name")?.as_str()?.to_string(),
-                    })
-                })
-                .collect()
-        })
-        .unwrap_or_default())
+/// Reads an `AuthenticationResult` body. Split out from the request so the
+/// parsing — the part that can actually be wrong — is testable offline.
+pub fn parse_auth_result(body: &serde_json::Value) -> Result<AuthSession, String> {
+    let token = str_field(body, "AccessToken");
+    if token.is_empty() {
+        return Err("The server's reply contained no access token".into());
+    }
+    let user = get_ci(body, "User").cloned().unwrap_or_default();
+    let user_id = str_field(&user, "Id");
+    if user_id.is_empty() {
+        return Err("The server's reply contained no user id".into());
+    }
+    Ok(AuthSession {
+        token,
+        user_id,
+        user_name: str_field(&user, "Name"),
+    })
+}
+
+/// Signs in with a username and password, returning an access token and the
+/// account's own id. Any Jellyfin account works — no administrator rights.
+pub async fn authenticate(
+    base_url: &str,
+    username: &str,
+    password: &str,
+    device: &str,
+    device_id: &str,
+) -> Result<AuthSession, String> {
+    let base = normalize_base_url(base_url);
+    if base.is_empty() {
+        return Err("Enter your server URL first".into());
+    }
+    if username.trim().is_empty() {
+        return Err("Enter your Jellyfin username".into());
+    }
+    let resp = reqwest::Client::new()
+        .post(format!("{base}/Users/AuthenticateByName"))
+        .header("Authorization", auth_header(device, device_id, None))
+        .header("Content-Type", "application/json")
+        .header("Accept", "application/json")
+        .json(&serde_json::json!({ "Username": username.trim(), "Pw": password }))
+        .timeout(std::time::Duration::from_secs(10))
+        .send()
+        .await
+        .map_err(|e| format!("Could not reach the server: {e}"))?;
+
+    if resp.status() == reqwest::StatusCode::UNAUTHORIZED {
+        // Deliberately not the server's body: it can echo back detail that
+        // does not belong on screen, and the cause is always the same.
+        return Err("Wrong username or password".into());
+    }
+    if !resp.status().is_success() {
+        return Err(format!("Sign-in failed: HTTP {}", resp.status()));
+    }
+    let body: serde_json::Value = resp
+        .json()
+        .await
+        .map_err(|e| format!("Could not read the server's reply: {e}"))?;
+    parse_auth_result(&body)
 }
 
 /// One row of the Test-connection diagnostic.
@@ -168,37 +296,27 @@ pub struct SessionSummary {
 }
 
 /// Every session the server reports, annotated with whether the filter accepts
-/// it. This is the only way a user can find out what their device is actually
-/// called — Jellyfin Media Player usually reports the machine hostname, but it
+/// it — now only the signed-in user's own, since the server scopes them.
+///
+/// This is the only way a user can find out what their device is actually
+/// called: Jellyfin Media Player usually reports the machine hostname, but it
 /// is configurable and a browser session reports the browser name instead.
-pub async fn list_sessions(
-    base: &str,
-    api_key: &str,
-    user_id: &str,
-    device: &str,
-) -> Result<Vec<SessionSummary>, String> {
-    let sessions = get_json(base, "/Sessions", api_key).await?;
+pub async fn list_sessions(cfg: &JellyfinConfig) -> Result<Vec<SessionSummary>, String> {
+    let sessions = get_json(cfg, "/Sessions").await?;
     Ok(sessions
         .as_array()
         .map(|arr| {
             arr.iter()
                 .map(|s| SessionSummary {
-                    user: field(s, "UserName"),
-                    device: field(s, "DeviceName"),
-                    client: field(s, "Client"),
+                    user: str_field(s, "UserName"),
+                    device: str_field(s, "DeviceName"),
+                    client: str_field(s, "Client"),
                     playing: playback_from_session(s).map(|p| p.media_title),
-                    matched: session_matches(s, user_id, device),
+                    matched: session_matches(s, &cfg.user_id, &cfg.device),
                 })
                 .collect()
         })
         .unwrap_or_default())
-}
-
-fn field(v: &serde_json::Value, key: &str) -> String {
-    v.get(key)
-        .and_then(|x| x.as_str())
-        .unwrap_or("")
-        .to_string()
 }
 
 /// Turns one `/Sessions` entry into a detection result.
@@ -268,20 +386,15 @@ pub fn playback_from_session(session: &serde_json::Value) -> Option<Playback> {
 /// Polls the configured server for what *this* user is playing on *this*
 /// device. Returns `None` when unconfigured, unreachable or idle — a Jellyfin
 /// box that is switched off must not break detection for everything else.
-pub async fn detect(
-    base_url: &str,
-    api_key: &str,
-    user_id: &str,
-    device: &str,
-) -> Option<Playback> {
-    if user_id.trim().is_empty() {
+pub async fn detect(cfg: &JellyfinConfig) -> Option<Playback> {
+    if cfg.user_id.trim().is_empty() {
         return None;
     }
-    let sessions = get_json(base_url, "/Sessions", api_key).await.ok()?;
+    let sessions = get_json(cfg, "/Sessions").await.ok()?;
     sessions
         .as_array()?
         .iter()
-        .filter(|s| session_matches(s, user_id, device))
+        .filter(|s| session_matches(s, &cfg.user_id, &cfg.device))
         .find_map(playback_from_session)
 }
 
@@ -395,5 +508,74 @@ mod tests {
     #[test]
     fn a_session_without_a_user_is_rejected() {
         assert!(!session_matches(&json!({ "DeviceName": "KYU-PC" }), ME, ""));
+    }
+
+    #[test]
+    fn auth_result_is_read_from_a_pascal_case_body() {
+        // The shape Jellyfin actually serialises.
+        let body = json!({
+            "AccessToken": "tok-123",
+            "ServerId": "srv",
+            "User": { "Id": ME, "Name": "Kyu" }
+        });
+        assert_eq!(
+            parse_auth_result(&body).unwrap(),
+            AuthSession {
+                token: "tok-123".into(),
+                user_id: ME.into(),
+                user_name: "Kyu".into(),
+            }
+        );
+    }
+
+    /// Guards the casing assumption rather than betting on it: a mismatch
+    /// would surface as a permanent silent "nothing is playing".
+    #[test]
+    fn auth_result_is_read_from_a_camel_case_body() {
+        let body = json!({
+            "accessToken": "tok-123",
+            "user": { "id": ME, "name": "Kyu" }
+        });
+        let s = parse_auth_result(&body).unwrap();
+        assert_eq!(s.token, "tok-123");
+        assert_eq!(s.user_id, ME);
+        assert_eq!(s.user_name, "Kyu");
+    }
+
+    #[test]
+    fn auth_result_without_a_token_or_id_is_an_error() {
+        // Must not degrade into an empty token that then 401s forever.
+        assert!(parse_auth_result(&json!({})).is_err());
+        assert!(parse_auth_result(&json!({ "User": { "Id": ME } })).is_err());
+        assert!(parse_auth_result(&json!({ "AccessToken": "t" })).is_err());
+        assert!(parse_auth_result(&json!({ "AccessToken": "t", "User": {} })).is_err());
+    }
+
+    #[test]
+    fn a_missing_user_name_is_tolerated() {
+        // Cosmetic only -- it must not block a working sign-in.
+        let body = json!({ "AccessToken": "t", "User": { "Id": ME } });
+        assert_eq!(parse_auth_result(&body).unwrap().user_name, "");
+    }
+
+    #[test]
+    fn the_auth_header_carries_what_jellyfin_requires() {
+        let h = auth_header("KYU-PC", "dev-1", None);
+        assert!(h.starts_with("MediaBrowser "));
+        for part in ["Client=\"Karasu\"", "Device=\"KYU-PC\"", "DeviceId=\"dev-1\""] {
+            assert!(h.contains(part), "{h} is missing {part}");
+        }
+        assert!(h.contains("Version=\""));
+        assert!(!h.contains("Token="), "no token before signing in");
+        assert!(auth_header("d", "i", Some("tok")).contains("Token=\"tok\""));
+    }
+
+    /// The header is a quoted-string list, so an unescaped quote in a hostname
+    /// would corrupt every field after it.
+    #[test]
+    fn quotes_cannot_break_out_of_the_auth_header() {
+        let h = auth_header("we\"ird", "i", None);
+        assert!(h.contains("Device=\"weird\""));
+        assert_eq!(h.matches('"').count() % 2, 0);
     }
 }

@@ -9,10 +9,18 @@ holds in your OS credential store (Windows Credential Manager, or the Secret
 Service on Linux):
 
 - your **AniList OAuth token**, and
-- your **Jellyfin API key**, if you connected a Jellyfin server.
+- your **Jellyfin access token**, if you connected a Jellyfin server.
 
 Neither is ever handed to the WebView — the UI only ever learns *whether* one
 is stored.
+
+Signing in to Jellyfin sends your username and password to your own server
+once, in exchange for that access token (`/Users/AuthenticateByName` — Jellyfin
+has no OAuth, so this is how every third-party client authenticates). **The
+password is never written to disk and never kept in memory beyond the request.**
+An ordinary account is enough; Karasu deliberately does not use an admin API
+key, because an API key makes Jellyfin report every session on the server
+rather than only your own.
 
 Karasu contacts AniList, GitHub (update checks and downloads) and a localhost
 callback during login. A Jellyfin server you configure yourself is contacted

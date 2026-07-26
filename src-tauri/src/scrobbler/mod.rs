@@ -407,7 +407,7 @@ pub fn spawn(app: AppHandle) {
                 let db = app.state::<Db>();
                 (
                     crate::commands::read_smtc_enabled(&db),
-                    crate::commands::jellyfin_credentials(&db),
+                    crate::commands::jellyfin_config(&db),
                 )
             };
             let playback = detection::detect_playback(smtc_enabled, jellyfin).await;

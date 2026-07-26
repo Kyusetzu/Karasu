@@ -28,7 +28,8 @@ import {
   getJellyfinSettings,
   getScrobbleSettings,
   getSmtcEnabled,
-  jellyfinUsers,
+  jellyfinSignIn,
+  jellyfinSignOut,
   setJellyfinSettings,
   setScrobbleSettings,
   setSmtcEnabled,
@@ -36,7 +37,6 @@ import {
   testJellyfin,
   type JellyfinSession,
   type JellyfinSettings,
-  type JellyfinUser,
   type ScrobbleSettings,
   type SmtcSession,
 } from "@/stores/nowPlaying";
@@ -820,61 +820,74 @@ function SmtcDiagnostic() {
  * setup. This is for when that isn't enough: the server reports the series,
  * season and episode as separate fields, so nothing has to be parsed.
  *
- * The scoping controls are not optional extras. `/Sessions` reports the whole
- * server, so without a user this would scrobble whatever anyone in the
- * household is watching — hence the required user picker, and a device filter
- * defaulting to this machine. Test connection lists every session, matching or
- * not, because a device name that is one character off is otherwise
- * indistinguishable from "nothing is playing".
+ * Signing in as a user rather than with an admin API key is deliberate and
+ * load-bearing — Jellyfin scopes `/Sessions` to the calling account, but only
+ * when the caller isn't an API key. It also means an ordinary account is
+ * enough. The password is submitted once and never stored; only the returned
+ * token reaches the credential store.
+ *
+ * Test connection still lists non-matching sessions, because a device name one
+ * character off is otherwise indistinguishable from "nothing is playing".
  */
 function JellyfinSection() {
   const { t } = useTranslation();
   const [settings, setSettings] = useState<JellyfinSettings | null>(null);
   const [url, setUrl] = useState("");
-  const [key, setKey] = useState("");
-  const [userId, setUserId] = useState("");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [device, setDevice] = useState("");
-  const [users, setUsers] = useState<JellyfinUser[]>([]);
   const [busy, setBusy] = useState(false);
+  const [signingIn, setSigningIn] = useState(false);
   const [sessions, setSessions] = useState<JellyfinSession[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  const loadUsers = () => {
-    // Silent on failure: an unreachable server is already reported by Test,
-    // and an empty picker says the same thing without a second error line.
-    jellyfinUsers()
-      .then(setUsers)
-      .catch(() => setUsers([]));
-  };
 
   useEffect(() => {
     if (!api.isTauri) return;
     getJellyfinSettings().then((s) => {
       setSettings(s);
       setUrl(s.url);
-      setUserId(s.userId);
       setDevice(s.device);
-      if (s.hasKey && s.url) loadUsers();
     });
   }, []);
 
   if (!settings) return null;
 
+  const signIn = async () => {
+    setSigningIn(true);
+    setError(null);
+    setSessions(null);
+    try {
+      const next = await jellyfinSignIn(url, username, password);
+      // Drop the password the moment it has been exchanged for a token.
+      setPassword("");
+      setUsername("");
+      setSettings(next);
+      // The device field is saved separately; persist whatever is in it now so
+      // signing in doesn't quietly discard an edit.
+      await setJellyfinSettings(url, device);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setSigningIn(false);
+    }
+  };
+
+  const signOut = async () => {
+    setError(null);
+    setSessions(null);
+    try {
+      setSettings(await jellyfinSignOut());
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
   const save = async () => {
     setError(null);
     setSessions(null);
     try {
-      // An empty field means "leave the stored key alone", not "clear it" --
-      // the key is never shown, so there is nothing to re-type.
-      await setJellyfinSettings(
-        url,
-        key.trim() === "" ? null : key,
-        userId,
-        device,
-      );
-      setKey("");
+      await setJellyfinSettings(url, device);
       setSettings(await getJellyfinSettings());
-      loadUsers();
     } catch (e) {
       setError(String(e));
     }
@@ -902,63 +915,71 @@ function JellyfinSection() {
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           placeholder={t("settings.jellyfinUrlPlaceholder")}
+          disabled={settings.connected}
         />
-        <Input
-          type="password"
-          value={key}
-          onChange={(e) => setKey(e.target.value)}
-          placeholder={
-            settings.hasKey
-              ? t("settings.jellyfinKeyStored")
-              : t("settings.jellyfinKeyPlaceholder")
-          }
-        />
-        <select
-          value={userId}
-          onChange={(e) => setUserId(e.target.value)}
-          disabled={users.length === 0}
-          className="h-9 w-full rounded-lg border border-surface-700 bg-surface-900 px-2 text-sm focus:border-accent-500 focus:outline-none disabled:opacity-50"
-        >
-          <option value="">
-            {users.length === 0
-              ? t("settings.jellyfinUserUnavailable")
-              : t("settings.jellyfinUserNone")}
-          </option>
-          {/* A stored user stays selectable even if /Users can't be reached
-              right now, so saving other fields can't silently clear it. */}
-          {users.length === 0 && userId !== "" && (
-            <option value={userId}>{userId}</option>
-          )}
-          {users.map((u) => (
-            <option key={u.id} value={u.id}>
-              {u.name}
-            </option>
-          ))}
-        </select>
+
+        {settings.connected ? (
+          <p className="text-sm text-emerald-400">
+            {t("settings.jellyfinSignedIn", {
+              name: settings.userName || "?",
+            })}
+          </p>
+        ) : (
+          <>
+            <Input
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder={t("settings.jellyfinUsernamePlaceholder")}
+              autoComplete="off"
+            />
+            <Input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder={t("settings.jellyfinPasswordPlaceholder")}
+              autoComplete="off"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !signingIn) void signIn();
+              }}
+            />
+          </>
+        )}
+
         <Input
           value={device}
           onChange={(e) => setDevice(e.target.value)}
           placeholder={settings.localDevice || t("settings.jellyfinDeviceAny")}
         />
+
         <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={save}>
-            {t("common.save")}
-          </Button>
-          <Button onClick={test} disabled={busy || !settings.hasKey}>
-            <RefreshCw className={cn("size-4", busy && "animate-spin")} />{" "}
-            {t("settings.jellyfinTest")}
-          </Button>
+          {settings.connected ? (
+            <>
+              <Button variant="secondary" onClick={save}>
+                {t("common.save")}
+              </Button>
+              <Button onClick={test} disabled={busy}>
+                <RefreshCw className={cn("size-4", busy && "animate-spin")} />{" "}
+                {t("settings.jellyfinTest")}
+              </Button>
+              <Button variant="secondary" onClick={signOut}>
+                {t("settings.jellyfinSignOut")}
+              </Button>
+            </>
+          ) : (
+            <Button onClick={signIn} disabled={signingIn || url.trim() === ""}>
+              {signingIn
+                ? t("settings.jellyfinSigningIn")
+                : t("settings.jellyfinSignIn")}
+            </Button>
+          )}
         </div>
       </div>
-      <p className="mt-2 text-xs text-ink-600">{t("settings.jellyfinKeyHelp")}</p>
+      <p className="mt-2 text-xs text-ink-600">
+        {t("settings.jellyfinAccountHelp")}
+      </p>
       <p className="mt-1 text-xs text-ink-600">
         {t("settings.jellyfinDeviceHelp")}
       </p>
-      {settings.hasKey && settings.userId === "" && (
-        <p className="mt-2 text-sm text-amber-300">
-          {t("settings.jellyfinNoUser")}
-        </p>
-      )}
       {sessions && <SessionList sessions={sessions} />}
       {error && <p className="mt-2 text-sm text-red-300">{error}</p>}
     </Card>

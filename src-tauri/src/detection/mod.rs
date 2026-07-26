@@ -184,9 +184,7 @@ pub async fn detect_playback(
     jellyfin: Option<jellyfin::JellyfinConfig>,
 ) -> Option<Playback> {
     if let Some(cfg) = jellyfin {
-        if let Some(p) =
-            jellyfin::detect(&cfg.url, &cfg.key, &cfg.user_id, &cfg.device).await
-        {
+        if let Some(p) = jellyfin::detect(&cfg).await {
             return Some(p);
         }
     }

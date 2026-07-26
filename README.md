@@ -77,8 +77,11 @@ Because a desktop app can do things anilist.co simply can't:
   Media Player, Plex and browser video
 - **Jellyfin server integration** (optional) — ask your server instead of
   guessing from a window title, and it reports the series, season and episode
-  as exact fields rather than a filename to parse. Scoped to the user and
-  device you pick, so nobody else on the server ends up on your list
+  as exact fields rather than a filename to parse. Sign in with your ordinary
+  Jellyfin account (no administrator rights, no API key); the server then only
+  ever reports your own playback, so nobody else on a shared server ends up on
+  your list. Your password is exchanged once for an access token and never
+  stored
 - Automatic scrobbling after a configurable threshold, with optional
   confirmation, episode-gap protection and
   [anime-relations](https://github.com/erengy/anime-relations) episode redirects

@@ -108,19 +108,14 @@ export const smtcSessions = () => invoke<SmtcSession[]>("smtc_sessions");
 
 export interface JellyfinSettings {
   url: string;
-  /** Whether a key is stored. The key itself never leaves the backend. */
-  hasKey: boolean;
-  /** Required — detection stays off until a user is picked. */
-  userId: string;
-  /** Empty means "any device of that user". */
+  /** Whether a sign-in is stored. The token itself never leaves the backend. */
+  connected: boolean;
+  /** The signed-in account, for display only. */
+  userName: string;
+  /** Empty means "any device of this account". */
   device: string;
   /** This machine's name, offered as the default device. */
   localDevice: string;
-}
-
-export interface JellyfinUser {
-  id: string;
-  name: string;
 }
 
 export interface JellyfinSession {
@@ -129,27 +124,34 @@ export interface JellyfinSession {
   client: string;
   /** What that session is playing, or null when idle. */
   playing: string | null;
-  /** Whether the configured user/device filter accepts this session. */
+  /** Whether the device filter accepts this session. */
   matched: boolean;
 }
 
 export const getJellyfinSettings = () =>
   invoke<JellyfinSettings>("get_jellyfin_settings");
 
-/** Pass `apiKey: null` to save the rest without touching the stored key. */
-export const setJellyfinSettings = (
-  url: string,
-  apiKey: string | null,
-  userId: string,
-  device: string,
-) => invoke<void>("set_jellyfin_settings", { url, apiKey, userId, device });
-
-/** The server's users, for the picker. Needs only a URL and key. */
-export const jellyfinUsers = () => invoke<JellyfinUser[]>("jellyfin_users");
+/** Saves the settings that aren't part of signing in. */
+export const setJellyfinSettings = (url: string, device: string) =>
+  invoke<void>("set_jellyfin_settings", { url, device });
 
 /**
- * Every session the server reports, flagged with whether the filter accepts
- * it — including other people's. Showing the non-matching ones is the point:
- * it's the only way to find out what Jellyfin calls your device.
+ * Exchanges a username and password for an access token. Any Jellyfin account
+ * works — no administrator rights. The password is sent once and never stored;
+ * only the returned token reaches the credential store.
+ */
+export const jellyfinSignIn = (
+  url: string,
+  username: string,
+  password: string,
+) => invoke<JellyfinSettings>("jellyfin_sign_in", { url, username, password });
+
+export const jellyfinSignOut = () =>
+  invoke<JellyfinSettings>("jellyfin_sign_out");
+
+/**
+ * The signed-in account's own sessions, flagged with whether the device filter
+ * accepts each one. Showing the non-matching ones is the point: it's the only
+ * way to find out what Jellyfin calls your device.
  */
 export const testJellyfin = () => invoke<JellyfinSession[]>("test_jellyfin");

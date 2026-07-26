@@ -497,25 +497,25 @@ const en = {
     jellyfinHint:
       "Optional. Ask your server directly instead of guessing from a window title — it reports the series and episode exactly.",
     jellyfinUrlPlaceholder: "http://192.168.1.10:8096",
-    jellyfinKeyPlaceholder: "API key",
-    jellyfinKeyStored: "API key saved — leave empty to keep it",
-    jellyfinKeyHelp:
-      "Create a key in Jellyfin under Dashboard → API Keys. It is stored in the Windows Credential Manager, never in the app window.",
-    jellyfinUserNone: "Pick your user…",
-    jellyfinUserUnavailable: "Save a server URL and API key first",
-    jellyfinNoUser:
-      "Pick your user to switch Jellyfin detection on. Until then it stays off, so nobody else's playback lands on your list.",
+    jellyfinUsernamePlaceholder: "Jellyfin username",
+    jellyfinPasswordPlaceholder: "Password",
+    jellyfinSignIn: "Sign in",
+    jellyfinSigningIn: "Signing in…",
+    jellyfinSignOut: "Sign out",
+    jellyfinSignedIn: "Signed in as {{name}}",
+    jellyfinAccountHelp:
+      "Any Jellyfin account works — no administrator rights needed. Your password is used once to sign in and is never saved; only the access token the server returns is kept, in the Windows Credential Manager. Because Karasu signs in as you, the server only ever reports your own playback.",
     jellyfinDeviceAny: "Any device",
     jellyfinDeviceHelp:
       "Only this device counts. Clear the field to track any of your devices, including your phone or TV. Use Test connection to see what your device is actually called.",
     jellyfinTest: "Test connection",
-    jellyfinNoSessions: "Connected. Nobody is playing anything right now.",
+    jellyfinNoSessions: "Connected. You aren't playing anything right now.",
     jellyfinMatched: "tracked",
     jellyfinIdle: "idle",
     jellyfinUnknownUser: "Unknown user",
     jellyfinUnknownDevice: "Unknown device",
     jellyfinNoMatch:
-      "None of these match your user and device, so nothing is being tracked. Copy the device name from the row that is yours into the device field.",
+      "None of these match your device, so nothing is being tracked. Copy the device name from the row that is yours into the device field, or clear the field to accept any of your devices.",
     threshold: "Threshold (minutes)",
     thresholdHint: "0 = automatic (two thirds of the episode length)",
     airingNotify: "New-episode notifications",
@@ -1044,25 +1044,25 @@ const de: typeof en = {
     jellyfinHint:
       "Optional. Frag deinen Server direkt, statt aus einem Fenstertitel zu raten — er meldet Serie und Folge exakt.",
     jellyfinUrlPlaceholder: "http://192.168.1.10:8096",
-    jellyfinKeyPlaceholder: "API-Schlüssel",
-    jellyfinKeyStored: "API-Schlüssel gespeichert — leer lassen zum Behalten",
-    jellyfinKeyHelp:
-      "Erstelle einen Schlüssel in Jellyfin unter Dashboard → API-Schlüssel. Er wird im Windows-Anmeldeinformationsmanager gespeichert, nie im App-Fenster.",
-    jellyfinUserNone: "Benutzer auswählen…",
-    jellyfinUserUnavailable: "Erst Server-URL und API-Schlüssel speichern",
-    jellyfinNoUser:
-      "Wähle deinen Benutzer, um die Jellyfin-Erkennung einzuschalten. Bis dahin bleibt sie aus, damit nichts von anderen auf deiner Liste landet.",
+    jellyfinUsernamePlaceholder: "Jellyfin-Benutzername",
+    jellyfinPasswordPlaceholder: "Passwort",
+    jellyfinSignIn: "Anmelden",
+    jellyfinSigningIn: "Anmeldung läuft…",
+    jellyfinSignOut: "Abmelden",
+    jellyfinSignedIn: "Angemeldet als {{name}}",
+    jellyfinAccountHelp:
+      "Jedes Jellyfin-Konto funktioniert — Administratorrechte sind nicht nötig. Dein Passwort wird nur einmal zur Anmeldung verwendet und nie gespeichert; behalten wird lediglich der Zugriffstoken des Servers, im Windows-Anmeldeinformationsmanager. Da Karasu sich als du anmeldet, meldet der Server nur deine eigene Wiedergabe.",
     jellyfinDeviceAny: "Beliebiges Gerät",
     jellyfinDeviceHelp:
       "Es zählt nur dieses Gerät. Leere das Feld, um alle deine Geräte zu erfassen, auch Handy oder TV. Mit „Verbindung testen“ siehst du, wie dein Gerät tatsächlich heißt.",
     jellyfinTest: "Verbindung testen",
-    jellyfinNoSessions: "Verbunden. Gerade spielt niemand etwas ab.",
+    jellyfinNoSessions: "Verbunden. Du spielst gerade nichts ab.",
     jellyfinMatched: "wird erfasst",
     jellyfinIdle: "inaktiv",
     jellyfinUnknownUser: "Unbekannter Benutzer",
     jellyfinUnknownDevice: "Unbekanntes Gerät",
     jellyfinNoMatch:
-      "Keine dieser Sitzungen passt zu deinem Benutzer und Gerät, es wird also nichts erfasst. Übernimm den Gerätenamen aus deiner Zeile ins Gerätefeld.",
+      "Keine dieser Sitzungen passt zu deinem Gerät, es wird also nichts erfasst. Übernimm den Gerätenamen aus deiner Zeile ins Gerätefeld, oder leere das Feld, um alle deine Geräte zu akzeptieren.",
     threshold: "Schwelle (Minuten)",
     thresholdHint: "0 = automatisch (zwei Drittel der Episodenlänge)",
     airingNotify: "Benachrichtigung bei neuer Folge",

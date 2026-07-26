@@ -51,7 +51,6 @@ export default function Dashboard() {
 }
 
 function DashboardContent({ userId }: { userId: number }) {
-  const { t } = useTranslation();
   const { data } = useQuery({
     queryKey: ["mediaList", "ANIME", userId],
     queryFn: () => fetchMediaList(userId, "ANIME"),
@@ -85,17 +84,81 @@ function DashboardContent({ userId }: { userId: number }) {
     [mangaData, level],
   );
 
+  // Every section is its own component, so the running order below is a plain
+  // list and rearranging it is a one-line move.
+  return (
+    <div className="space-y-8 p-8">
+      {/* Pinned above the rest: this is the "right now" card, and it is only
+          useful while something is actually playing. */}
+      <NowPlayingCard />
+
+      <Stats entries={allAnime} />
+      <WeeklyDigest entries={allAnime} />
+      <AiringSoon entries={allAnime} />
+      <ContinueWatching entries={allAnime} save={save} />
+      <RecommendedSection type="ANIME" entries={allAnime} />
+      <RecommendedSection type="MANGA" entries={allManga} />
+    </div>
+  );
+}
+
+/** Shows in progress, most recently touched first, with a +1 shortcut. */
+function ContinueWatching({
+  entries,
+  save,
+}: {
+  entries: MediaListEntry[];
+  save: ReturnType<typeof useListMutations>["save"];
+}) {
+  const { t } = useTranslation();
   const watching = useMemo(
     () =>
-      allAnime
+      entries
         .filter((e) => e.status === "CURRENT" || e.status === "REPEATING")
         .sort((a, b) => b.updatedAt - a.updatedAt),
-    [allAnime],
+    [entries],
   );
 
+  return (
+    <section>
+      <h2 className="flex items-center gap-2 text-lg font-semibold">
+        <Play className="size-4.5 text-accent-400" />{" "}
+        {t("dashboard.continueWatching")}
+      </h2>
+      {watching.length === 0 ? (
+        <p className="mt-3 text-sm text-ink-600">
+          {t("dashboard.nothingWatching")}{" "}
+          <Link to="/seasonal" className="text-accent-400 hover:underline">
+            {t("dashboard.currentSeason")}
+          </Link>
+          .
+        </p>
+      ) : (
+        <div className="mt-4 grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-4">
+          {watching.map((entry) => (
+            <ContinueCard
+              key={entry.id}
+              entry={entry}
+              onPlusOne={() =>
+                save.mutate({
+                  mediaId: entry.mediaId,
+                  progress: entry.progress + 1,
+                })
+              }
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/** The next episodes due on the list, soonest first. */
+function AiringSoon({ entries }: { entries: MediaListEntry[] }) {
+  const { t } = useTranslation();
   const upcoming = useMemo(
     () =>
-      allAnime
+      entries
         .filter(
           (e) =>
             e.media.nextAiringEpisode &&
@@ -108,67 +171,25 @@ function DashboardContent({ userId }: { userId: number }) {
             a.media.nextAiringEpisode!.airingAt -
             b.media.nextAiringEpisode!.airingAt,
         ),
-    [allAnime],
+    [entries],
   );
 
   return (
-    <div className="space-y-8 p-8">
-      <NowPlayingCard />
-      <WeeklyDigest entries={allAnime} />
-      <section>
-        <h2 className="flex items-center gap-2 text-lg font-semibold">
-          <Play className="size-4.5 text-accent-400" />{" "}
-          {t("dashboard.continueWatching")}
-        </h2>
-        {watching.length === 0 ? (
-          <p className="mt-3 text-sm text-ink-600">
-            {t("dashboard.nothingWatching")}{" "}
-            <Link to="/seasonal" className="text-accent-400 hover:underline">
-              {t("dashboard.currentSeason")}
-            </Link>
-            .
-          </p>
-        ) : (
-          <div className="mt-4 grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-4">
-            {watching.map((entry) => (
-              <ContinueCard
-                key={entry.id}
-                entry={entry}
-                onPlusOne={() =>
-                  save.mutate({
-                    mediaId: entry.mediaId,
-                    progress: entry.progress + 1,
-                  })
-                }
-              />
-            ))}
-          </div>
-        )}
-      </section>
-
-      <Stats entries={allAnime} />
-
-      <RecommendedSection type="ANIME" entries={allAnime} />
-      <RecommendedSection type="MANGA" entries={allManga} />
-
-      <section>
-        <h2 className="flex items-center gap-2 text-lg font-semibold">
-          <CalendarClock className="size-4.5 text-accent-400" />{" "}
-          {t("dashboard.upcoming")}
-        </h2>
-        {upcoming.length === 0 ? (
-          <p className="mt-3 text-sm text-ink-600">
-            {t("dashboard.noUpcoming")}
-          </p>
-        ) : (
-          <div className="mt-4 grid gap-1 2xl:grid-cols-2">
-            {upcoming.slice(0, 10).map((entry) => (
-              <AiringRow key={entry.id} entry={entry} />
-            ))}
-          </div>
-        )}
-      </section>
-    </div>
+    <section>
+      <h2 className="flex items-center gap-2 text-lg font-semibold">
+        <CalendarClock className="size-4.5 text-accent-400" />{" "}
+        {t("dashboard.upcoming")}
+      </h2>
+      {upcoming.length === 0 ? (
+        <p className="mt-3 text-sm text-ink-600">{t("dashboard.noUpcoming")}</p>
+      ) : (
+        <div className="mt-4 grid gap-1 2xl:grid-cols-2">
+          {upcoming.slice(0, 10).map((entry) => (
+            <AiringRow key={entry.id} entry={entry} />
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 

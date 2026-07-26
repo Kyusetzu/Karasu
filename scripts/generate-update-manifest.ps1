@@ -31,7 +31,14 @@ if (-not $commitMatch) {
 }
 $commitNumber = $commitMatch.Matches[0].Groups[1].Value
 $packageVersion = (Get-Content $packageJson -Raw | ConvertFrom-Json).version
-$fullVersion = "$packageVersion.$commitNumber"
+# The commit number is attached as semver *build metadata* ("0.23.2+90"), not as
+# a fourth dotted segment. tauri-plugin-updater parses this field with
+# semver::Version::from_str, which rejects "0.23.2.90" outright -- the manifest
+# then fails to deserialize and every install dies with
+# "unexpected character '.' after patch version number".
+# Build metadata is ignored by semver precedence, so commands.rs pairs this with
+# an explicit version_comparator to keep commit-only bumps detectable.
+$fullVersion = "$packageVersion+$commitNumber"
 
 # Fixed rolling-tag download URL -- matches release.yml's `tag_name: latest`.
 $downloadUrl = "https://github.com/Kyusetzu/Karasu/releases/download/latest/$($installer.Name)"

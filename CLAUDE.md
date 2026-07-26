@@ -75,8 +75,24 @@ The three manifests (`package.json`, `src-tauri/Cargo.toml`,
 segment lives in `COMMIT_NUMBER` in `src-tauri/src/commands.rs`;
 `app_version()` returns the full `MAJOR.MINOR.PATCH.COMMIT#` string, which the
 About window always displays. **Bump the appropriate segment(s) and the
-`COMMIT_NUMBER` on every commit.** The update-check comparison ignores the
-COMMIT# segment (no semver precedence).
+`COMMIT_NUMBER` on every commit.** The update check compares all four segments,
+COMMIT# included, so a commit-only bump still registers as an update.
+
+**`latest.json` spells the commit number as semver build metadata**
+(`0.23.2+90`), not as a fourth dotted segment — see
+`scripts/generate-update-manifest.ps1`. `tauri-plugin-updater` parses that field
+with `semver::Version::from_str`, which rejects `0.23.2.90` outright and makes
+every install fail with *"unexpected character '.' after patch version number"*.
+
+That fix alone isn't enough, so `download_pending_update` also supplies an
+explicit `version_comparator`. The plugin's default compares the manifest
+against `package_info().version` — which comes from `Cargo.toml` and therefore
+has **no commit number** — so the running `0.23.2.90` reaches it as a bare
+`0.23.2`, and the manifest for that same build (`0.23.2+90`) sorts above it:
+the app would download and reinstall itself on a loop. The comparator supplies
+`COMMIT_NUMBER` as the running commit number instead. `version_parts` in
+`commands.rs` treats `+` and `.` alike so both spellings compare equal.
+**Don't "tidy" that `+` back into a dot, and don't drop the comparator.**
 
 ## Verification (per commit)
 

@@ -872,7 +872,7 @@ pub fn mark_all_notifications_read(db: State<'_, Db>) -> Result<(), String> {
 
 /// Monotonic commit counter — the 4th version segment
 /// (`MAJOR.MINOR.PATCH.COMMIT#`). Bumped by one on every commit.
-pub const COMMIT_NUMBER: u32 = 89;
+pub const COMMIT_NUMBER: u32 = 90;
 
 /// Full four-part display version, e.g. `0.1.1.38`. The `MAJOR.MINOR.PATCH`
 /// core comes from the crate version (kept in sync across the manifests).
@@ -1082,20 +1082,33 @@ pub async fn check_for_updates(db: State<'_, Db>, force: bool) -> Result<UpdateI
     let is_newer = version_gt(&latest, &current);
     Ok(UpdateInfo {
         current,
-        latest: Some(latest),
+        latest: Some(display_version(&latest)),
         url: Some(update_channel_release_url(&channel).to_string()),
         is_newer,
     })
 }
 
+/// Splits a version into numeric segments, treating `+` exactly like `.`.
+///
+/// `latest.json` carries the commit number as semver build metadata
+/// (`0.23.2+90`) rather than a fourth dotted segment, because the updater
+/// plugin parses that field as strict semver. Both spellings have to compare
+/// identically here, so the running `0.23.2.90` lines up with the manifest.
+fn version_parts(s: &str) -> Vec<u32> {
+    s.split(['.', '+'])
+        .map(|p| p.parse::<u32>().unwrap_or(0))
+        .collect()
+}
+
+/// The four-part version in its display form, whatever separator it arrived
+/// with — the UI has always shown `MAJOR.MINOR.PATCH.COMMIT#`.
+fn display_version(s: &str) -> String {
+    s.replace('+', ".")
+}
+
 /// True if dotted-numeric version `a` is strictly greater than `b`.
 fn version_gt(a: &str, b: &str) -> bool {
-    let parse = |s: &str| {
-        s.split('.')
-            .map(|p| p.parse::<u32>().unwrap_or(0))
-            .collect::<Vec<_>>()
-    };
-    let (va, vb) = (parse(a), parse(b));
+    let (va, vb) = (version_parts(a), version_parts(b));
     for i in 0..va.len().max(vb.len()) {
         let x = va.get(i).copied().unwrap_or(0);
         let y = vb.get(i).copied().unwrap_or(0);
@@ -1108,7 +1121,7 @@ fn version_gt(a: &str, b: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::version_gt;
+    use super::{display_version, version_gt};
 
     #[test]
     fn version_comparison() {
@@ -1131,6 +1144,48 @@ mod tests {
     fn non_numeric_tag_never_reports_an_update() {
         assert!(!version_gt("latest", "0.19.2.82"));
         assert!(version_gt("0.19.3.83", "0.19.2.82"));
+    }
+
+    /// `latest.json` spells the commit number as semver build metadata
+    /// (`0.23.2+90`) because tauri-plugin-updater parses that field as strict
+    /// semver and a fourth dotted segment makes it fail to deserialize —
+    /// which is what broke installing with "unexpected character '.' after
+    /// patch version number". The two spellings must compare identically.
+    #[test]
+    fn build_metadata_reads_as_the_fourth_segment() {
+        assert!(version_gt("0.23.2+90", "0.23.1.89"));
+        assert!(version_gt("0.23.1+90", "0.23.1.89"));
+        assert!(!version_gt("0.23.1+89", "0.23.1.89"));
+        assert!(!version_gt("0.23.1+88", "0.23.1.89"));
+        // A commit-only bump is still an update.
+        assert!(version_gt("0.23.1+90", "0.23.1+89"));
+    }
+
+    /// The comparator handed to tauri-plugin-updater. The case that matters
+    /// most is the *equal* one: the plugin's own `current_version` comes from
+    /// Cargo.toml and has no commit number, so without this the manifest for
+    /// the running build would sort above it and the app would reinstall
+    /// itself on a loop.
+    #[test]
+    fn remote_is_newer_uses_the_running_commit_number() {
+        use super::{remote_is_newer, COMMIT_NUMBER};
+        let running = (0u64, 23u64, 2u64);
+        let n = COMMIT_NUMBER as u64;
+
+        assert!(!remote_is_newer((0, 23, 2, n), running), "same build");
+        assert!(!remote_is_newer((0, 23, 2, n - 1), running), "older commit");
+        assert!(!remote_is_newer((0, 23, 2, 0), running), "no build metadata");
+        assert!(remote_is_newer((0, 23, 2, n + 1), running), "newer commit");
+        assert!(remote_is_newer((0, 24, 0, 0), running), "newer minor");
+        assert!(!remote_is_newer((0, 22, 9, n + 5), running), "older minor");
+    }
+
+    /// The About page has always shown MAJOR.MINOR.PATCH.COMMIT#; the manifest
+    /// separator is an implementation detail and must not leak into the UI.
+    #[test]
+    fn versions_display_with_dots() {
+        assert_eq!(display_version("0.23.2+90"), "0.23.2.90");
+        assert_eq!(display_version("0.23.2.90"), "0.23.2.90");
     }
 
     /// Must stay in lockstep with `isBlocked` in src/lib/contentFilter.ts —
@@ -1163,6 +1218,17 @@ mod tests {
 }
 
 // --- In-app updater ------------------------------------------------------------
+
+/// Whether a manifest's `(major, minor, patch, commit)` is newer than the
+/// running build, whose commit number is `COMMIT_NUMBER` rather than anything
+/// the plugin can see (see the comparator in `download_pending_update`).
+///
+/// Split out from the closure so the comparison is testable without
+/// constructing a `semver::Version`.
+fn remote_is_newer(remote: (u64, u64, u64, u64), current_core: (u64, u64, u64)) -> bool {
+    let (major, minor, patch) = current_core;
+    remote > (major, minor, patch, COMMIT_NUMBER as u64)
+}
 
 /// Downloaded-but-not-yet-installed update, held between
 /// `download_pending_update` and `install_pending_update` so applying it is a
@@ -1197,6 +1263,28 @@ pub async fn download_pending_update(
         .updater_builder()
         .endpoints(vec![endpoint])
         .map_err(|e| e.to_string())?
+        // Without this the app would re-offer the build it is already running,
+        // forever. The plugin's default is `remote > current` using semver's
+        // *derived* Ord, which does compare build metadata — but its
+        // `current_version` comes from `package_info()`, i.e. Cargo.toml, which
+        // carries only `MAJOR.MINOR.PATCH` and no commit number at all. So the
+        // running 0.23.2.90 arrives here as a bare `0.23.2`, and any manifest
+        // with build metadata (`0.23.2+90` — the very same build) sorts above
+        // it: download, restart, repeat.
+        //
+        // COMMIT_NUMBER is a compile-time const in this file, so supplying the
+        // running commit number here is exact rather than reconstructed.
+        .version_comparator(|current, release| {
+            remote_is_newer(
+                (
+                    release.version.major,
+                    release.version.minor,
+                    release.version.patch,
+                    release.version.build.as_str().parse::<u64>().unwrap_or(0),
+                ),
+                (current.major, current.minor, current.patch),
+            )
+        })
         .build()
         .map_err(|e| e.to_string())?;
 
@@ -1204,7 +1292,7 @@ pub async fn download_pending_update(
         return Ok(None);
     };
 
-    let version = update.version.clone();
+    let version = display_version(&update.version);
     let notes = update.body.clone();
     let bytes = update
         .download(|_, _| {}, || {})

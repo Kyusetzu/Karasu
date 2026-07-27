@@ -84,7 +84,14 @@ pub fn get_library_index(state: State<'_, LibraryIndex>) -> Vec<LibraryEntry> {
 }
 
 /// Scans the configured folder and rebuilds the index.
-#[tauri::command]
+///
+/// `async` is load-bearing rather than decorative: `tauri-macros` defaults a
+/// plain `#[tauri::command]` to `ExecutionContext::Blocking`, which runs the
+/// body inline on the WebView2 UI thread. A recursive walk of up to
+/// `MAX_FILES` plus a fuzzy match per file froze the whole window — the
+/// "scanning" spinner could not even animate, because the thread that would
+/// have animated it was doing the scan.
+#[tauri::command(async)]
 pub fn scan_library(app: AppHandle) -> Result<ScanSummary, String> {
     let db = app.state::<Db>();
     let root = db
@@ -101,22 +108,7 @@ pub fn scan_library(app: AppHandle) -> Result<ScanSummary, String> {
     collect_videos(Path::new(&root), 0, &mut files);
     let total = files.len();
 
-    let mut by_media: HashMap<i64, HashMap<u32, String>> = HashMap::new();
-    for path in &files {
-        let name = Path::new(path)
-            .file_name()
-            .map(|n| n.to_string_lossy().to_string())
-            .unwrap_or_default();
-        let parsed = parser::parse(&name);
-        let Some(episode) = parsed.episode else { continue };
-        if let Some(m) = matcher::best_match(&parsed, &candidates) {
-            by_media
-                .entry(m.media_id)
-                .or_default()
-                .entry(episode)
-                .or_insert_with(|| path.clone());
-        }
-    }
+    let by_media = index_files(&files, &candidates);
 
     let summary = build_summary(&by_media);
 
@@ -133,6 +125,49 @@ pub fn scan_library(app: AppHandle) -> Result<ScanSummary, String> {
     *state.0.lock().unwrap() = LibraryData { by_media, summary: summary.clone() };
 
     Ok(ScanSummary { entries: summary, files: total, matched })
+}
+
+/// Maps every video file that parses to an episode onto the entry it belongs
+/// to. The first path wins for a given (media, episode) pair.
+///
+/// A library is organised per series, so the same (title, season) recurs once
+/// per episode file. `best_match` is pure in that pair plus `candidates`, so it
+/// only has to run once per distinct series rather than once per file — which
+/// collapses its input from the file count (up to `MAX_FILES`) to the
+/// distinct-title count, typically a few hundred.
+///
+/// Negative results are cached too, deliberately: an unmatched file (an OP, an
+/// ED, an extra) never hits the exact-match short circuit inside `best_match`
+/// and so costs a full fuzzy sweep over every candidate — the most expensive
+/// case there is, and the one most likely to repeat across a season folder.
+fn index_files(
+    files: &[String],
+    candidates: &[matcher::Candidate],
+) -> HashMap<i64, HashMap<u32, String>> {
+    let mut by_media: HashMap<i64, HashMap<u32, String>> = HashMap::new();
+    let mut matched_titles: HashMap<(String, Option<u32>), Option<i64>> = HashMap::new();
+
+    for path in files {
+        let name = Path::new(path)
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_default();
+        let parsed = parser::parse(&name);
+        let Some(episode) = parsed.episode else { continue };
+
+        let media_id = *matched_titles
+            .entry((parsed.title.clone(), parsed.season))
+            .or_insert_with(|| matcher::best_match(&parsed, candidates).map(|m| m.media_id));
+
+        if let Some(media_id) = media_id {
+            by_media
+                .entry(media_id)
+                .or_default()
+                .entry(episode)
+                .or_insert_with(|| path.clone());
+        }
+    }
+    by_media
 }
 
 /// Builds the sorted, frontend-facing summary from the index map.
@@ -294,5 +329,63 @@ mod tests {
         assert!(is_video(Path::new("ep.mkv")));
         let parsed = parser::parse("Totally Unrelated Show - 03.mkv");
         assert!(matcher::best_match(&parsed, &frieren()).is_none());
+    }
+
+    fn paths(names: &[&str]) -> Vec<String> {
+        names.iter().map(|n| format!("D:\\Anime\\{n}")).collect()
+    }
+
+    /// The memoized index must agree with calling `best_match` per file — the
+    /// cache key is exactly that function's input, so results are identical.
+    #[test]
+    fn indexes_a_season_folder_by_episode() {
+        let files = paths(&[
+            "[SubsPlease] Sousou no Frieren - 13 (1080p) [ABCD1234].mkv",
+            "[SubsPlease] Sousou no Frieren - 14 (1080p) [BCDE2345].mkv",
+            "[SubsPlease] Sousou no Frieren - 15 (1080p) [CDEF3456].mkv",
+        ]);
+        let index = index_files(&files, &frieren());
+
+        let eps = index.get(&154587).expect("Frieren should be indexed");
+        assert_eq!(eps.len(), 3);
+        // Each episode maps to its own file, not to whichever was seen last.
+        for ep in [13u32, 14, 15] {
+            assert!(eps[&ep].contains(&format!("- {ep} ")), "ep {ep} -> {}", eps[&ep]);
+        }
+    }
+
+    /// Repeated titles are what the cache exists for, and unmatched files are
+    /// the expensive case it must also cover — neither may change the result.
+    #[test]
+    fn repeated_and_unmatched_titles_are_handled_once() {
+        let mut files = paths(&["Totally Unrelated Show - 01.mkv", "Totally Unrelated Show - 02.mkv"]);
+        files.extend(paths(&["[SubsPlease] Sousou no Frieren - 13 (1080p) [A].mkv"]));
+
+        let index = index_files(&files, &frieren());
+        // The unmatched series contributes nothing…
+        assert_eq!(index.len(), 1);
+        // …and the matched one is unaffected by sharing the scan with it.
+        assert_eq!(index[&154587].len(), 1);
+        assert!(index[&154587].contains_key(&13));
+    }
+
+    /// A file with no parseable episode number is skipped, not mis-filed.
+    #[test]
+    fn files_without_an_episode_are_skipped() {
+        let files = paths(&["Sousou no Frieren [Movie].mkv"]);
+        let index = index_files(&files, &frieren());
+        assert!(index.get(&154587).is_none_or(|eps| !eps.is_empty()));
+    }
+
+    /// The first path wins for a duplicate (media, episode) — a re-encode in a
+    /// second folder must not silently replace the original.
+    #[test]
+    fn the_first_path_wins_for_a_duplicate_episode() {
+        let files = vec![
+            "D:\\A\\[SubsPlease] Sousou no Frieren - 13 (1080p) [A].mkv".to_string(),
+            "D:\\B\\[SubsPlease] Sousou no Frieren - 13 (720p) [B].mkv".to_string(),
+        ];
+        let index = index_files(&files, &frieren());
+        assert_eq!(index[&154587][&13], files[0]);
     }
 }

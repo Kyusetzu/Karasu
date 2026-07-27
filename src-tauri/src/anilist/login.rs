@@ -12,7 +12,7 @@
 use crate::anilist::client::AniList;
 use crate::db::Db;
 use std::io::{Read, Write};
-use std::net::{TcpListener, TcpStream};
+use std::net::{Shutdown, TcpListener, TcpStream};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, Manager, Runtime};
@@ -119,13 +119,18 @@ fn handle_connection(
     mut stream: TcpStream,
     on_token: &dyn Fn(&str) -> Result<(), String>,
 ) -> bool {
+    // The listener is non-blocking so the accept loop can time out, and on
+    // Windows the accepted socket inherits that flag — which would make the
+    // read below fail with `WouldBlock` (and silently drop the request)
+    // whenever the browser's bytes have not landed by the time `accept`
+    // returned. Put this socket back into blocking mode so the read timeout
+    // actually applies and a partial write cannot be lost either.
+    let _ = stream.set_nonblocking(false);
     let _ = stream.set_read_timeout(Some(Duration::from_secs(5)));
-    let mut buf = [0u8; 8192];
-    let n = match stream.read(&mut buf) {
-        Ok(n) if n > 0 => n,
-        _ => return false,
+    let request = match read_request(&mut stream) {
+        Some(r) => r,
+        None => return false,
     };
-    let request = String::from_utf8_lossy(&buf[..n]);
     let path = request.split_whitespace().nth(1).unwrap_or("/");
 
     if path == "/callback" || path.starts_with("/callback?") {
@@ -172,6 +177,32 @@ fn handle_connection(
     }
 }
 
+/// Reads the request head, i.e. everything up to the blank line that ends the
+/// headers. One `read` is not enough: TCP gives no framing guarantees, so the
+/// first segment can carry as little as `GET ` — parsing that alone yields no
+/// path at all and would answer a valid `/callback` with a 404.
+///
+/// Returns `None` if nothing was received, so the caller can drop the
+/// connection.
+fn read_request(stream: &mut TcpStream) -> Option<String> {
+    let mut buf = [0u8; 8192];
+    let mut len = 0;
+    while len < buf.len() {
+        match stream.read(&mut buf[len..]) {
+            Ok(0) => break, // peer closed
+            Ok(n) => {
+                len += n;
+                if buf[..len].windows(4).any(|w| w == b"\r\n\r\n") {
+                    break; // headers complete
+                }
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => {}
+            Err(_) => break, // timed out or reset — use whatever arrived
+        }
+    }
+    (len > 0).then(|| String::from_utf8_lossy(&buf[..len]).into_owned())
+}
+
 /// Extracts a raw query parameter value (no percent-decoding — AniList
 /// tokens are URL-safe JWTs).
 fn query_param<'a>(query: &'a str, key: &str) -> Option<&'a str> {
@@ -193,6 +224,10 @@ fn respond(stream: &mut TcpStream, status: u16, body: &str) {
     );
     let _ = stream.write_all(response.as_bytes());
     let _ = stream.flush();
+    // Half-close so the peer sees a clean end-of-response (we announced
+    // `Connection: close`) instead of inferring it from the socket being
+    // dropped, which can surface as a reset mid-read.
+    let _ = stream.shutdown(Shutdown::Write);
 }
 
 /// Minimal dark result page shown in the user's browser.
@@ -233,12 +268,53 @@ mod tests {
         (port, handle)
     }
 
+    /// Sends one request and reads the response until the server closes.
+    ///
+    /// Every failure mode here is loud on purpose: a discarded read error or a
+    /// truncated body would come back as an empty string and fail whichever
+    /// content assertion ran next with a message that says nothing about the
+    /// actual cause.
     fn get(port: u16, path: &str) -> String {
         let mut s = TcpStream::connect(("127.0.0.1", port)).unwrap();
-        write!(s, "GET {path} HTTP/1.1\r\nHost: localhost\r\n\r\n").unwrap();
-        let mut body = String::new();
-        let _ = s.read_to_string(&mut body);
-        body
+        s.set_read_timeout(Some(Duration::from_secs(10))).unwrap();
+        request(&mut s, path);
+        read_response(&mut s, path)
+    }
+
+    fn request(s: &mut TcpStream, path: &str) {
+        send(s, path, &format!("GET {path} HTTP/1.1\r\nHost: localhost\r\n\r\n"));
+    }
+
+    fn send(s: &mut TcpStream, path: &str, bytes: &str) {
+        s.write_all(bytes.as_bytes())
+            .and_then(|()| s.flush())
+            .unwrap_or_else(|e| panic!("sending {path} failed: {e}"));
+    }
+
+    /// Reads to end-of-stream and checks the response arrived whole, so a
+    /// short read fails as a short read rather than as a missing status line.
+    fn read_response(s: &mut TcpStream, path: &str) -> String {
+        let mut response = String::new();
+        s.read_to_string(&mut response)
+            .unwrap_or_else(|e| panic!("reading the response to {path} failed: {e}"));
+
+        let (head, body) = response
+            .split_once("\r\n\r\n")
+            .unwrap_or_else(|| panic!("response to {path} has no headers: {response:?}"));
+        let declared: usize = head
+            .lines()
+            .find_map(|l| l.strip_prefix("Content-Length: "))
+            .unwrap_or_else(|| panic!("response to {path} has no Content-Length: {head:?}"))
+            .trim()
+            .parse()
+            .unwrap();
+        assert_eq!(
+            body.len(),
+            declared,
+            "response to {path} was truncated: {} of {declared} body bytes",
+            body.len()
+        );
+        response
     }
 
     #[test]
@@ -267,6 +343,43 @@ mod tests {
         assert!(accepted.contains("logged in"), "good token: {accepted}");
         rx.recv_timeout(Duration::from_secs(5))
             .expect("server must shut down after a successful login");
+        handle.join().unwrap();
+    }
+
+    /// Pins the two timing assumptions the server must not make, both of which
+    /// a browser can violate and neither of which `full_callback_flow` exercises
+    /// reliably — it just happens to lose the race about once in twenty runs.
+    ///
+    /// 1. The accept loop polls a non-blocking listener, and on Windows the
+    ///    accepted socket inherits that flag, so a request whose bytes arrive
+    ///    after `accept` returned used to fail the read with `WouldBlock` and be
+    ///    dropped without any response.
+    /// 2. TCP does not preserve write boundaries, so the first `read` can return
+    ///    a fragment too short to contain the path.
+    ///
+    /// Connecting before sending, and splitting the request line, makes both
+    /// orderings certain rather than a race.
+    #[test]
+    fn serves_a_request_that_arrives_late_and_split() {
+        let (tx, rx) = mpsc::channel();
+        let (port, handle) = spawn_server("GOOD", tx);
+
+        let mut s = TcpStream::connect(("127.0.0.1", port)).unwrap();
+        s.set_read_timeout(Some(Duration::from_secs(10))).unwrap();
+        // Longer than one poll of the accept loop, so the server has certainly
+        // accepted this connection while its receive buffer is still empty.
+        std::thread::sleep(Duration::from_millis(250));
+        send(&mut s, "/callback", "GET ");
+        std::thread::sleep(Duration::from_millis(50));
+        send(&mut s, "/callback", "/callback HTTP/1.1\r\nHost: localhost\r\n\r\n");
+
+        let late = read_response(&mut s, "/callback");
+        assert!(late.contains("200 OK"), "late request: {late}");
+        assert!(late.contains("/token?"), "bridge must hop to /token");
+        assert!(rx.try_recv().is_err(), "server must still be running");
+
+        let accepted = get(port, "/token?access_token=GOOD&token_type=Bearer");
+        assert!(accepted.contains("logged in"), "good token: {accepted}");
         handle.join().unwrap();
     }
 

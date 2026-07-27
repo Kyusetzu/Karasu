@@ -4,9 +4,13 @@ import {
   useDeferredValue,
   useEffect,
   useMemo,
+  useRef,
   useState,
+  type ReactNode,
+  type RefObject,
 } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
 import {
@@ -47,6 +51,7 @@ import PresetModal from "@/components/PresetModal";
 import { loadPresets, savePresets, type Preset } from "@/lib/presets";
 import { collectTags, tagsOf } from "@/lib/tags";
 import { searchHaystack } from "@/lib/search";
+import { useColumnCount } from "@/hooks/useColumnCount";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -101,6 +106,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
   const [showPresetSave, setShowPresetSave] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   // Clear the selection whenever the pool it refers to changes.
   useEffect(() => setSelected(new Set()), [tab]);
@@ -473,12 +479,17 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-8 py-6">
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-8 py-6">
         {entries.length === 0 ? (
           <p className="text-sm text-ink-600">{t("list.empty")}</p>
         ) : grid ? (
-          <div className="media-grid gap-x-4 gap-y-6">
-            {entries.map((entry) => (
+          <VirtualGrid
+            items={entries}
+            scrollRef={scrollRef}
+            gridClassName="media-grid gap-x-4"
+            rowGap={24}
+            estimateRowHeight={300}
+            renderItem={(entry) => (
               <GridCard
                 key={entry.id}
                 entry={entry}
@@ -490,22 +501,29 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
                 selected={selected.has(entry.mediaId)}
                 onToggleSelect={toggleSelect}
               />
-            ))}
-          </div>
+            )}
+          />
         ) : (
-          <div className="grid gap-px overflow-hidden rounded-xl border border-surface-800 bg-surface-800 2xl:grid-cols-2">
-            {entries.map((entry) => (
-              <ListRow
-                key={entry.id}
-                entry={entry}
-                onQuickSave={quickSave}
-                onComplete={complete}
-                onEdit={startEdit}
-                selectMode={selectMode}
-                selected={selected.has(entry.mediaId)}
-                onToggleSelect={toggleSelect}
-              />
-            ))}
+          <div className="overflow-hidden rounded-xl border border-surface-800 bg-surface-800">
+            <VirtualGrid
+              items={entries}
+              scrollRef={scrollRef}
+              gridClassName="grid gap-px 2xl:grid-cols-2"
+              rowGap={1}
+              estimateRowHeight={78}
+              renderItem={(entry) => (
+                <ListRow
+                  key={entry.id}
+                  entry={entry}
+                  onQuickSave={quickSave}
+                  onComplete={complete}
+                  onEdit={startEdit}
+                  selectMode={selectMode}
+                  selected={selected.has(entry.mediaId)}
+                  onToggleSelect={toggleSelect}
+                />
+              )}
+            />
           </div>
         )}
       </div>
@@ -554,6 +572,81 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
         />
       )}
     </div>
+  );
+}
+
+/**
+ * A CSS grid whose rows are virtualized: only the rows near the viewport are
+ * mounted. A completed list can run to several thousand entries, and mounting
+ * every cover at once is what made switching to this page stutter.
+ *
+ * Rows are chunked by hand, so the number of columns has to be known — see
+ * `useColumnCount` for why it is measured rather than computed. The probe is a
+ * zero-height copy of the grid: `auto-fill` resolves its full track list even
+ * with no children, which gives a column count on the very first render and
+ * keeps one source of truth for the layout in `index.css`.
+ *
+ * `rowGap` is applied as padding rather than `gap-y` because each row is now
+ * its own grid — a gap between the rows of *different* grids does nothing. As
+ * padding it lands inside the border box, so `measureElement` counts it.
+ */
+function VirtualGrid({
+  items,
+  scrollRef,
+  gridClassName,
+  rowGap,
+  estimateRowHeight,
+  renderItem,
+}: {
+  items: MediaListEntry[];
+  scrollRef: RefObject<HTMLDivElement | null>;
+  gridClassName: string;
+  rowGap: number;
+  estimateRowHeight: number;
+  renderItem: (entry: MediaListEntry) => ReactNode;
+}) {
+  const probeRef = useRef<HTMLDivElement>(null);
+  const columns = useColumnCount(probeRef);
+  const rowCount = Math.ceil(items.length / columns);
+
+  const virtualizer = useVirtualizer({
+    count: rowCount,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => estimateRowHeight,
+    overscan: 4,
+  });
+
+  // Titles wrap differently at a different column count, so the cached row
+  // measurements are worthless once it changes.
+  useEffect(() => {
+    virtualizer.measure();
+  }, [columns, virtualizer]);
+
+  return (
+    <>
+      <div ref={probeRef} className={cn(gridClassName, "h-0")} aria-hidden />
+      <div
+        className="relative w-full"
+        style={{ height: virtualizer.getTotalSize() }}
+      >
+        {virtualizer.getVirtualItems().map((row) => (
+          <div
+            key={row.key}
+            data-index={row.index}
+            ref={virtualizer.measureElement}
+            className={cn(gridClassName, "absolute left-0 top-0 w-full")}
+            style={{
+              transform: `translateY(${row.start}px)`,
+              paddingBottom: rowGap,
+            }}
+          >
+            {items
+              .slice(row.index * columns, row.index * columns + columns)
+              .map(renderItem)}
+          </div>
+        ))}
+      </div>
+    </>
   );
 }
 

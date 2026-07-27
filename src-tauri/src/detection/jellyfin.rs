@@ -32,6 +32,7 @@
 
 use super::Playback;
 use crate::recognition::parser::Parsed;
+use std::sync::Mutex;
 
 const SERVICE: &str = "dev.kyu.karasu";
 /// Credential-store entry for the Jellyfin access token.
@@ -65,21 +66,63 @@ pub fn save_token(token: &str) -> Result<(), String> {
     }
     entry(TOKEN_USER)?
         .set_password(token)
-        .map_err(|e| format!("Could not save the access token: {e}"))
+        .map_err(|e| format!("Could not save the access token: {e}"))?;
+    set_cached_token(Some(token.to_string()));
+    Ok(())
 }
 
+/// The last credential-store read.
+///
+/// The scrobbler polls Jellyfin every 5 seconds and each tick used to hit the
+/// Windows Credential Manager — 17,280 reads a day for anyone with Jellyfin
+/// set up. The token only changes through `save_token` and `delete_token`, both
+/// in this module, so caching it here is safe as long as they keep updating it.
+///
+/// The outer `Option` is "have we looked yet", the inner one is what we found.
+/// That distinction matters: without it a signed-out user would re-read the
+/// credential store on every single tick, which is the case being fixed.
+static TOKEN_CACHE: Mutex<Option<Option<String>>> = Mutex::new(None);
+
 pub fn load_token() -> Option<String> {
-    entry(TOKEN_USER)
-        .ok()?
-        .get_password()
-        .ok()
-        .filter(|k| !k.is_empty())
+    cached_or(&TOKEN_CACHE, || {
+        entry(TOKEN_USER)
+            .ok()?
+            .get_password()
+            .ok()
+            .filter(|k| !k.is_empty())
+    })
+}
+
+/// Reads through `cache`, filling it on the first miss.
+///
+/// Split out from `load_token` so the caching itself is testable without
+/// touching the real credential store.
+///
+/// A poisoned lock is recovered from rather than propagated: a panic elsewhere
+/// should not permanently break Jellyfin detection, and the worst case is one
+/// stale read that the next sign-in overwrites.
+fn cached_or<F>(cache: &Mutex<Option<Option<String>>>, read: F) -> Option<String>
+where
+    F: FnOnce() -> Option<String>,
+{
+    let mut guard = cache.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some(known) = guard.as_ref() {
+        return known.clone();
+    }
+    let fresh = read();
+    *guard = Some(fresh.clone());
+    fresh
+}
+
+fn set_cached_token(token: Option<String>) {
+    *TOKEN_CACHE.lock().unwrap_or_else(|e| e.into_inner()) = Some(token);
 }
 
 pub fn delete_token() -> Result<(), String> {
     if let Ok(e) = entry(TOKEN_USER) {
         let _ = e.delete_credential();
     }
+    set_cached_token(None);
     Ok(())
 }
 
@@ -577,5 +620,52 @@ mod tests {
         let h = auth_header("we\"ird", "i", None);
         assert!(h.contains("Device=\"weird\""));
         assert_eq!(h.matches('"').count() % 2, 0);
+    }
+
+    #[test]
+    fn the_credential_store_is_read_once_not_once_per_poll() {
+        let cache = Mutex::new(None);
+        let mut reads = 0;
+        for _ in 0..5 {
+            let got = cached_or(&cache, || {
+                reads += 1;
+                Some("tok".to_string())
+            });
+            assert_eq!(got.as_deref(), Some("tok"));
+        }
+        assert_eq!(reads, 1, "five polls must cost one credential-store read");
+    }
+
+    /// The case the scrobbler actually spends most of its time in.
+    #[test]
+    fn a_missing_token_is_cached_too() {
+        let cache = Mutex::new(None);
+        let mut reads = 0;
+        for _ in 0..5 {
+            assert_eq!(
+                cached_or(&cache, || {
+                    reads += 1;
+                    None
+                }),
+                None
+            );
+        }
+        assert_eq!(reads, 1, "'nothing stored' must not be re-read every tick");
+    }
+
+    #[test]
+    fn signing_in_or_out_replaces_what_was_cached() {
+        let cache = Mutex::new(Some(Some("old".to_string())));
+        *cache.lock().unwrap() = Some(Some("new".to_string()));
+        assert_eq!(
+            cached_or(&cache, || panic!("must not read the credential store")),
+            Some("new".to_string()),
+        );
+
+        *cache.lock().unwrap() = Some(None);
+        assert_eq!(
+            cached_or(&cache, || panic!("must not read the credential store")),
+            None,
+        );
     }
 }

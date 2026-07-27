@@ -48,8 +48,9 @@ fn dice(ta: &HashSet<[u8; 3]>, tb: &HashSet<[u8; 3]>) -> f64 {
     (2.0 * common as f64) / (ta.len() + tb.len()) as f64
 }
 
-/// Dice coefficient over trigrams (0.0–1.0).
-pub fn similarity(a: &str, b: &str) -> f64 {
+/// Dice coefficient over two strings (0.0–1.0).
+#[cfg(test)]
+fn similarity(a: &str, b: &str) -> f64 {
     if a == b {
         return 1.0;
     }
@@ -257,6 +258,8 @@ mod tests {
     /// Kept here purely so the optimized version has something independent to
     /// be checked against — comparing `best_match` to `best_match_prepared`
     /// would prove nothing, since the former now delegates to the latter.
+    /// `similarity` is `#[cfg(test)]` for the same reason: the scoring path
+    /// works on prepared trigram sets and no longer goes through it.
     fn best_match_reference(parsed: &Parsed, candidates: &[Candidate]) -> Option<Match> {
         let needles = variants(parsed);
         let mut best: Option<Match> = None;

@@ -1,5 +1,31 @@
 @import "tailwindcss";
 
+/* Declared by hand instead of importing @fontsource's stylesheets, which list a
+   woff fallback after the woff2. WebView2 is Chromium and has supported woff2
+   for a decade, so that fallback is never fetched — but Vite still emits it and
+   the bundler still ships it. Kosugi Maru's woff alone is 1.83 MiB, on the
+   installer and on every auto-update; SN Pro's adds another 24 kB.
+
+   Do NOT swap these for @fontsource/kosugi-maru/400.css: that variant is
+   unicode-range split into 122 subsets totalling 7.9 MB, which is worse. */
+@font-face {
+  font-family: "SN Pro";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("@fontsource/sn-pro/files/sn-pro-latin-400-normal.woff2")
+    format("woff2");
+}
+
+@font-face {
+  font-family: "Kosugi Maru";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("@fontsource/kosugi-maru/files/kosugi-maru-japanese-400-normal.woff2")
+    format("woff2");
+}
+
 @theme {
   /* 125rem = 2000px, the third-column tier. The second-column tier is the
      built-in `2xl` (1536px); together they are how a wide screen gets filled,

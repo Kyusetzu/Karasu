@@ -5,8 +5,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import App from "./App";
 import { useTheme } from "./stores/theme";
 import "./i18n";
-import "@fontsource/sn-pro/latin-400.css";
-import "@fontsource/kosugi-maru/japanese-400.css";
+// The @font-face rules live in index.css — see the note there for why the
+// @fontsource stylesheets are not imported directly.
 import "./index.css";
 
 // Apply the saved theme before the first paint to avoid a flash.

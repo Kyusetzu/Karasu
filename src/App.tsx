@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Routes, Route, useLocation } from "react-router";
 import { invoke } from "@tauri-apps/api/core";
 import { X } from "lucide-react";
@@ -23,13 +23,21 @@ import Dashboard from "@/pages/Dashboard";
 import MediaList from "@/pages/MediaList";
 import Search from "@/pages/Search";
 import Seasonal from "@/pages/Seasonal";
-import Statistics from "@/pages/Statistics";
 import AnimeDetail from "@/pages/AnimeDetail";
-import Franchise from "@/pages/Franchise";
-import Wrapped from "@/pages/Wrapped";
-import LocalLibrary from "@/pages/LocalLibrary";
-import Settings from "@/pages/Settings";
-import About from "@/pages/About";
+
+// Split out of the entry chunk. These are the pages you do not land on: they
+// are reached deliberately, so a frame of nothing while the chunk loads is
+// invisible. Dashboard, MediaList, Search, Seasonal and AnimeDetail stay eager
+// — those are the launch and navigation hot path.
+//
+// Modest by itself: served over tauri:// there is no download, so this buys
+// parse and evaluate time rather than transfer.
+const Statistics = lazy(() => import("@/pages/Statistics"));
+const Franchise = lazy(() => import("@/pages/Franchise"));
+const Wrapped = lazy(() => import("@/pages/Wrapped"));
+const LocalLibrary = lazy(() => import("@/pages/LocalLibrary"));
+const Settings = lazy(() => import("@/pages/Settings"));
+const About = lazy(() => import("@/pages/About"));
 
 export default function App() {
   const init = useAuth((s) => s.init);
@@ -91,22 +99,24 @@ export default function App() {
       <div className="flex min-h-0 flex-1">
         <Sidebar />
         <main className="min-w-0 flex-1 overflow-y-auto">
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/list" element={<MediaList type="ANIME" />} />
-            <Route path="/manga" element={<MediaList type="MANGA" />} />
-            <Route path="/search" element={<Search />} />
-            <Route path="/seasonal" element={<Seasonal />} />
-            <Route path="/stats" element={<Statistics />} />
-            <Route path="/wrapped" element={<Wrapped />} />
-            <Route path="/library" element={<LocalLibrary />} />
-            <Route path="/media/:id" element={<AnimeDetail />} />
-            <Route path="/franchise/:id" element={<Franchise />} />
-            {/* Alias for old links */}
-            <Route path="/anime/:id" element={<AnimeDetail />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="/about" element={<About />} />
-          </Routes>
+          <Suspense fallback={null}>
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/list" element={<MediaList type="ANIME" />} />
+              <Route path="/manga" element={<MediaList type="MANGA" />} />
+              <Route path="/search" element={<Search />} />
+              <Route path="/seasonal" element={<Seasonal />} />
+              <Route path="/stats" element={<Statistics />} />
+              <Route path="/wrapped" element={<Wrapped />} />
+              <Route path="/library" element={<LocalLibrary />} />
+              <Route path="/media/:id" element={<AnimeDetail />} />
+              <Route path="/franchise/:id" element={<Franchise />} />
+              {/* Alias for old links */}
+              <Route path="/anime/:id" element={<AnimeDetail />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route path="/about" element={<About />} />
+            </Routes>
+          </Suspense>
         </main>
       </div>
     </div>

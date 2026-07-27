@@ -573,6 +573,30 @@ mod tests {
 
     /// The index must survive a write/read round-trip, and a rescan must
     /// replace the previous contents rather than accumulate them.
+    /// The list cache is what `cached_media_list` serves on a cold start, so a
+    /// miss has to be distinguishable from a cached empty list — the caller
+    /// falls back to a loading state on `None` and paints on `Some`.
+    #[test]
+    fn list_cache_round_trip_and_miss() {
+        let db = mem_db();
+        assert!(db.cached_list(7, "ANIME").is_none());
+
+        db.cache_list(7, "ANIME", "[{\"entries\":[]}]").unwrap();
+        assert_eq!(
+            db.cached_list(7, "ANIME").as_deref(),
+            Some("[{\"entries\":[]}]")
+        );
+
+        // Scoped per user *and* per media type: priming one must not serve the
+        // other, or the manga list would render the anime one.
+        assert!(db.cached_list(7, "MANGA").is_none());
+        assert!(db.cached_list(8, "ANIME").is_none());
+
+        // A second write replaces rather than accumulating rows.
+        db.cache_list(7, "ANIME", "[]").unwrap();
+        assert_eq!(db.cached_list(7, "ANIME").as_deref(), Some("[]"));
+    }
+
     #[test]
     fn library_round_trip_and_replace() {
         let db = mem_db();

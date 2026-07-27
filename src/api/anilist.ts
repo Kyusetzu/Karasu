@@ -58,6 +58,19 @@ export const fetchMediaList = (userId: number, mediaType: MediaType) =>
     : invoke<ListResult>("fetch_media_list", { userId, mediaType });
 
 /**
+ * The last cached list, read straight from SQLite with no network access.
+ * `null` when nothing is cached yet.
+ *
+ * Only meaningful in AniList mode — the local profile's list *is* the database,
+ * so `fetchMediaList` already returns instantly there and priming would just
+ * duplicate the read.
+ */
+export const cachedMediaList = (userId: number, mediaType: MediaType) =>
+  profileMode === "local"
+    ? Promise.resolve(null)
+    : invoke<ListResult | null>("cached_media_list", { userId, mediaType });
+
+/**
  * Saves an entry. In local mode the change goes to the local SQLite list; on
  * a first add pass `media` so the entry renders offline (field-only edits may
  * omit it). AniList mode ignores `media`.

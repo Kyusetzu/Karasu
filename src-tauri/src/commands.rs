@@ -211,6 +211,32 @@ pub struct ListResult {
     lists: Value,
 }
 
+/// The last cached list for this user and type, with no network access at all.
+///
+/// `fetch_media_list` always awaits AniList, so a cold start stares at a
+/// loading state even though a complete list is sitting on disk. This lets the
+/// frontend paint that immediately and let the real fetch land underneath it.
+///
+/// `from_cache` is deliberately `false` here. That flag means "you are offline
+/// and this is all we have" — it drives the amber banner in MediaList — and
+/// this path is a head start on a refresh that is already in flight, not an
+/// offline fallback. Returns `None` when nothing has been cached yet, so the
+/// caller simply falls back to the normal loading state.
+#[tauri::command]
+pub fn cached_media_list(
+    db: State<'_, Db>,
+    user_id: i64,
+    media_type: String,
+) -> Option<ListResult> {
+    let media_type = validate_media_type(&media_type).ok()?;
+    let cached = db.cached_list(user_id, media_type)?;
+    Some(ListResult {
+        from_cache: false,
+        pending: db.queue_len(),
+        lists: serde_json::from_str(&cached).ok()?,
+    })
+}
+
 /// Loads the anime/manga list; offline, the last known state is served
 /// from SQLite. The offline queue is drained first so that the server
 /// response already includes the user's own pending changes.
@@ -985,7 +1011,7 @@ pub fn mark_all_notifications_read(db: State<'_, Db>) -> Result<(), String> {
 
 /// Monotonic commit counter — the 4th version segment
 /// (`MAJOR.MINOR.PATCH.COMMIT#`). Bumped by one on every commit.
-pub const COMMIT_NUMBER: u32 = 96;
+pub const COMMIT_NUMBER: u32 = 97;
 
 /// Full four-part display version, e.g. `0.1.1.38`. The `MAJOR.MINOR.PATCH`
 /// core comes from the crate version (kept in sync across the manifests).

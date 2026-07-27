@@ -6,6 +6,7 @@ import { useAuth } from "@/stores/auth";
 import { useNowPlaying } from "@/stores/nowPlaying";
 import { useLibrary } from "@/stores/library";
 import { useContentFilter } from "@/stores/contentFilter";
+import { usePrimedLists } from "@/hooks/usePrimedLists";
 import {
   isTauri,
   checkForUpdates,
@@ -35,12 +36,19 @@ export default function App() {
   const initNowPlaying = useNowPlaying((s) => s.init);
   const refreshLibrary = useLibrary((s) => s.refresh);
   const initContentFilter = useContentFilter((s) => s.init);
+  // A primitive, so the selector is referentially stable across renders.
+  const viewerId = useAuth((s) => s.viewer?.id);
+
   useEffect(() => {
     init();
     initNowPlaying();
     refreshLibrary();
     initContentFilter();
   }, [init, initNowPlaying, refreshLibrary, initContentFilter]);
+
+  // Paint the list from SQLite as soon as the viewer is known, rather than
+  // waiting out a full AniList round trip on every launch.
+  usePrimedLists(viewerId);
 
   // Karasu takes its size from Windows, not from the window width. Display
   // scaling arrives for free through WebView2; the Accessibility text-size

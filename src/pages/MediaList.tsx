@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
@@ -92,13 +92,14 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
   // Clear the selection whenever the pool it refers to changes.
   useEffect(() => setSelected(new Set()), [tab]);
 
-  const toggleSelect = (mediaId: number) =>
+  const toggleSelect = useCallback((mediaId: number) => {
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(mediaId)) next.delete(mediaId);
       else next.add(mediaId);
       return next;
     });
+  }, []);
 
   const applyPreset = (name: string) => {
     const p = presets.find((x) => x.name === name);
@@ -199,6 +200,48 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
     });
   }, [byStatus, tab, filter, tagFilter, sort]);
 
+  // Everything below must stay *above* the early returns: hooks after a
+  // conditional return blow up on the loading → loaded transition. They are
+  // memoized so the memoized cards below don't re-render on every keystroke.
+  //
+  // `mutate` is referentially stable across renders; the mutation object it
+  // hangs off is not, so depend on the function itself.
+  const { mutate: saveMutate } = save;
+
+  const quickSave = useCallback(
+    (
+      entry: MediaListEntry,
+      patch: Partial<{ progress: number; score: number; status: MediaListStatus }>,
+    ) => saveMutate({ mediaId: entry.mediaId, ...patch }),
+    [saveMutate],
+  );
+
+  const complete = useCallback(
+    (entry: MediaListEntry) => {
+      const max = maxProgress(entry.media);
+      quickSave(entry, {
+        status: "COMPLETED",
+        ...(max !== null ? { progress: max } : {}),
+      });
+    },
+    [quickSave],
+  );
+
+  const plusOne = useCallback(
+    (entry: MediaListEntry) =>
+      quickSave(entry, { progress: entry.progress + 1 }),
+    [quickSave],
+  );
+
+  const startEdit = useCallback((entry: MediaListEntry) => setEditing(entry), []);
+
+  const selectedEntries = useMemo(
+    () => entries.filter((e) => selected.has(e.mediaId)),
+    [entries, selected],
+  );
+
+  const unit = type === "ANIME" ? t("common.episodes") : t("common.chapters");
+
   if (isLoading) {
     return <p className="p-8 text-ink-500">{t("list.loading")}</p>;
   }
@@ -215,24 +258,10 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
     );
   }
 
-  const quickSave = (
-    entry: MediaListEntry,
-    patch: Partial<{ progress: number; score: number; status: MediaListStatus }>,
-  ) => save.mutate({ mediaId: entry.mediaId, ...patch });
-
-  const complete = (entry: MediaListEntry) => {
-    const max = maxProgress(entry.media);
-    quickSave(entry, {
-      status: "COMPLETED",
-      ...(max !== null ? { progress: max } : {}),
-    });
-  };
-
-  const selectedEntries = entries.filter((e) => selected.has(e.mediaId));
   const bulkStatus = (status: MediaListStatus) =>
-    selectedEntries.forEach((e) => save.mutate({ mediaId: e.mediaId, status }));
+    selectedEntries.forEach((e) => saveMutate({ mediaId: e.mediaId, status }));
   const bulkScore = (score: number) =>
-    selectedEntries.forEach((e) => save.mutate({ mediaId: e.mediaId, score }));
+    selectedEntries.forEach((e) => saveMutate({ mediaId: e.mediaId, score }));
   const bulkDelete = () => {
     selectedEntries.forEach((e) => remove.mutate(e.id));
     setSelected(new Set());
@@ -419,15 +448,13 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
               <GridCard
                 key={entry.id}
                 entry={entry}
-                unit={type === "ANIME" ? t("common.episodes") : t("common.chapters")}
-                onPlusOne={() =>
-                  quickSave(entry, { progress: entry.progress + 1 })
-                }
-                onComplete={() => complete(entry)}
-                onEdit={() => setEditing(entry)}
+                unit={unit}
+                onPlusOne={plusOne}
+                onComplete={complete}
+                onEdit={startEdit}
                 selectMode={selectMode}
                 selected={selected.has(entry.mediaId)}
-                onToggleSelect={() => toggleSelect(entry.mediaId)}
+                onToggleSelect={toggleSelect}
               />
             ))}
           </div>
@@ -437,12 +464,12 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
               <ListRow
                 key={entry.id}
                 entry={entry}
-                onQuickSave={(patch) => quickSave(entry, patch)}
-                onComplete={() => complete(entry)}
-                onEdit={() => setEditing(entry)}
+                onQuickSave={quickSave}
+                onComplete={complete}
+                onEdit={startEdit}
                 selectMode={selectMode}
                 selected={selected.has(entry.mediaId)}
-                onToggleSelect={() => toggleSelect(entry.mediaId)}
+                onToggleSelect={toggleSelect}
               />
             ))}
           </div>
@@ -616,7 +643,12 @@ function SelectBox({
   );
 }
 
-function GridCard({
+/**
+ * Memoized: a list of a few hundred cards re-rendered on every keystroke or
+ * +1 is the single biggest cost on this page. The handlers take the entry
+ * rather than closing over it so the props stay referentially stable.
+ */
+const GridCard = memo(function GridCard({
   entry,
   unit,
   onPlusOne,
@@ -628,12 +660,12 @@ function GridCard({
 }: {
   entry: MediaListEntry;
   unit: string;
-  onPlusOne: () => void;
-  onComplete: () => void;
-  onEdit: () => void;
+  onPlusOne: (entry: MediaListEntry) => void;
+  onComplete: (entry: MediaListEntry) => void;
+  onEdit: (entry: MediaListEntry) => void;
   selectMode: boolean;
   selected: boolean;
-  onToggleSelect: () => void;
+  onToggleSelect: (mediaId: number) => void;
 }) {
   const { t } = useTranslation();
   const { media } = entry;
@@ -649,7 +681,7 @@ function GridCard({
       >
         {selectMode ? (
           <button
-            onClick={onToggleSelect}
+            onClick={() => onToggleSelect(entry.mediaId)}
             className="absolute inset-0 z-10 bg-black/30"
             aria-label={t("bulk.select")}
           >
@@ -677,7 +709,7 @@ function GridCard({
         {selectMode && (
           <SelectBox
             checked={selected}
-            onToggle={onToggleSelect}
+            onToggle={() => onToggleSelect(entry.mediaId)}
             className="absolute left-2 top-2 z-20"
           />
         )}
@@ -689,7 +721,7 @@ function GridCard({
           )}
         >
           <button
-            onClick={onEdit}
+            onClick={() => onEdit(entry)}
             className="grid h-8 w-8 place-items-center rounded-full bg-surface-900/90 text-ink-300 hover:bg-surface-800 hover:text-ink-100"
             aria-label={t("common.edit")}
             title={t("common.edit")}
@@ -698,7 +730,7 @@ function GridCard({
           </button>
           {entry.status !== "COMPLETED" && (
             <button
-              onClick={onComplete}
+              onClick={() => onComplete(entry)}
               className="grid h-8 w-8 place-items-center rounded-full bg-emerald-700/90 text-white hover:bg-emerald-600"
               aria-label={t("common.complete")}
               title={t("common.complete")}
@@ -708,7 +740,7 @@ function GridCard({
           )}
           {canIncrement(entry) && (
             <button
-              onClick={onPlusOne}
+              onClick={() => onPlusOne(entry)}
               className="grid h-8 w-8 place-items-center rounded-full bg-accent-600 text-accent-ink hover:bg-accent-500"
               aria-label={t("common.plusOne")}
               title={t("common.plusOne")}
@@ -743,7 +775,7 @@ function GridCard({
       <TagChips notes={entry.notes} />
     </div>
   );
-}
+});
 
 /** Read-only tag chips derived from an entry's notes (capped for layout). */
 function TagChips({ notes, max = 3 }: { notes: string | null; max?: number }) {
@@ -766,7 +798,8 @@ function TagChips({ notes, max = 3 }: { notes: string | null; max?: number }) {
   );
 }
 
-function ListRow({
+/** Memoized for the same reason as GridCard — see the note there. */
+const ListRow = memo(function ListRow({
   entry,
   onQuickSave,
   onComplete,
@@ -776,21 +809,37 @@ function ListRow({
   onToggleSelect,
 }: {
   entry: MediaListEntry;
-  onQuickSave: (patch: { progress?: number; score?: number }) => void;
-  onComplete: () => void;
-  onEdit: () => void;
+  onQuickSave: (
+    entry: MediaListEntry,
+    patch: { progress?: number; score?: number },
+  ) => void;
+  onComplete: (entry: MediaListEntry) => void;
+  onEdit: (entry: MediaListEntry) => void;
   selectMode: boolean;
   selected: boolean;
-  onToggleSelect: () => void;
+  onToggleSelect: (mediaId: number) => void;
 }) {
   const { t } = useTranslation();
   const { media } = entry;
   const max = maxProgress(media);
   const dropdown = max !== null && max <= PROGRESS_DROPDOWN_LIMIT;
-  const hasNext = useLibrary((s) => s.hasNext);
+  // Subscribe to the *data*, not to `hasNext`. The selector used to return the
+  // store's `hasNext` function, whose identity never changes — so the row never
+  // re-rendered after a library scan and the play button stayed missing until
+  // something else happened to re-render the list.
+  const episodes = useLibrary((s) => s.episodes[media.id]);
   const play = useLibrary((s) => s.play);
   const canPlayNext =
-    !selectMode && media.type === "ANIME" && hasNext(media.id, entry.progress);
+    !selectMode &&
+    media.type === "ANIME" &&
+    !!episodes?.some((e) => e > entry.progress);
+
+  // The progress dropdown can hold up to PROGRESS_DROPDOWN_LIMIT options. Only
+  // one of them is visible before the user opens it, so mount the rest on first
+  // interaction. Hover fires well ahead of the click; focus/mousedown are the
+  // keyboard and fast-click fallbacks.
+  const [progressOpened, setProgressOpened] = useState(false);
+  const openProgress = () => setProgressOpened(true);
 
   return (
     <div
@@ -802,7 +851,10 @@ function ListRow({
       )}
     >
       {selectMode && (
-        <SelectBox checked={selected} onToggle={onToggleSelect} />
+        <SelectBox
+          checked={selected}
+          onToggle={() => onToggleSelect(entry.mediaId)}
+        />
       )}
       <Link to={`/media/${media.id}`} className="shrink-0">
         <img
@@ -828,7 +880,7 @@ function ListRow({
       {/* Quick score */}
       <select
         value={entry.score}
-        onChange={(e) => onQuickSave({ score: Number(e.target.value) })}
+        onChange={(e) => onQuickSave(entry, { score: Number(e.target.value) })}
         className="h-8 rounded-lg border border-surface-700 bg-surface-900 px-1.5 text-sm text-amber-300 focus:border-accent-500 focus:outline-none"
         aria-label={t("common.score")}
         title={t("common.score")}
@@ -845,16 +897,27 @@ function ListRow({
       {dropdown ? (
         <select
           value={entry.progress}
-          onChange={(e) => onQuickSave({ progress: Number(e.target.value) })}
+          onChange={(e) =>
+            onQuickSave(entry, { progress: Number(e.target.value) })
+          }
+          onPointerEnter={openProgress}
+          onFocus={openProgress}
+          onMouseDown={openProgress}
           className="h-8 w-24 rounded-lg border border-surface-700 bg-surface-900 px-1.5 text-sm tabular-nums text-ink-300 focus:border-accent-500 focus:outline-none"
           aria-label={t("common.progress")}
           title={t("common.progress")}
         >
-          {Array.from({ length: max + 1 }, (_, n) => (
-            <option key={n} value={n}>
-              {n} / {max}
+          {progressOpened ? (
+            Array.from({ length: max + 1 }, (_, n) => (
+              <option key={n} value={n}>
+                {n} / {max}
+              </option>
+            ))
+          ) : (
+            <option value={entry.progress}>
+              {entry.progress} / {max}
             </option>
-          ))}
+          )}
         </select>
       ) : (
         <span className="w-24 text-right text-sm tabular-nums text-ink-300">
@@ -879,7 +942,7 @@ function ListRow({
         <Button
           variant="secondary"
           size="icon"
-          onClick={() => onQuickSave({ progress: entry.progress + 1 })}
+          onClick={() => onQuickSave(entry, { progress: entry.progress + 1 })}
           disabled={!canIncrement(entry)}
           aria-label={t("common.plusOne")}
           title={t("common.plusOne")}
@@ -891,7 +954,7 @@ function ListRow({
             variant="ghost"
             size="icon"
             className="text-emerald-400"
-            onClick={onComplete}
+            onClick={() => onComplete(entry)}
             aria-label={t("common.complete")}
             title={t("common.complete")}
           >
@@ -901,7 +964,7 @@ function ListRow({
         <Button
           variant="ghost"
           size="icon"
-          onClick={onEdit}
+          onClick={() => onEdit(entry)}
           aria-label={t("common.edit")}
           title={t("common.edit")}
         >
@@ -912,4 +975,4 @@ function ListRow({
       )}
     </div>
   );
-}
+});

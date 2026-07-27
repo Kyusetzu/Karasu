@@ -1,4 +1,11 @@
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  memo,
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
@@ -39,6 +46,7 @@ import RandomPickModal from "@/components/RandomPickModal";
 import PresetModal from "@/components/PresetModal";
 import { loadPresets, savePresets, type Preset } from "@/lib/presets";
 import { collectTags, tagsOf } from "@/lib/tags";
+import { searchHaystack } from "@/lib/search";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -49,6 +57,11 @@ const SORT_KEYS: SortKey[] = ["updated", "title", "score", "progress"];
 // Progress dropdowns only up to this length (long-runners like One Piece
 // keep +1/modal instead of a 1000-entry dropdown)
 const PROGRESS_DROPDOWN_LIMIT = 600;
+
+// `String.localeCompare` builds a fresh collator on every call, which a sort
+// over a few thousand titles pays for n·log n times. Options are deliberately
+// left at the defaults so the ordering matches what `localeCompare()` gave.
+const COLLATOR = new Intl.Collator();
 
 export default function MediaList({ type }: { type: MediaType }) {
   const { t } = useTranslation();
@@ -167,28 +180,49 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
       setTagFilter("");
   }, [allTags, tagFilter]);
 
+  /**
+   * Search and sort keys, derived once per list change instead of once per
+   * entry per keystroke. Filtering used to lowercase four titles plus every
+   * synonym for every entry on each character typed, and sorting by title
+   * re-derived the display title on each of the n·log n comparisons.
+   */
+  const searchKeys = useMemo(() => {
+    const map = new Map<
+      number,
+      { haystack: string; tags: string[]; title: string }
+    >();
+    for (const list of byStatus.values()) {
+      for (const e of list) {
+        map.set(e.id, {
+          haystack: searchHaystack(e.media),
+          tags: tagsOf(e.notes).map((x) => x.toLowerCase()),
+          title: displayTitle(e.media.title),
+        });
+      }
+    }
+    return map;
+  }, [byStatus]);
+
+  // Keeps the text field responsive: React renders the (possibly huge) filtered
+  // list at a lower priority while the input echoes the keystroke immediately.
+  const deferredFilter = useDeferredValue(filter);
+
   const entries = useMemo(() => {
     let list = byStatus.get(tab) ?? [];
-    if (filter.trim()) {
-      const q = filter.trim().toLowerCase();
-      list = list.filter((e) => {
-        const ti = e.media.title;
-        return [ti.romaji, ti.english, ti.native, ...e.media.synonyms]
-          .filter(Boolean)
-          .some((s) => s!.toLowerCase().includes(q));
-      });
+    const q = deferredFilter.trim().toLowerCase();
+    if (q) {
+      list = list.filter((e) => searchKeys.get(e.id)?.haystack.includes(q));
     }
     if (tagFilter) {
-      const q = tagFilter.toLowerCase();
-      list = list.filter((e) =>
-        tagsOf(e.notes).some((x) => x.toLowerCase() === q),
-      );
+      const tag = tagFilter.toLowerCase();
+      list = list.filter((e) => searchKeys.get(e.id)?.tags.includes(tag));
     }
     return [...list].sort((a, b) => {
       switch (sort) {
         case "title":
-          return displayTitle(a.media.title).localeCompare(
-            displayTitle(b.media.title),
+          return COLLATOR.compare(
+            searchKeys.get(a.id)?.title ?? "",
+            searchKeys.get(b.id)?.title ?? "",
           );
         case "score":
           return b.score - a.score;
@@ -198,7 +232,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
           return b.updatedAt - a.updatedAt;
       }
     });
-  }, [byStatus, tab, filter, tagFilter, sort]);
+  }, [byStatus, tab, deferredFilter, tagFilter, sort, searchKeys]);
 
   // Everything below must stay *above* the early returns: hooks after a
   // conditional return blow up on the loading → loaded transition. They are

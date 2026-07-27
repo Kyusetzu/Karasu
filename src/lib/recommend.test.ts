@@ -70,6 +70,25 @@ describe("pickSeeds", () => {
     const seeds = pickSeeds(many, 5);
     expect(seeds.map((s) => s.score)).toEqual([9, 9, 9, 9, 8]);
   });
+
+  /**
+   * Pins the reason RecommendedSection sorts the ids before using them as a
+   * query key. Any save bumps `updatedAt`, which reshuffles entries inside a
+   * score tie — so the raw seed order is unstable and would mint a new cache
+   * key, and a fresh AniList request, for a byte-identical result.
+   */
+  it("reorders within a score tie when updatedAt changes", () => {
+    const before = pickSeeds([
+      entry({ mediaId: 1, score: 8, updatedAt: 100 }),
+      entry({ mediaId: 2, score: 8, updatedAt: 50 }),
+    ]);
+    const after = pickSeeds([
+      entry({ mediaId: 1, score: 8, updatedAt: 100 }),
+      entry({ mediaId: 2, score: 8, updatedAt: 200 }),
+    ]);
+    expect(before.map((s) => s.mediaId)).toEqual([1, 2]);
+    expect(after.map((s) => s.mediaId)).toEqual([2, 1]);
+  });
 });
 
 describe("seedWeight", () => {

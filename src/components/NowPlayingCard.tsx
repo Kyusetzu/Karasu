@@ -38,12 +38,22 @@ export default function NowPlayingCard() {
   const qc = useQueryClient();
   const { t } = useTranslation();
 
-  // Reload the list after a successful auto-update
+  // Reload the list after a successful auto-update. Only the collection that
+  // actually changed: an anime scrobble cannot alter the manga list, and
+  // invalidating both refetched two full MediaListCollections.
+  //
+  // The event carries no media type, so it comes from the store — read at fire
+  // time rather than from a closure, which would pin whatever was playing when
+  // the listener was registered. The fallback is not optional: without it, an
+  // absent type would leave one list silently never refreshing.
   useEffect(() => {
     if (!isTauri) return;
     let unlisten: (() => void) | undefined;
     listen("scrobble-done", () => {
-      qc.invalidateQueries({ queryKey: ["mediaList"] });
+      const mediaType = useNowPlaying.getState().current?.mediaType;
+      qc.invalidateQueries({
+        queryKey: mediaType ? ["mediaList", mediaType] : ["mediaList"],
+      });
     }).then((fn) => (unlisten = fn));
     return () => unlisten?.();
   }, [qc]);

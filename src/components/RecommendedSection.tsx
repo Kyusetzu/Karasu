@@ -45,7 +45,15 @@ export default function RecommendedSection({
     [entries],
   );
 
-  const seedIds = seeds.map((s) => s.mediaId);
+  // Sorted numerically, because this array *is* the cache key. `pickSeeds`
+  // orders by score then updatedAt, so editing any completed title reshuffles
+  // ties and mints a brand-new key — a fresh AniList request for a
+  // byte-identical result, defeating the six-hour staleTime below. The
+  // unsorted `seeds` still goes to rankRecommendations, which looks up by id.
+  const seedIds = useMemo(
+    () => seeds.map((s) => s.mediaId).sort((a, b) => a - b),
+    [seeds],
+  );
   const { data } = useQuery({
     queryKey: ["recommendations", type, seedIds],
     queryFn: () => recommendationsFor(seedIds),

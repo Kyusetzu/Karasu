@@ -26,7 +26,9 @@ export default function MediaCard({ media }: { media: MediaWithListStatus }) {
     mutationFn: (input: Parameters<typeof saveListEntry>[0]) =>
       saveListEntry(input, media),
     onSuccess: (result, input) => {
-      qc.invalidateQueries({ queryKey: ["mediaList"] });
+      // Only the collection this card belongs to — saving an anime cannot
+      // change the manga list, and the broad key refetched both.
+      qc.invalidateQueries({ queryKey: ["mediaList", media.type] });
       // Patch the discovery cache locally instead of refetching (rate limit)
       media.mediaListEntry = {
         id: result.entry?.id ?? media.mediaListEntry?.id ?? 0,

@@ -37,6 +37,16 @@ export default function Franchise() {
     queryKey: ["franchise", rootId, level],
     queryFn: () => loadFranchise(rootId, level),
     enabled: isTauri && filterReady && Number.isFinite(rootId),
+    // A franchise graph is a bounded BFS over several batched requests — by
+    // far the most expensive thing Karasu fetches — and relations barely
+    // change. `gcTime` matters as much as `staleTime` here: the page is
+    // unmounted the moment you navigate away, and the default 30-minute
+    // collection would throw the graph out before a stale one ever mattered.
+    //
+    // Not a full day, though: `listStatus` drives every node's outline colour,
+    // so the graph would keep showing yesterday's progress.
+    staleTime: 60 * 60 * 1000,
+    gcTime: 60 * 60 * 1000,
   });
 
   const layout = useMemo(() => {

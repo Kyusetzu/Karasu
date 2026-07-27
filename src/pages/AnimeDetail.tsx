@@ -606,7 +606,8 @@ function ListEditor({
     onSuccess: () => {
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
-      qc.invalidateQueries({ queryKey: ["mediaList"] });
+      // Scoped to this title's own collection; the other cannot have changed.
+      qc.invalidateQueries({ queryKey: ["mediaList", media.type] });
       qc.invalidateQueries({ queryKey: ["mediaDetail", mediaId] });
     },
   });

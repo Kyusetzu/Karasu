@@ -14,6 +14,11 @@ Service on Linux):
 Neither is ever handed to the WebView — the UI only ever learns *whether* one
 is stored.
 
+The credential store stays the only place either token is persisted. The
+Jellyfin one is additionally held in memory by the Rust process while the app
+runs, so that the detection poll does not reach for the credential store every
+five seconds; it is dropped on exit and cleared on sign-out.
+
 Signing in to Jellyfin sends your username and password to your own server
 once, in exchange for that access token (`/Users/AuthenticateByName` — Jellyfin
 has no OAuth, so this is how every third-party client authenticates). **The

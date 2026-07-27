@@ -15,6 +15,10 @@ and in the browser and scrobbles your AniList progress automatically.
 - **Shell:** Tauri 2 (Rust backend, WebView2)
 - **Frontend:** React 19 + TypeScript + Vite + Tailwind CSS v4
 - **State:** TanStack Query (server), Zustand (client), i18next (i18n)
+- **Rendering:** `@tanstack/react-virtual` virtualizes the media lists. Rows are
+  chunked by hand, so anything that renders one needs a column count — take it
+  from `useColumnCount`, which reads the browser's resolved
+  `grid-template-columns` rather than recomputing the CSS in JS
 - **Storage:** SQLite via rusqlite (bundled); tokens in the OS credential store
 - **Detection:** Win32 window enumeration + Windows media sessions (SMTC) +
   an optional Jellyfin `/Sessions` source, with a custom release-name parser
@@ -30,7 +34,9 @@ src/                 React frontend
   pages/             Route pages (Dashboard, MediaList, Franchise, Wrapped, …)
   stores/            Zustand stores (auth, theme, library, nowPlaying)
   lib/               Pure logic + its *.test.ts (tags, contrast, format, wrapped,
-                     recommend, contentFilter, …)
+                     recommend, search, contentFilter, …)
+  hooks/             Shared hooks (useListMutations, usePrimedLists,
+                     useColumnCount)
   i18n.ts            en (primary) + de; `de: typeof en` enforces key parity
 src-tauri/src/       Rust backend
   commands.rs        Tauri commands, AniList list/save mutations, version
@@ -126,3 +132,34 @@ correctly skipped.
 - **Accent colours** derive shades + a readable ink colour (`src/lib/contrast.ts`);
   use `text-accent-ink` on accent-filled controls rather than hard-coded
   `text-white`.
+
+## Performance invariants
+
+Each of these looks like cruft and is not. They were measured; don't "tidy"
+them away without re-measuring.
+
+- **`@font-face` is hand-written in `index.css`.** Importing the `@fontsource`
+  stylesheets instead pulls a woff fallback WebView2 will never use — 1.83 MiB
+  of Kosugi Maru on the installer and every auto-update. Not the `400.css`
+  variant either: it is 122 unicode-range subsets totalling 7.9 MB.
+- **`reqwest` enables `gzip` and deliberately not `brotli`.** AniList prefers
+  `br` when offered both, and `br` measured *larger* than gzip on the list
+  payload.
+- **The list and grid queries must not ask for `coverImage.extraLarge` or
+  `bannerImage`** — nothing renders them there. They belong to `DETAIL_QUERY`.
+  **`synonyms` must stay**: local mode re-serves the stored media object and
+  `MediaList` spreads it.
+- **`RecommendedSection` sorts `seedIds` before using them as a query key.**
+  `pickSeeds` orders by score then `updatedAt`, so an unsorted array reshuffles
+  on any save and mints a new key, defeating its own cache.
+- **`usePrimedLists` uses `setQueryData(..., { updatedAt: 0 })`.** The
+  backdating is what keeps the primed entry stale so the mounting `useQuery`
+  still refetches; without it the list stops updating for a whole `staleTime`.
+- **`mediaList` invalidation is scoped to the media type that changed.** The
+  `scrobble-done` listener reads that type from the store at fire time (not
+  from a closure) and **must** keep its fallback to the broad key — otherwise an
+  absent type leaves one list silently never refreshing.
+- **`matcher::prepare` preserves candidate and title order**, keeps the empty
+  trigram-set guard (a NaN score pins `best` forever) and keeps the exact-match
+  short circuit. `matcher.rs`'s equivalence test checks the optimized path
+  against a copy of the original algorithm — keep that copy honest.

@@ -48,6 +48,9 @@ src-tauri/src/       Rust backend
   discord/           Discord Rich Presence
   notify/            notify(app, kind, title, body) → row + toast + event
   airing/ stale/ sequel/   background alert passes
+scripts/             bump-version.mjs (every commit), anilist-query.mjs
+                     (validate a query live), plus the release-time
+                     rename-installer / generate-update-manifest PowerShell
 ```
 
 ## Hard constraints (do not violate)
@@ -84,9 +87,11 @@ The three manifests (`package.json`, `src-tauri/Cargo.toml`,
 `src-tauri/tauri.conf.json`) carry the `MAJOR.MINOR.PATCH` semver core. The 4th
 segment lives in `COMMIT_NUMBER` in `src-tauri/src/commands.rs`;
 `app_version()` returns the full `MAJOR.MINOR.PATCH.COMMIT#` string, which the
-About window always displays. **Bump the appropriate segment(s) and the
-`COMMIT_NUMBER` on every commit.** The update check compares all four segments,
-COMMIT# included, so a commit-only bump still registers as an update.
+About window always displays. **Bump the appropriate segment and the
+`COMMIT_NUMBER` on every commit** — via `scripts/bump-version.mjs`, which also
+keeps `Cargo.lock` in step; see "The commit loop" below. The update check
+compares all four segments, COMMIT# included, so a commit-only bump still
+registers as an update.
 
 **`latest.json` spells the commit number as semver build metadata**
 (`0.23.2+90`), not as a fourth dotted segment — see
@@ -104,20 +109,47 @@ the app would download and reinstall itself on a loop. The comparator supplies
 `commands.rs` treats `+` and `.` alike so both spellings compare equal.
 **Don't "tidy" that `+` back into a dot, and don't drop the comparator.**
 
-## Verification (per commit)
+## The commit loop
 
-Run and keep green before committing:
+Three commands, in this order. Don't do any of it by hand.
 
 ```sh
-npm run typecheck                                  # TypeScript
-npm test                                           # frontend unit tests (vitest)
-cargo test --manifest-path src-tauri/Cargo.toml    # backend tests
+node scripts/bump-version.mjs patch   # minor for features, major for breaks
+npm run verify                        # typecheck + vitest + cargo test
+git commit                            # message ends with the Co-Authored-By trailer
 ```
 
-For build-affecting changes, also run a `npm run tauri build` smoke check.
+**`scripts/bump-version.mjs`** moves the version in all five places at once —
+the three manifests, `COMMIT_NUMBER`, and `Cargo.lock`. It prints the resulting
+four-part version on stdout (so a commit subject can be filled without a second
+grep) and refuses to run when the tree holds nothing but version files, since a
+bump with nothing to describe is a mistake or a double-run. `--force` overrides
+that, `--print` just reports the current version.
+
+**`npm run verify`** is the whole gate and is what CI runs, so the two cannot
+drift. It short-circuits, so a type error stops it before the tests.
+
+For build-affecting changes — dependencies, `tauri.conf.json`, anything in the
+bundle — also run `npm run tauri build` as a smoke check. On Windows only the
+NSIS bundle builds; `deb`/`appimage` are correctly skipped.
+
 Prefer extracting pure logic into `src/lib/*.ts` (or a pure Rust fn) and unit
-testing it. On Windows only the NSIS bundle builds; `deb`/`appimage` targets are
-correctly skipped.
+testing it. Untestable-by-construction logic in a component is the usual reason
+a regression here is invisible until it ships.
+
+### Notes that have cost real time
+
+- **`npm test` already means `vitest run`.** `npm test -- --run` is redundant.
+- **Validate AniList fields live before wiring them**, per the convention below,
+  with `node scripts/anilist-query.mjs <CONST> '<variables-json>'`. It reads the
+  constant off disk, so it checks the query the app actually ships.
+- **Control characters in source must be written as an escape and then
+  verified.** An editing tool can emit a literal control byte where `\u0000`
+  was intended; the file then reads back looking correct while every subsequent
+  exact-match edit on that line mysteriously fails to apply. `src/lib/search.ts`
+  contains one on purpose. Check with `grep -c $'\0' <file>` after writing.
+- **A suite that finishes far faster than usual failed early, it did not get
+  faster.** The Rust suite takes ~0.5 s; a 0.02 s run means something bailed.
 
 ## Conventions
 

@@ -140,10 +140,14 @@ pub fn scan_library(app: AppHandle) -> Result<ScanSummary, String> {
 /// ED, an extra) never hits the exact-match short circuit inside `best_match`
 /// and so costs a full fuzzy sweep over every candidate — the most expensive
 /// case there is, and the one most likely to repeat across a season folder.
+///
+/// The candidate list is normalized and trigrammed once up front rather than
+/// per lookup, which is the other half of the same idea.
 fn index_files(
     files: &[String],
     candidates: &[matcher::Candidate],
 ) -> HashMap<i64, HashMap<u32, String>> {
+    let prepared = matcher::prepare(candidates);
     let mut by_media: HashMap<i64, HashMap<u32, String>> = HashMap::new();
     let mut matched_titles: HashMap<(String, Option<u32>), Option<i64>> = HashMap::new();
 
@@ -157,7 +161,9 @@ fn index_files(
 
         let media_id = *matched_titles
             .entry((parsed.title.clone(), parsed.season))
-            .or_insert_with(|| matcher::best_match(&parsed, candidates).map(|m| m.media_id));
+            .or_insert_with(|| {
+                matcher::best_match_prepared(&parsed, &prepared).map(|m| m.media_id)
+            });
 
         if let Some(media_id) = media_id {
             by_media

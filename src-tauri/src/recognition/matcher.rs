@@ -35,17 +35,25 @@ fn trigrams(s: &str) -> HashSet<[u8; 3]> {
         .collect()
 }
 
+/// Dice coefficient over two ready-made trigram sets (0.0–1.0).
+///
+/// The empty guard is what keeps a `2.0 * 0.0 / 0.0` NaN out of the scoring
+/// loop. NaN would poison it permanently: every `score > best.score` comparison
+/// against a NaN best is false, so the first NaN pins the result forever.
+fn dice(ta: &HashSet<[u8; 3]>, tb: &HashSet<[u8; 3]>) -> f64 {
+    if ta.is_empty() || tb.is_empty() {
+        return 0.0;
+    }
+    let common = ta.intersection(tb).count();
+    (2.0 * common as f64) / (ta.len() + tb.len()) as f64
+}
+
 /// Dice coefficient over trigrams (0.0–1.0).
 pub fn similarity(a: &str, b: &str) -> f64 {
     if a == b {
         return 1.0;
     }
-    let (ta, tb) = (trigrams(a), trigrams(b));
-    if ta.is_empty() || tb.is_empty() {
-        return 0.0;
-    }
-    let common = ta.intersection(&tb).count();
-    (2.0 * common as f64) / (ta.len() + tb.len()) as f64
+    dice(&trigrams(a), &trigrams(b))
 }
 
 /// Title variants of the detected name to cover season spellings:
@@ -88,23 +96,74 @@ pub struct Match {
     pub score: f64,
 }
 
+/// A candidate whose titles have been normalized and trigrammed once.
+///
+/// A library scan matches many distinct titles against the *same* candidate
+/// list, and the naive loop redid `normalize` per candidate title per detected
+/// title and rebuilt both trigram sets inside every `similarity` call — the
+/// haystack's set once per needle variant, so up to five times over. Hoisting
+/// that out is the whole point of this type.
+pub struct PreparedCandidate {
+    media_id: i64,
+    /// `(normalized title, its trigrams)`, in the candidate's own title order.
+    titles: Vec<(String, HashSet<[u8; 3]>)>,
+}
+
+/// Pre-normalizes a candidate list for repeated `best_match_prepared` calls.
+///
+/// Candidate order and within-candidate title order are preserved, and they
+/// matter: the scoring loop keeps the *first* maximum, so reordering here would
+/// silently change which entry wins a tie.
+pub fn prepare(candidates: &[Candidate]) -> Vec<PreparedCandidate> {
+    candidates
+        .iter()
+        .map(|candidate| PreparedCandidate {
+            media_id: candidate.media_id,
+            titles: candidate
+                .titles
+                .iter()
+                .map(|title| {
+                    let hay = normalize(title);
+                    let grams = trigrams(&hay);
+                    (hay, grams)
+                })
+                .collect(),
+        })
+        .collect()
+}
+
 /// Best candidate from the list for a detected title.
 /// Minimum score 0.7; exact matches win immediately.
 pub fn best_match(parsed: &Parsed, candidates: &[Candidate]) -> Option<Match> {
-    let needles = variants(parsed);
+    best_match_prepared(parsed, &prepare(candidates))
+}
+
+/// [`best_match`] against a candidate list prepared once by [`prepare`].
+pub fn best_match_prepared(
+    parsed: &Parsed,
+    candidates: &[PreparedCandidate],
+) -> Option<Match> {
+    let needles: Vec<(String, HashSet<[u8; 3]>)> = variants(parsed)
+        .into_iter()
+        .map(|needle| {
+            let grams = trigrams(&needle);
+            (needle, grams)
+        })
+        .collect();
     let mut best: Option<Match> = None;
 
     for candidate in candidates {
-        for title in &candidate.titles {
-            let hay = normalize(title);
-            for needle in &needles {
-                if hay == *needle {
+        for (hay, hay_grams) in &candidate.titles {
+            for (needle, needle_grams) in &needles {
+                // Stays a plain string comparison: an exact hit must win
+                // outright, before any scoring.
+                if hay == needle {
                     return Some(Match {
                         media_id: candidate.media_id,
                         score: 1.0,
                     });
                 }
-                let score = similarity(needle, &hay);
+                let score = dice(needle_grams, hay_grams);
                 if best.as_ref().is_none_or(|b| score > b.score) {
                     best = Some(Match {
                         media_id: candidate.media_id,
@@ -191,5 +250,134 @@ mod tests {
     fn unrelated_title_no_match() {
         let parsed = parse("Totally Different Show - 05.mkv");
         assert!(best_match(&parsed, &candidates()).is_none());
+    }
+
+    /// The algorithm as it stood before `prepare` existed: normalize per
+    /// candidate title, rebuild both trigram sets inside every comparison.
+    /// Kept here purely so the optimized version has something independent to
+    /// be checked against — comparing `best_match` to `best_match_prepared`
+    /// would prove nothing, since the former now delegates to the latter.
+    fn best_match_reference(parsed: &Parsed, candidates: &[Candidate]) -> Option<Match> {
+        let needles = variants(parsed);
+        let mut best: Option<Match> = None;
+
+        for candidate in candidates {
+            for title in &candidate.titles {
+                let hay = normalize(title);
+                for needle in &needles {
+                    if hay == *needle {
+                        return Some(Match {
+                            media_id: candidate.media_id,
+                            score: 1.0,
+                        });
+                    }
+                    let score = similarity(needle, &hay);
+                    if best.as_ref().is_none_or(|b| score > b.score) {
+                        best = Some(Match {
+                            media_id: candidate.media_id,
+                            score,
+                        });
+                    }
+                }
+            }
+        }
+        best.filter(|m| m.score >= 0.7)
+    }
+
+    /// The whole point of `prepare` is that it changes nothing but the cost.
+    #[test]
+    fn prepared_agrees_with_the_original_algorithm() {
+        let candidates = candidates();
+        let prepared = prepare(&candidates);
+        for name in [
+            "[SubsPlease] Sousou no Frieren - 28 (1080p).mkv",
+            "Frieren: Beyond Journey's End Season 1 Ep 28",
+            "[Erai-raws] Kusuriya no Hitorigoto 2nd Season - 05 [1080p].mkv",
+            "Sousou no Frieren (2023) - 28.mkv",
+            "Totally Different Show - 05.mkv",
+            "One Piece - 1071.mkv",
+            "One Piece Season 3 - 12.mkv",
+            "NCOP01.mkv",
+            "",
+        ] {
+            let parsed = parse(name);
+            let reference = best_match_reference(&parsed, &candidates);
+            let fast = best_match_prepared(&parsed, &prepared);
+            assert_eq!(
+                reference.as_ref().map(|m| (m.media_id, m.score)),
+                fast.as_ref().map(|m| (m.media_id, m.score)),
+                "disagreement on {name:?}"
+            );
+        }
+    }
+
+    /// A NaN score would pin `best` forever: every later `score > best.score`
+    /// comparison against NaN is false.
+    #[test]
+    fn dice_returns_zero_rather_than_nan_for_empty_sets() {
+        let empty: HashSet<[u8; 3]> = HashSet::new();
+        let full = trigrams("frieren");
+        assert_eq!(dice(&empty, &empty), 0.0);
+        assert_eq!(dice(&empty, &full), 0.0);
+        assert_eq!(dice(&full, &empty), 0.0);
+    }
+
+    /// Scoring keeps the *first* maximum, so `prepare` must not reorder.
+    #[test]
+    fn first_candidate_wins_a_tie() {
+        let tied = vec![
+            Candidate {
+                media_id: 111,
+                titles: vec!["Sousou no Frieren Extra".into()],
+                episodes: None,
+                duration_min: None,
+                progress: 0,
+                status: "CURRENT".into(),
+            },
+            Candidate {
+                media_id: 222,
+                titles: vec!["Sousou no Frieren Extra".into()],
+                episodes: None,
+                duration_min: None,
+                progress: 0,
+                status: "CURRENT".into(),
+            },
+        ];
+        let parsed = parse("Sousou no Frieren - 28.mkv");
+        assert_eq!(best_match(&parsed, &tied).unwrap().media_id, 111);
+        assert_eq!(
+            best_match_prepared(&parsed, &prepare(&tied))
+                .unwrap()
+                .media_id,
+            111,
+        );
+    }
+
+    /// An exact hit must return immediately, even when an earlier candidate
+    /// already scored well on the fuzzy path.
+    #[test]
+    fn exact_match_short_circuits_past_a_close_fuzzy_one() {
+        let list = vec![
+            Candidate {
+                media_id: 111,
+                titles: vec!["Sousou no Frieren Extra".into()],
+                episodes: None,
+                duration_min: None,
+                progress: 0,
+                status: "CURRENT".into(),
+            },
+            Candidate {
+                media_id: 222,
+                titles: vec!["Sousou no Frieren".into()],
+                episodes: None,
+                duration_min: None,
+                progress: 0,
+                status: "CURRENT".into(),
+            },
+        ];
+        let parsed = parse("Sousou no Frieren - 28.mkv");
+        let m = best_match_prepared(&parsed, &prepare(&list)).unwrap();
+        assert_eq!(m.media_id, 222);
+        assert_eq!(m.score, 1.0);
     }
 }

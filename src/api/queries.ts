@@ -7,8 +7,7 @@ const MEDIA_FIELDS = `
   id
   type
   title { romaji english native }
-  coverImage { large extraLarge }
-  bannerImage
+  coverImage { large }
   episodes
   chapters
   volumes
@@ -167,6 +166,8 @@ const DETAIL_QUERY = `
 query ($id: Int!) {
   Media(id: $id) {
     ${MEDIA_FIELDS}
+    coverImage { extraLarge }
+    bannerImage
     description
     duration
     meanScore

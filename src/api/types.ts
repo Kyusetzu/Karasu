@@ -25,8 +25,13 @@ export interface Media {
   id: number;
   type?: MediaType;
   title: MediaTitle;
-  coverImage: { large: string | null; extraLarge: string | null };
-  bannerImage: string | null;
+  // `extraLarge` and `bannerImage` are optional because only the detail query
+  // asks for them. The list and grid queries return hundreds of entries at a
+  // time and nothing there renders either field; carrying them cost a
+  // deserialise, a re-serialise into the SQLite cache, an IPC hop and a
+  // JSON.parse for roughly 160 dead bytes per entry.
+  coverImage: { large: string | null; extraLarge?: string | null };
+  bannerImage?: string | null;
   episodes: number | null;
   chapters?: number | null;
   volumes?: number | null;

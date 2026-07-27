@@ -985,7 +985,7 @@ pub fn mark_all_notifications_read(db: State<'_, Db>) -> Result<(), String> {
 
 /// Monotonic commit counter — the 4th version segment
 /// (`MAJOR.MINOR.PATCH.COMMIT#`). Bumped by one on every commit.
-pub const COMMIT_NUMBER: u32 = 94;
+pub const COMMIT_NUMBER: u32 = 95;
 
 /// Full four-part display version, e.g. `0.1.1.38`. The `MAJOR.MINOR.PATCH`
 /// core comes from the crate version (kept in sync across the manifests).

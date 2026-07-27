@@ -1,4 +1,4 @@
-﻿import { useMemo } from "react";
+﻿import { memo, useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
@@ -51,13 +51,13 @@ export default function Dashboard() {
 }
 
 function DashboardContent({ userId }: { userId: number }) {
-  const { data } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ["mediaList", "ANIME", userId],
     queryFn: () => fetchMediaList(userId, "ANIME"),
   });
   // Only the recommendation section needs the manga list; it is served from
   // the same Rust-side cache the manga list page already fills.
-  const { data: mangaData } = useQuery({
+  const { data: mangaData, isLoading: mangaLoading } = useQuery({
     queryKey: ["mediaList", "MANGA", userId],
     queryFn: () => fetchMediaList(userId, "MANGA"),
   });
@@ -86,18 +86,65 @@ function DashboardContent({ userId }: { userId: number }) {
 
   // Every section is its own component, so the running order below is a plain
   // list and rearranging it is a one-line move.
+  //
+  // The loading gate is not cosmetic. Every section renders an *empty state*
+  // from an empty list, so without it a cold start claims "you are not watching
+  // anything" and "no upcoming episodes" until the network answers — the app
+  // stating the opposite of the truth. The two lists are gated separately so a
+  // slow manga fetch can't hold back the anime sections.
   return (
     <div className="space-y-8 p-8">
       {/* Pinned above the rest: this is the "right now" card, and it is only
           useful while something is actually playing. */}
       <NowPlayingCard />
 
-      <Stats entries={allAnime} />
-      <WeeklyDigest entries={allAnime} />
-      <AiringSoon entries={allAnime} />
-      <ContinueWatching entries={allAnime} save={save} />
-      <RecommendedSection type="ANIME" entries={allAnime} />
-      <RecommendedSection type="MANGA" entries={allManga} />
+      {isLoading ? (
+        <DashboardSkeleton />
+      ) : (
+        <>
+          <Stats entries={allAnime} />
+          <WeeklyDigest entries={allAnime} />
+          <AiringSoon entries={allAnime} />
+          <ContinueWatching entries={allAnime} save={save} />
+          <RecommendedSection type="ANIME" entries={allAnime} />
+        </>
+      )}
+      {!mangaLoading && (
+        <RecommendedSection type="MANGA" entries={allManga} />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Stand-in for the sections above while the list loads: a stat row and two
+ * poster grids, matching the real layout closely enough that nothing jumps
+ * when the data lands. Unlabelled on purpose — no i18n keys needed.
+ */
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-8" aria-hidden="true">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {Array.from({ length: 4 }, (_, i) => (
+          <div
+            key={i}
+            className="h-[4.5rem] animate-pulse rounded-xl border border-surface-800 bg-surface-900"
+          />
+        ))}
+      </div>
+      {Array.from({ length: 2 }, (_, section) => (
+        <div key={section}>
+          <div className="h-5 w-40 animate-pulse rounded bg-surface-800" />
+          <div className="mt-4 grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-4">
+            {Array.from({ length: 6 }, (_, i) => (
+              <div key={i}>
+                <div className="aspect-[2/3] animate-pulse rounded-lg bg-surface-800" />
+                <div className="mt-2 h-3 w-4/5 animate-pulse rounded bg-surface-800" />
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -119,6 +166,16 @@ function ContinueWatching({
     [entries],
   );
 
+  // `save` itself is a fresh object every render, but `save.mutate` is a stable
+  // reference — depending on the object would hand every card a new callback
+  // and defeat the memo on ContinueCard.
+  const { mutate } = save;
+  const plusOne = useCallback(
+    (entry: MediaListEntry) =>
+      mutate({ mediaId: entry.mediaId, progress: entry.progress + 1 }),
+    [mutate],
+  );
+
   return (
     <section>
       <h2 className="flex items-center gap-2 text-lg font-semibold">
@@ -136,16 +193,7 @@ function ContinueWatching({
       ) : (
         <div className="mt-4 grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-4">
           {watching.map((entry) => (
-            <ContinueCard
-              key={entry.id}
-              entry={entry}
-              onPlusOne={() =>
-                save.mutate({
-                  mediaId: entry.mediaId,
-                  progress: entry.progress + 1,
-                })
-              }
-            />
+            <ContinueCard key={entry.id} entry={entry} onPlusOne={plusOne} />
           ))}
         </div>
       )}
@@ -333,12 +381,19 @@ function Stats({ entries }: { entries: MediaListEntry[] }) {
   );
 }
 
-function ContinueCard({
+/**
+ * Memoized: a +1 flips the mutation state on the parent twice (optimistic
+ * patch, then settle), and without this every card in the section reconciles
+ * both times. Safe to memo because — unlike `MediaCard` — it never writes
+ * through its props, so a shallow compare sees every change that matters.
+ * `onPlusOne` takes the entry so the parent can hand out one stable callback.
+ */
+const ContinueCard = memo(function ContinueCard({
   entry,
   onPlusOne,
 }: {
   entry: MediaListEntry;
-  onPlusOne: () => void;
+  onPlusOne: (entry: MediaListEntry) => void;
 }) {
   const { t } = useTranslation();
   const { media } = entry;
@@ -360,7 +415,7 @@ function ContinueCard({
         </Link>
         {canPlus && (
           <button
-            onClick={onPlusOne}
+            onClick={() => onPlusOne(entry)}
             className="absolute bottom-2 right-2 grid h-8 w-8 place-items-center rounded-full bg-accent-600 text-accent-ink opacity-0 transition-opacity hover:bg-accent-500 group-hover:opacity-100"
             aria-label={t("common.plusOne")}
             title={t("dashboard.markWatched", { n: entry.progress + 1 })}
@@ -388,7 +443,7 @@ function ContinueCard({
       </p>
     </div>
   );
-}
+});
 
 function AiringRow({ entry }: { entry: MediaListEntry }) {
   const { t } = useTranslation();

@@ -3,14 +3,16 @@
 
 *.rs text eol=lf
 *.ts text eol=lf
+*.mjs text eol=lf
 *.tsx text eol=lf
 *.css text eol=lf
 *.json text eol=lf
 *.toml text eol=lf
-# Extensionless, so `* text=auto` claims it and warns about CRLF on every
-# single commit that touches it — which is every commit, since the version
-# bump lands here.
+# Extensionless, so `* text=auto` claims them and warns about CRLF on every
+# commit that touches them — in Cargo.lock's case, every commit, since the
+# version bump lands there.
 Cargo.lock text eol=lf
+.gitattributes text eol=lf
 *.yml text eol=lf
 *.md text eol=lf
 *.svg text eol=lf

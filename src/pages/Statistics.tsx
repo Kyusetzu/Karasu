@@ -89,7 +89,35 @@ function StatisticsContent({
     queryKey: ["userStats", userId],
     queryFn: () => userStatistics(userId),
     enabled: isTauri,
+    // AniList only recomputes these when list entries change, and Karasu is
+    // what changes them. Revisiting the page inside half an hour is free.
+    staleTime: 30 * 60 * 1000,
   });
+
+  // Hoisted out of WatchTimeEstimate. Nested there it only mounted once the
+  // stats query had resolved, so a cold /stats waited for the *sum* of the two
+  // requests rather than the longer of them. The key is the same one the list
+  // page and the SQLite priming use, so this shares their result rather than
+  // adding a request.
+  const level = useContentFilter((s) => s.level);
+  const { data: animeList } = useQuery({
+    queryKey: ["mediaList", "ANIME", userId],
+    queryFn: () => fetchMediaList(userId, "ANIME"),
+    enabled: isTauri,
+  });
+  const remainingTotal = useMemo(() => {
+    let sum = 0;
+    for (const group of animeList?.lists ?? []) {
+      if (group.isCustomList) continue;
+      for (const e of group.entries) {
+        if (e.status !== "CURRENT" && e.status !== "REPEATING") continue;
+        if (isBlocked(e.media, level)) continue;
+        const rem = remainingMinutes(e.media, e.progress);
+        if (rem) sum += rem;
+      }
+    }
+    return sum;
+  }, [animeList, level]);
 
   const categories = type === "ANIME" ? ANIME_CATEGORIES : MANGA_CATEGORIES;
   // Keep the selected sub-tab valid when switching media type.
@@ -157,34 +185,15 @@ function StatisticsContent({
         ))}
 
       {stats && type === "ANIME" && activeCategory === "overview" && (
-        <WatchTimeEstimate userId={userId} />
+        <WatchTimeEstimate total={remainingTotal} />
       )}
     </div>
   );
 }
 
 /** "Time to finish your watching list", summed from the cached anime list. */
-function WatchTimeEstimate({ userId }: { userId: number }) {
+function WatchTimeEstimate({ total }: { total: number }) {
   const { t } = useTranslation();
-  const level = useContentFilter((s) => s.level);
-  const { data } = useQuery({
-    queryKey: ["mediaList", "ANIME", userId],
-    queryFn: () => fetchMediaList(userId, "ANIME"),
-    enabled: isTauri,
-  });
-  const total = useMemo(() => {
-    let sum = 0;
-    for (const group of data?.lists ?? []) {
-      if (group.isCustomList) continue;
-      for (const e of group.entries) {
-        if (e.status !== "CURRENT" && e.status !== "REPEATING") continue;
-        if (isBlocked(e.media, level)) continue;
-        const rem = remainingMinutes(e.media, e.progress);
-        if (rem) sum += rem;
-      }
-    }
-    return sum;
-  }, [data, level]);
 
   if (total <= 0) return null;
   return (
@@ -483,7 +492,13 @@ function RankedRow({
       </span>
       {image !== undefined &&
         (image ? (
-          <img src={image} alt="" className="h-8 w-8 shrink-0 rounded-full object-cover" />
+          <img
+            src={image}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            className="h-8 w-8 shrink-0 rounded-full object-cover"
+          />
         ) : (
           <span className="h-8 w-8 shrink-0 rounded-full bg-surface-800" />
         ))}
@@ -517,8 +532,8 @@ function Empty() {
 
 /** Whether a category shows an avatar column (people do, genres/tags/studios don't). */
 function entryImage(e: StatEntry, category: Category): string | null | undefined {
-  if (category === "voiceActors") return e.voiceActor?.image?.large ?? null;
-  if (category === "staff") return e.staff?.image?.large ?? null;
+  if (category === "voiceActors") return e.voiceActor?.image?.medium ?? null;
+  if (category === "staff") return e.staff?.image?.medium ?? null;
   return undefined; // no avatar column
 }
 

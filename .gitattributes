@@ -7,6 +7,10 @@
 *.css text eol=lf
 *.json text eol=lf
 *.toml text eol=lf
+# Extensionless, so `* text=auto` claims it and warns about CRLF on every
+# single commit that touches it — which is every commit, since the version
+# bump lands here.
+Cargo.lock text eol=lf
 *.yml text eol=lf
 *.md text eol=lf
 *.svg text eol=lf

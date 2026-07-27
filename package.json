@@ -1,7 +1,7 @@
 {
   "name": "karasu",
   "private": true,
-  "version": "0.28.9",
+  "version": "0.28.10",
   "type": "module",
   "author": "Kyu",
   "license": "MIT",
@@ -9,6 +9,8 @@
     "dev": "vite",
     "build": "vite build",
     "typecheck": "tsc --noEmit",
+    "verify": "npm run typecheck && npm test && cargo test --manifest-path src-tauri/Cargo.toml",
+    "bump": "node scripts/bump-version.mjs",
     "preview": "vite preview",
     "test": "vitest run",
     "tauri": "tauri",

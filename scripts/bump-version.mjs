@@ -1,0 +1,154 @@
+#!/usr/bin/env node
+/**
+ * Bumps the version everywhere Karasu keeps one, in a single step.
+ *
+ *   node scripts/bump-version.mjs patch     0.28.9.109 -> 0.28.10.110
+ *   node scripts/bump-version.mjs minor     0.28.9.109 -> 0.29.0.110
+ *   node scripts/bump-version.mjs major     0.28.9.109 -> 1.0.0.110
+ *   node scripts/bump-version.mjs --print   report the version, change nothing
+ *
+ * The scheme is MAJOR.MINOR.PATCH.COMMIT# (see CLAUDE.md). The semver core
+ * lives in three manifests, the commit counter in commands.rs, and Cargo.lock
+ * carries a copy of the core that cargo would otherwise only fix up on its next
+ * run — five edits that used to be made by hand on every single commit.
+ *
+ * Files are patched by targeted replacement rather than parse-and-stringify:
+ * round-tripping package.json through JSON.stringify would reformat a file
+ * nobody asked to reformat. Every replacement is asserted to have matched and
+ * to have changed something, because the failure that actually hurts is a
+ * silent no-op that leaves the manifests disagreeing.
+ */
+
+import { execFileSync } from "node:child_process";
+import { readFileSync, writeFileSync } from "node:fs";
+import { dirname, join, relative } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
+
+const PACKAGE_JSON = join(ROOT, "package.json");
+const TAURI_CONF = join(ROOT, "src-tauri/tauri.conf.json");
+const CARGO_TOML = join(ROOT, "src-tauri/Cargo.toml");
+const CARGO_LOCK = join(ROOT, "src-tauri/Cargo.lock");
+const COMMANDS_RS = join(ROOT, "src-tauri/src/commands.rs");
+
+/** Every path this script writes, for the "did anything else change" guard. */
+const VERSION_FILES = [
+  PACKAGE_JSON,
+  TAURI_CONF,
+  CARGO_TOML,
+  CARGO_LOCK,
+  COMMANDS_RS,
+].map((p) => relative(ROOT, p).replaceAll("\\", "/"));
+
+const SEMVER = String.raw`\d+\.\d+\.\d+`;
+/** The top-level "version" key — the first one in both JSON files. */
+const JSON_VERSION = new RegExp(`"version":\\s*"${SEMVER}"`);
+/** Anchored to line start, so inline `{ version = "0.13" }` deps don't match. */
+const TOML_VERSION = new RegExp(`^version = "${SEMVER}"`, "m");
+const LOCK_VERSION = new RegExp(`(name = "karasu"\\r?\\nversion = )"${SEMVER}"`);
+const COMMIT_NUMBER = /COMMIT_NUMBER: u32 = (\d+);/;
+
+function fail(message) {
+  console.error(`bump-version: ${message}`);
+  process.exit(1);
+}
+
+/**
+ * Replaces one match, refusing to pass off a miss or a no-op as success.
+ *
+ * `replacement` is a function of the match and its groups, never a string —
+ * a string would make `$1` and friends live, which is a trap when the thing
+ * being substituted in is arbitrary file content.
+ */
+function patch(path, pattern, replacement) {
+  const before = readFileSync(path, "utf8");
+  if (!pattern.test(before)) {
+    fail(`no ${pattern} in ${relative(ROOT, path)}`);
+  }
+  const after = before.replace(pattern, replacement);
+  if (after === before) {
+    fail(`replacing ${pattern} in ${relative(ROOT, path)} changed nothing`);
+  }
+  writeFileSync(path, after);
+}
+
+function readCurrent() {
+  const core = readFileSync(PACKAGE_JSON, "utf8").match(
+    new RegExp(`"version":\\s*"(${SEMVER})"`),
+  );
+  if (!core) fail("could not read the version from package.json");
+  const commit = readFileSync(COMMANDS_RS, "utf8").match(COMMIT_NUMBER);
+  if (!commit) fail("could not read COMMIT_NUMBER from commands.rs");
+  return { core: core[1], commit: Number(commit[1]) };
+}
+
+/**
+ * Refuses a bump that would stand on its own.
+ *
+ * A version bump describes an accompanying change; on its own it is always
+ * either a mistake or a double-run. Bumping before editing is legitimate but
+ * unusual, hence --force rather than a prompt.
+ */
+function requireAccompanyingChange() {
+  let status;
+  try {
+    status = execFileSync("git", ["status", "--porcelain"], {
+      cwd: ROOT,
+      encoding: "utf8",
+    });
+  } catch {
+    return; // not a git checkout — nothing to guard against
+  }
+  const changed = status
+    .split("\n")
+    .map((line) => line.slice(3).trim())
+    .filter(Boolean)
+    .filter((path) => !VERSION_FILES.includes(path));
+  if (changed.length === 0) {
+    fail(
+      "nothing to accompany this bump — the tree holds only version files.\n" +
+        "  Make the change first, or pass --force if you meant to bump ahead of it.",
+    );
+  }
+}
+
+const args = process.argv.slice(2);
+const force = args.includes("--force");
+const parts = args.filter((a) => !a.startsWith("--"));
+const current = readCurrent();
+
+if (args.includes("--print")) {
+  console.log(`${current.core}.${current.commit}`);
+  process.exit(0);
+}
+
+const part = parts[0] ?? "patch";
+if (!["major", "minor", "patch"].includes(part)) {
+  fail(`unknown segment "${part}" — expected major, minor or patch`);
+}
+if (parts.length > 1) {
+  fail(`expected one segment, got: ${parts.join(", ")}`);
+}
+if (!force) requireAccompanyingChange();
+
+const [major, minor, patchNum] = current.core.split(".").map(Number);
+const core =
+  part === "major"
+    ? `${major + 1}.0.0`
+    : part === "minor"
+      ? `${major}.${minor + 1}.0`
+      : `${major}.${minor}.${patchNum + 1}`;
+const commit = current.commit + 1;
+
+patch(PACKAGE_JSON, JSON_VERSION, () => `"version": "${core}"`);
+patch(TAURI_CONF, JSON_VERSION, () => `"version": "${core}"`);
+patch(CARGO_TOML, TOML_VERSION, () => `version = "${core}"`);
+patch(CARGO_LOCK, LOCK_VERSION, (_match, prefix) => `${prefix}"${core}"`);
+patch(COMMANDS_RS, COMMIT_NUMBER, () => `COMMIT_NUMBER: u32 = ${commit};`);
+
+console.error(
+  `${current.core}.${current.commit} -> ${core}.${commit} (${part})`,
+);
+// stdout carries the version alone, so it can be captured for a commit subject.
+console.log(`${core}.${commit}`);

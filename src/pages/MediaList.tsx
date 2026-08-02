@@ -314,7 +314,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
   return (
     <div className="flex h-full flex-col">
       {(data?.fromCache || (data?.pending ?? 0) > 0) && (
-        <div className="flex items-center gap-3 border-b border-surface-800 bg-amber-950/40 px-8 py-2 text-xs text-amber-300">
+        <div className="flex items-center gap-3 border-b border-surface-800 bg-amber-950/40 px-8 py-2 text-xs text-gold">
           <CloudOff className="size-3.5" />
           {data?.fromCache
             ? t("list.offline")
@@ -322,7 +322,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
           <Button
             variant="ghost"
             size="sm"
-            className="ml-auto text-amber-300"
+            className="ml-auto text-gold"
             onClick={async () => {
               await flushQueue().catch(() => {});
               refetch();
@@ -700,7 +700,7 @@ function BulkBar({
         value=""
         disabled={disabled}
         onChange={(e) => e.target.value !== "" && onScore(Number(e.target.value))}
-        className="h-9 rounded-lg border border-surface-700 bg-surface-900 px-2 text-sm text-amber-300 focus:border-accent-500 focus:outline-none disabled:opacity-50"
+        className="h-9 rounded-lg border border-surface-700 bg-surface-900 px-2 text-sm text-gold focus:border-accent-500 focus:outline-none disabled:opacity-50"
         aria-label={t("bulk.setScore")}
       >
         <option value="">{t("bulk.setScore")}</option>
@@ -877,7 +877,7 @@ const GridCard = memo(function GridCard({
           )}
         </div>
         {entry.score > 0 && (
-          <span className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-black/70 px-2 py-0.5 text-xs font-medium text-amber-300">
+          <span className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-black/70 px-2 py-0.5 text-xs font-medium text-gold">
             <Star className="size-2.75" fill="currentColor" /> {entry.score}
           </span>
         )}
@@ -1008,7 +1008,7 @@ const ListRow = memo(function ListRow({
       <select
         value={entry.score}
         onChange={(e) => onQuickSave(entry, { score: Number(e.target.value) })}
-        className="h-8 rounded-lg border border-surface-700 bg-surface-900 px-1.5 text-sm text-amber-300 focus:border-accent-500 focus:outline-none"
+        className="h-8 rounded-lg border border-surface-700 bg-surface-900 px-1.5 text-sm text-gold focus:border-accent-500 focus:outline-none"
         aria-label={t("common.score")}
         title={t("common.score")}
       >

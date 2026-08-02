@@ -26,7 +26,13 @@
     format("woff2");
 }
 
-@theme {
+/* `static` because Tailwind v4 tree-shakes theme variables that no utility
+   references, and the light-theme block below overrides these unconditionally.
+   Without it a token used only via `var()` — or not yet used at all, like the
+   graph outlines — exists in light and is *undefined in dark*, where it
+   silently falls back to the inherited colour. Symmetry between the two blocks
+   matters more here than the few hundred bytes. */
+@theme static {
   /* 125rem = 2000px, the third-column tier. The second-column tier is the
      built-in `2xl` (1536px); together they are how a wide screen gets filled,
      since nothing here is allowed to grow instead.
@@ -50,10 +56,26 @@
   --color-surface-700: #262c3a;
   --color-surface-600: #333b4d;
 
+  /* The bottom two steps were raised to clear 4.5:1 on the *darkest surface
+     they ever sit on*, and the ramp re-spaced upward to keep four distinct
+     steps. The old ink-600 (#5b6474) managed only 3.26:1 on the page and
+     2.92:1 on an elevated panel, and it was spent almost entirely on the 10px
+     and 11px labels — the text that could least afford it. Verified:
+     ink-600 is 5.45:1 on surface-950 and 4.88:1 on surface-850. */
   --color-ink-100: #eef1f6;
-  --color-ink-300: #b8c0cf;
-  --color-ink-500: #7d8798;
-  --color-ink-600: #5b6474;
+  --color-ink-300: #c3cbd9;
+  --color-ink-500: #98a1b2;
+  --color-ink-600: #7f8899;
+
+  /* Score stars only. */
+  --color-gold: #fcd34d;
+  /* Destructive actions, failure states. */
+  --color-danger: #f0787f;
+  /* "Mark complete" — only ever a glyph on the scrim over cover art. */
+  --color-success: #6ee7b7;
+  /* Franchise-graph node outlines that aren't status- or accent-driven. */
+  --color-graph-completed: #5ec98a;
+  --color-graph-none: #3a3f4d;
 
   --color-accent-400: #8b9dff;
   --color-accent-500: #6c7fff;
@@ -67,6 +89,15 @@
   --font-brand-jp: "Kosugi Maru", var(--font-brand);
 }
 
+/* RGB triplets, for `rgba(var(--scrim), α)` in banner and cover gradients.
+   A triplet rather than a colour because the alpha varies per stop, and it has
+   to invert: hardcoded dark rgba stops left a dark smear across the light
+   theme. Not in `@theme` — Tailwind's colour utilities can't consume a bare
+   triplet, and nothing should try. */
+:root {
+  --scrim: 11, 13, 18;
+}
+
 /* Light theme: override the surface/ink tokens; accent is set at runtime. */
 :root[data-theme="light"] {
   --color-surface-950: #f4f6f9;
@@ -77,9 +108,21 @@
   --color-surface-600: #b6bece;
 
   --color-ink-100: #1a1e27;
-  --color-ink-300: #39414f;
-  --color-ink-500: #697184;
-  --color-ink-600: #8b93a4;
+  --color-ink-300: #333b48;
+  --color-ink-500: #464e5d;
+  --color-ink-600: #5f6879;
+
+  /* Gold, danger and success all need a light counterpart for the same reason
+     the inks do — they are used as *text*, and the dark values are tuned for a
+     near-black page. The handoff supplies one for gold but not for the other
+     two, which measure 2.73:1 (danger) and 1.52:1 (success) on white. These
+     are the same hues pulled down to 6.58:1 and 5.34:1. `#b3232c` is already
+     in the design language as the close-button hover. */
+  --color-gold: #8a6207;
+  --color-danger: #b3232c;
+  --color-success: #0d7a54;
+
+  --scrim: 244, 246, 249;
 
   color-scheme: light;
 }

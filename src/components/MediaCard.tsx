@@ -57,7 +57,7 @@ export default function MediaCard({ media }: { media: MediaWithListStatus }) {
           )}
         </Link>
         {media.averageScore !== null && (
-          <span className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-black/70 px-2 py-0.5 text-xs font-medium text-amber-300">
+          <span className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-black/70 px-2 py-0.5 text-xs font-medium text-gold">
             <Star className="size-2.75" fill="currentColor" /> {media.averageScore}%
           </span>
         )}

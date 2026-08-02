@@ -122,7 +122,7 @@ function PortableSection() {
         {t("settings.portableLocation")}: {status.dir}
       </p>
       {restart && (
-        <p className="mt-2 text-sm text-amber-300">{t("settings.portableRestart")}</p>
+        <p className="mt-2 text-sm text-gold">{t("settings.portableRestart")}</p>
       )}
       {error && <p className="mt-2 text-sm text-red-300">{error}</p>}
     </Card>
@@ -1033,7 +1033,7 @@ function SessionList({ sessions }: { sessions: JellyfinSession[] }) {
         </div>
       ))}
       {!sessions.some((s) => s.matched) && (
-        <p className="pt-1 text-xs text-amber-300">
+        <p className="pt-1 text-xs text-gold">
           {t("settings.jellyfinNoMatch")}
         </p>
       )}

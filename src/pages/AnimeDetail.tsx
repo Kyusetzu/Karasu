@@ -146,7 +146,7 @@ export default function AnimeDetail() {
             )}
             <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-300">
               {data.averageScore !== null && (
-                <span className="flex items-center gap-1 text-amber-300">
+                <span className="flex items-center gap-1 text-gold">
                   <Star className="size-3.5" fill="currentColor" /> {data.averageScore}%
                 </span>
               )}

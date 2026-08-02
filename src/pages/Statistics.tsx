@@ -516,7 +516,7 @@ function RankedRow({
           />
         </div>
       </div>
-      <span className="w-9 shrink-0 text-right text-xs font-medium tabular-nums text-amber-300">
+      <span className="w-9 shrink-0 text-right text-xs font-medium tabular-nums text-gold">
         {scoreText(entry.meanScore)}
       </span>
     </div>

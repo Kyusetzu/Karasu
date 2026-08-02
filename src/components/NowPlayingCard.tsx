@@ -127,7 +127,7 @@ function ScrobbleStatus({ countdown }: { countdown: string | null }) {
       );
     case "pending":
       return (
-        <p className="text-xs font-medium text-amber-300">
+        <p className="text-xs font-medium text-gold">
           {t(
             current?.mediaType === "MANGA"
               ? "nowPlaying.confirmPromptManga"
@@ -154,7 +154,7 @@ function ScrobbleStatus({ countdown }: { countdown: string | null }) {
       );
     case "blocked":
       return (
-        <p className="text-xs text-amber-300">
+        <p className="text-xs text-gold">
           {scrobble.reason ?? t("nowPlaying.blocked")}
         </p>
       );

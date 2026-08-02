@@ -106,6 +106,11 @@
   --w1: 63, 114, 199;
   --w2: 179, 63, 199;
   --hair: rgba(63, 114, 199, 0.11);
+
+  /* The 1px edge along the top of a raised panel. A white catch-light is how a
+     dark surface reads as lit from above — on a white panel it is invisible,
+     so light theme inverts it to a faint shadow line instead. */
+  --catch-light: rgba(255, 255, 255, 0.09);
 }
 
 /* Light theme: override the surface/ink tokens; accent is set at runtime. */
@@ -133,6 +138,7 @@
   --color-success: #0d7a54;
 
   --scrim: 244, 246, 249;
+  --catch-light: rgba(11, 13, 18, 0.07);
 
   color-scheme: light;
 }
@@ -214,7 +220,7 @@ nav a {
     background: linear-gradient(
       90deg,
       transparent,
-      rgba(255, 255, 255, 0.09),
+      var(--catch-light),
       transparent
     );
   }

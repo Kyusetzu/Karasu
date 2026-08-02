@@ -3,6 +3,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useTranslation } from "react-i18next";
 import { Minus, Square, X } from "lucide-react";
 import Bell from "@/components/Bell";
+import KarasuMark from "@/components/KarasuMark";
 import { appVersion, isTauri } from "@/api/anilist";
 
 // In a plain browser (vite dev without the Tauri shell) there is no window API
@@ -23,7 +24,7 @@ export default function Titlebar() {
       className="flex h-9 shrink-0 items-center justify-between bg-surface-950"
     >
       <div data-tauri-drag-region className="flex items-center gap-2 pl-4">
-        <img src="/favicon.png" alt="" className="h-5 w-5" />
+        <KarasuMark className="h-5 w-5" />
         <span className="font-brand text-sm font-semibold tracking-wide text-ink-300">
           Karasu
         </span>

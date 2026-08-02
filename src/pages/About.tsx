@@ -23,6 +23,7 @@ import {
 } from "@/api/anilist";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
+import KarasuMark from "@/components/KarasuMark";
 import { cn } from "@/lib/utils";
 
 const REPO_URL = "https://github.com/Kyusetzu/Karasu";
@@ -42,7 +43,7 @@ export default function About() {
   return (
     <div className="mx-auto max-w-2xl p-8 2xl:max-w-none">
       <header className="flex items-center gap-4">
-        <img src="/favicon.png" alt="" className="h-14 w-14 rounded-xl" />
+        <KarasuMark className="h-14 w-14" />
         <div>
           <div className="flex items-baseline gap-2">
             <h1 className="font-brand text-2xl font-bold">Karasu</h1>

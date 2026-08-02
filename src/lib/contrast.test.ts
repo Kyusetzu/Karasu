@@ -10,6 +10,7 @@ import {
   readableInk,
   relativeLuminance,
   rgbTriplet,
+  UI_INK,
 } from "./contrast";
 
 describe("parseHex", () => {
@@ -43,13 +44,35 @@ describe("contrastRatio", () => {
 });
 
 describe("readableInk", () => {
-  it("uses black on light backgrounds", () => {
+  it("uses the dark ink on light backgrounds", () => {
     expect(readableInk("#ffffff")).toBe("#000000");
     expect(readableInk("#ffd54a")).toBe("#000000"); // bright amber
   });
-  it("uses white on dark backgrounds", () => {
+  it("uses the light ink on dark backgrounds", () => {
     expect(readableInk("#000000")).toBe("#ffffff");
     expect(readableInk("#1e3a8a")).toBe("#ffffff"); // deep blue
+  });
+
+  it("returns whichever pair it is handed", () => {
+    expect(readableInk("#ffffff", UI_INK)).toBe(UI_INK.dark);
+    expect(readableInk("#000000", UI_INK)).toBe(UI_INK.light);
+  });
+
+  /**
+   * The UI pair is the two ends of the app's own ink scale, so a button's text
+   * matches the ink everywhere else instead of jumping to an absolute the rest
+   * of the interface never uses. It still has to clear the floor.
+   */
+  it("keeps the softer UI inks above 4.5:1 on every preset accent", () => {
+    const accents = [
+      "#4b3fc7", "#6c7fff", "#3b93e6", "#46a5b3",
+      "#34c78a", "#e8d48a", "#f56c92", "#ffab2e", "#a56cff",
+    ];
+    for (const accent of accents) {
+      const { a500, ink } = accentShades(accent);
+      expect(contrastRatio(ink, a500)).toBeGreaterThanOrEqual(4.5);
+      expect([UI_INK.dark, UI_INK.light]).toContain(ink);
+    }
   });
 
   /**
@@ -122,8 +145,9 @@ describe("accentShades", () => {
   });
 
   it("picks ink for contrast against the accent", () => {
-    expect(accentShades("#ffe100").ink).toBe("#000000"); // bright → black
-    expect(accentShades("#3a1d6e").ink).toBe("#ffffff"); // dark → white
+    // The UI pair, not pure black/white — see UI_INK.
+    expect(accentShades("#ffe100").ink).toBe(UI_INK.dark); // bright → dark ink
+    expect(accentShades("#3a1d6e").ink).toBe(UI_INK.light); // dark → light ink
   });
 
   /** The whole point: any colour on the wheel has to be safe. */

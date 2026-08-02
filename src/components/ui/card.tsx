@@ -11,7 +11,10 @@ export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
       className={cn(
-        "panel-wash panel-top overflow-hidden rounded-xl border border-surface-800 bg-surface-900 p-5",
+        // No `overflow-hidden`: the catch-light is a gradient that starts and
+        // ends transparent, so it already fades out before the rounded corners
+        // and clipping would only risk cutting off anything a card contains.
+        "panel-wash panel-top rounded-xl border border-surface-800 bg-surface-900 p-5",
         className,
       )}
       {...props}

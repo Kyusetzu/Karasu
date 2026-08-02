@@ -32,20 +32,41 @@ export function contrastRatio(a: string, b: string): number {
   return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
 }
 
+/** The two inks `readableInk` chooses between. */
+export interface InkPair {
+  dark: string;
+  light: string;
+}
+
+/** Maximum contrast, but harsh — use where nothing softer will do. */
+export const PURE_INK: InkPair = { dark: "#000000", light: "#ffffff" };
+
 /**
- * Black or white — whichever genuinely has more contrast on the background.
+ * The two ends of the app's own ink scale — the light theme's `ink-100` and
+ * the dark theme's. Text on an accent fill picks one of these rather than pure
+ * black or white, so a button matches the ink everywhere else instead of
+ * jumping to an absolute the rest of the UI never uses.
  *
- * This used to be `luminance > 0.45`, which is a much higher bar than the
+ * Deliberately *not* theme-dependent. Which one is readable is decided by the
+ * accent fill's own luminance, and that does not change when the page around
+ * it does.
+ */
+export const UI_INK: InkPair = { dark: "#1a1e27", light: "#eef1f6" };
+
+/**
+ * Whichever of the two inks genuinely has more contrast on the background.
+ *
+ * The rule used to be `luminance > 0.45`, which is a much higher bar than the
  * arithmetic supports: the two ratios actually cross at luminance ≈ 0.179, so
- * everything between there and 0.45 was being given white text when black was
- * the more readable choice. On the app's own accent presets that was not a
+ * everything between there and 0.45 was being given the light ink when the
+ * dark one was more readable. On the app's own accent presets that was not a
  * near-miss — white on `#46a5b3` measures 2.88:1 and on `#3b93e6` 3.23:1, both
  * below the 4.5:1 floor, where black would have given 7.29:1 and 6.50:1.
  */
-export function readableInk(hexBg: string): "#000000" | "#ffffff" {
-  return contrastRatio(hexBg, "#000000") >= contrastRatio(hexBg, "#ffffff")
-    ? "#000000"
-    : "#ffffff";
+export function readableInk(hexBg: string, ink: InkPair = PURE_INK): string {
+  return contrastRatio(hexBg, ink.dark) >= contrastRatio(hexBg, ink.light)
+    ? ink.dark
+    : ink.light;
 }
 
 /**
@@ -116,6 +137,8 @@ export interface AccentContext {
   surface950?: string;
   /** Panel fill — what an accent *fill* has to stay visible against. */
   surface900?: string;
+  /** Inks to choose between for text on the fill. Defaults to the UI pair. */
+  ink?: InkPair;
 }
 
 /**
@@ -129,7 +152,7 @@ export interface AccentContext {
  */
 export function accentShades(
   base: string,
-  { light = false, surface950, surface900 }: AccentContext = {},
+  { light = false, surface950, surface900, ink = UI_INK }: AccentContext = {},
 ): AccentShades {
   const toward = light ? "#000000" : "#ffffff";
   const page = surface950 ?? (light ? "#f4f6f9" : "#0b0d12");
@@ -154,7 +177,7 @@ export function accentShades(
     a400,
     a500,
     a600: mix(a500, "#000000", 0.16),
-    ink: readableInk(a500),
+    ink: readableInk(a500, ink),
     rgb: rgbTriplet(a500),
     w1,
     w2: rgbTriplet(hueRotate(base, 46, 0.45)),

@@ -96,6 +96,16 @@
    triplet, and nothing should try. */
 :root {
   --scrim: 11, 13, 18;
+
+  /* Derived from the accent by `stores/theme.ts` and written to this element's
+     inline style, which wins over these. They exist so the wash is still valid
+     CSS on the frame before that runs — `rgba(var(--w1), .07)` with `--w1`
+     undefined is an invalid declaration, and the gradient silently disappears.
+     Values are the default accent's (#4b3fc7). */
+  --accent-rgb: 75, 63, 199;
+  --w1: 63, 114, 199;
+  --w2: 179, 63, 199;
+  --hair: rgba(63, 114, 199, 0.11);
 }
 
 /* Light theme: override the surface/ink tokens; accent is set at runtime. */
@@ -173,6 +183,46 @@ nav a {
 @utility media-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(9.375rem, 1fr));
+}
+
+/* The iridescent wash. Two companion sheens rotated off the accent's own hue,
+   so overlapping panels read like feathers rather than stacked grey cards —
+   and so an indigo accent throws violet while a straw one throws warm amber.
+   Composes over a background colour: `class="bg-surface-900 panel-wash"`. */
+@utility panel-wash {
+  background-image: linear-gradient(
+    140deg,
+    rgba(var(--w1), 0.07),
+    rgba(var(--w2), 0.03) 60%,
+    transparent
+  );
+}
+
+/* The 1px catch-light along the top of a raised card. A pseudo-element rather
+   than a second gradient layer, so it can sit on a panel that already has the
+   wash without either fighting for `background-image`. */
+@utility panel-top {
+  position: relative;
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset-inline: 0;
+    top: 0;
+    height: 1px;
+    pointer-events: none;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.09),
+      transparent
+    );
+  }
+}
+
+/* Hairline borders, tinted with the cooler sheen rather than a flat grey. */
+@utility border-hair {
+  border-color: var(--hair);
 }
 
 /* Scrollbars */

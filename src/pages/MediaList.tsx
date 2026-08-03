@@ -394,6 +394,11 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
+    // Deliberately no dependency array. The handler closes over the focus, the
+    // selection and the filtered pool, all of which change constantly; a
+    // dependency list here would be every one of them, and getting it wrong
+    // leaves the keys acting on a stale list. Re-binding one window listener
+    // per render costs nothing next to the render itself.
   });
 
   // A filter or a tab change re-pools the entries, and index 12 in the old

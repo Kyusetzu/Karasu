@@ -182,13 +182,21 @@ nav a {
 /* The cover grid shared by the list, search and seasonal pages. One
    definition rather than three copies that could drift apart.
 
-   auto-fill at a 9.375rem (150px) floor already fills any width on its own —
-   a wider screen gets more covers, which is the point. No wide-screen branch:
-   raising the floor there would grow the covers instead, which is the
-   magnification this file no longer does. */
+   A wider window earns more covers, never bigger ones. That needs a **fixed**
+   track, not `minmax(…, 1fr)` — `1fr` absorbs the leftover space, so covers
+   grew about 10% at 1536px, which is exactly the magnification this file is
+   supposed to prevent. `justify-content: start` for the same reason: the
+   default would spread the remainder into the gutters, and a wider window
+   would look *less* dense.
+
+   The fallback is load-bearing. `--cover-track` is written to the root by the
+   theme store, but `repeat(auto-fill, var(--cover-track))` with the variable
+   unset is an invalid declaration — `grid-template-columns` then computes to
+   `none` and the grid silently collapses to a single column. */
 @utility media-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(9.375rem, 1fr));
+  grid-template-columns: repeat(auto-fill, var(--cover-track, 9.375rem));
+  justify-content: start;
 }
 
 /* The iridescent wash. Two companion sheens rotated off the accent's own hue,

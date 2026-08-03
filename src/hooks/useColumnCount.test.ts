@@ -20,6 +20,24 @@ describe("parseColumnCount", () => {
     expect(parseColumnCount("")).toBe(1);
   });
 
+  /**
+   * `repeat(auto-fill, var(--cover-track))` with the variable unset is an
+   * invalid declaration, and the property then computes to `none`. That must
+   * read as one column rather than throwing — but the real defence is the
+   * fallback baked into the `media-grid` utility, so it never gets here.
+   */
+  it("survives the unset-token case that would collapse the grid", () => {
+    expect(parseColumnCount("none")).toBe(1);
+    expect(parseColumnCount("repeat(auto-fill, )")).toBe(1);
+  });
+
+  /** Density only changes the track width, so the count must follow it. */
+  it("counts the tracks each density step actually produces", () => {
+    expect(parseColumnCount("120px 120px 120px 120px 120px 120px 120px")).toBe(7);
+    expect(parseColumnCount("150px 150px 150px 150px 150px 150px")).toBe(6);
+    expect(parseColumnCount("180px 180px 180px 180px 180px")).toBe(5);
+  });
+
   it("falls back rather than guessing at units it cannot resolve", () => {
     expect(parseColumnCount("1fr 1fr")).toBe(1);
     expect(parseColumnCount("min-content max-content")).toBe(1);

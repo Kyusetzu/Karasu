@@ -31,7 +31,21 @@ export function parseColumnCount(tracks: string): number {
  * `auto-fill` keeps empty tracks, so this reads correctly even when the element
  * being measured currently holds fewer items than there are columns.
  */
-export function useColumnCount(ref: RefObject<HTMLElement | null>): number {
+export function useColumnCount(
+  ref: RefObject<HTMLElement | null>,
+  /**
+   * Re-measure whenever this changes.
+   *
+   * A `ResizeObserver` only fires when the *element* changes size, and the
+   * column count can change without that happening: the cover-size setting
+   * moves `--cover-track`, which re-flows the tracks inside an element whose
+   * own width is untouched. The observer stays silent, the count goes stale,
+   * and a virtualized grid then chunks its rows by the wrong number — wrong
+   * row count, wrong total height, cells overflowing their row. Pass whatever
+   * drives the track (the density setting) so the measurement follows it.
+   */
+  watch?: unknown,
+): number {
   const [columns, setColumns] = useState(1);
 
   useEffect(() => {
@@ -47,7 +61,7 @@ export function useColumnCount(ref: RefObject<HTMLElement | null>): number {
     const observer = new ResizeObserver(measure);
     observer.observe(el);
     return () => observer.disconnect();
-  }, [ref]);
+  }, [ref, watch]);
 
   return columns;
 }

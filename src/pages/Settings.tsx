@@ -21,7 +21,13 @@ import { useAniListLogin } from "@/hooks/useAniListLogin";
 import { useLibrary } from "@/stores/library";
 import { useContentFilter } from "@/stores/contentFilter";
 import { CONTENT_FILTER_LEVELS } from "@/lib/contentFilter";
-import { ACCENT_PRESETS, useTheme, type ThemeMode } from "@/stores/theme";
+import {
+  ACCENT_PRESETS,
+  DENSITY_STEPS,
+  useTheme,
+  type Density,
+  type ThemeMode,
+} from "@/stores/theme";
 import * as api from "@/api/anilist";
 import * as library from "@/api/library";
 import {
@@ -1096,6 +1102,8 @@ function AppSection() {
   const [showCustomAccent, setShowCustomAccent] = useState(false);
   const themeMode = useTheme((s) => s.mode);
   const accent = useTheme((s) => s.accent);
+  const density = useTheme((s) => s.density);
+  const setDensity = useTheme((s) => s.setDensity);
   const setThemeMode = useTheme((s) => s.setMode);
   const setAccent = useTheme((s) => s.setAccent);
 
@@ -1163,6 +1171,26 @@ function AppSection() {
             {THEME_MODES.map((m) => (
               <option key={m} value={m}>
                 {t(`settings.theme_${m}`)}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="flex items-center justify-between gap-4 py-1 text-sm">
+          <span className="block">
+            <span className="block text-ink-100">{t("settings.coverSize")}</span>
+            <span className="block text-xs text-ink-600">
+              {t("settings.coverSizeHint")}
+            </span>
+          </span>
+          <select
+            value={density}
+            onChange={(e) => setDensity(e.target.value as Density)}
+            className="h-9 rounded-lg border border-surface-700 bg-surface-900 px-2 text-sm focus:border-accent-500 focus:outline-none"
+          >
+            {DENSITY_STEPS.map((d) => (
+              <option key={d} value={d}>
+                {t(`settings.coverSize_${d}`)}
               </option>
             ))}
           </select>

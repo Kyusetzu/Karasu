@@ -17,8 +17,22 @@ export const ACCENT_PRESETS = [
   "#a56cff", // violet
 ];
 
+/**
+ * Cover size. One token — the grid track — is the whole feature: every other
+ * measurement on a cover cell already sizes off the cover, so S/M/L needs no
+ * second layout and no separate compact-mode component.
+ */
+export type Density = "s" | "m" | "l";
+export const DENSITY_STEPS: Density[] = ["s", "m", "l"];
+const COVER_TRACK: Record<Density, string> = {
+  s: "7.5rem",
+  m: "9.375rem",
+  l: "11.25rem",
+};
+
 const MODE_KEY = "karasu-theme";
 const ACCENT_KEY = "karasu-accent";
+const DENSITY_KEY = "karasu-density";
 
 const isHex = (s: string) => /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(s);
 
@@ -38,10 +52,11 @@ function systemDark(): boolean {
  * depends on it: accent-as-text steps away from the page in whichever direction
  * that theme's page sits.
  */
-function apply(mode: ThemeMode, accent: string): void {
+function apply(mode: ThemeMode, accent: string, density: Density): void {
   const dark = mode === "dark" || (mode === "system" && systemDark());
   const html = document.documentElement;
   html.dataset.theme = dark ? "dark" : "light";
+  html.style.setProperty("--cover-track", COVER_TRACK[density] ?? COVER_TRACK.m);
 
   const base = isHex(accent) ? accent : DEFAULT_ACCENT;
   const { a400, a500, a600, ink, rgb, w1, w2, hair } = accentShades(base, {
@@ -61,34 +76,49 @@ function apply(mode: ThemeMode, accent: string): void {
 interface ThemeState {
   mode: ThemeMode;
   accent: string;
+  density: Density;
   setMode: (mode: ThemeMode) => void;
   setAccent: (accent: string) => void;
+  setDensity: (density: Density) => void;
   init: () => void;
 }
+
+const storedDensity = (): Density => {
+  const saved = localStorage.getItem(DENSITY_KEY);
+  return saved === "s" || saved === "l" ? saved : "m";
+};
 
 export const useTheme = create<ThemeState>((set, get) => ({
   mode: (localStorage.getItem(MODE_KEY) as ThemeMode) || "dark",
   accent: localStorage.getItem(ACCENT_KEY) || DEFAULT_ACCENT,
+  density: storedDensity(),
 
   setMode: (mode) => {
     localStorage.setItem(MODE_KEY, mode);
     set({ mode });
-    apply(mode, get().accent);
+    apply(mode, get().accent, get().density);
   },
 
   setAccent: (accent) => {
     localStorage.setItem(ACCENT_KEY, accent);
     set({ accent });
-    apply(get().mode, accent);
+    apply(get().mode, accent, get().density);
+  },
+
+  setDensity: (density) => {
+    localStorage.setItem(DENSITY_KEY, density);
+    set({ density });
+    apply(get().mode, get().accent, density);
   },
 
   init: () => {
-    apply(get().mode, get().accent);
+    apply(get().mode, get().accent, get().density);
     // Track the OS theme while in "system" mode.
     window
       .matchMedia?.("(prefers-color-scheme: dark)")
       .addEventListener("change", () => {
-        if (get().mode === "system") apply("system", get().accent);
+        if (get().mode === "system")
+          apply("system", get().accent, get().density);
       });
   },
 }));

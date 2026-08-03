@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/stores/auth";
 import { useLibrary } from "@/stores/library";
+import { useTheme } from "@/stores/theme";
 import { useContentFilter } from "@/stores/contentFilter";
 import { isBlocked } from "@/lib/contentFilter";
 import { fetchMediaList, flushQueue } from "@/api/anilist";
@@ -606,7 +607,10 @@ function VirtualGrid({
   renderItem: (entry: MediaListEntry) => ReactNode;
 }) {
   const probeRef = useRef<HTMLDivElement>(null);
-  const columns = useColumnCount(probeRef);
+  // Density moves the grid track without changing the probe's own size, so the
+  // ResizeObserver inside the hook never fires for it — see `watch` there.
+  const density = useTheme((s) => s.density);
+  const columns = useColumnCount(probeRef, density);
   const rowCount = Math.ceil(items.length / columns);
 
   const virtualizer = useVirtualizer({

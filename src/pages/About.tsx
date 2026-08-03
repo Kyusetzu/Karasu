@@ -41,33 +41,38 @@ export default function About() {
   }, []);
 
   return (
-    <div className="mx-auto max-w-2xl p-8 2xl:max-w-none">
-      <header className="flex items-center gap-4">
-        <KarasuMark className="h-14 w-14" />
-        <div>
-          <div className="flex items-baseline gap-2">
-            <h1 className="font-brand text-2xl font-bold">Karasu</h1>
-            <span className="font-brand-jp text-sm text-ink-500">
-              カラス
-            </span>
-          </div>
-          <p className="text-sm text-ink-500">{t("about.tagline")}</p>
+    <div className="relative overflow-hidden">
+      {/* A single wash falling from the top, so the mark sits in light rather
+          than on a flat panel. Narrower and stronger than `panel-wash`: this
+          page has one subject and can afford to point at it. */}
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-80"
+        style={{
+          backgroundImage:
+            "radial-gradient(40rem 20rem at 50% -20%, rgba(var(--w1), .16), transparent 70%)",
+        }}
+      />
+
+      <div className="relative mx-auto max-w-136 px-8 py-12">
+        <header className="flex flex-col items-center text-center">
+          <KarasuMark className="size-28" />
+          <h1 className="mt-4 font-brand text-[2rem] font-bold uppercase leading-none tracking-[.22em] text-ink-100">
+            Karasu
+          </h1>
+          {/* 烏 — the name itself, not a transliteration of it. */}
+          <p className="mt-2 font-brand-jp text-lg text-accent-400">烏</p>
+          <p className="mt-3 text-sm text-ink-500">{t("about.tagline")}</p>
+          <p className="mt-4 text-sm leading-relaxed text-ink-300">
+            {t("about.description")}
+          </p>
           {version && (
-            <p className="mt-0.5 text-xs text-ink-600">
+            <p className="mt-4 text-2xs tabular-nums text-ink-600">
               {t("about.version", { version })}
             </p>
           )}
-        </div>
-      </header>
+        </header>
 
-      {/* Three independent cards; side by side once there's room for them. */}
-      <div className="mt-6 grid grid-cols-[repeat(auto-fit,minmax(26rem,1fr))] items-start gap-6">
-      <Card>
-        <CardTitle>{t("about.title")}</CardTitle>
-        <p className="mt-3 max-w-[80ch] text-sm leading-relaxed text-ink-300">
-          {t("about.description")}
-        </p>
-      </Card>
+      <div className="mt-8 space-y-6">
 
       <UpdateSection />
 
@@ -103,6 +108,7 @@ export default function About() {
           </Row>
         </div>
       </Card>
+      </div>
       </div>
     </div>
   );

@@ -202,7 +202,7 @@ const en = {
     CONTAINS: "Contains",
   },
   dashboard: {
-    welcomeTitle: "Welcome to Karasu 🐦‍⬛",
+    welcomeTitle: "Welcome to Karasu",
     welcomeText:
       "Your anime tracker for AniList. Connect your account to manage your list and track your progress automatically.",
     connect: "Connect with AniList",
@@ -229,6 +229,13 @@ const en = {
     airingInDays: "in {{d}}d {{h}}h",
     airingInHours: "in {{h}}h {{m}}m",
     markWatched: "Mark episode {{n}} as watched",
+  },
+  firstRun: {
+    headline: "Never lose your place again.",
+    lookAround: "Look around first",
+    step1: "Connect your AniList account — one click, no password typed here.",
+    step2: "Play an episode in the player you already use.",
+    step3: "Karasu recognises it and moves your list on.",
   },
   stats: {
     title: "Statistics",
@@ -812,7 +819,7 @@ const de: typeof en = {
     CONTAINS: "Enthält",
   },
   dashboard: {
-    welcomeTitle: "Willkommen bei Karasu 🐦‍⬛",
+    welcomeTitle: "Willkommen bei Karasu",
     welcomeText:
       "Dein Anime-Tracker für AniList. Verbinde deinen Account, um deine Liste zu verwalten und deinen Fortschritt automatisch zu tracken.",
     connect: "Mit AniList verbinden",
@@ -840,6 +847,13 @@ const de: typeof en = {
     airingInDays: "in {{d}} T {{h}} Std",
     airingInHours: "in {{h}} Std {{m}} min",
     markWatched: "Episode {{n}} gesehen",
+  },
+  firstRun: {
+    headline: "Verlier nie wieder den Faden.",
+    lookAround: "Erst mal umsehen",
+    step1: "Verbinde deinen AniList-Account — ein Klick, kein Passwort hier.",
+    step2: "Spiel eine Folge in dem Player ab, den du sowieso nutzt.",
+    step3: "Karasu erkennt sie und zählt deine Liste weiter.",
   },
   stats: {
     title: "Statistik",

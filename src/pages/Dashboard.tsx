@@ -9,7 +9,6 @@ import { useAuth } from "@/stores/auth";
 import { useContentFilter } from "@/stores/contentFilter";
 import { isBlocked } from "@/lib/contentFilter";
 import { useListMutations } from "@/hooks/useListMutations";
-import { Button } from "@/components/ui/button";
 import { SectionHeader } from "@/components/ui/section-header";
 import { IconButton } from "@/components/ui/icon-button";
 import { TitleLockup } from "@/components/TitleLockup";
@@ -19,42 +18,18 @@ import {
   PerchRule,
   TickMarks,
 } from "@/components/EmptyState";
+import FirstRun from "@/components/FirstRun";
 import NowPlayingCard from "@/components/NowPlayingCard";
 import RecommendedSection from "@/components/RecommendedSection";
 
 export default function Dashboard() {
-  const { t } = useTranslation();
   const viewer = useAuth((s) => s.viewer);
   const mode = useAuth((s) => s.mode);
   const loading = useAuth((s) => s.loading);
-  const enableLocal = useAuth((s) => s.enableLocal);
 
   if (loading) return null;
 
-  if (!viewer && mode !== "local") {
-    return (
-      <div className="grid h-full place-items-center p-8">
-        <div className="max-w-md text-center">
-          <h1 className="text-3xl font-bold">{t("dashboard.welcomeTitle")}</h1>
-          <p className="mt-3 text-sm leading-relaxed text-ink-500">
-            {t("dashboard.welcomeText")}
-          </p>
-          <Link to="/settings">
-            <Button className="mt-5">{t("dashboard.connect")}</Button>
-          </Link>
-          {/* Switches to the account-free list in place — the store flips
-              `mode`, which re-renders straight into the dashboard below. */}
-          <button
-            type="button"
-            onClick={() => enableLocal()}
-            className="mt-3 block w-full text-xs text-ink-500 underline-offset-2 hover:text-ink-300 hover:underline"
-          >
-            {t("dashboard.startLocal")}
-          </button>
-        </div>
-      </div>
-    );
-  }
+  if (!viewer && mode !== "local") return <FirstRun />;
 
   return <DashboardContent userId={viewer?.id ?? 0} />;
 }

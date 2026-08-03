@@ -47,6 +47,7 @@ import {
 import { useListMutations } from "@/hooks/useListMutations";
 import EntryEditModal from "@/components/EntryEditModal";
 import { CoverGridSkeleton } from "@/components/Skeleton";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import RandomPickModal from "@/components/RandomPickModal";
 import PresetModal from "@/components/PresetModal";
 import { loadPresets, savePresets, type Preset } from "@/lib/presets";
@@ -557,6 +558,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
           onScore={bulkScore}
           onDelete={bulkDelete}
           onClear={exitSelect}
+          names={selectedEntries.map((e) => displayTitle(e.media.title))}
         />
       )}
 
@@ -687,6 +689,7 @@ function BulkBar({
   onScore,
   onDelete,
   onClear,
+  names,
 }: {
   type: MediaType;
   count: number;
@@ -694,6 +697,7 @@ function BulkBar({
   onScore: (n: number) => void;
   onDelete: () => void;
   onClear: () => void;
+  names: string[];
 }) {
   const { t } = useTranslation();
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -736,19 +740,30 @@ function BulkBar({
         className={cn(disabled && "pointer-events-none opacity-50")}
       />
 
-      {confirmDelete ? (
-        <Button variant="danger" size="control" disabled={disabled} onClick={onDelete}>
-          {t("bulk.confirmDelete", { count })}
-        </Button>
-      ) : (
-        <Button
-          variant="dangerGhost"
-          size="control"
-          disabled={disabled}
-          onClick={() => setConfirmDelete(true)}
-        >
-          <Trash2 className="size-3.5" /> {t("common.remove")}
-        </Button>
+      <Button
+        variant="dangerGhost"
+        size="control"
+        disabled={disabled}
+        onClick={() => setConfirmDelete(true)}
+      >
+        <Trash2 className="size-3.5" /> {t("common.remove")}
+      </Button>
+
+      {confirmDelete && (
+        <ConfirmDialog
+          title={t(count === 1 ? "confirm.removeOne" : "confirm.removeMany", {
+            count,
+          })}
+          names={names.slice(0, 3)}
+          extra={count - 3}
+          note={t("confirm.removeNote")}
+          confirmLabel={t("common.remove")}
+          onConfirm={() => {
+            setConfirmDelete(false);
+            onDelete();
+          }}
+          onCancel={() => setConfirmDelete(false)}
+        />
       )}
 
       <Button

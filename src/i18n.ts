@@ -95,6 +95,13 @@ const en = {
     footnote:
       "Single-key shortcuts stay quiet while you are typing in a field.",
   },
+  confirm: {
+    removeOne: "Remove this title from your list?",
+    removeMany: "Remove {{count}} entries from your list?",
+    removeNote:
+      "This removes them on AniList too, and the undo in the toast cannot bring them back.",
+    andMore: "+{{n}} more",
+  },
   ctx: {
     open: "Open",
     openAniList: "Open on AniList",
@@ -378,7 +385,6 @@ const en = {
     selected: "{{count}} selected",
     setStatus: "Set status …",
     setScore: "Set score …",
-    confirmDelete: "Delete {{count}}?",
     done: "Done",
   },
   palette: {
@@ -728,6 +734,13 @@ const de: typeof en = {
     footnote:
       "Einzeltasten-Kürzel bleiben still, solange du in einem Feld tippst.",
   },
+  confirm: {
+    removeOne: "Diesen Titel von deiner Liste entfernen?",
+    removeMany: "{{count}} Einträge von deiner Liste entfernen?",
+    removeNote:
+      "Das entfernt sie auch auf AniList, und das Rückgängig im Toast holt sie nicht zurück.",
+    andMore: "+{{n}} weitere",
+  },
   ctx: {
     open: "Öffnen",
     openAniList: "Auf AniList öffnen",
@@ -1013,7 +1026,6 @@ const de: typeof en = {
     selected: "{{count}} ausgewählt",
     setStatus: "Status setzen …",
     setScore: "Bewertung setzen …",
-    confirmDelete: "{{count}} löschen?",
     done: "Fertig",
   },
   palette: {

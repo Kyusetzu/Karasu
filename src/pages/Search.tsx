@@ -10,7 +10,7 @@ import { isTauri } from "@/api/anilist";
 import { adultQueryArg, isBlocked } from "@/lib/contentFilter";
 import { useContentFilter } from "@/stores/contentFilter";
 import { EmptyState, StruckQuery } from "@/components/EmptyState";
-import { cn } from "@/lib/utils";
+import { Pill } from "@/components/ui/pill";
 
 export default function Search() {
   const { t } = useTranslation();
@@ -43,8 +43,8 @@ export default function Search() {
     <div className="flex h-full flex-col">
       <div className="px-8 pt-6">
         <h1 className="text-2xl font-bold">{t("search.title")}</h1>
-        <div className="mt-4 flex items-center gap-2">
-          <div className="relative max-w-md flex-1">
+        <div className="mt-4 max-w-136">
+          <div className="relative">
             <SearchIcon
               className="pointer-events-none absolute left-3 top-1/2 size-3.75 -translate-y-1/2 text-ink-600"
             />
@@ -53,23 +53,21 @@ export default function Search() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder={t("search.placeholder")}
-              className="h-10 pl-9"
+              className="h-11 pl-9"
             />
           </div>
-          <div className="flex rounded-lg border border-surface-700">
+          {/* Chips rather than a segmented pair: the two mediums are one
+              choice among several the search will grow, and a bordered
+              two-button group reads as a control that owns the row. */}
+          <div className="mt-2.5 flex flex-wrap gap-1.5">
             {(["ANIME", "MANGA"] as const).map((tp) => (
-              <button
+              <Pill
                 key={tp}
+                active={type === tp}
                 onClick={() => setType(tp)}
-                className={cn(
-                  "h-10 px-4 text-sm font-medium first:rounded-l-lg last:rounded-r-lg",
-                  type === tp
-                    ? "bg-accent-600 text-accent-ink"
-                    : "text-ink-500 hover:bg-surface-800 hover:text-ink-100",
-                )}
               >
                 {tp === "ANIME" ? t("search.anime") : t("search.manga")}
-              </button>
+              </Pill>
             ))}
           </div>
         </div>

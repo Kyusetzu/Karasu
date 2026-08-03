@@ -48,13 +48,13 @@ export default function TagEditor({
       {tags.map((tag) => (
         <span
           key={tag}
-          className="flex items-center gap-1 rounded-full bg-accent-600/20 px-2 py-0.5 text-xs text-accent-300"
+          className="flex items-center gap-1 rounded-full bg-accent-600/20 px-2 py-0.5 text-xs text-accent-400"
         >
           {tag}
           <button
             type="button"
             onClick={() => remove(tag)}
-            className="text-accent-300/70 hover:text-accent-200"
+            className="text-accent-400/70 hover:text-accent-400"
             aria-label={t("tags.remove", { tag })}
           >
             <X className="size-2.75" />

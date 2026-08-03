@@ -152,9 +152,9 @@ function LibraryRow({
   const total = entry?.media.episodes ?? null;
 
   return (
-    <div className="flex gap-4 rounded-xl border border-surface-800 bg-surface-900 p-3">
+    <div className="flex gap-4 rounded-xl border border-hair bg-surface-900 p-3 panel-wash">
       <Link to={`/media/${lib.mediaId}`} className="shrink-0">
-        <div className="h-24 w-16 overflow-hidden rounded-md bg-surface-800">
+        <div className="h-24 w-16 overflow-hidden rounded-lg bg-surface-800">
           {cover && (
             <img
               src={cover}
@@ -191,7 +191,7 @@ function LibraryRow({
                   "flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors",
                   watched
                     ? "bg-surface-800 text-ink-500 hover:text-ink-200"
-                    : "bg-accent-600/15 text-accent-300 hover:bg-accent-600/30",
+                    : "bg-accent-600/15 text-accent-400 hover:bg-accent-600/30",
                 )}
               >
                 <Play className="size-2.5" fill="currentColor" />

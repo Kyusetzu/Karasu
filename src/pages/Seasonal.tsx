@@ -5,11 +5,11 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { currentSeason, seasonalAnime, type Season } from "@/api/queries";
 import { isTauri } from "@/api/anilist";
 import MediaCard from "@/components/MediaCard";
+import SeasonPicker from "@/components/SeasonPicker";
 import { Button } from "@/components/ui/button";
 import { adultQueryArg, isBlocked } from "@/lib/contentFilter";
 import { useContentFilter } from "@/stores/contentFilter";
 import { EmptyState, TickMarks } from "@/components/EmptyState";
-import { cn } from "@/lib/utils";
 
 const SEASONS: Season[] = ["WINTER", "SPRING", "SUMMER", "FALL"];
 
@@ -39,45 +39,26 @@ export default function Seasonal() {
   return (
     <div className="flex h-full flex-col">
       <div className="px-8 pt-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">{t("seasonal.title")}</h1>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setPeriod((p) => shift(p.season, p.year, -1))}
-              aria-label={t("seasonal.prev")}
-            >
-              <ChevronLeft className="size-4.5" />
-            </Button>
-            <span className="w-36 text-center text-sm font-semibold">
-              {t(`season.${season}`)} {year}
-            </span>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setPeriod((p) => shift(p.season, p.year, 1))}
-              aria-label={t("seasonal.next")}
-            >
-              <ChevronRight className="size-4.5" />
-            </Button>
-          </div>
-        </div>
-        <div className="mt-3 flex gap-1">
-          {SEASONS.map((s) => (
-            <button
-              key={s}
-              onClick={() => setPeriod({ season: s, year })}
-              className={cn(
-                "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
-                s === season
-                  ? "bg-accent-600 text-accent-ink"
-                  : "text-ink-500 hover:bg-surface-800 hover:text-ink-100",
-              )}
-            >
-              {t(`season.${s}`)}
-            </button>
-          ))}
+        <h1 className="sr-only">{t("seasonal.title")}</h1>
+        <div className="flex items-center gap-2">
+          <SeasonPicker season={season} year={year} onPick={setPeriod} />
+          <span className="section-rule" />
+          <Button
+            variant="ghost"
+            size="iconControl"
+            onClick={() => setPeriod((p) => shift(p.season, p.year, -1))}
+            aria-label={t("seasonal.prev")}
+          >
+            <ChevronLeft className="size-4.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="iconControl"
+            onClick={() => setPeriod((p) => shift(p.season, p.year, 1))}
+            aria-label={t("seasonal.next")}
+          >
+            <ChevronRight className="size-4.5" />
+          </Button>
         </div>
       </div>
 

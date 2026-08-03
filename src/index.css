@@ -190,6 +190,10 @@
      dark surface reads as lit from above — on a white panel it is invisible,
      so light theme inverts it to a faint shadow line instead. */
   --catch-light: rgba(255, 255, 255, 0.09);
+
+  /* The shadow cast *into* an inset well. Black at .55 is right against a
+     near-black page and is a bruise on a white one, so it is a token. */
+  --well-shadow: rgba(0, 0, 0, 0.55);
 }
 
 /* Light theme: override the surface/ink tokens; accent is set at runtime. */
@@ -218,6 +222,7 @@
 
   --scrim: 244, 246, 249;
   --catch-light: rgba(11, 13, 18, 0.07);
+  --well-shadow: rgba(11, 13, 18, 0.14);
 
   color-scheme: light;
 }
@@ -366,8 +371,28 @@ nav a {
 @utility inset-well {
   background-color: var(--color-surface-950);
   box-shadow:
-    inset 0 0.125rem 0.375rem rgba(0, 0, 0, 0.55),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+    inset 0 0.125rem 0.375rem var(--well-shadow),
+    inset 0 0 0 1px var(--catch-light);
+}
+
+/* The vertical accent stripe down the left edge of an inset well. It marks the
+   slab as *this app's* rather than a generic panel, and fading at both ends
+   keeps it from reading as a border. */
+@utility well-edge {
+  &::before {
+    content: "";
+    position: absolute;
+    inset-block: 0;
+    left: 0;
+    width: 0.125rem;
+    pointer-events: none;
+    background: linear-gradient(
+      180deg,
+      transparent,
+      var(--color-accent-500),
+      transparent
+    );
+  }
 }
 
 /* Transitions are suspended for one frame while the theme swaps.

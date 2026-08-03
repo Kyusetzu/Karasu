@@ -64,7 +64,10 @@ export default function NowPlayingCard() {
   const isManga = current.mediaType === "MANGA";
 
   return (
-    <div className="rounded-xl border border-accent-600/40 bg-gradient-to-r from-accent-600/15 to-transparent p-4">
+    // Cut *into* the page rather than raised off it. This card arrives
+    // unprompted every evening, so reading as a different substance is how it
+    // announces itself without shouting.
+    <div className="inset-well well-edge relative animate-rise-in overflow-hidden rounded-[.875rem] px-4.5 py-4">
       <div className="flex items-center gap-4">
         <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-accent-600/25 text-accent-400">
           {isManga ? (
@@ -76,12 +79,12 @@ export default function NowPlayingCard() {
           )}
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-medium uppercase tracking-wide text-accent-400">
+          <p className="text-2xs font-medium uppercase tracking-[.09em] text-accent-400">
             {t(isManga ? "nowPlaying.headingManga" : "nowPlaying.heading", {
               process: current.process.replace(".exe", ""),
             })}
           </p>
-          <p className="truncate font-semibold">
+          <p className="truncate text-[1.0625rem] font-semibold text-ink-100">
             {current.mediaId ? (
               <Link to={`/media/${current.mediaId}`} className="hover:underline">
                 {title}
@@ -90,7 +93,7 @@ export default function NowPlayingCard() {
               title
             )}
             {current.episode !== null && (
-              <span className="text-ink-300">
+              <span className="font-medium text-ink-500">
                 {" "}
                 —{" "}
                 {t(isManga ? "common.chapter" : "common.episode", {

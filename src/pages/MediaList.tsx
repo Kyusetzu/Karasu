@@ -56,6 +56,8 @@ import { useColumnCount } from "@/hooks/useColumnCount";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { Segmented } from "@/components/ui/segmented";
+import { FilterSelect } from "@/components/ui/filter-select";
+import { StatusTabs } from "@/components/ui/status-tabs";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
@@ -336,108 +338,87 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
         </div>
       )}
 
-      <div className="space-y-4 px-8 pt-6">
+      <div className="border-b border-surface-800 px-8 pb-3.5 pt-6">
         <div className="flex items-center justify-between gap-4">
-          <h1 className="text-2xl font-bold">
-            {type === "ANIME" ? t("list.animeTitle") : t("list.mangaTitle")}
-          </h1>
-          <div className="flex items-center gap-1">
+          <div className="flex items-baseline gap-2.5">
+            <h1 className="text-2xl font-bold text-ink-100">
+              {type === "ANIME" ? t("list.animeTitle") : t("list.mangaTitle")}
+            </h1>
+            <span className="font-brand-jp text-[.8125rem] tracking-[.04em] text-ink-600">
+              {type === "ANIME" ? t("list.animeNative") : t("list.mangaNative")}
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            {/* Labelled, not a bare icon: this one changes the whole
+                interaction model, so it is worth the width. */}
             <Button
-              variant={selectMode ? "secondary" : "ghost"}
-              size="icon"
+              variant={selectMode ? "secondary" : "outline"}
+              size="control"
               onClick={() => (selectMode ? exitSelect() : setSelectMode(true))}
-              aria-label={t("bulk.select")}
-              title={t("bulk.select")}
             >
-              <CheckSquare className="size-4" />
+              <CheckSquare className="size-3.75" />
+              {t("bulk.select")}
             </Button>
-            <Button
+            <IconButton
               variant="ghost"
-              size="icon"
               onClick={() => refetch()}
               disabled={isRefetching}
               aria-label={t("common.reload")}
             >
-              <RefreshCw className={cn("size-4", isRefetching && "animate-spin")} />
-            </Button>
+              <RefreshCw
+                className={cn("size-4", isRefetching && "animate-spin")}
+              />
+            </IconButton>
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-1">
-          {STATUS_ORDER.map((status) => {
-            const count = byStatus.get(status)?.length ?? 0;
-            return (
-              <button
-                key={status}
-                onClick={() => setTab(status)}
-                className={cn(
-                  "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
-                  tab === status
-                    ? "bg-accent-600 text-accent-ink"
-                    : "text-ink-500 hover:bg-surface-800 hover:text-ink-100",
-                )}
-              >
-                {t(`status.${type}.${status}`)}
-                {count > 0 && (
-                  <span className="ml-1.5 text-xs opacity-70">{count}</span>
-                )}
-              </button>
-            );
-          })}
-        </div>
+        <StatusTabs
+          className="mt-4"
+          value={tab}
+          onChange={setTab}
+          tabs={STATUS_ORDER.map((status) => ({
+            value: status,
+            label: t(`status.${type}.${status}`),
+            count: byStatus.get(status)?.length ?? 0,
+          }))}
+        />
+      </div>
 
-        <div className="flex items-center gap-2">
-          <div className="relative max-w-xs flex-1">
+      <div className="flex flex-wrap items-center gap-2 px-8 py-3.5">
+          <div className="relative max-w-68 flex-[1_1_11rem]">
             <SearchIcon
-              className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-ink-600"
+              className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-ink-600"
             />
             <Input
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
               placeholder={t("list.filterPlaceholder")}
-              className="pl-8"
+              className="h-8.5 pl-8"
             />
           </div>
-          <select
+          <FilterSelect
+            label={t("list.sortLabel")}
             value={sort}
-            onChange={(e) => setSort(e.target.value as SortKey)}
-            className="h-9 rounded-lg border border-surface-700 bg-surface-900 px-2 text-sm text-ink-300 focus:border-accent-500 focus:outline-none"
-          >
-            {SORT_KEYS.map((k) => (
-              <option key={k} value={k}>
-                {t(`sort.${k}`)}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => setSort(v as SortKey)}
+            options={SORT_KEYS.map((k) => ({ value: k, label: t(`sort.${k}`) }))}
+          />
           {allTags.length > 0 && (
-            <select
+            <FilterSelect
+              label={t("list.tagLabel")}
               value={tagFilter}
-              onChange={(e) => setTagFilter(e.target.value)}
-              className="h-9 max-w-32 rounded-lg border border-surface-700 bg-surface-900 px-2 text-sm text-ink-300 focus:border-accent-500 focus:outline-none"
-              aria-label={t("tags.filter")}
-            >
-              <option value="">{t("tags.allTags")}</option>
-              {allTags.map((tag) => (
-                <option key={tag} value={tag}>
-                  {tag}
-                </option>
-              ))}
-            </select>
+              onChange={setTagFilter}
+              placeholder={t("tags.allTags")}
+              options={allTags.map((tag) => ({ value: tag, label: tag }))}
+            />
           )}
           {presets.length > 0 && (
-            <select
+            <FilterSelect
+              label={t("list.presetLabel")}
               value=""
-              onChange={(e) => e.target.value && applyPreset(e.target.value)}
-              className="h-9 max-w-32 rounded-lg border border-surface-700 bg-surface-900 px-2 text-sm text-ink-300 focus:border-accent-500 focus:outline-none"
-              aria-label={t("presets.apply")}
-            >
-              <option value="">{t("presets.apply")}</option>
-              {presets.map((p) => (
-                <option key={p.name} value={p.name}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
+              onChange={(v) => v && applyPreset(v)}
+              placeholder={t("presets.apply")}
+              options={presets.map((p) => ({ value: p.name, label: p.name }))}
+            />
           )}
           <IconButton
             variant="surface"
@@ -473,10 +454,9 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
               },
             ]}
           />
-        </div>
       </div>
 
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-8 py-6">
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-8 pb-12 pt-1">
         {entries.length === 0 ? (
           <p className="text-sm text-ink-600">{t("list.empty")}</p>
         ) : grid ? (

@@ -38,17 +38,33 @@ const REDUCE_MOTION_KEY = "karasu-reduce-motion";
 /**
  * Kills every transition for one frame.
  *
- * Transitioning a `var()`-driven `color` makes the browser hold the *old*
- * computed value across a theme swap, so panels stay dark for a beat after
- * switching to light. Suspending transitions while the new values land avoids
- * animating between two palettes that were never meant to meet.
+ * Transitioning a `var()`-driven colour makes the browser hold the *old*
+ * computed value across a theme swap — and it holds it **permanently**, not for
+ * a beat: a panel with `transition-surface` keeps its dark fill in light theme
+ * until something else forces it to re-resolve. Measured directly: two sibling
+ * divs both `bg-surface-850`, only one with `transition-surface`, and after the
+ * swap the plain one reads `#eef1f5` while the transitioned one is still
+ * `#161a23`.
  *
- * The timeout is not redundant: `requestAnimationFrame` does not run in a
- * hidden or minimised window, and leaving the attribute on would disable every
- * transition in the app permanently.
+ * **Two forced reflows are the fix, and neither is decoration.** Everything in
+ * one task collapses into a single style recalculation, so:
+ *
+ * 1. Without the flush *here*, the browser decides whether to start a
+ *    transition against the values in effect before the task — which still had
+ *    `background-color` in `transition-property`. The transition starts anyway
+ *    and the guard does nothing.
+ * 2. Without the flush at the end of {@link apply}, the recalculation that
+ *    resolves the new palette is deferred past the frame that removes the
+ *    attribute, so it lands with transitions live again. Measured: every swap
+ *    then renders the *previous* swap's palette, one behind forever.
+ *
+ * The timeout is not redundant either: `requestAnimationFrame` does not run in
+ * a hidden or minimised window, and leaving the attribute on would disable
+ * every transition in the app permanently.
  */
 function suspendTransitions(html: HTMLElement): void {
   html.setAttribute("data-swapping", "");
+  void html.offsetHeight;
   const clear = () => html.removeAttribute("data-swapping");
   requestAnimationFrame(() => requestAnimationFrame(clear));
   setTimeout(clear, 120);
@@ -98,6 +114,11 @@ function apply(
   root.setProperty("--w1", w1);
   root.setProperty("--w2", w2);
   root.setProperty("--hair", hair);
+
+  // Resolve the new palette while `data-swapping` is still on — see
+  // `suspendTransitions`. Deferring this past the frame that clears the
+  // attribute leaves every swap rendering the previous one's colours.
+  void html.offsetHeight;
 }
 
 interface ThemeState {

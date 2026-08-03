@@ -482,12 +482,12 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
             )}
           />
         ) : (
-          <div className="overflow-hidden rounded-xl border border-surface-800 bg-surface-800">
+          <div className="overflow-hidden rounded-xl border border-surface-800">
             <VirtualGrid
               items={entries}
               scrollRef={scrollRef}
-              gridClassName="grid gap-px 2xl:grid-cols-2"
-              rowGap={1}
+              gridClassName="grid 2xl:grid-cols-2"
+              rowGap={0}
               estimateRowHeight={78}
               renderItem={(entry) => (
                 <ListRow
@@ -657,51 +657,50 @@ function BulkBar({
   const disabled = count === 0;
 
   return (
-    <div className="flex flex-wrap items-center gap-3 border-t border-surface-700 bg-surface-900 px-8 py-3">
-      <span className="text-sm font-medium text-ink-100">
+    // Same inset-well substance as the now-playing card, for the same reason:
+    // it appears unprompted over content that is already there, and reading as
+    // a different material is how it announces itself without a colour shout.
+    <div className="inset-well well-edge relative mx-8 mb-5 flex flex-wrap items-center gap-2.5 overflow-hidden rounded-[.875rem] px-4.5 py-3">
+      <span className="text-[.8125rem] font-semibold tabular-nums text-ink-100">
         {t("bulk.selected", { count })}
       </span>
+      <span className="h-4 w-px bg-surface-700" />
 
-      <select
+      <FilterSelect
+        label={t("bulk.setStatus")}
         value=""
-        disabled={disabled}
-        onChange={(e) => e.target.value && onStatus(e.target.value as MediaListStatus)}
-        className="h-9 rounded-lg border border-surface-700 bg-surface-900 px-2 text-sm text-ink-300 focus:border-accent-500 focus:outline-none disabled:opacity-50"
-        aria-label={t("bulk.setStatus")}
-      >
-        <option value="">{t("bulk.setStatus")}</option>
-        {STATUS_ORDER.map((s) => (
-          <option key={s} value={s}>
-            {t(`status.${type}.${s}`)}
-          </option>
-        ))}
-      </select>
+        placeholder="—"
+        onChange={(v) => v && onStatus(v as MediaListStatus)}
+        options={STATUS_ORDER.map((s) => ({
+          value: s,
+          label: t(`status.${type}.${s}`),
+        }))}
+        className={cn(disabled && "pointer-events-none opacity-50")}
+      />
 
-      <select
+      <FilterSelect
+        label={t("bulk.setScore")}
         value=""
-        disabled={disabled}
-        onChange={(e) => e.target.value !== "" && onScore(Number(e.target.value))}
-        className="h-9 rounded-lg border border-surface-700 bg-surface-900 px-2 text-sm text-gold focus:border-accent-500 focus:outline-none disabled:opacity-50"
-        aria-label={t("bulk.setScore")}
-      >
-        <option value="">{t("bulk.setScore")}</option>
-        <option value={0}>–</option>
-        {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
-          <option key={n} value={n}>
-            ★ {n}
-          </option>
-        ))}
-      </select>
+        placeholder="—"
+        onChange={(v) => v !== "" && onScore(Number(v))}
+        options={[
+          { value: "0", label: "–" },
+          ...Array.from({ length: 10 }, (_, i) => ({
+            value: String(i + 1),
+            label: `★ ${i + 1}`,
+          })),
+        ]}
+        className={cn(disabled && "pointer-events-none opacity-50")}
+      />
 
       {confirmDelete ? (
-        <Button variant="danger" size="sm" disabled={disabled} onClick={onDelete}>
+        <Button variant="danger" size="control" disabled={disabled} onClick={onDelete}>
           {t("bulk.confirmDelete", { count })}
         </Button>
       ) : (
         <Button
-          variant="ghost"
-          size="sm"
-          className="text-red-400"
+          variant="dangerGhost"
+          size="control"
           disabled={disabled}
           onClick={() => setConfirmDelete(true)}
         >
@@ -711,7 +710,7 @@ function BulkBar({
 
       <Button
         variant="ghost"
-        size="sm"
+        size="control"
         className="ml-auto"
         onClick={onClear}
       >
@@ -870,11 +869,21 @@ const GridCard = memo(function GridCard({
 });
 
 /** Read-only tag chips derived from an entry's notes (capped for layout). */
-function TagChips({ notes, max = 3 }: { notes: string | null; max?: number }) {
+function TagChips({
+  notes,
+  max = 3,
+  className,
+}: {
+  notes: string | null;
+  max?: number;
+  className?: string;
+}) {
   const tags = tagsOf(notes);
-  if (tags.length === 0) return null;
+  // Still occupies its column when empty — a row whose neighbours shift left
+  // because it happens to have no tags is harder to scan than a gap.
+  if (tags.length === 0) return className ? <div className={className} /> : null;
   return (
-    <div className="mt-1 flex flex-wrap gap-1">
+    <div className={cn("mt-1 flex flex-wrap gap-1", className)}>
       {tags.slice(0, max).map((tag) => (
         <span
           key={tag}
@@ -938,7 +947,7 @@ const ListRow = memo(function ListRow({
       data-media-id={media.id}
       data-media-type={media.type}
       className={cn(
-        "flex items-center gap-3 px-4 py-2.5",
+        "flex items-center gap-3.5 border-b border-surface-950 px-3.5 py-2 transition-surface",
         selected ? "bg-accent-600/10" : "bg-surface-900 hover:bg-surface-850",
       )}
     >
@@ -953,27 +962,24 @@ const ListRow = memo(function ListRow({
           src={media.coverImage.large ?? ""}
           alt=""
           loading="lazy"
-          className="h-14 w-10 rounded object-cover"
+          className="h-13.5 w-9.5 rounded-[.3125rem] object-cover"
         />
       </Link>
       <Link to={`/media/${media.id}`} className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-ink-100">
-          {displayTitle(media.title)}
-        </p>
-        <p className="text-xs text-ink-600">
-          {media.format ?? ""}
-          {media.seasonYear ? ` · ${media.seasonYear}` : ""}
-        </p>
-        <TagChips notes={entry.notes} max={4} />
+        <TitleLockup title={media.title} />
       </Link>
 
       {selectMode ? null : (
         <>
+      {/* Fixed-width from here on, so the columns line up down the list even
+          though every title above them is a different length. */}
+      <TagChips notes={entry.notes} max={4} className="w-32 justify-end" />
+
       {/* Quick score */}
       <select
         value={entry.score}
         onChange={(e) => onQuickSave(entry, { score: Number(e.target.value) })}
-        className="h-8 rounded-lg border border-surface-700 bg-surface-900 px-1.5 text-sm text-gold focus:border-accent-500 focus:outline-none"
+        className="h-8 w-13 rounded-md border border-surface-800 bg-surface-900 px-1.5 text-xs text-gold transition-surface focus:border-accent-500 focus:outline-none"
         aria-label={t("common.score")}
         title={t("common.score")}
       >
@@ -995,7 +1001,7 @@ const ListRow = memo(function ListRow({
           onPointerEnter={openProgress}
           onFocus={openProgress}
           onMouseDown={openProgress}
-          className="h-8 w-24 rounded-lg border border-surface-700 bg-surface-900 px-1.5 text-sm tabular-nums text-ink-300 focus:border-accent-500 focus:outline-none"
+          className="h-8 w-18 rounded-md border border-surface-800 bg-surface-900 px-1.5 text-xs tabular-nums text-ink-300 transition-surface focus:border-accent-500 focus:outline-none"
           aria-label={t("common.progress")}
           title={t("common.progress")}
         >
@@ -1012,7 +1018,7 @@ const ListRow = memo(function ListRow({
           )}
         </select>
       ) : (
-        <span className="w-24 text-right text-sm tabular-nums text-ink-300">
+        <span className="w-18 pr-1.5 text-right text-xs tabular-nums text-ink-300">
           {entry.progress}
           {max ? ` / ${max}` : ""}
         </span>
@@ -1020,48 +1026,47 @@ const ListRow = memo(function ListRow({
 
       <div className="flex gap-1">
         {canPlayNext && (
-          <Button
+          <IconButton
             variant="ghost"
-            size="icon"
+            size="xs"
             className="text-accent-400"
             onClick={() => play(media.id)}
             aria-label={t("common.playNext")}
             title={t("common.playNext")}
           >
-            <Play className="size-3.75" />
-          </Button>
+            <Play className="size-3.5" />
+          </IconButton>
         )}
-        <Button
-          variant="secondary"
-          size="icon"
+        <IconButton
+          variant="surface"
+          size="xs"
           onClick={() => onQuickSave(entry, { progress: entry.progress + 1 })}
           disabled={!canIncrement(entry)}
           aria-label={t("common.plusOne")}
           title={t("common.plusOne")}
         >
-          <Plus className="size-3.75" />
-        </Button>
+          <Plus className="size-3.5" />
+        </IconButton>
         {entry.status !== "COMPLETED" && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-emerald-400"
+          <IconButton
+            variant="success"
+            size="xs"
             onClick={() => onComplete(entry)}
             aria-label={t("common.complete")}
             title={t("common.complete")}
           >
-            <CheckCheck className="size-3.75" />
-          </Button>
+            <CheckCheck className="size-3.5" />
+          </IconButton>
         )}
-        <Button
+        <IconButton
           variant="ghost"
-          size="icon"
+          size="xs"
           onClick={() => onEdit(entry)}
           aria-label={t("common.edit")}
           title={t("common.edit")}
         >
           <Pencil className="size-3.5" />
-        </Button>
+        </IconButton>
       </div>
         </>
       )}

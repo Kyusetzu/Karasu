@@ -80,13 +80,15 @@ export default function Bell() {
     <div ref={ref} className="relative flex items-center">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="relative grid h-9 w-10 place-items-center text-ink-500 hover:bg-surface-800 hover:text-ink-100"
+        className="relative grid h-9 w-11 place-items-center text-ink-500 transition-surface hover:bg-surface-850 hover:text-ink-100"
         aria-label={t("notif.title")}
         title={t("notif.title")}
       >
         <BellIcon className="size-3.75" />
         {unread > 0 && (
-          <span className="absolute right-1.5 top-1.5 grid h-3.5 min-w-3.5 place-items-center rounded-full bg-accent-500 px-1 text-2xs font-bold text-accent-ink">
+          // The `s950` ring is what separates the badge from the bell glyph
+          // beneath it — without it the two silhouettes merge at this size.
+          <span className="absolute right-1.5 top-1.5 grid h-3.25 min-w-3.25 place-items-center rounded-[.4375rem] border border-surface-950 bg-accent-500 px-1 text-[.5625rem] font-semibold text-accent-ink">
             {unread > 9 ? "9+" : unread}
           </span>
         )}

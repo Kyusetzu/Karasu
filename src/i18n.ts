@@ -459,6 +459,7 @@ const en = {
     updateNowTitle: "Update progress now",
     skipTitle: "Don't update this one",
     soon: "soon",
+    idle: "Watching for players — nothing playing",
   },
   settings: {
     title: "Settings",
@@ -1014,6 +1015,7 @@ const de: typeof en = {
     updateNowTitle: "Fortschritt jetzt aktualisieren",
     skipTitle: "Nicht aktualisieren",
     soon: "gleich",
+    idle: "Warte auf Player – nichts läuft",
   },
   settings: {
     title: "Einstellungen",

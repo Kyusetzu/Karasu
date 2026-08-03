@@ -27,6 +27,8 @@ export function useListMutations(userId: number, mediaType: MediaType) {
   const snapshot = (entry: MediaListEntry): EntrySnapshot => ({
     status: entry.status,
     progress: entry.progress,
+    // Entries cached before schema v7 have no volume count at all.
+    progressVolumes: entry.progressVolumes ?? 0,
     score: entry.score,
     repeat: entry.repeat,
     notes: entry.notes,
@@ -43,6 +45,8 @@ export function useListMutations(userId: number, mediaType: MediaType) {
     switch (head.field) {
       case "progress":
         return t("receipt.progress", { title, n: head.value as number });
+      case "progressVolumes":
+        return t("receipt.volumes", { title, n: head.value as number });
       case "status":
         return t("receipt.status", {
           title,
@@ -66,6 +70,7 @@ export function useListMutations(userId: number, mediaType: MediaType) {
               ? {
                   ...e,
                   progress: input.progress ?? e.progress,
+                  progressVolumes: input.progressVolumes ?? e.progressVolumes,
                   score: input.score ?? e.score,
                   status: input.status ?? e.status,
                   repeat: input.repeat ?? e.repeat,

@@ -100,6 +100,17 @@ CREATE TABLE IF NOT EXISTS library_files (
 PRAGMA user_version = 6;
 ";
 
+/// Schema v7: volumes read, for the local list.
+///
+/// AniList tracks manga on two axes and always has (`progressVolumes`); the
+/// local list only ever stored chapters, so a volume edit made without an
+/// account was silently dropped. Added rather than backfilled — there is no
+/// way to infer volumes from chapters, and guessing would be worse than zero.
+const MIGRATION_V7: &str = "
+ALTER TABLE local_list ADD COLUMN progress_volumes INTEGER NOT NULL DEFAULT 0;
+PRAGMA user_version = 7;
+";
+
 /// One in-app notification (mirrors a shown desktop toast).
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct NotificationRow {
@@ -131,6 +142,7 @@ pub struct LocalRow {
     pub media_type: String,
     pub status: String,
     pub progress: i64,
+    pub progress_volumes: i64,
     pub score: f64,
     pub repeat: i64,
     pub notes: String,
@@ -168,6 +180,10 @@ impl Db {
         if version < 6 {
             conn.execute_batch(MIGRATION_V6)
                 .map_err(|e| format!("Migration v6 failed: {e}"))?;
+        }
+        if version < 7 {
+            conn.execute_batch(MIGRATION_V7)
+                .map_err(|e| format!("Migration v7 failed: {e}"))?;
         }
         Ok(Db(Mutex::new(conn)))
     }
@@ -310,6 +326,7 @@ impl Db {
         media_type: &str,
         status: &str,
         progress: i64,
+        progress_volumes: i64,
         score: f64,
         repeat: i64,
         notes: &str,
@@ -319,19 +336,20 @@ impl Db {
         let conn = self.0.lock().unwrap();
         conn.execute(
             "INSERT INTO local_list
-                (media_id, media_type, status, progress, score, repeat, notes, tags, updated_ms, media_json)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, '', ?8, ?9)
+                (media_id, media_type, status, progress, progress_volumes, score, repeat, notes, tags, updated_ms, media_json)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, '', ?9, ?10)
              ON CONFLICT(media_id, media_type) DO UPDATE SET
                 status = excluded.status,
                 progress = excluded.progress,
+                progress_volumes = excluded.progress_volumes,
                 score = excluded.score,
                 repeat = excluded.repeat,
                 notes = excluded.notes,
                 updated_ms = excluded.updated_ms,
                 media_json = COALESCE(excluded.media_json, local_list.media_json)",
             rusqlite::params![
-                media_id, media_type, status, progress, score, repeat, notes,
-                updated_ms, media_json
+                media_id, media_type, status, progress, progress_volumes, score,
+                repeat, notes, updated_ms, media_json
             ],
         )
         .map(|_| ())
@@ -362,19 +380,23 @@ impl Db {
 
     fn local_rows(&self, media_type: Option<&str>) -> Vec<LocalRow> {
         let conn = self.0.lock().unwrap();
-        let sql = "SELECT media_id, media_type, status, progress, score, repeat, \
-                   notes, updated_ms, media_json FROM local_list";
+        // Column order here is load-bearing: `map` reads by index, and
+        // `collect` below drops rows whose mapping errors. A mismatch does not
+        // fail loudly — it silently returns an empty list.
+        let sql = "SELECT media_id, media_type, status, progress, progress_volumes, \
+                   score, repeat, notes, updated_ms, media_json FROM local_list";
         let map = |r: &rusqlite::Row| {
             Ok(LocalRow {
                 media_id: r.get(0)?,
                 media_type: r.get(1)?,
                 status: r.get(2)?,
                 progress: r.get(3)?,
-                score: r.get(4)?,
-                repeat: r.get(5)?,
-                notes: r.get(6)?,
-                updated_ms: r.get(7)?,
-                media_json: r.get(8)?,
+                progress_volumes: r.get(4)?,
+                score: r.get(5)?,
+                repeat: r.get(6)?,
+                notes: r.get(7)?,
+                updated_ms: r.get(8)?,
+                media_json: r.get(9)?,
             })
         };
         let collect = |mut stmt: rusqlite::Statement, params: &[&dyn rusqlite::ToSql]| {
@@ -423,6 +445,7 @@ impl Db {
                 "status": row.status,
                 "score": row.score,
                 "progress": row.progress,
+                "progressVolumes": row.progress_volumes,
                 "repeat": row.repeat,
                 "notes": row.notes,
                 "updatedAt": row.updated_ms / 1000,
@@ -568,6 +591,7 @@ mod tests {
         conn.execute_batch(MIGRATION_V4).unwrap();
         conn.execute_batch(MIGRATION_V5).unwrap();
         conn.execute_batch(MIGRATION_V6).unwrap();
+        conn.execute_batch(MIGRATION_V7).unwrap();
         Db(Mutex::new(conn))
     }
 
@@ -618,11 +642,75 @@ mod tests {
         assert_eq!(rows, vec![(1, 1, "C:/anime/other-01.mkv".to_string())]);
     }
 
+    /// Schema v7. Volumes are a second axis, not a derived one: a manga read
+    /// by volume and a manga read by chapter are different states, and the
+    /// local list dropped the volume half entirely before this.
+    #[test]
+    fn local_list_round_trips_volumes() {
+        let db = mem_db();
+        db.local_upsert(7, "MANGA", "CURRENT", 120, 12, 0.0, 0, "", Some("{}"), 1_000)
+            .unwrap();
+
+        let lists: Value =
+            serde_json::from_str(&db.local_list_json("MANGA")).unwrap();
+        let entry = lists
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|g| g["status"] == "CURRENT")
+            .unwrap()["entries"][0]
+            .clone();
+        assert_eq!(entry["progress"], 120);
+        assert_eq!(entry["progressVolumes"], 12);
+
+        // A chapter-only edit must not silently reset the volume count.
+        db.local_upsert(7, "MANGA", "CURRENT", 121, 12, 0.0, 0, "", None, 2_000)
+            .unwrap();
+        let row = db.local_all().into_iter().find(|r| r.media_id == 7).unwrap();
+        assert_eq!(row.progress, 121);
+        assert_eq!(row.progress_volumes, 12);
+    }
+
+    /// The migration runs on a database that already has rows. `ALTER TABLE
+    /// ... DEFAULT 0` has to leave them readable rather than erroring or
+    /// yielding NULL, which `local_rows` would drop on the floor.
+    #[test]
+    fn migration_v7_backfills_existing_rows_with_zero() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(MIGRATIONS).unwrap();
+        conn.execute_batch(MIGRATION_V2).unwrap();
+        conn.execute_batch(MIGRATION_V3).unwrap();
+        conn.execute_batch(MIGRATION_V4).unwrap();
+        conn.execute_batch(MIGRATION_V5).unwrap();
+        conn.execute_batch(MIGRATION_V6).unwrap();
+        conn.execute(
+            "INSERT INTO local_list
+                (media_id, media_type, status, progress, score, repeat, notes, tags, updated_ms)
+             VALUES (3, 'MANGA', 'CURRENT', 40, 0, 0, '', '', 1)",
+            [],
+        )
+        .unwrap();
+
+        conn.execute_batch(MIGRATION_V7).unwrap();
+
+        let db = Db(Mutex::new(conn));
+        let row = db.local_all().into_iter().find(|r| r.media_id == 3).unwrap();
+        assert_eq!(row.progress, 40);
+        assert_eq!(row.progress_volumes, 0);
+        let version: i64 = db
+            .0
+            .lock()
+            .unwrap()
+            .query_row("PRAGMA user_version", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(version, 7);
+    }
+
     #[test]
     fn local_upsert_and_render() {
         let db = mem_db();
         db.local_upsert(
-            5, "ANIME", "CURRENT", 3, 8.0, 1, "note",
+            5, "ANIME", "CURRENT", 3, 0, 8.0, 1, "note",
             Some(r#"{"id":5,"title":{"romaji":"X"}}"#), 2_000,
         )
         .unwrap();
@@ -647,10 +735,10 @@ mod tests {
     #[test]
     fn local_upsert_keeps_media_json_on_field_edit() {
         let db = mem_db();
-        db.local_upsert(1, "MANGA", "PLANNING", 0, 0.0, 0, "", Some("{\"id\":1}"), 1_000)
+        db.local_upsert(1, "MANGA", "PLANNING", 0, 0, 0.0, 0, "", Some("{\"id\":1}"), 1_000)
             .unwrap();
         // Edit without re-supplying media metadata.
-        db.local_upsert(1, "MANGA", "CURRENT", 2, 0.0, 0, "", None, 3_000)
+        db.local_upsert(1, "MANGA", "CURRENT", 2, 1, 0.0, 0, "", None, 3_000)
             .unwrap();
         let rows = db.local_all();
         assert_eq!(rows.len(), 1);
@@ -661,7 +749,7 @@ mod tests {
     #[test]
     fn local_delete_removes_row() {
         let db = mem_db();
-        db.local_upsert(9, "ANIME", "COMPLETED", 12, 10.0, 0, "", Some("{}"), 1)
+        db.local_upsert(9, "ANIME", "COMPLETED", 12, 0, 10.0, 0, "", Some("{}"), 1)
             .unwrap();
         db.local_delete(9, "ANIME").unwrap();
         assert!(db.local_all().is_empty());

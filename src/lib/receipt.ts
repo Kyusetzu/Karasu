@@ -4,13 +4,21 @@ import type { MediaListStatus, SaveEntryInput } from "@/api/types";
 export interface EntrySnapshot {
   status: MediaListStatus;
   progress: number;
+  progressVolumes: number;
   score: number;
   repeat: number;
   notes: string | null;
 }
 
 /** Every field of a save that is actually an edit, minus the id. */
-const FIELDS = ["status", "progress", "score", "repeat", "notes"] as const;
+const FIELDS = [
+  "status",
+  "progress",
+  "progressVolumes",
+  "score",
+  "repeat",
+  "notes",
+] as const;
 
 /**
  * The save that puts an entry back the way it was.
@@ -65,7 +73,14 @@ export function headline(
   input: SaveEntryInput,
   before: EntrySnapshot,
 ): { field: (typeof FIELDS)[number]; value: unknown } | null {
-  const order = ["progress", "status", "score", "repeat", "notes"] as const;
+  const order = [
+    "progress",
+    "progressVolumes",
+    "status",
+    "score",
+    "repeat",
+    "notes",
+  ] as const;
   for (const field of order) {
     const next = input[field];
     if (next === undefined || next === before[field]) continue;

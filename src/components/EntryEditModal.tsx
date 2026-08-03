@@ -23,11 +23,13 @@ export interface EditableMedia {
   title: MediaTitle;
   episodes: number | null;
   chapters?: number | null;
+  volumes?: number | null;
 }
 
 export interface EditableEntry {
   status: MediaListStatus;
   progress: number;
+  progressVolumes?: number;
   score: number;
   repeat: number;
   notes: string | null;
@@ -37,6 +39,7 @@ export interface EntrySaveInput {
   mediaId: number;
   status: MediaListStatus;
   progress: number;
+  progressVolumes?: number;
   score: number;
   repeat: number;
   notes: string;
@@ -67,12 +70,18 @@ export default function EntryEditModal({
     entry?.status ?? "PLANNING",
   );
   const [progress, setProgress] = useState(entry?.progress ?? 0);
+  const [volumes, setVolumes] = useState(entry?.progressVolumes ?? 0);
   const [score, setScore] = useState(entry?.score ?? 0);
   const [repeat, setRepeat] = useState(entry?.repeat ?? 0);
   const [notes, setNotes] = useState(initial.notes);
   const [tags, setTags] = useState(initial.tags);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const max = maxProgress(media) ?? 99999;
+  // Manga is tracked on two axes and always has been on AniList. A volume
+  // count is not derivable from chapters — series split them differently, and
+  // plenty of readers only track one of the two.
+  const isManga = media.type === "MANGA";
+  const maxVolumes = media.volumes ?? 99999;
   const rewatchLabel =
     media.type === "MANGA" ? t("entry.rereads") : t("entry.rewatches");
 
@@ -96,22 +105,44 @@ export default function EntryEditModal({
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <label className="block text-sm">
-            <span className="mb-1 block text-ink-500">
-              {maxProgress(media)
-                ? t("list.progressMax", { max })
-                : t("common.progress")}
-            </span>
-            <Input
-              type="number"
-              min={0}
-              max={max}
-              value={progress}
-              onChange={(e) =>
-                setProgress(Math.max(0, Math.min(max, Number(e.target.value))))
-              }
-            />
-          </label>
+          <div className="space-y-3">
+            <label className="block text-sm">
+              <span className="mb-1 block text-ink-500">
+                {isManga
+                  ? t("common.chapters")
+                  : maxProgress(media)
+                    ? t("list.progressMax", { max })
+                    : t("common.progress")}
+              </span>
+              <Input
+                type="number"
+                min={0}
+                max={max}
+                value={progress}
+                onChange={(e) =>
+                  setProgress(Math.max(0, Math.min(max, Number(e.target.value))))
+                }
+              />
+            </label>
+            {isManga && (
+              <label className="block text-sm">
+                <span className="mb-1 block text-ink-500">
+                  {t("common.volumes")}
+                </span>
+                <Input
+                  type="number"
+                  min={0}
+                  max={maxVolumes}
+                  value={volumes}
+                  onChange={(e) =>
+                    setVolumes(
+                      Math.max(0, Math.min(maxVolumes, Number(e.target.value))),
+                    )
+                  }
+                />
+              </label>
+            )}
+          </div>
           <div className="text-sm">
             <span className="mb-1.5 block text-ink-500">
               {t("common.score")}
@@ -185,6 +216,9 @@ export default function EntryEditModal({
                   mediaId: media.id,
                   status,
                   progress,
+                  // Never sent for anime: AniList accepts it there and would
+                  // store a volume count on a TV series.
+                  ...(isManga ? { progressVolumes: volumes } : {}),
                   score,
                   repeat,
                   notes: serializeNotes(notes, tags),

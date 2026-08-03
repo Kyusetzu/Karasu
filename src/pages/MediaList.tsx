@@ -860,8 +860,27 @@ const GridCard = memo(function GridCard({
         />
       </Link>
       <CoverMeta>
-        {entry.progress}
-        {max ? ` / ${max}` : ""} {unit}
+        {media.type === "MANGA" ? (
+          // Chapters lead, volumes trail, on the one line anime spends on
+          // episodes. `?` rather than a hidden total: an ongoing series
+          // genuinely has no end count, and blanking it reads as a bug.
+          <>
+            {t("common.progressChapters", {
+              n: entry.progress,
+              total: media.chapters ?? "?",
+            })}
+            {" · "}
+            {t("common.progressVolumes", {
+              n: entry.progressVolumes ?? 0,
+              total: media.volumes ?? "?",
+            })}
+          </>
+        ) : (
+          <>
+            {entry.progress}
+            {max ? ` / ${max}` : ""} {unit}
+          </>
+        )}
       </CoverMeta>
       <TagChips notes={entry.notes} />
     </CoverCell>

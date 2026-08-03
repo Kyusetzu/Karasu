@@ -4,6 +4,7 @@ import { headline, inverse, type EntrySnapshot } from "./receipt";
 const before: EntrySnapshot = {
   status: "CURRENT",
   progress: 13,
+  progressVolumes: 1,
   score: 8,
   repeat: 0,
   notes: null,
@@ -69,6 +70,21 @@ describe("inverse", () => {
     const after = { ...before, ...input };
     const undo = inverse(input, before)!;
     expect({ ...after, ...undo }).toMatchObject(before);
+  });
+});
+
+describe("inverse: volumes", () => {
+  it("undoes a volume bump without touching chapters", () => {
+    expect(inverse({ mediaId: 1, progressVolumes: 2 }, before)).toEqual({
+      mediaId: 1,
+      progressVolumes: 1,
+    });
+  });
+
+  it("keeps the two axes separate when both move", () => {
+    expect(
+      inverse({ mediaId: 1, progress: 20, progressVolumes: 2 }, before),
+    ).toEqual({ mediaId: 1, progress: 13, progressVolumes: 1 });
   });
 });
 

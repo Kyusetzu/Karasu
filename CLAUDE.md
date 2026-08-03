@@ -69,10 +69,15 @@ scripts/             bump-version.mjs (every commit), anilist-query.mjs
 
 ### Explicitly rejected — never implement (or propose)
 
-Activity/playback-history expansion, manga volume/cost tracking, settings
-cloud-sync, and anything that would require a hosted backend. If a requested
-feature depends on any of these, flag the dependency rather than silently
-building around it.
+Activity/playback-history expansion, **manga cost tracking** (what a collection
+was worth or what it was bought for), settings cloud-sync, and anything that
+would require a hosted backend. If a requested feature depends on any of these,
+flag the dependency rather than silently building around it.
+
+Read *volumes* (`progressVolumes`) is not on this list and never was — it is one
+of AniList's own list fields, it costs nothing to carry, and the local list
+stores it as of schema v7. The rejected idea is tracking **purchases**, which
+would need price data the app has no source for.
 
 ## Versioning (every commit)
 

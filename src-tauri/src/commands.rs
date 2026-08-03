@@ -153,6 +153,7 @@ query ($userId: Int!, $type: MediaType!) {
         status
         score(format: POINT_10)
         progress
+        progressVolumes
         repeat
         notes
         updatedAt
@@ -188,9 +189,9 @@ fn validate_media_type(media_type: &str) -> Result<&str, String> {
 }
 
 const SAVE_MUTATION: &str = "
-mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int, $score: Float, $repeat: Int, $notes: String) {
-  SaveMediaListEntry(mediaId: $mediaId, status: $status, progress: $progress, score: $score, repeat: $repeat, notes: $notes) {
-    id mediaId status progress repeat notes updatedAt
+mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int, $progressVolumes: Int, $score: Float, $repeat: Int, $notes: String) {
+  SaveMediaListEntry(mediaId: $mediaId, status: $status, progress: $progress, progressVolumes: $progressVolumes, score: $score, repeat: $repeat, notes: $notes) {
+    id mediaId status progress progressVolumes repeat notes updatedAt
     score(format: POINT_10)
   }
 }";
@@ -418,6 +419,10 @@ pub fn local_save_entry(
 
     let status = input.get("status").and_then(|v| v.as_str()).unwrap_or("PLANNING");
     let progress = input.get("progress").and_then(|v| v.as_i64()).unwrap_or(0);
+    let progress_volumes = input
+        .get("progressVolumes")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(0);
     let score = input.get("score").and_then(|v| v.as_f64()).unwrap_or(0.0);
     let repeat = input.get("repeat").and_then(|v| v.as_i64()).unwrap_or(0);
     let notes = input.get("notes").and_then(|v| v.as_str()).unwrap_or("");
@@ -432,6 +437,7 @@ pub fn local_save_entry(
         &media_type,
         status,
         progress,
+        progress_volumes,
         score,
         repeat,
         notes,
@@ -446,6 +452,7 @@ pub fn local_save_entry(
             "mediaId": media_id,
             "status": status,
             "progress": progress,
+            "progressVolumes": progress_volumes,
             "score": score,
             "repeat": repeat,
             "notes": notes,
@@ -482,6 +489,7 @@ pub fn local_all_entries(db: State<'_, Db>) -> Value {
                 "mediaType": r.media_type,
                 "status": r.status,
                 "progress": r.progress,
+                "progressVolumes": r.progress_volumes,
                 "score": r.score,
                 "repeat": r.repeat,
                 "notes": r.notes,
@@ -1010,7 +1018,7 @@ pub fn mark_all_notifications_read(db: State<'_, Db>) -> Result<(), String> {
 
 /// Monotonic commit counter — the 4th version segment
 /// (`MAJOR.MINOR.PATCH.COMMIT#`). Bumped by one on every commit.
-pub const COMMIT_NUMBER: u32 = 130;
+pub const COMMIT_NUMBER: u32 = 131;
 
 /// Full four-part display version, e.g. `0.1.1.38`. The `MAJOR.MINOR.PATCH`
 /// core comes from the crate version (kept in sync across the manifests).

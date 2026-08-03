@@ -53,6 +53,8 @@ export interface MediaListEntry {
   status: MediaListStatus;
   score: number;
   progress: number;
+  /** Manga only; 0 on anime and on entries saved before schema v7. */
+  progressVolumes: number;
   repeat: number;
   notes: string | null;
   updatedAt: number;
@@ -76,6 +78,8 @@ export interface SaveEntryInput {
   mediaId: number;
   status?: MediaListStatus;
   progress?: number;
+  /** Manga only. AniList tracks chapters and volumes as separate axes. */
+  progressVolumes?: number;
   score?: number;
   repeat?: number;
   notes?: string;

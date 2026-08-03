@@ -34,6 +34,8 @@ import BackButton from "@/components/BackButton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardTitle } from "@/components/ui/card";
+import { Pill } from "@/components/ui/pill";
+import { ScoreBars } from "@/components/ui/score-bars";
 import TagEditor from "@/components/TagEditor";
 import { parseNotes, serializeNotes } from "@/lib/tags";
 
@@ -62,7 +64,7 @@ export default function AnimeDetail() {
   if (isLoading) return <p className="p-8 text-ink-500">{t("common.loading")}</p>;
   if (error)
     return (
-      <p className="p-8 text-red-300">
+      <p className="p-8 text-danger">
         {t("common.error", { message: String(error) })}
       </p>
     );
@@ -133,18 +135,30 @@ export default function AnimeDetail() {
       </div>
 
       <div className="relative mx-auto max-w-4xl px-8 pb-10 2xl:max-w-none">
-        <div className="-mt-16 flex gap-6">
+        <div className="-mt-14 flex gap-6">
           <img
             src={coverSrc}
             alt=""
-            className="h-56 w-40 shrink-0 rounded-xl border border-surface-700 object-cover shadow-xl"
+            className="h-57 w-38 shrink-0 rounded-[.625rem] border border-surface-700 object-cover shadow-[0_1.25rem_2.5rem_rgba(0,0,0,.65)]"
           />
           <div className="min-w-0 flex-1 pt-16">
-            <h1 className="text-2xl font-bold">{title}</h1>
-            {data.title.romaji && data.title.romaji !== title && (
-              <p className="text-sm text-ink-500">{data.title.romaji}</p>
+            <h1 className="text-[1.625rem] font-bold leading-tight text-ink-100">
+              {title}
+            </h1>
+            {/* Native first, romaji only as a fallback — the Japanese face is
+                part of the app's identity and this is the one screen with the
+                room to set it properly. */}
+            {data.title.native && data.title.native !== title ? (
+              <p className="font-brand-jp text-[1.0625rem] text-ink-500">
+                {data.title.native}
+              </p>
+            ) : (
+              data.title.romaji &&
+              data.title.romaji !== title && (
+                <p className="text-sm text-ink-500">{data.title.romaji}</p>
+              )
             )}
-            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-300">
+            <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[.8125rem] text-ink-300">
               {data.averageScore !== null && (
                 <span className="flex items-center gap-1 text-gold">
                   <Star className="size-3.5" fill="currentColor" /> {data.averageScore}%
@@ -188,7 +202,7 @@ export default function AnimeDetail() {
               {data.genres.map((g) => (
                 <span
                   key={g}
-                  className="rounded-full bg-surface-800 px-2.5 py-0.5 text-xs text-ink-300"
+                  className="rounded-[.625rem] border border-surface-800 bg-surface-850 px-2 py-0.5 text-2xs text-ink-300"
                 >
                   {g}
                 </span>
@@ -271,8 +285,11 @@ export default function AnimeDetail() {
             {data.description && (
               <Card>
                 <CardTitle>{t("detail.description")}</CardTitle>
+                {/* Capped at a reading measure and set loose. A synopsis is
+                    the only long-form prose in the app; `pretty` keeps it off
+                    orphaned last words. */}
                 <p
-                  className="mt-3 text-sm leading-relaxed text-ink-300"
+                  className="mt-3 max-w-176 text-[.8125rem] leading-[1.75] text-pretty text-ink-300"
                   dangerouslySetInnerHTML={{
                     __html: sanitizeDescription(data.description),
                   }}
@@ -620,21 +637,19 @@ function ListEditor({
       <CardTitle>
         {entry ? t("detail.myEntry") : t("detail.addToList")}
       </CardTitle>
-      <div className="mt-3 flex flex-wrap items-end gap-3">
-        <label className="text-sm">
-          <span className="mb-1 block text-ink-500">{t("common.status")}</span>
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value as MediaListStatus)}
-            className="h-9 rounded-lg border border-surface-700 bg-surface-900 px-2 text-sm focus:border-accent-500 focus:outline-none"
-          >
-            {STATUS_ORDER.map((s) => (
-              <option key={s} value={s}>
-                {t(`status.${mediaType}.${s}`)}
-              </option>
-            ))}
-          </select>
-        </label>
+      {/* Same six pills as the modal — this is the panel people actually
+          live in, so the two must not disagree about how status is set. */}
+      <div className="mt-3 text-sm">
+        <span className="mb-1.5 block text-ink-500">{t("common.status")}</span>
+        <div className="flex flex-wrap gap-0.75">
+          {STATUS_ORDER.map((s) => (
+            <Pill key={s} active={status === s} onClick={() => setStatus(s)}>
+              {t(`status.${mediaType}.${s}`)}
+            </Pill>
+          ))}
+        </div>
+      </div>
+      <div className="mt-4 flex flex-wrap items-end gap-3">
         <label className="text-sm">
           <span className="mb-1 block text-ink-500">
             {t("common.progress")}
@@ -650,19 +665,10 @@ function ListEditor({
             className="w-24"
           />
         </label>
-        <label className="text-sm">
-          <span className="mb-1 block text-ink-500">{t("common.score")}</span>
-          <Input
-            type="number"
-            min={0}
-            max={10}
-            value={score}
-            onChange={(e) =>
-              setScore(Math.max(0, Math.min(10, Number(e.target.value))))
-            }
-            className="w-20"
-          />
-        </label>
+        <div className="text-sm">
+          <span className="mb-1.5 block text-ink-500">{t("common.score")}</span>
+          <ScoreBars value={score} onChange={setScore} />
+        </div>
         <label className="text-sm">
           <span className="mb-1 block text-ink-500">
             {mediaType === "MANGA" ? t("entry.rereads") : t("entry.rewatches")}
@@ -694,7 +700,7 @@ function ListEditor({
               : t("common.add")}
         </Button>
         {save.error && (
-          <p className="text-sm text-red-300">{String(save.error)}</p>
+          <p className="text-sm text-danger">{String(save.error)}</p>
         )}
       </div>
       <div className="mt-3">

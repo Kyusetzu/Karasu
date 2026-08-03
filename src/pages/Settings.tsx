@@ -130,7 +130,7 @@ function PortableSection() {
       {restart && (
         <p className="mt-2 text-sm text-gold">{t("settings.portableRestart")}</p>
       )}
-      {error && <p className="mt-2 text-sm text-red-300">{error}</p>}
+      {error && <p className="mt-2 text-sm text-danger">{error}</p>}
     </Card>
   );
 }
@@ -246,11 +246,11 @@ function LibrarySection() {
         <p className="mt-3 break-all text-xs text-ink-600">{path}</p>
       )}
       {matched !== null && (
-        <p className="mt-1 text-sm text-emerald-400">
+        <p className="mt-1 text-sm text-success">
           {t("settings.libraryMatched", { n: matched })}
         </p>
       )}
-      {error && <p className="mt-2 text-sm text-red-300">{error}</p>}
+      {error && <p className="mt-2 text-sm text-danger">{error}</p>}
     </Card>
   );
 }
@@ -578,7 +578,7 @@ function AccountSection() {
         </div>
       </div>
       {(error ?? login.error) && (
-        <p className="mt-4 rounded-lg bg-red-950/60 px-3 py-2 text-sm text-red-300">
+        <p className="mt-4 rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">
           {error ?? login.error}
         </p>
       )}
@@ -925,7 +925,7 @@ function JellyfinSection() {
         />
 
         {settings.connected ? (
-          <p className="text-sm text-emerald-400">
+          <p className="text-sm text-success">
             {t("settings.jellyfinSignedIn", {
               name: settings.userName || "?",
             })}
@@ -987,7 +987,7 @@ function JellyfinSection() {
         {t("settings.jellyfinDeviceHelp")}
       </p>
       {sessions && <SessionList sessions={sessions} />}
-      {error && <p className="mt-2 text-sm text-red-300">{error}</p>}
+      {error && <p className="mt-2 text-sm text-danger">{error}</p>}
     </Card>
   );
 }
@@ -1012,7 +1012,7 @@ function SessionList({ sessions }: { sessions: JellyfinSession[] }) {
           className={cn(
             "rounded-lg border px-3 py-2 text-sm",
             s.matched
-              ? "border-emerald-700/60 bg-emerald-950/30"
+              ? "border-success/40 bg-success/10"
               : "border-surface-800 bg-surface-900",
           )}
         >
@@ -1028,7 +1028,7 @@ function SessionList({ sessions }: { sessions: JellyfinSession[] }) {
               <span className="text-xs text-ink-600">({s.client})</span>
             )}
             {s.matched && (
-              <span className="rounded-full bg-emerald-700/40 px-2 py-0.5 text-xs text-emerald-200">
+              <span className="rounded-full bg-success/20 px-2 py-0.5 text-xs text-success">
                 {t("settings.jellyfinMatched")}
               </span>
             )}

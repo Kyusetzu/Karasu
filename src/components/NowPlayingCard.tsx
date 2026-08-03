@@ -143,7 +143,7 @@ function ScrobbleStatus({ countdown }: { countdown: string | null }) {
       return <p className="text-xs text-ink-500">{t("nowPlaying.updating")}</p>;
     case "updated":
       return (
-        <p className="flex items-center gap-1 text-xs font-medium text-emerald-400">
+        <p className="flex items-center gap-1 text-xs font-medium text-success">
           <Check className="size-3" />{" "}
           {t("nowPlaying.updated", {
             n: t(

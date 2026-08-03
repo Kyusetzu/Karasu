@@ -294,7 +294,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
   if (error) {
     return (
       <div className="p-8">
-        <p className="text-red-300">
+        <p className="text-danger">
           {t("list.loadError", { message: String(error) })}
         </p>
         <Button className="mt-4" variant="secondary" onClick={() => refetch()}>
@@ -320,7 +320,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
   return (
     <div className="flex h-full flex-col">
       {(data?.fromCache || (data?.pending ?? 0) > 0) && (
-        <div className="flex items-center gap-3 border-b border-surface-800 bg-amber-950/40 px-8 py-2 text-xs text-gold">
+        <div className="flex items-center gap-3 border-b border-surface-800 bg-gold/10 px-8 py-2 text-xs text-gold">
           <CloudOff className="size-3.5" />
           {data?.fromCache
             ? t("list.offline")

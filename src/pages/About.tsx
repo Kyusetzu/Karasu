@@ -209,7 +209,7 @@ function UpdateSection() {
               {t("about.updateAvailable", { version: info.latest })}
             </span>
           ) : (
-            <span className="flex items-center gap-1.5 text-sm text-emerald-400">
+            <span className="flex items-center gap-1.5 text-sm text-success">
               <CheckCircle2 className="size-4" />{" "}
               {t("about.upToDate", { version: info.current })}
             </span>
@@ -229,7 +229,7 @@ function UpdateSection() {
           {t("about.updateReady", { version: downloaded.version })}
         </p>
       )}
-      {error && <p className="mt-3 text-sm text-red-300">{error}</p>}
+      {error && <p className="mt-3 text-sm text-danger">{error}</p>}
     </Card>
   );
 }

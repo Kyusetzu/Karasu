@@ -68,7 +68,7 @@ export default function Franchise() {
 
       {isLoading && <p className="text-ink-500">{t("common.loading")}</p>}
       {error && (
-        <p className="text-red-300">
+        <p className="text-danger">
           {t("common.error", { message: String(error) })}
         </p>
       )}

@@ -82,7 +82,7 @@ export default function Seasonal() {
 
       <div className="min-h-0 flex-1 overflow-y-auto px-8 py-6">
         {error && (
-          <p className="text-sm text-red-300">
+          <p className="text-sm text-danger">
             {t("common.error", { message: String(error) })}
           </p>
         )}

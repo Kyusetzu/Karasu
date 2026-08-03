@@ -53,7 +53,7 @@ export default function PresetModal({
                 <span className="truncate text-ink-100">{p.name}</span>
                 <button
                   onClick={() => onDelete(p.name)}
-                  className="text-ink-600 hover:text-red-400"
+                  className="text-ink-600 hover:text-danger"
                   aria-label={t("common.remove")}
                 >
                   <Trash2 className="size-3.5" />

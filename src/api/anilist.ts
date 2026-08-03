@@ -190,9 +190,17 @@ export const getSequelNotify = () => invoke<boolean>("get_sequel_notify");
 export const setSequelNotify = (enabled: boolean) =>
   invoke<void>("set_sequel_notify", { enabled });
 
-/** Opens a save dialog and writes PNG bytes; false if cancelled. */
-export const savePng = (data: number[], defaultName: string) =>
-  invoke<boolean>("save_png", { data, defaultName });
+export type ImageFormat = "png" | "jpeg";
+
+/**
+ * Opens a save dialog and writes the bytes; false if cancelled.
+ * The dialog reopens wherever the last export went.
+ */
+export const saveImage = (
+  data: number[],
+  defaultName: string,
+  format: ImageFormat,
+) => invoke<boolean>("save_image", { data, defaultName, format });
 
 // --- Notification centre ---------------------------------------------------
 

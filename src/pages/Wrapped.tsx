@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { Download, Sparkles } from "lucide-react";
 import { wrappedEntries, type WrappedEntry } from "@/api/queries";
-import { isTauri, savePng } from "@/api/anilist";
+import { isTauri, saveImage, type ImageFormat } from "@/api/anilist";
 import { readableInk } from "@/lib/contrast";
 import {
   aggregate,
@@ -16,6 +16,7 @@ import { useAuth } from "@/stores/auth";
 import { useContentFilter } from "@/stores/contentFilter";
 import { isBlocked, isBlockedGenre } from "@/lib/contentFilter";
 import { Button } from "@/components/ui/button";
+import { Pill } from "@/components/ui/pill";
 
 const P = 72;
 
@@ -119,6 +120,14 @@ function drawCard(
   t: TFunction,
   lang: string,
   preset: Preset,
+  /**
+   * Output multiplier. Every coordinate and font size in this function is a
+   * hardcoded design-unit number, so the *only* way to render larger without
+   * blurring is a context transform — upscaling the finished bitmap would
+   * resample text that was already rasterized at 1x. With the transform, the
+   * glyphs are rasterized at the final size.
+   */
+  scale = 1,
 ) {
   // Sections are painted onto an offscreen buffer sized to their natural
   // content height first; the visible canvas is only assigned at the end,
@@ -315,8 +324,10 @@ function drawCard(
   });
 
   const totalH = sections.reduce((sum, s) => sum + s.height, 0);
-  work.width = W;
-  work.height = totalH;
+  work.width = W * scale;
+  work.height = totalH * scale;
+  // Applied after sizing, because setting width/height resets the context.
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
 
   const bg = ctx.createLinearGradient(0, 0, 0, totalH);
   bg.addColorStop(0, "#0b0d12");
@@ -331,8 +342,8 @@ function drawCard(
   }
 
   if (!preset.square) {
-    canvas.width = W;
-    canvas.height = totalH;
+    canvas.width = W * scale;
+    canvas.height = totalH * scale;
     const outCtx = canvas.getContext("2d");
     outCtx?.drawImage(work, 0, 0);
     return;
@@ -341,18 +352,19 @@ function drawCard(
   // Square preset: content is naturally taller than it is wide, so scale it
   // down (never up — canvas text would blur) to fit an exact W×W frame,
   // centered, with the same background filling any letterboxed edge.
-  canvas.width = W;
-  canvas.height = W;
+  canvas.width = W * scale;
+  canvas.height = W * scale;
   const outCtx = canvas.getContext("2d");
   if (!outCtx) return;
+  outCtx.setTransform(scale, 0, 0, scale, 0, 0);
   const outBg = outCtx.createLinearGradient(0, 0, 0, W);
   outBg.addColorStop(0, "#0b0d12");
   outBg.addColorStop(1, "#141b26");
   outCtx.fillStyle = outBg;
   outCtx.fillRect(0, 0, W, W);
-  const scale = Math.min(1, W / totalH);
-  const drawW = W * scale;
-  const drawH = totalH * scale;
+  const fit = Math.min(1, W / totalH);
+  const drawW = W * fit;
+  const drawH = totalH * fit;
   outCtx.drawImage(work, (W - drawW) / 2, (W - drawH) / 2, drawW, drawH);
 }
 
@@ -367,6 +379,8 @@ export default function Wrapped() {
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
   const [presetKey, setPresetKey] = useState<PresetKey>("page");
+  const [format, setFormat] = useState<ImageFormat>("png");
+  const [scale, setScale] = useState(2);
   const preset = PRESETS.find((p) => p.key === presetKey) ?? PRESETS[2];
 
   useEffect(() => {
@@ -433,21 +447,36 @@ export default function Wrapped() {
     );
   }
 
-  const save = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    canvas.toBlob(async (blob) => {
-      if (!blob) return;
-      const bytes = Array.from(new Uint8Array(await blob.arrayBuffer()));
-      const ok = await savePng(
-        bytes,
-        `karasu-wrapped-${year}-${presetKey}.png`,
-      ).catch(() => false);
-      if (ok) {
-        setSaved(true);
-        setTimeout(() => setSaved(false), 2000);
-      }
-    }, "image/png");
+  /**
+   * Renders at the chosen scale and hands the bytes to the save dialog.
+   *
+   * Drawn into a throwaway canvas rather than the one on screen: the preview
+   * is sized for the page, and re-rendering it at 3x to export would leave a
+   * 4800px canvas mounted until the next preset change.
+   */
+  const save = async () => {
+    if (!stats || year === null) return;
+    const out = document.createElement("canvas");
+    drawCard(out, stats, year, viewer?.name ?? "", t, i18n.language, preset, scale);
+
+    const blob = await new Promise<Blob | null>((resolve) =>
+      // Quality only applies to JPEG; PNG ignores it. 0.92 is the browser
+      // default and is visually lossless on flat poster art.
+      out.toBlob(resolve, format === "png" ? "image/png" : "image/jpeg", 0.92),
+    );
+    if (!blob) return;
+
+    const bytes = Array.from(new Uint8Array(await blob.arrayBuffer()));
+    const suffix = scale === 1 ? "" : `@${scale}x`;
+    const ok = await saveImage(
+      bytes,
+      `karasu-wrapped-${year}-${presetKey}${suffix}.${format === "png" ? "png" : "jpg"}`,
+      format,
+    ).catch(() => false);
+    if (ok) {
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    }
   };
 
   return (
@@ -475,20 +504,35 @@ export default function Wrapped() {
       </div>
 
       {years.length > 0 && (
-        <div className="mb-4 flex flex-wrap gap-2">
-          {PRESETS.map((p) => (
-            <button
-              key={p.key}
-              onClick={() => setPresetKey(p.key)}
-              className={`rounded-lg border px-3 py-1.5 text-sm transition-colors ${
-                presetKey === p.key
-                  ? "border-accent-500 bg-accent-600 text-accent-ink"
-                  : "border-surface-700 bg-surface-900 text-ink-300 hover:border-surface-600"
-              }`}
-            >
-              {t(p.labelKey)}
-            </button>
-          ))}
+        <div className="mb-4 space-y-2.5">
+          <ExportRow label={t("wrapped.shape")}>
+            {PRESETS.map((p) => (
+              <Pill
+                key={p.key}
+                active={presetKey === p.key}
+                onClick={() => setPresetKey(p.key)}
+              >
+                {t(p.labelKey)}
+              </Pill>
+            ))}
+          </ExportRow>
+          <ExportRow label={t("wrapped.format")}>
+            {(["png", "jpeg"] as const).map((f) => (
+              <Pill key={f} active={format === f} onClick={() => setFormat(f)}>
+                {f.toUpperCase()}
+              </Pill>
+            ))}
+          </ExportRow>
+          {/* Not a preview control — the poster on screen is always drawn at
+              1x. Scale is what gets written to disk, so the pixel size is
+              shown rather than left to be inferred from "2x". */}
+          <ExportRow label={t("wrapped.size")}>
+            {[1, 2, 3].map((n) => (
+              <Pill key={n} active={scale === n} onClick={() => setScale(n)}>
+                {n}× · {preset.W * n}px
+              </Pill>
+            ))}
+          </ExportRow>
         </div>
       )}
 
@@ -502,6 +546,24 @@ export default function Wrapped() {
           className="w-full max-w-2xl rounded-2xl border border-surface-800 shadow-xl"
         />
       )}
+    </div>
+  );
+}
+
+/** One labelled row of the export controls. */
+function ExportRow({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="w-14 shrink-0 text-2xs uppercase tracking-[.13em] text-ink-600">
+        {label}
+      </span>
+      {children}
     </div>
   );
 }

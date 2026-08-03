@@ -201,6 +201,9 @@ mutation ($id: Int) {
   DeleteMediaListEntry(id: $id) { deleted }
 }";
 
+/// Where the last Wrapped poster was saved, so the next one opens there.
+const EXPORT_DIR_KEY: &str = "export_dir";
+
 #[derive(serde::Serialize)]
 pub struct ListResult {
     /// true if the data comes from the local cache (offline)
@@ -952,23 +955,49 @@ pub fn set_sequel_notify(db: State<'_, Db>, enabled: bool) -> Result<(), String>
 /// Opens a native save dialog and writes PNG bytes (e.g. the yearly wrap-up
 /// card). Returns false if the user cancelled.
 #[tauri::command]
-pub fn save_png(
+pub fn save_image(
     app: tauri::AppHandle,
+    db: State<'_, Db>,
     data: Vec<u8>,
     default_name: String,
+    format: String,
 ) -> Result<bool, String> {
     use tauri_plugin_dialog::DialogExt;
-    let path = app
-        .dialog()
-        .file()
-        .set_file_name(&default_name)
-        .add_filter("PNG image", &["png"])
+
+    // Only the two the encoder actually produces. An unchecked string here
+    // would end up as the file extension and the dialog filter, so a typo
+    // would silently write an unopenable file.
+    let (label, ext) = match format.as_str() {
+        "png" => ("PNG image", "png"),
+        "jpeg" => ("JPEG image", "jpg"),
+        _ => return Err(format!("Unsupported image format: {format}")),
+    };
+
+    let mut builder = app.dialog().file().set_file_name(&default_name);
+    // Reopening in the same folder the last poster went to. A year-in-review
+    // is exported in bursts — five presets, three sizes — and re-navigating
+    // from the home directory each time is the whole friction of the feature.
+    if let Some(dir) = db.kv_get(EXPORT_DIR_KEY) {
+        let dir = std::path::PathBuf::from(dir);
+        if dir.is_dir() {
+            builder = builder.set_directory(dir);
+        }
+    }
+
+    let path = builder
+        .add_filter(label, &[ext])
         .blocking_save_file()
         .and_then(|p| p.into_path().ok());
+
     match path {
-        Some(p) => std::fs::write(&p, &data)
-            .map(|_| true)
-            .map_err(|e| format!("Could not save image: {e}")),
+        Some(p) => {
+            std::fs::write(&p, &data)
+                .map_err(|e| format!("Could not save image: {e}"))?;
+            if let Some(dir) = p.parent() {
+                let _ = db.kv_set(EXPORT_DIR_KEY, &dir.to_string_lossy());
+            }
+            Ok(true)
+        }
         None => Ok(false),
     }
 }
@@ -1018,7 +1047,7 @@ pub fn mark_all_notifications_read(db: State<'_, Db>) -> Result<(), String> {
 
 /// Monotonic commit counter — the 4th version segment
 /// (`MAJOR.MINOR.PATCH.COMMIT#`). Bumped by one on every commit.
-pub const COMMIT_NUMBER: u32 = 131;
+pub const COMMIT_NUMBER: u32 = 132;
 
 /// Full four-part display version, e.g. `0.1.1.38`. The `MAJOR.MINOR.PATCH`
 /// core comes from the crate version (kept in sync across the manifests).

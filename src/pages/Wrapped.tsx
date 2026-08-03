@@ -5,7 +5,6 @@ import type { TFunction } from "i18next";
 import { Download, Sparkles } from "lucide-react";
 import { wrappedEntries, type WrappedEntry } from "@/api/queries";
 import { isTauri, saveImage, type ImageFormat } from "@/api/anilist";
-import { readableInk } from "@/lib/contrast";
 import {
   aggregate,
   availableYears,
@@ -18,12 +17,7 @@ import { isBlocked, isBlockedGenre } from "@/lib/contentFilter";
 import { Button } from "@/components/ui/button";
 import { Pill } from "@/components/ui/pill";
 import { EmptyState, OutlineYear } from "@/components/EmptyState";
-import {
-  MARK_BODY,
-  MARK_EYE,
-  MARK_HEAD,
-  MARK_VIEWBOX,
-} from "@/components/KarasuMark";
+import markUrl from "@/assets/karasu-mark.svg";
 
 /**
  * Poster type and geometry are expressed in `em`, like the design, and one
@@ -85,43 +79,44 @@ function roundRect(
 }
 
 /**
- * The corvid mark, painted straight onto the canvas from the same path data
- * the component renders — so the poster's bird can never drift from the app's.
+ * Loads the mark once, for the canvas.
  *
- * The eye is punched out on a scratch buffer rather than in place: cutting it
- * directly would take the poster's background with it and leave a hole.
+ * An `<img>` mounts and paints itself; a canvas has to be handed something
+ * already decoded, and `drawImage` with a half-loaded image silently draws
+ * nothing. One module-level promise, so five presets and an export share the
+ * single decode.
+ */
+let markPromise: Promise<HTMLImageElement | null> | null = null;
+function loadMark(): Promise<HTMLImageElement | null> {
+  markPromise ??= new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = markUrl;
+  });
+  return markPromise;
+}
+
+/**
+ * The corvid, in full colour — the same art the app shows, not a silhouette of
+ * it. Drawn from the SVG so the poster's bird and the titlebar's are one file.
  */
 function drawMark(
   ctx: CanvasRenderingContext2D,
+  mark: HTMLImageElement | null,
   x: number,
   y: number,
   size: number,
-  color: string,
   alpha: number,
   rotateDeg = 0,
 ) {
-  const buffer = document.createElement("canvas");
-  const scale = size / MARK_VIEWBOX.w;
-  buffer.width = Math.ceil(MARK_VIEWBOX.w * scale);
-  buffer.height = Math.ceil(MARK_VIEWBOX.h * scale);
-  const b = buffer.getContext("2d");
-  if (!b) return;
-  b.setTransform(scale, 0, 0, scale, 0, 0);
-
-  b.fillStyle = color;
-  b.beginPath();
-  b.arc(MARK_HEAD.cx, MARK_HEAD.cy, MARK_HEAD.r, 0, Math.PI * 2);
-  b.fill();
-  for (const d of MARK_BODY) b.fill(new Path2D(d));
-
-  b.globalCompositeOperation = "destination-out";
-  b.fill(new Path2D(MARK_EYE));
-
+  if (!mark) return;
+  const h = size * (mark.naturalHeight / mark.naturalWidth || 978.44 / 890.73);
   ctx.save();
   ctx.globalAlpha = alpha;
   ctx.translate(x, y);
   if (rotateDeg) ctx.rotate((rotateDeg * Math.PI) / 180);
-  ctx.drawImage(buffer, 0, 0, buffer.width, buffer.height);
+  ctx.drawImage(mark, 0, 0, size, h);
   ctx.restore();
 }
 
@@ -183,6 +178,7 @@ function drawCard(
   t: TFunction,
   lang: string,
   preset: Preset,
+  mark: HTMLImageElement | null,
   /**
    * Output multiplier. Every coordinate and font size in this function is a
    * hardcoded design-unit number, so the *only* way to render larger without
@@ -374,8 +370,13 @@ function drawCard(
               face(600, u(1.5));
               ctx.fillText(gv.name, P, y + u(1.9));
 
+              // The count sits *after* the bar, not on it: a number inside a
+              // filled track has to change colour to stay legible, and it did
+              // — which meant the same column read in two different inks
+              // depending on how long its bar happened to be.
+              const countW = u(3.2);
               const barX = CW / 2;
-              const barW = CW / 2 - P;
+              const barW = CW / 2 - P - countW;
               const fillW = Math.max(u(2), (barW * gv.count) / max);
               ctx.fillStyle = "rgba(238,241,246,.1)";
               roundRect(ctx, barX, y + u(0.6), barW, u(1.5), u(0.75));
@@ -385,16 +386,10 @@ function drawCard(
               ctx.fillStyle = bar;
               roundRect(ctx, barX, y + u(0.6), fillW, u(1.5), u(0.75));
 
-              // The count sits at the bar's right edge, which the fill covers
-              // whenever this genre is the max — use an ink that reads on the
-              // accent there rather than the fixed dim grey.
-              const countText = String(gv.count);
               face(600, u(1.2));
-              const countW = ctx.measureText(countText).width;
-              const overlapsFill = barX + fillW > CW - P - countW;
-              ctx.fillStyle = overlapsFill ? readableInk(a4) : INK_FAINT;
+              ctx.fillStyle = INK_FAINT;
               ctx.textAlign = "right";
-              ctx.fillText(countText, CW - P, y + u(1.75));
+              ctx.fillText(String(gv.count), CW - P, y + u(1.75));
             },
           });
         }
@@ -454,18 +449,18 @@ function drawCard(
     sections.push({
       height: u(6),
       paint: (y) => {
-        const size = u(1.15);
-        drawMark(ctx, P, y + u(1.2), size, INK_FAINT, 1);
+        const size = u(1.6);
+        drawMark(ctx, mark, P, y + u(0.7), size, 1);
         ctx.textAlign = "left";
         ctx.textBaseline = "alphabetic";
         ctx.fillStyle = INK_DIM;
         face(700, u(1.1));
         track(`${u(0.2)}px`);
-        ctx.fillText("KARASU", P + size * 1.5, y + u(2.05));
+        ctx.fillText("KARASU", P + size * 1.25, y + u(2.05));
         const brandW = ctx.measureText("KARASU").width;
         track("0px");
 
-        const divX = P + size * 1.5 + brandW + u(1);
+        const divX = P + size * 1.25 + brandW + u(1);
         ctx.fillStyle = "rgba(238,241,246,.18)";
         ctx.fillRect(divX, y + u(1.1), 1, u(1.2));
 
@@ -549,10 +544,11 @@ function drawCard(
   ctx.fillStyle = "rgba(255,255,255,.06)";
   ctx.fillRect(0, 0, W, 1);
 
-  // The mark bleeds off the bottom-right corner, flat rather than full-colour:
-  // a colour disc at 42em would read as a second surface instead of a mark in
-  // the material.
-  drawMark(ctx, W - em * 20, H - em * 20, em * 42, a5, 0.16, -7);
+  // The mark bleeds off the bottom-right corner, painted before the content so
+  // the text sits over it. The art is mostly near-black — a third of it is the
+  // gradient that catches light — so the alpha is higher than a watermark
+  // usually wants: at .16 the bird was arithmetically invisible on this ground.
+  drawMark(ctx, mark, W - em * 20, H - em * 22, em * 42, 0.34, -7);
 
   // Centred, so a card that cannot quite fill its crop is framed by the ground
   // rather than hanging from the top edge.
@@ -623,11 +619,18 @@ export default function Wrapped() {
     [visibleAnime, visibleManga, year, level],
   );
 
+  // The mark is decoded once and then held: the poster redraws on every
+  // preset change, and a fresh decode per draw would flash an empty corner.
+  const [mark, setMark] = useState<HTMLImageElement | null>(null);
+  useEffect(() => {
+    loadMark().then(setMark);
+  }, []);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !stats || year === null) return;
-    drawCard(canvas, stats, year, viewer?.name ?? "", t, i18n.language, preset);
-  }, [stats, year, viewer, t, i18n.language, preset]);
+    drawCard(canvas, stats, year, viewer?.name ?? "", t, i18n.language, preset, mark);
+  }, [stats, year, viewer, t, i18n.language, preset, mark]);
 
   if (!viewer) {
     return (
@@ -652,7 +655,10 @@ export default function Wrapped() {
   const save = async () => {
     if (!stats || year === null) return;
     const out = document.createElement("canvas");
-    drawCard(out, stats, year, viewer?.name ?? "", t, i18n.language, preset, scale);
+    // Awaited rather than read from state: an export fired before the decode
+    // landed would write a poster with no bird on it.
+    const art = mark ?? (await loadMark());
+    drawCard(out, stats, year, viewer?.name ?? "", t, i18n.language, preset, art, scale);
 
     const blob = await new Promise<Blob | null>((resolve) =>
       // Quality only applies to JPEG; PNG ignores it. 0.92 is the browser

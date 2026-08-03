@@ -149,10 +149,10 @@ function PlaybackError() {
   if (!error) return null;
   return (
     <div className="fixed bottom-4 right-4 z-50 flex max-w-sm items-start gap-3 rounded-lg border border-surface-700 bg-surface-850 px-4 py-3 shadow-xl">
-      <span className="text-sm text-ink-200">{error}</span>
+      <span className="text-sm text-ink-300">{error}</span>
       <button
         onClick={clearError}
-        className="shrink-0 text-ink-500 hover:text-ink-200"
+        className="shrink-0 text-ink-500 hover:text-ink-100"
         aria-label="Dismiss"
       >
         <X className="size-3.75" />

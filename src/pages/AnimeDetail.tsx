@@ -388,7 +388,7 @@ function Row({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div>
       <dt className="text-xs text-ink-600">{label}</dt>
-      <dd className="mt-0.5 text-sm text-ink-200">{value}</dd>
+      <dd className="mt-0.5 text-sm text-ink-300">{value}</dd>
     </div>
   );
 }
@@ -548,7 +548,7 @@ function LinkList({ links }: { links: ExternalLinkData[] }) {
           <button
             key={l.id}
             onClick={() => openUrl(l.url)}
-            className="flex items-center gap-1.5 rounded-lg border border-surface-700 bg-surface-850 px-3 py-1.5 text-xs text-ink-200 transition-colors hover:border-surface-600 hover:text-ink-100"
+            className="flex items-center gap-1.5 rounded-lg border border-surface-700 bg-surface-850 px-3 py-1.5 text-xs text-ink-300 transition-colors hover:border-surface-600 hover:text-ink-100"
           >
             <span
               className="h-2 w-2 shrink-0 rounded-full"

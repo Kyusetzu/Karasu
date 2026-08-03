@@ -1085,11 +1085,11 @@ function SessionList({ sessions }: { sessions: JellyfinSession[] }) {
           )}
         >
           <p className="flex flex-wrap items-center gap-x-2">
-            <span className="font-medium text-ink-200">
+            <span className="font-medium text-ink-300">
               {s.user || t("settings.jellyfinUnknownUser")}
             </span>
             <span className="text-ink-600">·</span>
-            <span className="text-ink-400">
+            <span className="text-ink-500">
               {s.device || t("settings.jellyfinUnknownDevice")}
             </span>
             {s.client && (

@@ -190,7 +190,7 @@ function LibraryRow({
                 className={cn(
                   "flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors",
                   watched
-                    ? "bg-surface-800 text-ink-500 hover:text-ink-200"
+                    ? "bg-surface-800 text-ink-500 hover:text-ink-100"
                     : "bg-accent-600/15 text-accent-400 hover:bg-accent-600/30",
                 )}
               >

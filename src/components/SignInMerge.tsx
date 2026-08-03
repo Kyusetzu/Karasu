@@ -145,7 +145,7 @@ export default function SignInMerge() {
               {(["newest", "local", "anilist"] as Strategy[]).map((s) => (
                 <label
                   key={s}
-                  className="flex items-center gap-2 text-sm text-ink-200"
+                  className="flex items-center gap-2 text-sm text-ink-300"
                 >
                   <input
                     type="radio"
@@ -157,7 +157,7 @@ export default function SignInMerge() {
                   {t(`merge.strategy.${s}`)}
                 </label>
               ))}
-              <ul className="max-h-32 overflow-y-auto rounded-lg bg-surface-850 p-2 text-xs text-ink-400">
+              <ul className="max-h-32 overflow-y-auto rounded-lg bg-surface-850 p-2 text-xs text-ink-500">
                 {conflicts.map((r) => (
                   <li key={r.mediaId} className="truncate">
                     {displayTitle(r.media.title)}

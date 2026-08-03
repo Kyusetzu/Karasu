@@ -137,7 +137,7 @@ export default function Bell() {
                             <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent-500" />
                           )}
                         </span>
-                        <span className="mt-0.5 block text-xs text-ink-400">
+                        <span className="mt-0.5 block text-xs text-ink-500">
                           {n.body}
                         </span>
                         <span className="mt-0.5 block text-2xs text-ink-600">

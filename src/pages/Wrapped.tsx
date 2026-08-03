@@ -18,8 +18,30 @@ import { isBlocked, isBlockedGenre } from "@/lib/contentFilter";
 import { Button } from "@/components/ui/button";
 import { Pill } from "@/components/ui/pill";
 import { EmptyState, OutlineYear } from "@/components/EmptyState";
+import {
+  MARK_BODY,
+  MARK_EYE,
+  MARK_HEAD,
+  MARK_VIEWBOX,
+} from "@/components/KarasuMark";
 
-const P = 72;
+/**
+ * Poster type and geometry are expressed in `em`, like the design, and one
+ * layout serves all five crops. Canvas has no `em`, so each preset carries the
+ * pixel value of one — the design's root font size for that crop.
+ */
+const FONT = '"SN Pro", system-ui, sans-serif';
+const FONT_JP = '"Kosugi Maru", "SN Pro", sans-serif';
+
+/**
+ * The poster keeps the dark palette in both themes. It is an image that leaves
+ * the app — it should look like Karasu wherever it is posted, not like the
+ * theme of whoever exported it. Only the accent follows the user.
+ */
+const POSTER_BG = "#07090d";
+const INK = "#f1f5f9";
+const INK_DIM = "rgba(238,241,246,.62)";
+const INK_FAINT = "rgba(238,241,246,.5)";
 
 type PresetKey = "banner" | "square" | "page" | "compressed" | "detailed";
 
@@ -27,22 +49,21 @@ interface Preset {
   key: PresetKey;
   labelKey: string;
   W: number;
+  /** Exact output height. The crop is the whole point of a preset. */
+  H: number;
   includeGenres: boolean;
   maxGenres: number;
   includeTitles: boolean;
   maxTitles: number;
-  /** Force the exported image to an exact 1:1 square, scaling the naturally
-   *  taller content to fit rather than letting height drift with content. */
-  square?: boolean;
 }
 
 /** Shape + content-density presets, in the order shown to the user. */
 const PRESETS: Preset[] = [
-  { key: "banner", labelKey: "wrapped.presetBanner", W: 1600, includeGenres: false, maxGenres: 0, includeTitles: false, maxTitles: 0 },
-  { key: "square", labelKey: "wrapped.presetSquare", W: 1080, includeGenres: true, maxGenres: 3, includeTitles: false, maxTitles: 0, square: true },
-  { key: "page", labelKey: "wrapped.presetPage", W: 1080, includeGenres: true, maxGenres: 5, includeTitles: true, maxTitles: 3 },
-  { key: "compressed", labelKey: "wrapped.presetCompressed", W: 780, includeGenres: false, maxGenres: 0, includeTitles: false, maxTitles: 0 },
-  { key: "detailed", labelKey: "wrapped.presetDetailed", W: 1200, includeGenres: true, maxGenres: 5, includeTitles: true, maxTitles: 5 },
+  { key: "banner", labelKey: "wrapped.presetBanner", W: 1600, H: 620, includeGenres: false, maxGenres: 0, includeTitles: false, maxTitles: 0 },
+  { key: "square", labelKey: "wrapped.presetSquare", W: 1080, H: 1080, includeGenres: true, maxGenres: 3, includeTitles: false, maxTitles: 0 },
+  { key: "page", labelKey: "wrapped.presetPage", W: 1080, H: 1720, includeGenres: true, maxGenres: 5, includeTitles: true, maxTitles: 3 },
+  { key: "compressed", labelKey: "wrapped.presetCompressed", W: 780, H: 980, includeGenres: false, maxGenres: 0, includeTitles: false, maxTitles: 0 },
+  { key: "detailed", labelKey: "wrapped.presetDetailed", W: 1200, H: 1900, includeGenres: true, maxGenres: 5, includeTitles: true, maxTitles: 5 },
 ];
 
 function cssVar(name: string, fallback: string): string {
@@ -61,6 +82,47 @@ function roundRect(
   ctx.beginPath();
   ctx.roundRect(x, y, w, h, r);
   ctx.fill();
+}
+
+/**
+ * The corvid mark, painted straight onto the canvas from the same path data
+ * the component renders — so the poster's bird can never drift from the app's.
+ *
+ * The eye is punched out on a scratch buffer rather than in place: cutting it
+ * directly would take the poster's background with it and leave a hole.
+ */
+function drawMark(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  size: number,
+  color: string,
+  alpha: number,
+  rotateDeg = 0,
+) {
+  const buffer = document.createElement("canvas");
+  const scale = size / MARK_VIEWBOX.w;
+  buffer.width = Math.ceil(MARK_VIEWBOX.w * scale);
+  buffer.height = Math.ceil(MARK_VIEWBOX.h * scale);
+  const b = buffer.getContext("2d");
+  if (!b) return;
+  b.setTransform(scale, 0, 0, scale, 0, 0);
+
+  b.fillStyle = color;
+  b.beginPath();
+  b.arc(MARK_HEAD.cx, MARK_HEAD.cy, MARK_HEAD.r, 0, Math.PI * 2);
+  b.fill();
+  for (const d of MARK_BODY) b.fill(new Path2D(d));
+
+  b.globalCompositeOperation = "destination-out";
+  b.fill(new Path2D(MARK_EYE));
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(x, y);
+  if (rotateDeg) ctx.rotate((rotateDeg * Math.PI) / 180);
+  ctx.drawImage(buffer, 0, 0, buffer.width, buffer.height);
+  ctx.restore();
 }
 
 function round1(n: number): string {
@@ -84,11 +146,11 @@ function fitText(
 ): { text: string; size: number } {
   let size = startSize;
   while (size > minSize) {
-    ctx.font = `${weight} ${size}px system-ui, sans-serif`;
+    ctx.font = `${weight} ${size}px ${FONT}`;
     if (ctx.measureText(text).width <= maxWidth) return { text, size };
     size -= 2;
   }
-  ctx.font = `${weight} ${size}px system-ui, sans-serif`;
+  ctx.font = `${weight} ${size}px ${FONT}`;
   if (!allowTruncate || ctx.measureText(text).width <= maxWidth) {
     return { text, size };
   }
@@ -139,234 +201,366 @@ function drawCard(
   if (!ctx) return;
 
   const W = preset.W;
-  const accent = cssVar("--color-accent-500", "#6c7fff");
-  const accent600 = cssVar("--color-accent-600", accent);
-  const headerInk = readableInk(accent600);
+  const H = preset.H;
+  /**
+   * A 2.58:1 crop has no room for a stacked column — the two medium blocks
+   * would each get a couple of centimetres of height and the right third of
+   * the poster would stay empty. At that aspect they sit side by side.
+   */
+  const row = preset.W / preset.H > 2;
 
-  const sections: Section[] = [];
+  const a4 = cssVar("--color-accent-400", "#8b9dff");
+  const a5 = cssVar("--color-accent-500", "#6c7fff");
+  const a6 = cssVar("--color-accent-600", a5);
+  const accentRgb = cssVar("--accent-rgb", "108, 127, 255");
+  const w1 = cssVar("--w1", accentRgb);
+  const w2 = cssVar("--w2", accentRgb);
 
-  const subhead = (text: string, y: number) => {
-    ctx.textAlign = "left";
-    ctx.fillStyle = "#94a3b8";
-    ctx.font = "700 28px system-ui, sans-serif";
-    ctx.fillText(text.toUpperCase(), P, y + 36);
+  const face = (weight: number, size: number, jp = false) => {
+    ctx.font = `${weight} ${size}px ${jp ? FONT_JP : FONT}`;
+  };
+  /** `letterSpacing` is Chromium-only and silently ignored elsewhere, which
+      is the right failure: tracking is a refinement, not the layout. */
+  const track = (value: string) => {
+    ctx.letterSpacing = value;
   };
 
-  // --- Header band --------------------------------------------------------
-  sections.push({
-    height: 268,
-    paint: (y) => {
-      const g = ctx.createLinearGradient(0, y, W, y + 268);
-      g.addColorStop(0, accent600);
-      g.addColorStop(1, accent);
-      ctx.fillStyle = g;
-      ctx.fillRect(0, y, W, 268);
+  /**
+   * Lays the card out at a given `em`, in pixels.
+   *
+   * Run twice: once at `em = 1`, which measures the card's natural height in
+   * ems, and then at the size that makes that height fill the preset's crop.
+   * A poster is a fixed frame, so the type scales to the frame rather than the
+   * frame drifting with however much the year happened to contain.
+   */
+  const build = (em: number) => {
+    /** One `em`, in pixels — the unit every size below is written in. */
+    const u = (n: number) => n * em;
+    const P = u(9);
 
+    // Block painters run from `P` to `CW - P`, so a column's frame is its
+    // content plus a padding on each side — and the two frames overlap by one
+    // padding where they meet, which is what keeps the outer margins equal to
+    // the inner gap's half and the poster symmetrical.
+    const gutter = u(4);
+    const colContent = (W - P * 2 - gutter) / 2;
+    const CW = row ? colContent + P * 2 : W;
+    const header: Section[] = [];
+    const blocks: Section[][] = [];
+    const footer: Section[] = [];
+    let sections = header;
+
+    const subhead = (text: string, y: number) => {
       ctx.textAlign = "left";
-      ctx.textBaseline = "alphabetic";
-      ctx.fillStyle = headerInk;
-      ctx.globalAlpha = 0.85;
-      ctx.font = "600 30px system-ui, sans-serif";
-      ctx.fillText(name.toUpperCase(), P, y + 88);
-      ctx.globalAlpha = 1;
-      ctx.font = "800 132px system-ui, sans-serif";
-      ctx.fillText(String(year), P, y + 202);
-      const yearW = ctx.measureText(String(year)).width;
-      ctx.font = "600 40px system-ui, sans-serif";
-      ctx.fillText(t("wrapped.inReview"), P + yearW + 24, y + 202);
-    },
-  });
-  sections.push({ height: 28, paint: () => {} });
+      ctx.fillStyle = INK_FAINT;
+      face(600, u(1.05));
+      track(`${u(0.16)}px`);
+      ctx.fillText(text.toUpperCase(), P, y + u(2.4));
+      track("0px");
+    };
 
-  // --- One medium block ---------------------------------------------------
-  const addBlock = (label: string, s: MediaYearStats, tiles: Tile[]) => {
+    // --- Header -------------------------------------------------------------
+    // No coloured band: at poster scale a filled header reads as a UI chrome
+    // bar. The year carries the page on its own, with the accent spent on the
+    // rule beneath it and on the wash behind.
     sections.push({
-      height: 66,
+      height: u(15.5),
       paint: (y) => {
         ctx.textAlign = "left";
-        ctx.fillStyle = accent;
-        ctx.font = "800 50px system-ui, sans-serif";
-        ctx.fillText(label, P, y + 52);
+        ctx.textBaseline = "alphabetic";
+
+        ctx.fillStyle = INK_DIM;
+        face(600, u(1.5));
+        track(`${u(0.34)}px`);
+        ctx.fillText(name.toUpperCase(), P, y + u(2.6));
+        track("0px");
+
+        ctx.fillStyle = INK;
+        face(800, u(8.4));
+        track(`${u(-0.045)}px`);
+        ctx.fillText(String(year), P, y + u(11.4));
+        const yearW = ctx.measureText(String(year)).width;
+        track("0px");
+
+        ctx.fillStyle = a4;
+        face(400, u(2), true);
+        ctx.fillText("一年のまとめ", P + yearW + u(1.4), y + u(11.4));
+
+        const rule = ctx.createLinearGradient(P, 0, W - P, 0);
+        rule.addColorStop(0, a5);
+        rule.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = rule;
+        ctx.fillRect(P, y + u(13.4), W - P * 2, 3);
       },
     });
 
-    if (s.count === 0) {
+    // --- One medium block ---------------------------------------------------
+    const addBlock = (label: string, s: MediaYearStats, tiles: Tile[]) => {
+      sections = [];
+      blocks.push(sections);
       sections.push({
-        height: 64,
+        height: u(4.6),
         paint: (y) => {
           ctx.textAlign = "left";
-          ctx.fillStyle = "#64748b";
-          ctx.font = "500 30px system-ui, sans-serif";
-          ctx.fillText(t("wrapped.noneThisYear"), P, y + 40);
+          ctx.fillStyle = a4;
+          face(800, u(2.6));
+          ctx.fillText(label, P, y + u(2.8));
         },
       });
-      sections.push({ height: 28, paint: () => {} });
-      return;
-    }
 
-    // Stat tiles — the numbers are the main "at a glance" content, so these
-    // get the biggest type on the card after the year itself.
-    sections.push({
-      height: 174,
-      paint: (y) => {
-        const gap = 20;
-        const tw = (W - P * 2 - gap * (tiles.length - 1)) / tiles.length;
-        const maxTextW = tw - 48;
-        tiles.forEach((tile, i) => {
-          const x = P + i * (tw + gap);
-          ctx.fillStyle = "#171e2a";
-          roundRect(ctx, x, y, tw, 150, 18);
-          ctx.textAlign = "left";
-          ctx.fillStyle = "#f1f5f9";
-          const value = fitText(ctx, tile.value, maxTextW, 800, 64, 36, false);
-          ctx.fillText(value.text, x + 24, y + 80);
-          ctx.fillStyle = "#94a3b8";
-          const label = fitText(ctx, tile.label, maxTextW, 500, 28, 16, true);
-          ctx.fillText(label.text, x + 24, y + 124);
+      if (s.count === 0) {
+        sections.push({
+          height: u(4),
+          paint: (y) => {
+            ctx.textAlign = "left";
+            ctx.fillStyle = INK_FAINT;
+            face(500, u(1.4));
+            ctx.fillText(t("wrapped.noneThisYear"), P, y + u(2));
+          },
         });
+        sections.push({ height: u(2), paint: () => {} });
+        return;
+      }
+
+      // Stat tiles: a top rule and text, no fill. A bordered box at this scale
+      // reads as a UI card that wandered into a poster.
+      sections.push({
+        height: u(7.4),
+        paint: (y) => {
+          const gap = u(2);
+          const tw = (CW - P * 2 - gap * (tiles.length - 1)) / tiles.length;
+          tiles.forEach((tile, i) => {
+            const x = P + i * (tw + gap);
+            ctx.fillStyle = "rgba(238,241,246,.14)";
+            ctx.fillRect(x, y, tw, 2);
+
+            ctx.textAlign = "left";
+            ctx.fillStyle = INK;
+            const value = fitText(ctx, tile.value, tw, 800, u(3.1), u(1.8), false);
+            ctx.fillText(value.text, x, y + u(4.4));
+
+            ctx.fillStyle = INK_FAINT;
+            face(600, u(1.05));
+            track(`${u(0.16)}px`);
+            const label = fitText(
+              ctx,
+              tile.label.toUpperCase(),
+              tw,
+              600,
+              u(1.05),
+              u(0.8),
+              true,
+            );
+            ctx.fillText(label.text, x, y + u(6.4));
+            track("0px");
+          });
+        },
+      });
+
+      // Top genres (mini-bars)
+      const genres = preset.includeGenres ? s.topGenres.slice(0, preset.maxGenres) : [];
+      if (genres.length) {
+        sections.push({
+          height: u(3.4),
+          paint: (y) => subhead(t("wrapped.topGenres"), y),
+        });
+        const max = genres[0].count || 1;
+        for (const gv of genres) {
+          sections.push({
+            height: u(3.4),
+            paint: (y) => {
+              ctx.textAlign = "left";
+              ctx.fillStyle = INK_DIM;
+              face(600, u(1.5));
+              ctx.fillText(gv.name, P, y + u(1.9));
+
+              const barX = CW / 2;
+              const barW = CW / 2 - P;
+              const fillW = Math.max(u(2), (barW * gv.count) / max);
+              ctx.fillStyle = "rgba(238,241,246,.1)";
+              roundRect(ctx, barX, y + u(0.6), barW, u(1.5), u(0.75));
+              const bar = ctx.createLinearGradient(barX, 0, barX + fillW, 0);
+              bar.addColorStop(0, a6);
+              bar.addColorStop(1, a4);
+              ctx.fillStyle = bar;
+              roundRect(ctx, barX, y + u(0.6), fillW, u(1.5), u(0.75));
+
+              // The count sits at the bar's right edge, which the fill covers
+              // whenever this genre is the max — use an ink that reads on the
+              // accent there rather than the fixed dim grey.
+              const countText = String(gv.count);
+              face(600, u(1.2));
+              const countW = ctx.measureText(countText).width;
+              const overlapsFill = barX + fillW > CW - P - countW;
+              ctx.fillStyle = overlapsFill ? readableInk(a4) : INK_FAINT;
+              ctx.textAlign = "right";
+              ctx.fillText(countText, CW - P, y + u(1.75));
+            },
+          });
+        }
+      }
+
+      // Top rated titles
+      const titles = preset.includeTitles ? s.topTitles.slice(0, preset.maxTitles) : [];
+      if (titles.length) {
+        sections.push({
+          height: u(3.4),
+          paint: (y) => subhead(t("wrapped.topRated"), y),
+        });
+        titles.forEach((title, i) => {
+          sections.push({
+            height: u(3),
+            paint: (y) => {
+              ctx.textAlign = "left";
+              ctx.fillStyle = a5;
+              face(800, u(1.3));
+              ctx.fillText(String(i + 1), P, y + u(2));
+              ctx.fillStyle = INK_DIM;
+              const room = CW - P * 2 - u(2.6);
+              const line = fitText(ctx, title, room, 600, u(1.5), u(1.1), true);
+              ctx.fillText(line.text, P + u(2.6), y + u(2));
+            },
+          });
+        });
+      }
+
+      sections.push({ height: u(3), paint: () => {} });
+    };
+
+    addBlock(t("common.anime"), stats.anime, [
+      { value: stats.anime.count.toLocaleString(lang), label: t("wrapped.completed") },
+      { value: stats.anime.units.toLocaleString(lang), label: t("common.episodes") },
+      {
+        value: Math.round(stats.anime.minutes / 60).toLocaleString(lang),
+        label: t("wrapped.hours"),
+      },
+      {
+        value: stats.anime.meanScore ? round1(stats.anime.meanScore) : "–",
+        label: t("wrapped.meanScore"),
+      },
+    ]);
+
+    addBlock(t("common.manga"), stats.manga, [
+      { value: stats.manga.count.toLocaleString(lang), label: t("wrapped.completed") },
+      { value: stats.manga.units.toLocaleString(lang), label: t("common.chapters") },
+      {
+        value: stats.manga.meanScore ? round1(stats.manga.meanScore) : "–",
+        label: t("wrapped.meanScore"),
+      },
+    ]);
+
+    // --- Footer -------------------------------------------------------------
+    sections = footer;
+    sections.push({
+      height: u(6),
+      paint: (y) => {
+        const size = u(1.15);
+        drawMark(ctx, P, y + u(1.2), size, INK_FAINT, 1);
+        ctx.textAlign = "left";
+        ctx.textBaseline = "alphabetic";
+        ctx.fillStyle = INK_DIM;
+        face(700, u(1.1));
+        track(`${u(0.2)}px`);
+        ctx.fillText("KARASU", P + size * 1.5, y + u(2.05));
+        const brandW = ctx.measureText("KARASU").width;
+        track("0px");
+
+        const divX = P + size * 1.5 + brandW + u(1);
+        ctx.fillStyle = "rgba(238,241,246,.18)";
+        ctx.fillRect(divX, y + u(1.1), 1, u(1.2));
+
+        ctx.fillStyle = INK_FAINT;
+        face(500, u(1.05));
+        ctx.fillText("github.com/Kyusetzu/Karasu", divX + u(1), y + u(2.05));
       },
     });
 
-    // Top genres (mini-bars)
-    const genres = preset.includeGenres ? s.topGenres.slice(0, preset.maxGenres) : [];
-    if (genres.length) {
-      sections.push({
-        height: 48,
-        paint: (y) => subhead(t("wrapped.topGenres"), y),
-      });
-      const max = genres[0].count || 1;
-      for (const gv of genres) {
-        sections.push({
-          height: 48,
-          paint: (y) => {
-            ctx.textAlign = "left";
-            ctx.fillStyle = "#e2e8f0";
-            ctx.font = "600 30px system-ui, sans-serif";
-            ctx.fillText(gv.name, P, y + 32);
-            const barX = W / 2;
-            const barW = W / 2 - P;
-            const fillW = Math.max(24, (barW * gv.count) / max);
-            ctx.fillStyle = "#232c3a";
-            roundRect(ctx, barX, y + 8, barW, 24, 12);
-            ctx.fillStyle = accent;
-            roundRect(ctx, barX, y + 8, fillW, 24, 12);
 
-            // The count sits at the bar's right edge, which is fully covered
-            // by the accent fill whenever this genre is the max (always true
-            // for the top genre) — use a contrasting ink there instead of
-            // the fixed gray, which can wash out against a light accent.
-            const countText = String(gv.count);
-            ctx.font = "600 24px system-ui, sans-serif";
-            const countW = ctx.measureText(countText).width;
-            const overlapsFill = barX + fillW > W - P - countW;
-            ctx.fillStyle = overlapsFill ? readableInk(accent) : "#94a3b8";
-            ctx.textAlign = "right";
-            ctx.fillText(countText, W - P, y + 27);
-          },
+    const tall = (list: Section[]) =>
+      list.reduce((sum, sec) => sum + sec.height, 0);
+    const bodyH = row
+      ? Math.max(...blocks.map(tall))
+      : blocks.reduce((sum, b) => sum + tall(b), 0);
+    const totalH = tall(header) + bodyH + tall(footer);
+
+    const paint = (top: number) => {
+      let y = top;
+      const run = (list: Section[]) => {
+        for (const sec of list) {
+          sec.paint(y);
+          y += sec.height;
+        }
+      };
+      run(header);
+      if (row) {
+        const bodyTop = y;
+        blocks.forEach((block, i) => {
+          ctx.save();
+          ctx.translate(i * (colContent + gutter), 0);
+          y = bodyTop;
+          run(block);
+          ctx.restore();
         });
+        y = bodyTop + bodyH;
+      } else {
+        blocks.forEach(run);
       }
-    }
+      run(footer);
+    };
 
-    // Top rated titles
-    const titles = preset.includeTitles ? s.topTitles.slice(0, preset.maxTitles) : [];
-    if (titles.length) {
-      sections.push({
-        height: 48,
-        paint: (y) => subhead(t("wrapped.topRated"), y),
-      });
-      titles.forEach((title, i) => {
-        sections.push({
-          height: 46,
-          paint: (y) => {
-            ctx.textAlign = "left";
-            ctx.fillStyle = "#e2e8f0";
-            ctx.font = "600 30px system-ui, sans-serif";
-            const clipped = title.length > 38 ? `${title.slice(0, 37)}…` : title;
-            ctx.fillText(`${i + 1}.  ${clipped}`, P, y + 34);
-          },
-        });
-      });
-    }
-
-    sections.push({ height: 44, paint: () => {} });
+    return { paint, totalH };
   };
 
-  addBlock(t("common.anime"), stats.anime, [
-    { value: stats.anime.count.toLocaleString(lang), label: t("wrapped.completed") },
-    { value: stats.anime.units.toLocaleString(lang), label: t("common.episodes") },
-    {
-      value: Math.round(stats.anime.minutes / 60).toLocaleString(lang),
-      label: t("wrapped.hours"),
-    },
-    {
-      value: stats.anime.meanScore ? round1(stats.anime.meanScore) : "–",
-      label: t("wrapped.meanScore"),
-    },
-  ]);
+  // Bounded above by the width: a sparse year would otherwise stretch a
+  // handful of lines into letters the height of a fist.
+  const natural = build(1).totalH;
+  const em = Math.min(W / 62, H / natural);
+  const card = build(em);
 
-  addBlock(t("common.manga"), stats.manga, [
-    { value: stats.manga.count.toLocaleString(lang), label: t("wrapped.completed") },
-    { value: stats.manga.units.toLocaleString(lang), label: t("common.chapters") },
-    {
-      value: stats.manga.meanScore ? round1(stats.manga.meanScore) : "–",
-      label: t("wrapped.meanScore"),
-    },
-  ]);
-
-  // Footer
-  sections.push({
-    height: 96,
-    paint: (y) => {
-      ctx.textAlign = "left";
-      ctx.fillStyle = "#64748b";
-      ctx.font = "500 26px system-ui, sans-serif";
-      ctx.fillText("Karasu · github.com/Kyusetzu/Karasu", P, y + 52);
-    },
-  });
-
-  const totalH = sections.reduce((sum, s) => sum + s.height, 0);
   work.width = W * scale;
-  work.height = totalH * scale;
+  work.height = H * scale;
   // Applied after sizing, because setting width/height resets the context.
   ctx.setTransform(scale, 0, 0, scale, 0, 0);
 
-  const bg = ctx.createLinearGradient(0, 0, 0, totalH);
-  bg.addColorStop(0, "#0b0d12");
-  bg.addColorStop(1, "#141b26");
-  ctx.fillStyle = bg;
-  ctx.fillRect(0, 0, W, totalH);
+  ctx.fillStyle = POSTER_BG;
+  ctx.fillRect(0, 0, W, H);
 
-  let y = 0;
-  for (const s of sections) {
-    s.paint(y);
-    y += s.height;
-  }
+  // Three washes off the derived hues, the same pair the panels use. They are
+  // what keeps a near-black poster from reading as a screenshot of a terminal.
+  const wash = (
+    cx: number,
+    cy: number,
+    r: number,
+    rgb: string,
+    alpha: number,
+  ) => {
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+    g.addColorStop(0, `rgba(${rgb}, ${alpha})`);
+    g.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+  };
+  wash(0, 0, W * 0.9, w1, 0.16);
+  wash(W, H, W * 0.9, accentRgb, 0.13);
+  wash(W * 0.5, H * 0.45, W * 0.7, w2, 0.07);
 
-  if (!preset.square) {
-    canvas.width = W * scale;
-    canvas.height = totalH * scale;
-    const outCtx = canvas.getContext("2d");
-    outCtx?.drawImage(work, 0, 0);
-    return;
-  }
+  // A 1px highlight along the top edge — the same catch-light every panel in
+  // the app carries, which is what makes the surface read as lit from above.
+  ctx.fillStyle = "rgba(255,255,255,.06)";
+  ctx.fillRect(0, 0, W, 1);
 
-  // Square preset: content is naturally taller than it is wide, so scale it
-  // down (never up — canvas text would blur) to fit an exact W×W frame,
-  // centered, with the same background filling any letterboxed edge.
+  // The mark bleeds off the bottom-right corner, flat rather than full-colour:
+  // a colour disc at 42em would read as a second surface instead of a mark in
+  // the material.
+  drawMark(ctx, W - em * 20, H - em * 20, em * 42, a5, 0.16, -7);
+
+  // Centred, so a card that cannot quite fill its crop is framed by the ground
+  // rather than hanging from the top edge.
+  card.paint(Math.max(0, (H - card.totalH) / 2));
+
   canvas.width = W * scale;
-  canvas.height = W * scale;
-  const outCtx = canvas.getContext("2d");
-  if (!outCtx) return;
-  outCtx.setTransform(scale, 0, 0, scale, 0, 0);
-  const outBg = outCtx.createLinearGradient(0, 0, 0, W);
-  outBg.addColorStop(0, "#0b0d12");
-  outBg.addColorStop(1, "#141b26");
-  outCtx.fillStyle = outBg;
-  outCtx.fillRect(0, 0, W, W);
-  const fit = Math.min(1, W / totalH);
-  const drawW = W * fit;
-  const drawH = totalH * fit;
-  outCtx.drawImage(work, (W - drawW) / 2, (W - drawH) / 2, drawW, drawH);
+  canvas.height = H * scale;
+  canvas.getContext("2d")?.drawImage(work, 0, 0);
 }
 
 export default function Wrapped() {

@@ -7,12 +7,20 @@ import { displayTitle, type ListResult, type MediaType } from "@/api/types";
 import { useAuth } from "@/stores/auth";
 import { useContentFilter } from "@/stores/contentFilter";
 import { isBlocked } from "@/lib/contentFilter";
+import { cn } from "@/lib/utils";
 
 interface Item {
   id: string;
   label: string;
   sub?: string;
   path: string;
+  cover?: string | null;
+  native?: string | null;
+}
+
+interface Group {
+  key: string;
+  items: Item[];
 }
 
 const NAV: { path: string; key: string }[] = [
@@ -88,6 +96,8 @@ export default function CommandPalette() {
               label: displayTitle(ti),
               sub: type === "ANIME" ? t("nav.list") : t("nav.manga"),
               path: `/media/${e.media.id}`,
+              cover: e.media.coverImage.large,
+              native: ti.native && ti.native !== displayTitle(ti) ? ti.native : null,
             },
             haystack: [ti.romaji, ti.english, ti.native, ...e.media.synonyms]
               .filter(Boolean)
@@ -100,21 +110,31 @@ export default function CommandPalette() {
     return out;
   }, [open, viewer, qc, t, level]);
 
-  const results = useMemo(() => {
+  // Grouped, because the two kinds of hit are not interchangeable: one moves
+  // you to a screen, the other to a title. A single ranked list makes the user
+  // read every row to work out which kind they are looking at.
+  const groups = useMemo<Group[]>(() => {
     const q = query.trim().toLowerCase();
     const navItems: Item[] = NAV.map((n) => ({
       id: n.path,
       label: t(n.key),
-      sub: t("palette.page"),
       path: n.path,
     }));
-    if (!q) return navItems;
+    if (!q) return [{ key: "palette.groupGoTo", items: navItems }];
     const nav = navItems.filter((i) => i.label.toLowerCase().includes(q));
     const media = entries
       .filter((e) => e.haystack.includes(q))
-      .map((e) => e.item);
-    return [...nav, ...media].slice(0, MAX_RESULTS);
+      .map((e) => e.item)
+      .slice(0, MAX_RESULTS);
+    return [
+      { key: "palette.groupList", items: media },
+      { key: "palette.groupGoTo", items: nav },
+    ].filter((g) => g.items.length > 0);
   }, [query, entries, t]);
+
+  // One flat order for the keyboard, so ↑↓ crosses group boundaries the way
+  // the eye does.
+  const results = useMemo(() => groups.flatMap((g) => g.items), [groups]);
 
   useEffect(() => setSel(0), [query]);
 
@@ -142,15 +162,15 @@ export default function CommandPalette() {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-4 pt-[12vh]"
+      className="fixed inset-0 z-50 flex animate-fade-in items-start justify-center bg-[rgba(4,5,8,.55)] px-4 pb-4 pt-22"
       onMouseDown={() => setOpen(false)}
     >
       <div
-        className="w-full max-w-lg overflow-hidden rounded-xl border border-surface-700 bg-surface-900 shadow-2xl"
+        className="w-full max-w-136 animate-settle overflow-hidden rounded-xl border border-hair bg-surface-900 shadow-2xl panel-wash"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center gap-2 border-b border-surface-800 px-3">
-          <Search className="size-4 text-ink-600" />
+        <div className="flex items-center gap-2 border-b border-hair px-3.5">
+          <Search className="size-4 shrink-0 text-ink-600" />
           <input
             ref={inputRef}
             value={query}
@@ -159,33 +179,76 @@ export default function CommandPalette() {
             placeholder={t("palette.placeholder")}
             className="h-12 flex-1 bg-transparent text-sm text-ink-100 placeholder:text-ink-600 focus:outline-none"
           />
+          <kbd className="shrink-0 rounded border border-surface-700 bg-surface-850 px-1.5 py-0.5 font-brand text-2xs font-semibold text-ink-600">
+            ESC
+          </kbd>
         </div>
-        <ul className="max-h-80 overflow-y-auto py-1">
+
+        <div className="max-h-96 overflow-y-auto py-1">
           {results.length === 0 ? (
-            <li className="px-4 py-3 text-sm text-ink-600">
-              {t("palette.empty")}
-            </li>
+            <p className="px-4 py-3 text-sm text-ink-600">{t("palette.empty")}</p>
           ) : (
-            results.map((item, i) => (
-              <li key={item.id}>
-                <button
-                  onMouseEnter={() => setSel(i)}
-                  onClick={() => go(item)}
-                  className={`flex w-full items-center justify-between gap-3 px-4 py-2 text-left text-sm ${
-                    i === sel ? "bg-surface-800 text-ink-100" : "text-ink-300"
-                  }`}
-                >
-                  <span className="truncate">{item.label}</span>
-                  {item.sub && (
-                    <span className="shrink-0 text-xs text-ink-600">
-                      {item.sub}
-                    </span>
-                  )}
-                </button>
-              </li>
+            groups.map((group) => (
+              <section key={group.key}>
+                <h3 className="px-3.5 pb-1 pt-2 text-[.5625rem] font-semibold uppercase tracking-[.14em] text-ink-600">
+                  {t(group.key)}
+                </h3>
+                <ul>
+                  {group.items.map((item) => {
+                    const i = results.indexOf(item);
+                    return (
+                      <li key={item.id}>
+                        <button
+                          onMouseEnter={() => setSel(i)}
+                          onClick={() => go(item)}
+                          className={cn(
+                            "flex w-full items-center gap-2.5 px-3.5 py-1.5 text-left text-sm transition-surface",
+                            i === sel
+                              ? "bg-surface-850 text-ink-100"
+                              : "text-ink-300",
+                          )}
+                        >
+                          {item.cover !== undefined && (
+                            <span className="h-8 w-5.5 shrink-0 overflow-hidden rounded-[.1875rem] bg-surface-800">
+                              {item.cover && (
+                                <img
+                                  src={item.cover}
+                                  alt=""
+                                  className="size-full object-cover"
+                                />
+                              )}
+                            </span>
+                          )}
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate">{item.label}</span>
+                            {item.native && (
+                              <span className="block truncate font-brand-jp text-2xs text-ink-600">
+                                {item.native}
+                              </span>
+                            )}
+                          </span>
+                          {item.sub && (
+                            <span className="shrink-0 text-2xs text-ink-600">
+                              {item.sub}
+                            </span>
+                          )}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
             ))
           )}
-        </ul>
+        </div>
+
+        {/* The strip is the whole tutorial: nobody reads documentation for a
+            palette, they read the bottom of it. */}
+        <div className="flex items-center gap-3 border-t border-hair px-3.5 py-1.5 text-2xs text-ink-600">
+          <span>{t("palette.hintMove")}</span>
+          <span>{t("palette.hintRun")}</span>
+          <span className="ml-auto">{t("palette.hintClose")}</span>
+        </div>
       </div>
     </div>
   );

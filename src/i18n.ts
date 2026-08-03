@@ -391,6 +391,11 @@ const en = {
     placeholder: "Jump to a page or title …",
     empty: "No matches.",
     page: "Page",
+    groupGoTo: "Go to",
+    groupList: "Your list",
+    hintMove: "↑↓ navigate",
+    hintRun: "↵ open",
+    hintClose: "Ctrl K close",
   },
   detail: {
     back: "Back",
@@ -1032,6 +1037,11 @@ const de: typeof en = {
     placeholder: "Zu Seite oder Titel springen …",
     empty: "Keine Treffer.",
     page: "Seite",
+    groupGoTo: "Gehe zu",
+    groupList: "Deine Liste",
+    hintMove: "↑↓ bewegen",
+    hintRun: "↵ öffnen",
+    hintClose: "Ctrl K schließen",
   },
   detail: {
     back: "Zurück",

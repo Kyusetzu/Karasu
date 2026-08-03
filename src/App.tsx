@@ -16,6 +16,7 @@ import {
 } from "@/api/anilist";
 import Titlebar from "@/components/Titlebar";
 import Sidebar from "@/components/Sidebar";
+import Toast from "@/components/Toast";
 import CommandPalette from "@/components/CommandPalette";
 import ContextMenu from "@/components/ContextMenu";
 import SignInMerge from "@/components/SignInMerge";
@@ -96,6 +97,7 @@ export default function App() {
       <ContextMenu />
       <SignInMerge />
       <PlaybackError />
+      <Toast />
       <Titlebar />
       <div className="flex min-h-0 flex-1">
         <Sidebar />

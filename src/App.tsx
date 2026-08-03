@@ -18,6 +18,8 @@ import Titlebar from "@/components/Titlebar";
 import Sidebar from "@/components/Sidebar";
 import Toast from "@/components/Toast";
 import CommandPalette from "@/components/CommandPalette";
+import KeyboardSheet from "@/components/KeyboardSheet";
+import GlobalKeys from "@/components/GlobalKeys";
 import ContextMenu from "@/components/ContextMenu";
 import SignInMerge from "@/components/SignInMerge";
 import Dashboard from "@/pages/Dashboard";
@@ -94,6 +96,8 @@ export default function App() {
     <div className="flex h-full flex-col">
       <PresenceReporter />
       <CommandPalette />
+      <KeyboardSheet />
+      <GlobalKeys />
       <ContextMenu />
       <SignInMerge />
       <PlaybackError />

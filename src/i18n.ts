@@ -79,6 +79,20 @@ const en = {
     markAll: "Mark all read",
     now: "now",
   },
+  keys: {
+    title: "Keyboard shortcuts",
+    global: "Anywhere in the app",
+    palette: "Command palette",
+    reference: "This list",
+    search: "Search AniList",
+    close: "Close or cancel",
+    overview: "Go to Overview",
+    anime: "Go to Anime",
+    manga: "Go to Manga",
+    sync: "Sync your lists now",
+    footnote:
+      "Single-key shortcuts stay quiet while you are typing in a field.",
+  },
   ctx: {
     open: "Open",
     openAniList: "Open on AniList",
@@ -695,6 +709,20 @@ const de: typeof en = {
     empty: "Alles gelesen.",
     markAll: "Alle als gelesen",
     now: "jetzt",
+  },
+  keys: {
+    title: "Tastenkürzel",
+    global: "Überall in der App",
+    palette: "Befehlspalette",
+    reference: "Diese Liste",
+    search: "AniList durchsuchen",
+    close: "Schließen oder abbrechen",
+    overview: "Zur Übersicht",
+    anime: "Zu Anime",
+    manga: "Zu Manga",
+    sync: "Listen jetzt synchronisieren",
+    footnote:
+      "Einzeltasten-Kürzel bleiben still, solange du in einem Feld tippst.",
   },
   ctx: {
     open: "Öffnen",

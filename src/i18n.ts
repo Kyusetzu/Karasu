@@ -39,7 +39,7 @@ export function setLanguageSetting(setting: LanguageSetting) {
   i18n.changeLanguage(resolveLanguage(setting));
 }
 
-const en = {
+export const en = {
   nav: {
     groupLibrary: "Library",
     groupDiscover: "Discover",
@@ -146,6 +146,7 @@ const en = {
     score: "Score",
     noScore: "No score",
     reload: "Reload",
+    done: "Done",
     edit: "Edit",
     plusOne: "+1",
     complete: "Mark as completed",
@@ -459,7 +460,18 @@ const en = {
       "Point Karasu at your anime folder, then scan — matched episodes show up here, ready to play.",
     toSettings: "Open settings",
   },
+  receipt: {
+    saved: "{{title}} saved",
+    progress: "{{title}} set to {{n}}",
+    volumes: "{{title}} set to volume {{n}}",
+    status: "{{title}} moved to {{status}}",
+    score: "{{title}} scored {{n}}",
+    undo: "Undo",
+    failed: "Couldn't save {{title}}",
+    failedDetail: "Queued — Karasu will retry.",
+  },
   entry: {
+    scoreHint: "Click the score you gave to clear it.",
     rewatches: "Rewatches",
     rereads: "Rereads",
     addRepeat: "+1",
@@ -800,6 +812,7 @@ const de: typeof en = {
     score: "Bewertung",
     noScore: "Keine Bewertung",
     reload: "Neu laden",
+    done: "Fertig",
     edit: "Bearbeiten",
     plusOne: "+1",
     complete: "Als abgeschlossen markieren",
@@ -1115,7 +1128,18 @@ const de: typeof en = {
       "Wähle deinen Anime-Ordner und starte den Scan — zugeordnete Folgen erscheinen hier und lassen sich direkt abspielen.",
     toSettings: "Einstellungen öffnen",
   },
+  receipt: {
+    saved: "{{title}} gespeichert",
+    progress: "{{title}} auf {{n}} gesetzt",
+    volumes: "{{title}} auf Band {{n}} gesetzt",
+    status: "{{title}} nach {{status}} verschoben",
+    score: "{{title}} mit {{n}} bewertet",
+    undo: "Rückgängig",
+    failed: "{{title}} konnte nicht gespeichert werden",
+    failedDetail: "In der Warteschlange — Karasu versucht es erneut.",
+  },
   entry: {
+    scoreHint: "Klick auf die vergebene Bewertung, um sie zu löschen.",
     rewatches: "Wiederholungen",
     rereads: "Wiederholungen",
     addRepeat: "+1",

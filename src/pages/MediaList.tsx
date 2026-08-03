@@ -15,6 +15,7 @@ import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
 import {
   Bookmark,
+  Check,
   CheckCheck,
   CheckSquare,
   CloudOff,
@@ -26,8 +27,6 @@ import {
   Plus,
   RefreshCw,
   Search as SearchIcon,
-  Square,
-  Star,
   Trash2,
   X,
 } from "lucide-react";
@@ -58,6 +57,8 @@ import { IconButton } from "@/components/ui/icon-button";
 import { Segmented } from "@/components/ui/segmented";
 import { FilterSelect } from "@/components/ui/filter-select";
 import { StatusTabs } from "@/components/ui/status-tabs";
+import { TitleLockup } from "@/components/TitleLockup";
+import { CoverCell, CoverMeta } from "@/components/CoverCell";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
@@ -735,17 +736,19 @@ function SelectBox({
     <button
       onClick={onToggle}
       className={cn(
-        "grid h-6 w-6 shrink-0 place-items-center rounded-md border transition-colors",
+        "grid size-5 shrink-0 place-items-center rounded-[.3125rem] border transition-surface",
+        // Near-opaque unchecked, because it sits on arbitrary cover art and a
+        // translucent box has no contrast floor there.
         checked
-          ? "border-accent-500 bg-accent-600 text-accent-ink"
-          : "border-surface-600 bg-surface-900/80 text-transparent hover:border-accent-500",
+          ? "border-accent-500 bg-accent-500 text-accent-ink"
+          : "border-[rgba(255,255,255,.35)] bg-[rgba(4,5,8,.7)] text-transparent hover:border-accent-500",
         className,
       )}
       role="checkbox"
       aria-checked={checked}
       aria-label={t("bulk.select")}
     >
-      {checked ? <CheckSquare className="size-3.5" /> : <Square className="size-3.5" />}
+      <Check className="size-3.25" strokeWidth={3} />
     </button>
   );
 }
@@ -777,110 +780,92 @@ const GridCard = memo(function GridCard({
   const { t } = useTranslation();
   const { media } = entry;
   const max = maxProgress(media);
-  const pct = max ? (entry.progress / max) * 100 : 0;
   return (
-    <div className="group" data-media-id={media.id} data-media-type={media.type}>
-      <div
-        className={cn(
-          "relative aspect-[2/3] overflow-hidden rounded-lg bg-surface-800",
-          selected && "ring-2 ring-accent-500",
-        )}
-      >
-        {selectMode ? (
-          <button
-            onClick={() => onToggleSelect(entry.mediaId)}
-            className="absolute inset-0 z-10 bg-black/30"
-            aria-label={t("bulk.select")}
-          >
-            {media.coverImage.large && (
-              <img
-                src={media.coverImage.large}
-                alt=""
-                loading="lazy"
-                className="h-full w-full object-cover"
-              />
-            )}
-          </button>
-        ) : (
-          <Link to={`/media/${media.id}`}>
-            {media.coverImage.large && (
-              <img
-                src={media.coverImage.large}
-                alt=""
-                loading="lazy"
-                className="h-full w-full object-cover"
-              />
-            )}
-          </Link>
-        )}
-        {selectMode && (
+    <CoverCell
+      to={`/media/${media.id}`}
+      cover={media.coverImage.large}
+      data-media-id={media.id}
+      data-media-type={media.type}
+      selected={selectMode && selected}
+      // In select mode the cover *is* the checkbox target — navigating away
+      // mid-selection is never what the click meant.
+      onCoverClick={
+        selectMode ? () => onToggleSelect(entry.mediaId) : undefined
+      }
+      coverLabel={t("bulk.select")}
+      score={!selectMode && entry.score > 0 ? entry.score : undefined}
+      progress={max ? { current: entry.progress, total: max } : null}
+      overlay={
+        selectMode ? (
           <SelectBox
             checked={selected}
             onToggle={() => onToggleSelect(entry.mediaId)}
             className="absolute left-2 top-2 z-20"
           />
-        )}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/80 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
-        <div
-          className={cn(
-            "absolute bottom-2 right-2 flex gap-1.5 opacity-0 transition-opacity group-hover:opacity-100",
-            selectMode && "hidden",
-          )}
-        >
-          <button
-            onClick={() => onEdit(entry)}
-            className="grid h-8 w-8 place-items-center rounded-full bg-surface-900/90 text-ink-300 hover:bg-surface-800 hover:text-ink-100"
-            aria-label={t("common.edit")}
-            title={t("common.edit")}
-          >
-            <Pencil className="size-3.5" />
-          </button>
-          {entry.status !== "COMPLETED" && (
-            <button
-              onClick={() => onComplete(entry)}
-              className="grid h-8 w-8 place-items-center rounded-full bg-emerald-700/90 text-white hover:bg-emerald-600"
-              aria-label={t("common.complete")}
-              title={t("common.complete")}
+        ) : (
+          // Deepens the foot of the cover only while the actions are showing,
+          // so the three circles have a ground without dimming every poster
+          // in the grid permanently.
+          <div className="cover-scrim pointer-events-none absolute inset-x-0 bottom-0 h-[45%] opacity-0 transition-opacity group-hover:opacity-100" />
+        )
+      }
+      actions={
+        // Suppressed entirely in select mode: one interaction model at a time.
+        !selectMode && (
+          <div className="flex gap-1.5 opacity-0 transition-opacity group-hover:opacity-100">
+            <IconButton
+              variant="onCover"
+              size="sm"
+              round
+              onClick={() => onEdit(entry)}
+              aria-label={t("common.edit")}
+              title={t("common.edit")}
             >
-              <CheckCheck className="size-3.5" />
-            </button>
-          )}
-          {canIncrement(entry) && (
-            <button
-              onClick={() => onPlusOne(entry)}
-              className="grid h-8 w-8 place-items-center rounded-full bg-accent-600 text-accent-ink hover:bg-accent-500"
-              aria-label={t("common.plusOne")}
-              title={t("common.plusOne")}
-            >
-              <Plus className="size-4" />
-            </button>
-          )}
-        </div>
-        {entry.score > 0 && (
-          <span className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-black/70 px-2 py-0.5 text-xs font-medium text-gold">
-            <Star className="size-2.75" fill="currentColor" /> {entry.score}
-          </span>
-        )}
-        {max !== null && (
-          <div className="absolute inset-x-0 bottom-0 h-1 bg-black/50">
-            <div
-              className="h-full bg-accent-500"
-              style={{ width: `${Math.min(pct, 100)}%` }}
-            />
+              <Pencil className="size-3.5" />
+            </IconButton>
+            {entry.status !== "COMPLETED" && (
+              <IconButton
+                variant="onCover"
+                size="sm"
+                round
+                onClick={() => onComplete(entry)}
+                aria-label={t("common.complete")}
+                title={t("common.complete")}
+                className="text-success"
+              >
+                <CheckCheck className="size-3.5" />
+              </IconButton>
+            )}
+            {canIncrement(entry) && (
+              <IconButton
+                variant="accent"
+                size="sm"
+                round
+                onClick={() => onPlusOne(entry)}
+                aria-label={t("common.plusOne")}
+                title={t("common.plusOne")}
+              >
+                <Plus className="size-4" />
+              </IconButton>
+            )}
           </div>
-        )}
-      </div>
+        )
+      }
+    >
       <Link to={`/media/${media.id}`}>
-        <p className="mt-2 line-clamp-2 text-xs font-medium text-ink-300 group-hover:text-ink-100">
-          {displayTitle(media.title)}
-        </p>
+        <TitleLockup
+          title={media.title}
+          clamp={2}
+          tone="muted"
+          className="mt-2"
+        />
       </Link>
-      <p className="text-xs text-ink-600">
+      <CoverMeta>
         {entry.progress}
         {max ? ` / ${max}` : ""} {unit}
-      </p>
+      </CoverMeta>
       <TagChips notes={entry.notes} />
-    </div>
+    </CoverCell>
   );
 });
 
@@ -893,7 +878,7 @@ function TagChips({ notes, max = 3 }: { notes: string | null; max?: number }) {
       {tags.slice(0, max).map((tag) => (
         <span
           key={tag}
-          className="rounded-full bg-surface-800 px-1.5 py-0.5 text-2xs text-accent-300"
+          className="rounded-[.625rem] border border-surface-800 bg-surface-850 px-1.25 py-px text-2xs text-accent-400"
         >
           {tag}
         </span>

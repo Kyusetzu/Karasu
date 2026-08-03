@@ -18,6 +18,9 @@ export function CoverCell({
   score,
   progress,
   actions,
+  overlay,
+  onCoverClick,
+  coverLabel,
   selected,
   className,
   children,
@@ -32,6 +35,14 @@ export function CoverCell({
   progress?: { current: number; total: number } | null;
   /** Overlaid bottom-right — the action circles. */
   actions?: ReactNode;
+  /** Anything else laid over the artwork: a hover scrim, a checkbox. Rendered
+      above the base scrim and below the badge and actions. */
+  overlay?: ReactNode;
+  /** Replaces the link on the artwork itself. Bulk-edit hands this in so a
+      click selects instead of navigating — one interaction model at a time. */
+  onCoverClick?: () => void;
+  /** Accessible name for `onCoverClick`. */
+  coverLabel?: string;
   /** Bulk-edit selection ring. */
   selected?: boolean;
   className?: string;
@@ -42,6 +53,15 @@ export function CoverCell({
     ? Math.min((progress.current / progress.total) * 100, 100)
     : 0;
 
+  const art = cover && (
+    <img
+      src={cover}
+      alt=""
+      loading="lazy"
+      className="h-full w-full object-cover"
+    />
+  );
+
   return (
     <div className={cn("group", className)} {...rest}>
       <div
@@ -50,19 +70,25 @@ export function CoverCell({
           selected && "outline-2 outline-offset-2 outline-accent-500",
         )}
       >
-        <Link to={to} className="block h-full">
-          {cover && (
-            <img
-              src={cover}
-              alt=""
-              loading="lazy"
-              className="h-full w-full object-cover"
-            />
-          )}
-        </Link>
+        {onCoverClick ? (
+          <button
+            type="button"
+            onClick={onCoverClick}
+            aria-label={coverLabel}
+            className="block h-full w-full"
+          >
+            {art}
+          </button>
+        ) : (
+          <Link to={to} className="block h-full">
+            {art}
+          </Link>
+        )}
 
         {/* Sized to the content it has to carry, not to the cover. */}
         <div className="cover-scrim pointer-events-none absolute inset-x-0 bottom-0 h-14" />
+
+        {overlay}
 
         {score != null && (
           <span className="absolute left-2 top-2 flex items-center gap-1 rounded-[.625rem] bg-[rgba(4,5,8,.93)] px-1.5 py-0.5 text-2xs font-semibold text-gold">

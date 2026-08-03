@@ -24,6 +24,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { Tabs, type TabOption } from "@/components/ui/tabs";
+import {
+  LineChart,
+  RadarChart,
+  Sunburst,
+  ToneLegend,
+  Treemap,
+  type Slice,
+} from "@/components/charts";
+import { STATUS_ORDER, type MediaListStatus } from "@/api/types";
 
 type Category = "overview" | "genres" | "tags" | "voiceActors" | "studios" | "staff";
 type SortKey = "count" | "time" | "score";
@@ -120,6 +129,37 @@ function StatisticsContent({
     return sum;
   }, [animeList, level]);
 
+  // The sunburst is the one panel AniList cannot answer: its statistics are
+  // one-dimensional, so "what formats are inside each status" has to be
+  // counted from the list itself. Same query key as the list screens, so on
+  // anime this is the request already in flight above rather than a new one.
+  const { data: typeList } = useQuery({
+    queryKey: ["mediaList", type, userId],
+    queryFn: () => fetchMediaList(userId, type),
+    enabled: isTauri,
+  });
+  const breakdown = useMemo<Slice[]>(() => {
+    const byStatus = new Map<MediaListStatus, Map<string, number>>();
+    for (const group of typeList?.lists ?? []) {
+      if (group.isCustomList) continue;
+      for (const e of group.entries) {
+        if (isBlocked(e.media, level)) continue;
+        const formats = byStatus.get(e.status) ?? new Map<string, number>();
+        const key = e.media.format ?? "?";
+        formats.set(key, (formats.get(key) ?? 0) + 1);
+        byStatus.set(e.status, formats);
+      }
+    }
+    return STATUS_ORDER.filter((st) => byStatus.has(st)).map((st) => {
+      const formats = [...byStatus.get(st)!].sort((a, b) => b[1] - a[1]);
+      return {
+        label: t(`status.${type}.${st}`),
+        value: formats.reduce((sum, [, n]) => sum + n, 0),
+        children: formats.map(([label, value]) => ({ label, value })),
+      };
+    });
+  }, [typeList, level, t, type]);
+
   const categories = type === "ANIME" ? ANIME_CATEGORIES : MANGA_CATEGORIES;
   // Keep the selected sub-tab valid when switching media type.
   const activeCategory = categories.includes(category) ? category : "overview";
@@ -187,9 +227,17 @@ function StatisticsContent({
       )}
       {stats &&
         (type === "ANIME" ? (
-          <AnimeView stats={stats.anime} category={activeCategory} />
+          <AnimeView
+            stats={stats.anime}
+            category={activeCategory}
+            breakdown={breakdown}
+          />
         ) : (
-          <MangaView stats={stats.manga} category={activeCategory} />
+          <MangaView
+            stats={stats.manga}
+            category={activeCategory}
+            breakdown={breakdown}
+          />
         ))}
 
       {stats && type === "ANIME" && activeCategory === "overview" && (
@@ -218,9 +266,11 @@ function WatchTimeEstimate({ total }: { total: number }) {
 function AnimeView({
   stats,
   category,
+  breakdown,
 }: {
   stats: AnimeStats;
   category: Category;
+  breakdown: Slice[];
 }) {
   const { t, i18n } = useTranslation();
   const level = useContentFilter((s) => s.level);
@@ -248,7 +298,7 @@ function AnimeView({
             },
           ]}
         />
-        <OverviewCharts stats={stats} type="ANIME" />
+        <OverviewCharts stats={stats} type="ANIME" breakdown={breakdown} />
       </div>
     );
   }
@@ -264,9 +314,11 @@ function AnimeView({
 function MangaView({
   stats,
   category,
+  breakdown,
 }: {
   stats: MangaStats;
   category: Category;
+  breakdown: Slice[];
 }) {
   const { t, i18n } = useTranslation();
   const level = useContentFilter((s) => s.level);
@@ -293,7 +345,7 @@ function MangaView({
             },
           ]}
         />
-        <OverviewCharts stats={stats} type="MANGA" />
+        <OverviewCharts stats={stats} type="MANGA" breakdown={breakdown} />
       </div>
     );
   }
@@ -339,9 +391,11 @@ function rowsFor(
 function OverviewCharts({
   stats,
   type,
+  breakdown,
 }: {
   stats: AnimeStats | MangaStats;
   type: MediaType;
+  breakdown: Slice[];
 }) {
   const { t } = useTranslation();
   const scores = [...stats.scores].sort((a, b) => (a.score ?? 0) - (b.score ?? 0));
@@ -358,6 +412,8 @@ function OverviewCharts({
     .filter((d) => d.length)
     .sort((a, b) => parseInt(a.length ?? "0", 10) - parseInt(b.length ?? "0", 10));
   const countries = [...stats.countries].filter((d) => d.country);
+  const genres = stats.genres.slice(0, 6);
+  const tags = (stats.tags.length ? stats.tags : stats.genres).slice(0, 14);
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <ScoreColumns
@@ -383,11 +439,65 @@ function OverviewCharts({
         data={stats.formats.map((d) => ({ label: d.format ?? "?", count: d.count }))}
       />
       {/* Release years say what you watch; start years say when you were
-          watching it. Same shape on purpose — the pair is the comparison. */}
-      <YearSparkline
-        title={t("stats.startYears")}
-        data={started.map((d) => ({ year: d.startYear ?? 0, count: d.count }))}
-      />
+          watching it. A line rather than the bars above, because these are one
+          series continuing rather than years to compare against each other. */}
+      {started.length > 1 && (
+        <Card>
+          <CardTitle>{t("stats.startYears")}</CardTitle>
+          <div className="mt-4">
+            <LineChart
+              data={started.map((d) => ({
+                label: String(d.startYear ?? 0),
+                value: d.count,
+              }))}
+            />
+          </div>
+        </Card>
+      )}
+
+      {breakdown.length > 0 && (
+        <Card>
+          <CardTitle>{t("stats.breakdown")}</CardTitle>
+          <p className="mt-1 text-2xs text-ink-600">{t("stats.breakdownHint")}</p>
+          <div className="mt-3 flex flex-wrap items-center justify-center gap-5">
+            <Sunburst data={breakdown} />
+            <div className="min-w-40 flex-1">
+              <ToneLegend
+                items={breakdown.map((b) => ({ label: b.label, value: b.value }))}
+              />
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {genres.length > 2 && (
+        <Card>
+          <CardTitle>{t("stats.genreShape")}</CardTitle>
+          <p className="mt-1 text-2xs text-ink-600">{t("stats.genreShapeHint")}</p>
+          <div className="mt-2 flex justify-center">
+            <RadarChart
+              axes={genres.map((g) => ({
+                label: g.genre ?? "?",
+                value: g.count,
+              }))}
+            />
+          </div>
+        </Card>
+      )}
+
+      {tags.length > 3 && (
+        <Card className="lg:col-span-2">
+          <CardTitle>{t("stats.tagMap")}</CardTitle>
+          <div className="mt-3">
+            <Treemap
+              data={tags.map((entry) => ({
+                label: entry.tag?.name ?? entry.genre ?? "?",
+                value: entry.count,
+              }))}
+            />
+          </div>
+        </Card>
+      )}
       <DistributionCard
         title={t("stats.lengths")}
         data={lengths.map((d) => ({

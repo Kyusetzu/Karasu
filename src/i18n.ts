@@ -41,16 +41,31 @@ export function setLanguageSetting(setting: LanguageSetting) {
 
 const en = {
   nav: {
+    groupLibrary: "Library",
+    groupDiscover: "Discover",
+    groupInsight: "Insight",
     dashboard: "Overview",
     list: "Anime",
     manga: "Manga",
     search: "Search",
     seasonal: "Seasonal",
     stats: "Statistics",
+    wrapped: "Wrapped",
     library: "Local library",
     linkAccount: "Link AniList account",
     about: "About",
     settings: "Settings",
+  },
+  sync: {
+    now: "Synced just now",
+    minutes: "Synced {{n}} min ago",
+    hours: "Synced {{n}} h ago",
+    days: "Synced {{n}} d ago",
+    never: "Not synced yet",
+    queuedOne: "1 change queued",
+    queuedMany: "{{n}} changes queued",
+    local: "Stored on this PC",
+    localProfile: "Local profile",
   },
   window: {
     minimize: "Minimize",
@@ -596,16 +611,31 @@ const en = {
 
 const de: typeof en = {
   nav: {
+    groupLibrary: "Bibliothek",
+    groupDiscover: "Entdecken",
+    groupInsight: "Einblicke",
     dashboard: "Übersicht",
     list: "Anime",
     manga: "Manga",
     search: "Suche",
     seasonal: "Saison",
     stats: "Statistik",
+    wrapped: "Wrapped",
     library: "Lokale Bibliothek",
     linkAccount: "AniList-Konto verknüpfen",
     about: "Über",
     settings: "Einstellungen",
+  },
+  sync: {
+    now: "Gerade synchronisiert",
+    minutes: "Vor {{n}} Min. synchronisiert",
+    hours: "Vor {{n}} Std. synchronisiert",
+    days: "Vor {{n}} T. synchronisiert",
+    never: "Noch nicht synchronisiert",
+    queuedOne: "1 Änderung wartet",
+    queuedMany: "{{n}} Änderungen warten",
+    local: "Auf diesem PC gespeichert",
+    localProfile: "Lokales Profil",
   },
   window: {
     minimize: "Minimieren",

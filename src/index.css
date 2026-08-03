@@ -291,6 +291,27 @@ nav a {
   );
 }
 
+/* The sidebar's own wash: one hue, shallower and steeper than `panel-wash`.
+   A tall narrow column crossed by that two-hue 140deg gradient reads as a
+   diagonal stripe; at 160deg over the top 42% it reads as light falling in. */
+@utility rail-wash {
+  background-image: linear-gradient(
+    160deg,
+    rgba(var(--w1), 0.05),
+    transparent 42%
+  );
+}
+
+/* The account avatar, when there is no picture to show. Strong enough that a
+   bare initial still reads as a deliberate object rather than a grey blob. */
+@utility avatar-wash {
+  background-image: linear-gradient(
+    140deg,
+    rgba(var(--w1), 0.35),
+    transparent 65%
+  );
+}
+
 /* The 1px catch-light along the top of a raised card. A pseudo-element rather
    than a second gradient layer, so it can sit on a panel that already has the
    wash without either fighting for `background-image`. */
@@ -332,8 +353,11 @@ nav a {
 /* Transitions are suspended for one frame while the theme swaps.
    `transition-colors` includes `color`, and transitioning a `var()`-driven
    colour makes the browser hold the *old* computed value across the swap —
-   panels stay dark for a beat after switching to light. Set by
-   `stores/theme.ts`, which also clears it on a timer in case rAF never runs. */
+   permanently, not for a beat: the panel simply stays dark in light theme.
+
+   This selector alone does not fix it. `stores/theme.ts` has to force a style
+   flush both before and after writing the new values, or the guard is decided
+   against the pre-swap styles and never applies. Don't move those reflows. */
 html[data-swapping] *,
 html[data-swapping] *::before,
 html[data-swapping] *::after {

@@ -236,6 +236,16 @@ function AnimeView({
             { label: t("stats.episodes"), value: fmt(stats.episodesWatched, i18n.language) },
             { label: t("stats.daysWatched"), value: days.toFixed(1) },
             { label: t("stats.meanScore"), value: scoreText(stats.meanScore) },
+            {
+              label: t("stats.spread"),
+              value: `± ${stats.standardDeviation.toFixed(1)}`,
+            },
+            {
+              label: t("stats.perEntry"),
+              value: t("stats.episodesEach", {
+                n: (stats.episodesWatched / Math.max(1, stats.count)).toFixed(1),
+              }),
+            },
           ]}
         />
         <OverviewCharts stats={stats} type="ANIME" />
@@ -271,6 +281,16 @@ function MangaView({
             { label: t("stats.chapters"), value: fmt(stats.chaptersRead, i18n.language) },
             { label: t("stats.volumes"), value: fmt(stats.volumesRead, i18n.language) },
             { label: t("stats.meanScore"), value: scoreText(stats.meanScore) },
+            {
+              label: t("stats.spread"),
+              value: `± ${stats.standardDeviation.toFixed(1)}`,
+            },
+            {
+              label: t("stats.perEntry"),
+              value: t("stats.chaptersEach", {
+                n: (stats.chaptersRead / Math.max(1, stats.count)).toFixed(0),
+              }),
+            },
           ]}
         />
         <OverviewCharts stats={stats} type="MANGA" />
@@ -328,6 +348,16 @@ function OverviewCharts({
   const years = [...stats.releaseYears]
     .sort((a, b) => (a.releaseYear ?? 0) - (b.releaseYear ?? 0))
     .slice(-16);
+  const started = [...stats.startYears]
+    .filter((d) => d.startYear)
+    .sort((a, b) => (a.startYear ?? 0) - (b.startYear ?? 0))
+    .slice(-16);
+  // AniList returns the buckets unordered and spells them "1", "17-28",
+  // "101+" — sort on the number each one opens with.
+  const lengths = [...stats.lengths]
+    .filter((d) => d.length)
+    .sort((a, b) => parseInt(a.length ?? "0", 10) - parseInt(b.length ?? "0", 10));
+  const countries = [...stats.countries].filter((d) => d.country);
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <ScoreColumns
@@ -352,6 +382,31 @@ function OverviewCharts({
         title={t("stats.formats")}
         data={stats.formats.map((d) => ({ label: d.format ?? "?", count: d.count }))}
       />
+      {/* Release years say what you watch; start years say when you were
+          watching it. Same shape on purpose — the pair is the comparison. */}
+      <YearSparkline
+        title={t("stats.startYears")}
+        data={started.map((d) => ({ year: d.startYear ?? 0, count: d.count }))}
+      />
+      <DistributionCard
+        title={t("stats.lengths")}
+        data={lengths.map((d) => ({
+          label: t(
+            type === "ANIME" ? "stats.lengthBucketEp" : "stats.lengthBucketCh",
+            { range: d.length },
+          ),
+          count: d.count,
+        }))}
+      />
+      {countries.length > 1 && (
+        <StatusBar
+          title={t("stats.countries")}
+          data={countries.map((d) => ({
+            label: t(`country.${d.country}`, { defaultValue: d.country ?? "?" }),
+            count: d.count,
+          }))}
+        />
+      )}
     </div>
   );
 }

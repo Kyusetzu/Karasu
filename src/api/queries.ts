@@ -288,10 +288,16 @@ export interface NamedPerson {
 
 export interface Distribution {
   count: number;
+  meanScore?: number;
   format?: string;
   status?: string;
   score?: number;
   releaseYear?: number;
+  startYear?: number;
+  /** Episode or chapter count bucket, as AniList spells it: "1", "13-26", … */
+  length?: string;
+  /** ISO country code of origin — JP, KR, CN, TW. */
+  country?: string;
 }
 
 interface CommonStats {
@@ -305,6 +311,9 @@ interface CommonStats {
   statuses: Distribution[];
   scores: Distribution[];
   releaseYears: Distribution[];
+  startYears: Distribution[];
+  lengths: Distribution[];
+  countries: Distribution[];
 }
 
 export interface AnimeStats extends CommonStats {
@@ -350,6 +359,9 @@ query ($id: Int!) {
         statuses { status count }
         scores(sort: MEAN_SCORE) { score count }
         releaseYears(sort: ID_DESC) { releaseYear count }
+        startYears(sort: ID) { startYear count meanScore }
+        lengths { length count meanScore }
+        countries(sort: COUNT_DESC) { country count }
       }
       manga {
         count
@@ -364,6 +376,9 @@ query ($id: Int!) {
         statuses { status count }
         scores(sort: MEAN_SCORE) { score count }
         releaseYears(sort: ID_DESC) { releaseYear count }
+        startYears(sort: ID) { startYear count meanScore }
+        lengths { length count meanScore }
+        countries(sort: COUNT_DESC) { country count }
       }
     }
   }

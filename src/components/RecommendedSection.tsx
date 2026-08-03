@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Sparkles } from "lucide-react";
+import { SectionHeader } from "@/components/ui/section-header";
 import { recommendationsFor } from "@/api/queries";
 import { displayTitle, type MediaListEntry, type MediaType } from "@/api/types";
 import { useContentFilter } from "@/stores/contentFilter";
@@ -78,14 +79,16 @@ export default function RecommendedSection({
 
   return (
     <section>
-      <h2 className="flex items-center gap-2 text-lg font-semibold">
-        <Sparkles className="size-4.5 text-accent-400" />{" "}
-        {t(type === "ANIME" ? "dashboard.recommendedAnime" : "dashboard.recommendedManga")}
-      </h2>
-      <p className="mt-1 text-sm text-ink-500">
-        {t("dashboard.recommendedHint")}
-      </p>
-      <div className="mt-4 grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-4">
+      <SectionHeader
+        icon={Sparkles}
+        title={t(
+          type === "ANIME"
+            ? "dashboard.recommendedAnime"
+            : "dashboard.recommendedManga",
+        )}
+        meta={t("dashboard.recommendedHint")}
+      />
+      <div className="mt-4 media-grid gap-y-5 gap-x-4">
         {ranked.map((r) => (
           <div key={r.media.id}>
             <MediaCard media={r.media} />

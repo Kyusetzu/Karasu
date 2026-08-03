@@ -10,6 +10,8 @@ import { useContentFilter } from "@/stores/contentFilter";
 import { isBlocked } from "@/lib/contentFilter";
 import { useListMutations } from "@/hooks/useListMutations";
 import { Button } from "@/components/ui/button";
+import { SectionHeader } from "@/components/ui/section-header";
+import { TitleLockup } from "@/components/TitleLockup";
 import NowPlayingCard from "@/components/NowPlayingCard";
 import RecommendedSection from "@/components/RecommendedSection";
 
@@ -93,7 +95,7 @@ function DashboardContent({ userId }: { userId: number }) {
   // stating the opposite of the truth. The two lists are gated separately so a
   // slow manga fetch can't hold back the anime sections.
   return (
-    <div className="space-y-8 p-8">
+    <div className="space-y-9 px-8 pb-12 pt-7">
       {/* Pinned above the rest: this is the "right now" card, and it is only
           useful while something is actually playing. */}
       <NowPlayingCard />
@@ -135,7 +137,7 @@ function DashboardSkeleton() {
       {Array.from({ length: 2 }, (_, section) => (
         <div key={section}>
           <div className="h-5 w-40 animate-pulse rounded bg-surface-800" />
-          <div className="mt-4 grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-4">
+          <div className="media-grid mt-4 gap-x-4 gap-y-5">
             {Array.from({ length: 6 }, (_, i) => (
               <div key={i}>
                 <div className="aspect-[2/3] animate-pulse rounded-lg bg-surface-800" />
@@ -178,10 +180,7 @@ function ContinueWatching({
 
   return (
     <section>
-      <h2 className="flex items-center gap-2 text-lg font-semibold">
-        <Play className="size-4.5 text-accent-400" />{" "}
-        {t("dashboard.continueWatching")}
-      </h2>
+      <SectionHeader icon={Play} title={t("dashboard.continueWatching")} />
       {watching.length === 0 ? (
         <p className="mt-3 text-sm text-ink-600">
           {t("dashboard.nothingWatching")}{" "}
@@ -191,7 +190,7 @@ function ContinueWatching({
           .
         </p>
       ) : (
-        <div className="mt-4 grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-4">
+        <div className="media-grid mt-4 gap-x-4 gap-y-5">
           {watching.map((entry) => (
             <ContinueCard key={entry.id} entry={entry} onPlusOne={plusOne} />
           ))}
@@ -224,20 +223,54 @@ function AiringSoon({ entries }: { entries: MediaListEntry[] }) {
 
   return (
     <section>
-      <h2 className="flex items-center gap-2 text-lg font-semibold">
-        <CalendarClock className="size-4.5 text-accent-400" />{" "}
-        {t("dashboard.upcoming")}
-      </h2>
+      <SectionHeader icon={CalendarClock} title={t("dashboard.upcoming")} />
       {upcoming.length === 0 ? (
         <p className="mt-3 text-sm text-ink-600">{t("dashboard.noUpcoming")}</p>
       ) : (
-        <div className="mt-4 grid gap-1 2xl:grid-cols-2">
+        <div className="mt-3 grid gap-0.5 2xl:grid-cols-2">
           {upcoming.slice(0, 10).map((entry) => (
             <AiringRow key={entry.id} entry={entry} />
           ))}
         </div>
       )}
     </section>
+  );
+}
+
+/**
+ * One line of a digest: art, what it is, when it lands.
+ *
+ * Both digests put the episode number in the *right* block rather than under
+ * the title, because the two things a glance wants — which episode and how
+ * long — then sit on top of each other in one column instead of straddling the
+ * row. The title column is left to say what the show is, in both scripts.
+ */
+function DigestRow({
+  entry,
+  note,
+  when,
+}: {
+  entry: MediaListEntry;
+  note: string;
+  when: string;
+}) {
+  return (
+    <Link
+      to={`/media/${entry.media.id}`}
+      className="flex items-center gap-2.5 rounded-[.625rem] px-2.5 py-2 transition-surface hover:bg-surface-900"
+    >
+      <img
+        src={entry.media.coverImage.large ?? ""}
+        alt=""
+        loading="lazy"
+        className="h-11.5 w-8.5 shrink-0 rounded-[.3125rem] object-cover"
+      />
+      <TitleLockup title={entry.media.title} className="flex-1" />
+      <div className="shrink-0 text-right">
+        <p className="text-2xs text-ink-600">{note}</p>
+        <p className="text-xs tabular-nums text-accent-400">{when}</p>
+      </div>
+    </Link>
   );
 }
 
@@ -278,44 +311,27 @@ function WeeklyDigest({ entries }: { entries: MediaListEntry[] }) {
 
   return (
     <section>
-      <h2 className="flex items-center gap-2 text-lg font-semibold">
-        <CalendarDays className="size-4.5 text-accent-400" />{" "}
-        {t("dashboard.thisWeek")}
-      </h2>
-      <p className="mt-1 text-sm text-ink-500">
-        {t("dashboard.thisWeekSummary", { count: thisWeek.length, shows })}
-      </p>
-      <div className="mt-4 grid gap-1 2xl:grid-cols-2">
+      <SectionHeader
+        icon={CalendarDays}
+        title={t("dashboard.thisWeek")}
+        meta={t("dashboard.thisWeekSummary", { count: thisWeek.length, shows })}
+      />
+      <div className="mt-3 grid gap-0.5 2xl:grid-cols-2">
         {thisWeek.map((entry) => (
-          <Link
+          <DigestRow
             key={entry.id}
-            to={`/media/${entry.media.id}`}
-            className="flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-surface-900"
-          >
-            <img
-              src={entry.media.coverImage.large ?? ""}
-              alt=""
-              loading="lazy"
-              className="h-12 w-9 rounded object-cover"
-            />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-ink-100">
-                {displayTitle(entry.media.title)}
-              </p>
-              <p className="text-xs text-ink-600">
-                {t("common.episode", { n: entry.media.nextAiringEpisode!.episode })}
-              </p>
-            </div>
-            <span className="shrink-0 text-sm tabular-nums text-accent-400">
-              {new Date(
-                entry.media.nextAiringEpisode!.airingAt * 1000,
-              ).toLocaleString(i18n.language, {
-                weekday: "short",
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </span>
-          </Link>
+            entry={entry}
+            note={t("common.episode", {
+              n: entry.media.nextAiringEpisode!.episode,
+            })}
+            when={new Date(
+              entry.media.nextAiringEpisode!.airingAt * 1000,
+            ).toLocaleString(i18n.language, {
+              weekday: "short",
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          />
         ))}
       </div>
     </section>
@@ -362,18 +378,19 @@ function Stats({ entries }: { entries: MediaListEntry[] }) {
 
   return (
     <section>
-      <h2 className="flex items-center gap-2 text-lg font-semibold">
-        <BarChart3 className="size-4.5 text-accent-400" />{" "}
-        {t("dashboard.stats")}
-      </h2>
+      <SectionHeader icon={BarChart3} title={t("dashboard.stats")} />
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {items.map((item) => (
           <div
             key={item.label}
-            className="rounded-xl border border-surface-800 bg-surface-900 px-4 py-3"
+            className="panel-wash panel-top rounded-xl border border-surface-800 bg-surface-900 px-4 py-3.5"
           >
-            <p className="text-xl font-bold tabular-nums">{item.value}</p>
-            <p className="text-xs text-ink-600">{item.label}</p>
+            <p className="text-2xl font-bold tabular-nums text-ink-100">
+              {item.value}
+            </p>
+            <p className="mt-0.5 text-2xs font-medium uppercase tracking-[.13em] text-ink-600">
+              {item.label}
+            </p>
           </div>
         ))}
       </div>
@@ -461,29 +478,15 @@ function AiringRow({ entry }: { entry: MediaListEntry }) {
   };
 
   return (
-    <Link
-      to={`/media/${entry.media.id}`}
-      className="flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-surface-900"
-    >
-      <img
-        src={entry.media.coverImage.large ?? ""}
-        alt=""
-        loading="lazy"
-        className="h-12 w-9 rounded object-cover"
-      />
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-ink-100">
-          {displayTitle(entry.media.title)}
-        </p>
-        <p className="text-xs text-ink-600">
-          {t("common.episode", { n: airing.episode })}
-          {entry.progress < airing.episode - 1 &&
-            ` · ${t("dashboard.youAreAt", { n: entry.progress })}`}
-        </p>
-      </div>
-      <span className="shrink-0 text-sm tabular-nums text-accent-400">
-        {formatAiring(airing.airingAt)}
-      </span>
-    </Link>
+    <DigestRow
+      entry={entry}
+      note={
+        t("common.episode", { n: airing.episode }) +
+        (entry.progress < airing.episode - 1
+          ? ` · ${t("dashboard.youAreAt", { n: entry.progress })}`
+          : "")
+      }
+      when={formatAiring(airing.airingAt)}
+    />
   );
 }

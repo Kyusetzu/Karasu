@@ -302,6 +302,18 @@ nav a {
   );
 }
 
+/* The rule trailing a section heading. Fading it out rather than running it
+   edge to edge is what keeps seven stacked sections from reading as a form. */
+@utility section-rule {
+  flex: 1;
+  height: 1px;
+  background-image: linear-gradient(
+    90deg,
+    var(--color-surface-800),
+    transparent
+  );
+}
+
 /* The account avatar, when there is no picture to show. Strong enough that a
    bare initial still reads as a deliberate object rather than a grey blob. */
 @utility avatar-wash {

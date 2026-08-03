@@ -138,6 +138,22 @@ const storedDensity = (): Density => {
   return saved === "s" || saved === "l" ? saved : "m";
 };
 
+/**
+ * Validated, not cast. `apply` treats anything that is not `dark` or `system`
+ * as light, so a stale or hand-edited value silently lands on the *opposite*
+ * of the documented default while the Settings radio group shows nothing
+ * selected at all.
+ */
+const storedMode = (): ThemeMode => {
+  const saved = localStorage.getItem(MODE_KEY);
+  return saved === "light" || saved === "system" ? saved : "dark";
+};
+
+const storedAccent = (): string => {
+  const saved = localStorage.getItem(ACCENT_KEY);
+  return saved && isHex(saved) ? saved : DEFAULT_ACCENT;
+};
+
 export const useTheme = create<ThemeState>((set, get) => {
   /** Writes whatever the store currently holds, so no call site has to
       remember the full argument list. */
@@ -158,8 +174,8 @@ export const useTheme = create<ThemeState>((set, get) => {
   };
 
   return {
-    mode: (localStorage.getItem(MODE_KEY) as ThemeMode) || "dark",
-    accent: localStorage.getItem(ACCENT_KEY) || DEFAULT_ACCENT,
+    mode: storedMode(),
+    accent: storedAccent(),
     density: storedDensity(),
     reduceMotion: localStorage.getItem(REDUCE_MOTION_KEY) === "true",
 

@@ -220,6 +220,15 @@
   --color-danger: #b3232c;
   --color-success: #0d7a54;
 
+  /* The graph outlines invert for the same reason. `#5ec98a` is a 2px line at
+     1.9:1 on the light panel — indistinguishable from the muted grey it is
+     supposed to contrast with — and `#3a3f4d` stops reading as "muted" and
+     becomes the heaviest line on the screen. "Completed" lands on the audited
+     light green; "not on list" sits a step under `s600`, which is where the
+     handoff puts muted graph nodes. */
+  --color-graph-completed: #0d7a54;
+  --color-graph-none: #aab2c2;
+
   --scrim: 244, 246, 249;
   --catch-light: rgba(11, 13, 18, 0.07);
   --well-shadow: rgba(11, 13, 18, 0.14);

@@ -21,9 +21,11 @@ query ($ids: [Int]) {
       title { romaji english native }
       coverImage { large }
       format
+      episodes
+      chapters
       isAdult
       genres
-      mediaListEntry { status }
+      mediaListEntry { status progress }
       relations {
         edges {
           relationType
@@ -33,9 +35,11 @@ query ($ids: [Int]) {
             title { romaji english native }
             coverImage { large }
             format
+            episodes
+            chapters
             isAdult
             genres
-            mediaListEntry { status }
+            mediaListEntry { status progress }
           }
         }
       }
@@ -69,6 +73,10 @@ export interface FranchiseNode {
   coverImage: { large: string | null };
   format: string | null;
   listStatus: MediaListStatus | null;
+  /** null when the title isn't on the list — 0 means on the list, unstarted. */
+  progress: number | null;
+  /** Episodes or chapters, whichever the medium counts in; null if unannounced. */
+  total: number | null;
 }
 
 export interface FranchiseEdge {
@@ -91,9 +99,11 @@ interface RawMedia {
   title: MediaTitle;
   coverImage: { large: string | null } | null;
   format: string | null;
+  episodes: number | null;
+  chapters: number | null;
   isAdult: boolean | null;
   genres: string[] | null;
-  mediaListEntry: { status: MediaListStatus } | null;
+  mediaListEntry: { status: MediaListStatus; progress: number } | null;
 }
 
 export async function loadFranchise(
@@ -122,6 +132,8 @@ export async function loadFranchise(
         coverImage: m.coverImage ?? { large: null },
         format: m.format ?? null,
         listStatus: m.mediaListEntry?.status ?? null,
+        progress: m.mediaListEntry?.progress ?? null,
+        total: (m.type === "MANGA" ? m.chapters : m.episodes) ?? null,
       });
     }
   };

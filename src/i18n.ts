@@ -576,6 +576,9 @@ const en = {
     coverSize_s: "Small",
     coverSize_m: "Medium",
     coverSize_l: "Large",
+    reduceMotion: "Reduce motion",
+    reduceMotionHint:
+      "Skip animations and transitions. Already on if Windows asks for it.",
     autostart: "Start with Windows",
     autostartHint: "Launch Karasu in the background when you sign in.",
     updateAuto: "Automatically check for updates",
@@ -1128,6 +1131,9 @@ const de: typeof en = {
     coverSize_s: "Klein",
     coverSize_m: "Mittel",
     coverSize_l: "Groß",
+    reduceMotion: "Bewegung reduzieren",
+    reduceMotionHint:
+      "Animationen und Übergänge überspringen. Bereits aktiv, wenn Windows es verlangt.",
     autostart: "Mit Windows starten",
     autostartHint: "Karasu beim Anmelden automatisch im Hintergrund starten.",
     updateAuto: "Automatisch nach Updates suchen",

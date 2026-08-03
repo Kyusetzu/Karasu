@@ -33,6 +33,26 @@ const COVER_TRACK: Record<Density, string> = {
 const MODE_KEY = "karasu-theme";
 const ACCENT_KEY = "karasu-accent";
 const DENSITY_KEY = "karasu-density";
+const REDUCE_MOTION_KEY = "karasu-reduce-motion";
+
+/**
+ * Kills every transition for one frame.
+ *
+ * Transitioning a `var()`-driven `color` makes the browser hold the *old*
+ * computed value across a theme swap, so panels stay dark for a beat after
+ * switching to light. Suspending transitions while the new values land avoids
+ * animating between two palettes that were never meant to meet.
+ *
+ * The timeout is not redundant: `requestAnimationFrame` does not run in a
+ * hidden or minimised window, and leaving the attribute on would disable every
+ * transition in the app permanently.
+ */
+function suspendTransitions(html: HTMLElement): void {
+  html.setAttribute("data-swapping", "");
+  const clear = () => html.removeAttribute("data-swapping");
+  requestAnimationFrame(() => requestAnimationFrame(clear));
+  setTimeout(clear, 120);
+}
 
 const isHex = (s: string) => /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(s);
 
@@ -52,10 +72,17 @@ function systemDark(): boolean {
  * depends on it: accent-as-text steps away from the page in whichever direction
  * that theme's page sits.
  */
-function apply(mode: ThemeMode, accent: string, density: Density): void {
+function apply(
+  mode: ThemeMode,
+  accent: string,
+  density: Density,
+  reduceMotion: boolean,
+): void {
   const dark = mode === "dark" || (mode === "system" && systemDark());
   const html = document.documentElement;
+  suspendTransitions(html);
   html.dataset.theme = dark ? "dark" : "light";
+  html.toggleAttribute("data-reduce-motion", reduceMotion);
   html.style.setProperty("--cover-track", COVER_TRACK[density] ?? COVER_TRACK.m);
 
   const base = isHex(accent) ? accent : DEFAULT_ACCENT;
@@ -77,9 +104,11 @@ interface ThemeState {
   mode: ThemeMode;
   accent: string;
   density: Density;
+  reduceMotion: boolean;
   setMode: (mode: ThemeMode) => void;
   setAccent: (accent: string) => void;
   setDensity: (density: Density) => void;
+  setReduceMotion: (reduceMotion: boolean) => void;
   init: () => void;
 }
 
@@ -88,37 +117,45 @@ const storedDensity = (): Density => {
   return saved === "s" || saved === "l" ? saved : "m";
 };
 
-export const useTheme = create<ThemeState>((set, get) => ({
-  mode: (localStorage.getItem(MODE_KEY) as ThemeMode) || "dark",
-  accent: localStorage.getItem(ACCENT_KEY) || DEFAULT_ACCENT,
-  density: storedDensity(),
+export const useTheme = create<ThemeState>((set, get) => {
+  /** Writes whatever the store currently holds, so no call site has to
+      remember the full argument list. */
+  const flush = () => {
+    const { mode, accent, density, reduceMotion } = get();
+    apply(mode, accent, density, reduceMotion);
+  };
 
-  setMode: (mode) => {
-    localStorage.setItem(MODE_KEY, mode);
-    set({ mode });
-    apply(mode, get().accent, get().density);
-  },
+  /** Persist, update, and push to the document — the shape every setter has. */
+  const commit = <K extends keyof ThemeState>(
+    key: string,
+    field: K,
+    value: ThemeState[K],
+  ) => {
+    localStorage.setItem(key, String(value));
+    set({ [field]: value } as Pick<ThemeState, K>);
+    flush();
+  };
 
-  setAccent: (accent) => {
-    localStorage.setItem(ACCENT_KEY, accent);
-    set({ accent });
-    apply(get().mode, accent, get().density);
-  },
+  return {
+    mode: (localStorage.getItem(MODE_KEY) as ThemeMode) || "dark",
+    accent: localStorage.getItem(ACCENT_KEY) || DEFAULT_ACCENT,
+    density: storedDensity(),
+    reduceMotion: localStorage.getItem(REDUCE_MOTION_KEY) === "true",
 
-  setDensity: (density) => {
-    localStorage.setItem(DENSITY_KEY, density);
-    set({ density });
-    apply(get().mode, get().accent, density);
-  },
+    setMode: (mode) => commit(MODE_KEY, "mode", mode),
+    setAccent: (accent) => commit(ACCENT_KEY, "accent", accent),
+    setDensity: (density) => commit(DENSITY_KEY, "density", density),
+    setReduceMotion: (reduceMotion) =>
+      commit(REDUCE_MOTION_KEY, "reduceMotion", reduceMotion),
 
-  init: () => {
-    apply(get().mode, get().accent, get().density);
-    // Track the OS theme while in "system" mode.
-    window
-      .matchMedia?.("(prefers-color-scheme: dark)")
-      .addEventListener("change", () => {
-        if (get().mode === "system")
-          apply("system", get().accent, get().density);
-      });
-  },
-}));
+    init: () => {
+      flush();
+      // Track the OS theme while in "system" mode.
+      window
+        .matchMedia?.("(prefers-color-scheme: dark)")
+        .addEventListener("change", () => {
+          if (get().mode === "system") flush();
+        });
+    },
+  };
+});

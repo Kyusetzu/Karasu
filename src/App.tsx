@@ -40,6 +40,7 @@ const Settings = lazy(() => import("@/pages/Settings"));
 const About = lazy(() => import("@/pages/About"));
 
 export default function App() {
+  const { pathname } = useLocation();
   const init = useAuth((s) => s.init);
   const initNowPlaying = useNowPlaying((s) => s.init);
   const refreshLibrary = useLibrary((s) => s.refresh);
@@ -98,7 +99,14 @@ export default function App() {
       <Titlebar />
       <div className="flex min-h-0 flex-1">
         <Sidebar />
-        <main className="min-w-0 flex-1 overflow-y-auto">
+        {/* Keyed on the route so the pane re-mounts and the animation replays.
+            One direction only — down from above, like a bird landing. No
+            slide-left/right, which would imply a history axis the app has
+            not got. */}
+        <main
+          key={pathname}
+          className="min-w-0 flex-1 animate-settle overflow-y-auto"
+        >
           <Suspense fallback={null}>
             <Routes>
               <Route path="/" element={<Dashboard />} />

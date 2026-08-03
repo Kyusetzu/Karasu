@@ -1104,6 +1104,8 @@ function AppSection() {
   const accent = useTheme((s) => s.accent);
   const density = useTheme((s) => s.density);
   const setDensity = useTheme((s) => s.setDensity);
+  const reduceMotion = useTheme((s) => s.reduceMotion);
+  const setReduceMotion = useTheme((s) => s.setReduceMotion);
   const setThemeMode = useTheme((s) => s.setMode);
   const setAccent = useTheme((s) => s.setAccent);
 
@@ -1195,6 +1197,13 @@ function AppSection() {
             ))}
           </select>
         </label>
+
+        <Toggle
+          checked={reduceMotion}
+          onChange={setReduceMotion}
+          label={t("settings.reduceMotion")}
+          hint={t("settings.reduceMotionHint")}
+        />
 
         <div className="space-y-3 py-1">
           <div className="flex items-center justify-between gap-4 text-sm">

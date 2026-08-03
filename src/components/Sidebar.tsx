@@ -18,7 +18,7 @@ import { useAniListLogin } from "@/hooks/useAniListLogin";
 
 const bottomClass = ({ isActive }: { isActive: boolean }) =>
   cn(
-    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-ink-300 transition-colors",
+    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-ink-300 transition-surface",
     "hover:bg-surface-800 hover:text-ink-100",
     isActive && "bg-surface-800 text-accent-400",
   );
@@ -55,7 +55,7 @@ export default function Sidebar() {
             end={"end" in rest}
             className={({ isActive }) =>
               cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-ink-300 transition-colors",
+                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-ink-300 transition-surface",
                 "hover:bg-surface-800 hover:text-ink-100",
                 isActive && "bg-surface-800 text-accent-400",
               )

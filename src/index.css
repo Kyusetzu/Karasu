@@ -83,10 +83,89 @@
   /* Readable text on accent-filled controls; recomputed at runtime per accent. */
   --color-accent-ink: #ffffff;
 
+  /* Corvids are quick and precise: one short duration and one sharp curve, no
+     springs and no overshoot. Overriding Tailwind's defaults means every plain
+     `transition-*` utility already lands on it. */
+  --default-transition-duration: 140ms;
+  --default-transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+  --ease-karasu: cubic-bezier(0.2, 0, 0, 1);
+
+  /* A bird landing on a branch — down from above, no bounce. On every screen
+     root, and on the palette, the bell and the graph rail. */
+  --animate-settle: settle 150ms cubic-bezier(0.2, 0, 0, 1);
+  /* Things that arrive from the bottom edge: toasts, the bulk bar. */
+  --animate-rise-in: riseIn 160ms cubic-bezier(0.2, 0, 0, 1);
+  --animate-pop-in: popIn 120ms cubic-bezier(0.2, 0, 0, 1);
+  --animate-fade-in: fadeIn 120ms linear;
+  /* The progress counter acknowledging a +1. */
+  --animate-tick: tick 180ms cubic-bezier(0.2, 0, 0, 1);
+  /* The titlebar detection dot: the app quietly proving it is watching. */
+  --animate-blip: blip 2.4s ease-in-out infinite;
+  /* `steps(1)` so the palette caret blinks rather than fades. */
+  --animate-breathe: breathe 1.2s steps(1) infinite;
+  --animate-shimmer: shimmer 1.5s linear infinite;
+
   --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
   /* Brand wordmark typography, matching the logo (design/Logo - Karasu Full Art.svg) */
   --font-brand: "SN Pro", var(--font-sans);
   --font-brand-jp: "Kosugi Maru", var(--font-brand);
+}
+
+/* Declared at the top level rather than inside `@theme`, so they are emitted
+   whether or not a utility referencing them has been written yet. */
+@keyframes settle {
+  from {
+    opacity: 0;
+    transform: translateY(-0.5rem);
+  }
+}
+
+@keyframes riseIn {
+  from {
+    opacity: 0;
+    transform: translateY(0.75rem);
+  }
+}
+
+@keyframes popIn {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes tick {
+  50% {
+    transform: scale(1.14);
+  }
+}
+
+@keyframes blip {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@keyframes breathe {
+  50% {
+    opacity: 0;
+  }
+}
+
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
 }
 
 /* RGB triplets, for `rgba(var(--scrim), α)` in banner and cover gradients.
@@ -237,6 +316,48 @@ nav a {
 /* Hairline borders, tinted with the cooler sheen rather than a flat grey. */
 @utility border-hair {
   border-color: var(--hair);
+}
+
+/* Transitions are suspended for one frame while the theme swaps.
+   `transition-colors` includes `color`, and transitioning a `var()`-driven
+   colour makes the browser hold the *old* computed value across the swap —
+   panels stay dark for a beat after switching to light. Set by
+   `stores/theme.ts`, which also clears it on a timer in case rAF never runs. */
+html[data-swapping] *,
+html[data-swapping] *::before,
+html[data-swapping] *::after {
+  transition: none !important;
+}
+
+/* Transitions only what the theme actually swaps. Prefer this over
+   `transition-colors`, which also animates `color` — see above. */
+@utility transition-surface {
+  transition-property: background-color, border-color, box-shadow, opacity;
+  transition-duration: var(--default-transition-duration);
+  transition-timing-function: var(--default-transition-timing-function);
+}
+
+/* Honour the OS setting, and the Settings toggle that mirrors it. Durations go
+   to a hair above zero rather than to `none`, so anything waiting on a
+   `transitionend` still gets one. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+html[data-reduce-motion] *,
+html[data-reduce-motion] *::before,
+html[data-reduce-motion] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
 }
 
 /* Scrollbars */

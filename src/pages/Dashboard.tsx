@@ -14,6 +14,11 @@ import { SectionHeader } from "@/components/ui/section-header";
 import { IconButton } from "@/components/ui/icon-button";
 import { TitleLockup } from "@/components/TitleLockup";
 import { CoverCell, CoverMeta } from "@/components/CoverCell";
+import {
+  EmptyState,
+  PerchRule,
+  TickMarks,
+} from "@/components/EmptyState";
 import NowPlayingCard from "@/components/NowPlayingCard";
 import RecommendedSection from "@/components/RecommendedSection";
 
@@ -184,13 +189,15 @@ function ContinueWatching({
     <section>
       <SectionHeader icon={Play} title={t("dashboard.continueWatching")} />
       {watching.length === 0 ? (
-        <p className="mt-3 text-sm text-ink-600">
-          {t("dashboard.nothingWatching")}{" "}
-          <Link to="/seasonal" className="text-accent-400 hover:underline">
-            {t("dashboard.currentSeason")}
-          </Link>
-          .
-        </p>
+        <EmptyState
+          visual={<PerchRule />}
+          title={t("dashboard.nothingWatching")}
+          hint={
+            <Link to="/seasonal" className="text-accent-400 hover:underline">
+              {t("dashboard.currentSeason")}
+            </Link>
+          }
+        />
       ) : (
         <div className="media-grid mt-4 gap-x-4 gap-y-5">
           {watching.map((entry) => (
@@ -227,7 +234,7 @@ function AiringSoon({ entries }: { entries: MediaListEntry[] }) {
     <section>
       <SectionHeader icon={CalendarClock} title={t("dashboard.upcoming")} />
       {upcoming.length === 0 ? (
-        <p className="mt-3 text-sm text-ink-600">{t("dashboard.noUpcoming")}</p>
+        <EmptyState visual={<TickMarks />} title={t("dashboard.noUpcoming")} />
       ) : (
         <div className="mt-3 grid gap-0.5 2xl:grid-cols-2">
           {upcoming.slice(0, 10).map((entry) => (

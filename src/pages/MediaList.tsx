@@ -59,6 +59,11 @@ import { FilterSelect } from "@/components/ui/filter-select";
 import { StatusTabs } from "@/components/ui/status-tabs";
 import { TitleLockup } from "@/components/TitleLockup";
 import { CoverCell, CoverMeta } from "@/components/CoverCell";
+import {
+  CoverOutline,
+  EmptyState,
+  StruckQuery,
+} from "@/components/EmptyState";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
@@ -459,7 +464,38 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
 
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-8 pb-12 pt-1">
         {entries.length === 0 ? (
-          <p className="text-sm text-ink-600">{t("list.empty")}</p>
+          // Two different nothings. A tab with no entries is a fact about the
+          // list; a search that matched none is a fact about the query, and
+          // the old single message could not tell them apart — so it never
+          // offered the one thing that fixes the second case.
+          filter || tagFilter ? (
+            <EmptyState
+              visual={<StruckQuery query={filter || tagFilter} />}
+              title={t("list.noMatch", {
+                status: t(`status.${type}.${tab}`),
+              })}
+              actions={
+                <Button
+                  variant="outline"
+                  size="control"
+                  onClick={() => {
+                    setFilter("");
+                    setTagFilter("");
+                  }}
+                >
+                  {t("list.clearFilter")}
+                </Button>
+              }
+            />
+          ) : (
+            <EmptyState
+              visual={<CoverOutline />}
+              title={t("list.emptyTab", {
+                status: t(`status.${type}.${tab}`),
+              })}
+              hint={t("list.emptyTabHint")}
+            />
+          )
         ) : grid ? (
           <VirtualGrid
             items={entries}

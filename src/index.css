@@ -302,6 +302,14 @@ nav a {
   );
 }
 
+/* The gradient at the foot of every cover. Cover art is arbitrary — it can be
+   white, busy, or bright — so anything sitting over the bottom of one needs a
+   deterministic backdrop rather than a hopeful `bg-black/40`. Near-opaque at
+   the base, gone by the top of its own 3.5rem. */
+@utility cover-scrim {
+  background-image: linear-gradient(to top, rgba(4, 5, 8, 0.92), transparent);
+}
+
 /* The rule trailing a section heading. Fading it out rather than running it
    edge to edge is what keeps seven stacked sections from reading as a form. */
 @utility section-rule {

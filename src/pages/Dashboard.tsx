@@ -4,14 +4,16 @@ import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
 import { BarChart3, CalendarClock, CalendarDays, Play, Plus } from "lucide-react";
 import { fetchMediaList } from "@/api/anilist";
-import { displayTitle, type MediaListEntry } from "@/api/types";
+import type { MediaListEntry } from "@/api/types";
 import { useAuth } from "@/stores/auth";
 import { useContentFilter } from "@/stores/contentFilter";
 import { isBlocked } from "@/lib/contentFilter";
 import { useListMutations } from "@/hooks/useListMutations";
 import { Button } from "@/components/ui/button";
 import { SectionHeader } from "@/components/ui/section-header";
+import { IconButton } from "@/components/ui/icon-button";
 import { TitleLockup } from "@/components/TitleLockup";
+import { CoverCell, CoverMeta } from "@/components/CoverCell";
 import NowPlayingCard from "@/components/NowPlayingCard";
 import RecommendedSection from "@/components/RecommendedSection";
 
@@ -415,50 +417,51 @@ const ContinueCard = memo(function ContinueCard({
   const { t } = useTranslation();
   const { media } = entry;
   const canPlus = media.episodes === null || entry.progress < media.episodes;
-  const pct = media.episodes ? (entry.progress / media.episodes) * 100 : 0;
 
   return (
-    <div className="group">
-      <div className="relative aspect-[2/3] overflow-hidden rounded-lg bg-surface-800">
-        <Link to={`/media/${media.id}`}>
-          {media.coverImage.large && (
-            <img
-              src={media.coverImage.large}
-              alt=""
-              loading="lazy"
-              className="h-full w-full object-cover"
-            />
-          )}
-        </Link>
-        {canPlus && (
-          <button
+    <CoverCell
+      to={`/media/${media.id}`}
+      cover={media.coverImage.large}
+      score={entry.score > 0 ? entry.score : null}
+      progress={
+        media.episodes
+          ? { current: entry.progress, total: media.episodes }
+          : null
+      }
+      actions={
+        // Always visible, not hover-only: this is the most-used action in the
+        // app, and hiding it behind a hover costs a deliberate movement every
+        // single time.
+        canPlus && (
+          <IconButton
+            variant="accent"
+            size="sm"
+            round
             onClick={() => onPlusOne(entry)}
-            className="absolute bottom-2 right-2 grid h-8 w-8 place-items-center rounded-full bg-accent-600 text-accent-ink opacity-0 transition-opacity hover:bg-accent-500 group-hover:opacity-100"
             aria-label={t("common.plusOne")}
             title={t("dashboard.markWatched", { n: entry.progress + 1 })}
+            className="shadow-[0_.25rem_.75rem_rgba(0,0,0,.5)]"
           >
             <Plus className="size-4" />
-          </button>
-        )}
-        {media.episodes !== null && (
-          <div className="absolute inset-x-0 bottom-0 h-1 bg-black/50">
-            <div
-              className="h-full bg-accent-500"
-              style={{ width: `${Math.min(pct, 100)}%` }}
-            />
-          </div>
-        )}
-      </div>
+          </IconButton>
+        )
+      }
+    >
       <Link to={`/media/${media.id}`}>
-        <p className="mt-2 line-clamp-2 text-xs font-medium text-ink-300 group-hover:text-ink-100">
-          {displayTitle(media.title)}
-        </p>
+        <TitleLockup
+          title={media.title}
+          clamp={2}
+          tone="muted"
+          className="mt-2"
+        />
       </Link>
-      <p className="text-xs text-ink-600">
-        {entry.progress}
-        {media.episodes ? ` / ${media.episodes}` : ""}
-      </p>
-    </div>
+      <CoverMeta>
+        {t("common.progressEpisodes", {
+          n: entry.progress,
+          total: media.episodes ?? "?",
+        })}
+      </CoverMeta>
+    </CoverCell>
   );
 });
 

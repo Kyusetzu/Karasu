@@ -2,9 +2,12 @@ import { useState } from "react";
 import { Link } from "react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { Check, Pencil, Plus, Star } from "lucide-react";
+import { Check, Pencil, Plus } from "lucide-react";
+import { IconButton } from "@/components/ui/icon-button";
+import { TitleLockup } from "@/components/TitleLockup";
+import { CoverCell, CoverMeta } from "@/components/CoverCell";
 import { saveListEntry } from "@/api/anilist";
-import { displayTitle } from "@/api/types";
+
 import { formatLabel } from "@/lib/format";
 import type { MediaWithListStatus } from "@/api/queries";
 import { useAuth } from "@/stores/auth";
@@ -44,66 +47,67 @@ export default function MediaCard({ media }: { media: MediaWithListStatus }) {
   const entry = media.mediaListEntry;
 
   return (
-    <div className="group" data-media-id={media.id} data-media-type={media.type}>
-      <div className="relative aspect-[2/3] overflow-hidden rounded-lg bg-surface-800">
-        <Link to={`/media/${media.id}`}>
-          {media.coverImage.large && (
-            <img
-              src={media.coverImage.large}
-              alt=""
-              loading="lazy"
-              className="h-full w-full object-cover transition-transform group-hover:scale-105"
-            />
-          )}
-        </Link>
-        {media.averageScore !== null && (
-          <span className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-black/70 px-2 py-0.5 text-xs font-medium text-gold">
-            <Star className="size-2.75" fill="currentColor" /> {media.averageScore}%
-          </span>
-        )}
-        {hasProfile && (
-          <div className="absolute bottom-2 right-2 flex gap-1.5">
-            <button
+    <CoverCell
+      to={`/media/${media.id}`}
+      cover={media.coverImage.large}
+      score={media.averageScore != null ? `${media.averageScore}%` : null}
+      data-media-id={media.id}
+      data-media-type={media.type}
+      actions={
+        hasProfile && (
+          <>
+            <IconButton
+              variant="onCover"
+              size="sm"
+              round
               onClick={() => setEditing(true)}
-              className="grid h-8 w-8 place-items-center rounded-full bg-surface-900/90 text-ink-300 opacity-0 transition-opacity hover:bg-surface-800 hover:text-ink-100 group-hover:opacity-100"
               aria-label={t("common.edit")}
               title={t("common.edit")}
             >
               <Pencil className="size-3.5" />
-            </button>
+            </IconButton>
             {entry ? (
               <span
-                className="grid h-8 w-8 place-items-center rounded-full bg-emerald-700/90 text-white"
+                className="grid size-7.5 place-items-center rounded-full bg-success text-surface-950"
                 title={t(`status.${media.type}.${entry.status}`)}
               >
                 <Check className="size-3.75" />
               </span>
             ) : (
-              <button
+              // Discovery grids get the neutral circle: adding to Planning is
+              // not the same weight of action as +1 on something you are
+              // actively watching, and the accent is reserved for that.
+              <IconButton
+                variant="onCover"
+                size="sm"
+                round
                 onClick={() =>
                   saveEntry.mutate({ mediaId: media.id, status: "PLANNING" })
                 }
                 disabled={saveEntry.isPending}
-                className="grid h-8 w-8 place-items-center rounded-full bg-accent-600 text-accent-ink opacity-0 transition-opacity hover:bg-accent-500 group-hover:opacity-100 disabled:opacity-50"
                 aria-label={t("media.addPlanning")}
                 title={t("media.addPlanning")}
               >
                 <Plus className="size-4" />
-              </button>
+              </IconButton>
             )}
-          </div>
-        )}
-      </div>
+          </>
+        )
+      }
+    >
       <Link to={`/media/${media.id}`}>
-        <p className="mt-2 line-clamp-2 text-xs font-medium text-ink-300 group-hover:text-ink-100">
-          {displayTitle(media.title)}
-        </p>
+        <TitleLockup
+          title={media.title}
+          clamp={2}
+          tone="muted"
+          className="mt-2"
+        />
       </Link>
-      <p className="text-xs text-ink-600">
+      <CoverMeta>
         {[formatLabel(media.format, t), media.seasonYear]
           .filter(Boolean)
           .join(" · ")}
-      </p>
+      </CoverMeta>
 
       {editing && (
         <EntryEditModal
@@ -116,6 +120,6 @@ export default function MediaCard({ media }: { media: MediaWithListStatus }) {
           }}
         />
       )}
-    </div>
+    </CoverCell>
   );
 }

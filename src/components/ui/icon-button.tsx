@@ -18,13 +18,17 @@ const iconButtonVariants = cva(
       },
       size: {
         /** 2.125rem — toolbar. */
-        control: "size-8.5 rounded-md",
+        control: "size-8.5",
         /** 1.875rem — the hover actions on a grid cover. */
-        sm: "size-7.5 rounded-md",
+        sm: "size-7.5",
         /** 1.75rem — the quick actions in a list row. */
-        xs: "size-7 rounded-md",
+        xs: "size-7",
       },
-      round: { true: "rounded-full", false: "" },
+      /** The radius lives here and nowhere else. Splitting it across `size`
+          and `round` puts two `rounded-*` utilities of equal specificity on
+          the same element, and the stylesheet's order decides — which meant
+          `round` silently did nothing. */
+      round: { true: "rounded-full", false: "rounded-md" },
     },
     defaultVariants: { variant: "ghost", size: "control", round: false },
   },

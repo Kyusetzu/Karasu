@@ -12,6 +12,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
+import { Pill } from "@/components/ui/pill";
+import { ScoreBars } from "@/components/ui/score-bars";
 import TagEditor from "@/components/TagEditor";
 import { parseNotes, serializeNotes } from "@/lib/tags";
 
@@ -77,20 +79,22 @@ export default function EntryEditModal({
   return (
     <Modal title={displayTitle(media.title)} onClose={onClose}>
       <div className="space-y-4">
-        <label className="block text-sm">
-          <span className="mb-1 block text-ink-500">{t("common.status")}</span>
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value as MediaListStatus)}
-            className="h-9 w-full rounded-lg border border-surface-700 bg-surface-900 px-2 text-sm focus:border-accent-500 focus:outline-none"
-          >
+        {/* Six pills, not a dropdown. Status is the most-changed field here and
+            a dropdown hides five of its six options behind a click. */}
+        <div className="text-sm">
+          <span className="mb-1.5 block text-ink-500">{t("common.status")}</span>
+          <div className="flex flex-wrap gap-0.75">
             {STATUS_ORDER.map((s) => (
-              <option key={s} value={s}>
+              <Pill
+                key={s}
+                active={status === s}
+                onClick={() => setStatus(s)}
+              >
                 {t(`status.${media.type}.${s}`)}
-              </option>
+              </Pill>
             ))}
-          </select>
-        </label>
+          </div>
+        </div>
         <div className="grid grid-cols-2 gap-3">
           <label className="block text-sm">
             <span className="mb-1 block text-ink-500">
@@ -108,20 +112,12 @@ export default function EntryEditModal({
               }
             />
           </label>
-          <label className="block text-sm">
-            <span className="mb-1 block text-ink-500">
-              {t("list.scoreRange")}
+          <div className="text-sm">
+            <span className="mb-1.5 block text-ink-500">
+              {t("common.score")}
             </span>
-            <Input
-              type="number"
-              min={0}
-              max={10}
-              value={score}
-              onChange={(e) =>
-                setScore(Math.max(0, Math.min(10, Number(e.target.value))))
-              }
-            />
-          </label>
+            <ScoreBars value={score} onChange={setScore} />
+          </div>
         </div>
         <label className="block text-sm">
           <span className="mb-1 block text-ink-500">{rewatchLabel}</span>
@@ -169,9 +165,8 @@ export default function EntryEditModal({
               </Button>
             ) : (
               <Button
-                variant="ghost"
+                variant="dangerGhost"
                 size="sm"
-                className="text-red-400"
                 onClick={() => setConfirmDelete(true)}
               >
                 <Trash2 className="size-3.5" /> {t("common.remove")}

@@ -22,6 +22,7 @@ export function Modal({ title, onClose, children, className }: ModalProps) {
 
   return (
     <div
+      data-overlay
       className="fixed inset-0 z-50 grid animate-fade-in place-items-center bg-[rgba(4,5,8,.55)] p-4"
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
     >

@@ -11,7 +11,7 @@ import {
 } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
 import {
   Bookmark,
@@ -48,6 +48,8 @@ import { useListMutations } from "@/hooks/useListMutations";
 import EntryEditModal from "@/components/EntryEditModal";
 import { CoverGridSkeleton } from "@/components/Skeleton";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { isTyping } from "@/components/KeyboardSheet";
+import { nextFocus, type Move } from "@/lib/roving";
 import RandomPickModal from "@/components/RandomPickModal";
 import PresetModal from "@/components/PresetModal";
 import { loadPresets, savePresets, type Preset } from "@/lib/presets";
@@ -119,7 +121,11 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
   const [showPresetSave, setShowPresetSave] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [focus, setFocus] = useState<number | null>(null);
+  const [columns, setColumns] = useState(1);
+  const [removing, setRemoving] = useState<MediaListEntry | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
 
   // Clear the selection whenever the pool it refers to changes.
   useEffect(() => setSelected(new Set()), [tab]);
@@ -292,6 +298,107 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
     () => entries.filter((e) => selected.has(e.mediaId)),
     [entries, selected],
   );
+
+  const { mutate: removeMutate } = remove;
+
+  /**
+   * The list's own key group.
+   *
+   * A roving index rather than real DOM focus: the rows are virtualized, so
+   * the element holding focus is unmounted the moment it scrolls out of view
+   * and the browser drops the focus to `body`. The index survives that, and
+   * `VirtualGrid` scrolls it back into existence when it moves.
+   */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      // Anything modal owns the keyboard while it is up, and a field owns it
+      // while the caret is in one.
+      if (isTyping() || document.querySelector("[data-overlay]")) return;
+      if (editing || removing || showRandom || showPresetSave) return;
+      if (e.altKey) return;
+      if (entries.length === 0) return;
+
+      const entry = focus === null ? undefined : entries[focus];
+
+      const move = (direction: Move) => {
+        e.preventDefault();
+        const next = nextFocus(focus, direction, columns, entries.length);
+        if (next === null) return;
+        setFocus(next);
+        // Shift extends the selection one step at a time, which is what a
+        // range select is when the anchor is wherever you started holding it.
+        if (e.shiftKey) {
+          setSelectMode(true);
+          setSelected((prev) => new Set(prev).add(entries[next].mediaId));
+        }
+      };
+
+      switch (e.key) {
+        case "ArrowRight":
+          return move("right");
+        case "ArrowLeft":
+          return move("left");
+        case "ArrowDown":
+          return move("down");
+        case "ArrowUp":
+          return move("up");
+      }
+
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key.toLowerCase() === "a") {
+          e.preventDefault();
+          setSelectMode(true);
+          setSelected(new Set(entries.map((x) => x.mediaId)));
+        }
+        return;
+      }
+
+      if (e.key === "Escape") {
+        if (selectMode) exitSelect();
+        else setFocus(null);
+        return;
+      }
+
+      // Everything below acts on the focused entry, so there has to be one.
+      if (focus === null || !entry) return;
+
+      switch (e.key) {
+        case "Enter":
+          e.preventDefault();
+          navigate(`/media/${entry.media.id}`);
+          break;
+        case " ":
+          // Without this the page scrolls a screen down under the grid.
+          e.preventDefault();
+          if (selectMode) toggleSelect(entry.mediaId);
+          else if (canIncrement(entry)) plusOne(entry);
+          break;
+        case "e":
+          e.preventDefault();
+          startEdit(entry);
+          break;
+        case "c":
+          e.preventDefault();
+          complete(entry);
+          break;
+        case "s":
+          e.preventDefault();
+          if (selectMode) exitSelect();
+          else setSelectMode(true);
+          break;
+        case "Delete":
+          e.preventDefault();
+          setRemoving(entry);
+          break;
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
+  // A filter or a tab change re-pools the entries, and index 12 in the old
+  // pool is a different title in the new one.
+  useEffect(() => setFocus(null), [tab, deferredFilter, tagFilter, sort]);
 
   const unit = type === "ANIME" ? t("common.episodes") : t("common.chapters");
 
@@ -511,10 +618,13 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
             gridClassName="media-grid gap-x-4"
             rowGap={24}
             estimateRowHeight={300}
-            renderItem={(entry) => (
+            focusIndex={focus}
+            onColumns={setColumns}
+            renderItem={(entry, i) => (
               <GridCard
                 key={entry.id}
                 entry={entry}
+                focused={i === focus}
                 unit={unit}
                 onPlusOne={plusOne}
                 onComplete={complete}
@@ -533,10 +643,13 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
               gridClassName="grid 2xl:grid-cols-2"
               rowGap={0}
               estimateRowHeight={78}
-              renderItem={(entry) => (
+              focusIndex={focus}
+              onColumns={setColumns}
+              renderItem={(entry, i) => (
                 <ListRow
                   key={entry.id}
                   entry={entry}
+                  focused={i === focus}
                   onQuickSave={quickSave}
                   onComplete={complete}
                   onEdit={startEdit}
@@ -576,6 +689,20 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
             remove.mutate(editing.id);
             setEditing(null);
           }}
+        />
+      )}
+
+      {removing && (
+        <ConfirmDialog
+          title={t("confirm.removeOne")}
+          names={[displayTitle(removing.media.title)]}
+          note={t("confirm.removeNote")}
+          confirmLabel={t("common.remove")}
+          onConfirm={() => {
+            removeMutate(removing.id);
+            setRemoving(null);
+          }}
+          onCancel={() => setRemoving(null)}
         />
       )}
 
@@ -620,13 +747,18 @@ function VirtualGrid({
   rowGap,
   estimateRowHeight,
   renderItem,
+  focusIndex,
+  onColumns,
 }: {
   items: MediaListEntry[];
   scrollRef: RefObject<HTMLDivElement | null>;
   gridClassName: string;
   rowGap: number;
   estimateRowHeight: number;
-  renderItem: (entry: MediaListEntry) => ReactNode;
+  renderItem: (entry: MediaListEntry, index: number) => ReactNode;
+  /** Position of the roving keyboard focus in `items`, if it is on screen. */
+  focusIndex?: number | null;
+  onColumns?: (columns: number) => void;
 }) {
   const probeRef = useRef<HTMLDivElement>(null);
   // Density moves the grid track without changing the probe's own size, so the
@@ -648,6 +780,19 @@ function VirtualGrid({
     virtualizer.measure();
   }, [columns, virtualizer]);
 
+  // The count is measured from the resolved track, and arrow keys need it to
+  // know what "down" means — so it is reported up rather than recomputed.
+  useEffect(() => onColumns?.(columns), [columns, onColumns]);
+
+  // A virtualized row that is scrolled out is not mounted, so moving the focus
+  // there would otherwise land it on nothing.
+  useEffect(() => {
+    if (focusIndex == null) return;
+    virtualizer.scrollToIndex(Math.floor(focusIndex / columns), {
+      align: "auto",
+    });
+  }, [focusIndex, columns, virtualizer]);
+
   return (
     <>
       <div ref={probeRef} className={cn(gridClassName, "h-0")} aria-hidden />
@@ -668,7 +813,7 @@ function VirtualGrid({
           >
             {items
               .slice(row.index * columns, row.index * columns + columns)
-              .map(renderItem)}
+              .map((entry, i) => renderItem(entry, row.index * columns + i))}
           </div>
         ))}
       </div>
@@ -823,6 +968,7 @@ const GridCard = memo(function GridCard({
   onEdit,
   selectMode,
   selected,
+  focused,
   onToggleSelect,
 }: {
   entry: MediaListEntry;
@@ -832,6 +978,7 @@ const GridCard = memo(function GridCard({
   onEdit: (entry: MediaListEntry) => void;
   selectMode: boolean;
   selected: boolean;
+  focused: boolean;
   onToggleSelect: (mediaId: number) => void;
 }) {
   const { t } = useTranslation();
@@ -843,7 +990,10 @@ const GridCard = memo(function GridCard({
       cover={media.coverImage.large}
       data-media-id={media.id}
       data-media-type={media.type}
-      selected={selectMode && selected}
+      // The focused cell wears the same outline a selected one does. They
+      // never mean the same thing, but they never appear for different
+      // reasons either: both say "this is the one the next key acts on".
+      selected={focused || (selectMode && selected)}
       // In select mode the cover *is* the checkbox target — navigating away
       // mid-selection is never what the click meant.
       onCoverClick={
@@ -984,6 +1134,7 @@ const ListRow = memo(function ListRow({
   onEdit,
   selectMode,
   selected,
+  focused,
   onToggleSelect,
 }: {
   entry: MediaListEntry;
@@ -995,6 +1146,7 @@ const ListRow = memo(function ListRow({
   onEdit: (entry: MediaListEntry) => void;
   selectMode: boolean;
   selected: boolean;
+  focused: boolean;
   onToggleSelect: (mediaId: number) => void;
 }) {
   const { t } = useTranslation();
@@ -1026,6 +1178,7 @@ const ListRow = memo(function ListRow({
       className={cn(
         "flex items-center gap-3.5 border-b border-surface-950 px-3.5 py-2 transition-surface",
         selected ? "bg-accent-600/10" : "bg-surface-900 hover:bg-surface-850",
+        focused && "outline-2 -outline-offset-2 outline-accent-500",
       )}
     >
       {selectMode && (

@@ -40,6 +40,7 @@ export default function ConfirmDialog({
 
   return (
     <div
+      data-overlay
       className="fixed inset-0 z-[110] grid animate-fade-in place-items-center bg-[rgba(4,5,8,.55)] p-4"
       onMouseDown={(e) => e.target === e.currentTarget && onCancel()}
     >

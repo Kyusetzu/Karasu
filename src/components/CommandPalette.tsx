@@ -162,6 +162,7 @@ export default function CommandPalette() {
 
   return (
     <div
+      data-overlay
       className="fixed inset-0 z-50 flex animate-fade-in items-start justify-center bg-[rgba(4,5,8,.55)] px-4 pb-4 pt-22"
       onMouseDown={() => setOpen(false)}
     >

@@ -26,15 +26,34 @@ export default function KeyboardSheet() {
 
   if (!open) return null;
 
-  const rows: { label: string; keys: string[] }[] = [
-    { label: t("keys.palette"), keys: ["Ctrl", "K"] },
-    { label: t("keys.reference"), keys: ["?"] },
-    { label: t("keys.search"), keys: ["/"] },
-    { label: t("keys.close"), keys: ["Esc"] },
-    { label: t("keys.overview"), keys: ["Ctrl", "1"] },
-    { label: t("keys.anime"), keys: ["Ctrl", "2"] },
-    { label: t("keys.manga"), keys: ["Ctrl", "3"] },
-    { label: t("keys.sync"), keys: ["Ctrl", "R"] },
+  const groups: { title: string; rows: { label: string; keys: string[] }[] }[] = [
+    {
+      title: t("keys.global"),
+      rows: [
+        { label: t("keys.palette"), keys: ["Ctrl", "K"] },
+        { label: t("keys.reference"), keys: ["?"] },
+        { label: t("keys.search"), keys: ["/"] },
+        { label: t("keys.close"), keys: ["Esc"] },
+        { label: t("keys.overview"), keys: ["Ctrl", "1"] },
+        { label: t("keys.anime"), keys: ["Ctrl", "2"] },
+        { label: t("keys.manga"), keys: ["Ctrl", "3"] },
+        { label: t("keys.sync"), keys: ["Ctrl", "R"] },
+      ],
+    },
+    {
+      title: t("keys.inList"),
+      rows: [
+        { label: t("keys.move"), keys: ["←", "↑", "↓", "→"] },
+        { label: t("keys.open"), keys: ["↵"] },
+        { label: t("keys.plusOne"), keys: ["Space"] },
+        { label: t("keys.edit"), keys: ["E"] },
+        { label: t("keys.complete"), keys: ["C"] },
+        { label: t("keys.remove"), keys: ["Del"] },
+        { label: t("keys.selectMode"), keys: ["S"] },
+        { label: t("keys.selectAll"), keys: ["Ctrl", "A"] },
+        { label: t("keys.extend"), keys: ["Shift", "↑↓"] },
+      ],
+    },
   ];
 
   return (
@@ -43,22 +62,28 @@ export default function KeyboardSheet() {
       onClose={() => setOpen(false)}
       className="max-w-152"
     >
-      <p className=" text-2xs uppercase tracking-[.12em] text-ink-600">
-        {t("keys.global")}
-      </p>
-      <div className="mt-3 grid gap-x-8 gap-y-1.5 sm:grid-cols-2">
-        {rows.map((row) => (
-          <div
-            key={row.label}
-            className="flex items-center justify-between gap-4 text-xs text-ink-300"
-          >
-            <span className="min-w-0 truncate">{row.label}</span>
-            <span className="flex shrink-0 items-center gap-1">
-              {row.keys.map((key) => (
-                <Cap key={key}>{key}</Cap>
+      <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
+        {groups.map((group) => (
+          <section key={group.title}>
+            <h3 className="text-2xs uppercase tracking-[.12em] text-ink-600">
+              {group.title}
+            </h3>
+            <div className="mt-2 space-y-1.5">
+              {group.rows.map((row) => (
+                <div
+                  key={row.label}
+                  className="flex items-center justify-between gap-4 text-xs text-ink-300"
+                >
+                  <span className="min-w-0 truncate">{row.label}</span>
+                  <span className="flex shrink-0 items-center gap-1">
+                    {row.keys.map((key) => (
+                      <Cap key={key}>{key}</Cap>
+                    ))}
+                  </span>
+                </div>
               ))}
-            </span>
-          </div>
+            </div>
+          </section>
         ))}
       </div>
       <p className="mt-4 text-2xs leading-relaxed text-ink-600">

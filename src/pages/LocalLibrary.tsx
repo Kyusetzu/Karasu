@@ -32,6 +32,7 @@ export default function LocalLibrary() {
       <div className="grid h-full place-items-center p-8">
         <div className="text-center">
           <p className="text-ink-500">{t("list.connectPrompt")}</p>
+          {/* Account, not Library: this prompt is about being signed out. */}
           <Link to="/settings">
             <Button className="mt-4">{t("list.toSettings")}</Button>
           </Link>
@@ -119,7 +120,7 @@ function LibraryView({ userId }: { userId: number }) {
             title={t("library.empty")}
             hint={t("library.emptyHint")}
             actions={
-              <Link to="/settings">
+              <Link to="/settings?pane=library">
                 <Button size="control">{t("library.toSettings")}</Button>
               </Link>
             }

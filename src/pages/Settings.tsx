@@ -1,14 +1,19 @@
 import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   ChevronRight,
   ExternalLink,
+  EyeOff,
   FolderOpen,
   LogIn,
   LogOut,
   Palette,
+  Plug,
+  Radar,
   RefreshCw,
+  SlidersHorizontal,
   User,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -56,24 +61,81 @@ import {
 /** Redirect URL that must be registered on the AniList API client. */
 const CALLBACK_URL = "http://localhost:46231/callback";
 
+/** The one select skin, so the four of them cannot drift apart. */
+const SELECT =
+  "h-9 rounded-lg border border-surface-700 bg-surface-900 px-2 text-sm focus:border-accent-500 focus:outline-none";
+
+/**
+ * The seven panes, in the order they are worth reading.
+ *
+ * They are keyed by a URL parameter rather than component state because the
+ * screen re-mounts on every navigation (the router keys the pane on the path),
+ * so state would drop the user back on Account each time — and because a
+ * dead-end elsewhere in the app can then point at the exact pane that fixes
+ * it, the way the empty local library points at Library.
+ */
+const PANES = [
+  { id: "account", icon: User, sections: [AccountSection] },
+  { id: "appearance", icon: Palette, sections: [AppearanceSection] },
+  {
+    id: "detection",
+    icon: Radar,
+    sections: [ScrobbleSection, JellyfinSection],
+  },
+  { id: "library", icon: FolderOpen, sections: [LibrarySection] },
+  { id: "content", icon: EyeOff, sections: [ContentSection] },
+  { id: "integrations", icon: Plug, sections: [DiscordSection] },
+  {
+    id: "advanced",
+    icon: SlidersHorizontal,
+    sections: [AdvancedSection, PortableSection],
+  },
+] as const;
+
+type PaneId = (typeof PANES)[number]["id"];
+
 export default function Settings() {
   const { t } = useTranslation();
+  const [params, setParams] = useSearchParams();
+  const requested = params.get("pane");
+  const active =
+    (PANES.find((p) => p.id === requested)?.id as PaneId | undefined) ??
+    "account";
+  const pane = PANES.find((p) => p.id === active)!;
+
   return (
-    <div className="mx-auto max-w-2xl p-8 2xl:max-w-none">
-      <h1 className="text-2xl font-bold">{t("settings.title")}</h1>
-      {/* Every section is self-contained, so they can sit side by side once
-          there's room. A grid rather than CSS `columns` because that would
-          reorder them, and Account belongs first. `items-start` keeps each
-          card its natural height instead of stretching to the tallest. */}
-      <div className="mt-6 grid grid-cols-[repeat(auto-fit,minmax(26rem,1fr))] items-start gap-6">
-        <AccountSection />
-        <ScrobbleSection />
-        <JellyfinSection />
-        <LibrarySection />
-        <ContentSection />
-        <DiscordSection />
-        <AppSection />
-        <PortableSection />
+    <div className="flex h-full min-h-0">
+      <nav className="flex w-48 shrink-0 flex-col gap-0.5 border-r border-hair p-3">
+        <h1 className="px-2.5 pb-2 pt-1 text-2xs font-semibold uppercase tracking-[.16em] text-ink-600">
+          {t("settings.title")}
+        </h1>
+        {PANES.map(({ id, icon: Icon }) => (
+          <button
+            key={id}
+            type="button"
+            aria-current={id === active ? "page" : undefined}
+            onClick={() => setParams(id === "account" ? {} : { pane: id })}
+            className={cn(
+              "flex items-center gap-2.5 rounded-lg px-2.5 py-1.75 text-left text-[.8125rem] transition-surface",
+              id === active
+                ? "bg-surface-850 text-ink-100"
+                : "text-ink-500 hover:bg-surface-850 hover:text-ink-100",
+            )}
+          >
+            <Icon className="size-4 shrink-0" />
+            {t(`settings.pane_${id}`)}
+          </button>
+        ))}
+      </nav>
+
+      {/* Keyed on the pane so switching replays `settle` — otherwise a pane
+          swap in place is indistinguishable from the page not reacting. */}
+      <div key={active} className="min-w-0 flex-1 animate-settle overflow-y-auto">
+        <div className="mx-auto max-w-2xl space-y-6 p-8">
+          {pane.sections.map((Section, i) => (
+            <Section key={i} />
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -277,14 +339,20 @@ function Toggle({
         role="switch"
         aria-checked={checked}
         onClick={() => onChange(!checked)}
-        className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${
-          checked ? "bg-accent-600" : "bg-surface-700"
-        }`}
+        className={cn(
+          "relative h-4.75 w-8.5 shrink-0 rounded-full transition-colors",
+          checked ? "bg-accent-600" : "bg-surface-700",
+        )}
       >
         <span
-          className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all ${
-            checked ? "left-4.5" : "left-0.5"
-          }`}
+          className={cn(
+            "absolute top-[.0625rem] size-4.25 rounded-full transition-all",
+            // The thumb has to hold on both tracks in both themes. White works
+            // on the accent fill (600 is the darkened shade in either theme)
+            // but disappears on the light theme's pale grey track, where the
+            // ink colour — which inverts — is the one that reads.
+            checked ? "left-4 bg-white" : "left-[.0625rem] bg-ink-100",
+          )}
         />
       </button>
     </label>
@@ -1092,13 +1160,9 @@ function DiscordSection() {
 
 const THEME_MODES: ThemeMode[] = ["system", "light", "dark"];
 
-function AppSection() {
+function AppearanceSection() {
   const { t } = useTranslation();
-  const [autostart, setAutostart] = useState<boolean | null>(null);
   const [lang, setLang] = useState<LanguageSetting>(getLanguageSetting());
-  const [updateAuto, setUpdateAuto] = useState<boolean | null>(null);
-  const [updateChannel, setUpdateChannelState] =
-    useState<api.UpdateChannel>("prerelease");
   const [showCustomAccent, setShowCustomAccent] = useState(false);
   const themeMode = useTheme((s) => s.mode);
   const accent = useTheme((s) => s.accent);
@@ -1108,6 +1172,131 @@ function AppSection() {
   const setReduceMotion = useTheme((s) => s.setReduceMotion);
   const setThemeMode = useTheme((s) => s.setMode);
   const setAccent = useTheme((s) => s.setAccent);
+
+  const changeLanguage = (setting: LanguageSetting) => {
+    setLang(setting);
+    setLanguageSetting(setting);
+  };
+
+  return (
+    <Card>
+      <CardTitle>{t("settings.pane_appearance")}</CardTitle>
+      <div className="mt-3 space-y-3">
+        <label className="flex items-center justify-between gap-4 py-1 text-sm">
+          <span>
+            <span className="block text-ink-100">{t("settings.language")}</span>
+            <span className="block text-xs text-ink-600">
+              {t("settings.languageHint")}
+            </span>
+          </span>
+          <select
+            value={lang}
+            onChange={(e) => changeLanguage(e.target.value as LanguageSetting)}
+            className={SELECT}
+          >
+            {SUPPORTED_LANGUAGES.map((l) => (
+              <option key={l.value} value={l.value}>
+                {l.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="flex items-center justify-between gap-4 py-1 text-sm">
+          <span className="block text-ink-100">{t("settings.theme")}</span>
+          <select
+            value={themeMode}
+            onChange={(e) => setThemeMode(e.target.value as ThemeMode)}
+            className={SELECT}
+          >
+            {THEME_MODES.map((m) => (
+              <option key={m} value={m}>
+                {t(`settings.theme_${m}`)}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="flex items-center justify-between gap-4 py-1 text-sm">
+          <span className="block">
+            <span className="block text-ink-100">{t("settings.coverSize")}</span>
+            <span className="block text-xs text-ink-600">
+              {t("settings.coverSizeHint")}
+            </span>
+          </span>
+          <select
+            value={density}
+            onChange={(e) => setDensity(e.target.value as Density)}
+            className={SELECT}
+          >
+            {DENSITY_STEPS.map((d) => (
+              <option key={d} value={d}>
+                {t(`settings.coverSize_${d}`)}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <Toggle
+          checked={reduceMotion}
+          onChange={setReduceMotion}
+          label={t("settings.reduceMotion")}
+          hint={t("settings.reduceMotionHint")}
+        />
+
+        <div className="space-y-3 py-1">
+          <div className="flex items-center justify-between gap-4 text-sm">
+            <span className="block text-ink-100">{t("settings.accent")}</span>
+            <div className="flex items-center gap-2">
+              {ACCENT_PRESETS.map((hex) => (
+                <button
+                  key={hex}
+                  onClick={() => setAccent(hex)}
+                  className="size-6 rounded-full transition"
+                  style={{
+                    backgroundColor: hex,
+                    // A double ring rather than a border: its gap is drawn in
+                    // the panel colour, so the mark holds on a swatch of any
+                    // hue instead of sinking into the darker ones.
+                    boxShadow:
+                      accent.toLowerCase() === hex.toLowerCase()
+                        ? "0 0 0 2px var(--color-surface-900), 0 0 0 3.5px var(--color-accent-500)"
+                        : undefined,
+                  }}
+                  aria-label={hex}
+                  title={hex}
+                />
+              ))}
+              <button
+                type="button"
+                onClick={() => setShowCustomAccent((v) => !v)}
+                aria-expanded={showCustomAccent}
+                className={cn(
+                  "grid size-6 place-items-center rounded-full border border-surface-600 transition",
+                  showCustomAccent && "border-accent-500 text-accent-400",
+                )}
+                title={t("settings.accentCustom")}
+                aria-label={t("settings.accentCustom")}
+              >
+                <Palette className="size-3.25 text-current" />
+              </button>
+            </div>
+          </div>
+          {showCustomAccent && (
+            <ColorPicker value={accent} onChange={setAccent} />
+          )}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function AdvancedSection() {
+  const { t } = useTranslation();
+  const [autostart, setAutostart] = useState<boolean | null>(null);
+  const [updateAuto, setUpdateAuto] = useState<boolean | null>(null);
+  const [updateChannel, setUpdateChannelState] =
+    useState<api.UpdateChannel>("prerelease");
 
   useEffect(() => {
     if (!api.isTauri) return;
@@ -1134,114 +1323,10 @@ function AppSection() {
     api.setUpdateChannel(channel);
   };
 
-  const changeLanguage = (setting: LanguageSetting) => {
-    setLang(setting);
-    setLanguageSetting(setting);
-  };
-
   return (
     <Card>
       <CardTitle>{t("settings.app")}</CardTitle>
       <div className="mt-3 space-y-3">
-        <label className="flex items-center justify-between gap-4 py-1 text-sm">
-          <span>
-            <span className="block text-ink-100">{t("settings.language")}</span>
-            <span className="block text-xs text-ink-600">
-              {t("settings.languageHint")}
-            </span>
-          </span>
-          <select
-            value={lang}
-            onChange={(e) => changeLanguage(e.target.value as LanguageSetting)}
-            className="h-9 rounded-lg border border-surface-700 bg-surface-900 px-2 text-sm focus:border-accent-500 focus:outline-none"
-          >
-            {SUPPORTED_LANGUAGES.map((l) => (
-              <option key={l.value} value={l.value}>
-                {l.label}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="flex items-center justify-between gap-4 py-1 text-sm">
-          <span className="block text-ink-100">{t("settings.theme")}</span>
-          <select
-            value={themeMode}
-            onChange={(e) => setThemeMode(e.target.value as ThemeMode)}
-            className="h-9 rounded-lg border border-surface-700 bg-surface-900 px-2 text-sm focus:border-accent-500 focus:outline-none"
-          >
-            {THEME_MODES.map((m) => (
-              <option key={m} value={m}>
-                {t(`settings.theme_${m}`)}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="flex items-center justify-between gap-4 py-1 text-sm">
-          <span className="block">
-            <span className="block text-ink-100">{t("settings.coverSize")}</span>
-            <span className="block text-xs text-ink-600">
-              {t("settings.coverSizeHint")}
-            </span>
-          </span>
-          <select
-            value={density}
-            onChange={(e) => setDensity(e.target.value as Density)}
-            className="h-9 rounded-lg border border-surface-700 bg-surface-900 px-2 text-sm focus:border-accent-500 focus:outline-none"
-          >
-            {DENSITY_STEPS.map((d) => (
-              <option key={d} value={d}>
-                {t(`settings.coverSize_${d}`)}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <Toggle
-          checked={reduceMotion}
-          onChange={setReduceMotion}
-          label={t("settings.reduceMotion")}
-          hint={t("settings.reduceMotionHint")}
-        />
-
-        <div className="space-y-3 py-1">
-          <div className="flex items-center justify-between gap-4 text-sm">
-            <span className="block text-ink-100">{t("settings.accent")}</span>
-            <div className="flex items-center gap-2">
-              {ACCENT_PRESETS.map((hex) => (
-                <button
-                  key={hex}
-                  onClick={() => setAccent(hex)}
-                  className={cn(
-                    "h-6 w-6 rounded-full ring-offset-2 ring-offset-surface-900 transition",
-                    accent.toLowerCase() === hex.toLowerCase() && "ring-2 ring-ink-100",
-                  )}
-                  style={{ backgroundColor: hex }}
-                  aria-label={hex}
-                  title={hex}
-                />
-              ))}
-              <button
-                type="button"
-                onClick={() => setShowCustomAccent((v) => !v)}
-                aria-expanded={showCustomAccent}
-                className={cn(
-                  "grid h-6 w-6 place-items-center rounded-full border border-surface-600 transition",
-                  showCustomAccent && "border-accent-500 text-accent-400",
-                )}
-                title={t("settings.accentCustom")}
-                aria-label={t("settings.accentCustom")}
-              >
-                <Palette className="size-3.25 text-current" />
-              </button>
-            </div>
-          </div>
-          {showCustomAccent && (
-            <ColorPicker value={accent} onChange={setAccent} />
-          )}
-        </div>
-
         {autostart !== null && (
           <Toggle
             checked={autostart}
@@ -1274,7 +1359,7 @@ function AppSection() {
             onChange={(e) =>
               changeUpdateChannel(e.target.value as api.UpdateChannel)
             }
-            className="h-9 rounded-lg border border-surface-700 bg-surface-900 px-2 text-sm focus:border-accent-500 focus:outline-none"
+            className={SELECT}
           >
             <option value="prerelease">
               {t("settings.updateChannelPrerelease")}

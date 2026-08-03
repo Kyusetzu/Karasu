@@ -59,8 +59,10 @@ export default function About() {
           <h1 className="mt-4 font-brand text-[2rem] font-bold uppercase leading-none tracking-[.22em] text-ink-100">
             Karasu
           </h1>
-          {/* 烏 — the name itself, not a transliteration of it. */}
-          <p className="mt-2 font-brand-jp text-lg text-accent-400">烏</p>
+          {/* カラス, not 烏. The app's Japanese flair is the katakana — it is
+              how the name is written everywhere else in the project, and the
+              handoff's kanji would make About the one place that disagrees. */}
+          <p className="mt-2 font-brand-jp text-lg text-accent-400">カラス</p>
           <p className="mt-3 text-sm text-ink-500">{t("about.tagline")}</p>
           <p className="mt-4 text-sm leading-relaxed text-ink-300">
             {t("about.description")}

@@ -146,7 +146,14 @@ function StatisticsContent({
           </span>
         )}
         <div className="min-w-0 flex-1">
-          <h1 className="text-xl font-bold">{t("stats.title")}</h1>
+          {/* The same lockup the two list screens use: title, then its
+              Japanese form a shade back. */}
+          <div className="flex items-baseline gap-2.5">
+            <h1 className="text-xl font-bold">{t("stats.title")}</h1>
+            <span className="font-brand-jp text-[.8125rem] tracking-[.04em] text-ink-600">
+              統計
+            </span>
+          </div>
           <a
             href={siteUrl}
             target="_blank"

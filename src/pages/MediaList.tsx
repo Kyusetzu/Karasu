@@ -54,6 +54,8 @@ import { collectTags, tagsOf } from "@/lib/tags";
 import { searchHaystack } from "@/lib/search";
 import { useColumnCount } from "@/hooks/useColumnCount";
 import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/icon-button";
+import { Segmented } from "@/components/ui/segmented";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
@@ -437,46 +439,40 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
               ))}
             </select>
           )}
-          <Button
-            variant="secondary"
-            size="icon"
+          <IconButton
+            variant="surface"
             onClick={() => setShowPresetSave(true)}
             aria-label={t("presets.save")}
             title={t("presets.save")}
           >
             <Bookmark className="size-4" />
-          </Button>
-          <Button
-            variant="secondary"
-            size="icon"
+          </IconButton>
+          <IconButton
+            variant="surface"
             onClick={() => setShowRandom(true)}
             aria-label={t("random.pick")}
             title={t("random.pick")}
           >
             <Dices className="size-4" />
-          </Button>
-          <div className="ml-auto flex rounded-lg border border-surface-700">
-            <button
-              onClick={() => setGrid(true)}
-              className={cn(
-                "grid h-9 w-9 place-items-center rounded-l-lg",
-                grid ? "bg-surface-700 text-ink-100" : "text-ink-600 hover:text-ink-300",
-              )}
-              aria-label={t("list.gridView")}
-            >
-              <LayoutGrid className="size-3.75" />
-            </button>
-            <button
-              onClick={() => setGrid(false)}
-              className={cn(
-                "grid h-9 w-9 place-items-center rounded-r-lg",
-                !grid ? "bg-surface-700 text-ink-100" : "text-ink-600 hover:text-ink-300",
-              )}
-              aria-label={t("list.listView")}
-            >
-              <ListIcon className="size-3.75" />
-            </button>
-          </div>
+          </IconButton>
+          <Segmented
+            className="ml-auto"
+            aria-label={t("list.view")}
+            value={grid ? "grid" : "rows"}
+            onChange={(v) => setGrid(v === "grid")}
+            segments={[
+              {
+                value: "grid",
+                title: t("list.gridView"),
+                label: <LayoutGrid className="size-3.75" />,
+              },
+              {
+                value: "rows",
+                title: t("list.listView"),
+                label: <ListIcon className="size-3.75" />,
+              },
+            ]}
+          />
         </div>
       </div>
 

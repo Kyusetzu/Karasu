@@ -46,6 +46,7 @@ import {
 } from "@/api/types";
 import { useListMutations } from "@/hooks/useListMutations";
 import EntryEditModal from "@/components/EntryEditModal";
+import { CoverGridSkeleton } from "@/components/Skeleton";
 import RandomPickModal from "@/components/RandomPickModal";
 import PresetModal from "@/components/PresetModal";
 import { loadPresets, savePresets, type Preset } from "@/lib/presets";
@@ -294,7 +295,13 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
   const unit = type === "ANIME" ? t("common.episodes") : t("common.chapters");
 
   if (isLoading) {
-    return <p className="p-8 text-ink-500">{t("list.loading")}</p>;
+    // The grid, not a sentence: the list is the whole screen, and a line of
+    // text where a wall of covers is about to appear moves everything twice.
+    return (
+      <div className="px-8 py-6">
+        <CoverGridSkeleton />
+      </div>
+    );
   }
   if (error) {
     return (

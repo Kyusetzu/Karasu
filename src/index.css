@@ -168,6 +168,22 @@
   }
 }
 
+/* The one skeleton fill: a light sweep travelling across the placeholder
+   rather than the whole block pulsing. A pulse says "this is busy"; a sweep
+   says "this is a shape that will be filled", which is what a skeleton is for.
+   The 100deg angle keeps the highlight off the vertical, so a column of cells
+   reads as one surface being lit rather than each blinking on its own. */
+@utility shimmer-fill {
+  background-image: linear-gradient(
+    100deg,
+    var(--color-surface-800) 8%,
+    var(--color-surface-700) 20%,
+    var(--color-surface-800) 34%
+  );
+  background-size: 200% 100%;
+  animation: var(--animate-shimmer);
+}
+
 /* RGB triplets, for `rgba(var(--scrim), α)` in banner and cover gradients.
    A triplet rather than a colour because the alpha varies per stop, and it has
    to invert: hardcoded dark rgba stops left a dark smear across the light

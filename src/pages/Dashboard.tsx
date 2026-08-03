@@ -19,6 +19,11 @@ import {
   TickMarks,
 } from "@/components/EmptyState";
 import FirstRun from "@/components/FirstRun";
+import {
+  CoverGridSkeleton,
+  HeaderSkeleton,
+  Shimmer,
+} from "@/components/Skeleton";
 import NowPlayingCard from "@/components/NowPlayingCard";
 import RecommendedSection from "@/components/RecommendedSection";
 
@@ -107,26 +112,25 @@ function DashboardContent({ userId }: { userId: number }) {
  */
 function DashboardSkeleton() {
   return (
-    <div className="space-y-8" aria-hidden="true">
+    <div className="space-y-9" aria-hidden="true">
+      {/* The stat cards keep their real frame and shimmer only the value, so
+          the row is already the right height and nothing shifts when the
+          numbers land. */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {Array.from({ length: 4 }, (_, i) => (
           <div
             key={i}
-            className="h-[4.5rem] animate-pulse rounded-xl border border-surface-800 bg-surface-900"
-          />
+            className="rounded-xl border border-hair bg-surface-900 px-4 py-3 panel-wash"
+          >
+            <Shimmer index={i} className="h-5 w-16" />
+            <Shimmer index={i} className="mt-2 h-2 w-20" />
+          </div>
         ))}
       </div>
       {Array.from({ length: 2 }, (_, section) => (
-        <div key={section}>
-          <div className="h-5 w-40 animate-pulse rounded bg-surface-800" />
-          <div className="media-grid mt-4 gap-x-4 gap-y-5">
-            {Array.from({ length: 6 }, (_, i) => (
-              <div key={i}>
-                <div className="aspect-[2/3] animate-pulse rounded-lg bg-surface-800" />
-                <div className="mt-2 h-3 w-4/5 animate-pulse rounded bg-surface-800" />
-              </div>
-            ))}
-          </div>
+        <div key={section} className="space-y-4">
+          <HeaderSkeleton index={section * 3} />
+          <CoverGridSkeleton count={6} />
         </div>
       ))}
     </div>

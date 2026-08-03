@@ -76,6 +76,8 @@ const en = {
   notif: {
     title: "Notifications",
     empty: "You're all caught up.",
+    groupNew: "New",
+    groupEarlier: "Earlier",
     markAll: "Mark all read",
     now: "now",
   },
@@ -707,6 +709,8 @@ const de: typeof en = {
   notif: {
     title: "Benachrichtigungen",
     empty: "Alles gelesen.",
+    groupNew: "Neu",
+    groupEarlier: "Früher",
     markAll: "Alle als gelesen",
     now: "jetzt",
   },

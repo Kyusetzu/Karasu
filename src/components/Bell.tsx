@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { listen } from "@tauri-apps/api/event";
 import { Bell as BellIcon, CalendarClock, Clock, Film } from "lucide-react";
 import { EmptyState, TickMarks } from "@/components/EmptyState";
+import { cn } from "@/lib/utils";
 import {
   getNotifications,
   isTauri,
@@ -16,6 +17,18 @@ const KIND_ICON: Record<string, typeof BellIcon> = {
   stale: Clock,
   sequel: Film,
 };
+
+/**
+ * Each kind of notice gets its own tint, because they are not the same news:
+ * an episode is out (accent — act on it), something has gone quiet (ink — a
+ * fact about you), a sequel was announced (green — good news, nothing to do).
+ */
+const KIND_TINT: Record<string, string> = {
+  airing: "bg-accent-500/14 text-accent-400",
+  stale: "bg-surface-800 text-ink-500",
+  sequel: "bg-success/14 text-success",
+};
+const DEFAULT_TINT = "bg-surface-800 text-ink-500";
 
 function relTime(ms: number, lang: string, nowLabel: string): string {
   const min = Math.floor((Date.now() - ms) / 60000);
@@ -77,6 +90,11 @@ export default function Bell() {
 
   if (!isTauri) return null;
 
+  const groups: [string, AppNotification[]][] = [
+    ["notif.groupNew", items.filter((n) => !n.read)],
+    ["notif.groupEarlier", items.filter((n) => n.read)],
+  ];
+
   return (
     <div ref={ref} className="relative flex items-center">
       <button
@@ -96,10 +114,15 @@ export default function Bell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-1 w-80 overflow-hidden rounded-xl border border-surface-700 bg-surface-900 shadow-2xl">
-          <div className="flex items-center justify-between border-b border-surface-800 px-3 py-2">
-            <span className="text-sm font-semibold text-ink-100">
-              {t("notif.title")}
+        <div className="absolute right-0 top-full z-50 mt-1 w-88 origin-top-right animate-settle overflow-hidden rounded-xl border border-hair bg-surface-900 shadow-2xl panel-wash">
+          <div className="flex items-center justify-between border-b border-hair px-3 py-2">
+            <span className="flex items-baseline gap-2">
+              <span className="text-2xs font-semibold uppercase tracking-[.14em] text-ink-600">
+                {t("notif.title")}
+              </span>
+              {unread > 0 && (
+                <span className="text-2xs tabular-nums text-ink-500">{unread}</span>
+              )}
             </span>
             {unread > 0 && (
               <button
@@ -114,41 +137,61 @@ export default function Bell() {
           {items.length === 0 ? (
             <EmptyState visual={<TickMarks />} title={t("notif.empty")} className="py-6" />
           ) : (
-            <ul className="max-h-96 overflow-y-auto">
-              {items.map((n) => {
-                const Icon = KIND_ICON[n.kind] ?? BellIcon;
-                return (
-                  <li key={n.id}>
-                    <button
-                      onClick={() => readOne(n)}
-                      className={`flex w-full items-start gap-2.5 px-3 py-2.5 text-left hover:bg-surface-850 ${
-                        n.read ? "opacity-60" : ""
-                      }`}
-                    >
-                      <span className="mt-0.5 text-accent-400">
-                        <Icon className="size-3.75" />
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="flex items-center gap-2">
-                          <span className="truncate text-sm font-medium text-ink-100">
-                            {n.title}
-                          </span>
-                          {!n.read && (
-                            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent-500" />
-                          )}
-                        </span>
-                        <span className="mt-0.5 block text-xs text-ink-500">
-                          {n.body}
-                        </span>
-                        <span className="mt-0.5 block text-2xs text-ink-600">
-                          {relTime(n.createdMs, i18n.language, t("notif.now"))}
-                        </span>
-                      </span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
+            <div className="max-h-96 overflow-y-auto">
+              {/* Unread first under their own heading. One flat stream by time
+                  buries a new episode under last week's read notices, which is
+                  the only thing anyone opens this for. */}
+              {groups.map(([label, list]) =>
+                list.length === 0 ? null : (
+                  <section key={label}>
+                    <h3 className="px-3 pb-1 pt-2.5 text-[.5625rem] font-semibold uppercase tracking-[.14em] text-ink-600">
+                      {t(label)}
+                    </h3>
+                    <ul>
+                      {list.map((n) => {
+                        const Icon = KIND_ICON[n.kind] ?? BellIcon;
+                        return (
+                          <li key={n.id}>
+                            <button
+                              onClick={() => readOne(n)}
+                              className={cn(
+                                "flex w-full items-start gap-2.5 px-3 py-2.5 text-left transition-surface hover:bg-surface-850",
+                                !n.read && "bg-[rgba(255,255,255,.018)]",
+                              )}
+                            >
+                              <span
+                                className={cn(
+                                  "mt-0.5 grid size-6 shrink-0 place-items-center rounded-md",
+                                  KIND_TINT[n.kind] ?? DEFAULT_TINT,
+                                )}
+                              >
+                                <Icon className="size-3.25" />
+                              </span>
+                              <span className="min-w-0 flex-1">
+                                <span className="flex items-center gap-2">
+                                  <span className="truncate text-[.8125rem] font-medium text-ink-100">
+                                    {n.title}
+                                  </span>
+                                  {!n.read && (
+                                    <span className="size-1.5 shrink-0 rounded-full bg-accent-500" />
+                                  )}
+                                </span>
+                                <span className="mt-0.5 block text-xs text-ink-500">
+                                  {n.body}
+                                </span>
+                                <span className="mt-0.5 block text-2xs text-ink-600">
+                                  {relTime(n.createdMs, i18n.language, t("notif.now"))}
+                                </span>
+                              </span>
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </section>
+                ),
+              )}
+            </div>
           )}
         </div>
       )}

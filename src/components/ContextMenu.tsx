@@ -25,6 +25,8 @@ interface MenuItem {
   label: string;
   icon: React.ReactNode;
   onClick: () => void;
+  /** Only ever set for a key that is actually wired — see `KeyboardSheet`. */
+  hint?: string;
 }
 
 /**
@@ -35,7 +37,7 @@ interface MenuItem {
  * off-screen.
  */
 const MENU_W_REM = 13.75;
-const MENU_ROW_H_REM = 2.125;
+const MENU_ROW_H_REM = 1.875;
 
 const rootFontSize = () =>
   parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
@@ -143,6 +145,7 @@ export default function ContextMenu() {
     {
       label: t("ctx.palette"),
       icon: <Command className="size-3.5" />,
+      hint: "Ctrl K",
       onClick: run(() =>
         window.dispatchEvent(new Event("open-command-palette")),
       ),
@@ -166,7 +169,7 @@ export default function ContextMenu() {
   return (
     <div
       ref={ref}
-      className="fixed z-[100] w-55 overflow-hidden rounded-lg border border-surface-700 bg-surface-900 py-1 shadow-2xl"
+      className="fixed z-[100] w-55 origin-top-left animate-pop-in overflow-hidden rounded-lg border border-hair bg-surface-850 p-1.25 shadow-2xl panel-wash"
       style={{ left: x, top: y }}
       onMouseDown={(e) => e.stopPropagation()}
     >
@@ -174,10 +177,17 @@ export default function ContextMenu() {
         <button
           key={i}
           onClick={item.onClick}
-          className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-sm text-ink-300 hover:bg-surface-800 hover:text-ink-100"
+          className="flex h-7.5 w-full items-center gap-2.5 rounded-md px-2.5 text-left text-[.78125rem] text-ink-300 transition-surface hover:bg-surface-800 hover:text-ink-100"
         >
-          <span className="text-ink-500">{item.icon}</span>
-          {item.label}
+          <span className="grid size-4 shrink-0 place-items-center text-ink-500">
+            {item.icon}
+          </span>
+          <span className="min-w-0 flex-1 truncate">{item.label}</span>
+          {item.hint && (
+            <span className="shrink-0 text-2xs tabular-nums text-ink-600">
+              {item.hint}
+            </span>
+          )}
         </button>
       ))}
     </div>

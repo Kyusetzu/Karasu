@@ -81,6 +81,41 @@ export function CoverOutline() {
   );
 }
 
+/** Three empty folders, stacked and knocked slightly out of true. */
+export function FolderStack() {
+  return (
+    <div className="relative h-24 w-22" aria-hidden="true">
+      {[-7, 3, 0].map((angle, i) => (
+        <span
+          key={angle}
+          className="absolute left-1/2 h-15 w-22 -translate-x-1/2 rounded-md border border-dashed border-surface-700"
+          style={{ top: `${i * 0.75}rem`, transform: `translateX(-50%) rotate(${angle}deg)` }}
+        />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * A year drawn in outline — the shape of a page that hasn't been filled in.
+ *
+ * Stroked rather than filled because a solid 7rem number would be the loudest
+ * thing on a screen whose whole message is that there is nothing to show.
+ */
+export function OutlineYear({ year }: { year: number }) {
+  return (
+    <p
+      className="font-brand text-[7rem] font-extrabold leading-none tracking-tight"
+      style={{
+        color: "transparent",
+        WebkitTextStroke: "1px var(--color-surface-700)",
+      }}
+    >
+      {year}
+    </p>
+  );
+}
+
 /**
  * The query that found nothing, struck through at size.
  *

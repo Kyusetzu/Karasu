@@ -314,7 +314,11 @@ const en = {
     title: "Search",
     placeholder: "Search AniList …",
     searching: "Searching …",
-    noResults: "No results for “{{term}}”.",
+    noResults: "Nothing matches that.",
+    noResultsHint: "Check the spelling, or try the romaji title.",
+    prompt: "Search AniList.",
+    promptHint:
+      "Two characters is enough to start. Romaji, English and native titles all match.",
     anime: "Anime",
     manga: "Manga",
   },
@@ -323,7 +327,7 @@ const en = {
     prev: "Previous season",
     next: "Next season",
     loading: "Loading season …",
-    empty: "No anime found for this season.",
+    empty: "Nothing announced yet for this season.",
   },
   time: {
     none: "done",
@@ -406,7 +410,7 @@ const en = {
     onDisk: "{{n}} episodes on disk",
     watchedOf: "{{progress}} / {{total}} watched",
     playEpisode: "Play episode {{n}}",
-    empty: "Nothing scanned yet.",
+    empty: "Karasu has nowhere to look.",
     emptyHint:
       "Point Karasu at your anime folder, then scan — matched episodes show up here, ready to play.",
     toSettings: "Open settings",
@@ -915,7 +919,11 @@ const de: typeof en = {
     title: "Suche",
     placeholder: "AniList durchsuchen …",
     searching: "Suche …",
-    noResults: "Keine Treffer für „{{term}}“.",
+    noResults: "Dafür gibt es keine Treffer.",
+    noResultsHint: "Prüf die Schreibweise oder versuch den Romaji-Titel.",
+    prompt: "Durchsuche AniList.",
+    promptHint:
+      "Zwei Zeichen genügen. Romaji, Englisch und Originaltitel passen alle.",
     anime: "Anime",
     manga: "Manga",
   },
@@ -924,7 +932,7 @@ const de: typeof en = {
     prev: "Vorherige Saison",
     next: "Nächste Saison",
     loading: "Lade Saison …",
-    empty: "Keine Anime für diese Saison gefunden.",
+    empty: "Für diese Saison ist noch nichts angekündigt.",
   },
   time: {
     none: "fertig",
@@ -1007,7 +1015,7 @@ const de: typeof en = {
     onDisk: "{{n}} Folgen auf der Platte",
     watchedOf: "{{progress}} / {{total}} gesehen",
     playEpisode: "Folge {{n}} abspielen",
-    empty: "Noch nichts gescannt.",
+    empty: "Karasu weiß nicht, wo er suchen soll.",
     emptyHint:
       "Wähle deinen Anime-Ordner und starte den Scan — zugeordnete Folgen erscheinen hier und lassen sich direkt abspielen.",
     toSettings: "Einstellungen öffnen",

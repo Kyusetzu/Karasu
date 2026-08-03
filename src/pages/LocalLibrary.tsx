@@ -11,6 +11,7 @@ import { useLibrary } from "@/stores/library";
 import { useContentFilter } from "@/stores/contentFilter";
 import { isBlocked } from "@/lib/contentFilter";
 import { Button } from "@/components/ui/button";
+import { EmptyState, FolderStack } from "@/components/EmptyState";
 import { cn } from "@/lib/utils";
 
 /**
@@ -113,15 +114,16 @@ function LibraryView({ userId }: { userId: number }) {
 
       <div className="min-h-0 flex-1 overflow-y-auto px-8 py-6">
         {rows.length === 0 ? (
-          <div className="rounded-xl border border-surface-800 bg-surface-900 p-8 text-center">
-            <p className="text-sm text-ink-300">{t("library.empty")}</p>
-            <p className="mx-auto mt-1 max-w-md text-xs text-ink-600">
-              {t("library.emptyHint")}
-            </p>
-            <Link to="/settings">
-              <Button className="mt-4">{t("library.toSettings")}</Button>
-            </Link>
-          </div>
+          <EmptyState
+            visual={<FolderStack />}
+            title={t("library.empty")}
+            hint={t("library.emptyHint")}
+            actions={
+              <Link to="/settings">
+                <Button size="control">{t("library.toSettings")}</Button>
+              </Link>
+            }
+          />
         ) : (
           <div className="grid gap-2 2xl:grid-cols-2">
             {rows.map(({ lib, entry }) => (

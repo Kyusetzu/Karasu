@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { listen } from "@tauri-apps/api/event";
 import { Bell as BellIcon, CalendarClock, Clock, Film } from "lucide-react";
+import { EmptyState, TickMarks } from "@/components/EmptyState";
 import {
   getNotifications,
   isTauri,
@@ -111,9 +112,7 @@ export default function Bell() {
           </div>
 
           {items.length === 0 ? (
-            <p className="px-3 py-6 text-center text-sm text-ink-600">
-              {t("notif.empty")}
-            </p>
+            <EmptyState visual={<TickMarks />} title={t("notif.empty")} className="py-6" />
           ) : (
             <ul className="max-h-96 overflow-y-auto">
               {items.map((n) => {

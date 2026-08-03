@@ -8,6 +8,7 @@ import MediaCard from "@/components/MediaCard";
 import { Button } from "@/components/ui/button";
 import { adultQueryArg, isBlocked } from "@/lib/contentFilter";
 import { useContentFilter } from "@/stores/contentFilter";
+import { EmptyState, TickMarks } from "@/components/EmptyState";
 import { cn } from "@/lib/utils";
 
 const SEASONS: Season[] = ["WINTER", "SPRING", "SUMMER", "FALL"];
@@ -90,7 +91,9 @@ export default function Seasonal() {
           <p className="text-sm text-ink-600">{t("seasonal.loading")}</p>
         )}
         {!isLoading && !error && results.length === 0 && (
-          <p className="text-sm text-ink-600">{t("seasonal.empty")}</p>
+          // Four verticals rather than the schedule's seven: a season is a
+          // shorter unit than a week's worth of episodes.
+          <EmptyState visual={<TickMarks count={4} />} title={t("seasonal.empty")} />
         )}
         {results.length > 0 && (
           <div className="media-grid gap-x-4 gap-y-6">

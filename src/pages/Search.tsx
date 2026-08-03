@@ -9,6 +9,7 @@ import MediaCard from "@/components/MediaCard";
 import { isTauri } from "@/api/anilist";
 import { adultQueryArg, isBlocked } from "@/lib/contentFilter";
 import { useContentFilter } from "@/stores/contentFilter";
+import { EmptyState, StruckQuery } from "@/components/EmptyState";
 import { cn } from "@/lib/utils";
 
 export default function Search() {
@@ -83,10 +84,19 @@ export default function Search() {
         {isFetching && (
           <p className="text-sm text-ink-600">{t("search.searching")}</p>
         )}
+        {!isFetching && term.length < 2 && (
+          // No mark here, deliberately: on every other empty screen the visual
+          // is the subject, and on this one the field above it is.
+          <EmptyState title={t("search.prompt")} hint={t("search.promptHint")} />
+        )}
         {!isFetching && term.length >= 2 && results.length === 0 && (
-          <p className="text-sm text-ink-600">
-            {t("search.noResults", { term })}
-          </p>
+          <EmptyState
+            visual={<StruckQuery query={term} />}
+            // The query is already on screen at 2.5rem — repeating it in the
+            // sentence underneath just says the same thing twice.
+            title={t("search.noResults")}
+            hint={t("search.noResultsHint")}
+          />
         )}
         {results.length > 0 && (
           <div className="media-grid gap-x-4 gap-y-6">

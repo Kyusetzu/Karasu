@@ -17,6 +17,7 @@ import { useContentFilter } from "@/stores/contentFilter";
 import { isBlocked, isBlockedGenre } from "@/lib/contentFilter";
 import { Button } from "@/components/ui/button";
 import { Pill } from "@/components/ui/pill";
+import { EmptyState, OutlineYear } from "@/components/EmptyState";
 
 const P = 72;
 
@@ -539,7 +540,7 @@ export default function Wrapped() {
       {loading ? (
         <p className="text-ink-500">{t("common.loading")}</p>
       ) : years.length === 0 ? (
-        <p className="text-sm text-ink-600">{t("wrapped.empty")}</p>
+        <EmptyState visual={<OutlineYear year={new Date().getFullYear()} />} title={t("wrapped.empty")} />
       ) : (
         <canvas
           ref={canvasRef}

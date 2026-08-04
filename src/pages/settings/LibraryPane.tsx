@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { FolderOpen, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,7 @@ import * as library from "@/api/library";
 export function LibrarySection() {
   const { t } = useTranslation();
   const refreshLibrary = useLibrary((s) => s.refresh);
+  const qc = useQueryClient();
   const [path, setPath] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const [matched, setMatched] = useState<number | null>(null);
@@ -36,6 +38,14 @@ export function LibrarySection() {
       const summary = await library.scanLibrary();
       setMatched(summary.matched);
       await refreshLibrary();
+      // A scan started here changes what the Library screen shows, and those
+      // two caches live only over there. Without this the folder row and the
+      // unplaced list keep serving pre-scan answers for a whole staleTime —
+      // long enough to offer "Assign" on a group the scan already placed.
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["libraryStatus"] }),
+        qc.invalidateQueries({ queryKey: ["libraryUnmatched"] }),
+      ]);
     } catch (e) {
       setError(String(e));
     } finally {

@@ -467,11 +467,13 @@ export const en = {
     notOnListHint:
       "Not on your AniList — these files play, but nothing is scrobbled until you add it.",
     correctFailed: "That correction couldn't be saved.",
+    addFailed: "That title couldn't be added to your list.",
     pickTitle: "Which title is this?",
     parsedAs: 'Read from the filename as "{{title}}"{{season}}',
     searchAniList: "Search AniList…",
     typeToSearch: "Type to search AniList.",
     noResults: "Nothing found. Try a shorter or more exact title.",
+    searchFailed: "Couldn't reach AniList. Try again in a moment.",
     currentMatch: "current",
     clearMatch: "Undo correction",
     epCount: "{{n}} ep",

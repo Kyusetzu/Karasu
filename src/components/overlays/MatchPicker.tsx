@@ -27,6 +27,7 @@ export default function MatchPicker({
   parsedTitle,
   season,
   current,
+  error,
   onPick,
   onClear,
   onCancel,
@@ -35,6 +36,8 @@ export default function MatchPicker({
   season: number;
   /** The title this is currently pointed at, if it is pointed anywhere. */
   current?: string;
+  /** Why the last pick was rejected. The dialog stays open when one fails. */
+  error?: string;
   onPick: (mediaId: number) => void;
   /** Present only when there is a correction to undo. */
   onClear?: () => void;
@@ -61,7 +64,7 @@ export default function MatchPicker({
     return () => clearTimeout(id);
   }, [term]);
 
-  const { data, isFetching } = useQuery({
+  const { data, isFetching, isError } = useQuery({
     queryKey: ["matchSearch", debounced],
     queryFn: () => searchMedia(debounced, "ANIME"),
     enabled: debounced.length > 1,
@@ -109,10 +112,16 @@ export default function MatchPicker({
 
         <div className="min-h-0 flex-1 overflow-y-auto p-2">
           {results.length === 0 ? (
+            // A search that never reached AniList is not a search that found
+            // nothing. Telling someone to "try a shorter or more exact title"
+            // after a rate-limit rejection asks them to retype, which spends
+            // the request budget that caused it.
             <p className="px-3 py-6 text-center text-xs text-ink-600">
-              {debounced.length > 1 && !isFetching
-                ? t("library.noResults")
-                : t("library.typeToSearch")}
+              {isError
+                ? t("library.searchFailed")
+                : debounced.length > 1 && !isFetching
+                  ? t("library.noResults")
+                  : t("library.typeToSearch")}
             </p>
           ) : (
             <ul className="space-y-0.5">
@@ -130,6 +139,11 @@ export default function MatchPicker({
         </div>
 
         <div className="flex items-center justify-between gap-2 border-t border-hair p-4">
+          {error && (
+            <span className="mr-auto min-w-0 flex-1 truncate text-2xs text-danger">
+              {error}
+            </span>
+          )}
           {onClear ? (
             <Button variant="ghost" size="control" onClick={onClear}>
               <X className="size-3.5" />

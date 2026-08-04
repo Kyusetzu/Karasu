@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { Link } from "react-router";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import {
   Check,
@@ -12,11 +12,10 @@ import {
   Search,
   Wand2,
 } from "lucide-react";
-import { fetchMediaList, isTauri } from "@/api/anilist";
+import { fetchMediaList, isTauri, saveListEntry } from "@/api/anilist";
 import { mediaByIds } from "@/api/queries";
 import { displayTitle, type Media, type MediaListEntry } from "@/api/types";
 import { missingIds } from "@/lib/chunk";
-import { useListMutations } from "@/hooks/useListMutations";
 import {
   clearLibraryMatch,
   getLibraryStatus,
@@ -148,10 +147,16 @@ function LibraryView({ userId }: { userId: number }) {
     [entries, onList],
   );
 
+  // `placeholderData` is what keeps the section on screen while it refetches.
+  // The key is the whole id set, so confirming one suggestion mints a new key,
+  // and a new key has no cached data — without this the entire "detected but
+  // not on the list" section blanks for a round trip after every correction,
+  // which reads as having deleted the row rather than moved it.
   const { data: fetched } = useQuery({
     queryKey: ["libraryMedia", offList],
     queryFn: () => mediaByIds(offList),
     enabled: offList.length > 0,
+    placeholderData: keepPreviousData,
     staleTime: 30 * 60 * 1000,
   });
 
@@ -212,11 +217,26 @@ function LibraryView({ userId }: { userId: number }) {
     queryKey: ["librarySuggestedMedia", suggestedIds],
     queryFn: () => mediaByIds(suggestedIds),
     enabled: suggestedIds.length > 0,
+    placeholderData: keepPreviousData,
     staleTime: 30 * 60 * 1000,
   });
   const suggestedById = useMemo(
     () => new Map((suggestedMedia ?? []).map((m) => [m.id, m])),
     [suggestedMedia],
+  );
+
+  // A suggestion is the one row on this screen AniList picked rather than the
+  // user, and nothing upstream filters it: the identify pass asks by title with
+  // no `isAdult` constraint. Filtering only the confirmed rows would invert the
+  // guarantee — accept the guess and the title vanishes, leave it and it shows.
+  // Blocking on unresolved media would be wrong the other way, so an id whose
+  // media has not arrived yet stays visible as the bare `#id` placeholder.
+  const visibleSuggestions = useMemo(
+    () =>
+      suggested.filter(
+        (g) => !isBlocked(suggestedById.get(g.suggestion!.mediaId), level),
+      ),
+    [suggested, suggestedById, level],
   );
 
   // What the picker is currently open on: either a row being corrected or an
@@ -232,17 +252,24 @@ function LibraryView({ userId }: { userId: number }) {
   // these used to let a rejected command fall on the floor: the dialog stayed
   // open, no row moved, and there was no way to tell a backend error from a
   // successful no-op.
+  //
+  // The reason belongs *in* the dialog. On failure the picker stays mounted at
+  // z-110, so routing this through the app-level playback banner would draw the
+  // explanation in the far corner, under the picker's own scrim, and clear it
+  // after six seconds.
+  const [correctError, setCorrectError] = useState<string | null>(null);
   const runCorrection = useCallback(
     async (work: () => Promise<unknown>) => {
+      setCorrectError(null);
       try {
         await work();
         setEditing(null);
         await Promise.all([refresh(), refetchStatus(), refetchUnmatched()]);
       } catch (e) {
-        setError(typeof e === "string" ? e : t("library.correctFailed"));
+        setCorrectError(typeof e === "string" ? e : t("library.correctFailed"));
       }
     },
-    [refresh, refetchStatus, refetchUnmatched, setError, t],
+    [refresh, refetchStatus, refetchUnmatched, t],
   );
 
   const applyMatch = useCallback(
@@ -278,10 +305,23 @@ function LibraryView({ userId }: { userId: number }) {
   // scrobbler builds its candidates from the cached list (`candidates_from_cache`),
   // so a title that is not on it can be played from here all evening and never
   // record a thing.
-  const { save } = useListMutations(userId, "ANIME");
+  //
+  // The whole media object, not just the id: every row here is by definition
+  // absent from the list, and `local_save_entry` has no row to read a type off,
+  // so a local-profile add without it is rejected outright. And the invalidate
+  // is what moves the row — `useListMutations` patches entries that already
+  // exist, which a first add never does, so this path cannot use it.
+  const qc = useQueryClient();
   const addToList = useCallback(
-    (mediaId: number) => save.mutate({ mediaId, status: "PLANNING" }),
-    [save],
+    async (media: Media) => {
+      try {
+        await saveListEntry({ mediaId: media.id, status: "PLANNING" }, media);
+        await qc.invalidateQueries({ queryKey: ["mediaList", "ANIME", userId] });
+      } catch (e) {
+        setError(typeof e === "string" ? e : t("library.addFailed"));
+      }
+    },
+    [qc, userId, setError, t],
   );
 
   // On the list, split into a list of things to do tonight and a list of
@@ -392,7 +432,7 @@ function LibraryView({ userId }: { userId: number }) {
             />
             <DetectedOffList
               rows={offListRows}
-              suggestions={suggested}
+              suggestions={visibleSuggestions}
               media={suggestedById}
               onCorrect={setEditing}
               onAdd={addToList}
@@ -412,9 +452,13 @@ function LibraryView({ userId }: { userId: number }) {
           parsedTitle={editing.key.title}
           season={editing.key.season}
           current={editing.current}
+          error={correctError ?? undefined}
           onPick={applyMatch}
           onClear={editing.hasOverride ? dropMatch : undefined}
-          onCancel={() => setEditing(null)}
+          onCancel={() => {
+            setCorrectError(null);
+            setEditing(null);
+          }}
         />
       )}
     </div>
@@ -444,7 +488,7 @@ function DetectedOffList({
   suggestions: UnmatchedGroup[];
   media: Map<number, Media>;
   onCorrect: (c: Correction) => void;
-  onAdd: (mediaId: number) => void;
+  onAdd: (media: Media) => void;
   onConfirm: (key: TitleKey, mediaId: number) => void;
   onReject: (key: TitleKey) => void;
 }) {
@@ -686,7 +730,7 @@ function Group({
   rows: Row[];
   muted?: boolean;
   onCorrect: (c: Correction) => void;
-  onAdd: (mediaId: number) => void;
+  onAdd: (media: Media) => void;
 }) {
   if (rows.length === 0) return null;
   return (
@@ -720,7 +764,7 @@ function LibraryRow({
   row: Row;
   muted: boolean;
   onCorrect: (c: Correction) => void;
-  onAdd: (mediaId: number) => void;
+  onAdd: (media: Media) => void;
 }) {
   const { t } = useTranslation();
   const playEpisode = useLibrary((s) => s.playEpisode);
@@ -780,7 +824,7 @@ function LibraryRow({
         {!entry && (
           <button
             type="button"
-            onClick={() => onAdd(lib.mediaId)}
+            onClick={() => onAdd(media)}
             title={t("library.notOnListHint")}
             className="shrink-0 rounded-md border border-surface-700 px-2 py-1 text-2xs text-ink-500 transition-surface hover:border-accent-500 hover:text-accent-400"
           >

@@ -453,7 +453,7 @@ export const de: typeof en = {
     matchManual: "von dir",
     correct: "Korrigieren…",
     correctHint:
-      'Zugeordnet über „{{title}}" — klicken, um etwas anderes zu wählen',
+      'Zugeordnet über „{{title}}“ — klicken, um etwas anderes zu wählen',
     fileCount: "{{n}} Dateien",
     detectedOffList: "Erkannt, aber nicht auf der Liste",
     detectedOffListHint:
@@ -470,11 +470,13 @@ export const de: typeof en = {
     notOnListHint:
       "Nicht auf deiner AniList — die Dateien laufen, aber es wird nichts übertragen, bis du sie hinzufügst.",
     correctFailed: "Die Korrektur konnte nicht gespeichert werden.",
+    addFailed: "Der Titel konnte nicht zur Liste hinzugefügt werden.",
     pickTitle: "Welcher Titel ist das?",
-    parsedAs: 'Aus dem Dateinamen gelesen als „{{title}}"{{season}}',
+    parsedAs: 'Aus dem Dateinamen gelesen als „{{title}}“{{season}}',
     searchAniList: "AniList durchsuchen…",
     typeToSearch: "Tippe, um AniList zu durchsuchen.",
     noResults: "Nichts gefunden. Versuch einen kürzeren oder genaueren Titel.",
+    searchFailed: "AniList war nicht erreichbar. Versuch es gleich noch mal.",
     currentMatch: "aktuell",
     clearMatch: "Korrektur aufheben",
     epCount: "{{n}} Fo.",

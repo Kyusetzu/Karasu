@@ -53,18 +53,27 @@ Because a desktop app can do things anilist.co simply can't:
 
 <table>
 <tr>
-<td width="50%"><img src="assets/screenshots/overview.jpg" alt="Dashboard overview" /><br /><sub>Overview — this week's airing, continue watching, stats at a glance</sub></td>
-<td width="50%"><img src="assets/screenshots/anime-list.jpg" alt="Anime list" /><br /><sub>Anime list — grid view with status tabs and filters</sub></td>
+<td width="50%"><img src="assets/screenshots/overview.jpg" alt="Dashboard overview" /><br /><sub>Overview — what's airing this week, what you're in the middle of, recommendations</sub></td>
+<td width="50%"><img src="assets/screenshots/local-library.jpg" alt="Local library" /><br /><sub>Local library — your files, matched to your list, next unwatched episode first</sub></td>
 </tr>
 <tr>
-<td width="50%"><img src="assets/screenshots/season-overview.jpg" alt="Seasonal chart" /><br /><sub>Seasonal — browse a season's chart</sub></td>
-<td width="50%"><img src="assets/screenshots/statistics.jpg" alt="Statistics page" /><br /><sub>Statistics — genres, tags, voice actors, studios and more</sub></td>
+<td width="50%"><img src="assets/screenshots/anime-list.jpg" alt="Anime list, grid view" /><br /><sub>Anime list — covers, status tabs, filters and presets</sub></td>
+<td width="50%"><img src="assets/screenshots/anime-list-columns.jpg" alt="Anime list, row view" /><br /><sub>…or as rows, with quick progress and score editing in place</sub></td>
 </tr>
 <tr>
-<td width="50%"><img src="assets/screenshots/year-in-review.jpg" alt="Year in review card" /><br /><sub>Year in review — a shareable card, exportable as a PNG</sub></td>
-<td width="50%"><img src="assets/screenshots/settings.jpg" alt="Settings page" /><br /><sub>Settings — themes, accent colours, detection and update preferences</sub></td>
+<td width="50%"><img src="assets/screenshots/manga-list.jpg" alt="Manga list, grid view" /><br /><sub>Manga list — the same list, counting chapters and volumes</sub></td>
+<td width="50%"><img src="assets/screenshots/manga-list-columns.jpg" alt="Manga list, row view" /><br /><sub>…and its row view</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src="assets/screenshots/season-overview.jpg" alt="Seasonal chart" /><br /><sub>Seasonal — a year row over a season grid, so any season is two clicks away</sub></td>
+<td width="50%"><img src="assets/screenshots/statistics.jpg" alt="Statistics page" /><br /><sub>Statistics — how your list splits, the shape of your taste, the years you were active</sub></td>
 </tr>
 </table>
+
+<p align="center">
+  <img src="assets/screenshots/year-in-review.jpg" alt="Year in review card" width="70%" /><br />
+  <sub>Year in review — a shareable poster of your year, in five crops</sub>
+</p>
 
 ## Features
 
@@ -94,6 +103,10 @@ Because a desktop app can do things anilist.co simply can't:
 - **Bulk multi-select** edits, saved **filter/sort presets**, a **random pick**,
   private **notes**, custom **tags** (with a tag filter), and a
   **rewatch/reread counter**
+- Manga counts **chapters and volumes** as two separate axes, the way AniList
+  stores them
+- Every edit can be **undone** from the toast it raises — and a failed write
+  says so, queues itself and offers a retry
 
 **Discovery**
 - Search with an anime/manga toggle, seasonal charts, rich detail pages
@@ -101,12 +114,15 @@ Because a desktop app can do things anilist.co simply can't:
   titles you've completed — the higher you scored something, the more its
   suggestions count, and anything already on your list is left out
 - **Franchise graph** — the whole franchise as a relation map (sequels, side
-  stories, cross-medium sources/adaptations), each node coloured by your status
+  stories, cross-medium sources/adaptations), each node coloured by your status,
+  pan and zoom, and any branch foldable out of the way
 
 **Insights**
-- **Statistics** — AniList profile stats (genres, tags, voice actors, studios,
-  staff) for both anime and manga
-- **Year in review** — a shareable card of your year, exportable as a PNG
+- **Statistics** — genres, tags, voice actors, studios and staff for both
+  mediums, plus a sunburst of what is on the list, a radar of the shape of your
+  taste, the years you were active, series length and country of origin
+- **Year in review** — a shareable poster of your year in five crops (banner,
+  square, page, compressed, detailed), exported as PNG or JPEG at 1×, 2× or 3×
 - Time-to-finish estimates and a Dashboard "this week" digest
 
 **Notifications**
@@ -116,16 +132,26 @@ Because a desktop app can do things anilist.co simply can't:
   read / mark-all-read
 
 **Integrations &amp; flexibility**
-- **Local library** with *play next episode* in your default player
+- **Local library** — your folder scanned and matched to your list, each title
+  showing the next unwatched file and how confident the match was, with every
+  episode on disk one click away
 - **Discord Rich Presence**, always on, with a link back to the project
 - **Local-only mode** (no account needed) with a later sign-in merge
 - **Portable mode** — keep everything in a folder next to the executable
 
 **Personalisation**
-- Light / dark themes and a full **accent colour picker** (text stays readable
-  on any colour)
-- Command palette (<kbd>Ctrl</kbd>+<kbd>K</kbd>), an app-appropriate in-app
-  right-click menu, system tray, single instance, autostart
+- Light / dark themes and a full **accent colour picker** — every shade, the
+  panel washes and the readable ink on top are derived from the one colour you
+  pick, so nothing is hardcoded
+- **Cover size** in three steps and a **reduce motion** switch
+- **Keyboard shortcuts** throughout, with a <kbd>?</kbd> reference sheet: a
+  command palette on <kbd>Ctrl</kbd>+<kbd>K</kbd>, <kbd>/</kbd> to search,
+  <kbd>Ctrl</kbd>+<kbd>1</kbd>–<kbd>3</kbd> between screens, and arrows,
+  <kbd>Space</kbd>, <kbd>E</kbd> and <kbd>C</kbd> inside a list
+- **Settings in seven panes** — account, appearance, detection, library,
+  content, integrations and advanced
+- An app-appropriate in-app right-click menu, system tray, single instance,
+  autostart
 - English / German with automatic system-language detection
 - One-click AniList login and a built-in *Check for updates*
 
@@ -187,6 +213,7 @@ running version is shown in the About window.
 | Rendering | `@tanstack/react-virtual` for the anime and manga lists, so a several-thousand-entry list only mounts the rows near the viewport |
 | Storage | SQLite via rusqlite (cache, offline queue, local list, notifications, settings); tokens in the OS credential store (Windows Credential Manager, Secret Service on Linux) |
 | Detection | Win32 window enumeration + Windows media sessions (SMTC), with an optional Jellyfin `/Sessions` source; titles resolved by a custom release-name parser (Anitomy equivalent) |
+| Theming | One accent colour in, a whole palette out — shades, the two companion wash hues and a readable ink are derived at runtime in `src/lib/contrast.ts`, contrast-checked against both themes |
 
 ### Shared application IDs
 

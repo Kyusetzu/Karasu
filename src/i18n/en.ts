@@ -268,6 +268,7 @@ export const en = {
     startYears: "Years you were active",
     breakdown: "What is on the list",
     breakdownHint: "Inner ring: status. Outer ring: the formats inside it.",
+    outerRing: "Outer ring",
     genreShape: "Shape of your taste",
     genreShapeHint: "A spike is a specialist; an even shape is an omnivore.",
     tagMap: "Tags by weight",

@@ -413,8 +413,28 @@ function OverviewCharts({
   const countries = [...stats.countries].filter((d) => d.country);
   const genres = stats.genres.slice(0, 6);
   const tags = (stats.tags.length ? stats.tags : stats.genres).slice(0, 14);
+  // The sunburst's outer ring is the formats inside each status. Totalled
+  // across statuses they are the same figures the Formats panel lists, but the
+  // ring needs its own key on its own card to be readable at all.
+  const formatsInBreakdown = useMemo(() => {
+    const totals = new Map<string, number>();
+    for (const group of breakdown) {
+      for (const kid of group.children ?? []) {
+        totals.set(kid.label, (totals.get(kid.label) ?? 0) + kid.value);
+      }
+    }
+    return [...totals]
+      .sort((a, b) => b[1] - a[1])
+      .map(([label, value]) => ({ label, value }));
+  }, [breakdown]);
+  // `items-start` rather than the default stretch. A grid row is as tall as its
+  // tallest card, and a chart drawn from a fixed viewBox cannot grow to use the
+  // slack — so stretching put the empty space *inside* the shorter panel, which
+  // is what made half these cards look like they had lost their contents.
+  // Unstretched, the same slack falls between the panels, where it reads as
+  // layout instead of as a hole.
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
+    <div className="grid items-start gap-4 lg:grid-cols-2">
       <ScoreColumns
         title={t("stats.scoreDist")}
         hint={t("stats.scoreDistHint")}
@@ -459,12 +479,34 @@ function OverviewCharts({
         <Card>
           <CardTitle>{t("stats.breakdown")}</CardTitle>
           <p className="mt-1 text-2xs text-ink-600">{t("stats.breakdownHint")}</p>
-          <div className="mt-3 flex flex-wrap items-center justify-center gap-5">
-            <Sunburst data={breakdown} />
-            <div className="min-w-40 flex-1">
+          {/* Chart beside its key rather than wrapped above it. The ring is
+              square, so letting it take the whole card width would make the
+              panel as tall as the page is wide. */}
+          <div className="mt-3 flex items-center gap-6">
+            <div className="w-40 shrink-0 sm:w-48">
+              <Sunburst data={breakdown} />
+            </div>
+            <div className="min-w-0 flex-1 space-y-3">
               <ToneLegend
                 items={breakdown.map((b) => ({ label: b.label, value: b.value }))}
               />
+              {/* The outer ring had no key at all — its formats were readable
+                  only by hovering, which is the thing this pass is undoing. */}
+              {formatsInBreakdown.length > 0 && (
+                <div>
+                  <p className="mb-1.5 text-2xs uppercase tracking-[.1em] text-ink-700">
+                    {t("stats.outerRing")}
+                  </p>
+                  <div className="flex flex-wrap gap-x-3 gap-y-1">
+                    {formatsInBreakdown.map((f) => (
+                      <span key={f.label} className="text-2xs text-ink-500">
+                        {f.label}
+                        <span className="ml-1 tabular-nums text-ink-300">{f.value}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </Card>
@@ -475,12 +517,14 @@ function OverviewCharts({
           <CardTitle>{t("stats.genreShape")}</CardTitle>
           <p className="mt-1 text-2xs text-ink-600">{t("stats.genreShapeHint")}</p>
           <div className="mt-2 flex justify-center">
-            <RadarChart
-              axes={genres.map((g) => ({
-                label: g.genre ?? "?",
-                value: g.count,
-              }))}
-            />
+            <div className="w-full max-w-72">
+              <RadarChart
+                axes={genres.map((g) => ({
+                  label: g.genre ?? "?",
+                  value: g.count,
+                }))}
+              />
+            </div>
           </div>
         </Card>
       )}

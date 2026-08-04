@@ -140,26 +140,35 @@ export function YearSparkline({
   if (data.length === 0) return null;
   const max = Math.max(...data.map((d) => d.count), 1);
   const recent = data.length - 3;
+  // Sixteen four-digit years across half a screen collide, so every other one
+  // is written and the rest keep their column. The counts above the bars are
+  // one or two digits and always fit, which is why they are never thinned.
+  const everyOther = data.length > 9;
 
   return (
     <Card>
       <CardTitle>{title}</CardTitle>
-      <div className="mt-4 flex h-20 items-end gap-0.75">
+      <div className="mt-4 flex flex-1 items-end gap-1">
         {data.map((d, i) => (
-          <div
-            key={d.year}
-            title={`${d.year}: ${d.count}`}
-            className={cn(
-              "flex-1 rounded-t-[.125rem]",
-              i >= recent ? "bg-accent-500" : "bg-surface-700",
-            )}
-            style={{ height: `${Math.max((d.count / max) * 100, 2)}%` }}
-          />
+          <div key={d.year} className="flex min-w-0 flex-1 flex-col items-center gap-1">
+            <span className="text-[.5625rem] tabular-nums text-ink-500">
+              {d.count || ""}
+            </span>
+            <div className="flex h-24 w-full items-end">
+              <div
+                title={`${d.year}: ${d.count}`}
+                className={cn(
+                  "w-full rounded-t-[.125rem]",
+                  i >= recent ? "bg-accent-500" : "bg-surface-700",
+                )}
+                style={{ height: `${Math.max((d.count / max) * 100, 2)}%` }}
+              />
+            </div>
+            <span className="text-[.5625rem] tabular-nums text-ink-600">
+              {!everyOther || i % 2 === 0 ? d.year : ""}
+            </span>
+          </div>
         ))}
-      </div>
-      <div className="mt-1.5 flex justify-between text-2xs tabular-nums text-ink-600">
-        <span>{data[0].year}</span>
-        <span>{data[data.length - 1].year}</span>
       </div>
     </Card>
   );

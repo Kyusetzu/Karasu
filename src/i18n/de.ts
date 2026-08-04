@@ -268,6 +268,7 @@ export const de: typeof en = {
     startYears: "Aktive Jahre",
     breakdown: "Was auf der Liste steht",
     breakdownHint: "Innen: Status. Außen: die Formate darin.",
+    outerRing: "Äußerer Ring",
     genreShape: "Form deines Geschmacks",
     genreShapeHint:
       "Eine Spitze heißt Spezialist, eine gleichmäßige Form Allesseher.",

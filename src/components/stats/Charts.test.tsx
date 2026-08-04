@@ -80,10 +80,13 @@ describe("Treemap", () => {
 });
 
 describe("RadarChart", () => {
+  // No axis is worth half the maximum. With one — the old fixture had 60
+  // against a 120 maximum — the half-ring label is indistinguishable from that
+  // axis's own count, and the ring test below passed with the rings deleted.
   const axes = [
     { label: "Action", value: 120 },
     { label: "Fantasy", value: 90 },
-    { label: "Comedy", value: 60 },
+    { label: "Comedy", value: 70 },
     { label: "Drama", value: 45 },
   ];
 
@@ -97,8 +100,10 @@ describe("RadarChart", () => {
 
   it("labels the rings, so the polygon is a measurement and not just a shape", () => {
     const out = texts(html(<RadarChart axes={axes} />));
-    expect(out).toContain("120"); // the outer ring == the largest axis
-    expect(out).toContain("60"); // the half ring
+    // The outer ring is the largest axis by definition, so no fixture makes it
+    // a unique string — count it instead of asking whether it is present.
+    expect(out.filter((v) => v === "120")).toHaveLength(2); // ring + axis
+    expect(out).toContain("60"); // the half ring, which is nobody's count
   });
 });
 
@@ -120,6 +125,26 @@ describe("Sunburst", () => {
     expect(out).toContain("474"); // the centre total
     expect(out).toContain("376");
     expect(out).toContain("300");
+  });
+
+  /**
+   * `accent-ink` is derived to be readable *on the accent colour*. Only the
+   * first two wedges are accent-filled; the rest are surface greys, where the
+   * same ink lands near 1.1:1 and the number is simply not there. A value that
+   * renders invisibly is still in the markup, so no `texts()` assertion can
+   * catch this — the class is the only evidence.
+   */
+  it("writes each ring's count in an ink that its own fill can carry", () => {
+    const markup = html(
+      <Sunburst
+        data={["Completed", "Current", "Paused", "Dropped", "Planning"].map(
+          (label, i) => ({ label, value: 100 - i }),
+        )}
+      />,
+    );
+    const inks = [...markup.matchAll(/<text[^>]*class="([^"]*)"/g)].map((m) => m[1]);
+    const onAccent = inks.filter((c) => c.includes("fill-accent-ink"));
+    expect(onAccent).toHaveLength(2); // TONES[0] and TONES[1], and no more
   });
 
   it("leaves a sliver unlabelled rather than overprinting it", () => {

@@ -69,13 +69,19 @@ export function Sunburst({ data, size = 260 }: { data: Slice[]; size?: number })
             >
               <title>{`${group.label}: ${group.value}`}</title>
             </path>
+            {/* `accent-ink` is the readable ink *for the accent colour*, and
+                only the first two tones are accent — the rest are surface
+                greys, where it resolves to whichever of near-black or
+                near-white contrasts with the accent and lands around 1.1:1 on
+                the grey underneath. Four of six statuses had an invisible
+                number. */}
             <ArcValue
               c={c}
               r={(inner + mid) / 2}
               from={span.start}
               to={span.end}
               value={group.value}
-              tone="fill-accent-ink"
+              tone={i < 2 ? "fill-accent-ink" : "fill-ink-100"}
             />
             {kids.map((kid, j) => {
               // The child's slice is its share of the parent's own wedge.
@@ -110,7 +116,7 @@ export function Sunburst({ data, size = 260 }: { data: Slice[]; size?: number })
         x={c}
         y={c + 4}
         textAnchor="middle"
-        className="fill-ink-300 text-[.8125rem] font-semibold tabular-nums"
+        className="fill-ink-300 text-[1.0625rem] font-semibold tabular-nums"
       >
         {total}
       </text>
@@ -148,7 +154,7 @@ function ArcValue({
       x={at.x}
       y={at.y + 3}
       textAnchor="middle"
-      className={`${tone} pointer-events-none text-[.5rem] font-medium tabular-nums`}
+      className={`${tone} pointer-events-none text-[.6875rem] font-medium tabular-nums`}
     >
       {value}
     </text>
@@ -218,7 +224,7 @@ export function RadarChart({
           key={step}
           x={c + 3}
           y={c - r * step + 3}
-          className="fill-ink-700 text-[.4375rem] tabular-nums"
+          className="fill-ink-600 text-[.4375rem] tabular-nums"
         >
           {Math.round(max * step)}
         </text>
@@ -408,7 +414,7 @@ export function Treemap({
                 <text
                   x={r.x + 7}
                   y={r.y + 30}
-                  className="fill-ink-200 text-[.625rem] tabular-nums"
+                  className="fill-ink-300 text-[.625rem] tabular-nums"
                 >
                   {items[i].value}
                 </text>
@@ -422,7 +428,7 @@ export function Treemap({
                 x={r.x + r.w / 2}
                 y={r.y + r.h / 2 + 3}
                 textAnchor="middle"
-                className="fill-ink-200 text-[.5625rem] tabular-nums"
+                className="fill-ink-300 text-[.5625rem] tabular-nums"
               >
                 {items[i].value}
               </text>

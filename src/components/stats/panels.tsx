@@ -123,12 +123,14 @@ export function StatusBar({
 }
 
 /**
- * Release years as a sparkline with only its ends labelled.
+ * Release years as a sparkline, every other year written under the bars.
  *
- * Sixteen labelled rows is a table nobody reads; the shape is the point, and
- * the two end labels are all that is needed to place it in time. The last
- * three years take the accent — that is the part of the chart that is still
- * moving.
+ * Sixteen four-digit labels across half a card collide, so past nine bars only
+ * every second one is written — counted back from the newest, not forward from
+ * the oldest. The newest year is the one the accent highlights and the one a
+ * reader looks for first, and an even number of bars would otherwise leave it
+ * as the blank column. The cost is the oldest year losing its label instead,
+ * which is the cheaper end to lose.
  */
 export function YearSparkline({
   title,
@@ -165,7 +167,7 @@ export function YearSparkline({
               />
             </div>
             <span className="text-[.5625rem] tabular-nums text-ink-600">
-              {!everyOther || i % 2 === 0 ? d.year : ""}
+              {!everyOther || (data.length - 1 - i) % 2 === 0 ? d.year : ""}
             </span>
           </div>
         ))}

@@ -397,6 +397,7 @@ function OverviewCharts({
   breakdown: Slice[];
 }) {
   const { t } = useTranslation();
+  const level = useContentFilter((s) => s.level);
   const scores = [...stats.scores].sort((a, b) => (a.score ?? 0) - (b.score ?? 0));
   const years = [...stats.releaseYears]
     .sort((a, b) => (a.releaseYear ?? 0) - (b.releaseYear ?? 0))
@@ -411,8 +412,15 @@ function OverviewCharts({
     .filter((d) => d.length)
     .sort((a, b) => parseInt(a.length ?? "0", 10) - parseInt(b.length ?? "0", 10));
   const countries = [...stats.countries].filter((d) => d.country);
-  const genres = stats.genres.slice(0, 6);
-  const tags = (stats.tags.length ? stats.tags : stats.genres).slice(0, 14);
+  // The ranked lists below filter these names; the radar and the treemap write
+  // them out in full, with counts. Filter before slicing, or a blocked name
+  // costs one of the six or fourteen slots it was removed from. The fallback
+  // has to be the filtered genres too — a list whose `tags` come back empty
+  // would otherwise put the unfiltered names straight into the treemap.
+  const safeGenres = stats.genres.filter((e) => !isBlockedGenre(e.genre ?? "", level));
+  const safeTags = stats.tags.filter((e) => !isBlockedGenre(e.tag?.name ?? "", level));
+  const genres = safeGenres.slice(0, 6);
+  const tags = (safeTags.length ? safeTags : safeGenres).slice(0, 14);
   // The sunburst's outer ring is the formats inside each status. Totalled
   // across statuses they are the same figures the Formats panel lists, but the
   // ring needs its own key on its own card to be readable at all.
@@ -494,7 +502,7 @@ function OverviewCharts({
                   only by hovering, which is the thing this pass is undoing. */}
               {formatsInBreakdown.length > 0 && (
                 <div>
-                  <p className="mb-1.5 text-2xs uppercase tracking-[.1em] text-ink-700">
+                  <p className="mb-1.5 text-2xs uppercase tracking-[.1em] text-ink-600">
                     {t("stats.outerRing")}
                   </p>
                   <div className="flex flex-wrap gap-x-3 gap-y-1">

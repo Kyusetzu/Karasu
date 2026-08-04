@@ -191,7 +191,7 @@ function ResultRow({
         <span className="h-12 w-8 shrink-0 rounded bg-surface-800" />
       )}
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-xs text-ink-200">
+        <span className="block truncate text-xs text-ink-300">
           {displayTitle(media.title)}
         </span>
         <span className="mt-0.5 block text-2xs text-ink-600">

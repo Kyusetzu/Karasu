@@ -500,7 +500,7 @@ function DetectedOffList({
       <p className="mb-1 text-[.6875rem] font-medium uppercase tracking-[.12em] text-ink-600">
         {t("library.detectedOffList")}
       </p>
-      <p className="mb-3 text-2xs text-ink-700">
+      <p className="mb-3 text-2xs text-ink-600">
         {t("library.detectedOffListHint")}
       </p>
       <div className="overflow-hidden rounded-xl border border-hair">
@@ -561,13 +561,13 @@ function SuggestionRow({
         {/* Both names, because judging the guess means comparing them. The
             parsed title alone cannot be checked and the suggestion alone hides
             what it was guessed from. */}
-        <span className="block truncate text-[.8125rem] text-ink-400">
+        <span className="block truncate text-[.8125rem] text-ink-500">
           {group.title}
           {group.season > 0 && (
             <span className="ml-1.5 text-2xs text-ink-600">S{group.season}</span>
           )}
-          <span className="mx-1.5 text-ink-700">→</span>
-          <span className="font-medium text-ink-200">
+          <span className="mx-1.5 text-ink-600">→</span>
+          <span className="font-medium text-ink-300">
             {media ? displayTitle(media.title) : `#${guess.mediaId}`}
           </span>
         </span>

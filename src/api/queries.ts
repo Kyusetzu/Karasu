@@ -1,4 +1,9 @@
 import { gql } from "./anilist";
+import {
+  normalizeDistribution,
+  toTenPoint,
+  type ScoreBucket,
+} from "@/lib/score";
 import { adultVars } from "@/lib/contentFilter";
 import type { Media, MediaListStatus, MediaTitle, MediaType } from "./types";
 
@@ -384,9 +389,50 @@ query ($id: Int!) {
   }
 }`;
 
-export async function userStatistics(userId: number) {
+/**
+ * Everything the statistics screen reads, on the app's ten-point scale.
+ *
+ * The endpoint mixes two scales and says so nowhere: `meanScore` and
+ * `standardDeviation` — top level and on every ranked row — are always
+ * AniList's internal hundred-point numbers, while the `scores` distribution
+ * arrives in whatever format the user has chosen to *see*. Normalizing here, at
+ * the boundary, is the only place a reader does not have to remember which of
+ * the two they are holding.
+ */
+function onTenPointScale(stats: AnimeStats | MangaStats) {
+  const rows = (entries: StatEntry[]) =>
+    entries.map((e) => ({ ...e, meanScore: toTenPoint(e.meanScore) }));
+  return {
+    ...stats,
+    meanScore: toTenPoint(stats.meanScore),
+    standardDeviation: toTenPoint(stats.standardDeviation),
+    genres: rows(stats.genres),
+    tags: rows(stats.tags),
+    staff: rows(stats.staff),
+    scores: normalizeDistribution(stats.scores as ScoreBucket[]) as Distribution[],
+  };
+}
+
+export async function userStatistics(userId: number): Promise<UserStats> {
   const data = await gql<{ User: UserStats }>(USER_STATS_QUERY, { id: userId });
-  return data.User;
+  const { anime, manga } = data.User.statistics;
+  return {
+    ...data.User,
+    statistics: {
+      anime: {
+        ...onTenPointScale(anime),
+        voiceActors: anime.voiceActors.map((e) => ({
+          ...e,
+          meanScore: toTenPoint(e.meanScore),
+        })),
+        studios: anime.studios.map((e) => ({
+          ...e,
+          meanScore: toTenPoint(e.meanScore),
+        })),
+      } as AnimeStats,
+      manga: onTenPointScale(manga) as MangaStats,
+    },
+  };
 }
 
 // --- Yearly wrap-up --------------------------------------------------------

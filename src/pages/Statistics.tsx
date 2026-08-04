@@ -418,6 +418,7 @@ function OverviewCharts({
     <div className="grid gap-4 lg:grid-cols-2">
       <ScoreColumns
         title={t("stats.scoreDist")}
+        hint={t("stats.scoreDistHint")}
         data={scores.map((d: Distribution) => ({
           score: d.score ?? 0,
           count: d.count,
@@ -532,9 +533,11 @@ function OverviewCharts({
  */
 function ScoreColumns({
   title,
+  hint,
   data,
 }: {
   title: string;
+  hint: string;
   data: { score: number; count: number }[];
 }) {
   if (data.length === 0) return null;
@@ -554,6 +557,7 @@ function ScoreColumns({
   return (
     <Card>
       <CardTitle>{title}</CardTitle>
+      <p className="mt-1 text-2xs text-ink-600">{hint}</p>
       <div className="mt-4 flex items-end gap-1.75">
         {steps.map((step) => {
           const count = by.get(step) ?? 0;
@@ -911,6 +915,13 @@ function fmt(n: number, locale: string): string {
 }
 
 /** AniList mean scores are on a 0–100 scale; show them rounded. */
+/**
+ * Scores read to one decimal, never rounded to a whole number.
+ *
+ * `userStatistics` hands these over already divided by ten, so rounding here
+ * would throw away the digit that division just made meaningful — a 7.1 and a
+ * 7.4 are the difference between two shelves of a list.
+ */
 function scoreText(score: number): string {
-  return score > 0 ? String(Math.round(score)) : "–";
+  return score > 0 ? score.toFixed(1) : "–";
 }

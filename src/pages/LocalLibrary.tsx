@@ -1,18 +1,23 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Link } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { ChevronDown, FolderOpen, Play, RefreshCw } from "lucide-react";
+import { ChevronDown, FolderOpen, HelpCircle, Play, RefreshCw, Wand2 } from "lucide-react";
 import { fetchMediaList, isTauri } from "@/api/anilist";
 import { displayTitle, type MediaListEntry } from "@/api/types";
 import {
+  clearLibraryMatch,
   getLibraryStatus,
+  getLibraryUnmatched,
   pickLibraryFolder,
   scanLibrary,
+  setLibraryMatch,
   setLibraryPath,
   type LibraryEntry,
   type LibraryFile,
+  type TitleKey,
 } from "@/api/library";
+import MatchPicker from "@/components/overlays/MatchPicker";
 import { useAuth } from "@/stores/auth";
 import { useLibrary } from "@/stores/library";
 import { useContentFilter } from "@/stores/contentFilter";
@@ -118,6 +123,40 @@ function LibraryView({ userId }: { userId: number }) {
     [entries, byMedia],
   );
 
+  // Files the scanner could not place. Kept in the cache next to the status so
+  // one rescan invalidates both.
+  const { data: unmatched, refetch: refetchUnmatched } = useQuery({
+    queryKey: ["libraryUnmatched"],
+    queryFn: getLibraryUnmatched,
+    enabled: isTauri,
+  });
+
+  // What the picker is currently open on: either a row being corrected or an
+  // unplaced group being assigned. One piece of state, because only one of
+  // them can be open at a time and two would let both be.
+  const [editing, setEditing] = useState<{
+    key: TitleKey;
+    current?: string;
+    hasOverride: boolean;
+  } | null>(null);
+
+  const applyMatch = useCallback(
+    async (mediaId: number) => {
+      if (!editing) return;
+      await setLibraryMatch(editing.key.title, editing.key.season, mediaId);
+      setEditing(null);
+      await Promise.all([refresh(), refetchStatus(), refetchUnmatched()]);
+    },
+    [editing, refresh, refetchStatus, refetchUnmatched],
+  );
+
+  const dropMatch = useCallback(async () => {
+    if (!editing) return;
+    await clearLibraryMatch(editing.key.title, editing.key.season);
+    setEditing(null);
+    await Promise.all([refresh(), refetchStatus(), refetchUnmatched()]);
+  }, [editing, refresh, refetchStatus, refetchUnmatched]);
+
   // The split is the screen's whole argument: one group is a list of things to
   // do tonight, the other is a list of things already done.
   const ready = rows.filter((r) => r.next);
@@ -129,6 +168,7 @@ function LibraryView({ userId }: { userId: number }) {
       await scanLibrary();
       await refresh();
       await refetchStatus();
+      await refetchUnmatched();
     } catch {
       /* the folder may be unset — Settings owns that flow */
     } finally {
@@ -194,7 +234,7 @@ function LibraryView({ userId }: { userId: number }) {
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-10">
-        {rows.length === 0 ? (
+        {rows.length === 0 && !unmatched?.length ? (
           <EmptyState
             visual={<FolderStack />}
             title={t("library.empty")}
@@ -207,25 +247,136 @@ function LibraryView({ userId }: { userId: number }) {
           />
         ) : (
           <>
-            <Group label={t("library.readyToPlay")} rows={ready} />
-            <Group label={t("library.upToDate")} rows={done} muted />
+            <Group
+              label={t("library.readyToPlay")}
+              rows={ready}
+              onCorrect={setEditing}
+            />
+            <Group
+              label={t("library.upToDate")}
+              rows={done}
+              muted
+              onCorrect={setEditing}
+            />
+            <Unplaced
+              groups={unmatched ?? []}
+              onAssign={(key) => setEditing({ key, hasOverride: false })}
+            />
           </>
         )}
       </div>
+
+      {editing && (
+        <MatchPicker
+          parsedTitle={editing.key.title}
+          season={editing.key.season}
+          current={editing.current}
+          onPick={applyMatch}
+          onClear={editing.hasOverride ? dropMatch : undefined}
+          onCancel={() => setEditing(null)}
+        />
+      )}
     </div>
   );
 }
 
+/**
+ * Files the scanner read but could not place.
+ *
+ * Before this they were simply absent — the screen listed what matched and
+ * said nothing about the rest, so a show missing from the library looked
+ * identical to a show that was never on disk. The count in the path row was the
+ * only hint that anything had been left behind, and it did not say what.
+ */
+function Unplaced({
+  groups,
+  onAssign,
+}: {
+  groups: { title: string; season: number; files: LibraryFile[] }[];
+  onAssign: (key: TitleKey) => void;
+}) {
+  const { t } = useTranslation();
+  const [expanded, setExpanded] = useState(false);
+  if (groups.length === 0) return null;
+
+  // A big library can leave dozens of these — usually extras and specials that
+  // legitimately match nothing. Showing every one by default would bury the
+  // part of the screen that works.
+  const shown = expanded ? groups : groups.slice(0, 5);
+
+  return (
+    <section className="pt-6">
+      <p className="mb-3 flex items-center gap-1.5 text-[.6875rem] font-medium uppercase tracking-[.12em] text-ink-600">
+        <HelpCircle className="size-3.25" />
+        {t("library.unplaced", { n: groups.length })}
+      </p>
+      <div className="overflow-hidden rounded-xl border border-hair">
+        {shown.map((group) => (
+          <div
+            key={`${group.title}:${group.season}`}
+            className="flex items-center gap-3.5 border-b border-surface-950 bg-surface-900 px-3.5 py-2 transition-surface last:border-b-0 hover:bg-surface-850"
+          >
+            <span className="grid h-13 w-8.75 shrink-0 place-items-center rounded-md bg-surface-800 text-ink-600">
+              <HelpCircle className="size-4" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[.8125rem] font-medium text-ink-300">
+                {group.title}
+                {group.season > 0 && (
+                  <span className="ml-1.5 text-2xs text-ink-600">
+                    S{group.season}
+                  </span>
+                )}
+              </span>
+              <span className="block truncate text-[.6875rem] text-ink-600">
+                {fileName(group.files[0]?.path ?? "")}
+              </span>
+            </span>
+            <span className="shrink-0 text-2xs tabular-nums text-ink-600">
+              {t("library.fileCount", { n: group.files.length })}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="shrink-0"
+              onClick={() => onAssign({ title: group.title, season: group.season })}
+            >
+              <Wand2 className="size-3" />
+              {t("library.assign")}
+            </Button>
+          </div>
+        ))}
+      </div>
+      {groups.length > 5 && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="mt-2 text-2xs font-medium text-accent-400 hover:underline"
+        >
+          {expanded
+            ? t("library.showFewer")
+            : t("library.showAllUnplaced", { n: groups.length - 5 })}
+        </button>
+      )}
+    </section>
+  );
+}
+
+
+/** What opening the picker on a row needs to know. */
+type Correction = { key: TitleKey; current?: string; hasOverride: boolean };
 
 /** One captioned block of rows, in a single bordered container. */
 function Group({
   label,
   rows,
   muted = false,
+  onCorrect,
 }: {
   label: string;
   rows: Row[];
   muted?: boolean;
+  onCorrect: (c: Correction) => void;
 }) {
   if (rows.length === 0) return null;
   return (
@@ -235,7 +386,12 @@ function Group({
       </p>
       <div className="overflow-hidden rounded-xl border border-hair">
         {rows.map((row) => (
-          <LibraryRow key={row.lib.mediaId} row={row} muted={muted} />
+          <LibraryRow
+            key={row.lib.mediaId}
+            row={row}
+            muted={muted}
+            onCorrect={onCorrect}
+          />
         ))}
       </div>
     </section>
@@ -244,7 +400,15 @@ function Group({
 
 const fileName = (path: string) => path.split(/[\\/]/).pop() ?? path;
 
-function LibraryRow({ row, muted }: { row: Row; muted: boolean }) {
+function LibraryRow({
+  row,
+  muted,
+  onCorrect,
+}: {
+  row: Row;
+  muted: boolean;
+  onCorrect: (c: Correction) => void;
+}) {
   const { t } = useTranslation();
   const playEpisode = useLibrary((s) => s.playEpisode);
   const [open, setOpen] = useState(false);
@@ -257,6 +421,10 @@ function LibraryRow({ row, muted }: { row: Row; muted: boolean }) {
   // was never given.
   const scored = lib.score > 0;
   const exact = lib.score >= EXACT;
+  // A row can be the merge of several parsed titles. Correcting it means
+  // correcting the parse that produced it, so with more than one there is no
+  // single answer — offer the first, which is the one the sort put on top.
+  const source = lib.sources?.[0];
 
   return (
     <div className="border-b border-surface-950 bg-surface-900 transition-surface last:border-b-0 hover:bg-surface-850">
@@ -301,15 +469,45 @@ function LibraryRow({ row, muted }: { row: Row; muted: boolean }) {
           <ChevronDown className={cn("size-3 transition-transform", open && "rotate-180")} />
         </button>
 
-        <span
-          className={cn(
-            "w-22 shrink-0 text-right text-xs",
-            exact ? "text-ink-500" : "text-gold",
-          )}
-          title={scored ? `${Math.round(lib.score * 100)}%` : undefined}
-        >
-          {scored ? t(exact ? "library.matchExact" : "library.matchClose") : ""}
-        </span>
+        {/* The match, and the way to disagree with it. A confidence the user
+            cannot act on is just a number; the button is what makes saying
+            "close" worth the width it takes.
+            A row with no source parse — one restored from an index written
+            before corrections existed — has nothing to key a correction on, so
+            it stays a label until the next scan gives it one. */}
+        {source ? (
+          <button
+            type="button"
+            onClick={() =>
+              onCorrect({ key: source, current: title, hasOverride: lib.manual })
+            }
+            title={t("library.correctHint", { title: source.title })}
+            className={cn(
+              "group/match w-24 shrink-0 rounded-md px-1.5 py-1 text-right text-xs transition-surface hover:bg-surface-800",
+              lib.manual ? "text-accent-400" : exact ? "text-ink-500" : "text-gold",
+            )}
+          >
+            <span className="group-hover/match:hidden">
+              {lib.manual
+                ? t("library.matchManual")
+                : scored
+                  ? t(exact ? "library.matchExact" : "library.matchClose")
+                  : t("library.correct")}
+            </span>
+            <span className="hidden text-accent-400 group-hover/match:inline">
+              {t("library.correct")}
+            </span>
+          </button>
+        ) : (
+          <span
+            className={cn(
+              "w-24 shrink-0 px-1.5 text-right text-xs",
+              exact ? "text-ink-500" : "text-gold",
+            )}
+          >
+            {scored ? t(exact ? "library.matchExact" : "library.matchClose") : ""}
+          </span>
+        )}
 
         {next ? (
           <>

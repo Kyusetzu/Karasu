@@ -24,7 +24,7 @@ const FILES = import.meta.glob("/src/**/*.{ts,tsx}", {
 // running the app, so the literal ones are what this covers.
 const CALL = /\bt\(\s*"([a-zA-Z0-9_.]+)"/g;
 
-// `src/i18n.ts` initialises i18next on import, which reads the browser's
+// `src/i18n/index.ts` initialises i18next on import, which reads the browser's
 // language preference and the saved override. The suite runs in node, so both
 // have to exist before the module is pulled in — hence the dynamic import.
 let en: unknown;

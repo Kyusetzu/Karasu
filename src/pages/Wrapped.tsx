@@ -97,26 +97,36 @@ function loadMark(): Promise<HTMLImageElement | null> {
   return markPromise;
 }
 
+/** How tall the mark is for a given width, from its own aspect. */
+const markHeight = (mark: HTMLImageElement, size: number) =>
+  size * (mark.naturalHeight / mark.naturalWidth || 978.44 / 890.73);
+
 /**
  * The corvid, in full colour — the same art the app shows, not a silhouette of
  * it. Drawn from the SVG so the poster's bird and the titlebar's are one file.
+ *
+ * Placed by its **centre**, not its top-left corner. Corner placement is what
+ * put the watermark off the poster: the call site asked for a 42em bird 20em
+ * from the right edge, which left 48% of it — the head, and only the head — on
+ * the canvas, cropped at both edges. Rotating about a corner then walks the art
+ * sideways as a side effect of the angle, which is the same bug in miniature.
  */
 function drawMark(
   ctx: CanvasRenderingContext2D,
   mark: HTMLImageElement | null,
-  x: number,
-  y: number,
+  cx: number,
+  cy: number,
   size: number,
   alpha: number,
   rotateDeg = 0,
 ) {
   if (!mark) return;
-  const h = size * (mark.naturalHeight / mark.naturalWidth || 978.44 / 890.73);
+  const h = markHeight(mark, size);
   ctx.save();
   ctx.globalAlpha = alpha;
-  ctx.translate(x, y);
+  ctx.translate(cx, cy);
   if (rotateDeg) ctx.rotate((rotateDeg * Math.PI) / 180);
-  ctx.drawImage(mark, 0, 0, size, h);
+  ctx.drawImage(mark, -size / 2, -h / 2, size, h);
   ctx.restore();
 }
 
@@ -450,7 +460,9 @@ function drawCard(
       height: u(6),
       paint: (y) => {
         const size = u(1.6);
-        drawMark(ctx, mark, P, y + u(0.7), size, 1);
+        // Centre-placed like the watermark, so the two calls mean the same
+        // thing: the row's own middle, half a mark in from the margin.
+        drawMark(ctx, mark, P + size / 2, y + u(1.5), size, 1);
         ctx.textAlign = "left";
         ctx.textBaseline = "alphabetic";
         ctx.fillStyle = INK_DIM;
@@ -545,10 +557,14 @@ function drawCard(
   ctx.fillRect(0, 0, W, 1);
 
   // The mark bleeds off the bottom-right corner, painted before the content so
-  // the text sits over it. The art is mostly near-black — a third of it is the
-  // gradient that catches light — so the alpha is higher than a watermark
-  // usually wants: at .16 the bird was arithmetically invisible on this ground.
-  drawMark(ctx, mark, W - em * 20, H - em * 22, em * 42, 0.34, -7);
+  // the text sits over it. Its centre sits 0.4 of the art in from each edge, so
+  // nine tenths of the bird is on the poster and only the corner it is meant to
+  // run off actually runs off. The alpha is higher than a watermark usually
+  // wants because the art is mostly near-black — at .16 it was arithmetically
+  // invisible on this ground.
+  const markW = em * 42;
+  const markH = mark ? markHeight(mark, markW) : 0;
+  drawMark(ctx, mark, W - markW * 0.4, H - markH * 0.4, markW, 0.34, -7);
 
   // Centred, so a card that cannot quite fill its crop is framed by the ground
   // rather than hanging from the top edge.

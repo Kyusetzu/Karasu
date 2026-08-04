@@ -6,7 +6,7 @@ import {
   type MediaListStatus,
   type MediaType,
 } from "@/api/types";
-import ConfirmDialog from "@/components/ConfirmDialog";
+import ConfirmDialog from "@/components/overlays/ConfirmDialog";
 import { Button } from "@/components/ui/button";
 import { FilterSelect } from "@/components/ui/filter-select";
 import { cn } from "@/lib/utils";

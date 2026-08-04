@@ -32,13 +32,13 @@ import {
   type MediaType,
 } from "@/api/types";
 import { useListMutations } from "@/hooks/useListMutations";
-import EntryEditModal from "@/components/EntryEditModal";
+import EntryEditModal from "@/components/media/EntryEditModal";
 import { CoverGridSkeleton } from "@/components/Skeleton";
-import ConfirmDialog from "@/components/ConfirmDialog";
-import { isTyping } from "@/components/KeyboardSheet";
+import ConfirmDialog from "@/components/overlays/ConfirmDialog";
+import { isTyping } from "@/components/shell/KeyboardSheet";
 import { nextFocus, type Move } from "@/lib/roving";
-import RandomPickModal from "@/components/RandomPickModal";
-import PresetModal from "@/components/PresetModal";
+import RandomPickModal from "@/components/overlays/RandomPickModal";
+import PresetModal from "@/components/overlays/PresetModal";
 import { loadPresets, savePresets, type Preset } from "@/lib/presets";
 import { collectTags, tagsOf } from "@/lib/tags";
 import { searchHaystack } from "@/lib/search";

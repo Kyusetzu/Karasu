@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { Pill } from "@/components/ui/pill";
 import { ScoreBars } from "@/components/ui/score-bars";
-import TagEditor from "@/components/TagEditor";
+import TagEditor from "@/components/media/TagEditor";
 import { parseNotes, serializeNotes } from "@/lib/tags";
 
 export interface EditableMedia {

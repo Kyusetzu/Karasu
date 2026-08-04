@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useTranslation } from "react-i18next";
 import { Minus, Square, X } from "lucide-react";
-import Bell from "@/components/Bell";
-import DetectionPill from "@/components/DetectionPill";
+import Bell from "@/components/shell/Bell";
+import DetectionPill from "@/components/shell/DetectionPill";
 import KarasuMark from "@/components/KarasuMark";
 import { appVersion, isTauri } from "@/api/anilist";
 

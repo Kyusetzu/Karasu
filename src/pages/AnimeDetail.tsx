@@ -30,13 +30,13 @@ import { useAuth } from "@/stores/auth";
 import { useLibrary } from "@/stores/library";
 import { useContentFilter } from "@/stores/contentFilter";
 import { isBlocked } from "@/lib/contentFilter";
-import BackButton from "@/components/BackButton";
+import BackButton from "@/components/shell/BackButton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Pill } from "@/components/ui/pill";
 import { ScoreBars } from "@/components/ui/score-bars";
-import TagEditor from "@/components/TagEditor";
+import TagEditor from "@/components/media/TagEditor";
 import { parseNotes, serializeNotes } from "@/lib/tags";
 
 /** AniList descriptions: strip spoilers, allow only harmless tags. */

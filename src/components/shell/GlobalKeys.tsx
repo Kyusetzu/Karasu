@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { isTyping } from "@/components/KeyboardSheet";
+import { isTyping } from "@/components/shell/KeyboardSheet";
 
 /**
  * The global shortcut group.

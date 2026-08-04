@@ -8,7 +8,7 @@ import { displayTitle, type MediaListEntry, type MediaType } from "@/api/types";
 import { useContentFilter } from "@/stores/contentFilter";
 import { isBlocked } from "@/lib/contentFilter";
 import { pickSeeds, rankRecommendations } from "@/lib/recommend";
-import MediaCard from "@/components/MediaCard";
+import MediaCard from "@/components/media/MediaCard";
 
 /** Below this the suggestions are too thin to be worth a section. */
 const MIN_SEEDS = 3;

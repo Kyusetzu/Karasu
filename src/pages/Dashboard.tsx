@@ -11,21 +11,21 @@ import { isBlocked } from "@/lib/contentFilter";
 import { useListMutations } from "@/hooks/useListMutations";
 import { SectionHeader } from "@/components/ui/section-header";
 import { IconButton } from "@/components/ui/icon-button";
-import { TitleLockup } from "@/components/TitleLockup";
-import { CoverCell, CoverMeta } from "@/components/CoverCell";
+import { TitleLockup } from "@/components/media/TitleLockup";
+import { CoverCell, CoverMeta } from "@/components/media/CoverCell";
 import {
   EmptyState,
   PerchRule,
   TickMarks,
 } from "@/components/EmptyState";
-import FirstRun from "@/components/FirstRun";
+import FirstRun from "@/components/shell/FirstRun";
 import {
   CoverGridSkeleton,
   HeaderSkeleton,
   Shimmer,
 } from "@/components/Skeleton";
-import NowPlayingCard from "@/components/NowPlayingCard";
-import RecommendedSection from "@/components/RecommendedSection";
+import NowPlayingCard from "@/components/media/NowPlayingCard";
+import RecommendedSection from "@/components/media/RecommendedSection";
 
 export default function Dashboard() {
   const viewer = useAuth((s) => s.viewer);

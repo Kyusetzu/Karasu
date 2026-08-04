@@ -5,7 +5,7 @@ import { Search as SearchIcon } from "lucide-react";
 import { searchMedia } from "@/api/queries";
 import type { MediaType } from "@/api/types";
 import { Input } from "@/components/ui/input";
-import MediaCard from "@/components/MediaCard";
+import MediaCard from "@/components/media/MediaCard";
 import { isTauri } from "@/api/anilist";
 import { adultQueryArg, isBlocked } from "@/lib/contentFilter";
 import { useContentFilter } from "@/stores/contentFilter";

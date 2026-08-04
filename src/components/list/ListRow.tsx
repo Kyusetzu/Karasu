@@ -5,7 +5,7 @@ import { CheckCheck, Pencil, Play, Plus } from "lucide-react";
 import { useLibrary } from "@/stores/library";
 import { maxProgress, type MediaListEntry } from "@/api/types";
 import { IconButton } from "@/components/ui/icon-button";
-import { TitleLockup } from "@/components/TitleLockup";
+import { TitleLockup } from "@/components/media/TitleLockup";
 import { cn } from "@/lib/utils";
 import { SelectBox } from "./SelectBox";
 import { TagChips } from "./TagChips";

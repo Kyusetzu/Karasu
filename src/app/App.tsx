@@ -14,14 +14,14 @@ import {
   getTextScale,
   getUpdateCheckAuto,
 } from "@/api/anilist";
-import Titlebar from "@/components/Titlebar";
-import Sidebar from "@/components/Sidebar";
-import Toast from "@/components/Toast";
-import CommandPalette from "@/components/CommandPalette";
-import KeyboardSheet from "@/components/KeyboardSheet";
-import GlobalKeys from "@/components/GlobalKeys";
-import ContextMenu from "@/components/ContextMenu";
-import SignInMerge from "@/components/SignInMerge";
+import Titlebar from "@/components/shell/Titlebar";
+import Sidebar from "@/components/shell/Sidebar";
+import Toast from "@/components/shell/Toast";
+import CommandPalette from "@/components/shell/CommandPalette";
+import KeyboardSheet from "@/components/shell/KeyboardSheet";
+import GlobalKeys from "@/components/shell/GlobalKeys";
+import ContextMenu from "@/components/shell/ContextMenu";
+import SignInMerge from "@/components/overlays/SignInMerge";
 import Dashboard from "@/pages/Dashboard";
 import MediaList from "@/pages/MediaList";
 import Search from "@/pages/Search";

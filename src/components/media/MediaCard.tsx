@@ -4,14 +4,14 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Check, Pencil, Plus } from "lucide-react";
 import { IconButton } from "@/components/ui/icon-button";
-import { TitleLockup } from "@/components/TitleLockup";
-import { CoverCell, CoverMeta } from "@/components/CoverCell";
+import { TitleLockup } from "@/components/media/TitleLockup";
+import { CoverCell, CoverMeta } from "@/components/media/CoverCell";
 import { saveListEntry } from "@/api/anilist";
 
 import { formatLabel } from "@/lib/format";
 import type { MediaWithListStatus } from "@/api/queries";
 import { useAuth } from "@/stores/auth";
-import EntryEditModal, { type EntrySaveInput } from "@/components/EntryEditModal";
+import EntryEditModal, { type EntrySaveInput } from "@/components/media/EntryEditModal";
 
 /**
  * Card for discovery grids (search, season): quick add and full editing

@@ -1,15 +1,11 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Capability for the main window",
+  "description": "Capability for the main window. Only what the WebView itself calls: notification, dialog and updater are driven from Rust (alerts/notify.rs, commands/system.rs and library.rs, commands/update.rs), and Tauri 2 enforces this ACL at the IPC boundary alone, so granting them here gave the page a door it never needed and the Rust side nothing. opener:allow-open-url is already inside opener:default.",
   "windows": ["main"],
   "permissions": [
     "core:default",
     "opener:default",
-    "opener:allow-open-url",
-    "notification:default",
-    "dialog:default",
-    "updater:default",
     "core:window:allow-minimize",
     "core:window:allow-unminimize",
     "core:window:allow-toggle-maximize",

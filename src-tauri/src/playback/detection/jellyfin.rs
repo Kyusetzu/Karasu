@@ -223,6 +223,24 @@ fn str_field(v: &serde_json::Value, name: &str) -> String {
         .to_string()
 }
 
+/// The one client both calls share.
+///
+/// `reqwest::Client` owns the connection pool, so building it inline dropped
+/// the pool with the future — and detection polls every 5 seconds, forever.
+/// That is a fresh TCP handshake ~17k times a day, plus a rebuilt rustls config
+/// and root store on an https server, for a request that should be riding a
+/// kept-alive connection. Per-request timeouts still work on a shared client,
+/// which matters because the two callers want different ones.
+fn http() -> &'static reqwest::Client {
+    static HTTP: std::sync::OnceLock<reqwest::Client> = std::sync::OnceLock::new();
+    HTTP.get_or_init(|| {
+        reqwest::Client::builder()
+            .user_agent(concat!("Karasu/", env!("CARGO_PKG_VERSION")))
+            .build()
+            .expect("reqwest client")
+    })
+}
+
 /// GET a JSON endpoint on the configured server, as the signed-in user.
 async fn get_json(
     cfg: &JellyfinConfig,
@@ -232,7 +250,7 @@ async fn get_json(
     if base.is_empty() || cfg.token.is_empty() {
         return Err("Sign in to your Jellyfin server first".into());
     }
-    let resp = reqwest::Client::new()
+    let resp = http()
         .get(format!("{base}{path}"))
         .header(
             "Authorization",
@@ -300,7 +318,7 @@ pub async fn authenticate(
     if username.trim().is_empty() {
         return Err("Enter your Jellyfin username".into());
     }
-    let resp = reqwest::Client::new()
+    let resp = http()
         .post(format!("{base}/Users/AuthenticateByName"))
         .header("Authorization", auth_header(device, device_id, None))
         .header("Content-Type", "application/json")

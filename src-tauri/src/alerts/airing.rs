@@ -11,6 +11,10 @@ use tauri::{AppHandle, Manager};
 const CHECK_INTERVAL: Duration = Duration::from_secs(20 * 60);
 /// Let the list cache populate before the first check.
 const STARTUP_DELAY: Duration = Duration::from_secs(30);
+/// Must equal the `perPage` in `AIRING_QUERY`; a test pins the two together.
+/// Getting a full page back is the only signal that the answer was truncated —
+/// the query asks for no `pageInfo`.
+const PAGE_SIZE: usize = 50;
 
 const AIRING_QUERY: &str = "
 query ($ids: [Int], $from: Int, $to: Int) {
@@ -115,14 +119,21 @@ async fn check(app: &AppHandle) {
 
     let level = crate::commands::read_content_filter(&db);
 
-    for sched in data
+    let page: &[Value] = data
         .pointer("/Page/airingSchedules")
         .and_then(|v| v.as_array())
-        .into_iter()
-        .flatten()
-    {
+        .map(|v| v.as_slice())
+        .unwrap_or(&[]);
+    // How far this run actually got. `sort: TIME` is ascending, so a full page
+    // is the *oldest* 50 in the window and the newest are the ones missing.
+    let mut reached = last;
+
+    for sched in page {
         let episode = sched.get("episode").and_then(|v| v.as_i64()).unwrap_or(0);
         let media_id = sched.pointer("/media/id").and_then(|v| v.as_i64()).unwrap_or(0);
+        // Before the dedupe: a schedule that was skipped was still *seen*, and
+        // the checkpoint is about what the window covered, not what it notified.
+        reached = reached.max(sched.get("airingAt").and_then(|v| v.as_i64()).unwrap_or(0));
         let key = format!("aired:{media_id}:{episode}");
         if db.kv_get(&key).is_some() {
             continue; // already notified
@@ -143,5 +154,29 @@ async fn check(app: &AppHandle) {
         let _ = db.kv_set(&key, "1");
     }
 
-    let _ = db.kv_set("airing_last_check", &now.to_string());
+    // A full page means the answer was cut off, and moving the checkpoint to
+    // `now` would step over every episode past the fiftieth — permanently, since
+    // no `aired:` key was written for them and no later window reaches back.
+    // Stopping at the last one seen lets the 20-minute interval drain the
+    // backlog instead. `airingAt_greater` is strictly greater, so the -1 keeps
+    // any schedule sharing that second; the `aired:` keys absorb the overlap.
+    let checkpoint = if page.len() >= PAGE_SIZE { reached.saturating_sub(1) } else { now };
+    let _ = db.kv_set("airing_last_check", &checkpoint.to_string());
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The truncation check reads a page length against `PAGE_SIZE`, and the
+    /// page length is whatever the query asked for. Nothing else ties them
+    /// together, so lowering `perPage` for a rate-limit tune would silently
+    /// turn the checkpoint back into the bug it fixes: never full, always `now`.
+    #[test]
+    fn the_page_size_matches_the_query_that_produces_it() {
+        assert!(
+            AIRING_QUERY.contains(&format!("perPage: {PAGE_SIZE}")),
+            "AIRING_QUERY no longer asks for {PAGE_SIZE} results per page",
+        );
+    }
 }

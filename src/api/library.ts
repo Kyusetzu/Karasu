@@ -9,6 +9,15 @@ export interface LibraryEntry {
   mediaId: number;
   episodes: number[];
   files: LibraryFile[];
+  /** Matcher confidence, 0–1. 1 is the exact-title short circuit. */
+  score: number;
+}
+
+export interface LibraryStatus {
+  path: string | null;
+  /** Video files the last scan walked past, matched or not. */
+  filesSeen: number;
+  matched: number;
 }
 
 export interface ScanSummary {
@@ -24,6 +33,8 @@ export const pickLibraryFolder = () =>
   invoke<string | null>("pick_library_folder");
 export const getLibraryIndex = () =>
   invoke<LibraryEntry[]>("get_library_index");
+export const getLibraryStatus = () =>
+  invoke<LibraryStatus>("get_library_status");
 export const scanLibrary = () => invoke<ScanSummary>("scan_library");
 export const playNext = (mediaId: number) =>
   invoke<void>("play_next", { mediaId });

@@ -122,8 +122,8 @@ registers as an update.
 
 **`latest.json` spells the commit number as semver build metadata**
 (`0.23.2+90`), not as a fourth dotted segment — see
-`scripts/generate-update-manifest.ps1`. `tauri-plugin-updater` parses that field
-with `semver::Version::from_str`, which rejects `0.23.2.90` outright and makes
+`scripts/release/generate-update-manifest.ps1`. `tauri-plugin-updater` parses
+that field with `semver::Version::from_str`, which rejects `0.23.2.90` outright and makes
 every install fail with *"unexpected character '.' after patch version number"*.
 
 That fix alone isn't enough, so `download_pending_update` also supplies an

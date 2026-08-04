@@ -9,7 +9,7 @@ use super::*;
 
 /// Monotonic commit counter — the 4th version segment
 /// (`MAJOR.MINOR.PATCH.COMMIT#`). Bumped by one on every commit.
-pub const COMMIT_NUMBER: u32 = 167;
+pub const COMMIT_NUMBER: u32 = 168;
 
 /// Full four-part display version, e.g. `0.1.1.38`. The `MAJOR.MINOR.PATCH`
 /// core comes from the crate version (kept in sync across the manifests).
@@ -114,7 +114,7 @@ pub async fn check_for_updates(db: State<'_, Db>, force: bool) -> Result<UpdateI
     // The prerelease channel publishes to a rolling tag literally called
     // "latest", which `version_gt` parses as 0 — so a tag-based comparison can
     // never report an update. The manifest carries the real four-part version
-    // (see scripts/generate-update-manifest.ps1) and is what the updater
+    // (see scripts/release/generate-update-manifest.ps1) and is what the updater
     // downloads from anyway.
     let resp = reqwest::Client::new()
         .get(update_channel_manifest_url(&channel))

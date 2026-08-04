@@ -38,7 +38,13 @@ function sourceFiles() {
   const api = readdirSync(apiDir)
     .filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts"))
     .map((f) => join(apiDir, f));
-  return [...api, join(ROOT, "src-tauri/src/commands.rs")];
+  // The Rust queries used to share one commands.rs; read the whole module so
+  // LIST_QUERY and friends stay reachable wherever they end up living.
+  const cmdDir = join(ROOT, "src-tauri/src/commands");
+  const rust = readdirSync(cmdDir)
+    .filter((f) => f.endsWith(".rs"))
+    .map((f) => join(cmdDir, f));
+  return [...api, ...rust];
 }
 
 /**
@@ -115,7 +121,7 @@ try {
   process.exit(1);
 }
 if (!found) {
-  console.error(`no const named ${name} in src/api/*.ts or commands.rs`);
+  console.error(`no const named ${name} in src/api/*.ts or src-tauri/src/commands/*.rs`);
   process.exit(1);
 }
 

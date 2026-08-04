@@ -7,9 +7,15 @@
 
 $ErrorActionPreference = "Stop"
 
-$repoRoot = Split-Path -Parent $PSScriptRoot
+# Two levels: scripts/release/ -> scripts/ -> repo root. Nothing here runs
+# outside CI, so a wrong root surfaces minutes into a release build; check it
+# rather than letting Get-ChildItem report a path nobody recognises.
+$repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+if (-not (Test-Path (Join-Path $repoRoot "package.json"))) {
+    throw "Repo root resolved to '$repoRoot', which holds no package.json -- did this script move?"
+}
 $bundleDir = Join-Path $repoRoot "src-tauri/target/release/bundle/nsis"
-$commandsRs = Join-Path $repoRoot "src-tauri/src/commands.rs"
+$commandsRs = Join-Path $repoRoot "src-tauri/src/commands/update.rs"
 $packageJson = Join-Path $repoRoot "package.json"
 
 $installer = Get-ChildItem -Path $bundleDir -Filter "*.exe" |

@@ -1,7 +1,7 @@
 {
   "name": "karasu",
   "private": true,
-  "version": "0.51.9",
+  "version": "0.51.10",
   "type": "module",
   "author": "Kyu",
   "license": "MIT",
@@ -14,7 +14,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "tauri": "tauri",
-    "tauri:build": "tauri build && powershell -ExecutionPolicy Bypass -File scripts/rename-installer.ps1"
+    "tauri:build": "tauri build && powershell -ExecutionPolicy Bypass -File scripts/release/rename-installer.ps1"
   },
   "dependencies": {
     "@fontsource/kosugi-maru": "^5.3.0",

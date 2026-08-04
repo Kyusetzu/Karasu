@@ -8,7 +8,8 @@
  *   node scripts/bump-version.mjs --print   report the version, change nothing
  *
  * The scheme is MAJOR.MINOR.PATCH.COMMIT# (see CLAUDE.md). The semver core
- * lives in three manifests, the commit counter in commands.rs, and Cargo.lock
+ * lives in three manifests, the commit counter in commands/update.rs, and
+ * Cargo.lock
  * carries a copy of the core that cargo would otherwise only fix up on its next
  * run — five edits that used to be made by hand on every single commit.
  *
@@ -30,7 +31,9 @@ const PACKAGE_JSON = join(ROOT, "package.json");
 const TAURI_CONF = join(ROOT, "src-tauri/tauri.conf.json");
 const CARGO_TOML = join(ROOT, "src-tauri/Cargo.toml");
 const CARGO_LOCK = join(ROOT, "src-tauri/Cargo.lock");
-const COMMANDS_RS = join(ROOT, "src-tauri/src/commands.rs");
+// The counter sits with the updater, which is the only thing that reads it
+// at runtime — see `version_comparator` there.
+const COMMANDS_RS = join(ROOT, "src-tauri/src/commands/update.rs");
 
 /** Every path this script writes, for the "did anything else change" guard. */
 const VERSION_FILES = [
@@ -79,7 +82,7 @@ function readCurrent() {
   );
   if (!core) fail("could not read the version from package.json");
   const commit = readFileSync(COMMANDS_RS, "utf8").match(COMMIT_NUMBER);
-  if (!commit) fail("could not read COMMIT_NUMBER from commands.rs");
+  if (!commit) fail("could not read COMMIT_NUMBER from commands/update.rs");
   return { core: core[1], commit: Number(commit[1]) };
 }
 

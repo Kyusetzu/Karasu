@@ -218,8 +218,8 @@ running version is shown in the About window.
 ### Shared application IDs
 
 Karasu ships with a built-in AniList client ID and Discord application ID (see
-`BUILTIN_ANILIST_CLIENT_ID` in `src-tauri/src/commands.rs` and
-`BUILTIN_DISCORD_APP_ID` in `src-tauri/src/discord/mod.rs`), so users don't need
+`BUILTIN_ANILIST_CLIENT_ID` in `src-tauri/src/commands/auth.rs` and
+`BUILTIN_DISCORD_APP_ID` in `src-tauri/src/discord.rs`), so users don't need
 to register anything themselves. Discord uses the built-in application. If you
 build with your own AniList API client, set its redirect URL to
 `http://localhost:46231/callback` so the one-click login works.

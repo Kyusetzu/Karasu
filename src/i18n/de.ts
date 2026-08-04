@@ -459,6 +459,12 @@ export const de: typeof en = {
     assign: "Zuordnen",
     showAllUnplaced: "{{n}} weitere zeigen",
     showFewer: "Weniger zeigen",
+    filterUnplaced: "Nach Titel filtern…",
+    noUnplacedMatch: "Dazu passt hier nichts.",
+    addToList: "Zur Liste",
+    notOnListHint:
+      "Nicht auf deiner AniList — die Dateien laufen, aber es wird nichts übertragen, bis du sie hinzufügst.",
+    correctFailed: "Die Korrektur konnte nicht gespeichert werden.",
     pickTitle: "Welcher Titel ist das?",
     parsedAs: 'Aus dem Dateinamen gelesen als „{{title}}"{{season}}',
     searchAniList: "AniList durchsuchen…",

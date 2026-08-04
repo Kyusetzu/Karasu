@@ -12,8 +12,14 @@ interface LibraryState {
   episodes: Record<number, number[]>;
   /** The full index, for the library page (titles are joined in the UI). */
   entries: LibraryEntry[];
-  /** Last playback failure, surfaced globally so every call site reports it. */
+  /** Last library failure, surfaced globally so every call site reports it. */
   error: string | null;
+  /**
+   * Report a failure from outside the store. Playback sets `error` on its own,
+   * but a manual match is just as capable of failing and had no channel to say
+   * so — App already renders this one, so a second would only compete with it.
+   */
+  setError: (message: string) => void;
   refresh: () => Promise<void>;
   /** Whether an episode beyond `progress` exists locally. */
   hasNext: (mediaId: number, progress: number) => boolean;
@@ -67,5 +73,6 @@ export const useLibrary = create<LibraryState>((set, get) => ({
     }
   },
 
+  setError: (message) => set({ error: message }),
   clearError: () => set({ error: null }),
 }));

@@ -456,6 +456,12 @@ export const en = {
     assign: "Assign",
     showAllUnplaced: "Show {{n}} more",
     showFewer: "Show fewer",
+    filterUnplaced: "Filter by title…",
+    noUnplacedMatch: "Nothing here matches that.",
+    addToList: "Add to list",
+    notOnListHint:
+      "Not on your AniList — these files play, but nothing is scrobbled until you add it.",
+    correctFailed: "That correction couldn't be saved.",
     pickTitle: "Which title is this?",
     parsedAs: 'Read from the filename as "{{title}}"{{season}}',
     searchAniList: "Search AniList…",

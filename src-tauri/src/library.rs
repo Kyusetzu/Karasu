@@ -464,16 +464,16 @@ pub fn set_library_match(
     app: AppHandle,
     title: String,
     season: i32,
-    #[allow(non_snake_case)] mediaId: i64,
+    media_id: i64,
 ) -> Result<Vec<LibraryEntry>, String> {
     let db = app.state::<Db>();
-    db.library_override_set(&title, season, mediaId)?;
+    db.library_override_set(&title, season, media_id)?;
 
     let state = app.state::<LibraryIndex>();
     let mut guard = state.0.lock().unwrap();
     for f in &mut guard.files {
         if f.title == title && f.season == season {
-            f.media_id = Some(mediaId);
+            f.media_id = Some(media_id);
             f.score = 1.0;
             f.manual = true;
         }

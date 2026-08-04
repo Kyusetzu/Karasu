@@ -2,9 +2,20 @@ import { useCallback, useMemo, useState } from "react";
 import { Link } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { ChevronDown, FolderOpen, HelpCircle, Play, RefreshCw, Wand2 } from "lucide-react";
+import {
+  ChevronDown,
+  FolderOpen,
+  HelpCircle,
+  Play,
+  RefreshCw,
+  Search,
+  Wand2,
+} from "lucide-react";
 import { fetchMediaList, isTauri } from "@/api/anilist";
-import { displayTitle, type MediaListEntry } from "@/api/types";
+import { mediaByIds } from "@/api/queries";
+import { displayTitle, type Media, type MediaListEntry } from "@/api/types";
+import { missingIds } from "@/lib/chunk";
+import { useListMutations } from "@/hooks/useListMutations";
 import {
   clearLibraryMatch,
   getLibraryStatus,
@@ -66,7 +77,14 @@ export default function LocalLibrary() {
 
 interface Row {
   lib: LibraryEntry;
-  entry: MediaListEntry;
+  media: Media;
+  /**
+   * The list entry, when there is one. A manual match can point files at a
+   * title the user has never added — indeed that is the usual case, since a
+   * title absent from the list is exactly what the matcher could not place —
+   * and such a row has no progress, no status and nothing to scrobble against.
+   */
+  entry: MediaListEntry | null;
   /** The first file past the user's progress, if there is one. */
   next: LibraryFile | null;
 }
@@ -75,6 +93,7 @@ function LibraryView({ userId }: { userId: number }) {
   const { t } = useTranslation();
   const entries = useLibrary((s) => s.entries);
   const refresh = useLibrary((s) => s.refresh);
+  const setError = useLibrary((s) => s.setError);
   const level = useContentFilter((s) => s.level);
   const [scanning, setScanning] = useState(false);
 
@@ -106,21 +125,58 @@ function LibraryView({ userId }: { userId: number }) {
     return map;
   }, [data, level]);
 
+  // Every id the list holds, blocked ones included. `byMedia` cannot answer
+  // "is this on the list?" because a content-filtered title is deliberately
+  // missing from it — asking that one would send us to AniList to fetch the
+  // very titles the filter exists to keep off this screen.
+  const onList = useMemo(() => {
+    const ids = new Set<number>();
+    for (const group of data?.lists ?? []) {
+      if (group.isCustomList) continue;
+      for (const e of group.entries) ids.add(e.mediaId);
+    }
+    return ids;
+  }, [data]);
+
+  // Library ids with no cached list entry. Sorted and de-duplicated, because
+  // this array is a query key: an unsorted one reshuffles on every render and
+  // mints a fresh key each time, which defeats the cache it is meant to use.
+  const offList = useMemo(
+    () => missingIds(entries.map((e) => e.mediaId), onList),
+    [entries, onList],
+  );
+
+  const { data: fetched } = useQuery({
+    queryKey: ["libraryMedia", offList],
+    queryFn: () => mediaByIds(offList),
+    enabled: offList.length > 0,
+    staleTime: 30 * 60 * 1000,
+  });
+
+  const byId = useMemo(
+    () => new Map((fetched ?? []).map((m) => [m.id, m])),
+    [fetched],
+  );
+
   const rows = useMemo<Row[]>(
     () =>
       entries
         .flatMap((lib) => {
-          const entry = byMedia.get(lib.mediaId);
-          if (!entry) return [];
-          const next = lib.files.find((f) => f.episode > entry.progress) ?? null;
-          return [{ lib, entry, next }];
+          const entry = byMedia.get(lib.mediaId) ?? null;
+          // A row needs a title to draw. It comes from the list when the title
+          // is on it and from AniList directly when it is not; only an id that
+          // AniList itself does not know leaves us with nothing to show.
+          const media = entry?.media ?? byId.get(lib.mediaId);
+          if (!media) return [];
+          if (isBlocked(media, level)) return [];
+          const progress = entry?.progress ?? 0;
+          const next = lib.files.find((f) => f.episode > progress) ?? null;
+          return [{ lib, media, entry, next }];
         })
         .sort((a, b) =>
-          displayTitle(a.entry.media.title).localeCompare(
-            displayTitle(b.entry.media.title),
-          ),
+          displayTitle(a.media.title).localeCompare(displayTitle(b.media.title)),
         ),
-    [entries, byMedia],
+    [entries, byMedia, byId, level],
   );
 
   // Files the scanner could not place. Kept in the cache next to the status so
@@ -140,22 +196,52 @@ function LibraryView({ userId }: { userId: number }) {
     hasOverride: boolean;
   } | null>(null);
 
-  const applyMatch = useCallback(
-    async (mediaId: number) => {
-      if (!editing) return;
-      await setLibraryMatch(editing.key.title, editing.key.season, mediaId);
-      setEditing(null);
-      await Promise.all([refresh(), refetchStatus(), refetchUnmatched()]);
+  // A correction that fails must not look like one that did nothing. Both of
+  // these used to let a rejected command fall on the floor: the dialog stayed
+  // open, no row moved, and there was no way to tell a backend error from a
+  // successful no-op.
+  const runCorrection = useCallback(
+    async (work: () => Promise<unknown>) => {
+      try {
+        await work();
+        setEditing(null);
+        await Promise.all([refresh(), refetchStatus(), refetchUnmatched()]);
+      } catch (e) {
+        setError(typeof e === "string" ? e : t("library.correctFailed"));
+      }
     },
-    [editing, refresh, refetchStatus, refetchUnmatched],
+    [refresh, refetchStatus, refetchUnmatched, setError, t],
   );
 
-  const dropMatch = useCallback(async () => {
-    if (!editing) return;
-    await clearLibraryMatch(editing.key.title, editing.key.season);
-    setEditing(null);
-    await Promise.all([refresh(), refetchStatus(), refetchUnmatched()]);
-  }, [editing, refresh, refetchStatus, refetchUnmatched]);
+  const applyMatch = useCallback(
+    (mediaId: number) =>
+      runCorrection(() =>
+        editing
+          ? setLibraryMatch(editing.key.title, editing.key.season, mediaId)
+          : Promise.resolve(),
+      ),
+    [editing, runCorrection],
+  );
+
+  const dropMatch = useCallback(
+    () =>
+      runCorrection(() =>
+        editing
+          ? clearLibraryMatch(editing.key.title, editing.key.season)
+          : Promise.resolve(),
+      ),
+    [editing, runCorrection],
+  );
+
+  // Adding a corrected title to the list is what makes it trackable: the
+  // scrobbler builds its candidates from the cached list (`candidates_from_cache`),
+  // so a title that is not on it can be played from here all evening and never
+  // record a thing.
+  const { save } = useListMutations(userId, "ANIME");
+  const addToList = useCallback(
+    (mediaId: number) => save.mutate({ mediaId, status: "PLANNING" }),
+    [save],
+  );
 
   // The split is the screen's whole argument: one group is a list of things to
   // do tonight, the other is a list of things already done.
@@ -251,12 +337,14 @@ function LibraryView({ userId }: { userId: number }) {
               label={t("library.readyToPlay")}
               rows={ready}
               onCorrect={setEditing}
+              onAdd={addToList}
             />
             <Group
               label={t("library.upToDate")}
               rows={done}
               muted
               onCorrect={setEditing}
+              onAdd={addToList}
             />
             <Unplaced
               groups={unmatched ?? []}
@@ -297,19 +385,48 @@ function Unplaced({
 }) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
+  const [filter, setFilter] = useState("");
+
+  const matching = useMemo(() => {
+    const q = filter.trim().toLowerCase();
+    return q ? groups.filter((g) => g.title.toLowerCase().includes(q)) : groups;
+  }, [groups, filter]);
+
   if (groups.length === 0) return null;
 
-  // A big library can leave dozens of these — usually extras and specials that
-  // legitimately match nothing. Showing every one by default would bury the
-  // part of the screen that works.
-  const shown = expanded ? groups : groups.slice(0, 5);
+  // A real library leaves over a hundred of these — mostly extras, specials and
+  // one-off files that legitimately match nothing. Showing them all buries the
+  // part of the screen that works, and showing five means correcting one just
+  // promotes the next into view, which reads as nothing having happened.
+  // Filtering is how you reach a specific show without either.
+  const shown = expanded || filter ? matching : matching.slice(0, 5);
+  const hidden = matching.length - shown.length;
 
   return (
     <section className="pt-6">
-      <p className="mb-3 flex items-center gap-1.5 text-[.6875rem] font-medium uppercase tracking-[.12em] text-ink-600">
-        <HelpCircle className="size-3.25" />
-        {t("library.unplaced", { n: groups.length })}
-      </p>
+      <div className="mb-3 flex items-center gap-3">
+        <p className="flex items-center gap-1.5 text-[.6875rem] font-medium uppercase tracking-[.12em] text-ink-600">
+          <HelpCircle className="size-3.25" />
+          {t("library.unplaced", { n: groups.length })}
+        </p>
+        {groups.length > 5 && (
+          <div className="relative ml-auto w-56">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3 -translate-y-1/2 text-ink-600" />
+            <input
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              placeholder={t("library.filterUnplaced")}
+              className="h-7 w-full rounded-md border border-surface-800 bg-surface-900 pl-7 pr-2 text-2xs text-ink-200 placeholder:text-ink-600 focus:border-accent-500 focus:outline-none"
+            />
+          </div>
+        )}
+      </div>
+
+      {matching.length === 0 && (
+        <p className="rounded-xl border border-hair px-3.5 py-4 text-center text-xs text-ink-600">
+          {t("library.noUnplacedMatch")}
+        </p>
+      )}
       <div className="overflow-hidden rounded-xl border border-hair">
         {shown.map((group) => (
           <div
@@ -347,7 +464,7 @@ function Unplaced({
           </div>
         ))}
       </div>
-      {groups.length > 5 && (
+      {!filter && (hidden > 0 || expanded) && (
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
@@ -355,7 +472,7 @@ function Unplaced({
         >
           {expanded
             ? t("library.showFewer")
-            : t("library.showAllUnplaced", { n: groups.length - 5 })}
+            : t("library.showAllUnplaced", { n: hidden })}
         </button>
       )}
     </section>
@@ -372,11 +489,13 @@ function Group({
   rows,
   muted = false,
   onCorrect,
+  onAdd,
 }: {
   label: string;
   rows: Row[];
   muted?: boolean;
   onCorrect: (c: Correction) => void;
+  onAdd: (mediaId: number) => void;
 }) {
   if (rows.length === 0) return null;
   return (
@@ -391,6 +510,7 @@ function Group({
             row={row}
             muted={muted}
             onCorrect={onCorrect}
+            onAdd={onAdd}
           />
         ))}
       </div>
@@ -404,16 +524,17 @@ function LibraryRow({
   row,
   muted,
   onCorrect,
+  onAdd,
 }: {
   row: Row;
   muted: boolean;
   onCorrect: (c: Correction) => void;
+  onAdd: (mediaId: number) => void;
 }) {
   const { t } = useTranslation();
   const playEpisode = useLibrary((s) => s.playEpisode);
   const [open, setOpen] = useState(false);
-  const { lib, entry, next } = row;
-  const { media } = entry;
+  const { lib, media, entry, next } = row;
   const title = displayTitle(media.title);
   // A zero is not a bad match — it is *no* match on record. Only a scan writes
   // confidences, so an index carried over from a build before they existed has
@@ -452,12 +573,29 @@ function LibraryRow({
           {/* The file, not a summary of it. This is the one screen where the
               name on disk is the thing being talked about. */}
           <span className="block truncate text-[.6875rem] text-ink-600">
-            {next ? fileName(next.path) : t("library.watchedOf", {
-              progress: entry.progress,
-              total: media.episodes ?? lib.episodes.length,
-            })}
+            {next
+              ? fileName(next.path)
+              : t("library.watchedOf", {
+                  progress: entry?.progress ?? 0,
+                  total: media.episodes ?? lib.episodes.length,
+                })}
           </span>
         </span>
+
+        {/* Not on the list, so nothing here scrobbles: the scrobbler builds its
+            candidates from the cached list and cannot see this title at all.
+            The files still play — they just would not have recorded anything,
+            which is worth saying out loud rather than leaving to be noticed. */}
+        {!entry && (
+          <button
+            type="button"
+            onClick={() => onAdd(lib.mediaId)}
+            title={t("library.notOnListHint")}
+            className="shrink-0 rounded-md border border-surface-700 px-2 py-1 text-2xs text-ink-500 transition-surface hover:border-accent-500 hover:text-accent-400"
+          >
+            {t("library.addToList")}
+          </button>
+        )}
 
         <button
           type="button"
@@ -536,7 +674,10 @@ function LibraryRow({
       {open && (
         <div className="flex flex-wrap gap-1.5 border-t border-surface-950 px-3.5 py-2.5 pl-[3.9375rem]">
           {lib.files.map((file) => {
-            const watched = file.episode <= entry.progress;
+            // No list entry means no recorded progress, so nothing counts as
+            // watched — every episode is offered as unseen rather than the
+            // whole season being greyed out on a progress of zero it never had.
+            const watched = file.episode <= (entry?.progress ?? 0);
             return (
               <button
                 key={file.episode}

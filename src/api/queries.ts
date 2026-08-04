@@ -5,6 +5,7 @@ import {
   type ScoreBucket,
 } from "@/lib/score";
 import { adultVars } from "@/lib/contentFilter";
+import { chunk } from "@/lib/chunk";
 import type { Media, MediaListStatus, MediaTitle, MediaType } from "./types";
 
 /** Media fields for discovery grids, including the user's own list entry. */
@@ -97,6 +98,40 @@ export async function seasonalAnime(
     Page: { pageInfo: { hasNextPage: boolean }; media: MediaWithListStatus[] };
   }>(SEASONAL_QUERY, { season, year, page, ...adultVars(isAdult) });
   return data.Page;
+}
+
+// --- Media by id -----------------------------------------------------------
+
+const MEDIA_BY_IDS_QUERY = `
+query ($ids: [Int]) {
+  Page(perPage: 50) {
+    media(id_in: $ids) {
+      ${MEDIA_FIELDS}
+    }
+  }
+}`;
+
+/**
+ * Media for a set of ids, batched into pages of 50.
+ *
+ * The local library can hold titles that are not on the user's list — a manual
+ * match points files at whatever they choose, and the whole reason a title
+ * needed correcting is usually that it was never on the list for the matcher to
+ * find. Those rows have no cached list entry to draw from, so the media is
+ * fetched directly.
+ *
+ * Relations are deliberately absent: `loadFranchise` asks for the same ids with
+ * a relations tree attached and that query is expensive. This one only needs
+ * enough to draw a row.
+ */
+export async function mediaByIds(ids: number[]): Promise<Media[]> {
+  if (ids.length === 0) return [];
+  const pages = await Promise.all(
+    chunk(ids).map((batch) =>
+      gql<{ Page: { media: Media[] } }>(MEDIA_BY_IDS_QUERY, { ids: batch }),
+    ),
+  );
+  return pages.flatMap((p) => p.Page.media);
 }
 
 // --- Recommendations -------------------------------------------------------

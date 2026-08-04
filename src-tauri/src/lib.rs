@@ -3,6 +3,7 @@ mod anilist;
 mod commands;
 mod db;
 mod discord;
+mod identify;
 mod library;
 mod playback;
 mod portable;

@@ -29,6 +29,13 @@ export interface UnmatchedGroup {
   title: string;
   season: number;
   files: LibraryFile[];
+  /**
+   * What AniList thinks this is. Unconfirmed — a search hit is a weaker claim
+   * than a match against the user's own list, and open search returns
+   * *something* for almost any input. `null` when nothing scored well enough,
+   * which is what puts a group in the failed section.
+   */
+  suggestion: { mediaId: number; score: number } | null;
 }
 
 export interface LibraryStatus {

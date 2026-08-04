@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import {
+  Check,
   ChevronDown,
   FolderOpen,
   HelpCircle,
@@ -27,6 +28,7 @@ import {
   type LibraryEntry,
   type LibraryFile,
   type TitleKey,
+  type UnmatchedGroup,
 } from "@/api/library";
 import MatchPicker from "@/components/overlays/MatchPicker";
 import { useAuth } from "@/stores/auth";
@@ -187,6 +189,36 @@ function LibraryView({ userId }: { userId: number }) {
     enabled: isTauri,
   });
 
+  // A group with a suggestion is something AniList recognised; without one it
+  // is a genuine failure. The two get their own sections, because "we think
+  // this is Hunter x Hunter, confirm?" and "we have no idea what this is" are
+  // different questions and only one of them has an answer to check.
+  const suggested = useMemo(
+    () => (unmatched ?? []).filter((g) => g.suggestion),
+    [unmatched],
+  );
+  const failed = useMemo(
+    () => (unmatched ?? []).filter((g) => !g.suggestion),
+    [unmatched],
+  );
+
+  // Covers and titles for the suggested media, fetched the same way the
+  // off-list rows are.
+  const suggestedIds = useMemo(
+    () => missingIds(suggested.map((g) => g.suggestion!.mediaId), new Set()),
+    [suggested],
+  );
+  const { data: suggestedMedia } = useQuery({
+    queryKey: ["librarySuggestedMedia", suggestedIds],
+    queryFn: () => mediaByIds(suggestedIds),
+    enabled: suggestedIds.length > 0,
+    staleTime: 30 * 60 * 1000,
+  });
+  const suggestedById = useMemo(
+    () => new Map((suggestedMedia ?? []).map((m) => [m.id, m])),
+    [suggestedMedia],
+  );
+
   // What the picker is currently open on: either a row being corrected or an
   // unplaced group being assigned. One piece of state, because only one of
   // them can be open at a time and two would let both be.
@@ -233,6 +265,15 @@ function LibraryView({ userId }: { userId: number }) {
     [editing, runCorrection],
   );
 
+  // Accepting a suggestion is an ordinary correction — the same command, the
+  // same override row. The only difference is that the answer came from a
+  // search rather than from the picker.
+  const confirmSuggestion = useCallback(
+    (key: TitleKey, mediaId: number) =>
+      runCorrection(() => setLibraryMatch(key.title, key.season, mediaId)),
+    [runCorrection],
+  );
+
   // Adding a corrected title to the list is what makes it trackable: the
   // scrobbler builds its candidates from the cached list (`candidates_from_cache`),
   // so a title that is not on it can be played from here all evening and never
@@ -243,10 +284,13 @@ function LibraryView({ userId }: { userId: number }) {
     [save],
   );
 
-  // The split is the screen's whole argument: one group is a list of things to
-  // do tonight, the other is a list of things already done.
-  const ready = rows.filter((r) => r.next);
-  const done = rows.filter((r) => !r.next);
+  // On the list, split into a list of things to do tonight and a list of
+  // things already done. Titles that resolved but were never added are a
+  // different state entirely and get their own section below.
+  const onListRows = rows.filter((r) => r.entry);
+  const ready = onListRows.filter((r) => r.next);
+  const done = onListRows.filter((r) => !r.next);
+  const offListRows = rows.filter((r) => !r.entry);
 
   const rescan = async () => {
     setScanning(true);
@@ -346,8 +390,17 @@ function LibraryView({ userId }: { userId: number }) {
               onCorrect={setEditing}
               onAdd={addToList}
             />
+            <DetectedOffList
+              rows={offListRows}
+              suggestions={suggested}
+              media={suggestedById}
+              onCorrect={setEditing}
+              onAdd={addToList}
+              onConfirm={confirmSuggestion}
+              onReject={(key) => setEditing({ key, hasOverride: false })}
+            />
             <Unplaced
-              groups={unmatched ?? []}
+              groups={failed}
               onAssign={(key) => setEditing({ key, hasOverride: false })}
             />
           </>
@@ -369,7 +422,145 @@ function LibraryView({ userId }: { userId: number }) {
 }
 
 /**
- * Files the scanner read but could not place.
+ * Titles that resolved to an AniList show you have not added.
+ *
+ * Two kinds of row live here, and the difference is who decided. Confirmed
+ * ones — corrections you made, suggestions you accepted — are ordinary rows
+ * that play. Unconfirmed suggestions are greyed: AniList answered, but open
+ * search returns *something* for almost any input, and its top hit for
+ * "digimon" is a 2005 film rather than the series. Nothing moves until you say
+ * so.
+ */
+function DetectedOffList({
+  rows,
+  suggestions,
+  media,
+  onCorrect,
+  onAdd,
+  onConfirm,
+  onReject,
+}: {
+  rows: Row[];
+  suggestions: UnmatchedGroup[];
+  media: Map<number, Media>;
+  onCorrect: (c: Correction) => void;
+  onAdd: (mediaId: number) => void;
+  onConfirm: (key: TitleKey, mediaId: number) => void;
+  onReject: (key: TitleKey) => void;
+}) {
+  const { t } = useTranslation();
+  if (rows.length === 0 && suggestions.length === 0) return null;
+
+  return (
+    <section className="pt-6">
+      <p className="mb-1 text-[.6875rem] font-medium uppercase tracking-[.12em] text-ink-600">
+        {t("library.detectedOffList")}
+      </p>
+      <p className="mb-3 text-2xs text-ink-700">
+        {t("library.detectedOffListHint")}
+      </p>
+      <div className="overflow-hidden rounded-xl border border-hair">
+        {rows.map((row) => (
+          <LibraryRow
+            key={row.lib.mediaId}
+            row={row}
+            muted={false}
+            onCorrect={onCorrect}
+            onAdd={onAdd}
+          />
+        ))}
+        {suggestions.map((group) => (
+          <SuggestionRow
+            key={`${group.title}:${group.season}`}
+            group={group}
+            media={media.get(group.suggestion!.mediaId)}
+            onConfirm={onConfirm}
+            onReject={onReject}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/** One unconfirmed guess, shown greyed until it is accepted. */
+function SuggestionRow({
+  group,
+  media,
+  onConfirm,
+  onReject,
+}: {
+  group: UnmatchedGroup;
+  media: Media | undefined;
+  onConfirm: (key: TitleKey, mediaId: number) => void;
+  onReject: (key: TitleKey) => void;
+}) {
+  const { t } = useTranslation();
+  const key = { title: group.title, season: group.season };
+  const guess = group.suggestion!;
+  const exact = guess.score >= EXACT;
+
+  return (
+    <div className="flex items-center gap-3.5 border-b border-surface-950 bg-surface-900/60 px-3.5 py-2 transition-surface last:border-b-0 hover:bg-surface-850">
+      <div className="h-13 w-8.75 shrink-0 overflow-hidden rounded-md bg-surface-800 opacity-60">
+        {media?.coverImage.large && (
+          <img
+            src={media.coverImage.large}
+            alt=""
+            loading="lazy"
+            className="size-full object-cover"
+          />
+        )}
+      </div>
+
+      <span className="min-w-0 flex-1">
+        {/* Both names, because judging the guess means comparing them. The
+            parsed title alone cannot be checked and the suggestion alone hides
+            what it was guessed from. */}
+        <span className="block truncate text-[.8125rem] text-ink-400">
+          {group.title}
+          {group.season > 0 && (
+            <span className="ml-1.5 text-2xs text-ink-600">S{group.season}</span>
+          )}
+          <span className="mx-1.5 text-ink-700">→</span>
+          <span className="font-medium text-ink-200">
+            {media ? displayTitle(media.title) : `#${guess.mediaId}`}
+          </span>
+        </span>
+        <span className="block truncate text-[.6875rem] text-ink-600">
+          {t("library.fileCount", { n: group.files.length })}
+        </span>
+      </span>
+
+      <span
+        className={cn("shrink-0 text-xs", exact ? "text-ink-500" : "text-gold")}
+        title={`${Math.round(guess.score * 100)}%`}
+      >
+        {t(exact ? "library.matchExact" : "library.matchClose")}
+      </span>
+
+      <Button
+        variant="outline"
+        size="sm"
+        className="shrink-0"
+        onClick={() => onReject(key)}
+      >
+        {t("library.notThis")}
+      </Button>
+      <Button
+        size="sm"
+        className="shrink-0"
+        onClick={() => onConfirm(key, guess.mediaId)}
+      >
+        <Check className="size-3" />
+        {t("library.confirm")}
+      </Button>
+    </div>
+  );
+}
+
+/**
+ * Files the scanner read but could not place at all.
  *
  * Before this they were simply absent — the screen listed what matched and
  * said nothing about the rest, so a show missing from the library looked

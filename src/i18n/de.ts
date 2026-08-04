@@ -455,7 +455,12 @@ export const de: typeof en = {
     correctHint:
       'Zugeordnet über „{{title}}" — klicken, um etwas anderes zu wählen',
     fileCount: "{{n}} Dateien",
-    unplaced: "Nicht zuzuordnen ({{n}})",
+    detectedOffList: "Erkannt, aber nicht auf der Liste",
+    detectedOffListHint:
+      "Karasu hat diese auf AniList gefunden. Bestätige einen Vorschlag und füge den Titel hinzu, um ihn zu verfolgen.",
+    confirm: "Bestätigen",
+    notThis: "Falsch",
+    unplaced: "Erkennung / AniList-Zuordnung fehlgeschlagen ({{n}})",
     assign: "Zuordnen",
     showAllUnplaced: "{{n}} weitere zeigen",
     showFewer: "Weniger zeigen",

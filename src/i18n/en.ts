@@ -452,7 +452,12 @@ export const en = {
     correct: "Correct…",
     correctHint: 'Matched from "{{title}}" — click to point it somewhere else',
     fileCount: "{{n}} files",
-    unplaced: "Couldn't place these ({{n}})",
+    detectedOffList: "Detected but not on the list",
+    detectedOffListHint:
+      "Karasu found these on AniList. Confirm a guess to keep it, then add the title to start tracking.",
+    confirm: "Confirm",
+    notThis: "Not this",
+    unplaced: "Failed to detect / match with AniList ({{n}})",
     assign: "Assign",
     showAllUnplaced: "Show {{n}} more",
     showFewer: "Show fewer",

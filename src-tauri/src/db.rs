@@ -161,6 +161,26 @@ CREATE TABLE IF NOT EXISTS library_unmatched (
 PRAGMA user_version = 9;
 ";
 
+/// What AniList thinks an unplaceable title is, pending the user's agreement.
+///
+/// The local matcher can only ever search the cached list, so a show that was
+/// never added is outside its universe entirely — no filename is clean enough
+/// to be found. A scan now asks AniList about the leftovers, but a search hit
+/// is a weaker thing than a match against a known list: searching "Pokemon"
+/// returns *something* whether or not it is the right something. So these are
+/// stored as suggestions and applied only when confirmed, at which point they
+/// become an ordinary `library_override` row and this table stops mattering.
+const MIGRATION_V10: &str = "
+CREATE TABLE IF NOT EXISTS library_suggestion (
+  title TEXT NOT NULL,
+  season INTEGER NOT NULL,
+  media_id INTEGER NOT NULL,
+  score REAL NOT NULL,
+  PRIMARY KEY (title, season)
+);
+PRAGMA user_version = 10;
+";
+
 /// One in-app notification (mirrors a shown desktop toast).
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct NotificationRow {
@@ -242,6 +262,10 @@ impl Db {
         if version < 9 {
             conn.execute_batch(MIGRATION_V9)
                 .map_err(|e| format!("Migration v9 failed: {e}"))?;
+        }
+        if version < 10 {
+            conn.execute_batch(MIGRATION_V10)
+                .map_err(|e| format!("Migration v10 failed: {e}"))?;
         }
         Ok(Db(Mutex::new(conn)))
     }
@@ -721,6 +745,46 @@ impl Db {
             .unwrap_or_default()
     }
 
+    /// AniList's guess at each unplaceable title, with its score.
+    pub fn library_suggestions(&self) -> Vec<(String, i32, i64, f64)> {
+        let conn = self.0.lock().unwrap();
+        conn.prepare("SELECT title, season, media_id, score FROM library_suggestion")
+            .and_then(|mut stmt| {
+                stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))
+                    .map(|rows| rows.filter_map(Result::ok).collect())
+            })
+            .unwrap_or_default()
+    }
+
+    /// Replaces the suggestions in one transaction. Scan output, like the
+    /// unplaced files — and like them, `library_override` is left alone: a
+    /// confirmed correction outranks anything a later search comes up with.
+    pub fn library_replace_suggestions(
+        &self,
+        rows: &[(String, i32, i64, f64)],
+    ) -> Result<(), String> {
+        let mut conn = self.0.lock().unwrap();
+        let tx = conn
+            .transaction()
+            .map_err(|e| format!("Library write failed: {e}"))?;
+        tx.execute("DELETE FROM library_suggestion", [])
+            .map_err(|e| format!("Library write failed: {e}"))?;
+        {
+            let mut stmt = tx
+                .prepare(
+                    "INSERT OR REPLACE INTO library_suggestion (title, season, media_id, score)
+                     VALUES (?1, ?2, ?3, ?4)",
+                )
+                .map_err(|e| format!("Library write failed: {e}"))?;
+            for (title, season, media_id, score) in rows {
+                stmt.execute(rusqlite::params![title, season, media_id, score])
+                    .map_err(|e| format!("Library write failed: {e}"))?;
+            }
+        }
+        tx.commit()
+            .map_err(|e| format!("Library write failed: {e}"))
+    }
+
     /// Replaces the unplaced files in one transaction.
     ///
     /// `library_override` is deliberately untouched: it is the user's, not the
@@ -769,7 +833,24 @@ mod tests {
         conn.execute_batch(MIGRATION_V7).unwrap();
         conn.execute_batch(MIGRATION_V8).unwrap();
         conn.execute_batch(MIGRATION_V9).unwrap();
+        conn.execute_batch(MIGRATION_V10).unwrap();
         Db(Mutex::new(conn))
+    }
+
+    /// A suggestion is the scan's opinion and a correction is the user's, so a
+    /// rescan may replace all of the former and none of the latter.
+    #[test]
+    fn a_rescan_replaces_suggestions_but_never_corrections() {
+        let db = mem_db();
+        db.library_override_set("hunter x hunter", -1, 136).unwrap();
+        db.library_replace_suggestions(&[("digimon".into(), 1, 552, 0.91)])
+            .unwrap();
+        assert_eq!(db.library_suggestions(), vec![("digimon".into(), 1, 552, 0.91)]);
+
+        db.library_replace_suggestions(&[("sailor moon".into(), -1, 530, 1.0)])
+            .unwrap();
+        assert_eq!(db.library_suggestions(), vec![("sailor moon".into(), -1, 530, 1.0)]);
+        assert_eq!(db.library_overrides(), vec![("hunter x hunter".into(), -1, 136)]);
     }
 
     /// A correction is the user's answer and has to outlive the scan that

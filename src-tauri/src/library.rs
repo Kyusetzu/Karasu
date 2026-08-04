@@ -4,6 +4,7 @@
 //! and a reason to use the app over the website.
 
 use crate::db::Db;
+use crate::identify;
 use crate::playback::recognition::{matcher, parser};
 use crate::playback::scrobbler::candidates_from_cache;
 use std::collections::HashMap;
@@ -47,6 +48,10 @@ pub struct LibraryData {
     /// that reads them is the screen, and it reads the summary.
     summary: Vec<LibraryEntry>,
     unmatched: Vec<UnmatchedGroup>,
+    /// AniList's guesses, keyed the same way everything else here is. Held
+    /// separately from the groups because `reindex` rebuilds those from
+    /// scratch on every correction and would otherwise drop the lot.
+    suggestions: HashMap<(String, i32), Suggested>,
 }
 
 impl LibraryData {
@@ -94,7 +99,8 @@ impl LibraryData {
             .into_iter()
             .map(|((title, season), mut files)| {
                 files.sort_unstable_by_key(|f| f.episode);
-                UnmatchedGroup { title, season, files }
+                let suggestion = self.suggestions.get(&(title.clone(), season)).cloned();
+                UnmatchedGroup { title, season, files, suggestion }
             })
             .collect();
         // Most files first: the folder with a season in it is the one worth
@@ -128,6 +134,17 @@ pub struct UnmatchedGroup {
     pub title: String,
     pub season: i32,
     pub files: Vec<LibraryFile>,
+    /// What AniList thinks this is, if it was asked and answered convincingly.
+    /// Unconfirmed: the screen shows it greyed and the user decides. A search
+    /// hit is a weaker claim than a match against a list the user curated.
+    pub suggestion: Option<Suggested>,
+}
+
+#[derive(Clone, serde::Serialize)]
+pub struct Suggested {
+    #[serde(rename = "mediaId")]
+    pub media_id: i64,
+    pub score: f64,
 }
 
 pub struct LibraryIndex(pub Mutex<LibraryData>);
@@ -237,35 +254,80 @@ pub fn get_library_index(state: State<'_, LibraryIndex>) -> Vec<LibraryEntry> {
 /// "scanning" spinner could not even animate, because the thread that would
 /// have animated it was doing the scan.
 #[tauri::command(async)]
-pub fn scan_library(app: AppHandle) -> Result<ScanSummary, String> {
-    let db = app.state::<Db>();
-    let root = db
-        .kv_get("library_path")
-        .filter(|p| !p.is_empty())
-        .ok_or("No library folder set")?;
-
-    let candidates = candidates_from_cache(&db, "ANIME");
-    if candidates.is_empty() {
-        return Err("Load your anime list first, then scan".into());
-    }
+pub async fn scan_library(app: AppHandle) -> Result<ScanSummary, String> {
+    let (root, candidates, overrides) = {
+        let db = app.state::<Db>();
+        let root = db
+            .kv_get("library_path")
+            .filter(|p| !p.is_empty())
+            .ok_or("No library folder set")?;
+        let candidates = candidates_from_cache(&db, "ANIME");
+        if candidates.is_empty() {
+            return Err("Load your anime list first, then scan".into());
+        }
+        (root, candidates, override_map(&db))
+    };
 
     let mut files = Vec::new();
     collect_videos(Path::new(&root), 0, &mut files);
     let total = files.len();
 
-    let overrides = override_map(&db);
     let mut data = LibraryData {
         files: index_files(&files, &candidates, &overrides),
         ..Default::default()
     };
     data.reindex();
 
-    // Persist so the index survives a restart — without this every relaunch
-    // drops the library and the play buttons disappear until a manual rescan.
-    persist(&db, &data)?;
-    // The count of files *walked* is not derivable from the index — most of
-    // them matched nothing — so it is stored rather than recomputed.
-    db.kv_set("library_files_seen", &total.to_string())?;
+    // Whatever the list could not place, AniList is asked about directly.
+    // (See below for why this sits between indexing and publishing.) This
+    // is the only way an off-list show is ever identified: the matcher above
+    // searches the cached list and nothing else, so a title that was never
+    // added cannot be found there however clean its filename is.
+    //
+    // Deliberately between indexing and publishing, and deliberately holding no
+    // lock: `LibraryIndex` is a `std::sync::Mutex` and its guard must not be
+    // alive across an `.await`.
+    let unknown: Vec<identify::Unidentified> = data
+        .unmatched
+        .iter()
+        .map(|g| identify::Unidentified { title: g.title.clone(), season: g.season })
+        .collect();
+    let suggestions = if unknown.is_empty() {
+        Vec::new()
+    } else {
+        let api = app.state::<crate::anilist::client::AniList>();
+        let token = crate::anilist::auth::load_token();
+        identify::identify(&api, token.as_deref(), &unknown).await
+    };
+
+    {
+        let db = app.state::<Db>();
+        // Persist so the index survives a restart — without this every relaunch
+        // drops the library and the play buttons disappear until a manual rescan.
+        persist(&db, &data)?;
+        db.library_replace_suggestions(
+            &suggestions
+                .iter()
+                .map(|s| (s.title.clone(), s.season, s.media_id, s.score))
+                .collect::<Vec<_>>(),
+        )?;
+        // The count of files *walked* is not derivable from the index — most of
+        // them matched nothing — so it is stored rather than recomputed.
+        db.kv_set("library_files_seen", &total.to_string())?;
+    }
+
+    data.suggestions = suggestions
+        .iter()
+        .map(|s| {
+            (
+                (s.title.clone(), s.season),
+                Suggested { media_id: s.media_id, score: s.score },
+            )
+        })
+        .collect();
+    // Cheap second pass: only the unplaced groups change, and it keeps the
+    // suggestion in one place rather than patched onto the groups afterwards.
+    data.reindex();
 
     let summary = data.summary.clone();
     let matched = summary.len();
@@ -431,7 +493,19 @@ pub fn hydrate(app: &AppHandle) {
         ScannedFile { title, season, episode, path, media_id: None, score: 0.0, manual: false }
     }));
 
-    let mut data = LibraryData { files, ..Default::default() };
+    let mut data = LibraryData {
+        files,
+        // Restored rather than re-fetched: identification costs AniList
+        // requests and a restart is not new information.
+        suggestions: db
+            .library_suggestions()
+            .into_iter()
+            .map(|(title, season, media_id, score)| {
+                ((title, season), Suggested { media_id, score })
+            })
+            .collect(),
+        ..Default::default()
+    };
     data.reindex();
     let state = app.state::<LibraryIndex>();
     *state.0.lock().unwrap() = data;

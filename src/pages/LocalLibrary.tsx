@@ -21,7 +21,12 @@ import { Button } from "@/components/ui/button";
 import { EmptyState, FolderStack } from "@/components/EmptyState";
 import { cn } from "@/lib/utils";
 
-/** Above this the matcher hit the title exactly; below it, it guessed. */
+/**
+ * Above this the matcher hit the title exactly; below it, it guessed.
+ *
+ * `best_match_prepared` returns exactly `1.0` from its string-equality short
+ * circuit, so this is a test for that branch rather than a tolerance.
+ */
 const EXACT = 0.999;
 
 /**
@@ -246,6 +251,11 @@ function LibraryRow({ row, muted }: { row: Row; muted: boolean }) {
   const { lib, entry, next } = row;
   const { media } = entry;
   const title = displayTitle(media.title);
+  // A zero is not a bad match — it is *no* match on record. Only a scan writes
+  // confidences, so an index carried over from a build before they existed has
+  // none, and calling that "close" would be the screen inventing a judgement it
+  // was never given.
+  const scored = lib.score > 0;
   const exact = lib.score >= EXACT;
 
   return (
@@ -296,9 +306,9 @@ function LibraryRow({ row, muted }: { row: Row; muted: boolean }) {
             "w-22 shrink-0 text-right text-xs",
             exact ? "text-ink-500" : "text-gold",
           )}
-          title={`${Math.round(lib.score * 100)}%`}
+          title={scored ? `${Math.round(lib.score * 100)}%` : undefined}
         >
-          {t(exact ? "library.matchExact" : "library.matchClose")}
+          {scored ? t(exact ? "library.matchExact" : "library.matchClose") : ""}
         </span>
 
         {next ? (

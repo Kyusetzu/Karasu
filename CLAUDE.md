@@ -48,9 +48,9 @@ src/
   pages/             one per route; settings/ holds the seven panes
   stores/            Zustand stores (auth, theme, library, nowPlaying, …)
 src-tauri/src/
-  commands/          62 of the 70 frontend-facing commands, by subject:
+  commands/          62 of the 73 frontend-facing commands, by subject:
                      auth · list · playback · prefs · system · update. The
-                     other 8 are the library scanner's, in `library.rs`.
+                     other 11 are the library scanner's, in `library.rs`.
                      `mod.rs` re-exports all of it, so `commands::x` paths and
                      `generate_handler!` do not care which file a command is in
   playback/          the pipeline: detection/ (Win32 windows, SMTC, Jellyfin) →
@@ -60,6 +60,9 @@ src-tauri/src/
                      airing, sequel, stale, and notify itself
   anilist/           auth (token handling), API client
   db.rs              SQLite: PRAGMA user_version migrations + row helpers
+  identify.rs        the AniList search pass for titles the local matcher
+                     cannot place — 25 per request, capped at 8 requests a
+                     scan, scored by the same matcher
   discord.rs · library.rs · portable.rs
 scripts/             bump-version.mjs (every commit), anilist-query.mjs
                      (validate a query live); release/ holds the two PowerShell
@@ -99,8 +102,15 @@ of AniList's own list fields, it costs nothing to carry, and the local list has
 stored it since schema v7. The rejected idea is tracking **purchases**, which
 would need price data the app has no source for.
 
-The schema is at **v8**; `library_match` holds the scanner's per-title match
-confidence, which is what the local library's `exact` / `close` column reads.
+The schema is at **v10**. `library_match` (v8) holds the scanner's per-title
+match confidence, which is what the local library's `exact` / `close` column
+reads. v9 adds `library_override` — the user's corrections, keyed on the parsed
+`(title, season)` with `season = -1` for a release name that carried none, and
+never cleared by a scan — plus `library_unmatched`, so the unplaced list
+survives a restart. v10 adds `library_suggestion`, AniList's guess for a title
+the matcher cannot place; it is applied only once confirmed, at which point it
+becomes an ordinary override and the row reads `yours` rather than
+`exact`/`close`.
 
 ## Versioning (every commit)
 

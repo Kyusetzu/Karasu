@@ -1,10 +1,5 @@
 import { tagsOf } from "@/lib/tags";
 import { cn } from "@/lib/utils";
-/**
- * Memoized: a list of a few hundred cards re-rendered on every keystroke or
- * +1 is the single biggest cost on this page. The handlers take the entry
- * rather than closing over it so the props stay referentially stable.
- */
 
 /** Read-only tag chips derived from an entry's notes (capped for layout). */
 export function TagChips({

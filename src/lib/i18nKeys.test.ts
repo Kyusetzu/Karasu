@@ -55,7 +55,9 @@ function resolve(key: string): unknown {
 describe("i18n keys", () => {
   const found = new Map<string, string>();
   for (const [path, text] of Object.entries(FILES)) {
-    if (path.endsWith(".test.ts")) continue;
+    // Both extensions: the glob above takes .ts *and* .tsx, and the repo now
+    // has a .tsx test, which this skip used to walk straight past.
+    if (/\.test\.tsx?$/.test(path)) continue;
     for (const match of text.matchAll(CALL)) {
       if (!found.has(match[1])) found.set(match[1], path);
     }

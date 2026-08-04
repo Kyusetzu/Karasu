@@ -1,7 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
-/** Sticky action bar for bulk edits over the current selection. */
 
 /** Selection checkbox shared by the grid and list rows. */
 export function SelectBox({

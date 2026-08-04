@@ -109,7 +109,6 @@ export const de: typeof en = {
     status: "Status",
     progress: "Fortschritt",
     score: "Bewertung",
-    noScore: "Keine Bewertung",
     reload: "Neu laden",
     done: "Fertig",
     edit: "Bearbeiten",
@@ -211,7 +210,6 @@ export const de: typeof en = {
     welcomeText:
       "Dein Anime-Tracker für AniList. Verbinde deinen Account, um deine Liste zu verwalten und deinen Fortschritt automatisch zu tracken.",
     connect: "Mit AniList verbinden",
-    startLocal: "oder ohne Konto lokal starten",
     continueWatching: "Weiterschauen",
     nothingWatching: "Nichts unterwegs.",
     currentSeason: "Aktuelle Saison ansehen →",
@@ -293,7 +291,6 @@ export const de: typeof en = {
     timeToFinishHint: "Verbleibende Episoden deiner Watching-Liste × Laufzeit.",
   },
   about: {
-    title: "Über Karasu",
     tagline: "Anime- & Manga-Tracker für AniList",
     version: "Version {{version}}",
     description:
@@ -317,7 +314,6 @@ export const de: typeof en = {
   list: {
     connectPrompt: "Verbinde dich mit AniList, um deine Liste zu sehen.",
     toSettings: "Zu den Einstellungen",
-    loading: "Lade deine Liste …",
     loadError: "Fehler beim Laden: {{message}}",
     animeTitle: "Anime",
     mangaTitle: "Manga",
@@ -340,7 +336,6 @@ export const de: typeof en = {
     listView: "Listenansicht",
     empty: "Keine Einträge.",
     progressMax: "Fortschritt (max. {{max}})",
-    scoreRange: "Bewertung (0–10)",
   },
   search: {
     title: "Suche",
@@ -392,7 +387,6 @@ export const de: typeof en = {
   palette: {
     placeholder: "Zu Seite oder Titel springen …",
     empty: "Keine Treffer.",
-    page: "Seite",
     groupGoTo: "Gehe zu",
     groupList: "Deine Liste",
     hintMove: "↑↓ bewegen",
@@ -412,7 +406,6 @@ export const de: typeof en = {
     countdownDh: "{{d}}T {{h}}Std",
     countdownHm: "{{h}}Std {{m}}Min",
     countdownM: "{{m}}Min",
-    airingIn: "Folge {{n}} in {{time}}",
     information: "Informationen",
     format: "Format",
     season: "Saison",
@@ -442,7 +435,6 @@ export const de: typeof en = {
   },
   library: {
     title: "Lokale Bibliothek",
-    matched: "{{n}} Titel auf der Platte.",
     readyToPlay: "Bereit — nächste ungesehene Datei",
     upToDate: "Aktuell — nichts Neues auf der Platte",
     filesMatched: "{{files}} Dateien · {{matched}} zugeordnet",
@@ -483,7 +475,6 @@ export const de: typeof en = {
     ep: "Fo. {{n}}",
     play: "Abspielen",
     allWatched: "gesehen",
-    onDisk: "{{n}} Folgen auf der Platte",
     watchedOf: "{{progress}} / {{total}} gesehen",
     playEpisode: "Folge {{n}} abspielen",
     empty: "Karasu weiß nicht, wo er suchen soll.",
@@ -553,7 +544,6 @@ export const de: typeof en = {
   },
   wrapped: {
     title: "Jahresrückblick",
-    inReview: "im Rückblick",
     completed: "Abgeschlossen",
     hours: "Stunden",
     meanScore: "Ø Bewertung",
@@ -574,7 +564,6 @@ export const de: typeof en = {
   },
   media: {
     addPlanning: "Zu Geplant hinzufügen",
-    onList: "Auf deiner Liste",
   },
   nowPlaying: {
     heading: "Läuft gerade · {{process}}",

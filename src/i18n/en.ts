@@ -111,7 +111,6 @@ export const en = {
     status: "Status",
     progress: "Progress",
     score: "Score",
-    noScore: "No score",
     reload: "Reload",
     done: "Done",
     edit: "Edit",
@@ -213,7 +212,6 @@ export const en = {
     welcomeText:
       "Your anime tracker for AniList. Connect your account to manage your list and track your progress automatically.",
     connect: "Connect with AniList",
-    startLocal: "or start locally without an account",
     continueWatching: "Continue watching",
     nothingWatching: "Nothing in flight.",
     currentSeason: "Browse the current season →",
@@ -292,7 +290,6 @@ export const en = {
     timeToFinishHint: "Remaining episodes on your Watching list × runtime.",
   },
   about: {
-    title: "About Karasu",
     tagline: "Anime & manga tracker for AniList",
     version: "Version {{version}}",
     description:
@@ -316,7 +313,6 @@ export const en = {
   list: {
     connectPrompt: "Connect with AniList to see your list.",
     toSettings: "Go to Settings",
-    loading: "Loading your list …",
     loadError: "Failed to load: {{message}}",
     animeTitle: "Anime",
     mangaTitle: "Manga",
@@ -338,7 +334,6 @@ export const en = {
     listView: "List view",
     empty: "No entries.",
     progressMax: "Progress (max. {{max}})",
-    scoreRange: "Score (0–10)",
   },
   search: {
     title: "Search",
@@ -390,7 +385,6 @@ export const en = {
   palette: {
     placeholder: "Jump to a page or title …",
     empty: "No matches.",
-    page: "Page",
     groupGoTo: "Go to",
     groupList: "Your list",
     hintMove: "↑↓ navigate",
@@ -410,7 +404,6 @@ export const en = {
     countdownDh: "{{d}}d {{h}}h",
     countdownHm: "{{h}}h {{m}}m",
     countdownM: "{{m}}m",
-    airingIn: "Ep {{n}} in {{time}}",
     information: "Information",
     format: "Format",
     season: "Season",
@@ -440,7 +433,6 @@ export const en = {
   },
   library: {
     title: "Local library",
-    matched: "{{n}} titles on disk.",
     readyToPlay: "Ready to play — next unwatched file",
     upToDate: "Up to date — nothing new on disk",
     filesMatched: "{{files}} files · {{matched}} matched",
@@ -480,7 +472,6 @@ export const en = {
     ep: "Ep {{n}}",
     play: "Play",
     allWatched: "watched",
-    onDisk: "{{n}} episodes on disk",
     watchedOf: "{{progress}} / {{total}} watched",
     playEpisode: "Play episode {{n}}",
     empty: "Karasu has nowhere to look.",
@@ -550,7 +541,6 @@ export const en = {
   },
   wrapped: {
     title: "Year in review",
-    inReview: "in review",
     completed: "Completed",
     hours: "Hours",
     meanScore: "Mean score",
@@ -571,7 +561,6 @@ export const en = {
   },
   media: {
     addPlanning: "Add to Planning",
-    onList: "On your list",
   },
   nowPlaying: {
     heading: "Now playing · {{process}}",

@@ -124,6 +124,43 @@ CREATE TABLE IF NOT EXISTS library_match (
 PRAGMA user_version = 8;
 ";
 
+/// Manual match corrections, and the two things they need to be possible.
+///
+/// All three key on the `(title, season)` pair the parser extracts from a
+/// release name — the same pair `index_files` already memoises its matcher
+/// lookups on. Keying on anything else (a path, a media id) would not survive
+/// the next scan, and surviving the next scan is the entire point: the user is
+/// correcting the *parse*, not this one row.
+///
+/// `season` is `-1` rather than NULL where the release name carried none.
+/// SQLite permits NULLs in a PRIMARY KEY and treats each one as distinct, so a
+/// nullable column here would let the same seasonless title be overridden
+/// twice and neither row would win.
+///
+/// - `library_override` is user data. A scan must never clear it.
+/// - `library_unmatched` is what the scan could *not* place, kept so the
+///   \"unplaced\" list is still there after a restart rather than only until one.
+///
+/// There is deliberately no table recording which parsed title produced each
+/// matched row. `hydrate` recovers that by re-parsing the stored filenames, and
+/// a stored copy could only ever drift away from what the parser says today.
+const MIGRATION_V9: &str = "
+CREATE TABLE IF NOT EXISTS library_override (
+  title TEXT NOT NULL,
+  season INTEGER NOT NULL,
+  media_id INTEGER NOT NULL,
+  PRIMARY KEY (title, season)
+);
+CREATE TABLE IF NOT EXISTS library_unmatched (
+  title TEXT NOT NULL,
+  season INTEGER NOT NULL,
+  episode INTEGER NOT NULL,
+  path TEXT NOT NULL,
+  PRIMARY KEY (title, season, episode)
+);
+PRAGMA user_version = 9;
+";
+
 /// One in-app notification (mirrors a shown desktop toast).
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct NotificationRow {
@@ -201,6 +238,10 @@ impl Db {
         if version < 8 {
             conn.execute_batch(MIGRATION_V8)
                 .map_err(|e| format!("Migration v8 failed: {e}"))?;
+        }
+        if version < 9 {
+            conn.execute_batch(MIGRATION_V9)
+                .map_err(|e| format!("Migration v9 failed: {e}"))?;
         }
         Ok(Db(Mutex::new(conn)))
     }
@@ -623,6 +664,93 @@ impl Db {
             })
             .unwrap_or_default()
     }
+
+    // --- Manual match corrections -------------------------------------------
+
+    /// Every user-set `(title, season) -> media_id` correction.
+    pub fn library_overrides(&self) -> Vec<(String, i32, i64)> {
+        let conn = self.0.lock().unwrap();
+        conn.prepare("SELECT title, season, media_id FROM library_override")
+            .and_then(|mut stmt| {
+                stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
+                    .map(|rows| rows.filter_map(Result::ok).collect())
+            })
+            .unwrap_or_default()
+    }
+
+    /// Records a correction. Upsert rather than insert: pointing the same
+    /// release name somewhere new is a correction of the correction, not a
+    /// second opinion to be kept alongside the first.
+    pub fn library_override_set(
+        &self,
+        title: &str,
+        season: i32,
+        media_id: i64,
+    ) -> Result<(), String> {
+        let conn = self.0.lock().unwrap();
+        conn.execute(
+            "INSERT INTO library_override (title, season, media_id) VALUES (?1, ?2, ?3)
+             ON CONFLICT(title, season) DO UPDATE SET media_id = excluded.media_id",
+            rusqlite::params![title, season, media_id],
+        )
+        .map(|_| ())
+        .map_err(|e| format!("Could not save the correction: {e}"))
+    }
+
+    /// Forgets a correction, letting the matcher have its guess back.
+    pub fn library_override_clear(&self, title: &str, season: i32) -> Result<(), String> {
+        let conn = self.0.lock().unwrap();
+        conn.execute(
+            "DELETE FROM library_override WHERE title = ?1 AND season = ?2",
+            rusqlite::params![title, season],
+        )
+        .map(|_| ())
+        .map_err(|e| format!("Could not clear the correction: {e}"))
+    }
+
+    /// Files the scan could not place, grouped by the title it parsed out.
+    pub fn library_unmatched(&self) -> Vec<(String, i32, u32, String)> {
+        let conn = self.0.lock().unwrap();
+        conn.prepare("SELECT title, season, episode, path FROM library_unmatched")
+            .and_then(|mut stmt| {
+                stmt.query_map([], |r| {
+                    Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?))
+                })
+                .map(|rows| rows.filter_map(Result::ok).collect())
+            })
+            .unwrap_or_default()
+    }
+
+    /// Replaces the unplaced files in one transaction.
+    ///
+    /// `library_override` is deliberately untouched: it is the user's, not the
+    /// scan's, and wiping it here would undo every correction on the next scan
+    /// — which is precisely the failure the whole design exists to avoid.
+    pub fn library_replace_unmatched(
+        &self,
+        unmatched: &[(String, i32, u32, String)],
+    ) -> Result<(), String> {
+        let mut conn = self.0.lock().unwrap();
+        let tx = conn
+            .transaction()
+            .map_err(|e| format!("Library write failed: {e}"))?;
+        tx.execute("DELETE FROM library_unmatched", [])
+            .map_err(|e| format!("Library write failed: {e}"))?;
+        {
+            let mut stmt = tx
+                .prepare(
+                    "INSERT OR REPLACE INTO library_unmatched (title, season, episode, path)
+                     VALUES (?1, ?2, ?3, ?4)",
+                )
+                .map_err(|e| format!("Library write failed: {e}"))?;
+            for (title, season, episode, path) in unmatched {
+                stmt.execute(rusqlite::params![title, season, episode, path])
+                    .map_err(|e| format!("Library write failed: {e}"))?;
+            }
+        }
+        tx.commit()
+            .map_err(|e| format!("Library write failed: {e}"))
+    }
 }
 
 #[cfg(test)]
@@ -640,7 +768,47 @@ mod tests {
         conn.execute_batch(MIGRATION_V6).unwrap();
         conn.execute_batch(MIGRATION_V7).unwrap();
         conn.execute_batch(MIGRATION_V8).unwrap();
+        conn.execute_batch(MIGRATION_V9).unwrap();
         Db(Mutex::new(conn))
+    }
+
+    /// A correction is the user's answer and has to outlive the scan that
+    /// disagreed with it — so a rescan replaces sources and unmatched files
+    /// while leaving every override exactly where it was.
+    #[test]
+    fn a_rescan_keeps_corrections_and_replaces_everything_else() {
+        let db = mem_db();
+        db.library_override_set("shingeki no kyojin", -1, 16498).unwrap();
+        db.library_replace_unmatched(&[("mystery show".into(), 2, 3, "C:/a/E03.mkv".into())])
+            .unwrap();
+
+        db.library_replace_unmatched(&[("mystery show".into(), 2, 4, "C:/a/E04.mkv".into())])
+            .unwrap();
+
+        assert_eq!(db.library_overrides(), vec![("shingeki no kyojin".into(), -1, 16498)]);
+        assert_eq!(
+            db.library_unmatched(),
+            vec![("mystery show".into(), 2, 4, "C:/a/E04.mkv".into())]
+        );
+    }
+
+    /// Re-pointing the same release name replaces the earlier answer instead of
+    /// leaving two rows for one key, and clearing gives the matcher its guess
+    /// back rather than pinning the title to nothing.
+    #[test]
+    fn an_override_is_replaced_then_cleared() {
+        let db = mem_db();
+        db.library_override_set("bleach", 2, 100).unwrap();
+        db.library_override_set("bleach", 2, 200).unwrap();
+        assert_eq!(db.library_overrides(), vec![("bleach".into(), 2, 200)]);
+
+        // A different season of the same show is a different key, not the same
+        // correction seen twice.
+        db.library_override_set("bleach", -1, 300).unwrap();
+        assert_eq!(db.library_overrides().len(), 2);
+
+        db.library_override_clear("bleach", 2).unwrap();
+        assert_eq!(db.library_overrides(), vec![("bleach".into(), -1, 300)]);
     }
 
     /// The index must survive a write/read round-trip, and a rescan must

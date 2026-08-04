@@ -159,6 +159,9 @@ pub fn run() {
             library::get_library_index,
             library::get_library_status,
             library::scan_library,
+            library::get_library_unmatched,
+            library::set_library_match,
+            library::clear_library_match,
             library::play_next,
             library::play_episode,
         ])

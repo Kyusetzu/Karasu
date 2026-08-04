@@ -541,8 +541,8 @@ pub async fn flush_queue(
 /// Currently detected playback (poll loop state).
 #[tauri::command]
 pub fn get_now_playing(
-    state: State<'_, crate::scrobbler::PlaybackState>,
-) -> Option<crate::scrobbler::NowPlaying> {
+    state: State<'_, crate::playback::scrobbler::PlaybackState>,
+) -> Option<crate::playback::scrobbler::NowPlaying> {
     state.0.lock().unwrap().clone()
 }
 
@@ -607,13 +607,13 @@ pub fn set_smtc_enabled(db: State<'_, Db>, enabled: bool) -> Result<(), String> 
 /// so the source fails closed rather than falling back to something broader.
 pub(crate) fn jellyfin_config(
     db: &Db,
-) -> Option<crate::detection::jellyfin::JellyfinConfig> {
+) -> Option<crate::playback::detection::jellyfin::JellyfinConfig> {
     let url = db.kv_get("jellyfin_url").filter(|u| !u.trim().is_empty())?;
-    let token = crate::detection::jellyfin::load_token()?;
+    let token = crate::playback::detection::jellyfin::load_token()?;
     let user_id = db
         .kv_get("jellyfin_user_id")
         .filter(|u| !u.trim().is_empty())?;
-    Some(crate::detection::jellyfin::JellyfinConfig {
+    Some(crate::playback::detection::jellyfin::JellyfinConfig {
         url,
         token,
         user_id,
@@ -682,7 +682,7 @@ pub struct JellyfinSettings {
 pub fn get_jellyfin_settings(db: State<'_, Db>) -> JellyfinSettings {
     JellyfinSettings {
         url: db.kv_get("jellyfin_url").unwrap_or_default(),
-        connected: crate::detection::jellyfin::load_token().is_some()
+        connected: crate::playback::detection::jellyfin::load_token().is_some()
             && db
                 .kv_get("jellyfin_user_id")
                 .is_some_and(|u| !u.trim().is_empty()),
@@ -703,7 +703,7 @@ pub fn set_jellyfin_settings(
 ) -> Result<(), String> {
     db.kv_set(
         "jellyfin_url",
-        &crate::detection::jellyfin::normalize_base_url(&url),
+        &crate::playback::detection::jellyfin::normalize_base_url(&url),
     )?;
     db.kv_set("jellyfin_device", device.trim())?;
     Ok(())
@@ -722,12 +722,12 @@ pub async fn jellyfin_sign_in(
     username: String,
     password: String,
 ) -> Result<JellyfinSettings, String> {
-    let base = crate::detection::jellyfin::normalize_base_url(&url);
+    let base = crate::playback::detection::jellyfin::normalize_base_url(&url);
     let (device_name, device_id) = {
         (local_device_name(), jellyfin_device_id(&db))
     };
 
-    let session = crate::detection::jellyfin::authenticate(
+    let session = crate::playback::detection::jellyfin::authenticate(
         &base,
         &username,
         &password,
@@ -739,18 +739,18 @@ pub async fn jellyfin_sign_in(
     db.kv_set("jellyfin_url", &base)?;
     db.kv_set("jellyfin_user_id", &session.user_id)?;
     db.kv_set("jellyfin_user_name", &session.user_name)?;
-    crate::detection::jellyfin::save_token(&session.token)?;
+    crate::playback::detection::jellyfin::save_token(&session.token)?;
     // The old admin API key is useless now and grants far more on the server
     // than Karasu needs; don't leave it sitting in the credential store.
-    crate::detection::jellyfin::delete_legacy_api_key();
+    crate::playback::detection::jellyfin::delete_legacy_api_key();
 
     Ok(get_jellyfin_settings(db))
 }
 
 #[tauri::command]
 pub fn jellyfin_sign_out(db: State<'_, Db>) -> Result<JellyfinSettings, String> {
-    crate::detection::jellyfin::delete_token()?;
-    crate::detection::jellyfin::delete_legacy_api_key();
+    crate::playback::detection::jellyfin::delete_token()?;
+    crate::playback::detection::jellyfin::delete_legacy_api_key();
     db.kv_delete("jellyfin_user_id");
     db.kv_delete("jellyfin_user_name");
     Ok(get_jellyfin_settings(db))
@@ -767,18 +767,18 @@ pub fn jellyfin_sign_out(db: State<'_, Db>) -> Result<JellyfinSettings, String> 
 #[tauri::command]
 pub async fn test_jellyfin(
     db: State<'_, Db>,
-) -> Result<Vec<crate::detection::jellyfin::SessionSummary>, String> {
+) -> Result<Vec<crate::playback::detection::jellyfin::SessionSummary>, String> {
     let cfg = jellyfin_config(&db).ok_or("Sign in to your Jellyfin server first")?;
-    crate::detection::jellyfin::list_sessions(&cfg).await
+    crate::playback::detection::jellyfin::list_sessions(&cfg).await
 }
 
 /// Every media session Windows currently knows about, for the Settings
 /// diagnostic. Players fill these fields inconsistently, so this is the only
 /// honest way to see why something was or wasn't detected.
 #[tauri::command]
-pub async fn smtc_sessions() -> Vec<crate::detection::smtc::SmtcSession> {
+pub async fn smtc_sessions() -> Vec<crate::playback::detection::smtc::SmtcSession> {
     // Blocking WinRT work: off the main thread, like the detection loop.
-    tokio::task::spawn_blocking(crate::detection::smtc::sessions)
+    tokio::task::spawn_blocking(crate::playback::detection::smtc::sessions)
         .await
         .unwrap_or_default()
 }
@@ -813,7 +813,7 @@ pub fn set_discord_settings(
     db.kv_set("discord_app_id", app_id.trim())?;
     // Apply the new state to the presence immediately
     let now = app
-        .state::<crate::scrobbler::PlaybackState>()
+        .state::<crate::playback::scrobbler::PlaybackState>()
         .0
         .lock()
         .unwrap()
@@ -927,7 +927,7 @@ pub struct StaleSettings {
 pub fn get_stale_settings(db: State<'_, Db>) -> StaleSettings {
     StaleSettings {
         enabled: db.kv_get("stale_notify").as_deref() == Some("1"),
-        months: crate::stale::stale_months(&db),
+        months: crate::alerts::stale::stale_months(&db),
     }
 }
 
@@ -1047,7 +1047,7 @@ pub fn mark_all_notifications_read(db: State<'_, Db>) -> Result<(), String> {
 
 /// Monotonic commit counter — the 4th version segment
 /// (`MAJOR.MINOR.PATCH.COMMIT#`). Bumped by one on every commit.
-pub const COMMIT_NUMBER: u32 = 163;
+pub const COMMIT_NUMBER: u32 = 164;
 
 /// Full four-part display version, e.g. `0.1.1.38`. The `MAJOR.MINOR.PATCH`
 /// core comes from the crate version (kept in sync across the manifests).
@@ -1475,7 +1475,7 @@ pub async fn download_pending_update(
         .map_err(|e| e.to_string())?;
 
     *pending.0.lock().unwrap() = Some((update, bytes));
-    crate::notify::notify(
+    crate::alerts::notify::notify(
         &app,
         "update",
         "Update ready",
@@ -1503,11 +1503,11 @@ pub fn install_pending_update(
 /// Confirms the pending auto-update immediately (also from Blocked).
 #[tauri::command]
 pub async fn scrobble_now(app: tauri::AppHandle) -> Result<(), String> {
-    crate::scrobbler::confirm_pending(app, true).await
+    crate::playback::scrobbler::confirm_pending(app, true).await
 }
 
 /// Discards the pending auto-update for this episode.
 #[tauri::command]
 pub async fn scrobble_cancel(app: tauri::AppHandle) -> Result<(), String> {
-    crate::scrobbler::confirm_pending(app, false).await
+    crate::playback::scrobbler::confirm_pending(app, false).await
 }

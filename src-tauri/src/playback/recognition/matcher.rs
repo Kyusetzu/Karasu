@@ -180,7 +180,7 @@ pub fn best_match_prepared(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::recognition::parser::parse;
+    use crate::playback::recognition::parser::parse;
 
     fn candidates() -> Vec<Candidate> {
         vec![

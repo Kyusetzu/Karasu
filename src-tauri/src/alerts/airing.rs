@@ -134,7 +134,7 @@ async fn check(app: &AppHandle) {
             }
         }
         let title = pick_title(sched.pointer("/media/title"));
-        crate::notify::notify(
+        crate::alerts::notify::notify(
             app,
             "airing",
             "New episode aired",

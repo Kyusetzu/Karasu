@@ -8,7 +8,7 @@
 //! Uses the built-in application ID or a user override from the settings.
 
 use crate::db::Db;
-use crate::scrobbler::{NowPlaying, PlaybackState, ScrobbleSession};
+use crate::playback::scrobbler::{NowPlaying, PlaybackState, ScrobbleSession};
 use discord_rich_presence::{
     activity::{Activity, ActivityType, Assets, Button, Timestamps},
     DiscordIpc, DiscordIpcClient,
@@ -73,7 +73,7 @@ fn session_start(app: &AppHandle, np: &NowPlaying) -> i64 {
 fn episode_duration(app: &AppHandle, np: &NowPlaying) -> Option<u32> {
     let media_id = np.media_id?;
     let db = app.state::<Db>();
-    crate::scrobbler::candidates_from_cache(&db, &np.media_type)
+    crate::playback::scrobbler::candidates_from_cache(&db, &np.media_type)
         .iter()
         .find(|c| c.media_id == media_id)
         .and_then(|c| c.duration_min)

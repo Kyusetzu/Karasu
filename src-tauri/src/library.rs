@@ -4,8 +4,8 @@
 //! and a reason to use the app over the website.
 
 use crate::db::Db;
-use crate::recognition::{matcher, parser};
-use crate::scrobbler::candidates_from_cache;
+use crate::playback::recognition::{matcher, parser};
+use crate::playback::scrobbler::candidates_from_cache;
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Mutex;
@@ -359,7 +359,7 @@ fn is_video(path: &Path) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::recognition::matcher::Candidate;
+    use crate::playback::recognition::matcher::Candidate;
 
     fn frieren() -> Vec<Candidate> {
         vec![Candidate {

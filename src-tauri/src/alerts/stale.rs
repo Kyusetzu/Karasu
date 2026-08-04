@@ -115,7 +115,7 @@ fn check(app: &AppHandle) {
             if db.kv_get(&key).and_then(|s| s.parse::<i64>().ok()) == Some(updated) {
                 continue;
             }
-            crate::notify::notify(
+            crate::alerts::notify::notify(
                 app,
                 "stale",
                 "On-hold reminder",

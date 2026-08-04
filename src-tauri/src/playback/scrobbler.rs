@@ -8,9 +8,9 @@
 //! after user abort.
 
 use crate::db::Db;
-use crate::detection;
-use crate::recognition::{matcher, parser};
-use crate::relations::{self, Relations};
+use crate::playback::detection;
+use crate::playback::recognition::{matcher, parser};
+use crate::playback::relations::{self, Relations};
 use serde_json::{json, Value};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};

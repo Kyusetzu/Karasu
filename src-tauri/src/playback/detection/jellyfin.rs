@@ -31,7 +31,7 @@
 //! "only this device" narrowing lives.
 
 use super::Playback;
-use crate::recognition::parser::Parsed;
+use crate::playback::recognition::parser::Parsed;
 use std::sync::Mutex;
 
 const SERVICE: &str = "dev.kyu.karasu";

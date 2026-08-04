@@ -171,7 +171,7 @@ async fn check(app: &AppHandle) {
                     }
                     let title = pick_title(edge.pointer("/node/title"));
                     let label = if rel == "SEQUEL" { "Sequel" } else { "Side story" };
-                    crate::notify::notify(
+                    crate::alerts::notify::notify(
                         app,
                         "sequel",
                         &format!("{label} announced"),

@@ -96,7 +96,7 @@ pub fn match_player(process: &str, title: &str) -> Option<String> {
     }
     // MPC/mpv may hide the file extension: accept heuristically when an
     // episode number is recognizable.
-    if crate::recognition::parser::parse(media).episode.is_some() {
+    if crate::playback::recognition::parser::parse(media).episode.is_some() {
         return Some(media.to_string());
     }
     None
@@ -135,7 +135,7 @@ pub fn match_streaming(process: &str, title: &str) -> Option<String> {
 
     // Only accept when an episode number is recognizable — otherwise it is
     // just an overview page.
-    if crate::recognition::parser::parse(media).episode.is_some() {
+    if crate::playback::recognition::parser::parse(media).episode.is_some() {
         Some(media.to_string())
     } else {
         None
@@ -162,7 +162,7 @@ pub fn match_manga(process: &str, title: &str) -> Option<String> {
     let media = media.trim();
 
     // Only accept when a chapter number is recognizable
-    if crate::recognition::parser::parse_manga(media).episode.is_some() {
+    if crate::playback::recognition::parser::parse_manga(media).episode.is_some() {
         Some(media.to_string())
     } else {
         None

@@ -1,17 +1,11 @@
-mod airing;
+mod alerts;
 mod anilist;
 mod commands;
 mod db;
-mod detection;
 mod discord;
-mod notify;
 mod library;
+mod playback;
 mod portable;
-mod recognition;
-mod relations;
-mod scrobbler;
-mod sequel;
-mod stale;
 
 use tauri::{
     menu::{Menu, MenuItem},
@@ -45,19 +39,19 @@ pub fn run() {
             let data_dir = portable::data_dir(app.path().app_data_dir()?);
             app.manage(db::Db::open(data_dir).map_err(std::io::Error::other)?);
             app.manage(anilist::client::AniList::new());
-            app.manage(scrobbler::PlaybackState(std::sync::Mutex::new(None)));
-            app.manage(scrobbler::ScrobbleSession(std::sync::Mutex::new(None)));
-            app.manage(relations::Relations(std::sync::RwLock::new(Vec::new())));
+            app.manage(playback::scrobbler::PlaybackState(std::sync::Mutex::new(None)));
+            app.manage(playback::scrobbler::ScrobbleSession(std::sync::Mutex::new(None)));
+            app.manage(playback::relations::Relations(std::sync::RwLock::new(Vec::new())));
             app.manage(discord::Discord(std::sync::Mutex::new(None)));
             app.manage(discord::UiPage::default());
             app.manage(library::LibraryIndex::default());
             app.manage(commands::PendingUpdate::default());
             library::hydrate(app.handle());
-            relations::spawn_loader(app.handle().clone());
-            scrobbler::spawn(app.handle().clone());
-            airing::spawn(app.handle().clone());
-            stale::spawn(app.handle().clone());
-            sequel::spawn(app.handle().clone());
+            playback::relations::spawn_loader(app.handle().clone());
+            playback::scrobbler::spawn(app.handle().clone());
+            alerts::airing::spawn(app.handle().clone());
+            alerts::stale::spawn(app.handle().clone());
+            alerts::sequel::spawn(app.handle().clone());
             // Show the idle presence right away (if Discord is enabled).
             discord::sync_current(app.handle());
 

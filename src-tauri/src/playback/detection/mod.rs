@@ -40,7 +40,7 @@ pub struct Playback {
     /// Set when the source already knows the series and episode exactly, so
     /// the release-name parser is skipped. Only the Jellyfin API can do this;
     /// every window-title source leaves it `None`.
-    pub parsed: Option<crate::recognition::parser::Parsed>,
+    pub parsed: Option<crate::playback::recognition::parser::Parsed>,
 }
 
 /// Lists all visible top-level windows with title and process name.

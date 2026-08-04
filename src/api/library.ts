@@ -13,8 +13,8 @@ export interface TitleKey {
   /**
    * Whether this parse is the one carrying a correction. A row can merge
    * several parses and only one of them is usually corrected, so the row's own
-   * `manual` cannot say which. Optional: an index written before the field
-   * existed has none.
+   * `manual` cannot say which. Optional only so the two key literals on the
+   * library screen, which have no parse to speak for, still typecheck.
    */
   manual?: boolean;
 }

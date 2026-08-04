@@ -133,7 +133,6 @@ async fn check(app: &AppHandle) {
     // first reaches entry 301 announces its long-known sequels as new.
     let seeding = db.kv_get("sequel_seeded").is_none();
     let level = crate::commands::read_content_filter(&db);
-    let mut covered_everything = true;
 
     for media_type in ["ANIME", "MANGA"] {
         // Everything on the list (any status) counts as "already have it".
@@ -150,8 +149,14 @@ async fn check(app: &AppHandle) {
         // twelve hours later the window has moved on rather than re-reading the
         // same six chunks.
         let chunks: Vec<&[i64]> = sources.chunks(BATCH).collect();
+        let covered_key = format!("sequel_covered:{media_type}");
         if chunks.is_empty() {
-            continue; // an empty list is trivially covered
+            // Nothing to walk. Note this also covers "the cache for this type
+            // was never fetched", which is not the same thing — but a list we
+            // cannot read is one we cannot announce from either, so seeding
+            // must not wait on it.
+            let _ = db.kv_set(&covered_key, "1");
+            continue;
         }
         let cursor_key = format!("sequel_cursor:{media_type}");
         let start = db
@@ -227,10 +232,24 @@ async fn check(app: &AppHandle) {
         // Did the window reach the end of this list? The cursor starts at 0 and
         // only ever advances, so "start + done past the last chunk" is exactly
         // "every chunk has been seen at least once".
-        covered_everything &= start + done >= chunks.len();
+        //
+        // Recorded per type and persisted, not ANDed inside one run. Both
+        // cursors advance by six per run in their own modulus, so requiring
+        // them to land in their last window *simultaneously* is a coincidence
+        // of two orbits: 29 and 35 chunks would have taken 170 runs — 85 days
+        // — and every sequel announced in that window is marked seen and
+        // silently swallowed. Per type it is ceil(len/6) runs, which is what
+        // "all the way round both lists" was supposed to mean.
+        if start + done >= chunks.len() {
+            let _ = db.kv_set(&covered_key, "1");
+        }
     }
 
-    if seeding && covered_everything {
+    if seeding
+        && ["ANIME", "MANGA"]
+            .iter()
+            .all(|t| db.kv_get(&format!("sequel_covered:{t}")).is_some())
+    {
         let _ = db.kv_set("sequel_seeded", "1");
     }
 }

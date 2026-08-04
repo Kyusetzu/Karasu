@@ -140,8 +140,13 @@ impl LibraryData {
 pub struct TitleKey {
     pub title: String,
     pub season: i32,
-    /// Whether *this* parse is the one carrying a correction. Defaulted so an
-    /// index written before the field existed still deserializes.
+    /// Whether *this* parse is the one carrying a correction.
+    ///
+    /// `#[serde(default)]` only keeps the pre-existing `Deserialize` derive
+    /// total; nothing actually deserializes a `TitleKey`. The index on disk is
+    /// SQLite rows with no `sources` array, and `hydrate` rebuilds the whole
+    /// thing through `reindex`, so this flag is always computed by the running
+    /// binary.
     #[serde(default)]
     pub manual: bool,
 }
@@ -294,7 +299,7 @@ pub async fn scan_library(app: AppHandle) -> Result<ScanSummary, String> {
     }
     let _scanning = ScanGuard(&index.1);
 
-    let (root, candidates, overrides, stored) = {
+    let (root, candidates, overrides, stored, cursor) = {
         let db = app.state::<Db>();
         let root = db
             .kv_get("library_path")
@@ -313,7 +318,11 @@ pub async fn scan_library(app: AppHandle) -> Result<ScanSummary, String> {
             .into_iter()
             .map(|(t, s, id, score)| ((t, s), (id, score)))
             .collect();
-        (root, candidates, override_map(&db), stored)
+        let cursor = db
+            .kv_get("identify_cursor")
+            .and_then(|s| s.parse::<usize>().ok())
+            .unwrap_or(0);
+        (root, candidates, override_map(&db), stored, cursor)
     };
 
     let mut files = Vec::new();
@@ -335,12 +344,26 @@ pub async fn scan_library(app: AppHandle) -> Result<ScanSummary, String> {
     // Deliberately between indexing and publishing, and deliberately holding no
     // lock: `LibraryIndex` is a `std::sync::Mutex` and its guard must not be
     // alive across an `.await`.
-    let unknown: Vec<identify::Unidentified> = data
+    let mut unknown: Vec<identify::Unidentified> = data
         .unmatched
         .iter()
         .filter(|g| !stored.contains_key(&(g.title.clone(), g.season)))
         .map(|g| identify::Unidentified { title: g.title.clone(), season: g.season })
         .collect();
+    // Rotate before the cap, so successive scans work through the whole
+    // unplaced set instead of re-asking the same head of it. `reindex` sorts
+    // the groups most-files-first and a title that gets no answer is stored
+    // nowhere, so without this a folder of 200 unanswerable extras would sit at
+    // the front of the queue forever and everything behind it would never be
+    // asked once. A fresh library still starts at 0, so the biggest folders are
+    // still asked about first.
+    let pending = unknown.len();
+    let asked = if pending == 0 {
+        0
+    } else {
+        unknown.rotate_left(cursor % pending);
+        identify::MAX_TITLES.min(pending)
+    };
     let fresh = if unknown.is_empty() {
         Vec::new()
     } else {
@@ -370,6 +393,10 @@ pub async fn scan_library(app: AppHandle) -> Result<ScanSummary, String> {
         // drops the library and the play buttons disappear until a manual rescan.
         persist(&db, &data)?;
         db.library_replace_suggestions(&suggestions)?;
+        // Where the next scan picks up. Modulo the set it was taken against, so
+        // a shrinking unplaced set cannot park the cursor past the end.
+        let next = if pending == 0 { 0 } else { (cursor + asked) % pending };
+        db.kv_set("identify_cursor", &next.to_string())?;
         // The count of files *walked* is not derivable from the index — most of
         // them matched nothing — so it is stored rather than recomputed.
         db.kv_set("library_files_seen", &total.to_string())?;

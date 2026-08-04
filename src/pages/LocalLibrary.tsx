@@ -202,10 +202,6 @@ function LibraryView({ userId }: { userId: number }) {
     () => (unmatched ?? []).filter((g) => g.suggestion),
     [unmatched],
   );
-  const failed = useMemo(
-    () => (unmatched ?? []).filter((g) => !g.suggestion),
-    [unmatched],
-  );
 
   // Covers and titles for the suggested media, fetched the same way the
   // off-list rows are.
@@ -231,12 +227,25 @@ function LibraryView({ userId }: { userId: number }) {
   // guarantee — accept the guess and the title vanishes, leave it and it shows.
   // Blocking on unresolved media would be wrong the other way, so an id whose
   // media has not arrived yet stays visible as the bare `#id` placeholder.
+  //
+  // A blocked guess demotes the group to "failed" rather than deleting it. The
+  // files are still on disk and still unplaced, and the suggestion row is the
+  // only thing that carries "Not this" — dropping the group outright would
+  // take away the one way to say the guess was wrong, and with it the only
+  // route to the picker. Unplaced prints the parsed filename, never the
+  // AniList title, so nothing blocked reaches the screen.
+  const blocked = useCallback(
+    (g: UnmatchedGroup) =>
+      !!g.suggestion && isBlocked(suggestedById.get(g.suggestion.mediaId), level),
+    [suggestedById, level],
+  );
   const visibleSuggestions = useMemo(
-    () =>
-      suggested.filter(
-        (g) => !isBlocked(suggestedById.get(g.suggestion!.mediaId), level),
-      ),
-    [suggested, suggestedById, level],
+    () => suggested.filter((g) => !blocked(g)),
+    [suggested, blocked],
+  );
+  const failed = useMemo(
+    () => (unmatched ?? []).filter((g) => !g.suggestion || blocked(g)),
+    [unmatched, blocked],
   );
 
   // What the picker is currently open on: either a row being corrected or an
@@ -257,16 +266,23 @@ function LibraryView({ userId }: { userId: number }) {
   // z-110, so routing this through the app-level playback banner would draw the
   // explanation in the far corner, under the picker's own scrim, and clear it
   // after six seconds.
+  // Not every correction comes from the dialog, though: confirming a
+  // suggestion is one click on the row itself, and reporting *that* failure
+  // into a picker that is not open would lose it entirely. Such callers pass
+  // the app-level banner instead, which is the only thing on screen for them.
   const [correctError, setCorrectError] = useState<string | null>(null);
   const runCorrection = useCallback(
-    async (work: () => Promise<unknown>) => {
+    async (
+      work: () => Promise<unknown>,
+      report: (msg: string) => void = setCorrectError,
+    ) => {
       setCorrectError(null);
       try {
         await work();
         setEditing(null);
         await Promise.all([refresh(), refetchStatus(), refetchUnmatched()]);
       } catch (e) {
-        setCorrectError(typeof e === "string" ? e : t("library.correctFailed"));
+        report(typeof e === "string" ? e : t("library.correctFailed"));
       }
     },
     [refresh, refetchStatus, refetchUnmatched, t],
@@ -297,8 +313,11 @@ function LibraryView({ userId }: { userId: number }) {
   // search rather than from the picker.
   const confirmSuggestion = useCallback(
     (key: TitleKey, mediaId: number) =>
-      runCorrection(() => setLibraryMatch(key.title, key.season, mediaId)),
-    [runCorrection],
+      runCorrection(
+        () => setLibraryMatch(key.title, key.season, mediaId),
+        setError,
+      ),
+    [runCorrection, setError],
   );
 
   // Adding a corrected title to the list is what makes it trackable: the

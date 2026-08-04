@@ -26,6 +26,21 @@ export const TONES = [
   "var(--color-graph-none)",
 ];
 
+/**
+ * The ink for text drawn on top of `TONES[i]`.
+ *
+ * Only the first two tones are the accent, and only they need `accent-ink` —
+ * the derived colour that reads on whatever the user picked, which for a pale
+ * accent is near-black and for a dark one near-white. On the surface greys the
+ * same ink is a coin flip, so those take a fixed light ink instead.
+ *
+ * Deliberately `i` and not `i % TONES.length`: the treemap fades later tiles
+ * with `opacity`, so tiles 6 and 7 wear the accent hue at 0.6 over surface-900
+ * and are grey in practice. Judging them by their tone index would put
+ * near-black text on a near-black tile.
+ */
+export const onAccent = (i: number) => (i < 2 ? "fill-accent-ink" : "fill-ink-300");
+
 export interface Slice {
   label: string;
   value: number;
@@ -71,10 +86,12 @@ export function Sunburst({ data, size = 260 }: { data: Slice[]; size?: number })
             </path>
             {/* `accent-ink` is the readable ink *for the accent colour*, and
                 only the first two tones are accent — the rest are surface
-                greys, where it resolves to whichever of near-black or
-                near-white contrasts with the accent and lands around 1.1:1 on
-                the grey underneath. Four of six statuses had an invisible
-                number. */}
+                greys. `readableInk` picks whichever of near-black and
+                near-white contrasts with the accent, which is not the same
+                question as what reads on a grey. It happens to come out right
+                for seven of the eighteen accent/theme combinations, the
+                default among them; for the other eleven it lands at 1.0–1.9:1
+                and the number is not there at all. */}
             <ArcValue
               c={c}
               r={(inner + mid) / 2}
@@ -83,6 +100,8 @@ export function Sunburst({ data, size = 260 }: { data: Slice[]; size?: number })
               value={group.value}
               tone={i < 2 ? "fill-accent-ink" : "fill-ink-100"}
             />
+            {/* The outer ring is the same hue stepped down in opacity, so it is
+                mostly card underneath and takes the light ink throughout. */}
             {kids.map((kid, j) => {
               // The child's slice is its share of the parent's own wedge.
               const from = span.start + (kidArcs[j].start / 360) * width;
@@ -407,14 +426,14 @@ export function Treemap({
                 <text
                   x={r.x + 7}
                   y={r.y + 17}
-                  className="fill-ink-100 text-[.625rem] font-medium"
+                  className={`${onAccent(i)} text-[.625rem] font-medium`}
                 >
                   {label.length > fits ? `${label.slice(0, Math.max(1, fits))}…` : label}
                 </text>
                 <text
                   x={r.x + 7}
                   y={r.y + 30}
-                  className="fill-ink-300 text-[.625rem] tabular-nums"
+                  className={`${onAccent(i)} text-[.625rem] tabular-nums`}
                 >
                   {items[i].value}
                 </text>
@@ -428,7 +447,7 @@ export function Treemap({
                 x={r.x + r.w / 2}
                 y={r.y + r.h / 2 + 3}
                 textAnchor="middle"
-                className="fill-ink-300 text-[.5625rem] tabular-nums"
+                className={`${onAccent(i)} text-[.5625rem] tabular-nums`}
               >
                 {items[i].value}
               </text>

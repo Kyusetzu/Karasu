@@ -130,9 +130,10 @@ describe("Sunburst", () => {
   /**
    * `accent-ink` is derived to be readable *on the accent colour*. Only the
    * first two wedges are accent-filled; the rest are surface greys, where the
-   * same ink lands near 1.1:1 and the number is simply not there. A value that
-   * renders invisibly is still in the markup, so no `texts()` assertion can
-   * catch this — the class is the only evidence.
+   * derivation is answering a different question and lands at 1.0–1.9:1 for
+   * eleven of the eighteen accent/theme combinations. A value that renders
+   * invisibly is still in the markup, so no `texts()` assertion can catch
+   * this — the class is the only evidence.
    */
   it("writes each ring's count in an ink that its own fill can carry", () => {
     const markup = html(

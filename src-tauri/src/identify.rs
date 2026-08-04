@@ -31,6 +31,15 @@ const PER_REQUEST: usize = 25;
 /// bounds a pathological one. `alerts::sequel` bounds itself the same way.
 const MAX_BATCHES: usize = 8;
 
+/// Titles one scan may ask about, which is what the caller rotates through.
+///
+/// The cap alone would be a *prefix*, not a window: the unplaced groups are
+/// sorted deterministically, and a title that gets no answer leaves no record,
+/// so the same 200 junk folders would block the queue on every rescan and
+/// groups past them would never be asked at all. `alerts::sequel` had the
+/// identical shape.
+pub const MAX_TITLES: usize = PER_REQUEST * MAX_BATCHES;
+
 /// One title a scan could not place.
 pub struct Unidentified {
     pub title: String,
@@ -127,7 +136,7 @@ fn score(item: &Unidentified, node: &Value) -> Option<Suggestion> {
 /// it to a flaky connection should cost the suggestions, not the index. It
 /// stops rather than skipping on because the batches are identical in shape —
 /// whatever rejected one (a rate limit, most likely, after `client` has already
-/// slept out its retry) will reject the next fourteen just as fast.
+/// slept out its retry) will reject the remaining ones just as fast.
 pub async fn identify(
     api: &AniList,
     token: Option<&str>,
@@ -163,6 +172,29 @@ mod tests {
 
     fn item(title: &str, season: i32) -> Unidentified {
         Unidentified { title: title.into(), season }
+    }
+
+    /// The cap has to be a window, not a prefix.
+    ///
+    /// A title that gets no answer is stored nowhere, so it is asked again on
+    /// every scan; take the first `MAX_TITLES` of a deterministically sorted
+    /// list and a block of unanswerable junk at the front starves everything
+    /// behind it forever. This walks the caller's rotate-then-cap arithmetic
+    /// over a set half again as large as one scan's budget and asserts that
+    /// three scans reach every title.
+    #[test]
+    fn successive_scans_ask_about_every_unplaced_title() {
+        let total = MAX_TITLES + MAX_TITLES / 2;
+        let mut seen = std::collections::HashSet::new();
+        let mut cursor = 0usize;
+        for _ in 0..3 {
+            let mut queue: Vec<usize> = (0..total).collect();
+            queue.rotate_left(cursor % total);
+            let asked = MAX_TITLES.min(total);
+            seen.extend(queue.iter().take(asked).copied());
+            cursor = (cursor + asked) % total;
+        }
+        assert_eq!(seen.len(), total, "a title must not be starved by the cap");
     }
 
     /// Every alias is a `Page`, because a bare `Media` miss would take the

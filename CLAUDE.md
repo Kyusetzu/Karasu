@@ -28,30 +28,49 @@ and in the browser and scrobbles your AniList progress automatically.
 ## Layout
 
 ```
-src/                 React frontend
-  api/               AniList GraphQL client, queries, types, franchise loader
-  components/        UI components (Bell, ContextMenu, EntryEditModal, …)
-  pages/             Route pages (Dashboard, MediaList, Franchise, Wrapped, …)
-  stores/            Zustand stores (auth, theme, library, nowPlaying)
-  lib/               Pure logic + its *.test.ts (tags, contrast, format, wrapped,
-                     recommend, search, contentFilter, …)
-  hooks/             Shared hooks (useListMutations, usePrimedLists,
-                     useColumnCount)
-  i18n.ts            en (primary) + de; `de: typeof en` enforces key parity
-src-tauri/src/       Rust backend
-  commands.rs        Tauri commands, AniList list/save mutations, version
-  db/                SQLite: PRAGMA user_version migrations + row helpers
-  anilist/           auth (token handling), API glue
-  detection/         mod.rs (Win32 window enumeration, cfg-gated for Windows),
-                     profiles.rs (player/site matching), smtc.rs (Windows media
-                     sessions), jellyfin.rs (optional /Sessions source)
-  discord/           Discord Rich Presence
-  notify/            notify(app, kind, title, body) → row + toast + event
-  airing/ stale/ sequel/   background alert passes
+src/
+  app/               App.tsx, main.tsx, index.css — the entry, and only the entry
+  api/               AniList GraphQL client, queries, types, franchise, library
+  components/
+    ui/              primitives with no app knowledge (kebab-case files)
+    shell/           the window frame and global machinery — titlebar, sidebar,
+                     bell, command palette, keyboard sheet, context menu, toast
+    media/           anything that renders a title or edits an entry
+    overlays/        modal flows (confirm, preset, random pick, sign-in merge)
+    list/            the parts MediaList draws (virtual grid, rows, bulk bar)
+    stats/           the parts Statistics draws (panels, ranked list, charts)
+    EmptyState · Skeleton · KarasuMark — cross-cutting, belong to no group
+  hooks/             shared hooks (useListMutations, usePrimedLists,
+                     useColumnCount, usePanZoom, useCachedEntry)
+  i18n/              index.ts (setup) + en.ts + de.ts; `de: typeof en` enforces
+                     key parity across the two files
+  lib/               pure logic + its *.test.ts — the place testable code goes
+  pages/             one per route; settings/ holds the seven panes
+  stores/            Zustand stores (auth, theme, library, nowPlaying, …)
+src-tauri/src/
+  commands/          the whole frontend-facing surface, 62 commands by subject:
+                     auth · list · playback · prefs · system · update.
+                     `mod.rs` re-exports all of it, so `commands::x` paths and
+                     `generate_handler!` do not care which file a command is in
+  playback/          the pipeline: detection/ (Win32 windows, SMTC, Jellyfin) →
+                     recognition/ (release-name parser, fuzzy matcher) →
+                     relations (episode redirects) → scrobbler (when to write)
+  alerts/            the background passes that end in a notification —
+                     airing, sequel, stale, and notify itself
+  anilist/           auth (token handling), API client
+  db.rs              SQLite: PRAGMA user_version migrations + row helpers
+  discord.rs · library.rs · portable.rs
 scripts/             bump-version.mjs (every commit), anilist-query.mjs
-                     (validate a query live), plus the release-time
-                     rename-installer / generate-update-manifest PowerShell
+                     (validate a query live); release/ holds the two PowerShell
+                     scripts the release workflow runs
 ```
+
+**Where things go.** `lib/` is pure logic with tests beside it; `hooks/` is
+React glue; a component's folder is its answer to "what am I" — a `ui/`
+primitive knows nothing about Karasu, `shell/` is the frame around every screen,
+`media/` renders titles, `overlays/` opens over things. On the Rust side a
+folder exists only when it holds more than one file, and a command's file is
+its subject, not its age.
 
 ## Hard constraints (do not violate)
 
@@ -59,7 +78,7 @@ scripts/             bump-version.mjs (every commit), anilist-query.mjs
   AniList GraphQL API. Never introduce a server we would have to run.
 - **AniList client secret is never embedded.** Login uses the implicit OAuth
   grant only. A built-in *client id* (`BUILTIN_ANILIST_CLIENT_ID` in
-  `commands.rs`) is fine; a *secret* is not.
+  `commands/auth.rs`) is fine; a *secret* is not.
 - **The access token stays in the Rust backend.** It must never be exposed to
   the WebView / frontend JS.
 - **i18n key parity.** `de` is typed `de: typeof en`, so every English key needs
@@ -75,9 +94,12 @@ would require a hosted backend. If a requested feature depends on any of these,
 flag the dependency rather than silently building around it.
 
 Read *volumes* (`progressVolumes`) is not on this list and never was — it is one
-of AniList's own list fields, it costs nothing to carry, and the local list
-stores it as of schema v7. The rejected idea is tracking **purchases**, which
+of AniList's own list fields, it costs nothing to carry, and the local list has
+stored it since schema v7. The rejected idea is tracking **purchases**, which
 would need price data the app has no source for.
+
+The schema is at **v8**; `library_match` holds the scanner's per-title match
+confidence, which is what the local library's `exact` / `close` column reads.
 
 ## Versioning (every commit)
 
@@ -90,7 +112,7 @@ Four-part scheme **`MAJOR.MINOR.PATCH.COMMIT#`**:
 
 The three manifests (`package.json`, `src-tauri/Cargo.toml`,
 `src-tauri/tauri.conf.json`) carry the `MAJOR.MINOR.PATCH` semver core. The 4th
-segment lives in `COMMIT_NUMBER` in `src-tauri/src/commands.rs`;
+segment lives in `COMMIT_NUMBER` in `src-tauri/src/commands/update.rs`;
 `app_version()` returns the full `MAJOR.MINOR.PATCH.COMMIT#` string, which the
 About window always displays. **Bump the appropriate segment and the
 `COMMIT_NUMBER` on every commit** — via `scripts/bump-version.mjs`, which also
@@ -111,7 +133,7 @@ has **no commit number** — so the running `0.23.2.90` reaches it as a bare
 `0.23.2`, and the manifest for that same build (`0.23.2+90`) sorts above it:
 the app would download and reinstall itself on a loop. The comparator supplies
 `COMMIT_NUMBER` as the running commit number instead. `version_parts` in
-`commands.rs` treats `+` and `.` alike so both spellings compare equal.
+`commands/update.rs` treats `+` and `.` alike so both spellings compare equal.
 **Don't "tidy" that `+` back into a dot, and don't drop the comparator.**
 
 ## The commit loop
@@ -155,6 +177,13 @@ a regression here is invisible until it ships.
   contains one on purpose. Check with `grep -c $'\0' <file>` after writing.
 - **A suite that finishes far faster than usual failed early, it did not get
   faster.** The Rust suite takes ~0.5 s; a 0.02 s run means something bailed.
+- **Never pipe `npm run verify` through `grep`.** The pipe reports *grep's*
+  exit status, so a `tsc` failure sails through and gets committed. Run it bare
+  and read the exit code.
+- **A missing i18n key renders as the key.** i18next does not throw and does not
+  fall back, so `entry.scoreHint` appears on screen and nothing reports it.
+  `src/lib/i18nKeys.test.ts` resolves every literal `t("…")` in the source; the
+  `de: typeof en` type covers the other direction.
 
 ## Conventions
 
@@ -169,6 +198,12 @@ a regression here is invisible until it ships.
 - **Accent colours** derive shades + a readable ink colour (`src/lib/contrast.ts`);
   use `text-accent-ink` on accent-filled controls rather than hard-coded
   `text-white`.
+- **Overlays carry `data-overlay`.** Screen-level key handlers check for it and
+  stand down, so a dialog owns the keyboard instead of the list behind it acting
+  on the same press.
+- **Statistics scores are normalized in `userStatistics`.** AniList mixes a
+  hundred-point `meanScore` with a distribution in the user's *display* format,
+  and says so nowhere. Everything downstream is ten-point.
 
 ## Performance invariants
 
@@ -196,6 +231,10 @@ them away without re-measuring.
   `scrobble-done` listener reads that type from the store at fire time (not
   from a closure) and **must** keep its fallback to the broad key — otherwise an
   absent type leaves one list silently never refreshing.
+- **The Wrapped poster is laid out in `em` and measured twice** — once at
+  `em = 1` for its natural height, then drawn at the size that fills the
+  preset's crop. `drawMark` places the mark by its **centre**: corner anchoring
+  is what once left 52% of the bird outside the page.
 - **`matcher::prepare` preserves candidate and title order**, keeps the empty
   trigram-set guard (a NaN score pins `best` forever) and keeps the exact-match
   short circuit. `matcher.rs`'s equivalence test checks the optimized path

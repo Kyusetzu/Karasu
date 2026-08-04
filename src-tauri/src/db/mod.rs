@@ -111,6 +111,19 @@ ALTER TABLE local_list ADD COLUMN progress_volumes INTEGER NOT NULL DEFAULT 0;
 PRAGMA user_version = 7;
 ";
 
+/// How confident the scanner was about each matched title.
+///
+/// Its own table rather than a column on `library_files`: the score belongs to
+/// the *title*, and a column there would repeat it down every episode row and
+/// invite the two copies to disagree.
+const MIGRATION_V8: &str = "
+CREATE TABLE IF NOT EXISTS library_match (
+  media_id INTEGER PRIMARY KEY,
+  score REAL NOT NULL
+);
+PRAGMA user_version = 8;
+";
+
 /// One in-app notification (mirrors a shown desktop toast).
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct NotificationRow {
@@ -184,6 +197,10 @@ impl Db {
         if version < 7 {
             conn.execute_batch(MIGRATION_V7)
                 .map_err(|e| format!("Migration v7 failed: {e}"))?;
+        }
+        if version < 8 {
+            conn.execute_batch(MIGRATION_V8)
+                .map_err(|e| format!("Migration v8 failed: {e}"))?;
         }
         Ok(Db(Mutex::new(conn)))
     }
@@ -547,7 +564,15 @@ impl Db {
 
     /// Replaces the whole library index in one transaction — a scan always
     /// produces the complete picture, so a diff would only add failure modes.
-    pub fn library_replace_all(&self, rows: &[(i64, u32, String)]) -> Result<(), String> {
+    ///
+    /// `scores` goes in the same transaction for the same reason: an index that
+    /// survived a crash without its confidences would show every title as an
+    /// exact match, which is the one thing the column exists to deny.
+    pub fn library_replace_all(
+        &self,
+        rows: &[(i64, u32, String)],
+        scores: &[(i64, f64)],
+    ) -> Result<(), String> {
         let mut conn = self.0.lock().unwrap();
         let tx = conn
             .transaction()
@@ -563,8 +588,30 @@ impl Db {
                     .map_err(|e| format!("Library write failed: {e}"))?;
             }
         }
+        tx.execute("DELETE FROM library_match", [])
+            .map_err(|e| format!("Library write failed: {e}"))?;
+        {
+            let mut stmt = tx
+                .prepare("INSERT INTO library_match (media_id, score) VALUES (?1, ?2)")
+                .map_err(|e| format!("Library write failed: {e}"))?;
+            for (media_id, score) in scores {
+                stmt.execute(rusqlite::params![media_id, score])
+                    .map_err(|e| format!("Library write failed: {e}"))?;
+            }
+        }
         tx.commit()
             .map_err(|e| format!("Library write failed: {e}"))
+    }
+
+    /// Match confidence per media, for the rows the library screen draws.
+    pub fn library_scores(&self) -> Vec<(i64, f64)> {
+        let conn = self.0.lock().unwrap();
+        conn.prepare("SELECT media_id, score FROM library_match")
+            .and_then(|mut stmt| {
+                stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+                    .map(|rows| rows.filter_map(Result::ok).collect())
+            })
+            .unwrap_or_default()
     }
 
     pub fn library_all(&self) -> Vec<(i64, u32, String)> {
@@ -592,6 +639,7 @@ mod tests {
         conn.execute_batch(MIGRATION_V5).unwrap();
         conn.execute_batch(MIGRATION_V6).unwrap();
         conn.execute_batch(MIGRATION_V7).unwrap();
+        conn.execute_batch(MIGRATION_V8).unwrap();
         Db(Mutex::new(conn))
     }
 
@@ -626,20 +674,50 @@ mod tests {
         let db = mem_db();
         assert!(db.library_all().is_empty());
 
-        db.library_replace_all(&[
-            (154587, 13, "C:/anime/frieren-13.mkv".into()),
-            (154587, 14, "C:/anime/frieren-14.mkv".into()),
-        ])
+        db.library_replace_all(
+            &[
+                (154587, 13, "C:/anime/frieren-13.mkv".into()),
+                (154587, 14, "C:/anime/frieren-14.mkv".into()),
+            ],
+            &[(154587, 1.0)],
+        )
         .unwrap();
         let mut rows = db.library_all();
         rows.sort_by_key(|(_, ep, _)| *ep);
         assert_eq!(rows.len(), 2);
         assert_eq!(rows[0], (154587, 13, "C:/anime/frieren-13.mkv".into()));
 
-        db.library_replace_all(&[(1, 1, "C:/anime/other-01.mkv".into())])
+        db.library_replace_all(&[(1, 1, "C:/anime/other-01.mkv".into())], &[(1, 0.82)])
             .unwrap();
         let rows = db.library_all();
         assert_eq!(rows, vec![(1, 1, "C:/anime/other-01.mkv".to_string())]);
+    }
+
+    /// Schema v8. The scanner's confidence is the difference between "this is
+    /// the show" and "this is my best guess", and the screen says so — but only
+    /// if the number survives the restart the index already survives.
+    #[test]
+    fn library_scores_round_trip_and_replace() {
+        let db = mem_db();
+        assert!(db.library_scores().is_empty());
+
+        db.library_replace_all(
+            &[
+                (154587, 13, "C:/anime/frieren-13.mkv".into()),
+                (1, 1, "C:/anime/other-01.mkv".into()),
+            ],
+            &[(154587, 1.0), (1, 0.74)],
+        )
+        .unwrap();
+        let mut scores = db.library_scores();
+        scores.sort_by_key(|(id, _)| *id);
+        assert_eq!(scores, vec![(1, 0.74), (154587, 1.0)]);
+
+        // A rescan is the whole picture, so the previous confidences go with
+        // the previous paths rather than lingering beside them.
+        db.library_replace_all(&[(1, 1, "C:/anime/other-01.mkv".into())], &[(1, 0.91)])
+            .unwrap();
+        assert_eq!(db.library_scores(), vec![(1, 0.91)]);
     }
 
     /// Schema v7. Volumes are a second axis, not a derived one: a manga read

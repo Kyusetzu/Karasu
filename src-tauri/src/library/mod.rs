@@ -19,6 +19,8 @@ const MAX_FILES: usize = 20_000;
 #[derive(Default)]
 pub struct LibraryData {
     by_media: HashMap<i64, HashMap<u32, String>>,
+    /// The confidences live on the summary rows themselves — the only thing
+    /// that reads them is the screen, and it reads the summary.
     summary: Vec<LibraryEntry>,
 }
 
@@ -46,6 +48,10 @@ pub struct LibraryEntry {
     pub media_id: i64,
     pub episodes: Vec<u32>,
     pub files: Vec<LibraryFile>,
+    /// Matcher confidence, 0–1. `1.0` is the exact-title short circuit; the
+    /// screen says "exact" there and "close" below it, because a fuzzy match
+    /// is a guess and the user is the only one who can check it.
+    pub score: f64,
 }
 
 #[derive(serde::Serialize)]
@@ -54,6 +60,34 @@ pub struct ScanSummary {
     /// Total video files seen (matched or not).
     pub files: usize,
     pub matched: usize,
+}
+
+/// What the library screen's path row says, without needing a scan to say it.
+#[derive(serde::Serialize)]
+pub struct LibraryStatus {
+    pub path: Option<String>,
+    /// Video files the last scan walked past, matched or not.
+    #[serde(rename = "filesSeen")]
+    pub files_seen: usize,
+    /// Titles it could identify.
+    pub matched: usize,
+}
+
+/// The folder, and what the last scan made of it.
+///
+/// `ScanSummary` carries the same two counts but only as the return value of a
+/// scan, so a restart forgot them and the row had nothing to show until the
+/// user rescanned.
+#[tauri::command]
+pub fn get_library_status(db: State<'_, Db>, state: State<'_, LibraryIndex>) -> LibraryStatus {
+    LibraryStatus {
+        path: db.kv_get("library_path").filter(|p| !p.is_empty()),
+        files_seen: db
+            .kv_get("library_files_seen")
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(0),
+        matched: state.0.lock().unwrap().summary.len(),
+    }
 }
 
 #[tauri::command]
@@ -108,9 +142,9 @@ pub fn scan_library(app: AppHandle) -> Result<ScanSummary, String> {
     collect_videos(Path::new(&root), 0, &mut files);
     let total = files.len();
 
-    let by_media = index_files(&files, &candidates);
+    let (by_media, scores) = index_files(&files, &candidates);
 
-    let summary = build_summary(&by_media);
+    let summary = build_summary(&by_media, &scores);
 
     // Persist so the index survives a restart — without this every relaunch
     // drops the library and the play buttons disappear until a manual rescan.
@@ -118,7 +152,11 @@ pub fn scan_library(app: AppHandle) -> Result<ScanSummary, String> {
         .iter()
         .flat_map(|(id, eps)| eps.iter().map(move |(ep, path)| (*id, *ep, path.clone())))
         .collect();
-    db.library_replace_all(&rows)?;
+    let score_rows: Vec<(i64, f64)> = scores.iter().map(|(id, s)| (*id, *s)).collect();
+    db.library_replace_all(&rows, &score_rows)?;
+    // The count of files *walked* is not derivable from the index — most of
+    // them matched nothing — so it is stored rather than recomputed.
+    db.kv_set("library_files_seen", &total.to_string())?;
 
     let matched = summary.len();
     let state = app.state::<LibraryIndex>();
@@ -146,10 +184,11 @@ pub fn scan_library(app: AppHandle) -> Result<ScanSummary, String> {
 fn index_files(
     files: &[String],
     candidates: &[matcher::Candidate],
-) -> HashMap<i64, HashMap<u32, String>> {
+) -> (HashMap<i64, HashMap<u32, String>>, HashMap<i64, f64>) {
     let prepared = matcher::prepare(candidates);
     let mut by_media: HashMap<i64, HashMap<u32, String>> = HashMap::new();
-    let mut matched_titles: HashMap<(String, Option<u32>), Option<i64>> = HashMap::new();
+    let mut scores: HashMap<i64, f64> = HashMap::new();
+    let mut matched_titles: HashMap<(String, Option<u32>), Option<(i64, f64)>> = HashMap::new();
 
     for path in files {
         let name = Path::new(path)
@@ -159,25 +198,34 @@ fn index_files(
         let parsed = parser::parse(&name);
         let Some(episode) = parsed.episode else { continue };
 
-        let media_id = *matched_titles
+        let hit = *matched_titles
             .entry((parsed.title.clone(), parsed.season))
             .or_insert_with(|| {
-                matcher::best_match_prepared(&parsed, &prepared).map(|m| m.media_id)
+                matcher::best_match_prepared(&parsed, &prepared).map(|m| (m.media_id, m.score))
             });
 
-        if let Some(media_id) = media_id {
+        if let Some((media_id, score)) = hit {
             by_media
                 .entry(media_id)
                 .or_default()
                 .entry(episode)
                 .or_insert_with(|| path.clone());
+            // Two folders can land on one title — a season and its batch
+            // re-encode, say. The best of them is what the row should claim.
+            let best = scores.entry(media_id).or_insert(score);
+            if score > *best {
+                *best = score;
+            }
         }
     }
-    by_media
+    (by_media, scores)
 }
 
 /// Builds the sorted, frontend-facing summary from the index map.
-fn build_summary(by_media: &HashMap<i64, HashMap<u32, String>>) -> Vec<LibraryEntry> {
+fn build_summary(
+    by_media: &HashMap<i64, HashMap<u32, String>>,
+    scores: &HashMap<i64, f64>,
+) -> Vec<LibraryEntry> {
     let mut summary: Vec<LibraryEntry> = by_media
         .iter()
         .map(|(id, eps)| {
@@ -187,7 +235,12 @@ fn build_summary(by_media: &HashMap<i64, HashMap<u32, String>>) -> Vec<LibraryEn
                 .collect();
             files.sort_unstable_by_key(|f| f.episode);
             let episodes = files.iter().map(|f| f.episode).collect();
-            LibraryEntry { media_id: *id, episodes, files }
+            LibraryEntry {
+                media_id: *id,
+                episodes,
+                files,
+                score: scores.get(id).copied().unwrap_or(0.0),
+            }
         })
         .collect();
     summary.sort_by_key(|e| e.media_id);
@@ -205,7 +258,8 @@ pub fn hydrate(app: &AppHandle) {
     for (media_id, episode, path) in rows {
         by_media.entry(media_id).or_default().insert(episode, path);
     }
-    let summary = build_summary(&by_media);
+    let scores: HashMap<i64, f64> = db.library_scores().into_iter().collect();
+    let summary = build_summary(&by_media, &scores);
     let state = app.state::<LibraryIndex>();
     *state.0.lock().unwrap() = LibraryData { by_media, summary };
 }
@@ -350,7 +404,7 @@ mod tests {
             "[SubsPlease] Sousou no Frieren - 14 (1080p) [BCDE2345].mkv",
             "[SubsPlease] Sousou no Frieren - 15 (1080p) [CDEF3456].mkv",
         ]);
-        let index = index_files(&files, &frieren());
+        let (index, _) = index_files(&files, &frieren());
 
         let eps = index.get(&154587).expect("Frieren should be indexed");
         assert_eq!(eps.len(), 3);
@@ -367,7 +421,7 @@ mod tests {
         let mut files = paths(&["Totally Unrelated Show - 01.mkv", "Totally Unrelated Show - 02.mkv"]);
         files.extend(paths(&["[SubsPlease] Sousou no Frieren - 13 (1080p) [A].mkv"]));
 
-        let index = index_files(&files, &frieren());
+        let (index, _) = index_files(&files, &frieren());
         // The unmatched series contributes nothing…
         assert_eq!(index.len(), 1);
         // …and the matched one is unaffected by sharing the scan with it.
@@ -379,8 +433,21 @@ mod tests {
     #[test]
     fn files_without_an_episode_are_skipped() {
         let files = paths(&["Sousou no Frieren [Movie].mkv"]);
-        let index = index_files(&files, &frieren());
+        let (index, _) = index_files(&files, &frieren());
         assert!(index.get(&154587).is_none_or(|eps| !eps.is_empty()));
+    }
+
+    /// The match confidence rides along with the index. It is the difference
+    /// between "this is the show" and "this is my best guess", and the library
+    /// screen says which — so the scanner has to hand it over rather than
+    /// dropping it the moment it has an id.
+    #[test]
+    fn the_index_carries_its_match_confidence() {
+        let files = paths(&["[SubsPlease] Sousou no Frieren - 13 (1080p) [A].mkv"]);
+        let (index, scores) = index_files(&files, &frieren());
+        assert!(index.contains_key(&154587));
+        let score = *scores.get(&154587).expect("a matched title has a score");
+        assert!(score > 0.0 && score <= 1.0, "score out of range: {score}");
     }
 
     /// The first path wins for a duplicate (media, episode) — a re-encode in a
@@ -391,7 +458,7 @@ mod tests {
             "D:\\A\\[SubsPlease] Sousou no Frieren - 13 (1080p) [A].mkv".to_string(),
             "D:\\B\\[SubsPlease] Sousou no Frieren - 13 (720p) [B].mkv".to_string(),
         ];
-        let index = index_files(&files, &frieren());
+        let (index, _) = index_files(&files, &frieren());
         assert_eq!(index[&154587][&13], files[0]);
     }
 }

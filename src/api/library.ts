@@ -10,6 +10,13 @@ export interface TitleKey {
   title: string;
   /** -1 where the release name carried no season. */
   season: number;
+  /**
+   * Whether this parse is the one carrying a correction. A row can merge
+   * several parses and only one of them is usually corrected, so the row's own
+   * `manual` cannot say which. Optional: an index written before the field
+   * existed has none.
+   */
+  manual?: boolean;
 }
 
 export interface LibraryEntry {

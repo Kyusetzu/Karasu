@@ -9,6 +9,7 @@ use crate::playback::recognition::{matcher, parser};
 use crate::playback::scrobbler::candidates_from_cache;
 use std::collections::HashMap;
 use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use tauri::{AppHandle, Manager, State};
 
@@ -80,10 +81,23 @@ impl LibraryData {
                         *best = f.score;
                     }
                     *manual.entry(id).or_insert(false) |= f.manual;
-                    let key = TitleKey { title: f.title.clone(), season: f.season };
+                    // Per source, not only per row. One title can be the merge
+                    // of several parses — a specials folder assigned onto the
+                    // main show, say — and only one of them carries the
+                    // override. A row-level flag says "something here was
+                    // corrected" but not *which*, which is the one thing
+                    // "remove correction" needs to know.
                     let seen = sources.entry(id).or_default();
-                    if !seen.iter().any(|k| k.title == key.title && k.season == key.season) {
-                        seen.push(key);
+                    match seen
+                        .iter_mut()
+                        .find(|k| k.title == f.title && k.season == f.season)
+                    {
+                        Some(k) => k.manual |= f.manual,
+                        None => seen.push(TitleKey {
+                            title: f.title.clone(),
+                            season: f.season,
+                            manual: f.manual,
+                        }),
                     }
                 }
                 None => groups
@@ -126,6 +140,10 @@ impl LibraryData {
 pub struct TitleKey {
     pub title: String,
     pub season: i32,
+    /// Whether *this* parse is the one carrying a correction. Defaulted so an
+    /// index written before the field existed still deserializes.
+    #[serde(default)]
+    pub manual: bool,
 }
 
 /// Files that parsed to a title the matcher could not place.
@@ -147,11 +165,18 @@ pub struct Suggested {
     pub score: f64,
 }
 
-pub struct LibraryIndex(pub Mutex<LibraryData>);
+/// The index, and whether a scan is currently rebuilding it.
+///
+/// The flag is not a lock on the data — it is a lock on the *conclusion*. A
+/// scan reads the corrections once at the start and ends by replacing the whole
+/// index and both of its tables, so a correction saved in between is written,
+/// then silently overwritten minutes later. Refusing it is the honest answer;
+/// the screen already shows a rejected command's reason.
+pub struct LibraryIndex(pub Mutex<LibraryData>, pub AtomicBool);
 
 impl Default for LibraryIndex {
     fn default() -> Self {
-        LibraryIndex(Mutex::new(LibraryData::default()))
+        LibraryIndex(Mutex::new(LibraryData::default()), AtomicBool::new(false))
     }
 }
 
@@ -255,7 +280,21 @@ pub fn get_library_index(state: State<'_, LibraryIndex>) -> Vec<LibraryEntry> {
 /// have animated it was doing the scan.
 #[tauri::command(async)]
 pub async fn scan_library(app: AppHandle) -> Result<ScanSummary, String> {
-    let (root, candidates, overrides) = {
+    let index = app.state::<LibraryIndex>();
+    // A scan ends by replacing the whole index and both of its tables, so
+    // anything that writes one meanwhile is thrown away when it lands. Claim
+    // the flag before the first early return, and drop-guard it so every exit —
+    // including the two `?`s below and a panic — clears it.
+    if index
+        .1
+        .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+        .is_err()
+    {
+        return Err("A scan is already running".into());
+    }
+    let _scanning = ScanGuard(&index.1);
+
+    let (root, candidates, overrides, stored) = {
         let db = app.state::<Db>();
         let root = db
             .kv_get("library_path")
@@ -265,7 +304,16 @@ pub async fn scan_library(app: AppHandle) -> Result<ScanSummary, String> {
         if candidates.is_empty() {
             return Err("Load your anime list first, then scan".into());
         }
-        (root, candidates, override_map(&db))
+        // What AniList has already been asked. Re-asking costs a request per 25
+        // titles and returns the same answer, so a rescan of a folder that
+        // never changed would spend the whole identification budget learning
+        // nothing.
+        let stored: HashMap<(String, i32), (i64, f64)> = db
+            .library_suggestions()
+            .into_iter()
+            .map(|(t, s, id, score)| ((t, s), (id, score)))
+            .collect();
+        (root, candidates, override_map(&db), stored)
     };
 
     let mut files = Vec::new();
@@ -290,9 +338,10 @@ pub async fn scan_library(app: AppHandle) -> Result<ScanSummary, String> {
     let unknown: Vec<identify::Unidentified> = data
         .unmatched
         .iter()
+        .filter(|g| !stored.contains_key(&(g.title.clone(), g.season)))
         .map(|g| identify::Unidentified { title: g.title.clone(), season: g.season })
         .collect();
-    let suggestions = if unknown.is_empty() {
+    let fresh = if unknown.is_empty() {
         Vec::new()
     } else {
         let api = app.state::<crate::anilist::client::AniList>();
@@ -300,17 +349,27 @@ pub async fn scan_library(app: AppHandle) -> Result<ScanSummary, String> {
         identify::identify(&api, token.as_deref(), &unknown).await
     };
 
+    // The union, not just what this scan learned: `library_replace_suggestions`
+    // empties the table first, so writing only `fresh` would delete every
+    // answer the filter above just decided not to re-ask for. Carried-forward
+    // rows are kept only while their group is still unplaced — a title the
+    // scan has since matched, or whose files are gone, drops out here.
+    let suggestions: Vec<(String, i32, i64, f64)> = fresh
+        .iter()
+        .map(|s| (s.title.clone(), s.season, s.media_id, s.score))
+        .chain(data.unmatched.iter().filter_map(|g| {
+            stored
+                .get(&(g.title.clone(), g.season))
+                .map(|&(id, score)| (g.title.clone(), g.season, id, score))
+        }))
+        .collect();
+
     {
         let db = app.state::<Db>();
         // Persist so the index survives a restart — without this every relaunch
         // drops the library and the play buttons disappear until a manual rescan.
         persist(&db, &data)?;
-        db.library_replace_suggestions(
-            &suggestions
-                .iter()
-                .map(|s| (s.title.clone(), s.season, s.media_id, s.score))
-                .collect::<Vec<_>>(),
-        )?;
+        db.library_replace_suggestions(&suggestions)?;
         // The count of files *walked* is not derivable from the index — most of
         // them matched nothing — so it is stored rather than recomputed.
         db.kv_set("library_files_seen", &total.to_string())?;
@@ -318,10 +377,10 @@ pub async fn scan_library(app: AppHandle) -> Result<ScanSummary, String> {
 
     data.suggestions = suggestions
         .iter()
-        .map(|s| {
+        .map(|(title, season, media_id, score)| {
             (
-                (s.title.clone(), s.season),
-                Suggested { media_id: s.media_id, score: s.score },
+                (title.clone(), *season),
+                Suggested { media_id: *media_id, score: *score },
             )
         })
         .collect();
@@ -331,10 +390,23 @@ pub async fn scan_library(app: AppHandle) -> Result<ScanSummary, String> {
 
     let summary = data.summary.clone();
     let matched = summary.len();
-    let state = app.state::<LibraryIndex>();
-    *state.0.lock().unwrap() = data;
+    *index.0.lock().unwrap() = data;
 
     Ok(ScanSummary { entries: summary, files: total, matched })
+}
+
+/// Clears the scanning flag however `scan_library` leaves.
+///
+/// A plain `store(false)` before each `return` would be four call sites and one
+/// of them would eventually be forgotten — which is how the two early errors,
+/// the ones that fire before a single file is walked, would have left the app
+/// refusing corrections until it was restarted.
+struct ScanGuard<'a>(&'a AtomicBool);
+
+impl Drop for ScanGuard<'_> {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::Release);
+    }
 }
 
 /// The user's corrections, in the shape `index_files` looks them up by.
@@ -540,10 +612,14 @@ pub fn set_library_match(
     season: i32,
     media_id: i64,
 ) -> Result<Vec<LibraryEntry>, String> {
+    let state = app.state::<LibraryIndex>();
+    if state.1.load(Ordering::Acquire) {
+        return Err("A scan is running — try again when it finishes".into());
+    }
+
     let db = app.state::<Db>();
     db.library_override_set(&title, season, media_id)?;
 
-    let state = app.state::<LibraryIndex>();
     let mut guard = state.0.lock().unwrap();
     for f in &mut guard.files {
         if f.title == title && f.season == season {
@@ -570,17 +646,30 @@ pub fn clear_library_match(
     title: String,
     season: i32,
 ) -> Result<Vec<LibraryEntry>, String> {
-    let db = app.state::<Db>();
-    db.library_override_clear(&title, season)?;
-
     let state = app.state::<LibraryIndex>();
+    if state.1.load(Ordering::Acquire) {
+        return Err("A scan is running — try again when it finishes".into());
+    }
+
+    let db = app.state::<Db>();
+    let dropped = db.library_override_clear(&title, season)?;
+
     let mut guard = state.0.lock().unwrap();
+    let mut reset = 0usize;
     for f in &mut guard.files {
         if f.title == title && f.season == season && f.manual {
             f.media_id = None;
             f.score = 0.0;
             f.manual = false;
+            reset += 1;
         }
+    }
+    // Deleting no rows and resetting no files is not a correction removed, and
+    // reporting Ok for it closes the dialog and refetches as though something
+    // happened. The reachable case is a row whose sources were picked in walk
+    // order, so the button was offered against a parse that was never corrected.
+    if dropped == 0 && reset == 0 {
+        return Err("There is no correction on that title to remove".into());
     }
     guard.reindex();
     persist(&db, &guard)?;
@@ -855,5 +944,33 @@ mod tests {
         assert_eq!(corrected.by_media[&154587].len(), 1);
         let frieren_row = corrected.summary.iter().find(|e| e.media_id == 154587).unwrap();
         assert!(!frieren_row.manual, "the untouched row must not become manual");
+    }
+
+    /// A row can merge two parses, and only one of them may be the corrected
+    /// one. The row-level `manual` flag is the OR of them, so it cannot answer
+    /// "which parse do I remove the correction from?" — the sources have to.
+    ///
+    /// Without the per-source flag the screen offers "remove correction" keyed
+    /// on whichever parse walk order happened to put first, and picking the
+    /// auto-matched one deletes nothing while reporting success.
+    #[test]
+    fn each_source_says_whether_it_is_the_corrected_one() {
+        let files = paths(&[
+            "[SubsPlease] Sousou no Frieren - 13 (1080p) [A].mkv",
+            "[Group] Totally Unrelated Show - 01.mkv",
+        ]);
+        let plain = indexed(&files, &frieren());
+        // Point the unplaceable parse at the same show the other one matched.
+        let key = (plain.unmatched[0].title.clone(), plain.unmatched[0].season);
+        let merged = indexed_with(&files, &frieren(), &HashMap::from([(key, 154587)]));
+
+        let row = merged.summary.iter().find(|e| e.media_id == 154587).unwrap();
+        assert_eq!(row.sources.len(), 2, "two parses, one title");
+        assert!(row.manual, "the row is corrected, because one of its parses is");
+        assert_eq!(
+            row.sources.iter().filter(|s| s.manual).count(),
+            1,
+            "exactly the corrected parse carries the flag, not both",
+        );
     }
 }

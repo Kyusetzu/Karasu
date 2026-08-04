@@ -722,13 +722,16 @@ impl Db {
     }
 
     /// Forgets a correction, letting the matcher have its guess back.
-    pub fn library_override_clear(&self, title: &str, season: i32) -> Result<(), String> {
+    ///
+    /// Returns how many rows that was. Discarding the count made "there was no
+    /// correction here" indistinguishable from "removed it", and the caller
+    /// needs to tell those apart to avoid reporting success for a no-op.
+    pub fn library_override_clear(&self, title: &str, season: i32) -> Result<usize, String> {
         let conn = self.0.lock().unwrap();
         conn.execute(
             "DELETE FROM library_override WHERE title = ?1 AND season = ?2",
             rusqlite::params![title, season],
         )
-        .map(|_| ())
         .map_err(|e| format!("Could not clear the correction: {e}"))
     }
 
@@ -888,8 +891,14 @@ mod tests {
         db.library_override_set("bleach", -1, 300).unwrap();
         assert_eq!(db.library_overrides().len(), 2);
 
-        db.library_override_clear("bleach", 2).unwrap();
+        assert_eq!(db.library_override_clear("bleach", 2).unwrap(), 1);
         assert_eq!(db.library_overrides(), vec![("bleach".into(), -1, 300)]);
+
+        // Clearing a key that holds no correction is not an error, but it must
+        // not read as a removal either — the caller reports success on the
+        // strength of this number, and 0 is the whole no-op case.
+        assert_eq!(db.library_override_clear("bleach", 2).unwrap(), 0);
+        assert_eq!(db.library_override_clear("never-corrected", 1).unwrap(), 0);
     }
 
     /// The index must survive a write/read round-trip, and a rescan must

@@ -779,8 +779,11 @@ function LibraryRow({
   const exact = lib.score >= EXACT;
   // A row can be the merge of several parsed titles. Correcting it means
   // correcting the parse that produced it, so with more than one there is no
-  // single answer — offer the first, which is the one the sort put on top.
-  const source = lib.sources?.[0];
+  // single answer — offer the corrected one if there is one, since that is the
+  // parse "remove correction" has to be keyed on. Source order is walk order,
+  // so picking the first would offer the auto-matched parse about as often as
+  // not, and clearing that one deletes nothing.
+  const source = lib.sources?.find((s) => s.manual) ?? lib.sources?.[0];
 
   return (
     <div className="border-b border-surface-950 bg-surface-900 transition-surface last:border-b-0 hover:bg-surface-850">
@@ -852,7 +855,11 @@ function LibraryRow({
           <button
             type="button"
             onClick={() =>
-              onCorrect({ key: source, current: title, hasOverride: lib.manual })
+              onCorrect({
+                key: source,
+                current: title,
+                hasOverride: source.manual ?? false,
+              })
             }
             title={t("library.correctHint", { title: source.title })}
             className={cn(

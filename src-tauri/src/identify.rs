@@ -22,6 +22,15 @@ use serde_json::Value;
 /// cost six requests instead of four, out of ~30 a minute.
 const PER_REQUEST: usize = 25;
 
+/// Requests one scan may spend on identification.
+///
+/// The rate limit is ~30 a minute and it is shared with list fetches and
+/// scrobble saves, so a folder of mostly off-list series — the group key is
+/// (title, season), and `MAX_FILES` is 20_000 — must not be allowed to eat all
+/// of it. 8 batches is 200 titles, which covers a real library in one pass and
+/// bounds a pathological one. `alerts::sequel` bounds itself the same way.
+const MAX_BATCHES: usize = 8;
+
 /// One title a scan could not place.
 pub struct Unidentified {
     pub title: String,
@@ -110,24 +119,28 @@ fn score(item: &Unidentified, node: &Value) -> Option<Suggestion> {
     })
 }
 
-/// Asks AniList about every title, in batches, and keeps what scores well.
+/// Asks AniList about up to `MAX_BATCHES` batches of titles and keeps what
+/// scores well.
 ///
-/// A failed batch is skipped rather than failing the scan. Identification is an
-/// improvement on top of a scan that has already succeeded locally; losing it
-/// to a flaky connection should cost the suggestions, not the index.
+/// A failed batch ends the pass rather than failing the scan. Identification is
+/// an improvement on top of a scan that has already succeeded locally; losing
+/// it to a flaky connection should cost the suggestions, not the index. It
+/// stops rather than skipping on because the batches are identical in shape —
+/// whatever rejected one (a rate limit, most likely, after `client` has already
+/// slept out its retry) will reject the next fourteen just as fast.
 pub async fn identify(
     api: &AniList,
     token: Option<&str>,
     items: &[Unidentified],
 ) -> Vec<Suggestion> {
     let mut out = Vec::new();
-    for batch in items.chunks(PER_REQUEST) {
+    for batch in items.chunks(PER_REQUEST).take(MAX_BATCHES) {
         let refs: Vec<&Unidentified> = batch.iter().collect();
         let Ok(data) = api
             .query(token, &batch_query(&refs), serde_json::json!({}))
             .await
         else {
-            continue;
+            break;
         };
         for (i, item) in refs.iter().enumerate() {
             let Some(node) = data

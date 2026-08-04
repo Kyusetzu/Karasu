@@ -276,6 +276,18 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
 
   const startEdit = useCallback((entry: MediaListEntry) => setEditing(entry), []);
 
+  // Above the early returns because the keydown effect below has no dependency
+  // array and so re-subscribes on every commit — including the error commit,
+  // which returns before this line. Declared down there, the live listener
+  // closed over a `const` that had never been initialized, and pressing Escape
+  // (or `s` then Escape) threw a TDZ error into the window handler, where it
+  // did nothing visible. The error branch renders with a full `entries`,
+  // because a failed refetch leaves the previous `data` in place.
+  const exitSelect = useCallback(() => {
+    setSelectMode(false);
+    setSelected(new Set());
+  }, []);
+
   const selectedEntries = useMemo(
     () => entries.filter((e) => selected.has(e.mediaId)),
     [entries, selected],
@@ -419,11 +431,6 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
     selectedEntries.forEach((e) => remove.mutate(e.id));
     setSelected(new Set());
   };
-  const exitSelect = () => {
-    setSelectMode(false);
-    setSelected(new Set());
-  };
-
   return (
     <div className="flex h-full flex-col">
       {(data?.fromCache || (data?.pending ?? 0) > 0) && (

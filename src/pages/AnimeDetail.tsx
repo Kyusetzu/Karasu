@@ -38,13 +38,8 @@ import { Pill } from "@/components/ui/pill";
 import { ScoreBars } from "@/components/ui/score-bars";
 import TagEditor from "@/components/media/TagEditor";
 import { parseNotes, serializeNotes } from "@/lib/tags";
+import { sanitizeDescription } from "@/lib/description";
 
-/** AniList descriptions: strip spoilers, allow only harmless tags. */
-function sanitizeDescription(html: string): string {
-  return html
-    .replace(/~!([\s\S]*?)!~/g, "")
-    .replace(/<(?!\/?(b|i|em|strong|br)\b)[^>]*>/gi, "");
-}
 
 export default function AnimeDetail() {
   const { t, i18n } = useTranslation();

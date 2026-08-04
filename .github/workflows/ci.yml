@@ -46,7 +46,7 @@ jobs:
 
       - name: Rename installer to the full 4-part version
         shell: pwsh
-        run: ./scripts/rename-installer.ps1
+        run: ./scripts/release/rename-installer.ps1
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4

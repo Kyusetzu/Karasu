@@ -1,6 +1,6 @@
 //! Jellyfin as a detection source, via the server's own `/Sessions` endpoint.
 //!
-//! The Windows media-session pass (see `smtc`) covers Jellyfin Media Player
+//! The system media-session pass (see `media_session`) covers Jellyfin Media Player
 //! without any setup, but it only ever sees what is playing *on this PC*, and
 //! it still hands the release-name parser a string to guess at.
 //!

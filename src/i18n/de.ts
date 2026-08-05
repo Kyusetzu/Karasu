@@ -619,12 +619,12 @@ export const de: typeof en = {
     trackingConfirm: "Vorher nachfragen",
     trackingConfirmHint:
       "Vor jedem Update eine Bestätigung in der App anzeigen.",
-    smtc: "Windows-Medieninfos nutzen",
-    smtcHint:
-      "Erkennt zusätzlich Player, die ihren Titel an die Windows-Mediensteuerung melden statt ins Fenster zu schreiben. Deckt Jellyfin Media Player, Plex und Browser-Videos ab.",
-    detectionDebug: "Was Windows gerade meldet",
+    mediaSessions: "System-Medieninfos nutzen",
+    mediaSessionsHint:
+      "Erkennt zusätzlich Player, die ihren Titel an die Mediensteuerung deiner Arbeitsumgebung melden statt ins Fenster zu schreiben. Deckt Jellyfin Media Player, Plex und Browser-Videos ab.",
+    detectionDebug: "Was dein System gerade meldet",
     detectionDebugHint:
-      "Alle Mediensitzungen, die Windows aktuell kennt. Damit siehst du, was ein Player veröffentlicht, wenn er nicht erkannt wird.",
+      "Alle Mediensitzungen, die dein System aktuell kennt. Damit siehst du, was ein Player veröffentlicht, wenn er nicht erkannt wird.",
     detectionDebugEmpty: "Zurzeit meldet keine Mediensitzung etwas.",
     refreshDebug: "Aktualisieren",
     jellyfin: "Jellyfin-Server",

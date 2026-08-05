@@ -54,20 +54,26 @@ pub fn set_scrobble_settings(
     db.kv_set("scrobble_delay_min", &delay_min.to_string())
 }
 
-/// Whether the Windows media-session detection pass runs. Default on, same
-/// opt-out idiom as the other detection settings.
-pub(crate) fn read_smtc_enabled(db: &Db) -> bool {
-    db.kv_get("smtc_enabled").as_deref() != Some("0")
+/// Still spelled `smtc_enabled`, deliberately. The setting is no longer
+/// Windows-only, but renaming the key would silently reset every existing
+/// user's opt-out back to on — a migration is more code than the wart is
+/// worth.
+const MEDIA_DETECTION_KEY: &str = "smtc_enabled";
+
+/// Whether the system media-session pass runs (SMTC on Windows, MPRIS on
+/// Linux). Default on, same opt-out idiom as the other detection settings.
+pub(crate) fn read_media_detection(db: &Db) -> bool {
+    db.kv_get(MEDIA_DETECTION_KEY).as_deref() != Some("0")
 }
 
 #[tauri::command]
-pub fn get_smtc_enabled(db: State<'_, Db>) -> bool {
-    read_smtc_enabled(&db)
+pub fn get_media_detection(db: State<'_, Db>) -> bool {
+    read_media_detection(&db)
 }
 
 #[tauri::command]
-pub fn set_smtc_enabled(db: State<'_, Db>, enabled: bool) -> Result<(), String> {
-    db.kv_set("smtc_enabled", if enabled { "1" } else { "0" })
+pub fn set_media_detection(db: State<'_, Db>, enabled: bool) -> Result<(), String> {
+    db.kv_set(MEDIA_DETECTION_KEY, if enabled { "1" } else { "0" })
 }
 
 /// Everything the Jellyfin source needs, or `None` when it isn't fully
@@ -240,13 +246,13 @@ pub async fn test_jellyfin(
     crate::playback::detection::jellyfin::list_sessions(&cfg).await
 }
 
-/// Every media session Windows currently knows about, for the Settings
+/// Every media session the desktop currently knows about, for the Settings
 /// diagnostic. Players fill these fields inconsistently, so this is the only
 /// honest way to see why something was or wasn't detected.
 #[tauri::command]
-pub async fn smtc_sessions() -> Vec<crate::playback::detection::smtc::SmtcSession> {
-    // Blocking WinRT work: off the main thread, like the detection loop.
-    tokio::task::spawn_blocking(crate::playback::detection::smtc::sessions)
+pub async fn media_sessions() -> Vec<crate::playback::detection::media_session::MediaSession> {
+    // Blocking WinRT / D-Bus work: off the main thread, like the detection loop.
+    tokio::task::spawn_blocking(crate::playback::detection::media_session::sessions)
         .await
         .unwrap_or_default()
 }

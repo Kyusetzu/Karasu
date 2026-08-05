@@ -403,14 +403,14 @@ pub fn spawn(app: AppHandle) {
     tauri::async_runtime::spawn(async move {
         let mut last_raw: Option<(String, String)> = None;
         loop {
-            let (smtc_enabled, jellyfin) = {
+            let (media_detection, jellyfin) = {
                 let db = app.state::<Db>();
                 (
-                    crate::commands::read_smtc_enabled(&db),
+                    crate::commands::read_media_detection(&db),
                     crate::commands::jellyfin_config(&db),
                 )
             };
-            let playback = detection::detect_playback(smtc_enabled, jellyfin).await;
+            let playback = detection::detect_playback(media_detection, jellyfin).await;
             let raw = playback
                 .as_ref()
                 .map(|p| (p.process.clone(), p.media_title.clone()));

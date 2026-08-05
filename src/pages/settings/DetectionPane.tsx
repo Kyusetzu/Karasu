@@ -9,18 +9,18 @@ import * as api from "@/api/anilist";
 import {
   getJellyfinSettings,
   getScrobbleSettings,
-  getSmtcEnabled,
+  getMediaDetection,
   jellyfinSignIn,
   jellyfinSignOut,
   setJellyfinSettings,
   setScrobbleSettings,
-  setSmtcEnabled,
-  smtcSessions,
+  setMediaDetection,
+  mediaSessions,
   testJellyfin,
   type JellyfinSession,
   type JellyfinSettings,
   type ScrobbleSettings,
-  type SmtcSession,
+  type MediaSession,
 } from "@/stores/nowPlaying";
 import { Toggle } from "./shared";
 export function ScrobbleSection() {
@@ -29,7 +29,7 @@ export function ScrobbleSection() {
   const [airing, setAiring] = useState<boolean | null>(null);
   const [stale, setStale] = useState<api.StaleSettings | null>(null);
   const [sequel, setSequel] = useState<boolean | null>(null);
-  const [smtc, setSmtc] = useState<boolean | null>(null);
+  const [mediaOn, setMediaOn] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (!api.isTauri) return;
@@ -37,7 +37,7 @@ export function ScrobbleSection() {
     api.getAiringNotify().then(setAiring);
     api.getStaleSettings().then(setStale);
     api.getSequelNotify().then(setSequel);
-    getSmtcEnabled().then(setSmtc);
+    getMediaDetection().then(setMediaOn);
   }, []);
 
   if (!settings) return null;
@@ -81,15 +81,15 @@ export function ScrobbleSection() {
           label={t("settings.trackingConfirm")}
           hint={t("settings.trackingConfirmHint")}
         />
-        {smtc !== null && (
+        {mediaOn !== null && (
           <Toggle
-            checked={smtc}
+            checked={mediaOn}
             onChange={(v) => {
-              setSmtc(v);
-              setSmtcEnabled(v);
+              setMediaOn(v);
+              setMediaDetection(v);
             }}
-            label={t("settings.smtc")}
-            hint={t("settings.smtcHint")}
+            label={t("settings.mediaSessions")}
+            hint={t("settings.mediaSessionsHint")}
           />
         )}
         <label className="flex items-center justify-between gap-4 py-1 text-sm">
@@ -162,30 +162,30 @@ export function ScrobbleSection() {
             )}
           </>
         )}
-        <SmtcDiagnostic />
+        <MediaSessionDiagnostic />
       </div>
     </Card>
   );
 }
 
 /**
- * Shows what Windows currently reports for every media session.
+ * Shows what the desktop currently reports for every media session.
  *
  * Players disagree about which field carries the show and which carries the
  * episode, and some publish nothing at all. Without this there is no way to
- * tell "Karasu ignored it" from "the player never told Windows" — which is
+ * tell "Karasu ignored it" from "the player never told the system" — which is
  * exactly the question when a title isn't picked up.
  */
-function SmtcDiagnostic() {
+function MediaSessionDiagnostic() {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
-  const [sessions, setSessions] = useState<SmtcSession[] | null>(null);
+  const [sessions, setSessions] = useState<MediaSession[] | null>(null);
   const [busy, setBusy] = useState(false);
 
   const refresh = async () => {
     setBusy(true);
     try {
-      setSessions(await smtcSessions());
+      setSessions(await mediaSessions());
     } catch {
       setSessions([]);
     } finally {
@@ -247,6 +247,14 @@ function SmtcDiagnostic() {
                 <dd className="text-ink-300">{s.playbackType}</dd>
                 <dt>status</dt>
                 <dd className="text-ink-300">{s.status}</dd>
+                {/* MPRIS only. Rendered when present rather than always, so
+                    the Windows diagnostic looks exactly as it did. */}
+                {s.url && (
+                  <>
+                    <dt>url</dt>
+                    <dd className="break-all text-ink-300">{s.url}</dd>
+                  </>
+                )}
               </dl>
             </div>
           ))}
@@ -259,7 +267,7 @@ function SmtcDiagnostic() {
 /**
  * Optional Jellyfin server connection.
  *
- * The Windows media-session pass already covers Jellyfin Media Player with no
+ * The system media-session pass already covers Jellyfin Media Player with no
  * setup. This is for when that isn't enough: the server reports the series,
  * season and episode as separate fields, so nothing has to be parsed.
  *

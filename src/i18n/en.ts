@@ -615,12 +615,12 @@ export const en = {
       "Mark detected episodes as watched on AniList after the threshold.",
     trackingConfirm: "Ask before updating",
     trackingConfirmHint: "Show a confirmation in the app before every update.",
-    smtc: "Use Windows media info",
-    smtcHint:
-      "Also detect players that report to Windows' media controls instead of putting the title in their window. Covers Jellyfin Media Player, Plex and browser video.",
-    detectionDebug: "What Windows currently reports",
+    mediaSessions: "Use system media info",
+    mediaSessionsHint:
+      "Also detect players that report to your desktop's media controls instead of putting the title in their window. Covers Jellyfin Media Player, Plex and browser video.",
+    detectionDebug: "What your system currently reports",
     detectionDebugHint:
-      "Every media session Windows knows about right now. Use this to see what a player publishes when it isn't being detected.",
+      "Every media session your desktop knows about right now. Use this to see what a player publishes when it isn't being detected.",
     detectionDebugEmpty: "No media session is reporting anything right now.",
     refreshDebug: "Refresh",
     jellyfin: "Jellyfin server",

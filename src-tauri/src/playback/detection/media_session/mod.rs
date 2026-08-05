@@ -1,9 +1,9 @@
-//! Windows System Media Transport Controls as a detection source.
+//! The desktop's own media session as a detection source.
 //!
 //! Window-title parsing only works for players that put the file name in
 //! their title bar. Plenty don't — Jellyfin Media Player is the motivating
 //! case: its title never changes, so it was invisible to detection. But it
-//! does publish to the Windows media controls (the overlay you get with the
+//! does publish to the system's media controls (the overlay you get with the
 //! volume keys), and so do browsers playing video, Plex, and anything using
 //! the Media Session API.
 //!
@@ -11,23 +11,33 @@
 //! instead of one string to reverse-engineer, which is strictly better input
 //! than a release name.
 //!
+//! Every desktop has its own name for this. Windows calls it SMTC and exposes
+//! it through WinRT; Linux calls it MPRIS and exposes it over D-Bus. They
+//! agree closely enough on *what* a media session is that only the reading of
+//! it differs, so the shape and every decision made about it live here and the
+//! two backends supply nothing but a `Vec<MediaSession>`.
+//!
 //! Two caveats this module has to live with:
 //!   - Not every app fills the fields the same way. Which field carries the
 //!     series and which carries the episode varies, and jellyfin-web is known
 //!     to swap artist and title outright. `compose_title` is therefore
 //!     deliberately forgiving, and `sessions()` exists so the Settings
 //!     diagnostic can show exactly what a given player reports.
-//!   - Music players publish here too. `PlaybackType` is how we tell them
+//!   - Music players publish here too. `playback_type` is how we tell them
 //!     apart.
 
 use super::Playback;
 
-/// One media session as Windows sees it. Serialized straight into the
+#[cfg(windows)]
+mod smtc;
+
+/// One media session as the desktop sees it. Serialized straight into the
 /// Settings diagnostic — this is the only way to find out what a player
 /// actually publishes, short of guessing.
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
-pub struct SmtcSession {
-    /// Source app, e.g. a package family name or an executable path.
+pub struct MediaSession {
+    /// Source app: an executable path or package family name on Windows, a
+    /// D-Bus bus name on Linux.
     #[serde(rename = "appId")]
     pub app_id: String,
     pub title: String,
@@ -38,15 +48,18 @@ pub struct SmtcSession {
     pub playback_type: String,
     /// "playing" | "paused" | "stopped" | "changing" | "opened" | "closed"
     pub status: String,
+    /// What is being played, when the source says. MPRIS publishes a
+    /// `xesam:url`; SMTC has no equivalent and leaves this empty.
+    pub url: String,
 }
 
-impl SmtcSession {
+impl MediaSession {
     fn is_playing(&self) -> bool {
         self.status == "playing"
     }
 
     /// Music is excluded outright; anything else is allowed through, because
-    /// a player that leaves `PlaybackType` unset would otherwise never be
+    /// a player that leaves the type unset would otherwise never be
     /// detected. Getting a false positive from an unset video player is
     /// recoverable — the title simply won't match anything on the list.
     fn is_watchable(&self) -> bool {
@@ -83,12 +96,18 @@ pub fn compose_title(artist: &str, title: &str, album: &str) -> String {
 }
 
 /// Trims an app id down to something that reads like the other sources'
-/// `process` field ("mpv.exe", "chrome.exe"). SMTC reports either an
-/// executable path or a package family name, so both shapes are handled.
+/// `process` field ("mpv.exe", "chrome.exe"). The three shapes are an
+/// executable path, a Windows package family name, and an MPRIS bus name.
 pub fn short_app_name(app_id: &str) -> String {
     let id = app_id.trim();
     if id.is_empty() {
         return String::new();
+    }
+    // An MPRIS bus name, "org.mpris.MediaPlayer2.mpv.instance1234". Checked
+    // before the package-family branch because it has no underscore to split
+    // on and would otherwise reduce to its instance suffix.
+    if let Some(rest) = id.strip_prefix("org.mpris.MediaPlayer2.") {
+        return rest.split('.').next().unwrap_or(rest).to_lowercase();
     }
     if id.contains('\\') || id.contains('/') {
         // A path: the file name is already the right shape.
@@ -105,20 +124,18 @@ pub fn short_app_name(app_id: &str) -> String {
 }
 
 /// Picks the session to report: the first one that is playing and isn't music.
-pub fn pick(sessions: &[SmtcSession]) -> Option<&SmtcSession> {
+pub fn pick(sessions: &[MediaSession]) -> Option<&MediaSession> {
     sessions
         .iter()
         .find(|s| s.is_playing() && s.is_watchable() && s.playback_type == "video")
-        .or_else(|| {
-            sessions
-                .iter()
-                .find(|s| s.is_playing() && s.is_watchable())
-        })
+        .or_else(|| sessions.iter().find(|s| s.is_playing() && s.is_watchable()))
 }
 
-pub fn detect() -> Option<Playback> {
-    let sessions = sessions();
-    let session = pick(&sessions)?;
+/// Turns one session into a playback candidate.
+///
+/// Split out of `detect` so the mapping can be tested without a live session
+/// manager on either platform.
+pub fn playback_from(session: &MediaSession) -> Option<Playback> {
     let media_title = compose_title(&session.artist, &session.title, &session.album);
     if media_title.trim().is_empty() {
         return None;
@@ -134,135 +151,34 @@ pub fn detect() -> Option<Playback> {
     })
 }
 
-#[cfg(windows)]
-pub fn sessions() -> Vec<SmtcSession> {
-    read_sessions().unwrap_or_default()
+pub fn detect() -> Option<Playback> {
+    playback_from(pick(&sessions())?)
 }
 
-/// Non-Windows groundwork: there is no SMTC equivalent wired up yet.
+#[cfg(windows)]
+pub fn sessions() -> Vec<MediaSession> {
+    smtc::read_sessions().unwrap_or_default()
+}
+
+/// No media-session API on this platform.
 #[cfg(not(windows))]
-pub fn sessions() -> Vec<SmtcSession> {
+pub fn sessions() -> Vec<MediaSession> {
     Vec::new()
-}
-
-/// Waits for a WinRT async operation on the current thread.
-///
-/// `windows-future` only exposes `IntoFuture`, and the resulting future holds
-/// a raw COM pointer so it isn't `Send` — it can't be awaited inside the
-/// scrobbler's spawned task. Its blocking `join()` is private. Polling the
-/// public `Status()` is the remaining option, and these particular operations
-/// resolve against in-process state, so in practice the first check already
-/// succeeds. The deadline exists so a wedged session manager can never stall
-/// detection.
-#[cfg(windows)]
-fn wait_for<T>(
-    op: windows_future::IAsyncOperation<T>,
-) -> windows::core::Result<T>
-where
-    T: windows::core::RuntimeType + 'static,
-{
-    use std::time::{Duration, Instant};
-    use windows_future::AsyncStatus;
-
-    let deadline = Instant::now() + Duration::from_millis(500);
-    loop {
-        match op.Status()? {
-            AsyncStatus::Completed => return op.GetResults(),
-            AsyncStatus::Started if Instant::now() < deadline => {
-                std::thread::sleep(Duration::from_millis(2));
-            }
-            _ => return Err(windows::core::Error::empty()),
-        }
-    }
-}
-
-/// WinRT needs a COM apartment, and the detection sweep runs on a tokio
-/// blocking thread that has none. `CoIncrementMTAUsage` keeps a process-wide
-/// MTA alive, which those threads then join implicitly — once, not per call.
-#[cfg(windows)]
-fn ensure_mta() {
-    use std::sync::OnceLock;
-    static MTA: OnceLock<()> = OnceLock::new();
-    MTA.get_or_init(|| {
-        // Intentionally never released: the cookie would end the MTA on drop,
-        // and we want it for the lifetime of the process.
-        unsafe {
-            let _ = windows::Win32::System::Com::CoIncrementMTAUsage();
-        }
-    });
-}
-
-#[cfg(windows)]
-fn read_sessions() -> windows::core::Result<Vec<SmtcSession>> {
-    use windows::Media::Control::{
-        GlobalSystemMediaTransportControlsSessionManager as Manager,
-        GlobalSystemMediaTransportControlsSessionPlaybackStatus as Status,
-    };
-    use windows::Media::MediaPlaybackType;
-
-    ensure_mta();
-    let manager = wait_for(Manager::RequestAsync()?)?;
-    let mut out = Vec::new();
-
-    for session in manager.GetSessions()? {
-        // A session can vanish between listing and reading it, so a failure
-        // on any one of these is a skip, not an error for the whole sweep.
-        let Ok(props) = session.TryGetMediaPropertiesAsync().and_then(wait_for) else {
-            continue;
-        };
-        let status = session
-            .GetPlaybackInfo()
-            .and_then(|i| i.PlaybackStatus())
-            .map(|s| match s {
-                Status::Playing => "playing",
-                Status::Paused => "paused",
-                Status::Stopped => "stopped",
-                Status::Changing => "changing",
-                Status::Opened => "opened",
-                Status::Closed => "closed",
-                _ => "unknown",
-            })
-            .unwrap_or("unknown");
-
-        let playback_type = props
-            .PlaybackType()
-            .and_then(|r| r.Value())
-            .map(|t| match t {
-                MediaPlaybackType::Music => "music",
-                MediaPlaybackType::Video => "video",
-                MediaPlaybackType::Image => "image",
-                _ => "unknown",
-            })
-            .unwrap_or("unknown");
-
-        let s = |v: windows::core::Result<windows::core::HSTRING>| {
-            v.map(|h| h.to_string_lossy()).unwrap_or_default()
-        };
-
-        out.push(SmtcSession {
-            app_id: s(session.SourceAppUserModelId()),
-            title: s(props.Title()),
-            artist: s(props.Artist()),
-            album: s(props.AlbumTitle()),
-            playback_type: playback_type.to_string(),
-            status: status.to_string(),
-        });
-    }
-    Ok(out)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn session(artist: &str, title: &str, kind: &str, status: &str) -> SmtcSession {
-        SmtcSession {
+    fn session(artist: &str, title: &str, kind: &str, status: &str) -> MediaSession {
+        MediaSession {
             app_id: "C:\\Program Files\\Jellyfin Media Player\\jellyfinmediaplayer.exe".into(),
             title: title.into(),
             artist: artist.into(),
             album: String::new(),
             playback_type: kind.into(),
             status: status.into(),
+            url: String::new(),
         }
     }
 
@@ -311,7 +227,7 @@ mod tests {
 
     #[test]
     fn untyped_still_counts_when_nothing_declares_video() {
-        // A player that never sets PlaybackType must not be invisible.
+        // A player that never sets a playback type must not be invisible.
         let sessions = vec![session("A", "1", "unknown", "playing")];
         assert_eq!(pick(&sessions).unwrap().artist, "A");
     }
@@ -333,5 +249,32 @@ mod tests {
             "zunemusic"
         );
         assert_eq!(short_app_name(""), "");
+    }
+
+    /// An MPRIS bus name carries an instance suffix and no underscore, so the
+    /// package-family branch would have reduced it to "instance1234".
+    #[test]
+    fn an_mpris_bus_name_shortens_to_the_player() {
+        assert_eq!(short_app_name("org.mpris.MediaPlayer2.mpv.instance1234"), "mpv");
+        assert_eq!(short_app_name("org.mpris.MediaPlayer2.firefox.instance_1_25"), "firefox");
+        assert_eq!(short_app_name("org.mpris.MediaPlayer2.VLC"), "vlc");
+        assert_eq!(
+            short_app_name("org.mpris.MediaPlayer2.plasma-browser-integration"),
+            "plasma-browser-integration"
+        );
+    }
+
+    #[test]
+    fn a_session_with_no_usable_title_is_not_playback() {
+        assert!(playback_from(&session("  ", "  ", "video", "playing")).is_none());
+    }
+
+    #[test]
+    fn a_playing_session_becomes_a_streaming_candidate() {
+        let p = playback_from(&session("Frieren", "Episode 5", "video", "playing")).unwrap();
+        assert_eq!(p.media_title, "Frieren - Episode 5");
+        assert_eq!(p.process, "jellyfinmediaplayer.exe");
+        assert!(p.streaming);
+        assert!(!p.manga);
     }
 }

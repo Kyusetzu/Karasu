@@ -2,8 +2,8 @@
 //! (Karasu's counterpart to Taiga's Anisthesia).
 
 pub mod jellyfin;
+pub mod media_session;
 pub mod profiles;
-pub mod smtc;
 
 #[cfg(windows)]
 use windows::core::BOOL;
@@ -174,13 +174,17 @@ pub fn detect_windows() -> Option<Playback> {
 /// The Jellyfin API comes first when it is configured (server URL, API key
 /// *and* a user — see `jellyfin`): it reports the series and episode as
 /// separate fields, so it beats anything derived from a string. Window titles
-/// come next. The Windows media sessions come last —
+/// come next. The desktop's media sessions come last —
 /// a browser playing Crunchyroll appears in both, and the site-marker path
-/// produces a cleaner title, so SMTC only gets a look in when nothing
-/// recognised a window. That is exactly the Jellyfin Media Player case, where
-/// the title bar never changes.
+/// produces a cleaner title, so the session pass only gets a look in when
+/// nothing recognised a window. That is exactly the Jellyfin Media Player
+/// case, where the title bar never changes.
+///
+/// The order holds on Linux too, but the middle rung is empty there: window
+/// enumeration has no X11/Wayland backend, so the media-session pass is the
+/// only generic source and effectively runs first.
 pub async fn detect_playback(
-    smtc_enabled: bool,
+    media_detection: bool,
     jellyfin: Option<jellyfin::JellyfinConfig>,
 ) -> Option<Playback> {
     if let Some(cfg) = jellyfin {
@@ -188,9 +192,16 @@ pub async fn detect_playback(
             return Some(p);
         }
     }
-    // Blocking Win32 and WinRT work; keep it off the runtime's worker thread.
+    // Blocking Win32/WinRT and D-Bus work; keep it off the runtime's worker
+    // thread.
     tokio::task::spawn_blocking(move || {
-        detect_windows().or_else(|| if smtc_enabled { smtc::detect() } else { None })
+        detect_windows().or_else(|| {
+            if media_detection {
+                media_session::detect()
+            } else {
+                None
+            }
+        })
     })
     .await
     .unwrap_or(None)

@@ -85,26 +85,29 @@ export const setScrobbleSettings = (s: ScrobbleSettings) =>
     delayMin: s.delayMin,
   });
 
-/** Whether the Windows media-session detection pass runs. */
-export const getSmtcEnabled = () => invoke<boolean>("get_smtc_enabled");
-export const setSmtcEnabled = (enabled: boolean) =>
-  invoke<void>("set_smtc_enabled", { enabled });
+/** Whether the system media-session pass runs (SMTC on Windows, MPRIS on Linux). */
+export const getMediaDetection = () => invoke<boolean>("get_media_detection");
+export const setMediaDetection = (enabled: boolean) =>
+  invoke<void>("set_media_detection", { enabled });
 
-/** One entry of the Windows media-session list, for the Settings diagnostic. */
-export interface SmtcSession {
+/** One entry of the system media-session list, for the Settings diagnostic. */
+export interface MediaSession {
   appId: string;
   title: string;
   artist: string;
   album: string;
   playbackType: string;
   status: string;
+  /** What is playing, where the source says. MPRIS only; empty on Windows. */
+  url: string;
 }
 
 /**
- * What Windows currently reports. Players fill these fields inconsistently,
- * so this is the honest way to see why something was or wasn't detected.
+ * What the desktop currently reports. Players fill these fields
+ * inconsistently, so this is the honest way to see why something was or
+ * wasn't detected.
  */
-export const smtcSessions = () => invoke<SmtcSession[]>("smtc_sessions");
+export const mediaSessions = () => invoke<MediaSession[]>("media_sessions");
 
 export interface JellyfinSettings {
   url: string;

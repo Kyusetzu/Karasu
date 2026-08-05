@@ -25,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import KarasuMark from "@/components/KarasuMark";
 import { cn } from "@/lib/utils";
+import { isLinux, usePlatform } from "@/stores/platform";
 
 const REPO_URL = "https://github.com/Kyusetzu/Karasu";
 const DISCORD_HANDLE = "Kyusetzu";
@@ -136,6 +137,7 @@ function Row({
 
 function UpdateSection() {
   const { t } = useTranslation();
+  const platform = usePlatform((s) => s.info);
   const [busy, setBusy] = useState(false);
   const [info, setInfo] = useState<UpdateInfo | null>(null);
   const [downloading, setDownloading] = useState(false);
@@ -235,6 +237,14 @@ function UpdateSection() {
       {downloaded && (
         <p className="mt-3 text-sm text-ink-300">
           {t("about.updateReady", { version: downloaded.version })}
+        </p>
+      )}
+      {/* On Linux the updater can only replace an AppImage in place. A distro
+          package or a build run from source has to be updated the way it was
+          installed, and saying so beats a download that cannot apply. */}
+      {isLinux(platform) && !platform?.appImage && (
+        <p className="mt-3 text-sm text-ink-500">
+          {t("about.updateAppImageOnly")}
         </p>
       )}
       {error && <p className="mt-3 text-sm text-danger">{error}</p>}

@@ -302,6 +302,8 @@ export const en = {
     downloading: "Downloading update …",
     updateReady: "Update {{version}} downloaded and ready to install.",
     restartUpdate: "Restart & Update",
+    updateAppImageOnly:
+      "In-app updates work for the AppImage build. This install came from somewhere else, so update it the way you installed it.",
     installing: "Installing …",
     viewRelease: "View release page",
     contact: "Contact",
@@ -615,6 +617,8 @@ export const en = {
       "Mark detected episodes as watched on AniList after the threshold.",
     trackingConfirm: "Ask before updating",
     trackingConfirmHint: "Show a confirmation in the app before every update.",
+    mediaSessionsLinuxOnly:
+      "On Linux this is the only source that sees local players — window titles are not readable there. Turning it off leaves Jellyfin alone.",
     mediaSessions: "Use system media info",
     mediaSessionsHint:
       "Also detect players that report to your desktop's media controls instead of putting the title in their window. Covers Jellyfin Media Player, Plex and browser video.",
@@ -634,7 +638,7 @@ export const en = {
     jellyfinSignOut: "Sign out",
     jellyfinSignedIn: "Signed in as {{name}}",
     jellyfinAccountHelp:
-      "Any Jellyfin account works — no administrator rights needed. Your password is used once to sign in and is never saved; only the access token the server returns is kept, in the Windows Credential Manager. Because Karasu signs in as you, the server only ever reports your own playback.",
+      "Any Jellyfin account works — no administrator rights needed. Your password is used once to sign in and is never saved; only the access token the server returns is kept, in your system's credential store. Because Karasu signs in as you, the server only ever reports your own playback.",
     jellyfinDeviceAny: "Any device",
     jellyfinDeviceHelp:
       "Only this device counts. Clear the field to track any of your devices, including your phone or TV. Use Test connection to see what your device is actually called.",
@@ -673,9 +677,11 @@ export const en = {
     libraryMatched: "{{n}} titles matched on disk.",
     portable: "Portable mode",
     portableHint:
-      "Keep the database and token next to the executable so the whole folder can be moved (e.g. onto a USB drive).",
+      "Keep the database and token next to the executable, so everything lives in one folder instead of your user profile. The token is encrypted to this machine and account, so a copy carried elsewhere asks you to sign in again.",
     portableOn: "Portable mode is on.",
-    portableOff: "Using the default AppData location.",
+    portableAppImage:
+      "Data lives beside the .AppImage file, not inside it — the AppImage itself stays replaceable.",
+    portableOff: "Using the default application data folder.",
     portableEnable: "Enable portable mode",
     portableDisable: "Disable portable mode",
     portableLocation: "Data folder",
@@ -708,8 +714,8 @@ export const en = {
     coverSize_l: "Large",
     reduceMotion: "Reduce motion",
     reduceMotionHint:
-      "Skip animations and transitions. Already on if Windows asks for it.",
-    autostart: "Start with Windows",
+      "Skip animations and transitions. Already on if your system asks for it.",
+    autostart: "Start with the system",
     autostartHint: "Launch Karasu in the background when you sign in.",
     closeToTray: "Closing hides to the tray",
     closeToTrayHint:
@@ -723,6 +729,6 @@ export const en = {
     updateChannelPrerelease: "Rolling (latest build)",
     updateChannelStable: "Stable",
     language: "Language",
-    languageHint: "“System” follows your Windows display language.",
+    languageHint: "“System” follows your system display language.",
   },
 };

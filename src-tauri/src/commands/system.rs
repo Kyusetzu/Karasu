@@ -42,6 +42,34 @@ pub fn get_text_scale() -> f64 {
     1.0
 }
 
+// --- Platform ----------------------------------------------------------------
+
+/// What the screen needs to know about where it is running.
+///
+/// Capabilities rather than an OS string alone, because every consumer's real
+/// question is a capability — "can this self-update", "is there a folder
+/// portable mode can write to". `@tauri-apps/plugin-os` would be a new npm
+/// dependency, a new Rust dependency and a new capability grant to answer less
+/// than this does. Tray presence is deliberately *not* here: `get_close_to_tray`
+/// already reports it, and two sources for one fact is how they drift.
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlatformInfo {
+    /// "windows" | "linux" | "macos"
+    pub os: String,
+    /// Running from an AppImage. The updater can only replace one of those on
+    /// Linux, and it is the only Linux layout portable mode can write beside.
+    pub app_image: bool,
+}
+
+#[tauri::command]
+pub fn platform_info() -> PlatformInfo {
+    PlatformInfo {
+        os: std::env::consts::OS.to_string(),
+        app_image: std::env::var_os("APPIMAGE").is_some(),
+    }
+}
+
 // --- Close to tray -----------------------------------------------------------
 
 /// A constant rather than a literal because `lib.rs`'s window handler reads

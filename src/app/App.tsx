@@ -3,6 +3,7 @@ import { Routes, Route, useLocation } from "react-router";
 import { invoke } from "@tauri-apps/api/core";
 import { X } from "lucide-react";
 import { useAuth } from "@/stores/auth";
+import { usePlatform } from "@/stores/platform";
 import { useNowPlaying } from "@/stores/nowPlaying";
 import { useLibrary } from "@/stores/library";
 import { useContentFilter } from "@/stores/contentFilter";
@@ -66,6 +67,12 @@ export default function App() {
   // scaling arrives for free through WebView2; the Accessibility text-size
   // slider does not, so apply it here. 100% (the default) leaves the root at
   // the stylesheet's 16px and this is a no-op.
+  // Platform facts, read once — nothing here changes while the app is open.
+  const loadPlatform = usePlatform((s) => s.load);
+  useEffect(() => {
+    loadPlatform();
+  }, [loadPlatform]);
+
   useEffect(() => {
     if (!isTauri) return;
     getTextScale()

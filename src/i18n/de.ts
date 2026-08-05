@@ -303,6 +303,8 @@ export const de: typeof en = {
     downloading: "Update wird heruntergeladen …",
     updateReady: "Update {{version}} heruntergeladen und bereit zur Installation.",
     restartUpdate: "Neustarten & Aktualisieren",
+    updateAppImageOnly:
+      "Updates in der App funktionieren mit der AppImage-Version. Diese Installation stammt woanders her — aktualisiere sie so, wie du sie installiert hast.",
     installing: "Installiere …",
     viewRelease: "Release-Seite öffnen",
     contact: "Kontakt",
@@ -619,6 +621,8 @@ export const de: typeof en = {
     trackingConfirm: "Vorher nachfragen",
     trackingConfirmHint:
       "Vor jedem Update eine Bestätigung in der App anzeigen.",
+    mediaSessionsLinuxOnly:
+      "Unter Linux ist das die einzige Quelle, die lokale Player sieht — Fenstertitel sind dort nicht lesbar. Ausschalten lässt nur noch Jellyfin übrig.",
     mediaSessions: "System-Medieninfos nutzen",
     mediaSessionsHint:
       "Erkennt zusätzlich Player, die ihren Titel an die Mediensteuerung deiner Arbeitsumgebung melden statt ins Fenster zu schreiben. Deckt Jellyfin Media Player, Plex und Browser-Videos ab.",
@@ -638,7 +642,7 @@ export const de: typeof en = {
     jellyfinSignOut: "Abmelden",
     jellyfinSignedIn: "Angemeldet als {{name}}",
     jellyfinAccountHelp:
-      "Jedes Jellyfin-Konto funktioniert — Administratorrechte sind nicht nötig. Dein Passwort wird nur einmal zur Anmeldung verwendet und nie gespeichert; behalten wird lediglich der Zugriffstoken des Servers, im Windows-Anmeldeinformationsmanager. Da Karasu sich als du anmeldet, meldet der Server nur deine eigene Wiedergabe.",
+      "Jedes Jellyfin-Konto funktioniert — Administratorrechte sind nicht nötig. Dein Passwort wird nur einmal zur Anmeldung verwendet und nie gespeichert; behalten wird lediglich der Zugriffstoken des Servers, im Anmeldeinformationsspeicher deines Systems. Da Karasu sich als du anmeldet, meldet der Server nur deine eigene Wiedergabe.",
     jellyfinDeviceAny: "Beliebiges Gerät",
     jellyfinDeviceHelp:
       "Es zählt nur dieses Gerät. Leere das Feld, um alle deine Geräte zu erfassen, auch Handy oder TV. Mit „Verbindung testen“ siehst du, wie dein Gerät tatsächlich heißt.",
@@ -677,9 +681,11 @@ export const de: typeof en = {
     libraryMatched: "{{n}} Titel auf der Platte zugeordnet.",
     portable: "Portabler Modus",
     portableHint:
-      "Datenbank und Token neben der Anwendung speichern, damit der ganze Ordner verschoben werden kann (z. B. auf einen USB-Stick).",
+      "Datenbank und Token neben der Anwendung speichern, damit alles in einem Ordner liegt statt im Benutzerprofil. Der Token ist an diesen Rechner und dieses Konto gebunden — eine anderswo geöffnete Kopie verlangt eine neue Anmeldung.",
     portableOn: "Portabler Modus ist aktiv.",
-    portableOff: "Standard-Speicherort (AppData) wird verwendet.",
+    portableAppImage:
+      "Die Daten liegen neben der .AppImage-Datei, nicht darin — die AppImage selbst bleibt austauschbar.",
+    portableOff: "Standard-Ordner für Anwendungsdaten wird verwendet.",
     portableEnable: "Portablen Modus aktivieren",
     portableDisable: "Portablen Modus deaktivieren",
     portableLocation: "Datenordner",
@@ -712,8 +718,8 @@ export const de: typeof en = {
     coverSize_l: "Groß",
     reduceMotion: "Bewegung reduzieren",
     reduceMotionHint:
-      "Animationen und Übergänge überspringen. Bereits aktiv, wenn Windows es verlangt.",
-    autostart: "Mit Windows starten",
+      "Animationen und Übergänge überspringen. Bereits aktiv, wenn dein System es verlangt.",
+    autostart: "Mit dem System starten",
     autostartHint: "Karasu beim Anmelden automatisch im Hintergrund starten.",
     closeToTray: "Schließen minimiert in den Infobereich",
     closeToTrayHint:
@@ -728,6 +734,6 @@ export const de: typeof en = {
     updateChannelPrerelease: "Rolling (neuester Build)",
     updateChannelStable: "Stabil",
     language: "Sprache",
-    languageHint: "„System“ folgt deiner Windows-Anzeigesprache.",
+    languageHint: "„System“ folgt der Anzeigesprache deines Systems.",
   },
 };

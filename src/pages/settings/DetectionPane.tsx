@@ -22,6 +22,7 @@ import {
   type ScrobbleSettings,
   type MediaSession,
 } from "@/stores/nowPlaying";
+import { isLinux, usePlatform } from "@/stores/platform";
 import { Toggle } from "./shared";
 export function ScrobbleSection() {
   const { t } = useTranslation();
@@ -30,6 +31,7 @@ export function ScrobbleSection() {
   const [stale, setStale] = useState<api.StaleSettings | null>(null);
   const [sequel, setSequel] = useState<boolean | null>(null);
   const [mediaOn, setMediaOn] = useState<boolean | null>(null);
+  const platform = usePlatform((s) => s.info);
 
   useEffect(() => {
     if (!api.isTauri) return;
@@ -89,7 +91,14 @@ export function ScrobbleSection() {
               setMediaDetection(v);
             }}
             label={t("settings.mediaSessions")}
-            hint={t("settings.mediaSessionsHint")}
+            hint={
+              // Worth saying out loud on Linux: this pass is the only thing
+              // that sees a local player there, so switching it off is not
+              // the small refinement the generic hint suggests.
+              isLinux(platform)
+                ? t("settings.mediaSessionsLinuxOnly")
+                : t("settings.mediaSessionsHint")
+            }
           />
         )}
         <label className="flex items-center justify-between gap-4 py-1 text-sm">

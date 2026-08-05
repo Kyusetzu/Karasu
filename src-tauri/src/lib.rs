@@ -216,6 +216,7 @@ pub fn run() {
             commands::jellyfin_sign_in,
             commands::jellyfin_sign_out,
             commands::test_jellyfin,
+            commands::platform_info,
             commands::get_close_to_tray,
             commands::set_close_to_tray,
             commands::get_portable_status,

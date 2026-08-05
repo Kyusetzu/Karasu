@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import * as api from "@/api/anilist";
+import { usePlatform } from "@/stores/platform";
 import { SELECT, Toggle } from "./shared";
 interface PortableStatus {
   portable: boolean;
@@ -11,6 +12,7 @@ interface PortableStatus {
 
 export function PortableSection() {
   const { t } = useTranslation();
+  const platform = usePlatform((s) => s.info);
   const [status, setStatus] = useState<PortableStatus | null>(null);
   const [restart, setRestart] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -52,6 +54,11 @@ export function PortableSection() {
       <p className="mt-2 break-all text-xs text-ink-600">
         {t("settings.portableLocation")}: {status.dir}
       </p>
+      {platform?.appImage && (
+        <p className="mt-1 text-xs text-ink-600">
+          {t("settings.portableAppImage")}
+        </p>
+      )}
       {restart && (
         <p className="mt-2 text-sm text-gold">{t("settings.portableRestart")}</p>
       )}
@@ -67,6 +74,7 @@ interface CloseToTray {
 
 export function AdvancedSection() {
   const { t } = useTranslation();
+  const platform = usePlatform((s) => s.info);
   const [autostart, setAutostart] = useState<boolean | null>(null);
   const [updateAuto, setUpdateAuto] = useState<boolean | null>(null);
   const [closeTray, setCloseTray] = useState<CloseToTray | null>(null);
@@ -109,7 +117,10 @@ export function AdvancedSection() {
     <Card>
       <CardTitle>{t("settings.app")}</CardTitle>
       <div className="mt-3 space-y-3">
-        {autostart !== null && (
+        {/* Hidden inside an AppImage: the plugin writes the autostart entry
+            from `current_exe()`, which there is a /tmp mount that is gone by
+            the next login. The toggle would report success and never work. */}
+        {autostart !== null && !platform?.appImage && (
           <Toggle
             checked={autostart}
             onChange={toggleAutostart}

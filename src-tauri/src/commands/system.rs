@@ -42,6 +42,54 @@ pub fn get_text_scale() -> f64 {
     1.0
 }
 
+// --- Close to tray -----------------------------------------------------------
+
+/// A constant rather than a literal because `lib.rs`'s window handler reads
+/// the same key, and the two disagreeing would be invisible.
+pub const CLOSE_TO_TRAY_KEY: &str = "close_to_tray";
+
+/// Whether closing the window hides it instead of quitting.
+///
+/// Unset means "whatever this desktop can support": hiding is only safe when
+/// something can bring the window back. On Windows that is always the tray; on
+/// Linux the tray may not exist at all, and a hidden window with no tray icon
+/// is an app the user cannot reach.
+///
+/// An explicit choice always wins, including "hide anyway" with no tray —
+/// re-launching Karasu re-shows the window through the single-instance hook,
+/// so that is a recoverable preference rather than a trap.
+pub(crate) fn close_hides_window(setting: Option<&str>, tray_present: bool) -> bool {
+    match setting {
+        Some("1") => true,
+        Some("0") => false,
+        _ => tray_present,
+    }
+}
+
+#[derive(serde::Serialize)]
+pub struct CloseToTray {
+    /// What closing the window does right now.
+    pub enabled: bool,
+    /// Whether a tray icon was actually created at startup. The screen needs
+    /// this to explain *why* the setting reads the way it does — without it a
+    /// Linux user sees "closing quits" with no reason given.
+    pub tray: bool,
+}
+
+#[tauri::command]
+pub fn get_close_to_tray(app: tauri::AppHandle, db: State<'_, Db>) -> CloseToTray {
+    let tray = app.state::<crate::TrayPresent>().0;
+    CloseToTray {
+        enabled: close_hides_window(db.kv_get(CLOSE_TO_TRAY_KEY).as_deref(), tray),
+        tray,
+    }
+}
+
+#[tauri::command]
+pub fn set_close_to_tray(db: State<'_, Db>, enabled: bool) -> Result<(), String> {
+    db.kv_set(CLOSE_TO_TRAY_KEY, if enabled { "1" } else { "0" })
+}
+
 // --- Portable mode -----------------------------------------------------------
 
 #[derive(serde::Serialize)]
@@ -184,3 +232,32 @@ pub fn mark_all_notifications_read(db: State<'_, Db>) -> Result<(), String> {
 }
 
 // --- Version -----------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::close_hides_window;
+
+    /// The default has to follow the desktop, because the failure is not
+    /// symmetric: hiding with no tray loses the window, while quitting with a
+    /// tray merely surprises someone once.
+    #[test]
+    fn an_unset_preference_follows_whether_a_tray_exists() {
+        assert!(close_hides_window(None, true));
+        assert!(!close_hides_window(None, false));
+    }
+
+    /// An explicit choice wins both ways — including "hide anyway" with no
+    /// tray, which re-launching recovers from via the single-instance hook.
+    #[test]
+    fn an_explicit_preference_beats_the_tray() {
+        assert!(close_hides_window(Some("1"), false));
+        assert!(!close_hides_window(Some("0"), true));
+    }
+
+    /// Anything else is an unset preference, not a third state.
+    #[test]
+    fn an_unrecognised_value_reads_as_unset() {
+        assert!(close_hides_window(Some(""), true));
+        assert!(!close_hides_window(Some("yes"), false));
+    }
+}

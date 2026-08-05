@@ -711,6 +711,11 @@ export const en = {
       "Skip animations and transitions. Already on if Windows asks for it.",
     autostart: "Start with Windows",
     autostartHint: "Launch Karasu in the background when you sign in.",
+    closeToTray: "Closing hides to the tray",
+    closeToTrayHint:
+      "Karasu keeps running and detecting. Quit from the tray menu.",
+    closeToTrayNoTray:
+      "Your desktop has no tray icon, so closing quits — otherwise the window would have no way back.",
     updateAuto: "Automatically check for updates",
     updateAutoHint: "Checks once a day on startup and notifies you if found.",
     updateChannel: "Update channel",

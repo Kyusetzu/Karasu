@@ -20,14 +20,22 @@ export function Toggle({
   onChange,
   label,
   hint,
+  disabled,
 }: {
   checked: boolean;
   onChange: (v: boolean) => void;
   label: string;
   hint?: string;
+  /** For a setting this desktop cannot honour — the hint says why. */
+  disabled?: boolean;
 }) {
   return (
-    <label className="flex cursor-pointer items-start justify-between gap-4 py-1">
+    <label
+      className={cn(
+        "flex items-start justify-between gap-4 py-1",
+        disabled ? "cursor-not-allowed opacity-55" : "cursor-pointer",
+      )}
+    >
       <span>
         <span className="block text-sm text-ink-100">{label}</span>
         {hint && <span className="block text-xs text-ink-600">{hint}</span>}
@@ -36,10 +44,12 @@ export function Toggle({
         type="button"
         role="switch"
         aria-checked={checked}
+        disabled={disabled}
         onClick={() => onChange(!checked)}
         className={cn(
           "relative h-4.75 w-8.5 shrink-0 rounded-full transition-colors",
           checked ? "bg-accent-600" : "bg-surface-700",
+          disabled && "pointer-events-none",
         )}
       >
         <span

@@ -62,10 +62,14 @@ export default function Titlebar() {
         >
           <Square className="size-3" />
         </button>
-        {/* Closing hides to the tray — the app keeps detecting. Don't turn
-            this back into a real close. */}
+        {/* Closing still hides to the tray so the app keeps detecting — but
+            Rust decides that, not this button. `close()` raises
+            CloseRequested, whose handler is the only place that knows whether
+            a tray icon actually exists; calling `hide()` straight from here
+            hid the window on Linux desktops with no tray to restore it from.
+            Don't put `hide()` back. */}
         <button
-          onClick={() => appWindow?.hide()}
+          onClick={() => appWindow?.close()}
           className="grid h-full w-12 place-items-center text-ink-500 transition-surface hover:bg-[#b3232c] hover:text-white"
           aria-label={t("window.closeToTray")}
         >

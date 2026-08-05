@@ -60,18 +60,25 @@ export function PortableSection() {
   );
 }
 
+interface CloseToTray {
+  enabled: boolean;
+  tray: boolean;
+}
+
 export function AdvancedSection() {
   const { t } = useTranslation();
   const [autostart, setAutostart] = useState<boolean | null>(null);
   const [updateAuto, setUpdateAuto] = useState<boolean | null>(null);
+  const [closeTray, setCloseTray] = useState<CloseToTray | null>(null);
   const [updateChannel, setUpdateChannelState] =
     useState<api.UpdateChannel>("prerelease");
 
   useEffect(() => {
     if (!api.isTauri) return;
-    import("@tauri-apps/api/core").then(({ invoke }) =>
-      invoke<boolean>("get_autostart").then(setAutostart),
-    );
+    import("@tauri-apps/api/core").then(({ invoke }) => {
+      invoke<boolean>("get_autostart").then(setAutostart);
+      invoke<CloseToTray>("get_close_to_tray").then(setCloseTray);
+    });
     api.getUpdateCheckAuto().then(setUpdateAuto);
     api.getUpdateChannel().then(setUpdateChannelState);
   }, []);
@@ -80,6 +87,12 @@ export function AdvancedSection() {
     setAutostart(enabled);
     const { invoke } = await import("@tauri-apps/api/core");
     await invoke("set_autostart", { enabled });
+  };
+
+  const toggleCloseTray = async (enabled: boolean) => {
+    setCloseTray((prev) => (prev ? { ...prev, enabled } : prev));
+    const { invoke } = await import("@tauri-apps/api/core");
+    await invoke("set_close_to_tray", { enabled });
   };
 
   const toggleUpdateAuto = (enabled: boolean) => {
@@ -102,6 +115,22 @@ export function AdvancedSection() {
             onChange={toggleAutostart}
             label={t("settings.autostart")}
             hint={t("settings.autostartHint")}
+          />
+        )}
+
+        {/* Locked off where there is no tray: hiding into one that does not
+            exist is how the window becomes unreachable. */}
+        {closeTray !== null && (
+          <Toggle
+            checked={closeTray.enabled}
+            onChange={toggleCloseTray}
+            disabled={!closeTray.tray}
+            label={t("settings.closeToTray")}
+            hint={
+              closeTray.tray
+                ? t("settings.closeToTrayHint")
+                : t("settings.closeToTrayNoTray")
+            }
           />
         )}
 

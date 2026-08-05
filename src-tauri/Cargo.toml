@@ -1,6 +1,6 @@
 [package]
 name = "karasu"
-version = "0.53.9"
+version = "0.54.0"
 description = "A modern anime and manga tracker built exclusively for AniList (Windows; Linux experimental)"
 authors = ["Kyu"]
 license = "MIT"
@@ -80,6 +80,10 @@ debug = "line-tables-only"
 # Release: default codegen-units (16) already parallelises; skip LTO so the
 # bundle build stays fast (this app is I/O-bound, not CPU-bound).
 [profile.release]
+# Do not add `panic = "abort"` here. `lib.rs` catches the panic
+# `libappindicator-sys` raises when it cannot dlopen the AppIndicator library,
+# which is how the app still starts on a Linux desktop that has none. With
+# `abort` that panic kills the process instead, and the catch is silently dead.
 lto = false
 codegen-units = 16
 strip = true

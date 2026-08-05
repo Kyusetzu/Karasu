@@ -715,6 +715,11 @@ export const de: typeof en = {
       "Animationen und Übergänge überspringen. Bereits aktiv, wenn Windows es verlangt.",
     autostart: "Mit Windows starten",
     autostartHint: "Karasu beim Anmelden automatisch im Hintergrund starten.",
+    closeToTray: "Schließen minimiert in den Infobereich",
+    closeToTrayHint:
+      "Karasu läuft weiter und erkennt weiter. Beenden über das Tray-Menü.",
+    closeToTrayNoTray:
+      "Deine Arbeitsumgebung hat kein Tray-Symbol, deshalb beendet Schließen die App — sonst gäbe es keinen Weg zurück zum Fenster.",
     updateAuto: "Automatisch nach Updates suchen",
     updateAutoHint:
       "Prüft einmal täglich beim Start und benachrichtigt dich bei Funden.",

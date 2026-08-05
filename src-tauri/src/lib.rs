@@ -22,8 +22,63 @@ fn show_main_window(app: &AppHandle) {
     }
 }
 
+/// Whether a tray icon exists.
+///
+/// Nothing may hide the window without asking this first: on a desktop with no
+/// StatusNotifier host there is nothing left to click to bring it back.
+pub struct TrayPresent(pub bool);
+
+/// Builds the tray, or reports why it could not be built.
+///
+/// Split out of `setup` so the whole thing can be wrapped in `catch_unwind` —
+/// see the call site for why an ordinary `?` is not enough.
+fn build_tray(app: &tauri::App) -> tauri::Result<()> {
+    let show = MenuItem::with_id(app, "show", "Open Karasu", true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+    let menu = Menu::with_items(app, &[&show, &quit])?;
+
+    // A window with no icon is a launch worth continuing, not one worth
+    // aborting — the tray simply goes without.
+    let Some(icon) = app.default_window_icon().cloned() else {
+        return Err(tauri::Error::UnknownPath);
+    };
+
+    TrayIconBuilder::with_id("main-tray")
+        .icon(icon)
+        .tooltip("Karasu")
+        .menu(&menu)
+        .show_menu_on_left_click(false)
+        .on_menu_event(|app, event| match event.id.as_ref() {
+            "show" => show_main_window(app),
+            "quit" => app.exit(0),
+            _ => {}
+        })
+        .on_tray_icon_event(|tray, event| {
+            if let TrayIconEvent::Click {
+                button: MouseButton::Left,
+                button_state: MouseButtonState::Up,
+                ..
+            } = event
+            {
+                show_main_window(tray.app_handle());
+            }
+        })
+        .build(app)?;
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // WebKitGTK's DMA-BUF renderer paints a blank window on a long list of
+    // driver/compositor combinations — the NVIDIA proprietary driver most
+    // often. The app starts, the process runs, and the user sees nothing,
+    // which is the single most common way a Tauri app "fails" on Linux.
+    // Only set when the user has not chosen for themselves.
+    #[cfg(target_os = "linux")]
+    if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
+        std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+    }
+
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             show_main_window(app);
@@ -56,39 +111,49 @@ pub fn run() {
             // Show the idle presence right away (if Discord is enabled).
             discord::sync_current(app.handle());
 
-            let show = MenuItem::with_id(app, "show", "Open Karasu", true, None::<&str>)?;
-            let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&show, &quit])?;
-
-            TrayIconBuilder::with_id("main-tray")
-                .icon(app.default_window_icon().unwrap().clone())
-                .tooltip("Karasu")
-                .menu(&menu)
-                .show_menu_on_left_click(false)
-                .on_menu_event(|app, event| match event.id.as_ref() {
-                    "show" => show_main_window(app),
-                    "quit" => app.exit(0),
-                    _ => {}
-                })
-                .on_tray_icon_event(|tray, event| {
-                    if let TrayIconEvent::Click {
-                        button: MouseButton::Left,
-                        button_state: MouseButtonState::Up,
-                        ..
-                    } = event
-                    {
-                        show_main_window(tray.app_handle());
-                    }
-                })
-                .build(app)?;
+            // `catch_unwind`, not `?`, because the tray does not fail politely
+            // on Linux: `libappindicator-sys` *panics* when it cannot dlopen
+            // libayatana-appindicator3.so.1, and a panic walks straight past
+            // `?`. That aborted startup on every desktop without the library
+            // installed — the app did not merely lose its tray, it never came
+            // up. A dlopen probe would not be enough either: `build()` can
+            // also return Err and the menu can panic on its own.
+            //
+            // The default panic hook stays installed on purpose: the backtrace
+            // it prints is the only diagnostic a user ever gets for this.
+            let built = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                build_tray(app)
+            }));
+            let built = match built {
+                Ok(Ok(())) => true,
+                Ok(Err(e)) => {
+                    eprintln!("karasu: no tray icon ({e})");
+                    false
+                }
+                Err(_) => {
+                    eprintln!(
+                        "karasu: no tray icon (the desktop has no AppIndicator library). \
+                         Closing the window will quit instead of hiding.",
+                    );
+                    false
+                }
+            };
+            app.manage(TrayPresent(built));
 
             Ok(())
         })
         .on_window_event(|window, event| {
-            // Closing minimizes to the tray instead of quitting (quit via tray menu)
+            // Closing minimizes to the tray instead of quitting (quit via tray
+            // menu) — but only where there is a tray to minimize *to*. Hiding
+            // into a tray that does not exist leaves no way back to the window.
             if let WindowEvent::CloseRequested { api, .. } = event {
-                api.prevent_close();
-                let _ = window.hide();
+                let app = window.app_handle();
+                let tray = app.state::<TrayPresent>().0;
+                let setting = app.state::<db::Db>().kv_get(commands::CLOSE_TO_TRAY_KEY);
+                if commands::close_hides_window(setting.as_deref(), tray) {
+                    api.prevent_close();
+                    let _ = window.hide();
+                }
             }
         })
         .invoke_handler(tauri::generate_handler![
@@ -151,6 +216,8 @@ pub fn run() {
             commands::jellyfin_sign_in,
             commands::jellyfin_sign_out,
             commands::test_jellyfin,
+            commands::get_close_to_tray,
+            commands::set_close_to_tray,
             commands::get_portable_status,
             commands::enable_portable,
             commands::disable_portable,

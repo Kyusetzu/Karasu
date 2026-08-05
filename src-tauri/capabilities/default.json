@@ -1,11 +1,12 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Capability for the main window. Only what the WebView itself calls: notification, dialog and updater are driven from Rust (alerts/notify.rs, commands/system.rs and library.rs, commands/update.rs), and Tauri 2 enforces this ACL at the IPC boundary alone, so granting them here gave the page a door it never needed and the Rust side nothing. opener:allow-open-url is already inside opener:default.",
+  "description": "Capability for the main window. Only what the WebView itself calls: notification, dialog and updater are driven from Rust (alerts/notify.rs, commands/system.rs and library.rs, commands/update.rs), and Tauri 2 enforces this ACL at the IPC boundary alone, so granting them here gave the page a door it never needed and the Rust side nothing. opener:allow-open-url is already inside opener:default. allow-close is load-bearing: the titlebar's X calls close() so that Rust's CloseRequested handler decides between hiding and quitting, which is the only place that knows whether a tray exists.",
   "windows": ["main"],
   "permissions": [
     "core:default",
     "opener:default",
+    "core:window:allow-close",
     "core:window:allow-minimize",
     "core:window:allow-unminimize",
     "core:window:allow-toggle-maximize",

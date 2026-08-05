@@ -69,7 +69,7 @@ src-tauri/src/
                      scan, scored by the same matcher
   discord.rs · library.rs · portable.rs
 scripts/             bump-version.mjs (every commit), anilist-query.mjs
-                     (validate a query live); release/ holds the two PowerShell
+                     (validate a query live); release/ holds the three PowerShell
                      scripts the release workflow runs
 ```
 

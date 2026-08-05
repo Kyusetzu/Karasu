@@ -50,16 +50,40 @@ $fullVersion = "$packageVersion+$commitNumber"
 $downloadUrl = "https://github.com/Kyusetzu/Karasu/releases/download/latest/$($installer.Name)"
 $pubDate = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
 
+$platforms = [ordered]@{
+    "windows-x86_64" = [ordered]@{
+        signature = $signature.Trim()
+        url       = $downloadUrl
+    }
+}
+
+# The Linux leg is optional on purpose. Its build job is a soft dependency, so
+# a broken AppImage must not hold back a working Windows release — the manifest
+# simply describes what actually exists. `linux-x86_64` is
+# tauri-plugin-updater's own target key ({os}-{arch}); a client looks up only
+# its own key and errors only when *that* one is missing, so adding this cannot
+# affect Windows. The `version` field is shared, which is correct: same commit,
+# same version, two artifacts.
+$linuxDir = Join-Path $repoRoot "linux-artifacts"
+$appimage = Get-ChildItem -Path $linuxDir -Filter "*.AppImage" -ErrorAction SilentlyContinue |
+    Sort-Object LastWriteTime -Descending |
+    Select-Object -First 1
+if ($appimage) {
+    $appimageSig = "$($appimage.FullName).sig"
+    if (-not (Test-Path $appimageSig)) {
+        throw "An AppImage was published but is unsigned: $($appimage.Name). The updater would offer a download it cannot verify."
+    }
+    $platforms["linux-x86_64"] = [ordered]@{
+        signature = (Get-Content $appimageSig -Raw).Trim()
+        url       = "https://github.com/Kyusetzu/Karasu/releases/download/latest/$($appimage.Name)"
+    }
+}
+
 $manifest = [ordered]@{
     version   = $fullVersion
     notes     = "Automated build from the latest commit on main."
     pub_date  = $pubDate
-    platforms = [ordered]@{
-        "windows-x86_64" = [ordered]@{
-            signature = $signature.Trim()
-            url       = $downloadUrl
-        }
-    }
+    platforms = $platforms
 }
 
 $outPath = Join-Path $repoRoot "latest.json"

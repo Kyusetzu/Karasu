@@ -12,8 +12,85 @@ permissions:
   contents: write
 
 jobs:
+  # Builds the Linux artifact and hands it to the publisher below as an
+  # artifact. A matrix was the obvious shape and the wrong one: every
+  # post-build step here is PowerShell against `bundle/nsis`, `latest.json` has
+  # to describe *both* platforms so it can only be written once both builds
+  # exist, and the prune step would run twice with each leg deleting the
+  # other's asset.
+  #
+  # ubuntu-22.04 for glibc reach — see ci.yml for the reasoning.
+  build-linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Tauri system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libglib2.0-dev \
+            libdbus-1-dev \
+            patchelf \
+            file
+
+      - name: Cache Rust build
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify (typecheck + frontend tests + Rust tests)
+        run: npm run verify
+
+      - name: Build AppImage
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          NO_STRIP: true
+        run: npx tauri build --config '{"bundle":{"createUpdaterArtifacts":true}}'
+
+      # First release run: confirm what the updater artifacts are actually
+      # called before trusting latest.json's linux-x86_64 url.
+      - name: List bundle output
+        run: ls -la src-tauri/target/release/bundle/appimage
+
+      - name: Rename AppImage to the full 4-part version
+        shell: pwsh
+        run: ./scripts/release/rename-appimage.ps1
+
+      - name: Upload AppImage
+        uses: actions/upload-artifact@v7
+        with:
+          name: karasu-linux
+          path: |
+            src-tauri/target/release/bundle/appimage/*.AppImage
+            src-tauri/target/release/bundle/appimage/*.AppImage.sig
+          if-no-files-found: error
+
   build-and-publish:
     runs-on: windows-latest
+    # Soft: `always()` plus continue-on-error on the download means a broken
+    # Linux build costs the Linux artifact, not the Windows release. The
+    # manifest generator emits only the platforms whose artifacts it finds.
+    needs: [build-linux]
+    if: always()
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -34,6 +111,16 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      # Flattened into linux-artifacts/. continue-on-error so a missing or
+      # failed Linux build degrades to a Windows-only release rather than
+      # taking the whole thing down.
+      - name: Download the Linux AppImage
+        continue-on-error: true
+        uses: actions/download-artifact@v7
+        with:
+          name: karasu-linux
+          path: linux-artifacts
 
       # This job publishes straight to users, and it triggers on the same push
       # as ci.yml rather than after it, so nothing was gating it. `tauri build`
@@ -64,8 +151,16 @@ jobs:
           $installer = Get-ChildItem -Path "src-tauri/target/release/bundle/nsis" -Filter *.exe |
               Sort-Object LastWriteTime -Descending |
               Select-Object -First 1
+          $lines = @()
           $hash = Get-FileHash -Algorithm SHA256 -Path $installer.FullName
-          "$($hash.Hash.ToLower())  $($installer.Name)" | Out-File -FilePath SHA256SUMS.txt -Encoding utf8
+          $lines += "$($hash.Hash.ToLower())  $($installer.Name)"
+          $appimage = Get-ChildItem -Path "linux-artifacts" -Filter *.AppImage -ErrorAction SilentlyContinue |
+              Select-Object -First 1
+          if ($appimage) {
+            $h = Get-FileHash -Algorithm SHA256 -Path $appimage.FullName
+            $lines += "$($h.Hash.ToLower())  $($appimage.Name)"
+          }
+          $lines | Out-File -FilePath SHA256SUMS.txt -Encoding utf8
 
       - name: Scan installer with VirusTotal
         id: virustotal
@@ -86,9 +181,18 @@ jobs:
           body: |
             Automated build from the latest commit on `main` (${{ github.sha }}).
 
-            This installer is **unsigned** — Windows SmartScreen may warn on
-            first run. Verify the download against `SHA256SUMS.txt` if you
-            want to confirm it wasn't tampered with in transit.
+            **Windows** — the `.exe` installer. It is **unsigned**, so
+            SmartScreen may warn on first run. Verify the download against
+            `SHA256SUMS.txt` if you want to confirm it wasn't tampered with in
+            transit.
+
+            **Linux** — the `.AppImage`, x86_64. `chmod +x` it and run it; it
+            works on Ubuntu 22.04+, Debian 12+ and Arch. It needs
+            **webkit2gtk-4.1** present on the system (`libwebkit2gtk-4.1-0` on
+            Ubuntu/Debian, `webkit2gtk-4.1` on Arch) — that one is not bundled.
+            For a tray icon you also need a StatusNotifier host; on GNOME that
+            means the AppIndicator extension. Without one Karasu still runs and
+            closing the window quits instead of hiding.
 
             Karasu's built-in updater (About page, or automatic daily checks)
             verifies updates against its own signing key regardless — see
@@ -97,6 +201,7 @@ jobs:
             VirusTotal scan: ${{ steps.virustotal.outputs.analysis || 'unavailable for this release' }}
           files: |
             src-tauri/target/release/bundle/nsis/*.exe
+            linux-artifacts/*.AppImage
             SHA256SUMS.txt
             latest.json
 
@@ -111,6 +216,12 @@ jobs:
         shell: pwsh
         run: |
           $keep = @("${{ steps.installer.outputs.installer }}", "SHA256SUMS.txt", "latest.json")
+          # Read from the downloaded folder rather than plumbing an output
+          # across jobs — and it must be here, or the prune deletes the
+          # AppImage seconds after uploading it.
+          $appimage = Get-ChildItem -Path "linux-artifacts" -Filter *.AppImage -ErrorAction SilentlyContinue |
+              Select-Object -First 1
+          if ($appimage) { $keep += $appimage.Name }
           Write-Host "Keeping: $($keep -join ', ')"
           $assets = gh release view latest --json assets --jq '.assets[].name'
           foreach ($name in $assets) {

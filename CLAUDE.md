@@ -173,7 +173,9 @@ drift. It short-circuits, so a type error stops it before the tests.
 
 For build-affecting changes — dependencies, `tauri.conf.json`, anything in the
 bundle — also run `npm run tauri build` as a smoke check. On Windows only the
-NSIS bundle builds; `deb`/`appimage` are correctly skipped.
+NSIS bundle builds and `appimage` is correctly skipped; the AppImage is built by
+the `linux-build` job in CI, which is also the only place Linux-only code is
+compiled at all.
 
 Prefer extracting pure logic into `src/lib/*.ts` (or a pure Rust fn) and unit
 testing it. Untestable-by-construction logic in a component is the usual reason
@@ -195,6 +197,18 @@ a regression here is invisible until it ships.
 - **Never pipe `npm run verify` through `grep`.** The pipe reports *grep's*
   exit status, so a `tsc` failure sails through and gets committed. Run it bare
   and read the exit code.
+- **Never add `panic = "abort"` to `[profile.release]`.** `lib.rs` catches the
+  panic `libappindicator-sys` raises when it cannot dlopen the AppIndicator
+  library — that catch is the only reason Karasu starts on a Linux desktop
+  without it, and `abort` would silently kill it.
+- **The media-detection kv key is still spelled `smtc_enabled`.** The setting
+  is no longer Windows-only, but renaming the key would reset every existing
+  user's opt-out. It is behind `MEDIA_DETECTION_KEY` in `commands/playback.rs`.
+- **Linux-only code does not compile on Windows**, so `cargo test` here proves
+  nothing about it. Either let CI's `linux-build` job be the check, or — for a
+  pure-Rust dependency like zbus or chacha20poly1305 — paste the module into a
+  throwaway crate and `cargo check` it locally. That caught two real errors in
+  the MPRIS backend that would otherwise have gone to CI.
 - **A missing i18n key renders as the key.** i18next does not throw and does not
   fall back, so `entry.scoreHint` appears on screen and nothing reports it.
   `src/lib/i18nKeys.test.ts` resolves every literal `t("…")` in the source; the
@@ -208,8 +222,14 @@ a regression here is invisible until it ships.
   a throwaway Node script), since the schema is the source of truth.
 - **DB changes go through a new `MIGRATION_V*`** guarded by PRAGMA
   `user_version`; add a `mem_db()` test.
-- **Platform-specific Rust is `#[cfg(...)]`-gated** with a non-Windows fallback
-  so the crate still compiles on Linux.
+- **Platform-specific Rust is `#[cfg(...)]`-gated**, and both Windows and Linux
+  are real implementations rather than one plus a stub. Keep the pure decisions
+  out of the gated modules — `media_session/mod.rs` is the pattern: the backends
+  supply data, the shared module decides, and its tests then run on both
+  platforms instead of only in the Linux CI job. macOS is deliberately *not*
+  covered: the keyring dependency is `cfg(target_os = "linux")`, so a macOS
+  build fails at the manifest rather than compiling a Secret Service backend
+  that cannot work there.
 - **Accent colours** derive shades + a readable ink colour (`src/lib/contrast.ts`);
   use `text-accent-ink` on accent-filled controls rather than hard-coded
   `text-white`.

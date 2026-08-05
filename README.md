@@ -11,7 +11,7 @@
 <p align="center">
   <a href="https://github.com/Kyusetzu/Karasu/actions/workflows/ci.yml"><img src="https://github.com/Kyusetzu/Karasu/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
   <img src="https://img.shields.io/badge/platform-Windows-0078D6?logo=windows&logoColor=white" alt="Windows" />
-  <img src="https://img.shields.io/badge/Linux-experimental-FCC624?logo=linux&logoColor=black" alt="Linux (experimental)" />
+  <img src="https://img.shields.io/badge/platform-Linux-FCC624?logo=linux&logoColor=black" alt="Linux" />
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT" /></a>
   <img src="https://img.shields.io/github/v/release/Kyusetzu/Karasu?include_prereleases&label=release" alt="Release" />
   <a href="https://discord.gg/yeHNSGyM8F"><img src="https://img.shields.io/badge/Discord-Kyu's%20Cozy%20Corner-5865F2?logo=discord&logoColor=white" alt="Discord" /></a>
@@ -23,7 +23,8 @@
 
 Karasu watches your list for you. Play an episode in your video player, read a
 chapter in your browser, and Karasu recognizes it and updates your AniList
-progress automatically — no buttons to press. It lives in your system tray,
+progress automatically — no buttons to press. It lives in your system tray
+where your desktop has one,
 speaks English and German, and is built as a small native app with Tauri, React
 and Rust.
 
@@ -177,22 +178,35 @@ account** to track locally and connect later.
 > independently verifies every update it installs against its own signing
 > key, regardless of SmartScreen.
 
-> **Platforms.** Windows is the supported target. Linux (Ubuntu) support is
-> experimental groundwork: the app compiles and its tests run on Linux in CI,
-> but window detection and encrypted portable-token storage are not implemented
-> there yet, and no Linux build is published.
+> **Platforms.** Windows and Linux, both x86_64.
+>
+> Linux ships as an **AppImage** — one file for Ubuntu, Debian and Arch alike.
+> It is built on Ubuntu 22.04, so it needs **glibc ≥ 2.35**, and it expects
+> **webkit2gtk-4.1** on the system (`libwebkit2gtk-4.1-0` on Ubuntu/Debian,
+> `webkit2gtk-4.1` on Arch); that one is not bundled. A tray icon needs a
+> StatusNotifier host — on GNOME, the AppIndicator extension — and without one
+> Karasu still runs, but closing the window quits instead of hiding it.
+>
+> Detection differs. Window titles are read on Windows only: there is no
+> X11/Wayland enumerator, and under Wayland one application cannot read
+> another's windows at all. On Linux the sources are **MPRIS** — which covers
+> mpv (with the `mpv-mpris` plugin), VLC, SMPlayer and browser video — plus the
+> optional Jellyfin server. Manga sites, which publish no MPRIS, are not
+> detected there.
 
 ## Development
 
 Prerequisites: [Node.js](https://nodejs.org) ≥ 22.22, [Rust](https://rustup.rs)
 (MSVC toolchain on Windows), VS Build Tools with the C++ workload, WebView2
 (included in Windows 11). On Ubuntu, install `libwebkit2gtk-4.1-dev`,
-`libgtk-3-dev`, `libayatana-appindicator3-dev` and `librsvg2-dev`.
+`libgtk-3-dev`, `libayatana-appindicator3-dev`, `librsvg2-dev`,
+`libglib2.0-dev`, `libdbus-1-dev`, `patchelf` and `file` — the same list
+`.github/workflows/ci.yml` installs, so the two cannot drift.
 
 ```sh
 npm install
 npm run tauri dev    # development build with hot reload
-npm run tauri build  # release build + installer (NSIS on Windows)
+npm run tauri build  # release build (NSIS on Windows, AppImage on Linux)
 
 npm run typecheck    # TypeScript
 npm test             # frontend unit tests (vitest)
@@ -211,8 +225,8 @@ running version is shown in the About window.
 | Frontend | React 19 + TypeScript + Vite + Tailwind CSS v4 |
 | State | TanStack Query (server), Zustand (client), i18next (i18n) |
 | Rendering | `@tanstack/react-virtual` for the anime and manga lists, so a several-thousand-entry list only mounts the rows near the viewport |
-| Storage | SQLite via rusqlite (cache, offline queue, local list, notifications, settings); tokens in the OS credential store (Windows Credential Manager, Secret Service on Linux) |
-| Detection | Win32 window enumeration + Windows media sessions (SMTC), with an optional Jellyfin `/Sessions` source; titles resolved by a custom release-name parser (Anitomy equivalent) |
+| Storage | SQLite via rusqlite (cache, offline queue, local list, notifications, settings); tokens in the OS credential store (Windows Credential Manager, Secret Service on Linux). In portable mode the token is a file instead, encrypted with DPAPI on Windows and XChaCha20-Poly1305 under a Secret Service-held key on Linux — bound to the machine and account either way |
+| Detection | System media sessions (SMTC on Windows, MPRIS on Linux) + Win32 window enumeration (Windows only) + an optional Jellyfin `/Sessions` source; titles resolved by a custom release-name parser (Anitomy equivalent) |
 | Theming | One accent colour in, a whole palette out — shades, the two companion wash hues and a readable ink are derived at runtime in `src/lib/contrast.ts`, contrast-checked against both themes |
 
 ### Shared application IDs

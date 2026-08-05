@@ -1,20 +1,38 @@
 //! Portable mode: when a `karasu.portable` marker file sits next to the
 //! executable, Karasu keeps its database and token in a `data` folder
-//! beside the exe instead of in the user's AppData, so the whole folder
-//! can be carried on a USB drive. The token is DPAPI-encrypted (see auth).
+//! beside the exe instead of in the user's AppData. The token is encrypted
+//! either way — DPAPI on Windows, XChaCha20-Poly1305 on Linux (see auth).
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 const MARKER: &str = "karasu.portable";
 const DATA_DIR: &str = "data";
 const TOKEN_FILE: &str = "token.dat";
 
-/// Directory containing the running executable.
-pub fn exe_dir() -> Option<PathBuf> {
-    std::env::current_exe()
-        .ok()?
-        .parent()
+/// The folder portable mode works out of, from the two inputs that decide it.
+///
+/// Split from `exe_dir` so the AppImage case can be tested without one.
+/// `$APPIMAGE` wins because inside an AppImage `current_exe()` resolves into
+/// the throwaway `/tmp/.mount_XXXX` squashfs: the marker written there would
+/// never be found again, and the data folder would cease to exist the moment
+/// the process ends. `$APPIMAGE` is the real path of the `.AppImage` file, and
+/// its folder is the one the user can actually see.
+fn base_dir(appimage: Option<&Path>, current_exe: Option<&Path>) -> Option<PathBuf> {
+    appimage
+        .or(current_exe)
+        .and_then(|p| p.parent())
         .map(|p| p.to_path_buf())
+}
+
+/// Directory portable mode reads and writes.
+pub fn exe_dir() -> Option<PathBuf> {
+    #[cfg(target_os = "linux")]
+    let appimage = std::env::var_os("APPIMAGE").map(PathBuf::from);
+    #[cfg(not(target_os = "linux"))]
+    let appimage: Option<PathBuf> = None;
+
+    let current = std::env::current_exe().ok();
+    base_dir(appimage.as_deref(), current.as_deref())
 }
 
 fn marker_path() -> Option<PathBuf> {
@@ -73,8 +91,28 @@ mod tests {
     #[test]
     fn data_dir_uses_fallback_when_not_portable() {
         // In the test binary there is no marker, so the fallback is used.
-        let fallback = PathBuf::from("C:/some/appdata");
+        let fallback = PathBuf::from("karasu-test-appdata");
         assert_eq!(data_dir(fallback.clone()), fallback);
+    }
+
+    /// Inside an AppImage `current_exe()` points into a temporary mount that
+    /// is gone as soon as the process ends, so `$APPIMAGE` has to win — the
+    /// whole point of portable mode is a folder that is still there next time.
+    #[test]
+    fn an_appimage_path_beats_the_mounted_executable() {
+        let appimage = PathBuf::from("/home/kyu/Apps/Karasu.AppImage");
+        let mounted = PathBuf::from("/tmp/.mount_KarasuAbc123/usr/bin/karasu");
+        assert_eq!(
+            base_dir(Some(&appimage), Some(&mounted)),
+            Some(PathBuf::from("/home/kyu/Apps")),
+        );
+    }
+
+    #[test]
+    fn without_an_appimage_the_executable_decides() {
+        let exe = PathBuf::from("/usr/local/bin/karasu");
+        assert_eq!(base_dir(None, Some(&exe)), Some(PathBuf::from("/usr/local/bin")));
+        assert_eq!(base_dir(None, None), None);
     }
 
     #[test]

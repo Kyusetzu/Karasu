@@ -1,10 +1,15 @@
 //! Token storage. In normal installs the token lives in the OS credential
 //! store (keyring — Windows Credential Manager, or the Secret Service on
 //! Linux). In portable mode it is stored in a file next to the executable so
-//! it travels with the folder: DPAPI-encrypted on Windows; on other platforms
-//! (Linux groundwork) it is currently stored unencrypted — a future
-//! platform-keystore/passphrase step is needed there. Either way the token
-//! never leaves the Rust backend.
+//! it travels with the folder, encrypted on both platforms: DPAPI on Windows,
+//! XChaCha20-Poly1305 under a Secret Service-held key on Linux. Either way the
+//! token never leaves the Rust backend.
+//!
+//! Both schemes bind the file to the machine and account, and that is not an
+//! accident of the Linux one. `CryptProtectData` with no entropy has always
+//! been per-user, so a Windows portable token has never decrypted on another
+//! machine either. The folder is portable; the sign-in is not, on either
+//! platform.
 
 const SERVICE: &str = "dev.kyu.karasu";
 const USER: &str = "anilist";
@@ -76,15 +81,24 @@ fn unprotect(data: &[u8]) -> Result<Vec<u8>, String> {
     dpapi_unprotect(data)
 }
 
-// Non-Windows groundwork: store as-is for now. NOT encrypted — a platform
-// keystore or passphrase should back this before portable mode ships on Linux.
-#[cfg(not(windows))]
+#[cfg(target_os = "linux")]
 fn protect(data: &[u8]) -> Result<Vec<u8>, String> {
-    Ok(data.to_vec())
+    seal(&portable_key()?, data)
 }
-#[cfg(not(windows))]
+#[cfg(target_os = "linux")]
 fn unprotect(data: &[u8]) -> Result<Vec<u8>, String> {
-    Ok(data.to_vec())
+    open(&portable_key()?, data)
+}
+
+/// No at-rest protection available, so portable mode is refused outright
+/// rather than writing a bearer token in the clear.
+#[cfg(not(any(windows, target_os = "linux")))]
+fn protect(_data: &[u8]) -> Result<Vec<u8>, String> {
+    Err("Portable mode is not supported on this platform".into())
+}
+#[cfg(not(any(windows, target_os = "linux")))]
+fn unprotect(_data: &[u8]) -> Result<Vec<u8>, String> {
+    Err("Portable mode is not supported on this platform".into())
 }
 
 /// Encrypts bytes with the Windows Data Protection API (per-user).
@@ -196,5 +210,138 @@ mod tests {
             extract_token("access_token=xyz&token_type=Bearer"),
             "xyz"
         );
+    }
+}
+
+// --- Linux portable-token encryption ----------------------------------------
+
+/// Credential-store entry holding the key the portable token file is sealed
+/// with. Separate from the token entry: this one exists precisely so the token
+/// does *not* have to live in the credential store.
+#[cfg(target_os = "linux")]
+const PORTABLE_KEY_USER: &str = "portable-key";
+
+/// Distinguishes this file format from the plaintext one that never shipped,
+/// and gives a future change something to branch on. Without it a wrong-format
+/// file reaches the AEAD as garbage and fails with nothing to say.
+#[cfg(target_os = "linux")]
+const MAGIC: &[u8; 5] = b"KRSU1";
+#[cfg(target_os = "linux")]
+const NONCE_LEN: usize = 24;
+
+/// The portable file's key, generated on first use and kept in the Secret
+/// Service.
+///
+/// Failing closed is deliberate. The alternative — writing the token in the
+/// clear when no keyring daemon is running — is what this replaces, and
+/// shipping that under the word "encrypted" would be a lie. Note the default,
+/// non-portable path already requires the Secret Service (`entry()` above), so
+/// this asks for nothing new; a desktop without one cannot store a token at
+/// all, in either mode.
+#[cfg(target_os = "linux")]
+fn portable_key() -> Result<[u8; 32], String> {
+    use base64::Engine as _;
+    let engine = base64::engine::general_purpose::STANDARD;
+    let store = keyring::Entry::new(SERVICE, PORTABLE_KEY_USER)
+        .map_err(|e| format!("Portable mode needs a login keyring: {e}"))?;
+
+    if let Ok(existing) = store.get_password() {
+        if let Ok(raw) = engine.decode(existing.trim()) {
+            if let Ok(key) = <[u8; 32]>::try_from(raw.as_slice()) {
+                return Ok(key);
+            }
+        }
+        // A key that cannot be read is worse than none: it would decrypt
+        // nothing and silently re-seal under a new one. Say so instead.
+        return Err("The stored portable key is unreadable; sign in again".into());
+    }
+
+    let mut key = [0u8; 32];
+    use chacha20poly1305::aead::rand_core::RngCore;
+    chacha20poly1305::aead::OsRng.fill_bytes(&mut key);
+    store
+        .set_password(&engine.encode(key))
+        .map_err(|e| format!("Portable mode needs a login keyring to hold its key: {e}"))?;
+    Ok(key)
+}
+
+#[cfg(target_os = "linux")]
+fn seal(key: &[u8; 32], plain: &[u8]) -> Result<Vec<u8>, String> {
+    use chacha20poly1305::aead::{Aead, KeyInit, OsRng};
+    use chacha20poly1305::{XChaCha20Poly1305, XNonce};
+    use chacha20poly1305::aead::rand_core::RngCore;
+
+    let cipher = XChaCha20Poly1305::new(key.into());
+    let mut nonce = [0u8; NONCE_LEN];
+    OsRng.fill_bytes(&mut nonce);
+    let ct = cipher
+        .encrypt(XNonce::from_slice(&nonce), plain)
+        .map_err(|_| "Could not encrypt the token".to_string())?;
+
+    let mut out = Vec::with_capacity(MAGIC.len() + NONCE_LEN + ct.len());
+    out.extend_from_slice(MAGIC);
+    out.extend_from_slice(&nonce);
+    out.extend_from_slice(&ct);
+    Ok(out)
+}
+
+#[cfg(target_os = "linux")]
+fn open(key: &[u8; 32], blob: &[u8]) -> Result<Vec<u8>, String> {
+    use chacha20poly1305::aead::{Aead, KeyInit};
+    use chacha20poly1305::{XChaCha20Poly1305, XNonce};
+
+    // Length first, so a short file is an error rather than a panic on the
+    // slice below — the obvious way to get this wrong.
+    let head = MAGIC.len() + NONCE_LEN;
+    if blob.len() <= head || &blob[..MAGIC.len()] != MAGIC {
+        return Err("That token file is not in a format Karasu wrote".into());
+    }
+    let cipher = XChaCha20Poly1305::new(key.into());
+    cipher
+        .decrypt(
+            XNonce::from_slice(&blob[MAGIC.len()..head]),
+            &blob[head..],
+        )
+        .map_err(|_| "Could not decrypt the token; sign in again".to_string())
+}
+
+#[cfg(all(test, target_os = "linux"))]
+mod portable_crypto_tests {
+    use super::*;
+
+    const KEY: [u8; 32] = [7u8; 32];
+
+    #[test]
+    fn a_sealed_token_round_trips() {
+        let sealed = seal(&KEY, b"a.token.value").unwrap();
+        assert!(sealed.starts_with(MAGIC), "the format has to be identifiable");
+        assert_eq!(open(&KEY, &sealed).unwrap(), b"a.token.value");
+    }
+
+    /// Two seals of the same token must differ, or the nonce is not random.
+    #[test]
+    fn sealing_twice_does_not_repeat_itself() {
+        assert_ne!(seal(&KEY, b"same").unwrap(), seal(&KEY, b"same").unwrap());
+    }
+
+    #[test]
+    fn a_tampered_or_foreign_file_is_rejected() {
+        let mut sealed = seal(&KEY, b"a.token.value").unwrap();
+        let last = sealed.len() - 1;
+        sealed[last] ^= 0x01;
+        assert!(open(&KEY, &sealed).is_err(), "AEAD must catch a flipped byte");
+
+        let sealed = seal(&KEY, b"a.token.value").unwrap();
+        assert!(open(&[9u8; 32], &sealed).is_err(), "a wrong key must not open it");
+    }
+
+    /// A truncated file must error, not panic — slicing past the end is how
+    /// this would otherwise take the app down on a corrupt USB stick.
+    #[test]
+    fn a_truncated_file_is_an_error_not_a_panic() {
+        assert!(open(&KEY, b"").is_err());
+        assert!(open(&KEY, MAGIC).is_err());
+        assert!(open(&KEY, b"KRSU1short").is_err());
+        assert!(open(&KEY, b"NOTMEnonce........................").is_err());
     }
 }

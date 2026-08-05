@@ -1,6 +1,6 @@
 [package]
 name = "karasu"
-version = "0.55.0"
+version = "0.56.0"
 description = "A modern anime and manga tracker built exclusively for AniList (Windows; Linux experimental)"
 authors = ["Kyu"]
 license = "MIT"
@@ -80,8 +80,15 @@ windows-future = "0.3"
 # `async-io` + `blocking-api`, and the rest of the tree already unified on
 # async-io — asking for the tokio feature would enable both stacks for nothing.
 zbus = "5"
-
-[target.'cfg(unix)'.dependencies]
+# Portable-mode token encryption. A real new subtree — nothing RustCrypto is in
+# the tree today — but small and pure-Rust. XChaCha20's 24-byte nonce is what
+# makes a randomly generated nonce per write safe without a counter to keep.
+chacha20poly1305 = "0.10"
+base64 = "0.22"
+# `cfg(target_os = "linux")`, not `cfg(unix)`: sync-secret-service is a D-Bus
+# backend and macOS has none — it needs `apple-native`. The old predicate only
+# "worked" because nobody has ever built for macOS. This way a macOS build
+# fails at the manifest instead of compiling a backend that cannot work.
 keyring = { version = "3", features = ["sync-secret-service", "crypto-rust"] }
 
 # --- Build-speed tuning -----------------------------------------------------

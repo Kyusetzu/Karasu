@@ -28,8 +28,31 @@
 
 use super::Playback;
 
+#[cfg(target_os = "linux")]
+mod mpris;
 #[cfg(windows)]
 mod smtc;
+
+// The three items below are only *called* from the MPRIS backend, so a
+// Windows build sees them as dead. They live here rather than in `mpris.rs`
+// deliberately: they are pure decisions about a session, and keeping them
+// platform-neutral is what lets their tests run on both platforms instead of
+// only in the Linux CI job.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+/// Audio-only extensions, for telling a music player from a video one.
+const AUDIO_EXTENSIONS: &[&str] = &[
+    ".mp3", ".flac", ".m4a", ".aac", ".ogg", ".oga", ".opus", ".wav", ".wma", ".aiff",
+    ".m4b", ".ape", ".wv",
+];
+
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+/// Players that only ever play music. Matched on the shortened app name, so
+/// this is the MPRIS bus suffix in practice.
+const MUSIC_PLAYERS: &[&str] = &[
+    "spotify", "spotifyd", "ncspot", "rhythmbox", "clementine", "strawberry",
+    "audacious", "elisa", "lollypop", "amberol", "mpd", "cmus", "moc", "quodlibet",
+    "deadbeef", "tauon", "gnome-music", "sayonara",
+];
 
 /// One media session as the desktop sees it. Serialized straight into the
 /// Settings diagnostic — this is the only way to find out what a player
@@ -131,11 +154,68 @@ pub fn pick(sessions: &[MediaSession]) -> Option<&MediaSession> {
         .or_else(|| sessions.iter().find(|s| s.is_playing() && s.is_watchable()))
 }
 
+/// The file name behind a `file://` URL, percent-decoded.
+///
+/// `None` for anything else — an http stream, or a URL with no last segment.
+/// Lossy decoding rather than strict: a file name that is not valid UTF-8 is
+/// still worth a guess at, and the matcher will simply fail to place it.
+pub fn local_file_name(url: &str) -> Option<String> {
+    let path = url.strip_prefix("file://")?;
+    // Strip the (usually empty) authority: file://host/path.
+    let path = match path.find('/') {
+        Some(i) => &path[i..],
+        None => return None,
+    };
+    let last = path.rsplit('/').find(|s| !s.is_empty())?;
+    let decoded = percent_encoding::percent_decode_str(last)
+        .decode_utf8_lossy()
+        .to_string();
+    let decoded = decoded.trim();
+    (!decoded.is_empty()).then(|| decoded.to_string())
+}
+
+/// What kind of media this is, for sources that do not say.
+///
+/// MPRIS publishes no equivalent of SMTC's `PlaybackType`, so it is inferred.
+/// The URL is evidence about the file itself and beats any guess made from the
+/// player's name, so it is checked first. "unknown" is deliberately the
+/// fallback rather than "video": `pick` treats unknown as eligible, and a
+/// player that says nothing must not be invisible.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+pub fn infer_playback_type(url: &str, app_id: &str) -> &'static str {
+    // The path only — a query string must not defeat the extension check.
+    let path = url.split(['?', '#']).next().unwrap_or(url).to_lowercase();
+    if super::profiles::VIDEO_EXTENSIONS.iter().any(|e| path.ends_with(e)) {
+        return "video";
+    }
+    if AUDIO_EXTENSIONS.iter().any(|e| path.ends_with(e)) {
+        return "music";
+    }
+    let name = short_app_name(app_id);
+    if MUSIC_PLAYERS.contains(&name.as_str()) {
+        return "music";
+    }
+    "unknown"
+}
+
 /// Turns one session into a playback candidate.
 ///
 /// Split out of `detect` so the mapping can be tested without a live session
 /// manager on either platform.
 pub fn playback_from(session: &MediaSession) -> Option<Playback> {
+    // A local file is the good case: MPRIS hands over the real release name,
+    // which is better parser input than any composition of artist and title,
+    // and is the same shape the Windows window-title path produces for mpv.
+    if let Some(name) = local_file_name(&session.url) {
+        return Some(Playback {
+            process: short_app_name(&session.app_id),
+            media_title: name,
+            streaming: false,
+            manga: false,
+            parsed: None,
+        });
+    }
+
     let media_title = compose_title(&session.artist, &session.title, &session.album);
     if media_title.trim().is_empty() {
         return None;
@@ -160,8 +240,13 @@ pub fn sessions() -> Vec<MediaSession> {
     smtc::read_sessions().unwrap_or_default()
 }
 
+#[cfg(target_os = "linux")]
+pub fn sessions() -> Vec<MediaSession> {
+    mpris::read_sessions().unwrap_or_default()
+}
+
 /// No media-session API on this platform.
-#[cfg(not(windows))]
+#[cfg(not(any(windows, target_os = "linux")))]
 pub fn sessions() -> Vec<MediaSession> {
     Vec::new()
 }
@@ -267,6 +352,70 @@ mod tests {
     #[test]
     fn a_session_with_no_usable_title_is_not_playback() {
         assert!(playback_from(&session("  ", "  ", "video", "playing")).is_none());
+    }
+
+    /// The URL is evidence about the file; the player's name is only a guess
+    /// about the player. So the extension wins, including for a browser, and
+    /// a query string must not defeat it.
+    #[test]
+    fn the_media_kind_is_inferred_from_the_url_before_the_player() {
+        assert_eq!(infer_playback_type("file:///a/Frieren%20-%2005.mkv", ""), "video");
+        assert_eq!(infer_playback_type("file:///a/song.flac", ""), "music");
+        assert_eq!(
+            infer_playback_type("https://x/v.mp4?token=1", "org.mpris.MediaPlayer2.firefox"),
+            "video"
+        );
+        // Spotify streams, so there is no extension to read — the bus name is
+        // all there is to go on.
+        assert_eq!(
+            infer_playback_type("https://open.spotify.com/track/1", "org.mpris.MediaPlayer2.spotify"),
+            "music"
+        );
+    }
+
+    /// Anything unrecognised stays eligible. `pick` lets "unknown" through on
+    /// purpose, so guessing "video" here would gain nothing and guessing
+    /// "music" would make a whole player invisible.
+    #[test]
+    fn an_unrecognised_source_stays_unknown() {
+        assert_eq!(infer_playback_type("", ""), "unknown");
+        assert_eq!(
+            infer_playback_type("https://x/watch", "org.mpris.MediaPlayer2.chromium"),
+            "unknown"
+        );
+    }
+
+    #[test]
+    fn a_file_url_yields_the_release_name() {
+        assert_eq!(
+            local_file_name("file:///srv/anime/%5BSubsPlease%5D%20Frieren%20-%2005.mkv").unwrap(),
+            "[SubsPlease] Frieren - 05.mkv"
+        );
+        // Multi-byte UTF-8 survives the decode.
+        assert_eq!(
+            local_file_name("file:///a/%E8%91%AC%E9%80%81%E3%81%AE.mkv").unwrap(),
+            "葬送の.mkv"
+        );
+        // A trailing slash has no file to name.
+        assert_eq!(local_file_name("file:///a/b/"), Some("b".to_string()));
+    }
+
+    #[test]
+    fn a_url_that_is_not_a_local_file_has_no_name() {
+        assert!(local_file_name("https://example.com/x.mkv").is_none());
+        assert!(local_file_name("").is_none());
+        assert!(local_file_name("file://").is_none());
+    }
+
+    /// The whole point of reading `xesam:url`: a local file goes to the parser
+    /// as the name on disk, and is not called streaming.
+    #[test]
+    fn a_local_file_beats_the_composed_title() {
+        let mut s = session("Some Artist", "Track 5", "video", "playing");
+        s.url = "file:///srv/[Group]%20Frieren%20-%2005.mkv".into();
+        let p = playback_from(&s).unwrap();
+        assert_eq!(p.media_title, "[Group] Frieren - 05.mkv");
+        assert!(!p.streaming);
     }
 
     #[test]

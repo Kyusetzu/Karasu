@@ -2220,10 +2220,11 @@ dependencies = [
 
 [[package]]
 name = "karasu"
-version = "0.54.3"
+version = "0.55.0"
 dependencies = [
  "discord-rich-presence",
  "keyring",
+ "percent-encoding",
  "regex",
  "reqwest",
  "rusqlite",
@@ -2240,6 +2241,7 @@ dependencies = [
  "tokio",
  "windows 0.62.2",
  "windows-future 0.3.2",
+ "zbus 5.18.0",
 ]
 
 [[package]]

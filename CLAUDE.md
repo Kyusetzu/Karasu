@@ -20,10 +20,13 @@ and in the browser and scrobbles your AniList progress automatically.
   from `useColumnCount`, which reads the browser's resolved
   `grid-template-columns` rather than recomputing the CSS in JS
 - **Storage:** SQLite via rusqlite (bundled); tokens in the OS credential store
-- **Detection:** Win32 window enumeration + Windows media sessions (SMTC) +
-  an optional Jellyfin `/Sessions` source, with a custom release-name parser
-- **Platforms:** Windows is supported. Linux (Ubuntu) is experimental
-  compile-only groundwork — do not assume feature parity there.
+- **Detection:** system media sessions (SMTC on Windows, MPRIS on Linux) +
+  Win32 window enumeration (Windows only) + an optional Jellyfin `/Sessions`
+  source, with a custom release-name parser
+- **Platforms:** Windows and Linux (x86_64). Window-title detection is Windows
+  only — there is no X11/Wayland enumerator and Wayland forbids one — so on
+  Linux the media-session pass and Jellyfin are the whole of detection. Browser
+  *tab* titles are therefore only seen where the browser publishes MPRIS.
 
 ## Layout
 

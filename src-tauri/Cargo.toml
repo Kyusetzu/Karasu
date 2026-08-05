@@ -1,6 +1,6 @@
 [package]
 name = "karasu"
-version = "0.54.3"
+version = "0.55.0"
 description = "A modern anime and manga tracker built exclusively for AniList (Windows; Linux experimental)"
 authors = ["Kyu"]
 license = "MIT"
@@ -44,6 +44,11 @@ tokio = { version = "1", features = ["time", "sync", "macros"] }
 rusqlite = { version = "0.40", features = ["bundled"] }
 regex = "1"
 discord-rich-presence = "1"
+# MPRIS hands over a `file://` URL for local playback, and the file name inside
+# it is the release name — better parser input than any composed title. Not
+# hand-rolled: multi-byte UTF-8 and malformed `%` are exactly the cases a
+# fifteen-line decoder gets wrong, and this is already in the tree.
+percent-encoding = "2"
 
 # --- Platform-specific -------------------------------------------------------
 # Windows: Credential Manager keyring + DPAPI (via the `windows` crate).
@@ -67,6 +72,15 @@ windows = { version = "0.62", features = [
 windows-future = "0.3"
 
 # Linux groundwork: keyring via the Secret Service (libsecret/D-Bus).
+[target.'cfg(target_os = "linux")'.dependencies]
+# The desktop's media sessions live on D-Bus here. zbus rather than the
+# `mpris`/`dbus-rs` crates because it is pure Rust and is already compiled into
+# this tree by tauri-plugin-opener, -single-instance and notify-rust, so it
+# costs no new dependency graph. Default features on purpose: they are
+# `async-io` + `blocking-api`, and the rest of the tree already unified on
+# async-io — asking for the tokio feature would enable both stacks for nothing.
+zbus = "5"
+
 [target.'cfg(unix)'.dependencies]
 keyring = { version = "3", features = ["sync-secret-service", "crypto-rust"] }
 

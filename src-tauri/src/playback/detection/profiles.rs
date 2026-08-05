@@ -17,7 +17,9 @@ const PLAYERS: &[(&[&str], &[&str])] = &[
     (&["smplayer.exe"], &[" - SMPlayer"]),
 ];
 
-const VIDEO_EXTENSIONS: &[&str] = &[
+/// Shared with `media_session`, which uses them to tell a video URL from an
+/// audio one. One list, so the two cannot disagree about what a video is.
+pub(crate) const VIDEO_EXTENSIONS: &[&str] = &[
     ".mkv", ".mp4", ".avi", ".m4v", ".webm", ".ts", ".m2ts", ".ogm", ".wmv", ".flv",
 ];
 

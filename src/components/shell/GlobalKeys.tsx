@@ -19,15 +19,23 @@ export default function GlobalKeys() {
     const onKey = (e: KeyboardEvent) => {
       const mod = e.ctrlKey || e.metaKey;
 
+      // A dialog owns the keyboard while it is open — the `data-overlay`
+      // convention, which MediaList already honours and this did not. Without
+      // it, pressing `/` with the entry editor open (focus on a status pill, so
+      // `isTyping` is false) navigated to Search, remounted the page and threw
+      // away every unsaved edit with no prompt. Ctrl+1/2/3 did the same from
+      // any open dialog.
+      const overlay = document.querySelector("[data-overlay]") !== null;
+
       // Single-key shortcuts must not fire while the caret is in a field —
       // `/` is a character before it is a command.
-      if (!mod && e.key === "/" && !isTyping()) {
+      if (!mod && e.key === "/" && !isTyping() && !overlay) {
         e.preventDefault();
         navigate("/search");
         return;
       }
 
-      if (!mod || e.altKey) return;
+      if (!mod || e.altKey || overlay) return;
 
       if (e.key === "1" || e.key === "2" || e.key === "3") {
         e.preventDefault();

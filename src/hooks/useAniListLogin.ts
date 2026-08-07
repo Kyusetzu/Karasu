@@ -18,15 +18,20 @@ export function useAniListLogin() {
 
   useEffect(() => {
     if (!api.isTauri) return;
-    let unlisten: (() => void) | undefined;
     // Failures arrive asynchronously from the callback server (denied consent,
     // invalid token) long after `start()` has resolved, so they need an event
     // rather than a rejected promise.
-    listen<string>("anilist-auth-error", (e) => {
+    //
+    // Cleanup awaits the registration promise: an unmount that beats the IPC
+    // round trip — which StrictMode guarantees in dev — would otherwise leave
+    // the handler registered forever, calling setState on a dead component.
+    const registered = listen<string>("anilist-auth-error", (e) => {
       setWaiting(false);
       setError(e.payload);
-    }).then((fn) => (unlisten = fn));
-    return () => unlisten?.();
+    });
+    return () => {
+      registered.then((un) => un());
+    };
   }, []);
 
   /**

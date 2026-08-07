@@ -46,16 +46,24 @@ export default function NowPlayingCard() {
   // time rather than from a closure, which would pin whatever was playing when
   // the listener was registered. The fallback is not optional: without it, an
   // absent type would leave one list silently never refreshing.
+  //
+  // Cleanup awaits the registration promise rather than a variable it fills
+  // in. `<main key={pathname}>` remounts this on every navigation, and under
+  // StrictMode the cleanup always runs before the IPC round trip settles, so
+  // the old form found `unlisten` still undefined, did nothing, and left a
+  // handler registered for the life of the process — one more on every trip
+  // through the Dashboard, each invalidating queries on every scrobble.
   useEffect(() => {
     if (!isTauri) return;
-    let unlisten: (() => void) | undefined;
-    listen("scrobble-done", () => {
+    const registered = listen("scrobble-done", () => {
       const mediaType = useNowPlaying.getState().current?.mediaType;
       qc.invalidateQueries({
         queryKey: mediaType ? ["mediaList", mediaType] : ["mediaList"],
       });
-    }).then((fn) => (unlisten = fn));
-    return () => unlisten?.();
+    });
+    return () => {
+      registered.then((un) => un());
+    };
   }, [qc]);
 
   if (!current) return null;

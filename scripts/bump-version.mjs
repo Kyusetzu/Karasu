@@ -58,13 +58,14 @@ function fail(message) {
 }
 
 /**
- * Replaces one match, refusing to pass off a miss or a no-op as success.
+ * Computes one replacement, refusing to pass off a miss or a no-op as success.
+ * Returns the write rather than performing it — see `writeAll` below.
  *
  * `replacement` is a function of the match and its groups, never a string —
  * a string would make `$1` and friends live, which is a trap when the thing
  * being substituted in is arbitrary file content.
  */
-function patch(path, pattern, replacement) {
+function plan(path, pattern, replacement) {
   const before = readFileSync(path, "utf8");
   if (!pattern.test(before)) {
     fail(`no ${pattern} in ${relative(ROOT, path)}`);
@@ -73,7 +74,42 @@ function patch(path, pattern, replacement) {
   if (after === before) {
     fail(`replacing ${pattern} in ${relative(ROOT, path)} changed nothing`);
   }
-  writeFileSync(path, after);
+  return { path, before, after };
+}
+
+/**
+ * Writes every planned change, or none of them.
+ *
+ * The version lives in five places and they have to agree. Writing each one as
+ * soon as it was computed meant a miss in the fourth — Cargo.lock mid-merge, so
+ * the anchored `name = "karasu"\nversion =` pattern does not match — left the
+ * first three bumped and `COMMIT_NUMBER` behind. Nothing in `npm run verify`
+ * compares the five, so that mismatch commits silently, and the release ships a
+ * manifest whose commit number repeats the previous one: the exact thing the
+ * four-part scheme exists to keep monotonic.
+ *
+ * Every check now runs before any write, and a write that fails mid-sequence
+ * restores what has already been written.
+ */
+function writeAll(writes) {
+  const done = [];
+  try {
+    for (const w of writes) {
+      writeFileSync(w.path, w.after);
+      done.push(w);
+    }
+  } catch (e) {
+    for (const w of done) {
+      try {
+        writeFileSync(w.path, w.before);
+      } catch {
+        // Restoring failed too — say which file is left inconsistent rather
+        // than reporting only the original error.
+        console.error(`bump-version: could not restore ${relative(ROOT, w.path)}`);
+      }
+    }
+    fail(`writing ${relative(ROOT, e.path ?? "")} failed: ${e.message}`);
+  }
 }
 
 function readCurrent() {
@@ -144,11 +180,15 @@ const core =
       : `${major}.${minor}.${patchNum + 1}`;
 const commit = current.commit + 1;
 
-patch(PACKAGE_JSON, JSON_VERSION, () => `"version": "${core}"`);
-patch(TAURI_CONF, JSON_VERSION, () => `"version": "${core}"`);
-patch(CARGO_TOML, TOML_VERSION, () => `version = "${core}"`);
-patch(CARGO_LOCK, LOCK_VERSION, (_match, prefix) => `${prefix}"${core}"`);
-patch(COMMANDS_RS, COMMIT_NUMBER, () => `COMMIT_NUMBER: u32 = ${commit};`);
+// Every replacement is computed and checked first; `writeAll` then writes them
+// all, so a pattern that misses cannot leave the five files disagreeing.
+writeAll([
+  plan(PACKAGE_JSON, JSON_VERSION, () => `"version": "${core}"`),
+  plan(TAURI_CONF, JSON_VERSION, () => `"version": "${core}"`),
+  plan(CARGO_TOML, TOML_VERSION, () => `version = "${core}"`),
+  plan(CARGO_LOCK, LOCK_VERSION, (_match, prefix) => `${prefix}"${core}"`),
+  plan(COMMANDS_RS, COMMIT_NUMBER, () => `COMMIT_NUMBER: u32 = ${commit};`),
+]);
 
 console.error(
   `${current.core}.${current.commit} -> ${core}.${commit} (${part})`,

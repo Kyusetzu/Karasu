@@ -26,7 +26,7 @@
  */
 
 import { readFileSync, readdirSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -162,7 +162,10 @@ if (parsed.errors) {
 if (!flags.has("--raw")) {
   // The byte count is the point: it is what makes a field's cost, or a
   // compression change, an observation rather than an assumption.
-  console.log(`${name} from ${found.file.replace(ROOT + "\\", "")}`);
+  // `relative`, not a hard-coded backslash: paths here are built with `join`,
+  // so on Linux they use `/` and the old strip silently did nothing — printing
+  // the absolute checkout path into output that gets pasted into issues.
+  console.log(`${name} from ${relative(ROOT, found.file)}`);
   console.log(`  HTTP ${response.status}, ${body.length} bytes`);
   console.log(`  data: ${Object.keys(parsed.data ?? {}).join(", ") || "none"}`);
 }

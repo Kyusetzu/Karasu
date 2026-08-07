@@ -14,10 +14,17 @@ Service on Linux):
 Neither is ever handed to the WebView — the UI only ever learns *whether* one
 is stored.
 
-The credential store stays the only place either token is persisted. The
-Jellyfin one is additionally held in memory by the Rust process while the app
-runs, so that the detection poll does not reach for the credential store every
-five seconds; it is dropped on exit and cleared on sign-out.
+In the default layout the credential store is the only place either token is
+persisted. **Portable mode is the one exception**: it keeps the AniList token in
+a file beside the executable so the folder travels, encrypted at rest — DPAPI on
+Windows, XChaCha20-Poly1305 under a Secret Service-held key on Linux. Both bind
+the file to that machine and user account, so a portable folder copied elsewhere
+does not carry a usable sign-in. Signing out clears the file, the credential
+store entry and the Linux encryption key.
+
+The Jellyfin token is additionally held in memory by the Rust process while the
+app runs, so that the detection poll does not reach for the credential store
+every five seconds; it is dropped on exit and cleared on sign-out.
 
 Signing in to Jellyfin sends your username and password to your own server
 once, in exchange for that access token (`/Users/AuthenticateByName` — Jellyfin
@@ -49,11 +56,14 @@ Karasu's public dependency alerts include advisories against the **GTK stack**
 (`glib`, `gtk`, `atk` and friends). These are worth explaining rather than
 leaving to look ignored.
 
-That stack is **Linux-only groundwork and is not in the published Windows
-build**. `cargo tree -i glib --target x86_64-pc-windows-msvc` finds nothing —
-the crates only enter the graph for Linux targets, and no Linux build is
-published (see the platforms note in the README). The shipped installer never
-contains this code.
+That stack is **not in the published Windows build**. `cargo tree -i glib
+--target x86_64-pc-windows-msvc` finds nothing — the crates only enter the graph
+for Linux targets, so the NSIS installer never contains this code.
+
+It **does** ship in the Linux AppImage, which is published alongside it. This
+section used to say no Linux build existed; that stopped being true when the
+AppImage started being released, and the advisories should be read accordingly:
+they apply to code Linux users are running, not to something hypothetical.
 
 It is also not fixable here. The versions are pinned upstream by Tauri's Linux
 backend — `glib` ← `atk` ← `gtk 0.18` ← `tao`/`tray-icon` ← `tauri` — and
@@ -61,9 +71,9 @@ backend — `glib` ← `atk` ← `gtk 0.18` ← `tao`/`tray-icon` ← `tauri` �
 what this repo does. It resolves when Tauri moves to a newer gtk-rs, and we
 pick that up with the next Tauri release.
 
-Advisories against anything that *does* ship — the Rust crates compiled into
-the Windows binary, or the frontend dependencies bundled into it — are treated
-as real and acted on.
+Advisories against anything else that ships — the Rust crates compiled into
+either binary, or the frontend dependencies bundled into both — are treated as
+real and acted on.
 
 ## Reporting a vulnerability
 

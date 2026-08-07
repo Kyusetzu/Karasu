@@ -4,6 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { Bell as BellIcon, CalendarClock, Clock, Film } from "lucide-react";
 import { EmptyState, TickMarks } from "@/components/EmptyState";
 import { cn } from "@/lib/utils";
+import { usePresence } from "@/hooks/usePresence";
 import {
   getNotifications,
   isTauri,
@@ -45,6 +46,7 @@ export default function Bell() {
   const { t, i18n } = useTranslation();
   const [items, setItems] = useState<AppNotification[]>([]);
   const [open, setOpen] = useState(false);
+  const panel = usePresence(open);
   const ref = useRef<HTMLDivElement>(null);
 
   const load = useCallback(() => {
@@ -113,8 +115,13 @@ export default function Bell() {
         )}
       </button>
 
-      {open && (
-        <div className="absolute right-0 top-full z-50 mt-1 w-88 origin-top-right animate-settle overflow-hidden rounded-xl border border-hair bg-surface-900 shadow-2xl panel-wash">
+      {panel.mounted && (
+        <div
+          className={cn(
+            "absolute right-0 top-full z-50 mt-1 w-88 origin-top-right overflow-hidden rounded-xl border border-hair bg-surface-900 shadow-2xl panel-wash",
+            panel.leaving ? "animate-pop-out" : "animate-spring-in",
+          )}
+        >
           <div className="flex items-center justify-between border-b border-hair px-3 py-2">
             <span className="flex items-baseline gap-2">
               <span className="text-2xs font-semibold uppercase tracking-[.14em] text-ink-600">

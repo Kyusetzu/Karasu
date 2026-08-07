@@ -50,6 +50,7 @@ import { StatusTabs } from "@/components/ui/status-tabs";
 import { CoverOutline, EmptyState, StruckQuery } from "@/components/EmptyState";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { Presence, PresenceIf } from "@/components/ui/presence";
 import { VirtualGrid } from "@/components/list/VirtualGrid";
 import { GridCard } from "@/components/list/GridCard";
 import { ListRow } from "@/components/list/ListRow";
@@ -671,52 +672,67 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
         />
       )}
 
-      {editing && (
-        <EntryEditModal
-          media={{ ...editing.media, type }}
-          entry={editing}
-          tagSuggestions={allTags}
-          onClose={() => setEditing(null)}
-          onSave={(input) => {
-            save.mutate(input);
-            setEditing(null);
-          }}
-          onDelete={() => {
-            remove.mutate(editing.id);
-            setEditing(null);
-          }}
-        />
-      )}
+      {/* `Presence` rather than `{editing && …}`: the dialog keeps rendering
+          the entry it was opened with while it animates away, instead of
+          disappearing between frames. */}
+      <Presence value={editing}>
+        {(entry, leaving) => (
+          <EntryEditModal
+            leaving={leaving}
+            media={{ ...entry.media, type }}
+            entry={entry}
+            tagSuggestions={allTags}
+            onClose={() => setEditing(null)}
+            onSave={(input) => {
+              save.mutate(input);
+              setEditing(null);
+            }}
+            onDelete={() => {
+              remove.mutate(entry.id);
+              setEditing(null);
+            }}
+          />
+        )}
+      </Presence>
 
-      {removing && (
-        <ConfirmDialog
-          title={t("confirm.removeOne")}
-          names={[displayTitle(removing.media.title)]}
-          note={t("confirm.removeNote")}
-          confirmLabel={t("common.remove")}
-          onConfirm={() => {
-            removeMutate(removing.id);
-            setRemoving(null);
-          }}
-          onCancel={() => setRemoving(null)}
-        />
-      )}
+      <Presence value={removing}>
+        {(entry, leaving) => (
+          <ConfirmDialog
+            leaving={leaving}
+            title={t("confirm.removeOne")}
+            names={[displayTitle(entry.media.title)]}
+            note={t("confirm.removeNote")}
+            confirmLabel={t("common.remove")}
+            onConfirm={() => {
+              removeMutate(entry.id);
+              setRemoving(null);
+            }}
+            onCancel={() => setRemoving(null)}
+          />
+        )}
+      </Presence>
 
-      {showRandom && (
-        <RandomPickModal
-          pool={byStatus.get("PLANNING") ?? []}
-          onClose={() => setShowRandom(false)}
-        />
-      )}
+      <PresenceIf when={showRandom}>
+        {(leaving) => (
+          <RandomPickModal
+            leaving={leaving}
+            pool={byStatus.get("PLANNING") ?? []}
+            onClose={() => setShowRandom(false)}
+          />
+        )}
+      </PresenceIf>
 
-      {showPresetSave && (
-        <PresetModal
-          presets={presets}
-          onSave={addPreset}
-          onDelete={deletePreset}
-          onClose={() => setShowPresetSave(false)}
-        />
-      )}
+      <PresenceIf when={showPresetSave}>
+        {(leaving) => (
+          <PresetModal
+            leaving={leaving}
+            presets={presets}
+            onSave={addPreset}
+            onDelete={deletePreset}
+            onClose={() => setShowPresetSave(false)}
+          />
+        )}
+      </PresenceIf>
     </div>
   );
 }

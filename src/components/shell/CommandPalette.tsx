@@ -8,6 +8,7 @@ import { useAuth } from "@/stores/auth";
 import { useContentFilter } from "@/stores/contentFilter";
 import { isBlocked } from "@/lib/contentFilter";
 import { cn } from "@/lib/utils";
+import { usePresence } from "@/hooks/usePresence";
 
 interface Item {
   id: string;
@@ -45,6 +46,7 @@ export default function CommandPalette() {
   const viewer = useAuth((s) => s.viewer);
   const level = useContentFilter((s) => s.level);
   const [open, setOpen] = useState(false);
+  const presence = usePresence(open);
   const [query, setQuery] = useState("");
   const [sel, setSel] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -138,7 +140,10 @@ export default function CommandPalette() {
 
   useEffect(() => setSel(0), [query]);
 
-  if (!open) return null;
+  // Escape should feel deliberate rather than abrupt: the panel leaves the
+  // way it came. `data-overlay` stays on it while it does, so the list
+  // behind cannot act on a keypress meant for a palette still on screen.
+  if (!presence.mounted) return null;
 
   const go = (item: Item | undefined) => {
     if (!item) return;
@@ -163,11 +168,17 @@ export default function CommandPalette() {
   return (
     <div
       data-overlay
-      className="fixed inset-0 z-50 flex animate-fade-in items-start justify-center bg-[rgba(4,5,8,.55)] px-4 pb-4 pt-22"
+      className={cn(
+        "fixed inset-0 z-50 flex items-start justify-center bg-[rgba(4,5,8,.55)] px-4 pb-4 pt-22",
+        presence.leaving ? "animate-fade-out" : "animate-fade-in",
+      )}
       onMouseDown={() => setOpen(false)}
     >
       <div
-        className="w-full max-w-136 animate-settle overflow-hidden rounded-xl border border-hair bg-surface-900 shadow-2xl panel-wash"
+        className={cn(
+          "w-full max-w-136 overflow-hidden rounded-xl border border-hair bg-surface-900 shadow-2xl panel-wash",
+          presence.leaving ? "animate-settle-out" : "animate-spring-in",
+        )}
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-2 border-b border-hair px-3.5">

@@ -8,11 +8,14 @@ import { Modal } from "@/components/ui/modal";
 
 /** Save the current filter/sort as a named preset and manage existing ones. */
 export default function PresetModal({
+  leaving,
   presets,
   onSave,
   onDelete,
   onClose,
 }: {
+  /** On its way out — supplied by `Presence`. */
+  leaving?: boolean;
   presets: Preset[];
   onSave: (name: string) => void;
   onDelete: (name: string) => void;
@@ -29,7 +32,7 @@ export default function PresetModal({
   };
 
   return (
-    <Modal title={t("presets.title")} onClose={onClose}>
+    <Modal title={t("presets.title")} onClose={onClose} leaving={leaving}>
       <div className="space-y-4">
         <div className="flex gap-2">
           <Input

@@ -36,6 +36,7 @@ import { showToast } from "@/stores/toast";
 import { useContentFilter } from "@/stores/contentFilter";
 import { isBlocked } from "@/lib/contentFilter";
 import { Button } from "@/components/ui/button";
+import { Presence } from "@/components/ui/presence";
 import { EmptyState, FolderStack } from "@/components/EmptyState";
 import { cn } from "@/lib/utils";
 
@@ -493,20 +494,23 @@ function LibraryView({ userId }: { userId: number }) {
         )}
       </div>
 
-      {editing && (
-        <MatchPicker
-          parsedTitle={editing.key.title}
-          season={editing.key.season}
-          current={editing.current}
-          error={correctError ?? undefined}
-          onPick={applyMatch}
-          onClear={editing.hasOverride ? dropMatch : undefined}
-          onCancel={() => {
-            setCorrectError(null);
-            setEditing(null);
-          }}
-        />
-      )}
+      <Presence value={editing}>
+        {(target, leaving) => (
+          <MatchPicker
+            leaving={leaving}
+            parsedTitle={target.key.title}
+            season={target.key.season}
+            current={target.current}
+            error={correctError ?? undefined}
+            onPick={applyMatch}
+            onClear={target.hasOverride ? dropMatch : undefined}
+            onCancel={() => {
+              setCorrectError(null);
+              setEditing(null);
+            }}
+          />
+        )}
+      </Presence>
     </div>
   );
 }

@@ -12,9 +12,12 @@ import { Modal } from "@/components/ui/modal";
  * episode-count cap. Reroll to draw again.
  */
 export default function RandomPickModal({
+  leaving,
   pool,
   onClose,
 }: {
+  /** On its way out — supplied by `Presence`. */
+  leaving?: boolean;
   pool: MediaListEntry[];
   onClose: () => void;
 }) {
@@ -40,7 +43,7 @@ export default function RandomPickModal({
   }, [filtered, nonce]);
 
   return (
-    <Modal title={t("random.title")} onClose={onClose}>
+    <Modal title={t("random.title")} onClose={onClose} leaving={leaving}>
       <div className="space-y-4">
         <label className="flex items-center justify-between gap-3 text-sm">
           <span className="text-ink-500">{t("random.capLabel")}</span>

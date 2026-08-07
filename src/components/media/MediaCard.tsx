@@ -12,6 +12,7 @@ import { formatLabel } from "@/lib/format";
 import type { MediaWithListStatus } from "@/api/queries";
 import { useAuth } from "@/stores/auth";
 import EntryEditModal, { type EntrySaveInput } from "@/components/media/EntryEditModal";
+import { PresenceIf } from "@/components/ui/presence";
 
 /**
  * Card for discovery grids (search, season): quick add and full editing
@@ -109,17 +110,20 @@ export default function MediaCard({ media }: { media: MediaWithListStatus }) {
           .join(" · ")}
       </CoverMeta>
 
-      {editing && (
-        <EntryEditModal
-          media={media}
-          entry={entry}
-          onClose={() => setEditing(false)}
-          onSave={(input: EntrySaveInput) => {
-            saveEntry.mutate(input);
-            setEditing(false);
-          }}
-        />
-      )}
+      <PresenceIf when={editing}>
+        {(leaving) => (
+          <EntryEditModal
+            leaving={leaving}
+            media={media}
+            entry={entry}
+            onClose={() => setEditing(false)}
+            onSave={(input: EntrySaveInput) => {
+              saveEntry.mutate(input);
+              setEditing(false);
+            }}
+          />
+        )}
+      </PresenceIf>
     </CoverCell>
   );
 }

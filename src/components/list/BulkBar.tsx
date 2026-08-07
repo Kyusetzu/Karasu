@@ -7,6 +7,7 @@ import {
   type MediaType,
 } from "@/api/types";
 import ConfirmDialog from "@/components/overlays/ConfirmDialog";
+import { PresenceIf } from "@/components/ui/presence";
 import { Button } from "@/components/ui/button";
 import { FilterSelect } from "@/components/ui/filter-select";
 import { cn } from "@/lib/utils";
@@ -79,8 +80,10 @@ export function BulkBar({
         <Trash2 className="size-3.5" /> {t("common.remove")}
       </Button>
 
-      {confirmDelete && (
+      <PresenceIf when={confirmDelete}>
+        {(leaving) => (
         <ConfirmDialog
+          leaving={leaving}
           title={t(count === 1 ? "confirm.removeOne" : "confirm.removeMany", {
             count,
           })}
@@ -94,7 +97,8 @@ export function BulkBar({
           }}
           onCancel={() => setConfirmDelete(false)}
         />
-      )}
+        )}
+      </PresenceIf>
 
       <Button
         variant="ghost"

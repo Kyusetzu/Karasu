@@ -12,6 +12,8 @@ import {
   Settings,
   SquareArrowOutUpRight,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { usePresentValue } from "@/hooks/usePresence";
 
 interface Ctx {
   x: number;
@@ -52,6 +54,9 @@ export default function ContextMenu() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [ctx, setCtx] = useState<Ctx | null>(null);
+  // Retained through the exit: the menu needs its position and its item
+  // list to keep drawing while it scales away.
+  const menu = usePresentValue(ctx);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -90,7 +95,8 @@ export default function ContextMenu() {
     };
   }, [ctx]);
 
-  if (!ctx) return null;
+  if (!menu.value) return null;
+  const shown = menu.value;
 
   const run = (fn: () => void) => () => {
     fn();
@@ -99,29 +105,29 @@ export default function ContextMenu() {
 
   const items: MenuItem[] = [];
 
-  if (ctx.mediaId) {
+  if (shown.mediaId) {
     items.push({
       label: t("ctx.open"),
       icon: <SquareArrowOutUpRight className="size-3.5" />,
-      onClick: run(() => navigate(`/media/${ctx.mediaId}`)),
+      onClick: run(() => navigate(`/media/${shown.mediaId}`)),
     });
     items.push({
       label: t("ctx.openAniList"),
       icon: <ExternalLink className="size-3.5" />,
       onClick: run(() =>
         openUrl(
-          `https://anilist.co/${ctx.mediaType === "MANGA" ? "manga" : "anime"}/${ctx.mediaId}`,
+          `https://anilist.co/${shown.mediaType === "MANGA" ? "manga" : "anime"}/${shown.mediaId}`,
         ),
       ),
     });
   }
 
-  if (ctx.selection) {
+  if (shown.selection) {
     items.push({
       label: t("ctx.copy"),
       icon: <Copy className="size-3.5" />,
       onClick: run(() => {
-        navigator.clipboard?.writeText(ctx.selection ?? "").catch(() => {});
+        navigator.clipboard?.writeText(shown.selection ?? "").catch(() => {});
       }),
     });
   }
@@ -160,16 +166,33 @@ export default function ContextMenu() {
   // Keep the menu inside the viewport.
   const rem = rootFontSize();
   const gap = 0.5 * rem;
-  const x = Math.min(ctx.x, window.innerWidth - MENU_W_REM * rem - gap);
+  const x = Math.min(shown.x, window.innerWidth - MENU_W_REM * rem - gap);
   const y = Math.min(
-    ctx.y,
+    shown.y,
     window.innerHeight - items.length * MENU_ROW_H_REM * rem - gap,
   );
+  // Which corner it actually ended up hinged on, once clamped — one class,
+  // since they all set the same property.
+  const origin =
+    y < shown.y
+      ? x < shown.x
+        ? "origin-bottom-right"
+        : "origin-bottom-left"
+      : x < shown.x
+        ? "origin-top-right"
+        : "origin-top-left";
 
   return (
     <div
       ref={ref}
-      className="fixed z-[100] w-55 origin-top-left animate-pop-in overflow-hidden rounded-lg border border-hair bg-surface-850 p-1.25 shadow-2xl panel-wash"
+      className={cn(
+        "fixed z-[100] w-55 overflow-hidden rounded-lg border border-hair bg-surface-850 p-1.25 shadow-2xl panel-wash",
+        // Scales from the corner it was opened at rather than always the
+        // top-left: the menu flips when clamped near an edge, and growing
+        // out of the wrong corner is the tell that it is a fixed guess.
+        origin,
+        menu.leaving ? "animate-pop-out" : "animate-pop-in",
+      )}
       style={{ left: x, top: y }}
       onMouseDown={(e) => e.stopPropagation()}
     >

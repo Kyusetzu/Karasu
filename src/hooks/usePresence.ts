@@ -68,3 +68,28 @@ export function usePresence(open: boolean, exitMs = 120): Presence {
   // `leaving` is only meaningful while something is still on screen.
   return { mounted, leaving: mounted && leaving && !open };
 }
+
+/** `Presence`, plus the value the overlay was opened with. */
+export interface ValuePresence<T> extends Presence {
+  /** The last non-null value — retained so an exiting overlay still renders. */
+  value: T | null;
+}
+
+/**
+ * `usePresence` for overlays whose visibility *is* their data.
+ *
+ * Most dialogs here are opened by setting state to the thing they edit —
+ * `{editing && <EntryEditModal entry={editing}/>}` — so closing sets it to null
+ * and the content vanishes before it can animate out. Retaining the last
+ * non-null value lets the exit render what the user was just looking at, rather
+ * than an empty shell or a flash of the next thing.
+ */
+export function usePresentValue<T>(
+  value: T | null | undefined,
+  exitMs = 120,
+): ValuePresence<T> {
+  const presence = usePresence(value != null, exitMs);
+  const last = useRef<T | null>(null);
+  if (value != null) last.current = value;
+  return { ...presence, value: presence.mounted ? last.current : null };
+}

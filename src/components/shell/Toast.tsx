@@ -4,6 +4,7 @@ import { useToast } from "@/stores/toast";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { cn } from "@/lib/utils";
+import { usePresentValue } from "@/hooks/usePresence";
 
 /**
  * The write receipt, bottom-centre.
@@ -16,18 +17,28 @@ export default function Toast() {
   const { t } = useTranslation();
   const toast = useToast((s) => s.toast);
   const dismiss = useToast((s) => s.dismiss);
+  // Dismissing used to remove the node mid-frame, which for the one surface
+  // whose whole job is "this happened" read as a glitch rather than a
+  // departure. The last toast is retained through the exit so it leaves the
+  // way it arrived.
+  const shown = usePresentValue(toast);
 
-  if (!toast) return null;
-  const error = toast.kind === "error";
+  if (!shown.value) return null;
+  const current = shown.value;
+  const error = current.kind === "error";
 
   return (
     <div
-      key={toast.id}
+      key={current.id}
       role="status"
       aria-live="polite"
       className={cn(
         "panel-wash panel-top pointer-events-auto fixed bottom-5 left-1/2 z-50 flex",
-        "max-w-[calc(100vw-4rem)] -translate-x-1/2 animate-rise-in items-center gap-3",
+        "max-w-[calc(100vw-4rem)] items-center gap-3",
+        // The existing -translate-x-1/2 is what centres this, so the exit has
+        // to animate opacity and a *nested* transform rather than replacing it.
+        "-translate-x-1/2",
+        shown.leaving ? "animate-fade-out" : "animate-rise-in",
         "rounded-xl border border-surface-800 bg-surface-900 py-2.5 pl-3 pr-2.5 shadow-2xl",
       )}
     >
@@ -46,26 +57,26 @@ export default function Toast() {
 
       <span className="min-w-0">
         <span className="block truncate text-[.8125rem] font-medium text-ink-100">
-          {toast.text}
+          {current.text}
         </span>
-        {toast.detail && (
+        {current.detail && (
           <span className="block truncate text-2xs text-ink-600">
-            {toast.detail}
+            {current.detail}
           </span>
         )}
       </span>
 
-      {toast.action && (
+      {current.action && (
         <Button
           variant="outline"
           size="control"
           className="shrink-0"
           onClick={() => {
-            toast.action?.run();
+            current.action?.run();
             dismiss();
           }}
         >
-          {toast.action.label}
+          {current.action.label}
         </Button>
       )}
 

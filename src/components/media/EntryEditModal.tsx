@@ -50,6 +50,7 @@ export interface EntrySaveInput {
  * and the season browser. `entry === null` means "add to list".
  */
 export default function EntryEditModal({
+  leaving,
   media,
   entry,
   onClose,
@@ -57,6 +58,8 @@ export default function EntryEditModal({
   onDelete,
   tagSuggestions = [],
 }: {
+  /** On its way out — supplied by `Presence`. */
+  leaving?: boolean;
   media: EditableMedia;
   entry: EditableEntry | null;
   onClose: () => void;
@@ -86,7 +89,7 @@ export default function EntryEditModal({
     media.type === "MANGA" ? t("entry.rereads") : t("entry.rewatches");
 
   return (
-    <Modal title={displayTitle(media.title)} onClose={onClose}>
+    <Modal title={displayTitle(media.title)} onClose={onClose} leaving={leaving}>
       <div className="space-y-4">
         {/* Six pills, not a dropdown. Status is the most-changed field here and
             a dropdown hides five of its six options behind a click. */}

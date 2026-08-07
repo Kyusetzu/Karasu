@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Modal } from "@/components/ui/modal";
+import { usePresence } from "@/hooks/usePresence";
 
 /**
  * The shortcut reference, on `?`.
@@ -12,6 +13,7 @@ import { Modal } from "@/components/ui/modal";
 export default function KeyboardSheet() {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+  const sheet = usePresence(open);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -24,7 +26,8 @@ export default function KeyboardSheet() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  if (!open) return null;
+  // The second `?` press should read as closing, not as a cut.
+  if (!sheet.mounted) return null;
 
   const groups: { title: string; rows: { label: string; keys: string[] }[] }[] = [
     {
@@ -58,6 +61,7 @@ export default function KeyboardSheet() {
 
   return (
     <Modal
+      leaving={sheet.leaving}
       title={t("keys.title")}
       onClose={() => setOpen(false)}
       className="max-w-152"

@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
  * the right result is already on screen when the dialog opens.
  */
 export default function MatchPicker({
+  leaving = false,
   parsedTitle,
   season,
   current,
@@ -32,6 +33,8 @@ export default function MatchPicker({
   onClear,
   onCancel,
 }: {
+  /** On its way out — supplied by `Presence`. */
+  leaving?: boolean;
   parsedTitle: string;
   season: number;
   /** The title this is currently pointed at, if it is pointed anywhere. */
@@ -79,10 +82,20 @@ export default function MatchPicker({
   return (
     <div
       data-overlay
-      className="fixed inset-0 z-[110] grid animate-fade-in place-items-center bg-[rgba(4,5,8,.55)] p-4"
-      onMouseDown={(e) => e.target === e.currentTarget && onCancel()}
+      className={cn(
+        "fixed inset-0 z-[110] grid place-items-center bg-[rgba(4,5,8,.55)] p-4",
+        leaving ? "animate-fade-out" : "animate-fade-in",
+      )}
+      onMouseDown={(e) =>
+        !leaving && e.target === e.currentTarget && onCancel()
+      }
     >
-      <div className="flex max-h-[80vh] w-[34rem] max-w-full animate-settle flex-col rounded-xl border border-hair bg-surface-900 shadow-2xl panel-wash">
+      <div
+        className={cn(
+          "flex max-h-[80vh] w-[34rem] max-w-full flex-col rounded-xl border border-hair bg-surface-900 shadow-2xl panel-wash",
+          leaving ? "animate-settle-out" : "animate-spring-in",
+        )}
+      >
         <div className="border-b border-hair p-5 pb-4">
           <h2 className="text-sm font-semibold text-ink-100">
             {t("library.pickTitle")}

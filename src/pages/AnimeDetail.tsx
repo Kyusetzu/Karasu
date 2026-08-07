@@ -31,6 +31,8 @@ import { useLibrary } from "@/stores/library";
 import { useContentFilter } from "@/stores/contentFilter";
 import { isBlocked } from "@/lib/contentFilter";
 import BackButton from "@/components/shell/BackButton";
+import { DetailSkeleton } from "@/components/Skeleton";
+import { DecodedImage } from "@/components/media/DecodedImage";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardTitle } from "@/components/ui/card";
@@ -56,7 +58,10 @@ export default function AnimeDetail() {
     enabled: isTauri && Number.isFinite(mediaId),
   });
 
-  if (isLoading) return <p className="p-8 text-ink-500">{t("common.loading")}</p>;
+  // A skeleton at the hero's real proportions rather than a line of text:
+  // the text sat at the top-left and then the whole page arrived underneath
+  // it, which moves everything twice. Same reasoning as MediaList's.
+  if (isLoading) return <DetailSkeleton />;
   if (error)
     return (
       <p className="p-8 text-danger">
@@ -108,17 +113,16 @@ export default function AnimeDetail() {
           off the top of the page. */}
       <div className="relative h-64">
         {data.bannerImage ? (
-          <img
+          <DecodedImage
             src={data.bannerImage}
-            alt=""
             className="h-full w-full object-cover"
           />
         ) : (
           coverSrc && (
-            <img
+            <DecodedImage
               src={coverSrc}
-              alt=""
-              className="h-full w-full scale-110 object-cover opacity-40 blur-2xl"
+              className="h-full w-full scale-110 object-cover blur-2xl"
+              loadedOpacity={0.4}
             />
           )
         )}
@@ -348,12 +352,16 @@ export default function AnimeDetail() {
                   <Link
                     key={`${e.relationType}-${e.node.id}`}
                     to={`/media/${e.node.id}`}
+                    className="group block"
                   >
+                    {/* The same lift the trailer thumbnail has had all
+                        along — these are equally clickable and said so
+                        with nothing at all. */}
                     <img
                       src={e.node.coverImage.large ?? ""}
                       alt=""
                       loading="lazy"
-                      className="aspect-[2/3] w-full rounded-lg object-cover"
+                      className="aspect-[2/3] w-full rounded-lg object-cover transition-transform duration-(--duration-expressive) ease-(--ease-out-expo) group-hover:-translate-y-1"
                     />
                     <p className="mt-1 text-xs text-accent-400">
                       {t(`relation.${e.relationType}`, {

@@ -65,3 +65,35 @@ export function HeaderSkeleton({ index = 0 }: { index?: number }) {
     </div>
   );
 }
+
+/**
+ * The detail screen while it loads, at the hero's real proportions.
+ *
+ * It used to be a single line of text at the top-left, so the page arrived
+ * *underneath* it and everything moved twice — the same objection MediaList's
+ * comment raises against a sentence where a wall of covers is about to appear.
+ */
+export function DetailSkeleton() {
+  return (
+    <div aria-hidden="true">
+      <Shimmer index={0} className="h-64 w-full rounded-none" />
+      <div className="relative mx-auto max-w-4xl px-8 pb-10 2xl:max-w-none">
+        <div className="-mt-14 flex gap-6">
+          <Shimmer index={1} className="h-57 w-38 shrink-0 rounded-[.625rem]" />
+          <div className="min-w-0 flex-1 pt-16">
+            <Shimmer index={2} className="h-6 w-2/3" />
+            <Shimmer index={3} className="mt-2 h-4 w-2/5" />
+            <Shimmer index={4} className="mt-3.5 h-3 w-1/2" />
+            <div className="mt-4 flex gap-2">
+              <Shimmer index={5} className="h-8 w-28 rounded-md" />
+              <Shimmer index={6} className="h-8 w-24 rounded-md" />
+            </div>
+          </div>
+        </div>
+        <Shimmer index={7} className="mt-8 h-3 w-full" />
+        <Shimmer index={8} className="mt-2 h-3 w-11/12" />
+        <Shimmer index={9} className="mt-2 h-3 w-4/5" />
+      </div>
+    </div>
+  );
+}

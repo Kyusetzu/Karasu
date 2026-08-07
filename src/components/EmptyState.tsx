@@ -46,7 +46,10 @@ export function PerchRule() {
   return (
     <div className="relative h-8 w-full max-w-80">
       <span className="section-rule absolute inset-x-0 bottom-0 block" />
-      <KarasuMarkFlat className="absolute bottom-0 left-1/2 size-6 -translate-x-1/2 text-ink-500 opacity-60" />
+      {/* The bird actually lands. This visual is a corvid perched on a
+          rule — the one place the file's own comment says the mark may
+          show itself — and it arrived already sitting there. */}
+      <KarasuMarkFlat className="animate-land absolute bottom-0 left-1/2 size-6 -translate-x-1/2 text-ink-500 opacity-60" />
     </div>
   );
 }

@@ -9,6 +9,25 @@ const MARKER: &str = "karasu.portable";
 const DATA_DIR: &str = "data";
 const TOKEN_FILE: &str = "token.dat";
 
+/// Whether `$APPIMAGE` names something we should believe.
+///
+/// The AppImage runtime exports `APPIMAGE`, `ARGV0` and `OWD`, and **every
+/// child process inherits them** — so a Karasu installed from a package and
+/// launched from a terminal that an AppImage'd app spawned would otherwise read
+/// a completely unrelated `.AppImage` as its own location, and put its data
+/// folder next to that. A bare name is the other trap: `Path::parent()` of
+/// `"Karasu.AppImage"` is `Some("")`, which makes the data directory relative
+/// to whatever the working directory happens to be.
+///
+/// Requiring an absolute path that exists rules out both.
+///
+/// Lives outside the `#[cfg]` so its tests run on both platforms rather than
+/// only in the Linux CI job, which is why Windows needs telling it is unused.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+pub(crate) fn plausible_appimage(path: &Path) -> bool {
+    path.is_absolute() && path.exists()
+}
+
 /// The folder portable mode works out of, from the two inputs that decide it.
 ///
 /// Split from `exe_dir` so the AppImage case can be tested without one.
@@ -24,15 +43,31 @@ fn base_dir(appimage: Option<&Path>, current_exe: Option<&Path>) -> Option<PathB
         .map(|p| p.to_path_buf())
 }
 
+/// `$APPIMAGE`, but only when it is worth believing. The gate lives here, at
+/// the boundary where the environment is read, so `base_dir` stays pure and
+/// testable against paths that need not exist.
+fn appimage_path() -> Option<PathBuf> {
+    #[cfg(target_os = "linux")]
+    {
+        std::env::var_os("APPIMAGE")
+            .map(PathBuf::from)
+            .filter(|p| plausible_appimage(p))
+    }
+    #[cfg(not(target_os = "linux"))]
+    None
+}
+
 /// Directory portable mode reads and writes.
 pub fn exe_dir() -> Option<PathBuf> {
-    #[cfg(target_os = "linux")]
-    let appimage = std::env::var_os("APPIMAGE").map(PathBuf::from);
-    #[cfg(not(target_os = "linux"))]
-    let appimage: Option<PathBuf> = None;
-
+    let appimage = appimage_path();
     let current = std::env::current_exe().ok();
     base_dir(appimage.as_deref(), current.as_deref())
+}
+
+/// Whether this process is running from an AppImage, as the UI understands it:
+/// autostart cannot work and the updater can only replace the bundle.
+pub fn running_from_appimage() -> bool {
+    appimage_path().is_some()
 }
 
 fn marker_path() -> Option<PathBuf> {
@@ -113,6 +148,23 @@ mod tests {
         let exe = PathBuf::from("/usr/local/bin/karasu");
         assert_eq!(base_dir(None, Some(&exe)), Some(PathBuf::from("/usr/local/bin")));
         assert_eq!(base_dir(None, None), None);
+    }
+
+    /// `$APPIMAGE` is inherited by every child of an AppImage'd process, so a
+    /// package-installed Karasu launched from an AppImage'd terminal would
+    /// otherwise adopt that unrelated bundle's folder as its own.
+    #[test]
+    fn only_an_absolute_existing_appimage_is_believed() {
+        // A bare name is the dangerous one: its parent is "", which would make
+        // the data folder relative to the working directory.
+        assert!(!plausible_appimage(Path::new("Karasu.AppImage")));
+        assert!(!plausible_appimage(Path::new(
+            "/home/kyu/Apps/DoesNotExist.AppImage"
+        )));
+
+        // Any absolute path that exists passes; the running test binary will do.
+        let real = std::env::current_exe().unwrap();
+        assert!(plausible_appimage(&real));
     }
 
     #[test]

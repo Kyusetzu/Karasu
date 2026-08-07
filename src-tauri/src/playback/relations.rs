@@ -116,9 +116,19 @@ pub fn redirect(rules: &[Rule], media_id: i64, episode: u32) -> Option<(i64, u32
 pub fn spawn_loader(app: tauri::AppHandle) {
     use tauri::Manager;
     tauri::async_runtime::spawn(async move {
+        // Through `portable::data_dir`, like the database and the token. This
+        // is the one persistent path that used to resolve AppData directly,
+        // which in portable mode wrote outside the folder portable mode
+        // promises to keep everything in — and on a machine where that AppData
+        // folder had never been created, failed outright.
         let Ok(dir) = app.path().app_data_dir() else {
             return;
         };
+        let dir = crate::portable::data_dir(dir);
+        if let Err(e) = std::fs::create_dir_all(&dir) {
+            eprintln!("anime-relations: cannot create {}: {e}", dir.display());
+            return;
+        }
         let path = dir.join("anime-relations.txt");
 
         // 1) Load the existing cache immediately
@@ -146,7 +156,12 @@ pub fn spawn_loader(app: tauri::AppHandle) {
         if rules.is_empty() {
             return;
         }
-        let _ = std::fs::write(&path, &text);
+        // Not discarded: a failure here means the staleness check re-fires on
+        // every launch and the whole file is downloaded again, forever, with
+        // nothing to say why.
+        if let Err(e) = std::fs::write(&path, &text) {
+            eprintln!("anime-relations: cannot cache {}: {e}", path.display());
+        }
         *app.state::<Relations>().0.write().unwrap() = rules;
     });
 }

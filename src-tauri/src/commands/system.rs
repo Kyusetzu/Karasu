@@ -66,7 +66,9 @@ pub struct PlatformInfo {
 pub fn platform_info() -> PlatformInfo {
     PlatformInfo {
         os: std::env::consts::OS.to_string(),
-        app_image: std::env::var_os("APPIMAGE").is_some(),
+        // Same gate portable mode applies, so the UI and the data folder can
+        // never disagree about whether this is an AppImage.
+        app_image: crate::portable::running_from_appimage(),
     }
 }
 

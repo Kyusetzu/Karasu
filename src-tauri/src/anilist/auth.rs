@@ -206,8 +206,22 @@ mod dpapi_tests {
     }
 }
 
-pub fn authorize_url(client_id: &str) -> String {
-    format!("https://anilist.co/api/v2/oauth/authorize?client_id={client_id}&response_type=token")
+/// The AniList authorize URL.
+///
+/// `state` is a per-attempt nonce that AniList echoes back in the redirect
+/// fragment; the callback server requires it before acting on a token. Without
+/// it, `/token` had nothing to distinguish the real redirect from any other
+/// page on the machine hitting the same port.
+pub fn authorize_url(client_id: &str, state: Option<&str>) -> String {
+    let base =
+        format!("https://anilist.co/api/v2/oauth/authorize?client_id={client_id}&response_type=token");
+    // `None` is the manual-paste fallback: no callback server is listening, so
+    // there is nothing for a nonce to protect — the user copies the token out
+    // of the page themselves.
+    match state {
+        Some(s) => format!("{base}&state={s}"),
+        None => base,
+    }
 }
 
 /// Extracts the access token from any user input: raw token, complete

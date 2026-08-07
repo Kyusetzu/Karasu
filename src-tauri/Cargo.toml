@@ -1,6 +1,6 @@
 [package]
 name = "karasu"
-version = "0.58.4"
+version = "0.58.5"
 description = "A modern anime and manga tracker built exclusively for AniList (Windows; Linux experimental)"
 authors = ["Kyu"]
 license = "MIT"
@@ -56,6 +56,10 @@ percent-encoding = "2"
 # costs a single decode. Was Linux-only (portable-key storage); the poster
 # needs it everywhere.
 base64 = "0.22"
+# The OAuth `state` nonce. Already in the graph three times over via rustls and
+# friends; this makes the one use that must be cryptographically random an
+# explicit dependency rather than a borrowed one.
+getrandom = "0.3"
 
 # --- Platform-specific -------------------------------------------------------
 # Windows: Credential Manager keyring + DPAPI (via the `windows` crate).

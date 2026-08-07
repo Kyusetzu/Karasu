@@ -50,8 +50,7 @@ pub fn set_client_id(db: State<'_, Db>, client_id: String) -> Result<(), String>
     db.kv_set("anilist_client_id", trimmed)
 }
 
-#[tauri::command]
-pub fn anilist_login_url(db: State<'_, Db>) -> Result<String, String> {
+fn configured_client_id(db: &Db) -> Result<String, String> {
     let client_id = db
         .kv_get("anilist_client_id")
         .filter(|id| !id.is_empty())
@@ -59,7 +58,14 @@ pub fn anilist_login_url(db: State<'_, Db>) -> Result<String, String> {
     if client_id.is_empty() {
         return Err("No AniList client ID configured".into());
     }
-    Ok(auth::authorize_url(&client_id))
+    Ok(client_id)
+}
+
+/// The authorize URL for the manual-paste flow, where the user copies the
+/// token out of the page. No callback server runs, so no `state` is needed.
+#[tauri::command]
+pub fn anilist_login_url(db: State<'_, Db>) -> Result<String, String> {
+    Ok(auth::authorize_url(&configured_client_id(&db)?, None))
 }
 
 /// Validates a token against the Viewer query, stores it in the Windows
@@ -101,9 +107,12 @@ pub fn anilist_start_login(
     app: tauri::AppHandle,
     db: State<'_, Db>,
 ) -> Result<String, String> {
-    let url = anilist_login_url(db)?;
-    crate::anilist::login::start(app)?;
-    Ok(url)
+    let client_id = configured_client_id(&db)?;
+    // The server first: it mints the nonce the URL has to carry, and starting
+    // it after building the URL would mean advertising a state nothing is
+    // checking against.
+    let state = crate::anilist::login::start(app)?;
+    Ok(auth::authorize_url(&client_id, Some(&state)))
 }
 
 /// Returns the cached viewer if a token is stored — without an API call,

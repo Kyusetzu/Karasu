@@ -1,11 +1,12 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Capability for the main window. Only what the WebView itself calls: notification, dialog and updater are driven from Rust (alerts/notify.rs, commands/system.rs and library.rs, commands/update.rs), and Tauri 2 enforces this ACL at the IPC boundary alone, so granting them here gave the page a door it never needed and the Rust side nothing. opener:allow-open-url is already inside opener:default. allow-close is load-bearing: the titlebar's X calls close() so that Rust's CloseRequested handler decides between hiding and quitting, which is the only place that knows whether a tray exists.",
+  "description": "Capability for the main window. Only what the WebView itself calls: notification, dialog and updater are driven from Rust (alerts/notify.rs, commands/system.rs and library.rs, commands/update.rs), and Tauri 2 enforces this ACL at the IPC boundary alone, so granting them here gave the page a door it never needed and the Rust side nothing. The opener permissions are listed one by one rather than taking opener:default, which also carries allow-reveal-item-in-dir — a command nothing in the WebView calls and, unlike open_url and open_path, one the plugin runs with no scope check at all, so any script in the page could spawn file-manager windows on paths of its choosing. allow-close is load-bearing: the titlebar's X calls close() so that Rust's CloseRequested handler decides between hiding and quitting, which is the only place that knows whether a tray exists.",
   "windows": ["main"],
   "permissions": [
     "core:default",
-    "opener:default",
+    "opener:allow-open-url",
+    "opener:allow-default-urls",
     "core:window:allow-close",
     "core:window:allow-minimize",
     "core:window:allow-unminimize",

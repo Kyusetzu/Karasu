@@ -27,6 +27,35 @@ const LOGIN_WINDOW: Duration = Duration::from_secs(600);
 
 static ACTIVE: AtomicBool = AtomicBool::new(false);
 
+/// The `state` nonce for the login attempt currently in flight.
+///
+/// Without one, `/token` acted on any GET that reached the port. The listener
+/// is open for ten minutes while the user is in their browser, and
+/// `http://127.0.0.1` counts as a potentially-trustworthy origin, so any page
+/// open in that browser — an ad iframe in a background tab is enough — could
+/// issue `new Image().src = "http://127.0.0.1:46231/token?access_token=…"` and
+/// hand Karasu *its* AniList token. It validates, so it gets saved, and from
+/// then on every scrobble and list edit the victim makes is written to the
+/// attacker's account while the victim's screen shows the attacker's list.
+/// Textbook login CSRF; the nonce is what closes it.
+static PENDING_STATE: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
+
+/// A fresh 256-bit nonce, hex-encoded.
+fn new_state() -> Result<String, String> {
+    let mut bytes = [0u8; 32];
+    getrandom::fill(&mut bytes).map_err(|e| format!("Could not start login: {e}"))?;
+    Ok(bytes.iter().map(|b| format!("{b:02x}")).collect())
+}
+
+/// Constant-time equality, so a reply cannot be guessed a byte at a time.
+fn state_matches(expected: &str, given: &str) -> bool {
+    let (a, b) = (expected.as_bytes(), given.as_bytes());
+    if a.len() != b.len() || a.is_empty() {
+        return false;
+    }
+    a.iter().zip(b).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
+}
+
 const BRIDGE_HTML: &str = concat!(
     "<!doctype html><html><head><meta charset=\"utf-8\"><title>Karasu</title></head>",
     "<body><script>location.replace(\"/token?\"+location.hash.slice(1));</script>",
@@ -37,10 +66,16 @@ const BRIDGE_HTML: &str = concat!(
 /// listener is bound. The actual token handling happens on a background
 /// thread; the UI is notified through the `anilist-auth` /
 /// `anilist-auth-error` events.
-pub fn start<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
+/// Returns the `state` nonce the authorize URL must carry.
+pub fn start<R: Runtime>(app: AppHandle<R>) -> Result<String, String> {
     if ACTIVE.swap(true, Ordering::SeqCst) {
-        // A previous login attempt is still waiting — reuse its listener.
-        return Ok(());
+        // A previous login attempt is still waiting — reuse its listener, and
+        // its nonce, since that is what the running server will check against.
+        return PENDING_STATE
+            .lock()
+            .unwrap()
+            .clone()
+            .ok_or_else(|| "A login is already in progress".to_string());
     }
     let listener = match bind(AUTH_CALLBACK_PORT) {
         Ok(l) => l,
@@ -49,6 +84,14 @@ pub fn start<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
             return Err(e);
         }
     };
+    let state = match new_state() {
+        Ok(s) => s,
+        Err(e) => {
+            ACTIVE.store(false, Ordering::SeqCst);
+            return Err(e);
+        }
+    };
+    *PENDING_STATE.lock().unwrap() = Some(state.clone());
     std::thread::spawn(move || {
         // Validates the token, persists it and notifies the frontend.
         let on_token = |token: &str| -> Result<(), String> {
@@ -74,9 +117,11 @@ pub fn start<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
             }
         };
         serve(&listener, LOGIN_WINDOW, &on_token);
+        // The window is over: no further reply can be legitimate.
+        *PENDING_STATE.lock().unwrap() = None;
         ACTIVE.store(false, Ordering::SeqCst);
     });
-    Ok(())
+    Ok(state)
 }
 
 /// Binds the callback port in non-blocking mode so the accept loop can
@@ -137,6 +182,22 @@ fn handle_connection(
         respond(&mut stream, 200, BRIDGE_HTML);
         false
     } else if let Some(query) = path.strip_prefix("/token?") {
+        // The bridge page is same-origin and sends no `Origin`; a cross-site
+        // fetch always does. Cheap to check and it costs a legitimate login
+        // nothing — but it is only the second line, because a plain
+        // `new Image().src` sends no Origin either. The nonce below is what
+        // actually holds.
+        if has_origin_header(&request) || !state_ok(query) {
+            respond(
+                &mut stream,
+                403,
+                &page(
+                    "Login failed",
+                    "That login response did not come from Karasu. Please start again from the app.",
+                ),
+            );
+            return false;
+        }
         match query_param(query, "access_token") {
             Some(token) if !token.is_empty() => match on_token(token) {
                 Ok(()) => {
@@ -175,6 +236,23 @@ fn handle_connection(
         respond(&mut stream, 404, &page("Not found", "This page does not exist."));
         false
     }
+}
+
+/// Whether the query carries the nonce this login attempt was started with.
+fn state_ok(query: &str) -> bool {
+    let expected = PENDING_STATE.lock().unwrap();
+    match (expected.as_deref(), query_param(query, "state")) {
+        (Some(want), Some(got)) => state_matches(want, got),
+        // No pending login means nothing legitimate can arrive here.
+        _ => false,
+    }
+}
+
+/// Whether the request carries an `Origin` header, i.e. came from a page.
+fn has_origin_header(request: &str) -> bool {
+    request
+        .lines()
+        .any(|l| l.to_ascii_lowercase().starts_with("origin:"))
 }
 
 /// Reads the request head, i.e. everything up to the blank line that ends the
@@ -248,10 +326,15 @@ mod tests {
 
     /// Spins up the server on an OS-assigned port with a scripted token
     /// handler and returns (port, join handle).
+    /// The nonce the tests hand to `/token`. Every test uses the same one, so
+    /// the shared `PENDING_STATE` is safe to set from each of them.
+    const TEST_STATE: &str = "0123456789abcdef";
+
     fn spawn_server(
         accept: &'static str,
         done: mpsc::Sender<()>,
     ) -> (u16, std::thread::JoinHandle<()>) {
+        *PENDING_STATE.lock().unwrap() = Some(TEST_STATE.to_string());
         let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
         listener.set_nonblocking(true).unwrap();
         let port = listener.local_addr().unwrap().port();
@@ -326,20 +409,37 @@ mod tests {
         assert!(bridge.contains("200 OK"), "bridge page: {bridge}");
         assert!(bridge.contains("/token?"), "bridge must hop to /token");
 
-        let missing = get(port, "/token?token_type=Bearer");
+        let missing = get(port, &format!("/token?token_type=Bearer&state={TEST_STATE}"));
         assert!(missing.contains("400"), "missing token: {missing}");
 
         let unknown = get(port, "/somewhere");
         assert!(unknown.contains("404"), "unknown path: {unknown}");
 
-        let rejected = get(port, "/token?access_token=BAD&token_type=Bearer");
+        // A token with no `state`, or the wrong one, is what a page on some
+        // other site can produce. It must never reach the token handler.
+        let unstamped = get(port, "/token?access_token=GOOD&token_type=Bearer");
+        assert!(unstamped.contains("403"), "state-less token: {unstamped}");
+        let wrong = get(port, "/token?access_token=GOOD&state=deadbeefdeadbeef");
+        assert!(wrong.contains("403"), "wrong state: {wrong}");
+        assert!(
+            rx.try_recv().is_err(),
+            "a rejected state must not end the login window"
+        );
+
+        let rejected = get(
+            port,
+            &format!("/token?access_token=BAD&token_type=Bearer&state={TEST_STATE}"),
+        );
         assert!(rejected.contains("Login failed"), "bad token: {rejected}");
         assert!(
             rx.try_recv().is_err(),
             "server must keep running after a rejected token"
         );
 
-        let accepted = get(port, "/token?access_token=GOOD&token_type=Bearer");
+        let accepted = get(
+            port,
+            &format!("/token?access_token=GOOD&token_type=Bearer&state={TEST_STATE}"),
+        );
         assert!(accepted.contains("logged in"), "good token: {accepted}");
         rx.recv_timeout(Duration::from_secs(5))
             .expect("server must shut down after a successful login");
@@ -378,9 +478,43 @@ mod tests {
         assert!(late.contains("/token?"), "bridge must hop to /token");
         assert!(rx.try_recv().is_err(), "server must still be running");
 
-        let accepted = get(port, "/token?access_token=GOOD&token_type=Bearer");
+        let accepted = get(
+            port,
+            &format!("/token?access_token=GOOD&token_type=Bearer&state={TEST_STATE}"),
+        );
         assert!(accepted.contains("logged in"), "good token: {accepted}");
         handle.join().unwrap();
+    }
+
+    /// The `Origin` header is the cheap half of the check: the bridge page is
+    /// same-origin and sends none, a cross-site fetch always does.
+    #[test]
+    fn a_request_carrying_an_origin_is_refused() {
+        let (tx, _rx) = mpsc::channel();
+        let (port, _handle) = spawn_server("GOOD", tx);
+
+        let mut s = TcpStream::connect(("127.0.0.1", port)).unwrap();
+        s.set_read_timeout(Some(Duration::from_secs(10))).unwrap();
+        let path = format!("/token?access_token=GOOD&state={TEST_STATE}");
+        send(
+            &mut s,
+            &path,
+            &format!(
+                "GET {path} HTTP/1.1\r\nHost: localhost\r\nOrigin: https://evil.example\r\n\r\n"
+            ),
+        );
+        let response = read_response(&mut s, &path);
+        assert!(response.contains("403"), "cross-origin token: {response}");
+    }
+
+    #[test]
+    fn the_state_compare_rejects_mismatches_and_empties() {
+        assert!(state_matches("abc123", "abc123"));
+        assert!(!state_matches("abc123", "abc124"));
+        assert!(!state_matches("abc123", "abc12"));
+        // An empty expectation must never match, or a login that was never
+        // started would accept anything.
+        assert!(!state_matches("", ""));
     }
 
     #[test]

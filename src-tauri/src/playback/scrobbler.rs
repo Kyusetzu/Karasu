@@ -80,6 +80,17 @@ pub struct Session {
 /// Running scrobble session (shared between the loop and commands).
 pub struct ScrobbleSession(pub Mutex<Option<Session>>);
 
+/// Whether a finished update still belongs to the session now in state.
+///
+/// Both update paths drop the lock across the AniList request, and the poll
+/// loop replaces the session wholesale whenever the detected episode changes.
+/// Writing the result back unconditionally would stamp one episode's outcome
+/// onto another — and since the threshold check only fires on `Watching`, the
+/// wrongly-stamped episode could never be scrobbled at all.
+fn applies_to(session: &Session, media_id: i64, episode: u32) -> bool {
+    session.media_id == media_id && session.episode == episode
+}
+
 #[derive(Clone, serde::Serialize)]
 struct ScrobbleEvent {
     phase: String,
@@ -389,11 +400,13 @@ pub async fn confirm_pending(app: AppHandle, accept: bool) -> Result<(), String>
     let state = app.state::<ScrobbleSession>();
     let mut guard = state.0.lock().unwrap();
     if let Some(session) = guard.as_mut() {
-        session.phase = match &result {
-            Ok(()) => Phase::Updated,
-            Err(e) => Phase::Blocked(e.clone()),
-        };
-        emit_session(&app, Some(session));
+        if applies_to(session, data.0, data.2) {
+            session.phase = match &result {
+                Ok(()) => Phase::Updated,
+                Err(e) => Phase::Blocked(e.clone()),
+            };
+            emit_session(&app, Some(session));
+        }
     }
     result
 }
@@ -531,7 +544,7 @@ async fn drive_session(app: &AppHandle) {
         let state = app.state::<ScrobbleSession>();
         let mut guard = state.0.lock().unwrap();
         if let Some(session) = guard.as_mut() {
-            if session.media_id == mid && session.episode == ep {
+            if applies_to(session, mid, ep) {
                 session.phase = match result {
                     Ok(()) => Phase::Updated,
                     Err(e) => Phase::Blocked(e),
@@ -539,5 +552,44 @@ async fn drive_session(app: &AppHandle) {
                 emit_session(app, Some(session));
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{applies_to, Phase, Session};
+
+    fn session(media_id: i64, episode: u32) -> Session {
+        Session {
+            media_id,
+            media_type: "ANIME".into(),
+            episode,
+            total: Some(12),
+            list_status: "CURRENT".into(),
+            started_ms: 0,
+            update_at: None,
+            update_at_epoch_ms: None,
+            phase: Phase::Watching,
+        }
+    }
+
+    #[test]
+    fn the_result_applies_to_the_session_it_was_started_for() {
+        assert!(applies_to(&session(1, 5), 1, 5));
+    }
+
+    /// The case that made this a bug: the poll loop swapped in the next
+    /// episode while the AniList request was in flight. Stamping "updated"
+    /// here would both lie about episode 6 and — because the threshold only
+    /// fires on `Watching` — stop it ever being scrobbled.
+    #[test]
+    fn a_newer_episode_of_the_same_media_does_not_take_the_result() {
+        assert!(!applies_to(&session(1, 6), 1, 5));
+    }
+
+    /// Switching to a different series entirely is the same hazard.
+    #[test]
+    fn a_different_media_does_not_take_the_result() {
+        assert!(!applies_to(&session(2, 5), 1, 5));
     }
 }

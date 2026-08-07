@@ -140,26 +140,28 @@ pub fn get_portable_status(app: tauri::AppHandle) -> PortableStatus {
     PortableStatus { portable, dir }
 }
 
-/// Enables portable mode: writes the marker, copies the current database
-/// next to the exe and moves the token into the encrypted portable file.
+/// Enables portable mode: copies the current database next to the exe, moves
+/// the token into the encrypted portable file and only then writes the marker.
 /// Takes effect after a restart.
+///
+/// The marker goes **last** on purpose. `is_portable()` is a live check for
+/// that file, so the moment it exists the app reads from the portable folder —
+/// there is no restart to wait for. Writing it first (as this did) meant any
+/// later failure returned an error the UI reported as "it did not work" while
+/// the app had in fact already switched, to a folder holding no token and
+/// possibly no database. Done in this order, a failure leaves an unused folder
+/// and nothing else.
 #[tauri::command]
-pub fn enable_portable(app: tauri::AppHandle) -> Result<(), String> {
-    crate::portable::create_marker()?;
+pub fn enable_portable(db: State<'_, Db>) -> Result<(), String> {
     let dest_dir = crate::portable::portable_data_dir().ok_or("No portable path")?;
     std::fs::create_dir_all(&dest_dir).map_err(|e| e.to_string())?;
 
-    let src = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| e.to_string())?
-        .join("karasu.db");
     let dest = dest_dir.join("karasu.db");
-    if src.exists() && !dest.exists() {
-        std::fs::copy(&src, &dest).map_err(|e| e.to_string())?;
+    if !dest.exists() {
+        db.snapshot_to(&dest)?;
     }
     crate::anilist::auth::migrate_to_portable_file()?;
-    Ok(())
+    crate::portable::create_marker()
 }
 
 /// Disables portable mode (removes the marker). Takes effect after a restart.

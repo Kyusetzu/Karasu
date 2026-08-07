@@ -46,12 +46,26 @@ pub fn delete_token() {
     }
 }
 
-/// Copies the current keyring token into the portable DPAPI file (used when
-/// switching a running install into portable mode).
+/// Moves the current credential-store token into the encrypted portable file
+/// (used when switching a running install into portable mode).
+///
+/// The distinction between "nothing is stored" and "the store could not be
+/// read" is the whole point. Collapsing both into "no token" — which
+/// `get_password().ok()` does — reported a successful migration for a user
+/// whose keyring was merely locked, and the sign-in was then unreachable
+/// through a portable folder that had never received it.
 pub fn migrate_to_portable_file() -> Result<(), String> {
-    if let Some(token) = entry().ok().and_then(|e| e.get_password().ok()) {
-        save_token_file(&token)?;
-    }
+    let entry = entry()?;
+    let token = match entry.get_password() {
+        Ok(token) => token,
+        Err(keyring::Error::NoEntry) => return Ok(()),
+        Err(e) => return Err(format!("Could not read the stored sign-in: {e}")),
+    };
+    save_token_file(&token)?;
+    // Only once the token is safely in the portable file. Leaving it behind
+    // would keep a live bearer token in the credential store that sign-out
+    // (which follows `is_portable()`) would never reach.
+    let _ = entry.delete_credential();
     Ok(())
 }
 

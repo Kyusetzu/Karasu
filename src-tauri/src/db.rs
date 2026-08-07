@@ -312,6 +312,24 @@ impl Db {
         .map_err(|e| format!("Cache write failed: {e}"))
     }
 
+    /// Writes a consistent copy of the database to `dest`, which must not
+    /// exist yet.
+    ///
+    /// `std::fs::copy` is not a substitute. The connection runs in SQLite's
+    /// default rollback-journal mode, where a database mid-transaction is only
+    /// consistent read together with its `-journal` sidecar — and the alert
+    /// passes, the scrobbler and a library scan all write from background
+    /// threads at any moment. Copying the main file alone can capture pages
+    /// whose originals still live in a journal that was never copied.
+    /// `VACUUM INTO` asks SQLite for the snapshot instead, and taking the same
+    /// mutex every other writer takes keeps it from racing them.
+    pub fn snapshot_to(&self, dest: &std::path::Path) -> Result<(), String> {
+        let conn = self.0.lock().unwrap();
+        conn.execute("VACUUM INTO ?1", rusqlite::params![dest.to_string_lossy()])
+            .map(|_| ())
+            .map_err(|e| format!("Could not copy the database: {e}"))
+    }
+
     pub fn cached_list(&self, user_id: i64, media_type: &str) -> Option<String> {
         let conn = self.0.lock().unwrap();
         conn.query_row(
@@ -904,6 +922,32 @@ mod tests {
     /// The index must survive a write/read round-trip, and a rescan must
     /// replace the previous contents rather than accumulate them.
     /// The list cache is what `cached_media_list` serves on a cold start, so a
+    /// Portable mode's copy step. Also pins that SQLite accepts a bound
+    /// parameter as the `VACUUM INTO` destination — building that path by
+    /// string concatenation would break on any apostrophe in a user's folder
+    /// name.
+    #[test]
+    fn a_snapshot_is_a_readable_database_with_the_same_rows() {
+        let db = mem_db();
+        db.kv_set("anilist_viewer", r#"{"id":7}"#).unwrap();
+
+        let dir = std::env::temp_dir().join(format!("karasu-snap-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let dest = dir.join("copy.db");
+        let _ = std::fs::remove_file(&dest);
+
+        db.snapshot_to(&dest).unwrap();
+        let copy = Db(Mutex::new(Connection::open(&dest).unwrap()));
+        assert_eq!(copy.kv_get("anilist_viewer").as_deref(), Some(r#"{"id":7}"#));
+
+        // VACUUM INTO refuses to overwrite, which is what makes the caller's
+        // "only when the destination is absent" guard load-bearing.
+        assert!(db.snapshot_to(&dest).is_err());
+
+        drop(copy);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     /// miss has to be distinguishable from a cached empty list — the caller
     /// falls back to a loading state on `None` and paints on `Some`.
     #[test]

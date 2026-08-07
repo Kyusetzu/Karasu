@@ -28,13 +28,18 @@ export function PortableSection() {
 
   const toggle = async () => {
     setError(null);
+    const { invoke } = await import("@tauri-apps/api/core");
     try {
-      const { invoke } = await import("@tauri-apps/api/core");
       await invoke(status.portable ? "disable_portable" : "enable_portable");
       setRestart(true);
     } catch (e) {
       setError(String(e));
     }
+    // Either way, re-read where the data actually lives rather than assuming
+    // the switch failed cleanly. The backend leaves portable mode off when
+    // enabling fails, but this pane should be showing what is true, not what
+    // it expected.
+    await invoke<PortableStatus>("get_portable_status").then(setStatus);
   };
 
   return (

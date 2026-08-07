@@ -86,11 +86,20 @@ jobs:
 
   build-and-publish:
     runs-on: windows-latest
-    # Soft: `always()` plus continue-on-error on the download means a broken
+    # Soft: `!cancelled()` plus continue-on-error on the download means a broken
     # Linux build costs the Linux artifact, not the Windows release. The
     # manifest generator emits only the platforms whose artifacts it finds.
+    #
+    # `!cancelled()` rather than `always()`: `always()` is true even when the
+    # run has been cancelled, and this workflow sets cancel-in-progress. Two
+    # pushes in quick succession — routine here, since every commit bumps the
+    # version — would cancel run A's Linux job and let A publish anyway, racing
+    # run B. If A landed second it would overwrite latest.json with the older
+    # build and its prune step would delete B's assets, since B's filenames are
+    # not in A's $keep. `!cancelled()` keeps the soft dependency identically and
+    # closes that.
     needs: [build-linux]
-    if: always()
+    if: ${{ !cancelled() }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -160,7 +169,17 @@ jobs:
             $h = Get-FileHash -Algorithm SHA256 -Path $appimage.FullName
             $lines += "$($h.Hash.ToLower())  $($appimage.Name)"
           }
-          $lines | Out-File -FilePath SHA256SUMS.txt -Encoding utf8
+          # LF, explicitly. `Out-File` terminates lines with the platform's
+          # newline, and this step runs on windows-latest — so the file went out
+          # with CRLF. GNU coreutils takes everything after the two-space
+          # separator as the filename, trailing \r included, so `sha256sum -c`
+          # reported "FAILED open or read" for every line. The release body
+          # tells Linux users to verify with exactly that command.
+          [IO.File]::WriteAllText(
+            (Join-Path $PWD "SHA256SUMS.txt"),
+            (($lines -join "`n") + "`n"),
+            [Text.UTF8Encoding]::new($false)
+          )
 
       - name: Scan installer with VirusTotal
         id: virustotal
@@ -213,9 +232,17 @@ jobs:
       - name: Prune stale release assets
         env:
           GH_TOKEN: ${{ github.token }}
+          # Through the environment, not `${{ }}` inside the script body. A
+          # workflow expression is substituted textually before pwsh parses the
+          # line, and it landed inside a double-quoted string where `$` and `"`
+          # are both live — so a productName containing `$` would have silently
+          # expanded to nothing (the real installer then missing from $keep and
+          # deleted seconds after upload), and one containing `"` would have
+          # closed the string and run as code, in a job holding the signing key.
+          INSTALLER: ${{ steps.installer.outputs.installer }}
         shell: pwsh
         run: |
-          $keep = @("${{ steps.installer.outputs.installer }}", "SHA256SUMS.txt", "latest.json")
+          $keep = @($env:INSTALLER, "SHA256SUMS.txt", "latest.json")
           # Read from the downloaded folder rather than plumbing an output
           # across jobs — and it must be here, or the prune deletes the
           # AppImage seconds after uploading it.
@@ -224,9 +251,19 @@ jobs:
           if ($appimage) { $keep += $appimage.Name }
           Write-Host "Keeping: $($keep -join ', ')"
           $assets = gh release view latest --json assets --jq '.assets[].name'
+          if ($LASTEXITCODE -ne 0) { throw "Could not list the release's assets." }
+          # Failures are collected and thrown at the end rather than ignored.
+          # The pwsh wrapper only appends `exit $LASTEXITCODE` once, so the
+          # step's status reflected the *last* gh call alone: a transient
+          # failure on the first deletion was overwritten by a later success,
+          # the run stayed green, and the stale installer survived — the one
+          # thing this step exists to prevent.
+          $failed = @()
           foreach ($name in $assets) {
             if ($keep -notcontains $name) {
               Write-Host "Deleting stale asset: $name"
               gh release delete-asset latest $name --yes
+              if ($LASTEXITCODE -ne 0) { $failed += $name }
             }
           }
+          if ($failed) { throw "Could not delete: $($failed -join ', ')" }

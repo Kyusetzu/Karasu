@@ -70,12 +70,22 @@ $appimage = Get-ChildItem -Path $linuxDir -Filter "*.AppImage" -ErrorAction Sile
     Select-Object -First 1
 if ($appimage) {
     $appimageSig = "$($appimage.FullName).sig"
-    if (-not (Test-Path $appimageSig)) {
-        throw "An AppImage was published but is unsigned: $($appimage.Name). The updater would offer a download it cannot verify."
+    if (Test-Path $appimageSig) {
+        $platforms["linux-x86_64"] = [ordered]@{
+            signature = (Get-Content $appimageSig -Raw).Trim()
+            url       = "https://github.com/Kyusetzu/Karasu/releases/download/latest/$($appimage.Name)"
+        }
     }
-    $platforms["linux-x86_64"] = [ordered]@{
-        signature = (Get-Content $appimageSig -Raw).Trim()
-        url       = "https://github.com/Kyusetzu/Karasu/releases/download/latest/$($appimage.Name)"
+    else {
+        # A warning, not a `throw`. Throwing here ran under
+        # $ErrorActionPreference = "Stop" inside the *Windows* publish job, so an
+        # unsigned AppImage failed the step and skipped everything after it:
+        # no checksums, no latest.json, and no installer published at all. That
+        # is precisely the coupling the soft dependency exists to prevent — a
+        # Linux packaging hiccup would have stalled auto-updates for every
+        # Windows user. Omitting the key leaves the manifest describing what
+        # actually exists, which is what it is for.
+        Write-Host "::warning::AppImage $($appimage.Name) has no signature; publishing without a Linux updater entry."
     }
 }
 

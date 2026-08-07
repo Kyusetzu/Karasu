@@ -59,10 +59,11 @@ if ($appimage.Name -ne $newName) {
     }
 }
 
-# The release workflow needs the final name to know which asset to keep when
-# it prunes the rolling release.
-if ($env:GITHUB_OUTPUT) {
-    "appimage=$newName" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-}
-
+# Deliberately no GITHUB_OUTPUT here, unlike rename-installer.ps1. This used to
+# write one under a comment claiming the workflow needed it, but the step that
+# runs this script has no `id:`, so no `steps.<id>.outputs.appimage` could ever
+# have referenced it — and the prune step reads the name out of the downloaded
+# folder instead, precisely to avoid plumbing an output across jobs. A dead
+# output is bad enough; one with a comment asserting it is load-bearing invites
+# someone to wire it up to an expression that silently resolves to "".
 Write-Output (Join-Path $bundleDir $newName)

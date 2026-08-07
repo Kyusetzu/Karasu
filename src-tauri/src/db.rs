@@ -220,6 +220,11 @@ pub struct LocalRow {
     pub media_json: Option<String>,
 }
 
+/// Notifications retained. The bell reads the newest 100, so this is scrollback
+/// headroom rather than a display limit — it exists only so the table cannot
+/// grow without bound.
+const NOTIF_KEEP: i64 = 500;
+
 /// Applies one migration step atomically.
 ///
 /// The wrapping transaction is the whole point. `execute_batch` otherwise runs
@@ -316,6 +321,26 @@ impl Db {
     pub fn kv_delete(&self, key: &str) {
         let conn = self.0.lock().unwrap();
         let _ = conn.execute("DELETE FROM kv WHERE key = ?1", [key]);
+    }
+
+    /// Drops `prefix`-keyed rows whose value is an epoch-seconds stamp older
+    /// than `cutoff`. Returns how many went.
+    ///
+    /// `substr` rather than `LIKE prefix || '%'` because `_` is a LIKE
+    /// wildcard, and several of these prefixes contain one.
+    ///
+    /// Rows written before the value carried a stamp hold `"1"`, which casts to
+    /// 1 and is therefore always older than the cutoff. That is correct: they
+    /// are by definition from an earlier run.
+    pub fn kv_prune_older(&self, prefix: &str, cutoff: i64) -> usize {
+        let conn = self.0.lock().unwrap();
+        conn.execute(
+            "DELETE FROM kv
+             WHERE substr(key, 1, length(?1)) = ?1
+               AND CAST(value AS INTEGER) < ?2",
+            rusqlite::params![prefix, cutoff],
+        )
+        .unwrap_or(0)
     }
 
     // --- List cache ---------------------------------------------------------
@@ -617,8 +642,19 @@ impl Db {
              VALUES (?1, ?2, ?3, ?4)",
             rusqlite::params![kind, title, body, created_ms],
         )
-        .map(|_| ())
-        .map_err(|e| format!("Notification write failed: {e}"))
+        .map_err(|e| format!("Notification write failed: {e}"))?;
+
+        // The table was insert-only, so a long-lived install accumulated every
+        // notification it had ever shown — thousands a year, of which nothing
+        // can read past the newest hundred. Trimming on write keeps the bound
+        // without a separate pass to forget to run. Well above the read limit,
+        // so scrolling back is unaffected.
+        let _ = conn.execute(
+            "DELETE FROM notifications WHERE id NOT IN
+                 (SELECT id FROM notifications ORDER BY created_ms DESC, id DESC LIMIT ?1)",
+            rusqlite::params![NOTIF_KEEP],
+        );
+        Ok(())
     }
 
     /// Most recent notifications first, capped at `limit`.
@@ -948,6 +984,54 @@ mod tests {
     /// The index must survive a write/read round-trip, and a rescan must
     /// replace the previous contents rather than accumulate them.
     /// The list cache is what `cached_media_list` serves on a cold start, so a
+    /// The airing watcher writes one of these per episode, forever. Pruning
+    /// has to take the old unstamped rows too, or the ones already on disk
+    /// would never go.
+    #[test]
+    fn pruning_takes_stale_and_legacy_keys_and_leaves_the_rest() {
+        let db = mem_db();
+        db.kv_set("aired:1:5", "1").unwrap(); // pre-stamp format
+        db.kv_set("aired:1:6", "1000").unwrap(); // old
+        db.kv_set("aired:1:7", "9000").unwrap(); // recent
+        db.kv_set("airing_last_check", "1000").unwrap();
+
+        assert_eq!(db.kv_prune_older("aired:", 5000), 2);
+        assert!(db.kv_get("aired:1:5").is_none());
+        assert!(db.kv_get("aired:1:6").is_none());
+        assert_eq!(db.kv_get("aired:1:7").as_deref(), Some("9000"));
+        // A prefix match, not a LIKE — and nothing outside it is touched.
+        assert_eq!(db.kv_get("airing_last_check").as_deref(), Some("1000"));
+    }
+
+    /// `_` is a LIKE wildcard, and these prefixes are full of them.
+    #[test]
+    fn pruning_a_prefix_does_not_match_it_as_a_wildcard() {
+        let db = mem_db();
+        db.kv_set("sequel_seen:1", "1").unwrap();
+        db.kv_set("sequelXseen:1", "1").unwrap();
+
+        assert_eq!(db.kv_prune_older("sequel_seen:", 5000), 1);
+        assert_eq!(db.kv_get("sequelXseen:1").as_deref(), Some("1"));
+    }
+
+    /// The table was insert-only; nothing can read past the newest 100.
+    #[test]
+    fn notifications_stop_at_the_retention_limit() {
+        let db = mem_db();
+        for i in 0..(NOTIF_KEEP + 25) {
+            db.notif_insert("airing", "New episode", "body", i).unwrap();
+        }
+        let count: i64 = db
+            .0
+            .lock()
+            .unwrap()
+            .query_row("SELECT COUNT(*) FROM notifications", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, NOTIF_KEEP);
+        // And it is the newest that survive.
+        assert_eq!(db.notif_all(1)[0].created_ms, NOTIF_KEEP + 24);
+    }
+
     /// v7 adds a column, and `ALTER TABLE ADD COLUMN` cannot be re-run. A
     /// database that had the column but was still labelled v6 — what an
     /// interrupted upgrade used to leave behind — failed to open on every

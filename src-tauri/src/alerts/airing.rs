@@ -15,6 +15,12 @@ const STARTUP_DELAY: Duration = Duration::from_secs(30);
 /// Getting a full page back is the only signal that the answer was truncated —
 /// the query asks for no `pageInfo`.
 const PAGE_SIZE: usize = 50;
+/// How long an `aired:` dedupe key is worth keeping.
+///
+/// Generous on purpose: the checkpoint only ever moves forward, so a key older
+/// than the longest plausible backlog-drain can never be consulted again. Thirty
+/// days is far past that and still bounds the table.
+const AIRED_KEY_TTL_SECS: i64 = 30 * 24 * 3600;
 
 const AIRING_QUERY: &str = "
 query ($ids: [Int], $from: Int, $to: Int) {
@@ -151,8 +157,16 @@ async fn check(app: &AppHandle) {
             "New episode aired",
             &format!("{title} — episode {episode} is out"),
         );
-        let _ = db.kv_set(&key, "1");
+        let _ = db.kv_set(&key, &now.to_string());
     }
+
+    // One kv row per episode, kept forever, was the shape here: a few thousand
+    // a year for someone following a full season, none of them ever read again
+    // once the checkpoint has moved past that episode. `airing_last_check` is
+    // what actually stops a re-notification — these keys only absorb the
+    // overlap at the window boundary, so anything older than the retention
+    // below cannot be consulted again and is safe to drop.
+    db.kv_prune_older("aired:", now - AIRED_KEY_TTL_SECS);
 
     // A full page means the answer was cut off, and moving the checkpoint to
     // `now` would step over every episode past the fiftieth — permanently, since

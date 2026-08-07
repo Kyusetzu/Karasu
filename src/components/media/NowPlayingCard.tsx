@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -11,22 +11,57 @@ import {
 } from "@/stores/nowPlaying";
 import { isTauri } from "@/api/anilist";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { countdownFraction, ringOffset, splitRemaining } from "@/lib/countdown";
+import { usePresentValue } from "@/hooks/usePresence";
 
-function useCountdown(targetMs: number | null): string | null {
+/**
+ * The countdown, as text and as a fraction for the ring.
+ *
+ * The span is remembered from the largest remaining time seen for this target,
+ * because the backend sends the deadline but not the length of the wait — see
+ * `lib/countdown.ts`.
+ */
+function useCountdown(targetMs: number | null): {
+  label: string | null;
+  fraction: number;
+} {
   const { t } = useTranslation();
   const [, tick] = useState(0);
+  const span = useRef<{ target: number; ms: number } | null>(null);
+
   useEffect(() => {
     if (targetMs === null) return;
     const timer = setInterval(() => tick((n) => n + 1), 1000);
     return () => clearInterval(timer);
   }, [targetMs]);
-  if (targetMs === null) return null;
+
+  if (targetMs === null) {
+    span.current = null;
+    return { label: null, fraction: 0 };
+  }
+
   const diff = targetMs - Date.now();
-  if (diff <= 0) return t("nowPlaying.soon");
-  const min = Math.floor(diff / 60_000);
-  const sec = Math.floor((diff % 60_000) / 1000);
-  return min > 0 ? `${min} min ${sec} s` : `${sec} s`;
+  if (span.current?.target !== targetMs) {
+    span.current = { target: targetMs, ms: Math.max(diff, 1) };
+  } else if (diff > span.current.ms) {
+    // A later tick reporting *more* time left means this session started before
+    // the card was mounted; widen rather than let the ring run backwards.
+    span.current.ms = diff;
+  }
+
+  const fraction = countdownFraction(diff, span.current.ms);
+  if (diff <= 0) return { label: t("nowPlaying.soon"), fraction: 1 };
+  const { minutes, seconds } = splitRemaining(diff);
+  return {
+    label: minutes > 0 ? `${minutes} min ${seconds} s` : `${seconds} s`,
+    fraction,
+  };
 }
+
+/** Circumference of the r=20 ring below, for the dash maths. */
+const RING_R = 20;
+const RING_C = 2 * Math.PI * RING_R;
 
 /** Banner for the currently detected playback, including scrobble state. */
 export default function NowPlayingCard() {
@@ -37,6 +72,9 @@ export default function NowPlayingCard() {
   );
   const qc = useQueryClient();
   const { t } = useTranslation();
+  // Retained through the exit so the card can animate away with its title
+  // rather than emptying first.
+  const shown = usePresentValue(current, 160);
 
   // Reload the list after a successful auto-update. Only the collection that
   // actually changed: an anime scrobble cannot alter the manga list, and
@@ -66,21 +104,54 @@ export default function NowPlayingCard() {
     };
   }, [qc]);
 
-  if (!current) return null;
+  // Playback ending removed the card mid-frame, though it arrived with a rise.
+  if (!shown.value) return null;
+  const playing = shown.value;
 
-  const title = current.matchedTitle ?? current.parsedTitle;
-  const isManga = current.mediaType === "MANGA";
+  const title = playing.matchedTitle ?? playing.parsedTitle;
+  const isManga = playing.mediaType === "MANGA";
 
   return (
     // Cut *into* the page rather than raised off it. This card arrives
     // unprompted every evening, so reading as a different substance is how it
     // announces itself without shouting.
-    <div className="inset-well well-edge relative animate-rise-in overflow-hidden rounded-[.875rem] px-4.5 py-4">
+    <div
+      className={cn(
+        "inset-well well-edge relative overflow-hidden rounded-[.875rem] px-4.5 py-4",
+        shown.leaving ? "animate-rise-out" : "animate-rise-in",
+      )}
+    >
       <div className="flex items-center gap-4">
-        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-accent-600/25 text-accent-400">
+        <span className="relative grid h-11 w-11 shrink-0 place-items-center rounded-full bg-accent-600/25 text-accent-400">
+          {/* The wait, drawn rather than counted. The digits below tick once a
+              second and jump; a ring closing over the same interval is the part
+              that can be read at a glance. Only while actually counting down —
+              a static full ring would suggest something is still pending. */}
+          {scrobble.phase === "watching" && countdown.label && (
+            <svg
+              className="absolute inset-0 size-11 -rotate-90"
+              viewBox="0 0 44 44"
+              aria-hidden
+            >
+              <circle
+                cx="22"
+                cy="22"
+                r={RING_R}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeDasharray={RING_C}
+                strokeDashoffset={ringOffset(countdown.fraction, RING_C)}
+                // A plain transition, so the reduce-motion rules already reach
+                // it — the ring still updates, it just stops sliding.
+                style={{ transition: "stroke-dashoffset 1s linear" }}
+              />
+            </svg>
+          )}
           {isManga ? (
             <BookOpen className="size-5" />
-          ) : current.streaming ? (
+          ) : playing.streaming ? (
             <Tv className="size-5" />
           ) : (
             <MonitorPlay className="size-5" />
@@ -89,28 +160,34 @@ export default function NowPlayingCard() {
         <div className="min-w-0 flex-1">
           <p className="text-2xs font-medium uppercase tracking-[.09em] text-accent-400">
             {t(isManga ? "nowPlaying.headingManga" : "nowPlaying.heading", {
-              process: current.process.replace(".exe", ""),
+              process: playing.process.replace(".exe", ""),
             })}
           </p>
           <p className="truncate text-[1.0625rem] font-semibold text-ink-100">
-            {current.mediaId ? (
-              <Link to={`/media/${current.mediaId}`} className="hover:underline">
+            {playing.mediaId ? (
+              <Link to={`/media/${playing.mediaId}`} className="hover:underline">
                 {title}
               </Link>
             ) : (
               title
             )}
-            {current.episode !== null && (
+            {playing.episode !== null && (
               <span className="font-medium text-ink-500">
                 {" "}
                 —{" "}
                 {t(isManga ? "common.chapter" : "common.episode", {
-                  n: current.episode,
+                  n: playing.episode,
                 })}
               </span>
             )}
           </p>
-          <ScrobbleStatus countdown={countdown} />
+          {/* Keyed on the phase so each state fades in rather than the line
+              swapping its words in place — this row is the app reporting on
+              something it did without being asked, and a silent text change is
+              easy to miss while looking straight at it. */}
+          <div key={scrobble.phase} className="animate-fade-in">
+            <ScrobbleStatus countdown={countdown.label} />
+          </div>
         </div>
         <ScrobbleActions />
       </div>
@@ -152,7 +229,9 @@ function ScrobbleStatus({ countdown }: { countdown: string | null }) {
     case "updated":
       return (
         <p className="flex items-center gap-1 text-xs font-medium text-success">
-          <Check className="size-3" />{" "}
+          {/* The one genuinely good outcome in this machine, so it lands
+              rather than appearing. */}
+          <Check className="size-3 animate-land" />{" "}
           {t("nowPlaying.updated", {
             n: t(
               current?.mediaType === "MANGA"

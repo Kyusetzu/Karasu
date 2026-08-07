@@ -490,6 +490,9 @@ export const en = {
     undo: "Undo",
     failed: "Couldn't save {{title}}",
     failedDetail: "Queued — Karasu will retry.",
+    bulkSaved: "{{count}} updated",
+    bulkFailed: "Bulk update failed",
+    removeFailed: "Couldn't remove that entry",
   },
   entry: {
     scoreHint: "Click the score you gave to clear it.",

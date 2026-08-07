@@ -87,6 +87,35 @@ export const deleteListEntry = (id: number) =>
     ? invoke<MutationResult>("local_delete_entry", { id })
     : invoke<MutationResult>("delete_list_entry", { id });
 
+/**
+ * One status or score across a whole selection.
+ *
+ * AniList mode sends the entry ids to `UpdateMediaListEntries`, batched in the
+ * backend, so a 500-entry selection costs ten requests rather than five hundred
+ * against a ~30/min budget. Local mode has no such budget — its list is the
+ * SQLite file — so it simply writes each row, keyed on media id the way
+ * `local_save_entry` expects.
+ */
+export const bulkSaveEntries = async (
+  entries: { id: number; mediaId: number }[],
+  patch: { status?: MediaListStatus; score?: number },
+): Promise<number> => {
+  if (!entries.length) return 0;
+  if (profileMode === "local") {
+    for (const e of entries) {
+      await invoke<MutationResult>("local_save_entry", {
+        input: { mediaId: e.mediaId, ...patch },
+      });
+    }
+    return entries.length;
+  }
+  return invoke<number>("bulk_save_list_entries", {
+    ids: entries.map((e) => e.id),
+    status: patch.status ?? null,
+    score: patch.score ?? null,
+  });
+};
+
 export const flushQueue = () => invoke<number>("flush_queue");
 
 // --- Sign-in merge (local list -> AniList) ---------------------------------

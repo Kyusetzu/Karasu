@@ -1,9 +1,10 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { deleteListEntry, saveListEntry } from "@/api/anilist";
+import { bulkSaveEntries, deleteListEntry, saveListEntry } from "@/api/anilist";
 import type {
   ListResult,
   MediaListEntry,
+  MediaListStatus,
   MediaType,
   SaveEntryInput,
 } from "@/api/types";
@@ -59,14 +60,25 @@ export function useListMutations(userId: number, mediaType: MediaType) {
     }
   };
 
-  const patchCache = (input: SaveEntryInput) => {
+  /**
+   * Applies one patch to every listed media id, in a single cache write.
+   *
+   * Taking a set rather than one id is what lets a bulk edit be one mutation:
+   * patching per entry meant N passes over the whole collection, and N
+   * optimistic mutations whose rollbacks then fought each other.
+   */
+  const patchCacheMany = (
+    mediaIds: Set<number>,
+    input: Omit<SaveEntryInput, "mediaId">,
+  ) => {
     qc.setQueryData<ListResult>(key, (old) => {
       if (!old) return old;
+      const now = Math.floor(Date.now() / 1000);
       const lists = old.lists.map((group) => ({
         ...group,
         entries: group.entries
           .map((e) =>
-            e.mediaId === input.mediaId
+            mediaIds.has(e.mediaId)
               ? {
                   ...e,
                   progress: input.progress ?? e.progress,
@@ -75,14 +87,14 @@ export function useListMutations(userId: number, mediaType: MediaType) {
                   status: input.status ?? e.status,
                   repeat: input.repeat ?? e.repeat,
                   notes: input.notes ?? e.notes,
-                  updatedAt: Math.floor(Date.now() / 1000),
+                  updatedAt: now,
                 }
               : e,
           )
           // On a status change, remove from the old status group
           .filter(
             (e) =>
-              e.mediaId !== input.mediaId ||
+              !mediaIds.has(e.mediaId) ||
               !input.status ||
               group.isCustomList ||
               group.status === input.status,
@@ -90,24 +102,29 @@ export function useListMutations(userId: number, mediaType: MediaType) {
       }));
       // Insert into the target group if it exists
       if (input.status) {
-        const entry = old.lists
-          .flatMap((g) => g.entries)
-          .find((e) => e.mediaId === input.mediaId);
-        if (entry) {
-          const target = lists.find(
-            (g) => !g.isCustomList && g.status === input.status,
-          );
-          if (target && !target.entries.some((e) => e.mediaId === input.mediaId)) {
-            target.entries = [
-              { ...entry, ...input, updatedAt: Math.floor(Date.now() / 1000) },
-              ...target.entries,
-            ];
+        const target = lists.find(
+          (g) => !g.isCustomList && g.status === input.status,
+        );
+        if (target) {
+          // By media id: an entry also present in a custom list appears more
+          // than once in this flat pass, and inserting it twice would render
+          // it twice.
+          const moved = new Map<number, MediaListEntry>();
+          for (const e of old.lists.flatMap((g) => g.entries)) {
+            if (!mediaIds.has(e.mediaId) || moved.has(e.mediaId)) continue;
+            if (target.entries.some((t) => t.mediaId === e.mediaId)) continue;
+            moved.set(e.mediaId, { ...e, ...input, updatedAt: now });
           }
+          if (moved.size)
+            target.entries = [...moved.values(), ...target.entries];
         }
       }
       return { ...old, lists };
     });
   };
+
+  const patchCache = (input: SaveEntryInput) =>
+    patchCacheMany(new Set([input.mediaId]), input);
 
   const save = useMutation({
     mutationFn: (input: SaveEntryInput) => saveListEntry(input),
@@ -153,8 +170,59 @@ export function useListMutations(userId: number, mediaType: MediaType) {
     },
   });
 
+  /**
+   * One status or score across a selection, as a single mutation.
+   *
+   * Deliberately not `selection.forEach(save.mutate)`, which is what this
+   * replaces. That fired one request per entry — hundreds at once against a
+   * ~30/min budget — and, because each `onMutate` snapshotted a cache the
+   * earlier siblings had already patched, a single failure restored a snapshot
+   * that erased the siblings which had succeeded. One mutation has no siblings
+   * to erase, and its rollback covers exactly what it changed.
+   */
+  const bulkSave = useMutation({
+    mutationFn: ({
+      entries,
+      patch,
+    }: {
+      entries: MediaListEntry[];
+      patch: { status?: MediaListStatus; score?: number };
+    }) => bulkSaveEntries(entries, patch),
+    onMutate: async ({ entries, patch }) => {
+      await qc.cancelQueries({ queryKey: key });
+      const previous = qc.getQueryData<ListResult>(key);
+      patchCacheMany(new Set(entries.map((e) => e.mediaId)), patch);
+      return { previous, count: entries.length };
+    },
+    onSuccess: (_res, _vars, ctx) => {
+      showToast({
+        kind: "success",
+        text: t("receipt.bulkSaved", { count: ctx?.count ?? 0 }),
+      });
+    },
+    onError: (_err, vars, ctx) => {
+      if (ctx?.previous) qc.setQueryData(key, ctx.previous);
+      showToast({
+        kind: "error",
+        text: t("receipt.bulkFailed", { count: ctx?.count ?? 0 }),
+        detail: t("receipt.failedDetail"),
+        action: { label: t("common.retry"), run: () => bulkSave.mutate(vars) },
+      });
+    },
+  });
+
   const remove = useMutation({
     mutationFn: deleteListEntry,
+    onError: () => {
+      // Without this a failed removal is completely silent: `onSuccess` never
+      // runs so the row stays on screen, and the confirm dialog has already
+      // closed as though it worked.
+      showToast({
+        kind: "error",
+        text: t("receipt.removeFailed"),
+        detail: t("receipt.failedDetail"),
+      });
+    },
     onSuccess: (_res, id) => {
       qc.setQueryData<ListResult>(key, (old) =>
         old
@@ -170,5 +238,5 @@ export function useListMutations(userId: number, mediaType: MediaType) {
     },
   });
 
-  return { save, remove };
+  return { save, bulkSave, remove };
 }

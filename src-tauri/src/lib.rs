@@ -168,6 +168,7 @@ pub fn run() {
             commands::fetch_media_list,
             commands::cached_media_list,
             commands::save_list_entry,
+            commands::bulk_save_list_entries,
             commands::delete_list_entry,
             commands::flush_queue,
             commands::get_profile_mode,

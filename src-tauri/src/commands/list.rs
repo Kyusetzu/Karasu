@@ -72,6 +72,26 @@ mutation ($id: Int) {
   DeleteMediaListEntry(id: $id) { deleted }
 }";
 
+/// One request for a whole selection, keyed on **list-entry** ids (not media
+/// ids, unlike `SaveMediaListEntry`'s `mediaId`).
+///
+/// Verified against the live schema before wiring: the batch mutation is
+/// `UpdateMediaListEntries(ids: [Int], …) -> [MediaList]`. It is *not* called
+/// `SaveMediaListEntries`, which does not exist — the reason CLAUDE.md insists
+/// on checking the schema rather than the shape one expects.
+const UPDATE_ENTRIES_MUTATION: &str = "
+mutation ($ids: [Int], $status: MediaListStatus, $score: Float) {
+  UpdateMediaListEntries(ids: $ids, status: $status, score: $score) {
+    id mediaId status progress progressVolumes repeat notes updatedAt
+    score(format: POINT_10)
+  }
+}";
+
+/// Entry ids per request. AniList documents no cap for this mutation, so this
+/// matches the ≤50 the read side uses for `Page.media(id_in:)` rather than
+/// inventing a second number.
+const BULK_CHUNK: usize = 50;
+
 #[derive(serde::Serialize)]
 pub struct ListResult {
     /// true if the data comes from the local cache (offline)
@@ -200,6 +220,63 @@ pub async fn save_list_entry(
 ) -> Result<MutationResult, String> {
     let token = auth::load_token().ok_or("Not connected to AniList")?;
     save_entry_core(&db, &api, &token, input).await
+}
+
+/// Splits ids into request-sized chunks.
+///
+/// Pure so the bound can be tested without a network call — the whole point of
+/// this command is that a 500-entry selection is ten requests rather than five
+/// hundred, and nothing else would catch that regressing.
+pub(crate) fn bulk_chunks(ids: &[i64]) -> Vec<Vec<i64>> {
+    ids.chunks(BULK_CHUNK).map(|c| c.to_vec()).collect()
+}
+
+/// Applies one status or score to many entries at once.
+///
+/// Replaces a `forEach` over the selection that issued one mutation per entry:
+/// selecting a whole list and picking a status fired hundreds of concurrent
+/// requests against a ~30/min budget, which AniList answers with 429s, and the
+/// per-entry rollback that followed then undid the ones that had succeeded.
+#[tauri::command]
+pub async fn bulk_save_list_entries(
+    db: State<'_, Db>,
+    api: State<'_, AniList>,
+    ids: Vec<i64>,
+    status: Option<String>,
+    score: Option<f64>,
+) -> Result<usize, String> {
+    if ids.is_empty() {
+        return Ok(0);
+    }
+    if status.is_none() && score.is_none() {
+        return Err("Nothing to change".into());
+    }
+    let token = auth::load_token().ok_or("Not connected to AniList")?;
+
+    // Anything already queued has to land first, or this write would be
+    // overwritten by an older one replaying on top of it.
+    if db.queue_len() > 0 {
+        process_queue(&db, &api, Some(&token)).await?;
+    }
+
+    let mut updated = 0usize;
+    for chunk in bulk_chunks(&ids) {
+        let vars = json!({ "ids": chunk, "status": status, "score": score });
+        // No offline queue for this one: the queue replays `SaveMediaListEntry`
+        // per entry, so draining a bulk edit through it would reintroduce
+        // exactly the fan-out this exists to avoid. Failing honestly lets the
+        // caller roll back and say so.
+        let data = api
+            .query(Some(&token), UPDATE_ENTRIES_MUTATION, vars)
+            .await
+            .map_err(String::from)?;
+        updated += data
+            .pointer("/UpdateMediaListEntries")
+            .and_then(|v| v.as_array())
+            .map(|a| a.len())
+            .unwrap_or(0);
+    }
+    Ok(updated)
 }
 
 #[tauri::command]
@@ -404,4 +481,35 @@ pub async fn flush_queue(
 ) -> Result<usize, String> {
     let token = auth::load_token().ok_or("Not connected to AniList")?;
     process_queue(&db, &api, Some(&token)).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{bulk_chunks, BULK_CHUNK};
+
+    /// The reason this command exists: a whole-list selection has to become a
+    /// handful of requests, not one per entry against a ~30/min budget.
+    #[test]
+    fn a_large_selection_becomes_few_requests() {
+        let ids: Vec<i64> = (1..=500).collect();
+        let chunks = bulk_chunks(&ids);
+        assert_eq!(chunks.len(), 10);
+        assert!(chunks.iter().all(|c| c.len() <= BULK_CHUNK));
+        // Every id is carried exactly once, in order.
+        assert_eq!(chunks.concat(), ids);
+    }
+
+    #[test]
+    fn a_partial_chunk_is_still_sent() {
+        assert_eq!(bulk_chunks(&[1, 2, 3]).len(), 1);
+        let ids: Vec<i64> = (1..=51).collect();
+        let chunks = bulk_chunks(&ids);
+        assert_eq!(chunks.len(), 2);
+        assert_eq!(chunks[1], vec![51]);
+    }
+
+    #[test]
+    fn an_empty_selection_sends_nothing() {
+        assert!(bulk_chunks(&[]).is_empty());
+    }
 }

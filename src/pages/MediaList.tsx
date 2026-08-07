@@ -148,7 +148,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
     queryKey: ["mediaList", type, userId],
     queryFn: () => fetchMediaList(userId, type),
   });
-  const { save, remove } = useListMutations(userId, type);
+  const { save, bulkSave, remove } = useListMutations(userId, type);
 
   const level = useContentFilter((s) => s.level);
 
@@ -423,10 +423,12 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
     );
   }
 
+  // One mutation for the whole selection, not one per entry — see
+  // `useListMutations.bulkSave`.
   const bulkStatus = (status: MediaListStatus) =>
-    selectedEntries.forEach((e) => saveMutate({ mediaId: e.mediaId, status }));
+    bulkSave.mutate({ entries: selectedEntries, patch: { status } });
   const bulkScore = (score: number) =>
-    selectedEntries.forEach((e) => saveMutate({ mediaId: e.mediaId, score }));
+    bulkSave.mutate({ entries: selectedEntries, patch: { score } });
   const bulkDelete = () => {
     selectedEntries.forEach((e) => remove.mutate(e.id));
     setSelected(new Set());

@@ -493,6 +493,9 @@ export const de: typeof en = {
     undo: "Rückgängig",
     failed: "{{title}} konnte nicht gespeichert werden",
     failedDetail: "In der Warteschlange — Karasu versucht es erneut.",
+    bulkSaved: "{{count}} aktualisiert",
+    bulkFailed: "Massenänderung fehlgeschlagen",
+    removeFailed: "Eintrag konnte nicht entfernt werden",
   },
   entry: {
     scoreHint: "Klick auf die vergebene Bewertung, um sie zu löschen.",

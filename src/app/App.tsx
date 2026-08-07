@@ -21,6 +21,7 @@ import Toast from "@/components/shell/Toast";
 import CommandPalette from "@/components/shell/CommandPalette";
 import KeyboardSheet from "@/components/shell/KeyboardSheet";
 import GlobalKeys from "@/components/shell/GlobalKeys";
+import { useViewTransitions } from "@/hooks/useViewTransitions";
 import ContextMenu from "@/components/shell/ContextMenu";
 import SignInMerge from "@/components/overlays/SignInMerge";
 import Dashboard from "@/pages/Dashboard";
@@ -51,6 +52,10 @@ export default function App() {
   const initContentFilter = useContentFilter((s) => s.init);
   // A primitive, so the selector is referentially stable across renders.
   const viewerId = useAuth((s) => s.viewer?.id);
+  // Route changes become a continuous transition rather than a cut followed by
+  // an arrival. Declines to intercept under reduced motion, in which case
+  // `<main key={pathname}>` below behaves exactly as it always has.
+  useViewTransitions();
 
   useEffect(() => {
     init();

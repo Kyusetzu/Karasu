@@ -595,6 +595,47 @@ html[data-reduce-motion] *::after {
   scroll-behavior: auto !important;
 }
 
+/* --- View transitions ------------------------------------------------------
+   The page change itself: the outgoing screen fades while the incoming one
+   settles down from above, which is the same "bird landing" direction
+   `--animate-settle` has always used — this makes it continuous rather than a
+   cut followed by an arrival.
+
+   The old snapshot leaves faster than the new one arrives, so the two overlap
+   instead of cross-dissolving through a flat grey midpoint. */
+::view-transition-old(root) {
+  animation: fadeOut 90ms linear forwards;
+}
+
+::view-transition-new(root) {
+  animation: settle 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* The cover morphing into the detail hero. The browser pairs the two by name
+   and interpolates position and size; all this has to do is not fight it, so
+   there is deliberately no animation declared here. `contain` is what lets a
+   captured element be lifted out of the page for the duration. */
+::view-transition-group(karasu-hero) {
+  animation-duration: 320ms;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Belt and braces with the JS gate in `useViewTransitions`: if a transition
+   ever starts under reduced motion, it must not move. */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+
+html[data-reduce-motion] ::view-transition-group(*),
+html[data-reduce-motion] ::view-transition-old(*),
+html[data-reduce-motion] ::view-transition-new(*) {
+  animation: none !important;
+}
+
 /* Scrollbars */
 *::-webkit-scrollbar {
   width: 10px;

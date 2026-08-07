@@ -131,9 +131,13 @@ export default function AnimeDetail() {
 
       <div className="relative mx-auto max-w-4xl px-8 pb-10 2xl:max-w-none">
         <div className="-mt-14 flex gap-6">
+          {/* The incoming half of the cover-to-hero morph. Unconditional here
+              because this page shows exactly one cover, so the name is unique
+              by construction — the grid side has to be applied per click. */}
           <img
             src={coverSrc}
             alt=""
+            style={{ viewTransitionName: "karasu-hero" }}
             className="h-57 w-38 shrink-0 rounded-[.625rem] border border-surface-700 object-cover shadow-[0_1.25rem_2.5rem_rgba(0,0,0,.65)]"
           />
           <div className="min-w-0 flex-1 pt-16">

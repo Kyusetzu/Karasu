@@ -2,6 +2,7 @@ import type { HTMLAttributes, ReactNode } from "react";
 import { Link } from "react-router";
 import { Star } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { HERO_ATTR } from "@/hooks/useViewTransitions";
 
 /**
  * One cover in a grid: the artwork, whatever is laid over it, and the lines
@@ -58,6 +59,12 @@ export function CoverCell({
       src={cover}
       alt=""
       loading="lazy"
+      // The outgoing half of the cover-to-hero morph. Only an attribute here:
+      // the `view-transition-name` is applied by the click handler to the one
+      // cover actually clicked, because two elements sharing a name in the same
+      // snapshot make the browser skip the pairing altogether — and a grid
+      // holds dozens of these.
+      {...{ [HERO_ATTR]: "" }}
       className="h-full w-full object-cover"
     />
   );

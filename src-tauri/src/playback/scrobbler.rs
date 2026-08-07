@@ -43,6 +43,18 @@ pub struct NowPlaying {
     pub progress: Option<u32>,
     #[serde(rename = "totalEpisodes")]
     pub total_episodes: Option<u32>,
+    /// Episode length of the matched entry, in minutes.
+    ///
+    /// Carried here rather than re-derived because finding the entry means
+    /// deserializing the whole cached list. Matching already did that once and
+    /// held the answer; `threshold` and the Discord presence used to each throw
+    /// that away and parse the list again. Internal — the frontend has no use
+    /// for either of these, so they stay off the `now-playing` payload.
+    #[serde(skip)]
+    pub duration_min: Option<u32>,
+    /// List status of the matched entry when detection started.
+    #[serde(skip)]
+    pub list_status: String,
 }
 
 /// Currently detected playback, shared by commands and the scrobbler.
@@ -255,19 +267,22 @@ fn build_now_playing(
         (m.media_id, parsed.episode)
     });
 
-    let (media_id, episode, matched_title, progress, total) = match matched {
-        Some((mid, ep)) => {
-            let c = candidates.iter().find(|c| c.media_id == mid);
-            (
-                Some(mid),
-                ep,
-                c.map(|c| c.titles[0].clone()),
-                c.map(|c| c.progress),
-                c.and_then(|c| c.episodes),
-            )
-        }
-        None => (None, parsed.episode, None, None, None),
-    };
+    let (media_id, episode, matched_title, progress, total, duration_min, list_status) =
+        match matched {
+            Some((mid, ep)) => {
+                let c = candidates.iter().find(|c| c.media_id == mid);
+                (
+                    Some(mid),
+                    ep,
+                    c.map(|c| c.titles[0].clone()),
+                    c.map(|c| c.progress),
+                    c.and_then(|c| c.episodes),
+                    c.and_then(|c| c.duration_min),
+                    c.map(|c| c.status.clone()).unwrap_or_default(),
+                )
+            }
+            None => (None, parsed.episode, None, None, None, None, String::new()),
+        };
 
     NowPlaying {
         process: playback.process,
@@ -280,25 +295,21 @@ fn build_now_playing(
         matched_title,
         progress,
         total_episodes: total,
+        duration_min,
+        list_status,
     }
 }
 
 /// Threshold until the auto-update: setting in minutes, or 2/3 of the
 /// episode length (anime), or 5 minutes (manga), otherwise 15 minutes.
-fn threshold(now: &NowPlaying, db: &Db, delay_min: u32) -> Duration {
+fn threshold(now: &NowPlaying, delay_min: u32) -> Duration {
     if delay_min > 0 {
         return Duration::from_secs(u64::from(delay_min) * 60);
     }
     if now.media_type == "MANGA" {
         return MANGA_THRESHOLD;
     }
-    let duration = now.media_id.and_then(|mid| {
-        candidates_from_cache(db, &now.media_type)
-            .iter()
-            .find(|c| c.media_id == mid)
-            .and_then(|c| c.duration_min)
-    });
-    match duration {
+    match now.duration_min {
         Some(min) => Duration::from_secs(u64::from(min) * 60 * 2 / 3),
         None => DEFAULT_THRESHOLD,
     }
@@ -470,8 +481,7 @@ async fn drive_session(app: &AppHandle) {
 
                 if !is_same {
                     // Start a new session
-                    let db = app.state::<Db>();
-                    let threshold = threshold(&np, &db, settings.delay_min);
+                    let threshold = threshold(&np, settings.delay_min);
                     let progress = np.progress.unwrap_or(0);
                     let phase = if ep <= progress {
                         Phase::Blocked(format!(
@@ -490,11 +500,7 @@ async fn drive_session(app: &AppHandle) {
                         media_type: np.media_type.clone(),
                         episode: ep,
                         total: np.total_episodes,
-                        list_status: candidates_from_cache(&db, &np.media_type)
-                            .iter()
-                            .find(|c| c.media_id == mid)
-                            .map(|c| c.status.clone())
-                            .unwrap_or_default(),
+                        list_status: np.list_status.clone(),
                         started_ms: now_ms(),
                         update_at: auto.then(|| Instant::now() + threshold),
                         update_at_epoch_ms: auto.then(|| epoch_ms_in(threshold)),
@@ -557,7 +563,56 @@ async fn drive_session(app: &AppHandle) {
 
 #[cfg(test)]
 mod tests {
-    use super::{applies_to, Phase, Session};
+    use super::{
+        applies_to, threshold, NowPlaying, Phase, Session, DEFAULT_THRESHOLD, MANGA_THRESHOLD,
+    };
+    use std::time::Duration;
+
+    fn now_playing(media_type: &str, duration_min: Option<u32>) -> NowPlaying {
+        NowPlaying {
+            process: "mpv".into(),
+            streaming: false,
+            media_type: media_type.into(),
+            raw_title: String::new(),
+            parsed_title: String::new(),
+            episode: Some(1),
+            media_id: Some(1),
+            matched_title: None,
+            progress: Some(0),
+            total_episodes: Some(12),
+            duration_min,
+            list_status: "CURRENT".into(),
+        }
+    }
+
+    /// An explicit delay setting wins over everything the entry knows.
+    #[test]
+    fn the_configured_delay_beats_the_episode_length() {
+        assert_eq!(
+            threshold(&now_playing("ANIME", Some(24)), 3),
+            Duration::from_secs(180)
+        );
+    }
+
+    /// Two thirds of the episode, from the length matching already found.
+    #[test]
+    fn a_known_episode_length_gives_two_thirds_of_it() {
+        assert_eq!(
+            threshold(&now_playing("ANIME", Some(24)), 0),
+            Duration::from_secs(24 * 60 * 2 / 3)
+        );
+    }
+
+    #[test]
+    fn an_unknown_episode_length_falls_back() {
+        assert_eq!(threshold(&now_playing("ANIME", None), 0), DEFAULT_THRESHOLD);
+    }
+
+    /// Reading is faster, and chapters carry no duration to reason from.
+    #[test]
+    fn manga_uses_its_own_threshold() {
+        assert_eq!(threshold(&now_playing("MANGA", None), 0), MANGA_THRESHOLD);
+    }
 
     fn session(media_id: i64, episode: u32) -> Session {
         Session {

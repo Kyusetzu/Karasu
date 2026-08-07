@@ -69,16 +69,6 @@ fn session_start(app: &AppHandle, np: &NowPlaying) -> i64 {
     }
 }
 
-/// Episode length in minutes for the matched entry, if known.
-fn episode_duration(app: &AppHandle, np: &NowPlaying) -> Option<u32> {
-    let media_id = np.media_id?;
-    let db = app.state::<Db>();
-    crate::playback::scrobbler::candidates_from_cache(&db, &np.media_type)
-        .iter()
-        .find(|c| c.media_id == media_id)
-        .and_then(|c| c.duration_min)
-}
-
 /// Re-syncs the presence using the current playback state (used after a UI
 /// page change, where the caller has no NowPlaying at hand).
 pub fn sync_current(app: &AppHandle) {
@@ -142,7 +132,7 @@ pub fn sync(app: &AppHandle, now: Option<&NowPlaying>) {
             // Elapsed timer, plus a progress bar when the episode length is
             // known (approximates how far into the episode you are).
             let start = session_start(app, np);
-            let timestamps = match (is_manga, episode_duration(app, np)) {
+            let timestamps = match (is_manga, np.duration_min) {
                 (false, Some(min)) => Timestamps::new()
                     .start(start)
                     .end(start + i64::from(min) * 60),

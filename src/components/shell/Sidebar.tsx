@@ -1,4 +1,11 @@
-import { NavLink, useNavigate } from "react-router";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
+import { NavLink, useLocation, useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import {
@@ -20,18 +27,58 @@ import { useAuth } from "@/stores/auth";
 import { useAniListLogin } from "@/hooks/useAniListLogin";
 import { useListSummary } from "@/hooks/useListSummary";
 
-/** The rail is the state change — an active item grows one, rather than
-    swapping colour. Collapsed to zero height it costs nothing to leave on
-    every item, which is what lets it animate. */
+/** The rail is the state change — one marker slides between items rather than
+    each growing its own. See `useRailMarker`. */
 const itemClass =
-  "relative flex items-center gap-2.75 rounded-lg px-2.5 py-1.75 transition-surface " +
-  "before:absolute before:left-0 before:top-1/2 before:w-0.75 before:-translate-y-1/2 " +
-  "before:rounded-r-[.125rem] before:bg-accent-500 before:transition-[height] before:content-['']";
+  "relative flex items-center gap-2.75 rounded-lg px-2.5 py-1.75 transition-surface";
 
 const stateClass = (isActive: boolean) =>
   isActive
-    ? "bg-surface-850 text-ink-100 before:h-4.5"
-    : "text-ink-500 before:h-0 hover:bg-surface-850 hover:text-ink-100";
+    ? "bg-surface-850 text-ink-100"
+    : "text-ink-500 hover:bg-surface-850 hover:text-ink-100";
+
+/**
+ * Where the accent rail should sit, measured from whichever item is active.
+ *
+ * Each item used to carry its own `::before` stripe and animate its height, so
+ * moving between two of them collapsed one and grew another — the rail
+ * blinked out and reappeared elsewhere rather than travelling, which is the one
+ * thing a rail is for. `StatusTabs` already slides a measured bar; this is the
+ * same trick applied to the nav.
+ *
+ * Found by `aria-current`, which `NavLink` sets itself, so nothing has to
+ * enumerate the items — the set is not fixed (the link-account button only
+ * exists in local mode) and a route outside the rail simply yields no marker.
+ */
+function useRailMarker(deps: unknown[]) {
+  const navRef = useRef<HTMLElement>(null);
+  const [top, setTop] = useState<number | null>(null);
+
+  const measure = useCallback(() => {
+    const nav = navRef.current;
+    const active = nav?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (!nav || !active) return setTop(null);
+    const navBox = nav.getBoundingClientRect();
+    const itemBox = active.getBoundingClientRect();
+    // The item's centre; the marker is centred on it and sized in rem, so this
+    // survives the Windows text-scale setting the app already honours.
+    setTop(itemBox.top - navBox.top + itemBox.height / 2);
+  }, []);
+
+  useLayoutEffect(measure, [measure, ...deps]);
+
+  // The rail is a fixed width, but its content is not: a wrapped label or a
+  // scrollbar appearing changes item heights.
+  useEffect(() => {
+    const nav = navRef.current;
+    if (!nav || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(nav);
+    return () => observer.disconnect();
+  }, [measure]);
+
+  return { navRef, top };
+}
 
 const labelClass = "text-[.8125rem] font-medium tracking-[.005em]";
 
@@ -168,6 +215,10 @@ export default function Sidebar() {
   const mode = useAuth((s) => s.mode);
   const login = useAniListLogin();
   const { counts, pending, syncedAt } = useListSummary(viewer?.id);
+  const { pathname } = useLocation();
+  // Re-measured when the route changes and when the item set does — the
+  // link-account button exists only in local mode.
+  const { navRef, top } = useRailMarker([pathname, mode]);
 
   // If the browser handoff can't start, Settings is where the manual token
   // paste lives — so send the user there rather than failing silently.
@@ -176,7 +227,19 @@ export default function Sidebar() {
   };
 
   return (
-    <nav className="rail-wash flex w-52 shrink-0 flex-col border-r border-hair bg-surface-900 pb-2.5 pt-3">
+    <nav
+      ref={navRef}
+      className="rail-wash relative flex w-52 shrink-0 flex-col border-r border-hair bg-surface-900 pb-2.5 pt-3"
+    >
+      {/* One rail for the whole nav, travelling between items. Hidden when the
+          route is not in it at all — during a page transition, say. */}
+      {top !== null && (
+        <span
+          aria-hidden="true"
+          className="absolute left-0 z-10 h-4.5 w-0.75 -translate-y-1/2 rounded-r-[.125rem] bg-accent-500 transition-[top] duration-(--duration-expressive) ease-(--ease-out-expo)"
+          style={{ top }}
+        />
+      )}
       <div className="flex flex-1 flex-col gap-px px-2.5">
         {GROUPS.map((group, i) => (
           <div key={group.label} className="contents">

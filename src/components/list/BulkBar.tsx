@@ -38,7 +38,10 @@ export function BulkBar({
     // Same inset-well substance as the now-playing card, for the same reason:
     // it appears unprompted over content that is already there, and reading as
     // a different material is how it announces itself without a colour shout.
-    <div className="inset-well well-edge relative mx-8 mb-5 flex flex-wrap items-center gap-2.5 overflow-hidden rounded-[.875rem] px-4.5 py-3">
+    // `--animate-rise-in` names "the bulk bar" as a consumer and never had
+    // one: entering select mode simply pushed the list up by the height of
+    // a bar that was suddenly there.
+    <div className="inset-well well-edge relative mx-8 mb-5 flex animate-rise-in flex-wrap items-center gap-2.5 overflow-hidden rounded-[.875rem] px-4.5 py-3">
       <span className="text-[.8125rem] font-semibold tabular-nums text-ink-100">
         {t("bulk.selected", { count })}
       </span>

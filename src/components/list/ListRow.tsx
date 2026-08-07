@@ -132,7 +132,13 @@ export const ListRow = memo(function ListRow({
           )}
         </select>
       ) : (
-        <span className="w-18 pr-1.5 text-right text-xs tabular-nums text-ink-300">
+        // Keyed on the number so `tick` replays when it changes. The token was
+        // written for exactly this — "the progress counter acknowledging a
+        // +1" — and had no consumer; incrementing simply substituted a digit.
+        <span
+          key={entry.progress}
+          className="w-18 animate-tick pr-1.5 text-right text-xs tabular-nums text-ink-300"
+        >
           {entry.progress}
           {max ? ` / ${max}` : ""}
         </span>

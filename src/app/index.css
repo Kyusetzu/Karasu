@@ -129,7 +129,11 @@
   --animate-tick: tick 180ms cubic-bezier(0.2, 0, 0, 1);
   /* The titlebar detection dot: the app quietly proving it is watching. */
   --animate-blip: blip 2.4s ease-in-out infinite;
-  /* `steps(1)` so the palette caret blinks rather than fades. */
+  /* `steps(1)` so a caret blinks rather than fades. Deliberately unused: it was
+     written for the command palette, which turned out to use a real `<input>`
+     and therefore has the platform's own caret already. Kept because the shape
+     is right for any custom text affordance that does need one — but don't wire
+     it to something merely to give it a consumer. */
   --animate-breathe: breathe 1.2s steps(1) infinite;
   --animate-shimmer: shimmer 1.5s linear infinite;
 

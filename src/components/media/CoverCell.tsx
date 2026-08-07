@@ -105,8 +105,11 @@ export function CoverCell({
 
         {progress && (
           <div className="absolute inset-x-0 bottom-0 h-0.75 bg-[rgba(4,5,8,.6)]">
+            {/* The most-repeated interaction in the app had no feedback at
+                all: the bar was an inline percentage, so a +1 snapped. It
+                grows now, on the house curve. */}
             <div
-              className="h-full bg-accent-500"
+              className="h-full bg-accent-500 transition-[width] duration-(--duration-expressive) ease-(--ease-out-expo)"
               style={{ width: `${pct}%` }}
             />
           </div>

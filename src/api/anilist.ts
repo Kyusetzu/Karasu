@@ -185,6 +185,15 @@ export interface DownloadedUpdate {
 export const downloadPendingUpdate = () =>
   invoke<DownloadedUpdate | null>("download_pending_update");
 
+/**
+ * What is already downloaded and waiting, if anything.
+ *
+ * The stash lives in the backend's memory, so a background download at startup
+ * is invisible to this page unless it asks.
+ */
+export const pendingUpdate = () =>
+  invoke<DownloadedUpdate | null>("pending_update");
+
 /** Installs the previously-downloaded update and restarts the app. */
 export const installPendingUpdate = () =>
   invoke<void>("install_pending_update");

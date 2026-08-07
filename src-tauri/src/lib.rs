@@ -207,6 +207,7 @@ pub fn run() {
             commands::get_content_filter,
             commands::set_content_filter,
             commands::download_pending_update,
+            commands::pending_update,
             commands::install_pending_update,
             commands::get_text_scale,
             commands::get_media_detection,

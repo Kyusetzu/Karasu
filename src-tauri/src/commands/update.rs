@@ -9,7 +9,7 @@ use super::*;
 
 /// Monotonic commit counter — the 4th version segment
 /// (`MAJOR.MINOR.PATCH.COMMIT#`). Bumped by one on every commit.
-pub const COMMIT_NUMBER: u32 = 207;
+pub const COMMIT_NUMBER: u32 = 208;
 
 /// Full four-part display version, e.g. `0.1.1.38`. The `MAJOR.MINOR.PATCH`
 /// core comes from the crate version (kept in sync across the manifests).
@@ -363,10 +363,30 @@ pub async fn download_pending_update(
         &app,
         "update",
         "Update ready",
-        &format!("Karasu {version} has been downloaded. Restart to install it."),
+        // Emphatically *not* "restart to install it", which is what this said.
+        // The download lives in process memory, so restarting is precisely the
+        // action that throws it away — the instruction undid the thing it was
+        // announcing, and the next check downloaded the whole installer again.
+        &format!("Karasu {version} is ready. Open About to install it."),
     );
 
     Ok(Some(DownloadedUpdate { version, notes }))
+}
+
+/// What is sitting in the stash, if anything.
+///
+/// Without this the frontend could not tell. `About` only ever learned about a
+/// download from its own call, so an update fetched automatically at startup
+/// was invisible there: no Restart button, and the only way forward was to
+/// check again and download the identical installer a second time.
+#[tauri::command]
+pub fn pending_update(pending: State<'_, PendingUpdate>) -> Option<DownloadedUpdate> {
+    let guard = pending.0.lock().unwrap();
+    let (update, _) = guard.as_ref()?;
+    Some(DownloadedUpdate {
+        version: display_version(&update.version),
+        notes: update.body.clone(),
+    })
 }
 
 /// Installs the update stashed by `download_pending_update` and restarts the
@@ -377,9 +397,17 @@ pub fn install_pending_update(
     app: tauri::AppHandle,
     pending: State<'_, PendingUpdate>,
 ) -> Result<(), String> {
-    let Some((update, bytes)) = pending.0.lock().unwrap().take() else {
+    // Held, not taken. `install` borrows the bytes, and taking them first meant
+    // a failure — an AV agent blocking the extracted installer, an unwritable
+    // %TEMP%, a refused UAC prompt — dropped the download on the floor. The
+    // second click then answered "No update has been downloaded yet" directly
+    // underneath a line saying it had been, and the only recovery was to
+    // download the whole thing again.
+    let guard = pending.0.lock().unwrap();
+    let Some((update, bytes)) = guard.as_ref() else {
         return Err("No update has been downloaded yet".into());
     };
     update.install(bytes).map_err(|e| e.to_string())?;
+    drop(guard);
     app.restart();
 }

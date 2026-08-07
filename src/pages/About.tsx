@@ -17,6 +17,7 @@ import {
   checkForUpdates,
   downloadPendingUpdate,
   installPendingUpdate,
+  pendingUpdate,
   isTauri,
   type DownloadedUpdate,
   type UpdateInfo,
@@ -145,6 +146,15 @@ function UpdateSection() {
   const [installing, setInstalling] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // An update downloaded in the background at startup is already sitting in
+  // the backend's stash. Without asking, this page only knew about downloads
+  // it had started itself, so that one was unreachable: no Restart button
+  // here, and the toast telling the user to restart would have discarded it.
+  useEffect(() => {
+    if (!isTauri) return;
+    pendingUpdate().then(setDownloaded).catch(() => {});
+  }, []);
+
   const startDownload = async () => {
     setDownloading(true);
     setError(null);
@@ -181,6 +191,10 @@ function UpdateSection() {
     } catch (e) {
       setError(String(e));
       setInstalling(false);
+      // The backend keeps the download on a failed install, so the button
+      // stays — but re-read rather than assume, so what is on screen is what
+      // is actually there.
+      pendingUpdate().then(setDownloaded).catch(() => {});
     }
   };
 

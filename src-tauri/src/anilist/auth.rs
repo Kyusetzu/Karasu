@@ -34,17 +34,38 @@ pub fn load_token() -> Option<String> {
     entry().ok()?.get_password().ok()
 }
 
+/// Clears the sign-in from **both** stores, whichever mode is active.
+///
+/// Branching on `is_portable()` here was a hole: an install that had been
+/// switched to portable mode signed out of the file and left the token sitting
+/// in the credential store — still valid, readable by anything running as that
+/// user, and still wired up, because turning portable mode back off made
+/// `load_token()` find it again and silently sign the user back in. The mirror
+/// case left `token.dat` on disk forever after disabling portable mode.
+///
+/// Sign-out means signed out, so it clears everywhere a token can live.
 pub fn delete_token() {
-    if crate::portable::is_portable() {
-        if let Some(path) = crate::portable::token_file() {
-            let _ = std::fs::remove_file(path);
-        }
-        return;
+    if let Some(path) = crate::portable::token_file() {
+        let _ = std::fs::remove_file(path);
     }
     if let Ok(e) = entry() {
         let _ = e.delete_credential();
     }
+    delete_portable_key();
 }
+
+/// Drops the key the portable file was sealed with — it only ever protected
+/// the file `delete_token` just removed. Written as a pair rather than a
+/// `#[cfg]` on the call above so the call site itself compiles everywhere;
+/// a cfg'd statement is invisible to `cargo test` on Windows.
+#[cfg(target_os = "linux")]
+fn delete_portable_key() {
+    if let Ok(e) = keyring::Entry::new(SERVICE, PORTABLE_KEY_USER) {
+        let _ = e.delete_credential();
+    }
+}
+#[cfg(not(target_os = "linux"))]
+fn delete_portable_key() {}
 
 /// Moves the current credential-store token into the encrypted portable file
 /// (used when switching a running install into portable mode).
@@ -259,15 +280,23 @@ fn portable_key() -> Result<[u8; 32], String> {
     let store = keyring::Entry::new(SERVICE, PORTABLE_KEY_USER)
         .map_err(|e| format!("Portable mode needs a login keyring: {e}"))?;
 
-    if let Ok(existing) = store.get_password() {
-        if let Ok(raw) = engine.decode(existing.trim()) {
-            if let Ok(key) = <[u8; 32]>::try_from(raw.as_slice()) {
-                return Ok(key);
+    match store.get_password() {
+        Ok(existing) => {
+            if let Ok(raw) = engine.decode(existing.trim()) {
+                if let Ok(key) = <[u8; 32]>::try_from(raw.as_slice()) {
+                    return Ok(key);
+                }
             }
+            // A key that cannot be read is worse than none: it would decrypt
+            // nothing and silently re-seal under a new one. Say so instead.
+            return Err("The stored portable key is unreadable; sign in again".into());
         }
-        // A key that cannot be read is worse than none: it would decrypt
-        // nothing and silently re-seal under a new one. Say so instead.
-        return Err("The stored portable key is unreadable; sign in again".into());
+        // First use — fall through and generate one.
+        Err(keyring::Error::NoEntry) => {}
+        // Anything else (locked collection, no D-Bus) is not "no key yet".
+        // Treating it as such would generate a replacement for a key that
+        // exists, which is how an existing token.dat becomes undecryptable.
+        Err(e) => return Err(format!("Portable mode needs a login keyring: {e}")),
     }
 
     let mut key = [0u8; 32];

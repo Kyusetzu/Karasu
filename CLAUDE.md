@@ -208,7 +208,16 @@ a regression here is invisible until it ships.
   nothing about it. Either let CI's `linux-build` job be the check, or — for a
   pure-Rust dependency like zbus or chacha20poly1305 — paste the module into a
   throwaway crate and `cargo check` it locally. That caught two real errors in
-  the MPRIS backend that would otherwise have gone to CI.
+  the MPRIS backend that would otherwise have gone to CI. For the same reason,
+  never put `#[cfg(target_os = "linux")]` on a *statement*: it is stripped here,
+  so nothing inside it is ever checked. Write a cfg'd pair of functions instead
+  (`protect`/`unprotect`, `delete_portable_key`) so the call site still compiles.
+- **A comment asserting what a dependency cannot do needs rechecking when that
+  dependency is bumped.** `smtc.rs` hand-rolled a 500 ms poll loop for years
+  because a comment said `windows-future`'s blocking `join()` was private. True
+  of 0.2; the crate has been on 0.3 — where it is `pub` — since long before
+  anyone reread it. The poll then returned a *fabricated* HRESULT on overrun,
+  which blanked the whole detection pass.
 - **A missing i18n key renders as the key.** i18next does not throw and does not
   fall back, so `entry.scoreHint` appears on screen and nothing reports it.
   `src/lib/i18nKeys.test.ts` resolves every literal `t("…")` in the source; the

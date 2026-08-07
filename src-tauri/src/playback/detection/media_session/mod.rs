@@ -146,12 +146,27 @@ pub fn short_app_name(app_id: &str) -> String {
         .to_lowercase()
 }
 
-/// Picks the session to report: the first one that is playing and isn't music.
-pub fn pick(sessions: &[MediaSession]) -> Option<&MediaSession> {
+/// Every session worth reporting, best first: those declaring video, then the
+/// rest. Playing and non-music throughout.
+fn watchable<'a>(sessions: &'a [MediaSession]) -> impl Iterator<Item = &'a MediaSession> + 'a {
+    let eligible = |s: &&MediaSession| s.is_playing() && s.is_watchable();
     sessions
         .iter()
-        .find(|s| s.is_playing() && s.is_watchable() && s.playback_type == "video")
-        .or_else(|| sessions.iter().find(|s| s.is_playing() && s.is_watchable()))
+        .filter(move |s| eligible(s) && s.playback_type == "video")
+        .chain(
+            sessions
+                .iter()
+                .filter(move |s| eligible(s) && s.playback_type != "video"),
+        )
+}
+
+/// The session to report: the best one that is playing and isn't music.
+///
+/// Only the tests take it a candidate at a time; `detect` needs the whole
+/// ordering so it can fall through past one it cannot use.
+#[cfg(test)]
+fn pick(sessions: &[MediaSession]) -> Option<&MediaSession> {
+    watchable(sessions).next()
 }
 
 /// The file name behind a `file://` URL, percent-decoded.
@@ -231,8 +246,21 @@ pub fn playback_from(session: &MediaSession) -> Option<Playback> {
     })
 }
 
+/// The best session that actually yields something to scrobble.
+///
+/// Not `playback_from(pick(…)?)`: `pick` returns one candidate and
+/// `playback_from` can still reject it for having no usable title, so a single
+/// unusable session ended the whole sweep. On Linux that is not hypothetical —
+/// `read_sessions` lists every `org.mpris.MediaPlayer2.*` bus name, including
+/// ones whose Metadata is absent (browsers between tracks, playerctld, a player
+/// that registered before setting metadata), and those are inferred "unknown"
+/// rather than "video", so they sit in the same tier as the real player and can
+/// be listed first. Falling through to the next candidate is the difference
+/// between scrobbling the episode and never seeing it.
 pub fn detect() -> Option<Playback> {
-    playback_from(pick(&sessions())?)
+    let sessions = sessions();
+    let found = watchable(&sessions).find_map(playback_from);
+    found
 }
 
 #[cfg(windows)]
@@ -352,6 +380,34 @@ mod tests {
     #[test]
     fn a_session_with_no_usable_title_is_not_playback() {
         assert!(playback_from(&session("  ", "  ", "video", "playing")).is_none());
+    }
+
+    /// A playing session with no metadata used to end the sweep, because
+    /// `pick` chose it and `playback_from` then rejected it. On Linux an empty
+    /// MPRIS player sitting on the bus ahead of the real one would have hidden
+    /// the episode for as long as it stayed there.
+    #[test]
+    fn an_empty_session_falls_through_to_the_next_one() {
+        let sessions = vec![
+            session("  ", "  ", "unknown", "playing"),
+            session("Frieren", "Episode 5", "unknown", "playing"),
+        ];
+        assert_eq!(
+            watchable(&sessions).find_map(playback_from).map(|p| p.media_title),
+            Some("Frieren - Episode 5".to_string())
+        );
+    }
+
+    /// The preference order `pick` documents still holds when iterating: video
+    /// is considered before anything untyped, whatever the bus order.
+    #[test]
+    fn video_is_still_considered_before_untyped() {
+        let sessions = vec![
+            session("A", "Untyped", "unknown", "playing"),
+            session("B", "Video", "video", "playing"),
+        ];
+        let order: Vec<_> = watchable(&sessions).map(|s| s.title.clone()).collect();
+        assert_eq!(order, vec!["Video", "Untyped"]);
     }
 
     /// The URL is evidence about the file; the player's name is only a guess

@@ -6,33 +6,28 @@
 
 use super::MediaSession;
 
-/// Waits for a WinRT async operation on the current thread.
-///
-/// `windows-future` only exposes `IntoFuture`, and the resulting future holds
-/// a raw COM pointer so it isn't `Send` — it can't be awaited inside the
-/// scrobbler's spawned task. Its blocking `join()` is private. Polling the
-/// public `Status()` is the remaining option, and these particular operations
-/// resolve against in-process state, so in practice the first check already
-/// succeeds. The deadline exists so a wedged session manager can never stall
-/// detection.
-fn wait_for<T>(op: windows_future::IAsyncOperation<T>) -> windows::core::Result<T>
-where
-    T: windows::core::RuntimeType + 'static,
-{
-    use std::time::{Duration, Instant};
-    use windows_future::AsyncStatus;
-
-    let deadline = Instant::now() + Duration::from_millis(500);
-    loop {
-        match op.Status()? {
-            AsyncStatus::Completed => return op.GetResults(),
-            AsyncStatus::Started if Instant::now() < deadline => {
-                std::thread::sleep(Duration::from_millis(2));
-            }
-            _ => return Err(windows::core::Error::empty()),
-        }
-    }
-}
+// Waiting for the WinRT operations below is `IAsyncOperation::join()`, which
+// windows-future 0.3 exposes publicly. This used to hand-roll a 500 ms poll of
+// `Status()` in 2 ms slices, on the premise that `join()` was private — true of
+// 0.2, which had no `join.rs` at all, and carried across the version bump
+// without being rechecked.
+//
+// The poll was not merely redundant. These are cross-process calls — into the
+// app that owns the session, and through the system broker for the manager —
+// not the in-process reads that comment assumed, so a browser mid-page-load or
+// a player cold-starting after resume from sleep overran the deadline. It then
+// returned `Error::empty()`, a fabricated `S_EMPTY_ERROR` unrelated to whatever
+// actually happened, which for `RequestAsync` propagates out of `read_sessions`
+// and is flattened to an empty Vec by the caller: the whole media-session pass
+// reported nothing for that tick, and the Settings diagnostic — whose entire
+// job is explaining why a player was not detected — showed an empty list with
+// no error to explain it.
+//
+// `join()` parks on a completion event instead of burning CPU, and returns the
+// operation's real `HRESULT`. It has no deadline; the deadline was guarding
+// against a wedged session manager, which would now stall the detection loop
+// instead. That is the better failure: it stops at one blocked thread rather
+// than silently reporting "nothing is playing" every five seconds forever.
 
 /// WinRT needs a COM apartment, and the detection sweep runs on a tokio
 /// blocking thread that has none. `CoIncrementMTAUsage` keeps a process-wide
@@ -57,13 +52,16 @@ pub fn read_sessions() -> windows::core::Result<Vec<MediaSession>> {
     use windows::Media::MediaPlaybackType;
 
     ensure_mta();
-    let manager = wait_for(Manager::RequestAsync()?)?;
+    let manager = Manager::RequestAsync()?.join()?;
     let mut out = Vec::new();
 
     for session in manager.GetSessions()? {
         // A session can vanish between listing and reading it, so a failure
         // on any one of these is a skip, not an error for the whole sweep.
-        let Ok(props) = session.TryGetMediaPropertiesAsync().and_then(wait_for) else {
+        let Ok(props) = session
+            .TryGetMediaPropertiesAsync()
+            .and_then(|op| op.join())
+        else {
             continue;
         };
         let status = session

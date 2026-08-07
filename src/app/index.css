@@ -282,6 +282,34 @@
   }
 }
 
+/* A line drawing itself. The length differs per series, so it arrives as
+   `--draw-length` on the element rather than being baked in here. */
+@keyframes drawLine {
+  from {
+    stroke-dashoffset: var(--draw-length);
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Chart shapes arriving: grows from its own centre, which for a treemap tile
+   or a radar dot is the honest direction. `transform-box: fill-box` is what
+   makes `transform-origin: center` mean the shape's own box rather than the
+   SVG's origin — without it every tile flies in from the top-left corner. */
+@keyframes chartIn {
+  from {
+    opacity: 0;
+    transform: scale(0.86);
+  }
+}
+
+@utility chart-in {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: chartIn 320ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
 /* The one skeleton fill: a light sweep travelling across the placeholder
    rather than the whole block pulsing. A pulse says "this is busy"; a sweep
    says "this is a shape that will be filled", which is what a skeleton is for.

@@ -118,6 +118,25 @@ export function linePoints(values: number[], w: number, h: number): Point[] {
   }));
 }
 
+/**
+ * Total length of the path through `points`, in viewBox units.
+ *
+ * For the line chart's draw-on: `stroke-dasharray` needs a length, and taking
+ * it from `getTotalLength()` would mean measuring the DOM after mount — a
+ * layout read, a re-render, and a first frame with the line already drawn.
+ * The geometry is right here, so it can just be summed.
+ */
+export function polylineLength(points: Point[]): number {
+  let total = 0;
+  for (let i = 1; i < points.length; i++) {
+    total += Math.hypot(
+      points[i].x - points[i - 1].x,
+      points[i].y - points[i - 1].y,
+    );
+  }
+  return total;
+}
+
 const round = (n: number) => Math.round(n * 100) / 100;
 
 /**

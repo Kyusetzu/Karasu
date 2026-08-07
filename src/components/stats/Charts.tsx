@@ -6,8 +6,23 @@ import {
   polar,
   radarPoints,
   slices,
+  polylineLength,
   squarify,
 } from "@/lib/charts";
+import { motionDuration, staggerDelay } from "@/lib/motion";
+
+/**
+ * When a line-chart point should land: as the drawing line reaches it.
+ *
+ * Spread across most of the 900ms draw so the last point is not still arriving
+ * after the line has finished, and through `motionDuration` because a delay is
+ * one of the things the reduce-motion CSS deliberately does *not* neutralise
+ * for us — see `lib/motion.ts`.
+ */
+function pointDelay(index: number, count: number): number {
+  if (count <= 1) return 0;
+  return motionDuration(Math.round((index / (count - 1)) * 780));
+}
 
 /**
  * The categorical ramp: the accent leading, then the surface steps.
@@ -76,11 +91,17 @@ export function Sunburst({ data, size = 260 }: { data: Slice[]; size?: number })
         const width = span.end - span.start;
         return (
           <Fragment key={group.label}>
+            {/* Arcs arrive in ring order. Deliberately a scale from the
+                slice's own centre rather than a sweep: a sweep would cross
+                `ArcValue`'s 26-degree label threshold on the way, popping
+                the number in partway through. */}
             <path
               d={arcPath(c, c, inner, mid, span.start, span.end)}
               fill={tone}
               stroke="var(--color-surface-900)"
               strokeWidth={1}
+              className="chart-in"
+              style={{ animationDelay: `${staggerDelay(i)}ms` }}
             >
               <title>{`${group.label}: ${group.value}`}</title>
             </path>
@@ -269,7 +290,15 @@ export function RadarChart({
         strokeWidth={1.5}
       />
       {shape.map((p, i) => (
-        <circle key={i} cx={p.x} cy={p.y} r={2.5} fill="var(--color-accent-400)">
+        <circle
+          key={i}
+          cx={p.x}
+          cy={p.y}
+          r={2.5}
+          fill="var(--color-accent-400)"
+          className="chart-in"
+          style={{ animationDelay: `${staggerDelay(i)}ms` }}
+        >
           <title>{`${axes[i].label}: ${axes[i].value}`}</title>
         </circle>
       ))}
@@ -328,13 +357,22 @@ export function LineChart({
     height - top - bottom,
   ).map((p) => ({ x: p.x + padX, y: p.y + top }));
   const floor = height - bottom;
+  // Summed from the geometry rather than read back with `getTotalLength()`,
+  // which would mean measuring the DOM after mount and drawing one frame of
+  // a line that is already complete.
+  const length = polylineLength(pts);
 
   return (
     <svg viewBox={`0 0 ${W} ${height}`} className="w-full">
       <polygon
         points={`${padX},${floor} ${pointsAttr(pts)} ${W - padX},${floor}`}
         fill="rgba(var(--accent-rgb), .14)"
+        className="animate-fade-in"
       />
+      {/* Drawn rather than appearing. A line chart is a shape the eye
+          follows left to right anyway, so letting it arrive that way costs
+          nothing and says "this is a series over time" before the axis
+          labels are read. */}
       <polyline
         points={pointsAttr(pts)}
         fill="none"
@@ -342,9 +380,20 @@ export function LineChart({
         strokeWidth={2}
         vectorEffect="non-scaling-stroke"
         strokeLinejoin="round"
+        style={{
+          strokeDasharray: length,
+          ["--draw-length" as string]: length,
+          animation: "drawLine 900ms cubic-bezier(0.16, 1, 0.3, 1) forwards",
+        }}
       />
       {pts.map((p, i) => (
         <Fragment key={data[i].label}>
+          {/* Each point lands as the line reaches it, so the labels do not
+              all appear over a line that is still drawing. */}
+          <g
+            className="chart-in"
+            style={{ animationDelay: `${pointDelay(i, pts.length)}ms` }}
+          >
           <circle cx={p.x} cy={p.y} r={2.5} fill="var(--color-accent-400)" />
           {/* Every point carries its own count. The old footer showed the
               series maximum between the two end years, which read as a third
@@ -365,6 +414,7 @@ export function LineChart({
           >
             {data[i].label}
           </text>
+          </g>
         </Fragment>
       ))}
     </svg>
@@ -409,7 +459,11 @@ export function Treemap({
         const named = r.w > 44 && r.h > 30;
         const numbered = !named && r.w > 26 && r.h > 14;
         return (
-          <g key={label}>
+          <g
+            key={label}
+            className="chart-in"
+            style={{ animationDelay: `${staggerDelay(i)}ms` }}
+          >
             <rect
               x={r.x}
               y={r.y}

@@ -3,6 +3,7 @@ import {
   arcPath,
   linePoints,
   polar,
+  polylineLength,
   radarPoints,
   slices,
   squarify,
@@ -139,5 +140,34 @@ describe("squarify", () => {
       { x: 0, y: 0, w: 0, h: 0 },
       { x: 0, y: 0, w: 0, h: 0 },
     ]);
+  });
+});
+
+describe("polylineLength", () => {
+  it("sums the segments", () => {
+    // 3-4-5 triangle, twice over.
+    expect(
+      polylineLength([
+        { x: 0, y: 0 },
+        { x: 3, y: 4 },
+        { x: 6, y: 8 },
+      ]),
+    ).toBe(10);
+  });
+
+  /** A single point or none is a length of zero, not a NaN dasharray. */
+  it("handles degenerate inputs", () => {
+    expect(polylineLength([])).toBe(0);
+    expect(polylineLength([{ x: 5, y: 5 }])).toBe(0);
+  });
+
+  /** The chart's own shape: a flat series is still as long as it is wide. */
+  it("measures a flat line as its width", () => {
+    expect(
+      polylineLength([
+        { x: 0, y: 10 },
+        { x: 100, y: 10 },
+      ]),
+    ).toBe(100);
   });
 });

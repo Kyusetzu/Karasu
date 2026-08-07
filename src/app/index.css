@@ -83,12 +83,40 @@
   /* Readable text on accent-filled controls; recomputed at runtime per accent. */
   --color-accent-ink: #ffffff;
 
-  /* Corvids are quick and precise: one short duration and one sharp curve, no
-     springs and no overshoot. Overriding Tailwind's defaults means every plain
-     `transition-*` utility already lands on it. */
+  /* Corvids are quick and precise, and that still governs *surface* motion:
+     hover, focus, background and border changes get one short duration and one
+     sharp curve. Overriding Tailwind's defaults means every plain
+     `transition-*` utility already lands on it, and that is the default a new
+     component should reach for.
+
+     What changed: this used to forbid springs and overshoot outright, which
+     left the app with no vocabulary for the handful of moments that are worth
+     noticing — a dialog arriving, a progress counter ticking up, a scrobble
+     landing. Those are *feature* motion, they are rare, and a little weight
+     there reads as craft rather than noise. The expressive tokens below exist
+     for exactly those; everything else stays on `--ease-karasu`.
+
+     Rule of thumb: if it happens on hover or on every keystroke, it is a
+     surface. If it happens because something in the user's library changed, it
+     may be a feature. */
   --default-transition-duration: 140ms;
   --default-transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
   --ease-karasu: cubic-bezier(0.2, 0, 0, 1);
+
+  /* Overshoots slightly past its target and settles back — the wingbeat, not a
+     bounce. Only for things that *arrive*: never for anything leaving, which
+     should read as decisive. */
+  --ease-spring: cubic-bezier(0.34, 1.42, 0.64, 1);
+  /* Long decelerating tail, no overshoot: for motion the eye follows rather
+     than merely notices — a hero settling, a chart drawing itself. */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  /* Leaving is the mirror of arriving and should be quicker than it: a dialog
+     that lingers on the way out feels unresponsive. */
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+
+  /* Two expressive durations, so feature motion does not each pick its own. */
+  --duration-expressive: 280ms;
+  --duration-exit: 120ms;
 
   /* A bird landing on a branch — down from above, no bounce. On every screen
      root, and on the palette, the bell and the graph rail. */
@@ -104,6 +132,25 @@
   /* `steps(1)` so the palette caret blinks rather than fades. */
   --animate-breathe: breathe 1.2s steps(1) infinite;
   --animate-shimmer: shimmer 1.5s linear infinite;
+
+  /* --- Feature motion ----------------------------------------------------
+     Entries that are meant to be noticed, and the exits that match them.
+     Every overlay in the app now leaves through one of these rather than
+     vanishing mid-frame; `usePresence` is what keeps the node alive long
+     enough for that to be visible. */
+  --animate-settle-out: settleOut var(--duration-exit) cubic-bezier(0.4, 0, 1, 1)
+    forwards;
+  --animate-rise-out: riseOut var(--duration-exit) cubic-bezier(0.4, 0, 1, 1)
+    forwards;
+  --animate-pop-out: popOut var(--duration-exit) cubic-bezier(0.4, 0, 1, 1)
+    forwards;
+  --animate-fade-out: fadeOut var(--duration-exit) linear forwards;
+  /* The dialog arrival: scales up past 1 and settles. */
+  --animate-spring-in: springIn 280ms cubic-bezier(0.34, 1.42, 0.64, 1);
+  /* A success landing — the scrobble confirmation. */
+  --animate-land: land 420ms cubic-bezier(0.16, 1, 0.3, 1);
+  /* Staggered arrivals (skeleton to content, list cells, chart series). */
+  --animate-reveal: reveal 320ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
 
   --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
   /* Brand wordmark typography, matching the logo (design/Logo - Karasu Full Art.svg) */
@@ -165,6 +212,69 @@
 @keyframes shimmer {
   to {
     background-position: -200% 0;
+  }
+}
+
+/* Exits. `forwards` on each animation above holds the end state, so the node
+   stays invisible for the frame between the animation finishing and React
+   unmounting it — without that it flashes back to full opacity. */
+@keyframes settleOut {
+  to {
+    opacity: 0;
+    transform: translateY(-0.375rem);
+  }
+}
+
+@keyframes riseOut {
+  to {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+}
+
+@keyframes popOut {
+  to {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+@keyframes fadeOut {
+  to {
+    opacity: 0;
+  }
+}
+
+/* Arrives past its size and settles — paired with `--ease-spring`, which is
+   what supplies the overshoot; the keyframes only say where it starts. */
+@keyframes springIn {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateY(0.5rem);
+  }
+}
+
+/* Something completing: a short drop onto its mark. */
+@keyframes land {
+  0% {
+    opacity: 0;
+    transform: translateY(-0.5rem) scale(0.9);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(0) scale(1.06);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* The staggered arrival. `backwards` on the animation matters: with a delay,
+   the element would otherwise render at full opacity until its turn came. */
+@keyframes reveal {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
   }
 }
 
@@ -444,14 +554,28 @@ html[data-swapping] *::after {
 
 /* Honour the OS setting, and the Settings toggle that mirrors it. Durations go
    to a hair above zero rather than to `none`, so anything waiting on a
-   `transitionend` still gets one. */
+   `transitionend` still gets one.
+
+   The *delays* have to go too, and used to be left alone. A staggered reveal
+   sets `animation-delay` per element (up to a few hundred ms); zeroing only the
+   duration turns that into a staggered *wait* — the content appears one piece
+   at a time exactly as before, just instantly each time, which is a worse
+   experience than the animation for the person who asked for less motion.
+   Same for `transition-delay`.
+
+   This covers CSS only. Anything driven from JS — a view transition, a
+   scroll-linked effect, a WAAPI call — is invisible to these rules and has to
+   read `useTheme(s => s.reduceMotion)` itself. `prefersReducedMotion()` in
+   `lib/motion.ts` is the shared answer. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
     scroll-behavior: auto !important;
   }
 }
@@ -460,8 +584,10 @@ html[data-reduce-motion] *,
 html[data-reduce-motion] *::before,
 html[data-reduce-motion] *::after {
   animation-duration: 0.01ms !important;
+  animation-delay: 0ms !important;
   animation-iteration-count: 1 !important;
   transition-duration: 0.01ms !important;
+  transition-delay: 0ms !important;
   scroll-behavior: auto !important;
 }
 

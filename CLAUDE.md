@@ -250,7 +250,25 @@ a regression here is invisible until it ships.
   `text-white`.
 - **Overlays carry `data-overlay`.** Screen-level key handlers check for it and
   stand down, so a dialog owns the keyboard instead of the list behind it acting
-  on the same press.
+  on the same press. `GlobalKeys` honours it too.
+- **Two motion registers, and the default is the quiet one.** *Surface* motion —
+  hover, focus, background and border — stays on the 140ms `--ease-karasu` that
+  every plain `transition-*` utility already inherits. *Feature* motion, for the
+  few moments worth noticing (a dialog arriving, a scrobble landing, a chart
+  drawing), may use `--ease-spring`, `--ease-out-expo` and
+  `--duration-expressive`. Reach for the first unless there is a reason;
+  springs everywhere is how an app starts feeling slow.
+- **Exit animations go through `usePresence`.** React unmounts before CSS can
+  animate, so `{open && <Modal/>}` can only ever have an entrance. The hook
+  holds the node for the exit and reports `leaving`; keep emitting
+  `data-overlay` while it does.
+- **Motion that CSS cannot see must ask `lib/motion.ts`.** The reduce-motion
+  rules in `index.css` are `!important` overrides on animation and transition
+  properties — they do nothing to a View Transition, a scroll handler, a WAAPI
+  call or a `setTimeout`. Those read `prefersReducedMotion()` /
+  `motionDuration()` themselves. Staggers use `staggerDelay`, which also zeroes
+  the *delay*: collapsing only the duration turns a stagger into a staggered
+  wait.
 - **Statistics scores are normalized in `userStatistics`.** AniList mixes a
   hundred-point `meanScore` with a distribution in the user's *display* format,
   and says so nowhere. Everything downstream is ten-point.

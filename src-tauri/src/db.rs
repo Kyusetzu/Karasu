@@ -220,6 +220,30 @@ pub struct LocalRow {
     pub media_json: Option<String>,
 }
 
+/// Applies one migration step atomically.
+///
+/// The wrapping transaction is the whole point. `execute_batch` otherwise runs
+/// in autocommit, so each statement lands on its own and a crash between a
+/// schema change and the `PRAGMA user_version` that records it left a database
+/// that had been migrated but was still labelled with the old version — and the
+/// next launch would try to migrate it again. SQLite's DDL and `user_version`
+/// are both transactional, so either the whole step lands or none of it does.
+fn apply(conn: &Connection, version: u32, sql: &str) -> Result<(), String> {
+    conn.execute_batch(&format!("BEGIN;\n{sql}\nCOMMIT;"))
+        .map_err(|e| format!("Migration v{version} failed: {e}"))
+}
+
+/// Whether a table already has a column, asked of SQLite rather than assumed.
+fn has_column(conn: &Connection, table: &str, column: &str) -> bool {
+    conn.query_row(
+        "SELECT COUNT(*) FROM pragma_table_info(?1) WHERE name = ?2",
+        rusqlite::params![table, column],
+        |r| r.get::<_, i64>(0),
+    )
+    .map(|n| n > 0)
+    .unwrap_or(false)
+}
+
 impl Db {
     pub fn open(data_dir: PathBuf) -> Result<Self, String> {
         std::fs::create_dir_all(&data_dir)
@@ -232,40 +256,42 @@ impl Db {
             .query_row("PRAGMA user_version", [], |r| r.get(0))
             .unwrap_or(0);
         if version < 2 {
-            conn.execute_batch(MIGRATION_V2)
-                .map_err(|e| format!("Migration v2 failed: {e}"))?;
+            apply(&conn, 2, MIGRATION_V2)?;
         }
         if version < 3 {
-            conn.execute_batch(MIGRATION_V3)
-                .map_err(|e| format!("Migration v3 failed: {e}"))?;
+            apply(&conn, 3, MIGRATION_V3)?;
         }
         if version < 4 {
-            conn.execute_batch(MIGRATION_V4)
-                .map_err(|e| format!("Migration v4 failed: {e}"))?;
+            apply(&conn, 4, MIGRATION_V4)?;
         }
         if version < 5 {
-            conn.execute_batch(MIGRATION_V5)
-                .map_err(|e| format!("Migration v5 failed: {e}"))?;
+            apply(&conn, 5, MIGRATION_V5)?;
         }
         if version < 6 {
-            conn.execute_batch(MIGRATION_V6)
-                .map_err(|e| format!("Migration v6 failed: {e}"))?;
+            apply(&conn, 6, MIGRATION_V6)?;
         }
         if version < 7 {
-            conn.execute_batch(MIGRATION_V7)
-                .map_err(|e| format!("Migration v7 failed: {e}"))?;
+            // The one migration that cannot simply be re-run: every other step
+            // is `CREATE TABLE IF NOT EXISTS`, but `ALTER TABLE ADD COLUMN`
+            // fails outright if the column is there. A database interrupted
+            // between that ALTER and its version bump — possible on any build
+            // before `apply` made the pair atomic — would otherwise fail to
+            // open on every launch from then on, with no way back short of
+            // deleting it. Recovering costs one query.
+            if has_column(&conn, "local_list", "progress_volumes") {
+                apply(&conn, 7, "PRAGMA user_version = 7;")?;
+            } else {
+                apply(&conn, 7, MIGRATION_V7)?;
+            }
         }
         if version < 8 {
-            conn.execute_batch(MIGRATION_V8)
-                .map_err(|e| format!("Migration v8 failed: {e}"))?;
+            apply(&conn, 8, MIGRATION_V8)?;
         }
         if version < 9 {
-            conn.execute_batch(MIGRATION_V9)
-                .map_err(|e| format!("Migration v9 failed: {e}"))?;
+            apply(&conn, 9, MIGRATION_V9)?;
         }
         if version < 10 {
-            conn.execute_batch(MIGRATION_V10)
-                .map_err(|e| format!("Migration v10 failed: {e}"))?;
+            apply(&conn, 10, MIGRATION_V10)?;
         }
         Ok(Db(Mutex::new(conn)))
     }
@@ -922,6 +948,37 @@ mod tests {
     /// The index must survive a write/read round-trip, and a rescan must
     /// replace the previous contents rather than accumulate them.
     /// The list cache is what `cached_media_list` serves on a cold start, so a
+    /// v7 adds a column, and `ALTER TABLE ADD COLUMN` cannot be re-run. A
+    /// database that had the column but was still labelled v6 — what an
+    /// interrupted upgrade used to leave behind — failed to open on every
+    /// launch from then on, permanently, with the whole list and library
+    /// unreachable behind it.
+    #[test]
+    fn a_database_left_mid_upgrade_still_opens() {
+        let dir = std::env::temp_dir().join(format!("karasu-mig-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+
+        drop(Db::open(dir.clone()).unwrap());
+
+        // Exactly the interrupted state: the ALTER committed, the version bump
+        // did not.
+        let conn = Connection::open(dir.join("karasu.db")).unwrap();
+        assert!(has_column(&conn, "local_list", "progress_volumes"));
+        conn.execute_batch("PRAGMA user_version = 6;").unwrap();
+        drop(conn);
+
+        Db::open(dir.clone()).expect("a half-migrated database must still open");
+
+        let conn = Connection::open(dir.join("karasu.db")).unwrap();
+        let version: i64 = conn
+            .query_row("PRAGMA user_version", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(version, 10, "and must end up fully migrated");
+        drop(conn);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     /// Portable mode's copy step. Also pins that SQLite accepts a bound
     /// parameter as the `VACUUM INTO` destination — building that path by
     /// string concatenation would break on any apostrophe in a user's folder

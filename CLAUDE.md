@@ -230,7 +230,13 @@ a regression here is invisible until it ships.
 - **Validate AniList queries live** before wiring new fields (introspection /
   a throwaway Node script), since the schema is the source of truth.
 - **DB changes go through a new `MIGRATION_V*`** guarded by PRAGMA
-  `user_version`; add a `mem_db()` test.
+  `user_version`; add a `mem_db()` test. Run it through `apply`, which wraps the
+  step in a transaction so the schema change and its `user_version` bump land
+  together — `execute_batch` alone commits each statement separately, and a
+  crash in between leaves a database that is migrated but not labelled as such.
+  Prefer `CREATE TABLE IF NOT EXISTS` so a step is re-runnable anyway; `ALTER
+  TABLE ADD COLUMN` is not, which is why v7 has to ask whether the column is
+  already there.
 - **Platform-specific Rust is `#[cfg(...)]`-gated**, and both Windows and Linux
   are real implementations rather than one plus a stub. Keep the pure decisions
   out of the gated modules — `media_session/mod.rs` is the pattern: the backends

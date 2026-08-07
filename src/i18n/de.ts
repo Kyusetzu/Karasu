@@ -437,6 +437,7 @@ export const de: typeof en = {
   },
   library: {
     title: "Lokale Bibliothek",
+    folderFailed: "Ordner konnte nicht gesetzt werden",
     readyToPlay: "Bereit — nächste ungesehene Datei",
     upToDate: "Aktuell — nichts Neues auf der Platte",
     filesMatched: "{{files}} Dateien · {{matched}} zugeordnet",

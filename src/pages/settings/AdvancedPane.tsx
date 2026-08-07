@@ -85,6 +85,7 @@ export function AdvancedSection() {
   const [closeTray, setCloseTray] = useState<CloseToTray | null>(null);
   const [updateChannel, setUpdateChannelState] =
     useState<api.UpdateChannel>("prerelease");
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!api.isTauri) return;
@@ -96,16 +97,34 @@ export function AdvancedSection() {
     api.getUpdateChannel().then(setUpdateChannelState);
   }, []);
 
+  // Both of these paint the switch first and then await a command that can
+  // genuinely fail — `set_autostart` cannot write its .desktop entry on a
+  // locked-down Linux session, `set_close_to_tray` is a database write. Without
+  // the rollback the switch kept reading "on" for the rest of the session while
+  // nothing had been configured, and the rejection went nowhere; reopening
+  // Settings then quietly showed "off" again with no explanation.
   const toggleAutostart = async (enabled: boolean) => {
     setAutostart(enabled);
-    const { invoke } = await import("@tauri-apps/api/core");
-    await invoke("set_autostart", { enabled });
+    setError(null);
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("set_autostart", { enabled });
+    } catch (e) {
+      setAutostart(!enabled);
+      setError(String(e));
+    }
   };
 
   const toggleCloseTray = async (enabled: boolean) => {
     setCloseTray((prev) => (prev ? { ...prev, enabled } : prev));
-    const { invoke } = await import("@tauri-apps/api/core");
-    await invoke("set_close_to_tray", { enabled });
+    setError(null);
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("set_close_to_tray", { enabled });
+    } catch (e) {
+      setCloseTray((prev) => (prev ? { ...prev, enabled: !enabled } : prev));
+      setError(String(e));
+    }
   };
 
   const toggleUpdateAuto = (enabled: boolean) => {
@@ -181,6 +200,7 @@ export function AdvancedSection() {
             <option value="stable">{t("settings.updateChannelStable")}</option>
           </select>
         </label>
+        {error && <p className="text-sm text-danger">{error}</p>}
       </div>
     </Card>
   );

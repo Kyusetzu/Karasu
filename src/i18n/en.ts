@@ -435,6 +435,7 @@ export const en = {
   },
   library: {
     title: "Local library",
+    folderFailed: "Couldn't set that folder",
     readyToPlay: "Ready to play — next unwatched file",
     upToDate: "Up to date — nothing new on disk",
     filesMatched: "{{files}} files · {{matched}} matched",

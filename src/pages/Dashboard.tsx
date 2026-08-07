@@ -10,6 +10,7 @@ import { useContentFilter } from "@/stores/contentFilter";
 import { isBlocked } from "@/lib/contentFilter";
 import { useListMutations } from "@/hooks/useListMutations";
 import { SectionHeader } from "@/components/ui/section-header";
+import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { TitleLockup } from "@/components/media/TitleLockup";
 import { CoverCell, CoverMeta } from "@/components/media/CoverCell";
@@ -40,7 +41,13 @@ export default function Dashboard() {
 }
 
 function DashboardContent({ userId }: { userId: number }) {
-  const { data, isLoading } = useQuery({
+  const { t } = useTranslation();
+  const {
+    data,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
     queryKey: ["mediaList", "ANIME", userId],
     queryFn: () => fetchMediaList(userId, "ANIME"),
   });
@@ -81,6 +88,12 @@ function DashboardContent({ userId }: { userId: number }) {
   // anything" and "no upcoming episodes" until the network answers — the app
   // stating the opposite of the truth. The two lists are gated separately so a
   // slow manga fetch can't hold back the anime sections.
+  //
+  // A *failed* fetch is the same hazard wearing a different hat, and it used to
+  // slip through: a query in the error state has `isLoading === false` and no
+  // data, so the sections rendered those same empty states as settled fact,
+  // with nothing on screen distinguishing "offline" from "you have watched
+  // nothing". It gets the error treatment the list page has.
   return (
     <div className="space-y-9 px-8 pb-12 pt-7">
       {/* Pinned above the rest: this is the "right now" card, and it is only
@@ -89,6 +102,15 @@ function DashboardContent({ userId }: { userId: number }) {
 
       {isLoading ? (
         <DashboardSkeleton />
+      ) : error ? (
+        <div>
+          <p className="text-danger">
+            {t("list.loadError", { message: String(error) })}
+          </p>
+          <Button className="mt-4" variant="secondary" onClick={() => refetch()}>
+            {t("common.retry")}
+          </Button>
+        </div>
       ) : (
         <>
           <Stats entries={allAnime} />

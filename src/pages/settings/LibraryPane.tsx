@@ -24,10 +24,19 @@ export function LibrarySection() {
 
   const choose = async () => {
     setError(null);
-    const picked = await library.pickLibraryFolder();
-    if (!picked) return;
-    await library.setLibraryPath(picked);
-    setPath(picked);
+    // `setLibraryPath` is a database write and can reject. Outside the try it
+    // took `setPath` and the scan down with it and left the pane showing the
+    // old folder, so picking a folder looked like it had done nothing at all —
+    // with an error line sitting right there, unused.
+    try {
+      const picked = await library.pickLibraryFolder();
+      if (!picked) return;
+      await library.setLibraryPath(picked);
+      setPath(picked);
+    } catch (e) {
+      setError(String(e));
+      return;
+    }
     await scan();
   };
 

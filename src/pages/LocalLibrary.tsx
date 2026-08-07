@@ -32,6 +32,7 @@ import {
 import MatchPicker from "@/components/overlays/MatchPicker";
 import { useAuth } from "@/stores/auth";
 import { useLibrary } from "@/stores/library";
+import { showToast } from "@/stores/toast";
 import { useContentFilter } from "@/stores/contentFilter";
 import { isBlocked } from "@/lib/contentFilter";
 import { Button } from "@/components/ui/button";
@@ -366,9 +367,17 @@ function LibraryView({ userId }: { userId: number }) {
   };
 
   const change = async () => {
-    const picked = await pickLibraryFolder();
-    if (!picked) return;
-    await setLibraryPath(picked);
+    // This page has no error line of its own, so a rejection here has nowhere
+    // to go but a toast — the alternative was an unhandled rejection and a
+    // button that silently did nothing.
+    try {
+      const picked = await pickLibraryFolder();
+      if (!picked) return;
+      await setLibraryPath(picked);
+    } catch (e) {
+      showToast({ kind: "error", text: t("library.folderFailed"), detail: String(e) });
+      return;
+    }
     await rescan();
   };
 

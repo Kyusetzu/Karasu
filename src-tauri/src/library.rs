@@ -270,9 +270,35 @@ pub fn pick_library_folder(app: AppHandle) -> Option<String> {
 }
 
 /// The most recent scan's index (empty before the first scan).
+///
+/// Everything: absolute paths, per-title match scores, the release names each
+/// match came from. Only the Library screen needs any of that, and it is
+/// lazily routed — see `get_library_episodes` for what everyone else reads.
 #[tauri::command]
 pub fn get_library_index(state: State<'_, LibraryIndex>) -> Vec<LibraryEntry> {
     state.0.lock().unwrap().summary.clone()
+}
+
+/// Just which episodes exist per media id.
+///
+/// This is the whole of what the app asks the library outside its own screen:
+/// a "next episode" affordance on a list row and on the detail page. Serving
+/// the full index for that meant cloning every absolute file path under the
+/// index mutex and shipping them all through the IPC bridge on **every
+/// launch** — hundreds of kilobytes of JSON, for a map of numbers, whether or
+/// not the Library screen was ever opened.
+#[tauri::command]
+pub fn get_library_episodes(
+    state: State<'_, LibraryIndex>,
+) -> std::collections::HashMap<i64, Vec<u32>> {
+    state
+        .0
+        .lock()
+        .unwrap()
+        .summary
+        .iter()
+        .map(|e| (e.media_id, e.episodes.clone()))
+        .collect()
 }
 
 /// Scans the configured folder and rebuilds the index.

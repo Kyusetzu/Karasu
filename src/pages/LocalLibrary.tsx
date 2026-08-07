@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -46,6 +46,11 @@ import { cn } from "@/lib/utils";
  * circuit, so this is a test for that branch rather than a tolerance.
  */
 const EXACT = 0.999;
+
+/// Hoisted for the same measured reason as MediaList's — see the note there.
+/// Options left at the defaults so the ordering matches what `localeCompare()`
+/// produced.
+const COLLATOR = new Intl.Collator();
 
 /**
  * The scanned local library. The index only stores media ids, so titles come
@@ -95,9 +100,16 @@ function LibraryView({ userId }: { userId: number }) {
   const { t } = useTranslation();
   const entries = useLibrary((s) => s.entries);
   const refresh = useLibrary((s) => s.refresh);
+  const loadEntries = useLibrary((s) => s.loadEntries);
   const setError = useLibrary((s) => s.setError);
   const level = useContentFilter((s) => s.level);
   const [scanning, setScanning] = useState(false);
+
+  // The full index is fetched here rather than at startup — this is the only
+  // screen that reads the paths and scores in it.
+  useEffect(() => {
+    loadEntries();
+  }, [loadEntries]);
 
   const { data } = useQuery({
     queryKey: ["mediaList", "ANIME", userId],
@@ -166,26 +178,32 @@ function LibraryView({ userId }: { userId: number }) {
     [fetched],
   );
 
-  const rows = useMemo<Row[]>(
-    () =>
-      entries
-        .flatMap((lib) => {
-          const entry = byMedia.get(lib.mediaId) ?? null;
-          // A row needs a title to draw. It comes from the list when the title
-          // is on it and from AniList directly when it is not; only an id that
-          // AniList itself does not know leaves us with nothing to show.
-          const media = entry?.media ?? byId.get(lib.mediaId);
-          if (!media) return [];
-          if (isBlocked(media, level)) return [];
-          const progress = entry?.progress ?? 0;
-          const next = lib.files.find((f) => f.episode > progress) ?? null;
-          return [{ lib, media, entry, next }];
-        })
-        .sort((a, b) =>
-          displayTitle(a.media.title).localeCompare(displayTitle(b.media.title)),
-        ),
-    [entries, byMedia, byId, level],
-  );
+  const rows = useMemo<Row[]>(() => {
+    const built = entries.flatMap((lib) => {
+      const entry = byMedia.get(lib.mediaId) ?? null;
+      // A row needs a title to draw. It comes from the list when the title
+      // is on it and from AniList directly when it is not; only an id that
+      // AniList itself does not know leaves us with nothing to show.
+      const media = entry?.media ?? byId.get(lib.mediaId);
+      if (!media) return [];
+      if (isBlocked(media, level)) return [];
+      const progress = entry?.progress ?? 0;
+      const next = lib.files.find((f) => f.episode > progress) ?? null;
+      return [{ lib, media, entry, next }];
+    });
+    // Titles resolved once and the collator hoisted, the same way MediaList
+    // does it: `localeCompare` builds a fresh collator per call, and both it
+    // and `displayTitle` were being run twice per comparison — n·log n times
+    // over a library that can hold thousands of titles, re-run on every
+    // rescan, every correction and every content-filter change.
+    const titles = new Map(built.map((r) => [r.lib.mediaId, displayTitle(r.media.title)]));
+    return built.sort((a, b) =>
+      COLLATOR.compare(
+        titles.get(a.lib.mediaId) ?? "",
+        titles.get(b.lib.mediaId) ?? "",
+      ),
+    );
+  }, [entries, byMedia, byId, level]);
 
   // Files the scanner could not place. Kept in the cache next to the status so
   // one rescan invalidates both.

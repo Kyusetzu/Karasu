@@ -172,17 +172,28 @@ pub fn disable_portable() -> Result<(), String> {
     crate::portable::remove_marker()
 }
 
-/// Opens a native save dialog and writes PNG bytes (e.g. the yearly wrap-up
+/// Opens a native save dialog and writes the image (e.g. the yearly wrap-up
 /// card). Returns false if the user cancelled.
+///
+/// `data` is base64, not a byte array. Tauri serializes a command's arguments
+/// with `JSON.stringify`, whose replacer expands any typed array into a JSON
+/// array of numbers — so a 4 MB poster crossed the bridge as ~16 MB of ASCII
+/// digits and was rebuilt one `serde_json` number at a time. Base64 is ~1.37x
+/// the bytes and one decode.
 #[tauri::command]
 pub fn save_image(
     app: tauri::AppHandle,
     db: State<'_, Db>,
-    data: Vec<u8>,
+    data: String,
     default_name: String,
     format: String,
 ) -> Result<bool, String> {
+    use base64::Engine as _;
     use tauri_plugin_dialog::DialogExt;
+
+    let data = base64::engine::general_purpose::STANDARD
+        .decode(data.as_bytes())
+        .map_err(|e| format!("Could not decode the image: {e}"))?;
 
     // Only the two the encoder actually produces. An unchecked string here
     // would end up as the file extension and the dialog filter, so a typo

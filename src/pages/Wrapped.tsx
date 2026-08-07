@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
@@ -18,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Pill } from "@/components/ui/pill";
 import { EmptyState, OutlineYear } from "@/components/EmptyState";
 import markUrl from "@/assets/karasu-mark.svg";
+import { toBase64 } from "@/lib/base64";
 
 /**
  * Poster type and geometry are expressed in `em`, like the design, and one
@@ -575,34 +577,41 @@ function drawCard(
   canvas.getContext("2d")?.drawImage(work, 0, 0);
 }
 
+/** Stable identity, so the memos below don't re-run while the query loads. */
+const EMPTY_ENTRIES: WrappedEntry[] = [];
+
 export default function Wrapped() {
   const { t, i18n } = useTranslation();
   const viewer = useAuth((s) => s.viewer);
   const level = useContentFilter((s) => s.level);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [anime, setAnime] = useState<WrappedEntry[]>([]);
-  const [manga, setManga] = useState<WrappedEntry[]>([]);
   const [year, setYear] = useState<number | null>(null);
-  const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
   const [presetKey, setPresetKey] = useState<PresetKey>("page");
   const [format, setFormat] = useState<ImageFormat>("png");
   const [scale, setScale] = useState(2);
   const preset = PRESETS.find((p) => p.key === presetKey) ?? PRESETS[2];
 
-  useEffect(() => {
-    if (!isTauri || !viewer) return;
-    setLoading(true);
-    Promise.all([
-      wrappedEntries(viewer.id, "ANIME"),
-      wrappedEntries(viewer.id, "MANGA"),
-    ])
-      .then(([a, m]) => {
-        setAnime(a);
-        setManga(m);
-      })
-      .finally(() => setLoading(false));
-  }, [viewer]);
+  // Through the query cache, not a bare effect into `useState`. `<main
+  // key={pathname}>` remounts this page on every navigation, so the old effect
+  // refetched *both* completed collections every single time /wrapped was
+  // opened — two large responses out of a ~30/min budget for data that changes
+  // when you finish something, not when you change tabs. Half an hour matches
+  // what Statistics does for the same reason.
+  const { data, isLoading: loading } = useQuery({
+    queryKey: ["wrapped", viewer?.id],
+    queryFn: async () => {
+      const [anime, manga] = await Promise.all([
+        wrappedEntries(viewer!.id, "ANIME"),
+        wrappedEntries(viewer!.id, "MANGA"),
+      ]);
+      return { anime, manga };
+    },
+    enabled: isTauri && !!viewer,
+    staleTime: 30 * 60 * 1000,
+  });
+  const anime = data?.anime ?? EMPTY_ENTRIES;
+  const manga = data?.manga ?? EMPTY_ENTRIES;
 
   // This card gets exported as a PNG and shared, so filtered entries must not
   // reach it — and neither must a filtered genre *name*, which would otherwise
@@ -683,10 +692,9 @@ export default function Wrapped() {
     );
     if (!blob) return;
 
-    const bytes = Array.from(new Uint8Array(await blob.arrayBuffer()));
     const suffix = scale === 1 ? "" : `@${scale}x`;
     const ok = await saveImage(
-      bytes,
+      toBase64(new Uint8Array(await blob.arrayBuffer())),
       `karasu-wrapped-${year}-${presetKey}${suffix}.${format === "png" ? "png" : "jpg"}`,
       format,
     ).catch(() => false);

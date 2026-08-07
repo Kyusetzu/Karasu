@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { isTauri } from "@/api/anilist";
 import {
+  getLibraryEpisodes,
   getLibraryIndex,
   playEpisode,
   playNext,
@@ -10,8 +11,18 @@ import {
 interface LibraryState {
   /** media_id → episode numbers present on disk. */
   episodes: Record<number, number[]>;
-  /** The full index, for the library page (titles are joined in the UI). */
+  /**
+   * The full index — paths, scores, sources — for the library page only.
+   *
+   * Loaded on demand rather than at startup: it carries an absolute path per
+   * file, so a large library cost a few hundred kilobytes of JSON across the
+   * bridge on every launch for a screen most sessions never open.
+   */
   entries: LibraryEntry[];
+  /** Whether `entries` has ever been fetched, so `refresh` knows to keep it current. */
+  entriesLoaded: boolean;
+  /** Fetches the full index. The library page calls this; nothing else needs to. */
+  loadEntries: () => Promise<void>;
   /** Last library failure, surfaced globally so every call site reports it. */
   error: string | null;
   /**
@@ -36,15 +47,26 @@ function message(e: unknown): string {
 export const useLibrary = create<LibraryState>((set, get) => ({
   episodes: {},
   entries: [],
+  entriesLoaded: false,
   error: null,
 
   refresh: async () => {
     if (!isTauri) return;
     try {
-      const index = await getLibraryIndex();
-      const map: Record<number, number[]> = {};
-      for (const e of index) map[e.mediaId] = e.episodes;
-      set({ episodes: map, entries: index });
+      set({ episodes: await getLibraryEpisodes() });
+      // Once the library page has asked for the full index, keep it in step —
+      // a rescan calls this, and leaving `entries` behind would show that page
+      // the pre-scan rows. Nothing fetches it if nobody has needed it yet.
+      if (get().entriesLoaded) set({ entries: await getLibraryIndex() });
+    } catch {
+      /* library not scanned yet — ignore */
+    }
+  },
+
+  loadEntries: async () => {
+    if (!isTauri) return;
+    try {
+      set({ entries: await getLibraryIndex(), entriesLoaded: true });
     } catch {
       /* library not scanned yet — ignore */
     }

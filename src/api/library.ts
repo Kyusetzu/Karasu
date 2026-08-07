@@ -63,8 +63,12 @@ export const setLibraryPath = (path: string) =>
   invoke<void>("set_library_path", { path });
 export const pickLibraryFolder = () =>
   invoke<string | null>("pick_library_folder");
+/** The full index — paths and all. Only the library page needs this. */
 export const getLibraryIndex = () =>
   invoke<LibraryEntry[]>("get_library_index");
+/** Just media_id → episodes, which is all the "next episode" affordances read. */
+export const getLibraryEpisodes = () =>
+  invoke<Record<number, number[]>>("get_library_episodes");
 export const getLibraryStatus = () =>
   invoke<LibraryStatus>("get_library_status");
 export const scanLibrary = () => invoke<ScanSummary>("scan_library");

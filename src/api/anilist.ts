@@ -222,11 +222,13 @@ export const setSequelNotify = (enabled: boolean) =>
 export type ImageFormat = "png" | "jpeg";
 
 /**
- * Opens a save dialog and writes the bytes; false if cancelled.
+ * Opens a save dialog and writes the image; false if cancelled.
  * The dialog reopens wherever the last export went.
+ *
+ * `data` is base64 — see `lib/base64.ts` for why bytes are not passed directly.
  */
 export const saveImage = (
-  data: number[],
+  data: string,
   defaultName: string,
   format: ImageFormat,
 ) => invoke<boolean>("save_image", { data, defaultName, format });

@@ -227,6 +227,7 @@ pub fn run() {
             library::set_library_path,
             library::pick_library_folder,
             library::get_library_index,
+            library::get_library_episodes,
             library::get_library_status,
             library::scan_library,
             library::get_library_unmatched,

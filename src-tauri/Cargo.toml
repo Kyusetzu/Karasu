@@ -1,6 +1,6 @@
 [package]
 name = "karasu"
-version = "0.58.2"
+version = "0.58.3"
 description = "A modern anime and manga tracker built exclusively for AniList (Windows; Linux experimental)"
 authors = ["Kyu"]
 license = "MIT"
@@ -49,6 +49,13 @@ discord-rich-presence = "1"
 # hand-rolled: multi-byte UTF-8 and malformed `%` are exactly the cases a
 # fifteen-line decoder gets wrong, and this is already in the tree.
 percent-encoding = "2"
+# The Wrapped poster crosses the IPC bridge as base64 text. Tauri serializes a
+# command's arguments with `JSON.stringify`, and its replacer turns any byte
+# array into a JSON array of numbers — about four ASCII characters per byte,
+# then parsed back one number at a time. Base64 is ~1.37x instead of ~4x and
+# costs a single decode. Was Linux-only (portable-key storage); the poster
+# needs it everywhere.
+base64 = "0.22"
 
 # --- Platform-specific -------------------------------------------------------
 # Windows: Credential Manager keyring + DPAPI (via the `windows` crate).
@@ -84,7 +91,6 @@ zbus = "5"
 # the tree today — but small and pure-Rust. XChaCha20's 24-byte nonce is what
 # makes a randomly generated nonce per write safe without a counter to keep.
 chacha20poly1305 = "0.10"
-base64 = "0.22"
 # `cfg(target_os = "linux")`, not `cfg(unix)`: sync-secret-service is a D-Bus
 # backend and macOS has none — it needs `apple-native`. The old predicate only
 # "worked" because nobody has ever built for macOS. This way a macOS build

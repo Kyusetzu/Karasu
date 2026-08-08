@@ -435,14 +435,14 @@ function OverviewCharts({
       .sort((a, b) => b[1] - a[1])
       .map(([label, value]) => ({ label, value }));
   }, [breakdown]);
-  // `items-start` rather than the default stretch. A grid row is as tall as its
-  // tallest card, and a chart drawn from a fixed viewBox cannot grow to use the
-  // slack — so stretching put the empty space *inside* the shorter panel, which
-  // is what made half these cards look like they had lost their contents.
-  // Unstretched, the same slack falls between the panels, where it reads as
-  // layout instead of as a hole.
+  // Stretched, with every card a flex column that knows what to do with the
+  // slack. `items-start` used to be the answer here, on the grounds that a
+  // fixed-viewBox chart cannot grow — but that left ragged gaps *between* the
+  // panels instead, which is what this row now avoids: the bar panels grow
+  // their plot area into the extra height, and the SVG panels centre their
+  // chart in it so the leftover reads as padding rather than a hole.
   return (
-    <div className="grid items-start gap-4 lg:grid-cols-2">
+    <div className="grid gap-4 lg:grid-cols-2">
       <ScoreColumns
         title={t("stats.scoreDist")}
         hint={t("stats.scoreDistHint")}
@@ -470,9 +470,9 @@ function OverviewCharts({
           watching it. A line rather than the bars above, because these are one
           series continuing rather than years to compare against each other. */}
       {started.length > 1 && (
-        <Card>
+        <Card className="flex h-full flex-col">
           <CardTitle>{t("stats.startYears")}</CardTitle>
-          <div className="mt-4">
+          <div className="mt-4 flex flex-1 items-center">
             <LineChart
               data={started.map((d) => ({
                 label: String(d.startYear ?? 0),
@@ -484,13 +484,13 @@ function OverviewCharts({
       )}
 
       {breakdown.length > 0 && (
-        <Card>
+        <Card className="flex h-full flex-col">
           <CardTitle>{t("stats.breakdown")}</CardTitle>
           <p className="mt-1 text-2xs text-ink-600">{t("stats.breakdownHint")}</p>
           {/* Chart beside its key rather than wrapped above it. The ring is
               square, so letting it take the whole card width would make the
               panel as tall as the page is wide. */}
-          <div className="mt-3 flex items-center gap-6">
+          <div className="mt-3 flex flex-1 items-center gap-6">
             <div className="w-40 shrink-0 sm:w-48">
               <Sunburst data={breakdown} />
             </div>
@@ -521,10 +521,10 @@ function OverviewCharts({
       )}
 
       {genres.length > 2 && (
-        <Card>
+        <Card className="flex h-full flex-col">
           <CardTitle>{t("stats.genreShape")}</CardTitle>
           <p className="mt-1 text-2xs text-ink-600">{t("stats.genreShapeHint")}</p>
-          <div className="mt-2 flex justify-center">
+          <div className="mt-2 flex flex-1 items-center justify-center">
             <div className="w-full max-w-72">
               <RadarChart
                 axes={genres.map((g) => ({
@@ -538,9 +538,9 @@ function OverviewCharts({
       )}
 
       {tags.length > 3 && (
-        <Card className="lg:col-span-2">
+        <Card className="flex h-full flex-col lg:col-span-2">
           <CardTitle>{t("stats.tagMap")}</CardTitle>
-          <div className="mt-3">
+          <div className="mt-3 flex flex-1 items-center">
             <Treemap
               data={tags.map((entry) => ({
                 label: entry.tag?.name ?? entry.genre ?? "?",

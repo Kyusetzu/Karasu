@@ -33,18 +33,25 @@ export function ScoreColumns({
   const high = Math.max(...steps) * 0.75;
 
   return (
-    <Card>
+    <Card className="flex h-full flex-col">
       <CardTitle>{title}</CardTitle>
       <p className="mt-1 text-2xs text-ink-600">{hint}</p>
-      <div className="mt-4 flex items-end gap-1.75">
+      {/* `flex-1` so the columns take whatever height the grid row gives this
+          card. A bar drawn in percentages is the one chart here that *can*
+          grow, so it absorbs the slack instead of leaving a hole under it. */}
+      <div className="mt-4 flex flex-1 items-end gap-1.75">
         {steps.map((step) => {
           const count = by.get(step) ?? 0;
           return (
             <div key={step} className="flex flex-1 flex-col items-center gap-1">
-              <span className="text-2xs tabular-nums text-ink-600">
+              {/* Fixed height, not `{count || ""}` alone: an empty span is a
+                  zero-height box, so a score with no entries made its column
+                  shorter than its neighbours — and with the row bottom-aligned
+                  that lifted the *bar* off the shared baseline. */}
+              <span className="h-3 text-2xs leading-3 tabular-nums text-ink-600">
                 {count || ""}
               </span>
-              <div className="flex h-32 w-full items-end">
+              <div className="flex min-h-32 w-full flex-1 items-end">
                 <div
                   className={cn(
                     "w-full rounded-t-[.1875rem]",
@@ -55,7 +62,9 @@ export function ScoreColumns({
                   style={{ height: `${Math.max((count / max) * 100, 1)}%` }}
                 />
               </div>
-              <span className="text-2xs tabular-nums text-ink-500">{step}</span>
+              <span className="h-3 text-2xs leading-3 tabular-nums text-ink-500">
+                {step}
+              </span>
             </div>
           );
         })}
@@ -92,9 +101,9 @@ export function StatusBar({
   ];
 
   return (
-    <Card>
+    <Card className="flex h-full flex-col">
       <CardTitle>{title}</CardTitle>
-      <div className="mt-4 flex h-2 overflow-hidden rounded-full bg-surface-800">
+      <div className="mt-4 flex h-2 shrink-0 overflow-hidden rounded-full bg-surface-800">
         {data.map((d, i) => (
           <span
             key={d.label}
@@ -148,15 +157,22 @@ export function YearSparkline({
   const everyOther = data.length > 9;
 
   return (
-    <Card>
+    <Card className="flex h-full flex-col">
       <CardTitle>{title}</CardTitle>
       <div className="mt-4 flex flex-1 items-end gap-1">
         {data.map((d, i) => (
           <div key={d.year} className="flex min-w-0 flex-1 flex-col items-center gap-1">
-            <span className="text-[.5625rem] tabular-nums text-ink-500">
+            {/* Both label slots keep their height when they hold nothing.
+                They are written conditionally — a year with no entries prints
+                no count, and past nine bars only every second year is named —
+                and an empty span is a zero-height box. With the row
+                bottom-aligned, the columns whose labels were blank sat lower
+                than the rest, so the bars had no common floor and the missing
+                labels left a visible notch under every other year. */}
+            <span className="h-3 text-[.5625rem] leading-3 tabular-nums text-ink-500">
               {d.count || ""}
             </span>
-            <div className="flex h-24 w-full items-end">
+            <div className="flex min-h-24 w-full flex-1 items-end">
               <div
                 title={`${d.year}: ${d.count}`}
                 className={cn(
@@ -166,7 +182,7 @@ export function YearSparkline({
                 style={{ height: `${Math.max((d.count / max) * 100, 2)}%` }}
               />
             </div>
-            <span className="text-[.5625rem] tabular-nums text-ink-600">
+            <span className="h-3 text-[.5625rem] leading-3 tabular-nums text-ink-600">
               {!everyOther || (data.length - 1 - i) % 2 === 0 ? d.year : ""}
             </span>
           </div>
@@ -202,15 +218,20 @@ export function DistributionCard({
   if (data.length === 0) return null;
   const max = Math.max(...data.map((d) => d.count), 1);
   return (
-    <Card>
+    <Card className="flex h-full flex-col">
       <CardTitle>{title}</CardTitle>
-      <div className="mt-3 space-y-1.5">
+      {/* `justify-around` rather than a fixed stack: when the grid row is
+          taller than this card needs, the rows spread through the slack
+          instead of leaving it pooled under the last one. */}
+      <div className="mt-3 flex flex-1 flex-col justify-around gap-1.5">
         {data.map((d) => (
           <div key={d.label} className="flex items-center gap-2 text-xs">
             <span className="w-16 shrink-0 truncate text-ink-500">{d.label}</span>
             <div className="h-3 flex-1 overflow-hidden rounded bg-surface-800">
               <div
-                className="h-full rounded bg-accent-500"
+                // Only fires when the figure changes — switching ANIME/MANGA
+                // re-measures the bars rather than cutting to new lengths.
+                className="h-full rounded bg-accent-500 transition-[width] duration-[280ms] ease-out-expo"
                 style={{ width: `${(d.count / max) * 100}%` }}
               />
             </div>

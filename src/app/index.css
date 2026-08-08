@@ -156,6 +156,24 @@
   /* Staggered arrivals (skeleton to content, list cells, chart series). */
   --animate-reveal: reveal 320ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
 
+  /* --- Idle motion -------------------------------------------------------
+     Ambient rather than attention-seeking: long periods, small amplitudes,
+     and only on surfaces where the app is genuinely doing or holding
+     something. The test for one of these is that it should be invisible
+     while you are reading the screen and only apparent when you look at it
+     directly — anything you can notice out of the corner of your eye while
+     working is a distraction, not atmosphere. Three consumers is the budget;
+     a screen where several things breathe at once reads as unstable. */
+
+  /* A live surface: the accent breathing around Now Playing while an episode
+     is actually running. Paired with the titlebar dot's `blip`, which is the
+     same idea at the other end of the window. */
+  --animate-idle-glow: idleGlow 4.5s ease-in-out infinite;
+  /* The perched bird settling — two pixels, six seconds. */
+  --animate-idle-float: idleFloat 6s ease-in-out infinite;
+  /* Something waiting to be read. */
+  --animate-idle-pulse: idlePulse 2.8s ease-in-out infinite;
+
   --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
   /* Brand wordmark typography, matching the logo (design/Logo - Karasu Full Art.svg) */
   --font-brand: "SN Pro", var(--font-sans);
@@ -279,6 +297,49 @@
   from {
     opacity: 0;
     transform: translateY(0.5rem);
+  }
+}
+
+/* Idle loops. Every one of these is a `box-shadow`/`opacity`/`transform`
+   animation and therefore already collapses under the reduce-motion rules at
+   the bottom of this file — none of them needs a JS guard. */
+/* Inset, not an outer glow. Its one consumer is an overlay inside Now
+   Playing, which is `overflow-hidden` — an outward shadow would be clipped at
+   the card edge and never seen. Inset also suits the surface it sits on: the
+   card is cut *into* the page, so what warms is the inside of the well. */
+@keyframes idleGlow {
+  0%,
+  100% {
+    box-shadow:
+      inset 0 0 0 1px rgba(var(--accent-rgb), 0.07),
+      inset 0 0 1.5rem -0.75rem rgba(var(--accent-rgb), 0.2);
+  }
+  50% {
+    box-shadow:
+      inset 0 0 0 1px rgba(var(--accent-rgb), 0.17),
+      inset 0 0 2rem -0.5rem rgba(var(--accent-rgb), 0.4);
+  }
+}
+
+@keyframes idleFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-0.125rem);
+  }
+}
+
+@keyframes idlePulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.75;
+    transform: scale(1.09);
   }
 }
 

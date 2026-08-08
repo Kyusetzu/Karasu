@@ -109,7 +109,10 @@ export default function Bell() {
         {unread > 0 && (
           // The `s950` ring is what separates the badge from the bell glyph
           // beneath it — without it the two silhouettes merge at this size.
-          <span className="absolute right-1.5 top-1.5 grid h-3.25 min-w-3.25 place-items-center rounded-[.4375rem] border border-surface-950 bg-accent-500 px-1 text-[.5625rem] font-semibold text-accent-ink">
+          // Breathes while there is something unread. The count is small and
+          // sits in the corner of a quiet titlebar, so a badge that merely
+          // appears is easy to walk past; this stops the moment it is read.
+          <span className="animate-idle-pulse absolute right-1.5 top-1.5 grid h-3.25 min-w-3.25 place-items-center rounded-[.4375rem] border border-surface-950 bg-accent-500 px-1 text-[.5625rem] font-semibold text-accent-ink">
             {unread > 9 ? "9+" : unread}
           </span>
         )}

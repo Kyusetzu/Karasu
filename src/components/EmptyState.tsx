@@ -79,7 +79,12 @@ export function TickMarks({ count = 7 }: { count?: number }) {
 export function CoverOutline() {
   return (
     <div className="grid h-30 w-20 place-items-center rounded-lg border border-dashed border-surface-700">
-      <KarasuMarkFlat className="size-14 text-ink-500 opacity-55" />
+      {/* Two pixels over six seconds. An empty screen is the one place in the
+          app with nothing else asking for attention, so the bird is allowed to
+          be alive here — but only just. `PerchRule`'s bird deliberately does
+          not get this: it already animates on arrival, and `land` owns the
+          same `transform` an idle float would need. */}
+      <KarasuMarkFlat className="animate-idle-float size-14 text-ink-500 opacity-55" />
     </div>
   );
 }

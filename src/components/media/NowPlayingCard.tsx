@@ -121,7 +121,18 @@ export default function NowPlayingCard() {
         shown.leaving ? "animate-rise-out" : "animate-rise-in",
       )}
     >
-      <div className="flex items-center gap-4">
+      {/* The one idle loop on this screen, and only while something is
+          genuinely running: the well warms and cools on a 4.5s cycle, which is
+          the same thing the titlebar dot says at the other end of the window.
+          Its own element because the card's `animation` is already spoken for
+          by the entrance/exit, and `inset-well` already owns `box-shadow`. */}
+      {scrobble.phase === "watching" && !shown.leaving && (
+        <span
+          aria-hidden
+          className="animate-idle-glow pointer-events-none absolute inset-0 rounded-[.875rem]"
+        />
+      )}
+      <div className="relative flex items-center gap-4">
         <span className="relative grid h-11 w-11 shrink-0 place-items-center rounded-full bg-accent-600/25 text-accent-400">
           {/* The wait, drawn rather than counted. The digits below tick once a
               second and jump; a ring closing over the same interval is the part

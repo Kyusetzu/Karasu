@@ -9,7 +9,7 @@ import {
   polylineLength,
   squarify,
 } from "@/lib/charts";
-import { motionDuration, staggerDelay } from "@/lib/motion";
+import { motionDuration, seriesDelay } from "@/lib/motion";
 
 /**
  * When a line-chart point should land: as the drawing line reaches it.
@@ -94,41 +94,60 @@ export function Sunburst({ data, size = 260 }: { data: Slice[]; size?: number })
             {/* Arcs arrive in ring order. Deliberately a scale from the
                 slice's own centre rather than a sweep: a sweep would cross
                 `ArcValue`'s 26-degree label threshold on the way, popping
-                the number in partway through. */}
-            <path
-              d={arcPath(c, c, inner, mid, span.start, span.end)}
-              fill={tone}
-              stroke="var(--color-surface-900)"
-              strokeWidth={1}
+                the number in partway through.
+
+                The wedge and its number arrive as one `<g>`. Animating the arc
+                alone left every figure sitting at full opacity over a ring that
+                was still coming in — half the chart moving and half of it
+                already there, which reads as the animation having stalled. */}
+            <g
               className="chart-in"
-              style={{ animationDelay: `${staggerDelay(i)}ms` }}
+              style={{ animationDelay: `${seriesDelay(i, data.length)}ms` }}
             >
-              <title>{`${group.label}: ${group.value}`}</title>
-            </path>
-            {/* `accent-ink` is the readable ink *for the accent colour*, and
-                only the first two tones are accent — the rest are surface
-                greys. `readableInk` picks whichever of near-black and
-                near-white contrasts with the accent, which is not the same
-                question as what reads on a grey. It happens to come out right
-                for seven of the eighteen accent/theme combinations, the
-                default among them; for the other eleven it lands at 1.0–1.9:1
-                and the number is not there at all. */}
-            <ArcValue
-              c={c}
-              r={(inner + mid) / 2}
-              from={span.start}
-              to={span.end}
-              value={group.value}
-              tone={i < 2 ? "fill-accent-ink" : "fill-ink-100"}
-            />
+              <path
+                d={arcPath(c, c, inner, mid, span.start, span.end)}
+                fill={tone}
+                stroke="var(--color-surface-900)"
+                strokeWidth={1}
+              >
+                <title>{`${group.label}: ${group.value}`}</title>
+              </path>
+              {/* `accent-ink` is the readable ink *for the accent colour*, and
+                  only the first two tones are accent — the rest are surface
+                  greys. `readableInk` picks whichever of near-black and
+                  near-white contrasts with the accent, which is not the same
+                  question as what reads on a grey. It happens to come out right
+                  for seven of the eighteen accent/theme combinations, the
+                  default among them; for the other eleven it lands at 1.0–1.9:1
+                  and the number is not there at all. */}
+              <ArcValue
+                c={c}
+                r={(inner + mid) / 2}
+                from={span.start}
+                to={span.end}
+                value={group.value}
+                tone={i < 2 ? "fill-accent-ink" : "fill-ink-100"}
+              />
+            </g>
             {/* The outer ring is the same hue stepped down in opacity, so it is
-                mostly card underneath and takes the light ink throughout. */}
+                mostly card underneath and takes the light ink throughout. It
+                follows its own parent rather than the whole inner ring, so each
+                group completes before the next begins. */}
             {kids.map((kid, j) => {
               // The child's slice is its share of the parent's own wedge.
               const from = span.start + (kidArcs[j].start / 360) * width;
               const to = span.start + (kidArcs[j].end / 360) * width;
               return (
-                <Fragment key={kid.label}>
+                <g
+                  key={kid.label}
+                  className="chart-in"
+                  style={{
+                    animationDelay: `${
+                      seriesDelay(i, data.length) +
+                      seriesDelay(j + 1, kids.length + 1) / 2
+                    }ms`,
+                  }}
+                >
                   <path
                     d={arcPath(c, c, mid + 1, outer, from, to)}
                     fill={tone}
@@ -146,7 +165,7 @@ export function Sunburst({ data, size = 260 }: { data: Slice[]; size?: number })
                     value={kid.value}
                     tone="fill-ink-100"
                   />
-                </Fragment>
+                </g>
               );
             })}
           </Fragment>
@@ -156,7 +175,7 @@ export function Sunburst({ data, size = 260 }: { data: Slice[]; size?: number })
         x={c}
         y={c + 4}
         textAnchor="middle"
-        className="fill-ink-300 text-[1.0625rem] font-semibold tabular-nums"
+        className="animate-fade-in fill-ink-300 text-[1.0625rem] font-semibold tabular-nums"
       >
         {total}
       </text>
@@ -283,12 +302,18 @@ export function RadarChart({
           />
         );
       })}
-      <polygon
-        points={pointsAttr(shape)}
-        fill="rgba(var(--accent-rgb), .22)"
-        stroke="var(--color-accent-500)"
-        strokeWidth={1.5}
-      />
+      {/* The rings and axes above are the chart's frame and are simply there.
+          The polygon is the *data*, so it arrives — it used to be painted at
+          full strength on the first frame while only the dots animated, which
+          left the shape looking finished and the animation looking stuck. */}
+      <g className="chart-in">
+        <polygon
+          points={pointsAttr(shape)}
+          fill="rgba(var(--accent-rgb), .22)"
+          stroke="var(--color-accent-500)"
+          strokeWidth={1.5}
+        />
+      </g>
       {shape.map((p, i) => (
         <circle
           key={i}
@@ -297,7 +322,11 @@ export function RadarChart({
           r={2.5}
           fill="var(--color-accent-400)"
           className="chart-in"
-          style={{ animationDelay: `${staggerDelay(i)}ms` }}
+          // Behind the polygon it belongs to, so the vertices land on a shape
+          // that is already in place rather than racing it.
+          style={{
+            animationDelay: `${motionDuration(90) + seriesDelay(i, shape.length)}ms`,
+          }}
         >
           <title>{`${axes[i].label}: ${axes[i].value}`}</title>
         </circle>
@@ -462,7 +491,10 @@ export function Treemap({
           <g
             key={label}
             className="chart-in"
-            style={{ animationDelay: `${staggerDelay(i)}ms` }}
+            // `seriesDelay`, not `staggerDelay`: the tag map draws fourteen
+            // tiles and the six-step cycle restarted twice on the way through,
+            // so the arrival visibly stalled and began again mid-chart.
+            style={{ animationDelay: `${seriesDelay(i, rects.length)}ms` }}
           >
             <rect
               x={r.x}

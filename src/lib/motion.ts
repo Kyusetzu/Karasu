@@ -66,3 +66,30 @@ export function staggerDelay(
 ): number {
   return motionDuration((index % STAGGER_CYCLE) * STAGGER_STEP_MS, reduced);
 }
+
+/** How long a whole chart series has to finish arriving. */
+export const SERIES_WINDOW_MS = 260;
+
+/**
+ * The delay for item `index` of a known `count`-item series, in ms.
+ *
+ * `staggerDelay` wraps every sixth item, which is right for a grid or a list —
+ * they are unbounded, and the wrap is what stops the hundredth cell waiting
+ * four seconds. It is wrong for a chart: a chart is read as *one shape*
+ * arriving, so a delay that returns to zero partway through looks like the
+ * animation stalled and started again. That is what a fourteen-tile treemap
+ * was doing.
+ *
+ * Bounded instead by compressing the step as the series grows, so the whole
+ * series still lands inside `SERIES_WINDOW_MS` however many members it has,
+ * while a short one keeps the same rhythm as everything else in the app.
+ */
+export function seriesDelay(
+  index: number,
+  count: number,
+  reduced = prefersReducedMotion(),
+): number {
+  if (index <= 0 || count <= 1) return 0;
+  const step = Math.min(STAGGER_STEP_MS, SERIES_WINDOW_MS / (count - 1));
+  return motionDuration(Math.round(index * step), reduced);
+}

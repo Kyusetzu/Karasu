@@ -1,12 +1,25 @@
 [package]
 name = "karasu"
-version = "0.73.1"
+version = "0.73.2"
 description = "A modern anime and manga tracker built exclusively for AniList"
 authors = ["Kyu"]
 license = "MIT"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lints.rust]
+# MSVC's link.exe prints "Creating library … and object …" on stdout for every
+# artifact that exports symbols, and rustc's warn-by-default `linker_messages`
+# forwards it verbatim — in the system language, which made two routine German
+# notices look like build problems. Nothing failed; it is link.exe narrating.
+#
+# Scoped to this package on purpose. The same suppression via `rustflags` in
+# `.cargo/config.toml` would apply to the whole dependency graph — silencing a
+# linker complaint that *would* be worth seeing, and invalidating both CI
+# caches. A crate-level `#![allow]` would need writing twice, in `lib.rs` and
+# `main.rs`, because it is evaluated per linked crate root.
+linker_messages = "allow"
 
 [lib]
 # The `_lib` suffix may seem redundant but it is necessary

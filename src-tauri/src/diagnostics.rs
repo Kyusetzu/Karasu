@@ -66,7 +66,12 @@ pub struct Diagnostics {
 ///
 /// Outside the `#[cfg]` so it is tested on both platforms rather than only in
 /// the Linux CI job — the shared-module half of the convention that keeps
-/// platform code honest.
+/// platform code honest, which is why Windows needs telling it is unused.
+///
+/// Worth knowing why `npm run verify` never caught this: the only other caller
+/// is in `#[cfg(test)]`, so `cargo test` keeps the function alive and a release
+/// build does not. The warning appears in `tauri build` alone.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 pub fn parse_os_release(text: &str) -> Option<String> {
     for line in text.lines() {
         let Some(value) = line.strip_prefix("PRETTY_NAME=") else {

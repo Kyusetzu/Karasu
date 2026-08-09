@@ -264,7 +264,12 @@ a regression here is invisible until it ships.
 - **One commit per feature.** The maintainer commits per feature; keep changes
   scoped. Commit messages end with the `Co-Authored-By:` trailer.
 - **Validate AniList queries live** before wiring new fields (introspection /
-  a throwaway Node script), since the schema is the source of truth.
+  a throwaway Node script), since the schema is the source of truth. A *mutation*
+  cannot be validated by running it — that means editing real entries — so use
+  schema introspection (`__type(name: "Mutation")`) for its argument list
+  instead; that is how `UpdateMediaListEntries` was widened past status/score.
+  Scalars on `LIST_QUERY` (`startedAt`, `completedAt`, `private`) are cheap and
+  fine; nested edge lists like `studios` are not, and belong to `DETAIL_QUERY`.
 - **DB changes go through a new `MIGRATION_V*`** guarded by PRAGMA
   `user_version`; add a `mem_db()` test. Run it through `apply`, which wraps the
   step in a transaction so the schema change and its `user_version` bump land
@@ -321,6 +326,17 @@ them away without re-measuring.
 - **`reqwest` enables `gzip` and deliberately not `brotli`.** AniList prefers
   `br` when offered both, and `br` measured *larger* than gzip on the list
   payload.
+- **The list view's columns are fixed tracks, sized in `components/list/columns.ts`.**
+  `VirtualGrid` makes every visual row its own grid container, so `subgrid` is
+  unavailable and an `auto`/`fr` track resolves differently per row — only
+  identical fixed tracks line up down the page. A fixed track also overflows
+  rather than shrinking, which is why the column *set* changes with the measured
+  container width (`useRowTier`) instead of a `2xl:` breakpoint. Never put a
+  width on a list cell at the call site: a fixed width nobody checked against
+  its worst case is what clipped every `★ 10` score and every `500 / 500`
+  progress, and `columns.test.ts` is what keeps the widths honest — including two
+  assertions that the *old* widths still do not fit, so a green suite cannot mean
+  the measurement drifted.
 - **The list and grid queries must not ask for `coverImage.extraLarge` or
   `bannerImage`** — nothing renders them there. They belong to `DETAIL_QUERY`.
   **`synonyms` must stay**: local mode re-serves the stored media object and

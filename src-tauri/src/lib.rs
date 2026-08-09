@@ -131,20 +131,25 @@ pub fn run() {
             // up. A dlopen probe would not be enough either: `build()` can
             // also return Err and the menu can panic on its own.
             //
-            // The default panic hook stays installed on purpose: the backtrace
-            // it prints is the only diagnostic a user ever gets for this.
+            // The outcome goes to the log, not to stderr. This is the single
+            // most-asked Linux question ("why does closing quit?") and until
+            // there was a log the answer was written to a handle nobody has.
             let built = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 build_tray(app)
             }));
             let built = match built {
-                Ok(Ok(())) => true,
+                Ok(Ok(())) => {
+                    logging::info("tray", "tray icon built");
+                    true
+                }
                 Ok(Err(e)) => {
-                    eprintln!("karasu: no tray icon ({e})");
+                    logging::warn("tray", format!("no tray icon ({e})"));
                     false
                 }
                 Err(_) => {
-                    eprintln!(
-                        "karasu: no tray icon (the desktop has no AppIndicator library). \
+                    logging::warn(
+                        "tray",
+                        "no tray icon (the desktop has no AppIndicator library). \
                          Closing the window will quit instead of hiding.",
                     );
                     false

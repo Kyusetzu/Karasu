@@ -126,7 +126,10 @@ pub fn spawn_loader(app: tauri::AppHandle) {
         };
         let dir = crate::portable::data_dir(dir);
         if let Err(e) = std::fs::create_dir_all(&dir) {
-            eprintln!("anime-relations: cannot create {}: {e}", dir.display());
+            crate::logging::error(
+                "relations",
+                format!("cannot create {}: {e}", dir.display()),
+            );
             return;
         }
         let path = dir.join("anime-relations.txt");
@@ -146,11 +149,19 @@ pub fn spawn_loader(app: tauri::AppHandle) {
         if !stale {
             return;
         }
-        let Ok(resp) = reqwest::get(SOURCE_URL).await else {
-            return;
+        let resp = match reqwest::get(SOURCE_URL).await {
+            Ok(r) => r,
+            Err(e) => {
+                crate::logging::warn("relations", format!("cannot fetch the rules: {e}"));
+                return;
+            }
         };
-        let Ok(text) = resp.text().await else {
-            return;
+        let text = match resp.text().await {
+            Ok(t) => t,
+            Err(e) => {
+                crate::logging::warn("relations", format!("cannot read the rules: {e}"));
+                return;
+            }
         };
         let rules = parse_rules(&text);
         if rules.is_empty() {
@@ -160,7 +171,10 @@ pub fn spawn_loader(app: tauri::AppHandle) {
         // every launch and the whole file is downloaded again, forever, with
         // nothing to say why.
         if let Err(e) = std::fs::write(&path, &text) {
-            eprintln!("anime-relations: cannot cache {}: {e}", path.display());
+            crate::logging::error(
+                "relations",
+                format!("cannot cache {}: {e}", path.display()),
+            );
         }
         *app.state::<Relations>().0.write().unwrap() = rules;
     });

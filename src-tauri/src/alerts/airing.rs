@@ -125,8 +125,20 @@ async fn check(app: &AppHandle) {
 
     let api = app.state::<AniList>();
     let vars = json!({ "ids": ids, "from": last, "to": now });
-    let Ok(data) = api.query(None, AIRING_QUERY, vars).await else {
-        return; // network error — keep last_check, retry next round
+    // Keep last_check and retry next round either way, but say which it was:
+    // a network blip and a schema break took the same silent branch, so "airing
+    // notifications stopped" had no cause anyone could report.
+    let data = match api.query(None, AIRING_QUERY, vars).await {
+        Ok(data) => data,
+        Err(e) => {
+            // `From<ApiError> for String` is what distinguishes a network error
+            // from an API one, which is the distinction worth recording.
+            crate::logging::warn(
+                "airing",
+                format!("the airing check failed: {}", String::from(e)),
+            );
+            return;
+        }
     };
 
     let level = crate::commands::read_content_filter(&db);

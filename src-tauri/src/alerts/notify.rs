@@ -17,8 +17,26 @@ fn now_ms() -> i64 {
 
 /// Record + toast + notify the UI. `kind` groups notifications
 /// ("airing" | "stale" | "sequel").
+///
+/// All three steps used to discard their result, which made "Karasu never tells
+/// me anything" undiagnosable: a desktop that refuses toasts (Focus Assist on
+/// Windows, no notification daemon on a bare Linux WM) looked exactly like a
+/// watcher that had found nothing to say. The failures are still not fatal —
+/// the bell entry is worth keeping even when the toast will not show — but each
+/// one now leaves a line.
 pub fn notify(app: &AppHandle, kind: &str, title: &str, body: &str) {
-    let _ = app.state::<Db>().notif_insert(kind, title, body, now_ms());
-    let _ = app.notification().builder().title(title).body(body).show();
-    let _ = app.emit("notifications-changed", ());
+    if let Err(e) = app.state::<Db>().notif_insert(kind, title, body, now_ms()) {
+        crate::logging::error("notify", format!("cannot record the {kind} notification: {e}"));
+    }
+    if let Err(e) = app.notification().builder().title(title).body(body).show() {
+        crate::logging::warn(
+            "notify",
+            format!(
+                "the desktop refused a {kind} notification: {e}. It is still in the bell."
+            ),
+        );
+    }
+    if let Err(e) = app.emit("notifications-changed", ()) {
+        crate::logging::warn("notify", format!("cannot refresh the bell: {e}"));
+    }
 }

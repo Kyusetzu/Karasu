@@ -46,10 +46,33 @@ pub fn load_token() -> Option<String> {
 /// Sign-out means signed out, so it clears everywhere a token can live.
 pub fn delete_token() {
     if let Some(path) = crate::portable::token_file() {
-        let _ = std::fs::remove_file(path);
+        // `NotFound` is the ordinary case (not portable, or never migrated) and
+        // is not worth a line; anything else means a live token may still be on
+        // disk after the user asked to be signed out.
+        if let Err(e) = std::fs::remove_file(&path) {
+            if e.kind() != std::io::ErrorKind::NotFound {
+                crate::logging::error(
+                    "auth",
+                    format!("sign-out could not remove {}: {e}", path.display()),
+                );
+            }
+        }
     }
-    if let Ok(e) = entry() {
-        let _ = e.delete_credential();
+    match entry() {
+        Ok(e) => {
+            if let Err(e) = e.delete_credential() {
+                if !matches!(e, keyring::Error::NoEntry) {
+                    crate::logging::error(
+                        "auth",
+                        format!("sign-out could not clear the credential store: {e}"),
+                    );
+                }
+            }
+        }
+        Err(e) => crate::logging::error(
+            "auth",
+            format!("sign-out could not reach the credential store: {e}"),
+        ),
     }
     delete_portable_key();
 }
@@ -61,7 +84,14 @@ pub fn delete_token() {
 #[cfg(target_os = "linux")]
 fn delete_portable_key() {
     if let Ok(e) = keyring::Entry::new(SERVICE, PORTABLE_KEY_USER) {
-        let _ = e.delete_credential();
+        if let Err(e) = e.delete_credential() {
+            if !matches!(e, keyring::Error::NoEntry) {
+                crate::logging::warn(
+                    "auth",
+                    format!("sign-out could not drop the portable key: {e}"),
+                );
+            }
+        }
     }
 }
 #[cfg(not(target_os = "linux"))]
@@ -85,8 +115,14 @@ pub fn migrate_to_portable_file() -> Result<(), String> {
     save_token_file(&token)?;
     // Only once the token is safely in the portable file. Leaving it behind
     // would keep a live bearer token in the credential store that sign-out
-    // (which follows `is_portable()`) would never reach.
-    let _ = entry.delete_credential();
+    // (which follows `is_portable()`) would never reach — so a failure here is
+    // worth recording even though the migration itself succeeded.
+    if let Err(e) = entry.delete_credential() {
+        crate::logging::warn(
+            "auth",
+            format!("migrated to portable mode but could not clear the old credential: {e}"),
+        );
+    }
     Ok(())
 }
 

@@ -140,7 +140,12 @@ pub async fn fetch_media_list(
 ) -> Result<ListResult, String> {
     let media_type = validate_media_type(&media_type)?;
     let token = auth::load_token();
-    let _ = process_queue(&db, &api, token.as_deref()).await;
+    // Not fatal — a fetch is still worth doing with the queue undrained — but a
+    // silent failure here presented as a stale list with a pending count that
+    // never went down, and nothing said why.
+    if let Err(e) = process_queue(&db, &api, token.as_deref()).await {
+        crate::logging::warn("queue", format!("cannot drain the offline queue: {e}"));
+    }
 
     match api
         .query(
@@ -155,7 +160,10 @@ pub async fn fetch_media_list(
                 .pointer("/MediaListCollection/lists")
                 .cloned()
                 .unwrap_or_else(|| json!([]));
-            let _ = db.cache_list(user_id, media_type, &lists.to_string());
+            if let Err(e) = db.cache_list(user_id, media_type, &lists.to_string()) {
+                // Every cold start then hits the network instead of the cache.
+                crate::logging::warn("cache", format!("cannot cache the {media_type} list: {e}"));
+            }
             Ok(ListResult {
                 from_cache: false,
                 pending: db.queue_len(),

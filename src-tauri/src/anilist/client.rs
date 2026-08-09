@@ -72,10 +72,15 @@ impl AniList {
                 req = req.bearer_auth(t);
             }
 
-            let resp = req
-                .send()
-                .await
-                .map_err(|e| ApiError::Network(e.to_string()))?;
+            let resp = req.send().await.map_err(|e| {
+                // The status class only. Never the body and never the headers:
+                // the request carries `Authorization: Bearer <token>` and the
+                // response to a Jellyfin sign-in carries an access token, so a
+                // logger that reached for either would be the leak this whole
+                // module exists to prevent.
+                crate::logging::warn("anilist", format!("request failed: {e}"));
+                ApiError::Network(e.to_string())
+            })?;
 
             if let Some(rem) = resp
                 .headers()
@@ -87,6 +92,10 @@ impl AniList {
             }
 
             if resp.status().as_u16() == 429 && attempt == 0 {
+                crate::logging::warn(
+                    "anilist",
+                    "rate limited (HTTP 429) — waiting before one retry",
+                );
                 let wait = resp
                     .headers()
                     .get("retry-after")

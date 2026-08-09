@@ -34,11 +34,17 @@ query ($ids: [Int], $from: Int, $to: Int) {
 }";
 
 pub fn spawn(app: AppHandle) {
-    tauri::async_runtime::spawn(async move {
-        tokio::time::sleep(STARTUP_DELAY).await;
-        loop {
-            check(&app).await;
-            tokio::time::sleep(CHECK_INTERVAL).await;
+    // Supervised: a panic in here used to take the airing checks down for the
+    // rest of the session with nothing said. The startup delay repeating on a
+    // restart is deliberate — it doubles as the first backoff.
+    crate::logging::supervise("airing", move || {
+        let app = app.clone();
+        async move {
+            tokio::time::sleep(STARTUP_DELAY).await;
+            loop {
+                check(&app).await;
+                tokio::time::sleep(CHECK_INTERVAL).await;
+            }
         }
     });
 }

@@ -18,11 +18,15 @@ const MIN_MONTHS: i64 = 1;
 const MAX_MONTHS: i64 = 24;
 
 pub fn spawn(app: AppHandle) {
-    tauri::async_runtime::spawn(async move {
-        tokio::time::sleep(STARTUP_DELAY).await;
-        loop {
-            check(&app);
-            tokio::time::sleep(CHECK_INTERVAL).await;
+    // Supervised — see `logging::supervise`.
+    crate::logging::supervise("stale", move || {
+        let app = app.clone();
+        async move {
+            tokio::time::sleep(STARTUP_DELAY).await;
+            loop {
+                check(&app);
+                tokio::time::sleep(CHECK_INTERVAL).await;
+            }
         }
     });
 }

@@ -334,6 +334,80 @@ pub fn entries(limit: usize) -> Vec<LogEntry> {
     ring.iter().rev().take(limit).cloned().collect()
 }
 
+/// How many times a background loop may be restarted before it is left down.
+///
+/// Bounded because the realistic cause is a poisoned `Db` mutex, which does not
+/// heal: without a cap the supervisor would respawn a task that panics on its
+/// first lock, forever, at whatever the backoff allows.
+const MAX_RESTARTS: u32 = 5;
+const FIRST_BACKOFF_SECS: u64 = 5;
+
+/// How long to wait before restart number `restarts`, or `None` to give up.
+///
+/// Split out so the schedule can be tested without actually sleeping through
+/// it — the alternative is a test that takes five seconds to prove arithmetic.
+fn restart_plan(restarts: u32) -> Option<u64> {
+    (restarts <= MAX_RESTARTS).then(|| FIRST_BACKOFF_SECS << (restarts - 1))
+}
+
+/// Runs a background loop, and puts it back if it panics.
+///
+/// The four long-lived loops — detection, airing, stale, sequel — were spawned
+/// with their `JoinHandle`s dropped on the floor. A panic inside one unwound the
+/// task, was captured into a `JoinError` nobody joined, and printed to the
+/// stderr that does not exist: the loop was simply gone for the rest of the
+/// process. The symptom is "scrobbling stopped working" with no event, no toast
+/// and nothing to report.
+///
+/// A supervisor task rather than `catch_unwind` inside the loop, because
+/// `catch_unwind` does not work across an `await` without pulling in
+/// `futures::FutureExt`. Tauri's `JoinHandle` already resolves to a `Result`, so
+/// the panic is observable for free.
+///
+/// Restarting is not a fix and does not pretend to be one — the log line is the
+/// point. But a detection loop that comes back after a transient panic is worth
+/// more than one that stays dead until the next restart.
+pub fn supervise<F, Fut>(name: &'static str, make: F)
+where
+    F: Fn() -> Fut + Send + 'static,
+    Fut: std::future::Future<Output = ()> + Send + 'static,
+{
+    tauri::async_runtime::spawn(async move {
+        let mut restarts = 0u32;
+        loop {
+            match tauri::async_runtime::spawn(make()).await {
+                // These loops never return, so this is only reachable if one is
+                // ever rewritten to finish. Worth a line either way.
+                Ok(()) => {
+                    info(name, "background loop ended");
+                    return;
+                }
+                Err(e) => {
+                    restarts += 1;
+                    let Some(wait) = restart_plan(restarts) else {
+                        error(
+                            name,
+                            format!(
+                                "background loop panicked again ({e}) — giving up after \
+                                 {MAX_RESTARTS} restarts. Restart Karasu to bring it back."
+                            ),
+                        );
+                        return;
+                    };
+                    error(
+                        name,
+                        format!(
+                            "background loop panicked ({e}) — restart {restarts}/{MAX_RESTARTS} \
+                             in {wait}s"
+                        ),
+                    );
+                    tokio::time::sleep(std::time::Duration::from_secs(wait)).await;
+                }
+            }
+        }
+    });
+}
+
 /// Installs the panic hook. Call this **first** in `run()`.
 ///
 /// Until this existed, a panic in one of the four background loops killed that
@@ -524,6 +598,44 @@ mod tests {
         // Put the sink back so a stray path does not outlive the test.
         *guard(sink()) = None;
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The hook is the whole reason a panic is reportable at all, so verify it
+    /// captures one rather than trusting that `set_hook` was called.
+    #[test]
+    fn the_panic_hook_records_the_panic() {
+        install_panic_hook();
+        let before = entries(RING_CAPACITY).len();
+
+        // Caught so the test itself survives; the hook still runs first.
+        let _ = std::panic::catch_unwind(|| panic!("a deliberate test panic"));
+
+        let recorded = entries(RING_CAPACITY);
+        assert!(recorded.len() > before, "the hook logged nothing");
+        let entry = recorded
+            .iter()
+            .find(|e| e.target == "panic")
+            .expect("no entry with the panic target");
+        assert_eq!(entry.level, Level::Error);
+        assert!(
+            entry.message.contains("a deliberate test panic"),
+            "{}",
+            entry.message
+        );
+        // The location is what makes it actionable, given `strip = true` leaves
+        // backtraces near-symbol-free.
+        assert!(entry.message.contains("logging.rs"), "{}", entry.message);
+    }
+
+    /// Backoff doubles and then stops. Without the cap, a poisoned `Db` mutex —
+    /// which does not heal — would have the supervisor respawning forever.
+    #[test]
+    fn restarts_back_off_and_then_give_up() {
+        assert_eq!(restart_plan(1), Some(5));
+        assert_eq!(restart_plan(2), Some(10));
+        assert_eq!(restart_plan(3), Some(20));
+        assert_eq!(restart_plan(MAX_RESTARTS), Some(80));
+        assert_eq!(restart_plan(MAX_RESTARTS + 1), None);
     }
 
     #[test]

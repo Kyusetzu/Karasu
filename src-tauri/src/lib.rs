@@ -70,6 +70,10 @@ fn build_tray(app: &tauri::App) -> tauri::Result<()> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // First, before anything can panic. Until this existed every panic in the
+    // app went to a stderr no packaged build has — see `logging`.
+    logging::install_panic_hook();
+
     // WebKitGTK's DMA-BUF renderer paints a blank window on a long list of
     // driver/compositor combinations — the NVIDIA proprietary driver most
     // often. The app starts, the process runs, and the user sees nothing,
@@ -94,7 +98,14 @@ pub fn run() {
         ))
         .setup(|app| {
             let data_dir = portable::data_dir(app.path().app_data_dir()?);
-            app.manage(db::Db::open(data_dir).map_err(std::io::Error::other)?);
+            // Before the database, so a failure to open *that* is the first
+            // thing the log records rather than something it misses.
+            logging::init(data_dir.clone());
+            logging::set_debug(false);
+            app.manage(db::Db::open(data_dir).map_err(|e| {
+                logging::error("db", format!("cannot open the database: {e}"));
+                std::io::Error::other(e)
+            })?);
             app.manage(anilist::client::AniList::new());
             app.manage(playback::scrobbler::PlaybackState(std::sync::Mutex::new(None)));
             app.manage(playback::scrobbler::ScrobbleSession(std::sync::Mutex::new(None)));

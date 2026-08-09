@@ -38,11 +38,15 @@ query ($ids: [Int], $type: MediaType) {
 }";
 
 pub fn spawn(app: AppHandle) {
-    tauri::async_runtime::spawn(async move {
-        tokio::time::sleep(STARTUP_DELAY).await;
-        loop {
-            check(&app).await;
-            tokio::time::sleep(CHECK_INTERVAL).await;
+    // Supervised — see `logging::supervise`.
+    crate::logging::supervise("sequel", move || {
+        let app = app.clone();
+        async move {
+            tokio::time::sleep(STARTUP_DELAY).await;
+            loop {
+                check(&app).await;
+                tokio::time::sleep(CHECK_INTERVAL).await;
+            }
         }
     });
 }

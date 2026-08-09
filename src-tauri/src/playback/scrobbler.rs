@@ -423,8 +423,14 @@ pub async fn confirm_pending(app: AppHandle, accept: bool) -> Result<(), String>
 }
 
 /// Starts the detection and scrobble loop (runs for the app's lifetime).
+///
+/// Supervised, because this is the loop whose silent death is most visible and
+/// least explicable: a panic here used to end detection for the session, and the
+/// only symptom was that scrobbling stopped happening.
 pub fn spawn(app: AppHandle) {
-    tauri::async_runtime::spawn(async move {
+    crate::logging::supervise("scrobbler", move || {
+        let app = app.clone();
+        async move {
         let mut last_raw: Option<(String, String)> = None;
         loop {
             let (media_detection, jellyfin) = {
@@ -454,6 +460,7 @@ pub fn spawn(app: AppHandle) {
 
             drive_session(&app).await;
             tokio::time::sleep(POLL_INTERVAL).await;
+        }
         }
     });
 }

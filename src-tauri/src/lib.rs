@@ -2,6 +2,7 @@ mod alerts;
 mod anilist;
 mod commands;
 mod db;
+mod diagnostics;
 mod discord;
 mod identify;
 mod library;
@@ -101,11 +102,22 @@ pub fn run() {
             // Before the database, so a failure to open *that* is the first
             // thing the log records rather than something it misses.
             logging::init(data_dir.clone());
-            logging::set_debug(false);
             app.manage(db::Db::open(data_dir).map_err(|e| {
                 logging::error("db", format!("cannot open the database: {e}"));
                 std::io::Error::other(e)
             })?);
+            // The verbose switch survives a restart, so a "turn it on and
+            // reproduce it" request does not have to be re-armed each launch.
+            logging::set_debug(
+                app.state::<db::Db>()
+                    .kv_get(commands::LOG_DEBUG_KEY)
+                    .as_deref()
+                    == Some("1"),
+            );
+            logging::info(
+                "startup",
+                format!("Karasu {}", commands::app_version_string()),
+            );
             app.manage(anilist::client::AniList::new());
             app.manage(playback::scrobbler::PlaybackState(std::sync::Mutex::new(None)));
             app.manage(playback::scrobbler::ScrobbleSession(std::sync::Mutex::new(None)));
@@ -211,6 +223,14 @@ pub fn run() {
             commands::get_sequel_notify,
             commands::set_sequel_notify,
             commands::get_notifications,
+            commands::diagnostics,
+            commands::diagnostics_report,
+            commands::get_logs,
+            commands::log_file_path,
+            commands::log_frontend_error,
+            commands::get_log_debug,
+            commands::set_log_debug,
+            commands::export_diagnostics,
             commands::unread_notification_count,
             commands::mark_notification_read,
             commands::mark_all_notifications_read,

@@ -8,6 +8,9 @@ use super::*;
 
 /// Where the last Wrapped poster was saved, so the next one opens there.
 const EXPORT_DIR_KEY: &str = "export_dir";
+/// Verbose logging. Off by default — the errors that matter are recorded either
+/// way, and this is the switch for reproducing something on request.
+pub(crate) const LOG_DEBUG_KEY: &str = "log_debug";
 
 /// Reports the page the user is currently on, so the idle Discord presence
 /// can show "Looking at <page>".
@@ -224,6 +227,129 @@ pub fn save_image(
         Some(p) => {
             std::fs::write(&p, &data)
                 .map_err(|e| format!("Could not save image: {e}"))?;
+            if let Some(dir) = p.parent() {
+                let _ = db.kv_set(EXPORT_DIR_KEY, &dir.to_string_lossy());
+            }
+            Ok(true)
+        }
+        None => Ok(false),
+    }
+}
+
+// --- Diagnostics -------------------------------------------------------------
+
+/// Everything a bug report needs, in one round trip.
+///
+/// One command rather than the frontend firing six, so a reporter cannot end up
+/// with half a picture because one of them failed.
+#[tauri::command]
+pub fn diagnostics(app: tauri::AppHandle) -> crate::diagnostics::Diagnostics {
+    crate::diagnostics::collect(&app)
+}
+
+/// The same facts as a markdown block, ready to paste into an issue.
+///
+/// Redacted by default — the destination is a public comment, and the data
+/// folder is the one field that names a person.
+#[tauri::command]
+pub fn diagnostics_report(app: tauri::AppHandle, redact: bool) -> String {
+    crate::diagnostics::render(&crate::diagnostics::collect(&app), redact)
+}
+
+/// The newest log entries, newest first.
+#[tauri::command]
+pub fn get_logs(limit: Option<usize>) -> Vec<crate::logging::LogEntry> {
+    crate::logging::entries(limit.unwrap_or(200).min(crate::logging::RING_CAPACITY))
+}
+
+/// Where the log file lives, for the "show me the folder" affordance.
+#[tauri::command]
+pub fn log_file_path() -> Option<String> {
+    crate::logging::log_path().map(|p| p.to_string_lossy().to_string())
+}
+
+/// A crash or unhandled rejection from the WebView.
+///
+/// The frontend had no error boundary and no `onerror`, so a render throw blanked
+/// the window and left nothing behind. Routing it here puts a UI crash in the
+/// same file as a backend one, in order, which is usually how the connection
+/// between the two becomes visible.
+#[tauri::command]
+pub fn log_frontend_error(message: String, stack: Option<String>) {
+    let detail = stack
+        .map(|s| format!("{message}\n{s}"))
+        .unwrap_or_else(|| message.clone());
+    crate::logging::error("ui", detail);
+}
+
+#[tauri::command]
+pub fn get_log_debug(db: State<'_, Db>) -> bool {
+    db.kv_get(LOG_DEBUG_KEY).as_deref() == Some("1")
+}
+
+#[tauri::command]
+pub fn set_log_debug(db: State<'_, Db>, enabled: bool) -> Result<(), String> {
+    crate::logging::set_debug(enabled);
+    db.kv_set(LOG_DEBUG_KEY, if enabled { "1" } else { "0" })
+}
+
+/// Writes the report and the log to a file the user picks.
+///
+/// Rust-driven dialog like `save_image`, so the WebView needs no new capability.
+/// `redact` is passed through rather than assumed: the button offering this is
+/// explicit about which one it is asking for.
+#[tauri::command]
+pub fn export_diagnostics(
+    app: tauri::AppHandle,
+    db: State<'_, Db>,
+    redact: bool,
+) -> Result<bool, String> {
+    use tauri_plugin_dialog::DialogExt;
+
+    let d = crate::diagnostics::collect(&app);
+    let mut out = String::from("# Karasu diagnostics\n\n");
+    out.push_str(&crate::diagnostics::render(&d, redact));
+    out.push_str("\n## Log\n\n```\n");
+    // Oldest first here: a log is read forwards when it is the story of what
+    // happened, even though the viewer shows the newest at the top.
+    for entry in crate::logging::entries(crate::logging::RING_CAPACITY)
+        .iter()
+        .rev()
+    {
+        let line = format!(
+            "{} {:<5} {}: {}\n",
+            crate::logging::format_utc(entry.ms),
+            entry.level.label(),
+            entry.target,
+            entry.message
+        );
+        out.push_str(&if redact {
+            crate::diagnostics::redact_home(&line)
+        } else {
+            line
+        });
+    }
+    out.push_str("```\n");
+
+    let mut builder = app
+        .dialog()
+        .file()
+        .set_file_name(format!("karasu-diagnostics-{}.md", d.version));
+    if let Some(dir) = db.kv_get(EXPORT_DIR_KEY) {
+        let dir = std::path::PathBuf::from(dir);
+        if dir.is_dir() {
+            builder = builder.set_directory(dir);
+        }
+    }
+    let path = builder
+        .add_filter("Markdown", &["md"])
+        .blocking_save_file()
+        .and_then(|p| p.into_path().ok());
+
+    match path {
+        Some(p) => {
+            std::fs::write(&p, out.as_bytes())
+                .map_err(|e| format!("Could not save the report: {e}"))?;
             if let Some(dir) = p.parent() {
                 let _ = db.kv_set(EXPORT_DIR_KEY, &dir.to_string_lossy());
             }

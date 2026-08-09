@@ -456,6 +456,19 @@ impl Db {
         let _ = conn.execute("DELETE FROM offline_queue WHERE id = ?1", [id]);
     }
 
+    /// The schema version the database is actually on.
+    ///
+    /// A diagnostics fact worth having because several readers here return an
+    /// empty list rather than an error when the shape does not match what they
+    /// expect — so "my library is empty" and "the migration did not run" look
+    /// identical from the outside.
+    pub fn schema_version(&self) -> u32 {
+        let conn = self.0.lock().unwrap();
+        conn.query_row("PRAGMA user_version", [], |r| r.get::<_, i64>(0))
+            .map(|v| v as u32)
+            .unwrap_or(0)
+    }
+
     pub fn queue_len(&self) -> usize {
         let conn = self.0.lock().unwrap();
         conn.query_row("SELECT COUNT(*) FROM offline_queue", [], |r| {

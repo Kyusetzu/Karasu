@@ -1,15 +1,37 @@
-# Optional local build-speed opt-ins. These are commented out because they
-# need extra tooling that isn't guaranteed on every machine — enable whichever
-# you have installed for faster (re)builds.
+# Optional local build-speed opt-ins, kept commented out. Read the measured
+# figures before enabling either — the first one was tried and is not worth it.
 
-# 1) LLD linker (linking is the slowest part of a Windows rebuild).
-#    Install once:  rustup component add llvm-tools
-#    then point the MSVC target at the bundled rust-lld:
+# 1) LLD linker. MEASURED, AND NOT WORTH IT on this project.
+#
+#    Three runs each, release, one touched file, same source:
+#      rust-lld   30.8s  30.8s  31.1s
+#      link.exe   30.7s  32.2s
+#    About 2%, which is inside the run-to-run noise.
+#
+#    The premise this comment used to state — "linking is the slowest part of a
+#    Windows rebuild" — stopped being true for this crate. There is now exactly
+#    one link per build (the exe), because `crate-type` dropped the mobile-only
+#    `staticlib` and `cdylib`, and the ~31s is dominated by codegen of the karasu
+#    crate rather than by linking it.
+#
+#    It also is not free to flip: the linker is part of Cargo's fingerprint, so
+#    switching invalidates cached artifacts. Changing it back cost a two-minute
+#    rebuild.
+#
+#    Note also that `rust-lld.exe` ships inside the toolchain
+#    (`lib/rustlib/<target>/bin/`) rather than in the `llvm-tools` component, so
+#    the old install instruction here was wrong — but it is not on PATH, so
+#    enabling it needs the absolute path or the
+#    `CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER` env var. Committing it would
+#    also make CI use a linker its cache was not built with, and the release job
+#    cannot be tested before a push. Not worth 2%.
 #
 # [target.x86_64-pc-windows-msvc]
-# linker = "rust-lld.exe"
+# linker = "…/lib/rustlib/x86_64-pc-windows-msvc/bin/rust-lld.exe"
 
-# 2) sccache — caches compiled crates across clean builds / branches.
+# 2) sccache — caches compiled crates across clean builds / branches. Unmeasured,
+#    and it helps a different case from the one above: a clean build or a branch
+#    switch, not the "deps cached, one file changed" loop.
 #    Install once:  cargo install sccache
 #    then uncomment:
 #

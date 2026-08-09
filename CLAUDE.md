@@ -69,6 +69,8 @@ src-tauri/src/
                      scan, scored by the same matcher
   logging.rs         the background log: a bounded in-memory ring for the
                      viewer plus a rotating `karasu.log` beside the database.
+                     `scrub` strips credentials on write; `debug_changed` is
+                     the per-key dedupe the 5 s detection poll logs through.
                      Owns the panic hook and `supervise`, which puts a panicked
                      background loop back
   diagnostics.rs     the facts a bug report needs, composed from the commands
@@ -109,12 +111,21 @@ would require a hosted backend. If a requested feature depends on any of these,
 flag the dependency rather than silently building around it.
 
 **The log is a deliberate exception to the first of those, decided by the
-maintainer** — with verbose logging on, `karasu.log` records what detection saw,
-which is a playback history by construction. It was raised as a conflict and
-kept on purpose: an unreportable bug is worse than a local file the user
-controls. Do not delete the feature on the strength of the line above. What is
-*not* carved out: no history UI, nothing queryable, nothing that survives log
-rotation, and nothing uploaded anywhere.
+maintainer.** With verbose logging on, `karasu.log` records what detection saw —
+window and session titles, the parsed release name, the matched id and score,
+each redirect, and every scrobble phase change. That is a playback history by
+construction. It was raised as a conflict and kept on purpose: an unreportable
+bug is worse than a local file the user controls. Do not delete the debug lines
+on the strength of the line above; they are what makes the toggle, its hint and
+the diagnostics report true.
+
+What is *not* carved out: no history UI, nothing queryable, nothing that
+survives log rotation (~1 MB, one kept generation), and nothing uploaded
+anywhere. And the volume is bounded on purpose — the detection poll runs every
+5 s, so the per-tick lines go through `logging::debug_changed`, which records a
+line only when it differs from the last one under the same key. A plain `debug`
+in `detect_playback` or `media_session::detect` is 17,280 lines a day and
+rotates the interesting part off disk; that is a bug, not a style preference.
 
 Read *volumes* (`progressVolumes`) is not on this list and never was — it is one
 of AniList's own list fields, it costs nothing to carry, and the local list has
@@ -258,6 +269,28 @@ a regression here is invisible until it ships.
   fall back, so `entry.scoreHint` appears on screen and nothing reports it.
   `src/lib/i18nKeys.test.ts` resolves every literal `t("…")` in the source; the
   `de: typeof en` type covers the other direction.
+- **`npm run verify` cannot see every warning `npm run tauri build` can.**
+  `cargo test` compiles `#[cfg(test)]`, so a function whose only non-Linux caller
+  is a test stays alive there and is dead code in a release build —
+  `diagnostics::parse_os_release` is exactly that, and the gate was green for as
+  long as it took to run a bundle build. Read the warnings from a `tauri build`
+  before assuming there are none.
+- **Never point Tailwind's scanner at a hand-written `@source` list without
+  diffing the emitted CSS.** `@import "tailwindcss" source(none);` plus explicit
+  globs made the build ~30× faster and emitted **6,560 bytes instead of
+  62,178** — every utility silently gone, no error, no warning. Nothing else was
+  learned for free either: the default scan is not the bottleneck. Vite's
+  `[PLUGIN_TIMINGS]` blames `@tailwindcss/vite:generate:build`, but the walk only
+  ever sees 285 tracked files (155 scannable, ~50 ms); the ~8 s is *generation*.
+  The one real hazard there is the walk's reliance on `.gitignore` — the root one
+  did not mention `src-tauri/target/`, so ~100 GB across ~195k files was kept out
+  by the nested ignore file alone. It is listed in both now.
+- **MSVC writes an 11 MB `karasu.pdb` on every release build and there is no
+  flag reaching the linker to stop it.** `debug = 0` and `strip = true` are
+  already set, `cargo build --release -v` shows no `/DEBUG`, no `-Cdebuginfo=`
+  and no `/PDB` — and the file is still produced and hardlinked into `deps/`.
+  It is not bundled, so this is target-dir disk and nothing else. Looked at
+  once; don't spend the afternoon on it again.
 
 ## Conventions
 
@@ -320,9 +353,20 @@ Each of these looks like cruft and is not. They were measured; don't "tidy"
 them away without re-measuring.
 
 - **`@font-face` is hand-written in `index.css`.** Importing the `@fontsource`
-  stylesheets instead pulls a woff fallback WebView2 will never use — 1.83 MiB
-  of Kosugi Maru on the installer and every auto-update. Not the `400.css`
-  variant either: it is 122 unicode-range subsets totalling 7.9 MB.
+  stylesheets instead pulls a woff fallback neither WebView2 nor WebKitGTK will
+  ever use — the Kosugi Maru woff is 1,876,732 B (1.79 MiB), carried by the
+  installer and every auto-update on top of the 1.44 MB woff2 that is actually
+  used. Not the `400.css` variant either: 121 unicode-range subsets, ~4.37 MB
+  of woff2 if all of them ship. (The 7.9 MB figure this note used to give is the
+  size of the whole `files/` directory — every weight and both formats — not of
+  anything a build would emit. The decision was always right; the arithmetic
+  was not.)
+- **The 1.44 MB Japanese subset cannot be trimmed.** It backs `font-brand-jp`,
+  which renders arbitrary `title.native` in `TitleLockup` (itself used by five
+  call sites, including every virtualized row), `AnimeDetail`, `Franchise` and
+  `CommandPalette`. A fixed-glyph subset would fall back to Yu Gothic UI per
+  missing glyph — mixed typefaces inside one title, which is worse than either
+  whole font.
 - **`reqwest` enables `gzip` and deliberately not `brotli`.** AniList prefers
   `br` when offered both, and `br` measured *larger* than gzip on the list
   payload.

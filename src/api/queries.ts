@@ -6,7 +6,15 @@ import {
 } from "@/lib/score";
 import { adultVars } from "@/lib/contentFilter";
 import { chunk } from "@/lib/chunk";
-import type { Media, MediaListStatus, MediaTitle, MediaType } from "./types";
+import type {
+  FuzzyDate,
+  Media,
+  MediaListStatus,
+  MediaTitle,
+  MediaType,
+} from "./types";
+// Re-exported because several stats/detail consumers import it from here.
+export type { FuzzyDate };
 
 /** Media fields for discovery grids, including the user's own list entry. */
 const MEDIA_FIELDS = `
@@ -238,12 +246,6 @@ query ($id: Int!) {
     }
   }
 }`;
-
-export interface FuzzyDate {
-  year: number | null;
-  month: number | null;
-  day: number | null;
-}
 
 export interface MediaTag {
   name: string;

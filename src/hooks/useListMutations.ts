@@ -1,10 +1,14 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { bulkSaveEntries, deleteListEntry, saveListEntry } from "@/api/anilist";
+import {
+  bulkSaveEntries,
+  deleteListEntry,
+  saveListEntry,
+  type BulkPatch,
+} from "@/api/anilist";
 import type {
   ListResult,
   MediaListEntry,
-  MediaListStatus,
   MediaType,
   SaveEntryInput,
 } from "@/api/types";
@@ -87,6 +91,13 @@ export function useListMutations(userId: number, mediaType: MediaType) {
                   status: input.status ?? e.status,
                   repeat: input.repeat ?? e.repeat,
                   notes: input.notes ?? e.notes,
+                  // `??` throughout, so an absent key means "leave it alone"
+                  // rather than "clear it" — which is also why `private` is
+                  // compared against undefined explicitly: `false` is a real
+                  // value here and `??` would keep it but `||` would not.
+                  private: input.private ?? e.private,
+                  startedAt: input.startedAt ?? e.startedAt,
+                  completedAt: input.completedAt ?? e.completedAt,
                   updatedAt: now,
                 }
               : e,
@@ -186,7 +197,16 @@ export function useListMutations(userId: number, mediaType: MediaType) {
       patch,
     }: {
       entries: MediaListEntry[];
-      patch: { status?: MediaListStatus; score?: number };
+      /**
+       * What `UpdateMediaListEntries` accepts and is sensible to set across a
+       * whole selection. Confirmed by schema introspection rather than by
+       * running the mutation, which would have meant editing real entries to
+       * find out.
+       *
+       * `notes` is left out on purpose: tags are serialized into it, so a bulk
+       * set would wipe every selected entry's tags.
+       */
+      patch: BulkPatch;
     }) => bulkSaveEntries(entries, patch),
     onMutate: async ({ entries, patch }) => {
       await qc.cancelQueries({ queryKey: key });

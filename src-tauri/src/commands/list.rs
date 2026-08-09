@@ -28,6 +28,9 @@ query ($userId: Int!, $type: MediaType!) {
         repeat
         notes
         updatedAt
+        private
+        startedAt { year month day }
+        completedAt { year month day }
         media {
           id
           type
@@ -59,10 +62,15 @@ fn validate_media_type(media_type: &str) -> Result<&str, String> {
     }
 }
 
+/// `startedAt`/`completedAt` are `FuzzyDateInput` — `{ year, month, day }`, each
+/// nullable, because AniList lets a date be partial ("2024", "March 2024"). That
+/// is why they are not plain dates on the frontend either.
 const SAVE_MUTATION: &str = "
-mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int, $progressVolumes: Int, $score: Float, $repeat: Int, $notes: String) {
-  SaveMediaListEntry(mediaId: $mediaId, status: $status, progress: $progress, progressVolumes: $progressVolumes, score: $score, repeat: $repeat, notes: $notes) {
-    id mediaId status progress progressVolumes repeat notes updatedAt
+mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int, $progressVolumes: Int, $score: Float, $repeat: Int, $notes: String, $private: Boolean, $startedAt: FuzzyDateInput, $completedAt: FuzzyDateInput) {
+  SaveMediaListEntry(mediaId: $mediaId, status: $status, progress: $progress, progressVolumes: $progressVolumes, score: $score, repeat: $repeat, notes: $notes, private: $private, startedAt: $startedAt, completedAt: $completedAt) {
+    id mediaId status progress progressVolumes repeat notes updatedAt private
+    startedAt { year month day }
+    completedAt { year month day }
     score(format: POINT_10)
   }
 }";
@@ -79,10 +87,22 @@ mutation ($id: Int) {
 /// `UpdateMediaListEntries(ids: [Int], …) -> [MediaList]`. It is *not* called
 /// `SaveMediaListEntries`, which does not exist — the reason CLAUDE.md insists
 /// on checking the schema rather than the shape one expects.
+/// Widened past status/score after checking the live schema by introspection
+/// rather than by running it — a mutation cannot be validated by executing it
+/// against real data. `UpdateMediaListEntries` accepts `progress`,
+/// `progressVolumes`, `repeat`, `private`, `startedAt` and `completedAt` too.
+///
+/// `notes` is deliberately **not** here even though the schema accepts it: tags
+/// are serialized into the notes field, so setting it across a selection would
+/// destroy every selected entry's tags. Appending instead would be a
+/// read-modify-write per entry, which is the fan-out this mutation exists to
+/// avoid — so bulk tag editing is a separate problem, not a missing argument.
 const UPDATE_ENTRIES_MUTATION: &str = "
-mutation ($ids: [Int], $status: MediaListStatus, $score: Float) {
-  UpdateMediaListEntries(ids: $ids, status: $status, score: $score) {
-    id mediaId status progress progressVolumes repeat notes updatedAt
+mutation ($ids: [Int], $status: MediaListStatus, $score: Float, $progress: Int, $progressVolumes: Int, $repeat: Int, $private: Boolean, $startedAt: FuzzyDateInput, $completedAt: FuzzyDateInput) {
+  UpdateMediaListEntries(ids: $ids, status: $status, score: $score, progress: $progress, progressVolumes: $progressVolumes, repeat: $repeat, private: $private, startedAt: $startedAt, completedAt: $completedAt) {
+    id mediaId status progress progressVolumes repeat notes updatedAt private
+    startedAt { year month day }
+    completedAt { year month day }
     score(format: POINT_10)
   }
 }";
@@ -252,11 +272,33 @@ pub async fn bulk_save_list_entries(
     ids: Vec<i64>,
     status: Option<String>,
     score: Option<f64>,
+    progress: Option<i64>,
+    // snake_case here, camelCase on the wire: Tauri maps the two, the same way
+    // `save_image`'s `default_name` receives `defaultName`.
+    progress_volumes: Option<i64>,
+    repeat: Option<i64>,
+    private: Option<bool>,
+    // `FuzzyDateInput`, forwarded as an opaque `{year, month, day}` rather than
+    // re-modelled here: every part is nullable and this layer only passes it on.
+    started_at: Option<Value>,
+    completed_at: Option<Value>,
 ) -> Result<usize, String> {
     if ids.is_empty() {
         return Ok(0);
     }
-    if status.is_none() && score.is_none() {
+    // Every field absent means the caller asked for nothing. Worth rejecting
+    // rather than sending: AniList would happily accept the mutation, touch
+    // every selected entry's `updatedAt`, and change nothing — which would
+    // reorder a list sorted by "last updated" for no reason.
+    if status.is_none()
+        && score.is_none()
+        && progress.is_none()
+        && progress_volumes.is_none()
+        && repeat.is_none()
+        && private.is_none()
+        && started_at.is_none()
+        && completed_at.is_none()
+    {
         return Err("Nothing to change".into());
     }
     let token = auth::load_token().ok_or("Not connected to AniList")?;
@@ -269,7 +311,17 @@ pub async fn bulk_save_list_entries(
 
     let mut updated = 0usize;
     for chunk in bulk_chunks(&ids) {
-        let vars = json!({ "ids": chunk, "status": status, "score": score });
+        let vars = json!({
+            "ids": chunk,
+            "status": status,
+            "score": score,
+            "progress": progress,
+            "progressVolumes": progress_volumes,
+            "repeat": repeat,
+            "private": private,
+            "startedAt": started_at,
+            "completedAt": completed_at,
+        });
         // No offline queue for this one: the queue replays `SaveMediaListEntry`
         // per entry, so draining a bulk edit through it would reintroduce
         // exactly the fan-out this exists to avoid. Failing honestly lets the

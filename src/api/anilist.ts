@@ -96,9 +96,34 @@ export const deleteListEntry = (id: number) =>
  * SQLite file — so it simply writes each row, keyed on media id the way
  * `local_save_entry` expects.
  */
+/**
+ * What can be set across a whole selection in one request.
+ *
+ * Exactly the arguments `UpdateMediaListEntries` accepts *and* that mean
+ * something applied to many entries at once — established by introspecting the
+ * live schema, because the only way to validate a mutation by running it is to
+ * edit real entries.
+ *
+ * `notes` is absent deliberately, though the schema takes it: tags live inside
+ * the notes field, so one bulk set would erase every selected entry's tags, and
+ * appending instead is a read-modify-write per entry — the fan-out this whole
+ * path exists to avoid.
+ */
+export type BulkPatch = Pick<
+  SaveEntryInput,
+  | "status"
+  | "score"
+  | "progress"
+  | "progressVolumes"
+  | "repeat"
+  | "private"
+  | "startedAt"
+  | "completedAt"
+>;
+
 export const bulkSaveEntries = async (
   entries: { id: number; mediaId: number }[],
-  patch: { status?: MediaListStatus; score?: number },
+  patch: BulkPatch,
 ): Promise<number> => {
   if (!entries.length) return 0;
   if (profileMode === "local") {
@@ -109,10 +134,19 @@ export const bulkSaveEntries = async (
     }
     return entries.length;
   }
+  // Nulls rather than omissions: the Rust command forwards each straight into
+  // the GraphQL variables, and an absent variable and an explicit null mean the
+  // same thing to AniList — "do not change this".
   return invoke<number>("bulk_save_list_entries", {
     ids: entries.map((e) => e.id),
     status: patch.status ?? null,
     score: patch.score ?? null,
+    progress: patch.progress ?? null,
+    progressVolumes: patch.progressVolumes ?? null,
+    repeat: patch.repeat ?? null,
+    private: patch.private ?? null,
+    startedAt: patch.startedAt ?? null,
+    completedAt: patch.completedAt ?? null,
   });
 };
 

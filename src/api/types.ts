@@ -47,6 +47,20 @@ export interface Media {
   nextAiringEpisode: { episode: number; airingAt: number } | null;
 }
 
+/**
+ * An AniList date that may be only partly known.
+ *
+ * Every part is nullable because the API genuinely returns "2024" or
+ * "March 2024" — a reader who remembers the year but not the day is the normal
+ * case, not an edge one. That is why these cannot be `<input type="date">` and
+ * why `fuzzyDate` in `lib/format.ts` drops the parts it does not have.
+ */
+export interface FuzzyDate {
+  year: number | null;
+  month: number | null;
+  day: number | null;
+}
+
 export interface MediaListEntry {
   id: number;
   mediaId: number;
@@ -58,6 +72,10 @@ export interface MediaListEntry {
   repeat: number;
   notes: string | null;
   updatedAt: number;
+  /** Hidden from other users on AniList. */
+  private: boolean;
+  startedAt: FuzzyDate | null;
+  completedAt: FuzzyDate | null;
   media: Media;
 }
 
@@ -83,6 +101,9 @@ export interface SaveEntryInput {
   score?: number;
   repeat?: number;
   notes?: string;
+  private?: boolean;
+  startedAt?: FuzzyDate;
+  completedAt?: FuzzyDate;
 }
 
 export interface MutationResult {

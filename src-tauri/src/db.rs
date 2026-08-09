@@ -613,6 +613,16 @@ impl Db {
                 "repeat": row.repeat,
                 "notes": row.notes,
                 "updatedAt": row.updated_ms / 1000,
+                // The account-free list has no AniList-side privacy and does not
+                // track dates, but the shape has to match what the API returns
+                // or every reader would need a second branch. Emitted
+                // explicitly rather than left absent: `MediaListEntry` declares
+                // them, so omitting them would make the type a lie in local
+                // mode and `entry.startedAt` would be `undefined` where the
+                // compiler promised an object or null.
+                "private": false,
+                "startedAt": Value::Null,
+                "completedAt": Value::Null,
                 "media": media,
             });
             buckets

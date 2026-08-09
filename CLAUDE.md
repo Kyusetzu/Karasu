@@ -67,6 +67,13 @@ src-tauri/src/
   identify.rs        the AniList search pass for titles the local matcher
                      cannot place — 25 per request, capped at 8 requests a
                      scan, scored by the same matcher
+  logging.rs         the background log: a bounded in-memory ring for the
+                     viewer plus a rotating `karasu.log` beside the database.
+                     Owns the panic hook and `supervise`, which puts a panicked
+                     background loop back
+  diagnostics.rs     the facts a bug report needs, composed from the commands
+                     that already know them (never re-derived), plus the
+                     Linux-only distro/desktop/session probe
   discord.rs · library.rs · portable.rs
 scripts/             bump-version.mjs (every commit), anilist-query.mjs
                      (validate a query live); release/ holds the three PowerShell
@@ -100,6 +107,14 @@ Activity/playback-history expansion, **manga cost tracking** (what a collection
 was worth or what it was bought for), settings cloud-sync, and anything that
 would require a hosted backend. If a requested feature depends on any of these,
 flag the dependency rather than silently building around it.
+
+**The log is a deliberate exception to the first of those, decided by the
+maintainer** — with verbose logging on, `karasu.log` records what detection saw,
+which is a playback history by construction. It was raised as a conflict and
+kept on purpose: an unreportable bug is worse than a local file the user
+controls. Do not delete the feature on the strength of the line above. What is
+*not* carved out: no history UI, nothing queryable, nothing that survives log
+rotation, and nothing uploaded anywhere.
 
 Read *volumes* (`progressVolumes`) is not on this list and never was — it is one
 of AniList's own list fields, it costs nothing to carry, and the local list has
@@ -218,6 +233,15 @@ a regression here is invisible until it ships.
   of 0.2; the crate has been on 0.3 — where it is `pub` — since long before
   anyone reread it. The poll then returned a *fabricated* HRESULT on overrun,
   which blanked the whole detection pass.
+- **`eprintln!` reaches nobody in a shipped build.** `main.rs` sets
+  `windows_subsystem = "windows"`, so a release binary on Windows has no console
+  and stderr is discarded; a Linux AppImage started from a desktop file is no
+  better. Use `logging::{error,warn,info,debug}` — and never log a command
+  argument, a request header or a response body: `anilist_connect` takes the raw
+  token and `jellyfin_sign_in` takes a plaintext password. `logging::scrub`
+  replaces credentials with a labelled `<CREDENTIAL_…>` on write, and has a
+  catch-all so an unforeseen shape fails closed, but it is a backstop rather
+  than a licence.
 - **A missing i18n key renders as the key.** i18next does not throw and does not
   fall back, so `entry.scoreHint` appears on screen and nothing reports it.
   `src/lib/i18nKeys.test.ts` resolves every literal `t("…")` in the source; the

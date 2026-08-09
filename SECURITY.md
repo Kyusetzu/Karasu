@@ -44,6 +44,24 @@ execute arbitrary code via a malicious media title/filename/response, or a
 flaw in the update mechanism (Karasu verifies every downloaded update
 against its own signing key — a way to bypass that would be serious).
 
+## The log file
+
+Karasu keeps a log beside its database (`karasu.log`, in the same folder the
+portable-mode section above describes). It records errors, panics and lifecycle
+events; with **Verbose logging** on it also records what detection saw, which
+means titles and file paths.
+
+Credentials never reach it. Both tokens, the Jellyfin password and the sealed
+portable key are replaced with a labelled `<CREDENTIAL_…>` placeholder at the
+moment a line is written — not when it is read — so the file on disk is safe and
+no command can read one back out through it. Anything else secret-shaped that
+matches no specific rule is replaced too, so an unforeseen leak fails closed.
+
+It is local and stays local: nothing is uploaded, and there is nowhere to upload
+it to. **About → Copy diagnostics** and **Save report** redact your home
+directory by default, but with verbose logging on the log itself can name what
+you have been watching — worth a glance before attaching it to a public issue.
+
 ## Supported versions
 
 Karasu ships as a single rolling `latest` prerelease — there's no separate

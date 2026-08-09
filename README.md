@@ -249,11 +249,28 @@ AI-written and hand-written code alike (`typecheck`, `vitest`, `cargo test`, and
 a build smoke check per commit). The repository-level [`CLAUDE.md`](CLAUDE.md)
 documents the conventions and guardrails these tools follow.
 
+## Reporting a bug
+
+**[GitHub Issues](https://github.com/Kyusetzu/Karasu/issues) is the place** —
+that's where things get tracked, and it's the only channel where a report won't
+be lost. There are two forms: a
+[bug report](https://github.com/Kyusetzu/Karasu/issues/new?template=bug_report.yml)
+and a
+[feature request](https://github.com/Kyusetzu/Karasu/issues/new?template=feature_request.yml).
+
+Most of the bug form fills itself in. Open **About → Copy diagnostics** and
+paste into the first field: it carries the four-part version, your OS, whether
+you're portable, which detection sources are on, and — on Linux — your distro,
+desktop, and whether you're on Wayland or X11. Your data folder is redacted, and
+no token, password, server address or library path is included.
+
+For more detail, **Settings → Advanced → Log** shows what Karasu recorded while
+it was running, and **About → Save report** writes the whole thing to a file.
+Credentials are replaced with `<CREDENTIAL_…>` before anything is written.
+
 ## Contact
 
-Bug reports and pull requests belong on
-[GitHub Issues](https://github.com/Kyusetzu/Karasu/issues) — that's where they
-get tracked. For everything else:
+For setup help, questions and anything that isn't a confirmed bug:
 
 - Discord server: [**Kyu's Cozy Corner**](https://discord.gg/yeHNSGyM8F)
 - Discord: **Kyusetzu**

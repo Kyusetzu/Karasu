@@ -1,0 +1,125 @@
+name: Bug report
+description: Something in Karasu does not work the way it should.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. **Most of this form fills itself in:** open
+        Karasu → **About** → **Copy diagnostics**, then paste into the first
+        field. That covers the version, your OS, portable mode, which detection
+        sources are on and — on Linux — your distro, desktop and whether you are
+        on Wayland or X11.
+
+        If Karasu will not start at all, skip that field and fill in the rest by
+        hand; the "Anything else" box at the bottom is the place for it.
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: >-
+        From About → Copy diagnostics. The data folder is redacted for you; no
+        token, password, server address or library path is included.
+      render: markdown
+      placeholder: |
+        | | |
+        |---|---|
+        | Karasu | 0.69.0.231 |
+        | OS | windows |
+        …
+    validations:
+      required: false
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Only if you could not paste the diagnostics above. About shows it.
+      placeholder: "0.69.0.231"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: install
+    attributes:
+      label: How did you install it?
+      description: >-
+        This decides whether the in-app updater can work, and on Linux whether
+        autostart can.
+      options:
+        - Windows installer (Karasu_..._x64-setup.exe)
+        - Linux AppImage
+        - Built from source
+    validations:
+      required: true
+
+  - type: input
+    id: linux
+    attributes:
+      label: Linux — distro, desktop, and Wayland or X11
+      description: >-
+        Only if you are on Linux **and** could not paste the diagnostics. If
+        Karasu will not launch, please also give your `webkit2gtk` version —
+        the AppImage does not bundle it and needs 4.1.
+      placeholder: "Arch Linux, GNOME, wayland, webkit2gtk-4.1 2.46"
+    validations:
+      required: false
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What you expected, and what happened instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: >-
+        For a detection problem, the **exact** filename or page title matters —
+        the recognition pipeline is a release-name parser, so a parse bug cannot
+        be reproduced without the literal string. Settings → Detection shows
+        what Karasu currently sees.
+      placeholder: |
+        1. Play `[SubsPlease] Frieren - 05 (1080p) [A1B2C3D4].mkv` in mpv
+        2. Wait for the scrobble countdown
+        3. Nothing happens
+    validations:
+      required: false
+
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: >-
+        Settings → Advanced → Log, or About → Save report for the whole thing.
+        If the problem is hard to catch, turn on **Verbose logging** there,
+        reproduce it, then copy. Credentials are replaced with
+        `<CREDENTIAL_…>` before anything is written, but do read it over —
+        with verbose logging on it can contain titles and file paths.
+      render: text
+    validations:
+      required: false
+
+  - type: textarea
+    id: anything-else
+    attributes:
+      label: Anything else?
+      description: Screenshots, and anything that did not fit above.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before you post
+      options:
+        - label: >-
+            I am on the current `latest` release (Karasu publishes one rolling
+            build; About → Check for updates says).
+          required: false
+        - label: I searched the existing issues.
+          required: false

@@ -1,0 +1,66 @@
+name: Feature request
+description: Suggest something Karasu should do.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Karasu is a local desktop tracker for AniList, and it stays that way —
+        the acknowledgement at the bottom lists the few things that are settled
+        as out of scope, so an idea that depends on one of them can be reshaped
+        before it is written up rather than after.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What is the problem?
+      description: >-
+        What are you trying to do, and where does Karasu get in the way? The
+        problem is more useful than the solution — there is often a way to solve
+        it that fits the app better than the first idea.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What should it do instead?
+    validations:
+      required: false
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Anything you have tried, or considered?
+      description: Including other trackers that get this right.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Does this apply to a particular platform?
+      options:
+        - Both
+        - Windows
+        - Linux
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope
+      description: >-
+        These are long-standing decisions rather than a backlog. Karasu talks
+        directly to AniList from your machine and has no server behind it, which
+        is what rules most of them out.
+      options:
+        - label: >-
+            This does not need a hosted backend, an account with me, or settings
+            that sync through a server.
+          required: true
+        - label: >-
+            This is not purchase or cost tracking for a manga collection, and not
+            a browsable history of everything I have watched.
+          required: true

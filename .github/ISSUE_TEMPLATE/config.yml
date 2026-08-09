@@ -1,11 +1,15 @@
-# Issues are the place for bugs and feature requests. These links catch the
-# things that aren't either, so they don't end up filed as issues.
-blank_issues_enabled: true
+# GitHub Issues is where bugs and feature requests go — that is where they get
+# tracked, and the two forms above collect what is actually needed to act on
+# one. Blank issues are off so a report cannot arrive without them.
+#
+# These links are for the things that are neither, so they do not end up filed
+# as issues.
+blank_issues_enabled: false
 contact_links:
   - name: Questions, help and general chat
     url: https://discord.gg/yeHNSGyM8F
-    about: Join Kyu's Cozy Corner on Discord — best for setup help, detection
-      quirks and anything that isn't a confirmed bug.
+    about: Join Kyu's Cozy Corner on Discord — for setup help and questions.
+      Found an actual bug? Please open an issue instead, so it gets tracked.
   - name: Report a security vulnerability
     url: https://github.com/Kyusetzu/Karasu/blob/main/SECURITY.md
     about: Please report security issues privately by email rather than opening

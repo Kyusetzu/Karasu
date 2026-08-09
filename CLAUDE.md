@@ -242,6 +242,18 @@ a regression here is invisible until it ships.
   replaces credentials with a labelled `<CREDENTIAL_…>` on write, and has a
   catch-all so an unforeseen shape fails closed, but it is a backstop rather
   than a licence.
+- **Run the dev app isolated, or it edits the real install's data.** Debug and
+  release share the identifier, so they share `%APPDATA%\dev.kyu.karasu` *and*
+  the `dev.kyu.karasu-sim` single-instance mutex: starting `tauri dev` while the
+  installed build runs makes the dev process hand over its argv and `exit(0)`,
+  and without isolation it would otherwise open the real `karasu.db`, append to
+  and rotate the real `karasu.log`, and read the real tokens. Drop a
+  `karasu.portable` marker beside `src-tauri/target/debug/karasu.exe` and
+  `portable::data_dir` sends all three to `target/debug/data/` instead. The
+  marker is inside the ignored `target/`, so it is invisible in git and
+  `cargo clean` deletes it — recreate it before trusting a dev run. A debug
+  build also starts hidden in the tray (`hide_window_in_dev`); relaunching the
+  exe shows the running one through the single-instance callback.
 - **A missing i18n key renders as the key.** i18next does not throw and does not
   fall back, so `entry.scoreHint` appears on screen and nothing reports it.
   `src/lib/i18nKeys.test.ts` resolves every literal `t("…")` in the source; the

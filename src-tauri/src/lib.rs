@@ -30,6 +30,37 @@ fn show_main_window(app: &AppHandle) {
 /// StatusNotifier host there is nothing left to click to bring it back.
 pub struct TrayPresent(pub bool);
 
+/// A debug build starts in the tray instead of in front of you.
+///
+/// `cargo tauri dev` is usually run while something else is being read or
+/// written, and a window that takes focus every time the Rust side rebuilds is
+/// the single most disruptive thing about the loop. The app is still fully
+/// running — detection, scrobbling, the lot — and one click on the tray icon
+/// brings it up.
+///
+/// Gated on `tray_present` because of the invariant on `TrayPresent` above: with
+/// no tray there is nothing left to click, and a hidden window with no way back
+/// is worse than a window that stole focus.
+///
+/// Written as a cfg'd **pair of functions** rather than a `#[cfg]` on the call.
+/// A cfg'd statement is stripped before type-checking, so the release build
+/// would never compile the debug arm and the first anyone would hear of a
+/// mistake in it is a broken dev loop.
+#[cfg(debug_assertions)]
+fn hide_window_in_dev(app: &tauri::App, tray_present: bool) {
+    use tauri::Manager as _;
+    if !tray_present {
+        return;
+    }
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.hide();
+        logging::info("startup", "debug build: started in the tray");
+    }
+}
+
+#[cfg(not(debug_assertions))]
+fn hide_window_in_dev(_app: &tauri::App, _tray_present: bool) {}
+
 /// Builds the tray, or reports why it could not be built.
 ///
 /// Split out of `setup` so the whole thing can be wrapped in `catch_unwind` —
@@ -168,6 +199,8 @@ pub fn run() {
                 }
             };
             app.manage(TrayPresent(built));
+            // Debug builds only, and only with a tray to come back from.
+            hide_window_in_dev(app, built);
 
             Ok(())
         })

@@ -39,7 +39,13 @@ export function ScoreColumns({
       {/* `flex-1` so the columns take whatever height the grid row gives this
           card. A bar drawn in percentages is the one chart here that *can*
           grow, so it absorbs the slack instead of leaving a hole under it. */}
-      <div className="mt-4 flex flex-1 items-end gap-1.75">
+      {/* `items-stretch`, not `items-end`: bottom-aligning the columns leaves
+          them content-sized, so the plot area below could never grow past its
+          own min-height and the card's extra row height pooled above the bars.
+          Stretching is only safe because every column now has the same fixed
+          label slots top and bottom — otherwise it would be the thing that
+          broke the shared baseline. */}
+      <div className="mt-4 flex flex-1 items-stretch gap-1.75">
         {steps.map((step) => {
           const count = by.get(step) ?? 0;
           return (
@@ -51,10 +57,18 @@ export function ScoreColumns({
               <span className="h-3 text-2xs leading-3 tabular-nums text-ink-600">
                 {count || ""}
               </span>
-              <div className="flex min-h-32 w-full flex-1 items-end">
+              {/* The bar is out of flow on purpose. This box gets its height
+                  from `flex-1`, so its `height` property is still `auto` — and
+                  a percentage height resolves against the *computed* height,
+                  not the used one. As an in-flow child the bar therefore
+                  computed to `auto`, which for an empty div is 0px, and the
+                  whole chart vanished. Out of flow the percentage resolves
+                  against the containing block's used height, which is definite
+                  once flex layout has run. */}
+              <div className="relative min-h-32 w-full flex-1">
                 <div
                   className={cn(
-                    "w-full rounded-t-[.1875rem]",
+                    "absolute inset-x-0 bottom-0 rounded-t-[.1875rem]",
                     step >= high ? "bg-accent-500" : "bg-surface-700",
                   )}
                   // A count of zero still draws a hairline, so the gap reads as
@@ -159,7 +173,8 @@ export function YearSparkline({
   return (
     <Card className="flex h-full flex-col">
       <CardTitle>{title}</CardTitle>
-      <div className="mt-4 flex flex-1 items-end gap-1">
+      {/* Stretched for the same reason as the score columns — see there. */}
+      <div className="mt-4 flex flex-1 items-stretch gap-1">
         {data.map((d, i) => (
           <div key={d.year} className="flex min-w-0 flex-1 flex-col items-center gap-1">
             {/* Both label slots keep their height when they hold nothing.
@@ -172,11 +187,14 @@ export function YearSparkline({
             <span className="h-3 text-[.5625rem] leading-3 tabular-nums text-ink-500">
               {d.count || ""}
             </span>
-            <div className="flex min-h-24 w-full flex-1 items-end">
+            {/* Out of flow for the same reason as the score columns: this box
+                is sized by `flex-1`, so an in-flow percentage height has no
+                definite containing block to resolve against and collapses. */}
+            <div className="relative min-h-24 w-full flex-1">
               <div
                 title={`${d.year}: ${d.count}`}
                 className={cn(
-                  "w-full rounded-t-[.125rem]",
+                  "absolute inset-x-0 bottom-0 rounded-t-[.125rem]",
                   i >= recent ? "bg-accent-500" : "bg-surface-700",
                 )}
                 style={{ height: `${Math.max((d.count / max) * 100, 2)}%` }}

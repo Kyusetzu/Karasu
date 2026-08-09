@@ -3,16 +3,52 @@ import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
 import { CheckCheck, Pencil, Play, Plus } from "lucide-react";
 import { useLibrary } from "@/stores/library";
-import { maxProgress, type MediaListEntry } from "@/api/types";
+import {
+  maxProgress,
+  STATUS_ORDER,
+  type MediaListEntry,
+  type MediaListStatus,
+} from "@/api/types";
 import { IconButton } from "@/components/ui/icon-button";
 import { TitleLockup } from "@/components/media/TitleLockup";
+import { countdown, formatLabel, fuzzyDate, mediaStatusLabel } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { SelectBox } from "./SelectBox";
 import { TagChips } from "./TagChips";
+import { ScoreSelect } from "./ScoreSelect";
 import { canIncrement, PROGRESS_DROPDOWN_LIMIT } from "./shared";
-/** Memoized for the same reason as GridCard — see the note there. */
+import { shows, templateColumns, type Tier } from "./columns";
+
+/** What one row can change without opening the editor. */
+export type RowPatch = {
+  progress?: number;
+  progressVolumes?: number;
+  score?: number;
+  status?: MediaListStatus;
+  repeat?: number;
+};
+
+const CELL =
+  "h-8 rounded-md border border-surface-800 bg-surface-900 px-2 text-xs tabular-nums text-ink-300 transition-surface focus:border-accent-500 focus:outline-none";
+
+/**
+ * One entry, with everything already known about it.
+ *
+ * This is the detail-and-edit view of a list, so it draws on the fields the
+ * payload has always carried and nothing rendered: format, airing status, season,
+ * community score, volumes, repeats, the next-episode countdown and the start and
+ * finish dates. None of it costs a request.
+ *
+ * The columns come from `columns.ts` rather than `w-*` classes here. Every row is
+ * its own grid container (`VirtualGrid` slices rows), so `subgrid` is unavailable
+ * and only identical fixed tracks line up down the page — and a fixed track that
+ * nobody sized against its worst case is what clipped every double-digit score.
+ *
+ * Memoized for the same reason as GridCard — see the note there.
+ */
 export const ListRow = memo(function ListRow({
   entry,
+  tier,
   onQuickSave,
   onComplete,
   onEdit,
@@ -22,10 +58,8 @@ export const ListRow = memo(function ListRow({
   onToggleSelect,
 }: {
   entry: MediaListEntry;
-  onQuickSave: (
-    entry: MediaListEntry,
-    patch: { progress?: number; score?: number },
-  ) => void;
+  tier: Tier;
+  onQuickSave: (entry: MediaListEntry, patch: RowPatch) => void;
   onComplete: (entry: MediaListEntry) => void;
   onEdit: (entry: MediaListEntry) => void;
   selectMode: boolean;
@@ -33,8 +67,9 @@ export const ListRow = memo(function ListRow({
   focused: boolean;
   onToggleSelect: (mediaId: number) => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { media } = entry;
+  const manga = media.type === "MANGA";
   const max = maxProgress(media);
   const dropdown = max !== null && max <= PROGRESS_DROPDOWN_LIMIT;
   // Subscribe to the *data*, not to `hasNext`. The selector used to return the
@@ -54,97 +89,240 @@ export const ListRow = memo(function ListRow({
   // keyboard and fast-click fallbacks.
   const [progressOpened, setProgressOpened] = useState(false);
   const openProgress = () => setProgressOpened(true);
+  const [volumesOpened, setVolumesOpened] = useState(false);
+
+  /**
+   * Everything the current tier does not give a column to, plus the descriptive
+   * fields that were never editable anyway. Prose, so it wraps and truncates
+   * instead of overflowing — which is what lets a narrow window drop columns
+   * without losing the information in them.
+   */
+  const secondary = [
+    media.format ? formatLabel(media.format, t) : null,
+    media.seasonYear
+      ? media.season
+        ? `${t(`season.${media.season}`, { defaultValue: media.season })} ${media.seasonYear}`
+        : String(media.seasonYear)
+      : null,
+    !shows(tier, "status") ? mediaStatusLabel(media.status, t) : null,
+    media.averageScore ? t("list.community", { n: media.averageScore }) : null,
+    manga && !shows(tier, "volumes") && entry.progressVolumes
+      ? t("common.progressVolumes", {
+          n: entry.progressVolumes,
+          total: media.volumes ?? "?",
+        })
+      : null,
+    !shows(tier, "repeat") && entry.repeat
+      ? t("list.repeatShort", { n: entry.repeat })
+      : null,
+    !shows(tier, "dates") && entry.startedAt?.year
+      ? fuzzyDate(entry.startedAt, i18n.language)
+      : null,
+    media.nextAiringEpisode
+      ? t("list.nextEpisode", {
+          n: media.nextAiringEpisode.episode,
+          when: countdown(
+            media.nextAiringEpisode.airingAt - Math.floor(Date.now() / 1000),
+            t,
+          ),
+        })
+      : null,
+    entry.private ? t("list.private") : null,
+  ].filter(Boolean);
+
+  // In select mode the row *is* the checkbox. Navigating away mid-selection is
+  // never what the click meant — the same substitution GridCard makes with its
+  // cover, which the list never had, so clicking a row used to leave the page.
+  const rowClick = selectMode
+    ? () => onToggleSelect(entry.mediaId)
+    : undefined;
 
   return (
     <div
       data-media-id={media.id}
       data-media-type={media.type}
+      onClick={rowClick}
       className={cn(
-        "flex items-center gap-3.5 border-b border-surface-950 px-3.5 py-2 transition-surface",
+        "grid items-center gap-x-2.5 border-b border-surface-950 px-3.5 py-2 transition-surface",
         selected ? "bg-accent-600/10" : "bg-surface-900 hover:bg-surface-850",
         focused && "outline-2 -outline-offset-2 outline-accent-500",
+        selectMode && "cursor-pointer",
       )}
+      style={{ gridTemplateColumns: templateColumns({ tier, selectMode, manga }) }}
     >
-      {selectMode && (
-        <SelectBox
-          checked={selected}
-          onToggle={() => onToggleSelect(entry.mediaId)}
-        />
-      )}
-      <Link to={`/media/${media.id}`} className="shrink-0">
+      {/* A zero-width track when not selecting, so no column shifts sideways on
+          entering select mode. */}
+      <div className="overflow-hidden">
+        {selectMode && (
+          <SelectBox
+            checked={selected}
+            onToggle={() => onToggleSelect(entry.mediaId)}
+          />
+        )}
+      </div>
+
+      {/* The cover carries the hero transition into the detail page, which the
+          old hand-rolled `<img>` did not. */}
+      <Link
+        to={`/media/${media.id}`}
+        className="block"
+        onClick={(e) => selectMode && e.preventDefault()}
+        tabIndex={selectMode ? -1 : undefined}
+      >
         <img
           src={media.coverImage.large ?? ""}
           alt=""
           loading="lazy"
-          className="h-13.5 w-9.5 rounded-[.3125rem] object-cover"
+          className="aspect-[2/3] w-full rounded-md bg-surface-800 object-cover"
         />
       </Link>
-      <Link to={`/media/${media.id}`} className="min-w-0 flex-1">
+
+      <Link
+        to={`/media/${media.id}`}
+        className="min-w-0"
+        onClick={(e) => selectMode && e.preventDefault()}
+        tabIndex={selectMode ? -1 : undefined}
+      >
         <TitleLockup title={media.title} />
+        {secondary.length > 0 && (
+          <p className="mt-0.5 truncate text-2xs text-ink-600">
+            {secondary.join(" · ")}
+          </p>
+        )}
       </Link>
 
-      {selectMode ? null : (
-        <>
-      {/* Fixed-width from here on, so the columns line up down the list even
-          though every title above them is a different length. */}
-      <TagChips notes={entry.notes} max={4} className="w-32 justify-end" />
-
-      {/* Quick score */}
-      <select
-        value={entry.score}
-        onChange={(e) => onQuickSave(entry, { score: Number(e.target.value) })}
-        className="h-8 w-13 rounded-md border border-surface-800 bg-surface-900 px-1.5 text-xs text-gold transition-surface focus:border-accent-500 focus:outline-none"
-        aria-label={t("common.score")}
-        title={t("common.score")}
-      >
-        <option value={0}>–</option>
-        {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
-          <option key={n} value={n}>
-            ★ {n}
-          </option>
-        ))}
-      </select>
-
-      {/* Quick progress */}
-      {dropdown ? (
-        <select
-          value={entry.progress}
-          onChange={(e) =>
-            onQuickSave(entry, { progress: Number(e.target.value) })
-          }
-          onPointerEnter={openProgress}
-          onFocus={openProgress}
-          onMouseDown={openProgress}
-          className="h-8 w-18 rounded-md border border-surface-800 bg-surface-900 px-1.5 text-xs tabular-nums text-ink-300 transition-surface focus:border-accent-500 focus:outline-none"
-          aria-label={t("common.progress")}
-          title={t("common.progress")}
-        >
-          {progressOpened ? (
-            Array.from({ length: max + 1 }, (_, n) => (
-              <option key={n} value={n}>
-                {n} / {max}
+      {/* Status — the most-changed field, so a control rather than a label
+          wherever there is room for one. */}
+      <div className="overflow-hidden">
+        {shows(tier, "status") && (
+          <select
+            value={entry.status}
+            onChange={(e) =>
+              onQuickSave(entry, { status: e.target.value as MediaListStatus })
+            }
+            onClick={(e) => e.stopPropagation()}
+            className={cn(CELL, "w-full")}
+            aria-label={t("common.status")}
+            title={t("common.status")}
+          >
+            {STATUS_ORDER.map((s) => (
+              <option key={s} value={s}>
+                {t(`status.${media.type}.${s}`)}
               </option>
-            ))
-          ) : (
-            <option value={entry.progress}>
-              {entry.progress} / {max}
-            </option>
-          )}
-        </select>
-      ) : (
-        // Keyed on the number so `tick` replays when it changes. The token was
-        // written for exactly this — "the progress counter acknowledging a
-        // +1" — and had no consumer; incrementing simply substituted a digit.
-        <span
-          key={entry.progress}
-          className="w-18 animate-tick pr-1.5 text-right text-xs tabular-nums text-ink-300"
-        >
-          {entry.progress}
-          {max ? ` / ${max}` : ""}
-        </span>
-      )}
+            ))}
+          </select>
+        )}
+      </div>
 
-      <div className="flex gap-1">
+      <ScoreSelect
+        value={entry.score}
+        onChange={(score) => onQuickSave(entry, { score })}
+        className="w-full"
+      />
+
+      <div onClick={(e) => e.stopPropagation()}>
+        {dropdown ? (
+          <select
+            value={entry.progress}
+            onChange={(e) =>
+              onQuickSave(entry, { progress: Number(e.target.value) })
+            }
+            onPointerEnter={openProgress}
+            onFocus={openProgress}
+            onMouseDown={openProgress}
+            className={cn(CELL, "w-full")}
+            aria-label={t("common.progress")}
+            title={t("common.progress")}
+          >
+            {progressOpened ? (
+              Array.from({ length: max + 1 }, (_, n) => (
+                <option key={n} value={n}>
+                  {n} / {max}
+                </option>
+              ))
+            ) : (
+              <option value={entry.progress}>
+                {entry.progress} / {max}
+              </option>
+            )}
+          </select>
+        ) : (
+          // Keyed on the number so `tick` replays when it changes. The token was
+          // written for exactly this — "the progress counter acknowledging a
+          // +1" — and had no consumer; incrementing simply substituted a digit.
+          <span
+            key={entry.progress}
+            className="block animate-tick pr-1.5 text-right text-xs tabular-nums text-ink-300"
+          >
+            {entry.progress}
+            {max ? ` / ${max}` : ""}
+          </span>
+        )}
+      </div>
+
+      {/* Volumes: manga's second axis, which the grid has always shown and the
+          list never did. Never sent for anime — AniList would accept it and
+          store a volume count on a TV series. */}
+      <div className="overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        {shows(tier, "volumes") && manga && (
+          <select
+            value={entry.progressVolumes ?? 0}
+            onChange={(e) =>
+              onQuickSave(entry, { progressVolumes: Number(e.target.value) })
+            }
+            onPointerEnter={() => setVolumesOpened(true)}
+            onFocus={() => setVolumesOpened(true)}
+            className={cn(CELL, "w-full")}
+            aria-label={t("common.volumes")}
+            title={t("common.volumes")}
+          >
+            {volumesOpened ? (
+              Array.from({ length: (media.volumes ?? 50) + 1 }, (_, n) => (
+                <option key={n} value={n}>
+                  {n} / {media.volumes ?? "?"}
+                </option>
+              ))
+            ) : (
+              <option value={entry.progressVolumes ?? 0}>
+                {entry.progressVolumes ?? 0} / {media.volumes ?? "?"}
+              </option>
+            )}
+          </select>
+        )}
+      </div>
+
+      <div className="overflow-hidden">
+        {shows(tier, "repeat") && (
+          <span
+            className="block text-right text-xs tabular-nums text-ink-600"
+            title={t(manga ? "entry.rereads" : "entry.rewatches")}
+          >
+            {entry.repeat ? `×${entry.repeat}` : ""}
+          </span>
+        )}
+      </div>
+
+      <div className="overflow-hidden">
+        {shows(tier, "dates") && (
+          <div className="text-2xs leading-tight tabular-nums text-ink-600">
+            <p className="truncate">{fuzzyDate(entry.startedAt, i18n.language)}</p>
+            <p className="truncate">
+              {fuzzyDate(entry.completedAt, i18n.language)}
+            </p>
+          </div>
+        )}
+      </div>
+
+      <div className="overflow-hidden">
+        {shows(tier, "tags") && (
+          <TagChips notes={entry.notes} max={3} className="justify-end" />
+        )}
+      </div>
+
+      <div
+        className="flex justify-end gap-1"
+        onClick={(e) => e.stopPropagation()}
+      >
         {canPlayNext && (
           <IconButton
             variant="ghost"
@@ -188,8 +366,6 @@ export const ListRow = memo(function ListRow({
           <Pencil className="size-3.5" />
         </IconButton>
       </div>
-        </>
-      )}
     </div>
   );
 });

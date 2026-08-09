@@ -53,7 +53,10 @@ import { cn } from "@/lib/utils";
 import { Presence, PresenceIf } from "@/components/ui/presence";
 import { VirtualGrid } from "@/components/list/VirtualGrid";
 import { GridCard } from "@/components/list/GridCard";
-import { ListRow } from "@/components/list/ListRow";
+import { ListRow, type RowPatch } from "@/components/list/ListRow";
+import { ListHeader } from "@/components/list/ListHeader";
+import { ROW_HEIGHT_PX } from "@/components/list/columns";
+import { useRowTier } from "@/hooks/useRowTier";
 import { BulkBar } from "@/components/list/BulkBar";
 import { canIncrement } from "@/components/list/shared";
 
@@ -108,6 +111,10 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
   const [columns, setColumns] = useState(1);
   const [removing, setRemoving] = useState<MediaListEntry | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  // Which list columns fit. Measured off the scroll container rather than a
+  // viewport breakpoint — a fixed grid track overflows instead of shrinking, so
+  // the set has to change with the space a row really has.
+  const tier = useRowTier(scrollRef, type === "MANGA");
   const navigate = useNavigate();
 
   // Clear the selection whenever the pool it refers to changes.
@@ -253,7 +260,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
   const quickSave = useCallback(
     (
       entry: MediaListEntry,
-      patch: Partial<{ progress: number; score: number; status: MediaListStatus }>,
+      patch: RowPatch,
     ) => saveMutate({ mediaId: entry.mediaId, ...patch }),
     [saveMutate],
   );
@@ -634,18 +641,23 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
           />
         ) : (
           <div className="overflow-hidden rounded-xl border border-surface-800">
+            <ListHeader tier={tier} selectMode={selectMode} mediaType={type} />
+            {/* One entry per row. `2xl:grid-cols-2` used to put two side by side
+                past 96rem, which is not a list — and it also made
+                `useColumnCount` report 2, so the down arrow moved by two. */}
             <VirtualGrid
               items={entries}
               scrollRef={scrollRef}
-              gridClassName="grid 2xl:grid-cols-2"
+              gridClassName="grid"
               rowGap={0}
-              estimateRowHeight={78}
+              estimateRowHeight={ROW_HEIGHT_PX}
               focusIndex={focus}
               onColumns={setColumns}
               renderItem={(entry, i) => (
                 <ListRow
                   key={entry.id}
                   entry={entry}
+                  tier={tier}
                   focused={i === focus}
                   onQuickSave={quickSave}
                   onComplete={complete}

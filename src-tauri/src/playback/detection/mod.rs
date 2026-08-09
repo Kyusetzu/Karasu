@@ -189,19 +189,31 @@ pub async fn detect_playback(
 ) -> Option<Playback> {
     if let Some(cfg) = jellyfin {
         if let Some(p) = jellyfin::detect(&cfg).await {
+            crate::logging::debug_changed("detect", "source", format!("jellyfin: {:?}", p.media_title));
             return Some(p);
         }
     }
     // Blocking Win32/WinRT and D-Bus work; keep it off the runtime's worker
     // thread.
     tokio::task::spawn_blocking(move || {
-        detect_windows().or_else(|| {
-            if media_detection {
-                media_session::detect()
-            } else {
-                None
-            }
-        })
+        // Which rung won, said at each rung rather than once afterwards:
+        // `Playback` carries no source field, so a single line after the fact
+        // could not tell a window title from a media session — and the
+        // precedence documented above is the most confusing part of the
+        // pipeline. `or_else` also collapses the branch, so there is no later
+        // point that still knows.
+        if let Some(p) = detect_windows() {
+            crate::logging::debug_changed("detect", "source", format!("window title: {:?}", p.media_title));
+            return Some(p);
+        }
+        if !media_detection {
+            return None;
+        }
+        let found = media_session::detect();
+        if let Some(p) = &found {
+            crate::logging::debug_changed("detect", "source", format!("media session: {:?}", p.media_title));
+        }
+        found
     })
     .await
     .unwrap_or(None)

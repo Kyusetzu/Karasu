@@ -253,6 +253,28 @@ fn build_now_playing(
     let candidates = candidates_from_cache(db, media_type);
     let matched = matcher::best_match(&parsed, &candidates);
 
+    // The verdict, while the score still exists. The `.map()` below rewrites
+    // `matched` into `(id, episode)` and the score is gone for good — so this is
+    // the only point where "matched the wrong show" can be told apart from
+    // "matched nothing", which is the top detection question. Logged here rather
+    // than inside the matcher on purpose: `best_match` is also the library
+    // scanner's and `identify.rs`'s, and a line in there fires once per scanned
+    // file — thousands per scan, enough to rotate this story off disk.
+    crate::logging::debug(
+        "recognize",
+        match &matched {
+            Some(m) => format!(
+                "{:?} → {:?} ep {:?} matched #{} score {:.2} of {} candidates",
+                playback.media_title, parsed.title, parsed.episode, m.media_id,
+                m.score, candidates.len()
+            ),
+            None => format!(
+                "{:?} → {:?} ep {:?} matched nothing among {} candidates",
+                playback.media_title, parsed.title, parsed.episode, candidates.len()
+            ),
+        },
+    );
+
     // Episode redirect (anime-relations): e.g. combined release "Ep 25"
     // → season 2, episode 1 of a different AniList entry. Anime only.
     let matched = matched.map(|m| {
@@ -260,6 +282,16 @@ fn build_now_playing(
             if let Some(ep) = parsed.episode {
                 if let Some((new_id, new_ep)) = relations::redirect(rules, m.media_id, ep)
                 {
+                    // Invisible today, and it reads as a matcher bug: a combined
+                    // release's "Ep 25" quietly becomes season 2 episode 1 of a
+                    // different AniList entry.
+                    crate::logging::debug(
+                        "relations",
+                        format!(
+                            "redirect #{} ep {ep} → #{new_id} ep {new_ep}",
+                            m.media_id
+                        ),
+                    );
                     return (new_id, Some(new_ep));
                 }
             }
@@ -446,6 +478,13 @@ pub fn spawn(app: AppHandle) {
                 .map(|p| (p.process.clone(), p.media_title.clone()));
 
             if raw != last_raw {
+                // What detection saw. Per *change*, never per tick: the poll runs
+                // every 5s, so a line here would be 17,280 a day and would rotate
+                // everything else off a 1 MB file.
+                crate::logging::debug(
+                    "detect",
+                    format!("playback changed: {last_raw:?} → {raw:?}"),
+                );
                 last_raw = raw;
                 let now = {
                     let db = app.state::<Db>();
@@ -513,6 +552,16 @@ async fn drive_session(app: &AppHandle) {
                         update_at_epoch_ms: auto.then(|| epoch_ms_in(threshold)),
                         phase,
                     };
+                    // The two `Blocked` reasons are the most-asked "why didn't it
+                    // scrobble", and until now they existed only as a transient
+                    // event to the WebView — nothing reached disk.
+                    crate::logging::debug(
+                        "scrobble",
+                        format!(
+                            "session #{mid} ep {ep} (progress {progress}) → {:?}, auto {}",
+                            session.phase, auto
+                        ),
+                    );
                     emit_session(app, Some(&session));
                     *guard = Some(session);
                     None
@@ -527,10 +576,24 @@ async fn drive_session(app: &AppHandle) {
                         None
                     } else if settings.confirm {
                         session.phase = Phase::Pending;
+                        crate::logging::debug(
+                            "scrobble",
+                            format!(
+                                "#{} ep {} due, waiting for confirmation",
+                                session.media_id, session.episode
+                            ),
+                        );
                         emit_session(app, Some(session));
                         None
                     } else {
                         session.phase = Phase::Updating;
+                        crate::logging::debug(
+                            "scrobble",
+                            format!(
+                                "#{} ep {} due, updating",
+                                session.media_id, session.episode
+                            ),
+                        );
                         emit_session(app, Some(session));
                         Some((
                             session.media_id,

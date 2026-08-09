@@ -222,6 +222,11 @@ pub fn playback_from(session: &MediaSession) -> Option<Playback> {
     // which is better parser input than any composition of artist and title,
     // and is the same shape the Windows window-title path produces for mpv.
     if let Some(name) = local_file_name(&session.url) {
+        crate::logging::debug_changed(
+            "session",
+            "chosen",
+            format!("{}: local file {:?}", session.app_id, name),
+        );
         return Some(Playback {
             process: short_app_name(&session.app_id),
             media_title: name,
@@ -233,8 +238,20 @@ pub fn playback_from(session: &MediaSession) -> Option<Playback> {
 
     let media_title = compose_title(&session.artist, &session.title, &session.album);
     if media_title.trim().is_empty() {
+        // A `None` that looks exactly like "nothing is playing" from the outside,
+        // which is why it is worth a line: the session existed and was rejected.
+        crate::logging::debug_changed(
+            "session",
+            "skipped",
+            format!("{}: no usable title, skipped", session.app_id),
+        );
         return None;
     }
+    crate::logging::debug_changed(
+        "session",
+        "chosen",
+        format!("{}: composed {:?}", session.app_id, media_title),
+    );
     Some(Playback {
         process: short_app_name(&session.app_id),
         media_title,
@@ -259,6 +276,27 @@ pub fn playback_from(session: &MediaSession) -> Option<Playback> {
 /// between scrobbling the episode and never seeing it.
 pub fn detect() -> Option<Playback> {
     let sessions = sessions();
+    // What the desktop actually publishes. This is the same data the Settings
+    // diagnostic shows, and for the same reason: there is otherwise no way to
+    // tell "Karasu ignored it" from "the player never told the system". On
+    // disk it also survives the moment, which the live diagnostic does not.
+    // `debug_changed`, not `debug`: this runs on every five-second poll.
+    crate::logging::debug_changed(
+        "session",
+        "sessions",
+        format!(
+            "{} session(s): [{}]",
+            sessions.len(),
+            sessions
+                .iter()
+                .map(|s| format!(
+                    "{} {}/{}",
+                    s.app_id, s.playback_type, s.status
+                ))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+    );
     let found = watchable(&sessions).find_map(playback_from);
     found
 }

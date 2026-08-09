@@ -327,6 +327,52 @@ pub fn debug(target: &str, message: impl AsRef<str>) {
     log(Level::Debug, target, message);
 }
 
+fn last_seen() -> &'static Mutex<std::collections::HashMap<&'static str, String>> {
+    static LAST: OnceLock<Mutex<std::collections::HashMap<&'static str, String>>> =
+        OnceLock::new();
+    LAST.get_or_init(|| Mutex::new(std::collections::HashMap::new()))
+}
+
+/// `debug`, but only when the line for `key` differs from the last one.
+///
+/// The detection pass runs every `POLL_INTERVAL` — five seconds, so 17,280 times
+/// a day. A plain `debug` anywhere inside it would fill the 1 MB file within
+/// hours and rotate away the handful of lines that actually explain a bug, which
+/// defeats the point of having it. Nearly everything worth recording from a poll
+/// loop is worth recording only when it *changes*.
+///
+/// `key` is a `&'static str` rather than the message so that "the same fact, a
+/// different value" replaces the previous entry instead of accumulating one per
+/// distinct string — an unbounded map keyed on messages would be its own leak.
+pub fn debug_changed(target: &str, key: &'static str, message: impl AsRef<str>) {
+    // Before the map and before the message is even borrowed: with the toggle
+    // off this must be as close to free as a function call gets.
+    if !debug_enabled() {
+        return;
+    }
+    let message = message.as_ref();
+    if !differs_from_last(key, message) {
+        return;
+    }
+    log(Level::Debug, target, message);
+}
+
+/// Whether `message` differs from the last one recorded under `key`, recording
+/// it either way.
+///
+/// Split out so the dedupe can be tested on its own. Going through
+/// `debug_changed` would mean depending on the process-global `DEBUG_ON` and on
+/// the shared ring, both of which other tests in this module mutate in
+/// parallel — a test that passes alone and fails in a suite is worse than none.
+fn differs_from_last(key: &'static str, message: &str) -> bool {
+    let mut seen = guard(last_seen());
+    if seen.get(key).is_some_and(|previous| previous == message) {
+        return false;
+    }
+    seen.insert(key, message.to_string());
+    true
+}
+
 /// The newest `limit` entries, newest first — the order the viewer shows them,
 /// matching `notif_all`.
 pub fn entries(limit: usize) -> Vec<LogEntry> {
@@ -544,6 +590,57 @@ mod tests {
         debug("test", "should appear");
         assert!(entries(RING_CAPACITY).len() > before);
         set_debug(false);
+    }
+
+    /// The mechanism that keeps a five-second poll loop from rotating the
+    /// interesting lines off disk. Without the dedupe the detection pass alone
+    /// would write 17,280 lines a day into a 1 MB file.
+    #[test]
+    fn a_repeated_line_is_recorded_once() {
+        // A key unique to this test, since the map is process-global.
+        const KEY: &str = "dedupe-repeat";
+
+        assert!(differs_from_last(KEY, "the same thing"), "first is new");
+        for _ in 0..50 {
+            assert!(
+                !differs_from_last(KEY, "the same thing"),
+                "a repeat was treated as a change"
+            );
+        }
+    }
+
+    /// "Differs from last", not "never seen" — a value flapping between two
+    /// states has to stay visible, or an intermittent bug becomes one line.
+    #[test]
+    fn a_value_returning_to_a_previous_one_is_still_a_change() {
+        const KEY: &str = "dedupe-flap";
+        assert!(differs_from_last(KEY, "a"));
+        assert!(differs_from_last(KEY, "b"));
+        assert!(differs_from_last(KEY, "a"));
+        assert!(!differs_from_last(KEY, "a"));
+    }
+
+    /// Keyed on the fact, not the message, so a changing value replaces its
+    /// predecessor instead of adding an entry per distinct string — an
+    /// unbounded map keyed on messages would be its own slow leak.
+    #[test]
+    fn each_key_holds_one_entry_however_many_values_it_sees() {
+        const KEY: &str = "dedupe-bound";
+        for i in 0..200 {
+            differs_from_last(KEY, &format!("value {i}"));
+        }
+        let seen = guard(last_seen());
+        assert_eq!(seen.keys().filter(|k| **k == KEY).count(), 1);
+    }
+
+    /// Costs nothing with the toggle off — not even the map lookup.
+    #[test]
+    fn debug_changed_records_nothing_while_disabled() {
+        const KEY: &str = "dedupe-off";
+        set_debug(false);
+        debug_changed("dedupetest", KEY, "anything");
+        // The map was never touched, so the value is still "new".
+        assert!(differs_from_last(KEY, "anything"));
     }
 
     #[test]

@@ -16,6 +16,20 @@ export default defineConfig(async () => ({
     },
   },
 
+  build: {
+    // Karasu only ever runs in two engines, and neither is "whatever browser
+    // matrix esbuild assumes by default" — so without this it emits downlevel
+    // transforms and polyfills for engines that cannot run the app at all.
+    //
+    // The split is Tauri's own recommendation and it is not symmetric on
+    // purpose: Windows is WebView2, i.e. evergreen Chromium, while Linux is
+    // webkit2gtk-4.1, which lags well behind it. Targeting Chromium on both
+    // would ship syntax WebKitGTK cannot parse, so Linux gets the conservative
+    // Safari target and the platform decides.
+    // @ts-expect-error process is a nodejs global
+    target: process.env.TAURI_ENV_PLATFORM === "windows" ? "chrome105" : "safari13",
+  },
+
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
   // 1. prevent Vite from obscuring rust errors

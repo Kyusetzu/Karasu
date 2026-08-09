@@ -6,7 +6,7 @@ import App from "./App";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { reportError } from "@/api/diagnostics";
 import { useTheme } from "@/stores/theme";
-import "@/i18n";
+import { initLanguage } from "@/i18n";
 // The @font-face rules live in index.css — see the note there for why the
 // @fontsource stylesheets are not imported directly.
 import "./index.css";
@@ -36,6 +36,10 @@ window.addEventListener("error", (e) => {
 window.addEventListener("unhandledrejection", (e) => {
   reportError(e.reason);
 });
+
+// Awaited so a German start does not paint English first. English resolves in a
+// microtask, so that path is unaffected — see `initLanguage`.
+await initLanguage();
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>

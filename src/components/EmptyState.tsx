@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { KarasuMarkFlat } from "@/components/KarasuMark";
+import KarasuMark from "@/components/KarasuMark";
 import { cn } from "@/lib/utils";
 
 /**
@@ -48,8 +48,13 @@ export function PerchRule() {
       <span className="section-rule absolute inset-x-0 bottom-0 block" />
       {/* The bird actually lands. This visual is a corvid perched on a
           rule — the one place the file's own comment says the mark may
-          show itself — and it arrived already sitting there. */}
-      <KarasuMarkFlat className="animate-land absolute bottom-0 left-1/2 size-6 -translate-x-1/2 text-ink-500 opacity-60" />
+          show itself — and it arrived already sitting there.
+
+          The full-colour mark, not the flat silhouette that used to be here:
+          that one filled the disc *and* the bird in a single colour, so the
+          raven was invisible inside its own disc and what rendered was a grey
+          blob with a tail. */}
+      <KarasuMark className="animate-land absolute bottom-0 left-1/2 size-6 -translate-x-1/2 opacity-70" />
     </div>
   );
 }
@@ -84,7 +89,7 @@ export function CoverOutline() {
           be alive here — but only just. `PerchRule`'s bird deliberately does
           not get this: it already animates on arrival, and `land` owns the
           same `transform` an idle float would need. */}
-      <KarasuMarkFlat className="animate-idle-float size-14 text-ink-500 opacity-55" />
+      <KarasuMark className="animate-idle-float size-13 opacity-80" />
     </div>
   );
 }

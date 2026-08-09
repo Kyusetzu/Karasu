@@ -5,6 +5,7 @@ mod db;
 mod discord;
 mod identify;
 mod library;
+mod logging;
 mod playback;
 mod portable;
 

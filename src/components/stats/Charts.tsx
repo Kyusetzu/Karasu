@@ -14,14 +14,24 @@ import { motionDuration, seriesDelay } from "@/lib/motion";
 /**
  * When a line-chart point should land: as the drawing line reaches it.
  *
- * Spread across most of the 900ms draw so the last point is not still arriving
- * after the line has finished, and through `motionDuration` because a delay is
- * one of the things the reduce-motion CSS deliberately does *not* neutralise
- * for us — see `lib/motion.ts`.
+ * The last point starts at `DRAW_MS - CHART_IN_MS` so it *finishes* with the
+ * line rather than after it. Spreading across 780ms of the 900ms draw looked
+ * right on paper but the arrival is 320ms long, so the final year's dot and
+ * label were still coming in 200ms after the line had stopped moving — the
+ * chart appeared to end twice.
+ *
+ * Through `motionDuration` because a delay is one of the things the
+ * reduce-motion CSS deliberately does *not* neutralise for us — see
+ * `lib/motion.ts`.
  */
+const DRAW_MS = 900;
+const CHART_IN_MS = 320;
+
 function pointDelay(index: number, count: number): number {
   if (count <= 1) return 0;
-  return motionDuration(Math.round((index / (count - 1)) * 780));
+  return motionDuration(
+    Math.round((index / (count - 1)) * (DRAW_MS - CHART_IN_MS)),
+  );
 }
 
 /**
@@ -402,17 +412,33 @@ export function LineChart({
           follows left to right anyway, so letting it arrive that way costs
           nothing and says "this is a series over time" before the axis
           labels are read. */}
+      {/* No `vectorEffect="non-scaling-stroke"` here, and it must not come
+          back. It moves stroke geometry — the dash pattern included — into
+          screen space, while `length` is measured in viewBox units. A dash of
+          `L` then covers `L` CSS px of a path that is `L × scale` px long, so
+          wherever the card renders wider than the 620-unit viewBox the tail is
+          simply never painted and `forwards` holds it that way: 76% drawn at
+          815px, 61% at 1024px. The translucent area fill underneath has no
+          dash and still spans the full width, which is why it read as the line
+          fading out rather than as the animation stopping. `pathLength` does
+          not help — the dash is already in screen space by the time it applies.
+
+          `Franchise.tsx` keeps `non-scaling-stroke` legitimately: no dash
+          array, and a real pan/zoom surface where a scaled 1px hairline would
+          render as a cable.
+
+          1.5 rather than 2 because the stroke now scales with the viewBox —
+          ~1.4px narrow, ~2px at the usual width, ~2.5px at the widest. */}
       <polyline
         points={pointsAttr(pts)}
         fill="none"
         stroke="var(--color-accent-500)"
-        strokeWidth={2}
-        vectorEffect="non-scaling-stroke"
+        strokeWidth={1.5}
         strokeLinejoin="round"
         style={{
           strokeDasharray: length,
           ["--draw-length" as string]: length,
-          animation: "drawLine 900ms cubic-bezier(0.16, 1, 0.3, 1) forwards",
+          animation: `drawLine ${DRAW_MS}ms cubic-bezier(0.16, 1, 0.3, 1) forwards`,
         }}
       />
       {pts.map((p, i) => (

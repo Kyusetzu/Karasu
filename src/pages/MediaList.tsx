@@ -58,6 +58,7 @@ import type { BulkPatch } from "@/api/anilist";
 import { ListHeader } from "@/components/list/ListHeader";
 import { ROW_HEIGHT_PX } from "@/components/list/columns";
 import { useRowTier } from "@/hooks/useRowTier";
+import { loadViewMode, saveViewMode, type ViewMode } from "@/lib/viewMode";
 import { BulkBar } from "@/components/list/BulkBar";
 import { canIncrement } from "@/components/list/shared";
 
@@ -101,7 +102,9 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
   const [filter, setFilter] = useState("");
   const [tagFilter, setTagFilter] = useState("");
   const [sort, setSort] = useState<SortKey>("updated");
-  const [grid, setGrid] = useState(true);
+  // Remembered per media type: the screen remounts on every navigation, so
+  // component state meant re-picking the view every single time.
+  const [grid, setGrid] = useState(() => loadViewMode(type) === "grid");
   const [editing, setEditing] = useState<MediaListEntry | null>(null);
   const [showRandom, setShowRandom] = useState(false);
   const [presets, setPresets] = useState<Preset[]>(() => loadPresets(type));
@@ -574,7 +577,10 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
             className="ml-auto"
             aria-label={t("list.view")}
             value={grid ? "grid" : "rows"}
-            onChange={(v) => setGrid(v === "grid")}
+            onChange={(v) => {
+              setGrid(v === "grid");
+              saveViewMode(type, v as ViewMode);
+            }}
             segments={[
               {
                 value: "grid",

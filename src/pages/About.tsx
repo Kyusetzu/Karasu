@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
+  Bug,
+  ClipboardCopy,
   Code2,
   Mail,
   MessageCircle,
@@ -22,6 +24,12 @@ import {
   type DownloadedUpdate,
   type UpdateInfo,
 } from "@/api/anilist";
+import {
+  copyDiagnostics,
+  diagnosticsReport,
+  exportDiagnostics,
+  ISSUE_URL,
+} from "@/api/diagnostics";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import KarasuMark from "@/components/KarasuMark";
@@ -80,6 +88,8 @@ export default function About() {
 
       <UpdateSection />
 
+      <DiagnosticsSection />
+
       <Card>
         <CardTitle>{t("about.contact")}</CardTitle>
         <div className="mt-3 space-y-2 text-sm">
@@ -115,6 +125,83 @@ export default function About() {
       </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * The report, and the two places it can go.
+ *
+ * Directly above the contact card on purpose: copy, then click through to the
+ * form that wants it pasted. Bugs belong on GitHub — that is where they get
+ * tracked — and the button says so rather than leaving a reporter to find the
+ * repo link one card down and guess.
+ */
+function DiagnosticsSection() {
+  const { t } = useTranslation();
+  const [report, setReport] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!isTauri) return;
+    diagnosticsReport(true).then(setReport).catch(() => setReport(null));
+  }, []);
+
+  if (!isTauri) return null;
+
+  const copy = async () => {
+    const ok = await copyDiagnostics();
+    setCopied(ok);
+    setFailed(!ok);
+    if (ok) setTimeout(() => setCopied(false), 2000);
+  };
+
+  const save = async () => {
+    setSaving(true);
+    // Redacted, matching the copy button: both are headed somewhere public.
+    // The unredacted path is the log file itself, which the user attaches
+    // deliberately.
+    await exportDiagnostics(true).catch(() => false);
+    setSaving(false);
+  };
+
+  return (
+    <Card>
+      <CardTitle>{t("about.diagnostics")}</CardTitle>
+      <p className="mt-1 text-xs text-ink-600">{t("about.diagnosticsHint")}</p>
+
+      {/* The actual facts, not just a button that promises them — so the user
+          can see what they are about to paste before they paste it. */}
+      {report && (
+        <pre className="mt-3 max-h-56 overflow-auto rounded-lg bg-surface-850 p-2.5 font-mono text-2xs leading-relaxed text-ink-500">
+          {report}
+        </pre>
+      )}
+
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <Button onClick={copy}>
+          <ClipboardCopy className="size-3.5" />
+          {copied ? t("common.copied") : t("about.copyDiagnostics")}
+        </Button>
+        <Button variant="secondary" onClick={save} disabled={saving}>
+          {/* The spinning RefreshCw is the house busy idiom; `animate-bounce`
+              is Tailwind's overshoot and index.css says plainly that this app
+              has no springs and no overshoot. */}
+          {saving ? (
+            <RefreshCw className="size-3.5 animate-spin" />
+          ) : (
+            <Download className="size-3.5" />
+          )}
+          {t("about.saveReport")}
+        </Button>
+        <Button variant="secondary" onClick={() => openUrl(ISSUE_URL)}>
+          <Bug className="size-3.5" /> {t("about.reportBug")}
+        </Button>
+      </div>
+      {failed && <p className="mt-2 text-sm text-danger">{t("about.copyFailed")}</p>}
+      <p className="mt-2 text-2xs text-ink-600">{t("about.reportHint")}</p>
+    </Card>
   );
 }
 

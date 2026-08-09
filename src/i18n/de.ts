@@ -88,6 +88,7 @@ export const de: typeof en = {
     settings: "Einstellungen",
   },
   common: {
+    copied: "Kopiert ✓",
     save: "Speichern",
     saved: "Gespeichert ✓",
     cancel: "Abbrechen",
@@ -290,7 +291,20 @@ export const de: typeof en = {
     timeToFinish: "Restzeit zum Fertigschauen",
     timeToFinishHint: "Verbleibende Episoden deiner Watching-Liste × Laufzeit.",
   },
+  error: {
+    title: "Diese Seite hat ein Problem",
+    hint: "Der Rest von Karasu läuft weiter, du kannst also woanders hin wechseln. Die Details unten stehen bereits im Log.",
+    reload: "Neu laden",
+    copy: "Diagnose kopieren",
+  },
   about: {
+    diagnostics: "Diagnose",
+    diagnosticsHint: "Die Angaben, die ein Fehlerbericht braucht. Kopieren, dann ein Issue öffnen — sie gehören ins erste Feld.",
+    copyDiagnostics: "Diagnose kopieren",
+    copyFailed: "Kopieren nicht möglich — nutze stattdessen Bericht speichern",
+    saveReport: "Bericht speichern …",
+    reportBug: "Fehler melden",
+    reportHint: "Fehler und Wünsche gehören auf GitHub — dort werden sie verfolgt.",
     tagline: "Anime- & Manga-Tracker für AniList",
     version: "Version {{version}}",
     description:
@@ -592,6 +606,12 @@ export const de: typeof en = {
     idle: "Warte auf Player – nichts läuft",
   },
   settings: {
+    log: "Log",
+    logHint: "Was Karasu während des Betriebs aufgezeichnet hat. Fehler werden immer behalten; die Datei liegt neben der Datenbank.",
+    logDebug: "Ausführliches Logging",
+    logDebugHint: "Zeichnet auch Erkennungsdetails auf. Zum Nachstellen einschalten, danach wieder aus.",
+    logShow: "Log anzeigen",
+    logEmpty: "Noch nichts aufgezeichnet.",
     title: "Einstellungen",
     pane_account: "Account",
     pane_appearance: "Darstellung",

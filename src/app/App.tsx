@@ -21,6 +21,7 @@ import Toast from "@/components/shell/Toast";
 import CommandPalette from "@/components/shell/CommandPalette";
 import KeyboardSheet from "@/components/shell/KeyboardSheet";
 import GlobalKeys from "@/components/shell/GlobalKeys";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useViewTransitions } from "@/hooks/useViewTransitions";
 import ContextMenu from "@/components/shell/ContextMenu";
 import SignInMerge from "@/components/overlays/SignInMerge";
@@ -125,24 +126,31 @@ export default function App() {
           key={pathname}
           className="min-w-0 flex-1 animate-settle overflow-y-auto"
         >
-          <Suspense fallback={null}>
-            <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/list" element={<MediaList type="ANIME" />} />
-              <Route path="/manga" element={<MediaList type="MANGA" />} />
-              <Route path="/search" element={<Search />} />
-              <Route path="/seasonal" element={<Seasonal />} />
-              <Route path="/stats" element={<Statistics />} />
-              <Route path="/wrapped" element={<Wrapped />} />
-              <Route path="/library" element={<LocalLibrary />} />
-              <Route path="/media/:id" element={<AnimeDetail />} />
-              <Route path="/franchise/:id" element={<Franchise />} />
-              {/* Alias for old links */}
-              <Route path="/anime/:id" element={<AnimeDetail />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="/about" element={<About />} />
-            </Routes>
-          </Suspense>
+          {/* Keyed on the route as well, so navigating away from a page that
+              threw resets the boundary — otherwise the fallback would outlive
+              the broken page and the app would look permanently crashed.
+              Inside `<main>` on purpose: the titlebar, sidebar and toast stay
+              alive, so the window is still closable and still navigable. */}
+          <ErrorBoundary key={pathname}>
+            <Suspense fallback={null}>
+              <Routes>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/list" element={<MediaList type="ANIME" />} />
+                <Route path="/manga" element={<MediaList type="MANGA" />} />
+                <Route path="/search" element={<Search />} />
+                <Route path="/seasonal" element={<Seasonal />} />
+                <Route path="/stats" element={<Statistics />} />
+                <Route path="/wrapped" element={<Wrapped />} />
+                <Route path="/library" element={<LocalLibrary />} />
+                <Route path="/media/:id" element={<AnimeDetail />} />
+                <Route path="/franchise/:id" element={<Franchise />} />
+                {/* Alias for old links */}
+                <Route path="/anime/:id" element={<AnimeDetail />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="/about" element={<About />} />
+              </Routes>
+            </Suspense>
+          </ErrorBoundary>
         </main>
       </div>
     </div>

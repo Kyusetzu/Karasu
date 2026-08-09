@@ -90,6 +90,7 @@ export const en = {
     settings: "Settings",
   },
   common: {
+    copied: "Copied ✓",
     save: "Save",
     saved: "Saved ✓",
     cancel: "Cancel",
@@ -289,7 +290,20 @@ export const en = {
     timeToFinish: "Time to finish watching",
     timeToFinishHint: "Remaining episodes on your Watching list × runtime.",
   },
+  error: {
+    title: "This page ran into a problem",
+    hint: "The rest of Karasu is still running, so you can navigate away. The details below are already in the log.",
+    reload: "Reload",
+    copy: "Copy diagnostics",
+  },
   about: {
+    diagnostics: "Diagnostics",
+    diagnosticsHint: "The facts a bug report needs. Copy them, then open an issue — they go in the first field.",
+    copyDiagnostics: "Copy diagnostics",
+    copyFailed: "Could not copy — use Save report instead",
+    saveReport: "Save report …",
+    reportBug: "Report a bug",
+    reportHint: "Bugs and feature requests go to GitHub — that is where they get tracked.",
     tagline: "Anime & manga tracker for AniList",
     version: "Version {{version}}",
     description:
@@ -589,6 +603,12 @@ export const en = {
     idle: "Watching for players — nothing playing",
   },
   settings: {
+    log: "Log",
+    logHint: "What Karasu recorded while it was running. Errors are always kept; the file lives next to the database.",
+    logDebug: "Verbose logging",
+    logDebugHint: "Records detection detail as well. Turn this on to reproduce something, then off again.",
+    logShow: "Show the log",
+    logEmpty: "Nothing recorded yet.",
     title: "Settings",
     pane_account: "Account",
     pane_appearance: "Appearance",

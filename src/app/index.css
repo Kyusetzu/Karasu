@@ -1,3 +1,21 @@
+/* No `@source` on purpose, and it was measured rather than assumed.
+   `[PLUGIN_TIMINGS]` blames `@tailwindcss/vite:generate:build` for most of the
+   build (~7.8s of ~8.1s), which reads like the source scan being slow — it is
+   not. The walk only ever sees 285 tracked files, 155 of them scannable, and
+   walking that costs ~50ms; the time is generation and Lightning CSS over the
+   62 kB of output, which no amount of narrowing touches.
+
+   Every attempt to narrow it made things worse in the one way that matters:
+   `source(none)` with explicit `@source` globs — relative, root-relative,
+   absolute — and plain `@source not` exclusions all emitted **6,560 bytes
+   instead of 62,178**, i.e. the theme and keyframes with every utility class
+   gone. The builds "sped up" to 240ms because they were producing nothing. If
+   you try this again, diff the emitted CSS byte-for-byte before believing the
+   timer.
+
+   The one real risk the investigation did find is handled in `.gitignore`
+   rather than here: the walk honours .gitignore, and `src-tauri/target` was
+   excluded by a single line in a *nested* ignore file. */
 @import "tailwindcss";
 
 /* Declared by hand instead of importing @fontsource's stylesheets, which list a

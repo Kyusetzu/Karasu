@@ -1,6 +1,6 @@
 [package]
 name = "karasu"
-version = "0.74.0"
+version = "0.74.1"
 description = "A modern anime and manga tracker built exclusively for AniList"
 authors = ["Kyu"]
 license = "MIT"
@@ -26,7 +26,24 @@ linker_messages = "allow"
 # to make the lib name unique and wouldn't conflict with the bin name.
 # This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
 name = "karasu_lib"
-crate-type = ["staticlib", "cdylib", "rlib"]
+# `rlib` only. The Tauri template's default is
+# `["staticlib", "cdylib", "rlib"]`, where `staticlib` is for iOS and `cdylib`
+# for Android — and Karasu ships Windows and Linux desktop, so both were built
+# and thrown away on every release build. `main.rs` reaches `run()` through the
+# rlib, so the desktop path is unaffected.
+#
+# This is a *disk* change, not a speed one, and the distinction is the whole
+# reason it is written down. Measured on identical source, two runs each:
+# rlib-only 35.5s / 34.5s, all three 34.7s / 35.1s — no difference, because the
+# static archive is a cheap concatenation of objects that were already compiled.
+# What it does save is real though: both artifacts are rewritten on every build
+# (verified by mtime), so this is ~170 MB of pointless writes per build that an
+# SSD no longer has to take.
+#
+# Restoring the two entries is the one-line revert if mobile ever happens; the
+# `#[cfg_attr(mobile, tauri::mobile_entry_point)]` in `lib.rs` stays as the
+# marker for where that would start.
+crate-type = ["rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

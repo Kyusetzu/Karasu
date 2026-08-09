@@ -31,3 +31,11 @@ design/*.svg
 # Release-build artifacts (generated fresh by release.yml, never committed)
 /latest.json
 /SHA256SUMS.txt
+
+# Belt and braces: `src-tauri/.gitignore` already ignores `/target/`, and that
+# nested file is the *only* thing keeping Tailwind's source scan out of it.
+# Tailwind's walk honours .gitignore, and `src-tauri/target` here is ~100 GB
+# across ~195k files — so if that one line were ever removed or negated, a
+# six-second production build would become an unbounded one. Naming it here too
+# means the guard does not depend on a single line in a nested file.
+src-tauri/target/

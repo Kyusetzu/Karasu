@@ -18,6 +18,9 @@ export function BulkBar({
   count,
   onStatus,
   onScore,
+  onProgress,
+  onRepeat,
+  onPrivate,
   onDelete,
   onClear,
   names,
@@ -26,6 +29,10 @@ export function BulkBar({
   count: number;
   onStatus: (s: MediaListStatus) => void;
   onScore: (n: number) => void;
+  /** Set the same progress across the selection. Mostly used to reset to 0. */
+  onProgress: (n: number) => void;
+  onRepeat: (n: number) => void;
+  onPrivate: (hidden: boolean) => void;
   onDelete: () => void;
   onClear: () => void;
   names: string[];
@@ -70,6 +77,50 @@ export function BulkBar({
             value: String(i + 1),
             label: `★ ${i + 1}`,
           })),
+        ]}
+        className={cn(disabled && "pointer-events-none opacity-50")}
+      />
+
+      {/* Every control here sets one value across the whole selection, which is
+          what `UpdateMediaListEntries` does in one request. Progress offers only
+          0 and 1 on purpose: "set them all to episode 137" is not a thing anyone
+          wants, but "reset these to unwatched" and "mark these as started" are.
+
+          Notes and tags are deliberately absent even though the mutation accepts
+          `notes` — tags are serialized into that field, so one bulk write would
+          erase every selected entry's tags. */}
+      <FilterSelect
+        label={t("bulk.setProgress")}
+        value=""
+        placeholder="—"
+        onChange={(v) => v !== "" && onProgress(Number(v))}
+        options={[
+          { value: "0", label: t("bulk.progressReset") },
+          { value: "1", label: t("bulk.progressOne") },
+        ]}
+        className={cn(disabled && "pointer-events-none opacity-50")}
+      />
+
+      <FilterSelect
+        label={t("bulk.setRepeat")}
+        value=""
+        placeholder="—"
+        onChange={(v) => v !== "" && onRepeat(Number(v))}
+        options={Array.from({ length: 6 }, (_, i) => ({
+          value: String(i),
+          label: i === 0 ? t("bulk.repeatNone") : `×${i}`,
+        }))}
+        className={cn(disabled && "pointer-events-none opacity-50")}
+      />
+
+      <FilterSelect
+        label={t("bulk.setPrivate")}
+        value=""
+        placeholder="—"
+        onChange={(v) => v !== "" && onPrivate(v === "1")}
+        options={[
+          { value: "1", label: t("bulk.privateOn") },
+          { value: "0", label: t("bulk.privateOff") },
         ]}
         className={cn(disabled && "pointer-events-none opacity-50")}
       />

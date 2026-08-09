@@ -54,6 +54,7 @@ import { Presence, PresenceIf } from "@/components/ui/presence";
 import { VirtualGrid } from "@/components/list/VirtualGrid";
 import { GridCard } from "@/components/list/GridCard";
 import { ListRow, type RowPatch } from "@/components/list/ListRow";
+import type { BulkPatch } from "@/api/anilist";
 import { ListHeader } from "@/components/list/ListHeader";
 import { ROW_HEIGHT_PX } from "@/components/list/columns";
 import { useRowTier } from "@/hooks/useRowTier";
@@ -156,7 +157,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
     queryKey: ["mediaList", type, userId],
     queryFn: () => fetchMediaList(userId, type),
   });
-  const { save, bulkSave, remove } = useListMutations(userId, type);
+  const { save, bulkSave, remove, bulkRemove } = useListMutations(userId, type);
 
   const level = useContentFilter((s) => s.level);
 
@@ -433,12 +434,20 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
 
   // One mutation for the whole selection, not one per entry — see
   // `useListMutations.bulkSave`.
-  const bulkStatus = (status: MediaListStatus) =>
-    bulkSave.mutate({ entries: selectedEntries, patch: { status } });
-  const bulkScore = (score: number) =>
-    bulkSave.mutate({ entries: selectedEntries, patch: { score } });
+  const bulkPatch = (patch: BulkPatch) =>
+    bulkSave.mutate({ entries: selectedEntries, patch });
+  const bulkStatus = (status: MediaListStatus) => bulkPatch({ status });
+  const bulkScore = (score: number) => bulkPatch({ score });
+  const bulkProgress = (progress: number) => bulkPatch({ progress });
+  const bulkRepeat = (repeat: number) => bulkPatch({ repeat });
+  const bulkPrivate = (hidden: boolean) => bulkPatch({ private: hidden });
+  // Sequential, through one mutation, rather than `forEach(remove.mutate)` —
+  // that fired one concurrent request per entry against a ~30/min budget, which
+  // is exactly the fan-out `bulkSave` was written to end and which the delete
+  // path never got. There is no batch delete to use instead:
+  // `DeleteMediaListEntry` takes a single id.
   const bulkDelete = () => {
-    selectedEntries.forEach((e) => remove.mutate(e.id));
+    bulkRemove.mutate(selectedEntries);
     setSelected(new Set());
   };
   return (
@@ -678,6 +687,9 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
           count={selected.size}
           onStatus={bulkStatus}
           onScore={bulkScore}
+          onProgress={bulkProgress}
+          onRepeat={bulkRepeat}
+          onPrivate={bulkPrivate}
           onDelete={bulkDelete}
           onClear={exitSelect}
           names={selectedEntries.map((e) => displayTitle(e.media.title))}

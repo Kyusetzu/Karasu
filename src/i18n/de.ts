@@ -402,6 +402,14 @@ export const de: typeof en = {
     namePlaceholder: "Preset-Name",
   },
   bulk: {
+    setProgress: "Fortschritt setzen",
+    progressReset: "Auf ungesehen zurücksetzen",
+    progressOne: "Auf 1 setzen",
+    setRepeat: "Wiederholungen setzen",
+    repeatNone: "Keine",
+    setPrivate: "Sichtbarkeit",
+    privateOn: "Privat machen",
+    privateOff: "Öffentlich machen",
     select: "Auswählen",
     selected: "{{count}} ausgewählt",
     setStatus: "Status setzen …",
@@ -508,6 +516,8 @@ export const de: typeof en = {
     toSettings: "Einstellungen öffnen",
   },
   receipt: {
+    removedMany: "{{count}} entfernt",
+    removedPartial: "{{count}} entfernt, {{failed}} fehlgeschlagen",
     saved: "{{title}} gespeichert",
     progress: "{{title}} auf {{n}} gesetzt",
     volumes: "{{title}} auf Band {{n}} gesetzt",

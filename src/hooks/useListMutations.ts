@@ -258,5 +258,77 @@ export function useListMutations(userId: number, mediaType: MediaType) {
     },
   });
 
-  return { save, bulkSave, remove };
+  /**
+   * Removes a whole selection, one request at a time.
+   *
+   * `selection.forEach(remove.mutate)` is what this replaces — the same
+   * fan-out `bulkSave` exists to prevent, still live on the delete path. It
+   * fired one concurrent request per entry against a ~30/min budget, so a
+   * fifty-entry removal was a burst of fifty mutations, a wall of 429s and a row
+   * of error toasts.
+   *
+   * There is no batch delete to switch to: `DeleteMediaListEntry` takes a single
+   * id and nothing else, confirmed against the schema. So the fix is not one
+   * request, it is *sequential* requests — awaited in turn so the client's rate
+   * limiter can pace them — with the cache patched once at the end rather than
+   * once per entry.
+   */
+  const bulkRemove = useMutation({
+    mutationFn: async (entries: MediaListEntry[]) => {
+      const removed: number[] = [];
+      const failed: string[] = [];
+      for (const entry of entries) {
+        try {
+          await deleteListEntry(entry.id);
+          removed.push(entry.id);
+        } catch {
+          // Carry on rather than abandoning the rest: a selection half-removed
+          // and reported is better than one that stops at the first failure and
+          // leaves the user guessing where it got to.
+          failed.push(displayTitle(entry.media.title));
+        }
+      }
+      return { removed, failed };
+    },
+    onSuccess: ({ removed, failed }) => {
+      if (removed.length) {
+        const gone = new Set(removed);
+        qc.setQueryData<ListResult>(key, (old) =>
+          old
+            ? {
+                ...old,
+                lists: old.lists.map((g) => ({
+                  ...g,
+                  entries: g.entries.filter((e) => !gone.has(e.id)),
+                })),
+              }
+            : old,
+        );
+      }
+      if (failed.length) {
+        showToast({
+          kind: "error",
+          text: t("receipt.removedPartial", {
+            count: removed.length,
+            failed: failed.length,
+          }),
+          detail: failed.slice(0, 3).join(", "),
+        });
+      } else {
+        showToast({
+          kind: "success",
+          text: t("receipt.removedMany", { count: removed.length }),
+        });
+      }
+    },
+    onError: () => {
+      showToast({
+        kind: "error",
+        text: t("receipt.removeFailed"),
+        detail: t("receipt.failedDetail"),
+      });
+    },
+  });
+
+  return { save, bulkSave, remove, bulkRemove };
 }

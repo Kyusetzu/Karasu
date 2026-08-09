@@ -400,6 +400,14 @@ export const en = {
     namePlaceholder: "Preset name",
   },
   bulk: {
+    setProgress: "Set progress",
+    progressReset: "Reset to unwatched",
+    progressOne: "Set to 1",
+    setRepeat: "Set repeats",
+    repeatNone: "None",
+    setPrivate: "Visibility",
+    privateOn: "Make private",
+    privateOff: "Make public",
     select: "Select",
     selected: "{{count}} selected",
     setStatus: "Set status …",
@@ -505,6 +513,8 @@ export const en = {
     toSettings: "Open settings",
   },
   receipt: {
+    removedMany: "{{count}} removed",
+    removedPartial: "{{count}} removed, {{failed}} failed",
     saved: "{{title}} saved",
     progress: "{{title}} set to {{n}}",
     volumes: "{{title}} set to volume {{n}}",

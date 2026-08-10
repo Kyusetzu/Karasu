@@ -1,11 +1,18 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link, useParams } from "react-router";
+import { Link, useParams, useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { Ban, UserRound } from "lucide-react";
-import { followCounts, userProfile } from "@/api/social";
+import {
+  followCounts,
+  followers,
+  following,
+  userProfile,
+  type UserProfile as UserProfileData,
+} from "@/api/social";
 import { isTauri } from "@/api/anilist";
 import { ProfileHeader } from "@/components/social/ProfileHeader";
-import { EmptyState, PerchRule, StruckQuery } from "@/components/EmptyState";
+import { UserList } from "@/components/social/UserList";
+import { CoverOutline, EmptyState, PerchRule, StruckQuery } from "@/components/EmptyState";
 import { Shimmer } from "@/components/Skeleton";
 import { SectionHeader } from "@/components/ui/section-header";
 import { Button } from "@/components/ui/button";
@@ -105,54 +112,115 @@ export default function UserProfile() {
   return (
     <div className="pb-12">
       <ProfileHeader user={user} />
-      <div className="mt-8 space-y-8 px-8">
-        <FollowSummary userId={user.id} name={user.name} />
-        <Favourites user={user} />
+      <Tabbed user={user} />
+    </div>
+  );
+}
+
+const TABS = ["overview", "followers", "following"] as const;
+type Tab = (typeof TABS)[number];
+
+function isTab(value: string | null): value is Tab {
+  return TABS.includes((value ?? "") as Tab);
+}
+
+/**
+ * Tabs in the search param, not in state.
+ *
+ * `<main key={pathname}>` in `App.tsx` does not remount on a search-param
+ * change, so tabs switch in place, deep-link, and survive back and forward —
+ * the same reasoning the settings panes already use for `?pane=`.
+ *
+ * Each panel is **mounted on activation rather than gated with `enabled`**.
+ * An unmounted query has no observer, so it cannot join a refetch either, and
+ * within `gcTime` switching back is free. It also keeps the two-queries-per-
+ * mount cap honest: tab content arrives at a second, user-initiated moment
+ * instead of racing the profile's own pair past the rate limiter's pre-flight
+ * check.
+ */
+function Tabbed({ user }: { user: UserProfileData }) {
+  const { t } = useTranslation();
+  const [params, setParams] = useSearchParams();
+  const raw = params.get("tab");
+  const tab: Tab = isTab(raw) ? raw : "overview";
+
+  const counts = useQuery({
+    queryKey: ["social", "followCounts", user.id],
+    queryFn: () => followCounts(user.id),
+    enabled: isTauri,
+    staleTime: 10 * 60 * 1000,
+  });
+
+  const tabCount: Record<Tab, number | undefined> = {
+    overview: undefined,
+    followers: counts.data?.followers,
+    following: counts.data?.following,
+  };
+
+  return (
+    <div className="mt-7 px-8">
+      <div role="tablist" className="flex gap-1 border-b border-surface-800">
+        {TABS.map((id) => {
+          const active = id === tab;
+          return (
+            <button
+              key={id}
+              role="tab"
+              aria-selected={active}
+              onClick={() => {
+                // `replace` so a tab flick does not fill the back stack with
+                // steps the user has to walk out of.
+                const next = new URLSearchParams(params);
+                if (id === "overview") next.delete("tab");
+                else next.set("tab", id);
+                setParams(next, { replace: true });
+              }}
+              className={cn(
+                "-mb-px border-b-2 px-3 py-2 text-sm transition-surface",
+                active
+                  ? "border-accent-500 text-ink-100"
+                  : "border-transparent text-ink-600 hover:text-ink-300",
+              )}
+            >
+              {id === "overview"
+                ? t("social.tabOverview")
+                : id === "followers"
+                  ? t("social.followers")
+                  : t("social.tabFollowing")}
+              {tabCount[id] !== undefined && (
+                <span className="ml-1.5 text-xs tabular-nums text-ink-600">
+                  {tabCount[id]}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Keyed on the tab so the panel replays `animate-settle`, exactly as the
+          settings panes do. */}
+      <div key={tab} className="animate-settle pt-6">
+        {tab === "overview" && <Favourites user={user} />}
+        {tab === "followers" && (
+          <UserList
+            queryKey={["social", "followers", user.id]}
+            fetchPage={(page) => followers(user.id, page)}
+            emptyTitle={t("social.noFollowers", { name: user.name })}
+          />
+        )}
+        {tab === "following" && (
+          <UserList
+            queryKey={["social", "following", user.id]}
+            fetchPage={(page) => following(user.id, page)}
+            emptyTitle={t("social.noFollowing", { name: user.name })}
+          />
+        )}
       </div>
     </div>
   );
 }
 
-/** The follower and following totals, in one request. */
-function FollowSummary({ userId, name }: { userId: number; name: string }) {
-  const { t } = useTranslation();
-  const counts = useQuery({
-    queryKey: ["social", "followCounts", userId],
-    queryFn: () => followCounts(userId),
-    enabled: isTauri,
-    staleTime: 10 * 60 * 1000,
-  });
-
-  return (
-    <div className="flex gap-3">
-      {(
-        [
-          ["followers", counts.data?.followers],
-          ["following", counts.data?.following],
-        ] as const
-      ).map(([kind, total]) => (
-        <div
-          key={kind}
-          className="panel-wash panel-top flex-1 rounded-xl border border-surface-800 bg-surface-900 p-4"
-        >
-          <p className="text-2xs uppercase tracking-wide text-ink-600">
-            {kind === "followers" ? t("social.followers") : t("social.following")}
-          </p>
-          {total === undefined ? (
-            <Shimmer className="mt-1.5 h-6 w-12 rounded" />
-          ) : (
-            <p className="mt-1 text-xl font-semibold tabular-nums text-ink-100">{total}</p>
-          )}
-          {/* The lists themselves arrive with the next commit; until then the
-              counts are honest on their own and cost nothing extra. */}
-          <p className="sr-only">{name}</p>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function Favourites({ user }: { user: Parameters<typeof ProfileHeader>[0]["user"] }) {
+function Favourites({ user }: { user: UserProfileData }) {
   const { t } = useTranslation();
   const level = useContentFilter((s) => s.level);
 
@@ -160,7 +228,18 @@ function Favourites({ user }: { user: Parameters<typeof ProfileHeader>[0]["user"
   // no `isAdult` argument, so it can only happen here.
   const anime = (user.favourites?.anime?.nodes ?? []).filter((m) => !isBlocked(m, level));
   const manga = (user.favourites?.manga?.nodes ?? []).filter((m) => !isBlocked(m, level));
-  if (!anime.length && !manga.length) return null;
+
+  // This is a whole tab now, so "nothing here" has to say so. Returning null
+  // was fine when favourites were one section among several; as a tab body it
+  // renders an empty page that reads as a failure.
+  if (!anime.length && !manga.length) {
+    return (
+      <EmptyState
+        visual={<CoverOutline />}
+        title={t("social.noFavourites", { name: user.name })}
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -222,9 +301,13 @@ function ProfileSkeleton() {
           <Shimmer key={i} className={cn("h-3 rounded", i === 2 ? "w-1/2" : "w-full")} index={i + 3} />
         ))}
       </div>
-      <div className="mt-8 flex gap-3">
-        <Shimmer className="h-20 flex-1 rounded-xl" index={1} />
-        <Shimmer className="h-20 flex-1 rounded-xl" index={2} />
+      {/* The tab bar, so the header does not jump when the real one arrives.
+          Widths written out: Tailwind scans source for literal class strings, so
+          an interpolated `w-${n}` is a class that never gets emitted. */}
+      <div className="mt-7 flex gap-4 border-b border-surface-800 pb-2">
+        {["w-16", "w-20", "w-20"].map((w, i) => (
+          <Shimmer key={i} className={cn("h-3 rounded", w)} index={i} />
+        ))}
       </div>
     </div>
   );

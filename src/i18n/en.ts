@@ -628,6 +628,17 @@ export const en = {
     unfollowedToast: "Unfollowed {{name}}",
     followFailed: "Couldn't follow {{name}}",
     followFailedDetail: "Nothing was sent. Social changes are not queued offline.",
+    // Tabs and lists
+    tabOverview: "Overview",
+    // Distinct from `following`, which is the button's *state* ("you follow
+    // them"). This is the set of people *they* follow. Identical in English,
+    // "Folgt" vs "Gefolgte" in German.
+    tabFollowing: "Following",
+    noFollowers: "Nobody follows {{name}} yet",
+    noFollowing: "{{name}} isn't following anyone yet",
+    noFavourites: "{{name}} hasn't picked any favourites",
+    loadMore: "Load {{n}} more",
+    loadingMore: "Loading …",
     // Favourites
     favAnime: "Favourite anime",
     favManga: "Favourite manga",

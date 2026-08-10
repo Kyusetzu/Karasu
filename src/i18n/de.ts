@@ -633,6 +633,16 @@ export const de: typeof en = {
     followFailed: "Konnte {{name}} nicht folgen",
     followFailedDetail:
       "Es wurde nichts gesendet. Soziale Änderungen werden offline nicht zwischengespeichert.",
+    // Tabs und Listen
+    tabOverview: "Übersicht",
+    // Nicht `following` ("Folgt" — der Zustand des Buttons), sondern die Menge
+    // der Personen, denen dieser Nutzer folgt.
+    tabFollowing: "Gefolgte",
+    noFollowers: "{{name}} hat noch keine Follower",
+    noFollowing: "{{name}} folgt noch niemandem",
+    noFavourites: "{{name}} hat noch keine Favoriten gewählt",
+    loadMore: "{{n}} weitere laden",
+    loadingMore: "Lädt …",
     // Favoriten
     favAnime: "Lieblings-Anime",
     favManga: "Lieblings-Manga",

@@ -16,6 +16,7 @@ export const en = {
     manga: "Manga",
     search: "Search",
     seasonal: "Seasonal",
+    social: "Social",
     stats: "Statistics",
     wrapped: "Wrapped",
     library: "Local library",
@@ -636,6 +637,24 @@ export const en = {
     followFailedDetail: "Nothing was sent. Social changes are not queued offline.",
     // Tabs and lists
     tabOverview: "Overview",
+    tabActivity: "Activity",
+    noActivity: "{{name}} hasn't posted anything yet",
+    // Verbs. AniList composes these sentences itself and only in English, so
+    // they are translated from a key — see `lib/activity`.
+    verbWatchedEpisode: "watched episode",
+    verbRewatchedEpisode: "rewatched episode",
+    verbReadChapter: "read chapter",
+    verbRereadChapter: "reread chapter",
+    verbCompleted: "completed",
+    verbPlansToWatch: "plans to watch",
+    verbPlansToRead: "plans to read",
+    verbDropped: "dropped",
+    verbPaused: "paused",
+    // The following feed
+    feedSubtitle: "What the people you follow have been up to.",
+    feedEmpty: "Nothing from the people you follow.",
+    feedEmptyHint: "Follow a few more accounts and their updates land here.",
+    myProfile: "My profile",
     // Distinct from `following`, which is the button's *state* ("you follow
     // them"). This is the set of people *they* follow. Identical in English,
     // "Folgt" vs "Gefolgte" in German.

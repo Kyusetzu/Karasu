@@ -14,6 +14,7 @@ export const de: typeof en = {
     manga: "Manga",
     search: "Suche",
     seasonal: "Saison",
+    social: "Sozial",
     stats: "Statistik",
     wrapped: "Wrapped",
     library: "Lokale Bibliothek",
@@ -641,6 +642,24 @@ export const de: typeof en = {
       "Es wurde nichts gesendet. Soziale Änderungen werden offline nicht zwischengespeichert.",
     // Tabs und Listen
     tabOverview: "Übersicht",
+    tabActivity: "Aktivität",
+    noActivity: "{{name}} hat noch nichts gepostet",
+    // Verben. AniList setzt diese Sätze selbst zusammen, und nur auf Englisch —
+    // deshalb werden sie aus einem Schlüssel übersetzt, siehe `lib/activity`.
+    verbWatchedEpisode: "sah Episode",
+    verbRewatchedEpisode: "sah erneut Episode",
+    verbReadChapter: "las Kapitel",
+    verbRereadChapter: "las erneut Kapitel",
+    verbCompleted: "beendete",
+    verbPlansToWatch: "plant zu schauen",
+    verbPlansToRead: "plant zu lesen",
+    verbDropped: "brach ab",
+    verbPaused: "pausierte",
+    // Der Feed der Gefolgten
+    feedSubtitle: "Was die Personen, denen du folgst, getrieben haben.",
+    feedEmpty: "Nichts von den Personen, denen du folgst.",
+    feedEmptyHint: "Folge ein paar mehr Konten, dann landen deren Updates hier.",
+    myProfile: "Mein Profil",
     // Nicht `following` ("Folgt" — der Zustand des Buttons), sondern die Menge
     // der Personen, denen dieser Nutzer folgt.
     tabFollowing: "Gefolgte",

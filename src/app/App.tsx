@@ -45,6 +45,7 @@ const LocalLibrary = lazy(() => import("@/pages/LocalLibrary"));
 const Settings = lazy(() => import("@/pages/Settings"));
 const About = lazy(() => import("@/pages/About"));
 const UserProfile = lazy(() => import("@/pages/UserProfile"));
+const Social = lazy(() => import("@/pages/Social"));
 
 export default function App() {
   const { pathname } = useLocation();
@@ -145,6 +146,7 @@ export default function App() {
                 <Route path="/library" element={<LocalLibrary />} />
                 <Route path="/media/:id" element={<AnimeDetail />} />
                 <Route path="/franchise/:id" element={<Franchise />} />
+                <Route path="/social" element={<Social />} />
                 {/* By name, not id: that is what AniList's own URLs, an
                     `@mention` and a pasted link all carry. */}
                 <Route path="/user/:name" element={<UserProfile />} />
@@ -196,6 +198,7 @@ const PAGE_LABELS: Record<string, string> = {
   "/manga": "Manga",
   "/search": "Search",
   "/seasonal": "Seasonal",
+  "/social": "Social",
   "/stats": "Statistics",
   "/library": "Local library",
   "/settings": "Settings",

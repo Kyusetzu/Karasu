@@ -12,6 +12,7 @@ import {
 import { isTauri } from "@/api/anilist";
 import { ProfileHeader } from "@/components/social/ProfileHeader";
 import { UserList } from "@/components/social/UserList";
+import { ActivityFeed } from "@/components/social/ActivityFeed";
 import { CoverOutline, EmptyState, PerchRule, StruckQuery } from "@/components/EmptyState";
 import { Shimmer } from "@/components/Skeleton";
 import { SectionHeader } from "@/components/ui/section-header";
@@ -117,7 +118,7 @@ export default function UserProfile() {
   );
 }
 
-const TABS = ["overview", "followers", "following"] as const;
+const TABS = ["overview", "activity", "followers", "following"] as const;
 type Tab = (typeof TABS)[number];
 
 function isTab(value: string | null): value is Tab {
@@ -153,6 +154,8 @@ function Tabbed({ user }: { user: UserProfileData }) {
 
   const tabCount: Record<Tab, number | undefined> = {
     overview: undefined,
+    // No count for activity: AniList's total there is a capped 5000.
+    activity: undefined,
     followers: counts.data?.followers,
     following: counts.data?.following,
   };
@@ -184,9 +187,11 @@ function Tabbed({ user }: { user: UserProfileData }) {
             >
               {id === "overview"
                 ? t("social.tabOverview")
-                : id === "followers"
-                  ? t("social.followers")
-                  : t("social.tabFollowing")}
+                : id === "activity"
+                  ? t("social.tabActivity")
+                  : id === "followers"
+                    ? t("social.followers")
+                    : t("social.tabFollowing")}
               {tabCount[id] !== undefined && (
                 <span className="ml-1.5 text-xs tabular-nums text-ink-600">
                   {tabCount[id]}
@@ -201,6 +206,13 @@ function Tabbed({ user }: { user: UserProfileData }) {
           settings panes do. */}
       <div key={tab} className="animate-settle pt-6">
         {tab === "overview" && <Favourites user={user} />}
+        {tab === "activity" && (
+          <ActivityFeed
+            queryKey={["social", "activities", user.id]}
+            source={{ userId: user.id }}
+            emptyTitle={t("social.noActivity", { name: user.name })}
+          />
+        )}
         {tab === "followers" && (
           <UserList
             queryKey={["social", "followers", user.id]}

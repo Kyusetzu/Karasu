@@ -4,6 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { Bell as BellIcon, CalendarClock, Clock, Film } from "lucide-react";
 import { EmptyState, TickMarks } from "@/components/EmptyState";
 import { cn } from "@/lib/utils";
+import { relTime } from "@/lib/relTime";
 import { usePresence } from "@/hooks/usePresence";
 import {
   getNotifications,
@@ -30,17 +31,6 @@ const KIND_TINT: Record<string, string> = {
   sequel: "bg-success/14 text-success",
 };
 const DEFAULT_TINT = "bg-surface-800 text-ink-500";
-
-function relTime(ms: number, lang: string, nowLabel: string): string {
-  const min = Math.floor((Date.now() - ms) / 60000);
-  if (min < 1) return nowLabel;
-  if (min < 60) return `${min}m`;
-  const h = Math.floor(min / 60);
-  if (h < 24) return `${h}h`;
-  const d = Math.floor(h / 24);
-  if (d < 7) return `${d}d`;
-  return new Date(ms).toLocaleDateString(lang);
-}
 
 export default function Bell() {
   const { t, i18n } = useTranslation();

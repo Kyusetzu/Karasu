@@ -328,6 +328,68 @@ export async function searchUsers(search: string, page = 1): Promise<UserPage> {
 /** The shortest query this endpoint answers usefully. See `USER_SEARCH_QUERY`. */
 export const USER_SEARCH_MIN = 3;
 
+// --- Activities -----------------------------------------------------------
+
+/**
+ * One constant serves both a profile's activity tab and the following feed —
+ * `userId` for the first, `isFollowing: true` for the second.
+ *
+ * `MESSAGE` is absent from `type_in` **and** `MessageActivity` gets no inline
+ * fragment, so even a widened argument yields nothing renderable. Private mail
+ * between two users is not something a tracker should surface, and
+ * `normalizeActivity` refuses it a third time.
+ *
+ * `sort: ID_DESC` because paging needs a total order and ids are the only
+ * strictly increasing thing here — `createdAt` ties constantly.
+ *
+ * No nested `replies { … }`: those load per-activity when a row is expanded,
+ * one user-initiated request each, rather than multiplying every page by them.
+ *
+ * `pageInfo.total` is a capped sentinel here too, exactly as in user search —
+ * measured at `total: 5000` with `lastPage: 500`. The feed therefore never
+ * shows a remaining count.
+ */
+export const ACTIVITY_QUERY = `
+query ($userId: Int, $isFollowing: Boolean, $page: Int) {
+  Page(page: $page, perPage: 25) {
+    ${PAGE_INFO}
+    activities(
+      userId: $userId
+      isFollowing: $isFollowing
+      type_in: [ANIME_LIST, MANGA_LIST, TEXT]
+      sort: ID_DESC
+    ) {
+      __typename
+      ... on ListActivity {
+        id status progress createdAt likeCount isLiked replyCount siteUrl
+        user { ${SOCIAL_USER} }
+        media { ${SOCIAL_MEDIA} }
+      }
+      ... on TextActivity {
+        id text createdAt likeCount isLiked replyCount siteUrl
+        user { ${SOCIAL_USER} }
+      }
+    }
+  }
+}`;
+
+export interface ActivityPage {
+  pageInfo: PageInfo;
+  /** Raw union members — `normalizeActivity` in `lib/activity` tightens these. */
+  activities: unknown[];
+}
+
+export async function activities(
+  vars: { userId: number } | { isFollowing: true },
+  page = 1,
+): Promise<ActivityPage> {
+  const data = await gql<{ Page: { pageInfo: PageInfo; activities: unknown[] } }>(
+    ACTIVITY_QUERY,
+    { ...vars, page },
+  );
+  return { pageInfo: data.Page.pageInfo, activities: data.Page.activities ?? [] };
+}
+
 // --- Mutations ------------------------------------------------------------
 
 /**

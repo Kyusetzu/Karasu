@@ -20,6 +20,7 @@ import {
   Info,
   LogIn,
   Settings,
+  Users,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -106,6 +107,7 @@ const GROUPS: { label: string; items: NavItem[] }[] = [
     items: [
       { to: "/search", key: "nav.search", icon: Search },
       { to: "/seasonal", key: "nav.seasonal", icon: CalendarDays },
+      { to: "/social", key: "nav.social", icon: Users },
     ],
   },
   {

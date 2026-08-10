@@ -6,6 +6,7 @@ import { Avatar } from "@/components/ui/user-lockup";
 import { FollowButton } from "./FollowButton";
 import { Markdown } from "./Markdown";
 import { followRelation, relationBadgeKey } from "@/lib/follows";
+import { donatorLabel } from "@/lib/donator";
 import { toTenPoint } from "@/lib/score";
 import { cn } from "@/lib/utils";
 
@@ -45,6 +46,7 @@ export function ProfileHeader({ user }: { user: UserProfile }) {
   const { t } = useTranslation();
   const relation = followRelation(user);
   const badgeKey = relationBadgeKey(relation);
+  const donator = donatorLabel(user);
   const anime = user.statistics?.anime;
   const manga = user.statistics?.manga;
 
@@ -77,9 +79,11 @@ export function ProfileHeader({ user }: { user: UserProfile }) {
                     : t("social.badgeFollowsYou")}
                 </Badge>
               )}
-              {user.donatorBadge && (
+              {/* `donatorLabel`, not `donatorBadge` — the badge string is the
+                  label and AniList returns it for everyone. See lib/donator.ts. */}
+              {donator && (
                 <Badge tone="gold" icon={<Heart className="size-2.5" />}>
-                  {user.donatorBadge}
+                  {donator}
                 </Badge>
               )}
               {user.moderatorRoles && user.moderatorRoles.length > 0 && (

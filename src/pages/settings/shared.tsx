@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Globe } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { hexToHsv, hsvToHex, type Hsv } from "@/lib/contrast";
 
@@ -14,6 +15,65 @@ import { hexToHsv, hsvToHex, type Hsv } from "@/lib/contrast";
 /** The one select skin, so the four of them cannot drift apart. */
 export const SELECT =
   "h-9 rounded-lg border border-surface-700 bg-surface-900 px-2 text-sm focus:border-accent-500 focus:outline-none";
+
+/**
+ * A label-and-hint on the left, a control on the right.
+ *
+ * `Toggle` below has always owned this shape for itself; every *other* row was
+ * the same eleven lines of JSX pasted per setting. Extracted now because the
+ * AniList account pane adds a dozen more, and because a few of them need a
+ * third line — `note` — which is not something to hand-place a dozen times.
+ *
+ * `items-center` rather than `Toggle`'s `items-start`: a select is taller than
+ * one line of text, so centring it reads better, while a switch is shorter and
+ * wants to sit with the label's first line.
+ */
+export function Row({
+  label,
+  hint,
+  note,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  /** Below the hint — an `ExternalNote`, usually. */
+  note?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <label className="flex items-center justify-between gap-4 py-1 text-sm">
+      <span>
+        <span className="block text-ink-100">{label}</span>
+        {hint && <span className="block text-xs text-ink-600">{hint}</span>}
+        {note}
+      </span>
+      {children}
+    </label>
+  );
+}
+
+/**
+ * "This one changes your AniList account, not Karasu."
+ *
+ * Karasu deliberately overrides four of AniList's own account settings —
+ * it forces a ten-point score format on every read and write, keeps its own
+ * display-title preference, runs its own content filter, and raises its own
+ * airing alerts. Editing those on the account is still legitimate: they are the
+ * user's settings and other clients honour them. But a settings row that
+ * appears to do nothing is a bug report waiting to happen, so each one says
+ * plainly where its effect lands.
+ *
+ * Gold, not danger: nothing is broken and nothing is at risk. It is a caveat,
+ * and `NowPlayingCard` already established gold as this app's caveat colour.
+ */
+export function ExternalNote({ children }: { children: ReactNode }) {
+  return (
+    <span className="mt-1 flex items-start gap-1.5 text-xs text-gold">
+      <Globe className="mt-px size-3 shrink-0" />
+      <span>{children}</span>
+    </span>
+  );
+}
 
 export function Toggle({
   checked,

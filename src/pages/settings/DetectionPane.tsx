@@ -23,7 +23,7 @@ import {
   type MediaSession,
 } from "@/stores/nowPlaying";
 import { isLinux, usePlatform } from "@/stores/platform";
-import { Toggle } from "./shared";
+import { Row, Toggle } from "./shared";
 export function ScrobbleSection() {
   const { t } = useTranslation();
   const [settings, setSettings] = useState<ScrobbleSettings | null>(null);
@@ -101,13 +101,7 @@ export function ScrobbleSection() {
             }
           />
         )}
-        <label className="flex items-center justify-between gap-4 py-1 text-sm">
-          <span>
-            <span className="block text-ink-100">{t("settings.threshold")}</span>
-            <span className="block text-xs text-ink-600">
-              {t("settings.thresholdHint")}
-            </span>
-          </span>
+        <Row label={t("settings.threshold")} hint={t("settings.thresholdHint")}>
           <Input
             type="number"
             min={0}
@@ -120,7 +114,7 @@ export function ScrobbleSection() {
             }
             className="w-20"
           />
-        </label>
+        </Row>
         {airing !== null && (
           <Toggle
             checked={airing}
@@ -146,15 +140,10 @@ export function ScrobbleSection() {
               hint={t("settings.staleNotifyHint")}
             />
             {stale.enabled && (
-              <label className="flex items-center justify-between gap-4 py-1 text-sm">
-                <span>
-                  <span className="block text-ink-100">
-                    {t("settings.staleMonths")}
-                  </span>
-                  <span className="block text-xs text-ink-600">
-                    {t("settings.staleMonthsHint")}
-                  </span>
-                </span>
+              <Row
+                label={t("settings.staleMonths")}
+                hint={t("settings.staleMonthsHint")}
+              >
                 <Input
                   type="number"
                   min={1}
@@ -167,7 +156,7 @@ export function ScrobbleSection() {
                   }
                   className="w-20"
                 />
-              </label>
+              </Row>
             )}
           </>
         )}

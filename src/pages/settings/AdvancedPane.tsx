@@ -7,7 +7,7 @@ import * as api from "@/api/anilist";
 import { getLogDebug, getLogs, setLogDebug, type LogEntry } from "@/api/diagnostics";
 import { usePlatform } from "@/stores/platform";
 import { cn } from "@/lib/utils";
-import { SELECT, Toggle } from "./shared";
+import { Row, SELECT, Toggle } from "./shared";
 interface PortableStatus {
   portable: boolean;
   dir: string;
@@ -181,15 +181,10 @@ export function AdvancedSection() {
           />
         )}
 
-        <label className="flex items-center justify-between gap-4 py-1 text-sm">
-          <span>
-            <span className="block text-ink-100">
-              {t("settings.updateChannel")}
-            </span>
-            <span className="block text-xs text-ink-600">
-              {t("settings.updateChannelHint")}
-            </span>
-          </span>
+        <Row
+          label={t("settings.updateChannel")}
+          hint={t("settings.updateChannelHint")}
+        >
           <select
             value={updateChannel}
             onChange={(e) =>
@@ -202,7 +197,7 @@ export function AdvancedSection() {
             </option>
             <option value="stable">{t("settings.updateChannelStable")}</option>
           </select>
-        </label>
+        </Row>
         {error && <p className="text-sm text-danger">{error}</p>}
       </div>
     </Card>

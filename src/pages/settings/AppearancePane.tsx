@@ -16,7 +16,7 @@ import {
   SUPPORTED_LANGUAGES,
   type LanguageSetting,
 } from "@/i18n";
-import { ColorPicker, SELECT, Toggle } from "./shared";
+import { ColorPicker, Row, SELECT, Toggle } from "./shared";
 const THEME_MODES: ThemeMode[] = ["system", "light", "dark"];
 
 export function AppearanceSection() {
@@ -41,13 +41,7 @@ export function AppearanceSection() {
     <Card>
       <CardTitle>{t("settings.pane_appearance")}</CardTitle>
       <div className="mt-3 space-y-3">
-        <label className="flex items-center justify-between gap-4 py-1 text-sm">
-          <span>
-            <span className="block text-ink-100">{t("settings.language")}</span>
-            <span className="block text-xs text-ink-600">
-              {t("settings.languageHint")}
-            </span>
-          </span>
+        <Row label={t("settings.language")} hint={t("settings.languageHint")}>
           <select
             value={lang}
             onChange={(e) => changeLanguage(e.target.value as LanguageSetting)}
@@ -59,10 +53,9 @@ export function AppearanceSection() {
               </option>
             ))}
           </select>
-        </label>
+        </Row>
 
-        <label className="flex items-center justify-between gap-4 py-1 text-sm">
-          <span className="block text-ink-100">{t("settings.theme")}</span>
+        <Row label={t("settings.theme")}>
           <select
             value={themeMode}
             onChange={(e) => setThemeMode(e.target.value as ThemeMode)}
@@ -74,15 +67,9 @@ export function AppearanceSection() {
               </option>
             ))}
           </select>
-        </label>
+        </Row>
 
-        <label className="flex items-center justify-between gap-4 py-1 text-sm">
-          <span className="block">
-            <span className="block text-ink-100">{t("settings.coverSize")}</span>
-            <span className="block text-xs text-ink-600">
-              {t("settings.coverSizeHint")}
-            </span>
-          </span>
+        <Row label={t("settings.coverSize")} hint={t("settings.coverSizeHint")}>
           <select
             value={density}
             onChange={(e) => setDensity(e.target.value as Density)}
@@ -94,7 +81,7 @@ export function AppearanceSection() {
               </option>
             ))}
           </select>
-        </label>
+        </Row>
 
         <Toggle
           checked={reduceMotion}

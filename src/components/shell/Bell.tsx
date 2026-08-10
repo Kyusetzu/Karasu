@@ -54,7 +54,13 @@ export default function Bell() {
     getNotifications().then(setItems).catch(() => {});
   }, []);
 
+  // `load` guards itself, but `listen` does not — outside Tauri it reaches for
+  // `__TAURI_INTERNALS__.transformCallback` and throws. That throw is in a
+  // passive effect during mount, so the shell's ErrorBoundary catches it and
+  // the *whole window* renders as the error screen: `npm run dev` in a plain
+  // browser showed an empty page, and nothing pointed at the bell.
   useEffect(() => {
+    if (!isTauri) return;
     load();
     const un = listen("notifications-changed", () => load());
     return () => {

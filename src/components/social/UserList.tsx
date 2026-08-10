@@ -37,6 +37,7 @@ export function UserList({
   emptyHint,
   staleTime = 30 * 60 * 1000,
   enabled = true,
+  countRemaining = true,
 }: {
   queryKey: QueryKey;
   fetchPage: (page: number) => Promise<UserPage>;
@@ -44,6 +45,15 @@ export function UserList({
   emptyHint?: string;
   staleTime?: number;
   enabled?: boolean;
+  /**
+   * Whether `pageInfo.total` can be believed.
+   *
+   * False for user search, where AniList reports a capped `total: 5000` with
+   * `lastPage: 1000` for anything with many matches — so a count would say
+   * "Load 4,975 more" and be inventing the number. Follower and following
+   * totals are real.
+   */
+  countRemaining?: boolean;
 }) {
   const { t } = useTranslation();
 
@@ -125,7 +135,9 @@ export function UserList({
           >
             {q.isFetchingNextPage
               ? t("social.loadingMore")
-              : t("social.loadMore", { n: remaining })}
+              : countRemaining && remaining > 0
+                ? t("social.loadMore", { n: remaining })
+                : t("social.loadMorePlain")}
           </Button>
         </div>
       )}

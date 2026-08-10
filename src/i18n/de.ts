@@ -372,6 +372,12 @@ export const de: typeof en = {
       "Zwei Zeichen genügen. Romaji, Englisch und Originaltitel passen alle.",
     anime: "Anime",
     manga: "Manga",
+    users: "Personen",
+    userPrompt: "Finde jemanden auf AniList.",
+    userPromptHint:
+      "Mindestens {{n}} Zeichen — bei weniger antwortet AniList mit beliebigen Konten.",
+    noUsers: "Kein Konto mit diesem Namen.",
+    noUsersHint: "AniList sucht am Anfang eines Nutzernamens, nicht in der Mitte.",
   },
   seasonal: {
     title: "Saison",
@@ -642,6 +648,8 @@ export const de: typeof en = {
     noFollowing: "{{name}} folgt noch niemandem",
     noFavourites: "{{name}} hat noch keine Favoriten gewählt",
     loadMore: "{{n}} weitere laden",
+    // Dort verwendet, wo AniLists total keine echte Anzahl ist.
+    loadMorePlain: "Mehr laden",
     loadingMore: "Lädt …",
     // Favoriten
     favAnime: "Lieblings-Anime",

@@ -370,6 +370,12 @@ export const en = {
       "Two characters is enough to start. Romaji, English and native titles all match.",
     anime: "Anime",
     manga: "Manga",
+    users: "People",
+    userPrompt: "Find someone on AniList.",
+    userPromptHint:
+      "At least {{n}} characters — shorter than that and AniList answers with whoever it likes.",
+    noUsers: "No account by that name.",
+    noUsersHint: "AniList matches the start of a username, not the middle.",
   },
   seasonal: {
     title: "Seasonal",
@@ -638,6 +644,8 @@ export const en = {
     noFollowing: "{{name}} isn't following anyone yet",
     noFavourites: "{{name}} hasn't picked any favourites",
     loadMore: "Load {{n}} more",
+    // Used where AniList's total is not a real count — see USER_SEARCH_QUERY.
+    loadMorePlain: "Load more",
     loadingMore: "Loading …",
     // Favourites
     favAnime: "Favourite anime",

@@ -290,6 +290,44 @@ export async function following(userId: number, page = 1): Promise<UserPage> {
   return { pageInfo: data.Page.pageInfo, users: data.Page.following ?? [] };
 }
 
+// --- User search ----------------------------------------------------------
+
+/**
+ * Search users by name.
+ *
+ * Two facts about this endpoint, both measured, both load-bearing for the UI:
+ *
+ * 1. **A short query returns junk.** Two characters come back as the exact
+ *    match followed by the same fixed set of unrelated accounts
+ *    (`user10151`, `Gregorymr`, …) — `"ky"` yields `["ky", "user10151", …]`.
+ *    Three characters behave properly. The caller enforces a three-character
+ *    minimum for this reason, where media search is happy with two.
+ * 2. **`pageInfo.total` is a capped sentinel, not a count.** Anything with many
+ *    matches reports `total: 5000` and `lastPage: 1000` regardless of the real
+ *    number; only a tiny result set is honest (`"Kyusetzu"` → 1). So the
+ *    remaining-count label is suppressed for search — see `UserList`.
+ *
+ * `perPage: 25` rather than 50: a search is scanned, not paged through.
+ */
+export const USER_SEARCH_QUERY = `
+query ($search: String!, $page: Int) {
+  Page(page: $page, perPage: 25) {
+    ${PAGE_INFO}
+    users(search: $search, sort: SEARCH_MATCH) { ${SOCIAL_USER} }
+  }
+}`;
+
+export async function searchUsers(search: string, page = 1): Promise<UserPage> {
+  const data = await gql<{ Page: { pageInfo: PageInfo; users: SocialUser[] } }>(
+    USER_SEARCH_QUERY,
+    { search, page },
+  );
+  return { pageInfo: data.Page.pageInfo, users: data.Page.users ?? [] };
+}
+
+/** The shortest query this endpoint answers usefully. See `USER_SEARCH_QUERY`. */
+export const USER_SEARCH_MIN = 3;
+
 // --- Mutations ------------------------------------------------------------
 
 /**

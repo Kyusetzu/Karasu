@@ -114,6 +114,11 @@ const RE = {
   link: /\[([^\]]*)\]\(\s*([^)\s]+)\s*\)/y,
   autolink: /https?:\/\/[^\s<>()[\]]+/y,
   mention: /@([A-Za-z0-9_]{2,20})\b/y,
+  // `script` and `style` lose their *contents* too, not just their tags. Every
+  // other element's text is prose worth keeping; theirs is code that was never
+  // meant to be read, and showing it produced `bold bitalert(1)` on a real bio.
+  dropWhole: /<\s*(script|style)\b[^>]*>[\s\S]*?<\/\s*\1\s*>/iy,
+  dropDangling: /<\s*(?:script|style)\b[\s\S]*$/iy,
   htmlTag: /<\/?[a-zA-Z][^>]*>|<!--[\s\S]*?-->|<![^>]*>/y,
   // An unclosed `<div` at the very end still has to be consumed, or the scanner
   // emits it as literal text and the art bio shows a stray fragment.
@@ -182,6 +187,11 @@ function parseInline(src: string): MdInline[] {
     }
 
     if (c === "<") {
+      const drop = at(RE.dropWhole, src, i) ?? at(RE.dropDangling, src, i);
+      if (drop) {
+        i += drop[0].length;
+        continue;
+      }
       const br = at(RE.brTag, src, i);
       if (br) {
         flush();
@@ -326,7 +336,16 @@ function pushChip(out: MdInline[], kind: "image" | "video", raw: string) {
 // --- Blocks ---------------------------------------------------------------
 
 const FENCE = /^\s*```/;
-const CENTER = /^\s*~~~\s*$/;
+/** Closes a centred block: three tildes and nothing else. */
+const CENTER_CLOSE = /^\s*~~~\s*$/;
+/**
+ * Opens one. The trailing group is content written on the *same line* as the
+ * fence, which real bios do constantly — `~~~ tam | she/her | arg` was the form
+ * that exposed this. Requiring a bare `~~~` line left the tildes on screen.
+ */
+const CENTER_OPEN = /^\s*~~~(.*)$/;
+/** The whole block on one line — the other common form, `~~~img28(url)~~~`. */
+const CENTER_ONE_LINE = /^\s*~~~([\s\S]*?)~~~\s*$/;
 const HEADING = /^(#{1,6})\s+(.*)$/;
 const QUOTE = /^\s*>\s?(.*)$/;
 const HR = /^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/;
@@ -362,21 +381,23 @@ function parseBlocks(lines: string[]): MdNode[] {
       continue;
     }
 
-    // `~~~` on its own line opens a centred block; 25 of 44 bios use one.
-    if (CENTER.test(line)) {
-      const body: string[] = [];
+    // Centred blocks — 25 of 44 sampled bios have one. Single line first, so
+    // `~~~x~~~` is not read as an opener whose content happens to end in `~~~`.
+    const oneLine = CENTER_ONE_LINE.exec(line);
+    if (oneLine) {
+      out.push({ type: "center", children: parseBlocks([oneLine[1]]) });
       i += 1;
-      while (i < lines.length && !CENTER.test(lines[i])) body.push(lines[i++]);
-      if (i < lines.length) i += 1;
-      out.push({ type: "center", children: parseBlocks(body) });
       continue;
     }
 
-    // `~~~content~~~` all on one line — the other half of how it is written.
-    const inlineCenter = /^\s*~~~([\s\S]*?)~~~\s*$/.exec(line);
-    if (inlineCenter) {
-      out.push({ type: "center", children: parseBlocks([inlineCenter[1]]) });
+    const opener = CENTER_OPEN.exec(line);
+    if (opener) {
+      // Anything after the fence on the opening line is the block's first line.
+      const body: string[] = opener[1].trim() ? [opener[1]] : [];
       i += 1;
+      while (i < lines.length && !CENTER_CLOSE.test(lines[i])) body.push(lines[i++]);
+      if (i < lines.length) i += 1; // the closing fence
+      out.push({ type: "center", children: parseBlocks(body) });
       continue;
     }
 
@@ -463,7 +484,7 @@ function parseBlocks(lines: string[]): MdNode[] {
 function startsBlock(line: string): boolean {
   return (
     FENCE.test(line) ||
-    CENTER.test(line) ||
+    CENTER_OPEN.test(line) ||
     HR.test(line) ||
     HEADING.test(line) ||
     QUOTE.test(line) ||

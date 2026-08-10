@@ -133,9 +133,15 @@ describe("raw HTML drops the tag and keeps the words", () => {
     expect(textOf(parse(`<b onmouseover=alert(1)>hi</b>`))).toBe("hi");
   });
 
-  it("keeps a script's body as inert text rather than executing anything", () => {
-    // The body is not markup once the tags are gone, so it is only ever words.
-    expect(textOf(parse(`<script>alert(1)</script>`))).toBe("alert(1)");
+  it("drops a script or style body entirely, contents included", () => {
+    // Not merely inert — gone. Every other element's text is prose worth
+    // keeping; theirs is code nobody meant to read, and rendering it produced
+    // `bold bitalert(1)` on a real HTML-art bio.
+    expect(textOf(parse(`<script>alert(1)</script>`))).toBe("");
+    expect(textOf(parse(`<style>body{color:red}</style>`))).toBe("");
+    expect(textOf(parse(`before<script>alert(1)</script>after`))).toBe("beforeafter");
+    // An unclosed one takes the rest with it, rather than leaking the tail.
+    expect(textOf(parse(`kept<script>alert(1)`))).toBe("kept");
     expect(types(parse(`<script>alert(1)</script>`))).not.toContain("link");
   });
 
@@ -366,14 +372,34 @@ describe("block structure", () => {
     expect(types([n])).not.toContain("spoiler");
   });
 
-  it("parses a centre block in both spellings, with content inside", () => {
-    const block = parse(`~~~\ncentred **text**\n~~~`)[0];
-    expect(block.type).toBe("center");
-    expect(types([block])).toContain("strong");
+  it("parses a centre block in all three spellings, with content inside", () => {
+    const bare = parse(`~~~\ncentred **text**\n~~~`)[0];
+    expect(bare.type).toBe("center");
+    expect(types([bare])).toContain("strong");
 
-    const inline = parse(`~~~img28(https://i.imgur.com/a.png)~~~`)[0];
-    expect(inline.type).toBe("center");
-    expect(types([inline])).toContain("chip");
+    const oneLine = parse(`~~~img28(https://i.imgur.com/a.png)~~~`)[0];
+    expect(oneLine.type).toBe("center");
+    expect(types([oneLine])).toContain("chip");
+
+    // Content on the opening fence's own line. This is the form that shipped a
+    // literal `~~~` to screen — a real bio opens with `~~~ tam | she/her | arg`
+    // and the old rule demanded a bare `~~~` line.
+    const trailing = parse(`~~~ tam | she/her\n\n[insta](https://instagram.com/x)\n\n~~~`);
+    expect(trailing[0].type).toBe("center");
+    expect(textOf(trailing)).toContain("she/her");
+    expect(textOf(trailing)).not.toContain("~~~");
+    expect(types(trailing)).toContain("link");
+  });
+
+  it("leaves no fence marker in the rendered text, in any spelling", () => {
+    for (const src of [
+      `~~~ trailing content\nmore\n~~~`,
+      `~~~\nbare\n~~~`,
+      `~~~one line~~~`,
+      `~~~ unclosed content`,
+    ]) {
+      expect(textOf(parse(src)), src).not.toContain("~~~");
+    }
   });
 
   it("renders table rows as cell text rather than dropping them", () => {

@@ -600,6 +600,43 @@ export const en = {
   media: {
     addPlanning: "Add to Planning",
   },
+  social: {
+    // Profile
+    notFound: "No such user",
+    notFoundHint: "AniList has no account by that name. It may have been renamed or deleted.",
+    blocked: "You have blocked {{name}}",
+    blockedHint: "Unblock them on anilist.co to see this profile.",
+    needsAccount: "Profiles need an AniList account",
+    needsAccountHint:
+      "Followers, following and profiles live on AniList. The account-free local list has no social graph.",
+    goToSettings: "Link account",
+    openOnAniList: "View on AniList",
+    moderator: "Moderator",
+    previouslyKnownAs: "Previously {{names}}",
+    animeCount: "{{n}} anime",
+    mangaCount: "{{n}} manga",
+    // Follow
+    follow: "Follow",
+    following: "Following",
+    unfollow: "Unfollow",
+    followAria: "Follow {{name}}",
+    unfollowAria: "Unfollow {{name}}",
+    badgeMutual: "Mutual",
+    badgeFollowsYou: "Follows you",
+    followers: "Followers",
+    followedToast: "Following {{name}}",
+    unfollowedToast: "Unfollowed {{name}}",
+    followFailed: "Couldn't follow {{name}}",
+    followFailedDetail: "Nothing was sent. Social changes are not queued offline.",
+    // Favourites
+    favAnime: "Favourite anime",
+    favManga: "Favourite manga",
+    // Markdown rendering
+    mdImage: "Image",
+    mdVideo: "Video",
+    mdSpoiler: "Spoiler",
+    mdTruncated: "This profile is longer than Karasu shows — read the rest on AniList.",
+  },
   nowPlaying: {
     heading: "Now playing · {{process}}",
     headingManga: "Now reading · {{process}}",

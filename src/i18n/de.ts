@@ -603,6 +603,45 @@ export const de: typeof en = {
   media: {
     addPlanning: "Zu Geplant hinzufügen",
   },
+  social: {
+    // Profil
+    notFound: "Kein solcher Nutzer",
+    notFoundHint:
+      "AniList kennt kein Konto mit diesem Namen. Es wurde möglicherweise umbenannt oder gelöscht.",
+    blocked: "Du hast {{name}} blockiert",
+    blockedHint: "Hebe die Blockierung auf anilist.co auf, um dieses Profil zu sehen.",
+    needsAccount: "Profile brauchen ein AniList-Konto",
+    needsAccountHint:
+      "Follower, Gefolgte und Profile liegen bei AniList. Die kontofreie lokale Liste hat kein soziales Netz.",
+    goToSettings: "Konto verknüpfen",
+    openOnAniList: "Auf AniList ansehen",
+    moderator: "Moderator",
+    previouslyKnownAs: "Früher {{names}}",
+    animeCount: "{{n}} Anime",
+    mangaCount: "{{n}} Manga",
+    // Folgen
+    follow: "Folgen",
+    following: "Folgt",
+    unfollow: "Entfolgen",
+    followAria: "{{name}} folgen",
+    unfollowAria: "{{name}} entfolgen",
+    badgeMutual: "Gegenseitig",
+    badgeFollowsYou: "Folgt dir",
+    followers: "Follower",
+    followedToast: "Du folgst {{name}}",
+    unfollowedToast: "{{name}} entfolgt",
+    followFailed: "Konnte {{name}} nicht folgen",
+    followFailedDetail:
+      "Es wurde nichts gesendet. Soziale Änderungen werden offline nicht zwischengespeichert.",
+    // Favoriten
+    favAnime: "Lieblings-Anime",
+    favManga: "Lieblings-Manga",
+    // Markdown-Darstellung
+    mdImage: "Bild",
+    mdVideo: "Video",
+    mdSpoiler: "Spoiler",
+    mdTruncated: "Dieses Profil ist länger als Karasu anzeigt — lies den Rest auf AniList.",
+  },
   nowPlaying: {
     heading: "Läuft gerade · {{process}}",
     headingManga: "Wird gelesen · {{process}}",

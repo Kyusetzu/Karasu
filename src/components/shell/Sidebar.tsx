@@ -178,25 +178,41 @@ function Account({ pending, syncedAt }: { pending: number; syncedAt: number | nu
   const avatar = viewer?.avatar?.large ?? null;
   const sync = syncLine(t, mode === "local", pending, syncedAt);
 
+  const lockup = (
+    <UserLockup
+      name={name}
+      src={avatar}
+      size="sm"
+      nameClassName="text-xs font-medium leading-snug text-ink-300"
+      sub={
+        <span
+          className={cn(
+            "flex items-center gap-1.25 text-2xs leading-snug",
+            sync.accent ? "text-accent-400" : "text-ink-600",
+          )}
+        >
+          <span className="size-1.25 shrink-0 rounded-full bg-current" />
+          <span className="truncate">{sync.text}</span>
+        </span>
+      }
+    />
+  );
+
   return (
     <div className="mx-2.5 mb-2 border-b border-surface-800 pb-3 pt-2">
-      <UserLockup
-        name={name}
-        src={avatar}
-        size="sm"
-        nameClassName="text-xs font-medium leading-snug text-ink-300"
-        sub={
-          <span
-            className={cn(
-              "flex items-center gap-1.25 text-2xs leading-snug",
-              sync.accent ? "text-accent-400" : "text-ink-600",
-            )}
-          >
-            <span className="size-1.25 shrink-0 rounded-full bg-current" />
-            <span className="truncate">{sync.text}</span>
-          </span>
-        }
-      />
+      {/* Only a link with an AniList account behind it. The local profile has no
+          AniList page to open, so there it stays plain text rather than a link
+          that would 404 on a name AniList has never heard of. */}
+      {viewer ? (
+        <NavLink
+          to={`/user/${encodeURIComponent(viewer.name)}`}
+          className="-mx-1 block rounded-lg px-1 py-0.5 transition-surface hover:bg-surface-900"
+        >
+          {lockup}
+        </NavLink>
+      ) : (
+        lockup
+      )}
     </div>
   );
 }

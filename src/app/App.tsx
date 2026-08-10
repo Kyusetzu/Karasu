@@ -44,6 +44,7 @@ const Wrapped = lazy(() => import("@/pages/Wrapped"));
 const LocalLibrary = lazy(() => import("@/pages/LocalLibrary"));
 const Settings = lazy(() => import("@/pages/Settings"));
 const About = lazy(() => import("@/pages/About"));
+const UserProfile = lazy(() => import("@/pages/UserProfile"));
 
 export default function App() {
   const { pathname } = useLocation();
@@ -144,6 +145,9 @@ export default function App() {
                 <Route path="/library" element={<LocalLibrary />} />
                 <Route path="/media/:id" element={<AnimeDetail />} />
                 <Route path="/franchise/:id" element={<Franchise />} />
+                {/* By name, not id: that is what AniList's own URLs, an
+                    `@mention` and a pasted link all carry. */}
+                <Route path="/user/:name" element={<UserProfile />} />
                 {/* Alias for old links */}
                 <Route path="/anime/:id" element={<AnimeDetail />} />
                 <Route path="/settings" element={<Settings />} />
@@ -207,7 +211,11 @@ function PresenceReporter() {
       PAGE_LABELS[pathname] ??
       (pathname.startsWith("/media/") || pathname.startsWith("/anime/")
         ? "Details"
-        : "Karasu");
+        : // Never the name — a presence broadcast to Discord should not say
+          // whose profile is open.
+          pathname.startsWith("/user/")
+          ? "Profile"
+          : "Karasu");
     invoke("set_ui_page", { page: label }).catch(() => {});
   }, [pathname]);
   return null;

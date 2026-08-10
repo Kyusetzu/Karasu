@@ -22,6 +22,7 @@ import {
 } from "@/lib/contentFilter";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
+import { Avatar } from "@/components/ui/user-lockup";
 import { Tabs, type TabOption } from "@/components/ui/tabs";
 import {
   LineChart,
@@ -177,13 +178,9 @@ function StatisticsContent({
   return (
     <div className="mx-auto max-w-4xl space-y-6 p-8 2xl:max-w-none 3xl:max-w-[130rem]">
       <header className="flex items-center gap-4">
-        {avatar ? (
-          <img src={avatar} alt="" className="h-12 w-12 rounded-full object-cover" />
-        ) : (
-          <span className="grid h-12 w-12 place-items-center rounded-full bg-surface-800 text-accent-400">
-            <BarChart3 className="size-5" />
-          </span>
-        )}
+        {/* Avatar without the lockup: the text beside it is this screen's title,
+            not the user's name, so there is no name/sub stack to share. */}
+        <Avatar src={avatar} size="lg" fallback={<BarChart3 className="size-5" />} />
         <div className="min-w-0 flex-1">
           {/* The same lockup the two list screens use: title, then its
               Japanese form a shade back. */}

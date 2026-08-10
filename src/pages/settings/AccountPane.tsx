@@ -5,6 +5,7 @@ import { ChevronRight, ExternalLink, LogIn, LogOut, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardTitle } from "@/components/ui/card";
+import { UserLockup } from "@/components/ui/user-lockup";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/stores/auth";
 import { useAniListLogin } from "@/hooks/useAniListLogin";
@@ -39,26 +40,20 @@ export function AccountSection() {
       <Card>
         <CardTitle>{t("settings.account")}</CardTitle>
         <div className="mt-4 flex items-center gap-4">
-          {viewer.avatar?.large ? (
-            <img
-              src={viewer.avatar.large}
-              alt=""
-              className="h-14 w-14 rounded-full object-cover"
-            />
-          ) : (
-            <div className="grid h-14 w-14 place-items-center rounded-full bg-surface-800">
-              <User className="text-ink-500" />
-            </div>
-          )}
-          <div className="min-w-0 flex-1">
-            <p className="font-semibold">{viewer.name}</p>
-            <button
-              onClick={() => openUrl(viewer.siteUrl)}
-              className="flex items-center gap-1 text-xs text-accent-400 hover:underline"
-            >
-              {t("settings.profileLink")} <ExternalLink className="size-3" />
-            </button>
-          </div>
+          <UserLockup
+            name={viewer.name}
+            src={viewer.avatar?.large}
+            size="xl"
+            fallback={<User className="text-ink-500" />}
+            sub={
+              <button
+                onClick={() => openUrl(viewer.siteUrl)}
+                className="flex items-center gap-1 text-xs text-accent-400 hover:underline"
+              >
+                {t("settings.profileLink")} <ExternalLink className="size-3" />
+              </button>
+            }
+          />
           <Button variant="danger" onClick={() => logout()}>
             <LogOut className="size-4" /> {t("settings.logout")}
           </Button>

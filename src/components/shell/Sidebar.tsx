@@ -26,6 +26,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/stores/auth";
 import { useAniListLogin } from "@/hooks/useAniListLogin";
 import { useListSummary } from "@/hooks/useListSummary";
+import { UserLockup } from "@/components/ui/user-lockup";
 
 /** The rail is the state change — one marker slides between items rather than
     each growing its own. See `useRailMarker`. */
@@ -178,32 +179,24 @@ function Account({ pending, syncedAt }: { pending: number; syncedAt: number | nu
   const sync = syncLine(t, mode === "local", pending, syncedAt);
 
   return (
-    <div className="mx-2.5 mb-2 flex items-center gap-2.5 border-b border-surface-800 pb-3 pt-2">
-      {avatar ? (
-        <img
-          src={avatar}
-          alt=""
-          className="size-7 shrink-0 rounded-full object-cover"
-        />
-      ) : (
-        <span className="avatar-wash grid size-7 shrink-0 place-items-center rounded-full bg-surface-800 text-[.6875rem] font-semibold text-ink-300">
-          {name.slice(0, 1).toUpperCase()}
-        </span>
-      )}
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-xs font-medium leading-snug text-ink-300">
-          {name}
-        </span>
-        <span
-          className={cn(
-            "flex items-center gap-1.25 text-2xs leading-snug",
-            sync.accent ? "text-accent-400" : "text-ink-600",
-          )}
-        >
-          <span className="size-1.25 shrink-0 rounded-full bg-current" />
-          <span className="truncate">{sync.text}</span>
-        </span>
-      </span>
+    <div className="mx-2.5 mb-2 border-b border-surface-800 pb-3 pt-2">
+      <UserLockup
+        name={name}
+        src={avatar}
+        size="sm"
+        nameClassName="text-xs font-medium leading-snug text-ink-300"
+        sub={
+          <span
+            className={cn(
+              "flex items-center gap-1.25 text-2xs leading-snug",
+              sync.accent ? "text-accent-400" : "text-ink-600",
+            )}
+          >
+            <span className="size-1.25 shrink-0 rounded-full bg-current" />
+            <span className="truncate">{sync.text}</span>
+          </span>
+        }
+      />
     </div>
   );
 }

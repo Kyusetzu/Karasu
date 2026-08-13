@@ -9,7 +9,9 @@ import { useAuth } from "@/stores/auth";
 import { useContentFilter } from "@/stores/contentFilter";
 import { isBlocked } from "@/lib/contentFilter";
 import { useListMutations } from "@/hooks/useListMutations";
+import { fromList } from "@/lib/calendar";
 import { SectionHeader } from "@/components/ui/section-header";
+import { DigestRow } from "@/components/media/DigestRow";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { TitleLockup } from "@/components/media/TitleLockup";
@@ -247,49 +249,13 @@ function AiringSoon({ entries }: { entries: MediaListEntry[] }) {
   );
 }
 
-/**
- * One line of a digest: art, what it is, when it lands.
- *
- * Both digests put the episode number in the *right* block rather than under
- * the title, because the two things a glance wants — which episode and how
- * long — then sit on top of each other in one column instead of straddling the
- * row. The title column is left to say what the show is, in both scripts.
- */
-function DigestRow({
-  entry,
-  note,
-  when,
-}: {
-  entry: MediaListEntry;
-  note: string;
-  when: string;
-}) {
-  return (
-    <Link
-      to={`/media/${entry.media.id}`}
-      className="flex items-center gap-2.5 rounded-[.625rem] px-2.5 py-2 transition-surface hover:bg-surface-900"
-    >
-      <img
-        src={entry.media.coverImage.large ?? ""}
-        alt=""
-        loading="lazy"
-        className="h-11.5 w-8.5 shrink-0 rounded-[.3125rem] object-cover"
-      />
-      <TitleLockup title={entry.media.title} className="flex-1" />
-      <div className="shrink-0 text-right">
-        <p className="text-2xs text-ink-600">{note}</p>
-        <p className="text-xs tabular-nums text-accent-400">{when}</p>
-      </div>
-    </Link>
-  );
-}
-
 const WEEK_SECS = 7 * 24 * 3600;
 
 /**
  * "This week" digest: episodes of the shows you're watching that air within
- * the next seven days, grouped by local weekday. Sourced entirely from the
- * cached list (each entry carries `nextAiringEpisode`), so it works offline.
+ * the next seven days. Sourced entirely from the cached list (each entry
+ * carries `nextAiringEpisode`) through `lib/calendar`'s `fromList`, which the
+ * calendar page shares — one implementation of "what airs in this window".
  *
  * Manga is intentionally absent: AniList exposes no chapter-release schedule,
  * so there is no truthful "new chapters this week" to show.
@@ -299,25 +265,12 @@ function WeeklyDigest({ entries }: { entries: MediaListEntry[] }) {
 
   const thisWeek = useMemo(() => {
     const now = Date.now() / 1000;
-    const end = now + WEEK_SECS;
-    return entries
-      .filter(
-        (e) =>
-          (e.status === "CURRENT" || e.status === "REPEATING") &&
-          e.media.nextAiringEpisode &&
-          e.media.nextAiringEpisode.airingAt >= now &&
-          e.media.nextAiringEpisode.airingAt <= end,
-      )
-      .sort(
-        (a, b) =>
-          a.media.nextAiringEpisode!.airingAt -
-          b.media.nextAiringEpisode!.airingAt,
-      );
+    return fromList(entries, now, now + WEEK_SECS);
   }, [entries]);
 
   if (thisWeek.length === 0) return null;
 
-  const shows = new Set(thisWeek.map((e) => e.mediaId)).size;
+  const shows = new Set(thisWeek.map((x) => x.mediaId)).size;
 
   return (
     <section>
@@ -327,16 +280,12 @@ function WeeklyDigest({ entries }: { entries: MediaListEntry[] }) {
         meta={t("dashboard.thisWeekSummary", { count: thisWeek.length, shows })}
       />
       <div className="mt-3 grid gap-0.5 2xl:grid-cols-2">
-        {thisWeek.map((entry) => (
+        {thisWeek.map((item) => (
           <DigestRow
-            key={entry.id}
-            entry={entry}
-            note={t("common.episode", {
-              n: entry.media.nextAiringEpisode!.episode,
-            })}
-            when={new Date(
-              entry.media.nextAiringEpisode!.airingAt * 1000,
-            ).toLocaleString(i18n.language, {
+            key={item.entry.id}
+            media={item.entry.media}
+            note={t("common.episode", { n: item.episode })}
+            when={new Date(item.airingAt * 1000).toLocaleString(i18n.language, {
               weekday: "short",
               hour: "2-digit",
               minute: "2-digit",
@@ -490,7 +439,7 @@ function AiringRow({ entry }: { entry: MediaListEntry }) {
 
   return (
     <DigestRow
-      entry={entry}
+      media={entry.media}
       note={
         t("common.episode", { n: airing.episode }) +
         (entry.progress < airing.episode - 1

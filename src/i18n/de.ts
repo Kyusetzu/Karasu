@@ -642,6 +642,18 @@ export const de: typeof en = {
       "Es wurde nichts gesendet. Soziale Änderungen werden offline nicht zwischengespeichert.",
     // Tabs und Listen
     tabOverview: "Übersicht",
+    editProfile: "Profil bearbeiten",
+    bio: "Bio",
+    bioPlaceholder: "Sag etwas über dich …",
+    bioPreviewEmpty: "Die Vorschau erscheint hier, während du schreibst.",
+    bioMarkdownHint:
+      "Markdown funktioniert. Bilder und Embeds erscheinen als Links — die Vorschau zeigt genau, wie dein Profil in Karasu aussieht.",
+    profileColor: "Profilfarbe",
+    profileColorHint:
+      "AniList färbt dein Profil damit ein. Ein eigener Hex-Wert ist dort eine Unterstützer-Funktion.",
+    colorInvalid: "Keiner der sieben Namen und kein #RRGGBB-Wert.",
+    otherAccountSettings: "Weitere AniList-Kontoeinstellungen →",
+    saving: "Speichere …",
     tabActivity: "Aktivität",
     noActivity: "{{name}} hat noch nichts gepostet",
     // Verben. AniList setzt diese Sätze selbst zusammen, und nur auf Englisch —

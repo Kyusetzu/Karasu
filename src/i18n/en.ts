@@ -637,6 +637,18 @@ export const en = {
     followFailedDetail: "Nothing was sent. Social changes are not queued offline.",
     // Tabs and lists
     tabOverview: "Overview",
+    editProfile: "Edit profile",
+    bio: "Bio",
+    bioPlaceholder: "Say something about yourself …",
+    bioPreviewEmpty: "The preview appears here as you type.",
+    bioMarkdownHint:
+      "Markdown works. Images and embeds show as links — the preview is exactly what your profile will look like in Karasu.",
+    profileColor: "Profile colour",
+    profileColorHint:
+      "AniList uses this to tint your profile. A custom hex value is a supporter feature on their side.",
+    colorInvalid: "Not one of the seven names or a #RRGGBB value.",
+    otherAccountSettings: "Other AniList account settings →",
+    saving: "Saving …",
     tabActivity: "Activity",
     noActivity: "{{name}} hasn't posted anything yet",
     // Verbs. AniList composes these sentences itself and only in English, so

@@ -1,8 +1,14 @@
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { ExternalLink, Heart, Shield, Sparkles } from "lucide-react";
+import { ExternalLink, Heart, Pencil, Shield, Sparkles } from "lucide-react";
 import type { UserProfile } from "@/api/social";
 import { Avatar } from "@/components/ui/user-lockup";
+import { Button } from "@/components/ui/button";
+import { PresenceIf } from "@/components/ui/presence";
+import { ProfileEditModal } from "@/components/overlays/ProfileEditModal";
+import { useAuth } from "@/stores/auth";
+import { isSelf } from "@/lib/follows";
 import { FollowButton } from "./FollowButton";
 import { Markdown } from "./Markdown";
 import { followRelation, relationBadgeKey } from "@/lib/follows";
@@ -47,6 +53,9 @@ export function ProfileHeader({ user }: { user: UserProfile }) {
   const relation = followRelation(user);
   const badgeKey = relationBadgeKey(relation);
   const donator = donatorLabel(user);
+  const viewer = useAuth((s) => s.viewer);
+  const self = isSelf(viewer?.id, user.id);
+  const [editing, setEditing] = useState(false);
   const anime = user.statistics?.anime;
   const manga = user.statistics?.manga;
 
@@ -127,12 +136,18 @@ export function ProfileHeader({ user }: { user: UserProfile }) {
             )}
           </div>
 
-          <FollowButton
-            userId={user.id}
-            name={user.name}
-            flags={user}
-            size="control"
-          />
+          {self ? (
+            <Button variant="secondary" size="control" onClick={() => setEditing(true)}>
+              <Pencil className="size-3.5" /> {t("social.editProfile")}
+            </Button>
+          ) : (
+            <FollowButton
+              userId={user.id}
+              name={user.name}
+              flags={user}
+              size="control"
+            />
+          )}
         </div>
 
         {user.about && (
@@ -143,6 +158,20 @@ export function ProfileHeader({ user }: { user: UserProfile }) {
           />
         )}
       </div>
+
+      {/* Through `PresenceIf` so the dialog can animate out — React unmounts
+          before CSS can, so `{open && <Modal/>}` only ever has an entrance. */}
+      <PresenceIf when={editing}>
+        {(leaving) => (
+          <ProfileEditModal
+            viewerName={user.name}
+            about={user.about}
+            profileColor={user.options?.profileColor ?? null}
+            onClose={() => setEditing(false)}
+            leaving={leaving}
+          />
+        )}
+      </PresenceIf>
     </header>
   );
 }

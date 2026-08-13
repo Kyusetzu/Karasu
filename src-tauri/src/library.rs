@@ -1289,8 +1289,11 @@ mod tests {
         assert!(matcher::best_match(&parsed, &frieren()).is_none());
     }
 
+    // Forward slashes on purpose: Windows' `Path` accepts both separators,
+    // Linux only `/` — a backslash fixture parses its whole self as the
+    // filename there, and these tests also run in the linux-build CI job.
     fn paths(names: &[&str]) -> Vec<String> {
-        names.iter().map(|n| format!("D:\\Anime\\{n}")).collect()
+        names.iter().map(|n| format!("/anime/{n}")).collect()
     }
 
     /// Scans without any correction on record, then derives every view — the
@@ -1377,7 +1380,7 @@ mod tests {
 
     fn bocchi_files(eps: &[u32]) -> Vec<String> {
         eps.iter()
-            .map(|e| format!("D:\\Anime\\Bocchi the Rock - {e:02}.mkv"))
+            .map(|e| format!("/anime/Bocchi the Rock - {e:02}.mkv"))
             .collect()
     }
 
@@ -1641,8 +1644,8 @@ mod tests {
     #[test]
     fn the_first_path_wins_for_a_duplicate_episode() {
         let files = vec![
-            "D:\\A\\[SubsPlease] Sousou no Frieren - 13 (1080p) [A].mkv".to_string(),
-            "D:\\B\\[SubsPlease] Sousou no Frieren - 13 (720p) [B].mkv".to_string(),
+            "/a/[SubsPlease] Sousou no Frieren - 13 (1080p) [A].mkv".to_string(),
+            "/b/[SubsPlease] Sousou no Frieren - 13 (720p) [B].mkv".to_string(),
         ];
         let index = indexed(&files, &frieren()).by_media;
         assert_eq!(index[&154587][&13], files[0]);

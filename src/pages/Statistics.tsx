@@ -25,7 +25,6 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { Avatar } from "@/components/ui/user-lockup";
 import { Tabs, type TabOption } from "@/components/ui/tabs";
 import {
-  LineChart,
   RadarChart,
   Sunburst,
   ToneLegend,
@@ -34,14 +33,24 @@ import {
 } from "@/components/stats/Charts";
 import { STATUS_ORDER, type MediaListStatus } from "@/api/types";
 import { Empty, type Category } from "@/components/stats/shared";
-import { DistributionCard, ScoreColumns, StatusBar, TileGrid, YearSparkline } from "@/components/stats/panels";
+import { DistributionCard, ScoreColumns, StatusBar, TileGrid } from "@/components/stats/panels";
 import { GradientBars } from "@/components/stats/GradientBars";
 import { DotPlot } from "@/components/stats/DotPlot";
-import { scoreDelta, type ScoreDeltaSummary } from "@/lib/localStats";
+import { AreaChart } from "@/components/stats/AreaChart";
+import { Heatmap } from "@/components/stats/Heatmap";
+import {
+  activityHeatmap,
+  scoreDelta,
+  seasonalHistory,
+  type ActivityHeatmap,
+  type ScoreDeltaSummary,
+  type SeasonCount,
+} from "@/lib/localStats";
 import { RankedList, fmt, scoreText } from "@/components/stats/RankedList";
 const ANIME_CATEGORIES: Category[] = [
   "overview",
   "ratings",
+  "years",
   "genres",
   "tags",
   "voiceActors",
@@ -49,7 +58,14 @@ const ANIME_CATEGORIES: Category[] = [
   "staff",
 ];
 
-const MANGA_CATEGORIES: Category[] = ["overview", "ratings", "genres", "tags", "staff"];
+const MANGA_CATEGORIES: Category[] = [
+  "overview",
+  "ratings",
+  "years",
+  "genres",
+  "tags",
+  "staff",
+];
 
 export default function Statistics() {
   const { t } = useTranslation();
@@ -166,15 +182,22 @@ function StatisticsContent({
     queryFn: () => fetchMediaList(userId, type),
     enabled: isTauri,
   });
+  // The list already in the cache, once, for every local panel below —
+  // filtered here so no panel can forget the check. Zero requests.
+  const localEntries = useMemo(
+    () =>
+      (typeList?.lists ?? [])
+        .filter((g) => !g.isCustomList)
+        .flatMap((g) => g.entries)
+        .filter((e) => !isBlocked(e.media, level)),
+    [typeList, level],
+  );
   // "My score against the crowd's" — the one figure AniList's statistics
-  // cannot answer, computed from the list already in the cache. Zero requests.
-  const delta = useMemo(() => {
-    const entries = (typeList?.lists ?? [])
-      .filter((g) => !g.isCustomList)
-      .flatMap((g) => g.entries)
-      .filter((e) => !isBlocked(e.media, level));
-    return scoreDelta(entries);
-  }, [typeList, level]);
+  // cannot answer.
+  const delta = useMemo(() => scoreDelta(localEntries), [localEntries]);
+  // When the list was worked on, from the fuzzy start/completion dates.
+  const heatmap = useMemo(() => activityHeatmap(localEntries), [localEntries]);
+  const seasons = useMemo(() => seasonalHistory(localEntries), [localEntries]);
 
   const breakdown = useMemo<Slice[]>(() => {
     const byStatus = new Map<MediaListStatus, Map<string, number>>();
@@ -266,6 +289,8 @@ function StatisticsContent({
             category={activeCategory}
             breakdown={breakdown}
             delta={delta}
+            heatmap={heatmap}
+            seasons={seasons}
           />
         ) : (
           <MangaView
@@ -273,6 +298,8 @@ function StatisticsContent({
             category={activeCategory}
             breakdown={breakdown}
             delta={delta}
+            heatmap={heatmap}
+            seasons={seasons}
           />
         ))}
 
@@ -304,11 +331,15 @@ function AnimeView({
   category,
   breakdown,
   delta,
+  heatmap,
+  seasons,
 }: {
   stats: AnimeStats;
   category: Category;
   breakdown: Slice[];
   delta: ScoreDeltaSummary | null;
+  heatmap: ActivityHeatmap | null;
+  seasons: SeasonCount[];
 }) {
   const { t, i18n } = useTranslation();
   const level = useContentFilter((s) => s.level);
@@ -316,6 +347,10 @@ function AnimeView({
 
   if (category === "ratings") {
     return <RatingsView stats={stats} type="ANIME" delta={delta} />;
+  }
+
+  if (category === "years") {
+    return <YearsView stats={stats} heatmap={heatmap} seasons={seasons} />;
   }
 
   if (category === "overview") {
@@ -358,11 +393,15 @@ function MangaView({
   category,
   breakdown,
   delta,
+  heatmap,
+  seasons,
 }: {
   stats: MangaStats;
   category: Category;
   breakdown: Slice[];
   delta: ScoreDeltaSummary | null;
+  heatmap: ActivityHeatmap | null;
+  seasons: SeasonCount[];
 }) {
   const { t, i18n } = useTranslation();
   const level = useContentFilter((s) => s.level);
@@ -370,6 +409,10 @@ function MangaView({
 
   if (category === "ratings") {
     return <RatingsView stats={stats} type="MANGA" delta={delta} />;
+  }
+
+  if (category === "years") {
+    return <YearsView stats={stats} heatmap={heatmap} seasons={seasons} />;
   }
 
   if (category === "overview") {
@@ -520,6 +563,113 @@ function RatingsView({
   );
 }
 
+/**
+ * The Years tab: the list along its time axes. Release years say what you
+ * watch, start years say when you were watching it, the heatmap says which
+ * months you were actually at it — the last one from the local list's fuzzy
+ * dates, a figure AniList's endpoint does not have.
+ */
+function YearsView({
+  stats,
+  heatmap,
+  seasons,
+}: {
+  stats: AnimeStats | MangaStats;
+  heatmap: ActivityHeatmap | null;
+  seasons: SeasonCount[];
+}) {
+  const { t, i18n } = useTranslation();
+
+  const released = [...stats.releaseYears]
+    .filter((d) => d.releaseYear)
+    .sort((a, b) => (a.releaseYear ?? 0) - (b.releaseYear ?? 0))
+    .slice(-20);
+  const started = [...stats.startYears]
+    .filter((d) => d.startYear)
+    .sort((a, b) => (a.startYear ?? 0) - (b.startYear ?? 0))
+    .slice(-16);
+  const startMeans = started
+    .filter((d) => (d.meanScore ?? 0) > 0)
+    .slice(-12)
+    .map((d) => ({
+      label: String(d.startYear ?? 0),
+      value: d.meanScore ?? 0,
+      text: (d.meanScore ?? 0).toFixed(1),
+      sub: `${fmt(d.count, i18n.language)}×`,
+    }));
+  const monthLabels = useMemo(
+    () =>
+      Array.from({ length: 12 }, (_, m) =>
+        new Date(2000, m, 1).toLocaleDateString(i18n.language, { month: "narrow" }),
+      ),
+    [i18n.language],
+  );
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-2">
+      {released.length > 1 && (
+        <Card className="flex h-full flex-col">
+          <CardTitle>{t("stats.releaseYears")}</CardTitle>
+          <p className="mt-1 text-2xs text-ink-600">{t("stats.releaseYearsHint")}</p>
+          <div className="mt-4 flex flex-1 items-center">
+            <AreaChart
+              data={released.map((d) => ({
+                label: String(d.releaseYear ?? 0),
+                value: d.count,
+              }))}
+            />
+          </div>
+        </Card>
+      )}
+      {started.length > 1 && (
+        <Card className="flex h-full flex-col">
+          <CardTitle>{t("stats.startYears")}</CardTitle>
+          <p className="mt-1 text-2xs text-ink-600">{t("stats.startYearsHint")}</p>
+          <div className="mt-4 flex flex-1 items-center">
+            <AreaChart
+              data={started.map((d) => ({
+                label: String(d.startYear ?? 0),
+                value: d.count,
+              }))}
+            />
+          </div>
+        </Card>
+      )}
+      {heatmap && (
+        <div className="lg:col-span-2">
+          <Heatmap
+            title={t("stats.activityHeatmap")}
+            hint={t("stats.activityHeatmapHint")}
+            years={heatmap.years}
+            max={heatmap.max}
+            monthLabels={monthLabels}
+          />
+        </div>
+      )}
+      {startMeans.length > 1 && (
+        <GradientBars
+          title={t("stats.meanByStartYear")}
+          hint={t("stats.meanByStartYearHint")}
+          domain={10}
+          rows={startMeans}
+        />
+      )}
+      {seasons.length > 0 && (
+        <GradientBars
+          title={t("stats.seasonHabits")}
+          hint={t("stats.seasonHabitsHint")}
+          rows={seasons.map((s) => ({
+            label: t(`season.${s.season}`, { defaultValue: s.season }),
+            value: s.count,
+            text: fmt(s.count, i18n.language),
+            sub: s.meanScore > 0 ? `★ ${s.meanScore.toFixed(1)}` : undefined,
+          }))}
+        />
+      )}
+    </div>
+  );
+}
+
 function OverviewCharts({
   stats,
   type,
@@ -531,13 +681,6 @@ function OverviewCharts({
 }) {
   const { t } = useTranslation();
   const level = useContentFilter((s) => s.level);
-  const years = [...stats.releaseYears]
-    .sort((a, b) => (a.releaseYear ?? 0) - (b.releaseYear ?? 0))
-    .slice(-16);
-  const started = [...stats.startYears]
-    .filter((d) => d.startYear)
-    .sort((a, b) => (a.startYear ?? 0) - (b.startYear ?? 0))
-    .slice(-16);
   // AniList returns the buckets unordered and spells them "1", "17-28",
   // "101+" — sort on the number each one opens with.
   const lengths = [...stats.lengths]
@@ -582,30 +725,12 @@ function OverviewCharts({
           count: d.count,
         }))}
       />
-      <YearSparkline
-        title={t("stats.releaseYears")}
-        data={years.map((d) => ({ year: d.releaseYear ?? 0, count: d.count }))}
-      />
       <DistributionCard
         title={t("stats.formats")}
         data={stats.formats.map((d) => ({ label: d.format ?? "?", count: d.count }))}
       />
-      {/* Release years say what you watch; start years say when you were
-          watching it. A line rather than the bars above, because these are one
-          series continuing rather than years to compare against each other. */}
-      {started.length > 1 && (
-        <Card className="flex h-full flex-col">
-          <CardTitle>{t("stats.startYears")}</CardTitle>
-          <div className="mt-4 flex flex-1 items-center">
-            <LineChart
-              data={started.map((d) => ({
-                label: String(d.startYear ?? 0),
-                value: d.count,
-              }))}
-            />
-          </div>
-        </Card>
-      )}
+      {/* The year serieses moved to the Years tab, which owns the time axis
+          now — two homes for one chart is how they drift apart. */}
 
       {breakdown.length > 0 && (
         <Card className="flex h-full flex-col">

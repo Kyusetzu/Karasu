@@ -1,4 +1,4 @@
-import type { MediaListEntry } from "@/api/types";
+import type { FuzzyDate, MediaListEntry } from "@/api/types";
 import { displayTitle } from "@/api/types";
 
 /**
@@ -79,4 +79,100 @@ export function scoreDelta(entries: MediaListEntry[], top = 5): ScoreDeltaSummar
       .reverse()
       .slice(0, top),
   };
+}
+
+// --- Activity heatmap -------------------------------------------------------
+
+export interface HeatmapYear {
+  year: number;
+  /** Events per calendar month, index 0 = January. */
+  months: number[];
+}
+
+export interface ActivityHeatmap {
+  /** Oldest first, at most `maxYears` of them. */
+  years: HeatmapYear[];
+  /** The busiest cell, for the intensity scale. */
+  max: number;
+  total: number;
+}
+
+/**
+ * When the list was actually worked on: every start and every completion with
+ * a known year *and* month becomes one event in its cell.
+ *
+ * Fuzzy-date honesty is the whole trick here — AniList dates are legitimately
+ * partial ("2019", "March 2024"), and a year-only date is **skipped**, never
+ * pinned to January: a fabricated cell reads exactly like a real one and
+ * poisons the picture. Both dates count, deliberately — starting and
+ * finishing are both activity, and a show begun in March and finished in May
+ * was worked on in both months.
+ */
+export function activityHeatmap(
+  entries: MediaListEntry[],
+  maxYears = 8,
+): ActivityHeatmap | null {
+  const byYear = new Map<number, number[]>();
+  let total = 0;
+  const record = (d: FuzzyDate | null) => {
+    if (!d?.year || !d.month || d.month < 1 || d.month > 12) return;
+    const months = byYear.get(d.year) ?? Array.from({ length: 12 }, () => 0);
+    months[d.month - 1] += 1;
+    byYear.set(d.year, months);
+    total += 1;
+  };
+  for (const e of entries) {
+    record(e.startedAt);
+    record(e.completedAt);
+  }
+  if (total === 0) return null;
+
+  const years = [...byYear.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .slice(-maxYears)
+    .map(([year, months]) => ({ year, months }));
+  const max = Math.max(...years.flatMap((y) => y.months), 1);
+  return { years, max, total };
+}
+
+// --- Seasonal habits --------------------------------------------------------
+
+export const SEASONS = ["WINTER", "SPRING", "SUMMER", "FALL"] as const;
+export type SeasonName = (typeof SEASONS)[number];
+
+export interface SeasonCount {
+  season: SeasonName;
+  count: number;
+  /** Mean of the user's own scores in that season, ten-point; 0 = unscored. */
+  meanScore: number;
+}
+
+/**
+ * Which broadcast seasons the list is drawn from, with how the user scored
+ * each — "am I a fall person". Seasonless media (most manga, some films) are
+ * simply outside the question rather than a fifth bucket.
+ */
+export function seasonalHistory(entries: MediaListEntry[]): SeasonCount[] {
+  const seen = new Set<number>();
+  const counts = new Map<SeasonName, { count: number; scoreSum: number; scored: number }>();
+  for (const e of entries) {
+    const season = e.media.season as SeasonName | null;
+    if (!season || !SEASONS.includes(season) || seen.has(e.mediaId)) continue;
+    seen.add(e.mediaId);
+    const bucket = counts.get(season) ?? { count: 0, scoreSum: 0, scored: 0 };
+    bucket.count += 1;
+    if (e.score > 0) {
+      bucket.scoreSum += e.score;
+      bucket.scored += 1;
+    }
+    counts.set(season, bucket);
+  }
+  return SEASONS.filter((s) => counts.has(s)).map((season) => {
+    const b = counts.get(season)!;
+    return {
+      season,
+      count: b.count,
+      meanScore: b.scored > 0 ? b.scoreSum / b.scored : 0,
+    };
+  });
 }

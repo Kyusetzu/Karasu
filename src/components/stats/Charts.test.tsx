@@ -3,6 +3,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { LineChart, RadarChart, Sunburst, Treemap } from "./Charts";
 import { GradientBars } from "./GradientBars";
 import { DotPlot } from "./DotPlot";
+import { AreaChart } from "./AreaChart";
+import { Heatmap } from "./Heatmap";
 
 /**
  * These charts kept their numbers in `<title>` elements, which is to say behind
@@ -21,6 +23,79 @@ const html = (node: React.ReactElement) => renderToStaticMarkup(node);
 function texts(markup: string): string[] {
   return [...markup.matchAll(/<text[^>]*>([^<]*)<\/text>/g)].map((m) => m[1]);
 }
+
+describe("AreaChart", () => {
+  const data = [
+    { label: "2021", value: 42 },
+    { label: "2022", value: 17 },
+    { label: "2023", value: 88 },
+  ];
+
+  it("writes every point's value and label, like the line it succeeds", () => {
+    const out = texts(html(<AreaChart data={data} />));
+    for (const d of data) {
+      expect(out).toContain(String(d.value));
+      expect(out).toContain(d.label);
+    }
+  });
+
+  it("draws a curve, not a polyline, and keeps the theme's palette", () => {
+    const markup = html(<AreaChart data={data} />);
+    // curveMonotoneX emits cubic segments — a C in the path is the curve.
+    expect(markup).toMatch(/<path[^>]*d="[^"]*C/);
+    expect(markup).toContain("var(--color-accent-500)");
+    expect(markup).toContain("rgba(var(--accent-rgb)");
+    expect(markup).not.toMatch(/(?:fill|stroke)="#/);
+  });
+
+  it("normalizes the draw-on with pathLength, since a curve's length is not knowable in markup", () => {
+    expect(html(<AreaChart data={data} />)).toContain('pathLength="1"');
+  });
+
+  it("declines a single point — one dot is not a series", () => {
+    expect(html(<AreaChart data={[{ label: "2024", value: 3 }]} />)).toBe("");
+  });
+});
+
+describe("Heatmap", () => {
+  const months = ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"];
+  const years = [
+    { year: 2023, months: [0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 5] },
+    { year: 2024, months: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
+  ];
+
+  it("labels every year and month, and titles each busy cell with its count", () => {
+    const markup = html(
+      <Heatmap title="t" years={years} max={5} monthLabels={months} />,
+    );
+    expect(markup).toContain("2023");
+    expect(markup).toContain("2024");
+    expect(markup).toContain("M 2023 · 2");
+    expect(markup).toContain("D 2023 · 5");
+  });
+
+  it("scales intensity through the accent variable, never a literal colour", () => {
+    const markup = html(
+      <Heatmap title="t" years={years} max={5} monthLabels={months} />,
+    );
+    expect(markup).toContain("rgba(var(--accent-rgb)");
+    expect(markup).not.toMatch(/background:#/);
+    // The busiest cell gets more alpha than the quietest.
+    expect(markup).toContain("0.92");
+    expect(markup).toContain("0.14");
+  });
+
+  it("an empty month keeps the surface tone — quiet, not missing", () => {
+    const markup = html(
+      <Heatmap title="t" years={years} max={5} monthLabels={months} />,
+    );
+    expect(markup).toContain("bg-surface-800");
+  });
+
+  it("renders nothing with no years", () => {
+    expect(html(<Heatmap title="t" years={[]} max={0} monthLabels={months} />)).toBe("");
+  });
+});
 
 describe("GradientBars", () => {
   const rows = [

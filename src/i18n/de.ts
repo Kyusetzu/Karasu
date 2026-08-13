@@ -690,7 +690,10 @@ export const de: typeof en = {
     resetView: "Ansicht zurücksetzen",
     collapse: "Diesen Zweig einklappen",
     expand: "Diesen Zweig ausklappen",
-    selectHint: "Wähle einen Titel, um zu sehen, was er ist.",
+    selectHint:
+      "Wähle einen Titel, um zu sehen, was er ist. Doppelklick öffnet die Detailseite.",
+    editMissing:
+      "Noch nicht auf deiner Liste — öffne den Titel, um ihn hinzuzufügen.",
     yourProgress: "Dein Fortschritt",
     connects: "Verbunden mit",
     openDetail: "Details öffnen",

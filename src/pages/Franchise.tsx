@@ -6,6 +6,7 @@ import { Minus, Plus } from "lucide-react";
 import { loadFranchise, type FranchiseNode } from "@/api/franchise";
 import { useContentFilter } from "@/stores/contentFilter";
 import { useAuth } from "@/stores/auth";
+import { showToast } from "@/stores/toast";
 import { isTauri } from "@/api/anilist";
 import { formatLabel } from "@/lib/format";
 import {
@@ -195,12 +196,15 @@ export default function Franchise() {
       )}
 
       {data && layout && data.nodes.length > 1 && (
-        <div className="flex min-h-0 flex-1 gap-4">
+        // Column below `xl`, row above: the rail holds the page's only open
+        // and edit buttons, so hiding it under 1280px left the whole screen
+        // without an affordance — the reported "can't click anything".
+        <div className="flex min-h-0 flex-1 flex-col gap-4 xl:flex-row">
           <div
             ref={viewport}
             {...pan.handlers}
             className={cn(
-              "relative min-w-0 flex-1 select-none overflow-hidden rounded-xl border border-hair bg-surface-900",
+              "relative min-h-0 min-w-0 flex-1 select-none overflow-hidden rounded-xl border border-hair bg-surface-900",
               pan.dragging ? "cursor-grabbing" : "cursor-grab",
             )}
             style={{
@@ -281,6 +285,10 @@ export default function Franchise() {
                       if (pan.dragged()) return;
                       setSelected(nodeId);
                     }}
+                    onOpen={() => {
+                      if (pan.dragged()) return;
+                      navigate(`/media/${nodeId}`);
+                    }}
                     onToggle={() => toggle(nodeId)}
                   />
                 );
@@ -360,6 +368,7 @@ function GraphNode({
   collapsed,
   onHover,
   onSelect,
+  onOpen,
   onToggle,
 }: {
   node: FranchiseNode;
@@ -372,6 +381,8 @@ function GraphNode({
   collapsed: boolean;
   onHover: (id: number | null) => void;
   onSelect: () => void;
+  /** Double-click: straight to the detail page, like a related cover. */
+  onOpen: () => void;
   onToggle: () => void;
 }) {
   const { t } = useTranslation();
@@ -397,6 +408,7 @@ function GraphNode({
       <button
         type="button"
         onClick={onSelect}
+        onDoubleClick={onOpen}
         className="block w-full text-left"
         style={{ cursor: "pointer" }}
       >
@@ -489,7 +501,7 @@ function Rail({
 
   if (!node) {
     return (
-      <aside className="hidden w-60 shrink-0 rounded-xl border border-hair bg-surface-900 p-4 xl:block">
+      <aside className="w-full shrink-0 rounded-xl border border-hair bg-surface-900 p-4 xl:w-60">
         <p className="text-xs text-ink-600">{t("franchise.selectHint")}</p>
       </aside>
     );
@@ -500,16 +512,17 @@ function Rail({
 
   return (
     // Keyed on the node so the pane re-runs `settle` when the selection moves,
-    // which is the only cue that the rail changed at all.
+    // which is the only cue that the rail changed at all. Below `xl` it sits
+    // under the canvas, full-width and height-capped, instead of vanishing.
     <aside
       key={node.id}
-      className="hidden w-60 shrink-0 animate-settle overflow-y-auto rounded-xl border border-hair bg-surface-900 p-4 panel-wash xl:block"
+      className="max-h-64 w-full shrink-0 animate-settle overflow-y-auto rounded-xl border border-hair bg-surface-900 p-4 panel-wash xl:max-h-none xl:w-60"
     >
       {node.coverImage.large && (
         <img
           src={node.coverImage.large}
           alt=""
-          className="mb-3 aspect-2/3 w-full rounded-lg object-cover"
+          className="mb-3 hidden aspect-2/3 w-full rounded-lg object-cover xl:block"
         />
       )}
       {relation && (
@@ -593,12 +606,18 @@ function EntryEditor({
   userId: number | undefined;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const entry = useCachedEntry(userId, type, mediaId);
   const { save, remove } = useListMutations(userId ?? 0, type);
 
+  // No cached entry means there is nothing to edit — say so instead of
+  // closing mutely, which read as a broken button.
   useEffect(() => {
-    if (!entry) onClose();
-  }, [entry, onClose]);
+    if (!entry) {
+      showToast({ kind: "error", text: t("franchise.editMissing") });
+      onClose();
+    }
+  }, [entry, onClose, t]);
   if (!entry) return null;
 
   return (

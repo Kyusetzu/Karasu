@@ -40,7 +40,8 @@ import { Pill } from "@/components/ui/pill";
 import { ScoreBars } from "@/components/ui/score-bars";
 import TagEditor from "@/components/media/TagEditor";
 import { parseNotes, serializeNotes } from "@/lib/tags";
-import { sanitizeDescription } from "@/lib/description";
+import { parseAniListHtml } from "@/lib/anilistHtml";
+import { RichText } from "@/components/RichText";
 
 
 export default function AnimeDetail() {
@@ -290,13 +291,14 @@ export default function AnimeDetail() {
                 <CardTitle>{t("detail.description")}</CardTitle>
                 {/* Capped at a reading measure and set loose. A synopsis is
                     the only long-form prose in the app; `pretty` keeps it off
-                    orphaned last words. */}
-                <p
-                  className="mt-3 max-w-176 text-[.8125rem] leading-[1.75] text-pretty text-ink-300"
-                  dangerouslySetInnerHTML={{
-                    __html: sanitizeDescription(data.description),
-                  }}
-                />
+                    orphaned last words.
+
+                    Elements, not `dangerouslySetInnerHTML`. This was the last
+                    innerHTML in the app, and the sanitizer it needed had already
+                    been a live XSS once — see `lib/anilistHtml`. */}
+                <p className="mt-3 max-w-176 text-[.8125rem] leading-[1.75] text-pretty text-ink-300">
+                  <RichText nodes={parseAniListHtml(data.description)} />
+                </p>
               </Card>
             )}
 

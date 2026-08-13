@@ -42,10 +42,24 @@ export default function Forum() {
 
   // The same 500 ms debounce the media search uses. A forum search on every
   // keystroke would spend the shared rate limit faster than anything else here.
+  // The settled term is also written back to `?q=` — it was only ever *read*
+  // before, so a search did not survive Back from a thread.
   useEffect(() => {
-    const timer = setTimeout(() => setTerm(input.trim()), 500);
+    const timer = setTimeout(() => {
+      const next = input.trim();
+      setTerm(next);
+      setParams(
+        (prev) => {
+          const p = new URLSearchParams(prev);
+          if (next) p.set("q", next);
+          else p.delete("q");
+          return p;
+        },
+        { replace: true },
+      );
+    }, 500);
     return () => clearTimeout(timer);
-  }, [input]);
+  }, [input, setParams]);
 
   const setLens = (next: Lens) => {
     const p = new URLSearchParams(params);

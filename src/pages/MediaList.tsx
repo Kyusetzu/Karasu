@@ -7,7 +7,7 @@ import {
   useState,
 } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link, useNavigate } from "react-router";
+import { Link, useNavigate, useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import {
   Bookmark,
@@ -98,10 +98,25 @@ export default function MediaList({ type }: { type: MediaType }) {
 
 function ListView({ userId, type }: { userId: number; type: MediaType }) {
   const { t } = useTranslation();
-  const [tab, setTab] = useState<MediaListStatus>("CURRENT");
-  const [filter, setFilter] = useState("");
-  const [tagFilter, setTagFilter] = useState("");
-  const [sort, setSort] = useState<SortKey>("updated");
+  // The view — tab, sort and both filters — lives in the URL, not in state.
+  // Back from a detail page then restores exactly the view that was left
+  // (`replace: true` keeps the `/anime` history entry current in place), while
+  // a sidebar click is a fresh navigation with no params and so a clean
+  // default view. Same reasoning as the profile's `?tab=`.
+  const [params, setParams] = useSearchParams();
+  const rawTab = params.get("tab");
+  const tab: MediaListStatus = STATUS_ORDER.includes(rawTab as MediaListStatus)
+    ? (rawTab as MediaListStatus)
+    : "CURRENT";
+  const rawSort = params.get("sort");
+  const sort: SortKey = SORT_KEYS.includes(rawSort as SortKey)
+    ? (rawSort as SortKey)
+    : "updated";
+  const tagFilter = params.get("tag") ?? "";
+  // The text filter is the one piece that keeps local state: the input echoes
+  // every keystroke, and writing `history.replaceState` per keystroke is the
+  // thing to avoid. It mirrors into `?q=` through the debounce below.
+  const [filter, setFilter] = useState(() => params.get("q") ?? "");
   // Remembered per media type: the screen remounts on every navigation, so
   // component state meant re-picking the view every single time.
   const [grid, setGrid] = useState(() => loadViewMode(type) === "grid");
@@ -133,12 +148,52 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
     });
   }, []);
 
+  /**
+   * The one writer for the URL-held view state.
+   *
+   * One writer rather than one per field because a preset sets three fields at
+   * once, and three separate `setParams` calls would each read a stale
+   * snapshot and clobber each other. The functional form closes the same gap
+   * against the debounced filter write landing between a click and its
+   * update. A field at its default is deleted, so the default view has a bare
+   * URL.
+   */
+  const setView = useCallback(
+    (patch: Partial<{ tab: MediaListStatus; filter: string; tagFilter: string; sort: SortKey }>) => {
+      setParams(
+        (prev) => {
+          const p = new URLSearchParams(prev);
+          const write = (key: string, value: string, def: string) =>
+            value === def ? p.delete(key) : p.set(key, value);
+          if (patch.tab !== undefined) write("tab", patch.tab, "CURRENT");
+          if (patch.sort !== undefined) write("sort", patch.sort, "updated");
+          if (patch.tagFilter !== undefined) write("tag", patch.tagFilter, "");
+          if (patch.filter !== undefined) write("q", patch.filter.trim(), "");
+          return p;
+        },
+        { replace: true },
+      );
+    },
+    [setParams],
+  );
+
+  // Mirror the text filter into `?q=` on the same 500 ms the other searches
+  // debounce on — one URL write when typing settles, not one per keystroke.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (filter.trim() !== (params.get("q") ?? "")) setView({ filter });
+    }, 500);
+    return () => clearTimeout(timer);
+    // `params` deliberately not a dependency: it changes on the write this
+    // effect just made, and re-arming the timer for that is a no-op loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter, setView]);
+
   const applyPreset = (name: string) => {
     const p = presets.find((x) => x.name === name);
     if (!p) return;
-    setTab(p.tab as MediaListStatus);
     setFilter(p.filter);
-    setSort(p.sort as SortKey);
+    setView({ tab: p.tab as MediaListStatus, filter: p.filter, sort: p.sort as SortKey });
   };
 
   const addPreset = (name: string) => {
@@ -196,8 +251,8 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
   // A tag that no longer exists anywhere must not keep the list empty.
   useEffect(() => {
     if (tagFilter && !allTags.some((x) => x.toLowerCase() === tagFilter.toLowerCase()))
-      setTagFilter("");
-  }, [allTags, tagFilter]);
+      setView({ tagFilter: "" });
+  }, [allTags, tagFilter, setView]);
 
   /**
    * Search and sort keys, derived once per list change instead of once per
@@ -512,7 +567,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
         <StatusTabs
           className="mt-4"
           value={tab}
-          onChange={setTab}
+          onChange={(v) => setView({ tab: v })}
           tabs={STATUS_ORDER.map((status) => ({
             value: status,
             label: t(`status.${type}.${status}`),
@@ -536,14 +591,14 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
           <FilterSelect
             label={t("list.sortLabel")}
             value={sort}
-            onChange={(v) => setSort(v as SortKey)}
+            onChange={(v) => setView({ sort: v as SortKey })}
             options={SORT_KEYS.map((k) => ({ value: k, label: t(`sort.${k}`) }))}
           />
           {allTags.length > 0 && (
             <FilterSelect
               label={t("list.tagLabel")}
               value={tagFilter}
-              onChange={setTagFilter}
+              onChange={(v) => setView({ tagFilter: v })}
               placeholder={t("tags.allTags")}
               options={allTags.map((tag) => ({ value: tag, label: tag }))}
             />
@@ -614,7 +669,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
                   size="control"
                   onClick={() => {
                     setFilter("");
-                    setTagFilter("");
+                    setView({ filter: "", tagFilter: "" });
                   }}
                 >
                   {t("list.clearFilter")}

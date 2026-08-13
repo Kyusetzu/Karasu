@@ -491,6 +491,20 @@ pub fn install_panic_hook() {
 mod tests {
     use super::*;
 
+    /// The ring, the sink and the debug flag are process-global, and `cargo
+    /// test` runs threads in parallel — so every test that writes or measures
+    /// that state takes this lock. Without it the suite is green by
+    /// scheduling luck: on a CI runner the ring-flood test evicted the panic
+    /// hook's entry between the panic and the assertion reading it, a
+    /// failure no local run had ever produced.
+    static GLOBAL_LOG_STATE: Mutex<()> = Mutex::new(());
+
+    /// An assertion failure in one locked test must not poison the rest —
+    /// they would all die reporting the lock instead of their own state.
+    fn serialize() -> std::sync::MutexGuard<'static, ()> {
+        GLOBAL_LOG_STATE.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
     #[test]
     fn levels_order_from_most_to_least_severe() {
         assert!(Level::Error < Level::Warn);
@@ -579,16 +593,24 @@ mod tests {
 
     #[test]
     fn debug_entries_are_dropped_unless_enabled() {
+        let _serial = serialize();
         set_debug(false);
         assert!(!debug_enabled());
-        // `log` returns early; the observable effect is that nothing is added.
-        let before = entries(RING_CAPACITY).len();
-        debug("test", "should not appear");
-        assert_eq!(entries(RING_CAPACITY).len(), before);
+        // Presence of the message, not ring length: a length comparison lies
+        // once the bounded ring is full (a push evicts, the length holds).
+        debug("test", "a debug line that must be dropped");
+        assert!(
+            !entries(RING_CAPACITY)
+                .iter()
+                .any(|e| e.message.contains("a debug line that must be dropped")),
+            "a disabled debug line reached the ring"
+        );
 
         set_debug(true);
-        debug("test", "should appear");
-        assert!(entries(RING_CAPACITY).len() > before);
+        debug("test", "a debug line that must be kept");
+        assert!(entries(RING_CAPACITY)
+            .iter()
+            .any(|e| e.message.contains("a debug line that must be kept")));
         set_debug(false);
     }
 
@@ -637,6 +659,7 @@ mod tests {
     #[test]
     fn debug_changed_records_nothing_while_disabled() {
         const KEY: &str = "dedupe-off";
+        let _serial = serialize();
         set_debug(false);
         debug_changed("dedupetest", KEY, "anything");
         // The map was never touched, so the value is still "new".
@@ -645,6 +668,9 @@ mod tests {
 
     #[test]
     fn the_ring_is_bounded_and_newest_first() {
+        // The lock is also what makes "newest first" checkable at all: any
+        // concurrent writer's entry would land on top of ours.
+        let _serial = serialize();
         for i in 0..(RING_CAPACITY + 50) {
             info("ringtest", format!("entry {i}"));
         }
@@ -665,6 +691,9 @@ mod tests {
     /// to a public issue, which is the property that actually matters.
     #[test]
     fn no_secret_survives_to_the_file_on_disk() {
+        // Locked for the sink: `init` points the process-global sink at this
+        // test's directory, and a concurrent writer would land in its file.
+        let _serial = serialize();
         let dir = std::env::temp_dir().join(format!("karasu-scrub-test-{}", now_ms()));
         std::fs::create_dir_all(&dir).unwrap();
         init(dir.clone());
@@ -701,14 +730,17 @@ mod tests {
     /// captures one rather than trusting that `set_hook` was called.
     #[test]
     fn the_panic_hook_records_the_panic() {
+        // The CI flake this lock exists for: the ring-flood test evicting
+        // this entry between the panic and the read. (A `len > before`
+        // assertion also used to live here — wrong for a different reason:
+        // a full ring evicts on push, so the length never moves.)
+        let _serial = serialize();
         install_panic_hook();
-        let before = entries(RING_CAPACITY).len();
 
         // Caught so the test itself survives; the hook still runs first.
         let _ = std::panic::catch_unwind(|| panic!("a deliberate test panic"));
 
         let recorded = entries(RING_CAPACITY);
-        assert!(recorded.len() > before, "the hook logged nothing");
         let entry = recorded
             .iter()
             .find(|e| e.target == "panic")

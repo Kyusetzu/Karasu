@@ -80,6 +80,8 @@ export interface AniListUserOptions {
   activityMergeTime: number | null;
   staffNameLanguage: string | null;
   restrictMessagesToFollowing: boolean | null;
+  /** Which list statuses do NOT post an activity — `disabled: true` mutes one. */
+  disabledListActivity?: { disabled: boolean | null; type: string | null }[] | null;
 }
 
 export interface AniListMediaListOptions {
@@ -192,6 +194,7 @@ query ($name: String, $id: Int) {
       activityMergeTime
       staffNameLanguage
       restrictMessagesToFollowing
+      disabledListActivity { disabled type }
     }
     mediaListOptions {
       scoreFormat
@@ -786,6 +789,8 @@ mutation (
   $airingNotifications: Boolean
   $restrictMessagesToFollowing: Boolean
   $notificationOptions: [NotificationOptionInput]
+  $donatorBadge: String
+  $disabledListActivity: [ListActivityOptionInput]
 ) {
   UpdateUser(
     about: $about
@@ -800,13 +805,17 @@ mutation (
     airingNotifications: $airingNotifications
     restrictMessagesToFollowing: $restrictMessagesToFollowing
     notificationOptions: $notificationOptions
+    donatorBadge: $donatorBadge
+    disabledListActivity: $disabledListActivity
   ) {
     id
     about
+    donatorBadge
     options {
       titleLanguage displayAdultContent airingNotifications profileColor
       timezone activityMergeTime staffNameLanguage restrictMessagesToFollowing
       notificationOptions { type enabled }
+      disabledListActivity { disabled type }
     }
     mediaListOptions { scoreFormat rowOrder }
   }
@@ -815,8 +824,10 @@ mutation (
 export interface UpdatedUser {
   id: number;
   about: string | null;
+  donatorBadge: string | null;
   options: (AniListUserOptions & {
     notificationOptions: { type: string | null; enabled: boolean | null }[] | null;
+    disabledListActivity: { disabled: boolean | null; type: string | null }[] | null;
   }) | null;
   mediaListOptions: { scoreFormat: string | null; rowOrder: string | null } | null;
 }

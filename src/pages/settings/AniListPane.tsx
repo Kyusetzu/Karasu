@@ -11,9 +11,12 @@ import { Button } from "@/components/ui/button";
 import { Shimmer } from "@/components/Skeleton";
 import { ExternalNote, Row, SELECT, Toggle } from "./shared";
 import {
+  LIST_ACTIVITY_STATUSES,
   LOCAL_OVERRIDES,
+  mergeListActivity,
   mergeNotificationOptions,
   NOTIFICATION_TYPES,
+  type ListActivityStatus,
   type NotificationTypeName,
 } from "@/lib/anilistUserFields";
 import { useUpdateUser } from "@/hooks/useUpdateUser";
@@ -218,8 +221,61 @@ export function AniListProfileSection() {
               label={t("settings.alRestrictMessages")}
               hint={t("settings.alRestrictMessagesHint")}
             />
+
+            <Row
+              label={t("settings.alDonatorBadge")}
+              hint={
+                (data?.donatorTier ?? 0) > 0
+                  ? t("settings.alDonatorBadgeHint")
+                  : t("settings.alDonatorBadgeLocked")
+              }
+            >
+              <input
+                type="text"
+                defaultValue={data?.donatorBadge ?? ""}
+                maxLength={24}
+                disabled={save.isPending || (data?.donatorTier ?? 0) === 0}
+                onBlur={(e) => {
+                  const next = e.target.value.trim();
+                  if (next && next !== (data?.donatorBadge ?? "")) {
+                    save.mutate({ donatorBadge: next });
+                  }
+                }}
+                className={cn(SELECT, "w-40")}
+              />
+            </Row>
+
+            {/* Per-status activity muting. The same whole-array write as the
+                notification grid: `mergeListActivity` always sends all six, so
+                flipping one cannot silently reset the other five. */}
+            <div className="border-t border-surface-800 pt-3">
+              <p className="text-sm text-ink-100">{t("settings.alListActivity")}</p>
+              <p className="mt-0.5 text-xs text-ink-600">{t("settings.alListActivityHint")}</p>
+              <div className="mt-2 space-y-1">
+                {LIST_ACTIVITY_STATUSES.map((status) => (
+                  <Toggle
+                    key={status}
+                    checked={!isActivityMuted(options.disabledListActivity, status)}
+                    disabled={save.isPending}
+                    onChange={(posts) =>
+                      save.mutate({
+                        disabledListActivity: mergeListActivity(
+                          options.disabledListActivity,
+                          { [status]: !posts },
+                        ),
+                      })
+                    }
+                    label={listActivityLabel(status, t)}
+                  />
+                ))}
+              </div>
+            </div>
           </>
         )}
+
+        {/* The hard edge, stated rather than hidden: the API has no mutation
+            for these three, so no client can offer them. */}
+        <ExternalNote>{t("settings.alNoUpload")}</ExternalNote>
 
         <div className="flex flex-wrap gap-2 border-t border-surface-800 pt-3">
           <Link to={`/user/${encodeURIComponent(viewer.name)}`}>
@@ -234,6 +290,36 @@ export function AniListProfileSection() {
       </div>
     </Card>
   );
+}
+
+/** Whether a status is currently muted in the server's array. */
+function isActivityMuted(
+  current: { disabled: boolean | null; type: string | null }[] | null | undefined,
+  status: ListActivityStatus,
+): boolean {
+  return (current ?? []).some((o) => o?.type === status && o.disabled === true);
+}
+
+/**
+ * A literal switch, not `` t(`status.ANIME.${s}`) `` — partly for
+ * `i18nKeys.test.ts`, partly because these labels cover anime *and* manga at
+ * once, which the per-type status labels deliberately do not.
+ */
+function listActivityLabel(status: ListActivityStatus, t: (k: string) => string): string {
+  switch (status) {
+    case "CURRENT":
+      return t("settings.alActCurrent");
+    case "PLANNING":
+      return t("settings.alActPlanning");
+    case "COMPLETED":
+      return t("settings.alActCompleted");
+    case "DROPPED":
+      return t("settings.alActDropped");
+    case "PAUSED":
+      return t("settings.alActPaused");
+    case "REPEATING":
+      return t("settings.alActRepeating");
+  }
 }
 
 export function AniListListOptionsSection() {

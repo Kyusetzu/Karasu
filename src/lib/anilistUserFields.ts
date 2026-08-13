@@ -74,6 +74,43 @@ export function mergeNotificationOptions(
 }
 
 /**
+ * `disabledListActivity` is the same whole-array shape as the notification
+ * grid, one entry per `MediaListStatus`: `disabled: true` means "don't post an
+ * activity when I set this status". A partial send would reset whatever was
+ * left out, so the merge always emits all six, defaulting to `false` (posting,
+ * AniList's own default) for a status the server has not stored.
+ */
+export const LIST_ACTIVITY_STATUSES = [
+  "CURRENT",
+  "PLANNING",
+  "COMPLETED",
+  "DROPPED",
+  "PAUSED",
+  "REPEATING",
+] as const;
+
+export type ListActivityStatus = (typeof LIST_ACTIVITY_STATUSES)[number];
+
+export interface ListActivityOption {
+  disabled: boolean | null;
+  type: string | null;
+}
+
+export function mergeListActivity(
+  current: ListActivityOption[] | null | undefined,
+  changes: Partial<Record<ListActivityStatus, boolean>>,
+): { disabled: boolean; type: ListActivityStatus }[] {
+  const now = new Map<string, boolean>();
+  for (const o of current ?? []) {
+    if (o?.type) now.set(o.type, o.disabled === true);
+  }
+  return LIST_ACTIVITY_STATUSES.map((type) => ({
+    type,
+    disabled: changes[type] ?? now.get(type) ?? false,
+  }));
+}
+
+/**
  * The four AniList settings Karasu deliberately ignores.
  *
  * Editing them is still legitimate — they are the user's settings and other
@@ -117,6 +154,8 @@ export interface UserSettingsForm {
   airingNotifications?: boolean;
   restrictMessagesToFollowing?: boolean;
   notificationOptions?: { type: NotificationTypeName; enabled: boolean }[];
+  donatorBadge?: string;
+  disabledListActivity?: { disabled: boolean; type: ListActivityStatus }[];
 }
 
 /**
@@ -151,6 +190,8 @@ export function formToUpdateUserVars(
   put("airingNotifications");
   put("restrictMessagesToFollowing");
   put("notificationOptions");
+  put("donatorBadge");
+  put("disabledListActivity");
 
   return vars;
 }

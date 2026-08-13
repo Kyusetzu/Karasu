@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   formToUpdateUserVars,
   hasChanges,
+  LIST_ACTIVITY_STATUSES,
   LOCAL_OVERRIDES,
+  mergeListActivity,
   mergeNotificationOptions,
   NOTIFICATION_TYPES,
 } from "./anilistUserFields";
@@ -158,6 +160,62 @@ describe("mergeNotificationOptions", () => {
     expect(merged).toHaveLength(20);
     // `enabled: null` reads as enabled, matching the `!== false` test.
     expect(allFrom(merged).get("AIRING")).toBe(true);
+  });
+});
+
+describe("mergeListActivity", () => {
+  it("always returns all six statuses — the same whole-array hazard as notifications", () => {
+    expect(LIST_ACTIVITY_STATUSES).toHaveLength(6);
+    expect(mergeListActivity(null, {})).toHaveLength(6);
+    expect(mergeListActivity([], {})).toHaveLength(6);
+    expect(mergeListActivity([{ type: "COMPLETED", disabled: true }], {})).toHaveLength(6);
+  });
+
+  it("preserves the five the user did not touch", () => {
+    const current = [
+      { type: "COMPLETED", disabled: true },
+      { type: "DROPPED", disabled: true },
+    ];
+    const merged = new Map(
+      mergeListActivity(current, { CURRENT: true }).map((o) => [o.type, o.disabled]),
+    );
+    expect(merged.get("CURRENT")).toBe(true);
+    expect(merged.get("COMPLETED")).toBe(true);
+    expect(merged.get("DROPPED")).toBe(true);
+    expect(merged.get("PLANNING")).toBe(false);
+    expect(merged.get("PAUSED")).toBe(false);
+    expect(merged.get("REPEATING")).toBe(false);
+  });
+
+  it("defaults an unstored status to posting (disabled: false), AniList's own default", () => {
+    const merged = new Map(
+      mergeListActivity([{ type: "PAUSED", disabled: true }], {}).map((o) => [
+        o.type,
+        o.disabled,
+      ]),
+    );
+    expect(merged.get("PAUSED")).toBe(true);
+    expect(merged.get("CURRENT")).toBe(false);
+  });
+
+  it("lets a change re-enable what the server had muted", () => {
+    const merged = new Map(
+      mergeListActivity([{ type: "PAUSED", disabled: true }], { PAUSED: false }).map((o) => [
+        o.type,
+        o.disabled,
+      ]),
+    );
+    expect(merged.get("PAUSED")).toBe(false);
+  });
+
+  it("carries donatorBadge and disabledListActivity through the form, and still never the list options", () => {
+    const vars = formToUpdateUserVars({
+      donatorBadge: "Crow enthusiast",
+      disabledListActivity: mergeListActivity(null, { PLANNING: true }),
+    });
+    expect(Object.keys(vars).sort()).toEqual(["disabledListActivity", "donatorBadge"]);
+    expect(vars).not.toHaveProperty("animeListOptions");
+    expect(vars).not.toHaveProperty("mangaListOptions");
   });
 });
 

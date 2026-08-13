@@ -27,6 +27,8 @@ export const en = {
     settings: "Settings",
   },
   sync: {
+    button: "Sync now",
+    failed: "Sync failed",
     now: "Synced just now",
     minutes: "Synced {{n}} min ago",
     hours: "Synced {{n}} h ago",

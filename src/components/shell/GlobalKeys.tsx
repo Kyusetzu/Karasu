@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { isTyping } from "@/components/shell/KeyboardSheet";
+import { useManualSync } from "@/hooks/useManualSync";
 
 /**
  * The global shortcut group.
@@ -14,6 +15,9 @@ import { isTyping } from "@/components/shell/KeyboardSheet";
 export default function GlobalKeys() {
   const navigate = useNavigate();
   const qc = useQueryClient();
+  // Destructured so the effect's deps stay stable across the `syncing` flips
+  // the hook's state makes — `sync` is a stable callback.
+  const { sync, available } = useManualSync();
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -46,14 +50,19 @@ export default function GlobalKeys() {
       if (e.key.toLowerCase() === "r") {
         // Reload is not a thing a desktop app should do: the WebView would
         // drop every cache and re-authenticate to show the same screen. Sync
-        // is what the user means by refresh here.
+        // is what the user means by refresh here — the same full sync as the
+        // sidebar button, which actually *fetches* (an invalidation alone
+        // refetches only mounted observers, so from most pages it did
+        // nothing visible). Local mode keeps the invalidation: its lists
+        // read SQLite and there is no server to ask.
         e.preventDefault();
-        qc.invalidateQueries({ queryKey: ["mediaList"] });
+        if (available) void sync();
+        else qc.invalidateQueries({ queryKey: ["mediaList"] });
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [navigate, qc]);
+  }, [navigate, qc, sync, available]);
 
   return null;
 }

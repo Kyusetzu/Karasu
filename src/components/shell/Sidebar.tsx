@@ -20,6 +20,7 @@ import {
   HardDrive,
   Info,
   LogIn,
+  RefreshCw,
   Settings,
   Users,
   MessagesSquare,
@@ -29,6 +30,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/stores/auth";
 import { useAniListLogin } from "@/hooks/useAniListLogin";
 import { useListSummary } from "@/hooks/useListSummary";
+import { useManualSync } from "@/hooks/useManualSync";
 import { UserLockup } from "@/components/ui/user-lockup";
 
 /** The rail is the state change — one marker slides between items rather than
@@ -231,6 +233,7 @@ export default function Sidebar() {
   const viewer = useAuth((s) => s.viewer);
   const mode = useAuth((s) => s.mode);
   const login = useAniListLogin();
+  const manualSync = useManualSync();
   const { counts, pending, syncedAt } = useListSummary(viewer?.id);
   const { pathname } = useLocation();
   // Re-measured when the route changes and when the item set does — the
@@ -282,6 +285,24 @@ export default function Sidebar() {
       </div>
 
       <div className="flex flex-col gap-px px-2.5">
+        {/* The chip below *says* when the last sync was; this is the way to
+            cause one. Signed-in only — a local list has nothing to sync. */}
+        {manualSync.available && (
+          <button
+            type="button"
+            onClick={() => void manualSync.sync()}
+            disabled={manualSync.syncing}
+            className={cn(itemClass, stateClass(false), "disabled:opacity-60")}
+          >
+            <RefreshCw
+              className={cn(
+                "size-4.25 shrink-0",
+                manualSync.syncing && "animate-spin",
+              )}
+            />
+            <span className={labelClass}>{t("sync.button")}</span>
+          </button>
+        )}
         <Account pending={pending} syncedAt={syncedAt} />
         {/* A local profile is usable on its own, but linking AniList is the
             one action it can't reach from anywhere else in one click. */}

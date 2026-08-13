@@ -25,6 +25,8 @@ export const de: typeof en = {
     settings: "Einstellungen",
   },
   sync: {
+    button: "Jetzt synchronisieren",
+    failed: "Synchronisierung fehlgeschlagen",
     now: "Gerade synchronisiert",
     minutes: "Vor {{n}} Min. synchronisiert",
     hours: "Vor {{n}} Std. synchronisiert",

@@ -66,8 +66,9 @@ export function cellWidth(chars: number, control = false): number {
  * cell clip. Kept here so the test and the widths cannot drift apart.
  */
 export const WORST_CASE = {
-  /** No star in the closed display — see `SCORE_SHOWS_STAR`. */
-  score: "10",
+  /** No star in the closed display — see `SCORE_SHOWS_STAR`. The widest any
+      format renders: `10.0` (POINT_10_DECIMAL) beats `100` by a character. */
+  score: "10.0",
   progress: "1100 / 1100",
   volumes: "108 / 108",
   repeat: "×12",

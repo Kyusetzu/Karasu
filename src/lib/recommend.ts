@@ -40,15 +40,16 @@ export interface ScoredRecommendation {
 }
 
 /**
- * How much a completed entry's opinion counts.
+ * How much a completed entry's opinion counts, as a 0–1 fraction of the
+ * score scale's `max` (scores arrive in the account's display format now).
  *
  * An unscored entry counts as a 7/10: you finished it, which is a mild
  * endorsement, but you never said you liked it. The point of weighting at all
  * is the other end — a 3/10 you slogged through shouldn't drag its
  * recommendations to the top of the page just because you saw it through.
  */
-export function seedWeight(score: number): number {
-  return score > 0 ? score / 10 : 0.7;
+export function seedWeight(score: number, max = 10): number {
+  return score > 0 ? score / max : 0.7;
 }
 
 /**
@@ -83,6 +84,8 @@ export interface RankOptions {
   limit?: number;
   /** Applied per candidate; the caller supplies the content-filter check. */
   isHidden?: (media: MediaWithListStatus) => boolean;
+  /** The score scale's maximum, from `scoreScale(format).max`. */
+  scoreMax?: number;
 }
 
 /**
@@ -100,9 +103,11 @@ export interface RankOptions {
  */
 export function rankRecommendations(
   recs: RawRecommendation[],
-  { seeds, exclude, type, limit = 12, isHidden }: RankOptions,
+  { seeds, exclude, type, limit = 12, isHidden, scoreMax = 10 }: RankOptions,
 ): ScoredRecommendation[] {
-  const weightOf = new Map(seeds.map((s) => [s.mediaId, seedWeight(s.score)]));
+  const weightOf = new Map(
+    seeds.map((s) => [s.mediaId, seedWeight(s.score, scoreMax)]),
+  );
 
   interface Acc {
     media: MediaWithListStatus;

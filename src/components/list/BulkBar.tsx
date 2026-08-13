@@ -10,6 +10,8 @@ import ConfirmDialog from "@/components/overlays/ConfirmDialog";
 import { PresenceIf } from "@/components/ui/presence";
 import { Button } from "@/components/ui/button";
 import { FilterSelect } from "@/components/ui/filter-select";
+import { bulkScoreOptions } from "./ScoreSelect";
+import { useScoreFormat } from "@/stores/auth";
 import { cn } from "@/lib/utils";
 /** Sticky action bar for bulk edits over the current selection. */
 
@@ -38,6 +40,7 @@ export function BulkBar({
   names: string[];
 }) {
   const { t } = useTranslation();
+  const scoreFormat = useScoreFormat();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const disabled = count === 0;
 
@@ -71,13 +74,7 @@ export function BulkBar({
         value=""
         placeholder="—"
         onChange={(v) => v !== "" && onScore(Number(v))}
-        options={[
-          { value: "0", label: "–" },
-          ...Array.from({ length: 10 }, (_, i) => ({
-            value: String(i + 1),
-            label: `★ ${i + 1}`,
-          })),
-        ]}
+        options={[{ value: "0", label: "–" }, ...bulkScoreOptions(scoreFormat)]}
         className={cn(disabled && "pointer-events-none opacity-50")}
       />
 

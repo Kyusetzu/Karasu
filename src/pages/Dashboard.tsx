@@ -5,7 +5,8 @@ import { useTranslation } from "react-i18next";
 import { BarChart3, CalendarClock, CalendarDays, Play, Plus } from "lucide-react";
 import { fetchMediaList } from "@/api/anilist";
 import type { MediaListEntry } from "@/api/types";
-import { useAuth } from "@/stores/auth";
+import { useAuth, useScoreFormat } from "@/stores/auth";
+import { formatMeanScore, formatScore } from "@/lib/scoreFormat";
 import { useContentFilter } from "@/stores/contentFilter";
 import { isBlocked } from "@/lib/contentFilter";
 import { useListMutations } from "@/hooks/useListMutations";
@@ -307,6 +308,7 @@ function WeeklyDigest({ entries }: { entries: MediaListEntry[] }) {
 
 function Stats({ entries }: { entries: MediaListEntry[] }) {
   const { t, i18n } = useTranslation();
+  const scoreFormat = useScoreFormat();
   const stats = useMemo(() => {
     const unique = new Map(entries.map((e) => [e.mediaId, e]));
     const list = [...unique.values()];
@@ -339,7 +341,10 @@ function Stats({ entries }: { entries: MediaListEntry[] }) {
     { label: t("dashboard.statDays"), value: stats.days.toFixed(1) },
     {
       label: t("dashboard.statMeanScore"),
-      value: stats.meanScore !== null ? stats.meanScore.toFixed(1) : "–",
+      value:
+        stats.meanScore !== null
+          ? formatMeanScore(scoreFormat, stats.meanScore)
+          : "–",
     },
   ];
 
@@ -380,6 +385,7 @@ const ContinueCard = memo(function ContinueCard({
   onPlusOne: (entry: MediaListEntry) => void;
 }) {
   const { t } = useTranslation();
+  const scoreFormat = useScoreFormat();
   const { media } = entry;
   const canPlus = media.episodes === null || entry.progress < media.episodes;
 
@@ -387,7 +393,7 @@ const ContinueCard = memo(function ContinueCard({
     <CoverCell
       to={`/media/${media.id}`}
       cover={media.coverImage.large}
-      score={entry.score > 0 ? entry.score : null}
+      score={entry.score > 0 ? formatScore(scoreFormat, entry.score) : null}
       progress={
         media.episodes
           ? { current: entry.progress, total: media.episodes }

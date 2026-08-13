@@ -28,7 +28,7 @@ import { cn } from "@/lib/utils";
  *
  * A pane rather than controls on the profile, for the reason `Settings.tsx`
  * already gives for itself — a pane is URL-addressable, so a dead end elsewhere
- * can point at the exact pane that fixes it. That is precisely what the four
+ * can point at the exact pane that fixes it. That is precisely what the three
  * override notes need.
  *
  * Reads through `["social", "user", <name>]`, the same cache entry the viewer's
@@ -61,6 +61,50 @@ const SCORE_FORMATS = [
 
 const ROW_ORDERS = ["title", "score", "updatedAt", "id"] as const;
 
+/**
+ * Literal-switch labels for the four selects, so `i18nKeys.test.ts` sees
+ * every key — the same trade `listActivityLabel` and `notificationLabel`
+ * already make. The raw enum values ("ROMAJI_STYLISED", "POINT_10_DECIMAL")
+ * are API vocabulary, not labels.
+ */
+function titleLanguageLabel(v: (typeof TITLE_LANGUAGES)[number], t: (k: string) => string): string {
+  switch (v) {
+    case "ROMAJI": return t("settings.alTitleRomaji");
+    case "ENGLISH": return t("settings.alTitleEnglish");
+    case "NATIVE": return t("settings.alTitleNative");
+    case "ROMAJI_STYLISED": return t("settings.alTitleRomajiStylised");
+    case "ENGLISH_STYLISED": return t("settings.alTitleEnglishStylised");
+    case "NATIVE_STYLISED": return t("settings.alTitleNativeStylised");
+  }
+}
+
+function staffLanguageLabel(v: (typeof STAFF_LANGUAGES)[number], t: (k: string) => string): string {
+  switch (v) {
+    case "ROMAJI_WESTERN": return t("settings.alStaffRomajiWestern");
+    case "ROMAJI": return t("settings.alStaffRomaji");
+    case "NATIVE": return t("settings.alStaffNative");
+  }
+}
+
+function scoreFormatLabel(v: (typeof SCORE_FORMATS)[number], t: (k: string) => string): string {
+  switch (v) {
+    case "POINT_100": return t("settings.alScore100");
+    case "POINT_10_DECIMAL": return t("settings.alScore10Decimal");
+    case "POINT_10": return t("settings.alScore10");
+    case "POINT_5": return t("settings.alScore5");
+    case "POINT_3": return t("settings.alScore3");
+  }
+}
+
+function rowOrderLabel(v: (typeof ROW_ORDERS)[number], t: (k: string) => string): string {
+  switch (v) {
+    case "title": return t("settings.alRowTitle");
+    case "score": return t("settings.alRowScore");
+    case "updatedAt": return t("settings.alRowUpdated");
+    case "id": return t("settings.alRowAdded");
+  }
+}
+
 /** The note for a setting Karasu overrides, with a link to what wins instead. */
 function OverrideNote({ field }: { field: keyof typeof LOCAL_OVERRIDES }) {
   const { t } = useTranslation();
@@ -68,13 +112,11 @@ function OverrideNote({ field }: { field: keyof typeof LOCAL_OVERRIDES }) {
   return (
     <ExternalNote>
       {/* Literal keys, one per field, so `i18nKeys.test.ts` resolves them. */}
-      {field === "scoreFormat"
-        ? t("settings.alOverrideScoreFormat")
-        : field === "titleLanguage"
-          ? t("settings.alOverrideTitleLanguage")
-          : field === "displayAdultContent"
-            ? t("settings.alOverrideAdult")
-            : t("settings.alOverrideAiring")}
+      {field === "titleLanguage"
+        ? t("settings.alOverrideTitleLanguage")
+        : field === "displayAdultContent"
+          ? t("settings.alOverrideAdult")
+          : t("settings.alOverrideAiring")}
       {o.pane && (
         <>
           {" "}
@@ -134,7 +176,7 @@ export function AniListProfileSection() {
               >
                 {TITLE_LANGUAGES.map((v) => (
                   <option key={v} value={v}>
-                    {v.replace("_", " ").toLowerCase()}
+                    {titleLanguageLabel(v, t)}
                   </option>
                 ))}
               </select>
@@ -152,7 +194,7 @@ export function AniListProfileSection() {
               >
                 {STAFF_LANGUAGES.map((v) => (
                   <option key={v} value={v}>
-                    {v.replace("_", " ").toLowerCase()}
+                    {staffLanguageLabel(v, t)}
                   </option>
                 ))}
               </select>
@@ -341,7 +383,6 @@ export function AniListListOptionsSection() {
             <Row
               label={t("settings.alScoreFormat")}
               hint={t("settings.alScoreFormatHint")}
-              note={<OverrideNote field="scoreFormat" />}
             >
               <select
                 value={mlo.scoreFormat ?? "POINT_10"}
@@ -351,7 +392,7 @@ export function AniListListOptionsSection() {
               >
                 {SCORE_FORMATS.map((v) => (
                   <option key={v} value={v}>
-                    {v.replace("POINT_", "").replace("_DECIMAL", ".0")}
+                    {scoreFormatLabel(v, t)}
                   </option>
                 ))}
               </select>
@@ -366,7 +407,7 @@ export function AniListListOptionsSection() {
               >
                 {ROW_ORDERS.map((v) => (
                   <option key={v} value={v}>
-                    {v}
+                    {rowOrderLabel(v, t)}
                   </option>
                 ))}
               </select>

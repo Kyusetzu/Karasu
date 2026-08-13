@@ -3,8 +3,9 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { motionDuration, seriesDelay } from "@/lib/motion";
 
 /**
- * A dumbbell plot: two scores per row on one 0–10 axis, joined by a line
- * whose length *is* the disagreement.
+ * A dumbbell plot: two scores per row on one 0–max axis, joined by a line
+ * whose length *is* the disagreement. `max` is the score scale's top —
+ * ten by default, whatever the account's format renders otherwise.
  *
  * Built for "my score against the community's" — the one figure AniList's
  * own statistics cannot draw, since it never sees both numbers side by side.
@@ -17,22 +18,23 @@ export interface DotPlotRow {
   other: number;
 }
 
-const X = scaleLinear().domain([0, 10]).range([3, 97]).clamp(true);
-
 export function DotPlot({
   title,
   hint,
   rows,
   legendMine,
   legendOther,
+  max = 10,
 }: {
   title: string;
   hint?: string;
   rows: DotPlotRow[];
   legendMine: string;
   legendOther: string;
+  max?: number;
 }) {
   if (rows.length === 0) return null;
+  const X = scaleLinear().domain([0, max]).range([3, 97]).clamp(true);
 
   return (
     <Card className="flex h-full flex-col">

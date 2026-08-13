@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   asScoreFormat,
+  formatMeanScore,
   formatScore,
   fromRaw,
   SCORE_FORMATS,
@@ -9,6 +10,24 @@ import {
   toRaw,
   type ScoreFormat,
 } from "./scoreFormat";
+
+describe("formatMeanScore", () => {
+  it("always keeps one decimal — a mean of integers is not an integer", () => {
+    expect(formatMeanScore("POINT_10", 7.06)).toBe("7.1");
+    expect(formatMeanScore("POINT_100", 82.36)).toBe("82.4");
+    expect(formatMeanScore("POINT_5", 4)).toBe("4.0");
+  });
+
+  it("stays numeric even on the smiley scale, and clamps to the max", () => {
+    expect(formatMeanScore("POINT_3", 2.4)).toBe("2.4");
+    expect(formatMeanScore("POINT_10", 11)).toBe("10.0");
+  });
+
+  it("nothing scored is an en dash", () => {
+    expect(formatMeanScore("POINT_10", 0)).toBe("–");
+    expect(formatMeanScore("POINT_10", NaN)).toBe("–");
+  });
+});
 
 describe("toRaw", () => {
   it("maps each format onto the hundred-point raw scale", () => {

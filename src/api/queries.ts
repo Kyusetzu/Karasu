@@ -1,5 +1,6 @@
-import { gql } from "./anilist";
+import { currentScoreFormat, gql } from "./anilist";
 import { normalizeStatsBlock } from "@/lib/score";
+import type { ScoreFormat } from "@/lib/scoreFormat";
 import { adultVars } from "@/lib/contentFilter";
 import { chunk } from "@/lib/chunk";
 import type {
@@ -11,6 +12,14 @@ import type {
 } from "./types";
 // Re-exported because several stats/detail consumers import it from here.
 export type { FuzzyDate };
+
+/**
+ * Every query that spreads `MEDIA_FIELDS` (or otherwise selects an entry's
+ * `score`) must declare `$scoreFormat: ScoreFormat` and spread this into its
+ * variables — scores arrive in the account's own scale, which is what every
+ * control and cell renders since the scoreRaw change made writes match.
+ */
+const scoreFormatVar = () => ({ scoreFormat: currentScoreFormat() });
 
 /** Media fields for discovery grids, including the user's own list entry. */
 const MEDIA_FIELDS = `
@@ -30,7 +39,7 @@ const MEDIA_FIELDS = `
   synonyms
   isAdult
   nextAiringEpisode { episode airingAt }
-  mediaListEntry { id status progress score(format: POINT_10) repeat notes }
+  mediaListEntry { id status progress score(format: $scoreFormat) repeat notes }
 `;
 
 export interface ListEntryStub {
@@ -51,7 +60,7 @@ export interface MediaWithListStatus extends Media {
 // filtered only on arrival can come back almost empty and read as "no
 // results".
 const SEARCH_QUERY = `
-query ($search: String!, $type: MediaType!, $page: Int, $isAdult: Boolean) {
+query ($search: String!, $type: MediaType!, $page: Int, $isAdult: Boolean, $scoreFormat: ScoreFormat) {
   Page(page: $page, perPage: 30) {
     pageInfo { hasNextPage }
     media(search: $search, type: $type, sort: SEARCH_MATCH, isAdult: $isAdult) {
@@ -68,12 +77,12 @@ export async function searchMedia(
 ) {
   const data = await gql<{
     Page: { pageInfo: { hasNextPage: boolean }; media: MediaWithListStatus[] };
-  }>(SEARCH_QUERY, { search, type, page, ...adultVars(isAdult) });
+  }>(SEARCH_QUERY, { search, type, page, ...adultVars(isAdult), ...scoreFormatVar() });
   return data.Page;
 }
 
 const SEASONAL_QUERY = `
-query ($season: MediaSeason!, $year: Int!, $page: Int, $isAdult: Boolean) {
+query ($season: MediaSeason!, $year: Int!, $page: Int, $isAdult: Boolean, $scoreFormat: ScoreFormat) {
   Page(page: $page, perPage: 50) {
     pageInfo { hasNextPage }
     media(season: $season, seasonYear: $year, type: ANIME, sort: POPULARITY_DESC, isAdult: $isAdult) {
@@ -100,7 +109,7 @@ export async function seasonalAnime(
 ) {
   const data = await gql<{
     Page: { pageInfo: { hasNextPage: boolean }; media: MediaWithListStatus[] };
-  }>(SEASONAL_QUERY, { season, year, page, ...adultVars(isAdult) });
+  }>(SEASONAL_QUERY, { season, year, page, ...adultVars(isAdult), ...scoreFormatVar() });
   return data.Page;
 }
 
@@ -230,7 +239,7 @@ export async function sequelsOf(id: number): Promise<SequelCandidate[]> {
 // --- Media by id -----------------------------------------------------------
 
 const MEDIA_BY_IDS_QUERY = `
-query ($ids: [Int]) {
+query ($ids: [Int], $scoreFormat: ScoreFormat) {
   Page(perPage: 50) {
     media(id_in: $ids) {
       ${MEDIA_FIELDS}
@@ -255,7 +264,10 @@ export async function mediaByIds(ids: number[]): Promise<Media[]> {
   if (ids.length === 0) return [];
   const pages = await Promise.all(
     chunk(ids).map((batch) =>
-      gql<{ Page: { media: Media[] } }>(MEDIA_BY_IDS_QUERY, { ids: batch }),
+      gql<{ Page: { media: Media[] } }>(MEDIA_BY_IDS_QUERY, {
+        ids: batch,
+        ...scoreFormatVar(),
+      }),
     ),
   );
   return pages.flatMap((p) => p.Page.media);
@@ -268,7 +280,7 @@ export async function mediaByIds(ids: number[]): Promise<Media[]> {
 // 25 seeds x 8 recommendations returns ~116 nodes without tripping AniList's
 // query-complexity limit, so the whole feature costs one request per type.
 const RECOMMENDATIONS_QUERY = `
-query ($ids: [Int]) {
+query ($ids: [Int], $scoreFormat: ScoreFormat) {
   Page(perPage: 50) {
     media(id_in: $ids) {
       id
@@ -308,7 +320,7 @@ export async function recommendationsFor(
         } | null;
       }[];
     };
-  }>(RECOMMENDATIONS_QUERY, { ids });
+  }>(RECOMMENDATIONS_QUERY, { ids, ...scoreFormatVar() });
 
   const out: RawRecommendationNode[] = [];
   for (const seed of data.Page.media ?? []) {
@@ -330,7 +342,7 @@ export async function recommendationsFor(
 // this metadata would be dead weight. Detail is a single Media(id:) call, so
 // widening it costs no extra request.
 const DETAIL_QUERY = `
-query ($id: Int!) {
+query ($id: Int!, $scoreFormat: ScoreFormat) {
   Media(id: $id) {
     ${MEDIA_FIELDS}
     coverImage { extraLarge }
@@ -423,7 +435,10 @@ export interface MediaDetail extends MediaWithListStatus {
 }
 
 export async function animeDetail(id: number) {
-  const data = await gql<{ Media: MediaDetail }>(DETAIL_QUERY, { id });
+  const data = await gql<{ Media: MediaDetail }>(DETAIL_QUERY, {
+    id,
+    ...scoreFormatVar(),
+  });
   return data.Media;
 }
 
@@ -555,7 +570,7 @@ query ($id: Int!) {
 }`;
 
 /**
- * Everything the statistics screen reads, on the app's ten-point scale.
+ * Everything the statistics screen reads, on the account's display scale.
  *
  * The endpoint mixes two scales and says so nowhere: `meanScore` and
  * `standardDeviation` — top level and on every ranked row — are always
@@ -567,14 +582,17 @@ query ($id: Int!) {
  * `startYears.meanScore` arriving hundred-point for years, fetched and never
  * shown.
  */
-export async function userStatistics(userId: number): Promise<UserStats> {
+export async function userStatistics(
+  userId: number,
+  format: ScoreFormat,
+): Promise<UserStats> {
   const data = await gql<{ User: UserStats }>(USER_STATS_QUERY, { id: userId });
   const { anime, manga } = data.User.statistics;
   return {
     ...data.User,
     statistics: {
-      anime: normalizeStatsBlock(anime),
-      manga: normalizeStatsBlock(manga),
+      anime: normalizeStatsBlock(anime, format),
+      manga: normalizeStatsBlock(manga, format),
     },
   };
 }
@@ -582,13 +600,13 @@ export async function userStatistics(userId: number): Promise<UserStats> {
 // --- Yearly wrap-up --------------------------------------------------------
 
 const WRAPPED_QUERY = `
-query ($userId: Int!, $type: MediaType!) {
+query ($userId: Int!, $type: MediaType!, $scoreFormat: ScoreFormat) {
   MediaListCollection(userId: $userId, type: $type, status: COMPLETED) {
     lists {
       isCustomList
       entries {
         progress
-        score(format: POINT_10)
+        score(format: $scoreFormat)
         completedAt { year }
         media {
           id
@@ -636,7 +654,7 @@ export async function wrappedEntries(
         }[];
       }[];
     };
-  }>(WRAPPED_QUERY, { userId, type });
+  }>(WRAPPED_QUERY, { userId, type, ...scoreFormatVar() });
 
   const seen = new Set<number>();
   const out: WrappedEntry[] = [];

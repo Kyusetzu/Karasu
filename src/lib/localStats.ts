@@ -10,15 +10,15 @@ import { displayTitle } from "@/api/types";
  * pure over the entries the caller already holds; the content filter runs at
  * the call site, on the same filtered pool every other panel reads.
  *
- * Scores: the user's is ten-point (`score(format: POINT_10)`), the community's
- * is hundred-point (`averageScore`) — normalized here, at the boundary, like
- * `normalizeStatsBlock` does for the statistics endpoint.
+ * Scores: the user's arrive in the account's display format, the community's
+ * is hundred-point (`averageScore`) — brought onto the display scale here, at
+ * the boundary, like `normalizeStatsBlock` does for the statistics endpoint.
  */
 
 export interface DeltaRow {
   mediaId: number;
   title: string;
-  /** The user's ten-point score. */
+  /** The user's score, in display units. */
   mine: number;
   /** The community mean, brought onto the same scale. */
   community: number;
@@ -45,7 +45,12 @@ export interface ScoreDeltaSummary {
  * excluded rather than counted as zero — a zero *is* the absence here, and
  * averaging it in would drag the mean toward an opinion nobody holds.
  */
-export function scoreDelta(entries: MediaListEntry[], top = 5): ScoreDeltaSummary | null {
+export function scoreDelta(
+  entries: MediaListEntry[],
+  top = 5,
+  /** The display scale's maximum, from `scoreScale(format).max`. */
+  max = 10,
+): ScoreDeltaSummary | null {
   const seen = new Set<number>();
   const rows: DeltaRow[] = [];
   for (const e of entries) {
@@ -53,13 +58,13 @@ export function scoreDelta(entries: MediaListEntry[], top = 5): ScoreDeltaSummar
     seen.add(e.mediaId);
     const community = e.media.averageScore;
     if (!e.score || e.score <= 0 || community == null || community <= 0) continue;
-    const communityTen = community / 10;
+    const communityScaled = (community / 100) * max;
     rows.push({
       mediaId: e.mediaId,
       title: displayTitle(e.media.title),
       mine: e.score,
-      community: communityTen,
-      delta: e.score - communityTen,
+      community: communityScaled,
+      delta: e.score - communityScaled,
     });
   }
   if (rows.length === 0) return null;
@@ -143,7 +148,7 @@ export type SeasonName = (typeof SEASONS)[number];
 export interface SeasonCount {
   season: SeasonName;
   count: number;
-  /** Mean of the user's own scores in that season, ten-point; 0 = unscored. */
+  /** Mean of the user's own scores in that season, display units; 0 = unscored. */
   meanScore: number;
 }
 

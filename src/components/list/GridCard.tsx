@@ -3,6 +3,8 @@ import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
 import { CheckCheck, Pencil, Plus } from "lucide-react";
 import { maxProgress, type MediaListEntry } from "@/api/types";
+import { formatScore } from "@/lib/scoreFormat";
+import { useScoreFormat } from "@/stores/auth";
 import { IconButton } from "@/components/ui/icon-button";
 import { TitleLockup } from "@/components/media/TitleLockup";
 import { CoverCell, CoverMeta } from "@/components/media/CoverCell";
@@ -37,6 +39,7 @@ export const GridCard = memo(function GridCard({
   onToggleSelect: (mediaId: number) => void;
 }) {
   const { t } = useTranslation();
+  const scoreFormat = useScoreFormat();
   const { media } = entry;
   const max = maxProgress(media);
   return (
@@ -55,7 +58,11 @@ export const GridCard = memo(function GridCard({
         selectMode ? () => onToggleSelect(entry.mediaId) : undefined
       }
       coverLabel={t("bulk.select")}
-      score={!selectMode && entry.score > 0 ? entry.score : undefined}
+      score={
+        !selectMode && entry.score > 0
+          ? formatScore(scoreFormat, entry.score)
+          : undefined
+      }
       progress={max ? { current: entry.progress, total: max } : null}
       overlay={
         selectMode ? (

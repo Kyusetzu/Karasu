@@ -63,6 +63,14 @@ describe("column widths fit their worst case", () => {
     expect(COLUMN_PX.score).toBeGreaterThan(52);
   });
 
+  /**
+   * Scores render in the account's format now, so the worst case is the widest
+   * across all five: `10.0` (POINT_10_DECIMAL) — one character more than `100`.
+   */
+  it("covers the widest rendering of every score format", () => {
+    expect(WORST_CASE.score.length).toBeGreaterThanOrEqual("10.0".length);
+  });
+
   /** Older and unreported: `1100 / 1100` in a 72px cell. */
   it("fits the longest progress string", () => {
     expect(COLUMN_PX.progress).toBeGreaterThanOrEqual(

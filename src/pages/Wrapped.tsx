@@ -5,7 +5,13 @@ import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { Download, Sparkles } from "lucide-react";
 import { wrappedEntries, type WrappedEntry } from "@/api/queries";
-import { isTauri, saveImage, type ImageFormat } from "@/api/anilist";
+import {
+  currentScoreFormat,
+  isTauri,
+  saveImage,
+  type ImageFormat,
+} from "@/api/anilist";
+import { formatMeanScore } from "@/lib/scoreFormat";
 import {
   aggregate,
   availableYears,
@@ -132,9 +138,6 @@ function drawMark(
   ctx.restore();
 }
 
-function round1(n: number): string {
-  return (Math.round(n * 10) / 10).toString();
-}
 
 /**
  * Shrinks `weight size`px system-ui text down toward `minSize` until it fits
@@ -442,7 +445,9 @@ function drawCard(
         label: t("wrapped.hours"),
       },
       {
-        value: stats.anime.meanScore ? round1(stats.anime.meanScore) : "–",
+        value: stats.anime.meanScore
+          ? formatMeanScore(currentScoreFormat(), stats.anime.meanScore)
+          : "–",
         label: t("wrapped.meanScore"),
       },
     ]);
@@ -451,7 +456,9 @@ function drawCard(
       { value: stats.manga.count.toLocaleString(lang), label: t("wrapped.completed") },
       { value: stats.manga.units.toLocaleString(lang), label: t("common.chapters") },
       {
-        value: stats.manga.meanScore ? round1(stats.manga.meanScore) : "–",
+        value: stats.manga.meanScore
+          ? formatMeanScore(currentScoreFormat(), stats.manga.meanScore)
+          : "–",
         label: t("wrapped.meanScore"),
       },
     ]);

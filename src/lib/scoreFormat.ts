@@ -104,6 +104,16 @@ export function formatScore(f: ScoreFormat, value: number): string {
 }
 
 /**
+ * An *aggregate* (mean, delta) on the display scale. Always one decimal —
+ * a mean of integers is not an integer — and numeric even for the smiley
+ * scale, where "😐, roughly" has no glyph and a number is at least honest.
+ */
+export function formatMeanScore(f: ScoreFormat, value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return "–";
+  return Math.min(scoreScale(f).max, value).toFixed(1);
+}
+
+/**
  * The selectable values for a discrete format, or `null` for the two
  * continuous ones (POINT_100 and POINT_10_DECIMAL take a number input — a
  * select of a hundred options is not a control).

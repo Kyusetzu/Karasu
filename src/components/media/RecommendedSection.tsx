@@ -8,6 +8,8 @@ import { displayTitle, type MediaListEntry, type MediaType } from "@/api/types";
 import { useContentFilter } from "@/stores/contentFilter";
 import { isBlocked } from "@/lib/contentFilter";
 import { pickSeeds, rankRecommendations } from "@/lib/recommend";
+import { scoreScale } from "@/lib/scoreFormat";
+import { useScoreFormat } from "@/stores/auth";
 import MediaCard from "@/components/media/MediaCard";
 
 /** Below this the suggestions are too thin to be worth a section. */
@@ -31,6 +33,7 @@ export default function RecommendedSection({
 }) {
   const { t } = useTranslation();
   const level = useContentFilter((s) => s.level);
+  const scoreFormat = useScoreFormat();
 
   const seeds = useMemo(() => pickSeeds(entries), [entries]);
 
@@ -70,9 +73,10 @@ export default function RecommendedSection({
             exclude,
             type,
             isHidden: (m) => isBlocked(m, level),
+            scoreMax: scoreScale(scoreFormat).max,
           })
         : [],
-    [data, seeds, exclude, type, level],
+    [data, seeds, exclude, type, level, scoreFormat],
   );
 
   if (seeds.length < MIN_SEEDS || ranked.length === 0) return null;

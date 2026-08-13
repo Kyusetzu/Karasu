@@ -5,6 +5,7 @@ import {
   formToUpdateUserVars,
   type UserSettingsForm,
 } from "@/lib/anilistUserFields";
+import { useAuth } from "@/stores/auth";
 import { showToast } from "@/stores/toast";
 
 /**
@@ -25,7 +26,7 @@ export function useUpdateUser(viewerName: string | undefined) {
 
   return useMutation({
     mutationFn: (form: UserSettingsForm) => updateUser(formToUpdateUserVars(form)),
-    onSuccess: (updated) => {
+    onSuccess: async (updated, form) => {
       if (viewerName && updated) {
         qc.setQueryData<UserProfile>(["social", "user", viewerName], (old) =>
           old
@@ -57,6 +58,14 @@ export function useUpdateUser(viewerName: string | undefined) {
           ["social", "notificationOptions", updated.id],
           updated.options.notificationOptions,
         );
+      }
+      // A score-format change rescales every score in the app: refresh the
+      // stored viewer (which recaches the format the save paths convert
+      // through), then drop the whole query cache — a rare, whole-scale
+      // event, and the one place a blanket invalidation is proportionate.
+      if (form.scoreFormat !== undefined) {
+        await useAuth.getState().refreshViewer();
+        await qc.invalidateQueries();
       }
       showToast({ kind: "success", text: t("settings.alSaved") });
     },

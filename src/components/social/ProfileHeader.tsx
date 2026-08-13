@@ -13,7 +13,7 @@ import { FollowButton } from "./FollowButton";
 import { Markdown } from "./Markdown";
 import { followRelation, relationBadgeKey } from "@/lib/follows";
 import { donatorLabel } from "@/lib/donator";
-import { toTenPoint } from "@/lib/score";
+import { toDisplayScale } from "@/lib/score";
 import { cn } from "@/lib/utils";
 
 /** A quiet outlined chip — donator, moderator, "follows you". */
@@ -41,11 +41,13 @@ function Badge({
   );
 }
 
-/** `meanScore` arrives hundred-point while everything downstream is ten-point —
- *  the normalisation trap CLAUDE.md records for the statistics screen. */
+/** `meanScore` arrives hundred-point — the normalisation trap CLAUDE.md
+ *  records for the statistics screen. Shown ten-point deliberately: this is
+ *  *someone else's* mean, and their scoring format is theirs, so the neutral
+ *  scale beats translating their opinion into the viewer's format. */
 function meanText(score: number | undefined | null): string | null {
   if (!score) return null; // 0 means "no scores", not "scored zero"
-  return `★ ${toTenPoint(score).toFixed(1)}`;
+  return `★ ${toDisplayScale("POINT_10", score).toFixed(1)}`;
 }
 
 export function ProfileHeader({ user }: { user: UserProfile }) {

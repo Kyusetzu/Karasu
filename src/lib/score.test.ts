@@ -1,11 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { normalizeDistribution, normalizeStatsBlock, toTenPoint } from "./score";
+import { normalizeDistribution, normalizeStatsBlock, toDisplayScale } from "./score";
 
-describe("toTenPoint", () => {
-  it("brings AniList's hundred-point statistics onto the app's scale", () => {
+describe("toDisplayScale", () => {
+  it("brings AniList's hundred-point statistics onto the display scale", () => {
     // The live account's own numbers: a mean the dashboard shows as 7.1.
-    expect(toTenPoint(70.64)).toBeCloseTo(7.064, 5);
-    expect(toTenPoint(18.6)).toBeCloseTo(1.86, 5);
+    expect(toDisplayScale("POINT_10", 70.64)).toBeCloseTo(7.064, 5);
+    expect(toDisplayScale("POINT_10", 18.6)).toBeCloseTo(1.86, 5);
+  });
+
+  it("scales to whatever the format's maximum is", () => {
+    expect(toDisplayScale("POINT_100", 70.64)).toBeCloseTo(70.64, 5);
+    expect(toDisplayScale("POINT_5", 70)).toBeCloseTo(3.5, 5);
+    expect(toDisplayScale("POINT_3", 60)).toBeCloseTo(1.8, 5);
   });
 });
 
@@ -26,6 +32,14 @@ describe("normalizeDistribution", () => {
       { score: 5, count: 40 },
     ];
     expect(normalizeDistribution(scores)).toEqual(scores);
+  });
+
+  it("leaves a hundred-point distribution alone when the display scale is 100", () => {
+    const scores = [
+      { score: 85, count: 4 },
+      { score: 100, count: 2 },
+    ];
+    expect(normalizeDistribution(scores, 100)).toEqual(scores);
   });
 
   it("collapses a hundred-point distribution by tens", () => {
@@ -56,14 +70,18 @@ describe("normalizeDistribution", () => {
     ]);
   });
 
-  it("keeps every bucket inside 1–10", () => {
-    for (const { score } of normalizeDistribution([
-      { score: 3, count: 1 },
-      { score: 100, count: 1 },
-      { score: 12, count: 1 },
-    ])) {
-      expect(score).toBeGreaterThanOrEqual(1);
-      expect(score).toBeLessThanOrEqual(10);
+  it("keeps every bucket inside 1–max", () => {
+    for (const max of [10, 5, 3]) {
+      for (const { score } of normalizeDistribution(
+        [
+          { score: 100, count: 1 },
+          { score: max + 2, count: 1 },
+        ],
+        max,
+      )) {
+        expect(score).toBeGreaterThanOrEqual(1);
+        expect(score).toBeLessThanOrEqual(max);
+      }
     }
   });
 
@@ -89,7 +107,7 @@ describe("normalizeStatsBlock", () => {
     // The trap this function exists for: the old per-list spelling covered
     // only the lists the screen rendered, so startYears/lengths arrived
     // hundred-point, fetched and waiting for someone to render them raw.
-    const out = normalizeStatsBlock(block);
+    const out = normalizeStatsBlock(block, "POINT_10");
     expect(out.meanScore).toBeCloseTo(7.06, 2);
     expect(out.standardDeviation).toBeCloseTo(1.86, 2);
     expect(out.genres[0].meanScore).toBeCloseTo(7.2, 5);
@@ -98,14 +116,28 @@ describe("normalizeStatsBlock", () => {
     expect(out.voiceActors[0].meanScore).toBeCloseTo(8.0, 5);
   });
 
+  it("scales to the account's format, distribution included", () => {
+    const out = normalizeStatsBlock(block, "POINT_5");
+    expect(out.meanScore).toBeCloseTo(3.53, 2);
+    expect(out.genres[0].meanScore).toBeCloseTo(3.6, 5);
+    // 85/100 → round(4.25) = 4 on a five-point scale.
+    expect(out.scores).toEqual([{ score: 4, count: 4 }]);
+  });
+
+  it("keeps a hundred-point account's numbers hundred-point", () => {
+    const out = normalizeStatsBlock(block, "POINT_100");
+    expect(out.meanScore).toBeCloseTo(70.6, 5);
+    expect(out.scores).toEqual([{ score: 85, count: 4 }]);
+  });
+
   it("leaves a count-only list untouched rather than inventing a NaN", () => {
-    const out = normalizeStatsBlock(block);
+    const out = normalizeStatsBlock(block, "POINT_10");
     expect(out.formats[0]).toEqual({ format: "TV", count: 80 });
     expect("meanScore" in out.formats[0]).toBe(false);
   });
 
   it("collapses the distribution and keeps non-score fields intact", () => {
-    const out = normalizeStatsBlock(block);
+    const out = normalizeStatsBlock(block, "POINT_10");
     expect(out.scores).toEqual([{ score: 9, count: 4 }]);
     expect(out.count).toBe(100);
     expect(out.startYears[0].startYear).toBe(2024);
@@ -113,7 +145,7 @@ describe("normalizeStatsBlock", () => {
 
   it("does not mutate its input — the query cache holds the original", () => {
     const before = JSON.stringify(block);
-    normalizeStatsBlock(block);
+    normalizeStatsBlock(block, "POINT_10");
     expect(JSON.stringify(block)).toBe(before);
   });
 });

@@ -13,7 +13,8 @@ import {
 import { fetchMediaList, isTauri } from "@/api/anilist";
 import type { MediaType } from "@/api/types";
 import { formatMinutes, remainingMinutes } from "@/lib/estimate";
-import { useAuth } from "@/stores/auth";
+import { useAuth, useScoreFormat } from "@/stores/auth";
+import { scoreScale } from "@/lib/scoreFormat";
 import { useContentFilter } from "@/stores/contentFilter";
 import {
   isBlocked,
@@ -129,9 +130,13 @@ function StatisticsContent({
       { replace: true },
     );
 
+  const scoreFormat = useScoreFormat();
   const { data, isLoading, error } = useQuery({
-    queryKey: ["userStats", userId],
-    queryFn: () => userStatistics(userId),
+    // The format is part of the key: a format change rescales every number
+    // the normalizer produced, so the cached shape is simply for another
+    // scale and must not be served.
+    queryKey: ["userStats", userId, scoreFormat],
+    queryFn: () => userStatistics(userId, scoreFormat),
     enabled: isTauri,
     // AniList only recomputes these when list entries change, and Karasu is
     // what changes them. Revisiting the page inside half an hour is free.
@@ -184,7 +189,10 @@ function StatisticsContent({
   );
   // "My score against the crowd's" — the one figure AniList's statistics
   // cannot answer.
-  const delta = useMemo(() => scoreDelta(localEntries), [localEntries]);
+  const delta = useMemo(
+    () => scoreDelta(localEntries, 5, scoreScale(scoreFormat).max),
+    [localEntries, scoreFormat],
+  );
   // When the list was worked on, from the fuzzy start/completion dates.
   const heatmap = useMemo(() => activityHeatmap(localEntries), [localEntries]);
   const seasons = useMemo(() => seasonalHistory(localEntries), [localEntries]);
@@ -476,6 +484,7 @@ function GenresTagsView({
 }) {
   const { t } = useTranslation();
   const level = useContentFilter((s) => s.level);
+  const scoreMax = scoreScale(useScoreFormat()).max;
 
   // Filter before slicing, or a blocked name costs one of the slots it was
   // removed from; the treemap falls back to genres when tags are empty.
@@ -514,6 +523,7 @@ function GenresTagsView({
             legendMine={t("stats.legendGenreMean")}
             legendOther={t("stats.legendOverallMean")}
             rows={genreDots}
+            max={scoreMax}
           />
         )}
         {treemapTags.length > 3 && (
@@ -596,6 +606,7 @@ function RatingsView({
   delta: ScoreDeltaSummary | null;
 }) {
   const { t, i18n } = useTranslation();
+  const scoreMax = scoreScale(useScoreFormat()).max;
   const scores = [...stats.scores].sort((a, b) => (a.score ?? 0) - (b.score ?? 0));
 
   const meanRows = (list: Distribution[], label: (d: Distribution) => string) =>
@@ -631,17 +642,18 @@ function RatingsView({
           hint={t("stats.scoreDistHint")}
           data={scores.map((d: Distribution) => ({ score: d.score ?? 0, count: d.count }))}
         />
-        {/* Pinned to 0–10, or a 7.1 next to a 7.4 reads as a landslide. */}
+        {/* Pinned to the full scale, or a 7.1 next to a 7.4 reads as a
+            landslide. */}
         <GradientBars
           title={t("stats.meanByFormat")}
           hint={t("stats.meanByFormatHint")}
-          domain={10}
+          domain={scoreMax}
           rows={meanRows(stats.formats, (d) => d.format ?? "?")}
         />
         <GradientBars
           title={t("stats.meanByStatus")}
           hint={t("stats.meanByStatusHint")}
-          domain={10}
+          domain={scoreMax}
           rows={meanRows(stats.statuses, (d) =>
             t(`status.${type}.${d.status}`, { defaultValue: d.status ?? "?" }),
           )}
@@ -657,6 +669,7 @@ function RatingsView({
               mine: r.mine,
               other: r.community,
             }))}
+            max={scoreMax}
           />
         )}
       </div>
@@ -680,6 +693,7 @@ function YearsView({
   seasons: SeasonCount[];
 }) {
   const { t, i18n } = useTranslation();
+  const scoreMax = scoreScale(useScoreFormat()).max;
 
   const released = [...stats.releaseYears]
     .filter((d) => d.releaseYear)
@@ -751,7 +765,7 @@ function YearsView({
         <GradientBars
           title={t("stats.meanByStartYear")}
           hint={t("stats.meanByStartYearHint")}
-          domain={10}
+          domain={scoreMax}
           rows={startMeans}
         />
       )}

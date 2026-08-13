@@ -12,7 +12,7 @@ use tauri::State;
 use super::*;
 
 const LIST_QUERY: &str = "
-query ($userId: Int!, $type: MediaType!) {
+query ($userId: Int!, $type: MediaType!, $scoreFormat: ScoreFormat) {
   MediaListCollection(userId: $userId, type: $type) {
     lists {
       name
@@ -22,7 +22,7 @@ query ($userId: Int!, $type: MediaType!) {
         id
         mediaId
         status
-        score(format: POINT_10)
+        score(format: $scoreFormat)
         progress
         progressVolumes
         repeat
@@ -62,6 +62,31 @@ fn validate_media_type(media_type: &str) -> Result<&str, String> {
     }
 }
 
+/// The account's score format, from the cached viewer blob.
+///
+/// Every `score(format:)` selection in this file takes it as a variable, so
+/// scores arrive in the scale the user actually chose — the display half of
+/// the `scoreRaw` note on `SAVE_MUTATION`. Validated against the enum rather
+/// than passed through: a corrupted blob must degrade to ten-point, not to a
+/// GraphQL error on every list fetch.
+pub(crate) fn viewer_score_format(db: &Db) -> &'static str {
+    let stored = db
+        .kv_get("anilist_viewer")
+        .and_then(|blob| serde_json::from_str::<Value>(&blob).ok())
+        .and_then(|v| {
+            v.pointer("/mediaListOptions/scoreFormat")
+                .and_then(|f| f.as_str())
+                .map(String::from)
+        });
+    match stored.as_deref() {
+        Some("POINT_100") => "POINT_100",
+        Some("POINT_10_DECIMAL") => "POINT_10_DECIMAL",
+        Some("POINT_5") => "POINT_5",
+        Some("POINT_3") => "POINT_3",
+        _ => "POINT_10",
+    }
+}
+
 /// `startedAt`/`completedAt` are `FuzzyDateInput` — `{ year, month, day }`, each
 /// nullable, because AniList lets a date be partial ("2024", "March 2024"). That
 /// is why they are not plain dates on the frontend either.
@@ -73,12 +98,12 @@ fn validate_media_type(media_type: &str) -> Result<&str, String> {
 /// converts through `lib/scoreFormat.toRaw` before invoking, which also makes
 /// the offline queue safe to replay across a format change.
 const SAVE_MUTATION: &str = "
-mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int, $progressVolumes: Int, $scoreRaw: Int, $repeat: Int, $notes: String, $private: Boolean, $startedAt: FuzzyDateInput, $completedAt: FuzzyDateInput) {
+mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int, $progressVolumes: Int, $scoreRaw: Int, $repeat: Int, $notes: String, $private: Boolean, $startedAt: FuzzyDateInput, $completedAt: FuzzyDateInput, $scoreFormat: ScoreFormat) {
   SaveMediaListEntry(mediaId: $mediaId, status: $status, progress: $progress, progressVolumes: $progressVolumes, scoreRaw: $scoreRaw, repeat: $repeat, notes: $notes, private: $private, startedAt: $startedAt, completedAt: $completedAt) {
     id mediaId status progress progressVolumes repeat notes updatedAt private
     startedAt { year month day }
     completedAt { year month day }
-    score(format: POINT_10)
+    score(format: $scoreFormat)
   }
 }";
 
@@ -105,12 +130,12 @@ mutation ($id: Int) {
 /// read-modify-write per entry, which is the fan-out this mutation exists to
 /// avoid — so bulk tag editing is a separate problem, not a missing argument.
 const UPDATE_ENTRIES_MUTATION: &str = "
-mutation ($ids: [Int], $status: MediaListStatus, $scoreRaw: Int, $progress: Int, $progressVolumes: Int, $repeat: Int, $private: Boolean, $startedAt: FuzzyDateInput, $completedAt: FuzzyDateInput) {
+mutation ($ids: [Int], $status: MediaListStatus, $scoreRaw: Int, $progress: Int, $progressVolumes: Int, $repeat: Int, $private: Boolean, $startedAt: FuzzyDateInput, $completedAt: FuzzyDateInput, $scoreFormat: ScoreFormat) {
   UpdateMediaListEntries(ids: $ids, status: $status, scoreRaw: $scoreRaw, progress: $progress, progressVolumes: $progressVolumes, repeat: $repeat, private: $private, startedAt: $startedAt, completedAt: $completedAt) {
     id mediaId status progress progressVolumes repeat notes updatedAt private
     startedAt { year month day }
     completedAt { year month day }
-    score(format: POINT_10)
+    score(format: $scoreFormat)
   }
 }";
 
@@ -178,7 +203,11 @@ pub async fn fetch_media_list(
         .query(
             token.as_deref(),
             LIST_QUERY,
-            json!({ "userId": user_id, "type": media_type }),
+            json!({
+                "userId": user_id,
+                "type": media_type,
+                "scoreFormat": viewer_score_format(&db),
+            }),
         )
         .await
     {
@@ -225,8 +254,16 @@ pub(crate) async fn save_entry_core(
     db: &Db,
     api: &AniList,
     token: &str,
-    input: Value,
+    mut input: Value,
 ) -> Result<MutationResult, String> {
+    // The echoed entry must come back in the account's display format, so the
+    // format rides along as a variable. Injected here rather than by callers
+    // because the scrobbler saves through this path too — and injected at
+    // replay time as well, since a queued payload's format may have changed
+    // between enqueue and drain.
+    if let Some(vars) = input.as_object_mut() {
+        vars.insert("scoreFormat".into(), json!(viewer_score_format(db)));
+    }
     if db.queue_len() > 0 && process_queue(db, api, Some(token)).await.is_err() {
         db.queue_push("save", &input.to_string())?;
         return Ok(MutationResult { queued: true, entry: None });
@@ -329,6 +366,7 @@ pub async fn bulk_save_list_entries(
             "private": private,
             "startedAt": started_at,
             "completedAt": completed_at,
+            "scoreFormat": viewer_score_format(&db),
         });
         // No offline queue for this one: the queue replays `SaveMediaListEntry`
         // per entry, so draining a bulk edit through it would reintroduce
@@ -526,8 +564,17 @@ async fn process_queue(
 ) -> Result<usize, String> {
     let mut flushed = 0;
     for (id, kind, payload) in db.queue_all() {
-        let variables: Value =
+        let mut variables: Value =
             serde_json::from_str(&payload).unwrap_or_else(|_| json!({}));
+        // Re-stamped at drain time: the format may have changed since the
+        // payload was queued, and the echoed entry should come back in the
+        // format the app is displaying *now*. The score itself is `scoreRaw`,
+        // so the write is format-independent either way.
+        if kind == "save" {
+            if let Some(vars) = variables.as_object_mut() {
+                vars.insert("scoreFormat".into(), json!(viewer_score_format(db)));
+            }
+        }
         let mutation = if kind == "delete" { DELETE_MUTATION } else { SAVE_MUTATION };
         match api.query(token, mutation, variables).await {
             Ok(_) => {

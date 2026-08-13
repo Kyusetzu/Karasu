@@ -297,7 +297,7 @@ export const en = {
     formats: "Formats",
     statuses: "Statuses",
     scoreDist: "How you score",
-    scoreDistHint: "Where your scores land on the ten-point scale.",
+    scoreDistHint: "Where your scores land on your scale.",
     releaseYears: "Release years",
     startYears: "Years you were active",
     breakdown: "What is on the list",
@@ -645,6 +645,7 @@ export const en = {
   },
   entry: {
     scoreHint: "Click the score you gave to clear it.",
+    scoreHintInput: "Leave the field empty to clear the score.",
     rewatches: "Rewatches",
     rereads: "Rereads",
     addRepeat: "+1",
@@ -883,11 +884,20 @@ export const en = {
     pane_anilist: "AniList account",
     alAccount: "Account settings",
     alAccountHint:
-      "These live on your AniList account, so they apply on anilist.co and in every other client. Karasu keeps its own preference for four of them — each says so below.",
+      "These live on your AniList account, so they apply on anilist.co and in every other client. Karasu keeps its own preference for three of them — each says so below.",
     alTitleLanguage: "Title language",
     alTitleLanguageHint: "How AniList writes titles.",
+    alTitleRomaji: "Romaji",
+    alTitleEnglish: "English",
+    alTitleNative: "Native",
+    alTitleRomajiStylised: "Romaji, stylised",
+    alTitleEnglishStylised: "English, stylised",
+    alTitleNativeStylised: "Native, stylised",
     alStaffLanguage: "Staff and character names",
     alStaffLanguageHint: "Western order, Japanese order, or the native script.",
+    alStaffRomajiWestern: "Romaji, Western order",
+    alStaffRomaji: "Romaji, Japanese order",
+    alStaffNative: "Native script",
     alTimezone: "Timezone",
     alTimezoneHint: "Offset AniList timestamps your activity with, e.g. +01:00.",
     alMergeTime: "Merge activity within",
@@ -917,10 +927,8 @@ export const en = {
     alSaved: "Saved on AniList",
     alSaveFailed: "That setting wasn’t saved",
     alSaveFailedDetail: "Nothing was sent. Account changes are not queued offline.",
-    // The four Karasu overrides. Each names where the effect actually lands —
+    // The three Karasu overrides. Each names where the effect actually lands —
     // a generic "affects AniList" would not tell anyone what to expect.
-    alOverrideScoreFormat:
-      "Changing this re-scales every score you see on anilist.co and in other clients. Karasu always reads and writes ten-point scores, so its own display will not move.",
     alOverrideTitleLanguage:
       "Karasu picks titles with its own setting and ignores this one.",
     alOverrideAdult:
@@ -930,9 +938,19 @@ export const en = {
     alOverrideWhere: "Karasu’s setting →",
     alListOptions: "List display",
     alScoreFormat: "Score format",
-    alScoreFormatHint: "The scale AniList shows your scores on.",
+    alScoreFormatHint:
+      "The scale your scores use everywhere — in Karasu, on anilist.co and in every other client. Existing scores are converted, not lost.",
+    alScore100: "100 points",
+    alScore10Decimal: "10 with decimals (8.5)",
+    alScore10: "10 points",
+    alScore5: "5 stars",
+    alScore3: "3 smileys",
     alRowOrder: "Row order",
     alRowOrderHint: "How AniList sorts your list by default.",
+    alRowTitle: "Title",
+    alRowScore: "Score",
+    alRowUpdated: "Last updated",
+    alRowAdded: "Last added",
     alCustomLists: "Custom lists",
     alCustomListsHint:
       "Shown, not editable. AniList replaces the whole set when it is written, and has no undo — so Karasu will not send them. Edit these on anilist.co.",

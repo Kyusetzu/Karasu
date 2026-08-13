@@ -220,11 +220,12 @@ describe("mergeListActivity", () => {
 });
 
 describe("LOCAL_OVERRIDES", () => {
-  it("names exactly the four settings Karasu ignores", () => {
+  it("names exactly the three settings Karasu ignores", () => {
+    // scoreFormat left this list on purpose: since the scoreRaw change the
+    // whole app follows the account's format, so the setting simply works.
     expect(Object.keys(LOCAL_OVERRIDES).sort()).toEqual([
       "airingNotifications",
       "displayAdultContent",
-      "scoreFormat",
       "titleLanguage",
     ]);
   });

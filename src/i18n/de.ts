@@ -296,8 +296,7 @@ export const de: typeof en = {
     formats: "Formate",
     statuses: "Status",
     scoreDist: "Wie du bewertest",
-    scoreDistHint:
-      "Wo deine Bewertungen auf der Zehn-Punkte-Skala landen.",
+    scoreDistHint: "Wo deine Bewertungen auf deiner Skala landen.",
     releaseYears: "Erscheinungsjahre",
     startYears: "Aktive Jahre",
     breakdown: "Was auf der Liste steht",
@@ -648,6 +647,7 @@ export const de: typeof en = {
   },
   entry: {
     scoreHint: "Klick auf die vergebene Bewertung, um sie zu löschen.",
+    scoreHintInput: "Feld leer lassen, um die Bewertung zu löschen.",
     rewatches: "Wiederholungen",
     rereads: "Wiederholungen",
     addRepeat: "+1",
@@ -888,12 +888,21 @@ export const de: typeof en = {
     pane_anilist: "AniList-Konto",
     alAccount: "Kontoeinstellungen",
     alAccountHint:
-      "Diese liegen auf deinem AniList-Konto und gelten daher auf anilist.co und in jedem anderen Client. Bei vier davon behält Karasu seine eigene Einstellung — das steht jeweils darunter.",
+      "Diese liegen auf deinem AniList-Konto und gelten daher auf anilist.co und in jedem anderen Client. Bei drei davon behält Karasu seine eigene Einstellung — das steht jeweils darunter.",
     alTitleLanguage: "Titelsprache",
     alTitleLanguageHint: "Wie AniList Titel schreibt.",
+    alTitleRomaji: "Romaji",
+    alTitleEnglish: "Englisch",
+    alTitleNative: "Original",
+    alTitleRomajiStylised: "Romaji, stilisiert",
+    alTitleEnglishStylised: "Englisch, stilisiert",
+    alTitleNativeStylised: "Original, stilisiert",
     alStaffLanguage: "Namen von Staff und Charakteren",
     alStaffLanguageHint:
       "Westliche Reihenfolge, japanische Reihenfolge oder Originalschrift.",
+    alStaffRomajiWestern: "Romaji, westliche Reihenfolge",
+    alStaffRomaji: "Romaji, japanische Reihenfolge",
+    alStaffNative: "Originalschrift",
     alTimezone: "Zeitzone",
     alTimezoneHint: "Versatz, mit dem AniList deine Aktivität stempelt, z. B. +01:00.",
     alMergeTime: "Aktivität zusammenfassen innerhalb",
@@ -924,10 +933,8 @@ export const de: typeof en = {
     alSaveFailed: "Diese Einstellung wurde nicht gespeichert",
     alSaveFailedDetail:
       "Es wurde nichts gesendet. Kontoänderungen werden offline nicht zwischengespeichert.",
-    // Die vier Karasu-Überschreibungen. Jede nennt, wo die Wirkung tatsächlich
+    // Die drei Karasu-Überschreibungen. Jede nennt, wo die Wirkung tatsächlich
     // landet — ein allgemeines "betrifft AniList" würde niemandem helfen.
-    alOverrideScoreFormat:
-      "Das skaliert jede Bewertung neu, die du auf anilist.co und in anderen Clients siehst. Karasu liest und schreibt immer Zehn-Punkte-Bewertungen, seine eigene Anzeige ändert sich also nicht.",
     alOverrideTitleLanguage:
       "Karasu wählt Titel mit seiner eigenen Einstellung und ignoriert diese.",
     alOverrideAdult:
@@ -937,9 +944,19 @@ export const de: typeof en = {
     alOverrideWhere: "Karasus Einstellung →",
     alListOptions: "Listenanzeige",
     alScoreFormat: "Bewertungsformat",
-    alScoreFormatHint: "Die Skala, auf der AniList deine Bewertungen zeigt.",
+    alScoreFormatHint:
+      "Die Skala für deine Bewertungen überall — in Karasu, auf anilist.co und in jedem anderen Client. Bestehende Bewertungen werden umgerechnet, nicht gelöscht.",
+    alScore100: "100 Punkte",
+    alScore10Decimal: "10 mit Dezimalstelle (8,5)",
+    alScore10: "10 Punkte",
+    alScore5: "5 Sterne",
+    alScore3: "3 Smileys",
     alRowOrder: "Zeilenreihenfolge",
     alRowOrderHint: "Wie AniList deine Liste standardmäßig sortiert.",
+    alRowTitle: "Titel",
+    alRowScore: "Bewertung",
+    alRowUpdated: "Zuletzt aktualisiert",
+    alRowAdded: "Zuletzt hinzugefügt",
     alCustomLists: "Eigene Listen",
     alCustomListsHint:
       "Nur Anzeige, nicht bearbeitbar. AniList ersetzt beim Schreiben den ganzen Satz und hat kein Rückgängig — Karasu sendet sie deshalb nicht. Bearbeite sie auf anilist.co.",

@@ -111,21 +111,22 @@ export function mergeListActivity(
 }
 
 /**
- * The four AniList settings Karasu deliberately ignores.
+ * The three AniList settings Karasu deliberately ignores.
  *
  * Editing them is still legitimate — they are the user's settings and other
  * clients honour them — but a row that appears to do nothing is a bug report
  * waiting to happen, so each carries a note naming *where* its effect lands.
  * The hint keys are literals so `i18nKeys.test.ts` can see them.
+ *
+ * `scoreFormat` used to be the fourth: Karasu pinned ten-point everywhere,
+ * so the row truthfully said its own display would not move. Since the
+ * scoreRaw change the whole app reads and writes in the account's format,
+ * so the setting simply *works* and needs no note.
  */
 export const LOCAL_OVERRIDES = {
-  scoreFormat: {
-    hintKey: "settings.alOverrideScoreFormat",
-    /** Which Karasu pane holds the setting that wins instead, if any. */
-    pane: null,
-  },
   titleLanguage: {
     hintKey: "settings.alOverrideTitleLanguage",
+    /** Which Karasu pane holds the setting that wins instead, if any. */
     pane: "appearance",
   },
   displayAdultContent: {

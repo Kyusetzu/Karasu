@@ -23,13 +23,13 @@
  * Escaping the tags into visible `<div style=…>` was the alternative and it is
  * worse: a wall of markup reads as a bug in Karasu, where a plain bio does not.
  *
- * **Images and embeds become chips, not pictures.** With no CSP, loading a
- * remote image from a stranger's bio is an unconditional request to a URL they
- * chose, from an app holding an OAuth token — an IP beacon and a "someone
- * opened my profile" signal. Origin-allowlisting `s4.anilist.co` would buy
- * nothing, since that is itself the user-upload CDN, and the sample showed most
- * images hosted on imgur, tumblr and giphy anyway. The prerequisite for
- * inlining them is a real `img-src` policy, not a URL check in JS.
+ * **Images and embeds become chips, not pictures** — and this survived the
+ * arrival of a real CSP rather than being made obsolete by it. Measured across
+ * 89 bios holding 350 images: **6 were on `*.anilist.co`**, the two per cent the
+ * policy permits. The rest were imgur, tumblr, pinimg, catbox and discord, which
+ * `img-src` cannot cover without allowlisting an unbounded set of third parties
+ * that would each learn the user's IP and which profile they opened. See the
+ * `Chip` comment in `components/RichText.tsx` for the full figures.
  *
  * Grounded in real data rather than the docs. Of those 44 bios: 36 relied on
  * single newlines (hence `br`, see `LIMIT`), 25 used `~~~centered~~~`, 24 used

@@ -45,11 +45,24 @@ export function ExternalAnchor({
 /**
  * An image or embed, as a link rather than the thing itself.
  *
- * `tauri.conf.json` sets `"csp": null`, so loading a remote image from a
- * stranger's bio is an unconditional request to a URL they chose, from a desktop
- * app holding an OAuth token — an IP beacon plus a "someone opened my profile"
- * signal. It also solves the layout problem for free, since bios routinely embed
- * 2000px-wide GIFs.
+ * **Measured, after the CSP landed and made inlining look possible.** Across 89
+ * real bios containing 350 images, **6 — two per cent — were on `*.anilist.co`**.
+ * The rest were imgur (147), tumblr (57), pinimg, postimg, catbox, discord and a
+ * dozen one-offs. So `img-src` cannot be widened to cover them without
+ * allowlisting an unbounded set of third parties, each of which then learns the
+ * user's IP and that they opened a particular profile — from a desktop app
+ * holding an OAuth token. Inlining the 2% that *are* permitted would change
+ * almost nothing on screen.
+ *
+ * The chip is therefore the answer, and the reason is stronger than the one this
+ * comment used to give. It was "there is no CSP"; there is one now, and the point
+ * stands anyway. Note what the policy *does* permit and what already renders
+ * because of it: avatars, banners and cover art are all AniList-hosted and go
+ * through plain `<img>`, so the images that carry meaning are inline and only
+ * decorative bio art is a chip.
+ *
+ * A pleasant side effect either way: bios routinely embed 2000px-wide GIFs, and a
+ * chip has no layout problem to solve.
  *
  * About one profile in twelve is images and nothing else, so this chip is the
  * entire visible content of those. It has to look deliberate.

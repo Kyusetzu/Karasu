@@ -389,6 +389,14 @@ import it.
 - **A CSP cannot be checked from the Vite dev server** — it applies to the Tauri
   webview, so the browser-pane tooling is blind to it. Only a real
   `tauri dev`/`tauri build` run proves it.
+- **Widening `img-src` to inline bio images is not worth attempting — measured.**
+  Across 89 real bios holding 350 images, **6 (2%) were on `*.anilist.co`**; the
+  rest were imgur (147), tumblr (57), pinimg, postimg, catbox and discord. So the
+  chips in `components/RichText.tsx` are not a stopgap waiting on a policy: no
+  allowlist can cover that tail without handing an unbounded set of third parties
+  the user's IP and which profile they opened. What the policy *does* permit is
+  the part that matters — avatars, banners and covers are AniList-hosted and
+  render as ordinary `<img>`.
 - **MSVC writes an 11 MB `karasu.pdb` on every release build and there is no
   flag reaching the linker to stop it.** `debug = 0` and `strip = true` are
   already set, `cargo build --release -v` shows no `/DEBUG`, no `-Cdebuginfo=`

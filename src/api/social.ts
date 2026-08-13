@@ -715,6 +715,33 @@ export async function toggleThreadSubscription(
   return data.ToggleThreadSubscription;
 }
 
+/**
+ * Creates a thread — `SaveThread` without an `id` is a create (verified by
+ * introspection: `id, title, body, categories: [Int], mediaCategories: [Int],
+ * sticky, locked`; the last two are moderator toys and never sent).
+ *
+ * Karasu is create-only by decision: no edit, no delete. Editing and deleting
+ * live on anilist.co, where a destructive click has the site's own confirm
+ * around it.
+ *
+ * Returns only the id, which is all the navigation to the new thread needs.
+ */
+export const SAVE_THREAD_MUTATION = `
+mutation ($title: String!, $body: String!, $categories: [Int]) {
+  SaveThread(title: $title, body: $body, categories: $categories) {
+    id
+  }
+}`;
+
+export async function saveThread(input: {
+  title: string;
+  body: string;
+  categories: number[];
+}): Promise<{ id: number }> {
+  const data = await gql<{ SaveThread: { id: number } }>(SAVE_THREAD_MUTATION, input);
+  return data.SaveThread;
+}
+
 // --- Account settings -----------------------------------------------------
 
 /**

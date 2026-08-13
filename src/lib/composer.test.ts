@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { charsLeft, POST_MAX, validatePost } from "./composer";
+import {
+  charsLeft,
+  POST_MAX,
+  TITLE_MAX,
+  validatePost,
+  validateThread,
+} from "./composer";
 
 describe("validatePost", () => {
   it("accepts ordinary text and hands back the trimmed form", () => {
@@ -44,6 +50,49 @@ describe("validatePost", () => {
     for (const raw of ["", "ok", "y".repeat(POST_MAX + 5)]) {
       expect(allowed.has(validatePost(raw).reason)).toBe(true);
     }
+  });
+});
+
+describe("validateThread", () => {
+  it("accepts a titled, bodied, categorised thread", () => {
+    expect(validateThread("  Weekly chapter talk ", "Body text", [7])).toEqual({
+      ok: true,
+      title: "Weekly chapter talk",
+      body: "Body text",
+    });
+  });
+
+  it("rejects each missing piece with its own reason", () => {
+    expect(validateThread("", "body", [7])).toMatchObject({ ok: false, reason: "titleEmpty" });
+    expect(validateThread("   ", "body", [7])).toMatchObject({ ok: false, reason: "titleEmpty" });
+    expect(validateThread("title", "", [7])).toMatchObject({ ok: false, reason: "empty" });
+    expect(validateThread("title", "body", [])).toMatchObject({ ok: false, reason: "noCategory" });
+  });
+
+  it("bounds the title the way POST_MAX bounds the body", () => {
+    expect(validateThread("x".repeat(TITLE_MAX), "body", [7])).toMatchObject({ ok: true });
+    expect(validateThread("x".repeat(TITLE_MAX + 1), "body", [7])).toMatchObject({
+      ok: false,
+      reason: "titleTooLong",
+    });
+  });
+
+  it("flattens whitespace inside a title, since the forum renders it on one line", () => {
+    expect(validateThread("a\n  b\t c", "body", [7]).title).toBe("a b c");
+  });
+
+  it("reuses the body rules, blank-line collapse included", () => {
+    expect(validateThread("t", "one\n\n\n\n\ntwo", [7]).body).toBe("one\n\ntwo");
+    expect(validateThread("t", "x".repeat(POST_MAX + 1), [7])).toMatchObject({
+      ok: false,
+      reason: "tooLong",
+    });
+  });
+
+  it("checks in the order a user fills the form: title, body, category", () => {
+    // All three wrong → the first thing to fix is reported, not an arbitrary one.
+    expect(validateThread("", "", []).reason).toBe("titleEmpty");
+    expect(validateThread("t", "", []).reason).toBe("empty");
   });
 });
 

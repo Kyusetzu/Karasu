@@ -12,6 +12,7 @@ import {
   type CommentPage,
 } from "@/api/social";
 import { isTauri } from "@/api/anilist";
+import BackButton from "@/components/shell/BackButton";
 import { Button } from "@/components/ui/button";
 import { UserLockup } from "@/components/ui/user-lockup";
 import { EmptyState, PerchRule, StruckQuery } from "@/components/EmptyState";
@@ -149,6 +150,7 @@ export default function Thread() {
 
   return (
     <div className="mx-auto max-w-3xl px-8 pb-12 pt-7">
+      <BackButton className="mb-4" />
       <header>
         <div className="flex items-start gap-2">
           {data.isLocked && <Lock className="mt-1.5 size-4 shrink-0 text-ink-600" />}

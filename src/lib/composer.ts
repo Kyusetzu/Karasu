@@ -48,3 +48,38 @@ export function validatePost(raw: string): PostValidation {
 export function charsLeft(raw: string): number {
   return POST_MAX - raw.trim().length;
 }
+
+/**
+ * What counts as a postable thread — a title, a body, and at least one
+ * category.
+ *
+ * AniList's own composer enforces the category; a threadless category is fine
+ * but a categoryless thread lands nowhere anyone browses. The title bound is
+ * Karasu's, like `POST_MAX`: AniList documents none, and the forum renders
+ * titles on one line.
+ */
+export type ThreadRejection = "titleEmpty" | "titleTooLong" | PostRejection | "noCategory";
+
+export const TITLE_MAX = 120;
+
+export interface ThreadValidation {
+  ok: boolean;
+  reason?: ThreadRejection;
+  title: string;
+  body: string;
+}
+
+export function validateThread(
+  rawTitle: string,
+  rawBody: string,
+  categories: number[],
+): ThreadValidation {
+  const title = rawTitle.trim().replace(/\s+/g, " ");
+  const bodyCheck = validatePost(rawBody);
+  const out = { title, body: bodyCheck.text };
+  if (!title) return { ok: false, reason: "titleEmpty", ...out };
+  if (title.length > TITLE_MAX) return { ok: false, reason: "titleTooLong", ...out };
+  if (!bodyCheck.ok) return { ok: false, reason: bodyCheck.reason, ...out };
+  if (categories.length === 0) return { ok: false, reason: "noCategory", ...out };
+  return { ok: true, ...out };
+}

@@ -10,6 +10,7 @@ import {
   type UserProfile as UserProfileData,
 } from "@/api/social";
 import { isTauri } from "@/api/anilist";
+import BackButton from "@/components/shell/BackButton";
 import { ProfileHeader } from "@/components/social/ProfileHeader";
 import { UserList } from "@/components/social/UserList";
 import { ActivityFeed } from "@/components/social/ActivityFeed";
@@ -113,6 +114,11 @@ export default function UserProfile() {
 
   return (
     <div className="pb-12">
+      {/* In flow above the banner rather than floating on it — the no-banner
+          profile puts the avatar exactly where a floated button would sit. */}
+      <div className="px-8 pt-4">
+        <BackButton />
+      </div>
       <ProfileHeader user={user} />
       <Tabbed user={user} />
     </div>

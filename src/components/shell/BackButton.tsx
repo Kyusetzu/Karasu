@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 /**
- * Shared back control for the two pages you can only arrive at from somewhere
- * else (media detail, franchise graph). Everything reachable from the sidebar
- * is a top-level destination and deliberately has none.
+ * Shared back control for the pages you can only arrive at from somewhere else
+ * — media detail, the franchise graph, a thread, a profile, and the
+ * character/staff/studio pages. Everything reachable from the sidebar is a
+ * top-level destination and deliberately has none.
  *
  * It carries a visible label rather than a bare glyph, and a bordered,
  * translucent-blurred fill so it stays readable on the detail page, where it

@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
-import { Search as SearchIcon } from "lucide-react";
+import { PenSquare, Search as SearchIcon } from "lucide-react";
 import { forumThreads, THREAD_CATEGORIES } from "@/api/social";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Pill } from "@/components/ui/pill";
+import { PresenceIf } from "@/components/ui/presence";
 import { ThreadList } from "@/components/social/ThreadList";
+import { NewThreadModal } from "@/components/overlays/NewThreadModal";
 import { useAuth } from "@/stores/auth";
 import { cn } from "@/lib/utils";
 
@@ -39,6 +42,7 @@ export default function Forum() {
 
   const [input, setInput] = useState(params.get("q") ?? "");
   const [term, setTerm] = useState(params.get("q") ?? "");
+  const [composing, setComposing] = useState(false);
 
   // The same 500 ms debounce the media search uses. A forum search on every
   // keystroke would spend the shared rate limit faster than anything else here.
@@ -80,11 +84,20 @@ export default function Forum() {
   return (
     <div className="flex h-full flex-col">
       <div className="px-8 pt-6">
-        <div className="flex items-baseline gap-2.5">
-          <h1 className="text-2xl font-bold">{t("forum.title")}</h1>
-          <span className="font-brand-jp text-[.8125rem] tracking-[.04em] text-ink-600">
-            掲示板
-          </span>
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-baseline gap-2.5">
+            <h1 className="text-2xl font-bold">{t("forum.title")}</h1>
+            <span className="font-brand-jp text-[.8125rem] tracking-[.04em] text-ink-600">
+              掲示板
+            </span>
+          </div>
+          {/* Nothing to post *as* without an account, matching the composer. */}
+          {mode === "anilist" && (
+            <Button variant="outline" size="control" onClick={() => setComposing(true)}>
+              <PenSquare className="size-3.75" />
+              {t("forum.newThread")}
+            </Button>
+          )}
         </div>
 
         <div className="mt-3 flex flex-wrap gap-1.5">
@@ -168,6 +181,12 @@ export default function Forum() {
           />
         )}
       </div>
+
+      {/* Through `PresenceIf` so the dialog can animate out — React unmounts
+          before CSS can, so `{open && <Modal/>}` only ever has an entrance. */}
+      <PresenceIf when={composing}>
+        {(leaving) => <NewThreadModal onClose={() => setComposing(false)} leaving={leaving} />}
+      </PresenceIf>
     </div>
   );
 }

@@ -12,6 +12,7 @@ import {
   type StudioDetail,
 } from "@/api/social";
 import { isTauri } from "@/api/anilist";
+import BackButton from "@/components/shell/BackButton";
 import { Avatar } from "@/components/ui/user-lockup";
 import { SectionHeader } from "@/components/ui/section-header";
 import { EmptyState, StruckQuery } from "@/components/EmptyState";
@@ -163,6 +164,7 @@ export default function Person({ kind }: { kind: Kind }) {
 
   return (
     <div className="mx-auto max-w-4xl px-8 pb-12 pt-7">
+      <BackButton className="mb-4" />
       <header className="flex flex-wrap gap-5">
         {!su && (
           <div className="w-32 shrink-0 overflow-hidden rounded-xl bg-surface-850">

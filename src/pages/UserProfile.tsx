@@ -13,6 +13,7 @@ import { isTauri } from "@/api/anilist";
 import { ProfileHeader } from "@/components/social/ProfileHeader";
 import { UserList } from "@/components/social/UserList";
 import { ActivityFeed } from "@/components/social/ActivityFeed";
+import { ThreadList } from "@/components/social/ThreadList";
 import { CoverOutline, EmptyState, PerchRule, StruckQuery } from "@/components/EmptyState";
 import { Shimmer } from "@/components/Skeleton";
 import { SectionHeader } from "@/components/ui/section-header";
@@ -118,7 +119,7 @@ export default function UserProfile() {
   );
 }
 
-const TABS = ["overview", "activity", "followers", "following"] as const;
+const TABS = ["overview", "activity", "followers", "following", "forum"] as const;
 type Tab = (typeof TABS)[number];
 
 function isTab(value: string | null): value is Tab {
@@ -158,6 +159,8 @@ function Tabbed({ user }: { user: UserProfileData }) {
     activity: undefined,
     followers: counts.data?.followers,
     following: counts.data?.following,
+    // Threads are capped at 5000 like everything else paginated here.
+    forum: undefined,
   };
 
   return (
@@ -191,7 +194,9 @@ function Tabbed({ user }: { user: UserProfileData }) {
                   ? t("social.tabActivity")
                   : id === "followers"
                     ? t("social.followers")
-                    : t("social.tabFollowing")}
+                    : id === "following"
+                      ? t("social.tabFollowing")
+                      : t("social.tabForum")}
               {tabCount[id] !== undefined && (
                 <span className="ml-1.5 text-xs tabular-nums text-ink-600">
                   {tabCount[id]}
@@ -227,6 +232,7 @@ function Tabbed({ user }: { user: UserProfileData }) {
             emptyTitle={t("social.noFollowing", { name: user.name })}
           />
         )}
+        {tab === "forum" && <ThreadList userId={user.id} name={user.name} />}
       </div>
     </div>
   );

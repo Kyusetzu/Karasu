@@ -558,3 +558,159 @@ export async function deleteActivity(id: number): Promise<boolean> {
   );
   return data.DeleteActivity?.deleted === true;
 }
+
+// --- Forum ----------------------------------------------------------------
+
+/**
+ * A list of threads. **No `body`** — a list renders titles.
+ *
+ * `sort: REPLIED_AT_DESC` puts the live conversations first and is a total
+ * order, which paging needs. `pageInfo.total` is the same capped 5000 sentinel
+ * as everywhere else in this file, so thread lists show no remaining count.
+ */
+export const THREADS_QUERY = `
+query ($userId: Int, $replyUserId: Int, $page: Int) {
+  Page(page: $page, perPage: 25) {
+    ${PAGE_INFO}
+    threads(userId: $userId, replyUserId: $replyUserId, sort: REPLIED_AT_DESC) {
+      id title replyCount viewCount likeCount isLiked isSticky isLocked
+      repliedAt createdAt siteUrl
+      user { ${SOCIAL_USER} }
+      replyUser { id name }
+      categories { id name }
+    }
+  }
+}`;
+
+export interface ThreadSummary {
+  id: number;
+  title: string | null;
+  replyCount: number | null;
+  viewCount: number | null;
+  likeCount: number | null;
+  isLiked: boolean | null;
+  isSticky: boolean | null;
+  isLocked: boolean | null;
+  repliedAt: number | null;
+  createdAt: number | null;
+  siteUrl: string | null;
+  user: SocialUser | null;
+  replyUser: { id: number; name: string } | null;
+  categories: { id: number; name: string }[] | null;
+}
+
+export interface ThreadPage {
+  pageInfo: PageInfo;
+  threads: ThreadSummary[];
+}
+
+export async function threads(
+  vars: { userId: number } | { replyUserId: number },
+  page = 1,
+): Promise<ThreadPage> {
+  const data = await gql<{ Page: { pageInfo: PageInfo; threads: ThreadSummary[] } }>(
+    THREADS_QUERY,
+    { ...vars, page },
+  );
+  return { pageInfo: data.Page.pageInfo, threads: data.Page.threads ?? [] };
+}
+
+export const THREAD_QUERY = `
+query ($id: Int!) {
+  Thread(id: $id) {
+    id title body replyCount viewCount likeCount isLiked isLocked isSticky
+    isSubscribed repliedAt createdAt siteUrl
+    user { id name avatar { large } isFollowing isFollower }
+    categories { id name }
+    mediaCategories { ${SOCIAL_MEDIA} }
+  }
+}`;
+
+export interface ThreadDetail extends Omit<ThreadSummary, "replyUser"> {
+  body: string | null;
+  isSubscribed: boolean | null;
+  mediaCategories: SocialMedia[] | null;
+}
+
+export async function thread(id: number): Promise<ThreadDetail> {
+  const data = await gql<{ Thread: ThreadDetail | null }>(THREAD_QUERY, { id });
+  if (!data.Thread) throw new Error("NOT_FOUND");
+  return data.Thread;
+}
+
+/**
+ * A page of comments, with their reply chains.
+ *
+ * `perPage: 10` rather than 25, and that is because of `childComments`: it is a
+ * raw `Json` scalar with no depth control, and asking for it cost 52,801 bytes
+ * for twelve comments against 3,964 without — 13×, with nesting measured 48
+ * levels deep. It is fetched anyway because replies are most of what a thread is
+ * and it is one request either way; the page size is what pays for it.
+ * `lib/comments` flattens the result to two levels and reports the rest.
+ *
+ * `ThreadCommentSort` offers only `ID`/`ID_DESC`, so oldest-first (the default)
+ * is the only reading order available — which is the right one for a thread.
+ */
+export const THREAD_COMMENTS_QUERY = `
+query ($threadId: Int!, $page: Int) {
+  Page(page: $page, perPage: 10) {
+    ${PAGE_INFO}
+    threadComments(threadId: $threadId) {
+      id comment likeCount isLiked createdAt siteUrl
+      user { ${SOCIAL_USER} }
+      childComments
+    }
+  }
+}`;
+
+export interface CommentPage {
+  pageInfo: PageInfo;
+  /** Raw — `flattenComments` in `lib/comments` is what tightens these. */
+  comments: unknown[];
+}
+
+export async function threadComments(threadId: number, page = 1): Promise<CommentPage> {
+  const data = await gql<{ Page: { pageInfo: PageInfo; threadComments: unknown[] } }>(
+    THREAD_COMMENTS_QUERY,
+    { threadId, page },
+  );
+  return { pageInfo: data.Page.pageInfo, comments: data.Page.threadComments ?? [] };
+}
+
+export const SAVE_THREAD_COMMENT_MUTATION = `
+mutation ($threadId: Int!, $comment: String!, $parentCommentId: Int) {
+  SaveThreadComment(threadId: $threadId, comment: $comment, parentCommentId: $parentCommentId) {
+    id comment createdAt likeCount isLiked siteUrl
+    user { ${SOCIAL_USER} }
+  }
+}`;
+
+export async function saveThreadComment(
+  threadId: number,
+  comment: string,
+  parentCommentId?: number,
+): Promise<unknown> {
+  const data = await gql<{ SaveThreadComment: unknown }>(SAVE_THREAD_COMMENT_MUTATION, {
+    threadId,
+    comment,
+    parentCommentId,
+  });
+  return data.SaveThreadComment;
+}
+
+export const TOGGLE_THREAD_SUBSCRIPTION_MUTATION = `
+mutation ($threadId: Int!, $subscribe: Boolean!) {
+  ToggleThreadSubscription(threadId: $threadId, subscribe: $subscribe) {
+    id isSubscribed
+  }
+}`;
+
+export async function toggleThreadSubscription(
+  threadId: number,
+  subscribe: boolean,
+): Promise<{ id: number; isSubscribed: boolean | null }> {
+  const data = await gql<{
+    ToggleThreadSubscription: { id: number; isSubscribed: boolean | null };
+  }>(TOGGLE_THREAD_SUBSCRIPTION_MUTATION, { threadId, subscribe });
+  return data.ToggleThreadSubscription;
+}

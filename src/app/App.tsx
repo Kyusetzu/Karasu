@@ -46,6 +46,7 @@ const Settings = lazy(() => import("@/pages/Settings"));
 const About = lazy(() => import("@/pages/About"));
 const UserProfile = lazy(() => import("@/pages/UserProfile"));
 const Social = lazy(() => import("@/pages/Social"));
+const Thread = lazy(() => import("@/pages/Thread"));
 
 export default function App() {
   const { pathname } = useLocation();
@@ -150,6 +151,7 @@ export default function App() {
                 {/* By name, not id: that is what AniList's own URLs, an
                     `@mention` and a pasted link all carry. */}
                 <Route path="/user/:name" element={<UserProfile />} />
+                <Route path="/thread/:id" element={<Thread />} />
                 {/* Alias for old links */}
                 <Route path="/anime/:id" element={<AnimeDetail />} />
                 <Route path="/settings" element={<Settings />} />
@@ -218,7 +220,9 @@ function PresenceReporter() {
           // whose profile is open.
           pathname.startsWith("/user/")
           ? "Profile"
-          : "Karasu");
+          : pathname.startsWith("/thread/")
+            ? "Forum"
+            : "Karasu");
     invoke("set_ui_page", { page: label }).catch(() => {});
   }, [pathname]);
   return null;

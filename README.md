@@ -106,22 +106,41 @@ Because a desktop app can do things anilist.co simply can't:
   **rewatch/reread counter**
 - Manga counts **chapters and volumes** as two separate axes, the way AniList
   stores them
+- Scores read and write in **your account's own format** — 100-point, 10-point
+  (with or without decimals), 5 stars or 3 smileys — and every control,
+  badge and chart follows when you change it
 - Every edit can be **undone** from the toast it raises — and a failed write
   says so, queues itself and offers a retry
 
 **Discovery**
 - Search with an anime/manga toggle, seasonal charts, rich detail pages
+- **Person, character and studio pages** — voice actors, staff and studios each
+  get a page of their own, with their roles and works, reachable from any
+  detail page or statistic
+- **Airing calendar** — a real week grid, Monday-first, with two lenses:
+  just your shows (instant, works offline) or the complete schedule
 - **Recommendations** for anime and manga on the dashboard, built from the
   titles you've completed — the higher you scored something, the more its
   suggestions count, and anything already on your list is left out
 - **Franchise graph** — the whole franchise as a relation map (sequels, side
   stories, cross-medium sources/adaptations), each node coloured by your status,
-  pan and zoom, and any branch foldable out of the way
+  pan and zoom, any branch foldable, double-click to open a title
+
+**Social**
+- **Profiles** — yours and anyone's: bio, banner, favourites, statistics and
+  their lists, with follow/unfollow and a follower browser
+- **Activity feeds** — what the people you follow watched, read, posted and
+  replied to, with likes, replies and a status composer of your own
+- **Forum** — browse and read AniList's forums, follow comment threads, and
+  start threads or reply from inside the app
+- All of it is AniList's own data, fetched live — Karasu stores none of it
 
 **Insights**
-- **Statistics** — genres, tags, voice actors, studios and staff for both
-  mediums, plus a sunburst of what is on the list, a radar of the shape of your
-  taste, the years you were active, series length and country of origin
+- **Statistics in five themed tabs** — overview, ratings, years, genres &amp;
+  tags, people &amp; studios — drawn with a sunburst, radar, treemap, area
+  charts, gradient bars, dot plots and an activity heatmap
+- **Your scores against the crowd's** — mean deltas and the titles you disagree
+  on hardest, computed from the list you already have, at zero request cost
 - **Year in review** — a shareable poster of your year in five crops (banner,
   square, page, compressed, detailed), exported as PNG or JPEG at 1×, 2× or 3×
 - Time-to-finish estimates and a Dashboard "this week" digest
@@ -136,6 +155,12 @@ Because a desktop app can do things anilist.co simply can't:
 - **Local library** — your folder scanned and matched to your list, each title
   showing the next unwatched file and how confident the match was, with every
   episode on disk one click away
+- **Season splitting** — a folder that holds more episodes than its show is
+  flagged, and a guided dialog re-points the overflow at the right season
+  (community rules pre-select the likely answer, you always confirm); splits
+  persist, chain, and can be corrected
+- Titles the matcher can't place get **AniList's best guess** to confirm with
+  one click, or a search to answer by hand
 - **Discord Rich Presence**, always on, with a link back to the project
 - **Local-only mode** (no account needed) with a later sign-in merge
 - **Portable mode** — keep everything in a folder next to the executable
@@ -149,8 +174,11 @@ Because a desktop app can do things anilist.co simply can't:
   command palette on <kbd>Ctrl</kbd>+<kbd>K</kbd>, <kbd>/</kbd> to search,
   <kbd>Ctrl</kbd>+<kbd>1</kbd>–<kbd>3</kbd> between screens, and arrows,
   <kbd>Space</kbd>, <kbd>E</kbd> and <kbd>C</kbd> inside a list
-- **Settings in seven panes** — account, appearance, detection, library,
-  content, integrations and advanced
+- **Settings in eight panes** — account, AniList account, appearance,
+  detection, library, content, integrations and advanced. The AniList pane
+  edits your *account's* settings in place — title language, score format,
+  activity posting, AniList's own notification toggles — so they apply on
+  anilist.co and in every client at once
 - An app-appropriate in-app right-click menu, system tray, single instance,
   autostart
 - English / German with automatic system-language detection

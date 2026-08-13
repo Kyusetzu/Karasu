@@ -15,6 +15,8 @@ and in the browser and scrobbles your AniList progress automatically.
 - **Shell:** Tauri 2 (Rust backend, WebView2)
 - **Frontend:** React 19 + TypeScript + Vite + Tailwind CSS v4
 - **State:** TanStack Query (server), Zustand (client), i18next (i18n)
+- **Charts:** drawn by hand in SVG/JSX; `d3-array`, `d3-scale` and `d3-shape`
+  supply the maths only — there is no chart library and the renderer stays ours
 - **Rendering:** `@tanstack/react-virtual` virtualizes the media lists. Rows are
   chunked by hand, so anything that renders one needs a column count — take it
   from `useColumnCount`, which reads the browser's resolved
@@ -41,25 +43,30 @@ src/
                      bell, command palette, keyboard sheet, context menu, toast
     media/           anything that renders a title or edits an entry
     overlays/        modal flows (confirm, preset, random pick, sign-in merge,
-                     profile edit)
+                     profile edit, match picker, favourites, new thread,
+                     season split)
     list/            the parts MediaList draws (virtual grid, rows, bulk bar)
-    stats/           the parts Statistics draws (panels, ranked list, charts)
+    stats/           the parts Statistics draws — panels, ranked list, Charts
+                     (radar/sunburst/treemap), AreaChart, DotPlot, GradientBars,
+                     Heatmap
     social/          the parts UserProfile, Social and Thread draw — the
                      markdown renderer, follow button, user and activity and
                      thread rows, and the two composers
     EmptyState · Skeleton · KarasuMark — cross-cutting, belong to no group
   hooks/             shared hooks (useListMutations, usePrimedLists,
-                     useColumnCount, usePanZoom, useCachedEntry, useFollow,
-                     useSocialActions, useActivityPost, useUpdateUser)
+                     useColumnCount, useRowTier, useListSummary, usePanZoom,
+                     useCachedEntry, usePresence, useViewTransitions,
+                     useAniListLogin, useFollow, useSocialActions,
+                     useFavourite, useActivityPost, useUpdateUser)
   i18n/              index.ts (setup) + en.ts + de.ts; `de: typeof en` enforces
                      key parity across the two files
   lib/               pure logic + its *.test.ts — the place testable code goes
   pages/             one per route; settings/ holds the eight panes
   stores/            Zustand stores (auth, theme, library, nowPlaying, …)
 src-tauri/src/
-  commands/          75 of the 87 frontend-facing commands, by subject:
+  commands/          76 of the 90 frontend-facing commands, by subject:
                      auth · list · playback · prefs · system · update. The
-                     other 12 are the library scanner's, in `library.rs`.
+                     other 14 are the library scanner's, in `library.rs`.
                      `mod.rs` re-exports all of it, so `commands::x` paths and
                      `generate_handler!` do not care which file a command is in.
                      Note what is *not* here: the entire social surface adds no
@@ -170,7 +177,7 @@ of AniList's own list fields, it costs nothing to carry, and the local list has
 stored it since schema v7. The rejected idea is tracking **purchases**, which
 would need price data the app has no source for.
 
-The schema is at **v10**. `library_match` (v8) holds the scanner's per-title
+The schema is at **v11**. `library_match` (v8) holds the scanner's per-title
 match confidence, which is what the local library's `exact` / `close` column
 reads. v9 adds `library_override` — the user's corrections, keyed on the parsed
 `(title, season)` with `season = -1` for a release name that carried none, and
@@ -178,7 +185,12 @@ never cleared by a scan — plus `library_unmatched`, so the unplaced list
 survives a restart. v10 adds `library_suggestion`, AniList's guess for a title
 the matcher cannot place; it is applied only once confirmed, at which point it
 becomes an ordinary override and the row reads `yours` rather than
-`exact`/`close`.
+`exact`/`close`. v11 adds `library_redirect` — confirmed season splits, keyed
+on the parse plus a **disk** episode range. The command that writes them
+(`set_library_redirect`) is keyed on `(media_id, current-frame range)` — the
+numbers the row displays — and `plan_redirect` translates per file, trimming
+any overlapped rule; don't re-key it on disk numbers, that was the chained-split
+bug.
 
 ## Versioning (every commit)
 
@@ -247,8 +259,8 @@ a regression here is invisible until it ships.
 
 **Two vitest projects, and the filename picks one.** Everything runs in **node**
 by default; only `*.dom.test.tsx` boots jsdom and Testing Library, via the
-`projects` block in `vite.config.ts`. That split is what keeps the suite at ~2 s
-for 430 tests, and it is a *name* rather than an inference on purpose:
+`projects` block in `vite.config.ts`. That split is what keeps the suite under
+~4 s for ~550 tests, and it is a *name* rather than an inference on purpose:
 `components/stats/Charts.test.tsx` renders with `renderToStaticMarkup` and needs
 no DOM, so an extension rule (`.tsx` ⇒ jsdom) dragged it into one and the suite
 went from 2.0 s to **14.1 s**. Needing a DOM is a decision, so it is spelled out
@@ -477,9 +489,17 @@ import it.
   `motionDuration()` themselves. Staggers use `staggerDelay`, which also zeroes
   the *delay*: collapsing only the duration turns a stagger into a staggered
   wait.
+- **Scores live in the account's `scoreFormat`, end to end.** Reads pass
+  `$scoreFormat` (never a pinned `POINT_10`), writes go through `scoreRaw` —
+  the format-independent 0–100 int — because a bare `score: Float` is
+  interpreted in the account's format and silently corrupted non-ten-point
+  accounts for years. `lib/scoreFormat.ts` is the one vocabulary
+  (`toRaw`/`fromRaw`/`formatScore`/`scoreScale`); local mode stays ten-point.
 - **Statistics scores are normalized in `userStatistics`.** AniList mixes a
   hundred-point `meanScore` with a distribution in the user's *display* format,
-  and says so nowhere. Everything downstream is ten-point.
+  and says so nowhere. `normalizeStatsBlock(stats, format)` brings everything
+  onto the display scale at the boundary; chart domains take
+  `scoreScale(format).max`, not a literal 10.
 
 ## Performance invariants
 

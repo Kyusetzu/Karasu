@@ -38,6 +38,7 @@ import { isLinux, usePlatform } from "@/stores/platform";
 
 const REPO_URL = "https://github.com/Kyusetzu/Karasu";
 const DISCORD_HANDLE = "Kyusetzu";
+const DISCORD_PROFILE = "https://discordapp.com/users/174216581222498304";
 const DISCORD_INVITE = "https://discord.gg/yeHNSGyM8F";
 const DISCORD_SERVER = "Kyu's Cozy Corner";
 const EMAIL = "contact@kyusetzu.de";
@@ -102,7 +103,12 @@ export default function About() {
             </button>
           </Row>
           <Row icon={<MessageCircle className="size-4" />} label={t("about.discord")}>
-            <span className="text-ink-100">{DISCORD_HANDLE}</span>
+            <button
+              onClick={() => openUrl(DISCORD_PROFILE)}
+              className="text-accent-400 hover:underline"
+            >
+              {DISCORD_HANDLE}
+            </button>
           </Row>
           <Row icon={<Mail className="size-4" />} label={t("about.email")}>
             <a

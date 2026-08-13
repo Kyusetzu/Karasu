@@ -3,8 +3,9 @@
  *
  * Karasu had no pagination anywhere before the social screens: `pageInfo` was
  * queried in two places and never read, and the only "show more" was
- * `RankedList`'s fixed top-25 expand. So this is the whole contract, in one
- * tested place, rather than a condition repeated per tab.
+ * `RankedList`'s fixed expand (since retired — the endpoint clamps at 30 rows,
+ * so 30 is "all of it"). So this is the whole contract, in one tested place,
+ * rather than a condition repeated per tab.
  *
  * Paging is button-driven on purpose, never scroll-driven. The rate limiter in
  * `anilist/client.rs` is a ~30/min brake shared with the scrobbler and the

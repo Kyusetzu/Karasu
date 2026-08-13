@@ -525,8 +525,8 @@ query ($id: Int!) {
         voiceActors(sort: COUNT_DESC) { voiceActor { id name { full } image { medium } } ${STAT_ROW} }
         studios(sort: COUNT_DESC) { studio { id name } ${STAT_ROW} }
         staff(sort: COUNT_DESC) { staff { id name { full } image { medium } } ${STAT_ROW} }
-        formats { format count }
-        statuses { status count }
+        formats { format count meanScore }
+        statuses { status count meanScore }
         scores(sort: MEAN_SCORE) { score count }
         releaseYears(sort: ID_DESC) { releaseYear count }
         startYears(sort: ID) { startYear count meanScore }
@@ -542,8 +542,8 @@ query ($id: Int!) {
         genres(sort: COUNT_DESC) { genre ${STAT_ROW} }
         tags(sort: COUNT_DESC) { tag { id name } ${STAT_ROW} }
         staff(sort: COUNT_DESC) { staff { id name { full } image { medium } } ${STAT_ROW} }
-        formats { format count }
-        statuses { status count }
+        formats { format count meanScore }
+        statuses { status count meanScore }
         scores(sort: MEAN_SCORE) { score count }
         releaseYears(sort: ID_DESC) { releaseYear count }
         startYears(sort: ID) { startYear count meanScore }

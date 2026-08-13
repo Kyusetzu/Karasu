@@ -35,9 +35,13 @@ import {
 import { STATUS_ORDER, type MediaListStatus } from "@/api/types";
 import { Empty, type Category } from "@/components/stats/shared";
 import { DistributionCard, ScoreColumns, StatusBar, TileGrid, YearSparkline } from "@/components/stats/panels";
+import { GradientBars } from "@/components/stats/GradientBars";
+import { DotPlot } from "@/components/stats/DotPlot";
+import { scoreDelta, type ScoreDeltaSummary } from "@/lib/localStats";
 import { RankedList, fmt, scoreText } from "@/components/stats/RankedList";
 const ANIME_CATEGORIES: Category[] = [
   "overview",
+  "ratings",
   "genres",
   "tags",
   "voiceActors",
@@ -45,7 +49,7 @@ const ANIME_CATEGORIES: Category[] = [
   "staff",
 ];
 
-const MANGA_CATEGORIES: Category[] = ["overview", "genres", "tags", "staff"];
+const MANGA_CATEGORIES: Category[] = ["overview", "ratings", "genres", "tags", "staff"];
 
 export default function Statistics() {
   const { t } = useTranslation();
@@ -162,6 +166,16 @@ function StatisticsContent({
     queryFn: () => fetchMediaList(userId, type),
     enabled: isTauri,
   });
+  // "My score against the crowd's" — the one figure AniList's statistics
+  // cannot answer, computed from the list already in the cache. Zero requests.
+  const delta = useMemo(() => {
+    const entries = (typeList?.lists ?? [])
+      .filter((g) => !g.isCustomList)
+      .flatMap((g) => g.entries)
+      .filter((e) => !isBlocked(e.media, level));
+    return scoreDelta(entries);
+  }, [typeList, level]);
+
   const breakdown = useMemo<Slice[]>(() => {
     const byStatus = new Map<MediaListStatus, Map<string, number>>();
     for (const group of typeList?.lists ?? []) {
@@ -251,12 +265,14 @@ function StatisticsContent({
             stats={stats.anime}
             category={activeCategory}
             breakdown={breakdown}
+            delta={delta}
           />
         ) : (
           <MangaView
             stats={stats.manga}
             category={activeCategory}
             breakdown={breakdown}
+            delta={delta}
           />
         ))}
 
@@ -287,14 +303,20 @@ function AnimeView({
   stats,
   category,
   breakdown,
+  delta,
 }: {
   stats: AnimeStats;
   category: Category;
   breakdown: Slice[];
+  delta: ScoreDeltaSummary | null;
 }) {
   const { t, i18n } = useTranslation();
   const level = useContentFilter((s) => s.level);
   if (stats.count === 0) return <Empty />;
+
+  if (category === "ratings") {
+    return <RatingsView stats={stats} type="ANIME" delta={delta} />;
+  }
 
   if (category === "overview") {
     const days = stats.minutesWatched / 60 / 24;
@@ -335,14 +357,20 @@ function MangaView({
   stats,
   category,
   breakdown,
+  delta,
 }: {
   stats: MangaStats;
   category: Category;
   breakdown: Slice[];
+  delta: ScoreDeltaSummary | null;
 }) {
   const { t, i18n } = useTranslation();
   const level = useContentFilter((s) => s.level);
   if (stats.count === 0) return <Empty />;
+
+  if (category === "ratings") {
+    return <RatingsView stats={stats} type="MANGA" delta={delta} />;
+  }
 
   if (category === "overview") {
     return (
@@ -408,6 +436,90 @@ function rowsFor(
   }
 }
 
+/**
+ * The Ratings tab: how the scores sit — the distribution, the means AniList
+ * computes per format and status (fetched for the first time here; they were
+ * always on the endpoint), and the community comparison only the local cache
+ * can draw.
+ */
+function RatingsView({
+  stats,
+  type,
+  delta,
+}: {
+  stats: AnimeStats | MangaStats;
+  type: MediaType;
+  delta: ScoreDeltaSummary | null;
+}) {
+  const { t, i18n } = useTranslation();
+  const scores = [...stats.scores].sort((a, b) => (a.score ?? 0) - (b.score ?? 0));
+
+  const meanRows = (list: Distribution[], label: (d: Distribution) => string) =>
+    list
+      .filter((d) => (d.meanScore ?? 0) > 0)
+      .sort((a, b) => (b.meanScore ?? 0) - (a.meanScore ?? 0))
+      .map((d) => ({
+        label: label(d),
+        value: d.meanScore ?? 0,
+        text: (d.meanScore ?? 0).toFixed(1),
+        sub: `${fmt(d.count, i18n.language)}×`,
+      }));
+
+  return (
+    <div className="space-y-6">
+      {delta && (
+        <TileGrid
+          tiles={[
+            { label: t("stats.yourMean"), value: delta.meanMine.toFixed(2) },
+            { label: t("stats.communityMean"), value: delta.meanCommunity.toFixed(2) },
+            {
+              label: t("stats.meanDelta"),
+              value: `${delta.meanDelta > 0 ? "+" : ""}${delta.meanDelta.toFixed(2)}`,
+            },
+            { label: t("stats.scoredTitles"), value: fmt(delta.count, i18n.language) },
+          ]}
+        />
+      )}
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <ScoreColumns
+          title={t("stats.scoreDist")}
+          hint={t("stats.scoreDistHint")}
+          data={scores.map((d: Distribution) => ({ score: d.score ?? 0, count: d.count }))}
+        />
+        {/* Pinned to 0–10, or a 7.1 next to a 7.4 reads as a landslide. */}
+        <GradientBars
+          title={t("stats.meanByFormat")}
+          hint={t("stats.meanByFormatHint")}
+          domain={10}
+          rows={meanRows(stats.formats, (d) => d.format ?? "?")}
+        />
+        <GradientBars
+          title={t("stats.meanByStatus")}
+          hint={t("stats.meanByStatusHint")}
+          domain={10}
+          rows={meanRows(stats.statuses, (d) =>
+            t(`status.${type}.${d.status}`, { defaultValue: d.status ?? "?" }),
+          )}
+        />
+        {delta && (delta.harshest.length > 0 || delta.kindest.length > 0) && (
+          <DotPlot
+            title={t("stats.vsCommunity")}
+            hint={t("stats.vsCommunityHint")}
+            legendMine={t("stats.legendMine")}
+            legendOther={t("stats.legendCommunity")}
+            rows={[...delta.harshest, ...delta.kindest].map((r) => ({
+              label: r.title,
+              mine: r.mine,
+              other: r.community,
+            }))}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
 function OverviewCharts({
   stats,
   type,
@@ -419,7 +531,6 @@ function OverviewCharts({
 }) {
   const { t } = useTranslation();
   const level = useContentFilter((s) => s.level);
-  const scores = [...stats.scores].sort((a, b) => (a.score ?? 0) - (b.score ?? 0));
   const years = [...stats.releaseYears]
     .sort((a, b) => (a.releaseYear ?? 0) - (b.releaseYear ?? 0))
     .slice(-16);
@@ -464,14 +575,6 @@ function OverviewCharts({
   // chart in it so the leftover reads as padding rather than a hole.
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <ScoreColumns
-        title={t("stats.scoreDist")}
-        hint={t("stats.scoreDistHint")}
-        data={scores.map((d: Distribution) => ({
-          score: d.score ?? 0,
-          count: d.count,
-        }))}
-      />
       <StatusBar
         title={t("stats.statuses")}
         data={stats.statuses.map((d) => ({

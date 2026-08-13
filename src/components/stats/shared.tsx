@@ -8,6 +8,7 @@ import { useTranslation } from "react-i18next";
  */
 export type Category =
   | "overview"
+  | "ratings"
   | "genres"
   | "tags"
   | "voiceActors"

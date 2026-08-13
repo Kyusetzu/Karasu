@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { LineChart, RadarChart, Sunburst, Treemap } from "./Charts";
+import { GradientBars } from "./GradientBars";
+import { DotPlot } from "./DotPlot";
 
 /**
  * These charts kept their numbers in `<title>` elements, which is to say behind
@@ -19,6 +21,74 @@ const html = (node: React.ReactElement) => renderToStaticMarkup(node);
 function texts(markup: string): string[] {
   return [...markup.matchAll(/<text[^>]*>([^<]*)<\/text>/g)].map((m) => m[1]);
 }
+
+describe("GradientBars", () => {
+  const rows = [
+    { label: "TV", value: 7.4, text: "7.4", sub: "120×" },
+    { label: "Movie", value: 8.1, text: "8.1", sub: "14×" },
+  ];
+
+  it("writes every label, value and count in the flow of the page", () => {
+    const markup = html(<GradientBars title="t" rows={rows} />);
+    for (const r of rows) {
+      expect(markup).toContain(r.label);
+      expect(markup).toContain(r.text);
+      expect(markup).toContain(r.sub);
+    }
+  });
+
+  it("fills through a theme-following SVG gradient, never a literal colour", () => {
+    const markup = html(<GradientBars title="t" rows={rows} />);
+    expect(markup).toContain("<linearGradient");
+    expect(markup).toContain("var(--color-accent-600)");
+    expect(markup).toContain("var(--color-accent-400)");
+    expect(markup).not.toMatch(/(?:fill|stop-color)="#/);
+  });
+
+  it("a pinned domain keeps a 7.4 from reading as a landslide over a 7.1", () => {
+    // With domain 10, a 7.4 bar is 74 units wide — not the full 100 the
+    // data-relative scale would give the longest row.
+    const markup = html(
+      <GradientBars title="t" domain={10} rows={[{ label: "TV", value: 7.4, text: "7.4" }]} />,
+    );
+    expect(markup).toContain('width="74"');
+  });
+
+  it("renders nothing for an empty list", () => {
+    expect(html(<GradientBars title="t" rows={[]} />)).toBe("");
+  });
+});
+
+describe("DotPlot", () => {
+  const rows = [
+    { label: "Hidden Gem", mine: 9.5, other: 6.2 },
+    { label: "Overrated", mine: 4, other: 8.6 },
+  ];
+
+  it("writes each row's pair as text, not only as geometry", () => {
+    const markup = html(
+      <DotPlot title="t" rows={rows} legendMine="mine" legendOther="crowd" />,
+    );
+    expect(markup).toContain("Hidden Gem");
+    expect(markup).toContain("6.2");
+    expect(markup).toContain("9.5");
+    expect(markup).toContain("mine");
+    expect(markup).toContain("crowd");
+  });
+
+  it("keeps both dots on the theme's palette", () => {
+    const markup = html(
+      <DotPlot title="t" rows={rows} legendMine="m" legendOther="c" />,
+    );
+    expect(markup).toContain("var(--color-accent-400)");
+    expect(markup).toContain("var(--color-graph-none)");
+    expect(markup).not.toMatch(/fill="#/);
+  });
+
+  it("renders nothing for an empty list", () => {
+    expect(html(<DotPlot title="t" rows={[]} legendMine="m" legendOther="c" />)).toBe("");
+  });
+});
 
 describe("LineChart", () => {
   const data = [

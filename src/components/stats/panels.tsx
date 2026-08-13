@@ -70,7 +70,12 @@ export function ScoreColumns({
                 <div
                   className={cn(
                     "absolute inset-x-0 bottom-0 rounded-t-[.1875rem]",
-                    step >= high ? "bg-accent-500" : "bg-surface-700",
+                    // The Wrapped poster's accent gradient, as a column: the
+                    // high scores carry the light and the ramp gives them depth
+                    // a flat fill did not have.
+                    step >= high
+                      ? "bg-gradient-to-t from-accent-600 to-accent-400"
+                      : "bg-surface-700",
                   )}
                   // A count of zero still draws a hairline, so the gap reads as
                   // "none at this score" rather than as a missing column.

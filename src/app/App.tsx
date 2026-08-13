@@ -39,6 +39,7 @@ import AnimeDetail from "@/pages/AnimeDetail";
 // Modest by itself: served over tauri:// there is no download, so this buys
 // parse and evaluate time rather than transfer.
 const Statistics = lazy(() => import("@/pages/Statistics"));
+const Calendar = lazy(() => import("@/pages/Calendar"));
 const Franchise = lazy(() => import("@/pages/Franchise"));
 const Wrapped = lazy(() => import("@/pages/Wrapped"));
 const LocalLibrary = lazy(() => import("@/pages/LocalLibrary"));
@@ -152,6 +153,7 @@ export default function App() {
                 <Route path="/manga" element={<MediaList type="MANGA" />} />
                 <Route path="/search" element={<Search />} />
                 <Route path="/seasonal" element={<Seasonal />} />
+                <Route path="/calendar" element={<Calendar />} />
                 <Route path="/stats" element={<Statistics />} />
                 <Route path="/wrapped" element={<Wrapped />} />
                 <Route path="/library" element={<LocalLibrary />} />
@@ -214,6 +216,7 @@ const PAGE_LABELS: Record<string, string> = {
   "/manga": "Manga",
   "/search": "Search",
   "/seasonal": "Seasonal",
+  "/calendar": "Calendar",
   "/social": "Social",
   "/forum": "Forum",
   "/stats": "Statistics",

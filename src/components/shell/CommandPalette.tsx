@@ -30,6 +30,7 @@ const NAV: { path: string; key: string }[] = [
   { path: "/manga", key: "nav.manga" },
   { path: "/search", key: "nav.search" },
   { path: "/seasonal", key: "nav.seasonal" },
+  { path: "/calendar", key: "nav.calendar" },
   { path: "/social", key: "nav.social" },
   { path: "/forum", key: "nav.forum" },
   { path: "/stats", key: "nav.stats" },

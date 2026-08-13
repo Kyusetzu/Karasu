@@ -293,6 +293,14 @@ function WeeklyDigest({ entries }: { entries: MediaListEntry[] }) {
           />
         ))}
       </div>
+      {/* The digest is the teaser; the calendar is the real thing — per-day
+          grouping, other weeks, and everything airing rather than only yours. */}
+      <Link
+        to="/calendar"
+        className="mt-2 inline-block px-2.5 text-xs text-accent-400 hover:underline"
+      >
+        {t("dashboard.fullCalendar")}
+      </Link>
     </section>
   );
 }

@@ -14,6 +14,7 @@ import {
   BookOpen,
   Search,
   CalendarDays,
+  CalendarRange,
   BarChart3,
   Sparkles,
   HardDrive,
@@ -108,6 +109,9 @@ const GROUPS: { label: string; items: NavItem[] }[] = [
     items: [
       { to: "/search", key: "nav.search", icon: Search },
       { to: "/seasonal", key: "nav.seasonal", icon: CalendarDays },
+      // CalendarRange, not CalendarDays (Seasonal's) or CalendarClock (the
+      // Bell's) — three calendar surfaces, three distinguishable glyphs.
+      { to: "/calendar", key: "nav.calendar", icon: CalendarRange },
       { to: "/social", key: "nav.social", icon: Users },
       { to: "/forum", key: "nav.forum", icon: MessagesSquare },
     ],

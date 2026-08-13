@@ -108,6 +108,71 @@ export async function seasonalAnime(
   return data.Page;
 }
 
+// --- Airing calendar --------------------------------------------------------
+
+/**
+ * A time window of the global airing schedule, deliberately slim.
+ *
+ * Not `MEDIA_FIELDS`: a calendar row draws a cover, a title and a time, and
+ * list membership comes from the cached list rather than `mediaListEntry`
+ * (free, and it works in local mode). `isAdult` and `genres` are here only so
+ * `isBlocked` can run — `airingSchedules` takes no `isAdult` argument, so the
+ * content filter can only happen client-side.
+ *
+ * `pageInfo.total` is the capped 5000 sentinel on this connection (measured),
+ * so the caller pages by `hasNextPage` with a hard cap, never by `total`.
+ */
+export const CALENDAR_QUERY = `
+query ($gt: Int!, $lt: Int!, $page: Int) {
+  Page(page: $page, perPage: 50) {
+    pageInfo { hasNextPage }
+    airingSchedules(airingAt_greater: $gt, airingAt_lesser: $lt, sort: TIME) {
+      id
+      episode
+      airingAt
+      media {
+        id
+        type
+        title { romaji english native }
+        coverImage { large }
+        format
+        isAdult
+        genres
+      }
+    }
+  }
+}`;
+
+export interface AiringSlot {
+  id: number;
+  episode: number;
+  airingAt: number;
+  media: Pick<
+    Media,
+    "id" | "type" | "title" | "coverImage" | "format" | "isAdult" | "genres"
+  >;
+}
+
+/** More pages than any real week needs — measured at 3 for ~120 airings. */
+const CALENDAR_MAX_PAGES = 5;
+
+/**
+ * Every airing in `(gt, lt]`, paged sequentially until AniList says stop or
+ * the cap does. One user action spends at most `CALENDAR_MAX_PAGES` requests —
+ * the bounded-traversal shape, not a fan-out.
+ */
+export async function airingWeek(gt: number, lt: number): Promise<AiringSlot[]> {
+  const out: AiringSlot[] = [];
+  for (let page = 1; page <= CALENDAR_MAX_PAGES; page++) {
+    const data = await gql<{
+      Page: { pageInfo: { hasNextPage: boolean }; airingSchedules: AiringSlot[] };
+    }>(CALENDAR_QUERY, { gt, lt, page });
+    out.push(...data.Page.airingSchedules);
+    if (!data.Page.pageInfo.hasNextPage) break;
+  }
+  return out;
+}
+
 // --- Media by id -----------------------------------------------------------
 
 const MEDIA_BY_IDS_QUERY = `

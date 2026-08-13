@@ -6,6 +6,7 @@
 use crate::db::Db;
 use crate::identify;
 use crate::playback::recognition::{matcher, parser};
+use crate::playback::relations;
 use crate::playback::scrobbler::candidates_from_cache;
 use std::collections::HashMap;
 use std::path::Path;
@@ -40,6 +41,31 @@ pub struct ScannedFile {
     pub manual: bool,
 }
 
+/// A user-confirmed season split, in the shape `index_files` applies it:
+/// "episodes `ep_from..=ep_to` of this parse are `media_id`, renumbered from
+/// `dst_start`". The persisted form is `library_redirect` (schema v11), and the
+/// record shape deliberately mirrors `relations::Rule`.
+#[derive(Clone)]
+pub struct SplitRule {
+    pub title: String,
+    pub season: i32,
+    pub ep_from: u32,
+    pub ep_to: u32,
+    pub media_id: i64,
+    pub dst_start: u32,
+}
+
+impl SplitRule {
+    /// The renumbered episode, when this rule covers the parsed one.
+    fn apply(&self, title: &str, season: i32, episode: u32) -> Option<u32> {
+        (self.title == title
+            && self.season == season
+            && episode >= self.ep_from
+            && episode <= self.ep_to)
+            .then(|| episode - self.ep_from + self.dst_start)
+    }
+}
+
 /// Every scanned file, plus the two views the frontend asks for.
 #[derive(Default)]
 pub struct LibraryData {
@@ -53,6 +79,16 @@ pub struct LibraryData {
     /// separately from the groups because `reindex` rebuilds those from
     /// scratch on every correction and would otherwise drop the lot.
     suggestions: HashMap<(String, i32), Suggested>,
+    /// AniList's episode count per matched id, lifted from the same candidates
+    /// the matcher used — the number a folder can overflow. Only ids whose
+    /// count is known appear; an airing show with `episodes: null` cannot
+    /// honestly overflow anything.
+    episode_counts: HashMap<i64, u32>,
+    /// A snapshot of the community anime-relations rules, taken where the app
+    /// state is available (scan, hydrate) so `reindex` can hint without it.
+    /// Empty on a cold start before the file downloads — an overflow then
+    /// simply carries no hint.
+    rules: Vec<relations::Rule>,
 }
 
 impl LibraryData {
@@ -107,7 +143,8 @@ impl LibraryData {
             }
         }
 
-        self.summary = build_summary(&by_media, &scores, &manual, &sources);
+        self.summary =
+            build_summary(&by_media, &scores, &manual, &sources, &self.episode_counts, &self.rules);
         self.by_media = by_media;
         self.unmatched = groups
             .into_iter()
@@ -210,6 +247,38 @@ pub struct LibraryEntry {
     /// Placed by the user rather than by the matcher, so the screen can say so
     /// instead of reporting a confidence nothing measured.
     pub manual: bool,
+    /// More files than the matched entry has episodes — a 24-file folder on a
+    /// 12-episode show, almost always a next season under one folder name.
+    /// Detection only; nothing is re-pointed until the user confirms a split.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub overflow: Option<Overflow>,
+}
+
+/// The facts the season-split card needs, computed at reindex time.
+#[derive(Clone, serde::Serialize)]
+pub struct Overflow {
+    /// AniList's episode count for the matched entry.
+    #[serde(rename = "knownEpisodes")]
+    pub known_episodes: u32,
+    /// How many on-disk episodes lie beyond it.
+    #[serde(rename = "extraFiles")]
+    pub extra_files: u32,
+    /// The first overflowing episode number, as the files spell it.
+    #[serde(rename = "firstExtra")]
+    pub first_extra: u32,
+    /// What the community anime-relations rules say the overflow is, when they
+    /// say anything. A *suggestion* for the card to pre-select — never applied
+    /// on its own; the user always confirms (maintainer's decision).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hint: Option<SplitHint>,
+}
+
+#[derive(Clone, serde::Serialize)]
+pub struct SplitHint {
+    #[serde(rename = "mediaId")]
+    pub media_id: i64,
+    #[serde(rename = "dstStart")]
+    pub dst_start: u32,
 }
 
 #[derive(serde::Serialize)]
@@ -325,7 +394,7 @@ pub async fn scan_library(app: AppHandle) -> Result<ScanSummary, String> {
     }
     let _scanning = ScanGuard(&index.1);
 
-    let (root, candidates, overrides, stored, cursor) = {
+    let (root, candidates, overrides, redirects, stored, cursor) = {
         let db = app.state::<Db>();
         let root = db
             .kv_get("library_path")
@@ -348,7 +417,7 @@ pub async fn scan_library(app: AppHandle) -> Result<ScanSummary, String> {
             .kv_get("identify_cursor")
             .and_then(|s| s.parse::<usize>().ok())
             .unwrap_or(0);
-        (root, candidates, override_map(&db), stored, cursor)
+        (root, candidates, override_map(&db), redirect_rules(&db), stored, cursor)
     };
 
     let mut files = Vec::new();
@@ -356,7 +425,11 @@ pub async fn scan_library(app: AppHandle) -> Result<ScanSummary, String> {
     let total = files.len();
 
     let mut data = LibraryData {
-        files: index_files(&files, &candidates, &overrides),
+        files: index_files(&files, &candidates, &overrides, &redirects),
+        episode_counts: episode_counts(&candidates),
+        // Snapshotted before the identify await below — the guard on a
+        // `std::sync::RwLock` must not live across one, same as the index lock.
+        rules: app.state::<relations::Relations>().0.read().unwrap().clone(),
         ..Default::default()
     };
     data.reindex();
@@ -470,6 +543,29 @@ fn override_map(db: &Db) -> HashMap<(String, i32), i64> {
         .collect()
 }
 
+/// The user's season splits, in the shape `index_files` applies them.
+fn redirect_rules(db: &Db) -> Vec<SplitRule> {
+    db.library_redirects()
+        .into_iter()
+        .map(|(title, season, ep_from, ep_to, media_id, dst_start)| SplitRule {
+            title,
+            season,
+            ep_from,
+            ep_to,
+            media_id,
+            dst_start,
+        })
+        .collect()
+}
+
+/// AniList's episode count per candidate id, where it states one.
+fn episode_counts(candidates: &[matcher::Candidate]) -> HashMap<i64, u32> {
+    candidates
+        .iter()
+        .filter_map(|c| c.episodes.map(|e| (c.media_id, e)))
+        .collect()
+}
+
 /// Writes the whole index — files, confidences, sources and the unplaced —
 /// so a restart and a correction see the same picture a scan just built.
 fn persist(db: &Db, data: &LibraryData) -> Result<(), String> {
@@ -504,10 +600,17 @@ fn persist(db: &Db, data: &LibraryData) -> Result<(), String> {
 /// Running the matcher first and then overwriting its answer would waste the
 /// expensive fuzzy sweep on precisely the titles the user has already told us
 /// the matcher gets wrong.
+///
+/// A season split is consulted before *both*: it names an episode range of the
+/// same parse, which is strictly more specific than the whole-key override —
+/// files 13–24 go where the split says while 1–12 still follow the override or
+/// the matcher. A split file's episode is stored **renumbered** (disk 13 →
+/// sequel's 1), which is what `play_next`'s progress comparison needs.
 fn index_files(
     files: &[String],
     candidates: &[matcher::Candidate],
     overrides: &HashMap<(String, i32), i64>,
+    redirects: &[SplitRule],
 ) -> Vec<ScannedFile> {
     let prepared = matcher::prepare(candidates);
     let mut scanned = Vec::new();
@@ -521,6 +624,22 @@ fn index_files(
         let parsed = parser::parse(&name);
         let Some(episode) = parsed.episode else { continue };
         let season = season_key(parsed.season);
+
+        if let Some((rule, renumbered)) = redirects
+            .iter()
+            .find_map(|r| r.apply(&parsed.title, season, episode).map(|e| (r, e)))
+        {
+            scanned.push(ScannedFile {
+                title: parsed.title,
+                season,
+                episode: renumbered,
+                path: path.clone(),
+                media_id: Some(rule.media_id),
+                score: 1.0,
+                manual: true,
+            });
+            continue;
+        }
 
         let forced = overrides.get(&(parsed.title.clone(), season)).copied();
         let hit = match forced {
@@ -557,6 +676,8 @@ fn build_summary(
     scores: &HashMap<i64, f64>,
     manual: &HashMap<i64, bool>,
     sources: &HashMap<i64, Vec<TitleKey>>,
+    episode_counts: &HashMap<i64, u32>,
+    rules: &[relations::Rule],
 ) -> Vec<LibraryEntry> {
     let mut summary: Vec<LibraryEntry> = by_media
         .iter()
@@ -566,7 +687,8 @@ fn build_summary(
                 .map(|(episode, path)| LibraryFile { episode: *episode, path: path.clone() })
                 .collect();
             files.sort_unstable_by_key(|f| f.episode);
-            let episodes = files.iter().map(|f| f.episode).collect();
+            let episodes: Vec<u32> = files.iter().map(|f| f.episode).collect();
+            let overflow = detect_overflow(*id, &episodes, episode_counts, rules);
             LibraryEntry {
                 media_id: *id,
                 episodes,
@@ -574,11 +696,38 @@ fn build_summary(
                 score: scores.get(id).copied().unwrap_or(0.0),
                 sources: sources.get(id).cloned().unwrap_or_default(),
                 manual: manual.get(id).copied().unwrap_or(false),
+                overflow,
             }
         })
         .collect();
     summary.sort_by_key(|e| e.media_id);
     summary
+}
+
+/// Whether a folder holds more than the matched entry can — and, when the
+/// community rules already know where the rest goes, where that is.
+///
+/// Only fires when AniList states an episode count: an airing show with an
+/// unknown total cannot honestly overflow anything. Files already re-pointed by
+/// a confirmed split have left this entry, so the check settles itself once the
+/// user answers.
+fn detect_overflow(
+    media_id: i64,
+    episodes: &[u32],
+    episode_counts: &HashMap<i64, u32>,
+    rules: &[relations::Rule],
+) -> Option<Overflow> {
+    let known = *episode_counts.get(&media_id)?;
+    let extra: Vec<u32> = episodes.iter().copied().filter(|&e| e > known).collect();
+    let first_extra = *extra.first()?;
+    let hint = relations::redirect(rules, media_id, first_extra)
+        .map(|(dst_id, dst_ep)| SplitHint { media_id: dst_id, dst_start: dst_ep });
+    Some(Overflow {
+        known_episodes: known,
+        extra_files: extra.len() as u32,
+        first_extra,
+        hint,
+    })
 }
 
 /// Restores the index from the database at startup (no disk walk).
@@ -597,11 +746,32 @@ pub fn hydrate(app: &AppHandle) {
     }
     let scores: HashMap<i64, f64> = db.library_scores().into_iter().collect();
     let overrides = override_map(&db);
+    let redirects = redirect_rules(&db);
 
     let mut files: Vec<ScannedFile> = rows
         .into_iter()
         .map(|(media_id, episode, path)| {
-            let (title, season) = reparse(&path);
+            let (title, season, disk_episode) = reparse(&path);
+            // A split row's stored episode is the *renumbered* one, which the
+            // filename cannot confirm — so the split is re-derived from its
+            // rule and the filename's own number, the two sources that cannot
+            // drift. A rule cleared since last run simply stops matching here
+            // and the row falls back to what is stored.
+            if let Some((rule, renumbered)) = disk_episode.and_then(|ep| {
+                redirects
+                    .iter()
+                    .find_map(|r| r.apply(&title, season, ep).map(|e| (r, e)))
+            }) {
+                return ScannedFile {
+                    title,
+                    season,
+                    episode: renumbered,
+                    path,
+                    media_id: Some(rule.media_id),
+                    score: 1.0,
+                    manual: true,
+                };
+            }
             ScannedFile {
                 manual: overrides.get(&(title.clone(), season)) == Some(&media_id),
                 title,
@@ -629,6 +799,15 @@ pub fn hydrate(app: &AppHandle) {
                 ((title, season), Suggested { media_id, score })
             })
             .collect(),
+        // The counts come from the same cached list a scan reads, so the
+        // overflow chips survive a restart without one.
+        episode_counts: episode_counts(&candidates_from_cache(&db, "ANIME")),
+        rules: app
+            .state::<relations::Relations>()
+            .0
+            .read()
+            .map(|r| r.clone())
+            .unwrap_or_default(),
         ..Default::default()
     };
     data.reindex();
@@ -636,14 +815,14 @@ pub fn hydrate(app: &AppHandle) {
     *state.0.lock().unwrap() = data;
 }
 
-/// Recovers the `(title, season)` a path parses to.
-fn reparse(path: &str) -> (String, i32) {
+/// Recovers the `(title, season, episode)` a path parses to.
+fn reparse(path: &str) -> (String, i32, Option<u32>) {
     let name = Path::new(path)
         .file_name()
         .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_default();
     let parsed = parser::parse(&name);
-    (parsed.title, season_key(parsed.season))
+    (parsed.title, season_key(parsed.season), parsed.episode)
 }
 
 /// Files the last scan could not place, grouped by what it read them as.
@@ -871,8 +1050,24 @@ mod tests {
         candidates: &[Candidate],
         overrides: &HashMap<(String, i32), i64>,
     ) -> LibraryData {
-        let mut data =
-            LibraryData { files: index_files(files, candidates, overrides), ..Default::default() };
+        indexed_full(files, candidates, overrides, &[], &[])
+    }
+
+    /// The full pipeline as `scan_library` runs it: splits and overrides at
+    /// index time, episode counts and relations rules at reindex time.
+    fn indexed_full(
+        files: &[String],
+        candidates: &[Candidate],
+        overrides: &HashMap<(String, i32), i64>,
+        redirects: &[SplitRule],
+        rules: &[relations::Rule],
+    ) -> LibraryData {
+        let mut data = LibraryData {
+            files: index_files(files, candidates, overrides, redirects),
+            episode_counts: episode_counts(candidates),
+            rules: rules.to_vec(),
+            ..Default::default()
+        };
         data.reindex();
         data
     }
@@ -913,6 +1108,145 @@ mod tests {
         // and both its episodes belong to the one group.
         assert_eq!(data.unmatched.len(), 1);
         assert_eq!(data.unmatched[0].files.len(), 2);
+    }
+
+    fn bocchi(episodes: Option<u32>) -> Vec<Candidate> {
+        vec![Candidate {
+            media_id: 1,
+            titles: vec!["Bocchi the Rock".into()],
+            episodes,
+            duration_min: Some(24),
+            progress: 0,
+            status: "CURRENT".into(),
+        }]
+    }
+
+    fn bocchi_files(eps: &[u32]) -> Vec<String> {
+        eps.iter()
+            .map(|e| format!("D:\\Anime\\Bocchi the Rock - {e:02}.mkv"))
+            .collect()
+    }
+
+    /// 24 files on a 12-episode show is flagged, with the facts the split card
+    /// needs — and nothing is re-pointed, because detection is not a decision.
+    #[test]
+    fn a_folder_larger_than_the_show_is_flagged_not_repointed() {
+        let data = indexed_full(
+            &bocchi_files(&[11, 12, 13, 14]),
+            &bocchi(Some(12)),
+            &HashMap::new(),
+            &[],
+            &[],
+        );
+        let entry = data.summary.iter().find(|e| e.media_id == 1).expect("matched");
+        // Everything is still on the one id…
+        assert_eq!(entry.episodes, vec![11, 12, 13, 14]);
+        // …but the row says the folder holds more than the show.
+        let overflow = entry.overflow.as_ref().expect("overflow flagged");
+        assert_eq!(overflow.known_episodes, 12);
+        assert_eq!(overflow.extra_files, 2);
+        assert_eq!(overflow.first_extra, 13);
+        assert!(overflow.hint.is_none());
+    }
+
+    /// When the community anime-relations rules know the overflow, the flag
+    /// carries their answer as a pre-selection — still never applied alone.
+    #[test]
+    fn the_community_rules_supply_the_hint_only() {
+        let rules = vec![relations::Rule {
+            src_id: 1,
+            src_start: 13,
+            src_end: Some(24),
+            dst_id: 2,
+            dst_start: 1,
+        }];
+        let data = indexed_full(
+            &bocchi_files(&[12, 13]),
+            &bocchi(Some(12)),
+            &HashMap::new(),
+            &[],
+            &rules,
+        );
+        let entry = data.summary.iter().find(|e| e.media_id == 1).expect("matched");
+        let hint = entry.overflow.as_ref().and_then(|o| o.hint.as_ref()).expect("hint");
+        assert_eq!(hint.media_id, 2);
+        assert_eq!(hint.dst_start, 1);
+        // The rule is a hint, not a redirect: file 13 is still on media 1.
+        assert!(data.by_media[&1].contains_key(&13));
+        assert!(!data.by_media.contains_key(&2));
+    }
+
+    /// A show whose total is unknown (airing) cannot honestly overflow.
+    #[test]
+    fn an_unknown_episode_total_never_flags() {
+        let data = indexed_full(
+            &bocchi_files(&[1, 2, 50]),
+            &bocchi(None),
+            &HashMap::new(),
+            &[],
+            &[],
+        );
+        let entry = data.summary.iter().find(|e| e.media_id == 1).expect("matched");
+        assert!(entry.overflow.is_none());
+    }
+
+    /// A confirmed split re-points its range, renumbered to the sequel's own
+    /// count — disk 13 becomes the sequel's episode 1 — and the flag settles.
+    #[test]
+    fn a_confirmed_split_repoints_and_renumbers() {
+        let parsed = parser::parse("Bocchi the Rock - 13.mkv");
+        let split = SplitRule {
+            title: parsed.title.clone(),
+            season: season_key(parsed.season),
+            ep_from: 13,
+            ep_to: 24,
+            media_id: 2,
+            dst_start: 1,
+        };
+        let data = indexed_full(
+            &bocchi_files(&[11, 12, 13, 14]),
+            &bocchi(Some(12)),
+            &HashMap::new(),
+            &[split],
+            &[],
+        );
+        // The first cour stays put and no longer overflows…
+        let first = data.summary.iter().find(|e| e.media_id == 1).expect("season 1");
+        assert_eq!(first.episodes, vec![11, 12]);
+        assert!(first.overflow.is_none());
+        // …and the range lands on the sequel, renumbered and marked as the
+        // user's own placement.
+        let second = data.summary.iter().find(|e| e.media_id == 2).expect("season 2");
+        assert_eq!(second.episodes, vec![1, 2]);
+        assert!(second.manual);
+        assert!(data.by_media[&2][&1].contains("- 13"));
+    }
+
+    /// A split names an episode range, which is strictly more specific than a
+    /// whole-key override — inside the range the split wins, outside it the
+    /// override still does.
+    #[test]
+    fn a_split_beats_a_whole_key_override_inside_its_range() {
+        let parsed = parser::parse("Bocchi the Rock - 13.mkv");
+        let key = (parsed.title.clone(), season_key(parsed.season));
+        let overrides: HashMap<(String, i32), i64> = [(key.clone(), 7)].into();
+        let split = SplitRule {
+            title: key.0.clone(),
+            season: key.1,
+            ep_from: 13,
+            ep_to: 24,
+            media_id: 2,
+            dst_start: 1,
+        };
+        let data = indexed_full(
+            &bocchi_files(&[12, 13]),
+            &bocchi(Some(12)),
+            &overrides,
+            &[split],
+            &[],
+        );
+        assert!(data.by_media[&7].contains_key(&12), "override keeps its side");
+        assert!(data.by_media[&2].contains_key(&1), "split takes its range");
     }
 
     /// A file with no parseable episode number is skipped, not mis-filed.

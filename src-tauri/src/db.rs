@@ -181,6 +181,31 @@ CREATE TABLE IF NOT EXISTS library_suggestion (
 PRAGMA user_version = 10;
 ";
 
+/// A user-confirmed season split: \"episodes `ep_from..=ep_to` of this parse
+/// belong to `media_id`, renumbered from `dst_start`\".
+///
+/// The record shape is exactly `relations::Rule` — a source range and a
+/// destination start — but keyed on the parsed `(title, season)` like
+/// `library_override`, because the user is correcting the *parse* and the
+/// correction must survive the next scan. Unlike an override it also carries an
+/// episode range: a 24-file folder for a 12-episode show holds two shows under
+/// one parse key, which is precisely what `library_override` cannot express.
+///
+/// `season` is `-1` where the release name carried none, matching v9's
+/// convention and for the same reason. User data: a scan must never clear it.
+const MIGRATION_V11: &str = "
+CREATE TABLE IF NOT EXISTS library_redirect (
+  title TEXT NOT NULL,
+  season INTEGER NOT NULL,
+  ep_from INTEGER NOT NULL,
+  ep_to INTEGER NOT NULL,
+  media_id INTEGER NOT NULL,
+  dst_start INTEGER NOT NULL,
+  PRIMARY KEY (title, season, ep_from)
+);
+PRAGMA user_version = 11;
+";
+
 /// One in-app notification (mirrors a shown desktop toast).
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct NotificationRow {
@@ -297,6 +322,9 @@ impl Db {
         }
         if version < 10 {
             apply(&conn, 10, MIGRATION_V10)?;
+        }
+        if version < 11 {
+            apply(&conn, 11, MIGRATION_V11)?;
         }
         Ok(Db(Mutex::new(conn)))
     }
@@ -838,6 +866,65 @@ impl Db {
         .map_err(|e| format!("Could not clear the correction: {e}"))
     }
 
+    // --- Season splits --------------------------------------------------------
+
+    /// Every user-confirmed episode-range redirect:
+    /// `(title, season, ep_from, ep_to, media_id, dst_start)`.
+    pub fn library_redirects(&self) -> Vec<(String, i32, u32, u32, i64, u32)> {
+        let conn = self.0.lock().unwrap();
+        conn.prepare(
+            "SELECT title, season, ep_from, ep_to, media_id, dst_start FROM library_redirect",
+        )
+        .and_then(|mut stmt| {
+            stmt.query_map([], |r| {
+                Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?))
+            })
+            .map(|rows| rows.filter_map(Result::ok).collect())
+        })
+        .unwrap_or_default()
+    }
+
+    /// Records a season split. Upsert on the range start, like the overrides:
+    /// re-pointing the same range is a correction of the correction.
+    pub fn library_redirect_set(
+        &self,
+        title: &str,
+        season: i32,
+        ep_from: u32,
+        ep_to: u32,
+        media_id: i64,
+        dst_start: u32,
+    ) -> Result<(), String> {
+        let conn = self.0.lock().unwrap();
+        conn.execute(
+            "INSERT INTO library_redirect (title, season, ep_from, ep_to, media_id, dst_start)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+             ON CONFLICT(title, season, ep_from) DO UPDATE SET
+               ep_to = excluded.ep_to,
+               media_id = excluded.media_id,
+               dst_start = excluded.dst_start",
+            rusqlite::params![title, season, ep_from, ep_to, media_id, dst_start],
+        )
+        .map(|_| ())
+        .map_err(|e| format!("Could not save the season split: {e}"))
+    }
+
+    /// Removes a season split. Returns the row count, for the same reason
+    /// `library_override_clear` does.
+    pub fn library_redirect_clear(
+        &self,
+        title: &str,
+        season: i32,
+        ep_from: u32,
+    ) -> Result<usize, String> {
+        let conn = self.0.lock().unwrap();
+        conn.execute(
+            "DELETE FROM library_redirect WHERE title = ?1 AND season = ?2 AND ep_from = ?3",
+            rusqlite::params![title, season, ep_from],
+        )
+        .map_err(|e| format!("Could not clear the season split: {e}"))
+    }
+
     /// Files the scan could not place, grouped by the title it parsed out.
     pub fn library_unmatched(&self) -> Vec<(String, i32, u32, String)> {
         let conn = self.0.lock().unwrap();
@@ -940,6 +1027,7 @@ mod tests {
         conn.execute_batch(MIGRATION_V8).unwrap();
         conn.execute_batch(MIGRATION_V9).unwrap();
         conn.execute_batch(MIGRATION_V10).unwrap();
+        conn.execute_batch(MIGRATION_V11).unwrap();
         Db(Mutex::new(conn))
     }
 
@@ -1002,6 +1090,32 @@ mod tests {
         // strength of this number, and 0 is the whole no-op case.
         assert_eq!(db.library_override_clear("bleach", 2).unwrap(), 0);
         assert_eq!(db.library_override_clear("never-corrected", 1).unwrap(), 0);
+    }
+
+    /// A season split keys on its range start, so re-pointing the same range
+    /// replaces the earlier answer, a second range on the same parse is its own
+    /// row, and clearing returns the honest count.
+    #[test]
+    fn a_season_split_is_replaced_then_cleared() {
+        let db = mem_db();
+        db.library_redirect_set("frieren", -1, 13, 24, 555, 1).unwrap();
+        db.library_redirect_set("frieren", -1, 13, 28, 556, 1).unwrap();
+        assert_eq!(
+            db.library_redirects(),
+            vec![("frieren".into(), -1, 13, 28, 556, 1)]
+        );
+
+        // A second overflow of the same parse — a three-cour folder — is a
+        // second range, not a correction of the first.
+        db.library_redirect_set("frieren", -1, 29, 40, 557, 1).unwrap();
+        assert_eq!(db.library_redirects().len(), 2);
+
+        assert_eq!(db.library_redirect_clear("frieren", -1, 13).unwrap(), 1);
+        assert_eq!(
+            db.library_redirects(),
+            vec![("frieren".into(), -1, 29, 40, 557, 1)]
+        );
+        assert_eq!(db.library_redirect_clear("frieren", -1, 13).unwrap(), 0);
     }
 
     /// The index must survive a write/read round-trip, and a rescan must
@@ -1080,7 +1194,7 @@ mod tests {
         let version: i64 = conn
             .query_row("PRAGMA user_version", [], |r| r.get(0))
             .unwrap();
-        assert_eq!(version, 10, "and must end up fully migrated");
+        assert_eq!(version, 11, "and must end up fully migrated");
         drop(conn);
 
         let _ = std::fs::remove_dir_all(&dir);

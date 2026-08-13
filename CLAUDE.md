@@ -33,29 +33,39 @@ and in the browser and scrobbles your AniList progress automatically.
 ```
 src/
   app/               App.tsx, main.tsx, index.css — the entry, and only the entry
-  api/               AniList GraphQL client, queries, types, franchise, library
+  api/               AniList GraphQL client, queries, types, franchise, library,
+                     social (the whole profile/follow/forum surface)
   components/
     ui/              primitives with no app knowledge (kebab-case files)
     shell/           the window frame and global machinery — titlebar, sidebar,
                      bell, command palette, keyboard sheet, context menu, toast
     media/           anything that renders a title or edits an entry
-    overlays/        modal flows (confirm, preset, random pick, sign-in merge)
+    overlays/        modal flows (confirm, preset, random pick, sign-in merge,
+                     profile edit)
     list/            the parts MediaList draws (virtual grid, rows, bulk bar)
     stats/           the parts Statistics draws (panels, ranked list, charts)
+    social/          the parts UserProfile, Social and Thread draw — the
+                     markdown renderer, follow button, user and activity and
+                     thread rows, and the two composers
     EmptyState · Skeleton · KarasuMark — cross-cutting, belong to no group
   hooks/             shared hooks (useListMutations, usePrimedLists,
-                     useColumnCount, usePanZoom, useCachedEntry)
+                     useColumnCount, usePanZoom, useCachedEntry, useFollow,
+                     useSocialActions, useActivityPost, useUpdateUser)
   i18n/              index.ts (setup) + en.ts + de.ts; `de: typeof en` enforces
                      key parity across the two files
   lib/               pure logic + its *.test.ts — the place testable code goes
-  pages/             one per route; settings/ holds the seven panes
+  pages/             one per route; settings/ holds the eight panes
   stores/            Zustand stores (auth, theme, library, nowPlaying, …)
 src-tauri/src/
-  commands/          62 of the 73 frontend-facing commands, by subject:
+  commands/          75 of the 87 frontend-facing commands, by subject:
                      auth · list · playback · prefs · system · update. The
-                     other 11 are the library scanner's, in `library.rs`.
+                     other 12 are the library scanner's, in `library.rs`.
                      `mod.rs` re-exports all of it, so `commands::x` paths and
-                     `generate_handler!` do not care which file a command is in
+                     `generate_handler!` do not care which file a command is in.
+                     Note what is *not* here: the entire social surface adds no
+                     command at all, because `anilist_query` in `auth.rs` is a
+                     generic authenticated passthrough and the token stays in
+                     Rust either way
   playback/          the pipeline: detection/ (Win32 windows, media_session/
                      — SMTC on Windows, Jellyfin) →
                      recognition/ (release-name parser, fuzzy matcher) →
@@ -313,6 +323,38 @@ a regression here is invisible until it ships.
   The one real hazard there is the walk's reliance on `.gitignore` — the root one
   did not mention `src-tauri/target/`, so ~100 GB across ~195k files was kept out
   by the nested ignore file alone. It is listed in both now.
+- **`pageInfo.total` is a capped sentinel on most AniList collections, not a
+  count.** Anything with many matches reports `total: 5000` with a `lastPage`
+  that is just 5000/perPage — measured on user search, activities and threads
+  alike. It is honest only for small sets (`User(name: "Kyusetzu")` really is 1,
+  and follower/following totals are real). So a "Load N more" label is a lie on
+  those three, which is why `UserList` takes a `countRemaining` flag and the
+  feeds pass a countless button. A number on a button is a claim about what a
+  click costs.
+- **`Page.users(search:)` needs three characters.** Two returns the exact match
+  followed by a fixed set of unrelated accounts — `"ky"` yields
+  `["ky", "user10151", "Gregorymr", …]` — and so does any single character or
+  non-Latin string. Media search is fine at two and keeps it; `USER_SEARCH_MIN`
+  is why they differ.
+- **One not-found root nulls every sibling root.** `{ good: User(id: 153164) bad:
+  User(id: 999999999) }` returns HTTP 404 and `{"good": null, "bad": null}` — the
+  good one dies with the bad. That is why `FOLLOW_COUNTS_QUERY` may alias two
+  `Page` roots (a `Page` cannot 404) and why `User` is never aliased beside
+  anything else. `Page.users` also has no `id_in`, so users cannot be batched by
+  id at all.
+- **`ThreadComment.childComments` is a raw `Json` scalar and costs 13×.** Twelve
+  comments measured 52,801 bytes with it and 3,964 without, and the nesting ran
+  **48 levels deep**. There is no depth control, so it is all or nothing: the
+  query keeps it, pays for it with `perPage: 10`, and `lib/comments` flattens to
+  two levels while reporting what it hides. Being untyped, "unexpected shape" is
+  a normal outcome there rather than a defensive hypothetical.
+- **Never round-trip source text through `encode("utf-8").decode("unicode_escape")`.**
+  A script inserting i18n keys did, over text Python had already decoded, and
+  every em-dash, arrow and umlaut came back a byte at a time as latin-1 —
+  `Kontoänderungen` became `KontoÃ¤nderungen` in seven strings across both files.
+  Worse, `grep` reported the files clean because the console codepage hid it. If
+  non-ASCII is ever in question, compare **codepoints** (`hex(ord(c))`), not
+  glyphs, and write literal UTF-8 rather than escapes.
 - **MSVC writes an 11 MB `karasu.pdb` on every release build and there is no
   flag reaching the linker to stop it.** `debug = 0` and `strip = true` are
   already set, `cargo build --release -v` shows no `/DEBUG`, no `-Cdebuginfo=`
@@ -353,6 +395,28 @@ a regression here is invisible until it ships.
 - **Overlays carry `data-overlay`.** Screen-level key handlers check for it and
   stand down, so a dialog owns the keyboard instead of the list behind it acting
   on the same press. `GlobalKeys` honours it too.
+- **Paging is a button, never a scroll.** Every paginated list — followers,
+  following, user search, activities, threads, comments — uses
+  `useInfiniteQuery` with `fetchNextPage` on a click and no `IntersectionObserver`
+  anywhere. The reason is the limiter in `anilist/client.rs`: it is a ~30/min
+  brake shared with the scrobbler and the three alert passes, and it reads its
+  budget then drops the lock *before* any response header lands, so it cannot see
+  a burst it has not sent. A feed that fetches because the user scrolled spends
+  that budget with nobody asking. Two further traps live in `UserList`'s comment
+  and are worth reading before touching an infinite query: `refetch()` refetches
+  **every** retained page, and `maxPages` evicts from the wrong end.
+- **Two queries per mount, at most.** Same cause. The profile spends its two on
+  the user and the follower totals; everything else arrives when a tab is
+  activated, which is a second user-initiated moment rather than a fourth
+  concurrent request clearing a pre-flight check that has not been updated yet.
+- **A pure function returns an i18n *key*, never a sentence.**
+  `src/lib/i18nKeys.test.ts` only sees literal `t("…")` calls, so
+  `` t(`social.verb${v}`) `` is invisible to it — and AniList makes this matter
+  rather than academic: it composes activity sentences itself, in English only, so
+  a German feed would read half-translated. `listActivityVerb`, `relationBadgeKey`,
+  `validatePost` and the twenty notification labels all return closed unions that
+  a component maps through a literal switch, which is the shape `receiptText` in
+  `useListMutations` established.
 - **Two motion registers, and the default is the quiet one.** *Surface* motion —
   hover, focus, background and border — stays on the 140ms `--ease-karasu` that
   every plain `transition-*` utility already inherits. *Feature* motion, for the

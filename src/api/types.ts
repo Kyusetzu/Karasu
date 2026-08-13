@@ -3,6 +3,10 @@ export interface Viewer {
   name: string;
   siteUrl: string;
   avatar: { large: string | null } | null;
+  /** Carried by `VIEWER_QUERY` so the whole app can follow the account's
+   *  score format without a profile fetch. Optional: cached viewer blobs from
+   *  before the field existed lack it, and read as ten-point. */
+  mediaListOptions?: { scoreFormat: string | null } | null;
 }
 
 export type MediaListStatus =

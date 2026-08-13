@@ -12,6 +12,10 @@ use super::*;
 /// client ID. Set once by the maintainer.
 pub const BUILTIN_ANILIST_CLIENT_ID: &str = "46231";
 
+/// `mediaListOptions.scoreFormat` rides along because the whole app follows
+/// it — score controls, list cells, statistics. It lands in the cached
+/// `anilist_viewer` kv blob and the frontend auth store at zero extra request
+/// cost, which is how the list screens read it without a profile fetch.
 const VIEWER_QUERY: &str = "
 query {
   Viewer {
@@ -19,6 +23,7 @@ query {
     name
     siteUrl
     avatar { large }
+    mediaListOptions { scoreFormat }
   }
 }";
 
@@ -128,6 +133,28 @@ pub fn anilist_session(db: State<'_, Db>) -> Option<Value> {
 pub fn anilist_logout(db: State<'_, Db>) {
     auth::delete_token();
     db.kv_delete("anilist_viewer");
+}
+
+/// Refetches the viewer and replaces the cached blob.
+///
+/// `anilist_session` deliberately never touches the network, so a
+/// `scoreFormat` changed on anilist.co (or through Karasu's own pane, which
+/// calls this on success) would otherwise stay stale until the next login.
+/// One request, on demand, never in the background.
+#[tauri::command]
+pub async fn refresh_viewer(
+    db: State<'_, Db>,
+    api: State<'_, AniList>,
+) -> Result<Value, String> {
+    let token = auth::load_token().ok_or("Not connected to AniList")?;
+    let data = api.query(Some(&token), VIEWER_QUERY, json!({})).await?;
+    let viewer = data
+        .get("Viewer")
+        .filter(|v| !v.is_null())
+        .cloned()
+        .ok_or("Token invalid or expired")?;
+    db.kv_set("anilist_viewer", &viewer.to_string())?;
+    Ok(viewer)
 }
 
 /// Generic GraphQL proxy: the frontend supplies query + variables, the

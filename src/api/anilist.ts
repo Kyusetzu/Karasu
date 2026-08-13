@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { toRaw, type ScoreFormat } from "@/lib/scoreFormat";
 import type {
   ListResult,
   Media,
@@ -27,6 +28,9 @@ export const startLogin = () => invoke<string>("anilist_start_login");
 export const connect = (token: string) =>
   invoke<Viewer>("anilist_connect", { token });
 export const session = () => invoke<Viewer | null>("anilist_session");
+/** Refetches the viewer (one request) and replaces the cached blob — how a
+ *  scoreFormat change reaches the store without a re-login. */
+export const refreshViewer = () => invoke<Viewer>("refresh_viewer");
 export const logout = () => invoke<void>("anilist_logout");
 
 // --- GraphQL --------------------------------------------------------------
@@ -46,6 +50,31 @@ export const setProfileModeCache = (mode: ProfileMode) => {
   profileMode = mode;
 };
 export const isLocalMode = () => profileMode === "local";
+
+// The account's score format, cached the same way and by the same owner (the
+// auth store), so the save paths below can convert display-format scores to
+// `scoreRaw` without importing a React store into the api layer.
+let scoreFormat: ScoreFormat = "POINT_10";
+export const setScoreFormatCache = (format: ScoreFormat) => {
+  scoreFormat = format;
+};
+export const currentScoreFormat = () => scoreFormat;
+
+/**
+ * `score` (display units) → `scoreRaw` (0–100), leaving everything else
+ * untouched. Applied to every AniList-bound save: the bare `score` float is
+ * interpreted in the account's format, which is how ten-point writes were
+ * silently corrupting non-ten-point accounts. Absent stays absent — "do not
+ * change" must not become "clear".
+ */
+function withRawScore<T extends { score?: number }>(
+  input: T,
+  format: ScoreFormat = scoreFormat,
+): Omit<T, "score"> & { scoreRaw?: number } {
+  const { score, ...rest } = input;
+  if (score === undefined) return rest;
+  return { ...rest, scoreRaw: toRaw(format, score) };
+}
 
 export const getProfileMode = () => invoke<ProfileMode>("get_profile_mode");
 export const enableLocalMode = () => invoke<void>("enable_local_mode");
@@ -78,9 +107,11 @@ export const cachedMediaList = (userId: number, mediaType: MediaType) =>
 export const saveListEntry = (input: SaveEntryInput, media?: Media) =>
   profileMode === "local"
     ? invoke<MutationResult>("local_save_entry", {
+        // Local mode keeps the display value — its list is the database and
+        // there is no account format to be misread by.
         input: { ...input, media, mediaType: media?.type },
       })
-    : invoke<MutationResult>("save_list_entry", { input });
+    : invoke<MutationResult>("save_list_entry", { input: withRawScore(input) });
 
 export const deleteListEntry = (id: number) =>
   profileMode === "local"
@@ -140,7 +171,7 @@ export const bulkSaveEntries = async (
   return invoke<number>("bulk_save_list_entries", {
     ids: entries.map((e) => e.id),
     status: patch.status ?? null,
-    score: patch.score ?? null,
+    scoreRaw: patch.score !== undefined ? toRaw(scoreFormat, patch.score) : null,
     progress: patch.progress ?? null,
     progressVolumes: patch.progressVolumes ?? null,
     repeat: patch.repeat ?? null,
@@ -174,9 +205,13 @@ export const localAllEntries = () =>
 export const localClearEntry = (mediaId: number) =>
   invoke<MutationResult>("local_delete_entry", { id: mediaId });
 
-/** Pushes an entry to AniList, bypassing the local dispatch. */
+/** Pushes an entry to AniList, bypassing the local dispatch. Local scores are
+ *  always ten-point (there is no account to follow), so the raw conversion is
+ *  pinned to POINT_10 whatever the connected account uses. */
 export const anilistSaveEntry = (input: SaveEntryInput) =>
-  invoke<MutationResult>("save_list_entry", { input });
+  invoke<MutationResult>("save_list_entry", {
+    input: withRawScore(input, "POINT_10"),
+  });
 
 /** Fetches an AniList list, bypassing the local dispatch (merge only). */
 export const anilistFetchList = (userId: number, mediaType: MediaType) =>

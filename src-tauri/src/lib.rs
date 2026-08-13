@@ -226,6 +226,7 @@ pub fn run() {
             commands::anilist_connect,
             commands::anilist_session,
             commands::anilist_logout,
+            commands::refresh_viewer,
             commands::anilist_query,
             commands::fetch_media_list,
             commands::cached_media_list,

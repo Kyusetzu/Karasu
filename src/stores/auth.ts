@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { listen } from "@tauri-apps/api/event";
 import * as api from "@/api/anilist";
+import { asScoreFormat, type ScoreFormat } from "@/lib/scoreFormat";
 import type { Viewer } from "@/api/types";
 
 type ProfileMode = "anilist" | "local" | "none";
@@ -17,12 +18,29 @@ interface AuthState {
   connect: (token: string) => Promise<void>;
   enableLocal: () => Promise<void>;
   logout: () => Promise<void>;
+  /** Refetches the viewer — how a scoreFormat change reaches the store. */
+  refreshViewer: () => Promise<void>;
 }
 
 /** Keep the api-layer routing cache aligned with the store. */
 function applyMode(mode: ProfileMode) {
   api.setProfileModeCache(mode);
   return mode;
+}
+
+/** Same idea for the score format: the save paths convert through the cached
+ *  value, so it must move with the viewer everywhere the viewer does. */
+function applyViewer(viewer: Viewer | null): Viewer | null {
+  api.setScoreFormatCache(asScoreFormat(viewer?.mediaListOptions?.scoreFormat));
+  return viewer;
+}
+
+/**
+ * The account's score format, for components. Ten-point when there is no
+ * account to follow (local mode, signed out) — exactly the old behaviour.
+ */
+export function useScoreFormat(): ScoreFormat {
+  return useAuth((s) => asScoreFormat(s.viewer?.mediaListOptions?.scoreFormat));
 }
 
 export const useAuth = create<AuthState>((set, get) => ({
@@ -43,12 +61,12 @@ export const useAuth = create<AuthState>((set, get) => ({
     // The one-click login completes in the backend (callback server) and
     // announces the fresh viewer through this event.
     listen<Viewer>("anilist-auth", (e) =>
-      set({ viewer: e.payload, mode: applyMode("anilist") }),
+      set({ viewer: applyViewer(e.payload), mode: applyMode("anilist") }),
     );
     try {
       const viewer = await api.session();
       if (viewer) {
-        set({ viewer, mode: applyMode("anilist"), loading: false });
+        set({ viewer: applyViewer(viewer), mode: applyMode("anilist"), loading: false });
         return;
       }
       const stored = await api.getProfileMode();
@@ -61,16 +79,22 @@ export const useAuth = create<AuthState>((set, get) => ({
 
   connect: async (token: string) => {
     const viewer = await api.connect(token);
-    set({ viewer, mode: applyMode("anilist") });
+    set({ viewer: applyViewer(viewer), mode: applyMode("anilist") });
   },
 
   enableLocal: async () => {
     await api.enableLocalMode();
+    applyViewer(null);
     set({ mode: applyMode("local") });
   },
 
   logout: async () => {
     await api.logout();
-    set({ viewer: null, mode: applyMode("none") });
+    set({ viewer: applyViewer(null), mode: applyMode("none") });
+  },
+
+  refreshViewer: async () => {
+    const viewer = await api.refreshViewer();
+    set({ viewer: applyViewer(viewer) });
   },
 }));

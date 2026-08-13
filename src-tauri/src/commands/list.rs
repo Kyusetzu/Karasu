@@ -65,9 +65,16 @@ fn validate_media_type(media_type: &str) -> Result<&str, String> {
 /// `startedAt`/`completedAt` are `FuzzyDateInput` — `{ year, month, day }`, each
 /// nullable, because AniList lets a date be partial ("2024", "March 2024"). That
 /// is why they are not plain dates on the frontend either.
+///
+/// **`$scoreRaw: Int`, never `$score: Float`.** The bare `score` argument is
+/// interpreted in the *account's* scoreFormat, so a ten-point value written to
+/// a 100-point account stored 8/100 — a silent corruption this app shipped for
+/// months. `scoreRaw` is the format-independent 0–100 integer; the frontend
+/// converts through `lib/scoreFormat.toRaw` before invoking, which also makes
+/// the offline queue safe to replay across a format change.
 const SAVE_MUTATION: &str = "
-mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int, $progressVolumes: Int, $score: Float, $repeat: Int, $notes: String, $private: Boolean, $startedAt: FuzzyDateInput, $completedAt: FuzzyDateInput) {
-  SaveMediaListEntry(mediaId: $mediaId, status: $status, progress: $progress, progressVolumes: $progressVolumes, score: $score, repeat: $repeat, notes: $notes, private: $private, startedAt: $startedAt, completedAt: $completedAt) {
+mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int, $progressVolumes: Int, $scoreRaw: Int, $repeat: Int, $notes: String, $private: Boolean, $startedAt: FuzzyDateInput, $completedAt: FuzzyDateInput) {
+  SaveMediaListEntry(mediaId: $mediaId, status: $status, progress: $progress, progressVolumes: $progressVolumes, scoreRaw: $scoreRaw, repeat: $repeat, notes: $notes, private: $private, startedAt: $startedAt, completedAt: $completedAt) {
     id mediaId status progress progressVolumes repeat notes updatedAt private
     startedAt { year month day }
     completedAt { year month day }
@@ -98,8 +105,8 @@ mutation ($id: Int) {
 /// read-modify-write per entry, which is the fan-out this mutation exists to
 /// avoid — so bulk tag editing is a separate problem, not a missing argument.
 const UPDATE_ENTRIES_MUTATION: &str = "
-mutation ($ids: [Int], $status: MediaListStatus, $score: Float, $progress: Int, $progressVolumes: Int, $repeat: Int, $private: Boolean, $startedAt: FuzzyDateInput, $completedAt: FuzzyDateInput) {
-  UpdateMediaListEntries(ids: $ids, status: $status, score: $score, progress: $progress, progressVolumes: $progressVolumes, repeat: $repeat, private: $private, startedAt: $startedAt, completedAt: $completedAt) {
+mutation ($ids: [Int], $status: MediaListStatus, $scoreRaw: Int, $progress: Int, $progressVolumes: Int, $repeat: Int, $private: Boolean, $startedAt: FuzzyDateInput, $completedAt: FuzzyDateInput) {
+  UpdateMediaListEntries(ids: $ids, status: $status, scoreRaw: $scoreRaw, progress: $progress, progressVolumes: $progressVolumes, repeat: $repeat, private: $private, startedAt: $startedAt, completedAt: $completedAt) {
     id mediaId status progress progressVolumes repeat notes updatedAt private
     startedAt { year month day }
     completedAt { year month day }
@@ -271,7 +278,8 @@ pub async fn bulk_save_list_entries(
     api: State<'_, AniList>,
     ids: Vec<i64>,
     status: Option<String>,
-    score: Option<f64>,
+    // The 0–100 raw score — see `SAVE_MUTATION`'s note on why never a float.
+    score_raw: Option<i64>,
     progress: Option<i64>,
     // snake_case here, camelCase on the wire: Tauri maps the two, the same way
     // `save_image`'s `default_name` receives `defaultName`.
@@ -291,7 +299,7 @@ pub async fn bulk_save_list_entries(
     // every selected entry's `updatedAt`, and change nothing — which would
     // reorder a list sorted by "last updated" for no reason.
     if status.is_none()
-        && score.is_none()
+        && score_raw.is_none()
         && progress.is_none()
         && progress_volumes.is_none()
         && repeat.is_none()
@@ -314,7 +322,7 @@ pub async fn bulk_save_list_entries(
         let vars = json!({
             "ids": chunk,
             "status": status,
-            "score": score,
+            "scoreRaw": score_raw,
             "progress": progress,
             "progressVolumes": progress_volumes,
             "repeat": repeat,

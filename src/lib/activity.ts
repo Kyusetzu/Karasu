@@ -83,6 +83,41 @@ export function parseProgress(progress: string | null | undefined): ProgressRang
   return to !== undefined && to > from ? { from, to } : { from };
 }
 
+/**
+ * `"5"` or `"162–170"` — an en dash, because AniList's `"162 - 170"` is a batch
+ * of chapters read in one sitting, not "162 of a 170 total". The German
+ * templates were deliberately kept free of "von 170" for the same reason.
+ */
+export function formatProgress(p: ProgressRange): string {
+  return p.to !== undefined ? `${p.from}–${p.to}` : String(p.from);
+}
+
+/** The verbs whose sentence template carries a `{{n}}` progress slot. An
+ *  activity with one of these but no parseable progress falls back to
+ *  AniList's own words rather than rendering a hole where the number goes. */
+export const PROGRESS_VERBS: ReadonlySet<ActivityVerb> = new Set([
+  "watchedEpisode",
+  "rewatchedEpisode",
+  "readChapter",
+  "rereadChapter",
+]);
+
+/**
+ * Splits a sentence template at the `%t%` token, where the media title link is
+ * rendered. Each language owns its whole sentence — German puts the participle
+ * *after* the title ("hat Kapitel 162–170 von … gelesen"), which no fixed
+ * verb-then-title order can express — and the component drops a React element
+ * into the gap, so the title can stay a link without `Trans` or interpolation.
+ *
+ * A template missing the token degrades to `{before: s, after: ""}` — the old
+ * verb-first order — instead of eating the title.
+ */
+export function splitSentence(s: string): { before: string; after: string } {
+  const i = s.indexOf("%t%");
+  if (i === -1) return { before: s, after: "" };
+  return { before: s.slice(0, i), after: s.slice(i + 3) };
+}
+
 interface FeedBase {
   id: number;
   createdAt: number;

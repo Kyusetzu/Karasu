@@ -707,15 +707,19 @@ export const de: typeof en = {
     noActivity: "{{name}} hat noch nichts gepostet",
     // Verben. AniList setzt diese Sätze selbst zusammen, und nur auf Englisch —
     // deshalb werden sie aus einem Schlüssel übersetzt, siehe `lib/activity`.
-    verbWatchedEpisode: "sah Episode",
-    verbRewatchedEpisode: "sah erneut Episode",
-    verbReadChapter: "las Kapitel",
-    verbRereadChapter: "las erneut Kapitel",
-    verbCompleted: "beendete",
-    verbPlansToWatch: "plant zu schauen",
-    verbPlansToRead: "plant zu lesen",
-    verbDropped: "brach ab",
-    verbPaused: "pausierte",
+    // {{n}} ist die Episoden-/Kapitelnummer (oder ein Bereich wie 162–170),
+    // %t% der Titel-Link. Kleingeschrieben, weil der Satz den Nutzernamen
+    // darüber fortsetzt. Kein "von 170": der Bereich ist ein Stück am Stück,
+    // keine Angabe eines Gesamtumfangs.
+    sentWatchedEpisode: "hat Episode {{n}} von %t% geschaut",
+    sentRewatchedEpisode: "hat Episode {{n}} von %t% erneut geschaut",
+    sentReadChapter: "hat Kapitel {{n}} von %t% gelesen",
+    sentRereadChapter: "hat Kapitel {{n}} von %t% erneut gelesen",
+    sentCompleted: "hat %t% abgeschlossen",
+    sentPlansToWatch: "plant %t% zu schauen",
+    sentPlansToRead: "plant %t% zu lesen",
+    sentDropped: "hat %t% abgebrochen",
+    sentPaused: "hat %t% pausiert",
     // Der Feed der Gefolgten
     feedSubtitle: "Was die Personen, denen du folgst, getrieben haben.",
     feedEmpty: "Nichts von den Personen, denen du folgst.",

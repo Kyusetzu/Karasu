@@ -1,11 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
+  formatProgress,
   listActivityVerb,
   normalizeActivity,
   parseProgress,
+  PROGRESS_VERBS,
+  splitSentence,
   toggleLike,
   type ActivityVerb,
 } from "./activity";
+import { en } from "@/i18n/en";
+import { de } from "@/i18n/de";
 
 const USER = { id: 1, name: "kyu", avatar: null, isFollowing: null, isFollower: null };
 
@@ -168,6 +173,91 @@ describe("parseProgress", () => {
     expect(parseProgress("many")).toBeNull();
     expect(parseProgress("1 - 2 - 3")).toBeNull();
     expect(parseProgress("-4")).toBeNull();
+  });
+});
+
+describe("formatProgress", () => {
+  it("renders a single value bare and a range with an en dash", () => {
+    expect(formatProgress({ from: 12 })).toBe("12");
+    // An en dash, not "von"/"of": AniList's "162 - 170" is a batch read in one
+    // sitting, and phrasing it as "162 of 170" would claim a total it never sent.
+    expect(formatProgress({ from: 162, to: 170 })).toBe("162–170");
+  });
+});
+
+describe("splitSentence", () => {
+  it("opens the title slot", () => {
+    expect(splitSentence("hat Kapitel 5 von %t% gelesen")).toEqual({
+      before: "hat Kapitel 5 von ",
+      after: " gelesen",
+    });
+    expect(splitSentence("completed %t%")).toEqual({ before: "completed ", after: "" });
+  });
+
+  it("degrades to the verb-first order when the token is missing", () => {
+    // A translation that lost %t% must not eat the title — it falls back to
+    // sentence-then-title, the pre-template rendering.
+    expect(splitSentence("watched episode 5")).toEqual({
+      before: "watched episode 5",
+      after: "",
+    });
+  });
+
+  it("splits on the first token only", () => {
+    expect(splitSentence("%t% and %t%")).toEqual({ before: "", after: " and %t%" });
+  });
+});
+
+describe("the sentence templates themselves", () => {
+  // The failure mode a translator hits: dropping the title token or the
+  // progress slot. Asserted against both files so `de: typeof en` (key parity)
+  // and this test (value shape) cover different mistakes.
+  const SENT_KEYS = [
+    "sentWatchedEpisode",
+    "sentRewatchedEpisode",
+    "sentReadChapter",
+    "sentRereadChapter",
+    "sentCompleted",
+    "sentPlansToWatch",
+    "sentPlansToRead",
+    "sentDropped",
+    "sentPaused",
+  ] as const;
+
+  const PROGRESS_KEYS: Record<string, boolean> = {
+    sentWatchedEpisode: true,
+    sentRewatchedEpisode: true,
+    sentReadChapter: true,
+    sentRereadChapter: true,
+  };
+
+  it("every template carries exactly one title token in both languages", () => {
+    for (const lang of [en, de]) {
+      for (const key of SENT_KEYS) {
+        const value = lang.social[key];
+        expect(value.split("%t%").length, `${key}: ${value}`).toBe(2);
+      }
+    }
+  });
+
+  it("the four progress verbs carry the {{n}} slot, the rest do not", () => {
+    for (const lang of [en, de]) {
+      for (const key of SENT_KEYS) {
+        const value = lang.social[key];
+        expect(value.includes("{{n}}"), `${key}: ${value}`).toBe(!!PROGRESS_KEYS[key]);
+      }
+    }
+  });
+
+  it("PROGRESS_VERBS matches the keys that take a number", () => {
+    // The set gates the fallback in ListSentence; if it drifts from the
+    // templates, a progress verb renders with an empty slot.
+    expect([...PROGRESS_VERBS].sort()).toEqual([
+      "readChapter",
+      "rereadChapter",
+      "rewatchedEpisode",
+      "watchedEpisode",
+    ]);
   });
 });
 

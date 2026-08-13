@@ -702,15 +702,19 @@ export const en = {
     noActivity: "{{name}} hasn't posted anything yet",
     // Verbs. AniList composes these sentences itself and only in English, so
     // they are translated from a key — see `lib/activity`.
-    verbWatchedEpisode: "watched episode",
-    verbRewatchedEpisode: "rewatched episode",
-    verbReadChapter: "read chapter",
-    verbRereadChapter: "reread chapter",
-    verbCompleted: "completed",
-    verbPlansToWatch: "plans to watch",
-    verbPlansToRead: "plans to read",
-    verbDropped: "dropped",
-    verbPaused: "paused",
+    // Whole sentences, one per verb: {{n}} is the episode/chapter number or
+    // range, %t% is where the media title link is rendered (`splitSentence` in
+    // lib/activity). Each language owns its word order this way — German puts
+    // the participle after the title, which no verb-first fragment could.
+    sentWatchedEpisode: "watched episode {{n}} of %t%",
+    sentRewatchedEpisode: "rewatched episode {{n}} of %t%",
+    sentReadChapter: "read chapter {{n}} of %t%",
+    sentRereadChapter: "reread chapter {{n}} of %t%",
+    sentCompleted: "completed %t%",
+    sentPlansToWatch: "plans to watch %t%",
+    sentPlansToRead: "plans to read %t%",
+    sentDropped: "dropped %t%",
+    sentPaused: "paused %t%",
     // The following feed
     feedSubtitle: "What the people you follow have been up to.",
     feedEmpty: "Nothing from the people you follow.",

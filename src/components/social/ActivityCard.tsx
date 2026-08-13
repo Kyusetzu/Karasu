@@ -4,7 +4,13 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { ExternalLink, Heart, MessageSquare } from "lucide-react";
-import type { FeedItem, ActivityVerb } from "@/lib/activity";
+import {
+  formatProgress,
+  PROGRESS_VERBS,
+  splitSentence,
+  type ActivityVerb,
+  type FeedItem,
+} from "@/lib/activity";
 import { displayTitle } from "@/api/types";
 import { isTauri } from "@/api/anilist";
 import { activityReplies, type LikeableType } from "@/api/social";
@@ -21,33 +27,83 @@ import { cn } from "@/lib/utils";
 /**
  * One row of the feed.
  *
- * The verb is translated from a key rather than printed from AniList's string.
- * AniList composes the sentence itself — `"watched episode"` — and only in
- * English, so a German feed would otherwise read half-translated. `lib/activity`
- * maps the string to a closed union and this switch turns that into a literal
- * `t("…")` call, which is also what makes `i18nKeys.test.ts` able to see it.
+ * The sentence is translated whole, not assembled from a verb. AniList composes
+ * it itself — `"watched episode"` — in English word order and English only, so a
+ * German feed read "las Kapitel 162 - 170 Titel" where German wants the
+ * participle *after* the title. Each verb owns a full template with a `{{n}}`
+ * progress slot and a `%t%` token where the title link goes; `splitSentence`
+ * opens the gap and the component drops the `<Link>` in.
+ *
+ * Still a literal switch over a closed union — `i18nKeys.test.ts` only sees
+ * literal `t("…")` calls, and a key built by interpolation would be invisible
+ * to it.
  */
-function verbText(verb: ActivityVerb, t: (k: string) => string): string {
+function sentenceFor(
+  verb: ActivityVerb,
+  t: (k: string, o?: { n?: string }) => string,
+  n?: string,
+): string {
   switch (verb) {
     case "watchedEpisode":
-      return t("social.verbWatchedEpisode");
+      return t("social.sentWatchedEpisode", { n });
     case "rewatchedEpisode":
-      return t("social.verbRewatchedEpisode");
+      return t("social.sentRewatchedEpisode", { n });
     case "readChapter":
-      return t("social.verbReadChapter");
+      return t("social.sentReadChapter", { n });
     case "rereadChapter":
-      return t("social.verbRereadChapter");
+      return t("social.sentRereadChapter", { n });
     case "completed":
-      return t("social.verbCompleted");
+      return t("social.sentCompleted");
     case "plansToWatch":
-      return t("social.verbPlansToWatch");
+      return t("social.sentPlansToWatch");
     case "plansToRead":
-      return t("social.verbPlansToRead");
+      return t("social.sentPlansToRead");
     case "dropped":
-      return t("social.verbDropped");
+      return t("social.sentDropped");
     case "paused":
-      return t("social.verbPaused");
+      return t("social.sentPaused");
   }
+}
+
+/** The list-activity sentence, translated whole, with the title link in its slot. */
+function ListSentence({ item }: { item: Extract<FeedItem, { kind: "list" }> }) {
+  const { t } = useTranslation();
+
+  const titleLink = item.media ? (
+    <Link to={`/media/${item.media.id}`} className="text-accent-400 hover:underline">
+      {displayTitle(item.media.title)}
+    </Link>
+  ) : null;
+
+  // The template path needs a verb this build knows, a title for the slot,
+  // and — for the four progress verbs — a parsed progress. Anything else falls
+  // back to AniList's own words: slightly untranslated beats a sentence with a
+  // hole where the number or title goes.
+  if (
+    item.verb === null ||
+    item.media === null ||
+    (PROGRESS_VERBS.has(item.verb) && item.progress === null)
+  ) {
+    return (
+      <p>
+        <span>{item.rawStatus}</span>
+        {item.progress && (
+          <span className="tabular-nums text-ink-100"> {formatProgress(item.progress)}</span>
+        )}
+        {titleLink && <> {titleLink}</>}
+      </p>
+    );
+  }
+
+  const n = item.progress ? formatProgress(item.progress) : undefined;
+  const { before, after } = splitSentence(sentenceFor(item.verb, t, n));
+  return (
+    <p>
+      {before}
+      {titleLink}
+      {after}
+    </p>
+  );
 }
 
 /**
@@ -231,30 +287,7 @@ export function ActivityCard({ item }: { item: FeedItem }) {
 
         <div className="mt-2 text-sm text-ink-300">
           {item.kind === "list" ? (
-            <p>
-              {/* An unknown verb falls back to AniList's own words rather than
-                  leaving the sentence with a hole in it. */}
-              <span>{item.verb ? verbText(item.verb, t) : item.rawStatus}</span>
-              {item.progress && (
-                <span className="tabular-nums text-ink-100">
-                  {" "}
-                  {item.progress.to
-                    ? `${item.progress.from}–${item.progress.to}`
-                    : item.progress.from}
-                </span>
-              )}
-              {item.media && (
-                <>
-                  {" "}
-                  <Link
-                    to={`/media/${item.media.id}`}
-                    className="text-accent-400 hover:underline"
-                  >
-                    {displayTitle(item.media.title)}
-                  </Link>
-                </>
-              )}
-            </p>
+            <ListSentence item={item} />
           ) : (
             // Text activities are markdown, same dialect as a bio — so the same
             // renderer, which means no innerHTML and no remote images.

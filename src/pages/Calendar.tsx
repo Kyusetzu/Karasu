@@ -1,11 +1,11 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useSearchParams } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
-import { Check, ChevronLeft, ChevronRight, Clock } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { airingWeek, type AiringSlot } from "@/api/queries";
 import { fetchMediaList, isTauri } from "@/api/anilist";
-import type { Media, MediaListEntry } from "@/api/types";
+import { displayTitle, type Media, type MediaListEntry } from "@/api/types";
 import {
   addDays,
   bucketByLocalDay,
@@ -16,8 +16,6 @@ import {
 import { isBlocked } from "@/lib/contentFilter";
 import { useContentFilter } from "@/stores/contentFilter";
 import { useAuth } from "@/stores/auth";
-import { DigestRow } from "@/components/media/DigestRow";
-import { SectionHeader } from "@/components/ui/section-header";
 import { Segmented } from "@/components/ui/segmented";
 import { Button } from "@/components/ui/button";
 import { EmptyState, TickMarks } from "@/components/EmptyState";
@@ -25,7 +23,9 @@ import { Shimmer } from "@/components/Skeleton";
 import { cn } from "@/lib/utils";
 
 /**
- * The airing calendar: a week of episodes, Monday-first, today highlighted.
+ * The airing calendar: a real week grid — seven columns, Monday-first,
+ * today's column washed in the accent, empty days present as empty cells
+ * (on a calendar, emptiness is information).
  *
  * Two lenses, and they cost very different things:
  *
@@ -211,16 +211,17 @@ export default function Calendar() {
         />
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-8 py-6">
+      {/* `overflow-auto`, not `-y-`: the seven fixed-minimum columns are wider
+          than a narrow window, and scrolling the grid sideways beats crushing
+          a day into an unreadable sliver. */}
+      <div className="min-h-0 flex-1 overflow-auto px-8 py-6">
         {error ? (
           <p className="text-sm text-danger">{t("common.error", { message: String(error) })}</p>
         ) : loading ? (
-          <div className="space-y-3" aria-hidden="true">
-            <Shimmer className="h-5 w-40 rounded" />
-            <Shimmer className="h-12 w-full rounded-xl" index={1} />
-            <Shimmer className="h-12 w-4/5 rounded-xl" index={2} />
-            <Shimmer className="mt-6 h-5 w-40 rounded" index={3} />
-            <Shimmer className="h-12 w-full rounded-xl" index={4} />
+          <div className="grid min-w-[980px] grid-cols-7 gap-2" aria-hidden="true">
+            {days.map((day, i) => (
+              <Shimmer key={day} className="h-72 rounded-xl" index={i} />
+            ))}
           </div>
         ) : slots.length === 0 ? (
           <EmptyState
@@ -229,17 +230,15 @@ export default function Calendar() {
             hint={lens === "mine" ? t("calendar.emptyMineHint") : undefined}
           />
         ) : (
-          <div className="space-y-7">
-            {days.map((day, i) =>
-              buckets[i].length === 0 ? null : (
-                <DaySection
-                  key={day}
-                  day={day}
-                  isToday={day === todayMidnight}
-                  slots={buckets[i]}
-                />
-              ),
-            )}
+          <div className="grid min-w-[980px] grid-cols-7 items-stretch gap-2">
+            {days.map((day, i) => (
+              <DayColumn
+                key={day}
+                day={day}
+                isToday={day === todayMidnight}
+                slots={buckets[i]}
+              />
+            ))}
           </div>
         )}
       </div>
@@ -247,7 +246,7 @@ export default function Calendar() {
   );
 }
 
-function DaySection({
+function DayColumn({
   day,
   isToday,
   slots,
@@ -260,43 +259,88 @@ function DaySection({
   const date = new Date(day * 1000);
 
   return (
-    <section className={cn(isToday && "rounded-xl bg-surface-900/50 p-3 -mx-3")}>
-      <SectionHeader
-        icon={Clock}
-        title={date.toLocaleDateString(i18n.language, { weekday: "long" })}
-        meta={
-          date.toLocaleDateString(i18n.language, { day: "2-digit", month: "2-digit" }) +
-          (isToday ? ` · ${t("calendar.today")}` : "")
-        }
-      />
-      <div className="mt-2 grid gap-0.5 2xl:grid-cols-2">
+    <section
+      aria-label={
+        date.toLocaleDateString(i18n.language, { weekday: "long", day: "numeric", month: "long" }) +
+        (isToday ? ` · ${t("calendar.today")}` : "")
+      }
+      className={cn(
+        "flex min-h-72 flex-col rounded-xl border p-1.5",
+        isToday
+          ? "border-accent-600/50 bg-accent-500/[.07]"
+          : "border-surface-800 bg-surface-900/40",
+      )}
+    >
+      <header className="flex items-baseline justify-between gap-1 px-1 pb-1.5 pt-0.5">
+        <span
+          className={cn(
+            "text-2xs font-semibold uppercase tracking-[.1em]",
+            isToday ? "text-accent-400" : "text-ink-600",
+          )}
+        >
+          {date.toLocaleDateString(i18n.language, { weekday: "short" })}
+        </span>
+        <span
+          className={cn(
+            "text-sm font-bold tabular-nums",
+            isToday ? "text-accent-400" : "text-ink-300",
+          )}
+        >
+          {date.toLocaleDateString(i18n.language, { day: "numeric" })}
+        </span>
+      </header>
+      <div className="flex flex-1 flex-col gap-1">
         {slots.map((s) => (
-          <DigestRow
-            key={s.key}
-            media={s.media}
-            note={
-              t("common.episode", { n: s.episode }) +
-              (s.entry && s.entry.progress < s.episode - 1
-                ? ` · ${t("dashboard.youAreAt", { n: s.entry.progress })}`
-                : "")
-            }
-            when={new Date(s.airingAt * 1000).toLocaleTimeString(i18n.language, {
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
-            marker={
-              s.entry ? (
-                <span
-                  title={t(`status.ANIME.${s.entry.status}`)}
-                  className="ml-1 grid size-5 shrink-0 place-items-center rounded-full bg-success/15 text-success"
-                >
-                  <Check className="size-3" />
-                </span>
-              ) : undefined
-            }
-          />
+          <CalendarCard key={s.key} slot={s} />
         ))}
       </div>
     </section>
+  );
+}
+
+/**
+ * One airing in a day cell — `DigestRow` is the wrong shape for a column, so
+ * the card stacks what the row spreads: time and episode on one line, the
+ * title clamped beneath, the on-list pip trailing the first line.
+ */
+function CalendarCard({ slot }: { slot: Slot }) {
+  const { t, i18n } = useTranslation();
+  const title = displayTitle(slot.media.title);
+
+  return (
+    <Link
+      to={`/media/${slot.media.id}`}
+      title={title}
+      className="flex gap-1.5 rounded-lg bg-surface-900 p-1.5 transition-surface hover:bg-surface-850"
+    >
+      <img
+        src={slot.media.coverImage.large ?? ""}
+        alt=""
+        loading="lazy"
+        className="h-7 w-5 shrink-0 rounded-[.25rem] object-cover"
+      />
+      <div className="min-w-0 flex-1">
+        <p className="flex items-center gap-1 text-2xs leading-tight">
+          <span className="tabular-nums text-accent-400">
+            {new Date(slot.airingAt * 1000).toLocaleTimeString(i18n.language, {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </span>
+          <span className="text-ink-600">{t("calendar.ep", { n: slot.episode })}</span>
+          {slot.entry && (
+            <span
+              title={t(`status.ANIME.${slot.entry.status}`)}
+              className="ml-auto grid size-3.5 shrink-0 place-items-center rounded-full bg-success/15 text-success"
+            >
+              <Check className="size-2.5" />
+            </span>
+          )}
+        </p>
+        <p className="mt-0.5 line-clamp-2 text-2xs leading-tight text-ink-200">
+          {title}
+        </p>
+      </div>
+    </Link>
   );
 }

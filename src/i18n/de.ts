@@ -451,6 +451,7 @@ export const de: typeof en = {
     nextWeek: "Nächste Woche",
     thisWeek: "Diese Woche",
     today: "heute",
+    ep: "Ep. {{n}}",
     emptyMine: "Diese Woche läuft nichts von deinen Serien.",
     emptyMineHint: "Die Ansicht „Alles“ zeigt den kompletten Sendeplan.",
     emptyAll: "Diese Woche läuft nichts.",

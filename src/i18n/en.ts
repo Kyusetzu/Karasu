@@ -450,6 +450,7 @@ export const en = {
     nextWeek: "Next week",
     thisWeek: "This week",
     today: "today",
+    ep: "Ep {{n}}",
     emptyMine: "Nothing of yours airs this week.",
     emptyMineHint: "The Everything lens shows the whole schedule.",
     emptyAll: "Nothing airs this week.",

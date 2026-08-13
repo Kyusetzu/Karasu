@@ -204,7 +204,9 @@ export default function Franchise() {
             ref={viewport}
             {...pan.handlers}
             className={cn(
-              "relative min-h-0 min-w-0 flex-1 select-none overflow-hidden rounded-xl border border-hair bg-surface-900",
+              // `touch-none`, or Chromium reclaims a touch drag with a
+              // pointercancel mid-gesture and the pan stutters dead.
+              "relative min-h-0 min-w-0 flex-1 select-none touch-none overflow-hidden rounded-xl border border-hair bg-surface-900",
               pan.dragging ? "cursor-grabbing" : "cursor-grab",
             )}
             style={{
@@ -420,6 +422,13 @@ function GraphNode({
             boxShadow: isSelected
               ? "0 .5em 1.25em rgba(0,0,0,.5)"
               : "0 .125em .375em rgba(0,0,0,.3)",
+            // A gapped ring, so the selection floats clear of the 2px status
+            // border instead of fusing with it into a two-hue fringe. An
+            // outline follows the radius and `overflow-hidden` cannot clip it.
+            ...(isSelected && {
+              outline: "2px solid rgba(var(--accent-rgb), .9)",
+              outlineOffset: "2px",
+            }),
           }}
         >
           {node.coverImage.large ? (

@@ -86,16 +86,32 @@ export function usePanZoom(viewport: RefObject<HTMLElement | null>) {
     origin.current = { x: e.clientX, y: e.clientY, tx, ty };
     moved.current = false;
     setDragging(true);
-    e.currentTarget.setPointerCapture(e.pointerId);
+    // Deliberately NO pointer capture here. Capture retargets the derived
+    // `click`/`dblclick` at the capture element, so capturing on press made
+    // every button inside the canvas — nodes, zoom, collapse pills —
+    // unclickable for as long as the graph has existed. Capture is taken
+    // when a drag actually commits, in `onPointerMove`.
   }, []);
 
   const onPointerMove = useCallback(
     (e: PointerEvent<HTMLElement>) => {
       const from = origin.current;
       if (!from) return;
+      // No capture is held before the threshold, so a press whose release
+      // lands outside the viewport never delivers its `pointerup` — without
+      // this guard the stale origin would make bare hovers pan the canvas.
+      if (e.buttons === 0) {
+        origin.current = null;
+        setDragging(false);
+        return;
+      }
       const dx = e.clientX - from.x;
       const dy = e.clientY - from.y;
       if (!moved.current && Math.hypot(dx, dy) < MOVE_THRESHOLD) return;
+      // The drag is real from here on: take the capture now, so the pan
+      // keeps tracking past the viewport edge. A stationary click never
+      // reaches this line and its `click` stays on the button it pressed.
+      if (!moved.current) e.currentTarget.setPointerCapture(e.pointerId);
       moved.current = true;
       commit({ ...current.current, tx: from.tx + dx, ty: from.ty + dy });
     },

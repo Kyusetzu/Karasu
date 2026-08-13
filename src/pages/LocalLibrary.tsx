@@ -317,20 +317,31 @@ function LibraryView({ userId }: { userId: number }) {
   const [splitError, setSplitError] = useState<string | null>(null);
   const [splitPending, setSplitPending] = useState(false);
   const applySplit = useCallback(
-    async (mediaId: number, dstStart: number) => {
+    async (mediaId: number, dstStart: number, label: string) => {
       if (!splitting) return;
       setSplitError(null);
       setSplitPending(true);
       try {
+        // Keyed on the row and its displayed numbers; the backend resolves
+        // the files, so a chained split cannot target the wrong ones.
         await setLibraryRedirect(
-          splitting.key.title,
-          splitting.key.season,
+          splitting.mediaId,
           splitting.overflow.firstExtra,
           splitting.maxEpisode,
           mediaId,
           dstStart,
         );
         setSplitting(null);
+        // The visible confirmation the third split was missing: the row often
+        // barely changes, so the toast is what says the answer landed.
+        showToast({
+          kind: "success",
+          text: t("library.splitDone", {
+            from: splitting.overflow.firstExtra,
+            to: splitting.maxEpisode,
+            title: label,
+          }),
+        });
         await Promise.all([refresh(), refetchStatus(), refetchUnmatched()]);
       } catch (e) {
         setSplitError(typeof e === "string" ? e : t("library.correctFailed"));
@@ -958,12 +969,11 @@ function LibraryRow({
         {/* The folder holds more than the show: almost always the next season
             under one folder name. Detection is the scanner's; the decision is
             the user's — this chip opens the split card, nothing more. */}
-        {lib.overflow && source && (
+        {lib.overflow && (
           <button
             type="button"
             onClick={() =>
               onSplit({
-                key: source,
                 mediaId: lib.mediaId,
                 title,
                 overflow: lib.overflow!,

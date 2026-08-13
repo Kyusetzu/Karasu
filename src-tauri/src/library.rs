@@ -45,7 +45,7 @@ pub struct ScannedFile {
 /// "episodes `ep_from..=ep_to` of this parse are `media_id`, renumbered from
 /// `dst_start`". The persisted form is `library_redirect` (schema v11), and the
 /// record shape deliberately mirrors `relations::Rule`.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct SplitRule {
     pub title: String,
     pub season: i32,
@@ -865,25 +865,152 @@ pub fn set_library_match(
     Ok(guard.summary.clone())
 }
 
-/// Confirms a season split: episodes `ep_from..=ep_to` of this parse are
-/// `media_id`, renumbered from `dst_start`.
+/// Everything a confirmed split changes, computed before anything is written.
+///
+/// Split from the command so it is testable without Tauri state — the three
+/// bugs this shape replaced (a chained split shifting the wrong files, an
+/// upsert on `(title, season, ep_from)` silently swallowing an earlier rule,
+/// and a zero-match confirm returning `Ok` with nothing to show) were all
+/// invisible precisely because the old command mixed the decision with the
+/// writes.
+#[derive(Debug)]
+pub struct RedirectPlan {
+    /// Primary keys of existing rules to delete — every rule the new range
+    /// touches, including ones that come back trimmed.
+    pub delete: Vec<(String, i32, u32)>,
+    /// Rules to insert: one per parse group in the range, plus the trimmed
+    /// remnants of any overlapped rule.
+    pub insert: Vec<SplitRule>,
+    /// `(index into files, renumbered episode)` for every affected file.
+    pub files: Vec<(usize, u32)>,
+}
+
+/// Plans a split of the *current-frame* episodes `from..=to` of `media_id` —
+/// exactly the numbers the row and the chip display — onto `dst_media_id`,
+/// renumbered from `dst_start`.
+///
+/// The persisted rules stay keyed on `(title, season, disk range)`, because
+/// that is the frame a scan parses; the translation happens here, per file,
+/// by re-reading each filename's own number. Keying the *command* on what the
+/// user can see is the fix for the chained-split bug: after one split the
+/// row's numbers are renumbered, and a second command still keyed on disk
+/// numbers targeted files the user was not looking at.
+pub fn plan_redirect(
+    files: &[ScannedFile],
+    existing: &[SplitRule],
+    media_id: i64,
+    from: u32,
+    to: u32,
+    dst_media_id: i64,
+    dst_start: u32,
+) -> Result<RedirectPlan, String> {
+    // The affected files, grouped by the parse key their rule will carry.
+    // `title`/`season` are already the parse key on every ScannedFile; only
+    // the disk number needs the filename re-read, since `episode` may be the
+    // renumbered value of an earlier split.
+    let mut groups: HashMap<(String, i32), Vec<(usize, u32, u32)>> = HashMap::new();
+    for (i, f) in files.iter().enumerate() {
+        if f.media_id != Some(media_id) || f.episode < from || f.episode > to {
+            continue;
+        }
+        let (_, _, disk) = reparse(&f.path);
+        let Some(d) = disk else {
+            return Err(format!(
+                "\"{}\" has no episode number in its filename, so it cannot be split by range",
+                f.path
+            ));
+        };
+        groups.entry((f.title.clone(), f.season)).or_default().push((i, d, f.episode));
+    }
+    // The silent no-op this replaces: confirming against a range that matches
+    // nothing must say so, not close the dialog with an unchanged screen.
+    if groups.is_empty() {
+        return Err(format!("No files land in episodes {from}–{to} of that title — nothing to split"));
+    }
+
+    let mut plan = RedirectPlan { delete: Vec::new(), insert: Vec::new(), files: Vec::new() };
+    for ((title, season), members) in groups {
+        // Within one parse, disk and current numbering may only differ by a
+        // constant shift (an earlier split's renumbering). A mixed offset
+        // means the range spans files this plan cannot describe with one
+        // rule — refuse rather than guess.
+        let offset = members[0].1 as i64 - members[0].2 as i64;
+        if members.iter().any(|(_, d, e)| *d as i64 - *e as i64 != offset) {
+            return Err(
+                "The episode numbering inside that range is not contiguous — correct the files individually"
+                    .into(),
+            );
+        }
+        let d_min = members.iter().map(|(_, d, _)| *d).min().unwrap();
+        let d_max = members.iter().map(|(_, d, _)| *d).max().unwrap();
+        // A rule covers a disk range wholesale, so a same-parse file inside
+        // it that the user did *not* select would be silently dragged along
+        // on the next scan.
+        let selected: std::collections::HashSet<usize> =
+            members.iter().map(|(i, _, _)| *i).collect();
+        for (i, f) in files.iter().enumerate() {
+            if selected.contains(&i) || f.title != title || f.season != season {
+                continue;
+            }
+            let (_, _, disk) = reparse(&f.path);
+            if disk.is_some_and(|d| d >= d_min && d <= d_max) {
+                return Err(
+                    "That range overlaps files from another source — correct the files individually"
+                        .into(),
+                );
+            }
+        }
+
+        // A chained split supersedes exactly the disk range it covers: every
+        // overlapped rule is deleted, and whatever part of it lies outside
+        // the new range comes back trimmed, its own mapping intact.
+        for r in existing.iter().filter(|r| {
+            r.title == title && r.season == season && r.ep_from <= d_max && r.ep_to >= d_min
+        }) {
+            plan.delete.push((r.title.clone(), r.season, r.ep_from));
+            if r.ep_from < d_min {
+                plan.insert.push(SplitRule { ep_to: d_min - 1, ..r.clone() });
+            }
+            if r.ep_to > d_max {
+                plan.insert.push(SplitRule {
+                    ep_from: d_max + 1,
+                    dst_start: r.dst_start + (d_max + 1 - r.ep_from),
+                    ..r.clone()
+                });
+            }
+        }
+
+        let e_of_min = members.iter().find(|(_, d, _)| *d == d_min).unwrap().2;
+        plan.insert.push(SplitRule {
+            title,
+            season,
+            ep_from: d_min,
+            ep_to: d_max,
+            media_id: dst_media_id,
+            dst_start: dst_start + (e_of_min - from),
+        });
+        plan.files
+            .extend(members.iter().map(|(i, _, e)| (*i, dst_start + (e - from))));
+    }
+    Ok(plan)
+}
+
+/// Confirms a season split: current-frame episodes `from..=to` of `media_id`
+/// belong to `dst_media_id`, renumbered from `dst_start`.
 ///
 /// Like `set_library_match`, the answer is applied to the in-memory index
-/// immediately — the affected files are re-pointed by *disk* episode number
-/// (recovered by re-parsing their filenames, exactly as `hydrate` does) so a
-/// range that was already split elsewhere cannot be double-shifted. The v11 row
-/// is what makes the next scan agree.
+/// immediately; the v11 rows `plan_redirect` produces are what make the next
+/// scan and the next restart agree.
 #[tauri::command]
 pub fn set_library_redirect(
     app: AppHandle,
-    title: String,
-    season: i32,
-    ep_from: u32,
-    ep_to: u32,
     media_id: i64,
+    from: u32,
+    to: u32,
+    dst_media_id: i64,
     dst_start: u32,
 ) -> Result<Vec<LibraryEntry>, String> {
-    if ep_to < ep_from {
+    if to < from {
         return Err("The episode range is reversed".into());
     }
     let state = app.state::<LibraryIndex>();
@@ -892,22 +1019,22 @@ pub fn set_library_redirect(
     }
 
     let db = app.state::<Db>();
-    db.library_redirect_set(&title, season, ep_from, ep_to, media_id, dst_start)?;
-
+    let existing = redirect_rules(&db);
     let mut guard = state.0.lock().unwrap();
-    for f in &mut guard.files {
-        if f.title != title || f.season != season {
-            continue;
-        }
-        let (_, _, disk) = reparse(&f.path);
-        if let Some(ep) = disk {
-            if ep >= ep_from && ep <= ep_to {
-                f.media_id = Some(media_id);
-                f.episode = ep - ep_from + dst_start;
-                f.score = 1.0;
-                f.manual = true;
-            }
-        }
+    let plan = plan_redirect(&guard.files, &existing, media_id, from, to, dst_media_id, dst_start)?;
+
+    for (title, season, ep_from) in &plan.delete {
+        db.library_redirect_clear(title, *season, *ep_from)?;
+    }
+    for r in &plan.insert {
+        db.library_redirect_set(&r.title, r.season, r.ep_from, r.ep_to, r.media_id, r.dst_start)?;
+    }
+    for (i, episode) in &plan.files {
+        let f = &mut guard.files[*i];
+        f.media_id = Some(dst_media_id);
+        f.episode = *episode;
+        f.score = 1.0;
+        f.manual = true;
     }
     guard.reindex();
     persist(&db, &guard)?;
@@ -1374,6 +1501,112 @@ mod tests {
         );
         assert!(data.by_media[&7].contains_key(&12), "override keeps its side");
         assert!(data.by_media[&2].contains_key(&1), "split takes its range");
+    }
+
+    /// Two successive splits on one folder: the second is keyed on the
+    /// numbers the row *shows* (current frame), and both rules end up in
+    /// disk numbering. The old command's `(title, season, ep_from)` upsert
+    /// silently overwrote the first rule here.
+    #[test]
+    fn a_second_split_keys_on_what_the_row_shows() {
+        let eps: Vec<u32> = (1..=36).collect();
+        let first = {
+            let parsed = parser::parse("Bocchi the Rock - 13.mkv");
+            SplitRule {
+                title: parsed.title.clone(),
+                season: season_key(parsed.season),
+                ep_from: 13,
+                ep_to: 24,
+                media_id: 2,
+                dst_start: 1,
+            }
+        };
+        let data = indexed_full(
+            &bocchi_files(&eps),
+            &bocchi(Some(12)),
+            &HashMap::new(),
+            &[first.clone()],
+            &[],
+        );
+        // After the first split, media 1 shows 1–12 and 25–36 — so the next
+        // overflow the user confirms reads "25–36", in current-frame numbers
+        // that happen to equal disk numbers here.
+        let plan = plan_redirect(&data.files, &[first.clone()], 1, 25, 36, 3, 1)
+            .expect("second split plans");
+        assert!(plan.delete.is_empty(), "the first rule is untouched");
+        assert_eq!(plan.insert.len(), 1);
+        let rule = &plan.insert[0];
+        assert_eq!((rule.ep_from, rule.ep_to, rule.media_id, rule.dst_start), (25, 36, 3, 1));
+        // Disk 25 becomes the third season's episode 1.
+        let renumbered: Vec<u32> = plan.files.iter().map(|(_, e)| *e).collect();
+        assert_eq!(renumbered.iter().min(), Some(&1));
+        assert_eq!(renumbered.iter().max(), Some(&12));
+    }
+
+    /// Splitting the *destination* of an earlier split — the row whose
+    /// current numbers no longer match its filenames. The old command
+    /// re-parsed disk numbers and shifted the wrong twelve files; the plan
+    /// resolves per file and trims the overlapped rule to what it still
+    /// covers.
+    #[test]
+    fn splitting_a_renumbered_row_targets_the_right_files_and_trims() {
+        let eps: Vec<u32> = (1..=36).collect();
+        let parsed = parser::parse("Bocchi the Rock - 13.mkv");
+        let whole = SplitRule {
+            title: parsed.title.clone(),
+            season: season_key(parsed.season),
+            ep_from: 13,
+            ep_to: 36,
+            media_id: 2,
+            dst_start: 1,
+        };
+        let data = indexed_full(
+            &bocchi_files(&eps),
+            &bocchi(Some(12)),
+            &HashMap::new(),
+            &[whole.clone()],
+            &[],
+        );
+        // Media 2 now shows 1–24; its own overflow past 12 reads "13–24" in
+        // current-frame numbers, which live at disk 25–36.
+        let plan = plan_redirect(&data.files, &[whole.clone()], 2, 13, 24, 3, 1)
+            .expect("split of a renumbered row plans");
+        assert_eq!(plan.delete, vec![(whole.title.clone(), whole.season, 13)]);
+        // The overlapped rule comes back trimmed to the half it still covers,
+        // plus the new rule for the moved half — both in disk numbers.
+        let mut ranges: Vec<(u32, u32, i64, u32)> = plan
+            .insert
+            .iter()
+            .map(|r| (r.ep_from, r.ep_to, r.media_id, r.dst_start))
+            .collect();
+        ranges.sort_unstable();
+        assert_eq!(ranges, vec![(13, 24, 2, 1), (25, 36, 3, 1)]);
+        // And the files that move are the disk-25–36 twelve, not disk 13–24.
+        let mut moved: Vec<u32> = plan
+            .files
+            .iter()
+            .map(|(i, _)| reparse(&data.files[*i].path).2.unwrap())
+            .collect();
+        moved.sort_unstable();
+        assert_eq!(moved, (25..=36).collect::<Vec<u32>>());
+    }
+
+    /// Confirming a range that matches nothing is an error the dialog shows,
+    /// never an `Ok` that closes it over an unchanged screen — the exact
+    /// silence the user reported after their third split.
+    #[test]
+    fn a_split_matching_no_files_is_an_error() {
+        let data = indexed_full(
+            &bocchi_files(&[11, 12, 13]),
+            &bocchi(Some(12)),
+            &HashMap::new(),
+            &[],
+            &[],
+        );
+        let err = plan_redirect(&data.files, &[], 999, 13, 24, 3, 1).unwrap_err();
+        assert!(err.contains("nothing to split"), "unexpected error: {err}");
+        let err = plan_redirect(&data.files, &[], 1, 40, 50, 3, 1).unwrap_err();
+        assert!(err.contains("nothing to split"), "unexpected error: {err}");
     }
 
     /// A file with no parseable episode number is skipped, not mis-filed.

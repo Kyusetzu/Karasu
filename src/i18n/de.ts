@@ -611,6 +611,7 @@ export const de: typeof en = {
     splitBecomes: "Episode {{n}} von {{title}}",
     splitApplying: "Wird angewendet …",
     splitConfirm: "Aufteilung bestätigen",
+    splitDone: "Episoden {{from}}–{{to}} zeigen jetzt auf {{title}}.",
     addFailed: "Der Titel konnte nicht zur Liste hinzugefügt werden.",
     pickTitle: "Welcher Titel ist das?",
     parsedAs: 'Aus dem Dateinamen gelesen als „{{title}}“{{season}}',

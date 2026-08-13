@@ -103,24 +103,23 @@ export const clearLibraryMatch = (title: string, season: number) =>
   invoke<LibraryEntry[]>("clear_library_match", { title, season });
 
 /**
- * Confirms a season split: episodes `epFrom..=epTo` of this parse belong to
- * `mediaId`, renumbered from `dstStart`. Persisted (schema v11), so the next
- * scan agrees.
+ * Confirms a season split: the row's episodes `from..=to` — the numbers the
+ * screen shows, whatever earlier splits renumbered them from — belong to
+ * `dstMediaId`, renumbered from `dstStart`. The backend resolves the actual
+ * files and persists disk-keyed rules (schema v11), so the next scan agrees.
  */
 export const setLibraryRedirect = (
-  title: string,
-  season: number,
-  epFrom: number,
-  epTo: number,
   mediaId: number,
+  from: number,
+  to: number,
+  dstMediaId: number,
   dstStart: number,
 ) =>
   invoke<LibraryEntry[]>("set_library_redirect", {
-    title,
-    season,
-    epFrom,
-    epTo,
     mediaId,
+    from,
+    to,
+    dstMediaId,
     dstStart,
   });
 

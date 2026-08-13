@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { ArrowRight, Search as SearchIcon } from "lucide-react";
 import { searchMedia, sequelsOf, type SequelCandidate } from "@/api/queries";
-import type { Overflow, TitleKey } from "@/api/library";
+import type { Overflow } from "@/api/library";
 import { isTauri } from "@/api/anilist";
 import { displayTitle } from "@/api/types";
 import { previewMapping } from "@/lib/seasonSplit";
@@ -30,13 +30,12 @@ import { cn } from "@/lib/utils";
  */
 
 export interface SplitTarget {
-  /** The parse the split will be keyed on. */
-  key: TitleKey;
+  /** The row being split — the command is keyed on it, not on a parse. */
   mediaId: number;
   /** Display title of the currently matched entry. */
   title: string;
   overflow: Overflow;
-  /** Highest on-disk episode in the folder. */
+  /** Highest episode the row shows (current frame, like `firstExtra`). */
   maxEpisode: number;
 }
 
@@ -59,8 +58,9 @@ export function SeasonSplitModal({
   leaving,
 }: {
   target: SplitTarget;
-  /** The page owns the command and the refresh; this hands it the answer. */
-  onConfirm: (mediaId: number, dstStart: number) => void;
+  /** The page owns the command and the refresh; this hands it the answer.
+      The label rides along so the page's success toast can name the show. */
+  onConfirm: (mediaId: number, dstStart: number, label: string) => void;
   onClose: () => void;
   error: string | null;
   pending: boolean;
@@ -248,7 +248,9 @@ export function SeasonSplitModal({
           <Button
             size="sm"
             disabled={!selected || pending}
-            onClick={() => selected && onConfirm(selected.mediaId, selected.dstStart)}
+            onClick={() =>
+              selected && onConfirm(selected.mediaId, selected.dstStart, selected.label)
+            }
           >
             {pending ? t("library.splitApplying") : t("library.splitConfirm")}
           </Button>

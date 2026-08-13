@@ -609,6 +609,7 @@ export const en = {
     splitBecomes: "episode {{n}} of {{title}}",
     splitApplying: "Applying …",
     splitConfirm: "Confirm split",
+    splitDone: "Episodes {{from}}–{{to}} now point at {{title}}.",
     addFailed: "That title couldn't be added to your list.",
     pickTitle: "Which title is this?",
     parsedAs: 'Read from the filename as "{{title}}"{{season}}',

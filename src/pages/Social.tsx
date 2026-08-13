@@ -2,6 +2,7 @@ import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
 import { Users } from "lucide-react";
 import { ActivityFeed } from "@/components/social/ActivityFeed";
+import { ActivityComposer } from "@/components/social/ActivityComposer";
 import { EmptyState, PerchRule } from "@/components/EmptyState";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/stores/auth";
@@ -64,7 +65,8 @@ export default function Social() {
         </Link>
       </header>
 
-      <div className="mt-6">
+      <div className="mt-6 space-y-4">
+        <ActivityComposer />
         <ActivityFeed
           queryKey={["social", "feed", viewer.id]}
           source={{ isFollowing: true }}

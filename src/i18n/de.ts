@@ -672,6 +672,18 @@ export const de: typeof en = {
     posting: "Sende …",
     replyFailed: "Deine Antwort wurde nicht gesendet",
     replyFailedDetail: "Es wurde nichts gesendet, und dein Text steht noch im Feld.",
+    // Composer — siehe CLAUDE.mds zweite Ausnahme
+    composerPlaceholder: "Sag etwas. Strg+Enter sendet.",
+    post: "Senden",
+    posted: "Auf AniList gepostet",
+    postFailed: "Dein Beitrag wurde nicht gesendet",
+    postFailedDetail: "Es wurde nichts gesendet, und dein Text steht noch im Feld.",
+    deletePost: "Löschen",
+    postDeleted: "Beitrag gelöscht",
+    deleteFailed: "Konnte den Beitrag nicht löschen",
+    previewOn: "Vorschau",
+    previewOff: "Bearbeiten",
+    previewEmpty: "Noch nichts für die Vorschau.",
     // Nicht `following` ("Folgt" — der Zustand des Buttons), sondern die Menge
     // der Personen, denen dieser Nutzer folgt.
     tabFollowing: "Gefolgte",

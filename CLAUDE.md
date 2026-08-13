@@ -127,6 +127,34 @@ line only when it differs from the last one under the same key. A plain `debug`
 in `detect_playback` or `media_session::detect` is 17,280 lines a day and
 rotates the interesting part off disk; that is a bug, not a style preference.
 
+**The AniList social surface is the second deliberate exception, also decided by
+the maintainer.** Karasu reads AniList's own activity feed on `/social` and on
+every profile — list activities, text activities, replies and likes — and can
+post a status update through `SaveTextActivity`. That is activity expansion by
+construction. It was raised as a conflict with the line above, the narrower
+read-only option was offered and declined, and the whole surface was kept on
+purpose: this is AniList's data rendered by an AniList client, and a tracker that
+can read a friend's list but cannot show that they finished the show is a worse
+client than the website it replaces. **Do not delete the feed, the composer or
+the activity queries on the strength of the line above.**
+
+What is *not* carved out, and these are the load-bearing half of the exception:
+
+- **No local activity store.** Nothing in SQLite, no schema version, nothing
+  that survives a restart. Every activity on screen came from a
+  `Page.activities` request in this session and goes when the query cache does.
+- **Playback history is still what the rejection means, and is still rejected.**
+  The scrobbler does not write activities, `karasu.log` remains the only record
+  of what detection saw, and nothing correlates the two. A "what did I watch
+  last month" screen built from either is the thing being refused.
+- **`MessageActivity` is never rendered.** It is private mail between two users,
+  and it is excluded three ways — absent from `type_in`, given no inline
+  fragment, and normalised to null with a test that says so.
+- **Paging is user-initiated by design.** A feed that fetches on scroll spends a
+  ~30/min budget shared with the scrobbler and the alert passes without anyone
+  asking it to, and the limiter cannot see a burst it has not sent. Every page
+  past the first is a button; see the Conventions note.
+
 Read *volumes* (`progressVolumes`) is not on this list and never was — it is one
 of AniList's own list fields, it costs nothing to carry, and the local list has
 stored it since schema v7. The rejected idea is tracking **purchases**, which

@@ -509,3 +509,52 @@ export async function toggleFollow(userId: number): Promise<ToggleFollowResult> 
   );
   return data.ToggleFollow;
 }
+
+/**
+ * Post a status update.
+ *
+ * This mutation is the reason CLAUDE.md's rejected-features section carries a
+ * second carve-out — read it before removing anything here.
+ *
+ * Returns the created activity in the same shape `ACTIVITY_QUERY` produces, so
+ * the new post can be pushed straight onto the front of the cached feed rather
+ * than triggering a refetch of a page that has just changed underneath.
+ */
+export const SAVE_TEXT_ACTIVITY_MUTATION = `
+mutation ($text: String!) {
+  SaveTextActivity(text: $text) {
+    id text createdAt likeCount isLiked replyCount siteUrl
+    user { ${SOCIAL_USER} }
+  }
+}`;
+
+export interface SavedTextActivity {
+  id: number;
+  text: string | null;
+  createdAt: number;
+  likeCount: number | null;
+  isLiked: boolean | null;
+  replyCount: number | null;
+  siteUrl: string | null;
+  user: SocialUser | null;
+}
+
+export async function saveTextActivity(text: string): Promise<SavedTextActivity> {
+  const data = await gql<{ SaveTextActivity: SavedTextActivity }>(
+    SAVE_TEXT_ACTIVITY_MUTATION,
+    { text },
+  );
+  return data.SaveTextActivity;
+}
+
+/** Deleting is the only way back — AniList has no edit for a text activity. */
+export const DELETE_ACTIVITY_MUTATION = `
+mutation ($id: Int!) { DeleteActivity(id: $id) { deleted } }`;
+
+export async function deleteActivity(id: number): Promise<boolean> {
+  const data = await gql<{ DeleteActivity: { deleted: boolean } }>(
+    DELETE_ACTIVITY_MUTATION,
+    { id },
+  );
+  return data.DeleteActivity?.deleted === true;
+}

@@ -666,6 +666,18 @@ export const en = {
     posting: "Posting …",
     replyFailed: "Your reply wasn't posted",
     replyFailedDetail: "Nothing was sent, and what you wrote is still in the box.",
+    // Composer — see CLAUDE.md's second carve-out
+    composerPlaceholder: "Say something. Ctrl+Enter to post.",
+    post: "Post",
+    posted: "Posted to AniList",
+    postFailed: "Your post wasn't sent",
+    postFailedDetail: "Nothing was sent, and what you wrote is still in the box.",
+    deletePost: "Delete",
+    postDeleted: "Post deleted",
+    deleteFailed: "Couldn't delete that post",
+    previewOn: "Preview",
+    previewOff: "Edit",
+    previewEmpty: "Nothing to preview yet.",
     // Distinct from `following`, which is the button's *state* ("you follow
     // them"). This is the set of people *they* follow. Identical in English,
     // "Folgt" vs "Gefolgte" in German.

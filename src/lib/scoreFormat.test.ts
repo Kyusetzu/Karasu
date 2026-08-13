@@ -45,6 +45,16 @@ describe("toRaw", () => {
     expect(toRaw("POINT_3", 3)).toBe(85);
   });
 
+  it("the same rating is raw-equal across formats — what the sign-in merge compares on", () => {
+    // A local 6/10 against an online 😐 on a POINT_3 account is one rating,
+    // not a conflict; likewise ★8 against 80 on a POINT_100 account.
+    expect(toRaw("POINT_10", 6)).toBe(toRaw("POINT_3", 2));
+    expect(toRaw("POINT_10", 8)).toBe(toRaw("POINT_100", 80));
+    expect(toRaw("POINT_10", 8)).toBe(toRaw("POINT_5", 4));
+    // And a genuinely different rating still conflicts.
+    expect(toRaw("POINT_10", 8)).not.toBe(toRaw("POINT_100", 90));
+  });
+
   it("zero means unscored and stays zero in every format", () => {
     for (const f of SCORE_FORMATS) {
       expect(toRaw(f, 0), f).toBe(0);

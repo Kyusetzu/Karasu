@@ -4,10 +4,12 @@ import { useTranslation } from "react-i18next";
 import {
   anilistFetchList,
   anilistSaveEntry,
+  currentScoreFormat,
   localAllEntries,
   localClearEntry,
   type LocalEntryRow,
 } from "@/api/anilist";
+import { toRaw } from "@/lib/scoreFormat";
 import { displayTitle, type MediaListGroup } from "@/api/types";
 import { useAuth } from "@/stores/auth";
 import { Button } from "@/components/ui/button";
@@ -69,11 +71,16 @@ export default function SignInMerge() {
 
   const isConflict = (r: LocalEntryRow) => {
     const o = online.get(r.mediaId);
+    // Scores compare on the raw hundred-point scale, because the two sides
+    // speak different dialects: the local list is ten-point by design, the
+    // online one arrives in the *account's* format — a local ★8 against an
+    // online 80 on a POINT_100 account is the same rating, not a conflict.
+    // (The connect flow seeds the format cache before this dialog mounts.)
     return (
       !!o &&
       (o.status !== r.status ||
         o.progress !== r.progress ||
-        o.score !== r.score)
+        toRaw(currentScoreFormat(), o.score) !== toRaw("POINT_10", r.score))
     );
   };
   const conflicts = rows.filter(isConflict);

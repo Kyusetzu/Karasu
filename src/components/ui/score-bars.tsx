@@ -56,7 +56,7 @@ export function ScoreBars({
               onChange(Math.max(0, Math.min(max, Math.round(raw * factor) / factor)));
             }}
             aria-label={t("common.score")}
-            className="h-8 w-24 rounded-md border border-surface-700 bg-surface-950 px-2 text-sm tabular-nums text-gold focus:border-accent-500 focus:outline-none"
+            className="h-8 w-24 rounded-md border border-surface-700 bg-surface-950 px-2 text-sm tabular-nums text-gold focus:border-accent-500 focus:outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
           />
           <span className="text-xs text-ink-600">/ {max}</span>
         </div>

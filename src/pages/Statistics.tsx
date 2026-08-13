@@ -641,6 +641,7 @@ function RatingsView({
           title={t("stats.scoreDist")}
           hint={t("stats.scoreDistHint")}
           data={scores.map((d: Distribution) => ({ score: d.score ?? 0, count: d.count }))}
+          max={scoreMax}
         />
         {/* Pinned to the full scale, or a 7.1 next to a 7.4 reads as a
             landslide. */}

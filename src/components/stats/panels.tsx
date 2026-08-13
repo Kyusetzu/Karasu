@@ -1,37 +1,38 @@
 import { Card, CardTitle } from "@/components/ui/card";
 import { TONES } from "@/components/stats/Charts";
+import { distributionColumns } from "@/lib/score";
 import { cn } from "@/lib/utils";
 /**
- * Score distribution as ten columns.
+ * Score distribution as one column per step of the account's scale.
  *
  * Vertical rather than the horizontal bars everything else uses, because the
- * axis is the score itself and it runs 1–10 whether or not every step has
- * entries. 8–10 take the accent: the shape of the tail is the interesting
- * part — whether you are a generous scorer — and colour says it faster than
- * reading the counts.
+ * axis is the score itself and it runs the full scale whether or not every
+ * step has entries. The top quarter takes the accent: the shape of the tail
+ * is the interesting part — whether you are a generous scorer — and colour
+ * says it faster than reading the counts.
+ *
+ * The axis comes from `max` (the display scale's top) rather than being
+ * inferred from the data — the bucketing rules, and why they are not
+ * defensive paranoia, live with `distributionColumns`.
  */
 export function ScoreColumns({
   title,
   hint,
   data,
+  max,
 }: {
   title: string;
   hint: string;
   data: { score: number; count: number }[];
+  /** The display scale's top, from `scoreScale(format).max`. */
+  max: number;
 }) {
-  if (data.length === 0) return null;
-  const by = new Map(data.map((d) => [d.score, d.count]));
-  // AniList lets a user score on 3, 5, 10 or 100 points and the payload only
-  // carries the buckets in use, so the axis is inferred from the highest one:
-  // a five-point list must not be drawn as half of a ten-column chart, and a
-  // hundred-point list must not be drawn as a hundred columns.
-  const top = Math.max(...data.map((d) => d.score), 0);
-  const scale = top <= 3 ? 3 : top <= 5 ? 5 : top <= 10 ? 10 : 0;
-  const steps = scale
-    ? Array.from({ length: scale }, (_, i) => i + 1)
-    : data.map((d) => d.score);
-  const max = Math.max(...data.map((d) => d.count), 1);
-  const high = Math.max(...steps) * 0.75;
+  const columns = distributionColumns(data, max);
+  if (columns.length === 0) return null;
+  const peak = Math.max(...columns.map((c) => c.count), 1);
+  // Accent when step >= 0.75 × the scale's top — 8–10 on ten, 80–100 on
+  // the hundred-point deciles.
+  const high = columns[columns.length - 1].step * 0.75;
 
   return (
     <Card className="flex h-full flex-col">
@@ -47,8 +48,7 @@ export function ScoreColumns({
           label slots top and bottom — otherwise it would be the thing that
           broke the shared baseline. */}
       <div className="mt-4 flex flex-1 items-stretch gap-1.75">
-        {steps.map((step) => {
-          const count = by.get(step) ?? 0;
+        {columns.map(({ step, count }) => {
           return (
             <div key={step} className="flex flex-1 flex-col items-center gap-1">
               {/* Fixed height, not `{count || ""}` alone: an empty span is a
@@ -79,7 +79,7 @@ export function ScoreColumns({
                   )}
                   // A count of zero still draws a hairline, so the gap reads as
                   // "none at this score" rather than as a missing column.
-                  style={{ height: `${Math.max((count / max) * 100, 1)}%` }}
+                  style={{ height: `${Math.max((count / peak) * 100, 1)}%` }}
                 />
               </div>
               <span className="h-3 text-2xs leading-3 tabular-nums text-ink-500">

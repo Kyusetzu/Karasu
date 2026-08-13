@@ -55,13 +55,15 @@ export function Row({
 /**
  * "This one changes your AniList account, not Karasu."
  *
- * Karasu deliberately overrides four of AniList's own account settings —
- * it forces a ten-point score format on every read and write, keeps its own
- * display-title preference, runs its own content filter, and raises its own
- * airing alerts. Editing those on the account is still legitimate: they are the
- * user's settings and other clients honour them. But a settings row that
- * appears to do nothing is a bug report waiting to happen, so each one says
- * plainly where its effect lands.
+ * Karasu deliberately overrides three of AniList's own account settings —
+ * it keeps its own display-title preference, runs its own content filter,
+ * and raises its own airing alerts. (Score format used to be the fourth;
+ * since the scoreRaw change the whole app follows the account's format, so
+ * that row simply works and carries no note.) Editing the three on the
+ * account is still legitimate: they are the user's settings and other
+ * clients honour them. But a settings row that appears to do nothing is a
+ * bug report waiting to happen, so each one says plainly where its effect
+ * lands.
  *
  * Gold, not danger: nothing is broken and nothing is at risk. It is a caveat,
  * and `NowPlayingCard` already established gold as this app's caveat colour.

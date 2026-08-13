@@ -2,10 +2,12 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import {
   bulkSaveEntries,
+  currentScoreFormat,
   deleteListEntry,
   saveListEntry,
   type BulkPatch,
 } from "@/api/anilist";
+import { formatScore } from "@/lib/scoreFormat";
 import type {
   ListResult,
   MediaListEntry,
@@ -58,7 +60,13 @@ export function useListMutations(userId: number, mediaType: MediaType) {
           status: t(`status.${mediaType}.${head.value as string}`),
         });
       case "score":
-        return t("receipt.score", { title, n: head.value as number });
+        // Rendered, not interpolated raw: a smiley account should read
+        // "scored 🙂", not "scored 2", and a decimal one keeps its ".0".
+        // Local mode's cache holds POINT_10, matching its controls.
+        return t("receipt.score", {
+          title,
+          n: formatScore(currentScoreFormat(), head.value as number),
+        });
       default:
         return t("receipt.saved", { title });
     }

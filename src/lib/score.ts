@@ -51,6 +51,55 @@ export function normalizeDistribution(
     .map(([score, count]) => ({ score, count }));
 }
 
+/**
+ * The columns the score-distribution chart draws, `max` being the display
+ * scale's top (`scoreScale(format).max`).
+ *
+ * The payload only carries the buckets in use, and possibly in fractions
+ * (a POINT_10_DECIMAL account can hold an 8.5 bucket) — so exact-matching
+ * integer steps drew an empty chart for those accounts. Counts are
+ * aggregated instead: rounded onto integer steps for scales up to ten, and
+ * onto ten decile columns for the hundred-point scale, which must not be
+ * drawn as a hundred columns.
+ *
+ * Rules that look defensive and are not:
+ * - a `score <= 0` bucket is "unscored", not a low score — dropped, never
+ *   clamped into column 1;
+ * - a bucket *above* `max` means the cached payload predates a format
+ *   change; the data wins over the prop (escalate to deciles) because
+ *   clamping would pile 11–100 into one bar and dropping would blank the
+ *   chart. The reverse staleness is undetectable from the data alone and
+ *   self-heals on refetch.
+ *
+ * Every step is returned, zero counts included — a gap must read as "none
+ * at this score", not as a missing column.
+ */
+export function distributionColumns(
+  data: { score?: number | null; count: number }[],
+  max: number,
+): { step: number; count: number }[] {
+  const scored = data.filter((d) => (d.score ?? 0) > 0);
+  if (scored.length === 0) return [];
+  if (scored.some((d) => (d.score as number) > max)) max = 100;
+
+  const decile = max > 10;
+  const width = decile ? 10 : 1;
+  const stepOf = (s: number) =>
+    decile
+      ? Math.min(100, Math.ceil(s / 10) * 10)
+      : Math.max(1, Math.min(max, Math.round(s)));
+
+  const counts = new Map<number, number>();
+  for (const d of scored) {
+    const step = stepOf(d.score as number);
+    counts.set(step, (counts.get(step) ?? 0) + d.count);
+  }
+  return Array.from({ length: decile ? 10 : max }, (_, i) => {
+    const step = (i + 1) * width;
+    return { step, count: counts.get(step) ?? 0 };
+  });
+}
+
 /** Every ranked-category key a `userStatistics` block can carry. */
 const RANKED_KEYS = [
   "genres",

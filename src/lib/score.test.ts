@@ -1,5 +1,96 @@
 import { describe, expect, it } from "vitest";
-import { normalizeDistribution, normalizeStatsBlock, toDisplayScale } from "./score";
+import {
+  distributionColumns,
+  normalizeDistribution,
+  normalizeStatsBlock,
+  toDisplayScale,
+} from "./score";
+
+describe("distributionColumns", () => {
+  it("draws every step of the scale, zero counts included", () => {
+    const out = distributionColumns(
+      [
+        { score: 7, count: 3 },
+        { score: 10, count: 1 },
+      ],
+      10,
+    );
+    expect(out).toHaveLength(10);
+    expect(out[0]).toEqual({ step: 1, count: 0 });
+    expect(out[6]).toEqual({ step: 7, count: 3 });
+    expect(out[9]).toEqual({ step: 10, count: 1 });
+  });
+
+  it("a five-point scale is five columns, not half of ten", () => {
+    const out = distributionColumns([{ score: 4, count: 2 }], 5);
+    expect(out.map((c) => c.step)).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it("fractional buckets aggregate onto integer steps instead of vanishing", () => {
+    // A POINT_10_DECIMAL account holds 8.5 buckets; exact-matching integer
+    // steps drew this chart empty.
+    const out = distributionColumns(
+      [
+        { score: 8.5, count: 4 },
+        { score: 9, count: 2 },
+        { score: 7.4, count: 1 },
+      ],
+      10,
+    );
+    expect(out[8]).toEqual({ step: 9, count: 6 }); // 8.5 rounds half-up
+    expect(out[6]).toEqual({ step: 7, count: 1 });
+  });
+
+  it("an unscored bucket is dropped, never misfiled as a 1", () => {
+    const out = distributionColumns(
+      [
+        { score: 0, count: 99 },
+        { score: null, count: 7 },
+        { score: 2, count: 1 },
+      ],
+      10,
+    );
+    expect(out[0]).toEqual({ step: 1, count: 0 });
+    expect(out[1]).toEqual({ step: 2, count: 1 });
+  });
+
+  it("a hundred-point scale becomes ten deciles, not a hundred columns", () => {
+    const out = distributionColumns(
+      [
+        { score: 85, count: 4 },
+        { score: 90, count: 2 },
+        { score: 5, count: 1 },
+        { score: 100, count: 3 },
+      ],
+      100,
+    );
+    expect(out).toHaveLength(10);
+    expect(out.map((c) => c.step)).toEqual([10, 20, 30, 40, 50, 60, 70, 80, 90, 100]);
+    expect(out[8]).toEqual({ step: 90, count: 6 }); // 85 and 90 share a decile
+    expect(out[0]).toEqual({ step: 10, count: 1 });
+    expect(out[9]).toEqual({ step: 100, count: 3 });
+  });
+
+  it("data above the stated max escalates to deciles — the payload outranks the prop", () => {
+    // A cached hundred-point distribution just after switching to POINT_10:
+    // clamping would pile 11–100 into one bar, dropping would blank the chart.
+    const out = distributionColumns(
+      [
+        { score: 85, count: 4 },
+        { score: 7, count: 2 },
+      ],
+      10,
+    );
+    expect(out).toHaveLength(10);
+    expect(out[8]).toEqual({ step: 90, count: 4 });
+    expect(out[0]).toEqual({ step: 10, count: 2 });
+  });
+
+  it("has nothing to draw for an empty or all-unscored payload", () => {
+    expect(distributionColumns([], 10)).toEqual([]);
+    expect(distributionColumns([{ score: 0, count: 5 }], 10)).toEqual([]);
+  });
+});
 
 describe("toDisplayScale", () => {
   it("brings AniList's hundred-point statistics onto the display scale", () => {

@@ -25,7 +25,7 @@ export interface RawRecommendation {
 
 export interface SeedEntry {
   mediaId: number;
-  /** POINT_10; 0 means unscored. */
+  /** In the account's display units; 0 means unscored. */
   score: number;
 }
 

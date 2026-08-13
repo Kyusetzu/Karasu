@@ -19,6 +19,21 @@ export interface TitleKey {
   manual?: boolean;
 }
 
+/** The community rules' answer for an overflow, offered but never applied. */
+export interface SplitHint {
+  mediaId: number;
+  dstStart: number;
+}
+
+/** A folder holding more episodes than its matched entry has. */
+export interface Overflow {
+  knownEpisodes: number;
+  extraFiles: number;
+  /** First on-disk episode past the known count. */
+  firstExtra: number;
+  hint?: SplitHint;
+}
+
 export interface LibraryEntry {
   mediaId: number;
   episodes: number[];
@@ -29,6 +44,8 @@ export interface LibraryEntry {
   sources: TitleKey[];
   /** Placed by the user rather than the matcher — no confidence to report. */
   manual: boolean;
+  /** Present when the folder overflows the entry — the season-split card's facts. */
+  overflow?: Overflow;
 }
 
 /** Files that parsed to a title the matcher could not place. */
@@ -84,6 +101,31 @@ export const setLibraryMatch = (title: string, season: number, mediaId: number) 
 
 export const clearLibraryMatch = (title: string, season: number) =>
   invoke<LibraryEntry[]>("clear_library_match", { title, season });
+
+/**
+ * Confirms a season split: episodes `epFrom..=epTo` of this parse belong to
+ * `mediaId`, renumbered from `dstStart`. Persisted (schema v11), so the next
+ * scan agrees.
+ */
+export const setLibraryRedirect = (
+  title: string,
+  season: number,
+  epFrom: number,
+  epTo: number,
+  mediaId: number,
+  dstStart: number,
+) =>
+  invoke<LibraryEntry[]>("set_library_redirect", {
+    title,
+    season,
+    epFrom,
+    epTo,
+    mediaId,
+    dstStart,
+  });
+
+export const clearLibraryRedirect = (title: string, season: number, epFrom: number) =>
+  invoke<LibraryEntry[]>("clear_library_redirect", { title, season, epFrom });
 export const playNext = (mediaId: number) =>
   invoke<void>("play_next", { mediaId });
 export const playEpisode = (mediaId: number, episode: number) =>

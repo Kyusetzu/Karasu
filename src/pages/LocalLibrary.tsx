@@ -24,12 +24,14 @@ import {
   scanLibrary,
   setLibraryMatch,
   setLibraryPath,
+  setLibraryRedirect,
   type LibraryEntry,
   type LibraryFile,
   type TitleKey,
   type UnmatchedGroup,
 } from "@/api/library";
 import MatchPicker from "@/components/overlays/MatchPicker";
+import { SeasonSplitModal, type SplitTarget } from "@/components/overlays/SeasonSplitModal";
 import { useAuth } from "@/stores/auth";
 import { useLibrary } from "@/stores/library";
 import { showToast } from "@/stores/toast";
@@ -308,6 +310,37 @@ function LibraryView({ userId }: { userId: number }) {
     [refresh, refetchStatus, refetchUnmatched, t],
   );
 
+  // The season-split card: which overflowing row it is open on, and its own
+  // error line — the same reasoning as `correctError`, the reason belongs *in*
+  // the dialog that stays mounted over everything else.
+  const [splitting, setSplitting] = useState<SplitTarget | null>(null);
+  const [splitError, setSplitError] = useState<string | null>(null);
+  const [splitPending, setSplitPending] = useState(false);
+  const applySplit = useCallback(
+    async (mediaId: number, dstStart: number) => {
+      if (!splitting) return;
+      setSplitError(null);
+      setSplitPending(true);
+      try {
+        await setLibraryRedirect(
+          splitting.key.title,
+          splitting.key.season,
+          splitting.overflow.firstExtra,
+          splitting.maxEpisode,
+          mediaId,
+          dstStart,
+        );
+        setSplitting(null);
+        await Promise.all([refresh(), refetchStatus(), refetchUnmatched()]);
+      } catch (e) {
+        setSplitError(typeof e === "string" ? e : t("library.correctFailed"));
+      } finally {
+        setSplitPending(false);
+      }
+    },
+    [splitting, refresh, refetchStatus, refetchUnmatched, t],
+  );
+
   const applyMatch = useCallback(
     (mediaId: number) =>
       runCorrection(() =>
@@ -469,6 +502,7 @@ function LibraryView({ userId }: { userId: number }) {
               rows={ready}
               onCorrect={setEditing}
               onAdd={addToList}
+              onSplit={setSplitting}
             />
             <Group
               label={t("library.upToDate")}
@@ -476,6 +510,7 @@ function LibraryView({ userId }: { userId: number }) {
               muted
               onCorrect={setEditing}
               onAdd={addToList}
+              onSplit={setSplitting}
             />
             <DetectedOffList
               rows={offListRows}
@@ -485,6 +520,7 @@ function LibraryView({ userId }: { userId: number }) {
               onAdd={addToList}
               onConfirm={confirmSuggestion}
               onReject={(key) => setEditing({ key, hasOverride: false })}
+              onSplit={setSplitting}
             />
             <Unplaced
               groups={failed}
@@ -511,6 +547,22 @@ function LibraryView({ userId }: { userId: number }) {
           />
         )}
       </Presence>
+
+      <Presence value={splitting}>
+        {(target, leaving) => (
+          <SeasonSplitModal
+            leaving={leaving}
+            target={target}
+            error={splitError}
+            pending={splitPending}
+            onConfirm={applySplit}
+            onClose={() => {
+              setSplitError(null);
+              setSplitting(null);
+            }}
+          />
+        )}
+      </Presence>
     </div>
   );
 }
@@ -533,6 +585,7 @@ function DetectedOffList({
   onAdd,
   onConfirm,
   onReject,
+  onSplit,
 }: {
   rows: Row[];
   suggestions: UnmatchedGroup[];
@@ -541,6 +594,7 @@ function DetectedOffList({
   onAdd: (media: Media) => void;
   onConfirm: (key: TitleKey, mediaId: number) => void;
   onReject: (key: TitleKey) => void;
+  onSplit: (t: SplitTarget) => void;
 }) {
   const { t } = useTranslation();
   if (rows.length === 0 && suggestions.length === 0) return null;
@@ -561,6 +615,7 @@ function DetectedOffList({
             muted={false}
             onCorrect={onCorrect}
             onAdd={onAdd}
+            onSplit={onSplit}
           />
         ))}
         {suggestions.map((group) => (
@@ -775,12 +830,14 @@ function Group({
   muted = false,
   onCorrect,
   onAdd,
+  onSplit,
 }: {
   label: string;
   rows: Row[];
   muted?: boolean;
   onCorrect: (c: Correction) => void;
   onAdd: (media: Media) => void;
+  onSplit: (t: SplitTarget) => void;
 }) {
   if (rows.length === 0) return null;
   return (
@@ -796,6 +853,7 @@ function Group({
             muted={muted}
             onCorrect={onCorrect}
             onAdd={onAdd}
+            onSplit={onSplit}
           />
         ))}
       </div>
@@ -810,11 +868,13 @@ function LibraryRow({
   muted,
   onCorrect,
   onAdd,
+  onSplit,
 }: {
   row: Row;
   muted: boolean;
   onCorrect: (c: Correction) => void;
   onAdd: (media: Media) => void;
+  onSplit: (t: SplitTarget) => void;
 }) {
   const { t } = useTranslation();
   const playEpisode = useLibrary((s) => s.playEpisode);
@@ -894,6 +954,31 @@ function LibraryRow({
           {t("library.fileCount", { n: lib.files.length })}
           <ChevronDown className={cn("size-3 transition-transform", open && "rotate-180")} />
         </button>
+
+        {/* The folder holds more than the show: almost always the next season
+            under one folder name. Detection is the scanner's; the decision is
+            the user's — this chip opens the split card, nothing more. */}
+        {lib.overflow && source && (
+          <button
+            type="button"
+            onClick={() =>
+              onSplit({
+                key: source,
+                mediaId: lib.mediaId,
+                title,
+                overflow: lib.overflow!,
+                maxEpisode: lib.episodes[lib.episodes.length - 1] ?? lib.overflow!.firstExtra,
+              })
+            }
+            title={t("library.overflowHint")}
+            className="shrink-0 rounded-md border border-gold/40 bg-gold/10 px-1.5 py-1 text-2xs tabular-nums text-gold transition-surface hover:bg-gold/20"
+          >
+            {t("library.overflowChip", {
+              files: lib.episodes.length,
+              episodes: lib.overflow.knownEpisodes,
+            })}
+          </button>
+        )}
 
         {/* The match, and the way to disagree with it. A confidence the user
             cannot act on is just a number; the button is what makes saying

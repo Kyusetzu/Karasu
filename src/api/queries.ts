@@ -173,6 +173,64 @@ export async function airingWeek(gt: number, lt: number): Promise<AiringSlot[]> 
   return out;
 }
 
+// --- Sequels ----------------------------------------------------------------
+
+/**
+ * The direct relations of one title, slim — the season-split card's candidate
+ * list. One request per card opened, on demand; the franchise page's BFS is
+ * the wrong tool for "what comes after this", which is one hop by definition.
+ */
+export const SEQUELS_QUERY = `
+query ($id: Int!) {
+  Media(id: $id) {
+    id
+    relations {
+      edges {
+        relationType
+        node {
+          id
+          title { romaji english native }
+          coverImage { large }
+          format
+          episodes
+          status
+          isAdult
+          genres
+          startDate { year }
+        }
+      }
+    }
+  }
+}`;
+
+export interface SequelCandidate {
+  id: number;
+  title: MediaTitle;
+  coverImage: { large: string | null };
+  format: string | null;
+  episodes: number | null;
+  status: string | null;
+  /** For `isBlocked` — relations take no `isAdult` argument. */
+  isAdult: boolean | null;
+  genres: string[] | null;
+  startDate: { year: number | null } | null;
+}
+
+/** SEQUEL edges of `id`, oldest first — the natural "next season" order. */
+export async function sequelsOf(id: number): Promise<SequelCandidate[]> {
+  const data = await gql<{
+    Media: {
+      relations: {
+        edges: { relationType: string | null; node: SequelCandidate | null }[];
+      } | null;
+    } | null;
+  }>(SEQUELS_QUERY, { id });
+  return (data.Media?.relations?.edges ?? [])
+    .filter((e) => e.relationType === "SEQUEL" && e.node)
+    .map((e) => e.node!)
+    .sort((a, b) => (a.startDate?.year ?? 9999) - (b.startDate?.year ?? 9999));
+}
+
 // --- Media by id -----------------------------------------------------------
 
 const MEDIA_BY_IDS_QUERY = `

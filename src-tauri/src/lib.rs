@@ -304,6 +304,8 @@ pub fn run() {
             library::get_library_unmatched,
             library::set_library_match,
             library::clear_library_match,
+            library::set_library_redirect,
+            library::clear_library_redirect,
             library::play_next,
             library::play_episode,
         ])

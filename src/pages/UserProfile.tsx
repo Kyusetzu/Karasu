@@ -1,7 +1,8 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams, useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
-import { Ban, UserRound } from "lucide-react";
+import { Ban, Pencil, UserRound } from "lucide-react";
 import {
   followCounts,
   followers,
@@ -19,9 +20,13 @@ import { CoverOutline, EmptyState, PerchRule, StruckQuery } from "@/components/E
 import { Shimmer } from "@/components/Skeleton";
 import { SectionHeader } from "@/components/ui/section-header";
 import { Button } from "@/components/ui/button";
+import { Avatar } from "@/components/ui/user-lockup";
+import { PresenceIf } from "@/components/ui/presence";
+import { FavouritesModal } from "@/components/overlays/FavouritesModal";
 import { useAuth } from "@/stores/auth";
 import { useContentFilter } from "@/stores/contentFilter";
 import { isBlocked } from "@/lib/contentFilter";
+import { isSelf } from "@/lib/follows";
 import { displayTitle } from "@/api/types";
 import { cn } from "@/lib/utils";
 
@@ -247,26 +252,44 @@ function Tabbed({ user }: { user: UserProfileData }) {
 function Favourites({ user }: { user: UserProfileData }) {
   const { t } = useTranslation();
   const level = useContentFilter((s) => s.level);
+  const viewer = useAuth((s) => s.viewer);
+  const self = isSelf(viewer?.id, user.id);
+  const [editing, setEditing] = useState(false);
 
   // The filter has to run on other people's content too, and `favourites` takes
   // no `isAdult` argument, so it can only happen here.
   const anime = (user.favourites?.anime?.nodes ?? []).filter((m) => !isBlocked(m, level));
   const manga = (user.favourites?.manga?.nodes ?? []).filter((m) => !isBlocked(m, level));
+  const characters = user.favourites?.characters?.nodes ?? [];
+  const staff = user.favourites?.staff?.nodes ?? [];
+  const studios = user.favourites?.studios?.nodes ?? [];
 
-  // This is a whole tab now, so "nothing here" has to say so. Returning null
-  // was fine when favourites were one section among several; as a tab body it
-  // renders an empty page that reads as a failure.
-  if (!anime.length && !manga.length) {
-    return (
-      <EmptyState
-        visual={<CoverOutline />}
-        title={t("social.noFavourites", { name: user.name })}
-      />
-    );
-  }
+  const empty =
+    !anime.length && !manga.length && !characters.length && !staff.length && !studios.length;
+
+  const editButton = self ? (
+    <div className="flex justify-end">
+      <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+        <Pencil className="size-3.5" />
+        {t("social.editFavourites")}
+      </Button>
+    </div>
+  ) : null;
 
   return (
     <div className="space-y-6">
+      {editButton}
+
+      {/* This is a whole tab now, so "nothing here" has to say so. Returning
+          null was fine when favourites were one section among several; as a tab
+          body it renders an empty page that reads as a failure. */}
+      {empty && (
+        <EmptyState
+          visual={<CoverOutline />}
+          title={t("social.noFavourites", { name: user.name })}
+        />
+      )}
+
       {([
         ["anime", anime],
         ["manga", manga],
@@ -306,6 +329,64 @@ function Favourites({ user }: { user: UserProfileData }) {
           </section>
         ) : null,
       )}
+
+      {/* People, as the character/staff strips the person pages already draw. */}
+      {([
+        ["characters", characters, "/character"],
+        ["staff", staff, "/staff"],
+      ] as const).map(([kind, list, base]) =>
+        list.length ? (
+          <section key={kind} className="space-y-3">
+            <SectionHeader
+              icon={UserRound}
+              title={kind === "characters" ? t("social.favCharacters") : t("social.favStaff")}
+              meta={String(list.length)}
+            />
+            <div className="flex gap-3 overflow-x-auto pb-2">
+              {list.map((p) => (
+                <Link key={p.id} to={`${base}/${p.id}`} className="w-20 shrink-0 text-center">
+                  <Avatar src={p.image?.medium} name={p.name.full ?? ""} size="2xl" />
+                  <p className="mt-1.5 line-clamp-2 text-2xs leading-snug text-ink-500">
+                    {p.name.full}
+                  </p>
+                </Link>
+              ))}
+            </div>
+          </section>
+        ) : null,
+      )}
+
+      {studios.length > 0 && (
+        <section className="space-y-3">
+          <SectionHeader
+            icon={UserRound}
+            title={t("social.favStudios")}
+            meta={String(studios.length)}
+          />
+          <div className="flex flex-wrap gap-1.5">
+            {studios.map((s) => (
+              <Link
+                key={s.id}
+                to={`/studio/${s.id}`}
+                className="rounded-lg border border-surface-700 px-2.5 py-1.5 text-xs text-ink-300 transition-surface hover:border-surface-600 hover:text-ink-100"
+              >
+                {s.name}
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Through `PresenceIf` so the dialog can animate out. */}
+      <PresenceIf when={editing}>
+        {(leaving) => (
+          <FavouritesModal
+            userId={user.id}
+            onClose={() => setEditing(false)}
+            leaving={leaving}
+          />
+        )}
+      </PresenceIf>
     </div>
   );
 }

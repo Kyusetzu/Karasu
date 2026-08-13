@@ -132,7 +132,22 @@ export interface UserProfile {
   favourites: {
     anime: { nodes: SocialMedia[] } | null;
     manga: { nodes: SocialMedia[] } | null;
+    characters: { nodes: FavPerson[] } | null;
+    staff: { nodes: FavPerson[] } | null;
+    studios: { nodes: FavStudio[] } | null;
   } | null;
+}
+
+/** A favourited character or staff member — a disc and a name. */
+export interface FavPerson {
+  id: number;
+  name: { full: string | null };
+  image: { medium: string | null } | null;
+}
+
+export interface FavStudio {
+  id: number;
+  name: string | null;
 }
 
 /**
@@ -191,6 +206,9 @@ query ($name: String, $id: Int) {
     favourites {
       anime(perPage: 12) { nodes { ${SOCIAL_MEDIA} } }
       manga(perPage: 12) { nodes { ${SOCIAL_MEDIA} } }
+      characters(perPage: 12) { nodes { id name { full } image { medium } } }
+      staff(perPage: 12) { nodes { id name { full } image { medium } } }
+      studios(perPage: 12) { nodes { id name } }
     }
   }
 }`;
@@ -914,10 +932,6 @@ export async function forumThreads(vars: ForumQuery, page = 1): Promise<ThreadPa
  * own cache from the fact that the call succeeded rather than from the response.
  * That is the one place in this file where the optimistic value is also the
  * final value.
- *
- * `UpdateFavouriteOrder` exists too and is deliberately not wired: reordering is
- * a drag-and-drop surface for marginal value, and it takes whole id arrays,
- * which is the same replace-the-set hazard as `customLists`.
  */
 export const TOGGLE_FAVOURITE_MUTATION = `
 mutation ($animeId: Int, $mangaId: Int, $characterId: Int, $staffId: Int, $studioId: Int) {
@@ -944,6 +958,149 @@ const FAV_ARG: Record<FavouriteKind, string> = {
 
 export async function toggleFavourite(kind: FavouriteKind, id: number): Promise<void> {
   await gql<unknown>(TOGGLE_FAVOURITE_MUTATION, { [FAV_ARG[kind]]: id });
+}
+
+/**
+ * Every favourite of every kind, for the reorder modal.
+ *
+ * All five connections share one page counter: an exhausted kind returns an
+ * empty page while a longer one keeps going, and the request count is the
+ * *longest* kind's page count instead of five separate sweeps — one request
+ * for the common case of fewer than 25 per kind. Bounded at
+ * `FAVOURITES_MAX_PAGES` because `UpdateFavouriteOrder` replaces the whole
+ * set: a reorder built on a truncated read would silently drop the tail, so
+ * `truncated: true` is the signal to refuse the save, not to shrug.
+ */
+export const FAVOURITES_PAGE_QUERY = `
+query ($id: Int!, $page: Int) {
+  User(id: $id) {
+    favourites {
+      anime(page: $page, perPage: 25) {
+        pageInfo { hasNextPage }
+        nodes { ${SOCIAL_MEDIA} }
+      }
+      manga(page: $page, perPage: 25) {
+        pageInfo { hasNextPage }
+        nodes { ${SOCIAL_MEDIA} }
+      }
+      characters(page: $page, perPage: 25) {
+        pageInfo { hasNextPage }
+        nodes { id name { full } image { medium } }
+      }
+      staff(page: $page, perPage: 25) {
+        pageInfo { hasNextPage }
+        nodes { id name { full } image { medium } }
+      }
+      studios(page: $page, perPage: 25) {
+        pageInfo { hasNextPage }
+        nodes { id name }
+      }
+    }
+  }
+}`;
+
+const FAVOURITES_MAX_PAGES = 8;
+
+export interface AllFavourites {
+  anime: SocialMedia[];
+  manga: SocialMedia[];
+  characters: FavPerson[];
+  staff: FavPerson[];
+  studios: FavStudio[];
+  /** True when a kind still had pages at the cap — reordering must refuse. */
+  truncated: boolean;
+}
+
+interface FavPage<T> {
+  pageInfo: { hasNextPage: boolean };
+  nodes: T[];
+}
+
+export async function allFavourites(userId: number): Promise<AllFavourites> {
+  const out: AllFavourites = {
+    anime: [],
+    manga: [],
+    characters: [],
+    staff: [],
+    studios: [],
+    truncated: false,
+  };
+  for (let page = 1; page <= FAVOURITES_MAX_PAGES; page++) {
+    const data = await gql<{
+      User: {
+        favourites: {
+          anime: FavPage<SocialMedia> | null;
+          manga: FavPage<SocialMedia> | null;
+          characters: FavPage<FavPerson> | null;
+          staff: FavPage<FavPerson> | null;
+          studios: FavPage<FavStudio> | null;
+        } | null;
+      } | null;
+    }>(FAVOURITES_PAGE_QUERY, { id: userId, page });
+    const fav = data.User?.favourites;
+    if (!fav) break;
+    out.anime.push(...(fav.anime?.nodes ?? []));
+    out.manga.push(...(fav.manga?.nodes ?? []));
+    out.characters.push(...(fav.characters?.nodes ?? []));
+    out.staff.push(...(fav.staff?.nodes ?? []));
+    out.studios.push(...(fav.studios?.nodes ?? []));
+    const more =
+      fav.anime?.pageInfo.hasNextPage ||
+      fav.manga?.pageInfo.hasNextPage ||
+      fav.characters?.pageInfo.hasNextPage ||
+      fav.staff?.pageInfo.hasNextPage ||
+      fav.studios?.pageInfo.hasNextPage;
+    if (!more) return out;
+  }
+  out.truncated = true;
+  return out;
+}
+
+/**
+ * Reorder one kind's favourites. Whole-array by the API's design — the same
+ * replace-the-set shape as `customLists` — which is why the caller always
+ * sends the complete id list from a fresh `allFavourites` read (`staleTime: 0`
+ * in the modal), never a cached or partial one. `lib/favouritesOrder` builds
+ * the variables and its tests assert the set stays complete.
+ *
+ * One kind per call: the other kinds' arguments are omitted entirely, which
+ * the API treats as "leave untouched" (per-kind saves are how the website's
+ * own editor writes). Verified against the schema by introspection; never
+ * validated by running it.
+ */
+export const UPDATE_FAVOURITE_ORDER_MUTATION = `
+mutation (
+  $animeIds: [Int]
+  $animeOrder: [Int]
+  $mangaIds: [Int]
+  $mangaOrder: [Int]
+  $characterIds: [Int]
+  $characterOrder: [Int]
+  $staffIds: [Int]
+  $staffOrder: [Int]
+  $studioIds: [Int]
+  $studioOrder: [Int]
+) {
+  UpdateFavouriteOrder(
+    animeIds: $animeIds
+    animeOrder: $animeOrder
+    mangaIds: $mangaIds
+    mangaOrder: $mangaOrder
+    characterIds: $characterIds
+    characterOrder: $characterOrder
+    staffIds: $staffIds
+    staffOrder: $staffOrder
+    studioIds: $studioIds
+    studioOrder: $studioOrder
+  ) {
+    anime { pageInfo { total } }
+  }
+}`;
+
+export async function updateFavouriteOrder(
+  vars: Record<string, number[]>,
+): Promise<void> {
+  await gql<unknown>(UPDATE_FAVOURITE_ORDER_MUTATION, vars);
 }
 
 // --- People and studios ---------------------------------------------------

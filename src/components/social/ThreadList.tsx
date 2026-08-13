@@ -1,10 +1,8 @@
-import { useState } from "react";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, type QueryKey } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { isTauri } from "@/api/anilist";
-import { threads, type ThreadPage } from "@/api/social";
+import type { ThreadPage } from "@/api/social";
 import { Button } from "@/components/ui/button";
-import { Pill } from "@/components/ui/pill";
 import { EmptyState, PerchRule } from "@/components/EmptyState";
 import { Shimmer } from "@/components/Skeleton";
 import { nextPageParam } from "@/lib/paging";
@@ -12,69 +10,67 @@ import { staggerDelay } from "@/lib/motion";
 import { ThreadRow } from "./ThreadRow";
 
 /**
- * The threads a user is involved in — ones they started, and ones they replied
- * to.
+ * The one owner of "a paginated list of threads".
  *
- * Two lenses rather than one list, because AniList models them as two different
- * arguments (`userId` and `replyUserId`) and there is no way to ask for the
- * union. Chips rather than a segmented control, matching the search page.
+ * Same shape as `UserList` and for the same reason: a profile's Forum tab and the
+ * forum index would otherwise be two paging implementations that drift. Whoever
+ * calls it supplies the key and the fetcher.
  *
- * No remaining count: `pageInfo.total` is the same capped 5000 sentinel as every
- * other paginated thing in this API.
+ * Never a remaining count. `pageInfo.total` on threads is the capped 5000
+ * sentinel this API returns for anything with real content, so the button says
+ * "Load more" rather than inventing a number.
  */
-type Lens = "created" | "replied";
-
-export function ThreadList({ userId, name }: { userId: number; name: string }) {
+export function ThreadList({
+  queryKey,
+  fetchPage,
+  emptyTitle,
+  emptyHint,
+  staleTime = 10 * 60 * 1000,
+  enabled = true,
+}: {
+  queryKey: QueryKey;
+  fetchPage: (page: number) => Promise<ThreadPage>;
+  emptyTitle: string;
+  emptyHint?: string;
+  staleTime?: number;
+  enabled?: boolean;
+}) {
   const { t } = useTranslation();
-  const [lens, setLens] = useState<Lens>("created");
 
   const q = useInfiniteQuery({
-    queryKey: ["social", "threads", userId, lens],
-    queryFn: ({ pageParam }) =>
-      threads(lens === "created" ? { userId } : { replyUserId: userId }, pageParam),
+    queryKey,
+    queryFn: ({ pageParam }) => fetchPage(pageParam),
     initialPageParam: 1,
     getNextPageParam: (last: ThreadPage) => nextPageParam(last.pageInfo),
-    enabled: isTauri,
-    staleTime: 10 * 60 * 1000,
+    enabled: isTauri && enabled,
+    staleTime,
   });
 
-  const list = (q.data?.pages ?? []).flatMap((p) => p.threads);
-
-  return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap gap-1.5">
-        {(["created", "replied"] as const).map((l) => (
-          <Pill key={l} active={lens === l} onClick={() => setLens(l)}>
-            {l === "created" ? t("social.threadsCreated") : t("social.threadsReplied")}
-          </Pill>
+  if (q.isLoading) {
+    return (
+      <div className="space-y-2" aria-hidden="true">
+        {[0, 1, 2, 3].map((i) => (
+          <Shimmer key={i} className="h-20 w-full rounded-xl" index={i} />
         ))}
       </div>
+    );
+  }
 
-      {q.isLoading && (
-        <div className="space-y-2" aria-hidden="true">
-          {[0, 1, 2].map((i) => (
-            <Shimmer key={i} className="h-20 w-full rounded-xl" index={i} />
-          ))}
-        </div>
-      )}
+  if (q.error) {
+    return (
+      <p className="text-sm text-danger">
+        {t("common.error", { message: String(q.error) })}
+      </p>
+    );
+  }
 
-      {q.error && (
-        <p className="text-sm text-danger">
-          {t("common.error", { message: String(q.error) })}
-        </p>
-      )}
+  const list = (q.data?.pages ?? []).flatMap((p) => p.threads);
+  if (!list.length) {
+    return <EmptyState visual={<PerchRule />} title={emptyTitle} hint={emptyHint} />;
+  }
 
-      {!q.isLoading && !q.error && list.length === 0 && (
-        <EmptyState
-          visual={<PerchRule />}
-          title={
-            lens === "created"
-              ? t("social.noThreadsCreated", { name })
-              : t("social.noThreadsReplied", { name })
-          }
-        />
-      )}
-
+  return (
+    <div className="space-y-2">
       {list.map((th, i) => (
         <div
           key={th.id}
@@ -86,14 +82,16 @@ export function ThreadList({ userId, name }: { userId: number; name: string }) {
       ))}
 
       {q.hasNextPage && (
-        <Button
-          variant="secondary"
-          size="sm"
-          disabled={q.isFetchingNextPage}
-          onClick={() => void q.fetchNextPage()}
-        >
-          {q.isFetchingNextPage ? t("social.loadingMore") : t("social.loadMorePlain")}
-        </Button>
+        <div className="pt-1">
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={q.isFetchingNextPage}
+            onClick={() => void q.fetchNextPage()}
+          >
+            {q.isFetchingNextPage ? t("social.loadingMore") : t("social.loadMorePlain")}
+          </Button>
+        </div>
       )}
     </div>
   );

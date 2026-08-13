@@ -21,6 +21,7 @@ import {
   LogIn,
   Settings,
   Users,
+  MessagesSquare,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -108,6 +109,7 @@ const GROUPS: { label: string; items: NavItem[] }[] = [
       { to: "/search", key: "nav.search", icon: Search },
       { to: "/seasonal", key: "nav.seasonal", icon: CalendarDays },
       { to: "/social", key: "nav.social", icon: Users },
+      { to: "/forum", key: "nav.forum", icon: MessagesSquare },
     ],
   },
   {

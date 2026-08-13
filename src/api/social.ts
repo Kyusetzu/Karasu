@@ -801,3 +801,78 @@ export async function notificationOptions(
   }>(NOTIFICATION_OPTIONS_QUERY, { id });
   return data.User?.options?.notificationOptions ?? [];
 }
+
+// --- Forum index ----------------------------------------------------------
+
+/**
+ * AniList's forum categories, by id.
+ *
+ * Hardcoded because there is **no root query for them** — `Query.ThreadCategory`
+ * does not exist, and a category is only reachable through a thread that happens
+ * to be in it. This list was collected empirically: ten pages of threads across
+ * five sort orders, plus a direct `categoryId` probe of ids 1–20. Seventeen
+ * exist; 6 and anything above 18 return nothing, presumably merged or removed.
+ *
+ * If AniList adds one, threads in it still appear under "All" — only the filter
+ * chip is missing, which is a visible gap rather than a silent failure.
+ */
+export const THREAD_CATEGORIES: { id: number; name: string }[] = [
+  { id: 1, name: "Anime" },
+  { id: 2, name: "Manga" },
+  { id: 3, name: "Light Novels" },
+  { id: 4, name: "Visual Novels" },
+  { id: 5, name: "Release Discussion" },
+  { id: 7, name: "General" },
+  { id: 8, name: "News" },
+  { id: 9, name: "Music" },
+  { id: 10, name: "Gaming" },
+  { id: 11, name: "Site Feedback" },
+  { id: 12, name: "Bug Reports" },
+  { id: 13, name: "Site Announcements" },
+  { id: 14, name: "List Customisation" },
+  { id: 15, name: "Recommendations" },
+  { id: 16, name: "Forum Games" },
+  { id: 17, name: "Misc" },
+  { id: 18, name: "AniList Apps" },
+];
+
+/**
+ * The forum index: recent threads, one category, a search, or your subscriptions.
+ *
+ * `sort` is a parameter because search wants `SEARCH_MATCH` while browsing wants
+ * `REPLIED_AT_DESC` — and both are total orders, which paging needs.
+ * `subscribed: true` is viewer-scoped and returns nothing without a token.
+ */
+export const FORUM_THREADS_QUERY = `
+query ($page: Int, $categoryId: Int, $search: String, $subscribed: Boolean, $sort: [ThreadSort]) {
+  Page(page: $page, perPage: 25) {
+    ${PAGE_INFO}
+    threads(categoryId: $categoryId, search: $search, subscribed: $subscribed, sort: $sort) {
+      id title replyCount viewCount likeCount isLiked isSticky isLocked
+      repliedAt createdAt siteUrl
+      user { ${SOCIAL_USER} }
+      replyUser { id name }
+      categories { id name }
+    }
+  }
+}`;
+
+export interface ForumQuery {
+  categoryId?: number;
+  search?: string;
+  subscribed?: boolean;
+}
+
+export async function forumThreads(vars: ForumQuery, page = 1): Promise<ThreadPage> {
+  const data = await gql<{ Page: { pageInfo: PageInfo; threads: ThreadSummary[] } }>(
+    FORUM_THREADS_QUERY,
+    {
+      ...vars,
+      page,
+      // A search sorted by activity buries the match; browsing sorted by
+      // relevance is meaningless.
+      sort: vars.search ? ["SEARCH_MATCH"] : ["IS_STICKY", "REPLIED_AT_DESC"],
+    },
+  );
+  return { pageInfo: data.Page.pageInfo, threads: data.Page.threads ?? [] };
+}

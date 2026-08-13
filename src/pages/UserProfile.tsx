@@ -13,7 +13,7 @@ import { isTauri } from "@/api/anilist";
 import { ProfileHeader } from "@/components/social/ProfileHeader";
 import { UserList } from "@/components/social/UserList";
 import { ActivityFeed } from "@/components/social/ActivityFeed";
-import { ThreadList } from "@/components/social/ThreadList";
+import { UserThreads } from "@/components/social/UserThreads";
 import { CoverOutline, EmptyState, PerchRule, StruckQuery } from "@/components/EmptyState";
 import { Shimmer } from "@/components/Skeleton";
 import { SectionHeader } from "@/components/ui/section-header";
@@ -232,7 +232,7 @@ function Tabbed({ user }: { user: UserProfileData }) {
             emptyTitle={t("social.noFollowing", { name: user.name })}
           />
         )}
-        {tab === "forum" && <ThreadList userId={user.id} name={user.name} />}
+        {tab === "forum" && <UserThreads userId={user.id} name={user.name} />}
       </div>
     </div>
   );

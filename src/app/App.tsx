@@ -47,6 +47,7 @@ const About = lazy(() => import("@/pages/About"));
 const UserProfile = lazy(() => import("@/pages/UserProfile"));
 const Social = lazy(() => import("@/pages/Social"));
 const Thread = lazy(() => import("@/pages/Thread"));
+const Forum = lazy(() => import("@/pages/Forum"));
 
 export default function App() {
   const { pathname } = useLocation();
@@ -151,6 +152,7 @@ export default function App() {
                 {/* By name, not id: that is what AniList's own URLs, an
                     `@mention` and a pasted link all carry. */}
                 <Route path="/user/:name" element={<UserProfile />} />
+                <Route path="/forum" element={<Forum />} />
                 <Route path="/thread/:id" element={<Thread />} />
                 {/* Alias for old links */}
                 <Route path="/anime/:id" element={<AnimeDetail />} />
@@ -201,6 +203,7 @@ const PAGE_LABELS: Record<string, string> = {
   "/search": "Search",
   "/seasonal": "Seasonal",
   "/social": "Social",
+  "/forum": "Forum",
   "/stats": "Statistics",
   "/library": "Local library",
   "/settings": "Settings",

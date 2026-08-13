@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeDistribution, toTenPoint } from "./score";
+import { normalizeDistribution, normalizeStatsBlock, toTenPoint } from "./score";
 
 describe("toTenPoint", () => {
   it("brings AniList's hundred-point statistics onto the app's scale", () => {
@@ -69,5 +69,51 @@ describe("normalizeDistribution", () => {
 
   it("has nothing to say about an empty list", () => {
     expect(normalizeDistribution([])).toEqual([]);
+  });
+});
+
+describe("normalizeStatsBlock", () => {
+  const block = {
+    count: 100,
+    meanScore: 70.6,
+    standardDeviation: 18.6,
+    scores: [{ score: 85, count: 4 }],
+    genres: [{ genre: "Action", count: 40, meanScore: 72 }],
+    startYears: [{ startYear: 2024, count: 30, meanScore: 68 }],
+    lengths: [{ length: "13-26", count: 20, meanScore: 74 }],
+    formats: [{ format: "TV", count: 80 }],
+    voiceActors: [{ voiceActor: { id: 1 }, count: 5, meanScore: 80 }],
+  };
+
+  it("normalizes every ranked list that carries a meanScore — startYears and lengths included", () => {
+    // The trap this function exists for: the old per-list spelling covered
+    // only the lists the screen rendered, so startYears/lengths arrived
+    // hundred-point, fetched and waiting for someone to render them raw.
+    const out = normalizeStatsBlock(block);
+    expect(out.meanScore).toBeCloseTo(7.06, 2);
+    expect(out.standardDeviation).toBeCloseTo(1.86, 2);
+    expect(out.genres[0].meanScore).toBeCloseTo(7.2, 5);
+    expect(out.startYears[0].meanScore).toBeCloseTo(6.8, 5);
+    expect(out.lengths[0].meanScore).toBeCloseTo(7.4, 5);
+    expect(out.voiceActors[0].meanScore).toBeCloseTo(8.0, 5);
+  });
+
+  it("leaves a count-only list untouched rather than inventing a NaN", () => {
+    const out = normalizeStatsBlock(block);
+    expect(out.formats[0]).toEqual({ format: "TV", count: 80 });
+    expect("meanScore" in out.formats[0]).toBe(false);
+  });
+
+  it("collapses the distribution and keeps non-score fields intact", () => {
+    const out = normalizeStatsBlock(block);
+    expect(out.scores).toEqual([{ score: 9, count: 4 }]);
+    expect(out.count).toBe(100);
+    expect(out.startYears[0].startYear).toBe(2024);
+  });
+
+  it("does not mutate its input — the query cache holds the original", () => {
+    const before = JSON.stringify(block);
+    normalizeStatsBlock(block);
+    expect(JSON.stringify(block)).toBe(before);
   });
 });

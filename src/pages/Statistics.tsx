@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Link } from "react-router";
+import { useMemo } from "react";
+import { Link, useSearchParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { BarChart3, ExternalLink, Sparkles } from "lucide-react";
@@ -92,8 +92,32 @@ function StatisticsContent({
   avatar: string | null;
 }) {
   const { t } = useTranslation();
-  const [type, setType] = useState<MediaType>("ANIME");
-  const [category, setCategory] = useState<Category>("overview");
+  // Type and tab in the URL, not in state — Statistics was the last tabbed
+  // screen on `useState`, so Back from anywhere lost the selection. Same
+  // validate-or-default, delete-at-default, `replace: true` shape as the list
+  // view and the profile.
+  const [params, setParams] = useSearchParams();
+  const type: MediaType = params.get("type") === "MANGA" ? "MANGA" : "ANIME";
+  const rawTab = params.get("tab");
+  const category: Category = ANIME_CATEGORIES.includes(rawTab as Category)
+    ? (rawTab as Category)
+    : "overview";
+  const setView = (patch: { type?: MediaType; category?: Category }) =>
+    setParams(
+      (prev) => {
+        const p = new URLSearchParams(prev);
+        if (patch.type !== undefined) {
+          if (patch.type === "ANIME") p.delete("type");
+          else p.set("type", patch.type);
+        }
+        if (patch.category !== undefined) {
+          if (patch.category === "overview") p.delete("tab");
+          else p.set("tab", patch.category);
+        }
+        return p;
+      },
+      { replace: true },
+    );
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["userStats", userId],
@@ -207,11 +231,11 @@ function StatisticsContent({
       </header>
 
       <div className="space-y-3">
-        <Tabs options={typeOptions} value={type} onChange={setType} />
+        <Tabs options={typeOptions} value={type} onChange={(v) => setView({ type: v })} />
         <Tabs
           options={categoryOptions}
           value={activeCategory}
-          onChange={setCategory}
+          onChange={(v) => setView({ category: v })}
         />
       </div>
 

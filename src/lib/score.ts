@@ -44,3 +44,55 @@ export function normalizeDistribution(scores: ScoreBucket[]): ScoreBucket[] {
     .sort((a, b) => a[0] - b[0])
     .map(([score, count]) => ({ score, count }));
 }
+
+/** Every ranked-category key a `userStatistics` block can carry. */
+const RANKED_KEYS = [
+  "genres",
+  "tags",
+  "staff",
+  "voiceActors",
+  "studios",
+  "startYears",
+  "lengths",
+  "formats",
+  "statuses",
+  "releaseYears",
+  "countries",
+] as const;
+
+/**
+ * One `userStatistics` block (anime or manga), with **every** hundred-point
+ * number brought onto the ten-point scale in one pass.
+ *
+ * The old per-list spelling in `queries.ts` normalized exactly the lists the
+ * screen rendered at the time — which is how `startYears.meanScore` and
+ * `lengths.meanScore` were fetched for years and never normalized, a trap the
+ * statistics overhaul would have walked straight into. This walks every ranked
+ * key instead, and only touches a row that actually carries a numeric
+ * `meanScore`, so a count-only list (`formats` today) passes through untouched
+ * rather than gaining a `NaN`.
+ */
+export function normalizeStatsBlock<
+  T extends {
+    meanScore: number;
+    standardDeviation: number;
+    scores: { score?: number; count: number }[];
+  },
+>(stats: T): T {
+  const out: Record<string, unknown> = {
+    ...stats,
+    meanScore: toTenPoint(stats.meanScore),
+    standardDeviation: toTenPoint(stats.standardDeviation),
+    scores: normalizeDistribution(stats.scores as ScoreBucket[]),
+  };
+  for (const key of RANKED_KEYS) {
+    const rows = (stats as Record<string, unknown>)[key];
+    if (!Array.isArray(rows)) continue;
+    out[key] = rows.map((row) =>
+      row && typeof row === "object" && typeof (row as { meanScore?: unknown }).meanScore === "number"
+        ? { ...row, meanScore: toTenPoint((row as { meanScore: number }).meanScore) }
+        : row,
+    );
+  }
+  return out as T;
+}

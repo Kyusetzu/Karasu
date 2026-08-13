@@ -1,4 +1,5 @@
 import { Card, CardTitle } from "@/components/ui/card";
+import { TONES } from "@/components/stats/Charts";
 import { cn } from "@/lib/utils";
 /**
  * Score distribution as ten columns.
@@ -103,16 +104,9 @@ export function StatusBar({
 }) {
   if (data.length === 0) return null;
   const total = data.reduce((sum, d) => sum + d.count, 0) || 1;
-  // Shades of the surface ramp with the accent leading, so the segments read
-  // as one bar divided rather than five colours competing.
-  const tone = [
-    "var(--color-accent-500)",
-    "var(--color-accent-400)",
-    "var(--color-surface-600)",
-    "var(--color-surface-700)",
-    "var(--color-surface-800)",
-    "var(--color-graph-none)",
-  ];
+  // The shared categorical ramp — this used to be a local copy of `TONES`,
+  // which is exactly how two ramps start disagreeing.
+  const tone = TONES;
 
   return (
     <Card className="flex h-full flex-col">

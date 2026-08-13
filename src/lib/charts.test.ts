@@ -1,13 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  arcPath,
-  linePoints,
-  polar,
-  polylineLength,
-  radarPoints,
-  slices,
-  squarify,
-} from "./charts";
+import { arcPath, polar, radarPoints, slices, squarify } from "./charts";
 
 describe("polar", () => {
   it("starts at twelve o'clock and runs clockwise", () => {
@@ -72,19 +64,6 @@ describe("radarPoints", () => {
   });
 });
 
-describe("linePoints", () => {
-  it("spans the width and puts the peak on the ceiling", () => {
-    const pts = linePoints([1, 4, 2], 100, 50);
-    expect(pts[0].x).toBe(0);
-    expect(pts[2].x).toBe(100);
-    expect(pts[1].y).toBe(0);
-  });
-
-  it("centres a lone value instead of pinning it to the left edge", () => {
-    expect(linePoints([3], 100, 50)[0].x).toBe(50);
-  });
-});
-
 describe("squarify", () => {
   const box = { w: 400, h: 300 };
 
@@ -143,31 +122,3 @@ describe("squarify", () => {
   });
 });
 
-describe("polylineLength", () => {
-  it("sums the segments", () => {
-    // 3-4-5 triangle, twice over.
-    expect(
-      polylineLength([
-        { x: 0, y: 0 },
-        { x: 3, y: 4 },
-        { x: 6, y: 8 },
-      ]),
-    ).toBe(10);
-  });
-
-  /** A single point or none is a length of zero, not a NaN dasharray. */
-  it("handles degenerate inputs", () => {
-    expect(polylineLength([])).toBe(0);
-    expect(polylineLength([{ x: 5, y: 5 }])).toBe(0);
-  });
-
-  /** The chart's own shape: a flat series is still as long as it is wide. */
-  it("measures a flat line as its width", () => {
-    expect(
-      polylineLength([
-        { x: 0, y: 10 },
-        { x: 100, y: 10 },
-      ]),
-    ).toBe(100);
-  });
-});

@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { type StatEntry } from "@/api/queries";
 import type { MediaType } from "@/api/types";
 import { Tabs, type TabOption } from "@/components/ui/tabs";
-import { Empty, type Category, type SortKey } from "./shared";
+import { Empty, type RankedCategory, type SortKey } from "./shared";
 
 /**
  * Everything AniList will give, shown at once. `userStatistics` category lists
@@ -21,7 +21,7 @@ export function RankedList({
   type,
 }: {
   entries: StatEntry[];
-  category: Category;
+  category: RankedCategory;
   type: MediaType;
 }) {
   const { t, i18n } = useTranslation();
@@ -86,7 +86,7 @@ export function RankedRow({
 }: {
   rank: number;
   entry: StatEntry;
-  category: Category;
+  category: RankedCategory;
   type: MediaType;
   barPct: number;
   metricText: string;
@@ -144,7 +144,7 @@ export function RankedRow({
 }
 
 /** Whether a category shows an avatar column (people do, genres/tags/studios don't). */
-export function entryImage(e: StatEntry, category: Category): string | null | undefined {
+export function entryImage(e: StatEntry, category: RankedCategory): string | null | undefined {
   if (category === "voiceActors") return e.voiceActor?.image?.medium ?? null;
   if (category === "staff") return e.staff?.image?.medium ?? null;
   return undefined; // no avatar column
@@ -158,14 +158,14 @@ export function entryImage(e: StatEntry, category: Category): string | null | un
  * inventing a search link — a row that looks clickable and is not is worse than
  * a row that does not.
  */
-export function entryHref(e: StatEntry, category: Category): string | null {
+export function entryHref(e: StatEntry, category: RankedCategory): string | null {
   if (category === "voiceActors" && e.voiceActor?.id) return `/staff/${e.voiceActor.id}`;
   if (category === "staff" && e.staff?.id) return `/staff/${e.staff.id}`;
   if (category === "studios" && e.studio?.id) return `/studio/${e.studio.id}`;
   return null;
 }
 
-export function entryLabel(e: StatEntry, category: Category): string {
+export function entryLabel(e: StatEntry, category: RankedCategory): string {
   switch (category) {
     case "genres":
       return e.genre ?? "?";
@@ -182,7 +182,7 @@ export function entryLabel(e: StatEntry, category: Category): string {
   }
 }
 
-export function entryKey(e: StatEntry, category: Category): string {
+export function entryKey(e: StatEntry, category: RankedCategory): string {
   switch (category) {
     case "genres":
       return `g-${e.genre}`;

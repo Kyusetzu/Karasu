@@ -32,7 +32,8 @@ import {
   type Slice,
 } from "@/components/stats/Charts";
 import { STATUS_ORDER, type MediaListStatus } from "@/api/types";
-import { Empty, type Category } from "@/components/stats/shared";
+import { SectionHeader } from "@/components/ui/section-header";
+import { Empty, type Category, type RankedCategory } from "@/components/stats/shared";
 import { DistributionCard, ScoreColumns, StatusBar, TileGrid } from "@/components/stats/panels";
 import { GradientBars } from "@/components/stats/GradientBars";
 import { DotPlot } from "@/components/stats/DotPlot";
@@ -47,25 +48,14 @@ import {
   type SeasonCount,
 } from "@/lib/localStats";
 import { RankedList, fmt, scoreText } from "@/components/stats/RankedList";
-const ANIME_CATEGORIES: Category[] = [
-  "overview",
-  "ratings",
-  "years",
-  "genres",
-  "tags",
-  "voiceActors",
-  "studios",
-  "staff",
-];
-
-const MANGA_CATEGORIES: Category[] = [
-  "overview",
-  "ratings",
-  "years",
-  "genres",
-  "tags",
-  "staff",
-];
+/**
+ * Five themed tabs rather than one per ranked array. The old shape — a tab
+ * each for genres, tags, voice actors, studios and staff — made eight stops
+ * of one list apiece; the five ranked lists now live inside two themed tabs,
+ * and both media types share one tab bar (the people tab simply holds fewer
+ * sections on manga).
+ */
+const CATEGORIES: Category[] = ["overview", "ratings", "years", "genresTags", "people"];
 
 export default function Statistics() {
   const { t } = useTranslation();
@@ -119,7 +109,7 @@ function StatisticsContent({
   const [params, setParams] = useSearchParams();
   const type: MediaType = params.get("type") === "MANGA" ? "MANGA" : "ANIME";
   const rawTab = params.get("tab");
-  const category: Category = ANIME_CATEGORIES.includes(rawTab as Category)
+  const category: Category = CATEGORIES.includes(rawTab as Category)
     ? (rawTab as Category)
     : "overview";
   const setView = (patch: { type?: MediaType; category?: Category }) =>
@@ -221,15 +211,14 @@ function StatisticsContent({
     });
   }, [typeList, level, t, type]);
 
-  const categories = type === "ANIME" ? ANIME_CATEGORIES : MANGA_CATEGORIES;
-  // Keep the selected sub-tab valid when switching media type.
-  const activeCategory = categories.includes(category) ? category : "overview";
+  // One tab bar for both media types now, so switching type keeps the tab.
+  const activeCategory = category;
 
   const typeOptions: TabOption<MediaType>[] = [
     { value: "ANIME", label: t("nav.list") },
     { value: "MANGA", label: t("nav.manga") },
   ];
-  const categoryOptions: TabOption<Category>[] = categories.map((c) => ({
+  const categoryOptions: TabOption<Category>[] = CATEGORIES.map((c) => ({
     value: c,
     label: t(`stats.${c}`),
   }));
@@ -342,7 +331,6 @@ function AnimeView({
   seasons: SeasonCount[];
 }) {
   const { t, i18n } = useTranslation();
-  const level = useContentFilter((s) => s.level);
   if (stats.count === 0) return <Empty />;
 
   if (category === "ratings") {
@@ -353,38 +341,37 @@ function AnimeView({
     return <YearsView stats={stats} heatmap={heatmap} seasons={seasons} />;
   }
 
-  if (category === "overview") {
-    const days = stats.minutesWatched / 60 / 24;
-    return (
-      <div className="space-y-6">
-        <TileGrid
-          tiles={[
-            { label: t("stats.entries"), value: fmt(stats.count, i18n.language) },
-            { label: t("stats.episodes"), value: fmt(stats.episodesWatched, i18n.language) },
-            { label: t("stats.daysWatched"), value: days.toFixed(1) },
-            { label: t("stats.meanScore"), value: scoreText(stats.meanScore) },
-            {
-              label: t("stats.spread"),
-              value: `± ${stats.standardDeviation.toFixed(1)}`,
-            },
-            {
-              label: t("stats.perEntry"),
-              value: t("stats.episodesEach", {
-                n: (stats.episodesWatched / Math.max(1, stats.count)).toFixed(1),
-              }),
-            },
-          ]}
-        />
-        <OverviewCharts stats={stats} type="ANIME" breakdown={breakdown} />
-      </div>
-    );
+  if (category === "genresTags") {
+    return <GenresTagsView stats={stats} type="ANIME" />;
   }
+
+  if (category === "people") {
+    return <PeopleView stats={stats} type="ANIME" />;
+  }
+
+  const days = stats.minutesWatched / 60 / 24;
   return (
-    <RankedList
-      entries={rowsFor(stats, category, level)}
-      category={category}
-      type="ANIME"
-    />
+    <div className="space-y-6">
+      <TileGrid
+        tiles={[
+          { label: t("stats.entries"), value: fmt(stats.count, i18n.language) },
+          { label: t("stats.episodes"), value: fmt(stats.episodesWatched, i18n.language) },
+          { label: t("stats.daysWatched"), value: days.toFixed(1) },
+          { label: t("stats.meanScore"), value: scoreText(stats.meanScore) },
+          {
+            label: t("stats.spread"),
+            value: `± ${stats.standardDeviation.toFixed(1)}`,
+          },
+          {
+            label: t("stats.perEntry"),
+            value: t("stats.episodesEach", {
+              n: (stats.episodesWatched / Math.max(1, stats.count)).toFixed(1),
+            }),
+          },
+        ]}
+      />
+      <OverviewCharts stats={stats} type="ANIME" breakdown={breakdown} />
+    </div>
   );
 }
 
@@ -404,7 +391,6 @@ function MangaView({
   seasons: SeasonCount[];
 }) {
   const { t, i18n } = useTranslation();
-  const level = useContentFilter((s) => s.level);
   if (stats.count === 0) return <Empty />;
 
   if (category === "ratings") {
@@ -415,37 +401,36 @@ function MangaView({
     return <YearsView stats={stats} heatmap={heatmap} seasons={seasons} />;
   }
 
-  if (category === "overview") {
-    return (
-      <div className="space-y-6">
-        <TileGrid
-          tiles={[
-            { label: t("stats.entries"), value: fmt(stats.count, i18n.language) },
-            { label: t("stats.chapters"), value: fmt(stats.chaptersRead, i18n.language) },
-            { label: t("stats.volumes"), value: fmt(stats.volumesRead, i18n.language) },
-            { label: t("stats.meanScore"), value: scoreText(stats.meanScore) },
-            {
-              label: t("stats.spread"),
-              value: `± ${stats.standardDeviation.toFixed(1)}`,
-            },
-            {
-              label: t("stats.perEntry"),
-              value: t("stats.chaptersEach", {
-                n: (stats.chaptersRead / Math.max(1, stats.count)).toFixed(0),
-              }),
-            },
-          ]}
-        />
-        <OverviewCharts stats={stats} type="MANGA" breakdown={breakdown} />
-      </div>
-    );
+  if (category === "genresTags") {
+    return <GenresTagsView stats={stats} type="MANGA" />;
   }
+
+  if (category === "people") {
+    return <PeopleView stats={stats} type="MANGA" />;
+  }
+
   return (
-    <RankedList
-      entries={rowsFor(stats, category, level)}
-      category={category}
-      type="MANGA"
-    />
+    <div className="space-y-6">
+      <TileGrid
+        tiles={[
+          { label: t("stats.entries"), value: fmt(stats.count, i18n.language) },
+          { label: t("stats.chapters"), value: fmt(stats.chaptersRead, i18n.language) },
+          { label: t("stats.volumes"), value: fmt(stats.volumesRead, i18n.language) },
+          { label: t("stats.meanScore"), value: scoreText(stats.meanScore) },
+          {
+            label: t("stats.spread"),
+            value: `± ${stats.standardDeviation.toFixed(1)}`,
+          },
+          {
+            label: t("stats.perEntry"),
+            value: t("stats.chaptersEach", {
+              n: (stats.chaptersRead / Math.max(1, stats.count)).toFixed(0),
+            }),
+          },
+        ]}
+      />
+      <OverviewCharts stats={stats} type="MANGA" breakdown={breakdown} />
+    </div>
   );
 }
 
@@ -458,7 +443,7 @@ function MangaView({
  */
 function rowsFor(
   stats: AnimeStats | MangaStats,
-  category: Category,
+  category: RankedCategory,
   level: ContentFilterLevel,
 ): StatEntry[] {
   switch (category) {
@@ -474,9 +459,125 @@ function rowsFor(
       return "voiceActors" in stats ? stats.voiceActors : [];
     case "studios":
       return "studios" in stats ? stats.studios : [];
-    default:
-      return [];
   }
+}
+
+/**
+ * The Genres & Tags tab: the shape (radar), the long tail (treemap), the taste
+ * check (each genre's mean against your overall mean), and the two ranked
+ * lists — everything the list contains, one tab.
+ */
+function GenresTagsView({
+  stats,
+  type,
+}: {
+  stats: AnimeStats | MangaStats;
+  type: MediaType;
+}) {
+  const { t } = useTranslation();
+  const level = useContentFilter((s) => s.level);
+
+  // Filter before slicing, or a blocked name costs one of the slots it was
+  // removed from; the treemap falls back to genres when tags are empty.
+  const safeGenres = rowsFor(stats, "genres", level);
+  const safeTags = rowsFor(stats, "tags", level);
+  const radarGenres = safeGenres.slice(0, 6);
+  const treemapTags = (safeTags.length ? safeTags : safeGenres).slice(0, 14);
+  // Genres against your own average — deviation from yourself, not from the
+  // crowd; the community version lives on the Ratings tab.
+  const genreDots = [...safeGenres]
+    .filter((g) => g.meanScore > 0)
+    .sort((a, b) => Math.abs(b.meanScore - stats.meanScore) - Math.abs(a.meanScore - stats.meanScore))
+    .slice(0, 8)
+    .map((g) => ({ label: g.genre ?? "?", mine: g.meanScore, other: stats.meanScore }));
+
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-4 lg:grid-cols-2">
+        {radarGenres.length > 2 && (
+          <Card className="flex h-full flex-col">
+            <CardTitle>{t("stats.genreShape")}</CardTitle>
+            <p className="mt-1 text-2xs text-ink-600">{t("stats.genreShapeHint")}</p>
+            <div className="mt-2 flex flex-1 items-center justify-center">
+              <div className="w-full max-w-72">
+                <RadarChart
+                  axes={radarGenres.map((g) => ({ label: g.genre ?? "?", value: g.count }))}
+                />
+              </div>
+            </div>
+          </Card>
+        )}
+        {genreDots.length > 1 && (
+          <DotPlot
+            title={t("stats.genreTaste")}
+            hint={t("stats.genreTasteHint")}
+            legendMine={t("stats.legendGenreMean")}
+            legendOther={t("stats.legendOverallMean")}
+            rows={genreDots}
+          />
+        )}
+        {treemapTags.length > 3 && (
+          <Card className="flex h-full flex-col lg:col-span-2">
+            <CardTitle>{t("stats.tagMap")}</CardTitle>
+            <div className="mt-3 flex flex-1 items-center">
+              <Treemap
+                data={treemapTags.map((entry) => ({
+                  label: entry.tag?.name ?? entry.genre ?? "?",
+                  value: entry.count,
+                }))}
+              />
+            </div>
+          </Card>
+        )}
+      </div>
+
+      <section className="space-y-3">
+        <SectionHeader icon={BarChart3} title={t("stats.genres")} />
+        <RankedList entries={safeGenres} category="genres" type={type} />
+      </section>
+      {safeTags.length > 0 && (
+        <section className="space-y-3">
+          <SectionHeader icon={BarChart3} title={t("stats.tags")} />
+          <RankedList entries={safeTags} category="tags" type={type} />
+        </section>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The People & Studios tab: the three portrait lists on anime, staff alone on
+ * manga — who made what the list holds.
+ */
+function PeopleView({
+  stats,
+  type,
+}: {
+  stats: AnimeStats | MangaStats;
+  type: MediaType;
+}) {
+  const { t } = useTranslation();
+  const level = useContentFilter((s) => s.level);
+
+  const sections: { key: RankedCategory; title: string }[] = [
+    ...("voiceActors" in stats ? [{ key: "voiceActors" as const, title: t("stats.voiceActors") }] : []),
+    { key: "staff", title: t("stats.staff") },
+    ...("studios" in stats ? [{ key: "studios" as const, title: t("stats.studios") }] : []),
+  ];
+
+  return (
+    <div className="space-y-6">
+      {sections.map(({ key, title }) => {
+        const rows = rowsFor(stats, key, level);
+        return rows.length > 0 ? (
+          <section key={key} className="space-y-3">
+            <SectionHeader icon={BarChart3} title={title} />
+            <RankedList entries={rows} category={key} type={type} />
+          </section>
+        ) : null;
+      })}
+    </div>
+  );
 }
 
 /**
@@ -680,22 +781,12 @@ function OverviewCharts({
   breakdown: Slice[];
 }) {
   const { t } = useTranslation();
-  const level = useContentFilter((s) => s.level);
   // AniList returns the buckets unordered and spells them "1", "17-28",
   // "101+" — sort on the number each one opens with.
   const lengths = [...stats.lengths]
     .filter((d) => d.length)
     .sort((a, b) => parseInt(a.length ?? "0", 10) - parseInt(b.length ?? "0", 10));
   const countries = [...stats.countries].filter((d) => d.country);
-  // The ranked lists below filter these names; the radar and the treemap write
-  // them out in full, with counts. Filter before slicing, or a blocked name
-  // costs one of the six or fourteen slots it was removed from. The fallback
-  // has to be the filtered genres too — a list whose `tags` come back empty
-  // would otherwise put the unfiltered names straight into the treemap.
-  const safeGenres = stats.genres.filter((e) => !isBlockedGenre(e.genre ?? "", level));
-  const safeTags = stats.tags.filter((e) => !isBlockedGenre(e.tag?.name ?? "", level));
-  const genres = safeGenres.slice(0, 6);
-  const tags = (safeTags.length ? safeTags : safeGenres).slice(0, 14);
   // The sunburst's outer ring is the formats inside each status. Totalled
   // across statuses they are the same figures the Formats panel lists, but the
   // ring needs its own key on its own card to be readable at all.
@@ -769,36 +860,8 @@ function OverviewCharts({
         </Card>
       )}
 
-      {genres.length > 2 && (
-        <Card className="flex h-full flex-col">
-          <CardTitle>{t("stats.genreShape")}</CardTitle>
-          <p className="mt-1 text-2xs text-ink-600">{t("stats.genreShapeHint")}</p>
-          <div className="mt-2 flex flex-1 items-center justify-center">
-            <div className="w-full max-w-72">
-              <RadarChart
-                axes={genres.map((g) => ({
-                  label: g.genre ?? "?",
-                  value: g.count,
-                }))}
-              />
-            </div>
-          </div>
-        </Card>
-      )}
-
-      {tags.length > 3 && (
-        <Card className="flex h-full flex-col lg:col-span-2">
-          <CardTitle>{t("stats.tagMap")}</CardTitle>
-          <div className="mt-3 flex flex-1 items-center">
-            <Treemap
-              data={tags.map((entry) => ({
-                label: entry.tag?.name ?? entry.genre ?? "?",
-                value: entry.count,
-              }))}
-            />
-          </div>
-        </Card>
-      )}
+      {/* The radar and the treemap moved to Genres & Tags — one home per
+          chart, same reasoning as the year serieses. */}
       <DistributionCard
         title={t("stats.lengths")}
         data={lengths.map((d) => ({

@@ -145,80 +145,23 @@ export function StatusBar({
 }
 
 /**
- * Release years as a sparkline, every other year written under the bars.
- *
- * Sixteen four-digit labels across half a card collide, so past nine bars only
- * every second one is written — counted back from the newest, not forward from
- * the oldest. The newest year is the one the accent highlights and the one a
- * reader looks for first, and an even number of bars would otherwise leave it
- * as the blank column. The cost is the oldest year losing its label instead,
- * which is the cheaper end to lose.
+ * The stat tiles, in the Wrapped poster's register: a short accent rule over
+ * bare figures, no card fill. A bordered box at this density read as six UI
+ * cards competing with the charts below; the rule marks each figure without
+ * boxing it. (`YearSparkline` used to live here — the Years tab's AreaChart
+ * superseded it.)
  */
-export function YearSparkline({
-  title,
-  data,
-}: {
-  title: string;
-  data: { year: number; count: number }[];
-}) {
-  if (data.length === 0) return null;
-  const max = Math.max(...data.map((d) => d.count), 1);
-  const recent = data.length - 3;
-  // Sixteen four-digit years across half a screen collide, so every other one
-  // is written and the rest keep their column. The counts above the bars are
-  // one or two digits and always fit, which is why they are never thinned.
-  const everyOther = data.length > 9;
-
-  return (
-    <Card className="flex h-full flex-col">
-      <CardTitle>{title}</CardTitle>
-      {/* Stretched for the same reason as the score columns — see there. */}
-      <div className="mt-4 flex flex-1 items-stretch gap-1">
-        {data.map((d, i) => (
-          <div key={d.year} className="flex min-w-0 flex-1 flex-col items-center gap-1">
-            {/* Both label slots keep their height when they hold nothing.
-                They are written conditionally — a year with no entries prints
-                no count, and past nine bars only every second year is named —
-                and an empty span is a zero-height box. With the row
-                bottom-aligned, the columns whose labels were blank sat lower
-                than the rest, so the bars had no common floor and the missing
-                labels left a visible notch under every other year. */}
-            <span className="h-3 text-[.5625rem] leading-3 tabular-nums text-ink-500">
-              {d.count || ""}
-            </span>
-            {/* Out of flow for the same reason as the score columns: this box
-                is sized by `flex-1`, so an in-flow percentage height has no
-                definite containing block to resolve against and collapses. */}
-            <div className="relative min-h-24 w-full flex-1">
-              <div
-                title={`${d.year}: ${d.count}`}
-                className={cn(
-                  "absolute inset-x-0 bottom-0 rounded-t-[.125rem]",
-                  i >= recent ? "bg-accent-500" : "bg-surface-700",
-                )}
-                style={{ height: `${Math.max((d.count / max) * 100, 2)}%` }}
-              />
-            </div>
-            <span className="h-3 text-[.5625rem] leading-3 tabular-nums text-ink-600">
-              {!everyOther || (data.length - 1 - i) % 2 === 0 ? d.year : ""}
-            </span>
-          </div>
-        ))}
-      </div>
-    </Card>
-  );
-}
-
 export function TileGrid({ tiles }: { tiles: { label: string; value: string }[] }) {
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+    <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 2xl:grid-cols-6">
       {tiles.map((tile) => (
-        <div
-          key={tile.label}
-          className="rounded-xl border border-surface-800 bg-surface-900 px-4 py-3"
-        >
-          <p className="text-xl font-bold tabular-nums">{tile.value}</p>
-          <p className="text-xs text-ink-600">{tile.label}</p>
+        <div key={tile.label} className="relative pt-2.5">
+          <span
+            aria-hidden="true"
+            className="absolute left-0 top-0 h-0.5 w-9 rounded-full bg-gradient-to-r from-accent-500 to-accent-400/25"
+          />
+          <p className="text-2xl font-bold tabular-nums text-ink-100">{tile.value}</p>
+          <p className="mt-0.5 text-2xs uppercase tracking-[.08em] text-ink-600">{tile.label}</p>
         </div>
       ))}
     </div>

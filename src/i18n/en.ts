@@ -254,6 +254,13 @@ export const en = {
     overview: "Overview",
     ratings: "Ratings",
     years: "Years",
+    genresTags: "Genres & Tags",
+    people: "People & Studios",
+    genreTaste: "Genres against your average",
+    genreTasteHint:
+      "Each genre's mean beside your overall mean — where your taste actually bends.",
+    legendGenreMean: "genre mean",
+    legendOverallMean: "your average",
     genres: "Genres",
     tags: "Tags",
     voiceActors: "Voice Actors",

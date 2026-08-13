@@ -253,6 +253,13 @@ export const de: typeof en = {
     overview: "Übersicht",
     ratings: "Bewertungen",
     years: "Jahre",
+    genresTags: "Genres & Tags",
+    people: "Mitwirkende & Studios",
+    genreTaste: "Genres gegen deinen Schnitt",
+    genreTasteHint:
+      "Der Schnitt jedes Genres neben deinem Gesamtschnitt — wo dein Geschmack wirklich ausschlägt.",
+    legendGenreMean: "Genre-Schnitt",
+    legendOverallMean: "dein Schnitt",
     genres: "Genres",
     tags: "Tags",
     voiceActors: "Sprecher",

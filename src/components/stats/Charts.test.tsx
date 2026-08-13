@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import { LineChart, RadarChart, Sunburst, Treemap } from "./Charts";
+import { RadarChart, Sunburst, Treemap } from "./Charts";
 import { GradientBars } from "./GradientBars";
 import { DotPlot } from "./DotPlot";
 import { AreaChart } from "./AreaChart";
@@ -162,30 +162,6 @@ describe("DotPlot", () => {
 
   it("renders nothing for an empty list", () => {
     expect(html(<DotPlot title="t" rows={[]} legendMine="m" legendOther="c" />)).toBe("");
-  });
-});
-
-describe("LineChart", () => {
-  const data = [
-    { label: "2021", value: 42 },
-    { label: "2022", value: 17 },
-    { label: "2023", value: 88 },
-  ];
-
-  it("writes every point's value and every label", () => {
-    const out = texts(html(<LineChart data={data} />));
-    for (const d of data) {
-      expect(out).toContain(String(d.value));
-      expect(out).toContain(d.label);
-    }
-  });
-
-  it("scales to its container instead of being pinned to a pixel height", () => {
-    const markup = html(<LineChart data={data} />);
-    expect(markup).toContain('class="w-full"');
-    // A fixed height plus a narrower viewBox is what letterboxed these.
-    expect(markup).not.toMatch(/style="[^"]*height/);
-    expect(markup).not.toContain('preserveAspectRatio="none"');
   });
 });
 

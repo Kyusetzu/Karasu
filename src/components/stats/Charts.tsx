@@ -1,38 +1,13 @@
 import { Fragment } from "react";
 import {
   arcPath,
-  linePoints,
   pointsAttr,
   polar,
   radarPoints,
   slices,
-  polylineLength,
   squarify,
 } from "@/lib/charts";
 import { motionDuration, seriesDelay } from "@/lib/motion";
-
-/**
- * When a line-chart point should land: as the drawing line reaches it.
- *
- * The last point starts at `DRAW_MS - CHART_IN_MS` so it *finishes* with the
- * line rather than after it. Spreading across 780ms of the 900ms draw looked
- * right on paper but the arrival is 320ms long, so the final year's dot and
- * label were still coming in 200ms after the line had stopped moving — the
- * chart appeared to end twice.
- *
- * Through `motionDuration` because a delay is one of the things the
- * reduce-motion CSS deliberately does *not* neutralise for us — see
- * `lib/motion.ts`.
- */
-const DRAW_MS = 900;
-const CHART_IN_MS = 320;
-
-function pointDelay(index: number, count: number): number {
-  if (count <= 1) return 0;
-  return motionDuration(
-    Math.round((index / (count - 1)) * (DRAW_MS - CHART_IN_MS)),
-  );
-}
 
 /**
  * The categorical ramp: the accent leading, then the surface steps.
@@ -370,111 +345,10 @@ export function RadarChart({
   );
 }
 
-/**
- * A line over time.
- *
- * Bars invite comparison between neighbours; a line says the values are one
- * series that continues — which is the truth about years, and why a gap year
- * has to sit on the floor rather than leave the frame.
- */
-export function LineChart({
-  data,
-  height = 150,
-}: {
-  data: { label: string; value: number }[];
-  height?: number;
-}) {
-  const W = 620;
-  const padX = 14;
-  // Room above the line for a value and below it for the year, so neither has
-  // to overlap the series to be read.
-  const top = 16;
-  const bottom = 20;
-  const pts = linePoints(
-    data.map((d) => d.value),
-    W - padX * 2,
-    height - top - bottom,
-  ).map((p) => ({ x: p.x + padX, y: p.y + top }));
-  const floor = height - bottom;
-  // Summed from the geometry rather than read back with `getTotalLength()`,
-  // which would mean measuring the DOM after mount and drawing one frame of
-  // a line that is already complete.
-  const length = polylineLength(pts);
-
-  return (
-    <svg viewBox={`0 0 ${W} ${height}`} className="w-full">
-      <polygon
-        points={`${padX},${floor} ${pointsAttr(pts)} ${W - padX},${floor}`}
-        fill="rgba(var(--accent-rgb), .14)"
-        className="animate-fade-in"
-      />
-      {/* Drawn rather than appearing. A line chart is a shape the eye
-          follows left to right anyway, so letting it arrive that way costs
-          nothing and says "this is a series over time" before the axis
-          labels are read. */}
-      {/* No `vectorEffect="non-scaling-stroke"` here, and it must not come
-          back. It moves stroke geometry — the dash pattern included — into
-          screen space, while `length` is measured in viewBox units. A dash of
-          `L` then covers `L` CSS px of a path that is `L × scale` px long, so
-          wherever the card renders wider than the 620-unit viewBox the tail is
-          simply never painted and `forwards` holds it that way: 76% drawn at
-          815px, 61% at 1024px. The translucent area fill underneath has no
-          dash and still spans the full width, which is why it read as the line
-          fading out rather than as the animation stopping. `pathLength` does
-          not help — the dash is already in screen space by the time it applies.
-
-          `Franchise.tsx` keeps `non-scaling-stroke` legitimately: no dash
-          array, and a real pan/zoom surface where a scaled 1px hairline would
-          render as a cable.
-
-          1.5 rather than 2 because the stroke now scales with the viewBox —
-          ~1.4px narrow, ~2px at the usual width, ~2.5px at the widest. */}
-      <polyline
-        points={pointsAttr(pts)}
-        fill="none"
-        stroke="var(--color-accent-500)"
-        strokeWidth={1.5}
-        strokeLinejoin="round"
-        style={{
-          strokeDasharray: length,
-          ["--draw-length" as string]: length,
-          animation: `drawLine ${DRAW_MS}ms cubic-bezier(0.16, 1, 0.3, 1) forwards`,
-        }}
-      />
-      {pts.map((p, i) => (
-        <Fragment key={data[i].label}>
-          {/* Each point lands as the line reaches it, so the labels do not
-              all appear over a line that is still drawing. */}
-          <g
-            className="chart-in"
-            style={{ animationDelay: `${pointDelay(i, pts.length)}ms` }}
-          >
-          <circle cx={p.x} cy={p.y} r={2.5} fill="var(--color-accent-400)" />
-          {/* Every point carries its own count. The old footer showed the
-              series maximum between the two end years, which read as a third
-              year rather than as a value. */}
-          <text
-            x={p.x}
-            y={p.y - 7}
-            textAnchor="middle"
-            className="fill-ink-300 text-[.5625rem] font-medium tabular-nums"
-          >
-            {data[i].value}
-          </text>
-          <text
-            x={p.x}
-            y={height - 6}
-            textAnchor="middle"
-            className="fill-ink-600 text-[.5625rem] tabular-nums"
-          >
-            {data[i].label}
-          </text>
-          </g>
-        </Fragment>
-      ))}
-    </svg>
-  );
-}
+// `LineChart` lived here until the Years tab's `AreaChart` superseded it —
+// same text conventions, smoothed geometry from d3-shape. Its
+// non-scaling-stroke lesson moved with it: nothing that dashes a stroke may
+// put that stroke into screen space (see AreaChart's pathLength note).
 
 /**
  * A treemap — area for count, so the long tail is visible instead of being a

@@ -105,37 +105,9 @@ export function radarPoints(
 export const pointsAttr = (points: Point[]): string =>
   points.map((p) => `${round(p.x)},${round(p.y)}`).join(" ");
 
-/** A polyline through evenly spaced values, scaled to fill `w` × `h`. */
-export function linePoints(values: number[], w: number, h: number): Point[] {
-  if (values.length === 0) return [];
-  const max = Math.max(...values, 1);
-  const step = values.length > 1 ? w / (values.length - 1) : 0;
-  return values.map((v, i) => ({
-    x: values.length > 1 ? i * step : w / 2,
-    // A zero still sits on the floor rather than below it, so the line reads
-    // as a series with a gap instead of leaving the frame.
-    y: h - (Math.max(0, v) / max) * h,
-  }));
-}
-
-/**
- * Total length of the path through `points`, in viewBox units.
- *
- * For the line chart's draw-on: `stroke-dasharray` needs a length, and taking
- * it from `getTotalLength()` would mean measuring the DOM after mount — a
- * layout read, a re-render, and a first frame with the line already drawn.
- * The geometry is right here, so it can just be summed.
- */
-export function polylineLength(points: Point[]): number {
-  let total = 0;
-  for (let i = 1; i < points.length; i++) {
-    total += Math.hypot(
-      points[i].x - points[i - 1].x,
-      points[i].y - points[i - 1].y,
-    );
-  }
-  return total;
-}
+// `linePoints` and `polylineLength` lived here for the hand-rolled LineChart;
+// the Years tab's AreaChart gets both from d3-shape (`curveMonotoneX` and
+// `pathLength` normalization), so they left with their consumer.
 
 const round = (n: number) => Math.round(n * 100) / 100;
 

@@ -221,6 +221,11 @@ query ($id: Int!) {
     meanScore
     popularity
     favourites
+    # Whether this viewer has favourited it, and whether they are allowed to.
+    # The favourites field above is the global count — a different thing.
+    # (No backticks in here: this is inside a JS template literal.)
+    isFavourite
+    isFavouriteBlocked
     hashtag
     source
     countryOfOrigin
@@ -267,7 +272,11 @@ export interface MediaDetail extends MediaWithListStatus {
   duration: number | null;
   meanScore: number | null;
   popularity: number | null;
+  /** The global count. `isFavourite` below is this viewer's own flag. */
   favourites: number | null;
+  isFavourite: boolean | null;
+  /** AniList refuses the toggle for some entries; the button says so. */
+  isFavouriteBlocked: boolean | null;
   hashtag: string | null;
   source: string | null;
   countryOfOrigin: string | null;

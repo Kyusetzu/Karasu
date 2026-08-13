@@ -446,6 +446,13 @@ export const en = {
     hintClose: "Ctrl K close",
   },
   detail: {
+    favourite: "Favourite",
+    favourited: "Favourited",
+    favouriteAria: "Add to favourites",
+    unfavouriteAria: "Remove from favourites",
+    favouriteBlocked: "AniList does not allow favouriting this entry.",
+    favouriteFailed: "Couldn't change that favourite",
+    favouriteFailedDetail: "Nothing was sent. Favourites are not queued offline.",
     back: "Back",
     minutes: "{{n}} min",
     openOnAniList: "Open on AniList",

@@ -41,6 +41,7 @@ import { ScoreBars } from "@/components/ui/score-bars";
 import TagEditor from "@/components/media/TagEditor";
 import { parseNotes, serializeNotes } from "@/lib/tags";
 import { parseAniListHtml } from "@/lib/anilistHtml";
+import { FavouriteButton } from "@/components/media/FavouriteButton";
 import { RichText } from "@/components/RichText";
 
 
@@ -259,16 +260,24 @@ export default function AnimeDetail() {
                   {t("common.playNext")}
                 </Button>
               )}
-            <button
-              onClick={() =>
-                openUrl(
-                  `https://anilist.co/${data.type === "MANGA" ? "manga" : "anime"}/${data.id}`,
-                )
-              }
-              className="mt-2 flex items-center gap-1 text-xs text-ink-500 hover:text-accent-400"
-            >
-              {t("detail.openOnAniList")} <ExternalLink className="size-2.75" />
-            </button>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <FavouriteButton
+                kind={data.type === "MANGA" ? "manga" : "anime"}
+                id={data.id}
+                isFavourite={data.isFavourite}
+                blocked={data.isFavouriteBlocked}
+              />
+              <button
+                onClick={() =>
+                  openUrl(
+                    `https://anilist.co/${data.type === "MANGA" ? "manga" : "anime"}/${data.id}`,
+                  )
+                }
+                className="flex items-center gap-1 text-xs text-ink-500 hover:text-accent-400"
+              >
+                {t("detail.openOnAniList")} <ExternalLink className="size-2.75" />
+              </button>
+            </div>
           </div>
         </div>
 

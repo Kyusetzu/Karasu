@@ -876,3 +876,45 @@ export async function forumThreads(vars: ForumQuery, page = 1): Promise<ThreadPa
   );
   return { pageInfo: data.Page.pageInfo, threads: data.Page.threads ?? [] };
 }
+
+// --- Favourites -----------------------------------------------------------
+
+/**
+ * Toggle a favourite. One id per call, and which key you use picks the kind.
+ *
+ * Returns nothing useful — AniList answers with the viewer's whole favourites
+ * connection, which is far more than a heart needs — so the caller patches its
+ * own cache from the fact that the call succeeded rather than from the response.
+ * That is the one place in this file where the optimistic value is also the
+ * final value.
+ *
+ * `UpdateFavouriteOrder` exists too and is deliberately not wired: reordering is
+ * a drag-and-drop surface for marginal value, and it takes whole id arrays,
+ * which is the same replace-the-set hazard as `customLists`.
+ */
+export const TOGGLE_FAVOURITE_MUTATION = `
+mutation ($animeId: Int, $mangaId: Int, $characterId: Int, $staffId: Int, $studioId: Int) {
+  ToggleFavourite(
+    animeId: $animeId
+    mangaId: $mangaId
+    characterId: $characterId
+    staffId: $staffId
+    studioId: $studioId
+  ) {
+    anime { pageInfo { total } }
+  }
+}`;
+
+export type FavouriteKind = "anime" | "manga" | "character" | "staff" | "studio";
+
+const FAV_ARG: Record<FavouriteKind, string> = {
+  anime: "animeId",
+  manga: "mangaId",
+  character: "characterId",
+  staff: "staffId",
+  studio: "studioId",
+};
+
+export async function toggleFavourite(kind: FavouriteKind, id: number): Promise<void> {
+  await gql<unknown>(TOGGLE_FAVOURITE_MUTATION, { [FAV_ARG[kind]]: id });
+}

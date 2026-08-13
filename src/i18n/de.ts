@@ -448,6 +448,13 @@ export const de: typeof en = {
     hintClose: "Ctrl K schließen",
   },
   detail: {
+    favourite: "Favorit",
+    favourited: "Favorisiert",
+    favouriteAria: "Zu Favoriten hinzufügen",
+    unfavouriteAria: "Aus Favoriten entfernen",
+    favouriteBlocked: "AniList erlaubt für diesen Eintrag keine Favoriten.",
+    favouriteFailed: "Konnte den Favoriten nicht ändern",
+    favouriteFailedDetail: "Es wurde nichts gesendet. Favoriten werden offline nicht zwischengespeichert.",
     back: "Zurück",
     minutes: "{{n}} min",
     openOnAniList: "Auf AniList öffnen",

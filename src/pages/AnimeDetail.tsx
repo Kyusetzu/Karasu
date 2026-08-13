@@ -401,6 +401,29 @@ function trailerUrl(trailer: { id: string; site: string }): string {
 }
 
 /** One label/value row; renders nothing when there is no value. */
+/**
+ * A comma-joined list of studios, each linking to its own page.
+ *
+ * `Row` takes a `ReactNode`, so this needed no change there. Studios were a dead
+ * end until the studio page existed — the names were already right, they just
+ * went nowhere.
+ */
+function StudioLinks({ studios }: { studios: { id: number; name: string }[] }) {
+  if (!studios.length) return null;
+  return (
+    <>
+      {studios.map((s, i) => (
+        <span key={s.id}>
+          {i > 0 && ", "}
+          <Link to={`/studio/${s.id}`} className="hover:text-accent-400 hover:underline">
+            {s.name}
+          </Link>
+        </span>
+      ))}
+    </>
+  );
+}
+
 function Row({ label, value }: { label: string; value: ReactNode }) {
   if (value === null || value === undefined || value === "") return null;
   return (
@@ -465,14 +488,8 @@ function InformationCard({
         <Row label={t("detail.favorites")} value={num(data.favourites)} />
         <Row label={t("detail.source")} value={sourceLabel(data.source, t)} />
         <Row label={t("detail.country")} value={data.countryOfOrigin} />
-        <Row
-          label={t("detail.studios")}
-          value={mainStudios.map((s) => s.name).join(", ")}
-        />
-        <Row
-          label={t("detail.producers")}
-          value={producers.map((s) => s.name).join(", ")}
-        />
+        <Row label={t("detail.studios")} value={<StudioLinks studios={mainStudios} />} />
+        <Row label={t("detail.producers")} value={<StudioLinks studios={producers} />} />
         <Row label={t("detail.hashtag")} value={data.hashtag} />
       </dl>
     </Card>

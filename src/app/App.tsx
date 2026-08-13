@@ -48,6 +48,15 @@ const UserProfile = lazy(() => import("@/pages/UserProfile"));
 const Social = lazy(() => import("@/pages/Social"));
 const Thread = lazy(() => import("@/pages/Thread"));
 const Forum = lazy(() => import("@/pages/Forum"));
+const CharacterPage = lazy(() =>
+  import("@/pages/Person").then((m) => ({ default: m.CharacterPage })),
+);
+const StaffPage = lazy(() =>
+  import("@/pages/Person").then((m) => ({ default: m.StaffPage })),
+);
+const StudioPage = lazy(() =>
+  import("@/pages/Person").then((m) => ({ default: m.StudioPage })),
+);
 
 export default function App() {
   const { pathname } = useLocation();
@@ -154,6 +163,9 @@ export default function App() {
                 <Route path="/user/:name" element={<UserProfile />} />
                 <Route path="/forum" element={<Forum />} />
                 <Route path="/thread/:id" element={<Thread />} />
+                <Route path="/character/:id" element={<CharacterPage />} />
+                <Route path="/staff/:id" element={<StaffPage />} />
+                <Route path="/studio/:id" element={<StudioPage />} />
                 {/* Alias for old links */}
                 <Route path="/anime/:id" element={<AnimeDetail />} />
                 <Route path="/settings" element={<Settings />} />

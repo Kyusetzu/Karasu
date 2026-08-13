@@ -918,3 +918,144 @@ const FAV_ARG: Record<FavouriteKind, string> = {
 export async function toggleFavourite(kind: FavouriteKind, id: number): Promise<void> {
   await gql<unknown>(TOGGLE_FAVOURITE_MUTATION, { [FAV_ARG[kind]]: id });
 }
+
+// --- People and studios ---------------------------------------------------
+
+/**
+ * Characters, staff and studios — the four `Query` roots the app never touched.
+ *
+ * They live here rather than in `queries.ts` for the same reason the profile
+ * does: `queries.ts` is the media-and-statistics file, and these are the pages
+ * you reach *from* a title rather than the title itself.
+ *
+ * Each was validated live, and the studio one caught a real error: the edge field
+ * is `isMainStudio`, not `isMain` — `isMain` exists on `StudioEdge` (used by
+ * `DETAIL_QUERY`) but not on the `MediaEdge` a studio's own media returns.
+ */
+
+export interface PersonMediaEdge {
+  node: SocialMedia;
+  characterRole?: string | null;
+  staffRole?: string | null;
+  isMainStudio?: boolean | null;
+  voiceActors?: { id: number; name: { full: string | null }; image: { medium: string | null } | null }[] | null;
+}
+
+export interface CharacterDetail {
+  id: number;
+  name: { full: string | null; native: string | null; alternative: string[] | null };
+  image: { large: string | null } | null;
+  description: string | null;
+  gender: string | null;
+  age: string | null;
+  bloodType: string | null;
+  dateOfBirth: { year: number | null; month: number | null; day: number | null } | null;
+  favourites: number | null;
+  siteUrl: string | null;
+  isFavourite: boolean | null;
+  isFavouriteBlocked: boolean | null;
+  media: { edges: PersonMediaEdge[] } | null;
+}
+
+/** `description(asHtml: false)` on purpose — `lib/anilistHtml` parses AniList's
+ *  HTML flavour either way, and the raw form is what the markdown-ish source is. */
+export const CHARACTER_QUERY = `
+query ($id: Int!) {
+  Character(id: $id) {
+    id
+    name { full native alternative }
+    image { large }
+    description(asHtml: false)
+    gender age bloodType
+    dateOfBirth { year month day }
+    favourites siteUrl isFavourite isFavouriteBlocked
+    media(sort: POPULARITY_DESC, perPage: 24) {
+      edges {
+        characterRole
+        voiceActors(language: JAPANESE) { id name { full } image { medium } }
+        node { ${SOCIAL_MEDIA} }
+      }
+    }
+  }
+}`;
+
+export async function character(id: number): Promise<CharacterDetail> {
+  const data = await gql<{ Character: CharacterDetail | null }>(CHARACTER_QUERY, { id });
+  if (!data.Character) throw new Error("NOT_FOUND");
+  return data.Character;
+}
+
+export interface StaffDetail {
+  id: number;
+  name: { full: string | null; native: string | null };
+  image: { large: string | null } | null;
+  description: string | null;
+  primaryOccupations: string[] | null;
+  gender: string | null;
+  age: number | null;
+  homeTown: string | null;
+  yearsActive: number[] | null;
+  languageV2: string | null;
+  dateOfBirth: { year: number | null; month: number | null; day: number | null } | null;
+  dateOfDeath: { year: number | null; month: number | null; day: number | null } | null;
+  favourites: number | null;
+  siteUrl: string | null;
+  isFavourite: boolean | null;
+  isFavouriteBlocked: boolean | null;
+  staffMedia: { edges: PersonMediaEdge[] } | null;
+  characters: {
+    nodes: { id: number; name: { full: string | null }; image: { medium: string | null } | null }[];
+  } | null;
+}
+
+export const STAFF_QUERY = `
+query ($id: Int!) {
+  Staff(id: $id) {
+    id
+    name { full native }
+    image { large }
+    description(asHtml: false)
+    primaryOccupations gender age homeTown yearsActive languageV2
+    dateOfBirth { year month day }
+    dateOfDeath { year month day }
+    favourites siteUrl isFavourite isFavouriteBlocked
+    staffMedia(sort: POPULARITY_DESC, perPage: 24) {
+      edges { staffRole node { ${SOCIAL_MEDIA} } }
+    }
+    characters(sort: FAVOURITES_DESC, perPage: 12) {
+      nodes { id name { full } image { medium } }
+    }
+  }
+}`;
+
+export async function staff(id: number): Promise<StaffDetail> {
+  const data = await gql<{ Staff: StaffDetail | null }>(STAFF_QUERY, { id });
+  if (!data.Staff) throw new Error("NOT_FOUND");
+  return data.Staff;
+}
+
+export interface StudioDetail {
+  id: number;
+  name: string | null;
+  isAnimationStudio: boolean | null;
+  favourites: number | null;
+  siteUrl: string | null;
+  isFavourite: boolean | null;
+  media: { edges: PersonMediaEdge[] } | null;
+}
+
+export const STUDIO_QUERY = `
+query ($id: Int!) {
+  Studio(id: $id) {
+    id name isAnimationStudio favourites siteUrl isFavourite
+    media(sort: POPULARITY_DESC, perPage: 24) {
+      edges { isMainStudio node { ${SOCIAL_MEDIA} } }
+    }
+  }
+}`;
+
+export async function studio(id: number): Promise<StudioDetail> {
+  const data = await gql<{ Studio: StudioDetail | null }>(STUDIO_QUERY, { id });
+  if (!data.Studio) throw new Error("NOT_FOUND");
+  return data.Studio;
+}

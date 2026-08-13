@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
 import { type StatEntry } from "@/api/queries";
 import type { MediaType } from "@/api/types";
@@ -93,7 +94,18 @@ export function RankedRow({
 }) {
   const image = entryImage(entry, category);
   const label = entryLabel(entry, category);
+  const href = entryHref(entry, category);
+  // `Row` is the same markup either way; only the element changes, so a
+  // non-navigable category keeps exactly the layout it had.
+  const Wrapper = href
+    ? ({ children }: { children: React.ReactNode }) => (
+        <Link to={href} className="block">
+          {children}
+        </Link>
+      )
+    : ({ children }: { children: React.ReactNode }) => <>{children}</>;
   return (
+    <Wrapper>
     <div className="flex items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-surface-900">
       <span className="w-5 shrink-0 text-right text-xs tabular-nums text-ink-600">
         {rank}
@@ -128,6 +140,7 @@ export function RankedRow({
         {scoreText(entry.meanScore)}
       </span>
     </div>
+    </Wrapper>
   );
 }
 
@@ -136,6 +149,21 @@ export function entryImage(e: StatEntry, category: Category): string | null | un
   if (category === "voiceActors") return e.voiceActor?.image?.medium ?? null;
   if (category === "staff") return e.staff?.image?.medium ?? null;
   return undefined; // no avatar column
+}
+
+/**
+ * Where a row leads, or null for one that leads nowhere.
+ *
+ * Voice actors and staff have their own pages now; studios do too. Genres and
+ * tags have nothing behind them, which is why this returns null rather than
+ * inventing a search link — a row that looks clickable and is not is worse than
+ * a row that does not.
+ */
+export function entryHref(e: StatEntry, category: Category): string | null {
+  if (category === "voiceActors" && e.voiceActor?.id) return `/staff/${e.voiceActor.id}`;
+  if (category === "staff" && e.staff?.id) return `/staff/${e.staff.id}`;
+  if (category === "studios" && e.studio?.id) return `/studio/${e.studio.id}`;
+  return null;
 }
 
 export function entryLabel(e: StatEntry, category: Category): string {

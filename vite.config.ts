@@ -30,6 +30,42 @@ export default defineConfig(async () => ({
     target: process.env.TAURI_ENV_PLATFORM === "windows" ? "chrome105" : "safari13",
   },
 
+  /**
+   * Two test projects, split by an explicit `.dom.` in the filename.
+   *
+   * Everything is **node** by default, which is what keeps the suite fast —
+   * thirty-odd files and four hundred assertions in about two seconds. Only
+   * `*.dom.test.tsx` boots jsdom and Testing Library.
+   *
+   * The marker is in the name rather than inferred from the extension, because
+   * inferring it is wrong: `components/stats/Charts.test.tsx` renders with
+   * `renderToStaticMarkup` and its own comment says it needs no DOM and no
+   * testing library. An extension rule dragged it into jsdom for nothing. A test
+   * needing a DOM is a deliberate choice, so it says so in its filename.
+   */
+  test: {
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: "node",
+          include: ["src/**/*.test.{ts,tsx}"],
+          exclude: ["src/**/*.dom.test.tsx"],
+          environment: "node",
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: "dom",
+          include: ["src/**/*.dom.test.tsx"],
+          environment: "jsdom",
+          setupFiles: ["./vitest.setup.ts"],
+        },
+      },
+    ],
+  },
+
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
   // 1. prevent Vite from obscuring rust errors

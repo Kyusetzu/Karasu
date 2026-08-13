@@ -245,6 +245,17 @@ Prefer extracting pure logic into `src/lib/*.ts` (or a pure Rust fn) and unit
 testing it. Untestable-by-construction logic in a component is the usual reason
 a regression here is invisible until it ships.
 
+**Two vitest projects, and the filename picks one.** Everything runs in **node**
+by default; only `*.dom.test.tsx` boots jsdom and Testing Library, via the
+`projects` block in `vite.config.ts`. That split is what keeps the suite at ~2 s
+for 430 tests, and it is a *name* rather than an inference on purpose:
+`components/stats/Charts.test.tsx` renders with `renderToStaticMarkup` and needs
+no DOM, so an extension rule (`.tsx` ⇒ jsdom) dragged it into one and the suite
+went from 2.0 s to **14.1 s**. Needing a DOM is a decision, so it is spelled out
+in the filename. `src/test/render.tsx` holds the provider wrapper and the
+sign-in helpers; it imports Testing Library, so nothing in the node project may
+import it.
+
 ### Notes that have cost real time
 
 - **`npm test` already means `vitest run`.** `npm test -- --run` is redundant.

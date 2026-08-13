@@ -804,6 +804,10 @@ export const en = {
     favMoveUp: "Move up",
     favMoveDown: "Move down",
     favRemove: "Remove from favourites",
+    pin: "Pin to profile",
+    unpin: "Unpin from profile",
+    pinned: "Pinned",
+    pinFailed: "The pin didn't stick.",
     // Markdown rendering
     mdImage: "Image",
     mdVideo: "Video",

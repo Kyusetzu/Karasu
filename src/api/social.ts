@@ -371,23 +371,23 @@ export const USER_SEARCH_MIN = 3;
  * shows a remaining count.
  */
 export const ACTIVITY_QUERY = `
-query ($userId: Int, $isFollowing: Boolean, $page: Int) {
+query ($userId: Int, $isFollowing: Boolean, $page: Int, $sort: [ActivitySort]) {
   Page(page: $page, perPage: 25) {
     ${PAGE_INFO}
     activities(
       userId: $userId
       isFollowing: $isFollowing
       type_in: [ANIME_LIST, MANGA_LIST, TEXT]
-      sort: ID_DESC
+      sort: $sort
     ) {
       __typename
       ... on ListActivity {
-        id status progress createdAt likeCount isLiked replyCount siteUrl
+        id status progress createdAt likeCount isLiked isPinned replyCount siteUrl
         user { ${SOCIAL_USER} }
         media { ${SOCIAL_MEDIA} }
       }
       ... on TextActivity {
-        id text createdAt likeCount isLiked replyCount siteUrl
+        id text createdAt likeCount isLiked isPinned replyCount siteUrl
         user { ${SOCIAL_USER} }
       }
     }
@@ -406,7 +406,13 @@ export async function activities(
 ): Promise<ActivityPage> {
   const data = await gql<{ Page: { pageInfo: PageInfo; activities: unknown[] } }>(
     ACTIVITY_QUERY,
-    { ...vars, page },
+    {
+      ...vars,
+      page,
+      // A pin floats on the profile it belongs to; a following feed is a
+      // timeline and stays one. Both are still total orders, which paging needs.
+      sort: "userId" in vars ? ["PINNED", "ID_DESC"] : ["ID_DESC"],
+    },
   );
   return { pageInfo: data.Page.pageInfo, activities: data.Page.activities ?? [] };
 }
@@ -578,6 +584,29 @@ export async function deleteActivity(id: number): Promise<boolean> {
     { id },
   );
   return data.DeleteActivity?.deleted === true;
+}
+
+/**
+ * Pin (or unpin) one of the viewer's own activities to their profile.
+ * `isPinned` exists on both renderable members (verified by introspection),
+ * and the profile feed sorts `[PINNED, ID_DESC]` so a pin floats on refetch.
+ */
+export const TOGGLE_ACTIVITY_PIN_MUTATION = `
+mutation ($id: Int!, $pinned: Boolean) {
+  ToggleActivityPin(id: $id, pinned: $pinned) {
+    ... on ListActivity { id isPinned }
+    ... on TextActivity { id isPinned }
+  }
+}`;
+
+export async function toggleActivityPin(
+  id: number,
+  pinned: boolean,
+): Promise<{ id: number; isPinned: boolean | null } | null> {
+  const data = await gql<{
+    ToggleActivityPin: { id: number; isPinned: boolean | null } | null;
+  }>(TOGGLE_ACTIVITY_PIN_MUTATION, { id, pinned });
+  return data.ToggleActivityPin;
 }
 
 // --- Forum ----------------------------------------------------------------

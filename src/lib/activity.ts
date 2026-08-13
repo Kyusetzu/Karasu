@@ -124,6 +124,8 @@ interface FeedBase {
   user: SocialUser;
   likeCount: number;
   isLiked: boolean;
+  /** Pinned to its author's profile — only ever true on a profile feed. */
+  isPinned: boolean;
   replyCount: number;
   siteUrl: string;
 }
@@ -146,6 +148,7 @@ export interface RawActivity {
   createdAt?: number;
   likeCount?: number | null;
   isLiked?: boolean | null;
+  isPinned?: boolean | null;
   replyCount?: number | null;
   siteUrl?: string | null;
   user?: SocialUser | null;
@@ -172,6 +175,7 @@ export function normalizeActivity(raw: RawActivity | null | undefined): FeedItem
     user: raw.user,
     likeCount: raw.likeCount ?? 0,
     isLiked: raw.isLiked === true,
+    isPinned: raw.isPinned === true,
     replyCount: raw.replyCount ?? 0,
     siteUrl: raw.siteUrl ?? "",
   };

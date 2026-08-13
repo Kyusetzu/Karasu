@@ -809,6 +809,10 @@ export const de: typeof en = {
     favMoveUp: "Nach oben",
     favMoveDown: "Nach unten",
     favRemove: "Aus Favoriten entfernen",
+    pin: "Ans Profil heften",
+    unpin: "Vom Profil lösen",
+    pinned: "Angeheftet",
+    pinFailed: "Das Anheften hat nicht geklappt.",
     // Markdown-Darstellung
     mdImage: "Bild",
     mdVideo: "Video",

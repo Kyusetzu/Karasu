@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import {
   deleteActivity,
   saveTextActivity,
+  toggleActivityPin,
   type ActivityPage,
 } from "@/api/social";
 import { showToast } from "@/stores/toast";
@@ -98,5 +99,41 @@ export function useActivityPost(viewerId: number | undefined) {
     },
   });
 
-  return { post, remove };
+  /**
+   * Pin or unpin one of the viewer's own activities.
+   *
+   * The flag is patched in place across the loaded pages — the *ordering*
+   * (pinned floats to the top of the profile feed) only changes on the next
+   * refetch, which is honest: reshuffling rows under the cursor to celebrate a
+   * click is worse than a badge appearing where the row already is.
+   */
+  const pin = useMutation({
+    mutationFn: (vars: { id: number; pinned: boolean }) =>
+      toggleActivityPin(vars.id, vars.pinned),
+    onSuccess: (res, vars) => {
+      const isPinned = res?.isPinned ?? vars.pinned;
+      for (const key of feedKeys()) {
+        qc.setQueryData<InfiniteData<ActivityPage>>(key, (old) =>
+          old
+            ? {
+                ...old,
+                pages: old.pages.map((p) => ({
+                  ...p,
+                  activities: p.activities.map((raw) =>
+                    (raw as { id?: number })?.id === vars.id
+                      ? { ...(raw as object), isPinned }
+                      : raw,
+                  ),
+                })),
+              }
+            : old,
+        );
+      }
+    },
+    onError: () => {
+      showToast({ kind: "error", text: t("social.pinFailed") });
+    },
+  });
+
+  return { post, remove, pin };
 }

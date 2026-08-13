@@ -94,6 +94,24 @@ describe("normalizeActivity", () => {
     ).toBeNull();
   });
 
+  it("carries the pin, defaulting to unpinned", () => {
+    const pinned = normalizeActivity({
+      __typename: "TextActivity",
+      id: 20,
+      text: "pinned post",
+      user: USER,
+      isPinned: true,
+    });
+    expect(pinned).toMatchObject({ isPinned: true });
+    const plain = normalizeActivity({
+      __typename: "TextActivity",
+      id: 21,
+      text: "plain post",
+      user: USER,
+    });
+    expect(plain).toMatchObject({ isPinned: false });
+  });
+
   it("defaults the counts rather than passing null through to the UI", () => {
     const out = normalizeActivity({
       __typename: "ListActivity",

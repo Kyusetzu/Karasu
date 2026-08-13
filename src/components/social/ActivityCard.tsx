@@ -3,7 +3,7 @@ import { Link } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { ExternalLink, Heart, MessageSquare } from "lucide-react";
+import { ExternalLink, Heart, MessageSquare, Pin } from "lucide-react";
 import {
   formatProgress,
   PROGRESS_VERBS,
@@ -21,6 +21,7 @@ import { Markdown } from "./Markdown";
 import { relTimeFromSeconds } from "@/lib/relTime";
 import { validatePost } from "@/lib/composer";
 import { useSocialActions } from "@/hooks/useSocialActions";
+import { useActivityPost } from "@/hooks/useActivityPost";
 import { useAuth } from "@/stores/auth";
 import { cn } from "@/lib/utils";
 
@@ -244,6 +245,9 @@ function ActivityReplies({ activityId }: { activityId: number }) {
 export function ActivityCard({ item }: { item: FeedItem }) {
   const { t, i18n } = useTranslation();
   const [repliesOpen, setRepliesOpen] = useState(false);
+  const viewer = useAuth((s) => s.viewer);
+  const self = viewer !== null && viewer.id === item.user.id;
+  const { pin } = useActivityPost(viewer?.id);
   const when = relTimeFromSeconds(item.createdAt, i18n.language, t("notif.now"));
 
   return (
@@ -275,14 +279,39 @@ export function ActivityCard({ item }: { item: FeedItem }) {
               sub={<span className="block text-2xs text-ink-600">{when}</span>}
             />
           </Link>
-          <button
-            onClick={() => void openUrl(item.siteUrl)}
-            title={t("social.openOnAniList")}
-            aria-label={t("social.openOnAniList")}
-            className="shrink-0 text-ink-600 transition-surface hover:text-ink-300"
-          >
-            <ExternalLink className="size-3" />
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            {/* Your own activity gets the toggle; someone else's pinned one
+                gets the passive marker — same glyph, different verbs. */}
+            {self ? (
+              <button
+                onClick={() => pin.mutate({ id: item.id, pinned: !item.isPinned })}
+                disabled={pin.isPending}
+                aria-pressed={item.isPinned}
+                aria-label={item.isPinned ? t("social.unpin") : t("social.pin")}
+                title={item.isPinned ? t("social.unpin") : t("social.pin")}
+                className={cn(
+                  "transition-surface",
+                  item.isPinned ? "text-accent-400" : "text-ink-600 hover:text-ink-300",
+                )}
+              >
+                <Pin className={cn("size-3", item.isPinned && "fill-current")} />
+              </button>
+            ) : (
+              item.isPinned && (
+                <span title={t("social.pinned")} className="text-accent-400">
+                  <Pin className="size-3 fill-current" />
+                </span>
+              )
+            )}
+            <button
+              onClick={() => void openUrl(item.siteUrl)}
+              title={t("social.openOnAniList")}
+              aria-label={t("social.openOnAniList")}
+              className="text-ink-600 transition-surface hover:text-ink-300"
+            >
+              <ExternalLink className="size-3" />
+            </button>
+          </div>
         </div>
 
         <div className="mt-2 text-sm text-ink-300">

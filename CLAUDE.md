@@ -366,6 +366,29 @@ import it.
   Worse, `grep` reported the files clean because the console codepage hid it. If
   non-ASCII is ever in question, compare **codepoints** (`hex(ord(c))`), not
   glyphs, and write literal UTF-8 rather than escapes.
+- **The CSP needs `img-src data:`, and dropping it makes the bird disappear.**
+  `assets/karasu-mark.svg` is 2,966 bytes, under Vite's 4,096-byte
+  `assetsInlineLimit`, so the build inlines it as
+  `data:image/svg+xml,%3c?xml…` — verified by grepping `dist/`, not by reasoning
+  about it. Without `data:` the mark vanishes from the titlebar, About, first
+  run, the Wrapped footer and several empty states, and nothing else breaks, so
+  it looks like a styling regression rather than a policy one.
+- **`csp` and `devCsp` are separate, and dev genuinely needs the looser one.**
+  Vite injects `<style>` elements at runtime and serves HMR over a websocket;
+  the production bundle does neither. A single strict `csp` therefore breaks
+  `tauri dev` while the shipped app is fine — which is the worst way round to
+  find out.
+- **Tauri rewrites the CSP at compile time**, parsing the frontend assets and
+  injecting nonce and hash sources into `script-src` and `style-src`
+  (`dangerousDisableAssetCspModification` turns that off — don't). Two
+  consequences: never add `'unsafe-eval'` or `'unsafe-inline'` to `script-src`
+  in production, because Tauri's nonce is what makes it work; and
+  `'unsafe-inline'` in `style-src` is *inert* whenever a hash is present, since
+  CSP tells browsers to ignore it then. It is kept only as a fallback for the
+  case where Tauri injects nothing.
+- **A CSP cannot be checked from the Vite dev server** — it applies to the Tauri
+  webview, so the browser-pane tooling is blind to it. Only a real
+  `tauri dev`/`tauri build` run proves it.
 - **MSVC writes an 11 MB `karasu.pdb` on every release build and there is no
   flag reaching the linker to stop it.** `debug = 0` and `strip = true` are
   already set, `cargo build --release -v` shows no `/DEBUG`, no `-Cdebuginfo=`

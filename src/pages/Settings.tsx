@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import {
   EyeOff,
   FolderOpen,
+  Globe,
   Palette,
   Plug,
   Radar,
@@ -11,6 +12,11 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AccountSection } from "./settings/AccountPane";
+import {
+  AniListListOptionsSection,
+  AniListNotificationsSection,
+  AniListProfileSection,
+} from "./settings/AniListPane";
 import { AppearanceSection } from "./settings/AppearancePane";
 import { ScrobbleSection, JellyfinSection } from "./settings/DetectionPane";
 import { LibrarySection } from "./settings/LibraryPane";
@@ -28,6 +34,18 @@ import { AdvancedSection, PortableSection, LogSection } from "./settings/Advance
  */
 const PANES = [
   { id: "account", icon: User, sections: [AccountSection] },
+  // Second, right after the account it belongs to: these are that account's own
+  // settings rather than Karasu's, and four of them are ones Karasu overrides —
+  // which is a thing to find while thinking about the account, not later.
+  {
+    id: "anilist",
+    icon: Globe,
+    sections: [
+      AniListProfileSection,
+      AniListListOptionsSection,
+      AniListNotificationsSection,
+    ],
+  },
   { id: "appearance", icon: Palette, sections: [AppearanceSection] },
   {
     id: "detection",

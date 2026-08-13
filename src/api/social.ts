@@ -714,3 +714,90 @@ export async function toggleThreadSubscription(
   }>(TOGGLE_THREAD_SUBSCRIPTION_MUTATION, { threadId, subscribe });
   return data.ToggleThreadSubscription;
 }
+
+// --- Account settings -----------------------------------------------------
+
+/**
+ * `UpdateUser`, with only the arguments this pane is willing to send.
+ *
+ * **`animeListOptions` and `mangaListOptions` are deliberately absent from the
+ * variable list**, not merely unused: `MediaListOptionsInput.customLists` is a
+ * full replacement with no undo on AniList's side. `lib/anilistUserFields`
+ * carries the reasoning and a test that keeps it out.
+ *
+ * Returns what the pane needs to reconcile, so a save never costs a refetch.
+ */
+export const UPDATE_USER_MUTATION = `
+mutation (
+  $about: String
+  $titleLanguage: UserTitleLanguage
+  $staffNameLanguage: UserStaffNameLanguage
+  $scoreFormat: ScoreFormat
+  $rowOrder: String
+  $profileColor: String
+  $timezone: String
+  $activityMergeTime: Int
+  $displayAdultContent: Boolean
+  $airingNotifications: Boolean
+  $restrictMessagesToFollowing: Boolean
+  $notificationOptions: [NotificationOptionInput]
+) {
+  UpdateUser(
+    about: $about
+    titleLanguage: $titleLanguage
+    staffNameLanguage: $staffNameLanguage
+    scoreFormat: $scoreFormat
+    rowOrder: $rowOrder
+    profileColor: $profileColor
+    timezone: $timezone
+    activityMergeTime: $activityMergeTime
+    displayAdultContent: $displayAdultContent
+    airingNotifications: $airingNotifications
+    restrictMessagesToFollowing: $restrictMessagesToFollowing
+    notificationOptions: $notificationOptions
+  ) {
+    id
+    about
+    options {
+      titleLanguage displayAdultContent airingNotifications profileColor
+      timezone activityMergeTime staffNameLanguage restrictMessagesToFollowing
+      notificationOptions { type enabled }
+    }
+    mediaListOptions { scoreFormat rowOrder }
+  }
+}`;
+
+export interface UpdatedUser {
+  id: number;
+  about: string | null;
+  options: (AniListUserOptions & {
+    notificationOptions: { type: string | null; enabled: boolean | null }[] | null;
+  }) | null;
+  mediaListOptions: { scoreFormat: string | null; rowOrder: string | null } | null;
+}
+
+export async function updateUser(vars: Record<string, unknown>): Promise<UpdatedUser> {
+  const data = await gql<{ UpdateUser: UpdatedUser }>(UPDATE_USER_MUTATION, vars);
+  return data.UpdateUser;
+}
+
+/**
+ * The viewer's notification options, on their own key.
+ *
+ * Separate from `USER_PROFILE_QUERY` and read with `staleTime: 0` because
+ * `UpdateUser(notificationOptions:)` replaces the **whole array** — merging
+ * against a stale copy would silently disable whatever changed elsewhere since.
+ */
+export const NOTIFICATION_OPTIONS_QUERY = `
+query ($id: Int!) {
+  User(id: $id) { id options { notificationOptions { type enabled } } }
+}`;
+
+export async function notificationOptions(
+  id: number,
+): Promise<{ type: string | null; enabled: boolean | null }[]> {
+  const data = await gql<{
+    User: { options: { notificationOptions: { type: string | null; enabled: boolean | null }[] | null } | null } | null;
+  }>(NOTIFICATION_OPTIONS_QUERY, { id });
+  return data.User?.options?.notificationOptions ?? [];
+}

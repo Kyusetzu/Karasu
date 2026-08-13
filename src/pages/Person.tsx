@@ -17,10 +17,9 @@ import { Avatar } from "@/components/ui/user-lockup";
 import { SectionHeader } from "@/components/ui/section-header";
 import { EmptyState, StruckQuery } from "@/components/EmptyState";
 import { Shimmer } from "@/components/Skeleton";
-import { RichText } from "@/components/RichText";
+import { Markdown } from "@/components/social/Markdown";
 import { MediaStrip } from "@/components/media/MediaStrip";
 import { FavouriteButton } from "@/components/media/FavouriteButton";
-import { parseAniListHtml } from "@/lib/anilistHtml";
 import { cn } from "@/lib/utils";
 
 /**
@@ -35,9 +34,10 @@ import { cn } from "@/lib/utils";
  * with portraits, and the detail page already lists studios — all of them dead
  * ends until now. Reached from those, and by id.
  *
- * One request per page. `description` is AniList's HTML flavour, so it goes
- * through the same parser and renderer as a media synopsis: no innerHTML, and
- * spoilers stay behind a click.
+ * One request per page. `description` here is **markdown, not HTML** — measured
+ * across 24 staff and character samples, none carried a raw tag, while media
+ * descriptions have `<br>` in every one. So it renders through `Markdown`, the
+ * same path as a bio: no innerHTML, and spoilers stay behind a click.
  */
 type Kind = "character" | "staff" | "studio";
 
@@ -244,8 +244,12 @@ export default function Person({ kind }: { kind: Kind }) {
       </header>
 
       {description && (
-        <div className="mt-6 max-w-prose text-[.8125rem] leading-[1.75] text-pretty text-ink-300">
-          <RichText nodes={parseAniListHtml(description)} />
+        <div className="mt-6 max-w-prose">
+          <Markdown
+            source={description}
+            siteUrl={data.siteUrl ?? undefined}
+            className="text-[.8125rem] leading-[1.75] text-pretty"
+          />
         </div>
       )}
 

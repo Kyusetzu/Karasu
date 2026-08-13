@@ -5,7 +5,15 @@ import { type StatEntry } from "@/api/queries";
 import type { MediaType } from "@/api/types";
 import { Tabs, type TabOption } from "@/components/ui/tabs";
 import { Empty, type Category, type SortKey } from "./shared";
-export const TOP_N = 25;
+
+/**
+ * Everything AniList will give, shown at once. `userStatistics` category lists
+ * are clamped at 30 rows server-side regardless of the `limit` argument —
+ * measured live at limit 31, 50, 500 and 2000, all returning 30 — so 30 here is
+ * "all of it", not a choice, and raising it buys nothing. The expand button
+ * this list used to carry was a 25→30 step pretending to be one.
+ */
+export const TOP_N = 30;
 
 export function RankedList({
   entries,
@@ -18,7 +26,6 @@ export function RankedList({
 }) {
   const { t, i18n } = useTranslation();
   const [sort, setSort] = useState<SortKey>("count");
-  const [expanded, setExpanded] = useState(false);
 
   const metric = (e: StatEntry) =>
     type === "ANIME" ? e.minutesWatched : e.chaptersRead;
@@ -32,7 +39,7 @@ export function RankedList({
 
   if (entries.length === 0) return <Empty />;
 
-  const shown = expanded ? sorted : sorted.slice(0, TOP_N);
+  const shown = sorted.slice(0, TOP_N);
   const barValue = (e: StatEntry) =>
     sort === "score" ? e.meanScore : sort === "time" ? metric(e) : e.count;
   const max = Math.max(...shown.map(barValue), 1);
@@ -66,14 +73,6 @@ export function RankedList({
           />
         ))}
       </div>
-      {sorted.length > TOP_N && (
-        <button
-          onClick={() => setExpanded((v) => !v)}
-          className="text-sm text-accent-400 hover:underline"
-        >
-          {expanded ? t("stats.showLess") : t("stats.showAll", { n: sorted.length })}
-        </button>
-      )}
     </div>
   );
 }

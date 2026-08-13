@@ -984,8 +984,10 @@ export interface CharacterDetail {
   media: { edges: PersonMediaEdge[] } | null;
 }
 
-/** `description(asHtml: false)` on purpose — `lib/anilistHtml` parses AniList's
- *  HTML flavour either way, and the raw form is what the markdown-ish source is. */
+/** `description(asHtml: false)` on purpose — the raw form is **markdown** (0 raw
+ *  HTML tags across 24 staff+character samples; `asHtml: true` returns
+ *  markdown-it output), so it goes through `lib/anilistMarkdown` like a bio.
+ *  Media descriptions are the opposite case and keep `lib/anilistHtml`. */
 export const CHARACTER_QUERY = `
 query ($id: Int!) {
   Character(id: $id) {

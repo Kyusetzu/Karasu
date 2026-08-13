@@ -288,8 +288,6 @@ export const de: typeof en = {
     sortByScore: "Bewertung",
     hours: "{{n}} Std",
     chaptersShort: "{{n}} Kap.",
-    showAll: "Alle anzeigen ({{n}})",
-    showLess: "Weniger anzeigen",
     timeToFinish: "Restzeit zum Fertigschauen",
     timeToFinishHint: "Verbleibende Episoden deiner Watching-Liste × Laufzeit.",
   },

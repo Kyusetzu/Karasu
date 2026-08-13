@@ -287,8 +287,6 @@ export const en = {
     sortByScore: "Score",
     hours: "{{n}} h",
     chaptersShort: "{{n}} ch",
-    showAll: "Show all ({{n}})",
-    showLess: "Show less",
     timeToFinish: "Time to finish watching",
     timeToFinishHint: "Remaining episodes on your Watching list × runtime.",
   },

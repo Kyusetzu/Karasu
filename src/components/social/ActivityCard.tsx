@@ -1,12 +1,22 @@
+import { useState } from "react";
 import { Link } from "react-router";
+import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { ExternalLink, Heart, MessageSquare } from "lucide-react";
 import type { FeedItem, ActivityVerb } from "@/lib/activity";
 import { displayTitle } from "@/api/types";
+import { isTauri } from "@/api/anilist";
+import { activityReplies, type LikeableType } from "@/api/social";
 import { UserLockup } from "@/components/ui/user-lockup";
+import { Button } from "@/components/ui/button";
+import { Shimmer } from "@/components/Skeleton";
 import { Markdown } from "./Markdown";
 import { relTimeFromSeconds } from "@/lib/relTime";
+import { validatePost } from "@/lib/composer";
+import { useSocialActions } from "@/hooks/useSocialActions";
+import { useAuth } from "@/stores/auth";
+import { cn } from "@/lib/utils";
 
 /**
  * One row of the feed.
@@ -40,8 +50,144 @@ function verbText(verb: ActivityVerb, t: (k: string) => string): string {
   }
 }
 
+/**
+ * The heart is its own receipt and its own undo, which is why a like gets no
+ * toast — see `useSocialActions`. A *failed* one does, because that is the case
+ * the interface has already claimed succeeded.
+ */
+function LikeButton({
+  id,
+  type,
+  activityId,
+  likeCount,
+  isLiked,
+}: {
+  id: number;
+  type: LikeableType;
+  activityId?: number;
+  likeCount: number;
+  isLiked: boolean;
+}) {
+  const { t } = useTranslation();
+  const mode = useAuth((s) => s.mode);
+  const { like } = useSocialActions();
+
+  // Nothing to like *as* without an account, and a disabled heart is an
+  // invitation with no explanation.
+  if (mode !== "anilist") {
+    return (
+      <span className="flex items-center gap-1 px-1.5 py-0.5 text-2xs text-ink-600">
+        <Heart className="size-2.75" />
+        <span className="tabular-nums">{likeCount}</span>
+      </span>
+    );
+  }
+
+  return (
+    <button
+      onClick={() => like.mutate({ id, type, activityId })}
+      aria-pressed={isLiked}
+      aria-label={isLiked ? t("social.unlike") : t("social.like")}
+      className={cn(
+        "flex items-center gap-1 rounded-md px-1.5 py-0.5 text-2xs transition-surface hover:bg-surface-850",
+        isLiked ? "text-danger" : "text-ink-600 hover:text-ink-300",
+      )}
+    >
+      <Heart className={cn("size-2.75", isLiked && "fill-current")} />
+      <span className="tabular-nums">{likeCount}</span>
+    </button>
+  );
+}
+
+/** The flat reply list AniList returns — one level, which is its own shape. */
+function ActivityReplies({ activityId }: { activityId: number }) {
+  const { t, i18n } = useTranslation();
+  const mode = useAuth((s) => s.mode);
+  const { reply } = useSocialActions();
+  const [draft, setDraft] = useState("");
+
+  const q = useQuery({
+    queryKey: ["social", "activityReplies", activityId],
+    queryFn: () => activityReplies(activityId),
+    enabled: isTauri,
+    staleTime: 60 * 1000,
+  });
+
+  const check = validatePost(draft);
+
+  return (
+    <div className="mt-3 space-y-2 border-l-2 border-surface-800 pl-3">
+      {q.isLoading && <Shimmer className="h-3 w-32 rounded" />}
+      {q.data?.map((r) => (
+        <div key={r.id} className="text-sm">
+          <div className="flex items-center justify-between gap-2">
+            <Link
+              to={`/user/${encodeURIComponent(r.user?.name ?? "")}`}
+              className="min-w-0"
+            >
+              <UserLockup
+                name={r.user?.name ?? "—"}
+                src={r.user?.avatar?.medium}
+                size="sm"
+                nameClassName="text-xs font-medium text-ink-300"
+                sub={
+                  <span className="block text-2xs text-ink-600">
+                    {relTimeFromSeconds(r.createdAt, i18n.language, t("notif.now"))}
+                  </span>
+                }
+              />
+            </Link>
+            <LikeButton
+              id={r.id}
+              type="ACTIVITY_REPLY"
+              activityId={activityId}
+              likeCount={r.likeCount ?? 0}
+              isLiked={r.isLiked === true}
+            />
+          </div>
+          <Markdown source={r.text} className="mt-1" />
+        </div>
+      ))}
+      {!q.isLoading && !q.data?.length && (
+        <p className="text-2xs text-ink-600">{t("social.noReplies")}</p>
+      )}
+
+      {mode === "anilist" && (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!check.ok || reply.isPending) return;
+            reply.mutate(
+              { activityId, text: check.text },
+              { onSuccess: () => setDraft("") },
+            );
+          }}
+          className="flex items-start gap-2 pt-1"
+        >
+          <textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder={t("social.replyPlaceholder")}
+            rows={1}
+            className="min-h-8 flex-1 resize-y rounded-lg border border-surface-700 bg-surface-900 px-2 py-1.5 text-xs focus:border-accent-500 focus:outline-none"
+          />
+          <Button
+            type="submit"
+            variant="secondary"
+            size="sm"
+            disabled={!check.ok || reply.isPending}
+          >
+            {reply.isPending ? t("social.posting") : t("social.postReply")}
+          </Button>
+        </form>
+      )}
+    </div>
+  );
+}
+
 export function ActivityCard({ item }: { item: FeedItem }) {
   const { t, i18n } = useTranslation();
+  const [repliesOpen, setRepliesOpen] = useState(false);
   const when = relTimeFromSeconds(item.createdAt, i18n.language, t("notif.now"));
 
   return (
@@ -116,18 +262,30 @@ export function ActivityCard({ item }: { item: FeedItem }) {
           )}
         </div>
 
-        <div className="mt-2 flex items-center gap-3 text-2xs text-ink-600">
-          <span className="flex items-center gap-1">
-            <Heart className="size-2.75" />
-            <span className="tabular-nums">{item.likeCount}</span>
-          </span>
-          {item.replyCount > 0 && (
-            <span className="flex items-center gap-1">
-              <MessageSquare className="size-2.75" />
-              <span className="tabular-nums">{item.replyCount}</span>
-            </span>
-          )}
+        <div className="mt-2 flex items-center gap-1">
+          <LikeButton
+            id={item.id}
+            type="ACTIVITY"
+            likeCount={item.likeCount}
+            isLiked={item.isLiked}
+          />
+          <button
+            onClick={() => setRepliesOpen((v) => !v)}
+            aria-expanded={repliesOpen}
+            className={cn(
+              "flex items-center gap-1 rounded-md px-1.5 py-0.5 text-2xs transition-surface hover:bg-surface-850",
+              repliesOpen ? "text-ink-300" : "text-ink-600 hover:text-ink-300",
+            )}
+          >
+            <MessageSquare className="size-2.75" />
+            <span className="tabular-nums">{item.replyCount}</span>
+          </button>
         </div>
+
+        {/* One request per expansion, never eagerly — a page of twenty-five
+            activities carrying every reply would multiply the payload for rows
+            nobody opened. */}
+        {repliesOpen && <ActivityReplies activityId={item.id} />}
       </div>
     </article>
   );

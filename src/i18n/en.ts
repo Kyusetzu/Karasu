@@ -655,6 +655,17 @@ export const en = {
     feedEmpty: "Nothing from the people you follow.",
     feedEmptyHint: "Follow a few more accounts and their updates land here.",
     myProfile: "My profile",
+    // Likes and replies
+    like: "Like",
+    unlike: "Remove like",
+    likeFailed: "Couldn't change that like",
+    likeFailedDetail: "Nothing was sent. Social changes are not queued offline.",
+    noReplies: "No replies yet.",
+    replyPlaceholder: "Reply …",
+    postReply: "Reply",
+    posting: "Posting …",
+    replyFailed: "Your reply wasn't posted",
+    replyFailedDetail: "Nothing was sent, and what you wrote is still in the box.",
     // Distinct from `following`, which is the button's *state* ("you follow
     // them"). This is the set of people *they* follow. Identical in English,
     // "Folgt" vs "Gefolgte" in German.

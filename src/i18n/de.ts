@@ -660,6 +660,18 @@ export const de: typeof en = {
     feedEmpty: "Nichts von den Personen, denen du folgst.",
     feedEmptyHint: "Folge ein paar mehr Konten, dann landen deren Updates hier.",
     myProfile: "Mein Profil",
+    // Likes und Antworten
+    like: "Gefällt mir",
+    unlike: "Gefällt mir nicht mehr",
+    likeFailed: "Konnte das Like nicht ändern",
+    likeFailedDetail:
+      "Es wurde nichts gesendet. Soziale Änderungen werden offline nicht zwischengespeichert.",
+    noReplies: "Noch keine Antworten.",
+    replyPlaceholder: "Antworten …",
+    postReply: "Antworten",
+    posting: "Sende …",
+    replyFailed: "Deine Antwort wurde nicht gesendet",
+    replyFailedDetail: "Es wurde nichts gesendet, und dein Text steht noch im Feld.",
     // Nicht `following` ("Folgt" — der Zustand des Buttons), sondern die Menge
     // der Personen, denen dieser Nutzer folgt.
     tabFollowing: "Gefolgte",

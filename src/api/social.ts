@@ -401,6 +401,100 @@ mutation ($userId: Int!) {
   ToggleFollow(userId: $userId) { id name isFollowing isFollower }
 }`;
 
+/**
+ * Likes, for anything AniList calls likeable.
+ *
+ * `LikeableType` has exactly four members — `THREAD`, `THREAD_COMMENT`,
+ * `ACTIVITY`, `ACTIVITY_REPLY` — but the *return* is a `LikeableUnion` of six,
+ * which additionally includes `MessageActivity`. Every member we can actually
+ * reach gets a fragment; `MessageActivity` deliberately does not, so a like on
+ * private mail could not round-trip even if something asked for it.
+ *
+ * Returns only the two fields the optimistic patch has to reconcile, so a like
+ * never costs a refetch.
+ */
+export const TOGGLE_LIKE_MUTATION = `
+mutation ($id: Int!, $type: LikeableType!) {
+  ToggleLikeV2(id: $id, type: $type) {
+    __typename
+    ... on ListActivity  { id likeCount isLiked }
+    ... on TextActivity  { id likeCount isLiked }
+    ... on ActivityReply { id likeCount isLiked }
+    ... on Thread        { id likeCount isLiked }
+    ... on ThreadComment { id likeCount isLiked }
+  }
+}`;
+
+export type LikeableType = "ACTIVITY" | "ACTIVITY_REPLY" | "THREAD" | "THREAD_COMMENT";
+
+export interface LikeResult {
+  id: number;
+  likeCount: number;
+  isLiked: boolean;
+}
+
+export async function toggleLike(id: number, type: LikeableType): Promise<LikeResult> {
+  const data = await gql<{ ToggleLikeV2: LikeResult }>(TOGGLE_LIKE_MUTATION, { id, type });
+  return data.ToggleLikeV2;
+}
+
+/**
+ * Replies to one activity, loaded on demand.
+ *
+ * Not nested inside `ACTIVITY_QUERY`: a page of twenty-five activities carrying
+ * every reply would multiply the payload for rows nobody expanded. One request
+ * per expansion, user-initiated.
+ *
+ * `ActivityReply` has no `replyCount` and no children — replies are flat, one
+ * level, which is a fact about AniList rather than a simplification here.
+ */
+export const ACTIVITY_REPLIES_QUERY = `
+query ($activityId: Int!) {
+  Page(perPage: 50) {
+    ${PAGE_INFO}
+    activityReplies(activityId: $activityId) {
+      id text createdAt likeCount isLiked
+      user { ${SOCIAL_USER} }
+    }
+  }
+}`;
+
+export interface ActivityReply {
+  id: number;
+  text: string | null;
+  createdAt: number;
+  likeCount: number | null;
+  isLiked: boolean | null;
+  user: SocialUser | null;
+}
+
+export async function activityReplies(activityId: number): Promise<ActivityReply[]> {
+  const data = await gql<{ Page: { activityReplies: ActivityReply[] } }>(
+    ACTIVITY_REPLIES_QUERY,
+    { activityId },
+  );
+  return data.Page.activityReplies ?? [];
+}
+
+export const SAVE_ACTIVITY_REPLY_MUTATION = `
+mutation ($activityId: Int!, $text: String!) {
+  SaveActivityReply(activityId: $activityId, text: $text) {
+    id text createdAt likeCount isLiked
+    user { ${SOCIAL_USER} }
+  }
+}`;
+
+export async function saveActivityReply(
+  activityId: number,
+  text: string,
+): Promise<ActivityReply> {
+  const data = await gql<{ SaveActivityReply: ActivityReply }>(
+    SAVE_ACTIVITY_REPLY_MUTATION,
+    { activityId, text },
+  );
+  return data.SaveActivityReply;
+}
+
 export interface ToggleFollowResult {
   id: number;
   name: string;

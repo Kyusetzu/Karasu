@@ -1,0 +1,50 @@
+/**
+ * What counts as a postable message.
+ *
+ * Shared by the activity composer, the reply box and the thread comment box, so
+ * the three cannot disagree about whether a wall of spaces is a post.
+ *
+ * The reason it returns a *key* rather than a sentence: `i18nKeys.test.ts` only
+ * sees literal `t("…")` calls, so a pure function that returned prose would put
+ * its strings outside the suite's reach. The component maps the key through a
+ * literal switch, the same shape `receiptText` uses in `useListMutations`.
+ */
+export type PostRejection = "empty" | "tooLong";
+
+export interface PostValidation {
+  ok: boolean;
+  reason?: PostRejection;
+  /** What to actually send: trimmed, with runs of blank lines collapsed. */
+  text: string;
+}
+
+/**
+ * Karasu's own bound: AniList's schema documents no maximum for activity text.
+ *
+ * Generous rather than tight — a status update is not a tweet and people do
+ * write paragraphs — but still a number, because a field with no limit is one
+ * that eventually receives a pasted novel and fails at the API instead of in
+ * the box where it could be explained.
+ */
+export const POST_MAX = 4000;
+
+export function validatePost(raw: string): PostValidation {
+  // Three or more newlines become two: AniList renders single newlines as
+  // breaks, so a stray run of blank lines is a wall of nothing in the feed.
+  const text = raw.trim().replace(/\n{3,}/g, "\n\n");
+  if (!text) return { ok: false, reason: "empty", text };
+  // Counted on the trimmed text, so trailing whitespace cannot push a valid
+  // post over the edge.
+  if (text.length > POST_MAX) return { ok: false, reason: "tooLong", text };
+  return { ok: true, text };
+}
+
+/**
+ * Characters left, for a counter that only appears when it matters.
+ *
+ * Negative once over, so the caller can style it without repeating the
+ * comparison.
+ */
+export function charsLeft(raw: string): number {
+  return POST_MAX - raw.trim().length;
+}

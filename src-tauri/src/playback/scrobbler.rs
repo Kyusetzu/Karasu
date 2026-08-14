@@ -416,12 +416,37 @@ async fn perform_update(
 /// Confirms (or discards) the pending update — invoked by the frontend
 /// through the `scrobble_now` / `scrobble_cancel` commands.
 pub async fn confirm_pending(app: AppHandle, accept: bool) -> Result<(), String> {
+    confirm_pending_impl(app, accept, None).await
+}
+
+/// The toast button's path: confirm only the session the toast was raised
+/// for. The check happens under the same lock that reads the session out, so
+/// a click arriving after the next episode started fails here instead of
+/// stamping its confirmation onto whatever is pending now.
+pub async fn confirm_pending_for(
+    app: AppHandle,
+    media_id: i64,
+    episode: u32,
+) -> Result<(), String> {
+    confirm_pending_impl(app, true, Some((media_id, episode))).await
+}
+
+async fn confirm_pending_impl(
+    app: AppHandle,
+    accept: bool,
+    expect: Option<(i64, u32)>,
+) -> Result<(), String> {
     let data = {
         let state = app.state::<ScrobbleSession>();
         let mut guard = state.0.lock().unwrap();
         let Some(session) = guard.as_mut() else {
             return Err("Nothing is currently playing".into());
         };
+        if let Some((mid, ep)) = expect {
+            if !applies_to(session, mid, ep) || session.phase != Phase::Pending {
+                return Err("That update has moved on".into());
+            }
+        }
         if !accept {
             session.phase = Phase::Cancelled;
             emit_session(&app, Some(session));
@@ -590,6 +615,22 @@ async fn drive_session(app: &AppHandle) {
                             ),
                         );
                         emit_session(app, Some(session));
+                        // The window may be hidden in the tray, so the ask
+                        // also goes to the desk — with the one button that is
+                        // the whole point. Fires once per session: this branch
+                        // is only reachable from `Watching`.
+                        let body = if session.media_type == "MANGA" {
+                            format!("Mark chapter {} as read?", session.episode)
+                        } else {
+                            format!("Mark episode {} as watched?", session.episode)
+                        };
+                        crate::alerts::notify::notify_scrobble_confirm(
+                            app,
+                            np.matched_title.as_deref().unwrap_or(&np.parsed_title),
+                            &body,
+                            session.media_id,
+                            session.episode,
+                        );
                         None
                     } else {
                         session.phase = Phase::Updating;

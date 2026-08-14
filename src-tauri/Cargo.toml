@@ -1,6 +1,6 @@
 [package]
 name = "karasu"
-version = "0.113.0"
+version = "0.114.0"
 description = "A modern anime and manga tracker built exclusively for AniList"
 authors = ["Kyu"]
 license = "MIT"
@@ -112,6 +112,11 @@ windows = { version = "0.62", features = [
 ] }
 # The blocking `join()` on WinRT async operations lives here, not in `windows`.
 windows-future = "0.3"
+# The scrobble-confirm toast's button. Already compiled into this tree by
+# tauri-plugin-notification; the direct dependency exists because the plugin
+# *drops* action buttons on desktop, so the one toast that is an action talks
+# to the underlying crate itself.
+tauri-winrt-notification = "0.7"
 
 # Linux groundwork: keyring via the Secret Service (libsecret/D-Bus).
 [target.'cfg(target_os = "linux")'.dependencies]
@@ -131,6 +136,10 @@ chacha20poly1305 = "0.10"
 # "worked" because nobody has ever built for macOS. This way a macOS build
 # fails at the manifest instead of compiling a backend that cannot work.
 keyring = { version = "3", features = ["sync-secret-service", "crypto-rust"] }
+# The Linux half of the scrobble-confirm toast's button — same story as
+# tauri-winrt-notification above: already in the tree via the notification
+# plugin, direct because the plugin drops actions on desktop.
+notify-rust = "4"
 
 # --- Build-speed tuning -----------------------------------------------------
 # Dev: keep incremental on and trim debug info to the minimum needed for

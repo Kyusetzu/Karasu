@@ -2284,13 +2284,14 @@ dependencies = [
 
 [[package]]
 name = "karasu"
-version = "0.113.0"
+version = "0.114.0"
 dependencies = [
  "base64 0.22.1",
  "chacha20poly1305",
  "discord-rich-presence",
  "getrandom 0.3.4",
  "keyring",
+ "notify-rust",
  "percent-encoding",
  "regex",
  "reqwest",
@@ -2306,6 +2307,7 @@ dependencies = [
  "tauri-plugin-opener",
  "tauri-plugin-single-instance",
  "tauri-plugin-updater",
+ "tauri-winrt-notification",
  "tokio",
  "windows 0.62.2",
  "windows-future 0.3.2",

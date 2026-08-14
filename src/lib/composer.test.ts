@@ -2,10 +2,51 @@ import { describe, expect, it } from "vitest";
 import {
   charsLeft,
   POST_MAX,
+  REVIEW_BODY_MIN,
+  REVIEW_SUMMARY_MIN,
   TITLE_MAX,
   validatePost,
+  validateReview,
   validateThread,
 } from "./composer";
+
+describe("validateReview", () => {
+  const summary = "A perfectly serviceable twenty-plus character summary.";
+  const body = "x".repeat(REVIEW_BODY_MIN);
+
+  it("accepts a review meeting AniList's own bounds", () => {
+    expect(validateReview(summary, body, 85)).toMatchObject({ ok: true });
+  });
+
+  it("rejects a summary below AniList's floor", () => {
+    expect(validateReview("Too short.", body, 85)).toMatchObject({
+      ok: false,
+      reason: "summaryTooShort",
+    });
+    expect("Too short.".length).toBeLessThan(REVIEW_SUMMARY_MIN);
+  });
+
+  it("rejects a body below the 2200-character floor", () => {
+    expect(validateReview(summary, "brilliant show", 85)).toMatchObject({
+      ok: false,
+      reason: "bodyTooShort",
+    });
+  });
+
+  it("rejects a score outside 0-100 or fractional", () => {
+    for (const score of [-1, 101, 8.5]) {
+      expect(validateReview(summary, body, score)).toMatchObject({
+        ok: false,
+        reason: "scoreOut",
+      });
+    }
+  });
+
+  it("normalizes whitespace before measuring", () => {
+    const padded = `  ${summary}  `;
+    expect(validateReview(padded, body, 50).summary).toBe(summary);
+  });
+});
 
 describe("validatePost", () => {
   it("accepts ordinary text and hands back the trimmed form", () => {

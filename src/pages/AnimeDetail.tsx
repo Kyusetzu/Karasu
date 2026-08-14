@@ -5,9 +5,19 @@ import {
   useMutation,
   useQuery,
   useQueryClient,
+  type InfiniteData,
 } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { ChevronRight, Clock, ExternalLink, Play, Star, Trophy } from "lucide-react";
+import {
+  ChevronRight,
+  Clock,
+  ExternalLink,
+  Play,
+  Star,
+  ThumbsDown,
+  ThumbsUp,
+  Trophy,
+} from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   animeDetail,
@@ -18,8 +28,20 @@ import {
   type MediaDetail,
   type MediaTag,
 } from "@/api/queries";
+import {
+  myReview,
+  rateReview,
+  reviews,
+  type ReviewPage,
+  type ReviewRow,
+} from "@/api/social";
 import { AreaChart } from "@/components/stats/AreaChart";
-import { Avatar } from "@/components/ui/user-lockup";
+import { Avatar, UserLockup } from "@/components/ui/user-lockup";
+import { Markdown } from "@/components/social/Markdown";
+import { ReviewComposerModal } from "@/components/overlays/ReviewComposerModal";
+import { Presence } from "@/components/ui/presence";
+import { relTimeFromSeconds } from "@/lib/relTime";
+import { showToast } from "@/stores/toast";
 import {
   countdown,
   formatLabel,
@@ -331,6 +353,8 @@ export default function AnimeDetail() {
 
             <TrendSection mediaId={data.id} />
 
+            <ReviewsSection mediaId={data.id} />
+
             {data.trailer?.thumbnail && (
               <Card>
                 <CardTitle>{t("detail.trailer")}</CardTitle>
@@ -630,6 +654,236 @@ function CastSection({ mediaId }: { mediaId: number }) {
         </div>
       )}
     </Card>
+  );
+}
+
+/**
+ * Reviews behind a fold — essays, so five per page and a reading measure.
+ *
+ * Same on-demand contract as the other folds: opening spends the request,
+ * "load more" is a countless button. Rows collapse to their summary; the
+ * click that expands one is free, since the body already arrived. Voting
+ * patches the page in place with what `RateReview` returns — the server's
+ * numbers, not a guess — and the composer prefilms from `myReview`, its own
+ * user-initiated lookup, because a review of yours that nobody voted on can
+ * sit pages deep in a RATING_DESC feed.
+ */
+function ReviewsSection({ mediaId }: { mediaId: number }) {
+  const { t } = useTranslation();
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [composer, setComposer] = useState<{
+    existing: Awaited<ReturnType<typeof myReview>>;
+  } | null>(null);
+  const viewer = useAuth((s) => s.viewer);
+  const mode = useAuth((s) => s.mode);
+  const canWrite = mode === "anilist" && viewer !== null;
+
+  const revs = useInfiniteQuery({
+    queryKey: ["social", "reviews", mediaId],
+    queryFn: ({ pageParam }) => reviews(mediaId, pageParam),
+    initialPageParam: 1,
+    getNextPageParam: (last, all) => (last.pageInfo.hasNextPage ? all.length + 1 : undefined),
+    enabled: isTauri && open,
+    staleTime: 30 * 60 * 1000,
+  });
+
+  const vote = useMutation({
+    mutationFn: (vars: { id: number; rating: "UP_VOTE" | "DOWN_VOTE" | "NO_VOTE" }) =>
+      rateReview(vars.id, vars.rating),
+    onSuccess: (res, vars) => {
+      qc.setQueryData(
+        ["social", "reviews", mediaId],
+        (old: InfiniteData<ReviewPage> | undefined) =>
+          old && {
+            ...old,
+            pages: old.pages.map((p) => ({
+              ...p,
+              reviews: p.reviews.map((r) => (r.id === vars.id ? { ...r, ...res } : r)),
+            })),
+          },
+      );
+    },
+    onError: (e) =>
+      showToast({ kind: "error", text: t("common.error", { message: String(e) }) }),
+  });
+
+  // The lookup happens on the click, not the mount — a fourth query racing
+  // the detail page's own would clear no pre-flight budget check.
+  const compose = useMutation({
+    mutationFn: () => myReview(mediaId, viewer!.id),
+    onSuccess: (mine) => setComposer({ existing: mine }),
+    onError: (e) =>
+      showToast({ kind: "error", text: t("common.error", { message: String(e) }) }),
+  });
+
+  const rows = (revs.data?.pages ?? []).flatMap((p) => p.reviews);
+
+  return (
+    <Card>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-2 text-left"
+      >
+        <CardTitle>{t("detail.reviews")}</CardTitle>
+        <ChevronRight
+          className={cn("size-4 shrink-0 text-ink-500 transition-transform", open && "rotate-90")}
+        />
+      </button>
+      {open && (
+        <div className="mt-3 space-y-3">
+          {revs.isLoading && <Shimmer className="h-24 w-full rounded-lg" />}
+          {revs.error != null && (
+            <p className="text-sm text-danger">
+              {t("common.error", { message: String(revs.error) })}
+            </p>
+          )}
+          {revs.data && rows.length === 0 && (
+            <p className="text-xs text-ink-600">{t("detail.reviewsNone")}</p>
+          )}
+          {rows.map((r) => (
+            <ReviewCard
+              key={r.id}
+              review={r}
+              canVote={canWrite}
+              votePending={vote.isPending}
+              onVote={(rating) => vote.mutate({ id: r.id, rating })}
+            />
+          ))}
+          <div className="flex items-center gap-2">
+            {revs.hasNextPage && (
+              <Button
+                variant="outline"
+                size="control"
+                onClick={() => revs.fetchNextPage()}
+                disabled={revs.isFetchingNextPage}
+              >
+                {t("social.loadMorePlain")}
+              </Button>
+            )}
+            {canWrite && (
+              <Button
+                variant="outline"
+                size="control"
+                onClick={() => compose.mutate()}
+                disabled={compose.isPending}
+              >
+                {t("review.write")}
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+      {/* `Presence`, not `PresenceIf`: the composer state is a value, and the
+          boolean variant would hand the child a nulled `existing` for the
+          length of the exit — an edit session's title flipping to "write". */}
+      <Presence value={composer}>
+        {(c, leaving) => (
+          <ReviewComposerModal
+            mediaId={mediaId}
+            existing={c.existing}
+            onClose={() => setComposer(null)}
+            leaving={leaving}
+          />
+        )}
+      </Presence>
+    </Card>
+  );
+}
+
+/** One review: a summary that expands into the essay it already carries. */
+function ReviewCard({
+  review: r,
+  canVote,
+  votePending,
+  onVote,
+}: {
+  review: ReviewRow;
+  canVote: boolean;
+  votePending: boolean;
+  onVote: (rating: "UP_VOTE" | "DOWN_VOTE" | "NO_VOTE") => void;
+}) {
+  const { t, i18n } = useTranslation();
+  const [expanded, setExpanded] = useState(false);
+  const up = r.userRating === "UP_VOTE";
+  const down = r.userRating === "DOWN_VOTE";
+
+  return (
+    <div className="rounded-lg bg-surface-900 p-3">
+      <div className="flex items-center justify-between gap-3">
+        <Link to={`/user/${encodeURIComponent(r.user?.name ?? "")}`} className="min-w-0">
+          <UserLockup
+            name={r.user?.name ?? "—"}
+            src={r.user?.avatar?.medium}
+            size="sm"
+            nameClassName="text-xs font-medium text-ink-300"
+            sub={
+              <span className="block text-2xs text-ink-600">
+                {relTimeFromSeconds(r.createdAt, i18n.language, t("notif.now"))}
+              </span>
+            }
+          />
+        </Link>
+        {r.score != null && (
+          <span className="flex shrink-0 items-center gap-1 text-xs tabular-nums text-ink-300">
+            <Star className="size-3 text-gold" fill="currentColor" />
+            {t("detail.reviewScore", { n: r.score })}
+          </span>
+        )}
+      </div>
+
+      <button
+        onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded}
+        className="mt-2 block w-full text-left text-sm text-ink-100 transition-surface hover:text-accent-400"
+      >
+        {r.summary}
+      </button>
+
+      {expanded && (
+        <div className="mt-2 border-t border-surface-800 pt-2">
+          {/* `siteUrl` backs the parser's truncation notice: a review body is
+              an essay, and past the 8,000-char limit the "read the rest" line
+              needs somewhere to go. */}
+          <Markdown source={r.body} siteUrl={r.siteUrl ?? undefined} />
+        </div>
+      )}
+
+      <div className="mt-2 flex items-center gap-1.5">
+        <span className="mr-1 text-2xs text-ink-600">
+          {t("review.helpful", { up: r.rating ?? 0, total: r.ratingAmount ?? 0 })}
+        </span>
+        {canVote && (
+          <>
+            <button
+              onClick={() => onVote(up ? "NO_VOTE" : "UP_VOTE")}
+              disabled={votePending}
+              aria-pressed={up}
+              title={t("review.voteUp")}
+              className={cn(
+                "rounded p-1 transition-surface hover:bg-surface-800",
+                up ? "text-success" : "text-ink-600",
+              )}
+            >
+              <ThumbsUp className="size-3.5" fill={up ? "currentColor" : "none"} />
+            </button>
+            <button
+              onClick={() => onVote(down ? "NO_VOTE" : "DOWN_VOTE")}
+              disabled={votePending}
+              aria-pressed={down}
+              title={t("review.voteDown")}
+              className={cn(
+                "rounded p-1 transition-surface hover:bg-surface-800",
+                down ? "text-danger" : "text-ink-600",
+              )}
+            >
+              <ThumbsDown className="size-3.5" fill={down ? "currentColor" : "none"} />
+            </button>
+          </>
+        )}
+      </div>
+    </div>
   );
 }
 

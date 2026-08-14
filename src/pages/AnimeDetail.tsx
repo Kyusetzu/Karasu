@@ -2,10 +2,11 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { Clock, ExternalLink, Play, Star, Trophy } from "lucide-react";
+import { ChevronRight, Clock, ExternalLink, Play, Star, Trophy } from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   animeDetail,
+  streamingEpisodes,
   type ExternalLink as ExternalLinkData,
   type MediaDetail,
   type MediaTag,
@@ -31,7 +32,8 @@ import { useLibrary } from "@/stores/library";
 import { useContentFilter } from "@/stores/contentFilter";
 import { isBlocked } from "@/lib/contentFilter";
 import BackButton from "@/components/shell/BackButton";
-import { DetailSkeleton } from "@/components/Skeleton";
+import { DetailSkeleton, Shimmer } from "@/components/Skeleton";
+import { cn } from "@/lib/utils";
 import { DecodedImage } from "@/components/media/DecodedImage";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -314,6 +316,10 @@ export default function AnimeDetail() {
 
             <CommunitySection data={data} />
 
+            {data.type === "ANIME" && data.status !== "NOT_YET_RELEASED" && (
+              <EpisodesSection mediaId={data.id} />
+            )}
+
             {data.trailer?.thumbnail && (
               <Card>
                 <CardTitle>{t("detail.trailer")}</CardTitle>
@@ -393,6 +399,80 @@ export default function AnimeDetail() {
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * The licensed episode list — titles and thumbnails — behind a fold.
+ *
+ * Deliberately its own on-demand query rather than a `DETAIL_QUERY` field:
+ * measured at +49 KB for a long-runner, a 6× payload for a section most
+ * visits never open. Opening the fold is the user-initiated moment that
+ * spends the request; the six-hour staleTime makes reopening free. An empty
+ * answer renders as a quiet line — only AniList-licensed titles carry these.
+ */
+function EpisodesSection({ mediaId }: { mediaId: number }) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const episodes = useQuery({
+    queryKey: ["episodes", mediaId],
+    queryFn: () => streamingEpisodes(mediaId),
+    enabled: isTauri && open,
+    staleTime: 6 * 60 * 60 * 1000,
+  });
+
+  return (
+    <Card>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-2 text-left"
+      >
+        <CardTitle>{t("detail.episodes")}</CardTitle>
+        <ChevronRight
+          className={cn("size-4 shrink-0 text-ink-500 transition-transform", open && "rotate-90")}
+        />
+      </button>
+      {open && (
+        <div className="mt-3">
+          {episodes.isLoading && <Shimmer className="h-24 w-full rounded-lg" />}
+          {episodes.error != null && (
+            <p className="text-sm text-danger">
+              {t("common.error", { message: String(episodes.error) })}
+            </p>
+          )}
+          {episodes.data && episodes.data.length === 0 && (
+            <p className="text-xs text-ink-600">{t("detail.episodesNone")}</p>
+          )}
+          {episodes.data && episodes.data.length > 0 && (
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-3">
+              {episodes.data.map((ep, i) => (
+                <button
+                  key={i}
+                  onClick={() => ep.url && openUrl(ep.url)}
+                  disabled={!ep.url}
+                  className="group block text-left"
+                  title={ep.site ?? undefined}
+                >
+                  <div className="aspect-video w-full overflow-hidden rounded-lg bg-surface-800">
+                    {ep.thumbnail && (
+                      <img
+                        src={ep.thumbnail}
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                        className="size-full object-cover transition-transform group-hover:scale-105"
+                      />
+                    )}
+                  </div>
+                  <p className="mt-1 line-clamp-2 text-xs text-ink-300">{ep.title}</p>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </Card>
   );
 }
 

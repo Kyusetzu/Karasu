@@ -553,6 +553,8 @@ export const en = {
     showSpoilerTags: "Show {{n}} spoiler tags",
     links: "External & streaming links",
     trailer: "Trailer",
+    episodes: "Episodes",
+    episodesNone: "AniList lists no episode details for this title.",
     communityScores: "How the community scores it",
     communityScoresHint: "AniList's score distribution, in tens.",
     communityStatus: "On people's lists",

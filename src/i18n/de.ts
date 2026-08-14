@@ -554,6 +554,8 @@ export const de: typeof en = {
     showSpoilerTags: "{{n}} Spoiler-Tags anzeigen",
     links: "Externe & Streaming-Links",
     trailer: "Trailer",
+    episodes: "Episoden",
+    episodesNone: "AniList führt für diesen Titel keine Episodendetails.",
     communityScores: "So bewertet die Community",
     communityScoresHint: "AniLists Bewertungsverteilung, in Zehnerschritten.",
     communityStatus: "Auf den Listen anderer",

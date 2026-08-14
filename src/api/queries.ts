@@ -455,6 +455,35 @@ export interface MediaDetail extends MediaWithListStatus {
   };
 }
 
+/**
+ * The per-episode titles/thumbnails, deliberately NOT on `DETAIL_QUERY`:
+ * measured at +49 KB on a long-runner (One Piece), i.e. a 6× payload for a
+ * section most visits never open. Fetched when the Episodes section is
+ * expanded — a user-initiated moment — and cached long, since a licensed
+ * episode list barely changes.
+ */
+const EPISODES_QUERY = `
+query ($id: Int!) {
+  Media(id: $id) {
+    streamingEpisodes { title thumbnail url site }
+  }
+}`;
+
+export interface StreamingEpisode {
+  title: string | null;
+  thumbnail: string | null;
+  url: string | null;
+  site: string | null;
+}
+
+export async function streamingEpisodes(id: number): Promise<StreamingEpisode[]> {
+  const data = await gql<{ Media: { streamingEpisodes: StreamingEpisode[] | null } }>(
+    EPISODES_QUERY,
+    { id },
+  );
+  return data.Media.streamingEpisodes ?? [];
+}
+
 export async function animeDetail(id: number) {
   const data = await gql<{ Media: MediaDetail }>(DETAIL_QUERY, {
     id,

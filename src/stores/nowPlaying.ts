@@ -101,6 +101,8 @@ export interface DetectionOverride {
   mediaType: "ANIME" | "MANGA";
   mediaId: number;
   displayTitle: string;
+  /** Added to the detected episode; 0 when the numbering already lines up. */
+  episodeOffset: number;
 }
 
 export const listDetectionOverrides = () =>
@@ -117,6 +119,8 @@ export const setDetectionOverride = (input: {
   mediaType: string;
   mediaId: number;
   displayTitle: string;
+  /** What to add to the source's episode number. Omitted means "they agree". */
+  episodeOffset?: number;
 }) => invoke<void>("set_detection_override", input);
 
 export const clearDetectionOverride = (input: {

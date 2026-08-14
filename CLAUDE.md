@@ -188,7 +188,7 @@ of AniList's own list fields, it costs nothing to carry, and the local list has
 stored it since schema v7. The rejected idea is tracking **purchases**, which
 would need price data the app has no source for.
 
-The schema is at **v12**. `library_match` (v8) holds the scanner's per-title
+The schema is at **v13**. `library_match` (v8) holds the scanner's per-title
 match confidence, which is what the local library's `exact` / `close` column
 reads. v9 adds `library_override` — the user's corrections, keyed on the parsed
 `(title, season)` with `season = -1` for a release name that carried none, and
@@ -217,6 +217,31 @@ Settings list and an off-list forced entry read correctly with no request.
 documented order, and the relations redirect still applies afterwards: a
 correction settles which series this is, relations still decide which entry the
 episode number lands on.
+
+v13 adds `episode_offset` to it — the second `ALTER TABLE ADD COLUMN` in the
+schema, so it carries v7's `has_column` guard and for the same reason. A
+correction could say *which entry* and nothing about *which episode*, which
+covers a franchise whose seasons are separate AniList entries (Jellyfin's S2E1
+is episode 1 of the sequel) but not a server that splits one continuously
+numbered entry into cours, where S2E1 is episode 13. Signed, applied as
+`reported + offset` before the relations redirect, floored at 1. `NowPlaying`
+keeps `source_episode` beside `episode` because `requeue_match` re-resolves
+from that object rather than from a fresh detection — shifting an
+already-shifted number would drift further on every correction.
+
+**The season is inert for matching unless the *title* carries it.**
+`matcher::variants` only re-spells a marker already in the string; it never
+invents one, because "Show" plus season 2 could be "Show 2", "Show II" or a
+differently-named sequel, and guessing writes to a list. So every source that
+reports the season *beside* the name — the Jellyfin API above all — matched on
+the bare series title and offered that season's episode numbers against season
+one. `matcher::season_informed` is that guard as a named function, and
+`drive_session` blocks with `UnknownSeason` when a season past the first was
+reported, could not inform the match, and has no correction. Do not "fix" this
+by generating season variants: for Beyblade's Metal Fusion / Metal Masters /
+Metal Fury, three separate 51-episode entries, no spelling of "season 2" finds
+the right one — only the user can say, and the picker offers the AniList
+sequels so it is one click.
 
 ## Versioning (every commit)
 

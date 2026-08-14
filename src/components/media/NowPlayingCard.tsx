@@ -419,7 +419,8 @@ function ScrobbleActions({ playing }: { playing: NowPlaying }) {
             suggestSequelsOf={
               scrobble.reason?.code === "unknownSeason" ? np.mediaId : null
             }
-            onPick={(mediaId, displayTitle) =>
+            detectedEpisode={np.episode}
+            onPick={(mediaId, displayTitle, realEpisode) =>
               void correct(() =>
                 setDetectionOverride({
                   title: np.parsedTitle,
@@ -427,6 +428,13 @@ function ScrobbleActions({ playing }: { playing: NowPlaying }) {
                   mediaType: np.mediaType,
                   mediaId,
                   displayTitle,
+                  // The offset, not the episode: the correction has to hold
+                  // for *every* episode of this season, not only the one on
+                  // screen when it was made.
+                  episodeOffset:
+                    realEpisode != null && np.episode != null
+                      ? realEpisode - np.episode
+                      : 0,
                 }),
               )
             }

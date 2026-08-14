@@ -391,34 +391,9 @@ pub async fn scrobble_cancel(app: tauri::AppHandle) -> Result<(), String> {
 
 // --- Detection corrections ---------------------------------------------------
 
-/// One stored correction, for the Settings list.
-#[derive(serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct DetectionOverrideRow {
-    /// The parsed title it fires on — what detection saw, not what it means.
-    pub title: String,
-    /// `-1` when the parse carried no season; the screen hides that.
-    pub season: i32,
-    pub media_type: String,
-    pub media_id: i64,
-    pub display_title: String,
-}
-
 #[tauri::command]
-pub fn list_detection_overrides(db: State<'_, Db>) -> Vec<DetectionOverrideRow> {
-    let mut rows: Vec<DetectionOverrideRow> = db
-        .detection_overrides()
-        .into_iter()
-        .map(
-            |(title, season, media_type, media_id, display_title)| DetectionOverrideRow {
-                title,
-                season,
-                media_type,
-                media_id,
-                display_title,
-            },
-        )
-        .collect();
+pub fn list_detection_overrides(db: State<'_, Db>) -> Vec<crate::db::DetectionOverride> {
+    let mut rows = db.detection_overrides();
     rows.sort_by(|a, b| a.display_title.cmp(&b.display_title));
     rows
 }
@@ -435,6 +410,7 @@ pub fn set_detection_override(
     media_type: String,
     media_id: i64,
     display_title: String,
+    episode_offset: Option<i32>,
 ) -> Result<(), String> {
     let title = title.trim();
     if title.is_empty() {
@@ -446,6 +422,7 @@ pub fn set_detection_override(
         &media_type,
         media_id,
         display_title.trim(),
+        episode_offset.unwrap_or(0),
     )?;
     crate::playback::scrobbler::requeue_match(&app);
     Ok(())

@@ -722,6 +722,7 @@ export const en = {
     currentMatch: "current",
     clearMatch: "Undo correction",
     laterSeasons: "Later seasons of this series",
+    reallyEpisode: "Episode {{n}} is really episode",
     epCount: "{{n}} ep",
     ep: "Ep {{n}}",
     play: "Play",
@@ -1200,6 +1201,7 @@ export const en = {
     correctionsHint:
       "Titles you've corrected from the now-playing card. Each one holds for every future detection of the same title; remove one to let matching guess again.",
     correctionsFrom: "detected as {{title}}",
+    correctionsOffset: "episodes {{offset}}",
     detectionDebug: "What your system currently reports",
     detectionDebugHint:
       "Every media session your desktop knows about right now. Use this to see what a player publishes when it isn't being detected.",

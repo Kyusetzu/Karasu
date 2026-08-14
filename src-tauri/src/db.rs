@@ -245,6 +245,45 @@ CREATE TABLE IF NOT EXISTS detection_override (
 PRAGMA user_version = 12;
 ";
 
+/// How far the source's episode numbering sits from the entry's.
+///
+/// v12 could say *which entry* a detected title is, and nothing about *which
+/// episode*. That covers a franchise whose seasons are separate AniList
+/// entries — Jellyfin's S2E1 is episode 1 of the sequel — but not the other
+/// layout, where a server splits one continuously-numbered entry into cours
+/// and its S2E1 is episode 13. Only the viewer knows which they are looking
+/// at, so it is stored beside the entry they picked.
+///
+/// Signed, and applied as `reported + offset`: a source can number *ahead* of
+/// AniList as easily as behind. Zero for every existing row, which is exactly
+/// what those corrections meant.
+const MIGRATION_V13: &str = "
+ALTER TABLE detection_override ADD COLUMN episode_offset INTEGER NOT NULL DEFAULT 0;
+PRAGMA user_version = 13;
+";
+
+/// One detection correction: what was detected, and what it really is.
+///
+/// A struct rather than the tuple this started as, because the row grew a
+/// sixth field and `(String, i32, String, i64, String, i32)` at three call
+/// sites is a puzzle rather than a signature.
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DetectionOverride {
+    /// The parsed title this fires on — what detection saw.
+    pub title: String,
+    /// `-1` where the parse carried no season.
+    pub season: i32,
+    pub media_type: String,
+    pub media_id: i64,
+    /// The chosen entry's title, stored so the Settings list and an off-list
+    /// entry read correctly without a request.
+    pub display_title: String,
+    /// Added to the detected episode. Signed: a source may number ahead of
+    /// AniList as easily as behind.
+    pub episode_offset: i32,
+}
+
 /// One in-app notification (mirrors a shown desktop toast).
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct NotificationRow {
@@ -367,6 +406,17 @@ impl Db {
         }
         if version < 12 {
             apply(&conn, 12, MIGRATION_V12)?;
+        }
+        if version < 13 {
+            // `ALTER TABLE ADD COLUMN` again, so the same guard v7 needed: it
+            // fails outright when the column is already there, and a database
+            // interrupted between the ALTER and its version bump would then
+            // refuse to open on every launch from then on.
+            if has_column(&conn, "detection_override", "episode_offset") {
+                apply(&conn, 13, "PRAGMA user_version = 13;")?;
+            } else {
+                apply(&conn, 13, MIGRATION_V13)?;
+            }
         }
         Ok(Db(Mutex::new(conn)))
     }
@@ -910,17 +960,25 @@ impl Db {
 
     // --- Detection corrections ------------------------------------------------
 
-    /// Every `(title, season, media_type) -> (media_id, display_title)` the user
-    /// has corrected on the now-playing card. Small by nature — one row per
-    /// title the matcher gets wrong — so it is read whole and matched in memory.
-    pub fn detection_overrides(&self) -> Vec<(String, i32, String, i64, String)> {
+    /// Every correction the user has made on the now-playing card. Small by
+    /// nature — one row per title the matcher gets wrong — so it is read whole
+    /// and matched in memory.
+    pub fn detection_overrides(&self) -> Vec<DetectionOverride> {
         let conn = self.0.lock().unwrap();
         conn.prepare(
-            "SELECT title, season, media_type, media_id, display_title FROM detection_override",
+            "SELECT title, season, media_type, media_id, display_title, episode_offset
+             FROM detection_override",
         )
         .and_then(|mut stmt| {
             stmt.query_map([], |r| {
-                Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?))
+                Ok(DetectionOverride {
+                    title: r.get(0)?,
+                    season: r.get(1)?,
+                    media_type: r.get(2)?,
+                    media_id: r.get(3)?,
+                    display_title: r.get(4)?,
+                    episode_offset: r.get(5)?,
+                })
             })
             .map(|rows| rows.filter_map(Result::ok).collect())
         })
@@ -937,14 +995,25 @@ impl Db {
         media_type: &str,
         media_id: i64,
         display_title: &str,
+        episode_offset: i32,
     ) -> Result<(), String> {
         let conn = self.0.lock().unwrap();
         conn.execute(
-            "INSERT INTO detection_override (title, season, media_type, media_id, display_title)
-             VALUES (?1, ?2, ?3, ?4, ?5)
+            "INSERT INTO detection_override
+               (title, season, media_type, media_id, display_title, episode_offset)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)
              ON CONFLICT(title, season, media_type) DO UPDATE SET
-               media_id = excluded.media_id, display_title = excluded.display_title",
-            rusqlite::params![title, season, media_type, media_id, display_title],
+               media_id = excluded.media_id,
+               display_title = excluded.display_title,
+               episode_offset = excluded.episode_offset",
+            rusqlite::params![
+                title,
+                season,
+                media_type,
+                media_id,
+                display_title,
+                episode_offset
+            ],
         )
         .map(|_| ())
         .map_err(|e| format!("Could not save the correction: {e}"))
@@ -1130,7 +1199,33 @@ mod tests {
         conn.execute_batch(MIGRATION_V10).unwrap();
         conn.execute_batch(MIGRATION_V11).unwrap();
         conn.execute_batch(MIGRATION_V12).unwrap();
+        conn.execute_batch(MIGRATION_V13).unwrap();
         Db(Mutex::new(conn))
+    }
+
+    /// The offset is what makes a correction able to say *which episode*, not
+    /// only which entry — and it defaults to the "same numbering" every
+    /// pre-v13 row meant.
+    #[test]
+    fn a_correction_can_carry_an_episode_offset() {
+        let db = mem_db();
+        db.detection_override_set("beyblade metal fusion", 2, "ANIME", 8410, "Metal Masters", 0)
+            .unwrap();
+        db.detection_override_set("some 2 cour show", 2, "ANIME", 99, "Some Show", 12)
+            .unwrap();
+
+        let rows = db.detection_overrides();
+        let masters = rows.iter().find(|o| o.media_id == 8410).unwrap();
+        assert_eq!(masters.episode_offset, 0, "separate entries keep their numbering");
+        let cour = rows.iter().find(|o| o.media_id == 99).unwrap();
+        assert_eq!(cour.episode_offset, 12);
+
+        // Re-correcting replaces the offset too, rather than keeping the old.
+        db.detection_override_set("some 2 cour show", 2, "ANIME", 99, "Some Show", 13)
+            .unwrap();
+        let rows = db.detection_overrides();
+        assert_eq!(rows.iter().find(|o| o.media_id == 99).unwrap().episode_offset, 13);
+        assert_eq!(rows.len(), 2, "and does not add a row");
     }
 
     /// The detection correction is its own key space, and the two tables must
@@ -1140,29 +1235,30 @@ mod tests {
     fn a_detection_correction_is_keyed_by_medium_and_leaves_the_library_alone() {
         let db = mem_db();
         db.library_override_set("frieren", -1, 1).unwrap();
-        db.detection_override_set("frieren", -1, "ANIME", 2, "Frieren").unwrap();
+        db.detection_override_set("frieren", -1, "ANIME", 2, "Frieren", 0).unwrap();
         // Same parse, other medium: a different row, not a replacement.
-        db.detection_override_set("frieren", -1, "MANGA", 3, "Frieren (manga)")
+        db.detection_override_set("frieren", -1, "MANGA", 3, "Frieren (manga)", 0)
             .unwrap();
 
         let mut rows = db.detection_overrides();
-        rows.sort_by_key(|r| r.3);
+        rows.sort_by_key(|r| r.media_id);
         assert_eq!(rows.len(), 2);
-        assert_eq!(rows[0], ("frieren".into(), -1, "ANIME".into(), 2, "Frieren".into()));
-        assert_eq!(rows[1].2, "MANGA");
+        assert_eq!(rows[0].media_type, "ANIME");
+        assert_eq!(rows[0].display_title, "Frieren");
+        assert_eq!(rows[1].media_type, "MANGA");
         // The library's own correction is untouched by any of it.
         assert_eq!(db.library_overrides(), vec![("frieren".to_string(), -1, 1)]);
 
         // Correcting the correction replaces, never accumulates.
-        db.detection_override_set("frieren", -1, "ANIME", 9, "Frieren S2").unwrap();
+        db.detection_override_set("frieren", -1, "ANIME", 9, "Frieren S2", 0).unwrap();
         let anime: Vec<_> = db
             .detection_overrides()
             .into_iter()
-            .filter(|r| r.2 == "ANIME")
+            .filter(|r| r.media_type == "ANIME")
             .collect();
         assert_eq!(anime.len(), 1);
-        assert_eq!(anime[0].3, 9);
-        assert_eq!(anime[0].4, "Frieren S2");
+        assert_eq!(anime[0].media_id, 9);
+        assert_eq!(anime[0].display_title, "Frieren S2");
 
         // Clearing reports what it did, so a no-op cannot pass for a removal.
         assert_eq!(db.detection_override_clear("frieren", -1, "ANIME").unwrap(), 1);
@@ -1334,7 +1430,23 @@ mod tests {
         let version: i64 = conn
             .query_row("PRAGMA user_version", [], |r| r.get(0))
             .unwrap();
-        assert_eq!(version, 12, "and must end up fully migrated");
+        assert_eq!(version, 13, "and must end up fully migrated");
+        drop(conn);
+
+        // v13 is the other `ALTER TABLE ADD COLUMN`, so it needs the same
+        // guard and the same proof: the column present, the version behind.
+        let conn = Connection::open(dir.join("karasu.db")).unwrap();
+        assert!(has_column(&conn, "detection_override", "episode_offset"));
+        conn.execute_batch("PRAGMA user_version = 12;").unwrap();
+        drop(conn);
+
+        Db::open(dir.clone()).expect("a half-migrated v13 must still open");
+
+        let conn = Connection::open(dir.join("karasu.db")).unwrap();
+        let version: i64 = conn
+            .query_row("PRAGMA user_version", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(version, 13);
         drop(conn);
 
         let _ = std::fs::remove_dir_all(&dir);

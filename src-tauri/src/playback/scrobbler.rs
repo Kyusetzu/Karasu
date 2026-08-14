@@ -36,7 +36,16 @@ pub struct NowPlaying {
     /// The season the parse carried, if any — half the key a correction is
     /// stored under, so the picker has to be able to send it back.
     pub season: Option<u32>,
+    /// The episode as *resolved*: the source's number plus any correction's
+    /// offset, then whatever the relations redirect made of it.
     pub episode: Option<u32>,
+    /// The episode the source actually reported, before either of those.
+    ///
+    /// Kept because `requeue_match` re-resolves from this object rather than
+    /// from a fresh detection: without the untouched number it would shift an
+    /// already-shifted one and drift a little further on every correction.
+    #[serde(skip)]
+    pub source_episode: Option<u32>,
     /// AniList media ID on a successful match against the list
     #[serde(rename = "mediaId")]
     pub media_id: Option<i64>,
@@ -328,7 +337,7 @@ pub(crate) fn season_key(season: Option<u32>) -> i32 {
     season.map(|s| s as i32).unwrap_or(-1)
 }
 
-/// The user's correction for this parse, as `(media_id, display title)`.
+/// The user's correction for this parse.
 ///
 /// Read whole and matched in memory: the table holds one row per title the
 /// matcher gets wrong, which is a handful, and this runs on a 5 s poll.
@@ -337,12 +346,21 @@ pub(crate) fn detection_override(
     title: &str,
     season: Option<u32>,
     media_type: &str,
-) -> Option<(i64, String)> {
+) -> Option<crate::db::DetectionOverride> {
     let key = season_key(season);
     db.detection_overrides()
         .into_iter()
-        .find(|(t, s, m, _, _)| t == title && *s == key && m == media_type)
-        .map(|(_, _, _, media_id, display)| (media_id, display))
+        .find(|o| o.title == title && o.season == key && o.media_type == media_type)
+}
+
+/// The episode a correction says this really is.
+///
+/// Saturating, and floored at 1: an offset that would take the number to zero
+/// or below describes a mapping that cannot be true, and episode 0 is not a
+/// thing to write to a list.
+pub(crate) fn shift_episode(episode: u32, offset: i32) -> u32 {
+    let shifted = i64::from(episode) + i64::from(offset);
+    shifted.clamp(1, u32::MAX as i64) as u32
 }
 
 /// What the cached list knows about a matched id.
@@ -396,14 +414,27 @@ fn build_now_playing(
     // wrong (or cannot place at all) is corrected once on the card and every
     // later detection of that parse skips the guessing entirely.
     let forced = detection_override(db, &parsed.title, parsed.season, media_type);
-    if let Some((mid, _)) = &forced {
+    if let Some(o) = &forced {
         crate::logging::debug(
             "recognize",
-            format!("{:?} → your correction: #{mid}", parsed.title),
+            format!(
+                "{:?} → your correction: #{} offset {:+}",
+                parsed.title, o.media_id, o.episode_offset
+            ),
         );
     }
+    // The corrected number, *before* the relations redirect: a correction says
+    // which episode of the entry this is, and anime-relations then decides
+    // where that episode lands — the order the v12 note in CLAUDE.md sets out.
+    let source_episode = parsed.episode;
+    let mut parsed = parsed;
+    if let (Some(o), Some(ep)) = (&forced, parsed.episode) {
+        parsed.episode = Some(shift_episode(ep, o.episode_offset));
+    }
+    let parsed = parsed;
+
     let matched = match &forced {
-        Some((mid, _)) => Some(matcher::Match { media_id: *mid, score: 1.0 }),
+        Some(o) => Some(matcher::Match { media_id: o.media_id, score: 1.0 }),
         None => matcher::best_match(&parsed, &candidates),
     };
 
@@ -464,8 +495,8 @@ fn build_now_playing(
                     // the stored one would misreport.
                     forced
                         .as_ref()
-                        .filter(|(fid, _)| *fid == mid)
-                        .map(|(_, t)| t.as_str()),
+                        .filter(|o| o.media_id == mid)
+                        .map(|o| o.display_title.as_str()),
                 );
                 (Some(mid), ep, title, progress, total, duration, status)
             }
@@ -480,6 +511,7 @@ fn build_now_playing(
         parsed_title: parsed.title,
         season: parsed.season,
         episode,
+        source_episode,
         media_id,
         matched_title,
         overridden: forced.is_some(),
@@ -692,7 +724,7 @@ pub fn requeue_match(app: &AppHandle) {
     let media_type;
     let parsed_title;
     let season;
-    let episode;
+    let source_episode;
     {
         let state = app.state::<PlaybackState>();
         let guard = state.0.lock().unwrap();
@@ -700,13 +732,22 @@ pub fn requeue_match(app: &AppHandle) {
         media_type = np.media_type.clone();
         parsed_title = np.parsed_title.clone();
         season = np.season;
-        episode = np.episode;
+        // The number the *source* gave, never the resolved one: re-resolving
+        // from an already-shifted episode would move it again.
+        source_episode = np.source_episode;
     }
 
     let candidates = candidates_from_cache(&db, &media_type);
     let forced = detection_override(&db, &parsed_title, season, &media_type);
+
+    // Same order as `build_now_playing`, and it has to stay that way: offset
+    // first, then the redirect decides where that number lands.
+    let episode = match (&forced, source_episode) {
+        (Some(o), Some(ep)) => Some(shift_episode(ep, o.episode_offset)),
+        _ => source_episode,
+    };
     let picked = match &forced {
-        Some((mid, _)) => Some(*mid),
+        Some(o) => Some(o.media_id),
         // Cleared: fall back to what the matcher makes of the same parse, so
         // "undo" really returns the guess rather than leaving a hole.
         None => matcher::best_match(
@@ -725,18 +766,17 @@ pub fn requeue_match(app: &AppHandle) {
     // reason: a correction settles which *series* this is, and anime-relations
     // still decides which entry a combined release's episode number lands on.
     // Without this the two paths would disagree until the title changed.
-    let picked = picked.map(|mid| {
-        if media_type == "ANIME" {
-            if let Some(ep) = episode {
-                let rules = app.state::<Relations>();
-                let rules = rules.0.read().unwrap();
-                if let Some((new_id, _)) = relations::redirect(&rules, mid, ep) {
-                    return new_id;
-                }
+    let (picked, episode) = match picked {
+        Some(mid) if media_type == "ANIME" => {
+            let rules = app.state::<Relations>();
+            let rules = rules.0.read().unwrap();
+            match episode.and_then(|ep| relations::redirect(&rules, mid, ep)) {
+                Some((new_id, new_ep)) => (Some(new_id), Some(new_ep)),
+                None => (Some(mid), episode),
             }
         }
-        mid
-    });
+        other => (other, episode),
+    };
 
     let resolved = picked.map(|mid| {
         let (title, progress, total, duration, status) = resolve_match(
@@ -744,8 +784,8 @@ pub fn requeue_match(app: &AppHandle) {
             mid,
             forced
                 .as_ref()
-                .filter(|(fid, _)| *fid == mid)
-                .map(|(_, t)| t.as_str()),
+                .filter(|o| o.media_id == mid)
+                .map(|o| o.display_title.as_str()),
         );
         (mid, title, progress, total, duration, status)
     });
@@ -759,6 +799,9 @@ pub fn requeue_match(app: &AppHandle) {
         let mut guard = state.0.lock().unwrap();
         if let Some(np) = guard.as_mut() {
             np.overridden = forced.is_some();
+            // The resolved number, so `drive_session` starts its next session
+            // on the episode the correction actually names.
+            np.episode = episode;
             match resolved {
                 Some((mid, title, progress, total, duration, status)) => {
                     np.media_id = Some(mid);
@@ -1101,8 +1144,8 @@ async fn drive_session(app: &AppHandle) {
 #[cfg(test)]
 mod tests {
     use super::{
-        applies_to, block_reason, position_due, threshold, would_regress, BlockReason,
-        NowPlaying, Phase, Session, DEFAULT_THRESHOLD, MANGA_THRESHOLD,
+        applies_to, block_reason, position_due, shift_episode, threshold, would_regress,
+        BlockReason, NowPlaying, Phase, Session, DEFAULT_THRESHOLD, MANGA_THRESHOLD,
     };
     use std::time::Duration;
 
@@ -1115,6 +1158,7 @@ mod tests {
             parsed_title: String::new(),
             season: None,
             episode: Some(1),
+            source_episode: Some(1),
             media_id: Some(1),
             matched_title: None,
             overridden: false,
@@ -1191,6 +1235,20 @@ mod tests {
             block_reason(&np, 1, 27),
             Some(BlockReason::AlreadyWatched { .. })
         ));
+    }
+
+    /// The offset is what lets a correction name an *episode*, for the layout
+    /// where a server splits one continuously-numbered entry into cours.
+    #[test]
+    fn an_offset_moves_the_episode_and_never_below_one() {
+        // Jellyfin S2E1 of a 2-cour entry is episode 13.
+        assert_eq!(shift_episode(1, 12), 13);
+        assert_eq!(shift_episode(11, 12), 23);
+        // A source numbering *ahead* of AniList is the same tool, negated.
+        assert_eq!(shift_episode(27, -26), 1);
+        // Nonsense cannot produce episode 0, which is not a thing to write.
+        assert_eq!(shift_episode(1, -5), 1);
+        assert_eq!(shift_episode(1, 0), 1);
     }
 
     /// A release name that carries its own season marker was matched *with*

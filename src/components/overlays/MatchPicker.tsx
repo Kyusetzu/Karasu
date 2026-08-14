@@ -31,6 +31,7 @@ export default function MatchPicker({
   error,
   mediaType = "ANIME",
   suggestSequelsOf,
+  detectedEpisode,
   onPick,
   onClear,
   onCancel,
@@ -54,10 +55,16 @@ export default function MatchPicker({
    *  to which entry is a question only the viewer can answer, and the wrong
    *  guess writes to their list. */
   suggestSequelsOf?: number | null;
-  /** The chosen entry's id and its display title — the second because a
-      caller storing the pick has it right here and would otherwise need a
-      request to name what it points at. */
-  onPick: (mediaId: number, title: string) => void;
+  /** The episode the source reported. Supplying it adds the "and this is
+   *  really episode N" field, for the layout where a server splits one
+   *  continuously-numbered entry into cours: its S2E1 is episode 13, and
+   *  without this the entry can be corrected but never the number. */
+  detectedEpisode?: number | null;
+  /** The chosen entry's id, its display title — the second because a caller
+      storing the pick has it right here and would otherwise need a request to
+      name what it points at — and, when `detectedEpisode` was given, what
+      that episode really is. */
+  onPick: (mediaId: number, title: string, realEpisode?: number) => void;
   /** Present only when there is a correction to undo. */
   onClear?: () => void;
   onCancel: () => void;
@@ -66,7 +73,17 @@ export default function MatchPicker({
   const level = useContentFilter((s) => s.level);
   const [term, setTerm] = useState(parsedTitle);
   const [debounced, setDebounced] = useState(parsedTitle);
+  // Seeded with what was detected, so leaving it alone means "the numbering
+  // already agrees" — the common case, and the one that must cost nothing.
+  const [episode, setEpisode] = useState(
+    detectedEpisode != null ? String(detectedEpisode) : "",
+  );
   const box = useRef<HTMLInputElement>(null);
+
+  const realEpisode = (() => {
+    const n = Math.round(Number(episode));
+    return Number.isFinite(n) && n > 0 ? n : undefined;
+  })();
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onCancel();
@@ -161,6 +178,24 @@ export default function MatchPicker({
               <Loader2 className="absolute right-2.5 top-1/2 size-3.5 -translate-y-1/2 animate-spin text-ink-600" />
             )}
           </div>
+          {/* Only where an episode number is on the table. The library's own
+              corrections settle a whole title and have no single episode to
+              speak of. */}
+          {detectedEpisode != null && (
+            <div className="mt-2 flex items-center gap-2">
+              <label className="text-2xs text-ink-500" htmlFor="pick-episode">
+                {t("library.reallyEpisode", { n: detectedEpisode })}
+              </label>
+              <Input
+                id="pick-episode"
+                type="number"
+                min={1}
+                value={episode}
+                onChange={(e) => setEpisode(e.target.value)}
+                className="h-7 w-20"
+              />
+            </div>
+          )}
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-2">
@@ -175,7 +210,9 @@ export default function MatchPicker({
                     <ResultRow
                       media={media}
                       isCurrent={displayTitle(media.title) === current}
-                      onPick={() => onPick(media.id, displayTitle(media.title))}
+                      onPick={() =>
+                        onPick(media.id, displayTitle(media.title), realEpisode)
+                      }
                     />
                   </li>
                 ))}
@@ -201,7 +238,9 @@ export default function MatchPicker({
                   <ResultRow
                     media={media}
                     isCurrent={displayTitle(media.title) === current}
-                    onPick={() => onPick(media.id, displayTitle(media.title))}
+                    onPick={() =>
+                      onPick(media.id, displayTitle(media.title), realEpisode)
+                    }
                   />
                 </li>
               ))}

@@ -724,6 +724,7 @@ export const de: typeof en = {
     currentMatch: "aktuell",
     clearMatch: "Korrektur aufheben",
     laterSeasons: "Spätere Staffeln dieser Serie",
+    reallyEpisode: "Folge {{n}} ist eigentlich Folge",
     epCount: "{{n}} Fo.",
     ep: "Fo. {{n}}",
     play: "Abspielen",
@@ -1210,6 +1211,7 @@ export const de: typeof en = {
     correctionsHint:
       "Titel, die du über die Wiedergabe-Karte korrigiert hast. Jede gilt für jede weitere Erkennung desselben Titels; entferne eine, damit die Zuordnung wieder selbst rät.",
     correctionsFrom: "erkannt als {{title}}",
+    correctionsOffset: "Folgen {{offset}}",
     detectionDebug: "Was dein System gerade meldet",
     detectionDebugHint:
       "Alle Mediensitzungen, die dein System aktuell kennt. Damit siehst du, was ein Player veröffentlicht, wenn er nicht erkannt wird.",

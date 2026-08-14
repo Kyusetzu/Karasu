@@ -249,6 +249,24 @@ pub fn playback_from(session: &MediaSession) -> Option<Playback> {
         );
         return None;
     }
+    // A composed title whose *parse* is empty is not playback either. Some
+    // clients swap artist and title (the warning above), which puts the
+    // episode marker first — "Folge 1 - Some Show" parses to an empty title
+    // with an episode number, and an empty title matches nothing, blocks
+    // nothing useful, and would become the key of a correction that could
+    // never fire again.
+    if crate::playback::recognition::parser::parse(&media_title)
+        .title
+        .trim()
+        .is_empty()
+    {
+        crate::logging::debug_changed(
+            "session",
+            "skipped",
+            format!("{}: {media_title:?} has no title once parsed", session.app_id),
+        );
+        return None;
+    }
     crate::logging::debug_changed(
         "session",
         "chosen",

@@ -512,7 +512,12 @@ pub async fn detect(cfg: &JellyfinConfig) -> Option<Playback> {
         Ok(v) => v,
         Err(e) => {
             crate::logging::debug_changed("jellyfin", "detect", format!("/Sessions failed: {e}"));
-            return None;
+            // A failed request is not an answer, and treating it as one is
+            // what made a single slow response visible: detection dropped to
+            // the media session, which composes an episode-name title, and
+            // the card flipped to it for that tick. Hold the last good answer
+            // for a few ticks instead. See `last_good`.
+            return hold_last_good();
         }
     };
     let Some(list) = sessions.as_array() else {
@@ -539,7 +544,55 @@ pub async fn detect(cfg: &JellyfinConfig) -> Option<Playback> {
             ),
         );
     }
+    // The server answered. Whatever it said is the truth, including "nothing"
+    // — an episode that just finished must end the session at once, not three
+    // ticks later.
+    remember(found)
+}
+
+/// How many consecutive failed polls may be papered over. Three ticks of a
+/// 5 s poll is fifteen seconds — long enough to ride out one slow `/Sessions`
+/// response or a proxy hiccup, short enough that a server which really went
+/// away is noticed while the episode is still playing.
+const HOLD_TICKS: u8 = 3;
+
+/// The last answer the server actually gave, and how many failures have been
+/// covered with it since.
+static LAST_GOOD: Mutex<Option<(Playback, u8)>> = Mutex::new(None);
+
+/// Records a successful poll and hands the answer straight back.
+fn remember(found: Option<Playback>) -> Option<Playback> {
+    let mut guard = LAST_GOOD.lock().unwrap_or_else(|e| e.into_inner());
+    *guard = found.clone().map(|p| (p, 0));
     found
+}
+
+/// The stand-in for a failed poll, while there is one to give.
+///
+/// Deliberately only reachable from the request-failed branch: "the server
+/// says nothing is playing" is an answer and clears the memory through
+/// `remember`, so this can never keep a finished episode alive.
+fn hold_last_good() -> Option<Playback> {
+    let mut guard = LAST_GOOD.lock().unwrap_or_else(|e| e.into_inner());
+    let Some((playback, used)) = guard.as_mut() else {
+        return None;
+    };
+    if *used >= HOLD_TICKS {
+        crate::logging::debug_changed(
+            "jellyfin",
+            "hold",
+            "server still unreachable; letting the lower sources answer",
+        );
+        *guard = None;
+        return None;
+    }
+    *used += 1;
+    crate::logging::debug_changed(
+        "jellyfin",
+        "hold",
+        format!("holding the last answer while the server is unreachable ({used}/{HOLD_TICKS})"),
+    );
+    Some(playback.clone())
 }
 
 #[cfg(test)]
@@ -565,6 +618,64 @@ mod tests {
         assert_eq!(parsed.episode, Some(5));
         assert_eq!(parsed.season, Some(2));
         assert!(p.media_title.contains("Frieren"));
+    }
+
+    /// `LAST_GOOD` is process-global and `cargo test` runs in parallel, so the
+    /// two tests that drive it take this lock. The logging suite learned the
+    /// same lesson the expensive way: without it the suite is green by
+    /// scheduling luck and fails on a CI runner instead.
+    static HOLD_STATE: Mutex<()> = Mutex::new(());
+
+    /// A failed assertion in one locked test must not poison the other.
+    fn serialize_hold() -> std::sync::MutexGuard<'static, ()> {
+        HOLD_STATE.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    fn some_playback(title: &str) -> Playback {
+        playback_from_session(&json!({
+            "NowPlayingItem": {
+                "Type": "Episode", "Name": "Ep", "SeriesName": title, "IndexNumber": 1
+            }
+        }))
+        .unwrap()
+    }
+
+    /// A failed request is not an answer. One slow `/Sessions` used to demote
+    /// detection to the media session for that tick, which composes a title
+    /// out of the *episode* name — the "sometimes it just says Folge 1" case.
+    #[test]
+    fn a_failed_poll_holds_the_last_answer_but_not_for_ever() {
+        let _guard = serialize_hold();
+        *LAST_GOOD.lock().unwrap() = None;
+
+        // Nothing to hold yet: a failure before any success stays a failure.
+        assert!(hold_last_good().is_none());
+
+        let playback = some_playback("Beyblade: Metal Fusion");
+        remember(Some(playback.clone()));
+
+        for _ in 0..HOLD_TICKS {
+            assert_eq!(
+                hold_last_good().map(|p| p.media_title.clone()),
+                Some(playback.media_title.clone()),
+                "a transient failure must not change what is playing"
+            );
+        }
+        // Past the window the server is genuinely gone; let the lower rungs try.
+        assert!(hold_last_good().is_none());
+        assert!(hold_last_good().is_none(), "and it stays given up");
+    }
+
+    /// The other half, and the one that matters for correctness: "the server
+    /// says nothing is playing" is an answer, so a finished episode ends the
+    /// session immediately rather than lingering for three ticks.
+    #[test]
+    fn a_clean_nothing_playing_clears_the_memory_at_once() {
+        let _guard = serialize_hold();
+        *LAST_GOOD.lock().unwrap() = None;
+        remember(Some(some_playback("Frieren")));
+        assert!(remember(None).is_none());
+        assert!(hold_last_good().is_none());
     }
 
     /// The whole reason `get_ci` exists, applied to the mapping that used to

@@ -881,8 +881,15 @@ pub fn spawn(app: AppHandle) {
                 // What detection saw. Per *change*, never per tick: the poll runs
                 // every 5s, so a line here would be 17,280 a day and would rotate
                 // everything else off a 1 MB file.
-                crate::logging::debug(
+                //
+                // `debug_changed` rather than `debug`, because "changed" is not
+                // the same as "different from last time": two sources that
+                // disagree make this branch fire every single tick while
+                // alternating, which is the 17,280 lines the paragraph above
+                // is about — from the one line meant to prevent them.
+                crate::logging::debug_changed(
                     "detect",
+                    "playback",
                     format!("playback changed: {last_raw:?} → {raw:?}"),
                 );
                 last_raw = raw;

@@ -1072,6 +1072,17 @@ export const de: typeof en = {
     rescaleApply: "Umskalieren",
     rescaleDone: "{{n}} Bewertungen umskaliert.",
     rescaleFailed: "Das Umskalieren wurde nicht abgeschlossen",
+    export: "Listen exportieren",
+    exportHint:
+      "MAL-XML versteht fast jeder Tracker; das JSON trägt alles, was Karasu weiß — Bewertungen auf der rohen 0–100-Skala.",
+    exportAnime: "Anime → MAL-XML",
+    exportManga: "Manga → MAL-XML",
+    exportJson: "Alles → JSON",
+    exportDone: "{{n}} Einträge exportiert.",
+    exportDoneSkipped:
+      "{{n}} Einträge exportiert — {{skipped}} haben keine MyAnimeList-ID und wurden ausgelassen.",
+    exportEmpty: "Noch nichts zu exportieren.",
+    exportFailed: "Der Export wurde nicht abgeschlossen",
     alScoreFormat: "Bewertungsformat",
     alScoreFormatHint:
       "Die Skala für deine Bewertungen überall — in Karasu, auf anilist.co und in jedem anderen Client. Bestehende Bewertungen werden umgerechnet, nicht gelöscht.",

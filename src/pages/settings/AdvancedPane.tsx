@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import * as api from "@/api/anilist";
 import { getLogDebug, getLogs, setLogDebug, type LogEntry } from "@/api/diagnostics";
 import { planRescale } from "@/lib/rescale";
+import { buildJsonExport, buildMalXml } from "@/lib/malExport";
 import { scoreScale } from "@/lib/scoreFormat";
 import { useAuth, useScoreFormat } from "@/stores/auth";
 import { usePlatform } from "@/stores/platform";
@@ -197,6 +198,111 @@ export function PortableSection() {
         <p className="mt-2 text-sm text-gold">{t("settings.portableRestart")}</p>
       )}
       {error && <p className="mt-2 text-sm text-danger">{error}</p>}
+    </Card>
+  );
+}
+
+/**
+ * Export the lists as files: MAL XML per medium (the migration lingua
+ * franca), or everything as Karasu's own JSON. Composition is pure
+ * (`lib/malExport`, tested); this section only fetches, composes and hands
+ * the result to the same save dialog the other exports use.
+ *
+ * Works in both modes — a local list needs a way out at least as much as an
+ * account does. The list reads go through the query cache, so on a warm
+ * session they cost nothing; cold, they are the same two fetches the list
+ * pages would spend anyway, and the click is the user-initiated moment.
+ */
+export function ExportSection() {
+  const { t } = useTranslation();
+  const qc = useQueryClient();
+  const viewer = useAuth((s) => s.viewer);
+  const mode = useAuth((s) => s.mode);
+  const format = useScoreFormat();
+  const [busy, setBusy] = useState(false);
+
+  if (mode === "none") return null;
+  const userId = viewer?.id ?? 0;
+
+  const flat = (r: ListResult) => {
+    const seen = new Set<number>();
+    return r.lists
+      .filter((g) => !g.isCustomList)
+      .flatMap((g) => g.entries)
+      .filter((e) => (seen.has(e.mediaId) ? false : (seen.add(e.mediaId), true)));
+  };
+
+  const load = (type: MediaType) =>
+    qc
+      .fetchQuery({
+        queryKey: ["mediaList", type, userId],
+        queryFn: () => api.fetchMediaList(userId, type),
+      })
+      .then(flat);
+
+  const run = async (fn: () => Promise<void>) => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await fn();
+    } catch (e) {
+      showToast({ kind: "error", text: t("settings.exportFailed"), detail: String(e) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const exportMal = (type: MediaType) =>
+    run(async () => {
+      const entries = await load(type);
+      const { xml, count, skipped } = buildMalXml(entries, type, format);
+      if (count === 0) {
+        showToast({ kind: "error", text: t("settings.exportEmpty") });
+        return;
+      }
+      const name = type === "ANIME" ? "karasu-anime.xml" : "karasu-manga.xml";
+      if (await api.saveText(xml, name, "MyAnimeList XML", "xml")) {
+        showToast({
+          kind: "success",
+          text:
+            skipped > 0
+              ? t("settings.exportDoneSkipped", { n: count, skipped })
+              : t("settings.exportDone", { n: count }),
+        });
+      }
+    });
+
+  const exportJson = () =>
+    run(async () => {
+      const [anime, manga] = await Promise.all([load("ANIME"), load("MANGA")]);
+      if (anime.length === 0 && manga.length === 0) {
+        showToast({ kind: "error", text: t("settings.exportEmpty") });
+        return;
+      }
+      const json = buildJsonExport(anime, manga, format, Date.now());
+      if (await api.saveText(json, "karasu-export.json", "JSON", "json")) {
+        showToast({
+          kind: "success",
+          text: t("settings.exportDone", { n: anime.length + manga.length }),
+        });
+      }
+    });
+
+  return (
+    <Card>
+      <CardTitle>{t("settings.export")}</CardTitle>
+      <p className="mt-2 text-sm text-ink-500">{t("settings.exportHint")}</p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Button variant="secondary" disabled={busy} onClick={() => exportMal("ANIME")}>
+          {t("settings.exportAnime")}
+        </Button>
+        <Button variant="secondary" disabled={busy} onClick={() => exportMal("MANGA")}>
+          {t("settings.exportManga")}
+        </Button>
+        <Button variant="secondary" disabled={busy} onClick={exportJson}>
+          {t("settings.exportJson")}
+        </Button>
+      </div>
     </Card>
   );
 }

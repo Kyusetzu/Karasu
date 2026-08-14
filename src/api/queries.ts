@@ -24,6 +24,7 @@ const scoreFormatVar = () => ({ scoreFormat: currentScoreFormat() });
 /** Media fields for discovery grids, including the user's own list entry. */
 const MEDIA_FIELDS = `
   id
+  idMal
   type
   title { romaji english native }
   coverImage { large }

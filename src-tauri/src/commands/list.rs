@@ -35,6 +35,7 @@ query ($userId: Int!, $type: MediaType!, $scoreFormat: ScoreFormat) {
         completedAt { year month day }
         media {
           id
+          idMal
           type
           title { romaji english native }
           coverImage { large }

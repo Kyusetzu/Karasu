@@ -27,6 +27,10 @@ export interface MediaTitle {
 
 export interface Media {
   id: number;
+  /** MyAnimeList id — what the MAL XML export keys on. Optional: blobs
+      cached before the export existed lack it, and some titles are
+      AniList-only and genuinely have none. */
+  idMal?: number | null;
   type?: MediaType;
   title: MediaTitle;
   // `extraLarge` and `bannerImage` are optional because only the detail query

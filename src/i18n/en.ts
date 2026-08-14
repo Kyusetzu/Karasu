@@ -1064,6 +1064,17 @@ export const en = {
     rescaleApply: "Rescale",
     rescaleDone: "{{n}} scores rescaled.",
     rescaleFailed: "The rescale did not finish",
+    export: "Export your lists",
+    exportHint:
+      "MAL XML is what most trackers import; the JSON carries everything Karasu knows, scores in the raw 0–100 scale.",
+    exportAnime: "Anime → MAL XML",
+    exportManga: "Manga → MAL XML",
+    exportJson: "Everything → JSON",
+    exportDone: "{{n}} entries exported.",
+    exportDoneSkipped:
+      "{{n}} entries exported — {{skipped}} have no MyAnimeList id and were left out.",
+    exportEmpty: "Nothing to export yet.",
+    exportFailed: "The export did not finish",
     alScoreFormat: "Score format",
     alScoreFormatHint:
       "The scale your scores use everywhere — in Karasu, on anilist.co and in every other client. Existing scores are converted, not lost.",

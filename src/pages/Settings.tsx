@@ -22,7 +22,12 @@ import { ScrobbleSection, JellyfinSection } from "./settings/DetectionPane";
 import { LibrarySection } from "./settings/LibraryPane";
 import { ContentSection } from "./settings/ContentPane";
 import { DiscordSection } from "./settings/IntegrationsPane";
-import { AdvancedSection, PortableSection, LogSection } from "./settings/AdvancedPane";
+import {
+  AdvancedSection,
+  PortableSection,
+  LogSection,
+  RescaleSection,
+} from "./settings/AdvancedPane";
 /**
  * The seven panes, in the order they are worth reading.
  *
@@ -58,7 +63,7 @@ const PANES = [
   {
     id: "advanced",
     icon: SlidersHorizontal,
-    sections: [AdvancedSection, LogSection, PortableSection],
+    sections: [AdvancedSection, RescaleSection, LogSection, PortableSection],
   },
 ] as const;
 

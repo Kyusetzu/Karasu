@@ -1002,6 +1002,15 @@ export const de: typeof en = {
       "Karasu erzeugt seine eigenen Airing-Hinweise und ist davon unberührt.",
     alOverrideWhere: "Karasus Einstellung →",
     alListOptions: "Listenanzeige",
+    rescale: "Bewertungen umskalieren",
+    rescaleHint:
+      "Bildet alle Bewertungen eines Bereichs in einem Durchgang auf einen neuen Bereich ab — z. B. ein zaghaftes 5–8 auf volle 3–9 strecken. Unbewertete Einträge bleiben unberührt.",
+    rescalePreview:
+      "{{affected}} Bewertungen würden sich ändern ({{untouched}} unberührt) — kostet {{requests}} Anfrage(n).",
+    rescaleNoList: "Öffne zuerst einmal die Liste, damit es etwas zum Umskalieren gibt.",
+    rescaleApply: "Umskalieren",
+    rescaleDone: "{{n}} Bewertungen umskaliert.",
+    rescaleFailed: "Das Umskalieren wurde nicht abgeschlossen",
     alScoreFormat: "Bewertungsformat",
     alScoreFormatHint:
       "Die Skala für deine Bewertungen überall — in Karasu, auf anilist.co und in jedem anderen Client. Bestehende Bewertungen werden umgerechnet, nicht gelöscht.",

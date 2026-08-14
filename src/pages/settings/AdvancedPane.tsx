@@ -1,16 +1,142 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { ChevronRight, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import * as api from "@/api/anilist";
 import { getLogDebug, getLogs, setLogDebug, type LogEntry } from "@/api/diagnostics";
+import { planRescale } from "@/lib/rescale";
+import { scoreScale } from "@/lib/scoreFormat";
+import { useAuth, useScoreFormat } from "@/stores/auth";
 import { usePlatform } from "@/stores/platform";
+import { showToast } from "@/stores/toast";
+import type { ListResult, MediaType } from "@/api/types";
 import { cn } from "@/lib/utils";
 import { Row, SELECT, Toggle } from "./shared";
 interface PortableStatus {
   portable: boolean;
   dir: string;
+}
+
+/**
+ * The one-shot score rescale: every scored entry inside a source range maps
+ * linearly onto a target range. Planning is pure (`lib/rescale`) and shown
+ * before anything is written — including the request count, because
+ * AniList's bulk mutation takes one value per call, so the apply is one
+ * request per distinct target score. Signed-in only: a local list can be
+ * rescaled the day someone asks, but the tool exists for the account case.
+ */
+export function RescaleSection() {
+  const { t } = useTranslation();
+  const qc = useQueryClient();
+  const viewer = useAuth((s) => s.viewer);
+  const mode = useAuth((s) => s.mode);
+  const format = useScoreFormat();
+  const scale = scoreScale(format);
+  const [type, setType] = useState<MediaType>("ANIME");
+  const [fromMin, setFromMin] = useState(1);
+  const [fromMax, setFromMax] = useState(scale.max);
+  const [toMin, setToMin] = useState(1);
+  const [toMax, setToMax] = useState(scale.max);
+  const [applying, setApplying] = useState(false);
+
+  const entries = useMemo(() => {
+    if (!viewer) return [];
+    const data = qc.getQueryData<ListResult>(["mediaList", type, viewer.id]);
+    const seen = new Set<number>();
+    return (data?.lists ?? [])
+      .filter((g) => !g.isCustomList)
+      .flatMap((g) => g.entries)
+      .filter((e) => (seen.has(e.mediaId) ? false : (seen.add(e.mediaId), true)))
+      .map((e) => ({ id: e.id, mediaId: e.mediaId, score: e.score }));
+  }, [qc, viewer, type, applying]);
+
+  if (mode !== "anilist" || !viewer) return null;
+
+  const plan = planRescale(
+    entries,
+    { min: fromMin, max: fromMax },
+    { min: toMin, max: toMax },
+    format,
+  );
+  const listLoaded = entries.length > 0;
+
+  const apply = async () => {
+    setApplying(true);
+    try {
+      for (const group of plan.groups) {
+        await api.bulkSaveEntries(group.entries, { score: group.score });
+      }
+      showToast({
+        kind: "success",
+        text: t("settings.rescaleDone", { n: plan.affected }),
+      });
+      await qc.invalidateQueries({ queryKey: ["mediaList", type] });
+    } catch (e) {
+      showToast({ kind: "error", text: t("settings.rescaleFailed"), detail: String(e) });
+    } finally {
+      setApplying(false);
+    }
+  };
+
+  const range = (
+    value: number,
+    set: (n: number) => void,
+  ) => (
+    <Input
+      type="number"
+      min={0}
+      max={scale.max}
+      step={scale.step}
+      value={value}
+      onChange={(e) => set(Number(e.target.value))}
+      className="w-20"
+    />
+  );
+
+  return (
+    <Card>
+      <CardTitle>{t("settings.rescale")}</CardTitle>
+      <p className="mt-2 text-sm text-ink-500">{t("settings.rescaleHint")}</p>
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <select
+          value={type}
+          onChange={(e) => setType(e.target.value as MediaType)}
+          className={SELECT}
+        >
+          <option value="ANIME">{t("common.anime")}</option>
+          <option value="MANGA">{t("common.manga")}</option>
+        </select>
+        <span className="flex items-center gap-1.5 text-sm text-ink-300">
+          {range(fromMin, setFromMin)}–{range(fromMax, setFromMax)}
+          <span className="mx-1 text-ink-600">→</span>
+          {range(toMin, setToMin)}–{range(toMax, setToMax)}
+        </span>
+      </div>
+      <p className="mt-2 text-xs text-ink-600">
+        {listLoaded
+          ? t("settings.rescalePreview", {
+              affected: plan.affected,
+              untouched: plan.untouched,
+              requests: plan.requests,
+            })
+          : t("settings.rescaleNoList")}
+      </p>
+      <Button
+        className="mt-3"
+        variant="secondary"
+        disabled={!listLoaded || plan.affected === 0 || applying}
+        onClick={apply}
+      >
+        {applying ? (
+          <RefreshCw className="size-3.5 animate-spin" />
+        ) : null}
+        {t("settings.rescaleApply")}
+      </Button>
+    </Card>
+  );
 }
 
 export function PortableSection() {

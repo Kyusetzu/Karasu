@@ -994,6 +994,15 @@ export const en = {
       "Karasu raises its own airing alerts and is unaffected by this.",
     alOverrideWhere: "Karasu’s setting →",
     alListOptions: "List display",
+    rescale: "Rescale scores",
+    rescaleHint:
+      "Map every score inside a range onto a new range, in one pass — e.g. stretch a timid 5–8 into a full 3–9. Unscored entries are never touched.",
+    rescalePreview:
+      "{{affected}} scores would change ({{untouched}} untouched) — costs {{requests}} request(s).",
+    rescaleNoList: "Open the list once first, so there is something to rescale.",
+    rescaleApply: "Rescale",
+    rescaleDone: "{{n}} scores rescaled.",
+    rescaleFailed: "The rescale did not finish",
     alScoreFormat: "Score format",
     alScoreFormatHint:
       "The scale your scores use everywhere — in Karasu, on anilist.co and in every other client. Existing scores are converted, not lost.",

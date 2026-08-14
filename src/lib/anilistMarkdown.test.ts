@@ -397,9 +397,32 @@ describe("block structure", () => {
       `~~~\nbare\n~~~`,
       `~~~one line~~~`,
       `~~~ unclosed content`,
+      // The closing fence glued to the last content line — how a real bio
+      // ends (`img220(url)~~~`), and the form that shipped a literal `~~~`.
+      `~~~ opening\nimg220(https://i.imgur.com/a.jpg)~~~`,
     ]) {
       expect(textOf(parse(src)), src).not.toContain("~~~");
     }
+  });
+
+  it("keeps the closing line's content when the fence is glued to it", () => {
+    // The exact shape of the maintainer's own bio: multi-line centred block,
+    // images on their own lines, close glued to the last image.
+    const nodes = parse(
+      `~~~__Hi.__\n[a link](https://example.com)\n\n` +
+        `img220(https://i.imgur.com/a.jpeg)\n\n\n` +
+        `Prose line.\nimg220(https://i.imgur.com/b.jpg)~~~`,
+    );
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0].type).toBe("center");
+    const inner = types(nodes);
+    expect(inner).toContain("strong");
+    expect(inner).toContain("link");
+    // Both images survived — the glued one included.
+    const chips = JSON.stringify(nodes).match(/"chip"/g);
+    expect(chips).toHaveLength(2);
+    expect(textOf(nodes)).not.toContain("~~~");
+    expect(textOf(nodes)).toContain("Prose line.");
   });
 
   it("renders table rows as cell text rather than dropping them", () => {

@@ -336,8 +336,13 @@ function pushChip(out: MdInline[], kind: "image" | "video", raw: string) {
 // --- Blocks ---------------------------------------------------------------
 
 const FENCE = /^\s*```/;
-/** Closes a centred block: three tildes and nothing else. */
-const CENTER_CLOSE = /^\s*~~~\s*$/;
+/**
+ * Closes a centred block: a line *ending* in three tildes, with whatever
+ * precedes them being the block's last line. Real bios end this way —
+ * `img220(url)~~~` with no newline before the fence — and requiring a bare
+ * `~~~` line left the tildes on screen there, mirroring the opener's lesson.
+ */
+const CENTER_CLOSE = /^([\s\S]*?)~~~\s*$/;
 /**
  * Opens one. The trailing group is content written on the *same line* as the
  * fence, which real bios do constantly — `~~~ tam | she/her | arg` was the form
@@ -395,8 +400,17 @@ function parseBlocks(lines: string[]): MdNode[] {
       // Anything after the fence on the opening line is the block's first line.
       const body: string[] = opener[1].trim() ? [opener[1]] : [];
       i += 1;
-      while (i < lines.length && !CENTER_CLOSE.test(lines[i])) body.push(lines[i++]);
-      if (i < lines.length) i += 1; // the closing fence
+      while (i < lines.length) {
+        const close = CENTER_CLOSE.exec(lines[i]);
+        i += 1;
+        if (close) {
+          // Content on the closing line belongs to the block; a bare `~~~`
+          // has a whitespace-only prefix and contributes nothing.
+          if (close[1].trim()) body.push(close[1]);
+          break;
+        }
+        body.push(lines[i - 1]);
+      }
       out.push({ type: "center", children: parseBlocks(body) });
       continue;
     }

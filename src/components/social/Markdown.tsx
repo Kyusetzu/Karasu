@@ -79,13 +79,14 @@ function Blocks({ nodes }: { nodes: MdNode[] }) {
           case "hr":
             return <hr key={i} className="border-surface-800" />;
           case "center":
-            // `flex-wrap` rather than `text-align`: the commonest centred block
-            // is a row of image chips, and those are inline-flex buttons.
+            // `text-align`, not flex: a centred paragraph is still *lines*,
+            // and a flex row swallows `<br>` — a break is not a flex item, so
+            // image chips ended up glued onto the text line above them. Chips
+            // are inline-flex, which is inline-level, so plain text-align
+            // centres a row of them exactly as it centres words; the small
+            // leading keeps a chip line from touching the text line above.
             return (
-              <div
-                key={i}
-                className="flex flex-col items-center gap-1.5 text-center [&_p]:flex [&_p]:flex-wrap [&_p]:justify-center [&_p]:gap-1.5"
-              >
+              <div key={i} className="space-y-2 text-center leading-loose">
                 <Blocks nodes={n.children} />
               </div>
             );

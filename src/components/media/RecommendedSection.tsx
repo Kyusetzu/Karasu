@@ -1,15 +1,25 @@
-import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { Sparkles } from "lucide-react";
+import { Sparkles, ThumbsDown, ThumbsUp } from "lucide-react";
 import { SectionHeader } from "@/components/ui/section-header";
-import { recommendationsFor } from "@/api/queries";
+import {
+  recommendationsFor,
+  saveRecommendation,
+  type RawRecommendationNode,
+} from "@/api/queries";
 import { displayTitle, type MediaListEntry, type MediaType } from "@/api/types";
 import { useContentFilter } from "@/stores/contentFilter";
 import { isBlocked } from "@/lib/contentFilter";
-import { pickSeeds, rankRecommendations } from "@/lib/recommend";
+import {
+  pickSeeds,
+  rankRecommendations,
+  type ScoredRecommendation,
+} from "@/lib/recommend";
 import { scoreScale } from "@/lib/scoreFormat";
-import { useScoreFormat } from "@/stores/auth";
+import { useAuth, useScoreFormat } from "@/stores/auth";
+import { showToast } from "@/stores/toast";
+import { cn } from "@/lib/utils";
 import MediaCard from "@/components/media/MediaCard";
 
 /** Below this the suggestions are too thin to be worth a section. */
@@ -96,14 +106,77 @@ export default function RecommendedSection({
         {ranked.map((r) => (
           <div key={r.media.id}>
             <MediaCard media={r.media} />
-            <p className="mt-1 line-clamp-2 text-2xs text-ink-600">
-              {t("dashboard.becauseYouFinished", {
-                title: titleOf.get(r.topSeedId) ?? "?",
-              })}
-            </p>
+            <div className="mt-1 flex items-start justify-between gap-1.5">
+              <p className="line-clamp-2 flex-1 text-2xs text-ink-600">
+                {t("dashboard.becauseYouFinished", {
+                  title: titleOf.get(r.topSeedId) ?? "?",
+                })}
+              </p>
+              <RecVote rec={r} />
+            </div>
           </div>
         ))}
       </div>
     </section>
+  );
+}
+
+/**
+ * Up/down on the pairing the caption names — that pairing *is* the
+ * recommendation on AniList's side, so the vote lands where the sentence
+ * points. Votes feed the community's data; the pressed state is patched
+ * into the 6-hour recommendations cache so it survives a remount without a
+ * refetch, and clicking the pressed side retracts (NO_RATING).
+ */
+function RecVote({ rec }: { rec: ScoredRecommendation }) {
+  const { t } = useTranslation();
+  const qc = useQueryClient();
+  const mode = useAuth((s) => s.mode);
+  const [vote, setVote] = useState<string | null>(rec.userRating ?? null);
+  if (mode !== "anilist") return null;
+
+  const cast = async (rating: "RATE_UP" | "RATE_DOWN") => {
+    const next = vote === rating ? "NO_RATING" : rating;
+    const previous = vote;
+    setVote(next);
+    try {
+      await saveRecommendation(rec.topSeedId, rec.media.id, next);
+      // Keep the long-lived cache honest without spending a refetch.
+      qc.setQueriesData<RawRecommendationNode[]>(
+        { queryKey: ["recommendations"] },
+        (old) =>
+          old?.map((n) =>
+            n.seedId === rec.topSeedId && n.media.id === rec.media.id
+              ? { ...n, userRating: next }
+              : n,
+          ),
+      );
+    } catch (e) {
+      setVote(previous);
+      showToast({ kind: "error", text: t("dashboard.voteFailed"), detail: String(e) });
+    }
+  };
+
+  const button = (rating: "RATE_UP" | "RATE_DOWN", Icon: typeof ThumbsUp, label: string) => (
+    <button
+      type="button"
+      onClick={() => void cast(rating)}
+      aria-pressed={vote === rating}
+      aria-label={label}
+      title={label}
+      className={cn(
+        "rounded p-0.5 transition-surface hover:text-ink-100",
+        vote === rating ? "text-accent-400" : "text-ink-600",
+      )}
+    >
+      <Icon className="size-3" fill={vote === rating ? "currentColor" : "none"} />
+    </button>
+  );
+
+  return (
+    <span className="flex shrink-0 items-center">
+      {button("RATE_UP", ThumbsUp, t("dashboard.voteUp"))}
+      {button("RATE_DOWN", ThumbsDown, t("dashboard.voteDown"))}
+    </span>
   );
 }

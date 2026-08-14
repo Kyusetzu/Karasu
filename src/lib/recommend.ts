@@ -20,6 +20,8 @@ export interface RawRecommendation {
   seedId: number;
   /** AniList's community vote count. Can be negative — see below. */
   rating: number;
+  /** RATE_UP | RATE_DOWN | NO_RATING — the viewer's own vote, if fetched. */
+  userRating?: string | null;
   media: MediaWithListStatus;
 }
 
@@ -35,6 +37,9 @@ export interface ScoredRecommendation {
   weight: number;
   /** The seed that contributed most, for "because you finished …". */
   topSeedId: number;
+  /** The viewer's vote on the *top* pairing — the one the caption names
+      and the one a vote button acts on. */
+  userRating: string | null;
   /** How many distinct completed entries pointed here. */
   seedCount: number;
 }
@@ -114,6 +119,7 @@ export function rankRecommendations(
     weight: number;
     topSeedId: number;
     topSeedWeight: number;
+    userRating: string | null;
     seedCount: number;
   }
   const totals = new Map<number, Acc>();
@@ -134,6 +140,7 @@ export function rankRecommendations(
         weight: contribution,
         topSeedId: rec.seedId,
         topSeedWeight: contribution,
+        userRating: rec.userRating ?? null,
         seedCount: 1,
       });
       continue;
@@ -143,16 +150,19 @@ export function rankRecommendations(
     if (contribution > existing.topSeedWeight) {
       existing.topSeedWeight = contribution;
       existing.topSeedId = rec.seedId;
+      // The vote rides with the pairing the caption names.
+      existing.userRating = rec.userRating ?? null;
     }
   }
 
   return [...totals.values()]
     .sort((a, b) => b.weight - a.weight || a.media.id - b.media.id)
     .slice(0, limit)
-    .map(({ media, weight, topSeedId, seedCount }) => ({
+    .map(({ media, weight, topSeedId, userRating, seedCount }) => ({
       media,
       weight,
       topSeedId,
+      userRating,
       seedCount,
     }));
 }

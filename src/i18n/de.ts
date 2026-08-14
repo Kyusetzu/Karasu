@@ -225,6 +225,9 @@ export const de: typeof en = {
     thisWeekSummary:
       "{{count}} Episoden aus {{shows}} Serien laufen diese Woche.",
     fullCalendar: "Ganzer Kalender →",
+    voteUp: "Gute Empfehlung",
+    voteDown: "Schlechte Empfehlung",
+    voteFailed: "Die Stimme wurde nicht gespeichert",
     stats: "Statistik",
     statAnime: "Anime",
     statEpisodes: "Episoden",

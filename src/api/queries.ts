@@ -369,6 +369,7 @@ query ($ids: [Int], $scoreFormat: ScoreFormat) {
       recommendations(sort: RATING_DESC, perPage: 8) {
         nodes {
           rating
+          userRating
           mediaRecommendation { ${MEDIA_FIELDS} }
         }
       }
@@ -379,7 +380,31 @@ query ($ids: [Int], $scoreFormat: ScoreFormat) {
 export interface RawRecommendationNode {
   seedId: number;
   rating: number;
+  /** RATE_UP | RATE_DOWN | NO_RATING — this viewer's own vote. */
+  userRating: string | null;
   media: MediaWithListStatus;
+}
+
+/**
+ * Votes on one recommendation pairing. Keyed on the (seed, suggestion) pair
+ * because that is what AniList's recommendation *is* — the dashboard votes
+ * on the pairing its "because you finished …" line already names.
+ */
+const SAVE_RECOMMENDATION_MUTATION = `
+mutation ($mediaId: Int, $mediaRecommendationId: Int, $rating: RecommendationRating) {
+  SaveRecommendation(mediaId: $mediaId, mediaRecommendationId: $mediaRecommendationId, rating: $rating) {
+    id
+    rating
+    userRating
+  }
+}`;
+
+export async function saveRecommendation(
+  mediaId: number,
+  mediaRecommendationId: number,
+  rating: "RATE_UP" | "RATE_DOWN" | "NO_RATING",
+): Promise<void> {
+  await gql(SAVE_RECOMMENDATION_MUTATION, { mediaId, mediaRecommendationId, rating });
 }
 
 /**
@@ -397,6 +422,7 @@ export async function recommendationsFor(
         recommendations: {
           nodes: {
             rating: number | null;
+            userRating: string | null;
             mediaRecommendation: MediaWithListStatus | null;
           }[];
         } | null;
@@ -412,6 +438,7 @@ export async function recommendationsFor(
       out.push({
         seedId: seed.id,
         rating: node.rating ?? 0,
+        userRating: node.userRating ?? null,
         media: node.mediaRecommendation,
       });
     }

@@ -6,11 +6,13 @@ import { ChevronRight, Clock, ExternalLink, Play, Star, Trophy } from "lucide-re
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   animeDetail,
+  mediaTrends,
   streamingEpisodes,
   type ExternalLink as ExternalLinkData,
   type MediaDetail,
   type MediaTag,
 } from "@/api/queries";
+import { AreaChart } from "@/components/stats/AreaChart";
 import {
   countdown,
   formatLabel,
@@ -320,6 +322,8 @@ export default function AnimeDetail() {
               <EpisodesSection mediaId={data.id} />
             )}
 
+            <TrendSection mediaId={data.id} />
+
             {data.trailer?.thumbnail && (
               <Card>
                 <CardTitle>{t("detail.trailer")}</CardTitle>
@@ -470,6 +474,64 @@ function EpisodesSection({ mediaId }: { mediaId: number }) {
               ))}
             </div>
           )}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+/**
+ * The trending curve behind a fold — how loudly the site is talking about
+ * this title, drawn with the statistics page's own AreaChart. Same on-demand
+ * contract as the episode fold: the click spends the request.
+ */
+function TrendSection({ mediaId }: { mediaId: number }) {
+  const { t, i18n } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const trends = useQuery({
+    queryKey: ["mediaTrends", mediaId],
+    queryFn: () => mediaTrends(mediaId),
+    enabled: isTauri && open,
+    staleTime: 60 * 60 * 1000,
+  });
+
+  const points = (trends.data ?? []).map((p) => ({
+    label: new Date(p.date * 1000).toLocaleDateString(i18n.language, {
+      month: "short",
+      day: "numeric",
+    }),
+    value: p.trending,
+  }));
+
+  return (
+    <Card>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-2 text-left"
+      >
+        <CardTitle>{t("detail.trend")}</CardTitle>
+        <ChevronRight
+          className={cn("size-4 shrink-0 text-ink-500 transition-transform", open && "rotate-90")}
+        />
+      </button>
+      {open && (
+        <div className="mt-3">
+          {trends.isLoading && <Shimmer className="h-24 w-full rounded-lg" />}
+          {trends.error != null && (
+            <p className="text-sm text-danger">
+              {t("common.error", { message: String(trends.error) })}
+            </p>
+          )}
+          {trends.data &&
+            (points.length < 2 ? (
+              <p className="text-xs text-ink-600">{t("detail.trendNone")}</p>
+            ) : (
+              <>
+                <p className="mb-2 text-2xs text-ink-600">{t("detail.trendHint")}</p>
+                <AreaChart data={points} />
+              </>
+            ))}
         </div>
       )}
     </Card>

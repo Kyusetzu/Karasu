@@ -484,6 +484,33 @@ export async function streamingEpisodes(id: number): Promise<StreamingEpisode[]>
   return data.Media.streamingEpisodes ?? [];
 }
 
+/**
+ * The trending curve — how much the site is talking about a title, day by
+ * day. One page of 25 is the last few weeks, which is the part with a shape;
+ * fetched only when the fold opens, like the episode list above.
+ */
+const TRENDS_QUERY = `
+query ($id: Int!) {
+  Page(perPage: 25) {
+    mediaTrends(mediaId: $id, sort: DATE_DESC) { date trending }
+  }
+}`;
+
+export interface MediaTrendPoint {
+  /** Unix seconds. */
+  date: number;
+  trending: number;
+}
+
+export async function mediaTrends(id: number): Promise<MediaTrendPoint[]> {
+  const data = await gql<{ Page: { mediaTrends: MediaTrendPoint[] | null } }>(
+    TRENDS_QUERY,
+    { id },
+  );
+  // DATE_DESC arrives newest-first; the chart reads left-to-right in time.
+  return [...(data.Page.mediaTrends ?? [])].reverse();
+}
+
 export async function animeDetail(id: number) {
   const data = await gql<{ Media: MediaDetail }>(DETAIL_QUERY, {
     id,

@@ -897,6 +897,12 @@ export const de: typeof en = {
     noFollowers: "{{name}} hat noch keine Follower",
     noFollowing: "{{name}} folgt noch niemandem",
     noFavourites: "{{name}} hat noch keine Favoriten gewählt",
+    tabLists: "Listen",
+    listsEmpty: "Nichts in diesem Regal.",
+    affinity: "{{pct}} % Übereinstimmung",
+    affinityNone: "Übereinstimmung braucht mehr gemeinsame Bewertungen",
+    affinityShared: "{{n}} gemeinsame Titel",
+    affinityDisagree: "Größte Meinungsverschiedenheiten:",
     loadMore: "{{n}} weitere laden",
     // Dort verwendet, wo AniLists total keine echte Anzahl ist.
     loadMorePlain: "Mehr laden",

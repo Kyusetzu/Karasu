@@ -962,6 +962,69 @@ export async function forumThreads(vars: ForumQuery, page = 1): Promise<ThreadPa
   return { pageInfo: data.Page.pageInfo, threads: data.Page.threads ?? [] };
 }
 
+// --- Another user's list ---------------------------------------------------
+
+/**
+ * A foreign list, read-only. Deliberately a plain `gql` fetch rather than
+ * `fetchMediaList`: the Rust command writes its result into the SQLite list
+ * cache keyed by user id and drains the offline queue — machinery that
+ * exists for *your* list and must not run for someone else's. `score` is
+ * requested bare, so it arrives in the owner's own format; the caller pairs
+ * it with `UserProfile.mediaListOptions.scoreFormat` to render their numbers
+ * the way they chose them. Private entries are simply absent server-side.
+ */
+export const USER_LIST_QUERY = `
+query ($userId: Int!, $type: MediaType!) {
+  MediaListCollection(userId: $userId, type: $type) {
+    lists {
+      name
+      status
+      isCustomList
+      entries {
+        id
+        mediaId
+        status
+        score
+        progress
+        progressVolumes
+        media {
+          ${SOCIAL_MEDIA}
+          episodes
+          chapters
+        }
+      }
+    }
+  }
+}`;
+
+export interface ForeignListEntry {
+  id: number;
+  mediaId: number;
+  status: string;
+  /** In the *owner's* score format. */
+  score: number;
+  progress: number;
+  progressVolumes: number | null;
+  media: SocialMedia & { episodes: number | null; chapters: number | null };
+}
+
+export interface ForeignListGroup {
+  name: string;
+  status: string | null;
+  isCustomList: boolean;
+  entries: ForeignListEntry[];
+}
+
+export async function userList(
+  userId: number,
+  type: "ANIME" | "MANGA",
+): Promise<ForeignListGroup[]> {
+  const data = await gql<{
+    MediaListCollection: { lists: ForeignListGroup[] | null } | null;
+  }>(USER_LIST_QUERY, { userId, type });
+  return data.MediaListCollection?.lists ?? [];
+}
+
 // --- Favourites -----------------------------------------------------------
 
 /**

@@ -891,6 +891,12 @@ export const en = {
     noFollowers: "Nobody follows {{name}} yet",
     noFollowing: "{{name}} isn't following anyone yet",
     noFavourites: "{{name}} hasn't picked any favourites",
+    tabLists: "Lists",
+    listsEmpty: "Nothing on this shelf.",
+    affinity: "{{pct}}% affinity",
+    affinityNone: "Affinity needs more shared scores",
+    affinityShared: "{{n}} shared titles",
+    affinityDisagree: "Biggest disagreements:",
     loadMore: "Load {{n}} more",
     // Used where AniList's total is not a real count — see USER_SEARCH_QUERY.
     loadMorePlain: "Load more",

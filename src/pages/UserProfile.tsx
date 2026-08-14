@@ -14,6 +14,7 @@ import { isTauri } from "@/api/anilist";
 import BackButton from "@/components/shell/BackButton";
 import { ProfileHeader } from "@/components/social/ProfileHeader";
 import { UserList } from "@/components/social/UserList";
+import { UserLists } from "@/components/social/UserLists";
 import { ActivityFeed } from "@/components/social/ActivityFeed";
 import { UserThreads } from "@/components/social/UserThreads";
 import { CoverOutline, EmptyState, PerchRule, StruckQuery } from "@/components/EmptyState";
@@ -130,7 +131,7 @@ export default function UserProfile() {
   );
 }
 
-const TABS = ["overview", "activity", "followers", "following", "forum"] as const;
+const TABS = ["overview", "lists", "activity", "followers", "following", "forum"] as const;
 type Tab = (typeof TABS)[number];
 
 function isTab(value: string | null): value is Tab {
@@ -166,6 +167,7 @@ function Tabbed({ user }: { user: UserProfileData }) {
 
   const tabCount: Record<Tab, number | undefined> = {
     overview: undefined,
+    lists: undefined,
     // No count for activity: AniList's total there is a capped 5000.
     activity: undefined,
     followers: counts.data?.followers,
@@ -201,13 +203,15 @@ function Tabbed({ user }: { user: UserProfileData }) {
             >
               {id === "overview"
                 ? t("social.tabOverview")
-                : id === "activity"
-                  ? t("social.tabActivity")
-                  : id === "followers"
-                    ? t("social.followers")
-                    : id === "following"
-                      ? t("social.tabFollowing")
-                      : t("social.tabForum")}
+                : id === "lists"
+                  ? t("social.tabLists")
+                  : id === "activity"
+                    ? t("social.tabActivity")
+                    : id === "followers"
+                      ? t("social.followers")
+                      : id === "following"
+                        ? t("social.tabFollowing")
+                        : t("social.tabForum")}
               {tabCount[id] !== undefined && (
                 <span className="ml-1.5 text-xs tabular-nums text-ink-600">
                   {tabCount[id]}
@@ -222,6 +226,7 @@ function Tabbed({ user }: { user: UserProfileData }) {
           settings panes do. */}
       <div key={tab} className="animate-settle pt-6">
         {tab === "overview" && <Favourites user={user} />}
+        {tab === "lists" && <UserLists user={user} />}
         {tab === "activity" && (
           <ActivityFeed
             queryKey={["social", "activities", user.id]}

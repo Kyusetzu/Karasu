@@ -411,6 +411,8 @@ export const en = {
     mangaNative: "漫画",
     sortLabel: "Sort",
     tagLabel: "Tag",
+    sortAsc: "Ascending — click for descending",
+    sortDesc: "Descending — click for ascending",
     formatLabel: "Format",
     allFormats: "All formats",
     originLabel: "Origin",

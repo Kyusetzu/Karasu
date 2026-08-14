@@ -12,6 +12,8 @@ import { useTranslation } from "react-i18next";
 import {
   Bookmark,
   CheckSquare,
+  ArrowDownWideNarrow,
+  ArrowUpNarrowWide,
   CloudOff,
   Dices,
   LayoutGrid,
@@ -64,8 +66,19 @@ import { BulkBar } from "@/components/list/BulkBar";
 import { canIncrement } from "@/components/list/shared";
 
 type SortKey = "updated" | "title" | "score" | "progress";
+type SortDir = "asc" | "desc";
 
 const SORT_KEYS: SortKey[] = ["updated", "title", "score", "progress"];
+
+/** What each key means with no direction chosen — the order the list has
+    always used, so a bare URL keeps its meaning. The toggle flips *from*
+    this, and flipping back deletes the param again. */
+const SORT_DEFAULT_DIR: Record<SortKey, SortDir> = {
+  updated: "desc",
+  title: "asc",
+  score: "desc",
+  progress: "desc",
+};
 
 /** Manhwa/Manhua are not formats on AniList — they are `countryOfOrigin`. */
 const ORIGINS = ["JP", "KR", "CN", "TW"] as const;
@@ -130,6 +143,9 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
   const sort: SortKey = SORT_KEYS.includes(rawSort as SortKey)
     ? (rawSort as SortKey)
     : "updated";
+  const rawDir = params.get("dir");
+  const dir: SortDir =
+    rawDir === "asc" || rawDir === "desc" ? rawDir : SORT_DEFAULT_DIR[sort];
   const tagFilter = params.get("tag") ?? "";
   const formats = MEDIA_FORMATS[type];
   const rawFormat = params.get("format") ?? "";
@@ -192,6 +208,8 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
         filter: string;
         tagFilter: string;
         sort: SortKey;
+        /** Explicit direction, or "" for the sort key's own default. */
+        dir: string;
         format: string;
         country: string;
         list: string;
@@ -204,6 +222,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
             value === def ? p.delete(key) : p.set(key, value);
           if (patch.tab !== undefined) write("tab", patch.tab, "CURRENT");
           if (patch.sort !== undefined) write("sort", patch.sort, "updated");
+          if (patch.dir !== undefined) write("dir", patch.dir, "");
           if (patch.tagFilter !== undefined) write("tag", patch.tagFilter, "");
           if (patch.format !== undefined) write("format", patch.format, "");
           if (patch.country !== undefined) write("country", patch.country, "");
@@ -239,6 +258,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
       tab: p.tab as MediaListStatus,
       filter: p.filter,
       sort: p.sort as SortKey,
+      dir: p.dir ?? "",
       tagFilter: p.tagFilter ?? "",
       format: p.format ?? "",
       country: p.country ?? "",
@@ -248,7 +268,18 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
   const addPreset = (name: string) => {
     const next = [
       ...presets.filter((p) => p.name !== name),
-      { name, tab, filter, sort, tagFilter, format: formatFilter, country: countryFilter },
+      {
+        name,
+        tab,
+        filter,
+        sort,
+        // The raw param, so a preset saved on the default direction keeps
+        // following the key's default rather than pinning it.
+        dir: rawDir ?? "",
+        tagFilter,
+        format: formatFilter,
+        country: countryFilter,
+      },
     ];
     setPresets(next);
     savePresets(type, next);
@@ -368,22 +399,28 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
     if (listFilter) {
       list = list.filter((e) => e.customLists?.[listFilter] === true);
     }
+    // Each comparator returns its key's *default* order; a flipped direction
+    // negates it wholesale rather than each branch knowing about `dir`.
+    const flip = dir === SORT_DEFAULT_DIR[sort] ? 1 : -1;
     return [...list].sort((a, b) => {
-      switch (sort) {
-        case "title":
-          return COLLATOR.compare(
-            searchKeys.get(a.id)?.title ?? "",
-            searchKeys.get(b.id)?.title ?? "",
-          );
-        case "score":
-          return b.score - a.score;
-        case "progress":
-          return b.progress - a.progress;
-        default:
-          return b.updatedAt - a.updatedAt;
-      }
+      const cmp = (() => {
+        switch (sort) {
+          case "title":
+            return COLLATOR.compare(
+              searchKeys.get(a.id)?.title ?? "",
+              searchKeys.get(b.id)?.title ?? "",
+            );
+          case "score":
+            return b.score - a.score;
+          case "progress":
+            return b.progress - a.progress;
+          default:
+            return b.updatedAt - a.updatedAt;
+        }
+      })();
+      return cmp * flip;
     });
-  }, [byStatus, tab, deferredFilter, tagFilter, formatFilter, countryFilter, listFilter, sort, searchKeys]);
+  }, [byStatus, tab, deferredFilter, tagFilter, formatFilter, countryFilter, listFilter, sort, dir, searchKeys]);
 
   // Everything below must stay *above* the early returns: hooks after a
   // conditional return blow up on the loading → loaded transition. They are
@@ -671,9 +708,26 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
           <FilterSelect
             label={t("list.sortLabel")}
             value={sort}
-            onChange={(v) => setView({ sort: v as SortKey })}
+            // Changing the key clears the direction: "score, descending" was a
+            // choice about scores, not a standing instruction for titles.
+            onChange={(v) => setView({ sort: v as SortKey, dir: "" })}
             options={SORT_KEYS.map((k) => ({ value: k, label: t(`sort.${k}`) }))}
           />
+          <IconButton
+            variant="ghost"
+            onClick={() => {
+              const next: SortDir = dir === "asc" ? "desc" : "asc";
+              setView({ dir: next === SORT_DEFAULT_DIR[sort] ? "" : next });
+            }}
+            aria-label={t(dir === "asc" ? "list.sortAsc" : "list.sortDesc")}
+            title={t(dir === "asc" ? "list.sortAsc" : "list.sortDesc")}
+          >
+            {dir === "asc" ? (
+              <ArrowUpNarrowWide className="size-4" />
+            ) : (
+              <ArrowDownWideNarrow className="size-4" />
+            )}
+          </IconButton>
           <FilterSelect
             label={t("list.formatLabel")}
             value={formatFilter}

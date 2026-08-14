@@ -505,15 +505,25 @@ body {
    that). An author background also outranks `color-scheme`, so the fix is
    to give selects and options real colors, not more color-scheme. The
    `option` twin matters: the popup rows read each option's own computed
-   colors. */
-select {
-  background-color: var(--color-surface-900);
-  color: var(--color-ink-100);
-}
+   colors.
 
-option {
-  background-color: var(--color-surface-900);
-  color: var(--color-ink-100);
+   Inside `@layer base`, and that placement is load-bearing: unlayered CSS
+   beats every cascade layer, so the unlayered first version of this rule
+   silently overrode utility classes on selects app-wide — `text-gold` on
+   the score dropdowns computed to plain ink, and the popup fix arrived as
+   a recolor of every styled select. Base loses to utilities, which is the
+   order both fixes need: preflight's transparent is corrected here, and a
+   call site's own color still wins. */
+@layer base {
+  select {
+    background-color: var(--color-surface-900);
+    color: var(--color-ink-100);
+  }
+
+  option {
+    background-color: var(--color-surface-900);
+    color: var(--color-ink-100);
+  }
 }
 
 /* Text is selectable everywhere by default (titles, synopses, stats, file

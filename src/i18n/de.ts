@@ -412,6 +412,8 @@ export const de: typeof en = {
     mangaNative: "漫画",
     sortLabel: "Sort.",
     tagLabel: "Tag",
+    sortAsc: "Aufsteigend — Klick für absteigend",
+    sortDesc: "Absteigend — Klick für aufsteigend",
     formatLabel: "Format",
     allFormats: "Alle Formate",
     originLabel: "Herkunft",

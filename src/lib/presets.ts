@@ -13,6 +13,8 @@ export interface Preset {
   tagFilter?: string;
   format?: string;
   country?: string;
+  /** "" or absent means the sort key's own default direction. */
+  dir?: string;
 }
 
 const KEY = "karasu-presets";

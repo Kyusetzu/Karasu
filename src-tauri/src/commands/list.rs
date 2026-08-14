@@ -41,6 +41,7 @@ query ($userId: Int!, $type: MediaType!, $scoreFormat: ScoreFormat) {
           volumes
           duration
           format
+          countryOfOrigin
           status
           season
           seasonYear

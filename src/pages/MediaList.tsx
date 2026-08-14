@@ -40,6 +40,7 @@ import { nextFocus, type Move } from "@/lib/roving";
 import RandomPickModal from "@/components/overlays/RandomPickModal";
 import PresetModal from "@/components/overlays/PresetModal";
 import { loadPresets, savePresets, type Preset } from "@/lib/presets";
+import { formatLabel } from "@/lib/format";
 import { collectTags, tagsOf } from "@/lib/tags";
 import { searchHaystack } from "@/lib/search";
 import { Button } from "@/components/ui/button";
@@ -65,6 +66,27 @@ import { canIncrement } from "@/components/list/shared";
 type SortKey = "updated" | "title" | "score" | "progress";
 
 const SORT_KEYS: SortKey[] = ["updated", "title", "score", "progress"];
+
+/** The media-format vocabulary per list — a closed enum, unlike tags, so the
+    URL param is validated against it rather than against the data. */
+const ANIME_FORMATS = ["TV", "TV_SHORT", "MOVIE", "SPECIAL", "OVA", "ONA", "MUSIC"] as const;
+const MANGA_FORMATS = ["MANGA", "NOVEL", "ONE_SHOT"] as const;
+/** Manhwa/Manhua are not formats on AniList — they are `countryOfOrigin`. */
+const ORIGINS = ["JP", "KR", "CN", "TW"] as const;
+
+/** Literal switch, so `i18nKeys.test.ts` sees every key. */
+function originLabel(origin: (typeof ORIGINS)[number], t: (k: string) => string): string {
+  switch (origin) {
+    case "JP":
+      return t("list.originJP");
+    case "KR":
+      return t("list.originKR");
+    case "CN":
+      return t("list.originCN");
+    case "TW":
+      return t("list.originTW");
+  }
+}
 
 // `String.localeCompare` builds a fresh collator on every call, which a sort
 // over a few thousand titles pays for n·log n times. Options are deliberately
@@ -113,6 +135,14 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
     ? (rawSort as SortKey)
     : "updated";
   const tagFilter = params.get("tag") ?? "";
+  const formats = type === "ANIME" ? ANIME_FORMATS : MANGA_FORMATS;
+  const rawFormat = params.get("format") ?? "";
+  const formatFilter = (formats as readonly string[]).includes(rawFormat) ? rawFormat : "";
+  const rawCountry = params.get("country") ?? "";
+  // Origin is a manga question — a Korean-made anime is not what anyone
+  // filters an anime list by, so the param is simply ignored there.
+  const countryFilter =
+    type === "MANGA" && (ORIGINS as readonly string[]).includes(rawCountry) ? rawCountry : "";
   // The text filter is the one piece that keeps local state: the input echoes
   // every keystroke, and writing `history.replaceState` per keystroke is the
   // thing to avoid. It mirrors into `?q=` through the debounce below.
@@ -159,7 +189,16 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
    * URL.
    */
   const setView = useCallback(
-    (patch: Partial<{ tab: MediaListStatus; filter: string; tagFilter: string; sort: SortKey }>) => {
+    (
+      patch: Partial<{
+        tab: MediaListStatus;
+        filter: string;
+        tagFilter: string;
+        sort: SortKey;
+        format: string;
+        country: string;
+      }>,
+    ) => {
       setParams(
         (prev) => {
           const p = new URLSearchParams(prev);
@@ -168,6 +207,8 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
           if (patch.tab !== undefined) write("tab", patch.tab, "CURRENT");
           if (patch.sort !== undefined) write("sort", patch.sort, "updated");
           if (patch.tagFilter !== undefined) write("tag", patch.tagFilter, "");
+          if (patch.format !== undefined) write("format", patch.format, "");
+          if (patch.country !== undefined) write("country", patch.country, "");
           if (patch.filter !== undefined) write("q", patch.filter.trim(), "");
           return p;
         },
@@ -193,13 +234,22 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
     const p = presets.find((x) => x.name === name);
     if (!p) return;
     setFilter(p.filter);
-    setView({ tab: p.tab as MediaListStatus, filter: p.filter, sort: p.sort as SortKey });
+    // `?? ""` on the newer fields: presets saved before they existed must
+    // clear the filters they never captured, not leave stale ones standing.
+    setView({
+      tab: p.tab as MediaListStatus,
+      filter: p.filter,
+      sort: p.sort as SortKey,
+      tagFilter: p.tagFilter ?? "",
+      format: p.format ?? "",
+      country: p.country ?? "",
+    });
   };
 
   const addPreset = (name: string) => {
     const next = [
       ...presets.filter((p) => p.name !== name),
-      { name, tab, filter, sort },
+      { name, tab, filter, sort, tagFilter, format: formatFilter, country: countryFilter },
     ];
     setPresets(next);
     savePresets(type, next);
@@ -291,6 +341,15 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
       const tag = tagFilter.toLowerCase();
       list = list.filter((e) => searchKeys.get(e.id)?.tags.includes(tag));
     }
+    if (formatFilter) {
+      list = list.filter((e) => e.media.format === formatFilter);
+    }
+    if (countryFilter) {
+      // Blobs cached before the field existed read `undefined` and simply
+      // don't match — a sync refreshes them, and undefined must not pass a
+      // country the entry never claimed.
+      list = list.filter((e) => e.media.countryOfOrigin === countryFilter);
+    }
     return [...list].sort((a, b) => {
       switch (sort) {
         case "title":
@@ -306,7 +365,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
           return b.updatedAt - a.updatedAt;
       }
     });
-  }, [byStatus, tab, deferredFilter, tagFilter, sort, searchKeys]);
+  }, [byStatus, tab, deferredFilter, tagFilter, formatFilter, countryFilter, sort, searchKeys]);
 
   // Everything below must stay *above* the early returns: hooks after a
   // conditional return blow up on the loading → loaded transition. They are
@@ -464,7 +523,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
 
   // A filter or a tab change re-pools the entries, and index 12 in the old
   // pool is a different title in the new one.
-  useEffect(() => setFocus(null), [tab, deferredFilter, tagFilter, sort]);
+  useEffect(() => setFocus(null), [tab, deferredFilter, tagFilter, formatFilter, countryFilter, sort]);
 
   const unit = type === "ANIME" ? t("common.episodes") : t("common.chapters");
 
@@ -594,6 +653,22 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
             onChange={(v) => setView({ sort: v as SortKey })}
             options={SORT_KEYS.map((k) => ({ value: k, label: t(`sort.${k}`) }))}
           />
+          <FilterSelect
+            label={t("list.formatLabel")}
+            value={formatFilter}
+            onChange={(v) => setView({ format: v })}
+            placeholder={t("list.allFormats")}
+            options={formats.map((f) => ({ value: f, label: formatLabel(f, t) }))}
+          />
+          {type === "MANGA" && (
+            <FilterSelect
+              label={t("list.originLabel")}
+              value={countryFilter}
+              onChange={(v) => setView({ country: v })}
+              placeholder={t("list.allOrigins")}
+              options={ORIGINS.map((c) => ({ value: c, label: originLabel(c, t) }))}
+            />
+          )}
           {allTags.length > 0 && (
             <FilterSelect
               label={t("list.tagLabel")}
@@ -657,9 +732,13 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
           // list; a search that matched none is a fact about the query, and
           // the old single message could not tell them apart — so it never
           // offered the one thing that fixes the second case.
-          filter || tagFilter ? (
+          filter || tagFilter || formatFilter || countryFilter ? (
             <EmptyState
-              visual={<StruckQuery query={filter || tagFilter} />}
+              visual={
+                <StruckQuery
+                  query={filter || tagFilter || formatLabel(formatFilter, t) || countryFilter}
+                />
+              }
               title={t("list.noMatch", {
                 status: t(`status.${type}.${tab}`),
               })}
@@ -669,7 +748,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
                   size="control"
                   onClick={() => {
                     setFilter("");
-                    setView({ filter: "", tagFilter: "" });
+                    setView({ filter: "", tagFilter: "", format: "", country: "" });
                   }}
                 >
                   {t("list.clearFilter")}

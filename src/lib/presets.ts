@@ -7,6 +7,12 @@ export interface Preset {
   tab: string;
   filter: string;
   sort: string;
+  /** Optional: presets stored before these filters existed lack them, and
+      applying such a preset must *clear* the filters, not keep stale ones —
+      the apply site guards with `?? ""`. */
+  tagFilter?: string;
+  format?: string;
+  country?: string;
 }
 
 const KEY = "karasu-presets";

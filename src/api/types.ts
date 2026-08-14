@@ -41,6 +41,8 @@ export interface Media {
   volumes?: number | null;
   duration?: number | null;
   format: string | null;
+  /** Optional: blobs cached before the origin filter existed lack it. */
+  countryOfOrigin?: string | null;
   status: string | null;
   season: string | null;
   seasonYear: number | null;

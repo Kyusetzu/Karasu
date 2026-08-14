@@ -39,4 +39,25 @@ describe("presets", () => {
     localStorage.setItem("karasu-presets", "{not json");
     expect(loadPresets("ANIME")).toEqual([]);
   });
+
+  /** A preset saved before the format/origin/tag filters existed loads with
+      those fields absent — the apply site's `?? ""` is what turns absence
+      into "clear the filter" rather than "keep whatever is set". */
+  it("loads legacy presets without the newer filter fields", () => {
+    localStorage.setItem(
+      "karasu-presets",
+      JSON.stringify({ ANIME: [{ name: "Old", tab: "CURRENT", filter: "", sort: "updated" }] }),
+    );
+    const [p] = loadPresets("ANIME");
+    expect(p.name).toBe("Old");
+    expect(p.format).toBeUndefined();
+    expect(p.country).toBeUndefined();
+    expect(p.tagFilter).toBeUndefined();
+  });
+
+  it("round-trips the filter fields when present", () => {
+    const full: Preset = { ...preset, name: "Movies", format: "MOVIE", country: "", tagFilter: "gem" };
+    savePresets("ANIME", [full]);
+    expect(loadPresets("ANIME")[0]).toEqual(full);
+  });
 });

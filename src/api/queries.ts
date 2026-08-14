@@ -31,6 +31,7 @@ const MEDIA_FIELDS = `
   chapters
   volumes
   format
+  countryOfOrigin
   status
   season
   seasonYear

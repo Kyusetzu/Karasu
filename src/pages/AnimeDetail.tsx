@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { Clock, ExternalLink, Play, Star } from "lucide-react";
+import { Clock, ExternalLink, Play, Star, Trophy } from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   animeDetail,
@@ -43,6 +43,7 @@ import { parseNotes, serializeNotes } from "@/lib/tags";
 import { parseAniListHtml } from "@/lib/anilistHtml";
 import { FavouriteButton } from "@/components/media/FavouriteButton";
 import { RichText } from "@/components/RichText";
+import { ScoreColumns, StatusBar } from "@/components/stats/panels";
 
 
 export default function AnimeDetail() {
@@ -311,6 +312,8 @@ export default function AnimeDetail() {
               </Card>
             )}
 
+            <CommunitySection data={data} />
+
             {data.trailer?.thumbnail && (
               <Card>
                 <CardTitle>{t("detail.trailer")}</CardTitle>
@@ -389,6 +392,85 @@ export default function AnimeDetail() {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * The community's numbers: ranking shelves, the score distribution, and what
+ * status everyone else has the title under. All of it arrives on the detail
+ * query — no extra request — and the two charts are the statistics page's own
+ * components, so the same data draws the same way everywhere.
+ */
+function CommunitySection({ data }: { data: MediaDetail }) {
+  const { t } = useTranslation();
+  const scores = data.stats?.scoreDistribution ?? [];
+  const statuses = [...(data.stats?.statusDistribution ?? [])].sort(
+    (a, b) => b.amount - a.amount,
+  );
+  // The shelves worth a badge: all-time first, then the best seasonal/yearly
+  // one per type — a full list repeats itself ("#12 of 2019, #43 of 2018…").
+  const rankings = [...(data.rankings ?? [])]
+    .sort((a, b) => Number(b.allTime ?? false) - Number(a.allTime ?? false) || a.rank - b.rank)
+    .filter(
+      (r, i, all) => r.allTime || all.findIndex((x) => x.type === r.type && !x.allTime) === i,
+    )
+    .slice(0, 4);
+
+  if (!scores.length && !statuses.length && !rankings.length) return null;
+
+  const rankLabel = (r: MediaDetail["rankings"][number]) => {
+    const what = t(r.type === "RATED" ? "detail.rankRated" : "detail.rankPopular", {
+      n: r.rank,
+    });
+    if (r.allTime) return `${what} · ${t("detail.rankAllTime")}`;
+    const when = [
+      r.season ? t(`season.${r.season}`, { defaultValue: r.season }) : null,
+      r.year,
+    ]
+      .filter(Boolean)
+      .join(" ");
+    return when ? `${what} · ${when}` : what;
+  };
+
+  return (
+    <div className="space-y-4">
+      {rankings.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {rankings.map((r, i) => (
+            <span
+              key={i}
+              className="flex items-center gap-1.5 rounded-md border border-gold/40 bg-gold/10 px-2 py-1 text-xs text-gold"
+            >
+              <Trophy className="size-3" />
+              {rankLabel(r)}
+            </span>
+          ))}
+        </div>
+      )}
+      {(scores.length > 0 || statuses.length > 0) && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {scores.length > 0 && (
+            <ScoreColumns
+              title={t("detail.communityScores")}
+              hint={t("detail.communityScoresHint")}
+              data={scores.map((d) => ({ score: d.score, count: d.amount }))}
+              max={100}
+            />
+          )}
+          {statuses.length > 0 && (
+            <StatusBar
+              title={t("detail.communityStatus")}
+              data={statuses.map((d) => ({
+                label: t(`status.${data.type ?? "ANIME"}.${d.status}`, {
+                  defaultValue: d.status,
+                }),
+                count: d.amount,
+              }))}
+            />
+          )}
+        </div>
+      )}
     </div>
   );
 }

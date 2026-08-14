@@ -364,6 +364,14 @@ query ($id: Int!, $scoreFormat: ScoreFormat) {
     startDate { year month day }
     endDate { year month day }
     trailer { id site thumbnail }
+    # The community's own numbers: where scores land and which shelves the
+    # title sits on. Labels are composed from type/season/year client-side —
+    # the API's "context" strings are English-only prose.
+    rankings { rank type year season allTime }
+    stats {
+      scoreDistribution { score amount }
+      statusDistribution { status amount }
+    }
     studios { edges { isMain node { id name } } }
     tags { name rank isMediaSpoiler }
     externalLinks { id site url type color }
@@ -415,6 +423,18 @@ export interface MediaDetail extends MediaWithListStatus {
   startDate: FuzzyDate | null;
   endDate: FuzzyDate | null;
   trailer: { id: string; site: string; thumbnail: string | null } | null;
+  rankings: {
+    rank: number;
+    /** RATED | POPULAR */
+    type: string;
+    year: number | null;
+    season: string | null;
+    allTime: boolean | null;
+  }[];
+  stats: {
+    scoreDistribution: { score: number; amount: number }[] | null;
+    statusDistribution: { status: string; amount: number }[] | null;
+  } | null;
   studios: { edges: { isMain: boolean; node: { id: number; name: string } }[] };
   tags: MediaTag[];
   externalLinks: ExternalLink[];

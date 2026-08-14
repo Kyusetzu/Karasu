@@ -127,6 +127,17 @@ was worth or what it was bought for), settings cloud-sync, and anything that
 would require a hosted backend. If a requested feature depends on any of these,
 flag the dependency rather than silently building around it.
 
+Two more, decided by the maintainer in August 2026:
+
+- **Plex and Emby integration.** The maintainer uses Jellyfin (free, open
+  source) and has no use for supporting a paid product he doesn't run.
+  Revisit only if actual users ask for it — do not propose it unprompted.
+- **RSS/torrent release feeds, and anything piracy-adjacent.** New releases
+  are already reported through AniList's own airing data. The local library
+  is the user's own files; how they got there is not the app's business, and
+  nothing in Karasu may track, fetch, or point at torrents or release feeds.
+  This closes the classic Taiga feature deliberately.
+
 **The log is a deliberate exception to the first of those, decided by the
 maintainer.** With verbose logging on, `karasu.log` records what detection saw —
 window and session titles, the parsed release name, the matched id and score,

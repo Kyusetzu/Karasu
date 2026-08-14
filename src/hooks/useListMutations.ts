@@ -79,6 +79,33 @@ export function useListMutations(userId: number, mediaType: MediaType) {
    * patching per entry meant N passes over the whole collection, and N
    * optimistic mutations whose rollbacks then fought each other.
    */
+  /**
+   * One entry with `input` applied — `??` throughout, so an absent key means
+   * "leave it alone" rather than "clear it" (`private: false` is a real
+   * value, which is why `||` would be wrong). One function on purpose: the
+   * status-move insert below used to spread the raw input instead, which
+   * behaved differently from the in-place map (it copied `mediaId` along and
+   * wrote explicitly-undefined keys), and any field added to one path was
+   * silently missing from the other.
+   */
+  const applyInput = (
+    e: MediaListEntry,
+    input: Omit<SaveEntryInput, "mediaId">,
+    now: number,
+  ): MediaListEntry => ({
+    ...e,
+    progress: input.progress ?? e.progress,
+    progressVolumes: input.progressVolumes ?? e.progressVolumes,
+    score: input.score ?? e.score,
+    status: input.status ?? e.status,
+    repeat: input.repeat ?? e.repeat,
+    notes: input.notes ?? e.notes,
+    private: input.private ?? e.private,
+    startedAt: input.startedAt ?? e.startedAt,
+    completedAt: input.completedAt ?? e.completedAt,
+    updatedAt: now,
+  });
+
   const patchCacheMany = (
     mediaIds: Set<number>,
     input: Omit<SaveEntryInput, "mediaId">,
@@ -89,27 +116,7 @@ export function useListMutations(userId: number, mediaType: MediaType) {
       const lists = old.lists.map((group) => ({
         ...group,
         entries: group.entries
-          .map((e) =>
-            mediaIds.has(e.mediaId)
-              ? {
-                  ...e,
-                  progress: input.progress ?? e.progress,
-                  progressVolumes: input.progressVolumes ?? e.progressVolumes,
-                  score: input.score ?? e.score,
-                  status: input.status ?? e.status,
-                  repeat: input.repeat ?? e.repeat,
-                  notes: input.notes ?? e.notes,
-                  // `??` throughout, so an absent key means "leave it alone"
-                  // rather than "clear it" — which is also why `private` is
-                  // compared against undefined explicitly: `false` is a real
-                  // value here and `??` would keep it but `||` would not.
-                  private: input.private ?? e.private,
-                  startedAt: input.startedAt ?? e.startedAt,
-                  completedAt: input.completedAt ?? e.completedAt,
-                  updatedAt: now,
-                }
-              : e,
-          )
+          .map((e) => (mediaIds.has(e.mediaId) ? applyInput(e, input, now) : e))
           // On a status change, remove from the old status group
           .filter(
             (e) =>
@@ -132,7 +139,7 @@ export function useListMutations(userId: number, mediaType: MediaType) {
           for (const e of old.lists.flatMap((g) => g.entries)) {
             if (!mediaIds.has(e.mediaId) || moved.has(e.mediaId)) continue;
             if (target.entries.some((t) => t.mediaId === e.mediaId)) continue;
-            moved.set(e.mediaId, { ...e, ...input, updatedAt: now });
+            moved.set(e.mediaId, applyInput(e, input, now));
           }
           if (moved.size)
             target.entries = [...moved.values(), ...target.entries];

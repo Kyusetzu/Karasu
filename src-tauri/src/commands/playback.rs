@@ -275,9 +275,15 @@ pub fn get_jellyfin_settings(db: State<'_, Db>) -> JellyfinSettings {
                 .kv_get("jellyfin_user_id")
                 .is_some_and(|u| !u.trim().is_empty()),
         user_name: db.kv_get("jellyfin_user_name").unwrap_or_default(),
-        device: db
-            .kv_get("jellyfin_device")
-            .unwrap_or_else(local_device_name),
+        // The *stored* value, empty included. This used to prefill the
+        // machine name, which the screen puts in the field's `value` and
+        // writes back on any Save or sign-in — so opening the card and
+        // pressing Save silently converted "any device" into "only this PC",
+        // and a browser session (DeviceName "Chrome") stopped being detected
+        // with nothing on screen having been typed. `local_device` is still
+        // reported and belongs in the field's *placeholder*, where a
+        // suggestion cannot become a setting by itself.
+        device: db.kv_get("jellyfin_device").unwrap_or_default(),
         local_device: local_device_name(),
     }
 }

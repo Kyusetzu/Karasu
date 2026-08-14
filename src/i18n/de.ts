@@ -1217,7 +1217,7 @@ export const de: typeof en = {
       "Jedes Jellyfin-Konto funktioniert — Administratorrechte sind nicht nötig. Dein Passwort wird nur einmal zur Anmeldung verwendet und nie gespeichert; behalten wird lediglich der Zugriffstoken des Servers, im Anmeldeinformationsspeicher deines Systems. Da Karasu sich als du anmeldet, meldet der Server nur deine eigene Wiedergabe.",
     jellyfinDeviceAny: "Beliebiges Gerät",
     jellyfinDeviceHelp:
-      "Es zählt nur dieses Gerät. Leere das Feld, um alle deine Geräte zu erfassen, auch Handy oder TV. Mit „Verbindung testen“ siehst du, wie dein Gerät tatsächlich heißt.",
+      "Leer gelassen zählt jedes Gerät, auf dem du abspielst — Desktop, Browser, Handy oder TV. Trag eines ein, um nur dieses zu verfolgen; „Verbindung testen“ zeigt, wie deine Geräte tatsächlich heißen.",
     jellyfinTest: "Verbindung testen",
     jellyfinNoSessions: "Verbunden. Du spielst gerade nichts ab.",
     jellyfinMatched: "wird erfasst",

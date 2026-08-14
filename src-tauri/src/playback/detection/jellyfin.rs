@@ -85,11 +85,23 @@ static TOKEN_CACHE: Mutex<Option<Option<String>>> = Mutex::new(None);
 
 pub fn load_token() -> Option<String> {
     cached_or(&TOKEN_CACHE, || {
-        entry(TOKEN_USER)
-            .ok()?
-            .get_password()
-            .ok()
-            .filter(|k| !k.is_empty())
+        let Ok(entry) = entry(TOKEN_USER) else {
+            crate::logging::warn("jellyfin", "cannot reach the credential store");
+            // `Err` here means "we could not look", which must not be cached
+            // as "nothing is stored": one transient Credential Manager hiccup
+            // would otherwise disable Jellyfin until the next restart.
+            return Err(());
+        };
+        match entry.get_password() {
+            Ok(token) => Ok(Some(token).filter(|k: &String| !k.is_empty())),
+            // A genuinely absent credential is an answer, and worth caching —
+            // that is the 17,280-reads-a-day case this cache exists for.
+            Err(keyring::Error::NoEntry) => Ok(None),
+            Err(e) => {
+                crate::logging::warn("jellyfin", format!("could not read the token: {e}"));
+                Err(())
+            }
+        }
     })
 }
 
@@ -98,18 +110,25 @@ pub fn load_token() -> Option<String> {
 /// Split out from `load_token` so the caching itself is testable without
 /// touching the real credential store.
 ///
+/// `read` returns `Err(())` for "the store could not be read at all", which is
+/// the one answer that must **not** be remembered — see `load_token`. `Ok(None)`
+/// ("looked, nothing there") is cached like any other answer, because that is
+/// the signed-out case this cache exists to stop hammering.
+///
 /// A poisoned lock is recovered from rather than propagated: a panic elsewhere
 /// should not permanently break Jellyfin detection, and the worst case is one
 /// stale read that the next sign-in overwrites.
 fn cached_or<F>(cache: &Mutex<Option<Option<String>>>, read: F) -> Option<String>
 where
-    F: FnOnce() -> Option<String>,
+    F: FnOnce() -> Result<Option<String>, ()>,
 {
     let mut guard = cache.lock().unwrap_or_else(|e| e.into_inner());
     if let Some(known) = guard.as_ref() {
         return known.clone();
     }
-    let fresh = read();
+    let Ok(fresh) = read() else {
+        return None;
+    };
     *guard = Some(fresh.clone());
     fresh
 }
@@ -385,53 +404,62 @@ pub async fn list_sessions(cfg: &JellyfinConfig) -> Result<Vec<SessionSummary>, 
 /// Split out from the HTTP call so the mapping — which is the part with real
 /// decisions in it — is unit-testable without a server.
 pub fn playback_from_session(session: &serde_json::Value) -> Option<Playback> {
-    let item = session.get("NowPlayingItem")?;
-    let kind = item.get("Type").and_then(|v| v.as_str()).unwrap_or("");
+    // Every read here goes through `get_ci`, for the reason that function was
+    // written: a casing mismatch fails as a silent "nothing is playing", and
+    // this mapping used to be the one place in the file that did not use it.
+    let item = get_ci(session, "NowPlayingItem")?;
+    let kind = get_ci(item, "Type").and_then(|v| v.as_str()).unwrap_or("");
     if kind != "Episode" && kind != "Movie" {
         return None;
     }
 
     // Paused still counts as "what you're watching" — the scrobbler's own
     // threshold decides when to act, and a pause shouldn't drop the session.
-    let episode_name = item.get("Name").and_then(|v| v.as_str()).unwrap_or("");
-    let series = item
-        .get("SeriesName")
+    let episode_name = get_ci(item, "Name").and_then(|v| v.as_str()).unwrap_or("");
+    let series = get_ci(item, "SeriesName")
         .and_then(|v| v.as_str())
         .unwrap_or("")
         .trim();
-    let episode = item
-        .get("IndexNumber")
+    let episode = get_ci(item, "IndexNumber")
         .and_then(|v| v.as_u64())
         .map(|n| n as u32);
-    let season = item
-        .get("ParentIndexNumber")
+    let season = get_ci(item, "ParentIndexNumber")
         .and_then(|v| v.as_u64())
         .map(|n| n as u32);
 
-    // A movie has no series name; its own title is the title.
-    let title = if series.is_empty() {
-        item.get("Name").and_then(|v| v.as_str()).unwrap_or("").trim()
-    } else {
-        series
+    // A movie has no series name; its own title is the title. An *episode*
+    // without one is a different animal: falling back would put the episode
+    // name into `Parsed.title`, which can never match anything and reads on
+    // screen as "it detected the episode, not the show". Better to yield
+    // nothing with a reason, and let a lower rung try.
+    let title = match (kind, series.is_empty()) {
+        (_, false) => series,
+        ("Movie", true) => episode_name.trim(),
+        (_, true) => {
+            crate::logging::debug_changed(
+                "jellyfin",
+                "detect",
+                format!("episode {episode_name:?} carries no SeriesName; skipped"),
+            );
+            return None;
+        }
     };
     if title.is_empty() {
         return None;
     }
 
-    let client = session
-        .get("Client")
+    let client = get_ci(session, "Client")
         .and_then(|v| v.as_str())
         .unwrap_or("Jellyfin");
 
     // Ticks are 100 ns; both fields ride the payload the poll already fetches,
     // so the position costs zero extra requests.
     const TICKS_PER_SEC: u64 = 10_000_000;
-    let position_sec = session
-        .pointer("/PlayState/PositionTicks")
+    let position_sec = get_ci(session, "PlayState")
+        .and_then(|p| get_ci(p, "PositionTicks"))
         .and_then(|v| v.as_u64())
         .map(|t| (t / TICKS_PER_SEC) as u32);
-    let duration_sec = item
-        .get("RunTimeTicks")
+    let duration_sec = get_ci(item, "RunTimeTicks")
         .and_then(|v| v.as_u64())
         .map(|t| (t / TICKS_PER_SEC) as u32);
 
@@ -461,16 +489,50 @@ pub fn playback_from_session(session: &serde_json::Value) -> Option<Playback> {
 /// Polls the configured server for what *this* user is playing on *this*
 /// device. Returns `None` when unconfigured, unreachable or idle — a Jellyfin
 /// box that is switched off must not break detection for everything else.
+///
+/// Every one of those `None`s used to be silent, and that is what made a
+/// broken rung indistinguishable from an idle one: a revoked token, an
+/// unreachable server and "nothing is playing" all produced the same nothing,
+/// while detection quietly demoted to a window title. The failures now leave a
+/// line — through `debug_changed`, so a 5 s poll writes one line per *change*
+/// rather than 17,280 a day.
 pub async fn detect(cfg: &JellyfinConfig) -> Option<Playback> {
     if cfg.user_id.trim().is_empty() {
+        crate::logging::debug_changed("jellyfin", "detect", "no user id stored; rung skipped");
         return None;
     }
-    let sessions = get_json(cfg, "/Sessions").await.ok()?;
-    sessions
-        .as_array()?
+    let sessions = match get_json(cfg, "/Sessions").await {
+        Ok(v) => v,
+        Err(e) => {
+            crate::logging::debug_changed("jellyfin", "detect", format!("/Sessions failed: {e}"));
+            return None;
+        }
+    };
+    let Some(list) = sessions.as_array() else {
+        crate::logging::debug_changed("jellyfin", "detect", "/Sessions was not a list");
+        return None;
+    };
+    let mut matched = 0usize;
+    let found = list
         .iter()
         .filter(|s| session_matches(s, &cfg.user_id, &cfg.device))
-        .find_map(playback_from_session)
+        .inspect(|_| matched += 1)
+        .find_map(playback_from_session);
+    if found.is_none() {
+        // The two numbers separate "the filter rejects everything" from
+        // "nothing is playing" — the exact question the Test-connection
+        // button answers by hand, now answered in the log automatically.
+        crate::logging::debug_changed(
+            "jellyfin",
+            "detect",
+            format!(
+                "no playback: {} of {} sessions matched the user/device filter",
+                matched,
+                list.len()
+            ),
+        );
+    }
+    found
 }
 
 #[cfg(test)]
@@ -496,6 +558,48 @@ mod tests {
         assert_eq!(parsed.episode, Some(5));
         assert_eq!(parsed.season, Some(2));
         assert!(p.media_title.contains("Frieren"));
+    }
+
+    /// The whole reason `get_ci` exists, applied to the mapping that used to
+    /// skip it: a camelCase body must detect exactly like a PascalCase one.
+    #[test]
+    fn a_camel_case_session_maps_the_same_as_a_pascal_case_one() {
+        let s = json!({
+            "client": "Jellyfin Web",
+            "playState": { "positionTicks": 7_740_000_000u64 },
+            "nowPlayingItem": {
+                "type": "Episode",
+                "name": "The Mage's Journey",
+                "seriesName": "Frieren",
+                "indexNumber": 5,
+                "parentIndexNumber": 2,
+                "runTimeTicks": 14_200_000_000u64
+            }
+        });
+        let p = playback_from_session(&s).unwrap();
+        let parsed = p.parsed.unwrap();
+        assert_eq!(parsed.title, "Frieren");
+        assert_eq!(parsed.episode, Some(5));
+        assert_eq!(parsed.season, Some(2));
+        assert_eq!(p.position_sec, Some(774));
+        assert_eq!(p.duration_sec, Some(1420));
+    }
+
+    /// An episode with no series name must not pass its *own* name off as the
+    /// show: that title can never match, and on screen it reads as "Karasu
+    /// detected the episode, not the anime". A movie still uses its own name.
+    #[test]
+    fn an_episode_without_a_series_yields_nothing_but_a_movie_keeps_its_name() {
+        let orphan = json!({
+            "NowPlayingItem": { "Type": "Episode", "Name": "The Mage's Journey", "IndexNumber": 5 }
+        });
+        assert!(playback_from_session(&orphan).is_none());
+
+        let movie = json!({
+            "NowPlayingItem": { "Type": "Movie", "Name": "A Silent Voice" }
+        });
+        let p = playback_from_session(&movie).unwrap();
+        assert_eq!(p.parsed.unwrap().title, "A Silent Voice");
     }
 
     #[test]
@@ -684,7 +788,7 @@ mod tests {
         for _ in 0..5 {
             let got = cached_or(&cache, || {
                 reads += 1;
-                Some("tok".to_string())
+                Ok(Some("tok".to_string()))
             });
             assert_eq!(got.as_deref(), Some("tok"));
         }
@@ -700,12 +804,41 @@ mod tests {
             assert_eq!(
                 cached_or(&cache, || {
                     reads += 1;
-                    None
+                    Ok(None)
                 }),
                 None
             );
         }
         assert_eq!(reads, 1, "'nothing stored' must not be re-read every tick");
+    }
+
+    /// The distinction the `Result` exists for: "we could not look" is not an
+    /// answer, and caching it would disable Jellyfin until the next restart
+    /// over one transient credential-store failure.
+    #[test]
+    fn a_failed_read_is_retried_rather_than_remembered() {
+        let cache = Mutex::new(None);
+        let mut reads = 0;
+        for _ in 0..3 {
+            assert_eq!(
+                cached_or(&cache, || {
+                    reads += 1;
+                    Err(())
+                }),
+                None
+            );
+        }
+        assert_eq!(reads, 3, "a failure must be retried on the next poll");
+
+        // And the moment it succeeds, that answer is cached like any other.
+        assert_eq!(
+            cached_or(&cache, || Ok(Some("tok".into()))).as_deref(),
+            Some("tok")
+        );
+        assert_eq!(
+            cached_or(&cache, || panic!("must not read the credential store")).as_deref(),
+            Some("tok")
+        );
     }
 
     #[test]

@@ -1207,7 +1207,7 @@ export const en = {
       "Any Jellyfin account works — no administrator rights needed. Your password is used once to sign in and is never saved; only the access token the server returns is kept, in your system's credential store. Because Karasu signs in as you, the server only ever reports your own playback.",
     jellyfinDeviceAny: "Any device",
     jellyfinDeviceHelp:
-      "Only this device counts. Clear the field to track any of your devices, including your phone or TV. Use Test connection to see what your device is actually called.",
+      "Left empty, every device you play on counts — desktop, browser, phone or TV. Name one to track only that device; Test connection shows what each of yours is actually called.",
     jellyfinTest: "Test connection",
     jellyfinNoSessions: "Connected. You aren't playing anything right now.",
     jellyfinMatched: "tracked",

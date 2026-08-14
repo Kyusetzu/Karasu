@@ -506,10 +506,14 @@ export function JellyfinSection() {
           </>
         )}
 
+        {/* The placeholder states what an empty field *does*, and no longer
+            offers this machine's name — the backend used to prefill that as
+            the field's value, so a Save pinned the filter to this PC and
+            silently stopped detecting a browser or phone session. */}
         <Input
           value={device}
           onChange={(e) => setDevice(e.target.value)}
-          placeholder={settings.localDevice || t("settings.jellyfinDeviceAny")}
+          placeholder={t("settings.jellyfinDeviceAny")}
         />
 
         <div className="flex flex-wrap gap-2">

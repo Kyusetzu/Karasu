@@ -540,6 +540,23 @@ pub fn spawn(app: AppHandle) {
                 .as_ref()
                 .map(|p| (p.process.clone(), p.media_title.clone()));
 
+            // The block below rebuilds the match only when the *title* changes,
+            // but the position moves every tick of the same title. Patch it in
+            // place first, whatever happens next: without this the deadline
+            // check judges the session-start position forever — and since a
+            // position verdict of "not yet" suppresses the wall-clock fallback,
+            // a source that reports positions would simply never scrobble.
+            if raw == last_raw {
+                if let Some(p) = playback.as_ref() {
+                    let state = app.state::<PlaybackState>();
+                    let mut guard = state.0.lock().unwrap();
+                    if let Some(np) = guard.as_mut() {
+                        np.position_sec = p.position_sec;
+                        np.duration_sec = p.duration_sec;
+                    }
+                }
+            }
+
             if raw != last_raw {
                 // What detection saw. Per *change*, never per tick: the poll runs
                 // every 5s, so a line here would be 17,280 a day and would rotate

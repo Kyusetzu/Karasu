@@ -604,7 +604,11 @@ pub fn requeue_match(app: &AppHandle) {
         (mid, title, progress, total, duration, status)
     });
 
-    {
+    // Patch under the lock, then let go of it before telling anyone: the poll
+    // loop's own idiom, and `discord::sync` takes the session lock on its way
+    // through. Holding two of these at once is how a lock order becomes a
+    // deadlock the day one of them grows a caller.
+    let patched = {
         let state = app.state::<PlaybackState>();
         let mut guard = state.0.lock().unwrap();
         if let Some(np) = guard.as_mut() {
@@ -628,15 +632,17 @@ pub fn requeue_match(app: &AppHandle) {
                 }
             }
         }
-        let _ = app.emit("now-playing", &guard.clone());
-        crate::discord::sync(app, guard.as_ref());
-        crate::tray_set_now_playing(
-            app,
-            guard
-                .as_ref()
-                .map(|n| n.matched_title.as_deref().unwrap_or(&n.parsed_title)),
-        );
-    }
+        guard.clone()
+    };
+
+    let _ = app.emit("now-playing", &patched);
+    crate::discord::sync(app, patched.as_ref());
+    crate::tray_set_now_playing(
+        app,
+        patched
+            .as_ref()
+            .map(|n| n.matched_title.as_deref().unwrap_or(&n.parsed_title)),
+    );
 
     // The running session was started for the *old* id; dropping it makes the
     // next tick build one for the corrected entry rather than scrobbling the

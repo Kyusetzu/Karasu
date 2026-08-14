@@ -56,6 +56,9 @@ pub struct Diagnostics {
     pub library_matched: usize,
     pub media_sessions: bool,
     pub jellyfin: bool,
+    /// The mpv IPC pipe. It outranks every other source, so a bug report that
+    /// could not say whether it was on was missing the first thing to check.
+    pub mpv: bool,
     pub log_debug: bool,
     pub linux: Option<LinuxInfo>,
 }
@@ -178,6 +181,7 @@ pub fn collect(app: &tauri::AppHandle) -> Diagnostics {
         library_matched: library.matched,
         media_sessions: crate::commands::read_media_detection(&db),
         jellyfin: crate::commands::jellyfin_config(&db).is_some(),
+        mpv: crate::commands::mpv_ipc_config(&db).is_some(),
         log_debug: crate::logging::debug_enabled(),
         linux: linux_info(),
     }
@@ -217,6 +221,10 @@ pub fn render(d: &Diagnostics, redact: bool) -> String {
     row("Signed in", format!("{} ({})", yn(d.signed_in), d.profile_mode));
     row("Detection", {
         let mut sources: Vec<&str> = Vec::new();
+        // Listed first because that is where it sits in `detect_playback`.
+        if d.mpv {
+            sources.push("mpv IPC");
+        }
         if d.os == "windows" {
             sources.push("window titles");
         }
@@ -300,6 +308,7 @@ mod tests {
             library_matched: 980,
             media_sessions: true,
             jellyfin: false,
+            mpv: false,
             log_debug: false,
             linux: Some(LinuxInfo {
                 distro: Some("Arch Linux".into()),

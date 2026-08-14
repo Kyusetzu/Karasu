@@ -40,6 +40,8 @@ export interface Diagnostics {
   libraryMatched: number;
   mediaSessions: boolean;
   jellyfin: boolean;
+  /** The mpv IPC pipe — the source that outranks every other one. */
+  mpv: boolean;
   logDebug: boolean;
   linux: LinuxInfo | null;
 }

@@ -10,8 +10,16 @@
 //! The transport is the platform half (named pipe / unix socket, the cfg'd
 //! pair convention); everything with a decision in it — the request lines,
 //! reply parsing, and what counts as a usable candidate — is pure and
-//! tested on both platforms. The whole probe sits under one timeout, so a
-//! wedged pipe costs half a second, never the detection loop.
+//! tested on both platforms.
+//!
+//! The timeout covers the write and the reads, so a pipe that exists and
+//! never answers costs half a second. It does **not** cover the Windows
+//! connect: `ClientOptions::open` is a synchronous `CreateFileW` that runs
+//! inside the future's first poll, before the timer can arm. For a local
+//! `\\.\pipe\…` name that returns immediately, which is why the path is
+//! shape-checked before it ever gets here (`commands::mpv_ipc_config`) —
+//! a UNC or network path could otherwise stall a runtime thread past the
+//! advertised bound. Linux is genuinely async and has no such caveat.
 
 use super::Playback;
 
@@ -89,10 +97,13 @@ fn file_name(path: &str) -> Option<String> {
 
 /// What the probe found, as a detection candidate.
 ///
-/// Paused playback stays a candidate on purpose, unlike the media-session
-/// pass: that one drops paused sessions so a paused player cannot outrank
-/// live video elsewhere, but a deliberately configured pipe *is* the ranking,
-/// and with a live position a pause simply stops the number that decides.
+/// Paused playback stays a *candidate*, unlike the media-session pass which
+/// drops it outright — with a live position a pause simply stops the number
+/// the scrobble deadline reads, so nothing is lost by keeping it. What a
+/// paused player must not do is *outrank* a live source: `detect_playback`
+/// takes the pausedness this returns and demotes it to a last resort, which
+/// is the difference between "you paused mpv for a minute" and "an mpv window
+/// left paused an hour ago hides the episode you are streaming right now".
 pub(crate) fn playback_from_state(state: &MpvState) -> Option<Playback> {
     let title = state
         .path
@@ -160,9 +171,11 @@ async fn probe(path: &str) -> Option<MpvState> {
         .flatten()
 }
 
-pub async fn detect(cfg: &MpvConfig) -> Option<Playback> {
+/// The candidate and whether mpv is paused — the caller needs the second half
+/// to rank it. See `playback_from_state`.
+pub async fn detect(cfg: &MpvConfig) -> Option<(Playback, bool)> {
     let state = probe(&cfg.path).await?;
-    playback_from_state(&state)
+    playback_from_state(&state).map(|p| (p, state.paused))
 }
 
 #[cfg(test)]
@@ -243,7 +256,10 @@ mod tests {
             paused: true,
             ..MpvState::default()
         };
+        // Still a candidate — the *ranking* is where pausedness is spent, and
+        // `detect` reports the flag so `detect_playback` can demote it.
         assert!(playback_from_state(&paused).is_some());
+        assert!(paused.paused);
 
         let idle = MpvState::default();
         assert!(playback_from_state(&idle).is_none());

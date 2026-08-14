@@ -109,6 +109,31 @@ pub(crate) fn jellyfin_config(
 const MPV_IPC_ENABLED_KEY: &str = "mpv_ipc_enabled";
 const MPV_IPC_PATH_KEY: &str = "mpv_ipc_path";
 
+/// Whether a stored path can be a pipe at all.
+///
+/// On Windows the check earns its keep twice: `ClientOptions::open` is an
+/// `OPEN_EXISTING` `CreateFileW` that will happily open an ordinary *file* of
+/// that name and then hand it to `NamedPipeClient::from_raw_handle`, whose
+/// `unsafe` precondition is that the handle really is a pipe client; and a
+/// UNC or network path is the one shape whose synchronous connect can stall
+/// the detection loop past the probe's timeout (see the `mpv_ipc` header).
+/// Pure, so it is tested on both platforms.
+pub(crate) fn is_pipe_path(path: &str) -> bool {
+    let path = path.trim();
+    if path.is_empty() {
+        return false;
+    }
+    if cfg!(windows) {
+        // `\\.\pipe\name` — the local named-pipe namespace, and only it.
+        let lower = path.to_lowercase().replace('/', "\\");
+        lower.starts_with(r"\\.\pipe\") && lower.len() > r"\\.\pipe\".len()
+    } else {
+        // A unix socket is an ordinary filesystem path; absolute only, so a
+        // relative name cannot resolve against whatever the cwd happens to be.
+        path.starts_with('/')
+    }
+}
+
 pub(crate) fn mpv_ipc_config(
     db: &Db,
 ) -> Option<crate::playback::detection::mpv_ipc::MpvConfig> {
@@ -119,6 +144,14 @@ pub(crate) fn mpv_ipc_config(
         .kv_get(MPV_IPC_PATH_KEY)
         .filter(|p| !p.trim().is_empty())
         .unwrap_or_else(|| crate::playback::detection::mpv_ipc::DEFAULT_PIPE.to_string());
+    if !is_pipe_path(&path) {
+        crate::logging::debug_changed(
+            "mpv",
+            "path",
+            format!("{path:?} cannot be an IPC pipe; the source stays off"),
+        );
+        return None;
+    }
     Some(crate::playback::detection::mpv_ipc::MpvConfig { path })
 }
 
@@ -348,4 +381,29 @@ pub async fn scrobble_now(app: tauri::AppHandle) -> Result<(), String> {
 #[tauri::command]
 pub async fn scrobble_cancel(app: tauri::AppHandle) -> Result<(), String> {
     crate::playback::scrobbler::confirm_pending(app, false).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_pipe_path;
+
+    #[test]
+    fn only_a_real_pipe_shape_reaches_the_probe() {
+        if cfg!(windows) {
+            assert!(is_pipe_path(r"\\.\pipe\karasu-mpv"));
+            // Case and slash direction are both how people really type it.
+            assert!(is_pipe_path(r"\\.\PIPE\Karasu-Mpv"));
+            // The bare namespace names no pipe.
+            assert!(!is_pipe_path(r"\\.\pipe\"));
+            // An ordinary file `OPEN_EXISTING` would gladly open, and the UNC
+            // path whose connect can stall the loop.
+            assert!(!is_pipe_path(r"C:\Users\Kyu\notes.txt"));
+            assert!(!is_pipe_path(r"\\server\share\pipe\karasu-mpv"));
+        } else {
+            assert!(is_pipe_path("/tmp/karasu-mpv"));
+            assert!(!is_pipe_path("karasu-mpv"));
+        }
+        assert!(!is_pipe_path(""));
+        assert!(!is_pipe_path("   "));
+    }
 }

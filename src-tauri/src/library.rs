@@ -1229,10 +1229,22 @@ fn open_path(app: &AppHandle, path: &str) -> Result<(), String> {
     if let Some((player, pipe)) = crate::commands::mpv_launch_config(&app.state::<Db>()) {
         match std::process::Command::new(&player)
             .arg(format!("--input-ipc-server={pipe}"))
+            // `--` first: a file whose name begins with a dash is a filename,
+            // not an option, and mpv cannot tell without being told.
+            .arg("--")
             .arg(path)
             .spawn()
         {
-            Ok(_) => return Ok(()),
+            // The child is deliberately not held: Karasu does not manage the
+            // player's lifetime. `wait` in a detached thread only so a Linux
+            // exit is reaped instead of lingering as a zombie until Karasu
+            // quits — on Windows the handle simply closes.
+            Ok(mut child) => {
+                std::thread::spawn(move || {
+                    let _ = child.wait();
+                });
+                return Ok(());
+            }
             Err(e) => crate::logging::warn(
                 "library",
                 format!(

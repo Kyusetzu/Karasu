@@ -185,16 +185,24 @@ pub fn detect_windows() -> Option<Playback> {
 
 /// Full sweep, in order of how much each source actually knows.
 ///
-/// The mpv IPC pipe comes first when the user has configured one: it reports
-/// the real file path *and* a live position, and a pipe the user wrote into
-/// `mpv.conf` is the most explicit signal in the whole pipeline. The
-/// Jellyfin API is next (server URL, API key *and* a user — see `jellyfin`):
-/// series and episode as separate fields plus a position, beating anything
-/// derived from a string. Window titles come next. The desktop's media
-/// sessions come last — a browser playing Crunchyroll appears in both, and
-/// the site-marker path produces a cleaner title, so the session pass only
-/// gets a look in when nothing recognised a window. That is exactly the
-/// Jellyfin Media Player case, where the title bar never changes.
+/// A *playing* mpv IPC pipe comes first when the user has configured one: it
+/// reports the real file path **and** a live position, and a pipe the user
+/// wrote into `mpv.conf` is the most explicit signal in the whole pipeline.
+/// The Jellyfin API is next (server URL, API key *and* a user — see
+/// `jellyfin`): series and episode as separate fields plus a position,
+/// beating anything derived from a string. Window titles come next. The
+/// desktop's media sessions come last — a browser playing Crunchyroll appears
+/// in both, and the site-marker path produces a cleaner title, so the session
+/// pass only gets a look in when nothing recognised a window. That is exactly
+/// the Jellyfin Media Player case, where the title bar never changes.
+///
+/// A **paused** mpv is the exception to its own rung, and the reason is a real
+/// bug this fixed: Karasu now launches mpv itself, so an mpv window left
+/// paused an hour ago sat at the top of this order forever and hid a Jellyfin
+/// episode that was actually playing. A paused pipe is therefore held aside
+/// and used only when every other source came up empty — still the honest
+/// answer when it is the only thing on the machine, never an answer that
+/// outranks something live.
 ///
 /// The order holds on Linux too, but the window rung is empty there: window
 /// enumeration has no X11/Wayland backend, so after mpv and Jellyfin the
@@ -204,10 +212,14 @@ pub async fn detect_playback(
     jellyfin: Option<jellyfin::JellyfinConfig>,
     mpv: Option<mpv_ipc::MpvConfig>,
 ) -> Option<Playback> {
+    let mut paused_mpv: Option<Playback> = None;
     if let Some(cfg) = mpv {
-        if let Some(p) = mpv_ipc::detect(&cfg).await {
-            crate::logging::debug_changed("detect", "source", format!("mpv ipc: {:?}", p.media_title));
-            return Some(p);
+        if let Some((p, paused)) = mpv_ipc::detect(&cfg).await {
+            if !paused {
+                crate::logging::debug_changed("detect", "source", format!("mpv ipc: {:?}", p.media_title));
+                return Some(p);
+            }
+            paused_mpv = Some(p);
         }
     }
     if let Some(cfg) = jellyfin {
@@ -218,7 +230,7 @@ pub async fn detect_playback(
     }
     // Blocking Win32/WinRT and D-Bus work; keep it off the runtime's worker
     // thread.
-    tokio::task::spawn_blocking(move || {
+    let found = tokio::task::spawn_blocking(move || {
         // Which rung won, said at each rung rather than once afterwards:
         // `Playback` carries no source field, so a single line after the fact
         // could not tell a window title from a media session — and the
@@ -239,5 +251,17 @@ pub async fn detect_playback(
         found
     })
     .await
-    .unwrap_or(None)
+    .unwrap_or(None);
+
+    // Nothing live anywhere: a paused pipe is still what is on this machine.
+    if found.is_none() {
+        if let Some(p) = &paused_mpv {
+            crate::logging::debug_changed(
+                "detect",
+                "source",
+                format!("mpv ipc (paused): {:?}", p.media_title),
+            );
+        }
+    }
+    found.or(paused_mpv)
 }

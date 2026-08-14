@@ -497,6 +497,25 @@ body {
   overflow: hidden;
 }
 
+/* Chromium builds a native <select>'s popup stylesheet from the element's
+   *computed* colors — and Tailwind's preflight resets every select to
+   `background-color: transparent; color: inherit`. A select without an
+   explicit `bg-*` class therefore opens a white popup with the app's
+   near-white ink inherited into it (the FilterSelect overlay was exactly
+   that). An author background also outranks `color-scheme`, so the fix is
+   to give selects and options real colors, not more color-scheme. The
+   `option` twin matters: the popup rows read each option's own computed
+   colors. */
+select {
+  background-color: var(--color-surface-900);
+  color: var(--color-ink-100);
+}
+
+option {
+  background-color: var(--color-surface-900);
+  color: var(--color-ink-100);
+}
+
 /* Text is selectable everywhere by default (titles, synopses, stats, file
    paths). Only chrome that would otherwise turn a click or a window drag into
    a text selection opts out -- `[data-tauri-drag-region]` especially, since

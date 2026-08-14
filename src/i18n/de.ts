@@ -1002,6 +1002,7 @@ export const de: typeof en = {
     noMatch: "Kein Eintrag deiner Liste erkannt.",
     updateNow: "Jetzt",
     updateNowTitle: "Fortschritt jetzt aktualisieren",
+    correctTitle: "Falscher Titel? Den richtigen auswählen",
     skipTitle: "Nicht aktualisieren",
     soon: "gleich",
     idle: "Warte auf Player – nichts läuft",
@@ -1198,6 +1199,10 @@ export const de: typeof en = {
     mpvLaunchHint:
       "Pfad zur mpv-Programmdatei. Wenn gesetzt, starten die Abspielknöpfe der Bibliothek mpv mit der Pipe oben statt des Standardplayers — für Starts ist keine mpv.conf nötig. Leer behält den Standardplayer.",
     mpvLaunchPlaceholder: "z. B. C:\\mpv\\mpv.exe",
+    corrections: "Erkennungs-Korrekturen",
+    correctionsHint:
+      "Titel, die du über die Wiedergabe-Karte korrigiert hast. Jede gilt für jede weitere Erkennung desselben Titels; entferne eine, damit die Zuordnung wieder selbst rät.",
+    correctionsFrom: "erkannt als {{title}}",
     detectionDebug: "Was dein System gerade meldet",
     detectionDebugHint:
       "Alle Mediensitzungen, die dein System aktuell kennt. Damit siehst du, was ein Player veröffentlicht, wenn er nicht erkannt wird.",

@@ -9,9 +9,13 @@ export interface NowPlaying {
   mediaType: "ANIME" | "MANGA";
   rawTitle: string;
   parsedTitle: string;
+  /** The season the parse carried — half the key a correction is stored under. */
+  season: number | null;
   episode: number | null;
   mediaId: number | null;
   matchedTitle: string | null;
+  /** True when this match is the user's own correction, not the matcher's. */
+  overridden: boolean;
   progress: number | null;
   totalEpisodes: number | null;
 }
@@ -69,6 +73,39 @@ export const useNowPlaying = create<NowPlayingStore>((set) => ({
 
 export const scrobbleNow = () => invoke<void>("scrobble_now");
 export const scrobbleCancel = () => invoke<void>("scrobble_cancel");
+
+/** One stored detection correction, as the Settings list shows them. */
+export interface DetectionOverride {
+  /** What detection *saw* — the parsed title the correction fires on. */
+  title: string;
+  /** `-1` when the parse carried no season. */
+  season: number;
+  mediaType: "ANIME" | "MANGA";
+  mediaId: number;
+  displayTitle: string;
+}
+
+export const listDetectionOverrides = () =>
+  invoke<DetectionOverride[]>("list_detection_overrides");
+
+/**
+ * "What is playing is actually this." Keyed on the parse, so it holds for
+ * every later detection of the same title; applied at once, because the
+ * detection loop only rebuilds a match when the title itself changes.
+ */
+export const setDetectionOverride = (input: {
+  title: string;
+  season: number | null;
+  mediaType: string;
+  mediaId: number;
+  displayTitle: string;
+}) => invoke<void>("set_detection_override", input);
+
+export const clearDetectionOverride = (input: {
+  title: string;
+  season: number | null;
+  mediaType: string;
+}) => invoke<void>("clear_detection_override", input);
 
 export interface ScrobbleSettings {
   enabled: boolean;

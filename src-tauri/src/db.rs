@@ -206,6 +206,45 @@ CREATE TABLE IF NOT EXISTS library_redirect (
 PRAGMA user_version = 11;
 ";
 
+/// What the user says a *detected* title really is.
+///
+/// The same `(title, season)` idea as v9's `library_override`, and for the same
+/// reason — the correction must outlive the thing that produced it — but a
+/// deliberately separate table, because the two key spaces are different
+/// populations that happen to share a shape:
+///
+/// - The producers differ. `index_files` parses a *filename*; `build_now_playing`
+///   parses a cleaned window or media-session title, or takes Jellyfin's own
+///   `SeriesName`. They coincide for a local file in mpv and diverge everywhere
+///   else, so one table would let a correction typed against a browser tab
+///   silently re-point files on disk at the next scan.
+/// - Detection covers manga; the library scanner does not. Hence `media_type` in
+///   the key: a chapter title and an episode title may normalise to the same
+///   string and mean different entries.
+/// - `clear_library_match` deletes an override *and every redirect on its key*,
+///   and `set_library_match` refuses while a scan is running. Sharing would make
+///   "undo" on one screen quietly undo the other, and make a now-playing button
+///   fail for a reason the user cannot connect to what they clicked.
+///
+/// `display_title` is the chosen entry's title, stored because the picker has it
+/// in hand at correction time. It costs one column and buys two things with no
+/// request at all: the Settings list can name what each row points at, and a
+/// forced entry that is not on the cached list still reads as itself on screen.
+///
+/// `season = -1` where the parse carried none, per v9. User data: nothing on a
+/// scan or a poll may clear it.
+const MIGRATION_V12: &str = "
+CREATE TABLE IF NOT EXISTS detection_override (
+  title TEXT NOT NULL,
+  season INTEGER NOT NULL,
+  media_type TEXT NOT NULL,
+  media_id INTEGER NOT NULL,
+  display_title TEXT NOT NULL,
+  PRIMARY KEY (title, season, media_type)
+);
+PRAGMA user_version = 12;
+";
+
 /// One in-app notification (mirrors a shown desktop toast).
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct NotificationRow {
@@ -325,6 +364,9 @@ impl Db {
         }
         if version < 11 {
             apply(&conn, 11, MIGRATION_V11)?;
+        }
+        if version < 12 {
+            apply(&conn, 12, MIGRATION_V12)?;
         }
         Ok(Db(Mutex::new(conn)))
     }
@@ -866,6 +908,65 @@ impl Db {
         .map_err(|e| format!("Could not clear the correction: {e}"))
     }
 
+    // --- Detection corrections ------------------------------------------------
+
+    /// Every `(title, season, media_type) -> (media_id, display_title)` the user
+    /// has corrected on the now-playing card. Small by nature — one row per
+    /// title the matcher gets wrong — so it is read whole and matched in memory.
+    pub fn detection_overrides(&self) -> Vec<(String, i32, String, i64, String)> {
+        let conn = self.0.lock().unwrap();
+        conn.prepare(
+            "SELECT title, season, media_type, media_id, display_title FROM detection_override",
+        )
+        .and_then(|mut stmt| {
+            stmt.query_map([], |r| {
+                Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?))
+            })
+            .map(|rows| rows.filter_map(Result::ok).collect())
+        })
+        .unwrap_or_default()
+    }
+
+    /// Records a detection correction. Upsert for `library_override_set`'s
+    /// reason: pointing the same detected title somewhere new corrects the
+    /// correction rather than adding a second opinion.
+    pub fn detection_override_set(
+        &self,
+        title: &str,
+        season: i32,
+        media_type: &str,
+        media_id: i64,
+        display_title: &str,
+    ) -> Result<(), String> {
+        let conn = self.0.lock().unwrap();
+        conn.execute(
+            "INSERT INTO detection_override (title, season, media_type, media_id, display_title)
+             VALUES (?1, ?2, ?3, ?4, ?5)
+             ON CONFLICT(title, season, media_type) DO UPDATE SET
+               media_id = excluded.media_id, display_title = excluded.display_title",
+            rusqlite::params![title, season, media_type, media_id, display_title],
+        )
+        .map(|_| ())
+        .map_err(|e| format!("Could not save the correction: {e}"))
+    }
+
+    /// Forgets one, giving the matcher its guess back. Returns the row count so
+    /// a no-op is distinguishable from a removal, exactly as v9's clear does.
+    pub fn detection_override_clear(
+        &self,
+        title: &str,
+        season: i32,
+        media_type: &str,
+    ) -> Result<usize, String> {
+        let conn = self.0.lock().unwrap();
+        conn.execute(
+            "DELETE FROM detection_override
+             WHERE title = ?1 AND season = ?2 AND media_type = ?3",
+            rusqlite::params![title, season, media_type],
+        )
+        .map_err(|e| format!("Could not clear the correction: {e}"))
+    }
+
     // --- Season splits --------------------------------------------------------
 
     /// Every user-confirmed episode-range redirect:
@@ -1028,7 +1129,46 @@ mod tests {
         conn.execute_batch(MIGRATION_V9).unwrap();
         conn.execute_batch(MIGRATION_V10).unwrap();
         conn.execute_batch(MIGRATION_V11).unwrap();
+        conn.execute_batch(MIGRATION_V12).unwrap();
         Db(Mutex::new(conn))
+    }
+
+    /// The detection correction is its own key space, and the two tables must
+    /// not be able to reach into each other — the whole reason v12 exists
+    /// rather than a `media_type` column bolted onto v9.
+    #[test]
+    fn a_detection_correction_is_keyed_by_medium_and_leaves_the_library_alone() {
+        let db = mem_db();
+        db.library_override_set("frieren", -1, 1).unwrap();
+        db.detection_override_set("frieren", -1, "ANIME", 2, "Frieren").unwrap();
+        // Same parse, other medium: a different row, not a replacement.
+        db.detection_override_set("frieren", -1, "MANGA", 3, "Frieren (manga)")
+            .unwrap();
+
+        let mut rows = db.detection_overrides();
+        rows.sort_by_key(|r| r.3);
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0], ("frieren".into(), -1, "ANIME".into(), 2, "Frieren".into()));
+        assert_eq!(rows[1].2, "MANGA");
+        // The library's own correction is untouched by any of it.
+        assert_eq!(db.library_overrides(), vec![("frieren".to_string(), -1, 1)]);
+
+        // Correcting the correction replaces, never accumulates.
+        db.detection_override_set("frieren", -1, "ANIME", 9, "Frieren S2").unwrap();
+        let anime: Vec<_> = db
+            .detection_overrides()
+            .into_iter()
+            .filter(|r| r.2 == "ANIME")
+            .collect();
+        assert_eq!(anime.len(), 1);
+        assert_eq!(anime[0].3, 9);
+        assert_eq!(anime[0].4, "Frieren S2");
+
+        // Clearing reports what it did, so a no-op cannot pass for a removal.
+        assert_eq!(db.detection_override_clear("frieren", -1, "ANIME").unwrap(), 1);
+        assert_eq!(db.detection_override_clear("frieren", -1, "ANIME").unwrap(), 0);
+        assert_eq!(db.detection_overrides().len(), 1);
+        assert_eq!(db.library_overrides().len(), 1);
     }
 
     /// A suggestion is the scan's opinion and a correction is the user's, so a
@@ -1194,7 +1334,7 @@ mod tests {
         let version: i64 = conn
             .query_row("PRAGMA user_version", [], |r| r.get(0))
             .unwrap();
-        assert_eq!(version, 11, "and must end up fully migrated");
+        assert_eq!(version, 12, "and must end up fully migrated");
         drop(conn);
 
         let _ = std::fs::remove_dir_all(&dir);

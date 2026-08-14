@@ -3,14 +3,19 @@ import { Link } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { listen } from "@tauri-apps/api/event";
-import { BookOpen, Check, MonitorPlay, Tv, X } from "lucide-react";
+import { BookOpen, Check, MonitorPlay, SearchCheck, Tv, X } from "lucide-react";
 import {
+  clearDetectionOverride,
   scrobbleCancel,
   scrobbleNow,
+  setDetectionOverride,
   useNowPlaying,
+  type NowPlaying,
 } from "@/stores/nowPlaying";
 import { isTauri } from "@/api/anilist";
 import { Button } from "@/components/ui/button";
+import { Presence } from "@/components/ui/presence";
+import MatchPicker from "@/components/overlays/MatchPicker";
 import { cn } from "@/lib/utils";
 import { countdownFraction, ringOffset, splitRemaining } from "@/lib/countdown";
 import { usePresentValue } from "@/hooks/usePresence";
@@ -200,7 +205,7 @@ export default function NowPlayingCard() {
             <ScrobbleStatus countdown={countdown.label} />
           </div>
         </div>
-        <ScrobbleActions />
+        <ScrobbleActions playing={playing} />
       </div>
     </div>
   );
@@ -277,10 +282,21 @@ function ScrobbleStatus({ countdown }: { countdown: string | null }) {
   }
 }
 
-function ScrobbleActions() {
+/**
+ * The card's buttons.
+ *
+ * The scrobble pair appears only in the phases where there is something to
+ * confirm or skip. The correction button is always there — a wrong match needs
+ * fixing exactly as much as a missing one, and the unmatched case used to
+ * render no action at all, which left "No entry recognized" as a statement
+ * with nothing to do about it.
+ */
+function ScrobbleActions({ playing }: { playing: NowPlaying }) {
   const { t } = useTranslation();
   const scrobble = useNowPlaying((s) => s.scrobble);
   const [busy, setBusy] = useState(false);
+  const [correcting, setCorrecting] = useState<NowPlaying | null>(null);
+  const [error, setError] = useState<string | undefined>();
 
   const act = async (fn: () => Promise<void>) => {
     setBusy(true);
@@ -291,35 +307,102 @@ function ScrobbleActions() {
     }
   };
 
-  if (
+  // Errors land in the dialog rather than a toast, the way the library's
+  // corrections do: the dialog is where the decision was made.
+  const correct = async (fn: () => Promise<void>) => {
+    setError(undefined);
+    try {
+      await fn();
+      setCorrecting(null);
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
+  const canScrobble =
     scrobble.phase === "pending" ||
     scrobble.phase === "blocked" ||
     scrobble.phase === "watching" ||
-    scrobble.phase === "cancelled"
-  ) {
-    return (
+    scrobble.phase === "cancelled";
+
+  return (
+    <>
       <div className="flex shrink-0 gap-2">
+        {canScrobble && (
+          <>
+            <Button
+              size="sm"
+              disabled={busy}
+              onClick={() => act(scrobbleNow)}
+              title={t("nowPlaying.updateNowTitle")}
+            >
+              <Check className="size-3.5" /> {t("nowPlaying.updateNow")}
+            </Button>
+            {scrobble.phase !== "cancelled" && scrobble.phase !== "blocked" && (
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={busy}
+                onClick={() => act(scrobbleCancel)}
+                title={t("nowPlaying.skipTitle")}
+              >
+                <X className="size-3.5" />
+              </Button>
+            )}
+          </>
+        )}
         <Button
           size="sm"
-          disabled={busy}
-          onClick={() => act(scrobbleNow)}
-          title={t("nowPlaying.updateNowTitle")}
+          variant="secondary"
+          onClick={() => {
+            setError(undefined);
+            setCorrecting(playing);
+          }}
+          title={t("nowPlaying.correctTitle")}
+          aria-label={t("nowPlaying.correctTitle")}
         >
-          <Check className="size-3.5" /> {t("nowPlaying.updateNow")}
+          <SearchCheck className="size-3.5" />
         </Button>
-        {scrobble.phase !== "cancelled" && scrobble.phase !== "blocked" && (
-          <Button
-            size="sm"
-            variant="secondary"
-            disabled={busy}
-            onClick={() => act(scrobbleCancel)}
-            title={t("nowPlaying.skipTitle")}
-          >
-            <X className="size-3.5" />
-          </Button>
-        )}
       </div>
-    );
-  }
-  return null;
+
+      {/* `Presence`, not `PresenceIf`: the picker is opened *by* a value and
+          would otherwise lose its seeded title for the length of the exit. */}
+      <Presence value={correcting}>
+        {(np, leaving) => (
+          <MatchPicker
+            leaving={leaving}
+            parsedTitle={np.parsedTitle}
+            season={np.season ?? -1}
+            current={np.matchedTitle ?? undefined}
+            error={error}
+            mediaType={np.mediaType}
+            onPick={(mediaId, displayTitle) =>
+              void correct(() =>
+                setDetectionOverride({
+                  title: np.parsedTitle,
+                  season: np.season,
+                  mediaType: np.mediaType,
+                  mediaId,
+                  displayTitle,
+                }),
+              )
+            }
+            onClear={
+              np.overridden
+                ? () =>
+                    void correct(() =>
+                      clearDetectionOverride({
+                        title: np.parsedTitle,
+                        season: np.season,
+                        mediaType: np.mediaType,
+                      }),
+                    )
+                : undefined
+            }
+            onCancel={() => setCorrecting(null)}
+          />
+        )}
+      </Presence>
+    </>
+  );
 }

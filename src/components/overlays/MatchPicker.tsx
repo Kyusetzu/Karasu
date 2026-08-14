@@ -29,6 +29,7 @@ export default function MatchPicker({
   season,
   current,
   error,
+  mediaType = "ANIME",
   onPick,
   onClear,
   onCancel,
@@ -41,7 +42,12 @@ export default function MatchPicker({
   current?: string;
   /** Why the last pick was rejected. The dialog stays open when one fails. */
   error?: string;
-  onPick: (mediaId: number) => void;
+  /** What to search. The library scanner is anime-only; detection is not. */
+  mediaType?: "ANIME" | "MANGA";
+  /** The chosen entry's id and its display title — the second because a
+      caller storing the pick has it right here and would otherwise need a
+      request to name what it points at. */
+  onPick: (mediaId: number, title: string) => void;
   /** Present only when there is a correction to undo. */
   onClear?: () => void;
   onCancel: () => void;
@@ -68,8 +74,8 @@ export default function MatchPicker({
   }, [term]);
 
   const { data, isFetching, isError } = useQuery({
-    queryKey: ["matchSearch", debounced],
-    queryFn: () => searchMedia(debounced, "ANIME"),
+    queryKey: ["matchSearch", mediaType, debounced],
+    queryFn: () => searchMedia(debounced, mediaType),
     enabled: debounced.length > 1,
     staleTime: 5 * 60 * 1000,
   });
@@ -143,7 +149,7 @@ export default function MatchPicker({
                   <ResultRow
                     media={media}
                     isCurrent={displayTitle(media.title) === current}
-                    onPick={() => onPick(media.id)}
+                    onPick={() => onPick(media.id, displayTitle(media.title))}
                   />
                 </li>
               ))}

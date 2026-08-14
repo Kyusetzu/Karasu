@@ -389,6 +389,89 @@ pub async fn scrobble_cancel(app: tauri::AppHandle) -> Result<(), String> {
     crate::playback::scrobbler::confirm_pending(app, false).await
 }
 
+// --- Detection corrections ---------------------------------------------------
+
+/// One stored correction, for the Settings list.
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DetectionOverrideRow {
+    /// The parsed title it fires on — what detection saw, not what it means.
+    pub title: String,
+    /// `-1` when the parse carried no season; the screen hides that.
+    pub season: i32,
+    pub media_type: String,
+    pub media_id: i64,
+    pub display_title: String,
+}
+
+#[tauri::command]
+pub fn list_detection_overrides(db: State<'_, Db>) -> Vec<DetectionOverrideRow> {
+    let mut rows: Vec<DetectionOverrideRow> = db
+        .detection_overrides()
+        .into_iter()
+        .map(
+            |(title, season, media_type, media_id, display_title)| DetectionOverrideRow {
+                title,
+                season,
+                media_type,
+                media_id,
+                display_title,
+            },
+        )
+        .collect();
+    rows.sort_by(|a, b| a.display_title.cmp(&b.display_title));
+    rows
+}
+
+/// "This is actually <media_id>." Stored against the parse, so every later
+/// detection of the same title skips the guessing — and applied immediately,
+/// because the poll loop only rebuilds a match when the title changes.
+#[tauri::command]
+pub fn set_detection_override(
+    app: tauri::AppHandle,
+    db: State<'_, Db>,
+    title: String,
+    season: Option<u32>,
+    media_type: String,
+    media_id: i64,
+    display_title: String,
+) -> Result<(), String> {
+    let title = title.trim();
+    if title.is_empty() {
+        return Err("Nothing is playing to correct".into());
+    }
+    db.detection_override_set(
+        title,
+        crate::playback::scrobbler::season_key(season),
+        &media_type,
+        media_id,
+        display_title.trim(),
+    )?;
+    crate::playback::scrobbler::requeue_match(&app);
+    Ok(())
+}
+
+/// Forgets one, giving the matcher its guess back.
+#[tauri::command]
+pub fn clear_detection_override(
+    app: tauri::AppHandle,
+    db: State<'_, Db>,
+    title: String,
+    season: Option<u32>,
+    media_type: String,
+) -> Result<(), String> {
+    let removed = db.detection_override_clear(
+        title.trim(),
+        crate::playback::scrobbler::season_key(season),
+        &media_type,
+    )?;
+    if removed == 0 {
+        return Err("There was no correction for that title".into());
+    }
+    crate::playback::scrobbler::requeue_match(&app);
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::is_pipe_path;

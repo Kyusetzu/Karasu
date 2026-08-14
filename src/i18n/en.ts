@@ -996,6 +996,7 @@ export const en = {
     noMatch: "No entry from your list recognized.",
     updateNow: "Now",
     updateNowTitle: "Update progress now",
+    correctTitle: "Wrong title? Pick the right one",
     skipTitle: "Don't update this one",
     soon: "soon",
     idle: "Watching for players — nothing playing",
@@ -1188,6 +1189,10 @@ export const en = {
     mpvLaunchHint:
       "Path to the mpv executable. When set, the library's play buttons start mpv with the pipe above instead of the default player — no mpv.conf needed for launches. Empty keeps the default player.",
     mpvLaunchPlaceholder: "e.g. C:\\mpv\\mpv.exe",
+    corrections: "Detection corrections",
+    correctionsHint:
+      "Titles you've corrected from the now-playing card. Each one holds for every future detection of the same title; remove one to let matching guess again.",
+    correctionsFrom: "detected as {{title}}",
     detectionDebug: "What your system currently reports",
     detectionDebugHint:
       "Every media session your desktop knows about right now. Use this to see what a player publishes when it isn't being detected.",

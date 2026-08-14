@@ -1,22 +1,27 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
-import { ChevronRight, RefreshCw } from "lucide-react";
+import { ChevronRight, RefreshCw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/icon-button";
 import { Input } from "@/components/ui/input";
 import { Card, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import * as api from "@/api/anilist";
 import {
+  clearDetectionOverride,
   getJellyfinSettings,
   getScrobbleSettings,
   getMediaDetection,
   jellyfinSignIn,
   jellyfinSignOut,
+  listDetectionOverrides,
   setJellyfinSettings,
   setScrobbleSettings,
   setMediaDetection,
   mediaSessions,
   testJellyfin,
+  type DetectionOverride,
   type JellyfinSession,
   type JellyfinSettings,
   type ScrobbleSettings,
@@ -259,6 +264,81 @@ function MediaSessionDiagnostic() {
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * The corrections made from the now-playing card, so they can be reviewed and
+ * taken back somewhere other than the moment they were made.
+ *
+ * Absent entirely until there is one — an empty card explaining a feature
+ * nobody has used is noise on a pane that already has plenty. Each row names
+ * what detection *saw* and what it was told that means; removing one gives the
+ * matcher its guess back.
+ */
+export function DetectionCorrectionsSection() {
+  const { t } = useTranslation();
+  const [rows, setRows] = useState<DetectionOverride[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = () => {
+    if (!api.isTauri) return;
+    listDetectionOverrides().then(setRows).catch(() => {});
+  };
+  useEffect(load, []);
+
+  if (!rows || rows.length === 0) return null;
+
+  const remove = async (row: DetectionOverride) => {
+    setError(null);
+    try {
+      await clearDetectionOverride({
+        title: row.title,
+        // Back to the `null` the command expects; `-1` is the storage
+        // sentinel, not something the API should have to know about.
+        season: row.season < 0 ? null : row.season,
+        mediaType: row.mediaType,
+      });
+      load();
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
+  return (
+    <Card>
+      <CardTitle>{t("settings.corrections")}</CardTitle>
+      <p className="mt-2 text-sm text-ink-500">{t("settings.correctionsHint")}</p>
+      <ul className="mt-3 space-y-1.5">
+        {rows.map((row) => (
+          <li
+            key={`${row.mediaType}-${row.season}-${row.title}`}
+            className="flex items-center gap-3 rounded-lg bg-surface-900 px-3 py-2"
+          >
+            <span className="min-w-0 flex-1">
+              <Link
+                to={`/media/${row.mediaId}`}
+                className="block truncate text-xs text-ink-100 hover:text-accent-400"
+              >
+                {row.displayTitle}
+              </Link>
+              <span className="mt-0.5 block truncate text-2xs text-ink-600">
+                {t("settings.correctionsFrom", { title: row.title })}
+              </span>
+            </span>
+            <IconButton
+              variant="ghost"
+              onClick={() => remove(row)}
+              aria-label={t("library.clearMatch")}
+              title={t("library.clearMatch")}
+            >
+              <X className="size-3.5" />
+            </IconButton>
+          </li>
+        ))}
+      </ul>
+      {error && <p className="mt-2 text-sm text-danger">{error}</p>}
+    </Card>
   );
 }
 

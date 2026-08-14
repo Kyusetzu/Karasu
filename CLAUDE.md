@@ -188,7 +188,7 @@ of AniList's own list fields, it costs nothing to carry, and the local list has
 stored it since schema v7. The rejected idea is tracking **purchases**, which
 would need price data the app has no source for.
 
-The schema is at **v11**. `library_match` (v8) holds the scanner's per-title
+The schema is at **v12**. `library_match` (v8) holds the scanner's per-title
 match confidence, which is what the local library's `exact` / `close` column
 reads. v9 adds `library_override` — the user's corrections, keyed on the parsed
 `(title, season)` with `season = -1` for a release name that carried none, and
@@ -202,6 +202,21 @@ on the parse plus a **disk** episode range. The command that writes them
 numbers the row displays — and `plan_redirect` translates per file, trimming
 any overlapped rule; don't re-key it on disk numbers, that was the chained-split
 bug.
+
+v12 adds `detection_override` — the same idea as v9 for the *now-playing* card,
+and deliberately **not** the same table. Keyed `(title, season, media_type)`
+because the two key spaces are different populations that share a shape: the
+scanner parses filenames, detection parses window/session titles or takes
+Jellyfin's `SeriesName`, so one table would let a correction typed against a
+browser tab re-point files on disk at the next scan. Detection also covers
+manga, which the scanner does not, and `clear_library_match` deletes redirects
+on its key while `set_library_match` refuses during a scan — both of which
+would surface on the wrong screen if shared. It carries `display_title` so the
+Settings list and an off-list forced entry read correctly with no request.
+`build_now_playing` consults it *before* `best_match`, mirroring `index_files`'
+documented order, and the relations redirect still applies afterwards: a
+correction settles which series this is, relations still decide which entry the
+episode number lands on.
 
 ## Versioning (every commit)
 

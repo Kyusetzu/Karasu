@@ -33,12 +33,18 @@ pub struct NowPlaying {
     pub raw_title: String,
     #[serde(rename = "parsedTitle")]
     pub parsed_title: String,
+    /// The season the parse carried, if any — half the key a correction is
+    /// stored under, so the picker has to be able to send it back.
+    pub season: Option<u32>,
     pub episode: Option<u32>,
     /// AniList media ID on a successful match against the list
     #[serde(rename = "mediaId")]
     pub media_id: Option<i64>,
     #[serde(rename = "matchedTitle")]
     pub matched_title: Option<String>,
+    /// Whether this match came from the user's own correction rather than the
+    /// matcher. Drives the "undo" affordance; nothing else reads it.
+    pub overridden: bool,
     /// Current list progress of the matched entry
     pub progress: Option<u32>,
     #[serde(rename = "totalEpisodes")]
@@ -245,6 +251,60 @@ pub fn candidates_from_cache(db: &Db, media_type: &str) -> Vec<matcher::Candidat
     out
 }
 
+/// `-1` for a parse that carried no season — the sentinel `library_override`
+/// established in schema v9, and the reason it is a sentinel rather than NULL
+/// is that SQLite would treat each NULL in a primary key as distinct.
+pub(crate) fn season_key(season: Option<u32>) -> i32 {
+    season.map(|s| s as i32).unwrap_or(-1)
+}
+
+/// The user's correction for this parse, as `(media_id, display title)`.
+///
+/// Read whole and matched in memory: the table holds one row per title the
+/// matcher gets wrong, which is a handful, and this runs on a 5 s poll.
+pub(crate) fn detection_override(
+    db: &Db,
+    title: &str,
+    season: Option<u32>,
+    media_type: &str,
+) -> Option<(i64, String)> {
+    let key = season_key(season);
+    db.detection_overrides()
+        .into_iter()
+        .find(|(t, s, m, _, _)| t == title && *s == key && m == media_type)
+        .map(|(_, _, _, media_id, display)| (media_id, display))
+}
+
+/// What the cached list knows about a matched id.
+///
+/// Shared by the detection pass and the correction command so the card cannot
+/// say one thing when a title is detected and another when it is corrected.
+/// A forced id that is not on the list yet resolves to the stored display
+/// title with no progress — honest, and it self-heals on the first scrobble,
+/// since `SaveMediaListEntry` creates the entry.
+fn resolve_match(
+    candidates: &[matcher::Candidate],
+    media_id: i64,
+    fallback_title: Option<&str>,
+) -> (Option<String>, Option<u32>, Option<u32>, Option<u32>, String) {
+    match candidates.iter().find(|c| c.media_id == media_id) {
+        Some(c) => (
+            Some(c.titles[0].clone()),
+            Some(c.progress),
+            c.episodes,
+            c.duration_min,
+            c.status.clone(),
+        ),
+        None => (
+            fallback_title.map(str::to_string),
+            None,
+            None,
+            None,
+            String::new(),
+        ),
+    }
+}
+
 fn build_now_playing(
     db: &Db,
     rules: &[relations::Rule],
@@ -260,7 +320,22 @@ fn build_now_playing(
         None => parser::parse(&playback.media_title),
     };
     let candidates = candidates_from_cache(db, media_type);
-    let matched = matcher::best_match(&parsed, &candidates);
+
+    // The user's own answer, before the fuzzy sweep — the same precedence
+    // `index_files` documents for the library scanner. A title the matcher gets
+    // wrong (or cannot place at all) is corrected once on the card and every
+    // later detection of that parse skips the guessing entirely.
+    let forced = detection_override(db, &parsed.title, parsed.season, media_type);
+    if let Some((mid, _)) = &forced {
+        crate::logging::debug(
+            "recognize",
+            format!("{:?} → your correction: #{mid}", parsed.title),
+        );
+    }
+    let matched = match &forced {
+        Some((mid, _)) => Some(matcher::Match { media_id: *mid, score: 1.0 }),
+        None => matcher::best_match(&parsed, &candidates),
+    };
 
     // The verdict, while the score still exists. The `.map()` below rewrites
     // `matched` into `(id, episode)` and the score is gone for good — so this is
@@ -311,16 +386,18 @@ fn build_now_playing(
     let (media_id, episode, matched_title, progress, total, duration_min, list_status) =
         match matched {
             Some((mid, ep)) => {
-                let c = candidates.iter().find(|c| c.media_id == mid);
-                (
-                    Some(mid),
-                    ep,
-                    c.map(|c| c.titles[0].clone()),
-                    c.map(|c| c.progress),
-                    c.and_then(|c| c.episodes),
-                    c.and_then(|c| c.duration_min),
-                    c.map(|c| c.status.clone()).unwrap_or_default(),
-                )
+                let (title, progress, total, duration, status) = resolve_match(
+                    &candidates,
+                    mid,
+                    // Only when the id is the one *this* correction forced: a
+                    // redirect may have moved on to another entry, whose title
+                    // the stored one would misreport.
+                    forced
+                        .as_ref()
+                        .filter(|(fid, _)| *fid == mid)
+                        .map(|(_, t)| t.as_str()),
+                );
+                (Some(mid), ep, title, progress, total, duration, status)
             }
             None => (None, parsed.episode, None, None, None, None, String::new()),
         };
@@ -331,9 +408,11 @@ fn build_now_playing(
         media_type: media_type.to_string(),
         raw_title: playback.media_title,
         parsed_title: parsed.title,
+        season: parsed.season,
         episode,
         media_id,
         matched_title,
+        overridden: forced.is_some(),
         progress,
         total_episodes: total,
         duration_min,
@@ -449,6 +528,121 @@ async fn perform_update(
         json!({ "mediaId": media_id, "episode": episode }),
     );
     Ok(())
+}
+
+/// Re-resolves what is playing against the corrections table, right now.
+///
+/// The poll loop rebuilds a match only when the detected *title* changes, so a
+/// correction made mid-episode would otherwise show nothing until the next
+/// file. This patches the stored `NowPlaying` in place and re-emits everything
+/// that renders it, exactly as `perform_update` does after a scrobble — the
+/// card, the tray and the Discord presence all read from that one object.
+///
+/// `drive_session` re-reads `PlaybackState` on its next tick and starts a fresh
+/// session whenever `(media_id, episode)` differs, so the scrobbler follows the
+/// corrected entry without being told separately.
+pub fn requeue_match(app: &AppHandle) {
+    let db = app.state::<Db>();
+    let media_type;
+    let parsed_title;
+    let season;
+    let episode;
+    {
+        let state = app.state::<PlaybackState>();
+        let guard = state.0.lock().unwrap();
+        let Some(np) = guard.as_ref() else { return };
+        media_type = np.media_type.clone();
+        parsed_title = np.parsed_title.clone();
+        season = np.season;
+        episode = np.episode;
+    }
+
+    let candidates = candidates_from_cache(&db, &media_type);
+    let forced = detection_override(&db, &parsed_title, season, &media_type);
+    let picked = match &forced {
+        Some((mid, _)) => Some(*mid),
+        // Cleared: fall back to what the matcher makes of the same parse, so
+        // "undo" really returns the guess rather than leaving a hole.
+        None => matcher::best_match(
+            &parser::Parsed {
+                title: parsed_title.clone(),
+                episode,
+                season,
+                release_group: None,
+            },
+            &candidates,
+        )
+        .map(|m| m.media_id),
+    };
+
+    // The same episode redirect the detection pass applies, for the same
+    // reason: a correction settles which *series* this is, and anime-relations
+    // still decides which entry a combined release's episode number lands on.
+    // Without this the two paths would disagree until the title changed.
+    let picked = picked.map(|mid| {
+        if media_type == "ANIME" {
+            if let Some(ep) = episode {
+                let rules = app.state::<Relations>();
+                let rules = rules.0.read().unwrap();
+                if let Some((new_id, _)) = relations::redirect(&rules, mid, ep) {
+                    return new_id;
+                }
+            }
+        }
+        mid
+    });
+
+    let resolved = picked.map(|mid| {
+        let (title, progress, total, duration, status) = resolve_match(
+            &candidates,
+            mid,
+            forced
+                .as_ref()
+                .filter(|(fid, _)| *fid == mid)
+                .map(|(_, t)| t.as_str()),
+        );
+        (mid, title, progress, total, duration, status)
+    });
+
+    {
+        let state = app.state::<PlaybackState>();
+        let mut guard = state.0.lock().unwrap();
+        if let Some(np) = guard.as_mut() {
+            np.overridden = forced.is_some();
+            match resolved {
+                Some((mid, title, progress, total, duration, status)) => {
+                    np.media_id = Some(mid);
+                    np.matched_title = title;
+                    np.progress = progress;
+                    np.total_episodes = total;
+                    np.duration_min = duration;
+                    np.list_status = status;
+                }
+                None => {
+                    np.media_id = None;
+                    np.matched_title = None;
+                    np.progress = None;
+                    np.total_episodes = None;
+                    np.duration_min = None;
+                    np.list_status = String::new();
+                }
+            }
+        }
+        let _ = app.emit("now-playing", &guard.clone());
+        crate::discord::sync(app, guard.as_ref());
+        crate::tray_set_now_playing(
+            app,
+            guard
+                .as_ref()
+                .map(|n| n.matched_title.as_deref().unwrap_or(&n.parsed_title)),
+        );
+    }
+
+    // The running session was started for the *old* id; dropping it makes the
+    // next tick build one for the corrected entry rather than scrobbling the
+    // episode onto whatever the matcher had guessed.
+    *app.state::<ScrobbleSession>().0.lock().unwrap() = None;
+    emit_session(app, None);
 }
 
 /// Confirms (or discards) the pending update — invoked by the frontend
@@ -759,9 +953,11 @@ mod tests {
             media_type: media_type.into(),
             raw_title: String::new(),
             parsed_title: String::new(),
+            season: None,
             episode: Some(1),
             media_id: Some(1),
             matched_title: None,
+            overridden: false,
             progress: Some(0),
             total_episodes: Some(12),
             duration_min,

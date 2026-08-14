@@ -1380,6 +1380,57 @@ export async function allFavourites(userId: number): Promise<AllFavourites> {
 }
 
 /**
+ * The favourite people and their birthdays — the dashboard digest's read.
+ *
+ * Its own lean query rather than a `dateOfBirth` on `FAVOURITES_PAGE_QUERY`:
+ * the favourites modal renders discs and names and would carry the field for
+ * nothing, and this one skips the three kinds without a birthday to have.
+ * Paged like `allFavourites` and for the same reason, but a truncated read
+ * here only shortens a greeting, so the cap is a shrug rather than a refusal.
+ */
+export const BIRTHDAYS_QUERY = `
+query ($id: Int!, $page: Int) {
+  User(id: $id) {
+    favourites {
+      characters(page: $page, perPage: 25) {
+        pageInfo { hasNextPage }
+        nodes { id name { full } image { medium } dateOfBirth { month day } }
+      }
+      staff(page: $page, perPage: 25) {
+        pageInfo { hasNextPage }
+        nodes { id name { full } image { medium } dateOfBirth { month day } }
+      }
+    }
+  }
+}`;
+
+export interface BirthdayPerson extends FavPerson {
+  dateOfBirth: { month: number | null; day: number | null } | null;
+  kind: "character" | "staff";
+}
+
+export async function favouriteBirthdays(userId: number): Promise<BirthdayPerson[]> {
+  type Node = FavPerson & { dateOfBirth: BirthdayPerson["dateOfBirth"] };
+  const out: BirthdayPerson[] = [];
+  for (let page = 1; page <= FAVOURITES_MAX_PAGES; page++) {
+    const data = await gql<{
+      User: {
+        favourites: {
+          characters: FavPage<Node> | null;
+          staff: FavPage<Node> | null;
+        } | null;
+      } | null;
+    }>(BIRTHDAYS_QUERY, { id: userId, page });
+    const fav = data.User?.favourites;
+    if (!fav) break;
+    out.push(...(fav.characters?.nodes ?? []).map((n) => ({ ...n, kind: "character" as const })));
+    out.push(...(fav.staff?.nodes ?? []).map((n) => ({ ...n, kind: "staff" as const })));
+    if (!(fav.characters?.pageInfo.hasNextPage || fav.staff?.pageInfo.hasNextPage)) break;
+  }
+  return out;
+}
+
+/**
  * Reorder one kind's favourites. Whole-array by the API's design — the same
  * replace-the-set shape as `customLists` — which is why the caller always
  * sends the complete id list from a fresh `allFavourites` read (`staleTime: 0`

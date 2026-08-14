@@ -2,8 +2,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
-import { BarChart3, CalendarClock, CalendarDays, Play, Plus } from "lucide-react";
-import { fetchMediaList } from "@/api/anilist";
+import { BarChart3, Cake, CalendarClock, CalendarDays, Play, Plus } from "lucide-react";
+import { fetchMediaList, isTauri } from "@/api/anilist";
+import { favouriteBirthdays } from "@/api/social";
+import { birthdaysOn } from "@/lib/birthdays";
+import { Avatar } from "@/components/ui/user-lockup";
 import type { MediaListEntry } from "@/api/types";
 import { useAuth, useScoreFormat } from "@/stores/auth";
 import { formatMeanScore, formatScore } from "@/lib/scoreFormat";
@@ -117,6 +120,7 @@ function DashboardContent({ userId }: { userId: number }) {
       ) : (
         <>
           <Stats entries={allAnime} />
+          <Birthdays userId={userId} settled={!mangaLoading} />
           <WeeklyDigest entries={allAnime} />
           <AiringSoon entries={allAnime} />
           <ContinueWatching entries={allAnime} save={save} />
@@ -302,6 +306,65 @@ function WeeklyDigest({ entries }: { entries: MediaListEntry[] }) {
       >
         {t("dashboard.fullCalendar")}
       </Link>
+    </section>
+  );
+}
+
+/**
+ * Favourite characters and staff whose birthday is today. Absent entirely on
+ * most days, which is what makes it worth glancing at on the others.
+ *
+ * One request per day, not per mount: the query key carries the date, so the
+ * cached answer serves every remount until midnight mints a new key. And it
+ * waits for the two list queries to settle (`settled`) so the dashboard's
+ * mount burst stays at two concurrent requests — the birthday read is a
+ * *third* moment, deliberately after, not alongside.
+ */
+function Birthdays({ userId, settled }: { userId: number; settled: boolean }) {
+  const { t } = useTranslation();
+  const mode = useAuth((s) => s.mode);
+  const now = new Date();
+  const month = now.getMonth() + 1;
+  const day = now.getDate();
+
+  const q = useQuery({
+    queryKey: ["social", "birthdays", userId, `${month}-${day}`],
+    queryFn: () => favouriteBirthdays(userId),
+    enabled: isTauri && settled && mode === "anilist" && userId > 0,
+    staleTime: Infinity,
+  });
+
+  const today = useMemo(
+    () => (q.data ? birthdaysOn(q.data, month, day) : []),
+    [q.data, month, day],
+  );
+
+  if (today.length === 0) return null;
+
+  return (
+    <section>
+      <SectionHeader icon={Cake} title={t("dashboard.birthdays")} />
+      <div className="mt-3 flex flex-wrap gap-2">
+        {today.map((p) => (
+          <Link
+            key={`${p.kind}-${p.id}`}
+            to={`/${p.kind}/${p.id}`}
+            className="flex items-center gap-2.5 rounded-lg bg-surface-900 py-2 pl-2 pr-4 transition-surface hover:bg-surface-850"
+          >
+            <Avatar src={p.image?.medium} name={p.name.full ?? "?"} size="md" />
+            <span className="min-w-0">
+              <span className="block truncate text-xs font-medium text-ink-100">
+                {p.name.full}
+              </span>
+              <span className="block text-2xs text-ink-600">
+                {p.kind === "character"
+                  ? t("dashboard.birthdayCharacter")
+                  : t("dashboard.birthdayStaff")}
+              </span>
+            </span>
+          </Link>
+        ))}
+      </div>
     </section>
   );
 }

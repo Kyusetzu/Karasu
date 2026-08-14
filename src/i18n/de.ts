@@ -234,6 +234,9 @@ export const de: typeof en = {
     CONTAINS: "Enthält",
   },
   dashboard: {
+    birthdays: "Geburtstage heute",
+    birthdayCharacter: "Lieblingscharakter",
+    birthdayStaff: "Lieblings-Staff",
     welcomeTitle: "Willkommen bei Karasu",
     welcomeText:
       "Dein Anime-Tracker für AniList. Verbinde deinen Account, um deine Liste zu verwalten und deinen Fortschritt automatisch zu tracken.",

@@ -236,6 +236,9 @@ export const en = {
     CONTAINS: "Contains",
   },
   dashboard: {
+    birthdays: "Birthdays today",
+    birthdayCharacter: "Favourite character",
+    birthdayStaff: "Favourite staff",
     welcomeTitle: "Welcome to Karasu",
     welcomeText:
       "Your anime tracker for AniList. Connect your account to manage your list and track your progress automatically.",

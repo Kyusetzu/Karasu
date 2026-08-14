@@ -233,6 +233,8 @@ pub fn playback_from(session: &MediaSession) -> Option<Playback> {
             streaming: false,
             manga: false,
             parsed: None,
+            position_sec: None,
+            duration_sec: None,
         });
     }
 
@@ -260,6 +262,8 @@ pub fn playback_from(session: &MediaSession) -> Option<Playback> {
         streaming: true,
         manga: false,
         parsed: None,
+        position_sec: None,
+        duration_sec: None,
     })
 }
 

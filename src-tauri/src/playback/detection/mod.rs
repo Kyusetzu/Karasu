@@ -41,6 +41,13 @@ pub struct Playback {
     /// the release-name parser is skipped. Only the Jellyfin API can do this;
     /// every window-title source leaves it `None`.
     pub parsed: Option<crate::playback::recognition::parser::Parsed>,
+    /// Playback position in seconds, when the source reports one (Jellyfin's
+    /// `PlayState` today). A window title never knows it, so those sources
+    /// leave it `None` and the scrobbler falls back to the wall clock.
+    pub position_sec: Option<u32>,
+    /// The *file's* duration in seconds from the same source. More exact than
+    /// the entry's rounded minutes when present.
+    pub duration_sec: Option<u32>,
 }
 
 /// Lists all visible top-level windows with title and process name.
@@ -141,6 +148,8 @@ pub fn detect_windows() -> Option<Playback> {
                 streaming: false,
                 manga: false,
                 parsed: None,
+                position_sec: None,
+                duration_sec: None,
             });
         }
     }
@@ -152,6 +161,8 @@ pub fn detect_windows() -> Option<Playback> {
                 streaming: true,
                 manga: false,
                 parsed: None,
+                position_sec: None,
+                duration_sec: None,
             });
         }
     }
@@ -163,6 +174,8 @@ pub fn detect_windows() -> Option<Playback> {
                 streaming: true,
                 manga: true,
                 parsed: None,
+                position_sec: None,
+                duration_sec: None,
             });
         }
     }

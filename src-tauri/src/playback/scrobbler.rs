@@ -52,6 +52,15 @@ pub struct NowPlaying {
     /// for either of these, so they stay off the `now-playing` payload.
     #[serde(skip)]
     pub duration_min: Option<u32>,
+    /// Playback position in seconds, refreshed every poll when the source
+    /// reports one (Jellyfin). Internal like `duration_min`: the deadline
+    /// check reads it, the frontend does not.
+    #[serde(skip)]
+    pub position_sec: Option<u32>,
+    /// The file's own duration in seconds from the same source — beats the
+    /// entry's rounded minutes when both exist.
+    #[serde(skip)]
+    pub duration_sec: Option<u32>,
     /// List status of the matched entry when detection started.
     #[serde(skip)]
     pub list_status: String,
@@ -328,8 +337,37 @@ fn build_now_playing(
         progress,
         total_episodes: total,
         duration_min,
+        position_sec: playback.position_sec,
+        duration_sec: playback.duration_sec,
         list_status,
     }
+}
+
+/// Whether a source-reported position has crossed the update point — `None`
+/// when there is nothing to judge by, so the caller falls back to the wall
+/// clock. Two thirds of the file's own duration when the source reports one,
+/// of the entry's rounded minutes otherwise.
+///
+/// An explicit `delay_min` keeps the wall clock on purpose: "update after N
+/// minutes" is the user's own sentence, and reinterpreting it as a fraction
+/// of the file would change what the setting means the day a source starts
+/// reporting positions. The wall clock also remains the safety net a paused
+/// player used to abuse — with a position, pausing simply stops the number.
+fn position_due(
+    position_sec: Option<u32>,
+    duration_sec: Option<u32>,
+    duration_min: Option<u32>,
+    delay_min: u32,
+) -> Option<bool> {
+    if delay_min > 0 {
+        return None;
+    }
+    let pos = position_sec?;
+    let total = duration_sec.or(duration_min.map(|m| m.saturating_mul(60)))?;
+    if total == 0 {
+        return None;
+    }
+    Some(u64::from(pos) * 3 >= u64::from(total) * 2)
 }
 
 /// Threshold until the auto-update: setting in minutes, or 2/3 of the
@@ -597,12 +635,22 @@ async fn drive_session(app: &AppHandle) {
                     *guard = Some(session);
                     None
                 } else {
-                    // Existing session: check the threshold
+                    // Existing session: check the threshold. A position from
+                    // the source is believed over the wall clock — it is the
+                    // clock, one that pausing actually stops — but only while
+                    // the auto-update is armed at all (`update_at` present).
                     let session = guard.as_mut().unwrap();
                     let due = session.phase == Phase::Watching
-                        && session
-                            .update_at
-                            .is_some_and(|at| Instant::now() >= at);
+                        && session.update_at.is_some()
+                        && position_due(
+                            np.position_sec,
+                            np.duration_sec,
+                            np.duration_min,
+                            settings.delay_min,
+                        )
+                        .unwrap_or_else(|| {
+                            session.update_at.is_some_and(|at| Instant::now() >= at)
+                        });
                     if !due {
                         None
                     } else if settings.confirm {
@@ -681,7 +729,8 @@ async fn drive_session(app: &AppHandle) {
 #[cfg(test)]
 mod tests {
     use super::{
-        applies_to, threshold, NowPlaying, Phase, Session, DEFAULT_THRESHOLD, MANGA_THRESHOLD,
+        applies_to, position_due, threshold, NowPlaying, Phase, Session, DEFAULT_THRESHOLD,
+        MANGA_THRESHOLD,
     };
     use std::time::Duration;
 
@@ -698,8 +747,38 @@ mod tests {
             progress: Some(0),
             total_episodes: Some(12),
             duration_min,
+            position_sec: None,
+            duration_sec: None,
             list_status: "CURRENT".into(),
         }
+    }
+
+    /// The position crosses at exactly two thirds, not a second before.
+    #[test]
+    fn a_position_is_due_at_two_thirds_of_the_file() {
+        // 24 min file: 1440 s, two thirds is 960.
+        assert_eq!(position_due(Some(959), Some(1440), None, 0), Some(false));
+        assert_eq!(position_due(Some(960), Some(1440), None, 0), Some(true));
+    }
+
+    /// The file's own duration beats the entry's rounded minutes.
+    #[test]
+    fn the_sources_duration_beats_the_entrys_minutes() {
+        // The entry says 24 min (due at 960 s) but the file is 20 min
+        // (due at 800 s) — a position of 810 is due by the file's truth.
+        assert_eq!(position_due(Some(810), Some(1200), Some(24), 0), Some(true));
+        // Without the source duration the entry's minutes decide.
+        assert_eq!(position_due(Some(810), None, Some(24), 0), Some(false));
+    }
+
+    /// "Update after N minutes" is the user's own sentence; a position must
+    /// not reinterpret it. And with nothing to judge by, there is no verdict.
+    #[test]
+    fn a_position_stands_down_for_an_explicit_delay_or_missing_data() {
+        assert_eq!(position_due(Some(2000), Some(1440), None, 3), None);
+        assert_eq!(position_due(None, Some(1440), Some(24), 0), None);
+        assert_eq!(position_due(Some(900), None, None, 0), None);
+        assert_eq!(position_due(Some(900), Some(0), None, 0), None);
     }
 
     /// An explicit delay setting wins over everything the entry knows.

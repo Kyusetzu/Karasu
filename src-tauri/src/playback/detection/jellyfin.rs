@@ -423,6 +423,18 @@ pub fn playback_from_session(session: &serde_json::Value) -> Option<Playback> {
         .and_then(|v| v.as_str())
         .unwrap_or("Jellyfin");
 
+    // Ticks are 100 ns; both fields ride the payload the poll already fetches,
+    // so the position costs zero extra requests.
+    const TICKS_PER_SEC: u64 = 10_000_000;
+    let position_sec = session
+        .pointer("/PlayState/PositionTicks")
+        .and_then(|v| v.as_u64())
+        .map(|t| (t / TICKS_PER_SEC) as u32);
+    let duration_sec = item
+        .get("RunTimeTicks")
+        .and_then(|v| v.as_u64())
+        .map(|t| (t / TICKS_PER_SEC) as u32);
+
     Some(Playback {
         process: format!("jellyfin ({client})"),
         // Kept human-readable for the Now Playing card; the parser is skipped.
@@ -441,6 +453,8 @@ pub fn playback_from_session(session: &serde_json::Value) -> Option<Playback> {
             season: season.filter(|s| *s > 1),
             release_group: None,
         }),
+        position_sec,
+        duration_sec,
     })
 }
 
@@ -482,6 +496,29 @@ mod tests {
         assert_eq!(parsed.episode, Some(5));
         assert_eq!(parsed.season, Some(2));
         assert!(p.media_title.contains("Frieren"));
+    }
+
+    #[test]
+    fn the_play_state_position_rides_the_same_payload() {
+        // Ticks are 100 ns: 774 s in, of a 1,420 s file. The absence case
+        // matters equally — a session without a PlayState must not invent one.
+        let s = json!({
+            "PlayState": { "PositionTicks": 7_740_000_000u64 },
+            "NowPlayingItem": {
+                "Type": "Episode", "Name": "Ep", "SeriesName": "Frieren",
+                "IndexNumber": 3, "RunTimeTicks": 14_200_000_000u64
+            }
+        });
+        let p = playback_from_session(&s).unwrap();
+        assert_eq!(p.position_sec, Some(774));
+        assert_eq!(p.duration_sec, Some(1420));
+
+        let bare = json!({
+            "NowPlayingItem": { "Type": "Episode", "Name": "Ep", "SeriesName": "Frieren" }
+        });
+        let p = playback_from_session(&bare).unwrap();
+        assert_eq!(p.position_sec, None);
+        assert_eq!(p.duration_sec, None);
     }
 
     #[test]

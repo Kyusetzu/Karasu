@@ -10,6 +10,7 @@ import {
   scrobbleNow,
   setDetectionOverride,
   useNowPlaying,
+  type BlockReason,
   type NowPlaying,
 } from "@/stores/nowPlaying";
 import { isTauri } from "@/api/anilist";
@@ -261,7 +262,7 @@ function ScrobbleStatus({ countdown }: { countdown: string | null }) {
     case "blocked":
       return (
         <p className="text-xs text-gold">
-          {scrobble.reason ?? t("nowPlaying.blocked")}
+          {scrobble.reason ? blockedText(scrobble.reason, t) : t("nowPlaying.blocked")}
         </p>
       );
     case "cancelled":
@@ -283,13 +284,44 @@ function ScrobbleStatus({ countdown }: { countdown: string | null }) {
 }
 
 /**
+ * The block, in the reader's language.
+ *
+ * A literal `t()` per branch: the guard in `i18nKeys.test.ts` only sees those,
+ * and this line used to be an English sentence formatted in Rust and printed
+ * verbatim — which a German UI showed in English.
+ */
+function blockedText(
+  reason: BlockReason,
+  t: (k: string, o?: Record<string, unknown>) => string,
+): string {
+  switch (reason.code) {
+    case "alreadyWatched":
+      return t("nowPlaying.blockedAlreadyWatched", {
+        n: reason.episode,
+        progress: reason.progress,
+      });
+    case "episodeGap":
+      return t("nowPlaying.blockedGap", {
+        n: reason.episode,
+        progress: reason.progress,
+      });
+    case "failed":
+      return t("nowPlaying.blockedFailed", { message: reason.message });
+  }
+}
+
+/**
  * The card's buttons.
  *
  * The scrobble pair appears only in the phases where there is something to
- * confirm or skip. The correction button is always there — a wrong match needs
- * fixing exactly as much as a missing one, and the unmatched case used to
- * render no action at all, which left "No entry recognized" as a statement
- * with nothing to do about it.
+ * confirm or skip — and in the blocked phase, only when Rust says forcing is
+ * allowed: moving progress *backwards* is not an offer worth making, and used
+ * to be one click away from setting a 27-episode entry to 1.
+ *
+ * The correction button is always there — a wrong match needs fixing exactly
+ * as much as a missing one, and the unmatched case used to render no action at
+ * all, which left "No entry recognized" as a statement with nothing to do
+ * about it.
  */
 function ScrobbleActions({ playing }: { playing: NowPlaying }) {
   const { t } = useTranslation();
@@ -320,10 +352,13 @@ function ScrobbleActions({ playing }: { playing: NowPlaying }) {
   };
 
   const canScrobble =
-    scrobble.phase === "pending" ||
-    scrobble.phase === "blocked" ||
-    scrobble.phase === "watching" ||
-    scrobble.phase === "cancelled";
+    (scrobble.phase === "pending" ||
+      scrobble.phase === "watching" ||
+      scrobble.phase === "cancelled" ||
+      scrobble.phase === "blocked") &&
+    // A block Rust will refuse anyway must not be offered. Forcing forward
+    // over a gap and retrying a failed request still are.
+    (scrobble.phase !== "blocked" || scrobble.forceable);
 
   return (
     <>

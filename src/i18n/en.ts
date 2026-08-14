@@ -991,6 +991,10 @@ export const en = {
     updating: "Updating …",
     updated: "Progress updated ({{n}})",
     blocked: "Auto-update not possible",
+    blockedAlreadyWatched:
+      "Episode {{n}} is already watched — your list is at {{progress}}.",
+    blockedGap: "Episode {{n}}, but your list is at {{progress}}.",
+    blockedFailed: "Update failed: {{message}}",
     skipped: "Update skipped.",
     yourProgress: "Your progress: {{progress}}",
     noMatch: "No entry from your list recognized.",

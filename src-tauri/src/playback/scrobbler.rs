@@ -75,13 +75,63 @@ pub struct NowPlaying {
 /// Currently detected playback, shared by commands and the scrobbler.
 pub struct PlaybackState(pub Mutex<Option<NowPlaying>>);
 
+/// Why an auto-update will not happen — a code and its numbers, never a
+/// sentence.
+///
+/// It used to be a `String` formatted in Rust and rendered verbatim on the
+/// card, so a German UI read an English sentence. This is the shape CLAUDE.md
+/// names for exactly that reason: the backend decides *what* is wrong, the
+/// component maps the code through a literal `switch` to a translated line.
+/// The log still gets prose, built on this side by `Display`.
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[serde(tag = "code", rename_all = "camelCase")]
+pub enum BlockReason {
+    /// The detected episode is at or behind the list's progress. Forcing it
+    /// would *lower* progress, so the card offers no way to.
+    AlreadyWatched { episode: u32, progress: u32 },
+    /// Detected well ahead of the list. Forcing this is legitimate — it moves
+    /// progress forward — so the card keeps its button.
+    EpisodeGap { episode: u32, progress: u32 },
+    /// The update was attempted and the API refused it. Not a refusal of ours,
+    /// so retrying is exactly the right offer — and the message is the
+    /// server's own, which no translation could improve.
+    Failed { message: String },
+}
+
+impl std::fmt::Display for BlockReason {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BlockReason::AlreadyWatched { episode, progress } => write!(
+                f,
+                "episode {episode} is already watched according to your list (progress {progress})"
+            ),
+            BlockReason::EpisodeGap { episode, progress } => {
+                write!(f, "episode gap: detected {episode}, but your progress is {progress}")
+            }
+            BlockReason::Failed { message } => write!(f, "{message}"),
+        }
+    }
+}
+
+impl BlockReason {
+    /// Whether "Update now" may override this. Forcing *forward* is a choice
+    /// worth offering and a failed request is worth retrying; moving progress
+    /// backward and guessing which entry a season is are not.
+    pub fn forceable(&self) -> bool {
+        matches!(
+            self,
+            BlockReason::EpisodeGap { .. } | BlockReason::Failed { .. }
+        )
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Phase {
     Watching,
     Pending,
     Updating,
     Updated,
-    Blocked(String),
+    Blocked(BlockReason),
     Cancelled,
 }
 
@@ -121,7 +171,11 @@ fn applies_to(session: &Session, media_id: i64, episode: u32) -> bool {
 #[derive(Clone, serde::Serialize)]
 struct ScrobbleEvent {
     phase: String,
-    reason: Option<String>,
+    reason: Option<BlockReason>,
+    /// Whether the card may offer "Update now" against this block. Emitted
+    /// rather than re-derived on the other side, so the button and the command
+    /// that refuses it cannot drift apart.
+    forceable: bool,
     #[serde(rename = "mediaId")]
     media_id: Option<i64>,
     episode: Option<u32>,
@@ -134,6 +188,7 @@ fn emit_session(app: &AppHandle, session: Option<&Session>) {
         None => ScrobbleEvent {
             phase: "idle".into(),
             reason: None,
+            forceable: false,
             media_id: None,
             episode: None,
             update_at_ms: None,
@@ -151,6 +206,12 @@ fn emit_session(app: &AppHandle, session: Option<&Session>) {
             reason: match &s.phase {
                 Phase::Blocked(r) => Some(r.clone()),
                 _ => None,
+            },
+            // Everything that is not a block is forceable — that is what the
+            // button has always meant outside this phase.
+            forceable: match &s.phase {
+                Phase::Blocked(r) => r.forceable(),
+                _ => true,
             },
             media_id: Some(s.media_id),
             episode: Some(s.episode),
@@ -422,6 +483,23 @@ fn build_now_playing(
     }
 }
 
+/// Why this session may not auto-update, or `None` to go ahead.
+///
+/// Pure, and the single place the decision lives: `drive_session` builds a
+/// session from it, and `perform_update` refuses anything it calls
+/// unforceable, so the button on screen and the write to AniList cannot
+/// disagree about what is allowed.
+fn block_reason(now: &NowPlaying, episode: u32, progress: u32) -> Option<BlockReason> {
+    if episode <= progress {
+        return Some(BlockReason::AlreadyWatched { episode, progress });
+    }
+    if episode > progress + 1 {
+        return Some(BlockReason::EpisodeGap { episode, progress });
+    }
+    let _ = now;
+    None
+}
+
 /// Whether a source-reported position has crossed the update point — `None`
 /// when there is nothing to judge by, so the caller falls back to the wall
 /// clock. Two thirds of the file's own duration when the source reports one,
@@ -481,6 +559,20 @@ fn now_ms() -> i64 {
 }
 
 
+/// Whether writing `episode` would move the list *backwards*.
+///
+/// A scrobble may only ever advance progress. Rewatching is the one case where
+/// a lower number is meant, and it is spelled `REPEATING` — a status the user
+/// sets deliberately, at which point the count is theirs to restart.
+///
+/// This is a data-safety rule, not a UI one, which is why it lives next to the
+/// write rather than beside the button: a Jellyfin season-2 episode 1 detected
+/// against a season-1 entry with progress 27 used to be one click away from
+/// setting that entry back to 1, on AniList and in the local cache.
+fn would_regress(episode: u32, progress: Option<u32>, list_status: &str) -> bool {
+    list_status != "REPEATING" && progress.is_some_and(|p| episode <= p)
+}
+
 /// Performs the list update (including status logic and cache patch).
 async fn perform_update(
     app: &AppHandle,
@@ -492,6 +584,24 @@ async fn perform_update(
 ) -> Result<(), String> {
     let token =
         crate::anilist::auth::load_token().ok_or("Not connected to AniList")?;
+
+    // Read the progress the list actually holds, not what the session was
+    // built with: the session may be minutes old, and this is the last point
+    // before a write that cannot be taken back.
+    let cached_progress = {
+        let db = app.state::<Db>();
+        candidates_from_cache(&db, media_type)
+            .into_iter()
+            .find(|c| c.media_id == media_id)
+            .map(|c| c.progress)
+    };
+    if would_regress(episode, cached_progress, list_status) {
+        return Err(format!(
+            "Refusing to set progress back to {episode} from {}",
+            cached_progress.unwrap_or(0)
+        ));
+    }
+
     let done = total == Some(episode);
     let status = match (done, list_status) {
         (true, _) => "COMPLETED",
@@ -690,6 +800,15 @@ async fn confirm_pending_impl(
             emit_session(&app, Some(session));
             return Ok(());
         }
+        // A block the user is not allowed to override stays blocked, whatever
+        // asked. The card hides the button for these, so reaching here means
+        // a stale event or a caller that never saw it — either way the answer
+        // is the same one the phase already gave.
+        if let Phase::Blocked(reason) = &session.phase {
+            if !reason.forceable() {
+                return Err(format!("Not updating: {reason}"));
+            }
+        }
         session.phase = Phase::Updating;
         let d = (
             session.media_id,
@@ -709,7 +828,7 @@ async fn confirm_pending_impl(
         if applies_to(session, data.0, data.2) {
             session.phase = match &result {
                 Ok(()) => Phase::Updated,
-                Err(e) => Phase::Blocked(e.clone()),
+                Err(e) => Phase::Blocked(BlockReason::Failed { message: e.clone() }),
             };
             emit_session(&app, Some(session));
         }
@@ -816,17 +935,9 @@ async fn drive_session(app: &AppHandle) {
                     // Start a new session
                     let threshold = threshold(&np, settings.delay_min);
                     let progress = np.progress.unwrap_or(0);
-                    let phase = if ep <= progress {
-                        Phase::Blocked(format!(
-                            "Episode {ep} is already watched according to your list (progress {progress})"
-                        ))
-                    } else if ep > progress + 1 {
-                        Phase::Blocked(format!(
-                            "Episode gap: detected {ep}, but your progress is {progress}"
-                        ))
-                    } else {
-                        Phase::Watching
-                    };
+                    let phase = block_reason(&np, ep, progress)
+                        .map(Phase::Blocked)
+                        .unwrap_or(Phase::Watching);
                     let auto = settings.enabled && phase == Phase::Watching;
                     let session = Session {
                         media_id: mid,
@@ -936,7 +1047,7 @@ async fn drive_session(app: &AppHandle) {
             if applies_to(session, mid, ep) {
                 session.phase = match result {
                     Ok(()) => Phase::Updated,
-                    Err(e) => Phase::Blocked(e),
+                    Err(e) => Phase::Blocked(BlockReason::Failed { message: e }),
                 };
                 emit_session(app, Some(session));
             }
@@ -947,8 +1058,8 @@ async fn drive_session(app: &AppHandle) {
 #[cfg(test)]
 mod tests {
     use super::{
-        applies_to, position_due, threshold, NowPlaying, Phase, Session, DEFAULT_THRESHOLD,
-        MANGA_THRESHOLD,
+        applies_to, block_reason, position_due, threshold, would_regress, BlockReason,
+        NowPlaying, Phase, Session, DEFAULT_THRESHOLD, MANGA_THRESHOLD,
     };
     use std::time::Duration;
 
@@ -971,6 +1082,47 @@ mod tests {
             duration_sec: None,
             list_status: "CURRENT".into(),
         }
+    }
+
+    /// The data-safety rule. A scrobble may advance progress and never lower
+    /// it — the Jellyfin season-2 case (episode 1 detected against a
+    /// season-1 entry sitting at 27) was one click from writing 1.
+    #[test]
+    fn a_scrobble_can_only_ever_move_progress_forward() {
+        assert!(would_regress(1, Some(27), "CURRENT"));
+        assert!(would_regress(27, Some(27), "CURRENT"), "the same episode is not progress");
+        assert!(!would_regress(28, Some(27), "CURRENT"));
+        // Forcing over a gap is still allowed: it moves forward.
+        assert!(!would_regress(31, Some(27), "CURRENT"));
+        // Rewatching is the one place a lower number is meant, and the user
+        // set that status themselves.
+        assert!(!would_regress(1, Some(27), "REPEATING"));
+        // Nothing cached to compare against: not our call to refuse.
+        assert!(!would_regress(1, None, "CURRENT"));
+    }
+
+    /// The card's button and the command that would carry it out must agree,
+    /// which is why `forceable` is one function rather than two opinions.
+    #[test]
+    fn only_a_forward_force_or_a_retry_is_offered() {
+        assert!(!BlockReason::AlreadyWatched { episode: 1, progress: 27 }.forceable());
+        assert!(BlockReason::EpisodeGap { episode: 9, progress: 2 }.forceable());
+        assert!(BlockReason::Failed { message: "timeout".into() }.forceable());
+    }
+
+    #[test]
+    fn the_block_decision_names_which_way_it_went_wrong() {
+        let np = now_playing("ANIME", None);
+        assert!(matches!(
+            block_reason(&np, 1, 27),
+            Some(BlockReason::AlreadyWatched { episode: 1, progress: 27 })
+        ));
+        assert!(matches!(
+            block_reason(&np, 9, 2),
+            Some(BlockReason::EpisodeGap { .. })
+        ));
+        // The ordinary case: the very next episode.
+        assert!(block_reason(&np, 3, 2).is_none());
     }
 
     /// The position crosses at exactly two thirds, not a second before.

@@ -465,11 +465,18 @@ pub fn playback_from_session(session: &serde_json::Value) -> Option<Playback> {
 
     Some(Playback {
         process: format!("jellyfin ({client})"),
-        // Kept human-readable for the Now Playing card; the parser is skipped.
-        media_title: match (episode, episode_name.is_empty()) {
-            (Some(n), false) => format!("{title} - {n} - {episode_name}"),
-            (Some(n), true) => format!("{title} - {n}"),
-            (None, _) => title.to_string(),
+        // Human-readable, and spelled the way Jellyfin itself displays it —
+        // `S2E1`, not a bare `1`. The season is not decoration here: this
+        // string is what the poll loop dedupes on, and without it S1E1 and
+        // S2E1 are byte-identical whenever the episode names repeat (German
+        // "Folge 1" in every season does exactly that), so moving between
+        // seasons at the same episode number never rebuilt the match.
+        media_title: match (season, episode, episode_name.is_empty()) {
+            (Some(s), Some(n), false) => format!("{title} - S{s}E{n} - {episode_name}"),
+            (Some(s), Some(n), true) => format!("{title} - S{s}E{n}"),
+            (None, Some(n), false) => format!("{title} - {n} - {episode_name}"),
+            (None, Some(n), true) => format!("{title} - {n}"),
+            (_, None, _) => title.to_string(),
         },
         streaming: true,
         manga: false,

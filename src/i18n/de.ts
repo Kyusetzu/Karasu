@@ -997,6 +997,10 @@ export const de: typeof en = {
     updating: "Aktualisiere …",
     updated: "Fortschritt aktualisiert ({{n}})",
     blocked: "Auto-Update nicht möglich",
+    blockedAlreadyWatched:
+      "Folge {{n}} ist bereits gesehen — deine Liste steht bei {{progress}}.",
+    blockedGap: "Folge {{n}}, deine Liste steht aber bei {{progress}}.",
+    blockedFailed: "Update fehlgeschlagen: {{message}}",
     skipped: "Update übersprungen.",
     yourProgress: "Dein Fortschritt: {{progress}}",
     noMatch: "Kein Eintrag deiner Liste erkannt.",

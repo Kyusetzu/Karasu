@@ -29,9 +29,25 @@ export type ScrobblePhase =
   | "blocked"
   | "cancelled";
 
+/**
+ * Why an auto-update will not happen, as a code and its numbers.
+ *
+ * Deliberately not a sentence: it used to be English prose formatted in Rust
+ * and rendered verbatim, so a German UI read English. The card maps `code`
+ * through a literal switch, which is also what keeps every key visible to
+ * `i18nKeys.test.ts`.
+ */
+export type BlockReason =
+  | { code: "alreadyWatched"; episode: number; progress: number }
+  | { code: "episodeGap"; episode: number; progress: number }
+  | { code: "failed"; message: string };
+
 export interface ScrobbleState {
   phase: ScrobblePhase;
-  reason: string | null;
+  reason: BlockReason | null;
+  /** Whether "Update now" may override the block. Decided in Rust, where the
+      command that would carry it out lives. */
+  forceable: boolean;
   mediaId: number | null;
   episode: number | null;
   updateAtMs: number | null;
@@ -46,6 +62,7 @@ interface NowPlayingStore {
 const IDLE: ScrobbleState = {
   phase: "idle",
   reason: null,
+  forceable: false,
   mediaId: null,
   episode: null,
   updateAtMs: null,

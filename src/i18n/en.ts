@@ -1248,6 +1248,10 @@ export const en = {
       "Karasu keeps running and detecting. Quit from the tray menu.",
     closeToTrayNoTray:
       "Your desktop has no tray icon, so closing quits — otherwise the window would have no way back.",
+    hotkey: "Global hotkey",
+    hotkeyHint:
+      "Summons Karasu from anywhere; pressing it again while focused hides the window. Leave empty to disable.",
+    hotkeyPlaceholder: "e.g. Ctrl+Shift+K",
     updateAuto: "Automatically check for updates",
     updateAutoHint: "Checks once a day on startup and notifies you if found.",
     updateChannel: "Update channel",

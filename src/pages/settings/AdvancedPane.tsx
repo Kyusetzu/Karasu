@@ -214,6 +214,8 @@ export function AdvancedSection() {
   const [closeTray, setCloseTray] = useState<CloseToTray | null>(null);
   const [updateChannel, setUpdateChannelState] =
     useState<api.UpdateChannel>("prerelease");
+  const [hotkey, setHotkey] = useState<string | null>(null);
+  const [hotkeyDraft, setHotkeyDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -221,6 +223,10 @@ export function AdvancedSection() {
     import("@tauri-apps/api/core").then(({ invoke }) => {
       invoke<boolean>("get_autostart").then(setAutostart);
       invoke<CloseToTray>("get_close_to_tray").then(setCloseTray);
+      invoke<string | null>("get_global_hotkey").then((v) => {
+        setHotkey(v ?? "");
+        setHotkeyDraft(v ?? "");
+      });
     });
     api.getUpdateCheckAuto().then(setUpdateAuto);
     api.getUpdateChannel().then(setUpdateChannelState);
@@ -252,6 +258,25 @@ export function AdvancedSection() {
       await invoke("set_close_to_tray", { enabled });
     } catch (e) {
       setCloseTray((prev) => (prev ? { ...prev, enabled: !enabled } : prev));
+      setError(String(e));
+    }
+  };
+
+  // Same rollback idiom as the toggles above, because this one genuinely
+  // fails: the OS refuses an accelerator another app holds, and a typo is not
+  // an accelerator at all. Registration happens before the store on the Rust
+  // side, so a rejected string never comes back at the next startup.
+  const applyHotkey = async () => {
+    const next = hotkeyDraft.trim();
+    if (hotkey === null || next === hotkey) return;
+    setError(null);
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("set_global_hotkey", { accelerator: next || null });
+      setHotkey(next);
+      setHotkeyDraft(next);
+    } catch (e) {
+      setHotkeyDraft(hotkey);
       setError(String(e));
     }
   };
@@ -296,6 +321,24 @@ export function AdvancedSection() {
                 : t("settings.closeToTrayNoTray")
             }
           />
+        )}
+
+        {hotkey !== null && (
+          <Row label={t("settings.hotkey")} hint={t("settings.hotkeyHint")}>
+            <Input
+              value={hotkeyDraft}
+              onChange={(e) => setHotkeyDraft(e.target.value)}
+              onBlur={applyHotkey}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  applyHotkey();
+                }
+              }}
+              placeholder={t("settings.hotkeyPlaceholder")}
+              className="w-48"
+            />
+          </Row>
         )}
 
         {updateAuto !== null && (

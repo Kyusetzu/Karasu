@@ -25,6 +25,43 @@ fn show_main_window(app: &AppHandle) {
     }
 }
 
+/// The global hotkey's action: summon the window, or put it away if it is the
+/// thing on top right now. Focus decides, not visibility — a window that is
+/// technically visible but buried under something else should come forward,
+/// not vanish.
+fn toggle_main_window(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let focused = window.is_focused().unwrap_or(false);
+        let visible = window.is_visible().unwrap_or(false);
+        if focused && visible {
+            let _ = window.hide();
+        } else {
+            show_main_window(app);
+        }
+    }
+}
+
+/// (Re)binds the summon hotkey. The hotkey is the only global shortcut Karasu
+/// registers, so `unregister_all` is exact rather than approximate; `None`
+/// simply leaves everything unbound. Lives here beside the window helpers it
+/// drives — `commands::set_global_hotkey` and startup both call through this,
+/// so a registration failure looks identical from either path.
+pub(crate) fn apply_global_hotkey(app: &AppHandle, accel: Option<&str>) -> Result<(), String> {
+    use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
+    let shortcuts = app.global_shortcut();
+    shortcuts.unregister_all().map_err(|e| e.to_string())?;
+    if let Some(accel) = accel {
+        shortcuts
+            .on_shortcut(accel, |app, _shortcut, event| {
+                if event.state() == ShortcutState::Pressed {
+                    toggle_main_window(app);
+                }
+            })
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 /// The tray menu items that change at runtime. Held in managed state because
 /// the builder's handles are the only way to mutate a menu after `build` —
 /// rebuilding the whole menu per update would tear it down under an open
@@ -207,6 +244,7 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
@@ -284,6 +322,18 @@ pub fn run() {
             app.manage(TrayPresent(built));
             // Debug builds only, and only with a tray to come back from.
             hide_window_in_dev(app, built);
+
+            // A stored hotkey that no longer registers (another app claimed
+            // it, a layout changed) must not fail the launch — it goes to the
+            // log and the setting stays put for the user to see and change.
+            if let Some(accel) = commands::read_global_hotkey(&app.state::<db::Db>()) {
+                if let Err(e) = apply_global_hotkey(app.handle(), Some(&accel)) {
+                    logging::warn(
+                        "hotkey",
+                        format!("global hotkey '{accel}' failed to register: {e}"),
+                    );
+                }
+            }
 
             Ok(())
         })
@@ -376,6 +426,8 @@ pub fn run() {
             commands::platform_info,
             commands::get_close_to_tray,
             commands::set_close_to_tray,
+            commands::get_global_hotkey,
+            commands::set_global_hotkey,
             commands::get_portable_status,
             commands::enable_portable,
             commands::disable_portable,

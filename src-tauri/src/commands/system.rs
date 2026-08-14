@@ -123,6 +123,38 @@ pub fn set_close_to_tray(db: State<'_, Db>, enabled: bool) -> Result<(), String>
     db.kv_set(CLOSE_TO_TRAY_KEY, if enabled { "1" } else { "0" })
 }
 
+// --- Global hotkey -----------------------------------------------------------
+
+/// The accelerator that summons (or hides) the window from anywhere, or unset
+/// for off — off by default, because a hotkey the user never chose that
+/// swallows a system-wide key combination is a bug report, not a feature.
+const GLOBAL_HOTKEY_KEY: &str = "global_hotkey";
+
+pub(crate) fn read_global_hotkey(db: &Db) -> Option<String> {
+    db.kv_get(GLOBAL_HOTKEY_KEY).filter(|s| !s.is_empty())
+}
+
+#[tauri::command]
+pub fn get_global_hotkey(db: State<'_, Db>) -> Option<String> {
+    read_global_hotkey(&db)
+}
+
+/// Registers first, stores second: an accelerator the OS rejects must leave
+/// the stored setting untouched, or the same failure comes back silently at
+/// every startup. `None` (or blank) unregisters and turns the feature off.
+#[tauri::command]
+pub fn set_global_hotkey(
+    app: tauri::AppHandle,
+    db: State<'_, Db>,
+    accelerator: Option<String>,
+) -> Result<(), String> {
+    let accel = accelerator
+        .map(|a| a.trim().to_string())
+        .filter(|a| !a.is_empty());
+    crate::apply_global_hotkey(&app, accel.as_deref())?;
+    db.kv_set(GLOBAL_HOTKEY_KEY, accel.as_deref().unwrap_or(""))
+}
+
 // --- Portable mode -----------------------------------------------------------
 
 #[derive(serde::Serialize)]

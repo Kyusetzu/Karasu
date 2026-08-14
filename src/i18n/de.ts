@@ -1257,6 +1257,10 @@ export const de: typeof en = {
       "Karasu läuft weiter und erkennt weiter. Beenden über das Tray-Menü.",
     closeToTrayNoTray:
       "Deine Arbeitsumgebung hat kein Tray-Symbol, deshalb beendet Schließen die App — sonst gäbe es keinen Weg zurück zum Fenster.",
+    hotkey: "Globales Tastenkürzel",
+    hotkeyHint:
+      "Holt Karasu von überall in den Vordergrund; erneutes Drücken bei fokussiertem Fenster versteckt es. Leer lassen zum Deaktivieren.",
+    hotkeyPlaceholder: "z. B. Ctrl+Shift+K",
     updateAuto: "Automatisch nach Updates suchen",
     updateAutoHint:
       "Prüft einmal täglich beim Start und benachrichtigt dich bei Funden.",

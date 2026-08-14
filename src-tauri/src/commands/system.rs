@@ -359,6 +359,46 @@ pub fn export_diagnostics(
     }
 }
 
+/// Saves caller-supplied text through the same dialog + remembered-folder
+/// idiom as `export_diagnostics` above. The frontend builds the content (the
+/// airing `.ics` today); Rust owns only the dialog and the write, so the
+/// WebView still gets no filesystem door.
+#[tauri::command]
+pub fn save_text(
+    app: tauri::AppHandle,
+    db: State<'_, Db>,
+    contents: String,
+    default_name: String,
+    filter_label: String,
+    extension: String,
+) -> Result<bool, String> {
+    use tauri_plugin_dialog::DialogExt;
+
+    let mut builder = app.dialog().file().set_file_name(default_name);
+    if let Some(dir) = db.kv_get(EXPORT_DIR_KEY) {
+        let dir = std::path::PathBuf::from(dir);
+        if dir.is_dir() {
+            builder = builder.set_directory(dir);
+        }
+    }
+    let path = builder
+        .add_filter(filter_label, &[extension.as_str()])
+        .blocking_save_file()
+        .and_then(|p| p.into_path().ok());
+
+    match path {
+        Some(p) => {
+            std::fs::write(&p, contents.as_bytes())
+                .map_err(|e| format!("Could not save the file: {e}"))?;
+            if let Some(dir) = p.parent() {
+                let _ = db.kv_set(EXPORT_DIR_KEY, &dir.to_string_lossy());
+            }
+            Ok(true)
+        }
+        None => Ok(false),
+    }
+}
+
 #[tauri::command]
 pub fn get_autostart(app: tauri::AppHandle) -> bool {
     use tauri_plugin_autostart::ManagerExt;

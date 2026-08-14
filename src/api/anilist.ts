@@ -311,6 +311,15 @@ export const saveImage = (
   format: ImageFormat,
 ) => invoke<boolean>("save_image", { data, defaultName, format });
 
+/** Text twin of `saveImage` — same dialog, same remembered folder. */
+export const saveText = (
+  contents: string,
+  defaultName: string,
+  filterLabel: string,
+  extension: string,
+) =>
+  invoke<boolean>("save_text", { contents, defaultName, filterLabel, extension });
+
 // --- Notification centre ---------------------------------------------------
 
 export interface AppNotification {

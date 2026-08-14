@@ -2,9 +2,11 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
-import { Check, ChevronLeft, ChevronRight } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Download } from "lucide-react";
 import { airingWeek, type AiringSlot } from "@/api/queries";
-import { fetchMediaList, isTauri } from "@/api/anilist";
+import { fetchMediaList, isTauri, saveText } from "@/api/anilist";
+import { buildIcs } from "@/lib/ical";
+import { IconButton } from "@/components/ui/icon-button";
 import { displayTitle, type Media, type MediaListEntry } from "@/api/types";
 import {
   addDays,
@@ -197,6 +199,36 @@ export default function Calendar() {
           >
             <ChevronRight className="size-4.5" />
           </Button>
+          {/* Everything the export needs is already on screen — the same
+              slots the grid draws, as VEVENTs any calendar app imports.
+              Stable UIDs mean a re-export updates instead of duplicating. */}
+          {slots.length > 0 && (
+            <IconButton
+              variant="ghost"
+              size="control"
+              onClick={() =>
+                void saveText(
+                  buildIcs(
+                    slots.map((s) => ({
+                      uid: `karasu-${s.media.id}-ep${s.episode}@karasu`,
+                      start: s.airingAt,
+                      durationMin: 25,
+                      summary: `${displayTitle(s.media.title)} — ${t("calendar.ep", { n: s.episode })}`,
+                    })),
+                    // Unix *seconds*, like every timestamp in the file.
+                    Math.floor(Date.now() / 1000),
+                  ),
+                  `karasu-airing-${week}.ics`,
+                  "iCalendar",
+                  "ics",
+                )
+              }
+              aria-label={t("calendar.exportIcs")}
+              title={t("calendar.exportIcs")}
+            >
+              <Download className="size-4" />
+            </IconButton>
+          )}
         </div>
 
         <Segmented

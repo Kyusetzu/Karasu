@@ -479,6 +479,7 @@ export const en = {
     thisWeek: "This week",
     today: "today",
     ep: "Ep {{n}}",
+    exportIcs: "Export week as .ics",
     emptyMine: "Nothing of yours airs this week.",
     emptyMineHint: "The Everything lens shows the whole schedule.",
     emptyAll: "Nothing airs this week.",

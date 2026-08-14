@@ -352,6 +352,7 @@ pub fn run() {
             commands::mark_notification_read,
             commands::mark_all_notifications_read,
             commands::save_image,
+            commands::save_text,
             commands::app_version,
             commands::check_for_updates,
             commands::get_update_channel,

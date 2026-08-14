@@ -1094,6 +1094,11 @@ export const de: typeof en = {
     importDoneUnmatched:
       "{{n}} Einträge importiert — {{unmatched}} konnten auf AniList nicht zugeordnet werden.",
     importFailed: "Der Import wurde nicht abgeschlossen",
+    backup: "Backups",
+    backupEnabled: "Datenbank täglich sichern",
+    backupEnabledHint: "Ein Snapshot pro Tag, gespeichert unter {{dir}}.",
+    backupKeep: "Aufzubewahrende Snapshots",
+    backupKeepHint: "Ältere tägliche Snapshots werden automatisch entfernt.",
     alScoreFormat: "Bewertungsformat",
     alScoreFormatHint:
       "Die Skala für deine Bewertungen überall — in Karasu, auf anilist.co und in jedem anderen Client. Bestehende Bewertungen werden umgerechnet, nicht gelöscht.",

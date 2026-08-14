@@ -1085,6 +1085,11 @@ export const en = {
     importDone: "{{n}} entries imported.",
     importDoneUnmatched: "{{n}} entries imported — {{unmatched}} couldn't be matched on AniList.",
     importFailed: "The import did not finish",
+    backup: "Backups",
+    backupEnabled: "Back up the database daily",
+    backupEnabledHint: "One snapshot per day, written to {{dir}}.",
+    backupKeep: "Snapshots to keep",
+    backupKeepHint: "Older daily snapshots are pruned automatically.",
     alScoreFormat: "Score format",
     alScoreFormatHint:
       "The scale your scores use everywhere — in Karasu, on anilist.co and in every other client. Existing scores are converted, not lost.",

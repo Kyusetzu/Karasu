@@ -24,6 +24,7 @@ import { ContentSection } from "./settings/ContentPane";
 import { DiscordSection } from "./settings/IntegrationsPane";
 import {
   AdvancedSection,
+  BackupSection,
   ExportSection,
   ImportSection,
   PortableSection,
@@ -70,6 +71,7 @@ const PANES = [
       RescaleSection,
       ExportSection,
       ImportSection,
+      BackupSection,
       LogSection,
       PortableSection,
     ],

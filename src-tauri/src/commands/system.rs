@@ -475,6 +475,47 @@ pub fn open_text(
     }
 }
 
+// --- Backups -----------------------------------------------------------------
+
+#[derive(serde::Serialize)]
+pub struct BackupSettings {
+    pub enabled: bool,
+    pub keep: usize,
+    /// Where the files land — the settings hint shows it, so "where did my
+    /// backup go" never needs asking.
+    pub dir: String,
+}
+
+#[tauri::command]
+pub fn get_backup_settings(app: tauri::AppHandle, db: State<'_, Db>) -> BackupSettings {
+    let dir = app
+        .path()
+        .app_data_dir()
+        .map(crate::portable::data_dir)
+        .map(|p| p.join("backups").to_string_lossy().to_string())
+        .unwrap_or_default();
+    BackupSettings {
+        enabled: crate::backups::read_enabled(&db),
+        keep: crate::backups::read_keep(&db),
+        dir,
+    }
+}
+
+#[tauri::command]
+pub fn set_backup_settings(
+    app: tauri::AppHandle,
+    db: State<'_, Db>,
+    enabled: bool,
+    keep: u32,
+) -> Result<(), String> {
+    crate::backups::write_settings(&db, enabled, keep as usize)?;
+    if enabled {
+        // Switching it on should produce a backup now, not within the hour.
+        crate::backups::run_once(&app);
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub fn get_autostart(app: tauri::AppHandle) -> bool {
     use tauri_plugin_autostart::ManagerExt;

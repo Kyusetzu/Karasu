@@ -416,6 +416,90 @@ export function ImportSection() {
   );
 }
 
+interface BackupSettings {
+  enabled: boolean;
+  keep: number;
+  dir: string;
+}
+
+/**
+ * Daily local database snapshots — on by default, because the first time
+ * anyone thinks about backups is the moment they need one. The Rust side
+ * owns the schedule and the retention; this card owns the two knobs and
+ * shows where the files land, so "where did my backup go" answers itself.
+ */
+export function BackupSection() {
+  const { t } = useTranslation();
+  const [settings, setSettings] = useState<BackupSettings | null>(null);
+  const [keepDraft, setKeepDraft] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!api.isTauri) return;
+    import("@tauri-apps/api/core").then(({ invoke }) => {
+      invoke<BackupSettings>("get_backup_settings").then(setSettings).catch(() => {});
+    });
+  }, []);
+
+  if (!settings) return null;
+
+  // The toggles-above rollback idiom: paint first, await, un-paint on failure.
+  const apply = async (next: { enabled: boolean; keep: number }) => {
+    const prev = settings;
+    setSettings({ ...settings, ...next });
+    setError(null);
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("set_backup_settings", next);
+    } catch (e) {
+      setSettings(prev);
+      setError(String(e));
+    }
+  };
+
+  const applyKeep = () => {
+    const parsed = Math.round(Number(keepDraft ?? ""));
+    setKeepDraft(null);
+    if (!Number.isFinite(parsed) || parsed < 1 || parsed > 60 || parsed === settings.keep) {
+      return;
+    }
+    void apply({ enabled: settings.enabled, keep: parsed });
+  };
+
+  return (
+    <Card>
+      <CardTitle>{t("settings.backup")}</CardTitle>
+      <div className="mt-3 space-y-3">
+        <Toggle
+          checked={settings.enabled}
+          onChange={(enabled) => apply({ enabled, keep: settings.keep })}
+          label={t("settings.backupEnabled")}
+          hint={t("settings.backupEnabledHint", { dir: settings.dir })}
+        />
+        <Row label={t("settings.backupKeep")} hint={t("settings.backupKeepHint")}>
+          <Input
+            type="number"
+            min={1}
+            max={60}
+            value={keepDraft ?? String(settings.keep)}
+            onChange={(e) => setKeepDraft(e.target.value)}
+            onBlur={applyKeep}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                applyKeep();
+              }
+            }}
+            disabled={!settings.enabled}
+            className="w-20"
+          />
+        </Row>
+      </div>
+      {error && <p className="mt-2 text-sm text-danger">{error}</p>}
+    </Card>
+  );
+}
+
 interface CloseToTray {
   enabled: boolean;
   tray: boolean;

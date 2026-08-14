@@ -1,5 +1,6 @@
 mod alerts;
 mod anilist;
+mod backups;
 mod commands;
 mod db;
 mod diagnostics;
@@ -284,6 +285,7 @@ pub fn run() {
             alerts::airing::spawn(app.handle().clone());
             alerts::stale::spawn(app.handle().clone());
             alerts::sequel::spawn(app.handle().clone());
+            backups::spawn(app.handle().clone());
             // Show the idle presence right away (if Discord is enabled).
             discord::sync_current(app.handle());
 
@@ -429,6 +431,8 @@ pub fn run() {
             commands::get_global_hotkey,
             commands::set_global_hotkey,
             commands::open_text,
+            commands::get_backup_settings,
+            commands::set_backup_settings,
             commands::get_portable_status,
             commands::enable_portable,
             commands::disable_portable,

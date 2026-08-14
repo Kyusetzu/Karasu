@@ -134,6 +134,12 @@ pub fn format_utc(ms: i64) -> String {
     format!("{y:04}-{m:02}-{d:02}T{h:02}:{min:02}:{s:02}Z")
 }
 
+/// The civil UTC date for an epoch-seconds instant. The log formatter above
+/// uses the same arithmetic; the backup file namer is the other caller.
+pub(crate) fn civil_date(epoch_secs: i64) -> (i64, u32, u32) {
+    civil_from_days(epoch_secs.div_euclid(86_400))
+}
+
 fn civil_from_days(z: i64) -> (i64, u32, u32) {
     let z = z + 719_468;
     let era = if z >= 0 { z } else { z - 146_096 } / 146_097;

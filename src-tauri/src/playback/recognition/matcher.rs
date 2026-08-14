@@ -57,6 +57,38 @@ fn similarity(a: &str, b: &str) -> f64 {
     dice(&trigrams(a), &trigrams(b))
 }
 
+/// The title with its season marker removed, when it carried one.
+///
+/// `None` means the season number cannot be spelled out of this title —
+/// which is the case for every source that reports the season *beside* the
+/// name rather than inside it (the Jellyfin API, above all).
+fn without_season_marker(parsed: &Parsed) -> Option<String> {
+    let season = parsed.season?;
+    let base = normalize(&parsed.title);
+    let stripped = base
+        .replace(&format!("season {season}"), "")
+        .replace(&format!("{season}nd season"), "")
+        .replace(&format!("{season}rd season"), "")
+        .replace(&format!("{season}th season"), "")
+        .replace(&format!("{season}st season"), "")
+        .replace(&format!(" s{season}"), " ");
+    let stripped = stripped.split_whitespace().collect::<Vec<_>>().join(" ");
+    (!stripped.is_empty() && stripped != base).then_some(stripped)
+}
+
+/// Whether the season this parse carries could influence matching at all.
+///
+/// `variants` only ever *re-spells* a marker the title already contains; it
+/// never invents one, because "Show" plus season 2 could be "Show 2", "Show
+/// II", or a differently-named sequel entirely, and guessing writes to
+/// someone's list. So for a title that carries no marker the season is inert,
+/// and a caller that cares which entry it landed on needs to know that rather
+/// than assume the match considered it. The scrobbler asks this before
+/// trusting a season-2 detection.
+pub fn season_informed(parsed: &Parsed) -> bool {
+    without_season_marker(parsed).is_some()
+}
+
 /// Title variants of the detected name to cover season spellings:
 /// "Title S2" ↔ "Title 2nd Season" ↔ "Title Season 2".
 fn variants(parsed: &Parsed) -> Vec<String> {
@@ -64,16 +96,7 @@ fn variants(parsed: &Parsed) -> Vec<String> {
     let mut out = vec![base.clone()];
 
     if let Some(season) = parsed.season {
-        // Strip the season marker from the normalized title
-        let stripped = base
-            .replace(&format!("season {season}"), "")
-            .replace(&format!("{season}nd season"), "")
-            .replace(&format!("{season}rd season"), "")
-            .replace(&format!("{season}th season"), "")
-            .replace(&format!("{season}st season"), "")
-            .replace(&format!(" s{season}"), " ");
-        let stripped = stripped.split_whitespace().collect::<Vec<_>>().join(" ");
-        if !stripped.is_empty() && stripped != base {
+        if let Some(stripped) = without_season_marker(parsed) {
             out.push(format!("{stripped} season {season}"));
             let suffix = match season {
                 1 => "st",

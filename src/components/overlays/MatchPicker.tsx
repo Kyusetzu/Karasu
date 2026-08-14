@@ -2,8 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Loader2, Search, X } from "lucide-react";
-import { searchMedia } from "@/api/queries";
-import { displayTitle, type Media } from "@/api/types";
+import { searchMedia, sequelsOf } from "@/api/queries";
+import { displayTitle, type MediaTitle } from "@/api/types";
 import { useContentFilter } from "@/stores/contentFilter";
 import { isBlocked } from "@/lib/contentFilter";
 import { Button } from "@/components/ui/button";
@@ -30,6 +30,7 @@ export default function MatchPicker({
   current,
   error,
   mediaType = "ANIME",
+  suggestSequelsOf,
   onPick,
   onClear,
   onCancel,
@@ -44,6 +45,15 @@ export default function MatchPicker({
   error?: string;
   /** What to search. The library scanner is anime-only; detection is not. */
   mediaType?: "ANIME" | "MANGA";
+  /** Offer this entry's sequels above the search results.
+   *
+   *  For a season the matcher could not place, the answer is nearly always
+   *  the next entry in the franchise — and a renamed sequel ("Metal Masters"
+   *  for season 2 of "Metal Fusion") is exactly the case searching the
+   *  detected title cannot find. Suggested, never applied: which season maps
+   *  to which entry is a question only the viewer can answer, and the wrong
+   *  guess writes to their list. */
+  suggestSequelsOf?: number | null;
   /** The chosen entry's id and its display title — the second because a
       caller storing the pick has it right here and would otherwise need a
       request to name what it points at. */
@@ -83,6 +93,30 @@ export default function MatchPicker({
   const results = useMemo(
     () => (data?.media ?? []).filter((m) => !isBlocked(m, level)),
     [data, level],
+  );
+
+  // One request, on the season the user is being asked about — the same
+  // on-demand shape `SeasonSplitModal` uses for the identical question.
+  const { data: sequels } = useQuery({
+    queryKey: ["sequels", suggestSequelsOf],
+    queryFn: () => sequelsOf(suggestSequelsOf!),
+    enabled: suggestSequelsOf != null,
+    staleTime: 60 * 60 * 1000,
+  });
+
+  const suggestions = useMemo(
+    () =>
+      (sequels ?? [])
+        .filter((s) => !isBlocked(s, level))
+        .map((s) => ({
+          id: s.id,
+          title: s.title,
+          coverImage: s.coverImage,
+          format: s.format,
+          episodes: s.episodes,
+          seasonYear: s.startDate?.year ?? null,
+        })),
+    [sequels, level],
   );
 
   return (
@@ -130,6 +164,24 @@ export default function MatchPicker({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-2">
+          {suggestions.length > 0 && (
+            <div className="mb-2">
+              <p className="px-3 pb-1 pt-1 text-2xs font-semibold uppercase tracking-[.1em] text-ink-600">
+                {t("library.laterSeasons")}
+              </p>
+              <ul className="space-y-0.5">
+                {suggestions.map((media) => (
+                  <li key={`sequel-${media.id}`}>
+                    <ResultRow
+                      media={media}
+                      isCurrent={displayTitle(media.title) === current}
+                      onPick={() => onPick(media.id, displayTitle(media.title))}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {results.length === 0 ? (
             // A search that never reached AniList is not a search that found
             // nothing. Telling someone to "try a shorter or more exact title"
@@ -180,12 +232,23 @@ export default function MatchPicker({
   );
 }
 
+/** What a row needs, which is less than a `Media` — so a sequel candidate,
+    which carries `startDate` rather than `seasonYear`, can use it too. */
+export interface PickableMedia {
+  id: number;
+  title: MediaTitle;
+  coverImage: { large: string | null } | null;
+  format: string | null;
+  episodes: number | null;
+  seasonYear?: number | null;
+}
+
 function ResultRow({
   media,
   isCurrent,
   onPick,
 }: {
-  media: Media;
+  media: PickableMedia;
   isCurrent: boolean;
   onPick: () => void;
 }) {

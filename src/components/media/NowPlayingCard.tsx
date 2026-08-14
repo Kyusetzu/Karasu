@@ -305,6 +305,8 @@ function blockedText(
         n: reason.episode,
         progress: reason.progress,
       });
+    case "unknownSeason":
+      return t("nowPlaying.blockedSeason", { n: reason.season });
     case "failed":
       return t("nowPlaying.blockedFailed", { message: reason.message });
   }
@@ -411,6 +413,12 @@ function ScrobbleActions({ playing }: { playing: NowPlaying }) {
             current={np.matchedTitle ?? undefined}
             error={error}
             mediaType={np.mediaType}
+            // Only when a season is the open question: offering "later
+            // seasons" for an ordinary wrong match would be noise, and it
+            // costs a request.
+            suggestSequelsOf={
+              scrobble.reason?.code === "unknownSeason" ? np.mediaId : null
+            }
             onPick={(mediaId, displayTitle) =>
               void correct(() =>
                 setDetectionOverride({

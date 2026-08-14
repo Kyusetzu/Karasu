@@ -92,6 +92,11 @@ pub enum BlockReason {
     /// Detected well ahead of the list. Forcing this is legitimate — it moves
     /// progress forward — so the card keeps its button.
     EpisodeGap { episode: u32, progress: u32 },
+    /// The source reported a season the matcher provably could not use, and
+    /// nobody has said which AniList entry it is. Scrobbling would write to
+    /// whatever the bare title hit — for a franchise whose seasons are
+    /// separate entries, that is season one, at season two's episode numbers.
+    UnknownSeason { season: u32 },
     /// The update was attempted and the API refused it. Not a refusal of ours,
     /// so retrying is exactly the right offer — and the message is the
     /// server's own, which no translation could improve.
@@ -108,6 +113,10 @@ impl std::fmt::Display for BlockReason {
             BlockReason::EpisodeGap { episode, progress } => {
                 write!(f, "episode gap: detected {episode}, but your progress is {progress}")
             }
+            BlockReason::UnknownSeason { season } => write!(
+                f,
+                "season {season} cannot be placed on AniList without a correction"
+            ),
             BlockReason::Failed { message } => write!(f, "{message}"),
         }
     }
@@ -490,14 +499,41 @@ fn build_now_playing(
 /// unforceable, so the button on screen and the write to AniList cannot
 /// disagree about what is allowed.
 fn block_reason(now: &NowPlaying, episode: u32, progress: u32) -> Option<BlockReason> {
+    // First, because it is the *cause* where it applies. A Jellyfin season-2
+    // episode 1 detected against the season-1 entry is also "already watched",
+    // and saying so would send the reader after the wrong thing entirely.
+    if let Some(season) = unplaceable_season(now) {
+        return Some(BlockReason::UnknownSeason { season });
+    }
     if episode <= progress {
         return Some(BlockReason::AlreadyWatched { episode, progress });
     }
     if episode > progress + 1 {
         return Some(BlockReason::EpisodeGap { episode, progress });
     }
-    let _ = now;
     None
+}
+
+/// The season this detection reports and cannot account for, if any.
+///
+/// Three things have to be true. The source named a season past the first;
+/// the matcher provably could not use it (`season_informed` — a title that
+/// carries no marker leaves the season inert, so the match is really a match
+/// on the bare series name); and the user has not already said which entry
+/// this is. The last is what makes a correction stick: once made, this
+/// returns `None` and the session proceeds normally.
+fn unplaceable_season(now: &NowPlaying) -> Option<u32> {
+    let season = now.season.filter(|s| *s > 1)?;
+    if now.overridden {
+        return None;
+    }
+    let parsed = parser::Parsed {
+        title: now.parsed_title.clone(),
+        episode: now.episode,
+        season: Some(season),
+        release_group: None,
+    };
+    (!matcher::season_informed(&parsed)).then_some(season)
 }
 
 /// Whether a source-reported position has crossed the update point — `None`
@@ -1129,6 +1165,46 @@ mod tests {
             Some(BlockReason::EpisodeGap { .. })
         ));
         // The ordinary case: the very next episode.
+        assert!(block_reason(&np, 3, 2).is_none());
+    }
+
+    /// The Beyblade case. Jellyfin reports season 2 beside a bare series
+    /// name, so the matcher never saw the season and landed on the season-1
+    /// entry — where episode 1 is both wrong and, at progress 27, "already
+    /// watched". The season is the cause and has to be the thing reported.
+    #[test]
+    fn a_season_the_matcher_could_not_use_blocks_before_anything_else() {
+        let mut np = now_playing("ANIME", None);
+        np.parsed_title = "Beyblade: Metal Fusion".into();
+        np.season = Some(2);
+
+        assert!(matches!(
+            block_reason(&np, 1, 27),
+            Some(BlockReason::UnknownSeason { season: 2 })
+        ));
+        // Not forceable: scrobbling would write to the wrong entry.
+        assert!(!BlockReason::UnknownSeason { season: 2 }.forceable());
+
+        // Corrected once, it never asks again.
+        np.overridden = true;
+        assert!(matches!(
+            block_reason(&np, 1, 27),
+            Some(BlockReason::AlreadyWatched { .. })
+        ));
+    }
+
+    /// A release name that carries its own season marker was matched *with*
+    /// the season, so it is not ambiguous and must not be blocked.
+    #[test]
+    fn a_season_spelled_in_the_title_is_left_alone() {
+        let mut np = now_playing("ANIME", None);
+        np.parsed_title = "Kusuriya no Hitorigoto 2nd Season".into();
+        np.season = Some(2);
+        assert!(block_reason(&np, 3, 2).is_none());
+
+        // And season one is never ambiguous: there is nothing to place.
+        np.parsed_title = "Frieren".into();
+        np.season = Some(1);
         assert!(block_reason(&np, 3, 2).is_none());
     }
 

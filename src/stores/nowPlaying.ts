@@ -40,6 +40,7 @@ export type ScrobblePhase =
 export type BlockReason =
   | { code: "alreadyWatched"; episode: number; progress: number }
   | { code: "episodeGap"; episode: number; progress: number }
+  | { code: "unknownSeason"; season: number }
   | { code: "failed"; message: string };
 
 export interface ScrobbleState {

@@ -723,6 +723,7 @@ export const de: typeof en = {
     searchFailed: "AniList war nicht erreichbar. Versuch es gleich noch mal.",
     currentMatch: "aktuell",
     clearMatch: "Korrektur aufheben",
+    laterSeasons: "Spätere Staffeln dieser Serie",
     epCount: "{{n}} Fo.",
     ep: "Fo. {{n}}",
     play: "Abspielen",
@@ -1001,6 +1002,8 @@ export const de: typeof en = {
       "Folge {{n}} ist bereits gesehen — deine Liste steht bei {{progress}}.",
     blockedGap: "Folge {{n}}, deine Liste steht aber bei {{progress}}.",
     blockedFailed: "Update fehlgeschlagen: {{message}}",
+    blockedSeason:
+      "Staffel {{n}} — sag Karasu, welcher AniList-Eintrag das ist, dann merkt es sich das.",
     skipped: "Update übersprungen.",
     yourProgress: "Dein Fortschritt: {{progress}}",
     noMatch: "Kein Eintrag deiner Liste erkannt.",

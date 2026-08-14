@@ -721,6 +721,7 @@ export const en = {
     searchFailed: "Couldn't reach AniList. Try again in a moment.",
     currentMatch: "current",
     clearMatch: "Undo correction",
+    laterSeasons: "Later seasons of this series",
     epCount: "{{n}} ep",
     ep: "Ep {{n}}",
     play: "Play",
@@ -995,6 +996,8 @@ export const en = {
       "Episode {{n}} is already watched — your list is at {{progress}}.",
     blockedGap: "Episode {{n}}, but your list is at {{progress}}.",
     blockedFailed: "Update failed: {{message}}",
+    blockedSeason:
+      "Season {{n}} — tell Karasu which AniList entry that is, and it will remember.",
     skipped: "Update skipped.",
     yourProgress: "Your progress: {{progress}}",
     noMatch: "No entry from your list recognized.",

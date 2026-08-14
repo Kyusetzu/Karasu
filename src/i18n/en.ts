@@ -1182,6 +1182,10 @@ export const en = {
       "Checked before every other source. With a live position, pausing pauses the scrobble clock too.",
     mpvPath: "Pipe / socket path",
     mpvPathHint: "Must match the input-ipc-server value in mpv.conf.",
+    mpvLaunch: "Play library files with mpv",
+    mpvLaunchHint:
+      "Path to the mpv executable. When set, the library's play buttons start mpv with the pipe above instead of the default player — no mpv.conf needed for launches. Empty keeps the default player.",
+    mpvLaunchPlaceholder: "e.g. C:\\mpv\\mpv.exe",
     detectionDebug: "What your system currently reports",
     detectionDebugHint:
       "Every media session your desktop knows about right now. Use this to see what a player publishes when it isn't being detected.",

@@ -1213,12 +1213,33 @@ pub fn play_episode(app: AppHandle, media_id: i64, episode: u32) -> Result<(), S
     open_path(&app, &path)
 }
 
-/// Opens `path` in the default player, reporting a stale index clearly — the
-/// index is persisted now, so a file can legitimately have moved since the
-/// last scan.
+/// Opens `path`, reporting a stale index clearly — the index is persisted
+/// now, so a file can legitimately have moved since the last scan.
+///
+/// Two doors, and the default-player contract stays the default: only a
+/// configured mpv binary takes the first one, launched with
+/// `--input-ipc-server=<pipe>` so the IPC source sees the playback Karasu
+/// itself started — knowing the pipe name up front beats discovering a
+/// running instance. A failed launch (moved binary, typo) logs and falls
+/// through to the opener, so the play button never goes dead over a setting.
 fn open_path(app: &AppHandle, path: &str) -> Result<(), String> {
     if !Path::new(path).exists() {
         return Err("That file is no longer on disk — rescan your library".into());
+    }
+    if let Some((player, pipe)) = crate::commands::mpv_launch_config(&app.state::<Db>()) {
+        match std::process::Command::new(&player)
+            .arg(format!("--input-ipc-server={pipe}"))
+            .arg(path)
+            .spawn()
+        {
+            Ok(_) => return Ok(()),
+            Err(e) => crate::logging::warn(
+                "library",
+                format!(
+                    "could not launch {player:?}: {e}; falling back to the default player"
+                ),
+            ),
+        }
     }
     use tauri_plugin_opener::OpenerExt;
     app.opener()

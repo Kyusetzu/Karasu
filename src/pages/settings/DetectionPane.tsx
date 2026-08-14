@@ -266,6 +266,7 @@ interface MpvIpcSettings {
   enabled: boolean;
   path: string;
   defaultPath: string;
+  launchPath: string;
 }
 
 /**
@@ -279,6 +280,7 @@ export function MpvSection() {
   const { t } = useTranslation();
   const [settings, setSettings] = useState<MpvIpcSettings | null>(null);
   const [pathDraft, setPathDraft] = useState<string | null>(null);
+  const [launchDraft, setLaunchDraft] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -290,7 +292,7 @@ export function MpvSection() {
 
   if (!settings) return null;
 
-  const apply = async (next: { enabled: boolean; path: string }) => {
+  const apply = async (next: { enabled: boolean; path: string; launchPath: string }) => {
     const prev = settings;
     setSettings({ ...settings, ...next });
     setError(null);
@@ -303,11 +305,24 @@ export function MpvSection() {
     }
   };
 
+  const current = () => ({
+    enabled: settings.enabled,
+    path: settings.path,
+    launchPath: settings.launchPath,
+  });
+
   const applyPath = () => {
     const next = (pathDraft ?? settings.path).trim();
     setPathDraft(null);
     if (next === settings.path) return;
-    void apply({ enabled: settings.enabled, path: next });
+    void apply({ ...current(), path: next });
+  };
+
+  const applyLaunch = () => {
+    const next = (launchDraft ?? settings.launchPath).trim();
+    setLaunchDraft(null);
+    if (next === settings.launchPath) return;
+    void apply({ ...current(), launchPath: next });
   };
 
   return (
@@ -319,7 +334,7 @@ export function MpvSection() {
       <div className="mt-3 space-y-3">
         <Toggle
           checked={settings.enabled}
-          onChange={(enabled) => apply({ enabled, path: settings.path })}
+          onChange={(enabled) => apply({ ...current(), enabled })}
           label={t("settings.mpvEnable")}
           hint={t("settings.mpvEnableHint")}
         />
@@ -335,6 +350,21 @@ export function MpvSection() {
               }
             }}
             disabled={!settings.enabled}
+            className="w-72"
+          />
+        </Row>
+        <Row label={t("settings.mpvLaunch")} hint={t("settings.mpvLaunchHint")}>
+          <Input
+            value={launchDraft ?? settings.launchPath}
+            onChange={(e) => setLaunchDraft(e.target.value)}
+            onBlur={applyLaunch}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                applyLaunch();
+              }
+            }}
+            placeholder={t("settings.mpvLaunchPlaceholder")}
             className="w-72"
           />
         </Row>

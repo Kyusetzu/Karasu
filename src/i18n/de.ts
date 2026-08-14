@@ -1192,6 +1192,10 @@ export const de: typeof en = {
       "Wird vor allen anderen Quellen geprüft. Mit einer echten Position pausiert eine Pause auch die Scrobble-Uhr.",
     mpvPath: "Pipe-/Socket-Pfad",
     mpvPathHint: "Muss dem input-ipc-server-Wert in der mpv.conf entsprechen.",
+    mpvLaunch: "Bibliotheksdateien mit mpv abspielen",
+    mpvLaunchHint:
+      "Pfad zur mpv-Programmdatei. Wenn gesetzt, starten die Abspielknöpfe der Bibliothek mpv mit der Pipe oben statt des Standardplayers — für Starts ist keine mpv.conf nötig. Leer behält den Standardplayer.",
+    mpvLaunchPlaceholder: "z. B. C:\\mpv\\mpv.exe",
     detectionDebug: "Was dein System gerade meldet",
     detectionDebugHint:
       "Alle Mediensitzungen, die dein System aktuell kennt. Damit siehst du, was ein Player veröffentlicht, wenn er nicht erkannt wird.",

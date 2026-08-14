@@ -122,6 +122,24 @@ pub(crate) fn mpv_ipc_config(
     Some(crate::playback::detection::mpv_ipc::MpvConfig { path })
 }
 
+/// The player binary the library launches with the IPC pipe. Empty keeps the
+/// default-player contract — that fork is deliberate and the setting is its
+/// only door.
+const MPV_LAUNCH_KEY: &str = "mpv_launch_path";
+
+/// `(player binary, pipe path)` for a library launch, or `None` to open with
+/// the default player. The pipe comes back with the binary because launching
+/// mpv *with* `--input-ipc-server` is the whole point: Karasu knowing the
+/// name up front beats discovering a running instance.
+pub(crate) fn mpv_launch_config(db: &Db) -> Option<(String, String)> {
+    let player = db.kv_get(MPV_LAUNCH_KEY).filter(|p| !p.trim().is_empty())?;
+    let pipe = db
+        .kv_get(MPV_IPC_PATH_KEY)
+        .filter(|p| !p.trim().is_empty())
+        .unwrap_or_else(|| crate::playback::detection::mpv_ipc::DEFAULT_PIPE.to_string());
+    Some((player, pipe))
+}
+
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MpvIpcSettings {
@@ -130,6 +148,8 @@ pub struct MpvIpcSettings {
     pub path: String,
     /// What the settings hint tells the user to put in `mpv.conf`.
     pub default_path: String,
+    /// The player binary for library launches, empty for the default player.
+    pub launch_path: String,
 }
 
 #[tauri::command]
@@ -142,13 +162,20 @@ pub fn get_mpv_ipc(db: State<'_, Db>) -> MpvIpcSettings {
             .filter(|p| !p.trim().is_empty())
             .unwrap_or_else(|| default_path.clone()),
         default_path,
+        launch_path: db.kv_get(MPV_LAUNCH_KEY).unwrap_or_default(),
     }
 }
 
 #[tauri::command]
-pub fn set_mpv_ipc(db: State<'_, Db>, enabled: bool, path: String) -> Result<(), String> {
+pub fn set_mpv_ipc(
+    db: State<'_, Db>,
+    enabled: bool,
+    path: String,
+    launch_path: String,
+) -> Result<(), String> {
     db.kv_set(MPV_IPC_ENABLED_KEY, if enabled { "1" } else { "0" })?;
-    db.kv_set(MPV_IPC_PATH_KEY, path.trim())
+    db.kv_set(MPV_IPC_PATH_KEY, path.trim())?;
+    db.kv_set(MPV_LAUNCH_KEY, launch_path.trim())
 }
 
 /// A stable per-install id for the `DeviceId` Jellyfin wants on every request.

@@ -528,14 +528,15 @@ pub fn spawn(app: AppHandle) {
         async move {
         let mut last_raw: Option<(String, String)> = None;
         loop {
-            let (media_detection, jellyfin) = {
+            let (media_detection, jellyfin, mpv) = {
                 let db = app.state::<Db>();
                 (
                     crate::commands::read_media_detection(&db),
                     crate::commands::jellyfin_config(&db),
+                    crate::commands::mpv_ipc_config(&db),
                 )
             };
-            let playback = detection::detect_playback(media_detection, jellyfin).await;
+            let playback = detection::detect_playback(media_detection, jellyfin, mpv).await;
             let raw = playback
                 .as_ref()
                 .map(|p| (p.process.clone(), p.media_title.clone()));

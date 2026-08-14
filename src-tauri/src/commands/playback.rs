@@ -102,6 +102,55 @@ pub(crate) fn jellyfin_config(
     })
 }
 
+// --- mpv IPC ----------------------------------------------------------------
+
+/// Opt-in, unlike the media-session pass: probing a pipe name the user never
+/// configured, every five seconds, would be waste dressed as a feature.
+const MPV_IPC_ENABLED_KEY: &str = "mpv_ipc_enabled";
+const MPV_IPC_PATH_KEY: &str = "mpv_ipc_path";
+
+pub(crate) fn mpv_ipc_config(
+    db: &Db,
+) -> Option<crate::playback::detection::mpv_ipc::MpvConfig> {
+    if db.kv_get(MPV_IPC_ENABLED_KEY).as_deref() != Some("1") {
+        return None;
+    }
+    let path = db
+        .kv_get(MPV_IPC_PATH_KEY)
+        .filter(|p| !p.trim().is_empty())
+        .unwrap_or_else(|| crate::playback::detection::mpv_ipc::DEFAULT_PIPE.to_string());
+    Some(crate::playback::detection::mpv_ipc::MpvConfig { path })
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MpvIpcSettings {
+    pub enabled: bool,
+    /// The effective path — the stored one, or the platform default.
+    pub path: String,
+    /// What the settings hint tells the user to put in `mpv.conf`.
+    pub default_path: String,
+}
+
+#[tauri::command]
+pub fn get_mpv_ipc(db: State<'_, Db>) -> MpvIpcSettings {
+    let default_path = crate::playback::detection::mpv_ipc::DEFAULT_PIPE.to_string();
+    MpvIpcSettings {
+        enabled: db.kv_get(MPV_IPC_ENABLED_KEY).as_deref() == Some("1"),
+        path: db
+            .kv_get(MPV_IPC_PATH_KEY)
+            .filter(|p| !p.trim().is_empty())
+            .unwrap_or_else(|| default_path.clone()),
+        default_path,
+    }
+}
+
+#[tauri::command]
+pub fn set_mpv_ipc(db: State<'_, Db>, enabled: bool, path: String) -> Result<(), String> {
+    db.kv_set(MPV_IPC_ENABLED_KEY, if enabled { "1" } else { "0" })?;
+    db.kv_set(MPV_IPC_PATH_KEY, path.trim())
+}
+
 /// A stable per-install id for the `DeviceId` Jellyfin wants on every request.
 ///
 /// Generated once and kept: a fresh one per launch would register a new entry

@@ -1184,6 +1184,14 @@ export const de: typeof en = {
     mediaSessions: "System-Medieninfos nutzen",
     mediaSessionsHint:
       "Erkennt zusätzlich Player, die ihren Titel an die Mediensteuerung deiner Arbeitsumgebung melden statt ins Fenster zu schreiben. Deckt Jellyfin Media Player, Plex und Browser-Videos ab.",
+    mpv: "mpv (Direktverbindung)",
+    mpvHint:
+      "Liest Dateiname und Wiedergabeposition direkt aus mpv. Füge input-ipc-server={{path}} in deine mpv.conf ein und aktiviere den Schalter.",
+    mpvEnable: "mpv direkt fragen",
+    mpvEnableHint:
+      "Wird vor allen anderen Quellen geprüft. Mit einer echten Position pausiert eine Pause auch die Scrobble-Uhr.",
+    mpvPath: "Pipe-/Socket-Pfad",
+    mpvPathHint: "Muss dem input-ipc-server-Wert in der mpv.conf entsprechen.",
     detectionDebug: "Was dein System gerade meldet",
     detectionDebugHint:
       "Alle Mediensitzungen, die dein System aktuell kennt. Damit siehst du, was ein Player veröffentlicht, wenn er nicht erkannt wird.",

@@ -1,6 +1,6 @@
 [package]
 name = "karasu"
-version = "0.118.1"
+version = "0.119.0"
 description = "A modern anime and manga tracker built exclusively for AniList"
 authors = ["Kyu"]
 license = "MIT"
@@ -71,7 +71,9 @@ serde_json = "1"
 # offered both, and br came back larger here (26,401 bytes) — so enabling
 # reqwest's `brotli` feature on top would make the transfer slightly worse.
 reqwest = { version = "0.13", features = ["json", "gzip"] }
-tokio = { version = "1", features = ["time", "sync", "macros"] }
+# `net` + `io-util` are for the mpv IPC probe (named pipe / unix socket with
+# a real timeout); both were already compiled into the tree via tauri.
+tokio = { version = "1", features = ["time", "sync", "macros", "net", "io-util"] }
 rusqlite = { version = "0.40", features = ["bundled"] }
 regex = "1"
 discord-rich-presence = "1"

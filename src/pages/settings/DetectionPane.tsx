@@ -262,6 +262,88 @@ function MediaSessionDiagnostic() {
   );
 }
 
+interface MpvIpcSettings {
+  enabled: boolean;
+  path: string;
+  defaultPath: string;
+}
+
+/**
+ * The mpv IPC pipe — the detection source that knows the most, for the user
+ * willing to add one line to `mpv.conf`. Opt-in, because probing a pipe
+ * nobody configured every five seconds would be waste dressed as a feature.
+ * The hint quotes the exact `input-ipc-server=` line for the *effective*
+ * path, so the two sides of the pipe cannot quietly disagree.
+ */
+export function MpvSection() {
+  const { t } = useTranslation();
+  const [settings, setSettings] = useState<MpvIpcSettings | null>(null);
+  const [pathDraft, setPathDraft] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!api.isTauri) return;
+    import("@tauri-apps/api/core").then(({ invoke }) => {
+      invoke<MpvIpcSettings>("get_mpv_ipc").then(setSettings).catch(() => {});
+    });
+  }, []);
+
+  if (!settings) return null;
+
+  const apply = async (next: { enabled: boolean; path: string }) => {
+    const prev = settings;
+    setSettings({ ...settings, ...next });
+    setError(null);
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("set_mpv_ipc", next);
+    } catch (e) {
+      setSettings(prev);
+      setError(String(e));
+    }
+  };
+
+  const applyPath = () => {
+    const next = (pathDraft ?? settings.path).trim();
+    setPathDraft(null);
+    if (next === settings.path) return;
+    void apply({ enabled: settings.enabled, path: next });
+  };
+
+  return (
+    <Card>
+      <CardTitle>{t("settings.mpv")}</CardTitle>
+      <p className="mt-2 text-sm text-ink-500">
+        {t("settings.mpvHint", { path: settings.path })}
+      </p>
+      <div className="mt-3 space-y-3">
+        <Toggle
+          checked={settings.enabled}
+          onChange={(enabled) => apply({ enabled, path: settings.path })}
+          label={t("settings.mpvEnable")}
+          hint={t("settings.mpvEnableHint")}
+        />
+        <Row label={t("settings.mpvPath")} hint={t("settings.mpvPathHint")}>
+          <Input
+            value={pathDraft ?? settings.path}
+            onChange={(e) => setPathDraft(e.target.value)}
+            onBlur={applyPath}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                applyPath();
+              }
+            }}
+            disabled={!settings.enabled}
+            className="w-72"
+          />
+        </Row>
+      </div>
+      {error && <p className="mt-2 text-sm text-danger">{error}</p>}
+    </Card>
+  );
+}
+
 /**
  * Optional Jellyfin server connection.
  *

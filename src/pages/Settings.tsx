@@ -18,7 +18,7 @@ import {
   AniListProfileSection,
 } from "./settings/AniListPane";
 import { AppearanceSection } from "./settings/AppearancePane";
-import { ScrobbleSection, JellyfinSection } from "./settings/DetectionPane";
+import { ScrobbleSection, MpvSection, JellyfinSection } from "./settings/DetectionPane";
 import { LibrarySection } from "./settings/LibraryPane";
 import { ContentSection } from "./settings/ContentPane";
 import { DiscordSection } from "./settings/IntegrationsPane";
@@ -58,7 +58,7 @@ const PANES = [
   {
     id: "detection",
     icon: Radar,
-    sections: [ScrobbleSection, JellyfinSection],
+    sections: [ScrobbleSection, MpvSection, JellyfinSection],
   },
   { id: "library", icon: FolderOpen, sections: [LibrarySection] },
   { id: "content", icon: EyeOff, sections: [ContentSection] },

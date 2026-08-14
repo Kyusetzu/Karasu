@@ -1174,6 +1174,14 @@ export const en = {
     mediaSessions: "Use system media info",
     mediaSessionsHint:
       "Also detect players that report to your desktop's media controls instead of putting the title in their window. Covers Jellyfin Media Player, Plex and browser video.",
+    mpv: "mpv (direct connection)",
+    mpvHint:
+      "Reads the file name and the live playback position straight from mpv. Add input-ipc-server={{path}} to your mpv.conf and enable the toggle.",
+    mpvEnable: "Ask mpv directly",
+    mpvEnableHint:
+      "Checked before every other source. With a live position, pausing pauses the scrobble clock too.",
+    mpvPath: "Pipe / socket path",
+    mpvPathHint: "Must match the input-ipc-server value in mpv.conf.",
     detectionDebug: "What your system currently reports",
     detectionDebugHint:
       "Every media session your desktop knows about right now. Use this to see what a player publishes when it isn't being detected.",

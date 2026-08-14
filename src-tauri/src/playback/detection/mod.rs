@@ -3,6 +3,7 @@
 
 pub mod jellyfin;
 pub mod media_session;
+pub mod mpv_ipc;
 pub mod profiles;
 
 #[cfg(windows)]
@@ -184,22 +185,31 @@ pub fn detect_windows() -> Option<Playback> {
 
 /// Full sweep, in order of how much each source actually knows.
 ///
-/// The Jellyfin API comes first when it is configured (server URL, API key
-/// *and* a user — see `jellyfin`): it reports the series and episode as
-/// separate fields, so it beats anything derived from a string. Window titles
-/// come next. The desktop's media sessions come last —
-/// a browser playing Crunchyroll appears in both, and the site-marker path
-/// produces a cleaner title, so the session pass only gets a look in when
-/// nothing recognised a window. That is exactly the Jellyfin Media Player
-/// case, where the title bar never changes.
+/// The mpv IPC pipe comes first when the user has configured one: it reports
+/// the real file path *and* a live position, and a pipe the user wrote into
+/// `mpv.conf` is the most explicit signal in the whole pipeline. The
+/// Jellyfin API is next (server URL, API key *and* a user — see `jellyfin`):
+/// series and episode as separate fields plus a position, beating anything
+/// derived from a string. Window titles come next. The desktop's media
+/// sessions come last — a browser playing Crunchyroll appears in both, and
+/// the site-marker path produces a cleaner title, so the session pass only
+/// gets a look in when nothing recognised a window. That is exactly the
+/// Jellyfin Media Player case, where the title bar never changes.
 ///
-/// The order holds on Linux too, but the middle rung is empty there: window
-/// enumeration has no X11/Wayland backend, so the media-session pass is the
-/// only generic source and effectively runs first.
+/// The order holds on Linux too, but the window rung is empty there: window
+/// enumeration has no X11/Wayland backend, so after mpv and Jellyfin the
+/// media-session pass is the only generic source.
 pub async fn detect_playback(
     media_detection: bool,
     jellyfin: Option<jellyfin::JellyfinConfig>,
+    mpv: Option<mpv_ipc::MpvConfig>,
 ) -> Option<Playback> {
+    if let Some(cfg) = mpv {
+        if let Some(p) = mpv_ipc::detect(&cfg).await {
+            crate::logging::debug_changed("detect", "source", format!("mpv ipc: {:?}", p.media_title));
+            return Some(p);
+        }
+    }
     if let Some(cfg) = jellyfin {
         if let Some(p) = jellyfin::detect(&cfg).await {
             crate::logging::debug_changed("detect", "source", format!("jellyfin: {:?}", p.media_title));

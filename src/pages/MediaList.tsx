@@ -40,7 +40,7 @@ import { nextFocus, type Move } from "@/lib/roving";
 import RandomPickModal from "@/components/overlays/RandomPickModal";
 import PresetModal from "@/components/overlays/PresetModal";
 import { loadPresets, savePresets, type Preset } from "@/lib/presets";
-import { formatLabel } from "@/lib/format";
+import { formatLabel, MEDIA_FORMATS } from "@/lib/format";
 import { collectTags, tagsOf } from "@/lib/tags";
 import { searchHaystack } from "@/lib/search";
 import { Button } from "@/components/ui/button";
@@ -67,10 +67,6 @@ type SortKey = "updated" | "title" | "score" | "progress";
 
 const SORT_KEYS: SortKey[] = ["updated", "title", "score", "progress"];
 
-/** The media-format vocabulary per list — a closed enum, unlike tags, so the
-    URL param is validated against it rather than against the data. */
-const ANIME_FORMATS = ["TV", "TV_SHORT", "MOVIE", "SPECIAL", "OVA", "ONA", "MUSIC"] as const;
-const MANGA_FORMATS = ["MANGA", "NOVEL", "ONE_SHOT"] as const;
 /** Manhwa/Manhua are not formats on AniList — they are `countryOfOrigin`. */
 const ORIGINS = ["JP", "KR", "CN", "TW"] as const;
 
@@ -135,7 +131,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
     ? (rawSort as SortKey)
     : "updated";
   const tagFilter = params.get("tag") ?? "";
-  const formats = type === "ANIME" ? ANIME_FORMATS : MANGA_FORMATS;
+  const formats = MEDIA_FORMATS[type];
   const rawFormat = params.get("format") ?? "";
   const formatFilter = (formats as readonly string[]).includes(rawFormat) ? rawFormat : "";
   const rawCountry = params.get("country") ?? "";

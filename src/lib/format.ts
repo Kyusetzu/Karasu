@@ -1,18 +1,17 @@
 import type { TFunction } from "i18next";
 
+/**
+ * The format vocabulary per medium — the closed enum the list and search
+ * filters validate against. One definition, or the two filter surfaces
+ * drift.
+ */
+export const MEDIA_FORMATS = {
+  ANIME: ["TV", "TV_SHORT", "MOVIE", "SPECIAL", "OVA", "ONA", "MUSIC"],
+  MANGA: ["MANGA", "NOVEL", "ONE_SHOT"],
+} as const;
+
 /** AniList media-format enum values we have explicit labels for. */
-const KNOWN = new Set([
-  "TV",
-  "TV_SHORT",
-  "MOVIE",
-  "SPECIAL",
-  "OVA",
-  "ONA",
-  "MUSIC",
-  "MANGA",
-  "NOVEL",
-  "ONE_SHOT",
-]);
+const KNOWN = new Set<string>([...MEDIA_FORMATS.ANIME, ...MEDIA_FORMATS.MANGA]);
 
 /**
  * Human-readable label for an AniList media format (e.g. `TV_SHORT` →

@@ -82,6 +82,87 @@ export async function searchMedia(
   return data.Page;
 }
 
+/**
+ * The filterable search — every argument optional, so one query serves
+ * "search for X", "browse trending", and any combination. `gql`'s JSON body
+ * drops undefined keys, and AniList treats an absent variable's argument as
+ * no filter (its own site pages exactly this shape). Kept separate from
+ * `SEARCH_QUERY`, which the match picker and split modal still use bare.
+ */
+const BROWSE_QUERY = `
+query ($search: String, $type: MediaType!, $page: Int, $isAdult: Boolean, $genre: String, $tag: String, $seasonYear: Int, $season: MediaSeason, $format: MediaFormat, $status: MediaStatus, $sort: [MediaSort], $scoreFormat: ScoreFormat) {
+  Page(page: $page, perPage: 30) {
+    pageInfo { hasNextPage }
+    media(search: $search, type: $type, isAdult: $isAdult, genre: $genre, tag: $tag, seasonYear: $seasonYear, season: $season, format: $format, status: $status, sort: $sort) {
+      ${MEDIA_FIELDS}
+    }
+  }
+}`;
+
+export interface BrowseFilters {
+  search?: string;
+  genre?: string;
+  tag?: string;
+  seasonYear?: number;
+  season?: Season;
+  format?: string;
+  status?: string;
+  /** A MediaSort value; defaults server-side matter, so always pass one. */
+  sort: string;
+}
+
+export async function browseMedia(
+  type: MediaType,
+  filters: BrowseFilters,
+  page = 1,
+  isAdult?: boolean,
+) {
+  const data = await gql<{
+    Page: { pageInfo: { hasNextPage: boolean }; media: MediaWithListStatus[] };
+  }>(BROWSE_QUERY, {
+    type,
+    page,
+    search: filters.search || undefined,
+    genre: filters.genre || undefined,
+    tag: filters.tag || undefined,
+    seasonYear: filters.seasonYear || undefined,
+    season: filters.season || undefined,
+    format: filters.format || undefined,
+    status: filters.status || undefined,
+    sort: [filters.sort],
+    ...adultVars(isAdult),
+    ...scoreFormatVar(),
+  });
+  return data.Page;
+}
+
+/**
+ * The filter vocabularies AniList defines server-side. One request, cached
+ * effectively forever — genres change on the order of years. Adult-only
+ * tags carry their flag so the content filter can drop them from the picker.
+ */
+const GENRE_TAG_QUERY = `
+query {
+  GenreCollection
+  MediaTagCollection { name isAdult }
+}`;
+
+export interface GenreTagCollections {
+  genres: string[];
+  tags: { name: string; isAdult: boolean | null }[];
+}
+
+export async function genreTagCollections(): Promise<GenreTagCollections> {
+  const data = await gql<{
+    GenreCollection: (string | null)[] | null;
+    MediaTagCollection: { name: string; isAdult: boolean | null }[] | null;
+  }>(GENRE_TAG_QUERY, {});
+  return {
+    genres: (data.GenreCollection ?? []).filter((g): g is string => !!g),
+    tags: data.MediaTagCollection ?? [],
+  };
+}
+
 const SEASONAL_QUERY = `
 query ($season: MediaSeason!, $year: Int!, $page: Int, $isAdult: Boolean, $scoreFormat: ScoreFormat) {
   Page(page: $page, perPage: 50) {

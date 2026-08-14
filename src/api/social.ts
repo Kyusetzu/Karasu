@@ -1,5 +1,10 @@
 import { gql } from "./anilist";
 import type { Media, MediaType } from "./types";
+import {
+  normalizeSiteNotification,
+  type RawSiteNotification,
+  type SiteNotifRow,
+} from "@/lib/siteNotifications";
 
 /**
  * AniList's social graph: profiles, followers, following, user search, and the
@@ -1156,6 +1161,88 @@ export async function userList(
     MediaListCollection: { lists: ForeignListGroup[] | null } | null;
   }>(USER_LIST_QUERY, { userId, type });
   return data.MediaListCollection?.lists ?? [];
+}
+
+// --- Site notifications ----------------------------------------------------
+
+/**
+ * AniList's own notification feed — the bell's second view.
+ *
+ * Nineteen inline fragments because the union has nineteen members the bell
+ * renders; each selects only what its row draws (a name, a title, a route),
+ * never the covers or avatars the icon tiles replace. The twentieth member,
+ * `ActivityMessageNotification`, is private mail and is excluded the same
+ * three ways `MessageActivity` is on the feeds: absent from `type_in`, given
+ * no inline fragment, and normalised to null in `lib/siteNotifications` with
+ * a test that says so. One consequence is honest and accepted: a message can
+ * make the server's unread count exceed what the list shows.
+ *
+ * `$reset` is passed as true on the first page only — that is AniList's own
+ * "mark seen": the server zeroes `unreadNotificationCount` when it serves the
+ * page. Later pages must not reset; they are history, not news.
+ */
+export const SITE_NOTIFICATIONS_QUERY = `
+query ($page: Int, $reset: Boolean) {
+  Page(page: $page, perPage: 15) {
+    ${PAGE_INFO}
+    notifications(resetNotificationCount: $reset, type_in: [
+      AIRING, FOLLOWING, ACTIVITY_MENTION, ACTIVITY_REPLY, ACTIVITY_REPLY_SUBSCRIBED,
+      ACTIVITY_LIKE, ACTIVITY_REPLY_LIKE, THREAD_COMMENT_MENTION, THREAD_COMMENT_REPLY,
+      THREAD_SUBSCRIBED, THREAD_COMMENT_LIKE, THREAD_LIKE, RELATED_MEDIA_ADDITION,
+      MEDIA_DATA_CHANGE, MEDIA_MERGE, MEDIA_DELETION, MEDIA_SUBMISSION_UPDATE,
+      STAFF_SUBMISSION_UPDATE, CHARACTER_SUBMISSION_UPDATE
+    ]) {
+      __typename
+      ... on AiringNotification { id createdAt episode media { id title { romaji english native } } }
+      ... on FollowingNotification { id createdAt user { id name } }
+      ... on ActivityMentionNotification { id createdAt user { id name } }
+      ... on ActivityReplyNotification { id createdAt user { id name } }
+      ... on ActivityReplySubscribedNotification { id createdAt user { id name } }
+      ... on ActivityLikeNotification { id createdAt user { id name } }
+      ... on ActivityReplyLikeNotification { id createdAt user { id name } }
+      ... on ThreadCommentMentionNotification { id createdAt user { id name } thread { id title } }
+      ... on ThreadCommentReplyNotification { id createdAt user { id name } thread { id title } }
+      ... on ThreadCommentSubscribedNotification { id createdAt user { id name } thread { id title } }
+      ... on ThreadCommentLikeNotification { id createdAt user { id name } thread { id title } }
+      ... on ThreadLikeNotification { id createdAt user { id name } thread { id title } }
+      ... on RelatedMediaAdditionNotification { id createdAt media { id title { romaji english native } } }
+      ... on MediaDataChangeNotification { id createdAt reason media { id title { romaji english native } } }
+      ... on MediaMergeNotification { id createdAt reason deletedMediaTitles media { id title { romaji english native } } }
+      ... on MediaDeletionNotification { id createdAt reason deletedMediaTitle }
+      ... on MediaSubmissionUpdateNotification { id createdAt status submittedTitle media { id title { romaji english native } } }
+      ... on StaffSubmissionUpdateNotification { id createdAt status staff { id name { full } } }
+      ... on CharacterSubmissionUpdateNotification { id createdAt status character { id name { full } } }
+    }
+  }
+}`;
+
+export interface SiteNotifPage {
+  pageInfo: PageInfo;
+  rows: SiteNotifRow[];
+}
+
+export async function siteNotifications(page: number, reset: boolean): Promise<SiteNotifPage> {
+  const data = await gql<{
+    Page: { pageInfo: PageInfo; notifications: (RawSiteNotification | null)[] | null };
+  }>(SITE_NOTIFICATIONS_QUERY, { page, reset });
+  return {
+    pageInfo: data.Page.pageInfo,
+    rows: (data.Page.notifications ?? [])
+      .map(normalizeSiteNotification)
+      .filter((r): r is SiteNotifRow => r !== null),
+  };
+}
+
+/** How much is waiting, for the tab's chip. Cheap by construction: one
+    scalar off the viewer, spent when the bell opens. */
+export const SITE_NOTIF_COUNT_QUERY = `
+query { Viewer { unreadNotificationCount } }`;
+
+export async function siteNotifCount(): Promise<number> {
+  const data = await gql<{ Viewer: { unreadNotificationCount: number | null } | null }>(
+    SITE_NOTIF_COUNT_QUERY,
+  );
+  return data.Viewer?.unreadNotificationCount ?? 0;
 }
 
 // --- Favourites -----------------------------------------------------------

@@ -1,11 +1,30 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router";
+import {
+  useInfiniteQuery,
+  useQuery,
+  useQueryClient,
+  type InfiniteData,
+} from "@tanstack/react-query";
 import { listen } from "@tauri-apps/api/event";
-import { Bell as BellIcon, CalendarClock, Clock, Film } from "lucide-react";
+import {
+  Bell as BellIcon,
+  CalendarClock,
+  Clock,
+  Film,
+  Heart,
+  MessageCircle,
+  UserPlus,
+} from "lucide-react";
 import { EmptyState, TickMarks } from "@/components/EmptyState";
+import { Segmented } from "@/components/ui/segmented";
+import { Button } from "@/components/ui/button";
+import { Shimmer } from "@/components/Skeleton";
 import { cn } from "@/lib/utils";
-import { relTime } from "@/lib/relTime";
+import { relTime, relTimeFromSeconds } from "@/lib/relTime";
 import { usePresence } from "@/hooks/usePresence";
+import { useAuth } from "@/stores/auth";
 import {
   getNotifications,
   isTauri,
@@ -13,6 +32,8 @@ import {
   markNotificationRead,
   type AppNotification,
 } from "@/api/anilist";
+import { siteNotifCount, siteNotifications, type SiteNotifPage } from "@/api/social";
+import type { SiteNotifKind, SiteNotifRow } from "@/lib/siteNotifications";
 
 const KIND_ICON: Record<string, typeof BellIcon> = {
   airing: CalendarClock,
@@ -32,10 +53,110 @@ const KIND_TINT: Record<string, string> = {
 };
 const DEFAULT_TINT = "bg-surface-800 text-ink-500";
 
+/** The site view reuses the same vocabulary: an episode is still accent, a
+    person is green, a like is a heart, talk is quiet ink, site housekeeping
+    is a film reel. Grouped by what the news *is*, not by API type. */
+const SITE_ICON: Record<SiteNotifKind, typeof BellIcon> = {
+  AIRING: CalendarClock,
+  FOLLOWING: UserPlus,
+  ACTIVITY_MENTION: MessageCircle,
+  ACTIVITY_REPLY: MessageCircle,
+  ACTIVITY_REPLY_SUBSCRIBED: MessageCircle,
+  ACTIVITY_LIKE: Heart,
+  ACTIVITY_REPLY_LIKE: Heart,
+  THREAD_COMMENT_MENTION: MessageCircle,
+  THREAD_COMMENT_REPLY: MessageCircle,
+  THREAD_SUBSCRIBED: MessageCircle,
+  THREAD_COMMENT_LIKE: Heart,
+  THREAD_LIKE: Heart,
+  RELATED_MEDIA_ADDITION: Film,
+  MEDIA_DATA_CHANGE: Film,
+  MEDIA_MERGE: Film,
+  MEDIA_DELETION: Film,
+  MEDIA_SUBMISSION_UPDATE: Film,
+  STAFF_SUBMISSION_UPDATE: Film,
+  CHARACTER_SUBMISSION_UPDATE: Film,
+};
+
+const SITE_TINT: Record<SiteNotifKind, string> = {
+  AIRING: "bg-accent-500/14 text-accent-400",
+  FOLLOWING: "bg-success/14 text-success",
+  ACTIVITY_MENTION: "bg-surface-800 text-ink-500",
+  ACTIVITY_REPLY: "bg-surface-800 text-ink-500",
+  ACTIVITY_REPLY_SUBSCRIBED: "bg-surface-800 text-ink-500",
+  ACTIVITY_LIKE: "bg-danger/14 text-danger",
+  ACTIVITY_REPLY_LIKE: "bg-danger/14 text-danger",
+  THREAD_COMMENT_MENTION: "bg-surface-800 text-ink-500",
+  THREAD_COMMENT_REPLY: "bg-surface-800 text-ink-500",
+  THREAD_SUBSCRIBED: "bg-surface-800 text-ink-500",
+  THREAD_COMMENT_LIKE: "bg-danger/14 text-danger",
+  THREAD_LIKE: "bg-danger/14 text-danger",
+  RELATED_MEDIA_ADDITION: "bg-gold/14 text-gold",
+  MEDIA_DATA_CHANGE: "bg-gold/14 text-gold",
+  MEDIA_MERGE: "bg-gold/14 text-gold",
+  MEDIA_DELETION: "bg-gold/14 text-gold",
+  MEDIA_SUBMISSION_UPDATE: "bg-gold/14 text-gold",
+  STAFF_SUBMISSION_UPDATE: "bg-gold/14 text-gold",
+  CHARACTER_SUBMISSION_UPDATE: "bg-gold/14 text-gold",
+};
+
+/** Literal `t()` per case, so `i18nKeys.test.ts` sees every key. AniList's own
+    `context` strings are English-only compositions and are never rendered. */
+function siteVerb(
+  row: SiteNotifRow,
+  t: (k: string, o?: Record<string, unknown>) => string,
+): string {
+  const name = row.actorName ?? "—";
+  switch (row.kind) {
+    case "AIRING":
+      return t("notif.siteAiring", { n: row.episode ?? 0 });
+    case "FOLLOWING":
+      return t("notif.siteFollowing");
+    case "ACTIVITY_MENTION":
+      return t("notif.siteActivityMention");
+    case "ACTIVITY_REPLY":
+      return t("notif.siteActivityReply");
+    case "ACTIVITY_REPLY_SUBSCRIBED":
+      return t("notif.siteActivityReplySubscribed");
+    case "ACTIVITY_LIKE":
+      return t("notif.siteActivityLike");
+    case "ACTIVITY_REPLY_LIKE":
+      return t("notif.siteActivityReplyLike");
+    case "THREAD_COMMENT_MENTION":
+      return t("notif.siteThreadMention", { name });
+    case "THREAD_COMMENT_REPLY":
+      return t("notif.siteThreadReply", { name });
+    case "THREAD_SUBSCRIBED":
+      return t("notif.siteThreadSubscribed", { name });
+    case "THREAD_COMMENT_LIKE":
+      return t("notif.siteThreadCommentLike", { name });
+    case "THREAD_LIKE":
+      return t("notif.siteThreadLike", { name });
+    case "RELATED_MEDIA_ADDITION":
+      return t("notif.siteRelatedAdded");
+    case "MEDIA_DATA_CHANGE":
+      return t("notif.siteDataChange");
+    case "MEDIA_MERGE":
+      return t("notif.siteMerge");
+    case "MEDIA_DELETION":
+      return t("notif.siteDeleted");
+    case "MEDIA_SUBMISSION_UPDATE":
+      return t("notif.siteSubmissionMedia");
+    case "STAFF_SUBMISSION_UPDATE":
+      return t("notif.siteSubmissionStaff");
+    case "CHARACTER_SUBMISSION_UPDATE":
+      return t("notif.siteSubmissionCharacter");
+  }
+}
+
 export default function Bell() {
   const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
+  const qc = useQueryClient();
+  const mode = useAuth((s) => s.mode);
   const [items, setItems] = useState<AppNotification[]>([]);
   const [open, setOpen] = useState(false);
+  const [view, setView] = useState<"local" | "site">("local");
   const panel = usePresence(open);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -73,6 +194,61 @@ export default function Bell() {
     };
   }, [open]);
 
+  const anilist = mode === "anilist";
+
+  // One scalar off the viewer, spent when the panel opens — this is what the
+  // AniList segment's chip shows. No background polling by design: the count
+  // is as fresh as the last open, which is the only moment it is looked at.
+  const count = useQuery({
+    queryKey: ["social", "notifCount"],
+    queryFn: siteNotifCount,
+    enabled: isTauri && open && anilist,
+    staleTime: 60_000,
+  });
+
+  // The feed itself costs a request only when the AniList view is chosen —
+  // the second user-initiated moment. The first page passes `reset`, which is
+  // AniList's own mark-seen; when that page lands, the count is zeroed right
+  // here in the resolution path — cancel first, the house rule for every
+  // optimistic write, because an in-flight count read that was computed
+  // before the reset would otherwise land afterwards and resurrect the chip.
+  const site = useInfiniteQuery({
+    queryKey: ["social", "siteNotifs"],
+    queryFn: async ({ pageParam }) => {
+      const reset = pageParam === 1;
+      const page = await siteNotifications(pageParam, reset);
+      if (reset) {
+        await qc.cancelQueries({ queryKey: ["social", "notifCount"] });
+        qc.setQueryData(["social", "notifCount"], 0);
+      }
+      return page;
+    },
+    initialPageParam: 1,
+    getNextPageParam: (last, all) => (last.pageInfo.hasNextPage ? all.length + 1 : undefined),
+    enabled: isTauri && open && anilist && view === "site",
+    staleTime: 60_000,
+  });
+
+  // Trim retained pages when the panel closes, so a later stale open refetches
+  // one page rather than every page the last session walked — the infinite-
+  // query trap `UserList` documents, stepped around the way `Thread` does.
+  // The fetch-time clock is preserved on purpose: `setQueryData` stamps "now"
+  // by default, and a trim is housekeeping, not fresh data — restamping would
+  // postpone the reopen refetch (and its mark-seen) for as long as the user
+  // keeps glancing at the bell. Same lesson `usePrimedLists` backdates for.
+  useEffect(() => {
+    if (open) return;
+    const updatedAt = qc.getQueryState(["social", "siteNotifs"])?.dataUpdatedAt;
+    qc.setQueryData<InfiniteData<SiteNotifPage>>(
+      ["social", "siteNotifs"],
+      (old) =>
+        old && old.pages.length > 1
+          ? { pages: old.pages.slice(0, 1), pageParams: old.pageParams.slice(0, 1) }
+          : undefined,
+      { updatedAt },
+    );
+  }, [open, qc]);
+
   const unread = items.filter((n) => !n.read).length;
 
   const readOne = async (n: AppNotification) => {
@@ -92,6 +268,21 @@ export default function Bell() {
     ["notif.groupNew", items.filter((n) => !n.read)],
     ["notif.groupEarlier", items.filter((n) => n.read)],
   ];
+
+  const siteRows = (site.data?.pages ?? []).flatMap((p) => p.rows);
+  const siteUnread = count.data ?? 0;
+
+  // `view` is plain state nothing resets on sign-out, and the Segmented — its
+  // only writer — hides outside anilist mode. Rendering from the raw state
+  // would strand a signed-out bell on a site view it can neither fetch nor
+  // leave, so the branch is taken on this instead.
+  const shownView = anilist ? view : "local";
+
+  const openRow = (row: SiteNotifRow) => {
+    if (!row.target) return;
+    setOpen(false);
+    navigate(row.target);
+  };
 
   return (
     <div ref={ref} className="relative flex items-center">
@@ -126,11 +317,11 @@ export default function Bell() {
               <span className="text-2xs font-semibold uppercase tracking-[.14em] text-ink-600">
                 {t("notif.title")}
               </span>
-              {unread > 0 && (
+              {shownView === "local" && unread > 0 && (
                 <span className="text-2xs tabular-nums text-ink-500">{unread}</span>
               )}
             </span>
-            {unread > 0 && (
+            {shownView === "local" && unread > 0 && (
               <button
                 onClick={readAll}
                 className="text-xs text-accent-400 hover:underline"
@@ -140,62 +331,162 @@ export default function Bell() {
             )}
           </div>
 
-          {items.length === 0 ? (
-            <EmptyState visual={<TickMarks />} title={t("notif.empty")} className="py-6" />
-          ) : (
-            <div className="max-h-96 overflow-y-auto">
-              {/* Unread first under their own heading. One flat stream by time
-                  buries a new episode under last week's read notices, which is
-                  the only thing anyone opens this for. */}
-              {groups.map(([label, list]) =>
-                list.length === 0 ? null : (
-                  <section key={label}>
-                    <h3 className="px-3 pb-1 pt-2.5 text-[.5625rem] font-semibold uppercase tracking-[.14em] text-ink-600">
-                      {t(label)}
-                    </h3>
-                    <ul>
-                      {list.map((n) => {
-                        const Icon = KIND_ICON[n.kind] ?? BellIcon;
-                        return (
-                          <li key={n.id}>
-                            <button
-                              onClick={() => readOne(n)}
-                              className={cn(
-                                "flex w-full items-start gap-2.5 px-3 py-2.5 text-left transition-surface hover:bg-surface-850",
-                                !n.read && "bg-[rgba(255,255,255,.018)]",
-                              )}
-                            >
-                              <span
+          {anilist && (
+            <div className="border-b border-hair px-3 py-2">
+              <Segmented
+                aria-label={t("notif.title")}
+                value={view}
+                onChange={setView}
+                segments={[
+                  { value: "local", label: t("notif.tabKarasu") },
+                  {
+                    value: "site",
+                    label: (
+                      <span className="flex items-center gap-1.5">
+                        {t("notif.tabAniList")}
+                        {siteUnread > 0 && (
+                          <span className="grid h-3.5 min-w-3.5 place-items-center rounded-[.4375rem] bg-accent-500 px-1 text-[.5625rem] font-semibold tabular-nums text-accent-ink">
+                            {siteUnread > 99 ? "99+" : siteUnread}
+                          </span>
+                        )}
+                      </span>
+                    ),
+                    title: t("notif.tabAniList"),
+                  },
+                ]}
+              />
+            </div>
+          )}
+
+          {shownView === "local" ? (
+            items.length === 0 ? (
+              <EmptyState visual={<TickMarks />} title={t("notif.empty")} className="py-6" />
+            ) : (
+              <div className="max-h-96 overflow-y-auto">
+                {/* Unread first under their own heading. One flat stream by time
+                    buries a new episode under last week's read notices, which is
+                    the only thing anyone opens this for. */}
+                {groups.map(([label, list]) =>
+                  list.length === 0 ? null : (
+                    <section key={label}>
+                      <h3 className="px-3 pb-1 pt-2.5 text-[.5625rem] font-semibold uppercase tracking-[.14em] text-ink-600">
+                        {t(label)}
+                      </h3>
+                      <ul>
+                        {list.map((n) => {
+                          const Icon = KIND_ICON[n.kind] ?? BellIcon;
+                          return (
+                            <li key={n.id}>
+                              <button
+                                onClick={() => readOne(n)}
                                 className={cn(
-                                  "mt-0.5 grid size-6 shrink-0 place-items-center rounded-md",
-                                  KIND_TINT[n.kind] ?? DEFAULT_TINT,
+                                  "flex w-full items-start gap-2.5 px-3 py-2.5 text-left transition-surface hover:bg-surface-850",
+                                  !n.read && "bg-[rgba(255,255,255,.018)]",
                                 )}
                               >
-                                <Icon className="size-3.25" />
-                              </span>
-                              <span className="min-w-0 flex-1">
-                                <span className="flex items-center gap-2">
-                                  <span className="truncate text-[.8125rem] font-medium text-ink-100">
-                                    {n.title}
-                                  </span>
-                                  {!n.read && (
-                                    <span className="size-1.5 shrink-0 rounded-full bg-accent-500" />
+                                <span
+                                  className={cn(
+                                    "mt-0.5 grid size-6 shrink-0 place-items-center rounded-md",
+                                    KIND_TINT[n.kind] ?? DEFAULT_TINT,
                                   )}
+                                >
+                                  <Icon className="size-3.25" />
                                 </span>
-                                <span className="mt-0.5 block text-xs text-ink-500">
-                                  {n.body}
+                                <span className="min-w-0 flex-1">
+                                  <span className="flex items-center gap-2">
+                                    <span className="truncate text-[.8125rem] font-medium text-ink-100">
+                                      {n.title}
+                                    </span>
+                                    {!n.read && (
+                                      <span className="size-1.5 shrink-0 rounded-full bg-accent-500" />
+                                    )}
+                                  </span>
+                                  <span className="mt-0.5 block text-xs text-ink-500">
+                                    {n.body}
+                                  </span>
+                                  <span className="mt-0.5 block text-2xs text-ink-600">
+                                    {relTime(n.createdMs, i18n.language, t("notif.now"))}
+                                  </span>
                                 </span>
-                                <span className="mt-0.5 block text-2xs text-ink-600">
-                                  {relTime(n.createdMs, i18n.language, t("notif.now"))}
-                                </span>
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </section>
+                  ),
+                )}
+              </div>
+            )
+          ) : (
+            <div className="max-h-96 overflow-y-auto">
+              {site.isLoading && (
+                <div className="space-y-2 p-3">
+                  <Shimmer className="h-10 w-full rounded-lg" />
+                  <Shimmer className="h-10 w-full rounded-lg" />
+                </div>
+              )}
+              {site.error != null && (
+                <p className="px-3 py-4 text-xs text-danger">
+                  {t("common.error", { message: String(site.error) })}
+                </p>
+              )}
+              {site.data && siteRows.length === 0 && (
+                <EmptyState visual={<TickMarks />} title={t("notif.siteEmpty")} className="py-6" />
+              )}
+              {siteRows.length > 0 && (
+                <ul>
+                  {siteRows.map((row) => {
+                    const Icon = SITE_ICON[row.kind];
+                    return (
+                      <li key={row.id}>
+                        <button
+                          onClick={() => openRow(row)}
+                          disabled={!row.target}
+                          className="flex w-full items-start gap-2.5 px-3 py-2.5 text-left transition-surface hover:bg-surface-850 disabled:hover:bg-transparent"
+                        >
+                          <span
+                            className={cn(
+                              "mt-0.5 grid size-6 shrink-0 place-items-center rounded-md",
+                              SITE_TINT[row.kind],
+                            )}
+                          >
+                            <Icon className="size-3.25" />
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-[.8125rem] font-medium text-ink-100">
+                              {row.title}
+                            </span>
+                            <span className="mt-0.5 block text-xs text-ink-500">
+                              {siteVerb(row, t)}
+                            </span>
+                            {row.detail && (
+                              <span className="mt-0.5 block truncate text-2xs text-ink-600">
+                                {row.detail}
                               </span>
-                            </button>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </section>
-                ),
+                            )}
+                            <span className="mt-0.5 block text-2xs text-ink-600">
+                              {relTimeFromSeconds(row.createdAt, i18n.language, t("notif.now"))}
+                            </span>
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+              {site.hasNextPage && (
+                <div className="border-t border-hair p-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => site.fetchNextPage()}
+                    disabled={site.isFetchingNextPage}
+                    className="w-full"
+                  >
+                    {t("social.loadMorePlain")}
+                  </Button>
+                </div>
               )}
             </div>
           )}

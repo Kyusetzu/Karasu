@@ -485,6 +485,80 @@ export async function streamingEpisodes(id: number): Promise<StreamingEpisode[]>
 }
 
 /**
+ * Cast and staff, paged together behind the detail page's fold.
+ *
+ * One `$page` drives both edge lists — coarse, but it keeps "load more" at
+ * one request per click, and whichever list runs out first simply stops
+ * contributing rows while its `hasNextPage` goes false. Voice actors are the
+ * Japanese cast, matching the site's default. No `pageInfo.total` is read:
+ * on these collections it is the capped sentinel, so the button is countless.
+ */
+const CAST_QUERY = `
+query ($id: Int!, $page: Int) {
+  Media(id: $id) {
+    characters(page: $page, perPage: 12, sort: [ROLE, RELEVANCE, ID]) {
+      pageInfo { hasNextPage }
+      edges {
+        role
+        node { id name { full } image { medium } }
+        voiceActors(language: JAPANESE, sort: RELEVANCE) {
+          id
+          name { full }
+          image { medium }
+        }
+      }
+    }
+    staff(page: $page, perPage: 12, sort: RELEVANCE) {
+      pageInfo { hasNextPage }
+      edges { role node { id name { full } image { medium } } }
+    }
+  }
+}`;
+
+export interface CastPerson {
+  id: number;
+  name: { full: string | null };
+  image: { medium: string | null };
+}
+
+export interface CastPage {
+  characters: {
+    /** MAIN | SUPPORTING | BACKGROUND */
+    role: string | null;
+    node: CastPerson;
+    voiceActors: CastPerson[];
+  }[];
+  staff: {
+    /** Free text from AniList ("Director", "Original Creator", …). */
+    role: string | null;
+    node: CastPerson;
+  }[];
+  hasMoreCharacters: boolean;
+  hasMoreStaff: boolean;
+}
+
+export async function mediaCast(id: number, page: number): Promise<CastPage> {
+  const data = await gql<{
+    Media: {
+      characters: {
+        pageInfo: { hasNextPage: boolean | null };
+        edges: CastPage["characters"];
+      };
+      staff: {
+        pageInfo: { hasNextPage: boolean | null };
+        edges: CastPage["staff"];
+      };
+    };
+  }>(CAST_QUERY, { id, page });
+  return {
+    characters: data.Media.characters.edges ?? [],
+    staff: data.Media.staff.edges ?? [],
+    hasMoreCharacters: data.Media.characters.pageInfo.hasNextPage === true,
+    hasMoreStaff: data.Media.staff.pageInfo.hasNextPage === true,
+  };
+}
+
+/**
  * The trending curve — how much the site is talking about a title, day by
  * day. One page of 25 is the last few weeks, which is the part with a shape;
  * fetched only when the fold opens, like the episode list above.

@@ -1,11 +1,17 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { ChevronRight, Clock, ExternalLink, Play, Star, Trophy } from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   animeDetail,
+  mediaCast,
   mediaTrends,
   streamingEpisodes,
   type ExternalLink as ExternalLinkData,
@@ -13,6 +19,7 @@ import {
   type MediaTag,
 } from "@/api/queries";
 import { AreaChart } from "@/components/stats/AreaChart";
+import { Avatar } from "@/components/ui/user-lockup";
 import {
   countdown,
   formatLabel,
@@ -358,6 +365,10 @@ export default function AnimeDetail() {
             <LinkList links={data.externalLinks ?? []} />
           </div>
 
+          <div className="2xl:col-span-2">
+            <CastSection mediaId={data.id} />
+          </div>
+
           {relatedEdges.length > 0 && (
             <div className="2xl:col-span-2">
               <div className="flex items-center justify-between">
@@ -473,6 +484,148 @@ function EpisodesSection({ mediaId }: { mediaId: number }) {
                 </button>
               ))}
             </div>
+          )}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+/** Literal switch, so `i18nKeys.test.ts` sees every key. Staff roles are
+    free text from the API and render as data; only character roles are a
+    closed enum worth translating. */
+function characterRole(role: string | null, t: (k: string) => string): string {
+  switch (role) {
+    case "MAIN":
+      return t("detail.roleMain");
+    case "SUPPORTING":
+      return t("detail.roleSupporting");
+    case "BACKGROUND":
+      return t("detail.roleBackground");
+    default:
+      return "";
+  }
+}
+
+/**
+ * Cast and staff behind a fold, finally linking the character/staff pages
+ * from the one place people expect to reach them. One request per "load
+ * more" click pages both lists together; the button is countless because
+ * `pageInfo.total` is the capped sentinel on these collections.
+ */
+function CastSection({ mediaId }: { mediaId: number }) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const cast = useInfiniteQuery({
+    queryKey: ["cast", mediaId],
+    queryFn: ({ pageParam }) => mediaCast(mediaId, pageParam),
+    initialPageParam: 1,
+    getNextPageParam: (last, all) =>
+      last.hasMoreCharacters || last.hasMoreStaff ? all.length + 1 : undefined,
+    enabled: isTauri && open,
+    staleTime: 6 * 60 * 60 * 1000,
+  });
+
+  const characters = (cast.data?.pages ?? []).flatMap((p) => p.characters);
+  const staff = (cast.data?.pages ?? []).flatMap((p) => p.staff);
+
+  return (
+    <Card>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-2 text-left"
+      >
+        <CardTitle>{t("detail.cast")}</CardTitle>
+        <ChevronRight
+          className={cn("size-4 shrink-0 text-ink-500 transition-transform", open && "rotate-90")}
+        />
+      </button>
+      {open && (
+        <div className="mt-3 space-y-5">
+          {cast.isLoading && <Shimmer className="h-24 w-full rounded-lg" />}
+          {cast.error != null && (
+            <p className="text-sm text-danger">
+              {t("common.error", { message: String(cast.error) })}
+            </p>
+          )}
+          {characters.length > 0 && (
+            <div>
+              <p className="text-2xs font-semibold uppercase tracking-[.1em] text-ink-600">
+                {t("detail.castCharacters")}
+              </p>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                {characters.map((c) => {
+                  const va = c.voiceActors[0];
+                  return (
+                    <div
+                      key={c.node.id}
+                      className="flex items-center justify-between gap-3 rounded-lg bg-surface-900 p-2"
+                    >
+                      <Link
+                        to={`/character/${c.node.id}`}
+                        className="flex min-w-0 items-center gap-2.5 transition-surface hover:text-accent-400"
+                      >
+                        <Avatar src={c.node.image.medium} name={c.node.name.full ?? "?"} />
+                        <span className="min-w-0">
+                          <span className="block truncate text-xs text-ink-100">
+                            {c.node.name.full}
+                          </span>
+                          <span className="block text-2xs text-ink-600">
+                            {characterRole(c.role, t)}
+                          </span>
+                        </span>
+                      </Link>
+                      {va && (
+                        <Link
+                          to={`/staff/${va.id}`}
+                          className="flex min-w-0 shrink-0 items-center gap-2.5 transition-surface hover:text-accent-400"
+                        >
+                          <span className="block max-w-28 truncate text-right text-xs text-ink-300">
+                            {va.name.full}
+                          </span>
+                          <Avatar src={va.image.medium} name={va.name.full ?? "?"} />
+                        </Link>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          {staff.length > 0 && (
+            <div>
+              <p className="text-2xs font-semibold uppercase tracking-[.1em] text-ink-600">
+                {t("detail.castStaff")}
+              </p>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {staff.map((s, i) => (
+                  <Link
+                    key={`${s.node.id}-${i}`}
+                    to={`/staff/${s.node.id}`}
+                    className="flex min-w-0 items-center gap-2.5 rounded-lg bg-surface-900 p-2 transition-surface hover:text-accent-400"
+                  >
+                    <Avatar src={s.node.image.medium} name={s.node.name.full ?? "?"} />
+                    <span className="min-w-0">
+                      <span className="block truncate text-xs text-ink-100">
+                        {s.node.name.full}
+                      </span>
+                      <span className="block truncate text-2xs text-ink-600">{s.role}</span>
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+          {cast.hasNextPage && (
+            <Button
+              variant="outline"
+              size="control"
+              onClick={() => cast.fetchNextPage()}
+              disabled={cast.isFetchingNextPage}
+            >
+              {t("social.loadMorePlain")}
+            </Button>
           )}
         </div>
       )}

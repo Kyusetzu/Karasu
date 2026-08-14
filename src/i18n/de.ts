@@ -693,6 +693,14 @@ export const de: typeof en = {
   entry: {
     scoreHint: "Klick auf die vergebene Bewertung, um sie zu löschen.",
     scoreHintInput: "Feld leer lassen, um die Bewertung zu löschen.",
+    startDate: "Begonnen",
+    finishDate: "Abgeschlossen",
+    clearDate: "Leeren",
+    partialDate: "Aktuell: {{date}} — ein gewähltes Datum ersetzt es.",
+    private: "Privat",
+    hidden: "Aus Status-Listen ausblenden",
+    hiddenHint:
+      "Auf anilist.co erscheint der Eintrag dann nur in eigenen Listen, nicht unter Schaue/Abgeschlossen.",
     rewatches: "Wiederholungen",
     rereads: "Wiederholungen",
     addRepeat: "+1",

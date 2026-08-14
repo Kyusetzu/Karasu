@@ -5,10 +5,13 @@ import {
   displayTitle,
   maxProgress,
   STATUS_ORDER,
+  type FuzzyDate,
   type MediaListStatus,
   type MediaTitle,
   type MediaType,
 } from "@/api/types";
+import { fuzzyDate } from "@/lib/format";
+import { useAuth } from "@/stores/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
@@ -33,6 +36,10 @@ export interface EditableEntry {
   score: number;
   repeat: number;
   notes: string | null;
+  private?: boolean;
+  hiddenFromStatusLists?: boolean | null;
+  startedAt?: FuzzyDate | null;
+  completedAt?: FuzzyDate | null;
 }
 
 export interface EntrySaveInput {
@@ -43,6 +50,63 @@ export interface EntrySaveInput {
   score: number;
   repeat: number;
   notes: string;
+  private?: boolean;
+  hiddenFromStatusLists?: boolean;
+  startedAt?: FuzzyDate;
+  completedAt?: FuzzyDate;
+}
+
+/** What AniList takes to *clear* a fuzzy date — all parts null. */
+const CLEARED_DATE: FuzzyDate = { year: null, month: null, day: null };
+
+/**
+ * A fuzzy date behind a native date input. The picker speaks full dates
+ * only; a partial value AniList already holds ("2019", "March 2024") shows
+ * as a caption underneath and survives untouched until the user picks or
+ * clears — at which point full-or-nothing is what gets written.
+ */
+function DateField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: FuzzyDate | null;
+  onChange: (d: FuzzyDate | null) => void;
+}) {
+  const { t, i18n } = useTranslation();
+  const full =
+    value?.year && value.month && value.day
+      ? `${value.year}-${String(value.month).padStart(2, "0")}-${String(value.day).padStart(2, "0")}`
+      : "";
+  return (
+    <label className="block text-sm">
+      <span className="mb-1 block text-ink-500">{label}</span>
+      <div className="flex items-center gap-1.5">
+        <Input
+          type="date"
+          value={full}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (!v) return onChange(null);
+            const [year, month, day] = v.split("-").map(Number);
+            onChange({ year, month, day });
+          }}
+          className="min-w-0 flex-1"
+        />
+        {value?.year != null && (
+          <Button type="button" variant="ghost" size="sm" onClick={() => onChange(null)}>
+            {t("entry.clearDate")}
+          </Button>
+        )}
+      </div>
+      {value?.year != null && !full && (
+        <span className="mt-1 block text-2xs text-ink-600">
+          {t("entry.partialDate", { date: fuzzyDate(value, i18n.language) })}
+        </span>
+      )}
+    </label>
+  );
 }
 
 /**
@@ -68,6 +132,7 @@ export default function EntryEditModal({
   tagSuggestions?: string[];
 }) {
   const { t } = useTranslation();
+  const mode = useAuth((s) => s.mode);
   const initial = parseNotes(entry?.notes);
   const [status, setStatus] = useState<MediaListStatus>(
     entry?.status ?? "PLANNING",
@@ -78,7 +143,17 @@ export default function EntryEditModal({
   const [repeat, setRepeat] = useState(entry?.repeat ?? 0);
   const [notes, setNotes] = useState(initial.notes);
   const [tags, setTags] = useState(initial.tags);
+  const [priv, setPriv] = useState(entry?.private ?? false);
+  const [hidden, setHidden] = useState(entry?.hiddenFromStatusLists ?? false);
+  const [started, setStarted] = useState<FuzzyDate | null>(entry?.startedAt ?? null);
+  const [completed, setCompleted] = useState<FuzzyDate | null>(entry?.completedAt ?? null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  // Sent only when touched: a caller that never loaded a date must not have
+  // this dialog silently clear it on an unrelated save.
+  const startedDirty = started !== (entry?.startedAt ?? null);
+  const completedDirty = completed !== (entry?.completedAt ?? null);
+  // The local list stores none of these — the controls would be a lie there.
+  const anilist = mode === "anilist";
   const max = maxProgress(media) ?? 99999;
   // Manga is tracked on two axes and always has been on AniList. A volume
   // count is not derivable from chapters — series split them differently, and
@@ -173,6 +248,41 @@ export default function EntryEditModal({
             </Button>
           </div>
         </label>
+        {anilist && (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <DateField label={t("entry.startDate")} value={started} onChange={setStarted} />
+              <DateField
+                label={t("entry.finishDate")}
+                value={completed}
+                onChange={setCompleted}
+              />
+            </div>
+            <div className="flex flex-wrap gap-x-5 gap-y-1.5">
+              <label className="flex cursor-pointer items-center gap-2 text-sm text-ink-300">
+                <input
+                  type="checkbox"
+                  checked={priv}
+                  onChange={(e) => setPriv(e.target.checked)}
+                  className="size-3.5 accent-accent-500"
+                />
+                {t("entry.private")}
+              </label>
+              <label
+                className="flex cursor-pointer items-center gap-2 text-sm text-ink-300"
+                title={t("entry.hiddenHint")}
+              >
+                <input
+                  type="checkbox"
+                  checked={hidden}
+                  onChange={(e) => setHidden(e.target.checked)}
+                  className="size-3.5 accent-accent-500"
+                />
+                {t("entry.hidden")}
+              </label>
+            </div>
+          </>
+        )}
         <label className="block text-sm">
           <span className="mb-1 block text-ink-500">{t("tags.label")}</span>
           <TagEditor
@@ -225,6 +335,18 @@ export default function EntryEditModal({
                   score,
                   repeat,
                   notes: serializeNotes(notes, tags),
+                  ...(anilist
+                    ? {
+                        private: priv,
+                        hiddenFromStatusLists: hidden,
+                        // A cleared date is written as all-null parts — that
+                        // is AniList's own "remove the date" spelling.
+                        ...(startedDirty ? { startedAt: started ?? CLEARED_DATE } : {}),
+                        ...(completedDirty
+                          ? { completedAt: completed ?? CLEARED_DATE }
+                          : {}),
+                      }
+                    : {}),
                 })
               }
             >

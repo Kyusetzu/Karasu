@@ -80,6 +80,9 @@ export interface MediaListEntry {
   updatedAt: number;
   /** Hidden from other users on AniList. */
   private: boolean;
+  /** Kept off the status lists on anilist.co (custom lists only). Optional:
+      SQLite-cached lists from before the field existed lack it. */
+  hiddenFromStatusLists?: boolean | null;
   startedAt: FuzzyDate | null;
   completedAt: FuzzyDate | null;
   media: Media;
@@ -108,6 +111,7 @@ export interface SaveEntryInput {
   repeat?: number;
   notes?: string;
   private?: boolean;
+  hiddenFromStatusLists?: boolean;
   startedAt?: FuzzyDate;
   completedAt?: FuzzyDate;
 }

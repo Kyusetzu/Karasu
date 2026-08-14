@@ -101,6 +101,7 @@ export function useListMutations(userId: number, mediaType: MediaType) {
     repeat: input.repeat ?? e.repeat,
     notes: input.notes ?? e.notes,
     private: input.private ?? e.private,
+    hiddenFromStatusLists: input.hiddenFromStatusLists ?? e.hiddenFromStatusLists,
     startedAt: input.startedAt ?? e.startedAt,
     completedAt: input.completedAt ?? e.completedAt,
     updatedAt: now,

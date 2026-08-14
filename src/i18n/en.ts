@@ -691,6 +691,14 @@ export const en = {
   entry: {
     scoreHint: "Click the score you gave to clear it.",
     scoreHintInput: "Leave the field empty to clear the score.",
+    startDate: "Started",
+    finishDate: "Finished",
+    clearDate: "Clear",
+    partialDate: "Currently: {{date}} — picking a date replaces it.",
+    private: "Private",
+    hidden: "Hide from status lists",
+    hiddenHint:
+      "On anilist.co the entry then appears only in custom lists, not under Watching/Completed.",
     rewatches: "Rewatches",
     rereads: "Rereads",
     addRepeat: "+1",

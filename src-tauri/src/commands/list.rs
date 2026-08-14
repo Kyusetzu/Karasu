@@ -30,6 +30,7 @@ query ($userId: Int!, $type: MediaType!, $scoreFormat: ScoreFormat) {
         updatedAt
         private
         hiddenFromStatusLists
+        customLists
         startedAt { year month day }
         completedAt { year month day }
         media {
@@ -100,9 +101,9 @@ pub(crate) fn viewer_score_format(db: &Db) -> &'static str {
 /// converts through `lib/scoreFormat.toRaw` before invoking, which also makes
 /// the offline queue safe to replay across a format change.
 const SAVE_MUTATION: &str = "
-mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int, $progressVolumes: Int, $scoreRaw: Int, $repeat: Int, $notes: String, $private: Boolean, $hiddenFromStatusLists: Boolean, $startedAt: FuzzyDateInput, $completedAt: FuzzyDateInput, $scoreFormat: ScoreFormat) {
-  SaveMediaListEntry(mediaId: $mediaId, status: $status, progress: $progress, progressVolumes: $progressVolumes, scoreRaw: $scoreRaw, repeat: $repeat, notes: $notes, private: $private, hiddenFromStatusLists: $hiddenFromStatusLists, startedAt: $startedAt, completedAt: $completedAt) {
-    id mediaId status progress progressVolumes repeat notes updatedAt private hiddenFromStatusLists
+mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int, $progressVolumes: Int, $scoreRaw: Int, $repeat: Int, $notes: String, $private: Boolean, $hiddenFromStatusLists: Boolean, $customLists: [String], $startedAt: FuzzyDateInput, $completedAt: FuzzyDateInput, $scoreFormat: ScoreFormat) {
+  SaveMediaListEntry(mediaId: $mediaId, status: $status, progress: $progress, progressVolumes: $progressVolumes, scoreRaw: $scoreRaw, repeat: $repeat, notes: $notes, private: $private, hiddenFromStatusLists: $hiddenFromStatusLists, customLists: $customLists, startedAt: $startedAt, completedAt: $completedAt) {
+    id mediaId status progress progressVolumes repeat notes updatedAt private hiddenFromStatusLists customLists
     startedAt { year month day }
     completedAt { year month day }
     score(format: $scoreFormat)

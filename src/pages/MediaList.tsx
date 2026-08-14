@@ -139,6 +139,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
   // filters an anime list by, so the param is simply ignored there.
   const countryFilter =
     type === "MANGA" && (ORIGINS as readonly string[]).includes(rawCountry) ? rawCountry : "";
+  const listFilter = params.get("list") ?? "";
   // The text filter is the one piece that keeps local state: the input echoes
   // every keystroke, and writing `history.replaceState` per keystroke is the
   // thing to avoid. It mirrors into `?q=` through the debounce below.
@@ -193,6 +194,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
         sort: SortKey;
         format: string;
         country: string;
+        list: string;
       }>,
     ) => {
       setParams(
@@ -205,6 +207,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
           if (patch.tagFilter !== undefined) write("tag", patch.tagFilter, "");
           if (patch.format !== undefined) write("format", patch.format, "");
           if (patch.country !== undefined) write("country", patch.country, "");
+          if (patch.list !== undefined) write("list", patch.list, "");
           if (patch.filter !== undefined) write("q", patch.filter.trim(), "");
           return p;
         },
@@ -294,11 +297,27 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
     [byStatus],
   );
 
+  // The account's custom lists for this media type — the groups byStatus
+  // deliberately skips are exactly where their names live.
+  const customListNames = useMemo(
+    () =>
+      (data?.lists ?? [])
+        .filter((g) => g.isCustomList)
+        .map((g) => g.name)
+        .sort(),
+    [data],
+  );
+
   // A tag that no longer exists anywhere must not keep the list empty.
   useEffect(() => {
     if (tagFilter && !allTags.some((x) => x.toLowerCase() === tagFilter.toLowerCase()))
       setView({ tagFilter: "" });
   }, [allTags, tagFilter, setView]);
+
+  // Same for a custom list deleted on anilist.co since the URL was minted.
+  useEffect(() => {
+    if (data && listFilter && !customListNames.includes(listFilter)) setView({ list: "" });
+  }, [data, customListNames, listFilter, setView]);
 
   /**
    * Search and sort keys, derived once per list change instead of once per
@@ -346,6 +365,9 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
       // country the entry never claimed.
       list = list.filter((e) => e.media.countryOfOrigin === countryFilter);
     }
+    if (listFilter) {
+      list = list.filter((e) => e.customLists?.[listFilter] === true);
+    }
     return [...list].sort((a, b) => {
       switch (sort) {
         case "title":
@@ -361,7 +383,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
           return b.updatedAt - a.updatedAt;
       }
     });
-  }, [byStatus, tab, deferredFilter, tagFilter, formatFilter, countryFilter, sort, searchKeys]);
+  }, [byStatus, tab, deferredFilter, tagFilter, formatFilter, countryFilter, listFilter, sort, searchKeys]);
 
   // Everything below must stay *above* the early returns: hooks after a
   // conditional return blow up on the loading → loaded transition. They are
@@ -519,7 +541,10 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
 
   // A filter or a tab change re-pools the entries, and index 12 in the old
   // pool is a different title in the new one.
-  useEffect(() => setFocus(null), [tab, deferredFilter, tagFilter, formatFilter, countryFilter, sort]);
+  useEffect(
+    () => setFocus(null),
+    [tab, deferredFilter, tagFilter, formatFilter, countryFilter, listFilter, sort],
+  );
 
   const unit = type === "ANIME" ? t("common.episodes") : t("common.chapters");
 
@@ -665,6 +690,15 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
               options={ORIGINS.map((c) => ({ value: c, label: originLabel(c, t) }))}
             />
           )}
+          {customListNames.length > 0 && (
+            <FilterSelect
+              label={t("list.listLabel")}
+              value={listFilter}
+              onChange={(v) => setView({ list: v })}
+              placeholder={t("list.allLists")}
+              options={customListNames.map((n) => ({ value: n, label: n }))}
+            />
+          )}
           {allTags.length > 0 && (
             <FilterSelect
               label={t("list.tagLabel")}
@@ -728,11 +762,17 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
           // list; a search that matched none is a fact about the query, and
           // the old single message could not tell them apart — so it never
           // offered the one thing that fixes the second case.
-          filter || tagFilter || formatFilter || countryFilter ? (
+          filter || tagFilter || formatFilter || countryFilter || listFilter ? (
             <EmptyState
               visual={
                 <StruckQuery
-                  query={filter || tagFilter || formatLabel(formatFilter, t) || countryFilter}
+                  query={
+                    filter ||
+                    tagFilter ||
+                    formatLabel(formatFilter, t) ||
+                    countryFilter ||
+                    listFilter
+                  }
                 />
               }
               title={t("list.noMatch", {
@@ -744,7 +784,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
                   size="control"
                   onClick={() => {
                     setFilter("");
-                    setView({ filter: "", tagFilter: "", format: "", country: "" });
+                    setView({ filter: "", tagFilter: "", format: "", country: "", list: "" });
                   }}
                 >
                   {t("list.clearFilter")}
@@ -842,6 +882,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
             media={{ ...entry.media, type }}
             entry={entry}
             tagSuggestions={allTags}
+            customListNames={customListNames}
             onClose={() => setEditing(null)}
             onSave={(input) => {
               save.mutate(input);

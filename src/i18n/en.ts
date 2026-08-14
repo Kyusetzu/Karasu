@@ -391,6 +391,8 @@ export const en = {
     originKR: "Manhwa (Korea)",
     originCN: "Manhua (China)",
     originTW: "Taiwan",
+    listLabel: "List",
+    allLists: "All lists",
     presetLabel: "Preset",
     offline: "Offline — showing local data.",
     pending: "{{count}} change(s) waiting to sync.",
@@ -699,6 +701,7 @@ export const en = {
     hidden: "Hide from status lists",
     hiddenHint:
       "On anilist.co the entry then appears only in custom lists, not under Watching/Completed.",
+    customLists: "Custom lists",
     rewatches: "Rewatches",
     rereads: "Rereads",
     addRepeat: "+1",

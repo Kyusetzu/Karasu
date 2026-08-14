@@ -38,6 +38,7 @@ export interface EditableEntry {
   notes: string | null;
   private?: boolean;
   hiddenFromStatusLists?: boolean | null;
+  customLists?: Record<string, boolean> | null;
   startedAt?: FuzzyDate | null;
   completedAt?: FuzzyDate | null;
 }
@@ -52,6 +53,7 @@ export interface EntrySaveInput {
   notes: string;
   private?: boolean;
   hiddenFromStatusLists?: boolean;
+  customLists?: string[];
   startedAt?: FuzzyDate;
   completedAt?: FuzzyDate;
 }
@@ -121,6 +123,7 @@ export default function EntryEditModal({
   onSave,
   onDelete,
   tagSuggestions = [],
+  customListNames,
 }: {
   /** On its way out — supplied by `Presence`. */
   leaving?: boolean;
@@ -130,6 +133,10 @@ export default function EntryEditModal({
   onSave: (input: EntrySaveInput) => void;
   onDelete?: () => void;
   tagSuggestions?: string[];
+  /** The account's custom-list names for this media type. Only callers that
+      hold the list payload can supply them; without them the section hides
+      and membership is left untouched. */
+  customListNames?: string[];
 }) {
   const { t } = useTranslation();
   const mode = useAuth((s) => s.mode);
@@ -147,6 +154,15 @@ export default function EntryEditModal({
   const [hidden, setHidden] = useState(entry?.hiddenFromStatusLists ?? false);
   const [started, setStarted] = useState<FuzzyDate | null>(entry?.startedAt ?? null);
   const [completed, setCompleted] = useState<FuzzyDate | null>(entry?.completedAt ?? null);
+  const [memberships, setMemberships] = useState<Set<string>>(
+    () =>
+      new Set(
+        Object.entries(entry?.customLists ?? {})
+          .filter(([, member]) => member)
+          .map(([name]) => name),
+      ),
+  );
+  const [membershipsDirty, setMembershipsDirty] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   // Sent only when touched: a caller that never loaded a date must not have
   // this dialog silently clear it on an unrelated save.
@@ -281,6 +297,35 @@ export default function EntryEditModal({
                 {t("entry.hidden")}
               </label>
             </div>
+            {(customListNames?.length ?? 0) > 0 && (
+              <div className="text-sm">
+                <span className="mb-1.5 block text-ink-500">{t("entry.customLists")}</span>
+                <div className="flex flex-wrap gap-x-5 gap-y-1.5">
+                  {customListNames!.map((name) => (
+                    <label
+                      key={name}
+                      className="flex cursor-pointer items-center gap-2 text-sm text-ink-300"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={memberships.has(name)}
+                        onChange={(e) => {
+                          setMembershipsDirty(true);
+                          setMemberships((prev) => {
+                            const next = new Set(prev);
+                            if (e.target.checked) next.add(name);
+                            else next.delete(name);
+                            return next;
+                          });
+                        }}
+                        className="size-3.5 accent-accent-500"
+                      />
+                      {name}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
           </>
         )}
         <label className="block text-sm">
@@ -339,6 +384,9 @@ export default function EntryEditModal({
                     ? {
                         private: priv,
                         hiddenFromStatusLists: hidden,
+                        // Membership only when touched: the write replaces the
+                        // whole set, so an untouched dialog must not send one.
+                        ...(membershipsDirty ? { customLists: [...memberships] } : {}),
                         // A cleared date is written as all-null parts — that
                         // is AniList's own "remove the date" spelling.
                         ...(startedDirty ? { startedAt: started ?? CLEARED_DATE } : {}),

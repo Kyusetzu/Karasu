@@ -83,6 +83,9 @@ export interface MediaListEntry {
   /** Kept off the status lists on anilist.co (custom lists only). Optional:
       SQLite-cached lists from before the field existed lack it. */
   hiddenFromStatusLists?: boolean | null;
+  /** Reads as a name→member map (AniList `Json`); *writes* take a plain
+      array of member names — the asymmetry is the API's, not ours. */
+  customLists?: Record<string, boolean> | null;
   startedAt: FuzzyDate | null;
   completedAt: FuzzyDate | null;
   media: Media;
@@ -112,6 +115,9 @@ export interface SaveEntryInput {
   notes?: string;
   private?: boolean;
   hiddenFromStatusLists?: boolean;
+  /** The complete set of custom lists this entry belongs to — the API
+      replaces membership wholesale, so always send every checked name. */
+  customLists?: string[];
   startedAt?: FuzzyDate;
   completedAt?: FuzzyDate;
 }

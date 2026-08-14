@@ -102,6 +102,10 @@ export function useListMutations(userId: number, mediaType: MediaType) {
     notes: input.notes ?? e.notes,
     private: input.private ?? e.private,
     hiddenFromStatusLists: input.hiddenFromStatusLists ?? e.hiddenFromStatusLists,
+    customLists:
+      input.customLists !== undefined
+        ? Object.fromEntries(input.customLists.map((n) => [n, true]))
+        : e.customLists,
     startedAt: input.startedAt ?? e.startedAt,
     completedAt: input.completedAt ?? e.completedAt,
     updatedAt: now,

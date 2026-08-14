@@ -392,6 +392,8 @@ export const de: typeof en = {
     originKR: "Manhwa (Korea)",
     originCN: "Manhua (China)",
     originTW: "Taiwan",
+    listLabel: "Liste",
+    allLists: "Alle Listen",
     presetLabel: "Preset",
     offline: "Offline — zeige lokalen Stand.",
     pending: "{{count}} Änderung(en) warten auf Synchronisation.",
@@ -701,6 +703,7 @@ export const de: typeof en = {
     hidden: "Aus Status-Listen ausblenden",
     hiddenHint:
       "Auf anilist.co erscheint der Eintrag dann nur in eigenen Listen, nicht unter Schaue/Abgeschlossen.",
+    customLists: "Eigene Listen",
     rewatches: "Wiederholungen",
     rereads: "Wiederholungen",
     addRepeat: "+1",

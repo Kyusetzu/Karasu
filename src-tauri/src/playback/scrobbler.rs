@@ -495,6 +495,12 @@ pub fn spawn(app: AppHandle) {
                 *app.state::<PlaybackState>().0.lock().unwrap() = now.clone();
                 let _ = app.emit("now-playing", &now);
                 crate::discord::sync(&app, now.as_ref());
+                // The tray mirrors the same change: menu row + tooltip.
+                crate::tray_set_now_playing(
+                    &app,
+                    now.as_ref()
+                        .map(|n| n.matched_title.as_deref().unwrap_or(&n.parsed_title)),
+                );
             }
 
             drive_session(&app).await;

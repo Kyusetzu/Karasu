@@ -71,9 +71,14 @@ pub fn get_media_detection(db: State<'_, Db>) -> bool {
     read_media_detection(&db)
 }
 
+/// The raw setter, for callers without a `State` handle — the tray toggle.
+pub(crate) fn write_media_detection(db: &Db, enabled: bool) -> Result<(), String> {
+    db.kv_set(MEDIA_DETECTION_KEY, if enabled { "1" } else { "0" })
+}
+
 #[tauri::command]
 pub fn set_media_detection(db: State<'_, Db>, enabled: bool) -> Result<(), String> {
-    db.kv_set(MEDIA_DETECTION_KEY, if enabled { "1" } else { "0" })
+    write_media_detection(&db, enabled)
 }
 
 /// Everything the Jellyfin source needs, or `None` when it isn't fully

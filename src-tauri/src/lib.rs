@@ -10,10 +10,11 @@ mod logging;
 mod playback;
 mod portable;
 
+use std::sync::Mutex;
 use tauri::{
-    menu::{Menu, MenuItem},
+    menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    AppHandle, Manager, WindowEvent,
+    AppHandle, Emitter, Manager, WindowEvent, Wry,
 };
 
 fn show_main_window(app: &AppHandle) {
@@ -21,6 +22,41 @@ fn show_main_window(app: &AppHandle) {
         let _ = window.show();
         let _ = window.unminimize();
         let _ = window.set_focus();
+    }
+}
+
+/// The tray menu items that change at runtime. Held in managed state because
+/// the builder's handles are the only way to mutate a menu after `build` —
+/// rebuilding the whole menu per update would tear it down under an open
+/// click. `None` when the tray itself failed to build (Linux without an
+/// AppIndicator host), and every writer tolerates that.
+pub struct TrayHandles(pub Mutex<Option<TrayItems>>);
+
+pub struct TrayItems {
+    pub now_playing: MenuItem<Wry>,
+    pub detection: CheckMenuItem<Wry>,
+}
+
+/// Reflects the current detection into the tray: the disabled first row
+/// names what is playing, the tooltip mirrors it for hover.
+///
+/// Tray labels are deliberately English-only for now: the UI language lives
+/// in the WebView's localStorage, which Rust cannot read, and the tray has
+/// been English ("Open Karasu"/"Quit") since it existed.
+pub fn tray_set_now_playing(app: &AppHandle, title: Option<&str>) {
+    if let Some(handles) = app.try_state::<TrayHandles>() {
+        if let Some(items) = handles.0.lock().unwrap().as_ref() {
+            let _ = items.now_playing.set_text(match title {
+                Some(t) => format!("▶ {t}"),
+                None => "Nothing playing".into(),
+            });
+        }
+    }
+    if let Some(tray) = app.tray_by_id("main-tray") {
+        let _ = tray.set_tooltip(Some(match title {
+            Some(t) => format!("Karasu — {t}"),
+            None => "Karasu".into(),
+        }));
     }
 }
 
@@ -66,9 +102,29 @@ fn hide_window_in_dev(_app: &tauri::App, _tray_present: bool) {}
 /// Split out of `setup` so the whole thing can be wrapped in `catch_unwind` —
 /// see the call site for why an ordinary `?` is not enough.
 fn build_tray(app: &tauri::App) -> tauri::Result<()> {
+    let detection_on = commands::read_media_detection(&app.state::<db::Db>());
+
+    // The first row states what detection sees; disabled because it is a
+    // fact, not an action — clicking a title with nothing behind it would be
+    // a button that does nothing.
+    let now_playing = MenuItem::with_id(app, "now", "Nothing playing", false, None::<&str>)?;
+    let scrobble = MenuItem::with_id(app, "scrobble", "Scrobble now", true, None::<&str>)?;
+    let sync = MenuItem::with_id(app, "sync", "Sync now", true, None::<&str>)?;
+    let detection =
+        CheckMenuItem::with_id(app, "detection", "Media detection", true, detection_on, None::<&str>)?;
+    let sep1 = PredefinedMenuItem::separator(app)?;
+    let sep2 = PredefinedMenuItem::separator(app)?;
     let show = MenuItem::with_id(app, "show", "Open Karasu", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&show, &quit])?;
+    let menu = Menu::with_items(
+        app,
+        &[&now_playing, &sep1, &scrobble, &sync, &detection, &sep2, &show, &quit],
+    )?;
+
+    app.manage(TrayHandles(Mutex::new(Some(TrayItems {
+        now_playing: now_playing.clone(),
+        detection: detection.clone(),
+    }))));
 
     // A window with no icon is a launch worth continuing, not one worth
     // aborting — the tray simply goes without.
@@ -84,6 +140,33 @@ fn build_tray(app: &tauri::App) -> tauri::Result<()> {
         .on_menu_event(|app, event| match event.id.as_ref() {
             "show" => show_main_window(app),
             "quit" => app.exit(0),
+            // Same path as the in-app confirm button; errors ("nothing is
+            // playing") land in the log rather than a toast nobody can see.
+            "scrobble" => {
+                let handle = app.clone();
+                tauri::async_runtime::spawn(async move {
+                    if let Err(e) = playback::scrobbler::confirm_pending(handle, true).await {
+                        logging::info("tray", format!("scrobble now: {e}"));
+                    }
+                });
+            }
+            // The frontend owns the sync (it drives the query cache), so the
+            // tray only rings the bell — GlobalKeys listens.
+            "sync" => {
+                let _ = app.emit("manual-sync", ());
+            }
+            // The check item toggles itself; the kv follows *it*, so the menu
+            // is the source of truth for what was just clicked. The 5s poll
+            // reads the key per tick, so it takes effect within one cycle.
+            "detection" => {
+                if let Some(handles) = app.try_state::<TrayHandles>() {
+                    if let Some(items) = handles.0.lock().unwrap().as_ref() {
+                        let enabled = items.detection.is_checked().unwrap_or(true);
+                        let db = app.state::<db::Db>();
+                        let _ = commands::write_media_detection(&db, enabled);
+                    }
+                }
+            }
             _ => {}
         })
         .on_tray_icon_event(|tray, event| {

@@ -1,6 +1,8 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
+import { listen } from "@tauri-apps/api/event";
+import { isTauri } from "@/api/anilist";
 import { isTyping } from "@/components/shell/KeyboardSheet";
 import { useManualSync } from "@/hooks/useManualSync";
 
@@ -63,6 +65,19 @@ export default function GlobalKeys() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [navigate, qc, sync, available]);
+
+  // The tray's "Sync now" — Rust only rings the bell, because the sync has
+  // to drive the frontend's query cache. Same StrictMode-safe cleanup as
+  // NowPlayingCard: the registration promise is awaited before unlistening.
+  useEffect(() => {
+    if (!isTauri) return;
+    const registered = listen("manual-sync", () => {
+      if (available) void sync();
+    });
+    return () => {
+      void registered.then((unlisten) => unlisten());
+    };
+  }, [sync, available]);
 
   return null;
 }

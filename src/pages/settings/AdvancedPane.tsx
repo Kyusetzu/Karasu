@@ -9,11 +9,13 @@ import * as api from "@/api/anilist";
 import { getLogDebug, getLogs, setLogDebug, type LogEntry } from "@/api/diagnostics";
 import { planRescale } from "@/lib/rescale";
 import { buildJsonExport, buildMalXml } from "@/lib/malExport";
+import { parseMalXml } from "@/lib/malImport";
+import { resolveMalChunk } from "@/api/queries";
 import { scoreScale } from "@/lib/scoreFormat";
 import { useAuth, useScoreFormat } from "@/stores/auth";
 import { usePlatform } from "@/stores/platform";
 import { showToast } from "@/stores/toast";
-import type { ListResult, MediaType } from "@/api/types";
+import type { ListResult, Media, MediaType } from "@/api/types";
 import { cn } from "@/lib/utils";
 import { Row, SELECT, Toggle } from "./shared";
 interface PortableStatus {
@@ -302,6 +304,113 @@ export function ExportSection() {
         <Button variant="secondary" disabled={busy} onClick={exportJson}>
           {t("settings.exportJson")}
         </Button>
+      </div>
+    </Card>
+  );
+}
+
+/**
+ * MAL XML into the local list — deliberately local mode only, per the plan:
+ * an account import would be one mutation per entry against the shared
+ * ~30/min budget, a seventeen-minute job wearing a button's clothes. The
+ * local list is a SQLite file; writing it is free.
+ *
+ * The costed part is *matching*, and it is paced and visible: fifty MAL ids
+ * per request, one request per chunk, progress on screen between them. What
+ * cannot be matched or parsed is counted into the final toast — an import
+ * that silently drops rows is how two trackers drift apart unnoticed.
+ * Imported per row: status, progress (both axes), score, rewatch count.
+ */
+export function ImportSection() {
+  const { t } = useTranslation();
+  const qc = useQueryClient();
+  const mode = useAuth((s) => s.mode);
+  const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<string | null>(null);
+
+  if (mode !== "local") return null;
+
+  const importMal = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      const xml = await invoke<string | null>("open_text", {
+        filterLabel: "MyAnimeList XML",
+        extension: "xml",
+      });
+      if (xml == null) return;
+      const parsed = parseMalXml(xml);
+      if (parsed.rows.length === 0) {
+        showToast({ kind: "error", text: t("settings.importNothing") });
+        return;
+      }
+
+      const ids = [...new Set(parsed.rows.map((r) => r.idMal))];
+      const byMal = new Map<number, Media>();
+      for (let i = 0; i < ids.length; i += 50) {
+        setProgress(
+          t("settings.importResolving", {
+            done: Math.min(i + 50, ids.length),
+            total: ids.length,
+          }),
+        );
+        const media = await resolveMalChunk(ids.slice(i, i + 50), parsed.type);
+        for (const m of media) {
+          if (m.idMal != null) byMal.set(m.idMal, m);
+        }
+      }
+
+      setProgress(t("settings.importWriting"));
+      let imported = 0;
+      let unmatched = parsed.skipped;
+      for (const row of parsed.rows) {
+        const media = byMal.get(row.idMal);
+        if (!media) {
+          unmatched += 1;
+          continue;
+        }
+        // Local scores are ten-point, which is MAL's own scale — no
+        // conversion, by construction rather than luck.
+        await api.saveListEntry(
+          {
+            mediaId: media.id,
+            status: row.status,
+            progress: row.progress,
+            progressVolumes: row.progressVolumes,
+            score: row.score,
+            repeat: row.repeat,
+          },
+          media,
+        );
+        imported += 1;
+      }
+
+      await qc.invalidateQueries({ queryKey: ["mediaList"] });
+      showToast({
+        kind: "success",
+        text:
+          unmatched > 0
+            ? t("settings.importDoneUnmatched", { n: imported, unmatched })
+            : t("settings.importDone", { n: imported }),
+      });
+    } catch (e) {
+      showToast({ kind: "error", text: t("settings.importFailed"), detail: String(e) });
+    } finally {
+      setBusy(false);
+      setProgress(null);
+    }
+  };
+
+  return (
+    <Card>
+      <CardTitle>{t("settings.import")}</CardTitle>
+      <p className="mt-2 text-sm text-ink-500">{t("settings.importHint")}</p>
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <Button variant="secondary" disabled={busy} onClick={importMal}>
+          {t("settings.importMal")}
+        </Button>
+        {progress && <span className="text-xs text-ink-500">{progress}</span>}
       </div>
     </Card>
   );

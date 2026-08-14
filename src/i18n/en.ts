@@ -1075,6 +1075,16 @@ export const en = {
       "{{n}} entries exported — {{skipped}} have no MyAnimeList id and were left out.",
     exportEmpty: "Nothing to export yet.",
     exportFailed: "The export did not finish",
+    import: "Import a list",
+    importHint:
+      "Reads a MyAnimeList XML export into your local list — status, progress, scores and rewatch counts. Existing entries for the same title are updated.",
+    importMal: "Import MAL XML…",
+    importNothing: "That file holds no importable entries.",
+    importResolving: "Matching titles… {{done}} / {{total}}",
+    importWriting: "Writing entries…",
+    importDone: "{{n}} entries imported.",
+    importDoneUnmatched: "{{n}} entries imported — {{unmatched}} couldn't be matched on AniList.",
+    importFailed: "The import did not finish",
     alScoreFormat: "Score format",
     alScoreFormatHint:
       "The scale your scores use everywhere — in Karasu, on anilist.co and in every other client. Existing scores are converted, not lost.",

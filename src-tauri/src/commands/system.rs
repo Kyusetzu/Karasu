@@ -431,6 +431,50 @@ pub fn save_text(
     }
 }
 
+/// `save_text`'s opposite: an open dialog plus the read, same remembered
+/// folder, same division of labour — the WebView asks for a *kind* of file
+/// and receives text, never a path and never a filesystem door. Bounded at
+/// 16 MB because the only caller is the list import and a list export is
+/// kilobytes; a mistaken pick of something huge should fail, not OOM.
+#[tauri::command]
+pub fn open_text(
+    app: tauri::AppHandle,
+    db: State<'_, Db>,
+    filter_label: String,
+    extension: String,
+) -> Result<Option<String>, String> {
+    use tauri_plugin_dialog::DialogExt;
+
+    let mut builder = app.dialog().file();
+    if let Some(dir) = db.kv_get(EXPORT_DIR_KEY) {
+        let dir = std::path::PathBuf::from(dir);
+        if dir.is_dir() {
+            builder = builder.set_directory(dir);
+        }
+    }
+    let path = builder
+        .add_filter(filter_label, &[extension.as_str()])
+        .blocking_pick_file()
+        .and_then(|p| p.into_path().ok());
+
+    match path {
+        Some(p) => {
+            const MAX_BYTES: u64 = 16 * 1024 * 1024;
+            let size = std::fs::metadata(&p).map(|m| m.len()).unwrap_or(0);
+            if size > MAX_BYTES {
+                return Err("That file is too large to be a list export".into());
+            }
+            let contents = std::fs::read_to_string(&p)
+                .map_err(|e| format!("Could not read the file: {e}"))?;
+            if let Some(dir) = p.parent() {
+                let _ = db.kv_set(EXPORT_DIR_KEY, &dir.to_string_lossy());
+            }
+            Ok(Some(contents))
+        }
+        None => Ok(None),
+    }
+}
+
 #[tauri::command]
 pub fn get_autostart(app: tauri::AppHandle) -> bool {
     use tauri_plugin_autostart::ManagerExt;

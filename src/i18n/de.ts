@@ -1083,6 +1083,17 @@ export const de: typeof en = {
       "{{n}} Einträge exportiert — {{skipped}} haben keine MyAnimeList-ID und wurden ausgelassen.",
     exportEmpty: "Noch nichts zu exportieren.",
     exportFailed: "Der Export wurde nicht abgeschlossen",
+    import: "Liste importieren",
+    importHint:
+      "Liest einen MyAnimeList-XML-Export in deine lokale Liste — Status, Fortschritt, Bewertungen und Rewatch-Zähler. Vorhandene Einträge desselben Titels werden aktualisiert.",
+    importMal: "MAL-XML importieren…",
+    importNothing: "Diese Datei enthält keine importierbaren Einträge.",
+    importResolving: "Titel werden zugeordnet… {{done}} / {{total}}",
+    importWriting: "Einträge werden geschrieben…",
+    importDone: "{{n}} Einträge importiert.",
+    importDoneUnmatched:
+      "{{n}} Einträge importiert — {{unmatched}} konnten auf AniList nicht zugeordnet werden.",
+    importFailed: "Der Import wurde nicht abgeschlossen",
     alScoreFormat: "Bewertungsformat",
     alScoreFormatHint:
       "Die Skala für deine Bewertungen überall — in Karasu, auf anilist.co und in jedem anderen Client. Bestehende Bewertungen werden umgerechnet, nicht gelöscht.",

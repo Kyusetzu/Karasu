@@ -937,3 +937,58 @@ export async function wrappedEntries(
   }
   return out;
 }
+
+// --- MAL import resolution -------------------------------------------------
+
+/**
+ * MAL ids back into AniList media, for the local-mode list import.
+ *
+ * One chunk per call and the *caller* loops, so the import screen can show
+ * honest progress between requests instead of a spinner over an unbounded
+ * wait. Fifty ids per request is the `id_in` batching rule; the loop's
+ * length is the list's, so a two-thousand-entry import is forty requests
+ * through the limiter, paced like everything else. Selects what the local
+ * cache stores and re-serves (`LIST_QUERY`'s media shape) -- no
+ * `mediaListEntry`, because local mode has no account to ask about.
+ */
+export const MAL_RESOLVE_QUERY = `
+query ($idMal: [Int], $type: MediaType!, $page: Int) {
+  Page(page: $page, perPage: 50) {
+    media(idMal_in: $idMal, type: $type) {
+      id
+      idMal
+      type
+      title { romaji english native }
+      coverImage { large }
+      episodes
+      chapters
+      volumes
+      duration
+      format
+      countryOfOrigin
+      status
+      season
+      seasonYear
+      averageScore
+      genres
+      synonyms
+      isAdult
+      nextAiringEpisode { episode airingAt }
+    }
+  }
+}`;
+
+/** One chunk of at most fifty ids. Ids AniList has never heard of simply
+    do not come back; the caller counts them as unmatched. */
+export async function resolveMalChunk(
+  idsMal: number[],
+  type: MediaType,
+): Promise<Media[]> {
+  if (idsMal.length === 0) return [];
+  const data = await gql<{ Page: { media: Media[] } }>(MAL_RESOLVE_QUERY, {
+    idMal: idsMal.slice(0, 50),
+    type,
+    page: 1,
+  });
+  return data.Page.media ?? [];
+}

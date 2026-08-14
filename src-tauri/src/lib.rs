@@ -428,6 +428,7 @@ pub fn run() {
             commands::set_close_to_tray,
             commands::get_global_hotkey,
             commands::set_global_hotkey,
+            commands::open_text,
             commands::get_portable_status,
             commands::enable_portable,
             commands::disable_portable,

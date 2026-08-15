@@ -11,6 +11,18 @@ the rolling `latest` prerelease, which is force-moved on every push to `main`,
 so there is nothing under a version heading below to compare against. The first
 tagged release will close the `Unreleased` section rather than adding to it.
 
+**Cutting a release reads this file.** `scripts/release/release-notes.ps1`
+slices the section between `## <version>` and the next `## `, and *throws* if
+there isn't one — a release published with an empty body is not something
+GitHub complains about, so the script does. So before pushing `v1.0.0`:
+
+1. rename `## Unreleased` to `## 1.0.0` (a trailing ` — 2026-08-15` is fine,
+   the match only needs the version to come first),
+2. open a fresh empty `## Unreleased` above it,
+3. delete the paragraph above this one, which stops being true at that point,
+4. and make sure `package.json` already says `1.0.0` — the workflow refuses a
+   tag whose version disagrees with the commit it points at.
+
 Commit subjects are the real record and are written to be read; this file is the
 short version, grouped by what it means for someone using the app.
 

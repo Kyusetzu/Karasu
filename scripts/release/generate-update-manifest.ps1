@@ -3,7 +3,28 @@
   Builds latest.json, the manifest the in-app updater (tauri-plugin-updater)
   fetches to learn about new releases. Must run after rename-installer.ps1,
   since it needs the installer's final (4-part-versioned) filename.
+
+.PARAMETER Tag
+  The release tag the assets will live under. Defaults to the rolling `latest`,
+  which reproduces this script's original output byte for byte.
+
+  This is the single most important parameter here, and it exists because of a
+  failure that would have been invisible until it bit. The download URL used to
+  be hardcoded to `releases/download/latest/`. Publish a stable release with
+  that and its manifest points at an installer on the *rolling* tag — which the
+  prune step at the end of release.yml deletes on the very next push to main.
+  The release page still looks perfect; only the updater breaks, and only after
+  an unrelated commit.
+
+.PARAMETER Notes
+  The `notes` field. Carried through to `DownloadedUpdate.notes` and currently
+  rendered nowhere, so this is for the manifest's own readability.
 #>
+
+param(
+    [string]$Tag = "latest",
+    [string]$Notes = "Automated build from the latest commit on main."
+)
 
 $ErrorActionPreference = "Stop"
 
@@ -46,8 +67,10 @@ $packageVersion = (Get-Content $packageJson -Raw | ConvertFrom-Json).version
 # an explicit version_comparator to keep commit-only bumps detectable.
 $fullVersion = "$packageVersion+$commitNumber"
 
-# Fixed rolling-tag download URL -- matches release.yml's `tag_name: latest`.
-$downloadUrl = "https://github.com/Kyusetzu/Karasu/releases/download/latest/$($installer.Name)"
+# The tag the assets are published under -- release.yml passes whichever it is
+# about to publish to, so a stable release's manifest points at the stable
+# release's own assets and never into the rolling tag the prune step empties.
+$downloadUrl = "https://github.com/Kyusetzu/Karasu/releases/download/$Tag/$($installer.Name)"
 $pubDate = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
 
 $platforms = [ordered]@{
@@ -73,7 +96,7 @@ if ($appimage) {
     if (Test-Path $appimageSig) {
         $platforms["linux-x86_64"] = [ordered]@{
             signature = (Get-Content $appimageSig -Raw).Trim()
-            url       = "https://github.com/Kyusetzu/Karasu/releases/download/latest/$($appimage.Name)"
+            url       = "https://github.com/Kyusetzu/Karasu/releases/download/$Tag/$($appimage.Name)"
         }
     }
     else {
@@ -91,7 +114,7 @@ if ($appimage) {
 
 $manifest = [ordered]@{
     version   = $fullVersion
-    notes     = "Automated build from the latest commit on main."
+    notes     = $Notes
     pub_date  = $pubDate
     platforms = $platforms
 }

@@ -10,7 +10,7 @@ use super::*;
 
 /// Monotonic commit counter — the 4th version segment
 /// (`MAJOR.MINOR.PATCH.COMMIT#`). Bumped by one on every commit.
-pub const COMMIT_NUMBER: u32 = 349;
+pub const COMMIT_NUMBER: u32 = 350;
 
 /// Full four-part display version, e.g. `0.1.1.38`. The `MAJOR.MINOR.PATCH`
 /// core comes from the crate version (kept in sync across the manifests).
@@ -124,7 +124,17 @@ pub async fn check_for_updates(db: State<'_, Db>, force: bool) -> Result<UpdateI
         .await
         .map_err(|e| format!("Update check failed: {e}"))?;
 
-    // No release published yet on this channel — treat as "up to date".
+    // Treat as "up to date". On the prerelease channel this is a real state —
+    // the rolling tag has always existed, so a 404 there means GitHub is having
+    // a bad minute. On `stable` it meant "no non-prerelease release exists",
+    // which was the truth for as long as none did: `/releases/latest/` 404s
+    // until the first tagged non-prerelease, and the channel was silently
+    // green the whole time. It stops being that the moment one is published —
+    // after which a 404 here means the release was deleted or GitHub is down.
+    //
+    // Still silent, deliberately: this runs as a daily background check, and a
+    // toast about a transient 404 is worse than saying nothing. The manual
+    // button on the About page is the path that should report.
     if resp.status() == reqwest::StatusCode::NOT_FOUND {
         return Ok(UpdateInfo { current, latest: None, url: None, is_newer: false });
     }

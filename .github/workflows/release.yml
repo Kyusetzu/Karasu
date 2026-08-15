@@ -3,9 +3,20 @@ name: Release
 on:
   push:
     branches: ["main"]
+    # A tag build is the immutable half. `main` keeps publishing the rolling
+    # `latest` prerelease; `v*` publishes a release under its own tag, whose
+    # assets the prune step at the bottom of this file cannot reach.
+    tags: ["v*"]
 
+# Keyed on the ref, not one global slot. `git push --follow-tags` delivers two
+# separate push events — the branch, then the tag — and under a shared group
+# with `cancel-in-progress` they cancel each other: either the rolling build
+# dies, or the tag run does and leaves a git tag with no release behind it.
+# `if: !cancelled()` cannot rescue that, because a run cancelled before its jobs
+# start has no jobs left to evaluate it. Two quick pushes to `main` still
+# serialise, which is what the original group was protecting.
 concurrency:
-  group: release
+  group: release-${{ github.ref }}
   cancel-in-progress: true
 
 # Read by default; only the job that actually publishes gets write. This was
@@ -114,6 +125,45 @@ jobs:
       - name: Checkout
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
+      # Which release this run is, decided once. Everything downstream reads
+      # these outputs, so the three literals that used to be `latest` / `Latest
+      # build` / `prerelease: true` live in exactly one place.
+      #
+      # First, and deliberately before the ~15-minute build: a tag that
+      # disagrees with the commit it points at fails in seconds rather than
+      # producing a release called 1.0.0 whose installer says 0.132.0. The
+      # scripts read the version off disk at the tagged commit, so nothing else
+      # would ever catch that.
+      - name: Resolve release target
+        id: target
+        shell: pwsh
+        run: |
+          $ref = "${env:GITHUB_REF}"
+          if ($ref -like "refs/tags/*") {
+            $tag = $ref -replace "^refs/tags/", ""
+            $core = $tag -replace "^v", ""
+            $pkg = (Get-Content package.json -Raw | ConvertFrom-Json).version
+            # A prerelease tag (v1.0.0-rc1) keeps its suffix in the name but
+            # must still agree on the semver core with what is committed.
+            $tagCore = ($core -split "-")[0]
+            if ($tagCore -ne $pkg) {
+              throw "Tag $tag says $tagCore but package.json says $pkg -- bump the version on the tagged commit, or tag the right commit."
+            }
+            # `-` in the tag is semver's prerelease marker; GitHub should mark
+            # those as prereleases and a bare v1.0.0 as a real one.
+            $pre = if ($core -match "-") { "true" } else { "false" }
+            $out = @("tag=$tag", "name=Karasu $core", "prerelease=$pre", "rolling=false", "version=$core")
+          }
+          else {
+            $out = @("tag=latest", "name=Latest build", "prerelease=true", "rolling=true", "version=")
+          }
+          # `Out-File -Append -Encoding utf8`, the same idiom rename-installer.ps1
+          # already uses, rather than `>>` — the redirect's default encoding is
+          # a shell-version detail and this file is parsed by the runner.
+          $out | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          $summary = ($out | ForEach-Object { $_ -replace "^[^=]+=", "" })
+          Write-Host "Publishing to tag '$($summary[0])' as '$($summary[1])' (prerelease=$($summary[2]), rolling=$($summary[3]))"
+
       - name: Setup Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
@@ -160,9 +210,15 @@ jobs:
         shell: pwsh
         run: ./scripts/release/rename-installer.ps1
 
+      # The tag matters here more than anywhere else: the manifest's download
+      # URL is built from it, and a stable release whose manifest points into
+      # the rolling tag has its installer deleted by the prune step on the next
+      # unrelated push to main.
       - name: Generate update manifest (latest.json)
         shell: pwsh
-        run: ./scripts/release/generate-update-manifest.ps1
+        env:
+          RELEASE_TAG: ${{ steps.target.outputs.tag }}
+        run: ./scripts/release/generate-update-manifest.ps1 -Tag $env:RELEASE_TAG
 
       - name: Generate checksum
         shell: pwsh
@@ -201,33 +257,34 @@ jobs:
           files: |
             src-tauri/target/release/bundle/nsis/*.exe
 
-      - name: Publish rolling prerelease
+      # Written to a file rather than passed as a `body:` block scalar. A
+      # `${{ }}` in YAML is textual substitution before anything parses it, and
+      # for a tagged release this body is arbitrary CHANGELOG markdown — full of
+      # backticks, dollars and quotes, in a job holding the signing key. The
+      # prune step below already documents that class of bug for a single
+      # filename; this is worse input.
+      - name: Compose release notes
+        shell: pwsh
+        env:
+          NOTES_VERSION: ${{ steps.target.outputs.version }}
+          NOTES_SHA: ${{ github.sha }}
+          NOTES_VT: ${{ steps.virustotal.outputs.analysis || 'unavailable for this release' }}
+        run: >
+          ./scripts/release/release-notes.ps1
+          -Version $env:NOTES_VERSION
+          -Sha $env:NOTES_SHA
+          -VirusTotal $env:NOTES_VT
+          -OutFile notes.md
+
+      # One publish step for both shapes. A second copy would duplicate the
+      # whole file list, and the two would drift the first time one changed.
+      - name: Publish release
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3
         with:
-          tag_name: latest
-          name: Latest build
-          prerelease: true
-          body: |
-            Automated build from the latest commit on `main` (${{ github.sha }}).
-
-            **Windows** — the `.exe` installer. It is **unsigned**, so
-            SmartScreen may warn on first run. Verify the download against
-            `SHA256SUMS.txt` if you want to confirm it wasn't tampered with in
-            transit.
-
-            **Linux** — the `.AppImage`, x86_64. `chmod +x` it and run it; it
-            works on Ubuntu 22.04+, Debian 12+ and Arch. It needs
-            **webkit2gtk-4.1** present on the system (`libwebkit2gtk-4.1-0` on
-            Ubuntu/Debian, `webkit2gtk-4.1` on Arch) — that one is not bundled.
-            For a tray icon you also need a StatusNotifier host; on GNOME that
-            means the AppIndicator extension. Without one Karasu still runs and
-            closing the window quits instead of hiding.
-
-            Karasu's built-in updater (About page, or automatic daily checks)
-            verifies updates against its own signing key regardless — see
-            `latest.json` for the update manifest.
-
-            VirusTotal scan: ${{ steps.virustotal.outputs.analysis || 'unavailable for this release' }}
+          tag_name: ${{ steps.target.outputs.tag }}
+          name: ${{ steps.target.outputs.name }}
+          prerelease: ${{ steps.target.outputs.prerelease }}
+          body_path: notes.md
           files: |
             src-tauri/target/release/bundle/nsis/*.exe
             linux-artifacts/*.AppImage
@@ -239,7 +296,15 @@ jobs:
       # overwrite -- left alone, the rolling release accumulates one installer
       # per commit forever. Prune *after* uploading, so the release is never
       # momentarily without an installer for the updater to fetch.
+      #
+      # Rolling builds only. The `gh` calls below are already scoped to the
+      # literal tag `latest`, so a tagged release's assets are safe from this by
+      # construction — but on a tag run it would compute `$keep` from the *tag*
+      # build's filenames and then delete the rolling installer against that
+      # list, seconds after an unrelated push published it. Guarded by `if:`,
+      # never by emptying `$keep`.
       - name: Prune stale release assets
+        if: ${{ steps.target.outputs.rolling == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
           # Through the environment, not `${{ }}` inside the script body. A

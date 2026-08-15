@@ -10,7 +10,7 @@ use super::*;
 
 /// Monotonic commit counter — the 4th version segment
 /// (`MAJOR.MINOR.PATCH.COMMIT#`). Bumped by one on every commit.
-pub const COMMIT_NUMBER: u32 = 343;
+pub const COMMIT_NUMBER: u32 = 344;
 
 /// Full four-part display version, e.g. `0.1.1.38`. The `MAJOR.MINOR.PATCH`
 /// core comes from the crate version (kept in sync across the manifests).
@@ -363,12 +363,13 @@ pub async fn download_pending_update(
     crate::alerts::notify::notify(
         &app,
         "update",
-        "Update ready",
+        crate::i18n::Msg::UpdateTitle,
         // Emphatically *not* "restart to install it", which is what this said.
         // The download lives in process memory, so restarting is precisely the
         // action that throws it away — the instruction undid the thing it was
         // announcing, and the next check downloaded the whole installer again.
-        &format!("Karasu {version} is ready. Open About to install it."),
+        // The wording is in `i18n.rs` now, with that note beside it.
+        crate::i18n::Msg::UpdateBody { version: &version },
     );
 
     Ok(Some(DownloadedUpdate { version, notes }))

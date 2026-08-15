@@ -735,10 +735,10 @@ async fn process_queue(
 fn report_dropped(app: &AppHandle, dropped: &[String]) {
     let Some(first) = dropped.first() else { return };
     let body = match dropped.len() {
-        1 => format!("AniList refused an offline change: {first}"),
-        n => format!("AniList refused {n} offline changes. The first: {first}"),
+        1 => crate::i18n::Msg::QueueBodyOne { reason: first },
+        n => crate::i18n::Msg::QueueBodyMany { count: n, reason: first },
     };
-    crate::alerts::notify::notify(app, "queue", "Offline changes were not saved", &body);
+    crate::alerts::notify::notify(app, "queue", crate::i18n::Msg::QueueTitle, body);
 }
 
 /// Manually triggered sync of the offline queue (e.g. a button in the UI).

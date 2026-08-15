@@ -1083,11 +1083,15 @@ async fn drive_session(app: &AppHandle) {
                         // also goes to the desk — with the one button that is
                         // the whole point. Fires once per session: this branch
                         // is only reachable from `Watching`.
-                        let body = if session.media_type == "MANGA" {
-                            format!("Mark chapter {} as read?", session.episode)
-                        } else {
-                            format!("Mark episode {} as watched?", session.episode)
-                        };
+                        let lang = crate::i18n::lang(&app.state::<Db>());
+                        let body = crate::i18n::text(
+                            lang,
+                            if session.media_type == "MANGA" {
+                                crate::i18n::Msg::ConfirmChapter { chapter: session.episode }
+                            } else {
+                                crate::i18n::Msg::ConfirmEpisode { episode: session.episode }
+                            },
+                        );
                         crate::alerts::notify::notify_scrobble_confirm(
                             app,
                             np.matched_title.as_deref().unwrap_or(&np.parsed_title),

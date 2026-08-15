@@ -9,6 +9,7 @@ mod identify;
 mod library;
 mod logging;
 mod playback;
+mod i18n;
 mod portable;
 mod sync;
 
@@ -75,21 +76,36 @@ pub struct TrayHandles(pub Mutex<Option<TrayItems>>);
 pub struct TrayItems {
     pub now_playing: MenuItem<Wry>,
     pub detection: CheckMenuItem<Wry>,
+    /// Held only so their labels can be re-set when the language changes —
+    /// rebuilding the menu instead would tear it down under an open click,
+    /// which is the same reason `now_playing` is held.
+    pub scrobble: MenuItem<Wry>,
+    pub sync: MenuItem<Wry>,
+    pub show: MenuItem<Wry>,
+    pub quit: MenuItem<Wry>,
 }
 
 /// Reflects the current detection into the tray: the disabled first row
 /// names what is playing, the tooltip mirrors it for hover.
 ///
-/// Tray labels are deliberately English-only for now: the UI language lives
-/// in the WebView's localStorage, which Rust cannot read, and the tray has
-/// been English ("Open Karasu"/"Quit") since it existed.
+/// The language comes from the kv mirror the frontend writes, because the
+/// setting itself lives in the WebView's localStorage and Rust cannot read it.
+/// The labels are only rebuilt when this runs, which is on every detection
+/// tick — so a language change reaches the tray within five seconds rather
+/// than at the next launch.
 pub fn tray_set_now_playing(app: &AppHandle, title: Option<&str>) {
+    let lang = i18n::lang(&app.state::<db::Db>());
     if let Some(handles) = app.try_state::<TrayHandles>() {
         if let Some(items) = handles.0.guard().as_ref() {
             let _ = items.now_playing.set_text(match title {
                 Some(t) => format!("▶ {t}"),
-                None => "Nothing playing".into(),
+                None => i18n::text(lang, i18n::Msg::TrayNothingPlaying),
             });
+            let _ = items.scrobble.set_text(i18n::text(lang, i18n::Msg::TrayScrobbleNow));
+            let _ = items.sync.set_text(i18n::text(lang, i18n::Msg::TraySyncNow));
+            let _ = items.detection.set_text(i18n::text(lang, i18n::Msg::TrayDetection));
+            let _ = items.show.set_text(i18n::text(lang, i18n::Msg::TrayOpen));
+            let _ = items.quit.set_text(i18n::text(lang, i18n::Msg::TrayQuit));
         }
     }
     if let Some(tray) = app.tray_by_id("main-tray") {
@@ -142,20 +158,31 @@ fn hide_window_in_dev(_app: &tauri::App, _tray_present: bool) {}
 /// Split out of `setup` so the whole thing can be wrapped in `catch_unwind` —
 /// see the call site for why an ordinary `?` is not enough.
 fn build_tray(app: &tauri::App) -> tauri::Result<()> {
-    let detection_on = commands::read_media_detection(&app.state::<db::Db>());
+    let db = app.state::<db::Db>();
+    let detection_on = commands::read_media_detection(&db);
+    let lang = i18n::lang(&db);
+    let label = |m| i18n::text(lang, m);
 
     // The first row states what detection sees; disabled because it is a
     // fact, not an action — clicking a title with nothing behind it would be
     // a button that does nothing.
-    let now_playing = MenuItem::with_id(app, "now", "Nothing playing", false, None::<&str>)?;
-    let scrobble = MenuItem::with_id(app, "scrobble", "Scrobble now", true, None::<&str>)?;
-    let sync = MenuItem::with_id(app, "sync", "Sync now", true, None::<&str>)?;
-    let detection =
-        CheckMenuItem::with_id(app, "detection", "Media detection", true, detection_on, None::<&str>)?;
+    let now_playing =
+        MenuItem::with_id(app, "now", label(i18n::Msg::TrayNothingPlaying), false, None::<&str>)?;
+    let scrobble =
+        MenuItem::with_id(app, "scrobble", label(i18n::Msg::TrayScrobbleNow), true, None::<&str>)?;
+    let sync = MenuItem::with_id(app, "sync", label(i18n::Msg::TraySyncNow), true, None::<&str>)?;
+    let detection = CheckMenuItem::with_id(
+        app,
+        "detection",
+        label(i18n::Msg::TrayDetection),
+        true,
+        detection_on,
+        None::<&str>,
+    )?;
     let sep1 = PredefinedMenuItem::separator(app)?;
     let sep2 = PredefinedMenuItem::separator(app)?;
-    let show = MenuItem::with_id(app, "show", "Open Karasu", true, None::<&str>)?;
-    let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+    let show = MenuItem::with_id(app, "show", label(i18n::Msg::TrayOpen), true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", label(i18n::Msg::TrayQuit), true, None::<&str>)?;
     let menu = Menu::with_items(
         app,
         &[&now_playing, &sep1, &scrobble, &sync, &detection, &sep2, &show, &quit],
@@ -164,6 +191,10 @@ fn build_tray(app: &tauri::App) -> tauri::Result<()> {
     app.manage(TrayHandles(Mutex::new(Some(TrayItems {
         now_playing: now_playing.clone(),
         detection: detection.clone(),
+        scrobble: scrobble.clone(),
+        sync: sync.clone(),
+        show: show.clone(),
+        quit: quit.clone(),
     }))));
 
     // A window with no icon is a launch worth continuing, not one worth
@@ -387,6 +418,7 @@ pub fn run() {
             commands::set_ui_page,
             commands::get_autostart,
             commands::set_autostart,
+            commands::set_ui_language,
             commands::get_airing_notify,
             commands::set_airing_notify,
             commands::get_stale_settings,

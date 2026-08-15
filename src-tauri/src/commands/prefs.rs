@@ -1,4 +1,5 @@
 use crate::db::Db;
+use crate::sync::LockExt;
 use tauri::{Manager, State};
 
 // Siblings in the same module tree; `mod.rs` re-exports all of it, so
@@ -42,6 +43,34 @@ pub fn set_discord_settings(
         .unwrap()
         .clone();
     crate::discord::sync(&app, now.as_ref());
+    Ok(())
+}
+
+/// Mirrors the interface language into the kv store.
+///
+/// The setting itself lives in the WebView's localStorage, which Rust has no
+/// way to read — and Rust is what composes every desktop notification, every
+/// bell row and the tray menu. Without this mirror all of them are English
+/// whatever the app says around them, which is what they were.
+///
+/// Called on start and on every change, so it is a copy rather than a source of
+/// truth: an unset or unrecognised value simply means English.
+#[tauri::command]
+pub fn set_ui_language(app: tauri::AppHandle, db: State<'_, Db>, language: String) -> Result<(), String> {
+    db.kv_set(crate::i18n::LANGUAGE_KEY, &language)?;
+    // The tray's labels are set once at launch, so it needs telling; every
+    // other Rust-composed string reads the mirror at the moment it composes.
+    //
+    // The title is cloned out before the call, not read through a held guard:
+    // `tray_set_now_playing` is somebody else's lock order and this path is not
+    // worth finding that out on.
+    let title = app
+        .state::<crate::playback::scrobbler::PlaybackState>()
+        .0
+        .guard()
+        .as_ref()
+        .map(|n| n.matched_title.clone().unwrap_or_else(|| n.parsed_title.clone()));
+    crate::tray_set_now_playing(&app, title.as_deref());
     Ok(())
 }
 

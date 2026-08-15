@@ -220,12 +220,11 @@ async fn check(app: &AppHandle) {
                         continue; // seed silently on the first run
                     }
                     let title = pick_title(edge.pointer("/node/title"));
-                    let label = if rel == "SEQUEL" { "Sequel" } else { "Side story" };
                     crate::alerts::notify::notify(
                         app,
                         "sequel",
-                        &format!("{label} announced"),
-                        &format!("{title} — related to something on your list."),
+                        crate::i18n::Msg::SequelTitle { side_story: rel != "SEQUEL" },
+                        crate::i18n::Msg::SequelBody { title: &title },
                     );
                 }
             }

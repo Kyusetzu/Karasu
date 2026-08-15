@@ -83,6 +83,26 @@ i18n.use(initReactI18next).init({
 });
 
 /**
+ * Mirrors the language into SQLite, where Rust can read it.
+ *
+ * Rust composes every desktop notification, every row in the bell and the tray
+ * menu, and has no access to this setting — it lives in localStorage, inside
+ * the WebView. Without the mirror all of those are English whatever the
+ * interface says around them.
+ *
+ * Fire-and-forget on purpose: it is a copy of something already stored, so a
+ * failed write costs one notification in the wrong language, not a lost
+ * setting. It is also the reason this is not awaited anywhere — nothing on
+ * screen depends on it.
+ */
+function mirrorToBackend(lng: string) {
+  if (!("__TAURI_INTERNALS__" in window)) return;
+  void import("@tauri-apps/api/core")
+    .then(({ invoke }) => invoke("set_ui_language", { language: lng }))
+    .catch(() => {});
+}
+
+/**
  * Keeps `<html lang>` on the language actually being rendered.
  *
  * `index.html` ships `lang="en"` and nothing ever moved it, so a German UI
@@ -93,9 +113,15 @@ i18n.use(initReactI18next).init({
  */
 i18n.on("languageChanged", (lng) => {
   if (typeof document !== "undefined") document.documentElement.lang = lng;
+  mirrorToBackend(lng);
 });
 if (typeof document !== "undefined") {
-  document.documentElement.lang = resolveLanguage(getLanguageSetting());
+  const lng = resolveLanguage(getLanguageSetting());
+  document.documentElement.lang = lng;
+  // On start as well as on change: `languageChanged` does not fire for the
+  // language `init` was given, and "system" can resolve differently on a
+  // machine whose locale changed since the last run.
+  mirrorToBackend(lng);
 }
 
 export default i18n;

@@ -119,15 +119,11 @@ fn check(app: &AppHandle) {
             if db.kv_get(&key).and_then(|s| s.parse::<i64>().ok()) == Some(updated) {
                 continue;
             }
-            // "month(s)" is a form nobody writes; the two cases are cheaper
-            // than the apology. (The rest of this string is English until the
-            // Rust-side notifications are keyed — see the notes on `notify`.)
-            let unit = if months == 1 { "month" } else { "months" };
             crate::alerts::notify::notify(
                 app,
                 "stale",
-                "On-hold reminder",
-                &format!("{title} has been paused for over {months} {unit}."),
+                crate::i18n::Msg::StaleTitle,
+                crate::i18n::Msg::StaleBody { title: &title, months },
             );
             let _ = db.kv_set(&key, &updated.to_string());
         }

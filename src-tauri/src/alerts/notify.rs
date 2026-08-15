@@ -4,6 +4,7 @@
 //! sequel) all go through here so nothing is shown without also being logged.
 
 use crate::db::Db;
+use crate::i18n::Msg;
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_notification::NotificationExt;
 
@@ -24,8 +25,24 @@ fn now_ms() -> i64 {
 /// watcher that had found nothing to say. The failures are still not fatal —
 /// the bell entry is worth keeping even when the toast will not show — but each
 /// one now leaves a line.
-pub fn notify(app: &AppHandle, kind: &str, title: &str, body: &str) {
-    if let Err(e) = app.state::<Db>().notif_insert(kind, title, body, now_ms()) {
+/// Takes messages rather than sentences, and renders them in the user's
+/// language here — one place, so the toast, the bell row and the log cannot
+/// disagree about what was said.
+///
+/// What this does *not* do is re-render a bell row when the language changes
+/// later: the row is stored as text, so yesterday's news stays in yesterday's
+/// language. Storing the key and its parameters instead would fix that and
+/// costs a migration, a payload format and a second renderer on the frontend —
+/// for rows that expire at 500 and are read the day they arrive. The toast has
+/// to be composed in Rust either way, since the OS shows it and no WebView is
+/// involved.
+pub fn notify(app: &AppHandle, kind: &str, title: Msg<'_>, body: Msg<'_>) {
+    let db = app.state::<Db>();
+    let lang = crate::i18n::lang(&db);
+    let title = &crate::i18n::text(lang, title);
+    let body = &crate::i18n::text(lang, body);
+
+    if let Err(e) = db.notif_insert(kind, title, body, now_ms()) {
         crate::logging::error("notify", format!("cannot record the {kind} notification: {e}"));
     }
     if let Err(e) = app.notification().builder().title(title).body(body).show() {
@@ -76,6 +93,18 @@ pub fn notify_scrobble_confirm(
     }
 }
 
+/// The one button on the one toast that has one.
+///
+/// Read per toast rather than cached: the language can change between two
+/// scrobbles, and this costs a kv lookup on a path that already talks to the
+/// OS notification service.
+fn action_label(app: &AppHandle) -> String {
+    crate::i18n::text(
+        crate::i18n::lang(&app.state::<Db>()),
+        crate::i18n::Msg::ConfirmAction,
+    )
+}
+
 /// Windows: `tauri-winrt-notification` directly, since the plugin wrapping it
 /// drops buttons. Toasts are attributed by AppUserModelID; installed builds
 /// registered the bundle identifier through NSIS, while a dev build has no
@@ -100,7 +129,7 @@ fn toast_with_action(
     Toast::new(&app_id)
         .title(title)
         .text1(body)
-        .add_button("Update now", "confirm")
+        .add_button(&action_label(app), "confirm")
         .on_activated(move |action| {
             if action.as_deref() == Some("confirm") {
                 let app = handle.clone();
@@ -138,7 +167,7 @@ fn toast_with_action(
         .summary(title)
         .body(body)
         .appname("Karasu")
-        .action("confirm", "Update now")
+        .action("confirm", &action_label(app))
         .show()
         .map_err(|e| e.to_string())?;
     let app = app.clone();

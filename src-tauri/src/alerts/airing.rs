@@ -172,8 +172,8 @@ async fn check(app: &AppHandle) {
         crate::alerts::notify::notify(
             app,
             "airing",
-            "New episode aired",
-            &format!("{title} — episode {episode} is out"),
+            crate::i18n::Msg::AiringTitle,
+            crate::i18n::Msg::AiringBody { title: &title, episode },
         );
         let _ = db.kv_set(&key, &now.to_string());
     }

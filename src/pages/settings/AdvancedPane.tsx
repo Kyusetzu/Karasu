@@ -17,7 +17,7 @@ import { usePlatform } from "@/stores/platform";
 import { showToast } from "@/stores/toast";
 import type { ListResult, Media, MediaType } from "@/api/types";
 import { cn } from "@/lib/utils";
-import { Row, SELECT, Toggle } from "./shared";
+import { NeedsAccount, Row, SELECT, Toggle } from "./shared";
 interface DatabaseInfo {
   path: string;
   bytes: number;
@@ -379,7 +379,16 @@ export function ImportSection() {
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);
 
-  if (mode !== "local") return null;
+  // Signed in, this section is genuinely unavailable rather than irrelevant, so
+  // it says which and why. Vanishing left the reasoning stranded in the comment
+  // above, where a user looking for an import button will not find it.
+  if (mode !== "local") {
+    return (
+      <NeedsAccount title={t("settings.import")}>
+        {t("settings.importAniListHint")}
+      </NeedsAccount>
+    );
+  }
 
   const importMal = async () => {
     if (busy) return;

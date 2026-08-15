@@ -28,6 +28,7 @@ import {
   type MediaSession,
 } from "@/stores/nowPlaying";
 import { isLinux, usePlatform } from "@/stores/platform";
+import { useAuth } from "@/stores/auth";
 import { Row, Toggle } from "./shared";
 export function ScrobbleSection() {
   const { t } = useTranslation();
@@ -37,6 +38,7 @@ export function ScrobbleSection() {
   const [sequel, setSequel] = useState<boolean | null>(null);
   const [mediaOn, setMediaOn] = useState<boolean | null>(null);
   const platform = usePlatform((s) => s.info);
+  const viewer = useAuth((s) => s.viewer);
 
   useEffect(() => {
     if (!api.isTauri) return;
@@ -75,6 +77,13 @@ export function ScrobbleSection() {
   return (
     <Card>
       <CardTitle>{t("settings.tracking")}</CardTitle>
+      {/* Detection recognises a title by matching it against the AniList list,
+          and scrobbling writes to AniList. Without an account it will still
+          show what you are playing and nothing more — worth saying here rather
+          than leaving someone to conclude the feature is broken. */}
+      {!viewer && (
+        <p className="mt-2 text-sm text-gold">{t("settings.trackingNeedsAccount")}</p>
+      )}
       <div className="mt-3 space-y-3">
         <Toggle
           checked={settings.enabled}

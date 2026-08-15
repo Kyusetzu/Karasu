@@ -1017,6 +1017,7 @@ export const en = {
     skipped: "Update skipped.",
     yourProgress: "Your progress: {{progress}}",
     noMatch: "No entry from your list recognized.",
+    noAccount: "Detected, but there is no AniList list to match it against.",
     updateNow: "Now",
     updateNowTitle: "Update progress now",
     correctTitle: "Wrong title? Pick the right one",
@@ -1026,6 +1027,9 @@ export const en = {
   },
   settings: {
     pane_anilist: "AniList account",
+    alSignedOut: "Nothing here without an AniList account",
+    alSignedOutHint:
+      "This pane edits settings that live on your AniList account — the titles you see, how scores are stored, which notifications AniList sends. Connect an account on the Account pane and they appear here.",
     alAccount: "Account settings",
     alAccountHint:
       "These live on your AniList account, so they apply on anilist.co and in every other client. Karasu keeps its own preference for three of them — each says so below.",
@@ -1104,6 +1108,8 @@ export const en = {
     exportEmpty: "Nothing to export yet.",
     exportFailed: "The export did not finish",
     import: "Import a list",
+    importAniListHint:
+      "Importing into a connected account is deliberately not offered: AniList takes one write per entry against a shared ~30-requests-a-minute budget, so a thousand-entry import would be a seventeen-minute job behind a button that looks instant. Use AniList's own importer on the website instead.",
     importHint:
       "Reads a MyAnimeList XML export into your local list — status, progress, scores and rewatch counts. Existing entries for the same title are updated.",
     importMal: "Import MAL XML…",
@@ -1197,8 +1203,10 @@ export const en = {
       "Mark detected episodes as watched on AniList after the threshold.",
     trackingConfirm: "Ask before updating",
     trackingConfirmHint: "Show a confirmation in the app before every update.",
+    trackingNeedsAccount:
+      "Without an AniList account, detection can show what you are playing but cannot recognise the title or record progress: it matches against your AniList list, and there is nothing to write to.",
     mediaSessionsLinuxOnly:
-      "On Linux this is the only source that sees local players — window titles are not readable there. Turning it off leaves Jellyfin alone.",
+      "On Linux this is the only source that sees local players — window titles are not readable there. Turning it off leaves Jellyfin alone. Manga you read in a browser is not detected on Linux at all: that pass reads window titles, which Wayland does not expose.",
     mediaSessions: "Use system media info",
     mediaSessionsHint:
       "Also detect players that report to your desktop's media controls instead of putting the title in their window. Covers Jellyfin Media Player, Plex and browser video.",

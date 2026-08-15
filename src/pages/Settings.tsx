@@ -16,6 +16,7 @@ import {
   AniListListOptionsSection,
   AniListNotificationsSection,
   AniListProfileSection,
+  AniListSignedOutNote,
 } from "./settings/AniListPane";
 import { AppearanceSection } from "./settings/AppearancePane";
 import {
@@ -54,6 +55,9 @@ const PANES = [
     id: "anilist",
     icon: Globe,
     sections: [
+      // First, and the only one that renders without an account — the three
+      // below hide themselves, which left this pane blank.
+      AniListSignedOutNote,
       AniListProfileSection,
       AniListListOptionsSection,
       AniListNotificationsSection,

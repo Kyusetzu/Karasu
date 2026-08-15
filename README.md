@@ -42,8 +42,11 @@ Because a desktop app can do things anilist.co simply can't:
   centre for new episodes, announced sequels, and titles you've left on hold.
 - **It shows up on Discord.** Rich Presence that reflects what you're doing,
   always on.
-- **It works without an account, too.** A fully local list on your device, with
-  a one-time merge into AniList whenever you decide to connect.
+- **It works without an account, too.** A fully local list on your device —
+  editing, statistics, export and import all work offline — with a one-time
+  merge into AniList whenever you decide to connect. Two things do need an
+  account, because they have nothing to match against without one: automatic
+  scrobbling and the local library scan.
 
 ## Screenshots
 

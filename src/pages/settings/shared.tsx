@@ -77,6 +77,32 @@ export function ExternalNote({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * Says why a pane or a section is empty, instead of letting it vanish.
+ *
+ * Every settings section that needs an AniList account used to `return null`
+ * when there was none, which on the AniList pane meant three of them in a row
+ * and a completely blank page — indistinguishable from a crash, and no help at
+ * all to someone deciding whether signing in would gain them anything.
+ *
+ * Muted rather than gold: nothing here is a caveat about a setting that quietly
+ * does nothing, which is what `ExternalNote` is for. This is an explanation.
+ */
+export function NeedsAccount({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="rounded-xl border border-dashed border-surface-700 p-5">
+      <p className="text-sm font-medium text-ink-300">{title}</p>
+      <p className="mt-1.5 text-sm leading-relaxed text-ink-500">{children}</p>
+    </div>
+  );
+}
+
 export function Toggle({
   checked,
   onChange,

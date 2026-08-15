@@ -403,7 +403,17 @@ pub async fn scan_library(app: AppHandle) -> Result<ScanSummary, String> {
             .ok_or("No library folder set")?;
         let candidates = candidates_from_cache(&db, "ANIME");
         if candidates.is_empty() {
-            return Err("Load your anime list first, then scan".into());
+            // `candidates_from_cache` reads the cached *AniList* list, so in
+            // the account-free profile this is not "load your list first" — it
+            // is always empty and always will be. Saying so beats sending
+            // someone to look for a button that would not help.
+            return Err(if db.kv_get("anilist_viewer").is_some() {
+                "Load your anime list first, then scan"
+            } else {
+                "Scanning matches files against your AniList list, so it needs \
+                 an AniList account. The local profile has no list to match against."
+            }
+            .into());
         }
         // What AniList has already been asked. Re-asking costs a request per 25
         // titles and returns the same answer, so a rescan of a folder that

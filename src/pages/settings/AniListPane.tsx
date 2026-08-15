@@ -9,7 +9,7 @@ import { notificationOptions, userProfile } from "@/api/social";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Shimmer } from "@/components/Skeleton";
-import { ExternalNote, Row, SELECT, Toggle } from "./shared";
+import { ExternalNote, NeedsAccount, Row, SELECT, Toggle } from "./shared";
 import {
   LIST_ACTIVITY_STATUSES,
   LOCAL_OVERRIDES,
@@ -142,6 +142,25 @@ function useViewerSettings() {
     retry: false,
   });
   return { viewer, ...q };
+}
+
+/**
+ * The whole pane's answer when there is no account.
+ *
+ * Rendered first and alone: the three sections below each returned null, so
+ * this pane was three `return null`s and an empty page — which reads as a crash
+ * rather than as "there is nothing here for you yet".
+ */
+export function AniListSignedOutNote() {
+  const { t } = useTranslation();
+  const viewer = useAuth((s) => s.viewer);
+
+  if (viewer) return null;
+  return (
+    <NeedsAccount title={t("settings.alSignedOut")}>
+      {t("settings.alSignedOutHint")}
+    </NeedsAccount>
+  );
 }
 
 export function AniListProfileSection() {

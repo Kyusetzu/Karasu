@@ -14,6 +14,7 @@ import {
   type NowPlaying,
 } from "@/stores/nowPlaying";
 import { isTauri } from "@/api/anilist";
+import { useAuth } from "@/stores/auth";
 import { Button } from "@/components/ui/button";
 import { Presence } from "@/components/ui/presence";
 import MatchPicker from "@/components/overlays/MatchPicker";
@@ -216,6 +217,7 @@ function ScrobbleStatus({ countdown }: { countdown: string | null }) {
   const { t } = useTranslation();
   const current = useNowPlaying((s) => s.current);
   const scrobble = useNowPlaying((s) => s.scrobble);
+  const signedIn = !!useAuth((s) => s.viewer);
 
   switch (scrobble.phase) {
     case "watching":
@@ -279,7 +281,14 @@ function ScrobbleStatus({ countdown }: { countdown: string | null }) {
           </p>
         );
       }
-      return <p className="text-xs text-ink-500">{t("nowPlaying.noMatch")}</p>;
+      // Without an account there is nothing to match against, so "no entry
+      // recognized" reads as a failure when it is the expected outcome. The
+      // pill would otherwise show a raw title forever with no explanation.
+      return (
+        <p className="text-xs text-ink-500">
+          {t(signedIn ? "nowPlaying.noMatch" : "nowPlaying.noAccount")}
+        </p>
+      );
   }
 }
 

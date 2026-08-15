@@ -1025,6 +1025,7 @@ export const de: typeof en = {
     skipped: "Update übersprungen.",
     yourProgress: "Dein Fortschritt: {{progress}}",
     noMatch: "Kein Eintrag deiner Liste erkannt.",
+    noAccount: "Erkannt, aber es gibt keine AniList-Liste zum Abgleichen.",
     updateNow: "Jetzt",
     updateNowTitle: "Fortschritt jetzt aktualisieren",
     correctTitle: "Falscher Titel? Den richtigen auswählen",
@@ -1034,6 +1035,9 @@ export const de: typeof en = {
   },
   settings: {
     pane_anilist: "AniList-Konto",
+    alSignedOut: "Ohne AniList-Konto gibt es hier nichts",
+    alSignedOutHint:
+      "Dieser Bereich bearbeitet Einstellungen, die auf deinem AniList-Konto liegen — welche Titel du siehst, wie Bewertungen gespeichert werden, welche Benachrichtigungen AniList sendet. Verbinde ein Konto im Bereich Konto, dann erscheinen sie hier.",
     alAccount: "Kontoeinstellungen",
     alAccountHint:
       "Diese liegen auf deinem AniList-Konto und gelten daher auf anilist.co und in jedem anderen Client. Bei drei davon behält Karasu seine eigene Einstellung — das steht jeweils darunter.",
@@ -1114,6 +1118,8 @@ export const de: typeof en = {
     exportEmpty: "Noch nichts zu exportieren.",
     exportFailed: "Der Export wurde nicht abgeschlossen",
     import: "Liste importieren",
+    importAniListHint:
+      "Ein Import in ein verbundenes Konto wird bewusst nicht angeboten: AniList braucht einen Schreibvorgang pro Eintrag aus einem geteilten Budget von ~30 Anfragen pro Minute — ein Import mit tausend Einträgen wäre ein siebzehnminütiger Vorgang hinter einem Button, der sofort aussieht. Nutze dafür AniLists eigenen Importer auf der Website.",
     importHint:
       "Liest einen MyAnimeList-XML-Export in deine lokale Liste — Status, Fortschritt, Bewertungen und Rewatch-Zähler. Vorhandene Einträge desselben Titels werden aktualisiert.",
     importMal: "MAL-XML importieren…",
@@ -1206,11 +1212,13 @@ export const de: typeof en = {
     trackingEnable: "Fortschritt automatisch aktualisieren",
     trackingEnableHint:
       "Erkannte Episoden nach Ablauf der Schwelle auf AniList als gesehen markieren.",
+    trackingNeedsAccount:
+      "Ohne AniList-Konto zeigt die Erkennung zwar, was gerade läuft, kann den Titel aber nicht zuordnen und keinen Fortschritt speichern: Sie gleicht mit deiner AniList-Liste ab, und es gibt nichts, wohin geschrieben werden könnte.",
     trackingConfirm: "Vorher nachfragen",
     trackingConfirmHint:
       "Vor jedem Update eine Bestätigung in der App anzeigen.",
     mediaSessionsLinuxOnly:
-      "Unter Linux ist das die einzige Quelle, die lokale Player sieht — Fenstertitel sind dort nicht lesbar. Ausschalten lässt nur noch Jellyfin übrig.",
+      "Unter Linux ist das die einzige Quelle, die lokale Player sieht — Fenstertitel sind dort nicht lesbar. Ausschalten lässt nur noch Jellyfin übrig. Manga, die du im Browser liest, werden unter Linux gar nicht erkannt: Dieser Durchgang liest Fenstertitel, die Wayland nicht bereitstellt.",
     mediaSessions: "System-Medieninfos nutzen",
     mediaSessionsHint:
       "Erkennt zusätzlich Player, die ihren Titel an die Mediensteuerung deiner Arbeitsumgebung melden statt ins Fenster zu schreiben. Deckt Jellyfin Media Player, Plex und Browser-Videos ab.",

@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Kyusetzu/Karasu/actions/workflows/ci.yml"><img src="https://github.com/Kyusetzu/Karasu/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://github.com/Kyusetzu/Karasu/actions/workflows/release.yml"><img src="https://github.com/Kyusetzu/Karasu/actions/workflows/release.yml/badge.svg" alt="Build" /></a>
   <img src="https://img.shields.io/badge/platform-Windows-0078D6?logo=windows&logoColor=white" alt="Windows" />
   <img src="https://img.shields.io/badge/platform-Linux-FCC624?logo=linux&logoColor=black" alt="Linux" />
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT" /></a>
@@ -245,6 +245,11 @@ cargo test --manifest-path src-tauri/Cargo.toml   # backend tests
 `MAJOR.MINOR.PATCH.COMMIT#` (breaking / feature / fix / commit counter); the
 running version is shown in the About window.
 
+Contributions are welcome — [CONTRIBUTING.md](CONTRIBUTING.md) has the commit
+loop (which is mandatory), where code goes, and the list of things that are
+refused on purpose so nobody builds one by accident.
+[CHANGELOG.md](CHANGELOG.md) is the short version of what has landed.
+
 ### Architecture
 
 | Layer | Technology |
@@ -319,4 +324,10 @@ Security issues go to the email above, privately — see
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE).
+
+Shipped builds embed two fonts whose licences travel with them — SN Pro under
+the SIL Open Font License 1.1 and Kosugi Maru under Apache-2.0 — along with the
+Rust and npm dependencies they are built from.
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) has the attributions and the
+full licence texts.

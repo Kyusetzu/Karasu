@@ -62,6 +62,30 @@ it to. **About → Copy diagnostics** and **Save report** redact your home
 directory by default, but with verbose logging on the log itself can name what
 you have been watching — worth a glance before attaching it to a public issue.
 
+## The update signing key
+
+Every update Karasu downloads is verified against a minisign public key
+compiled into the binary (`plugins.updater.pubkey` in `tauri.conf.json`). That
+is what makes the update mechanism worth trusting, and it has a consequence
+worth stating plainly rather than discovering later:
+
+**If the private key is lost, every installed copy of Karasu becomes permanently
+un-updatable.** Not "until we publish a new one" — an install only trusts the
+key it was built with, so a new key can only reach users through a manual
+reinstall. There is no recovery path that does not involve every user
+downloading an installer by hand.
+
+The private half lives in the `TAURI_SIGNING_PRIVATE_KEY` repository secret,
+which GitHub cannot show you again once set. It must therefore also exist
+somewhere the maintainer controls and can still read after a laptop dies. That
+backup is deliberately not described here — naming its location in a public file
+would be the other way to lose it — but it exists, it is offline, and it is
+checked when the key is rotated.
+
+If you are forking Karasu: generate your own key
+(`npm run tauri signer generate`), because updates signed with this project's
+key will not verify against yours and vice versa.
+
 ## Supported versions
 
 Karasu ships as a single rolling `latest` prerelease — there's no separate

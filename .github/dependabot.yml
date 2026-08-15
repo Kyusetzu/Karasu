@@ -1,0 +1,44 @@
+version: 2
+
+# Security alerts were already on; this adds *version* updates, which is the
+# half that was missing. The third-party actions in both workflows are pinned to
+# commit SHAs — correct, and it means nothing ever tells you they moved unless
+# something is watching.
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      # One PR per ecosystem per week rather than fifteen. A lockfile bump that
+      # touches a dozen transitive packages is one review either way, and
+      # `npm run verify` on the PR is the same gate for all of them.
+      npm-minor-and-patch:
+        update-types: ["minor", "patch"]
+    # React, Tailwind and TanStack majors are migrations, not updates. They get
+    # their own PR so the diff is not buried in a grouped one.
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: cargo
+    directory: "/src-tauri"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      cargo-minor-and-patch:
+        update-types: ["minor", "patch"]
+    ignore:
+      # Tauri majors move the whole shell — WebView2, the plugin set, the
+      # config schema. Never an automatic PR.
+      - dependency-name: "tauri"
+      - dependency-name: "tauri-*"
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly

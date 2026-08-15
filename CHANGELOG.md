@@ -1,0 +1,69 @@
+# Changelog
+
+Notable changes to Karasu, newest first.
+
+Format loosely after [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
+versions are `MAJOR.MINOR.PATCH.COMMIT#`, where the fourth segment is a commit
+counter that moves on every commit (see `CONTRIBUTING.md`).
+
+**There has been no tagged release yet.** Everything published so far went to
+the rolling `latest` prerelease, which is force-moved on every push to `main`,
+so there is nothing under a version heading below to compare against. The first
+tagged release will close the `Unreleased` section rather than adding to it.
+
+Commit subjects are the real record and are written to be read; this file is the
+short version, grouped by what it means for someone using the app.
+
+## Unreleased
+
+### Fixed
+
+- An offline edit is no longer deleted when AniList answers with something
+  recoverable — an expired token, a rate limit, a server fault. Only a payload
+  AniList rejects on its own terms is dropped, and when one is, it says so.
+- Repeated offline edits to the same entry collapse instead of replaying as one
+  request each into a ~30/min budget.
+- The sign-in merge refuses to run unless it has read both live AniList lists
+  first. A failed read used to look like an empty account, at which point the
+  local list was pushed over real progress.
+- A merged entry whose write only reached the offline queue keeps its local row
+  until the write lands.
+- Enabling portable mode with a database already beside the executable asks
+  which copy to keep instead of silently adopting the older one. Disabling says
+  which database it is going back to.
+- A panic in a background loop can no longer poison a lock and take detection or
+  the alert passes out for the rest of the session.
+- A failed request stops reading as an empty result: Wrapped, the recommendation
+  sections and activity replies say the request failed rather than showing an
+  empty year, a missing section, or "no replies yet".
+- A bulk edit that stops partway reports how much it wrote, and the list
+  refetches instead of rolling back entries AniList has already changed.
+- A scrobble can only ever move progress forward; "Update now" from a blocked
+  session can no longer write episode 1 over episode 27.
+- A season Karasu cannot place is refused with the sequels offered, rather than
+  guessed at against season one.
+- One slow Jellyfin response no longer flips the now-playing card to another
+  source.
+- A paused mpv no longer outranks the thing actually playing.
+- Scores got their colour back in the list, and a bio's centred lines render as
+  lines.
+
+### Added
+
+- Detection corrections: tell Karasu which entry a detected title really is, and
+  which episode number that season starts at.
+- Position-aware scrobbling — Jellyfin's playback position and a direct mpv IPC
+  probe, so progress is written where you actually are in the episode.
+- Reviews on the detail page, with a composer that knows AniList's rules.
+- AniList's own notifications in the bell, beside Karasu's.
+- Export: MAL XML per medium and Karasu's own JSON; MAL import into the local
+  list; a daily local database backup.
+- A global hotkey, a real tray menu, and a working button on the scrobble
+  confirm toast.
+- Statistics: Ratings, Years and themed tabs, all charts drawn here.
+- The whole app reads, edits and charts in the account's own score format.
+- Search filters, sorting and paging, which makes it the browse page.
+- Custom list membership per entry; entry dates, privacy and repeat count.
+- A one-pass score rescale that prints the request count before it runs.
+- The airing week exports to any calendar app.
+- Profiles gained a Lists tab with an affinity score.

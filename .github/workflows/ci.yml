@@ -1,8 +1,12 @@
 name: CI
 
+# Pull requests only. `release.yml` fires on every push to `main` and runs the
+# same `npm run verify` in both of its jobs, so a push trigger here meant four
+# full builds per commit for one answer — and, worse, two answers: on
+# 2026-08-13 CI went green while Release failed on the same commit, and the
+# README badge reported the green one. The badge now points at Release, which
+# is the workflow that actually gates what ships.
 on:
-  push:
-    branches: ["main"]
   pull_request:
 
 concurrency:

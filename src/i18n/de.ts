@@ -262,6 +262,8 @@ export const de: typeof en = {
     recommendedManga: "Empfohlene Manga",
     recommendedHint:
       "Basierend auf dem, was du abgeschlossen hast — je höher deine Bewertung, desto mehr zählen die Vorschläge. Was schon auf deiner Liste steht, taucht hier nicht auf.",
+    recommendedUnavailable:
+      "Vorschläge konnten gerade nicht geladen werden — das ist eine fehlgeschlagene Anfrage, kein leeres Ergebnis.",
     becauseYouFinished: "Weil du {{title}} abgeschlossen hast",
     youAreAt: "du bist bei {{n}}",
     airingNow: "jetzt",
@@ -749,6 +751,8 @@ export const de: typeof en = {
     failedDetail: "In der Warteschlange — Karasu versucht es erneut.",
     bulkSaved: "{{count}} aktualisiert",
     bulkFailed: "Massenänderung fehlgeschlagen",
+    bulkPartial:
+      "Nach {{done}} von {{count}} abgebrochen — der Rest bleibt unverändert",
     removeFailed: "Eintrag konnte nicht entfernt werden",
   },
   entry: {
@@ -916,6 +920,7 @@ export const de: typeof en = {
     likeFailedDetail:
       "Es wurde nichts gesendet. Soziale Änderungen werden offline nicht zwischengespeichert.",
     noReplies: "Noch keine Antworten.",
+    repliesFailed: "Antworten konnten nicht geladen werden.",
     replyPlaceholder: "Antworten …",
     postReply: "Antworten",
     posting: "Sende …",

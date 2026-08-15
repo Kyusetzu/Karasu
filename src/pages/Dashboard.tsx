@@ -59,7 +59,11 @@ function DashboardContent({ userId }: { userId: number }) {
   });
   // Only the recommendation section needs the manga list; it is served from
   // the same Rust-side cache the manga list page already fills.
-  const { data: mangaData, isLoading: mangaLoading } = useQuery({
+  const {
+    data: mangaData,
+    isLoading: mangaLoading,
+    error: mangaError,
+  } = useQuery({
     queryKey: ["mediaList", "MANGA", userId],
     queryFn: () => fetchMediaList(userId, "MANGA"),
   });
@@ -128,7 +132,11 @@ function DashboardContent({ userId }: { userId: number }) {
         </>
       )}
       {!mangaLoading && (
-        <RecommendedSection type="MANGA" entries={allManga} />
+        <RecommendedSection
+          type="MANGA"
+          entries={allManga}
+          listUnavailable={!!mangaError}
+        />
       )}
     </div>
   );

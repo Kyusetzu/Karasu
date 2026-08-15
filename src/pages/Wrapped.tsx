@@ -605,7 +605,13 @@ export default function Wrapped() {
   // opened — two large responses out of a ~30/min budget for data that changes
   // when you finish something, not when you change tabs. Half an hour matches
   // what Statistics does for the same reason.
-  const { data, isLoading: loading } = useQuery({
+  //
+  // `error` is destructured for the same reason the Dashboard destructures it:
+  // a failed query has `isLoading === false` and no data, so without it an
+  // offline year fell through to the empty state and told the user they had
+  // finished nothing all year. The one screen built to be exported and shared
+  // is the last place to state that on a dropped request.
+  const { data, isLoading: loading, error, refetch } = useQuery({
     queryKey: ["wrapped", viewer?.id],
     queryFn: async () => {
       const [anime, manga] = await Promise.all([
@@ -770,6 +776,15 @@ export default function Wrapped() {
 
       {loading ? (
         <p className="text-ink-500">{t("common.loading")}</p>
+      ) : error ? (
+        <div>
+          <p className="text-danger">
+            {t("list.loadError", { message: String(error) })}
+          </p>
+          <Button className="mt-4" variant="secondary" onClick={() => refetch()}>
+            {t("common.retry")}
+          </Button>
+        </div>
       ) : years.length === 0 ? (
         <EmptyState visual={<OutlineYear year={new Date().getFullYear()} />} title={t("wrapped.empty")} />
       ) : (

@@ -263,6 +263,8 @@ export const en = {
     recommendedManga: "Recommended manga",
     recommendedHint:
       "Based on what you've finished — the higher you scored something, the more its suggestions count. Nothing already on your list appears here.",
+    recommendedUnavailable:
+      "Suggestions could not be loaded right now — this is a failed request, not an empty result.",
     becauseYouFinished: "Because you finished {{title}}",
     youAreAt: "you are at {{n}}",
     airingNow: "now",
@@ -747,6 +749,7 @@ export const en = {
     failedDetail: "Queued — Karasu will retry.",
     bulkSaved: "{{count}} updated",
     bulkFailed: "Bulk update failed",
+    bulkPartial: "Stopped after {{done}} of {{count}} — the rest is unchanged",
     removeFailed: "Couldn't remove that entry",
   },
   entry: {
@@ -908,6 +911,7 @@ export const en = {
     likeFailed: "Couldn't change that like",
     likeFailedDetail: "Nothing was sent. Social changes are not queued offline.",
     noReplies: "No replies yet.",
+    repliesFailed: "Replies could not be loaded.",
     replyPlaceholder: "Reply …",
     postReply: "Reply",
     posting: "Posting …",

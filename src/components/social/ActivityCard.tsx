@@ -175,6 +175,11 @@ function ActivityReplies({ activityId }: { activityId: number }) {
   return (
     <div className="mt-3 space-y-2 border-l-2 border-surface-800 pl-3">
       {q.isLoading && <Shimmer className="h-3 w-32 rounded" />}
+      {/* Before this, a failed fetch fell through to "no replies yet" below —
+          which is a claim about the thread, not about the request. */}
+      {q.error && (
+        <p className="text-2xs text-danger">{t("social.repliesFailed")}</p>
+      )}
       {q.data?.map((r) => (
         <div key={r.id} className="text-sm">
           <div className="flex items-center justify-between gap-2">
@@ -205,7 +210,7 @@ function ActivityReplies({ activityId }: { activityId: number }) {
           <Markdown source={r.text} className="mt-1" />
         </div>
       ))}
-      {!q.isLoading && !q.data?.length && (
+      {!q.isLoading && !q.error && !q.data?.length && (
         <p className="text-2xs text-ink-600">{t("social.noReplies")}</p>
       )}
 

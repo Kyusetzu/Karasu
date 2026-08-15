@@ -37,9 +37,17 @@ const MIN_SEEDS = 3;
 export default function RecommendedSection({
   type,
   entries,
+  listUnavailable,
 }: {
   type: MediaType;
   entries: MediaListEntry[];
+  /**
+   * The list these recommendations are seeded from could not be read. Without
+   * it an empty `entries` is ambiguous — too few completed titles to suggest
+   * anything, or a dropped request — and both rendered as the section quietly
+   * not being there.
+   */
+  listUnavailable?: boolean;
 }) {
   const { t } = useTranslation();
   const level = useContentFilter((s) => s.level);
@@ -68,7 +76,7 @@ export default function RecommendedSection({
     () => seeds.map((s) => s.mediaId).sort((a, b) => a - b),
     [seeds],
   );
-  const { data } = useQuery({
+  const { data, error } = useQuery({
     queryKey: ["recommendations", type, seedIds],
     queryFn: () => recommendationsFor(seedIds),
     enabled: seeds.length >= MIN_SEEDS,
@@ -89,17 +97,34 @@ export default function RecommendedSection({
     [data, seeds, exclude, type, level, scoreFormat],
   );
 
+  const title = t(
+    type === "ANIME"
+      ? "dashboard.recommendedAnime"
+      : "dashboard.recommendedManga",
+  );
+
+  // A failure keeps the heading and says so. Vanishing is the wrong answer
+  // here: this section is absent so often and so legitimately — too few
+  // completed titles, everything already on the list — that its absence reads
+  // as "nothing to suggest" rather than "the request did not come back".
+  if (error || listUnavailable) {
+    return (
+      <section>
+        <SectionHeader icon={Sparkles} title={title} />
+        <p className="mt-3 text-sm text-ink-600">
+          {t("dashboard.recommendedUnavailable")}
+        </p>
+      </section>
+    );
+  }
+
   if (seeds.length < MIN_SEEDS || ranked.length === 0) return null;
 
   return (
     <section>
       <SectionHeader
         icon={Sparkles}
-        title={t(
-          type === "ANIME"
-            ? "dashboard.recommendedAnime"
-            : "dashboard.recommendedManga",
-        )}
+        title={title}
         meta={t("dashboard.recommendedHint")}
       />
       <div className="mt-4 media-grid gap-y-5 gap-x-4">

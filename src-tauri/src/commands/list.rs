@@ -4,7 +4,7 @@ use crate::anilist::{
 };
 use crate::db::Db;
 use serde_json::{json, Value};
-use tauri::State;
+use tauri::{AppHandle, State};
 
 // Siblings in the same module tree; `mod.rs` re-exports all of it, so
 // every command keeps the path it had when they shared one file.
@@ -189,6 +189,7 @@ pub fn cached_media_list(
 /// response already includes the user's own pending changes.
 #[tauri::command]
 pub async fn fetch_media_list(
+    app: AppHandle,
     db: State<'_, Db>,
     api: State<'_, AniList>,
     user_id: i64,
@@ -199,8 +200,12 @@ pub async fn fetch_media_list(
     // Not fatal — a fetch is still worth doing with the queue undrained — but a
     // silent failure here presented as a stale list with a pending count that
     // never went down, and nothing said why.
-    if let Err(e) = process_queue(&db, &api, token.as_deref()).await {
-        crate::logging::warn("queue", format!("cannot drain the offline queue: {e}"));
+    //
+    // This is also the drain that runs on every list mount, so it is where a
+    // dropped edit is most likely to be noticed and reported.
+    match process_queue(&db, &api, token.as_deref()).await {
+        Ok(drained) => report_dropped(&app, &drained.dropped),
+        Err(e) => crate::logging::warn("queue", format!("cannot drain the offline queue: {e}")),
     }
 
     match api
@@ -269,19 +274,22 @@ pub(crate) async fn save_entry_core(
         vars.insert("scoreFormat".into(), json!(viewer_score_format(db)));
     }
     if db.queue_len() > 0 && process_queue(db, api, Some(token)).await.is_err() {
-        db.queue_push("save", &input.to_string())?;
+        queue_push_deduped(db, "save", &input.to_string())?;
         return Ok(MutationResult { queued: true, entry: None });
     }
 
     match api.query(Some(token), SAVE_MUTATION, input.clone()).await {
+        // Queued rather than raised for anything that could work later. A 429
+        // used to surface as a hard error here, which lost the edit outright:
+        // it was never written and never queued either.
+        Err(e) if e.is_retryable() => {
+            queue_push_deduped(db, "save", &input.to_string())?;
+            Ok(MutationResult { queued: true, entry: None })
+        }
         Ok(data) => Ok(MutationResult {
             queued: false,
             entry: data.get("SaveMediaListEntry").cloned(),
         }),
-        Err(ApiError::Network(_)) => {
-            db.queue_push("save", &input.to_string())?;
-            Ok(MutationResult { queued: true, entry: None })
-        }
         Err(e) => Err(e.into()),
     }
 }
@@ -315,6 +323,7 @@ pub(crate) fn bulk_chunks(ids: &[i64]) -> Vec<Vec<i64>> {
 /// per-entry rollback that followed then undid the ones that had succeeded.
 #[tauri::command]
 pub async fn bulk_save_list_entries(
+    app: AppHandle,
     db: State<'_, Db>,
     api: State<'_, AniList>,
     ids: Vec<i64>,
@@ -355,7 +364,8 @@ pub async fn bulk_save_list_entries(
     // Anything already queued has to land first, or this write would be
     // overwritten by an older one replaying on top of it.
     if db.queue_len() > 0 {
-        process_queue(&db, &api, Some(&token)).await?;
+        let drained = process_queue(&db, &api, Some(&token)).await?;
+        report_dropped(&app, &drained.dropped);
     }
 
     let mut updated = 0usize;
@@ -399,14 +409,14 @@ pub async fn delete_list_entry(
     let input = json!({ "id": id });
 
     if db.queue_len() > 0 && process_queue(&db, &api, Some(&token)).await.is_err() {
-        db.queue_push("delete", &input.to_string())?;
+        queue_push_deduped(&db, "delete", &input.to_string())?;
         return Ok(MutationResult { queued: true, entry: None });
     }
 
     match api.query(Some(&token), DELETE_MUTATION, input.clone()).await {
         Ok(_) => Ok(MutationResult { queued: false, entry: None }),
-        Err(ApiError::Network(_)) => {
-            db.queue_push("delete", &input.to_string())?;
+        Err(e) if e.is_retryable() => {
+            queue_push_deduped(&db, "delete", &input.to_string())?;
             Ok(MutationResult { queued: true, entry: None })
         }
         Err(e) => Err(e.into()),
@@ -559,14 +569,80 @@ pub fn local_all_entries(db: State<'_, Db>) -> Value {
     json!(rows)
 }
 
-/// Drains the offline queue in order. Network errors abort (the rest stays
-/// queued); API errors drop the entry so the queue can never get stuck.
+/// What a drain did. More than one number, because a dropped row is something
+/// the user typed and will not get back.
+pub(crate) struct Drained {
+    pub flushed: usize,
+    /// One message per queued edit AniList refused permanently.
+    pub dropped: Vec<String>,
+}
+
+/// The identity a newly queued mutation supersedes.
+///
+/// A second offline edit to the same entry *touching the same fields* makes the
+/// first one dead weight: replaying both spends two requests out of a ~30/min
+/// budget to reach the state the second one already describes — and running
+/// that budget down is what provokes the 429 the classification above now has
+/// to survive.
+///
+/// The field set is half the key on purpose, and the *non-null* fields at that.
+/// The frontend sends an explicit `null` for everything the user did not touch,
+/// so keying on which keys are present would make every save on one entry look
+/// alike and let a queued progress edit swallow an earlier status one, with no
+/// error anywhere. `scoreFormat` is excluded because it is re-stamped at drain
+/// time and says nothing about what changed.
+///
+/// `None` for a payload with no identifiable subject: it is left alone rather
+/// than guessed at.
+pub(crate) fn queue_key(kind: &str, payload: &str) -> Option<String> {
+    let value: Value = serde_json::from_str(payload).ok()?;
+    let obj = value.as_object()?;
+    let subject = match kind {
+        "save" => obj.get("mediaId")?.as_i64()?,
+        "delete" => obj.get("id")?.as_i64()?,
+        _ => return None,
+    };
+    let mut fields: Vec<&str> = obj
+        .iter()
+        .filter(|(k, v)| k.as_str() != "scoreFormat" && !v.is_null())
+        .map(|(k, _)| k.as_str())
+        .collect();
+    fields.sort_unstable();
+    Some(format!("{kind}:{subject}:{}", fields.join(",")))
+}
+
+/// Queues a mutation, dropping any queued one it makes redundant.
+fn queue_push_deduped(db: &Db, kind: &str, payload: &str) -> Result<(), String> {
+    if let Some(key) = queue_key(kind, payload) {
+        for (id, queued_kind, queued_payload) in db.queue_all() {
+            if queue_key(&queued_kind, &queued_payload).as_deref() == Some(key.as_str()) {
+                db.queue_remove(id);
+            }
+        }
+    }
+    db.queue_push(kind, payload)
+}
+
+/// Drains the offline queue in order.
+///
+/// Anything that could succeed later — offline, rate limited, an expired token,
+/// AniList being down — aborts the drain and leaves the whole queue intact.
+/// Only a payload AniList rejects on its own terms (validation, an entry that
+/// no longer exists) is dropped, because replaying that one forever would wedge
+/// every edit queued behind it.
+///
+/// That split is the entire point of this function, and it is newer than the
+/// function is. It used to drop a row for *any* non-transport error while
+/// `client.rs` classed an expired token and a surviving 429 as exactly that:
+/// the pending badge fell to zero and the edits were gone, with no error and no
+/// log line, because the `Ok(0)` it returned told the caller all was well.
 async fn process_queue(
     db: &Db,
     api: &AniList,
     token: Option<&str>,
-) -> Result<usize, String> {
+) -> Result<Drained, String> {
     let mut flushed = 0;
+    let mut dropped = Vec::new();
     for (id, kind, payload) in db.queue_all() {
         let mut variables: Value =
             serde_json::from_str(&payload).unwrap_or_else(|_| json!({}));
@@ -585,26 +661,118 @@ async fn process_queue(
                 db.queue_remove(id);
                 flushed += 1;
             }
-            Err(ApiError::Network(m)) => return Err(m),
-            Err(ApiError::Api(_)) => db.queue_remove(id),
+            Err(e) if e.is_retryable() => return Err(e.into()),
+            Err(e) => {
+                let reason = String::from(e);
+                crate::logging::warn(
+                    "queue",
+                    format!("AniList refused a queued {kind} for good; dropping it: {reason}"),
+                );
+                db.queue_remove(id);
+                dropped.push(reason);
+            }
         }
     }
-    Ok(flushed)
+    Ok(Drained { flushed, dropped })
+}
+
+/// Tells the user when a queued edit was thrown away.
+///
+/// Otherwise a drop is silent by construction: the row is gone, the pending
+/// badge falls to zero, and the list simply does not contain the change. The
+/// bell is the right place for it because the window may well be in the tray
+/// when a background drain runs.
+fn report_dropped(app: &AppHandle, dropped: &[String]) {
+    let Some(first) = dropped.first() else { return };
+    let body = match dropped.len() {
+        1 => format!("AniList refused an offline change: {first}"),
+        n => format!("AniList refused {n} offline changes. The first: {first}"),
+    };
+    crate::alerts::notify::notify(app, "queue", "Offline changes were not saved", &body);
 }
 
 /// Manually triggered sync of the offline queue (e.g. a button in the UI).
 #[tauri::command]
 pub async fn flush_queue(
+    app: AppHandle,
     db: State<'_, Db>,
     api: State<'_, AniList>,
 ) -> Result<usize, String> {
     let token = auth::load_token().ok_or("Not connected to AniList")?;
-    process_queue(&db, &api, Some(&token)).await
+    let drained = process_queue(&db, &api, Some(&token)).await?;
+    report_dropped(&app, &drained.dropped);
+    Ok(drained.flushed)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{bulk_chunks, BULK_CHUNK};
+    use super::{bulk_chunks, queue_key, BULK_CHUNK};
+
+    /// The case the dedupe exists for: bump progress five times offline and
+    /// five identical mutations replay into a ~30/min budget to reach the
+    /// state the last one already describes.
+    #[test]
+    fn repeated_edits_to_one_field_collapse() {
+        let first = queue_key("save", r#"{"mediaId":1,"progress":3}"#);
+        let then = queue_key("save", r#"{"mediaId":1,"progress":7}"#);
+        assert_eq!(first, then);
+        assert!(first.is_some());
+    }
+
+    /// The case it must *not* swallow. Both payloads name the same entry and
+    /// carry one field each; collapsing them loses the progress edit, and
+    /// nothing anywhere would report it.
+    #[test]
+    fn edits_to_different_fields_are_kept_apart() {
+        assert_ne!(
+            queue_key("save", r#"{"mediaId":1,"progress":3}"#),
+            queue_key("save", r#"{"mediaId":1,"status":"COMPLETED"}"#),
+        );
+    }
+
+    /// The frontend sends an explicit null for every field the user did not
+    /// touch, so a key built from which *keys* are present would make the two
+    /// payloads above identical. Only the non-null fields count.
+    #[test]
+    fn untouched_fields_do_not_join_the_key() {
+        assert_eq!(
+            queue_key("save", r#"{"mediaId":1,"progress":3}"#),
+            queue_key("save", r#"{"mediaId":1,"progress":9,"status":null,"notes":null}"#),
+        );
+    }
+
+    /// `scoreFormat` is re-stamped at drain time from the account's current
+    /// setting, so it describes the app rather than the edit.
+    #[test]
+    fn the_score_format_never_splits_two_edits() {
+        assert_eq!(
+            queue_key("save", r#"{"mediaId":1,"scoreRaw":80}"#),
+            queue_key("save", r#"{"mediaId":1,"scoreRaw":90,"scoreFormat":"POINT_5"}"#),
+        );
+    }
+
+    #[test]
+    fn entries_and_kinds_never_collide() {
+        assert_ne!(
+            queue_key("save", r#"{"mediaId":1,"progress":3}"#),
+            queue_key("save", r#"{"mediaId":2,"progress":3}"#),
+        );
+        // A delete is keyed on the list-entry id, a save on the media id, and
+        // the two number spaces overlap freely.
+        assert_ne!(
+            queue_key("delete", r#"{"id":1}"#),
+            queue_key("save", r#"{"mediaId":1}"#),
+        );
+    }
+
+    /// A payload with no identifiable subject is left alone rather than
+    /// guessed at — the fallback is the old behaviour, one row per edit.
+    #[test]
+    fn an_unrecognizable_payload_deduplicates_against_nothing() {
+        assert_eq!(queue_key("save", r#"{"progress":3}"#), None);
+        assert_eq!(queue_key("delete", "not json"), None);
+        assert_eq!(queue_key("something-else", r#"{"mediaId":1}"#), None);
+    }
 
     /// The reason this command exists: a whole-list selection has to become a
     /// handful of requests, not one per entry against a ~30/min budget.

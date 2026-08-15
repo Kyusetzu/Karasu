@@ -307,6 +307,11 @@ export default function Bell() {
 
       {panel.mounted && (
         <div
+          // The `data-overlay` convention: this panel is over the page and owns
+          // the keyboard while it is, so a `j` or a `/` behind it does not move
+          // a list selection nobody can see. Kept through the exit animation,
+          // like every other overlay.
+          data-overlay
           className={cn(
             "absolute right-0 top-full z-50 mt-1 w-88 origin-top-right overflow-hidden rounded-xl border border-hair bg-surface-900 shadow-2xl panel-wash",
             panel.leaving ? "animate-pop-out" : "animate-spring-in",

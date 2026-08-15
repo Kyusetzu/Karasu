@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect } from "react";
-import { Routes, Route, useLocation } from "react-router";
+import { Link, Routes, Route, useLocation } from "react-router";
+import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
 import { X } from "lucide-react";
 import { useAuth } from "@/stores/auth";
@@ -172,10 +173,38 @@ export default function App() {
                 <Route path="/anime/:id" element={<AnimeDetail />} />
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/about" element={<About />} />
+                {/* A hash that matches nothing rendered an empty `<main>` with
+                    the frame still around it, which reads as the page having
+                    crashed. Reachable in practice: the window restores the
+                    last route, so a renamed one strands whoever was on it. */}
+                <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>
           </ErrorBoundary>
         </main>
+      </div>
+    </div>
+  );
+}
+
+/** The route that matches nothing, so a stale one is a page rather than a void. */
+function NotFound() {
+  const { t } = useTranslation();
+  const { pathname } = useLocation();
+  return (
+    <div className="grid h-full place-items-center p-8">
+      <div className="max-w-md text-center">
+        <h1 className="text-2xl font-bold">{t("notFound.title")}</h1>
+        <p className="mt-3 text-sm leading-relaxed text-ink-500">
+          {t("notFound.body")}
+        </p>
+        <p className="mt-2 break-all text-xs text-ink-600">{pathname}</p>
+        <Link
+          to="/"
+          className="mt-5 inline-block rounded-lg bg-accent-500 px-4 py-2 text-sm font-medium text-accent-ink"
+        >
+          {t("notFound.home")}
+        </Link>
       </div>
     </div>
   );
@@ -186,6 +215,7 @@ export default function App() {
  * swallowed at every call site. One banner reports them wherever they happen.
  */
 function PlaybackError() {
+  const { t } = useTranslation();
   const error = useLibrary((s) => s.error);
   const clearError = useLibrary((s) => s.clearError);
   useEffect(() => {
@@ -201,7 +231,7 @@ function PlaybackError() {
       <button
         onClick={clearError}
         className="shrink-0 text-ink-500 hover:text-ink-100"
-        aria-label="Dismiss"
+        aria-label={t("common.dismiss")}
       >
         <X className="size-3.75" />
       </button>

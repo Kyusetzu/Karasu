@@ -116,6 +116,11 @@ export const en = {
     palette: "Command palette",
     settings: "Settings",
   },
+  notFound: {
+    title: "Nothing lives here",
+    body: "That address does not match any screen in Karasu. If you got here after an update, the page may have been renamed.",
+    home: "Back to the dashboard",
+  },
   common: {
     copied: "Copied ✓",
     save: "Save",

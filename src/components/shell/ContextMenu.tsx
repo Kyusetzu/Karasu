@@ -185,6 +185,9 @@ export default function ContextMenu() {
   return (
     <div
       ref={ref}
+      // Same convention as every dialog: while this is up it owns the
+      // keyboard, so a list shortcut cannot fire behind it.
+      data-overlay
       className={cn(
         "fixed z-[100] w-55 overflow-hidden rounded-lg border border-hair bg-surface-850 p-1.25 shadow-2xl panel-wash",
         // Scales from the corner it was opened at rather than always the

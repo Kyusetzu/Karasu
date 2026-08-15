@@ -82,4 +82,20 @@ i18n.use(initReactI18next).init({
   interpolation: { escapeValue: false },
 });
 
+/**
+ * Keeps `<html lang>` on the language actually being rendered.
+ *
+ * `index.html` ships `lang="en"` and nothing ever moved it, so a German UI
+ * claimed to be English — which is what a screen reader picks its voice and
+ * pronunciation rules from, and what the WebView hyphenates and spell-checks
+ * by. Registered rather than set once, because the language can change at
+ * runtime from the Appearance pane.
+ */
+i18n.on("languageChanged", (lng) => {
+  if (typeof document !== "undefined") document.documentElement.lang = lng;
+});
+if (typeof document !== "undefined") {
+  document.documentElement.lang = resolveLanguage(getLanguageSetting());
+}
+
 export default i18n;

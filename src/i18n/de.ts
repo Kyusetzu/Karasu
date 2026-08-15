@@ -114,6 +114,11 @@ export const de: typeof en = {
     palette: "Befehlspalette",
     settings: "Einstellungen",
   },
+  notFound: {
+    title: "Hier ist nichts",
+    body: "Diese Adresse gehört zu keinem Bereich in Karasu. Falls du nach einem Update hier gelandet bist, wurde die Seite vielleicht umbenannt.",
+    home: "Zurück zum Dashboard",
+  },
   common: {
     copied: "Kopiert ✓",
     save: "Speichern",

@@ -67,7 +67,7 @@ export function Sunburst({ data, size = 260 }: { data: Slice[]; size?: number })
   const total = data.reduce((sum, d) => sum + d.value, 0);
 
   return (
-    <svg viewBox={`0 0 ${size} ${size}`} className="w-full">
+    <svg data-chart viewBox={`0 0 ${size} ${size}`} className="w-full">
       {data.map((group, i) => {
         const tone = TONES[i % TONES.length];
         const span = arcs[i];
@@ -250,7 +250,7 @@ export function RadarChart({
   );
 
   return (
-    <svg viewBox={`0 0 ${size} ${size}`} className="w-full">
+    <svg data-chart viewBox={`0 0 ${size} ${size}`} className="w-full">
       {[0.25, 0.5, 0.75, 1].map((step) => (
         <polygon
           key={step}
@@ -379,7 +379,7 @@ export function Treemap({
   // `xMidYMid meet` fitted 320×180 into 1000×180 — a 1:1 scale, drawn in the
   // middle, with two thirds of the card left empty on either side.
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="w-full">
+    <svg data-chart viewBox={`0 0 ${width} ${height}`} className="w-full">
       {rects.map((r, i) => {
         // Roughly 5.4 viewBox units per character at this size — enough to
         // decide whether a name fits rather than clipping it mid-word.

@@ -57,6 +57,7 @@ export function GradientBars({
               </span>
             </div>
             <svg
+              data-chart
               className="mt-1 h-2 w-full"
               viewBox="0 0 100 8"
               preserveAspectRatio="none"

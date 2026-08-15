@@ -53,6 +53,7 @@ export function DotPlot({
               </span>
             </div>
             <svg
+              data-chart
               className="mt-1 h-3 w-full chart-in"
               viewBox="0 0 100 12"
               preserveAspectRatio="none"

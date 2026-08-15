@@ -50,7 +50,7 @@ export function AreaChart({
     .curve(curveMonotoneX)(pts);
 
   return (
-    <svg viewBox={`0 0 ${W} ${height}`} className="w-full">
+    <svg data-chart viewBox={`0 0 ${W} ${height}`} className="w-full">
       <path d={areaPath ?? ""} fill="rgba(var(--accent-rgb), .14)" className="animate-fade-in" />
       <path
         d={linePath ?? ""}

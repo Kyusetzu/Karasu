@@ -36,7 +36,10 @@ export function Heatmap({
       <CardTitle>{title}</CardTitle>
       {hint && <p className="mt-1 text-2xs text-ink-600">{hint}</p>}
 
-      <div className="mt-4 space-y-1">
+      {/* Colour *is* the data here — the cells carry nothing but their
+          opacity — so Windows High Contrast leaves this subtree alone. See the
+          `forced-colors` block in `index.css`. */}
+      <div data-keep-colors className="mt-4 space-y-1">
         <div className="grid grid-cols-[2.5rem_repeat(12,1fr)] gap-1">
           <span />
           {monthLabels.map((m, i) => (

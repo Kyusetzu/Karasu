@@ -772,6 +772,60 @@ html[data-reduce-motion] ::view-transition-new(*) {
   animation: none !important;
 }
 
+/* Windows High Contrast, which is the accessibility mode this app is most
+   likely to meet: WebView2 honours it, and it replaces every colour the theme
+   picked with the user's own palette. That is the point of it — the trouble is
+   that Karasu draws a lot of meaning in colour *alone*.
+
+   Three things break without this. The focus ring is a coloured outline, and a
+   forced palette flattens it into the border beside it. Every accent-filled
+   control loses the accent, so a primary button and a secondary one become the
+   same shape. And the charts are SVG fills, which are left as they are on
+   purpose: a bar chart repainted in system colours is unreadable, and
+   `forced-color-adjust: none` is the standard way to say "this element's
+   colours carry information".
+
+   `Highlight`/`ButtonText` are system colour keywords — the user's, whatever
+   they chose — not our tokens. */
+@media (forced-colors: active) {
+  /* The ring, in a colour the mode guarantees is distinct from everything
+     else, and thick enough to survive a border it might land on. */
+  *:focus-visible {
+    outline: 3px solid Highlight;
+    outline-offset: 2px;
+  }
+  /* A filled control keeps its edge when its fill is taken away. */
+  button,
+  [role="button"],
+  a {
+    forced-color-adjust: auto;
+  }
+  /* Anything whose colour *is* the data keeps ours. The charts are drawn by
+     hand in SVG, so they are addressable as a group. */
+  svg[data-chart],
+  [data-keep-colors] {
+    forced-color-adjust: none;
+  }
+  /* The scrim stops being a colour and becomes a border, or a dialog floats
+     over a page it no longer visually separates from. */
+  [data-overlay] > * {
+    border: 1px solid ButtonText;
+  }
+}
+
+/* `prefers-contrast: more` is the softer request, and it gets the softer
+   answer: keep the palette, sharpen the edges the design deliberately keeps
+   quiet. `--hair` is the line every panel and row is separated by, at 11%
+   opacity — legible on a good monitor, invisible on a bad one. */
+@media (prefers-contrast: more) {
+  :root {
+    --hair: rgba(63, 114, 199, 0.34);
+  }
+  *:focus-visible {
+    outline-width: 3px;
+  }
+}
+
 /* Scrollbars */
 *::-webkit-scrollbar {
   width: 10px;

@@ -116,7 +116,13 @@ export function StatusBar({
   return (
     <Card className="flex h-full flex-col">
       <CardTitle>{title}</CardTitle>
-      <div className="mt-4 flex h-2 shrink-0 overflow-hidden rounded-full bg-surface-800">
+      {/* The bar and its key are one colour scheme: each segment is identified
+          only by its tone, so a forced palette would merge all of them. Kept,
+          together, under Windows High Contrast. */}
+      <div
+        data-keep-colors
+        className="mt-4 flex h-2 shrink-0 overflow-hidden rounded-full bg-surface-800"
+      >
         {data.map((d, i) => (
           <span
             key={d.label}
@@ -128,7 +134,7 @@ export function StatusBar({
           />
         ))}
       </div>
-      <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5">
+      <div data-keep-colors className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5">
         {data.map((d, i) => (
           <div key={d.label} className="flex items-center gap-2 text-xs">
             <span

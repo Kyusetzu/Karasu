@@ -168,7 +168,10 @@ export default function EntryEditModal({
   // this dialog silently clear it on an unrelated save.
   const startedDirty = started !== (entry?.startedAt ?? null);
   const completedDirty = completed !== (entry?.completedAt ?? null);
-  // The local list stores none of these — the controls would be a lie there.
+  // Custom lists and "hidden from status lists" are AniList's own concepts —
+  // one is a server-side list arrangement, the other is about a profile nobody
+  // else can see locally. Dates and privacy are not: schema v14 stores both, so
+  // hiding them here was a gap rather than an honest omission.
   const anilist = mode === "anilist";
   const max = maxProgress(media) ?? 99999;
   // Manga is tracked on two axes and always has been on AniList. A volume
@@ -264,39 +267,47 @@ export default function EntryEditModal({
             </Button>
           </div>
         </label>
+        <div className="grid grid-cols-2 gap-3">
+          <DateField label={t("entry.startDate")} value={started} onChange={setStarted} />
+          <DateField
+            label={t("entry.finishDate")}
+            value={completed}
+            onChange={setCompleted}
+          />
+        </div>
+        <div className="flex flex-wrap gap-x-5 gap-y-1.5">
+          <label
+            className="flex cursor-pointer items-center gap-2 text-sm text-ink-300"
+            // Locally there is no account and no feed to be private from, so
+            // the checkbox has to say what it does do: keep the entry out of
+            // an export.
+            title={anilist ? undefined : t("entry.privateLocalHint")}
+          >
+            <input
+              type="checkbox"
+              checked={priv}
+              onChange={(e) => setPriv(e.target.checked)}
+              className="size-3.5 accent-accent-500"
+            />
+            {anilist ? t("entry.private") : t("entry.privateLocal")}
+          </label>
+          {anilist && (
+            <label
+              className="flex cursor-pointer items-center gap-2 text-sm text-ink-300"
+              title={t("entry.hiddenHint")}
+            >
+              <input
+                type="checkbox"
+                checked={hidden}
+                onChange={(e) => setHidden(e.target.checked)}
+                className="size-3.5 accent-accent-500"
+              />
+              {t("entry.hidden")}
+            </label>
+          )}
+        </div>
         {anilist && (
           <>
-            <div className="grid grid-cols-2 gap-3">
-              <DateField label={t("entry.startDate")} value={started} onChange={setStarted} />
-              <DateField
-                label={t("entry.finishDate")}
-                value={completed}
-                onChange={setCompleted}
-              />
-            </div>
-            <div className="flex flex-wrap gap-x-5 gap-y-1.5">
-              <label className="flex cursor-pointer items-center gap-2 text-sm text-ink-300">
-                <input
-                  type="checkbox"
-                  checked={priv}
-                  onChange={(e) => setPriv(e.target.checked)}
-                  className="size-3.5 accent-accent-500"
-                />
-                {t("entry.private")}
-              </label>
-              <label
-                className="flex cursor-pointer items-center gap-2 text-sm text-ink-300"
-                title={t("entry.hiddenHint")}
-              >
-                <input
-                  type="checkbox"
-                  checked={hidden}
-                  onChange={(e) => setHidden(e.target.checked)}
-                  className="size-3.5 accent-accent-500"
-                />
-                {t("entry.hidden")}
-              </label>
-            </div>
             {(customListNames?.length ?? 0) > 0 && (
               <div className="text-sm">
                 <span className="mb-1.5 block text-ink-500">{t("entry.customLists")}</span>
@@ -380,19 +391,20 @@ export default function EntryEditModal({
                   score,
                   repeat,
                   notes: serializeNotes(notes, tags),
+                  private: priv,
+                  // A cleared date is written as all-null parts — that is
+                  // AniList's own "remove the date" spelling, and schema v14
+                  // reads it the same way.
+                  ...(startedDirty ? { startedAt: started ?? CLEARED_DATE } : {}),
+                  ...(completedDirty
+                    ? { completedAt: completed ?? CLEARED_DATE }
+                    : {}),
                   ...(anilist
                     ? {
-                        private: priv,
                         hiddenFromStatusLists: hidden,
                         // Membership only when touched: the write replaces the
                         // whole set, so an untouched dialog must not send one.
                         ...(membershipsDirty ? { customLists: [...memberships] } : {}),
-                        // A cleared date is written as all-null parts — that
-                        // is AniList's own "remove the date" spelling.
-                        ...(startedDirty ? { startedAt: started ?? CLEARED_DATE } : {}),
-                        ...(completedDirty
-                          ? { completedAt: completed ?? CLEARED_DATE }
-                          : {}),
                       }
                     : {}),
                 })

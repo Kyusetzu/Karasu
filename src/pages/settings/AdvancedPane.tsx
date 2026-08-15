@@ -304,7 +304,7 @@ export function ExportSection() {
   const exportMal = (type: MediaType) =>
     run(async () => {
       const entries = await load(type);
-      const { xml, count, skipped } = buildMalXml(entries, type, format);
+      const { xml, count, skipped, omitted } = buildMalXml(entries, type, format);
       if (count === 0) {
         showToast({ kind: "error", text: t("settings.exportEmpty") });
         return;
@@ -317,6 +317,10 @@ export function ExportSection() {
             skipped > 0
               ? t("settings.exportDoneSkipped", { n: count, skipped })
               : t("settings.exportDone", { n: count }),
+          // Two different absences, so two different lines: no MAL id is a
+          // limit of the format, private is a choice the user made.
+          detail:
+            omitted > 0 ? t("settings.exportOmittedPrivate", { n: omitted }) : undefined,
         });
       }
     });

@@ -57,6 +57,8 @@ export interface MalExport {
   count: number;
   /** Entries with no MAL id, left out and owed a mention. */
   skipped: number;
+  /** Entries left out because they are marked private. */
+  omitted: number;
 }
 
 export function buildMalXml(
@@ -66,8 +68,17 @@ export function buildMalXml(
 ): MalExport {
   const rows: string[] = [];
   let skipped = 0;
+  let omitted = 0;
 
   for (const e of entries) {
+    // This file is the one export that hands the list to someone else, so it
+    // is the one where "private" has to mean something. The JSON export
+    // deliberately keeps private entries and carries the flag with them — it is
+    // a backup, and a backup that silently drops rows is not one.
+    if (e.private) {
+      omitted += 1;
+      continue;
+    }
     const mal = e.media.idMal;
     if (mal == null) {
       skipped += 1;
@@ -137,7 +148,7 @@ export function buildMalXml(
     "",
   ].join("\n");
 
-  return { xml, count: rows.length, skipped };
+  return { xml, count: rows.length, skipped, omitted };
 }
 
 /**

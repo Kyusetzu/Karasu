@@ -524,20 +524,31 @@ pub fn local_save_entry(
         .get("media")
         .filter(|m| !m.is_null())
         .map(|m| m.to_string());
+    // Absent means "leave it alone", exactly as it does for AniList — the
+    // editor sends a date only once the user has touched one, and a `+1
+    // progress` from a list row sends neither. Stored as the `FuzzyDate` object
+    // the frontend already speaks; clearing a date arrives as that object with
+    // every part null, which is a value rather than an absence.
+    let private = input.get("private").and_then(|v| v.as_bool());
+    let started_at = fuzzy_date_text(&input, "startedAt");
+    let completed_at = fuzzy_date_text(&input, "completedAt");
     let ts = now_ms();
 
-    db.local_upsert(
+    db.local_upsert(crate::db::LocalWrite {
         media_id,
-        &media_type,
+        media_type: &media_type,
         status,
         progress,
         progress_volumes,
         score,
         repeat,
         notes,
-        media_json.as_deref(),
-        ts,
-    )?;
+        private,
+        started_at: started_at.as_deref(),
+        completed_at: completed_at.as_deref(),
+        media_json: media_json.as_deref(),
+        updated_ms: ts,
+    })?;
 
     Ok(MutationResult {
         queued: false,
@@ -553,6 +564,19 @@ pub fn local_save_entry(
             "updatedAt": ts / 1000,
         })),
     })
+}
+
+/// A `FuzzyDate` argument as the JSON text the local list stores, or `None`
+/// when the caller did not send one.
+///
+/// Null is folded into `None` on purpose: AniList treats an explicit null and
+/// an absent variable the same way, and the frontend's `?? null` idiom means
+/// both spellings reach here for "not touched".
+fn fuzzy_date_text(input: &Value, key: &str) -> Option<String> {
+    input
+        .get(key)
+        .filter(|v| v.is_object())
+        .map(|v| v.to_string())
 }
 
 /// Deletes a local entry. In local mode the frontend entry id equals the

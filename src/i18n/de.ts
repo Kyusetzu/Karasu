@@ -763,6 +763,9 @@ export const de: typeof en = {
     clearDate: "Leeren",
     partialDate: "Aktuell: {{date}} — ein gewähltes Datum ersetzt es.",
     private: "Privat",
+    privateLocal: "Nicht in MAL-Export",
+    privateLocalHint:
+      "Hier gibt es kein Konto, vor dem etwas privat sein könnte. Der Eintrag fehlt im MyAnimeList-Export; im JSON-Backup bleibt er enthalten und als privat markiert.",
     hidden: "Aus Status-Listen ausblenden",
     hiddenHint:
       "Auf anilist.co erscheint der Eintrag dann nur in eigenen Listen, nicht unter Schaue/Abgeschlossen.",
@@ -1103,6 +1106,8 @@ export const de: typeof en = {
     exportDone: "{{n}} Einträge exportiert.",
     exportDoneSkipped:
       "{{n}} Einträge exportiert — {{skipped}} haben keine MyAnimeList-ID und wurden ausgelassen.",
+    exportOmittedPrivate:
+      "{{n}} private Einträge wurden ausgelassen. Im JSON-Backup sind sie weiterhin enthalten.",
     exportEmpty: "Noch nichts zu exportieren.",
     exportFailed: "Der Export wurde nicht abgeschlossen",
     import: "Liste importieren",

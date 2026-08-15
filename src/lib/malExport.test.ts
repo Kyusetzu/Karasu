@@ -66,6 +66,33 @@ describe("buildMalXml", () => {
     expect(xml).toContain("<user_total_anime>1</user_total_anime>");
   });
 
+  /**
+   * The MAL export is the one that hands the list to someone else, so it is
+   * the one where "private" has to bite. Counted separately from `skipped`:
+   * missing a MAL id is a limit of the format, private is a choice.
+   */
+  it("leaves a private entry out and says how many", () => {
+    const secret = entry({ private: true });
+    const { count, skipped, omitted, xml } = buildMalXml(
+      [secret, entry()],
+      "ANIME",
+      "POINT_10",
+    );
+    expect(count).toBe(1);
+    expect(omitted).toBe(1);
+    expect(skipped).toBe(0);
+    expect(xml).toContain("<user_total_anime>1</user_total_anime>");
+  });
+
+  /** The backup keeps everything — a backup that drops rows is not one. */
+  it("keeps a private entry in the JSON export, flagged", () => {
+    const json = JSON.parse(
+      buildJsonExport([entry({ private: true })], [], "POINT_10", 0),
+    );
+    expect(json.anime).toHaveLength(1);
+    expect(json.anime[0].private).toBe(true);
+  });
+
   it("maps every status, and REPEATING to the active one", () => {
     const at = (status: string) =>
       buildMalXml([entry({ status })], "ANIME", "POINT_10").xml.match(

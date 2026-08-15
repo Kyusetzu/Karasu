@@ -263,6 +263,25 @@ ALTER TABLE detection_override ADD COLUMN episode_offset INTEGER NOT NULL DEFAUL
 PRAGMA user_version = 13;
 ";
 
+/// Schema v14: start date, finish date and privacy on the local list.
+///
+/// The account-free list had none of them, so `local_list_json` emitted a
+/// hard-coded `false` and two nulls and the editor hid the controls — three
+/// fields the app understands everywhere else, missing for the one user who
+/// chose not to sign in. Nothing about them needs an account: a date is a date,
+/// and "private" locally means the same thing it means in an export.
+///
+/// The dates are stored as the JSON text of AniList's own `FuzzyDate`
+/// (`{"year":2024,"month":3,"day":null}`) rather than as an ISO string, because
+/// every part is independently nullable and the frontend already speaks that
+/// shape end to end. A partial date is a real answer here, not a broken one.
+const MIGRATION_V14: &str = "
+ALTER TABLE local_list ADD COLUMN started_at TEXT;
+ALTER TABLE local_list ADD COLUMN completed_at TEXT;
+ALTER TABLE local_list ADD COLUMN private INTEGER NOT NULL DEFAULT 0;
+PRAGMA user_version = 14;
+";
+
 /// One detection correction: what was detected, and what it really is.
 ///
 /// A struct rather than the tuple this started as, because the row grew a
@@ -320,8 +339,37 @@ pub struct LocalRow {
     pub score: f64,
     pub repeat: i64,
     pub notes: String,
+    pub private: bool,
+    /// AniList's `FuzzyDate` as JSON text, or `None` for no date.
+    pub started_at: Option<String>,
+    pub completed_at: Option<String>,
     pub updated_ms: i64,
     pub media_json: Option<String>,
+}
+
+/// One write to the local list.
+///
+/// A struct rather than the thirteen positional arguments this would otherwise
+/// be — the same reason `DetectionOverride` stopped being a tuple. Three of
+/// these fields are `Option` and mean "leave it alone" rather than "set it to
+/// nothing", which is a distinction no reader of `local_upsert(…, None, None,
+/// …)` would have made.
+pub struct LocalWrite<'a> {
+    pub media_id: i64,
+    pub media_type: &'a str,
+    pub status: &'a str,
+    pub progress: i64,
+    pub progress_volumes: i64,
+    pub score: f64,
+    pub repeat: i64,
+    pub notes: &'a str,
+    /// `None` leaves the stored value alone, matching what AniList does with an
+    /// absent variable — which is what the editor sends for an untouched field.
+    pub private: Option<bool>,
+    pub started_at: Option<&'a str>,
+    pub completed_at: Option<&'a str>,
+    pub media_json: Option<&'a str>,
+    pub updated_ms: i64,
 }
 
 /// Notifications retained. The bell reads the newest 100, so this is scrollback
@@ -417,6 +465,16 @@ impl Db {
                 apply(&conn, 13, "PRAGMA user_version = 13;")?;
             } else {
                 apply(&conn, 13, MIGRATION_V13)?;
+            }
+        }
+        if version < 14 {
+            // Three `ALTER TABLE ADD COLUMN`s, so the guard v7 and v13 carry.
+            // `apply` wraps the step in a transaction, so all three land or
+            // none do and the first column decides the answer for all of them.
+            if has_column(&conn, "local_list", "started_at") {
+                apply(&conn, 14, "PRAGMA user_version = 14;")?;
+            } else {
+                apply(&conn, 14, MIGRATION_V14)?;
             }
         }
         Ok(Db(Mutex::new(conn)))
@@ -604,25 +662,19 @@ impl Db {
     /// Insert or update a local entry. `media_json` is kept from the existing
     /// row when `None`, so field-only edits (progress/status) don't need to
     /// re-supply the media metadata.
-    #[allow(clippy::too_many_arguments)]
-    pub fn local_upsert(
-        &self,
-        media_id: i64,
-        media_type: &str,
-        status: &str,
-        progress: i64,
-        progress_volumes: i64,
-        score: f64,
-        repeat: i64,
-        notes: &str,
-        media_json: Option<&str>,
-        updated_ms: i64,
-    ) -> Result<(), String> {
+    pub fn local_upsert(&self, w: LocalWrite<'_>) -> Result<(), String> {
         let conn = self.0.guard();
         conn.execute(
+            // The three `COALESCE`d columns are the ones whose absence means
+            // "unchanged" — the same contract AniList gives an absent GraphQL
+            // variable, and what the editor relies on when it sends a date only
+            // once the user has touched it. Clearing a date is spelled the way
+            // AniList spells it, as an object with every part null, which is a
+            // present value here rather than an absent one.
             "INSERT INTO local_list
-                (media_id, media_type, status, progress, progress_volumes, score, repeat, notes, tags, updated_ms, media_json)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, '', ?9, ?10)
+                (media_id, media_type, status, progress, progress_volumes, score, repeat,
+                 notes, tags, private, started_at, completed_at, updated_ms, media_json)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, '', COALESCE(?9, 0), ?10, ?11, ?12, ?13)
              ON CONFLICT(media_id, media_type) DO UPDATE SET
                 status = excluded.status,
                 progress = excluded.progress,
@@ -630,11 +682,25 @@ impl Db {
                 score = excluded.score,
                 repeat = excluded.repeat,
                 notes = excluded.notes,
+                private = COALESCE(?9, local_list.private),
+                started_at = COALESCE(?10, local_list.started_at),
+                completed_at = COALESCE(?11, local_list.completed_at),
                 updated_ms = excluded.updated_ms,
                 media_json = COALESCE(excluded.media_json, local_list.media_json)",
             rusqlite::params![
-                media_id, media_type, status, progress, progress_volumes, score,
-                repeat, notes, updated_ms, media_json
+                w.media_id,
+                w.media_type,
+                w.status,
+                w.progress,
+                w.progress_volumes,
+                w.score,
+                w.repeat,
+                w.notes,
+                w.private,
+                w.started_at,
+                w.completed_at,
+                w.updated_ms,
+                w.media_json
             ],
         )
         .map(|_| ())
@@ -669,7 +735,8 @@ impl Db {
         // `collect` below drops rows whose mapping errors. A mismatch does not
         // fail loudly — it silently returns an empty list.
         let sql = "SELECT media_id, media_type, status, progress, progress_volumes, \
-                   score, repeat, notes, updated_ms, media_json FROM local_list";
+                   score, repeat, notes, updated_ms, media_json, private, \
+                   started_at, completed_at FROM local_list";
         let map = |r: &rusqlite::Row| {
             Ok(LocalRow {
                 media_id: r.get(0)?,
@@ -682,6 +749,9 @@ impl Db {
                 notes: r.get(7)?,
                 updated_ms: r.get(8)?,
                 media_json: r.get(9)?,
+                private: r.get::<_, i64>(10)? != 0,
+                started_at: r.get(11)?,
+                completed_at: r.get(12)?,
             })
         };
         let collect = |mut stmt: rusqlite::Statement, params: &[&dyn rusqlite::ToSql]| {
@@ -712,6 +782,18 @@ impl Db {
         self.local_rows(None)
     }
 
+    /// A stored `FuzzyDate` back as JSON, or null.
+    ///
+    /// Unparseable text becomes null rather than an error: the column is
+    /// written by exactly one place, so a row that does not parse is a row from
+    /// a Karasu that no longer exists, and the entry is worth more than the
+    /// date is.
+    fn fuzzy_date(stored: Option<&str>) -> serde_json::Value {
+        stored
+            .and_then(|s| serde_json::from_str(s).ok())
+            .unwrap_or(serde_json::Value::Null)
+    }
+
     /// The local list for one media type as an AniList-shaped `lists` array
     /// (JSON string), so the frontend `ListResult` is identical to online.
     pub fn local_list_json(&self, media_type: &str) -> String {
@@ -734,16 +816,22 @@ impl Db {
                 "repeat": row.repeat,
                 "notes": row.notes,
                 "updatedAt": row.updated_ms / 1000,
-                // The account-free list has no AniList-side privacy and does not
-                // track dates, but the shape has to match what the API returns
-                // or every reader would need a second branch. Emitted
+                // Real values since v14. They were a hard-coded `false` and two
+                // nulls for as long as the local list existed, which made the
+                // shape match the API's while quietly saying "no" to three
+                // questions nobody had asked the database. Still emitted
                 // explicitly rather than left absent: `MediaListEntry` declares
-                // them, so omitting them would make the type a lie in local
-                // mode and `entry.startedAt` would be `undefined` where the
-                // compiler promised an object or null.
-                "private": false,
-                "startedAt": Value::Null,
-                "completedAt": Value::Null,
+                // them, so omitting them would make the type a lie and
+                // `entry.startedAt` would be `undefined` where the compiler
+                // promised an object or null.
+                //
+                // "Private" locally cannot mean hidden from anyone — there is no
+                // account and no feed. It means left out of the MAL export, the
+                // one export that hands the list to someone else; the JSON
+                // backup keeps the entry and carries the flag with it.
+                "private": row.private,
+                "startedAt": Self::fuzzy_date(row.started_at.as_deref()),
+                "completedAt": Self::fuzzy_date(row.completed_at.as_deref()),
                 "media": media,
             });
             buckets
@@ -1201,6 +1289,7 @@ mod tests {
         conn.execute_batch(MIGRATION_V11).unwrap();
         conn.execute_batch(MIGRATION_V12).unwrap();
         conn.execute_batch(MIGRATION_V13).unwrap();
+        conn.execute_batch(MIGRATION_V14).unwrap();
         Db(Mutex::new(conn))
     }
 
@@ -1431,26 +1520,93 @@ mod tests {
         let version: i64 = conn
             .query_row("PRAGMA user_version", [], |r| r.get(0))
             .unwrap();
-        assert_eq!(version, 13, "and must end up fully migrated");
+        assert_eq!(version, 14, "and must end up fully migrated");
         drop(conn);
 
-        // v13 is the other `ALTER TABLE ADD COLUMN`, so it needs the same
-        // guard and the same proof: the column present, the version behind.
-        let conn = Connection::open(dir.join("karasu.db")).unwrap();
-        assert!(has_column(&conn, "detection_override", "episode_offset"));
-        conn.execute_batch("PRAGMA user_version = 12;").unwrap();
-        drop(conn);
+        // v13 and v14 are the other `ALTER TABLE ADD COLUMN` steps, so each
+        // needs the same guard and the same proof: the column present, the
+        // version behind. v14 adds three columns in one transaction, which is
+        // why checking the first one is enough to decide for all three.
+        for (version_behind, table, column) in [
+            (12, "detection_override", "episode_offset"),
+            (13, "local_list", "started_at"),
+        ] {
+            let conn = Connection::open(dir.join("karasu.db")).unwrap();
+            assert!(has_column(&conn, table, column));
+            conn.execute_batch(&format!("PRAGMA user_version = {version_behind};"))
+                .unwrap();
+            drop(conn);
 
-        Db::open(dir.clone()).expect("a half-migrated v13 must still open");
+            Db::open(dir.clone())
+                .unwrap_or_else(|e| panic!("a half-migrated v{} must still open: {e}", version_behind + 1));
 
-        let conn = Connection::open(dir.join("karasu.db")).unwrap();
-        let version: i64 = conn
-            .query_row("PRAGMA user_version", [], |r| r.get(0))
-            .unwrap();
-        assert_eq!(version, 13);
-        drop(conn);
+            let conn = Connection::open(dir.join("karasu.db")).unwrap();
+            let version: i64 = conn
+                .query_row("PRAGMA user_version", [], |r| r.get(0))
+                .unwrap();
+            assert_eq!(version, 14);
+        }
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// v14. Three fields the app understands everywhere else, which the local
+    /// list answered with a hard-coded `false` and two nulls.
+    #[test]
+    fn a_local_entry_carries_dates_and_privacy() {
+        let db = mem_db();
+        db.local_upsert(LocalWrite {
+            private: Some(true),
+            started_at: Some(r#"{"year":2024,"month":3,"day":null}"#),
+            media_json: Some("{}"),
+            ..write(4, "ANIME")
+        })
+        .unwrap();
+
+        let entry = |db: &Db| -> Value {
+            let lists: Value = serde_json::from_str(&db.local_list_json("ANIME")).unwrap();
+            lists
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|g| g["status"] == "CURRENT")
+                .unwrap()["entries"][0]
+                .clone()
+        };
+
+        let e = entry(&db);
+        assert_eq!(e["private"], true);
+        assert_eq!(e["startedAt"]["year"], 2024);
+        // A partial date is a real answer, not a broken one.
+        assert_eq!(e["startedAt"]["day"], Value::Null);
+        assert_eq!(e["completedAt"], Value::Null);
+
+        // The editor sends a date only once it has been touched, and a `+1
+        // progress` from a list row sends none of the three. Absent has to mean
+        // "leave it alone" or an unrelated save would quietly wipe all of them.
+        db.local_upsert(LocalWrite {
+            progress: 5,
+            updated_ms: 2_000,
+            ..write(4, "ANIME")
+        })
+        .unwrap();
+        let e = entry(&db);
+        assert_eq!(e["progress"], 5);
+        assert_eq!(e["private"], true);
+        assert_eq!(e["startedAt"]["year"], 2024);
+
+        // Clearing is AniList's own spelling — the object with every part null
+        // — which is a value rather than an absence and therefore lands.
+        db.local_upsert(LocalWrite {
+            private: Some(false),
+            started_at: Some(r#"{"year":null,"month":null,"day":null}"#),
+            updated_ms: 3_000,
+            ..write(4, "ANIME")
+        })
+        .unwrap();
+        let e = entry(&db);
+        assert_eq!(e["private"], false);
+        assert_eq!(e["startedAt"]["year"], Value::Null);
     }
 
     /// Portable mode's copy step. Also pins that SQLite accepts a bound
@@ -1556,11 +1712,36 @@ mod tests {
     /// Schema v7. Volumes are a second axis, not a derived one: a manga read
     /// by volume and a manga read by chapter are different states, and the
     /// local list dropped the volume half entirely before this.
+    /// Every field a test does not care about, so the ones it does care about
+    /// are the only ones written out at the call site.
+    fn write(media_id: i64, media_type: &'static str) -> LocalWrite<'static> {
+        LocalWrite {
+            media_id,
+            media_type,
+            status: "CURRENT",
+            progress: 0,
+            progress_volumes: 0,
+            score: 0.0,
+            repeat: 0,
+            notes: "",
+            private: None,
+            started_at: None,
+            completed_at: None,
+            media_json: None,
+            updated_ms: 1_000,
+        }
+    }
+
     #[test]
     fn local_list_round_trips_volumes() {
         let db = mem_db();
-        db.local_upsert(7, "MANGA", "CURRENT", 120, 12, 0.0, 0, "", Some("{}"), 1_000)
-            .unwrap();
+        db.local_upsert(LocalWrite {
+            progress: 120,
+            progress_volumes: 12,
+            media_json: Some("{}"),
+            ..write(7, "MANGA")
+        })
+        .unwrap();
 
         let lists: Value =
             serde_json::from_str(&db.local_list_json("MANGA")).unwrap();
@@ -1575,8 +1756,13 @@ mod tests {
         assert_eq!(entry["progressVolumes"], 12);
 
         // A chapter-only edit must not silently reset the volume count.
-        db.local_upsert(7, "MANGA", "CURRENT", 121, 12, 0.0, 0, "", None, 2_000)
-            .unwrap();
+        db.local_upsert(LocalWrite {
+            progress: 121,
+            progress_volumes: 12,
+            updated_ms: 2_000,
+            ..write(7, "MANGA")
+        })
+        .unwrap();
         let row = db.local_all().into_iter().find(|r| r.media_id == 7).unwrap();
         assert_eq!(row.progress, 121);
         assert_eq!(row.progress_volumes, 12);
@@ -1603,27 +1789,47 @@ mod tests {
         .unwrap();
 
         conn.execute_batch(MIGRATION_V7).unwrap();
+        let version: i64 = conn
+            .query_row("PRAGMA user_version", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(version, 7);
+
+        // The rest of the ladder, because `local_rows` reads every column the
+        // *current* schema has. Stopping at v7 here made this test fail the
+        // moment v14 added three more — silently, as an empty list rather than
+        // an error, which is the failure mode that function's comment warns
+        // about and is worth having a test walk into.
+        conn.execute_batch(MIGRATION_V8).unwrap();
+        conn.execute_batch(MIGRATION_V9).unwrap();
+        conn.execute_batch(MIGRATION_V10).unwrap();
+        conn.execute_batch(MIGRATION_V11).unwrap();
+        conn.execute_batch(MIGRATION_V12).unwrap();
+        conn.execute_batch(MIGRATION_V13).unwrap();
+        conn.execute_batch(MIGRATION_V14).unwrap();
 
         let db = Db(Mutex::new(conn));
         let row = db.local_all().into_iter().find(|r| r.media_id == 3).unwrap();
         assert_eq!(row.progress, 40);
         assert_eq!(row.progress_volumes, 0);
-        let version: i64 = db
-            .0
-            .lock()
-            .unwrap()
-            .query_row("PRAGMA user_version", [], |r| r.get(0))
-            .unwrap();
-        assert_eq!(version, 7);
+        // v14's three columns backfill the same way: a row written before them
+        // reads as not private, with no dates.
+        assert!(!row.private);
+        assert_eq!(row.started_at, None);
+        assert_eq!(row.completed_at, None);
     }
 
     #[test]
     fn local_upsert_and_render() {
         let db = mem_db();
-        db.local_upsert(
-            5, "ANIME", "CURRENT", 3, 0, 8.0, 1, "note",
-            Some(r#"{"id":5,"title":{"romaji":"X"}}"#), 2_000,
-        )
+        db.local_upsert(LocalWrite {
+            progress: 3,
+            score: 8.0,
+            repeat: 1,
+            notes: "note",
+            media_json: Some(r#"{"id":5,"title":{"romaji":"X"}}"#),
+            updated_ms: 2_000,
+            ..write(5, "ANIME")
+        })
         .unwrap();
         let lists: Value =
             serde_json::from_str(&db.local_list_json("ANIME")).unwrap();
@@ -1646,11 +1852,20 @@ mod tests {
     #[test]
     fn local_upsert_keeps_media_json_on_field_edit() {
         let db = mem_db();
-        db.local_upsert(1, "MANGA", "PLANNING", 0, 0, 0.0, 0, "", Some("{\"id\":1}"), 1_000)
-            .unwrap();
+        db.local_upsert(LocalWrite {
+            status: "PLANNING",
+            media_json: Some("{\"id\":1}"),
+            ..write(1, "MANGA")
+        })
+        .unwrap();
         // Edit without re-supplying media metadata.
-        db.local_upsert(1, "MANGA", "CURRENT", 2, 1, 0.0, 0, "", None, 3_000)
-            .unwrap();
+        db.local_upsert(LocalWrite {
+            progress: 2,
+            progress_volumes: 1,
+            updated_ms: 3_000,
+            ..write(1, "MANGA")
+        })
+        .unwrap();
         let rows = db.local_all();
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].status, "CURRENT");
@@ -1660,8 +1875,14 @@ mod tests {
     #[test]
     fn local_delete_removes_row() {
         let db = mem_db();
-        db.local_upsert(9, "ANIME", "COMPLETED", 12, 0, 10.0, 0, "", Some("{}"), 1)
-            .unwrap();
+        db.local_upsert(LocalWrite {
+            status: "COMPLETED",
+            progress: 12,
+            score: 10.0,
+            media_json: Some("{}"),
+            ..write(9, "ANIME")
+        })
+        .unwrap();
         db.local_delete(9, "ANIME").unwrap();
         assert!(db.local_all().is_empty());
     }

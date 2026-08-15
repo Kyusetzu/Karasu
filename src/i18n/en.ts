@@ -760,6 +760,9 @@ export const en = {
     clearDate: "Clear",
     partialDate: "Currently: {{date}} — picking a date replaces it.",
     private: "Private",
+    privateLocal: "Keep out of MAL exports",
+    privateLocalHint:
+      "There is no account here to be private from. This leaves the entry out of the MyAnimeList export; the JSON backup still includes it, marked private.",
     hidden: "Hide from status lists",
     hiddenHint:
       "On anilist.co the entry then appears only in custom lists, not under Watching/Completed.",
@@ -1093,6 +1096,8 @@ export const en = {
     exportDone: "{{n}} entries exported.",
     exportDoneSkipped:
       "{{n}} entries exported — {{skipped}} have no MyAnimeList id and were left out.",
+    exportOmittedPrivate:
+      "{{n}} private entries were left out. They are still in the JSON backup.",
     exportEmpty: "Nothing to export yet.",
     exportFailed: "The export did not finish",
     import: "Import a list",

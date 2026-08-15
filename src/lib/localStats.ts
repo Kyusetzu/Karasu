@@ -140,6 +140,73 @@ export function activityHeatmap(
   return { years, max, total };
 }
 
+// --- Totals -----------------------------------------------------------------
+
+export interface LocalTotals {
+  count: number;
+  /** Episodes watched or chapters read, summed across the list. */
+  progressTotal: number;
+  scored: number;
+  /** Mean of the scored entries, display units; 0 when nothing is scored. */
+  meanScore: number;
+  byStatus: { status: string; count: number }[];
+  /** Score → how many entries hold it, for the distribution columns. */
+  scoreCounts: { score: number; count: number }[];
+  releaseYears: { year: number; count: number }[];
+}
+
+/**
+ * The figures AniList's statistics endpoint would return, counted from the
+ * list instead.
+ *
+ * Every one of these is derivable from entries the app already holds, which is
+ * the whole reason the account-free profile can have a statistics screen at
+ * all. What is *not* here is what AniList precomputes and Karasu cannot:
+ * minutes watched (no duration on a list entry), and the genre, tag, studio,
+ * voice-actor and staff rankings, which need a join across every media the user
+ * has ever touched.
+ *
+ * Deliberately not filtered: the caller has already applied the content filter,
+ * the same way every other panel on that screen reads its pool.
+ */
+export function localTotals(entries: MediaListEntry[]): LocalTotals {
+  const byStatus = new Map<string, number>();
+  const scores = new Map<number, number>();
+  const years = new Map<number, number>();
+  let progressTotal = 0;
+  let scoreSum = 0;
+  let scored = 0;
+
+  for (const e of entries) {
+    byStatus.set(e.status, (byStatus.get(e.status) ?? 0) + 1);
+    progressTotal += e.progress ?? 0;
+    if (e.score > 0) {
+      scored += 1;
+      scoreSum += e.score;
+      scores.set(e.score, (scores.get(e.score) ?? 0) + 1);
+    }
+    // `seasonYear` rather than `startDate`: the list query carries it, and it
+    // is the year the *title* is from — which is what a release-year chart is
+    // asking. A missing one is left out rather than bucketed as 0.
+    const year = e.media.seasonYear;
+    if (year) years.set(year, (years.get(year) ?? 0) + 1);
+  }
+
+  return {
+    count: entries.length,
+    progressTotal,
+    scored,
+    meanScore: scored > 0 ? scoreSum / scored : 0,
+    byStatus: [...byStatus].map(([status, count]) => ({ status, count })),
+    scoreCounts: [...scores]
+      .map(([score, count]) => ({ score, count }))
+      .sort((a, b) => a.score - b.score),
+    releaseYears: [...years]
+      .map(([year, count]) => ({ year, count }))
+      .sort((a, b) => a.year - b.year),
+  };
+}
+
 // --- Seasonal habits --------------------------------------------------------
 
 export const SEASONS = ["WINTER", "SPRING", "SUMMER", "FALL"] as const;

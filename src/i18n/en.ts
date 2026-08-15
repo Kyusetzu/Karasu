@@ -282,6 +282,9 @@ export const en = {
   stats: {
     title: "Statistics",
     signInText: "Connect your AniList account to see your statistics.",
+    localSubtitle: "Counted from your local list — no account, no requests.",
+    localMissing:
+      "Watch time and the genre, tag, studio, voice-actor and staff rankings need an AniList account: AniList precomputes those across every title you have ever tracked, and a list entry carries neither an episode duration nor a staff credit. Everything above is counted from your own list.",
     empty: "No data yet.",
     overview: "Overview",
     ratings: "Ratings",

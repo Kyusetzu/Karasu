@@ -49,6 +49,7 @@ import {
   type SeasonCount,
 } from "@/lib/localStats";
 import { RankedList, fmt, scoreText } from "@/components/stats/RankedList";
+import LocalStatistics from "@/components/stats/LocalStatistics";
 /**
  * Five themed tabs rather than one per ranked array. The old shape — a tab
  * each for genres, tags, voice actors, studios and staff — made eight stops
@@ -62,8 +63,33 @@ export default function Statistics() {
   const { t } = useTranslation();
   const viewer = useAuth((s) => s.viewer);
   const loading = useAuth((s) => s.loading);
+  const mode = useAuth((s) => s.mode);
+  const [params, setParams] = useSearchParams();
 
   if (loading) return null;
+
+  // The account-free profile gets the panels that are counting rather than
+  // AniList aggregation — which is most of them. A sign-in wall here answered
+  // a question the user had already answered.
+  if (!viewer && mode === "local") {
+    const type: MediaType = params.get("type") === "MANGA" ? "MANGA" : "ANIME";
+    return (
+      <LocalStatistics
+        type={type}
+        onType={(v) =>
+          setParams(
+            (prev) => {
+              const p = new URLSearchParams(prev);
+              if (v === "ANIME") p.delete("type");
+              else p.set("type", v);
+              return p;
+            },
+            { replace: true },
+          )
+        }
+      />
+    );
+  }
 
   if (!viewer) {
     return (

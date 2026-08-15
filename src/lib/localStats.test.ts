@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { activityHeatmap, scoreDelta, seasonalHistory } from "./localStats";
+import {
+  activityHeatmap,
+  localTotals,
+  scoreDelta,
+  seasonalHistory,
+} from "./localStats";
 import type { MediaListEntry } from "@/api/types";
 
 const entry = (
@@ -151,5 +156,66 @@ describe("seasonalHistory", () => {
 
   it("leaves seasonless media outside the question", () => {
     expect(seasonalHistory([seasonal(1, null)])).toEqual([]);
+  });
+});
+
+describe("localTotals", () => {
+  const row = (over: Record<string, unknown> = {}) =>
+    ({
+      id: 1,
+      mediaId: 1,
+      status: "CURRENT",
+      score: 0,
+      progress: 0,
+      media: { id: 1, seasonYear: null },
+      ...over,
+    }) as unknown as MediaListEntry;
+
+  it("counts what AniList's endpoint would, from the list itself", () => {
+    const out = localTotals([
+      row({ mediaId: 1, status: "COMPLETED", score: 8, progress: 12 }),
+      row({ mediaId: 2, status: "COMPLETED", score: 6, progress: 24 }),
+      row({ mediaId: 3, status: "CURRENT", score: 0, progress: 3 }),
+    ]);
+    expect(out.count).toBe(3);
+    expect(out.progressTotal).toBe(39);
+    expect(out.scored).toBe(2);
+    expect(out.meanScore).toBe(7);
+    expect(out.byStatus).toContainEqual({ status: "COMPLETED", count: 2 });
+    expect(out.byStatus).toContainEqual({ status: "CURRENT", count: 1 });
+  });
+
+  /**
+   * The same rule the rest of this file follows: an unscored entry is an
+   * absence, not a zero. Averaging it in drags the mean toward an opinion
+   * nobody holds.
+   */
+  it("leaves the unscored out of the mean and the distribution", () => {
+    const out = localTotals([row({ score: 0 }), row({ mediaId: 2, score: 9 })]);
+    expect(out.meanScore).toBe(9);
+    expect(out.scoreCounts).toEqual([{ score: 9, count: 1 }]);
+  });
+
+  it("orders scores and years ascending, and skips media with no year", () => {
+    const out = localTotals([
+      row({ mediaId: 1, score: 9, media: { id: 1, seasonYear: 2021 } }),
+      row({ mediaId: 2, score: 5, media: { id: 2, seasonYear: 2019 } }),
+      row({ mediaId: 3, score: 9, media: { id: 3, seasonYear: null } }),
+    ]);
+    expect(out.scoreCounts).toEqual([
+      { score: 5, count: 1 },
+      { score: 9, count: 2 },
+    ]);
+    expect(out.releaseYears).toEqual([
+      { year: 2019, count: 1 },
+      { year: 2021, count: 1 },
+    ]);
+  });
+
+  it("has an empty answer rather than a divide by zero", () => {
+    const out = localTotals([]);
+    expect(out.count).toBe(0);
+    expect(out.meanScore).toBe(0);
+    expect(out.byStatus).toEqual([]);
   });
 });

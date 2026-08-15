@@ -281,6 +281,9 @@ export const de: typeof en = {
   stats: {
     title: "Statistik",
     signInText: "Verbinde deinen AniList-Account, um deine Statistik zu sehen.",
+    localSubtitle: "Aus deiner lokalen Liste gezählt — kein Konto, keine Anfragen.",
+    localMissing:
+      "Sehzeit und die Ranglisten für Genres, Tags, Studios, Synchronsprecher und Staff brauchen ein AniList-Konto: AniList berechnet sie über alles, was du je verfolgt hast, und ein Listeneintrag trägt weder eine Folgenlänge noch Credits. Alles darüber ist aus deiner eigenen Liste gezählt.",
     empty: "Noch keine Daten.",
     overview: "Übersicht",
     ratings: "Bewertungen",

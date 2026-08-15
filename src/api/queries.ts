@@ -101,12 +101,14 @@ query ($search: String, $type: MediaType!, $page: Int, $isAdult: Boolean, $genre
 }`;
 
 /**
- * The sources and countries AniList's own browse page offers.
+ * Every `MediaSource` the enum has, verified by introspection rather than
+ * copied from the website.
  *
- * Both verified by introspection rather than copied from the website:
- * `MediaSource` is an enum (15 values, of which these are the ones worth a
- * dropdown), and `countryOfOrigin` is a `CountryCode` scalar — an ISO 3166-1
- * alpha-2 string, so the four here are the four that have anime and manga.
+ * The *labels* are `lib/format`'s `sourceLabel` and have shipped in both
+ * languages since the detail page needed them — this is only the order they
+ * appear in a dropdown. The origin list is `lib/format`'s `ORIGINS` for the
+ * same reason: `countryOfOrigin` is a `CountryCode` scalar, so the four that
+ * have anime and manga were already spelled out for the manga list's filter.
  */
 export const MEDIA_SOURCES = [
   "ORIGINAL",
@@ -125,8 +127,6 @@ export const MEDIA_SOURCES = [
   "PICTURE_BOOK",
   "OTHER",
 ] as const;
-
-export const ORIGIN_COUNTRIES = ["JP", "KR", "CN", "TW"] as const;
 
 export interface BrowseFilters {
   search?: string;

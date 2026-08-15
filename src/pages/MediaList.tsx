@@ -42,7 +42,7 @@ import { nextFocus, type Move } from "@/lib/roving";
 import RandomPickModal from "@/components/overlays/RandomPickModal";
 import PresetModal from "@/components/overlays/PresetModal";
 import { loadPresets, savePresets, type Preset } from "@/lib/presets";
-import { formatLabel, MEDIA_FORMATS } from "@/lib/format";
+import { formatLabel, MEDIA_FORMATS, ORIGINS, originLabel } from "@/lib/format";
 import { collectTags, tagsOf } from "@/lib/tags";
 import { searchHaystack } from "@/lib/search";
 import { Button } from "@/components/ui/button";
@@ -79,23 +79,6 @@ const SORT_DEFAULT_DIR: Record<SortKey, SortDir> = {
   score: "desc",
   progress: "desc",
 };
-
-/** Manhwa/Manhua are not formats on AniList — they are `countryOfOrigin`. */
-const ORIGINS = ["JP", "KR", "CN", "TW"] as const;
-
-/** Literal switch, so `i18nKeys.test.ts` sees every key. */
-function originLabel(origin: (typeof ORIGINS)[number], t: (k: string) => string): string {
-  switch (origin) {
-    case "JP":
-      return t("list.originJP");
-    case "KR":
-      return t("list.originKR");
-    case "CN":
-      return t("list.originCN");
-    case "TW":
-      return t("list.originTW");
-  }
-}
 
 // `String.localeCompare` builds a fresh collator on every call, which a sort
 // over a few thousand titles pays for n·log n times. Options are deliberately

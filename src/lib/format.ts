@@ -85,6 +85,32 @@ export function sourceLabel(
   return titleCase(source);
 }
 
+/**
+ * Manhwa/Manhua are not formats on AniList — they are `countryOfOrigin`.
+ *
+ * Here rather than in `MediaList`, which had them to itself, because Search
+ * needs the same four and the same labels: two copies of this list is how
+ * "Manhua (China)" ends up spelled two ways.
+ */
+export const ORIGINS = ["JP", "KR", "CN", "TW"] as const;
+
+/** Literal switch, so `i18nKeys.test.ts` sees every key. */
+export function originLabel(
+  origin: (typeof ORIGINS)[number],
+  t: (k: string) => string,
+): string {
+  switch (origin) {
+    case "JP":
+      return t("list.originJP");
+    case "KR":
+      return t("list.originKR");
+    case "CN":
+      return t("list.originCN");
+    case "TW":
+      return t("list.originTW");
+  }
+}
+
 /** AniList fuzzy dates have independently-nullable parts. */
 export function fuzzyDate(
   date: { year: number | null; month: number | null; day: number | null } | null,

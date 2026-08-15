@@ -6,7 +6,6 @@ import {
   browseMedia,
   genreTagCollections,
   MEDIA_SOURCES,
-  ORIGIN_COUNTRIES,
   type BrowseFilters,
   type MediaWithListStatus,
   type Season,
@@ -15,7 +14,14 @@ import { EMPTY, encode, isEmpty, toQueryArgs } from "@/lib/multiFilter";
 import { MultiFilterSelect } from "@/components/ui/multi-filter-select";
 import type { MediaType } from "@/api/types";
 import { searchUsers, USER_SEARCH_MIN } from "@/api/social";
-import { formatLabel, MEDIA_FORMATS, mediaStatusLabel } from "@/lib/format";
+import {
+  formatLabel,
+  MEDIA_FORMATS,
+  mediaStatusLabel,
+  ORIGINS,
+  originLabel,
+  sourceLabel,
+} from "@/lib/format";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { FilterSelect } from "@/components/ui/filter-select";
@@ -39,62 +45,6 @@ const SEASONS: Season[] = ["WINTER", "SPRING", "SUMMER", "FALL"];
 const STATUSES = ["RELEASING", "FINISHED", "NOT_YET_RELEASED", "CANCELLED", "HIATUS"];
 /** The sorts worth offering; relevance only means something with a query. */
 const SORTS = ["SEARCH_MATCH", "TRENDING_DESC", "POPULARITY_DESC", "SCORE_DESC", "START_DATE_DESC"];
-
-/**
- * `MediaSource` in the reader's language, via a literal switch.
- *
- * Fifteen arms rather than `t(\`source.\${s}\`)` because `i18nKeys.test.ts` only
- * sees literal `t("…")` calls — a template key is invisible to it, and a
- * missing i18n key renders as the key with nothing reporting it.
- */
-function sourceLabel(source: string, t: (k: string) => string): string {
-  switch (source) {
-    case "ORIGINAL":
-      return t("search.sourceOriginal");
-    case "MANGA":
-      return t("search.sourceManga");
-    case "LIGHT_NOVEL":
-      return t("search.sourceLightNovel");
-    case "WEB_NOVEL":
-      return t("search.sourceWebNovel");
-    case "NOVEL":
-      return t("search.sourceNovel");
-    case "VISUAL_NOVEL":
-      return t("search.sourceVisualNovel");
-    case "VIDEO_GAME":
-      return t("search.sourceVideoGame");
-    case "GAME":
-      return t("search.sourceGame");
-    case "DOUJINSHI":
-      return t("search.sourceDoujinshi");
-    case "ANIME":
-      return t("search.sourceAnime");
-    case "LIVE_ACTION":
-      return t("search.sourceLiveAction");
-    case "COMIC":
-      return t("search.sourceComic");
-    case "MULTIMEDIA_PROJECT":
-      return t("search.sourceMultimedia");
-    case "PICTURE_BOOK":
-      return t("search.sourcePictureBook");
-    default:
-      return t("search.sourceOther");
-  }
-}
-
-/** The four origins that have anime and manga, same reasoning as above. */
-function countryLabel(code: string, t: (k: string) => string): string {
-  switch (code) {
-    case "JP":
-      return t("search.countryJP");
-    case "KR":
-      return t("search.countryKR");
-    case "CN":
-      return t("search.countryCN");
-    default:
-      return t("search.countryTW");
-  }
-}
 
 /** Literal switch, so `i18nKeys.test.ts` sees every key. */
 function sortLabel(sort: string, t: (k: string) => string): string {
@@ -358,6 +308,10 @@ export default function Search() {
                   label: mediaStatusLabel(s, t),
                 }))}
               />
+              {/* `sourceLabel` and `originLabel` are `lib/format`'s, not this
+                  file's: both already shipped with their labels in both
+                  languages, and a second copy is how "Manhua (China)" ends up
+                  spelled two ways. */}
               <FilterSelect
                 label={t("search.sourceLabel")}
                 value={source}
@@ -369,13 +323,13 @@ export default function Search() {
                 }))}
               />
               <FilterSelect
-                label={t("search.countryLabel")}
+                label={t("list.originLabel")}
                 value={country}
                 onChange={setCountry}
                 placeholder={t("search.any")}
-                options={ORIGIN_COUNTRIES.map((c) => ({
+                options={ORIGINS.map((c) => ({
                   value: c,
-                  label: countryLabel(c, t),
+                  label: originLabel(c, t),
                 }))}
               />
               <FilterSelect

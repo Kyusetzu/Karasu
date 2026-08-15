@@ -1,7 +1,8 @@
-import { useEffect } from "react";
+import { useEffect, useId, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useDialogFocus } from "@/hooks/useDialogFocus";
 import { cn } from "@/lib/utils";
 
 /**
@@ -35,6 +36,11 @@ export default function ConfirmDialog({
   leaving?: boolean;
 }) {
   const { t } = useTranslation();
+  const panel = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+  // Not routed through `Modal` — this one has its own layout — so it takes the
+  // same hook directly rather than going without.
+  useDialogFocus(panel, !leaving);
 
   useEffect(() => {
     if (leaving) return;
@@ -55,6 +61,13 @@ export default function ConfirmDialog({
       }
     >
       <div
+        ref={panel}
+        // `alertdialog` rather than `dialog`: this one guards a destructive
+        // action, and the role is what tells a screen reader to interrupt
+        // rather than wait its turn.
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
         className={cn(
           "w-96 rounded-xl border border-hair bg-surface-900 p-5 shadow-2xl panel-wash",
           leaving ? "animate-settle-out" : "animate-spring-in",
@@ -65,7 +78,9 @@ export default function ConfirmDialog({
             <AlertTriangle className="size-4" />
           </span>
           <div className="min-w-0">
-            <h2 className="text-sm font-semibold text-ink-100">{title}</h2>
+            <h2 id={titleId} className="text-sm font-semibold text-ink-100">
+              {title}
+            </h2>
             {names.length > 0 && (
               <ul className="mt-2 space-y-0.5 text-xs text-ink-500">
                 {names.map((name) => (

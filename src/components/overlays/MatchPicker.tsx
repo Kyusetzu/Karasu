@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Loader2, Search, X } from "lucide-react";
@@ -7,6 +7,7 @@ import { displayTitle, type MediaTitle } from "@/api/types";
 import { useContentFilter } from "@/stores/contentFilter";
 import { isBlocked } from "@/lib/contentFilter";
 import { Button } from "@/components/ui/button";
+import { useDialogFocus } from "@/hooks/useDialogFocus";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
@@ -70,6 +71,11 @@ export default function MatchPicker({
   onCancel: () => void;
 }) {
   const { t } = useTranslation();
+  const panel = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+  // This one focuses its own search field, which `useDialogFocus` leaves alone
+  // — it only places focus when nothing inside has claimed it.
+  useDialogFocus(panel, !leaving);
   const level = useContentFilter((s) => s.level);
   const [term, setTerm] = useState(parsedTitle);
   const [debounced, setDebounced] = useState(parsedTitle);
@@ -148,13 +154,17 @@ export default function MatchPicker({
       }
     >
       <div
+        ref={panel}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
         className={cn(
           "flex max-h-[80vh] w-[34rem] max-w-full flex-col rounded-xl border border-hair bg-surface-900 shadow-2xl panel-wash",
           leaving ? "animate-settle-out" : "animate-spring-in",
         )}
       >
         <div className="border-b border-hair p-5 pb-4">
-          <h2 className="text-sm font-semibold text-ink-100">
+          <h2 id={titleId} className="text-sm font-semibold text-ink-100">
             {t("library.pickTitle")}
           </h2>
           {/* The parsed title is the evidence for why this row looks wrong, so

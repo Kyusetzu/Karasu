@@ -131,6 +131,7 @@ export const en = {
     confirmRemove: "Really remove?",
     retry: "Try again",
     dismiss: "Dismiss",
+    skipToContent: "Skip to content",
     loading: "Loading …",
     error: "Error: {{message}}",
     episodes: "Episodes",

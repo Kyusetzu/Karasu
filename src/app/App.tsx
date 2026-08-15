@@ -131,6 +131,12 @@ export default function App() {
       <PlaybackError />
       <Toast />
       <Titlebar />
+      {/* The first Tab stop in the window, and invisible until it is one. The
+          sidebar is fourteen links, so reaching the page by keyboard meant
+          fourteen presses on every single navigation. Not `hidden` — a hidden
+          element is not focusable, which is the whole trick: it is off-screen
+          and comes back on focus. */}
+      <SkipLink />
       <div className="flex min-h-0 flex-1">
         <Sidebar />
         {/* Keyed on the route so the pane re-mounts and the animation replays.
@@ -139,7 +145,13 @@ export default function App() {
             not got. */}
         <main
           key={pathname}
-          className="min-w-0 flex-1 animate-settle overflow-y-auto"
+          id="main"
+          // `-1` so the skip link can move focus here: `<main>` is not
+          // focusable on its own, and a link to an unfocusable target scrolls
+          // without moving the caret, which leaves the next Tab back in the
+          // sidebar.
+          tabIndex={-1}
+          className="min-w-0 flex-1 animate-settle overflow-y-auto outline-none"
         >
           {/* Keyed on the route as well, so navigating away from a page that
               threw resets the boundary — otherwise the fallback would outlive
@@ -184,6 +196,26 @@ export default function App() {
         </main>
       </div>
     </div>
+  );
+}
+
+/** Straight past the sidebar, for anyone arriving by keyboard. */
+function SkipLink() {
+  const { t } = useTranslation();
+  return (
+    <a
+      href="#main"
+      onClick={(e) => {
+        // The href is what makes it a link for a screen reader; the focus call
+        // is what makes it work, since a hash change alone does not move the
+        // caret.
+        e.preventDefault();
+        document.getElementById("main")?.focus();
+      }}
+      className="sr-only rounded-lg bg-accent-500 px-3 py-2 text-sm font-medium text-accent-ink focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-[200]"
+    >
+      {t("common.skipToContent")}
+    </a>
   );
 }
 

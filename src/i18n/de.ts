@@ -129,6 +129,7 @@ export const de: typeof en = {
     confirmRemove: "Wirklich entfernen?",
     retry: "Erneut versuchen",
     dismiss: "Schließen",
+    skipToContent: "Zum Inhalt springen",
     loading: "Lade …",
     error: "Fehler: {{message}}",
     episodes: "Episoden",

@@ -801,14 +801,25 @@ html[data-reduce-motion] ::view-transition-new(*) {
     forced-color-adjust: auto;
   }
   /* Anything whose colour *is* the data keeps ours. The charts are drawn by
-     hand in SVG, so they are addressable as a group. */
+     hand in SVG, so they are addressable as a group.
+
+     `forced-color-adjust` INHERITS, which is the trap here: putting it on a
+     panel would freeze that panel's *text* at the dark theme's ink as well, and
+     a forced light palette then renders near-white labels on white. So the
+     opt-out goes on the painted elements themselves — the swatches, the bars,
+     the heatmap cells — and never on a container that also holds words. The
+     SVG charts are the exception that proves it: they contain no text. */
   svg[data-chart],
   [data-keep-colors] {
     forced-color-adjust: none;
   }
-  /* The scrim stops being a colour and becomes a border, or a dialog floats
-     over a page it no longer visually separates from. */
-  [data-overlay] > * {
+  /* A dialog floats over a page it no longer visually separates from, because
+     the scrim stops being a colour. Addressed by role rather than by
+     `[data-overlay] > *`: that attribute also sits on the bell panel, the
+     context menu and the filter popovers, which put it on the panel itself —
+     so the child selector drew a box around every row inside them. */
+  [role="dialog"],
+  [role="alertdialog"] {
     border: 1px solid ButtonText;
   }
 }

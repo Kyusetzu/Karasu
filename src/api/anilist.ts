@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { toRaw, type ScoreFormat } from "@/lib/scoreFormat";
 import type {
+  FuzzyDate,
   ListResult,
   Media,
   MediaListStatus,
@@ -217,9 +218,17 @@ export interface LocalEntryRow {
   mediaType: MediaType;
   status: MediaListStatus;
   progress: number;
+  /** Manga's second axis. Emitted by the command since v7 and simply never
+      declared here, which is how the merge came to drop it. */
+  progressVolumes: number;
   score: number;
   repeat: number;
   notes: string;
+  /** Since schema v14 — and the merge has to carry all three across, because
+      it deletes the local row once it has pushed. */
+  private: boolean;
+  startedAt: FuzzyDate | null;
+  completedAt: FuzzyDate | null;
   updatedAt: number;
   media: Media;
 }

@@ -171,6 +171,17 @@ export default function EntryEditModal({
   // Seeded from the entry's own name→score map; the write is a positional
   // array built from the account's category order by `lib/advancedScores`.
   const advancedCategories = useAdvancedCategories(media.type ?? "ANIME");
+  /**
+   * Only when this caller's entry actually carries the scores.
+   *
+   * The same rule `customListNames` follows, and for a sharper reason: three
+   * of this dialog's call sites hand over an entry that came from a query
+   * without `advancedScores` — a search result's `mediaListEntry`, the detail
+   * page's own fetch. Rendering from that shows every category at zero, and
+   * saving writes those zeros over real scores. A brand-new entry has nothing
+   * to overwrite, so it is safe and gets the section.
+   */
+  const advancedAvailable = entry === null || entry.advancedScores != null;
   const [advanced, setAdvanced] = useState<Record<string, number>>(
     () => ({ ...(entry?.advancedScores ?? {}) }),
   );
@@ -264,7 +275,7 @@ export default function EntryEditModal({
             has no column for them. Sent only when touched, like the dates and
             the memberships: an unrelated save must not write a category set the
             user never opened. */}
-        {anilist && advancedCategories.length > 0 && (
+        {anilist && advancedCategories.length > 0 && advancedAvailable && (
           <AdvancedScoreFields
             categories={advancedCategories}
             values={advanced}

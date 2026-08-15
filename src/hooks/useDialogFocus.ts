@@ -82,6 +82,16 @@ export function useDialogFocus(
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Tab" || !live.current) return;
+      // Another overlay has the keyboard — a confirm opened from inside a
+      // modal, most often. Both traps are registered on `document` in capture
+      // phase and both would run, and this one (the outer, registered first)
+      // would drag focus back out of the dialog the user is actually looking
+      // at on the very first Tab. Only the overlay holding focus acts.
+      const owner = (document.activeElement as HTMLElement | null)?.closest?.(
+        "[data-overlay]",
+      );
+      const mine = root.closest("[data-overlay]") ?? root;
+      if (owner && owner !== mine) return;
       const stops = focusable(root);
       if (stops.length === 0) {
         e.preventDefault();

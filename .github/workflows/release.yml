@@ -153,6 +153,14 @@ jobs:
             # those as prereleases and a bare v1.0.0 as a real one.
             $pre = if ($core -match "-") { "true" } else { "false" }
             $out = @("tag=$tag", "name=Karasu $core", "prerelease=$pre", "rolling=false", "version=$core")
+            # The notes are composed after the build, from CHANGELOG.md, and
+            # the slicer throws when the section is missing. Checked here too,
+            # so a tag with no changelog entry costs seconds rather than
+            # failing at the end of a fifteen-minute build with the tag
+            # already pushed and no release to show for it. Note this means a
+            # prerelease tag needs its own `## 1.0.0-rc1` section.
+            ./scripts/release/release-notes.ps1 -Version $core -OutFile notes-precheck.md | Out-Null
+            Remove-Item notes-precheck.md -ErrorAction SilentlyContinue
           }
           else {
             $out = @("tag=latest", "name=Latest build", "prerelease=true", "rolling=true", "version=")

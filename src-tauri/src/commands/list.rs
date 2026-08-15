@@ -642,6 +642,15 @@ pub fn local_all_entries(db: State<'_, Db>) -> Value {
                 "score": r.score,
                 "repeat": r.repeat,
                 "notes": r.notes,
+                // Everything the local row holds, because this is what the
+                // sign-in merge pushes and then *deletes the local copy of*.
+                // v14's three fields were missing here, so a local user who
+                // recorded when they started something lost that the moment
+                // they connected an account — the one moment the app promises
+                // not to lose anything.
+                "private": r.private,
+                "startedAt": Db::fuzzy_date(r.started_at.as_deref()),
+                "completedAt": Db::fuzzy_date(r.completed_at.as_deref()),
                 "updatedAt": r.updated_ms / 1000,
                 "media": media,
             })

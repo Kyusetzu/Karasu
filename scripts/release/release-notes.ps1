@@ -85,6 +85,15 @@ else {
     for ($i = $start; $i -lt $lines.Count; $i++) {
         if ($lines[$i] -match "^##\s") { $end = $i; break }
     }
+    # The bounds check comes BEFORE the slice, because PowerShell's `..` range
+    # silently *reverses* when the end is below the start: for an empty section
+    # (`## 1.0.0` immediately followed by the next heading) `$start` equals
+    # `$end`, and `$lines[5..4]` returns lines 5 and 4 in reverse rather than
+    # nothing. The emptiness guard below could then never fire, and the release
+    # body would have been the two headings backwards.
+    if ($start -ge $end) {
+        throw "The '## $Version' section in CHANGELOG.md is empty."
+    }
     $section = ($lines[$start..($end - 1)] -join "`n").Trim()
     if ([string]::IsNullOrWhiteSpace($section)) {
         throw "The '## $Version' section in CHANGELOG.md is empty."

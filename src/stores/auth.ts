@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { create } from "zustand";
 import { listen } from "@tauri-apps/api/event";
 import * as api from "@/api/anilist";
@@ -52,22 +53,33 @@ export function useScoreFormat(): ScoreFormat {
  * and signed out, where the whole idea does not apply.
  */
 export function useAdvancedCategories(type: MediaType): string[] {
-  return useAuth((s) => {
-    const options =
-      type === "MANGA"
-        ? s.viewer?.mediaListOptions?.mangaList
-        : s.viewer?.mediaListOptions?.animeList;
+  // The selector returns something the store already holds **by reference**,
+  // and the deriving happens outside it. This is not a style preference.
+  //
+  // zustand 5 hands the selector straight to React's `useSyncExternalStore`,
+  // which re-invokes it in its post-commit consistency check and re-renders
+  // whenever the result is not identical to the last one. A selector that ends
+  // in `.filter()` allocates a fresh array every time, so it is *never*
+  // identical — and the component re-renders until React gives up. Measured on
+  // this repo's own React 19.2.7 and zustand 5.0.14: 55 renders, then
+  // "Maximum update depth exceeded" (minified error #185 in a shipped build).
+  //
+  // The first version of this hook derived inside the selector and stabilised
+  // only the disabled branch with the frozen constant below — which is to say,
+  // it worked for everyone except the accounts the feature exists for.
+  const options = useAuth((s) =>
+    type === "MANGA"
+      ? s.viewer?.mediaListOptions?.mangaList
+      : s.viewer?.mediaListOptions?.animeList,
+  );
+  return useMemo(() => {
     if (!options?.advancedScoringEnabled) return EMPTY_CATEGORIES;
     const names = options.advancedScoring?.filter((n) => !!n) ?? [];
     return names.length > 0 ? names : EMPTY_CATEGORIES;
-  });
+  }, [options]);
 }
 
-/**
- * One frozen array, so the selector above returns a stable reference for the
- * common case. A fresh `[]` every call makes zustand see a new value on every
- * store notification and re-render every consumer.
- */
+/** One frozen array, so "no categories" is also a stable reference. */
 const EMPTY_CATEGORIES: string[] = [];
 
 export const useAuth = create<AuthState>((set, get) => ({

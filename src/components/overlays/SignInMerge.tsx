@@ -105,13 +105,21 @@ export default function SignInMerge() {
     for (const r of rows) {
       try {
         if (localWins(asSide(r), online.get(r.mediaId) ?? null, strategy)) {
+          // Everything the local row holds. The merge deletes that row once
+          // the push lands, so anything left out here is gone for good —
+          // which is what happened to manga volumes, privacy and both dates
+          // until this list caught up with what the local schema stores.
           const res = await anilistSaveEntry({
             mediaId: r.mediaId,
             status: r.status,
             progress: r.progress,
+            progressVolumes: r.progressVolumes,
             score: r.score,
             repeat: r.repeat,
             notes: r.notes,
+            private: r.private,
+            ...(r.startedAt ? { startedAt: r.startedAt } : {}),
+            ...(r.completedAt ? { completedAt: r.completedAt } : {}),
           });
           // A queued write has not reached AniList yet. Clearing the local row
           // on the strength of it would leave the entry in the offline queue

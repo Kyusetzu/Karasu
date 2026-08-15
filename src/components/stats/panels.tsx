@@ -116,16 +116,16 @@ export function StatusBar({
   return (
     <Card className="flex h-full flex-col">
       <CardTitle>{title}</CardTitle>
-      {/* The bar and its key are one colour scheme: each segment is identified
-          only by its tone, so a forced palette would merge all of them. Kept,
-          together, under Windows High Contrast. */}
-      <div
-        data-keep-colors
-        className="mt-4 flex h-2 shrink-0 overflow-hidden rounded-full bg-surface-800"
-      >
+      {/* `data-keep-colors` on the painted spans, never on a wrapper: the
+          property inherits, so a wrapper would freeze this card's *text* at the
+          dark theme's ink too — near-white labels on a forced light palette.
+          Each segment is identified only by its tone, so those do have to keep
+          ours. See the `forced-colors` block in `index.css`. */}
+      <div className="mt-4 flex h-2 shrink-0 overflow-hidden rounded-full bg-surface-800">
         {data.map((d, i) => (
           <span
             key={d.label}
+            data-keep-colors
             title={`${d.label}: ${d.count}`}
             style={{
               width: `${(d.count / total) * 100}%`,
@@ -134,10 +134,11 @@ export function StatusBar({
           />
         ))}
       </div>
-      <div data-keep-colors className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5">
+      <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5">
         {data.map((d, i) => (
           <div key={d.label} className="flex items-center gap-2 text-xs">
             <span
+              data-keep-colors
               className="size-2 shrink-0 rounded-[.125rem]"
               style={{ background: tone[i % tone.length] }}
             />

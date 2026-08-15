@@ -36,10 +36,7 @@ export function Heatmap({
       <CardTitle>{title}</CardTitle>
       {hint && <p className="mt-1 text-2xs text-ink-600">{hint}</p>}
 
-      {/* Colour *is* the data here — the cells carry nothing but their
-          opacity — so Windows High Contrast leaves this subtree alone. See the
-          `forced-colors` block in `index.css`. */}
-      <div data-keep-colors className="mt-4 space-y-1">
+      <div className="mt-4 space-y-1">
         <div className="grid grid-cols-[2.5rem_repeat(12,1fr)] gap-1">
           <span />
           {monthLabels.map((m, i) => (
@@ -58,6 +55,11 @@ export function Heatmap({
             {row.months.map((count, mi) => (
               <span
                 key={mi}
+                // On the cell, not on a wrapper: `forced-color-adjust` inherits,
+                // and a wrapper would freeze the year and month labels beside
+                // these at the dark theme's ink. The cell carries nothing but
+                // its opacity, so it is the one thing that must keep ours.
+                data-keep-colors
                 title={count > 0 ? `${monthLabels[mi]} ${row.year} · ${count}` : undefined}
                 className="aspect-square rounded-[.1875rem] bg-surface-800"
                 style={

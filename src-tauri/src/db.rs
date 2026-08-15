@@ -788,7 +788,7 @@ impl Db {
     /// written by exactly one place, so a row that does not parse is a row from
     /// a Karasu that no longer exists, and the entry is worth more than the
     /// date is.
-    fn fuzzy_date(stored: Option<&str>) -> serde_json::Value {
+    pub(crate) fn fuzzy_date(stored: Option<&str>) -> serde_json::Value {
         stored
             .and_then(|s| serde_json::from_str(s).ok())
             .unwrap_or(serde_json::Value::Null)

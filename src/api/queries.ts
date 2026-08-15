@@ -91,23 +91,57 @@ export async function searchMedia(
  * `SEARCH_QUERY`, which the match picker and split modal still use bare.
  */
 const BROWSE_QUERY = `
-query ($search: String, $type: MediaType!, $page: Int, $isAdult: Boolean, $genre: String, $tag: String, $seasonYear: Int, $season: MediaSeason, $format: MediaFormat, $status: MediaStatus, $sort: [MediaSort], $scoreFormat: ScoreFormat) {
+query ($search: String, $type: MediaType!, $page: Int, $isAdult: Boolean, $genreIn: [String], $genreNotIn: [String], $tagIn: [String], $tagNotIn: [String], $seasonYear: Int, $season: MediaSeason, $format: MediaFormat, $status: MediaStatus, $source: MediaSource, $countryOfOrigin: CountryCode, $sort: [MediaSort], $scoreFormat: ScoreFormat) {
   Page(page: $page, perPage: 30) {
     pageInfo { hasNextPage }
-    media(search: $search, type: $type, isAdult: $isAdult, genre: $genre, tag: $tag, seasonYear: $seasonYear, season: $season, format: $format, status: $status, sort: $sort) {
+    media(search: $search, type: $type, isAdult: $isAdult, genre_in: $genreIn, genre_not_in: $genreNotIn, tag_in: $tagIn, tag_not_in: $tagNotIn, seasonYear: $seasonYear, season: $season, format: $format, status: $status, source: $source, countryOfOrigin: $countryOfOrigin, sort: $sort) {
       ${MEDIA_FIELDS}
     }
   }
 }`;
 
+/**
+ * The sources and countries AniList's own browse page offers.
+ *
+ * Both verified by introspection rather than copied from the website:
+ * `MediaSource` is an enum (15 values, of which these are the ones worth a
+ * dropdown), and `countryOfOrigin` is a `CountryCode` scalar — an ISO 3166-1
+ * alpha-2 string, so the four here are the four that have anime and manga.
+ */
+export const MEDIA_SOURCES = [
+  "ORIGINAL",
+  "MANGA",
+  "LIGHT_NOVEL",
+  "WEB_NOVEL",
+  "NOVEL",
+  "VISUAL_NOVEL",
+  "VIDEO_GAME",
+  "GAME",
+  "DOUJINSHI",
+  "ANIME",
+  "LIVE_ACTION",
+  "COMIC",
+  "MULTIMEDIA_PROJECT",
+  "PICTURE_BOOK",
+  "OTHER",
+] as const;
+
+export const ORIGIN_COUNTRIES = ["JP", "KR", "CN", "TW"] as const;
+
 export interface BrowseFilters {
   search?: string;
-  genre?: string;
-  tag?: string;
+  /** Genres that must all be present. */
+  genreIn?: string[];
+  /** Genres that must all be absent. */
+  genreNotIn?: string[];
+  tagIn?: string[];
+  tagNotIn?: string[];
   seasonYear?: number;
   season?: Season;
   format?: string;
   status?: string;
+  source?: string;
+  countryOfOrigin?: string;
   /** A MediaSort value; defaults server-side matter, so always pass one. */
   sort: string;
 }
@@ -124,12 +158,20 @@ export async function browseMedia(
     type,
     page,
     search: filters.search || undefined,
-    genre: filters.genre || undefined,
-    tag: filters.tag || undefined,
+    // `undefined` rather than `[]` throughout: `gql` drops undefined keys and
+    // an absent argument is no filter, where `genre_in: []` is a filter that
+    // matches nothing. `lib/multiFilter`'s `toQueryArgs` is the other half of
+    // this contract and has a test for it.
+    genreIn: filters.genreIn?.length ? filters.genreIn : undefined,
+    genreNotIn: filters.genreNotIn?.length ? filters.genreNotIn : undefined,
+    tagIn: filters.tagIn?.length ? filters.tagIn : undefined,
+    tagNotIn: filters.tagNotIn?.length ? filters.tagNotIn : undefined,
     seasonYear: filters.seasonYear || undefined,
     season: filters.season || undefined,
     format: filters.format || undefined,
     status: filters.status || undefined,
+    source: filters.source || undefined,
+    countryOfOrigin: filters.countryOfOrigin || undefined,
     sort: [filters.sort],
     ...adultVars(isAdult),
     ...scoreFormatVar(),

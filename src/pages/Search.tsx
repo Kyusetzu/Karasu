@@ -5,10 +5,14 @@ import { Search as SearchIcon } from "lucide-react";
 import {
   browseMedia,
   genreTagCollections,
+  MEDIA_SOURCES,
+  ORIGIN_COUNTRIES,
   type BrowseFilters,
   type MediaWithListStatus,
   type Season,
 } from "@/api/queries";
+import { EMPTY, encode, isEmpty, toQueryArgs } from "@/lib/multiFilter";
+import { MultiFilterSelect } from "@/components/ui/multi-filter-select";
 import type { MediaType } from "@/api/types";
 import { searchUsers, USER_SEARCH_MIN } from "@/api/social";
 import { formatLabel, MEDIA_FORMATS, mediaStatusLabel } from "@/lib/format";
@@ -35,6 +39,62 @@ const SEASONS: Season[] = ["WINTER", "SPRING", "SUMMER", "FALL"];
 const STATUSES = ["RELEASING", "FINISHED", "NOT_YET_RELEASED", "CANCELLED", "HIATUS"];
 /** The sorts worth offering; relevance only means something with a query. */
 const SORTS = ["SEARCH_MATCH", "TRENDING_DESC", "POPULARITY_DESC", "SCORE_DESC", "START_DATE_DESC"];
+
+/**
+ * `MediaSource` in the reader's language, via a literal switch.
+ *
+ * Fifteen arms rather than `t(\`source.\${s}\`)` because `i18nKeys.test.ts` only
+ * sees literal `t("…")` calls — a template key is invisible to it, and a
+ * missing i18n key renders as the key with nothing reporting it.
+ */
+function sourceLabel(source: string, t: (k: string) => string): string {
+  switch (source) {
+    case "ORIGINAL":
+      return t("search.sourceOriginal");
+    case "MANGA":
+      return t("search.sourceManga");
+    case "LIGHT_NOVEL":
+      return t("search.sourceLightNovel");
+    case "WEB_NOVEL":
+      return t("search.sourceWebNovel");
+    case "NOVEL":
+      return t("search.sourceNovel");
+    case "VISUAL_NOVEL":
+      return t("search.sourceVisualNovel");
+    case "VIDEO_GAME":
+      return t("search.sourceVideoGame");
+    case "GAME":
+      return t("search.sourceGame");
+    case "DOUJINSHI":
+      return t("search.sourceDoujinshi");
+    case "ANIME":
+      return t("search.sourceAnime");
+    case "LIVE_ACTION":
+      return t("search.sourceLiveAction");
+    case "COMIC":
+      return t("search.sourceComic");
+    case "MULTIMEDIA_PROJECT":
+      return t("search.sourceMultimedia");
+    case "PICTURE_BOOK":
+      return t("search.sourcePictureBook");
+    default:
+      return t("search.sourceOther");
+  }
+}
+
+/** The four origins that have anime and manga, same reasoning as above. */
+function countryLabel(code: string, t: (k: string) => string): string {
+  switch (code) {
+    case "JP":
+      return t("search.countryJP");
+    case "KR":
+      return t("search.countryKR");
+    case "CN":
+      return t("search.countryCN");
+    default:
+      return t("search.countryTW");
+  }
+}
 
 /** Literal switch, so `i18nKeys.test.ts` sees every key. */
 function sortLabel(sort: string, t: (k: string) => string): string {
@@ -74,12 +134,17 @@ export default function Search() {
   const [input, setInput] = useState("");
   const [term, setTerm] = useState("");
   const [scope, setScope] = useState<Scope>("ANIME");
-  const [genre, setGenre] = useState("");
-  const [tag, setTag] = useState("");
+  // Include *and* exclude, many at a time — `Page.media` takes `genre_in` /
+  // `genre_not_in` and the tag pair, which is what AniList's own browse page
+  // is built on. One genre and one tag was a lens, not a filter.
+  const [genre, setGenre] = useState(EMPTY);
+  const [tag, setTag] = useState(EMPTY);
   const [year, setYear] = useState("");
   const [season, setSeason] = useState("");
   const [format, setFormat] = useState("");
   const [status, setStatus] = useState("");
+  const [source, setSource] = useState("");
+  const [country, setCountry] = useState("");
   const [sort, setSort] = useState("SEARCH_MATCH");
   const type: MediaType = scope === "USERS" ? "ANIME" : scope;
 
@@ -113,26 +178,53 @@ export default function Search() {
     [collections.data, level],
   );
 
-  const hasFilters = !!(genre || tag || year || season || format || status);
+  const hasFilters =
+    !isEmpty(genre) ||
+    !isEmpty(tag) ||
+    !!(year || season || format || status || source || country);
   // Relevance without a query is meaningless; popularity is the browse default.
   const effectiveSort = term || sort !== "SEARCH_MATCH" ? sort : "POPULARITY_DESC";
   const active = term.length >= 2 || hasFilters;
 
+  const genreArgs = toQueryArgs(genre);
+  const tagArgs = toQueryArgs(tag);
   const filters: BrowseFilters = {
     search: term.length >= 2 ? term : undefined,
-    genre: genre || undefined,
-    tag: tag || undefined,
+    genreIn: genreArgs.in,
+    genreNotIn: genreArgs.notIn,
+    tagIn: tagArgs.in,
+    tagNotIn: tagArgs.notIn,
     seasonYear: year ? Number(year) : undefined,
     season: (season || undefined) as Season | undefined,
     format: format || undefined,
     status: status || undefined,
+    source: source || undefined,
+    countryOfOrigin: country || undefined,
     sort: term.length >= 2 ? sort : effectiveSort,
   };
 
   const media = useInfiniteQuery({
     // The level is part of the key: changing it must refetch, since the
     // filtering happens server-side.
-    queryKey: ["search", type, term, genre, tag, year, season, format, status, filters.sort, level],
+    //
+    // Genre and tag go in *encoded*, not as arrays: `encode` sorts both sides,
+    // so picking the same two genres in a different order is one cache entry
+    // rather than two byte-identical requests.
+    queryKey: [
+      "search",
+      type,
+      term,
+      encode(genre),
+      encode(tag),
+      year,
+      season,
+      format,
+      status,
+      source,
+      country,
+      filters.sort,
+      level,
+    ],
     queryFn: ({ pageParam }) => browseMedia(type, filters, pageParam, adultQueryArg(level)),
     initialPageParam: 1,
     getNextPageParam: (last, all) => (last.pageInfo.hasNextPage ? all.length + 1 : undefined),
@@ -150,10 +242,12 @@ export default function Search() {
     const now = currentSeasonOf();
     setInput("");
     setTerm("");
-    setGenre("");
-    setTag("");
+    setGenre(EMPTY);
+    setTag(EMPTY);
     setStatus("");
     setFormat("");
+    setSource("");
+    setCountry("");
     setSort(chip.sort);
     setYear(chip.thisSeason ? String(now.year) : "");
     setSeason(chip.thisSeason ? now.season : "");
@@ -208,19 +302,22 @@ export default function Search() {
           </div>
           {scope !== "USERS" && (
             <div className="mt-2.5 flex flex-wrap gap-2">
-              <FilterSelect
+              <MultiFilterSelect
                 label={t("search.genreLabel")}
                 value={genre}
                 onChange={setGenre}
                 placeholder={t("search.any")}
-                options={genres.map((g) => ({ value: g, label: g }))}
+                options={genres}
               />
-              <FilterSelect
+              {/* Searchable: AniList ships roughly six hundred tags, which is
+                  a scroll rather than a list. */}
+              <MultiFilterSelect
                 label={t("search.tagLabel")}
                 value={tag}
                 onChange={setTag}
                 placeholder={t("search.any")}
-                options={tags.map((x) => ({ value: x, label: x }))}
+                options={tags}
+                searchable
               />
               <FilterSelect
                 label={t("search.yearLabel")}
@@ -259,6 +356,26 @@ export default function Search() {
                 options={STATUSES.map((s) => ({
                   value: s,
                   label: mediaStatusLabel(s, t),
+                }))}
+              />
+              <FilterSelect
+                label={t("search.sourceLabel")}
+                value={source}
+                onChange={setSource}
+                placeholder={t("search.any")}
+                options={MEDIA_SOURCES.map((s) => ({
+                  value: s,
+                  label: sourceLabel(s, t),
+                }))}
+              />
+              <FilterSelect
+                label={t("search.countryLabel")}
+                value={country}
+                onChange={setCountry}
+                placeholder={t("search.any")}
+                options={ORIGIN_COUNTRIES.map((c) => ({
+                  value: c,
+                  label: countryLabel(c, t),
                 }))}
               />
               <FilterSelect

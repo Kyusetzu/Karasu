@@ -306,6 +306,20 @@ pub async fn save_list_entry(
     save_entry_core(&db, &api, &token, input).await
 }
 
+/// What a bulk edit managed, and what stopped it if anything did.
+///
+/// Two fields rather than a `Result` because the two facts are independent: a
+/// run can both write hundreds of entries and fail, and the caller needs the
+/// number to decide whether rolling its optimistic update back would be a lie.
+#[derive(serde::Serialize)]
+pub struct BulkResult {
+    pub updated: usize,
+    /// The failure that ended the run. Whatever `updated` counts is already
+    /// written to AniList and is not undone by it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
 /// Splits ids into request-sized chunks.
 ///
 /// Pure so the bound can be tested without a network call — the whole point of
@@ -340,9 +354,9 @@ pub async fn bulk_save_list_entries(
     // re-modelled here: every part is nullable and this layer only passes it on.
     started_at: Option<Value>,
     completed_at: Option<Value>,
-) -> Result<usize, String> {
+) -> Result<BulkResult, String> {
     if ids.is_empty() {
-        return Ok(0);
+        return Ok(BulkResult { updated: 0, error: None });
     }
     // Every field absent means the caller asked for nothing. Worth rejecting
     // rather than sending: AniList would happily accept the mutation, touch
@@ -369,6 +383,7 @@ pub async fn bulk_save_list_entries(
     }
 
     let mut updated = 0usize;
+    let mut failure = None;
     for chunk in bulk_chunks(&ids) {
         let vars = json!({
             "ids": chunk,
@@ -386,17 +401,28 @@ pub async fn bulk_save_list_entries(
         // per entry, so draining a bulk edit through it would reintroduce
         // exactly the fan-out this exists to avoid. Failing honestly lets the
         // caller roll back and say so.
-        let data = api
-            .query(Some(&token), UPDATE_ENTRIES_MUTATION, vars)
-            .await
-            .map_err(String::from)?;
-        updated += data
-            .pointer("/UpdateMediaListEntries")
-            .and_then(|v| v.as_array())
-            .map(|a| a.len())
-            .unwrap_or(0);
+        //
+        // Stopping on the first failure, but reporting rather than discarding
+        // what landed before it. A bare `?` here threw the count away, so a
+        // selection of 500 that died on chunk 7 told the caller only "it
+        // failed" — and the caller's rollback then put 300 already-written
+        // entries back to their old values on screen while AniList held the
+        // new ones.
+        match api.query(Some(&token), UPDATE_ENTRIES_MUTATION, vars).await {
+            Ok(data) => {
+                updated += data
+                    .pointer("/UpdateMediaListEntries")
+                    .and_then(|v| v.as_array())
+                    .map(|a| a.len())
+                    .unwrap_or(0);
+            }
+            Err(e) => {
+                failure = Some(String::from(e));
+                break;
+            }
+        }
     }
-    Ok(updated)
+    Ok(BulkResult { updated, error: failure })
 }
 
 #[tauri::command]

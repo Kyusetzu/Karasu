@@ -152,6 +152,31 @@ export type BulkPatch = Pick<
   | "completedAt"
 >;
 
+/**
+ * A bulk edit that stopped partway, carrying what it *did* write.
+ *
+ * The backend chunks a selection into ten-ish requests and stops on the first
+ * failure, so "it failed" and "nothing changed" are different statements. A
+ * caller that rolls its optimistic update back on the second reading puts
+ * already-written entries back to their old values on screen while AniList
+ * holds the new ones.
+ */
+export class BulkSaveError extends Error {
+  constructor(
+    message: string,
+    /** Entries AniList accepted before the failure. */
+    readonly updated: number,
+  ) {
+    super(message);
+    this.name = "BulkSaveError";
+  }
+}
+
+interface BulkResult {
+  updated: number;
+  error?: string;
+}
+
 export const bulkSaveEntries = async (
   entries: { id: number; mediaId: number }[],
   patch: BulkPatch,
@@ -168,7 +193,7 @@ export const bulkSaveEntries = async (
   // Nulls rather than omissions: the Rust command forwards each straight into
   // the GraphQL variables, and an absent variable and an explicit null mean the
   // same thing to AniList — "do not change this".
-  return invoke<number>("bulk_save_list_entries", {
+  const res = await invoke<BulkResult>("bulk_save_list_entries", {
     ids: entries.map((e) => e.id),
     status: patch.status ?? null,
     scoreRaw: patch.score !== undefined ? toRaw(scoreFormat, patch.score) : null,
@@ -179,6 +204,8 @@ export const bulkSaveEntries = async (
     startedAt: patch.startedAt ?? null,
     completedAt: patch.completedAt ?? null,
   });
+  if (res.error) throw new BulkSaveError(res.error, res.updated);
+  return res.updated;
 };
 
 export const flushQueue = () => invoke<number>("flush_queue");

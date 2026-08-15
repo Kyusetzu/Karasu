@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import {
   bulkSaveEntries,
+  BulkSaveError,
   currentScoreFormat,
   deleteListEntry,
   saveListEntry,
@@ -240,13 +241,29 @@ export function useListMutations(userId: number, mediaType: MediaType) {
         text: t("receipt.bulkSaved", { count: ctx?.count ?? 0 }),
       });
     },
-    onError: (_err, vars, ctx) => {
-      if (ctx?.previous) qc.setQueryData(key, ctx.previous);
+    onError: (err, vars, ctx) => {
+      // A selection is sent in chunks and stops on the first failure, so some
+      // of it may well be written. Restoring the snapshot then would show the
+      // old values for entries AniList has already changed — worse than the
+      // failure itself, because it looks settled. Refetch instead and let the
+      // server say what is true.
+      const partial = err instanceof BulkSaveError && err.updated > 0;
+      if (partial) void qc.invalidateQueries({ queryKey: key });
+      else if (ctx?.previous) qc.setQueryData(key, ctx.previous);
       showToast({
         kind: "error",
-        text: t("receipt.bulkFailed", { count: ctx?.count ?? 0 }),
+        text: partial
+          ? t("receipt.bulkPartial", {
+              done: (err as BulkSaveError).updated,
+              count: ctx?.count ?? 0,
+            })
+          : t("receipt.bulkFailed", { count: ctx?.count ?? 0 }),
         detail: t("receipt.failedDetail"),
-        action: { label: t("common.retry"), run: () => bulkSave.mutate(vars) },
+        // No retry offer on a partial run: the same selection would be sent
+        // again, including the part that landed.
+        action: partial
+          ? undefined
+          : { label: t("common.retry"), run: () => bulkSave.mutate(vars) },
       });
     },
   });

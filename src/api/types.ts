@@ -6,7 +6,20 @@ export interface Viewer {
   /** Carried by `VIEWER_QUERY` so the whole app can follow the account's
    *  score format without a profile fetch. Optional: cached viewer blobs from
    *  before the field existed lack it, and read as ten-point. */
-  mediaListOptions?: { scoreFormat: string | null } | null;
+  mediaListOptions?: {
+    scoreFormat: string | null;
+    /** Per media type, because AniList keeps them per media type. The names
+     *  are seeded even when the feature is off, so `advancedScoringEnabled` is
+     *  the signal and a non-empty `advancedScoring` is not. */
+    animeList?: AdvancedScoringOptions | null;
+    mangaList?: AdvancedScoringOptions | null;
+  } | null;
+}
+
+export interface AdvancedScoringOptions {
+  /** The user's own category names — free text, rendered raw. */
+  advancedScoring: string[] | null;
+  advancedScoringEnabled: boolean | null;
 }
 
 export type MediaListStatus =
@@ -90,6 +103,14 @@ export interface MediaListEntry {
   /** Reads as a name→member map (AniList `Json`); *writes* take a plain
       array of member names — the asymmetry is the API's, not ours. */
   customLists?: Record<string, boolean> | null;
+  /** Reads as a name→score map (AniList `Json`); *writes* take a **positional**
+      `[Float]` ordered by `mediaListOptions.<type>List.advancedScoring` — the
+      same asymmetry as `customLists`, but with a sharper edge, since a wrong
+      order silently files one category's score under another. `lib/
+      advancedScores` is the only place that builds the array. Absent unless
+      the account has advanced scoring on: the list query asks for it behind an
+      `@include`, because it is +8% of a large list's payload. */
+  advancedScores?: Record<string, number> | null;
   startedAt: FuzzyDate | null;
   completedAt: FuzzyDate | null;
   media: Media;
@@ -122,6 +143,11 @@ export interface SaveEntryInput {
   /** The complete set of custom lists this entry belongs to — the API
       replaces membership wholesale, so always send every checked name. */
   customLists?: string[];
+  /** Positional, ordered by the account's `advancedScoring` names — build it
+      with `lib/advancedScores`'s `toAdvancedArray` and nothing else. Plain
+      floats in the display scale: there is no `advancedScoresRaw` on the
+      schema, so the `scoreRaw` discipline does not extend here. */
+  advancedScores?: number[];
   startedAt?: FuzzyDate;
   completedAt?: FuzzyDate;
 }
@@ -137,6 +163,10 @@ export interface MutationResult {
     repeat: number;
     notes: string | null;
     updatedAt: number;
+    /** AniList derives the overall score from these, so the server's answer is
+        the only true one — `useListMutations` reconciles from it rather than
+        keeping the optimistic guess. */
+    advancedScores?: Record<string, number> | null;
   } | null;
 }
 

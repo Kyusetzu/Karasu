@@ -16,6 +16,14 @@ pub const BUILTIN_ANILIST_CLIENT_ID: &str = "46231";
 /// it — score controls, list cells, statistics. It lands in the cached
 /// `anilist_viewer` kv blob and the frontend auth store at zero extra request
 /// cost, which is how the list screens read it without a profile fetch.
+///
+/// The advanced-scoring pair rides the same way and for the same reason: the
+/// entry editor needs to know whether the feature is on and what the user
+/// called their categories, and this is the one call that can carry both for
+/// free. Per media type, because AniList keeps them per media type — one
+/// account-wide flag would be wrong. The names are populated even when the
+/// flag is off (verified on a real account), so `advancedScoringEnabled` is
+/// the signal and a non-empty name list is not.
 const VIEWER_QUERY: &str = "
 query {
   Viewer {
@@ -23,7 +31,11 @@ query {
     name
     siteUrl
     avatar { large }
-    mediaListOptions { scoreFormat }
+    mediaListOptions {
+      scoreFormat
+      animeList { advancedScoring advancedScoringEnabled }
+      mangaList { advancedScoring advancedScoringEnabled }
+    }
   }
 }";
 

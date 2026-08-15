@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { listen } from "@tauri-apps/api/event";
 import * as api from "@/api/anilist";
 import { asScoreFormat, type ScoreFormat } from "@/lib/scoreFormat";
-import type { Viewer } from "@/api/types";
+import type { MediaType, Viewer } from "@/api/types";
 
 type ProfileMode = "anilist" | "local" | "none";
 
@@ -42,6 +42,33 @@ function applyViewer(viewer: Viewer | null): Viewer | null {
 export function useScoreFormat(): ScoreFormat {
   return useAuth((s) => asScoreFormat(s.viewer?.mediaListOptions?.scoreFormat));
 }
+
+/**
+ * The account's advanced-scoring categories for one media type, or none.
+ *
+ * Empty whenever the feature is off, which is the only correct gate: AniList
+ * seeds `advancedScoring` with five default names on accounts that have never
+ * switched it on, so the presence of names says nothing. Empty in local mode
+ * and signed out, where the whole idea does not apply.
+ */
+export function useAdvancedCategories(type: MediaType): string[] {
+  return useAuth((s) => {
+    const options =
+      type === "MANGA"
+        ? s.viewer?.mediaListOptions?.mangaList
+        : s.viewer?.mediaListOptions?.animeList;
+    if (!options?.advancedScoringEnabled) return EMPTY_CATEGORIES;
+    const names = options.advancedScoring?.filter((n) => !!n) ?? [];
+    return names.length > 0 ? names : EMPTY_CATEGORIES;
+  });
+}
+
+/**
+ * One frozen array, so the selector above returns a stable reference for the
+ * common case. A fresh `[]` every call makes zustand see a new value on every
+ * store notification and re-render every consumer.
+ */
+const EMPTY_CATEGORIES: string[] = [];
 
 export const useAuth = create<AuthState>((set, get) => ({
   viewer: null,

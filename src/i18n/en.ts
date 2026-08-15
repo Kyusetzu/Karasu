@@ -781,6 +781,8 @@ export const en = {
     hidden: "Hide from status lists",
     hiddenHint:
       "On anilist.co the entry then appears only in custom lists, not under Watching/Completed.",
+    advancedScores: "Score by category",
+    advancedDerived: "Overall becomes {{score}}",
     customLists: "Custom lists",
     rewatches: "Rewatches",
     rereads: "Rereads",

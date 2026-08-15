@@ -11,7 +11,9 @@ import {
   type MediaType,
 } from "@/api/types";
 import { fuzzyDate } from "@/lib/format";
-import { useAuth } from "@/stores/auth";
+import { toAdvancedArray } from "@/lib/advancedScores";
+import { useAdvancedCategories, useAuth } from "@/stores/auth";
+import { AdvancedScoreFields } from "@/components/media/AdvancedScoreFields";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
@@ -39,6 +41,7 @@ export interface EditableEntry {
   private?: boolean;
   hiddenFromStatusLists?: boolean | null;
   customLists?: Record<string, boolean> | null;
+  advancedScores?: Record<string, number> | null;
   startedAt?: FuzzyDate | null;
   completedAt?: FuzzyDate | null;
 }
@@ -54,6 +57,8 @@ export interface EntrySaveInput {
   private?: boolean;
   hiddenFromStatusLists?: boolean;
   customLists?: string[];
+  /** Positional — see `lib/advancedScores`. */
+  advancedScores?: number[];
   startedAt?: FuzzyDate;
   completedAt?: FuzzyDate;
 }
@@ -163,6 +168,13 @@ export default function EntryEditModal({
       ),
   );
   const [membershipsDirty, setMembershipsDirty] = useState(false);
+  // Seeded from the entry's own name→score map; the write is a positional
+  // array built from the account's category order by `lib/advancedScores`.
+  const advancedCategories = useAdvancedCategories(media.type ?? "ANIME");
+  const [advanced, setAdvanced] = useState<Record<string, number>>(
+    () => ({ ...(entry?.advancedScores ?? {}) }),
+  );
+  const [advancedDirty, setAdvancedDirty] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   // Sent only when touched: a caller that never loaded a date must not have
   // this dialog silently clear it on an unrelated save.
@@ -247,6 +259,21 @@ export default function EntryEditModal({
             <ScoreBars value={score} onChange={setScore} />
           </div>
         </div>
+        {/* Only when the account has it on. The category names are seeded even
+            when it is off, so their presence is not the signal — and local mode
+            has no column for them. Sent only when touched, like the dates and
+            the memberships: an unrelated save must not write a category set the
+            user never opened. */}
+        {anilist && advancedCategories.length > 0 && (
+          <AdvancedScoreFields
+            categories={advancedCategories}
+            values={advanced}
+            onChange={(next) => {
+              setAdvanced(next);
+              setAdvancedDirty(true);
+            }}
+          />
+        )}
         <label className="block text-sm">
           <span className="mb-1 block text-ink-500">{rewatchLabel}</span>
           <div className="flex items-center gap-2">
@@ -405,6 +432,17 @@ export default function EntryEditModal({
                         // Membership only when touched: the write replaces the
                         // whole set, so an untouched dialog must not send one.
                         ...(membershipsDirty ? { customLists: [...memberships] } : {}),
+                        // Same rule, sharper edge: the array is positional, so
+                        // it is built from the account's category order and
+                        // never from the map's own key order.
+                        ...(advancedDirty && advancedCategories.length > 0
+                          ? {
+                              advancedScores: toAdvancedArray(
+                                advancedCategories,
+                                advanced,
+                              ),
+                            }
+                          : {}),
                       }
                     : {}),
                 })

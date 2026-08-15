@@ -11,8 +11,17 @@ use tauri::{AppHandle, State};
 #[allow(unused_imports)]
 use super::*;
 
+/// `advancedScores` is behind `@include`, not merely optional.
+///
+/// Measured on a real 638-entry list in this exact shape: the field adds
+/// 51,040 JSON characters, +8.3% of the whole response and +26% of the entry
+/// fields alone. `reqwest`'s gzip crushes a repetitive map on the wire, but
+/// `cache_list` stores the blob uncompressed, so the disk cost is the full
+/// figure. Most accounts have advanced scoring off — `advancedScoringEnabled`
+/// is false even on ones AniList has seeded category names for — so the
+/// default is to not ask for it at all.
 const LIST_QUERY: &str = "
-query ($userId: Int!, $type: MediaType!, $scoreFormat: ScoreFormat) {
+query ($userId: Int!, $type: MediaType!, $scoreFormat: ScoreFormat, $withAdvanced: Boolean!) {
   MediaListCollection(userId: $userId, type: $type) {
     lists {
       name
@@ -31,6 +40,7 @@ query ($userId: Int!, $type: MediaType!, $scoreFormat: ScoreFormat) {
         private
         hiddenFromStatusLists
         customLists
+        advancedScores @include(if: $withAdvanced)
         startedAt { year month day }
         completedAt { year month day }
         media {
@@ -91,6 +101,26 @@ pub(crate) fn viewer_score_format(db: &Db) -> &'static str {
     }
 }
 
+/// Whether this media type has advanced scoring switched on, from the same
+/// cached viewer blob `viewer_score_format` reads.
+///
+/// The flag is the signal, never the name list: AniList seeds
+/// `advancedScoring` with five defaults on accounts that have the feature
+/// *off*, so "there are category names" would turn it on for almost everyone.
+/// Anything unexpected in the blob reads as off, which costs the field on the
+/// list query and nothing else.
+pub(crate) fn viewer_advanced_scoring(db: &Db, media_type: &str) -> bool {
+    let key = if media_type == "MANGA" {
+        "/mediaListOptions/mangaList/advancedScoringEnabled"
+    } else {
+        "/mediaListOptions/animeList/advancedScoringEnabled"
+    };
+    db.kv_get("anilist_viewer")
+        .and_then(|blob| serde_json::from_str::<Value>(&blob).ok())
+        .and_then(|v| v.pointer(key).and_then(|f| f.as_bool()))
+        .unwrap_or(false)
+}
+
 /// `startedAt`/`completedAt` are `FuzzyDateInput` — `{ year, month, day }`, each
 /// nullable, because AniList lets a date be partial ("2024", "March 2024"). That
 /// is why they are not plain dates on the frontend either.
@@ -102,9 +132,9 @@ pub(crate) fn viewer_score_format(db: &Db) -> &'static str {
 /// converts through `lib/scoreFormat.toRaw` before invoking, which also makes
 /// the offline queue safe to replay across a format change.
 const SAVE_MUTATION: &str = "
-mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int, $progressVolumes: Int, $scoreRaw: Int, $repeat: Int, $notes: String, $private: Boolean, $hiddenFromStatusLists: Boolean, $customLists: [String], $startedAt: FuzzyDateInput, $completedAt: FuzzyDateInput, $scoreFormat: ScoreFormat) {
-  SaveMediaListEntry(mediaId: $mediaId, status: $status, progress: $progress, progressVolumes: $progressVolumes, scoreRaw: $scoreRaw, repeat: $repeat, notes: $notes, private: $private, hiddenFromStatusLists: $hiddenFromStatusLists, customLists: $customLists, startedAt: $startedAt, completedAt: $completedAt) {
-    id mediaId status progress progressVolumes repeat notes updatedAt private hiddenFromStatusLists customLists
+mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int, $progressVolumes: Int, $scoreRaw: Int, $repeat: Int, $notes: String, $private: Boolean, $hiddenFromStatusLists: Boolean, $customLists: [String], $advancedScores: [Float], $startedAt: FuzzyDateInput, $completedAt: FuzzyDateInput, $scoreFormat: ScoreFormat) {
+  SaveMediaListEntry(mediaId: $mediaId, status: $status, progress: $progress, progressVolumes: $progressVolumes, scoreRaw: $scoreRaw, repeat: $repeat, notes: $notes, private: $private, hiddenFromStatusLists: $hiddenFromStatusLists, customLists: $customLists, advancedScores: $advancedScores, startedAt: $startedAt, completedAt: $completedAt) {
+    id mediaId status progress progressVolumes repeat notes updatedAt private hiddenFromStatusLists customLists advancedScores
     startedAt { year month day }
     completedAt { year month day }
     score(format: $scoreFormat)
@@ -216,6 +246,7 @@ pub async fn fetch_media_list(
                 "userId": user_id,
                 "type": media_type,
                 "scoreFormat": viewer_score_format(&db),
+                "withAdvanced": viewer_advanced_scoring(&db, media_type),
             }),
         )
         .await
@@ -700,6 +731,15 @@ async fn process_queue(
         // payload was queued, and the echoed entry should come back in the
         // format the app is displaying *now*. The score itself is `scoreRaw`,
         // so the write is format-independent either way.
+        //
+        // `advancedScores` deliberately is *not* re-stamped, and cannot be: it
+        // is a positional `[Float]` whose meaning comes from the account's
+        // category order at the moment it was built. Renaming or reordering a
+        // category on anilist.co between queueing and draining would move a
+        // value into the wrong category — but re-keying it here would need the
+        // names the payload was built against, which the payload does not
+        // carry. The window is small (a queued edit drains on the next list
+        // mount) and the alternative is guessing.
         if kind == "save" {
             if let Some(vars) = variables.as_object_mut() {
                 vars.insert("scoreFormat".into(), json!(viewer_score_format(db)));

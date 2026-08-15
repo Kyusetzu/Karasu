@@ -110,6 +110,11 @@ export function useListMutations(userId: number, mediaType: MediaType) {
     startedAt: input.startedAt ?? e.startedAt,
     completedAt: input.completedAt ?? e.completedAt,
     updatedAt: now,
+    // Deliberately not patched from `input.advancedScores`: it is a positional
+    // array and the entry holds a name-keyed map, so rebuilding one from the
+    // other here would mean this function knowing the account's category
+    // order. `onSuccess` takes the server's map instead, which is authoritative
+    // anyway because AniList recomputes the overall score from it.
   });
 
   const patchCacheMany = (
@@ -174,7 +179,28 @@ export function useListMutations(userId: number, mediaType: MediaType) {
         title: entry ? displayTitle(entry.media.title) : undefined,
       };
     },
-    onSuccess: (_res, input, ctx) => {
+    onSuccess: (res, input, ctx) => {
+      // AniList *derives* the overall score from the categories, so an
+      // advanced-scoring save is the one case where the optimistic patch
+      // cannot know the answer — it wrote whatever the score slider said,
+      // which the server has just overruled. Reconcile from the mutation's own
+      // result instead of leaving a number that will change on the next fetch.
+      if (res?.entry?.advancedScores) {
+        const { score, advancedScores } = res.entry;
+        qc.setQueryData<ListResult>(key, (old) =>
+          old
+            ? {
+                ...old,
+                lists: old.lists.map((group) => ({
+                  ...group,
+                  entries: group.entries.map((e) =>
+                    e.mediaId === input.mediaId ? { ...e, score, advancedScores } : e,
+                  ),
+                })),
+              }
+            : old,
+        );
+      }
       if (!ctx?.before || !ctx.title) return;
       const undo = inverse(input, ctx.before);
       // A save that changed nothing gets no receipt. Undoing a no-op is noise,

@@ -784,6 +784,8 @@ export const de: typeof en = {
     hidden: "Aus Status-Listen ausblenden",
     hiddenHint:
       "Auf anilist.co erscheint der Eintrag dann nur in eigenen Listen, nicht unter Schaue/Abgeschlossen.",
+    advancedScores: "Bewertung nach Kategorie",
+    advancedDerived: "Gesamt wird {{score}}",
     customLists: "Eigene Listen",
     rewatches: "Wiederholungen",
     rereads: "Wiederholungen",

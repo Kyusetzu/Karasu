@@ -1,4 +1,5 @@
-﻿use rusqlite::Connection;
+﻿use crate::sync::LockExt;
+use rusqlite::Connection;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
@@ -422,13 +423,13 @@ impl Db {
     }
 
     pub fn kv_get(&self, key: &str) -> Option<String> {
-        let conn = self.0.lock().unwrap();
+        let conn = self.0.guard();
         conn.query_row("SELECT value FROM kv WHERE key = ?1", [key], |r| r.get(0))
             .ok()
     }
 
     pub fn kv_set(&self, key: &str, value: &str) -> Result<(), String> {
-        let conn = self.0.lock().unwrap();
+        let conn = self.0.guard();
         conn.execute(
             "INSERT INTO kv (key, value) VALUES (?1, ?2)
              ON CONFLICT(key) DO UPDATE SET value = excluded.value",
@@ -439,7 +440,7 @@ impl Db {
     }
 
     pub fn kv_delete(&self, key: &str) {
-        let conn = self.0.lock().unwrap();
+        let conn = self.0.guard();
         let _ = conn.execute("DELETE FROM kv WHERE key = ?1", [key]);
     }
 
@@ -453,7 +454,7 @@ impl Db {
     /// 1 and is therefore always older than the cutoff. That is correct: they
     /// are by definition from an earlier run.
     pub fn kv_prune_older(&self, prefix: &str, cutoff: i64) -> usize {
-        let conn = self.0.lock().unwrap();
+        let conn = self.0.guard();
         conn.execute(
             "DELETE FROM kv
              WHERE substr(key, 1, length(?1)) = ?1
@@ -471,7 +472,7 @@ impl Db {
         media_type: &str,
         payload: &str,
     ) -> Result<(), String> {
-        let conn = self.0.lock().unwrap();
+        let conn = self.0.guard();
         conn.execute(
             "INSERT INTO list_cache (user_id, media_type, payload, fetched_at)
              VALUES (?1, ?2, ?3, strftime('%s','now'))
@@ -495,14 +496,14 @@ impl Db {
     /// `VACUUM INTO` asks SQLite for the snapshot instead, and taking the same
     /// mutex every other writer takes keeps it from racing them.
     pub fn snapshot_to(&self, dest: &std::path::Path) -> Result<(), String> {
-        let conn = self.0.lock().unwrap();
+        let conn = self.0.guard();
         conn.execute("VACUUM INTO ?1", rusqlite::params![dest.to_string_lossy()])
             .map(|_| ())
             .map_err(|e| format!("Could not copy the database: {e}"))
     }
 
     pub fn cached_list(&self, user_id: i64, media_type: &str) -> Option<String> {
-        let conn = self.0.lock().unwrap();
+        let conn = self.0.guard();
         conn.query_row(
             "SELECT payload FROM list_cache WHERE user_id = ?1 AND media_type = ?2",
             rusqlite::params![user_id, media_type],
@@ -548,7 +549,7 @@ impl Db {
     // --- Offline queue ------------------------------------------------------
 
     pub fn queue_push(&self, kind: &str, payload: &str) -> Result<(), String> {
-        let conn = self.0.lock().unwrap();
+        let conn = self.0.guard();
         conn.execute(
             "INSERT INTO offline_queue (kind, payload, created_at)
              VALUES (?1, ?2, strftime('%s','now'))",
@@ -559,7 +560,7 @@ impl Db {
     }
 
     pub fn queue_all(&self) -> Vec<(i64, String, String)> {
-        let conn = self.0.lock().unwrap();
+        let conn = self.0.guard();
         let mut stmt = match conn
             .prepare("SELECT id, kind, payload FROM offline_queue ORDER BY id")
         {
@@ -572,7 +573,7 @@ impl Db {
     }
 
     pub fn queue_remove(&self, id: i64) {
-        let conn = self.0.lock().unwrap();
+        let conn = self.0.guard();
         let _ = conn.execute("DELETE FROM offline_queue WHERE id = ?1", [id]);
     }
 
@@ -583,14 +584,14 @@ impl Db {
     /// expect — so "my library is empty" and "the migration did not run" look
     /// identical from the outside.
     pub fn schema_version(&self) -> u32 {
-        let conn = self.0.lock().unwrap();
+        let conn = self.0.guard();
         conn.query_row("PRAGMA user_version", [], |r| r.get::<_, i64>(0))
             .map(|v| v as u32)
             .unwrap_or(0)
     }
 
     pub fn queue_len(&self) -> usize {
-        let conn = self.0.lock().unwrap();
+        let conn = self.0.guard();
         conn.query_row("SELECT COUNT(*) FROM offline_queue", [], |r| {
             r.get::<_, i64>(0)
         })
@@ -617,7 +618,7 @@ impl Db {
         media_json: Option<&str>,
         updated_ms: i64,
     ) -> Result<(), String> {
-        let conn = self.0.lock().unwrap();
+        let conn = self.0.guard();
         conn.execute(
             "INSERT INTO local_list
                 (media_id, media_type, status, progress, progress_volumes, score, repeat, notes, tags, updated_ms, media_json)
@@ -643,7 +644,7 @@ impl Db {
     /// Media type of an existing local row (media ids are globally unique on
     /// AniList, so the id alone identifies the row).
     pub fn local_find_type(&self, media_id: i64) -> Option<String> {
-        let conn = self.0.lock().unwrap();
+        let conn = self.0.guard();
         conn.query_row(
             "SELECT media_type FROM local_list WHERE media_id = ?1",
             [media_id],
@@ -653,7 +654,7 @@ impl Db {
     }
 
     pub fn local_delete(&self, media_id: i64, media_type: &str) -> Result<(), String> {
-        let conn = self.0.lock().unwrap();
+        let conn = self.0.guard();
         conn.execute(
             "DELETE FROM local_list WHERE media_id = ?1 AND media_type = ?2",
             rusqlite::params![media_id, media_type],
@@ -663,7 +664,7 @@ impl Db {
     }
 
     fn local_rows(&self, media_type: Option<&str>) -> Vec<LocalRow> {
-        let conn = self.0.lock().unwrap();
+        let conn = self.0.guard();
         // Column order here is load-bearing: `map` reads by index, and
         // `collect` below drops rows whose mapping errors. A mismatch does not
         // fail loudly — it silently returns an empty list.
@@ -779,7 +780,7 @@ impl Db {
         body: &str,
         created_ms: i64,
     ) -> Result<(), String> {
-        let conn = self.0.lock().unwrap();
+        let conn = self.0.guard();
         conn.execute(
             "INSERT INTO notifications (kind, title, body, created_ms)
              VALUES (?1, ?2, ?3, ?4)",
@@ -802,7 +803,7 @@ impl Db {
 
     /// Most recent notifications first, capped at `limit`.
     pub fn notif_all(&self, limit: i64) -> Vec<NotificationRow> {
-        let conn = self.0.lock().unwrap();
+        let conn = self.0.guard();
         let mut stmt = match conn.prepare(
             "SELECT id, kind, title, body, created_ms, read
              FROM notifications ORDER BY id DESC LIMIT ?1",
@@ -825,21 +826,21 @@ impl Db {
     }
 
     pub fn notif_mark_read(&self, id: i64) -> Result<(), String> {
-        let conn = self.0.lock().unwrap();
+        let conn = self.0.guard();
         conn.execute("UPDATE notifications SET read = 1 WHERE id = ?1", [id])
             .map(|_| ())
             .map_err(|e| format!("Notification update failed: {e}"))
     }
 
     pub fn notif_mark_all_read(&self) -> Result<(), String> {
-        let conn = self.0.lock().unwrap();
+        let conn = self.0.guard();
         conn.execute("UPDATE notifications SET read = 1 WHERE read = 0", [])
             .map(|_| ())
             .map_err(|e| format!("Notification update failed: {e}"))
     }
 
     pub fn notif_unread_count(&self) -> i64 {
-        let conn = self.0.lock().unwrap();
+        let conn = self.0.guard();
         conn.query_row(
             "SELECT COUNT(*) FROM notifications WHERE read = 0",
             [],
@@ -861,7 +862,7 @@ impl Db {
         rows: &[(i64, u32, String)],
         scores: &[(i64, f64)],
     ) -> Result<(), String> {
-        let mut conn = self.0.lock().unwrap();
+        let mut conn = self.0.guard();
         let tx = conn
             .transaction()
             .map_err(|e| format!("Library write failed: {e}"))?;
@@ -893,7 +894,7 @@ impl Db {
 
     /// Match confidence per media, for the rows the library screen draws.
     pub fn library_scores(&self) -> Vec<(i64, f64)> {
-        let conn = self.0.lock().unwrap();
+        let conn = self.0.guard();
         conn.prepare("SELECT media_id, score FROM library_match")
             .and_then(|mut stmt| {
                 stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
@@ -903,7 +904,7 @@ impl Db {
     }
 
     pub fn library_all(&self) -> Vec<(i64, u32, String)> {
-        let conn = self.0.lock().unwrap();
+        let conn = self.0.guard();
         conn.prepare("SELECT media_id, episode, path FROM library_files")
             .and_then(|mut stmt| {
                 stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
@@ -916,7 +917,7 @@ impl Db {
 
     /// Every user-set `(title, season) -> media_id` correction.
     pub fn library_overrides(&self) -> Vec<(String, i32, i64)> {
-        let conn = self.0.lock().unwrap();
+        let conn = self.0.guard();
         conn.prepare("SELECT title, season, media_id FROM library_override")
             .and_then(|mut stmt| {
                 stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
@@ -934,7 +935,7 @@ impl Db {
         season: i32,
         media_id: i64,
     ) -> Result<(), String> {
-        let conn = self.0.lock().unwrap();
+        let conn = self.0.guard();
         conn.execute(
             "INSERT INTO library_override (title, season, media_id) VALUES (?1, ?2, ?3)
              ON CONFLICT(title, season) DO UPDATE SET media_id = excluded.media_id",
@@ -950,7 +951,7 @@ impl Db {
     /// correction here" indistinguishable from "removed it", and the caller
     /// needs to tell those apart to avoid reporting success for a no-op.
     pub fn library_override_clear(&self, title: &str, season: i32) -> Result<usize, String> {
-        let conn = self.0.lock().unwrap();
+        let conn = self.0.guard();
         conn.execute(
             "DELETE FROM library_override WHERE title = ?1 AND season = ?2",
             rusqlite::params![title, season],
@@ -964,7 +965,7 @@ impl Db {
     /// nature — one row per title the matcher gets wrong — so it is read whole
     /// and matched in memory.
     pub fn detection_overrides(&self) -> Vec<DetectionOverride> {
-        let conn = self.0.lock().unwrap();
+        let conn = self.0.guard();
         conn.prepare(
             "SELECT title, season, media_type, media_id, display_title, episode_offset
              FROM detection_override",
@@ -997,7 +998,7 @@ impl Db {
         display_title: &str,
         episode_offset: i32,
     ) -> Result<(), String> {
-        let conn = self.0.lock().unwrap();
+        let conn = self.0.guard();
         conn.execute(
             "INSERT INTO detection_override
                (title, season, media_type, media_id, display_title, episode_offset)
@@ -1027,7 +1028,7 @@ impl Db {
         season: i32,
         media_type: &str,
     ) -> Result<usize, String> {
-        let conn = self.0.lock().unwrap();
+        let conn = self.0.guard();
         conn.execute(
             "DELETE FROM detection_override
              WHERE title = ?1 AND season = ?2 AND media_type = ?3",
@@ -1041,7 +1042,7 @@ impl Db {
     /// Every user-confirmed episode-range redirect:
     /// `(title, season, ep_from, ep_to, media_id, dst_start)`.
     pub fn library_redirects(&self) -> Vec<(String, i32, u32, u32, i64, u32)> {
-        let conn = self.0.lock().unwrap();
+        let conn = self.0.guard();
         conn.prepare(
             "SELECT title, season, ep_from, ep_to, media_id, dst_start FROM library_redirect",
         )
@@ -1065,7 +1066,7 @@ impl Db {
         media_id: i64,
         dst_start: u32,
     ) -> Result<(), String> {
-        let conn = self.0.lock().unwrap();
+        let conn = self.0.guard();
         conn.execute(
             "INSERT INTO library_redirect (title, season, ep_from, ep_to, media_id, dst_start)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6)
@@ -1087,7 +1088,7 @@ impl Db {
         season: i32,
         ep_from: u32,
     ) -> Result<usize, String> {
-        let conn = self.0.lock().unwrap();
+        let conn = self.0.guard();
         conn.execute(
             "DELETE FROM library_redirect WHERE title = ?1 AND season = ?2 AND ep_from = ?3",
             rusqlite::params![title, season, ep_from],
@@ -1097,7 +1098,7 @@ impl Db {
 
     /// Files the scan could not place, grouped by the title it parsed out.
     pub fn library_unmatched(&self) -> Vec<(String, i32, u32, String)> {
-        let conn = self.0.lock().unwrap();
+        let conn = self.0.guard();
         conn.prepare("SELECT title, season, episode, path FROM library_unmatched")
             .and_then(|mut stmt| {
                 stmt.query_map([], |r| {
@@ -1110,7 +1111,7 @@ impl Db {
 
     /// AniList's guess at each unplaceable title, with its score.
     pub fn library_suggestions(&self) -> Vec<(String, i32, i64, f64)> {
-        let conn = self.0.lock().unwrap();
+        let conn = self.0.guard();
         conn.prepare("SELECT title, season, media_id, score FROM library_suggestion")
             .and_then(|mut stmt| {
                 stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))
@@ -1126,7 +1127,7 @@ impl Db {
         &self,
         rows: &[(String, i32, i64, f64)],
     ) -> Result<(), String> {
-        let mut conn = self.0.lock().unwrap();
+        let mut conn = self.0.guard();
         let tx = conn
             .transaction()
             .map_err(|e| format!("Library write failed: {e}"))?;
@@ -1157,7 +1158,7 @@ impl Db {
         &self,
         unmatched: &[(String, i32, u32, String)],
     ) -> Result<(), String> {
-        let mut conn = self.0.lock().unwrap();
+        let mut conn = self.0.guard();
         let tx = conn
             .transaction()
             .map_err(|e| format!("Library write failed: {e}"))?;

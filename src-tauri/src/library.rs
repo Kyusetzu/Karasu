@@ -4,6 +4,7 @@
 //! and a reason to use the app over the website.
 
 use crate::db::Db;
+use crate::sync::LockExt;
 use crate::identify;
 use crate::playback::recognition::{matcher, parser};
 use crate::playback::relations;
@@ -313,7 +314,7 @@ pub fn get_library_status(db: State<'_, Db>, state: State<'_, LibraryIndex>) -> 
             .kv_get("library_files_seen")
             .and_then(|v| v.parse().ok())
             .unwrap_or(0),
-        matched: state.0.lock().unwrap().summary.len(),
+        matched: state.0.guard().summary.len(),
     }
 }
 
@@ -345,7 +346,7 @@ pub fn pick_library_folder(app: AppHandle) -> Option<String> {
 /// lazily routed — see `get_library_episodes` for what everyone else reads.
 #[tauri::command]
 pub fn get_library_index(state: State<'_, LibraryIndex>) -> Vec<LibraryEntry> {
-    state.0.lock().unwrap().summary.clone()
+    state.0.guard().summary.clone()
 }
 
 /// Just which episodes exist per media id.
@@ -516,7 +517,7 @@ pub async fn scan_library(app: AppHandle) -> Result<ScanSummary, String> {
 
     let summary = data.summary.clone();
     let matched = summary.len();
-    *index.0.lock().unwrap() = data;
+    *index.0.guard() = data;
 
     Ok(ScanSummary { entries: summary, files: total, matched })
 }
@@ -812,7 +813,7 @@ pub fn hydrate(app: &AppHandle) {
     };
     data.reindex();
     let state = app.state::<LibraryIndex>();
-    *state.0.lock().unwrap() = data;
+    *state.0.guard() = data;
 }
 
 /// Recovers the `(title, season, episode)` a path parses to.
@@ -828,7 +829,7 @@ fn reparse(path: &str) -> (String, i32, Option<u32>) {
 /// Files the last scan could not place, grouped by what it read them as.
 #[tauri::command]
 pub fn get_library_unmatched(state: State<'_, LibraryIndex>) -> Vec<UnmatchedGroup> {
-    state.0.lock().unwrap().unmatched.clone()
+    state.0.guard().unmatched.clone()
 }
 
 /// Points every file that parses to `title`/`season` at `media_id`.
@@ -852,7 +853,7 @@ pub fn set_library_match(
     let db = app.state::<Db>();
     db.library_override_set(&title, season, media_id)?;
 
-    let mut guard = state.0.lock().unwrap();
+    let mut guard = state.0.guard();
     for f in &mut guard.files {
         if f.title == title && f.season == season {
             f.media_id = Some(media_id);
@@ -1020,7 +1021,7 @@ pub fn set_library_redirect(
 
     let db = app.state::<Db>();
     let existing = redirect_rules(&db);
-    let mut guard = state.0.lock().unwrap();
+    let mut guard = state.0.guard();
     let plan = plan_redirect(&guard.files, &existing, media_id, from, to, dst_media_id, dst_start)?;
 
     for (title, season, ep_from) in &plan.delete {
@@ -1068,7 +1069,7 @@ pub fn clear_library_redirect(
     db.library_redirect_clear(&title, season, ep_from)?;
     let remaining = redirect_rules(&db);
 
-    let mut guard = state.0.lock().unwrap();
+    let mut guard = state.0.guard();
     // The answer the freed files fall back to: any sibling of the same parse
     // that no remaining split claims.
     let fallback = guard.files.iter().find_map(|f| {
@@ -1134,7 +1135,7 @@ pub fn clear_library_match(
         db.library_redirect_clear(&title, season, r.ep_from)?;
     }
 
-    let mut guard = state.0.lock().unwrap();
+    let mut guard = state.0.guard();
     let mut reset = 0usize;
     for f in &mut guard.files {
         if f.title == title && f.season == season && f.manual {
@@ -1175,7 +1176,7 @@ pub fn play_next(app: AppHandle, media_id: i64) -> Result<(), String> {
 
     let path = {
         let state = app.state::<LibraryIndex>();
-        let guard = state.0.lock().unwrap();
+        let guard = state.0.guard();
         let eps = guard
             .by_media
             .get(&media_id)
@@ -1201,7 +1202,7 @@ pub fn play_next(app: AppHandle, media_id: i64) -> Result<(), String> {
 pub fn play_episode(app: AppHandle, media_id: i64, episode: u32) -> Result<(), String> {
     let path = {
         let state = app.state::<LibraryIndex>();
-        let guard = state.0.lock().unwrap();
+        let guard = state.0.guard();
         guard
             .by_media
             .get(&media_id)

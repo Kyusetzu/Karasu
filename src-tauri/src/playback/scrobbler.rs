@@ -8,6 +8,7 @@
 //! after user abort.
 
 use crate::db::Db;
+use crate::sync::LockExt;
 use crate::playback::detection;
 use crate::playback::recognition::{matcher, parser};
 use crate::playback::relations::{self, Relations};
@@ -689,7 +690,7 @@ async fn perform_update(
     // Refresh the now-playing display
     {
         let state = app.state::<PlaybackState>();
-        let mut guard = state.0.lock().unwrap();
+        let mut guard = state.0.guard();
         if let Some(np) = guard.as_mut() {
             if np.media_id == Some(media_id) {
                 np.progress = Some(episode);
@@ -727,7 +728,7 @@ pub fn requeue_match(app: &AppHandle) {
     let source_episode;
     {
         let state = app.state::<PlaybackState>();
-        let guard = state.0.lock().unwrap();
+        let guard = state.0.guard();
         let Some(np) = guard.as_ref() else { return };
         media_type = np.media_type.clone();
         parsed_title = np.parsed_title.clone();
@@ -796,7 +797,7 @@ pub fn requeue_match(app: &AppHandle) {
     // deadlock the day one of them grows a caller.
     let patched = {
         let state = app.state::<PlaybackState>();
-        let mut guard = state.0.lock().unwrap();
+        let mut guard = state.0.guard();
         if let Some(np) = guard.as_mut() {
             np.overridden = forced.is_some();
             // The resolved number, so `drive_session` starts its next session
@@ -836,7 +837,7 @@ pub fn requeue_match(app: &AppHandle) {
     // The running session was started for the *old* id; dropping it makes the
     // next tick build one for the corrected entry rather than scrobbling the
     // episode onto whatever the matcher had guessed.
-    *app.state::<ScrobbleSession>().0.lock().unwrap() = None;
+    *app.state::<ScrobbleSession>().0.guard() = None;
     emit_session(app, None);
 }
 
@@ -865,7 +866,7 @@ async fn confirm_pending_impl(
 ) -> Result<(), String> {
     let data = {
         let state = app.state::<ScrobbleSession>();
-        let mut guard = state.0.lock().unwrap();
+        let mut guard = state.0.guard();
         let Some(session) = guard.as_mut() else {
             return Err("Nothing is currently playing".into());
         };
@@ -902,7 +903,7 @@ async fn confirm_pending_impl(
 
     let result = perform_update(&app, data.0, &data.1, data.2, data.3, &data.4).await;
     let state = app.state::<ScrobbleSession>();
-    let mut guard = state.0.lock().unwrap();
+    let mut guard = state.0.guard();
     if let Some(session) = guard.as_mut() {
         if applies_to(session, data.0, data.2) {
             session.phase = match &result {
@@ -948,7 +949,7 @@ pub fn spawn(app: AppHandle) {
             if raw == last_raw {
                 if let Some(p) = playback.as_ref() {
                     let state = app.state::<PlaybackState>();
-                    let mut guard = state.0.lock().unwrap();
+                    let mut guard = state.0.guard();
                     if let Some(np) = guard.as_mut() {
                         np.position_sec = p.position_sec;
                         np.duration_sec = p.duration_sec;
@@ -978,7 +979,7 @@ pub fn spawn(app: AppHandle) {
                     let rules = rules.0.read().unwrap().clone();
                     playback.map(|p| build_now_playing(&db, &rules, p))
                 };
-                *app.state::<PlaybackState>().0.lock().unwrap() = now.clone();
+                *app.state::<PlaybackState>().0.guard() = now.clone();
                 let _ = app.emit("now-playing", &now);
                 crate::discord::sync(&app, now.as_ref());
                 // The tray mirrors the same change: menu row + tooltip.
@@ -998,7 +999,7 @@ pub fn spawn(app: AppHandle) {
 
 /// One tick of the scrobble state machine.
 async fn drive_session(app: &AppHandle) {
-    let now_playing = app.state::<PlaybackState>().0.lock().unwrap().clone();
+    let now_playing = app.state::<PlaybackState>().0.guard().clone();
     let settings = {
         let db = app.state::<Db>();
         crate::commands::read_scrobble_settings(&db)
@@ -1008,7 +1009,7 @@ async fn drive_session(app: &AppHandle) {
     // await while holding the mutex).
     let update_data = {
         let state = app.state::<ScrobbleSession>();
-        let mut guard = state.0.lock().unwrap();
+        let mut guard = state.0.guard();
 
         match now_playing {
             Some(np) if np.media_id.is_some() && np.episode.is_some() => {
@@ -1128,7 +1129,7 @@ async fn drive_session(app: &AppHandle) {
     if let Some((mid, mtype, ep, total, status)) = update_data {
         let result = perform_update(app, mid, &mtype, ep, total, &status).await;
         let state = app.state::<ScrobbleSession>();
-        let mut guard = state.0.lock().unwrap();
+        let mut guard = state.0.guard();
         if let Some(session) = guard.as_mut() {
             if applies_to(session, mid, ep) {
                 session.phase = match result {

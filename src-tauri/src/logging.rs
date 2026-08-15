@@ -105,9 +105,12 @@ static DEBUG_ON: AtomicBool = AtomicBool::new(false);
 /// The whole point of this module is to still work when something has panicked,
 /// and a poisoned mutex means exactly that. `unwrap()` here would turn "we
 /// logged a panic" into "we panicked while logging a panic", which aborts.
-/// Same reasoning as the Jellyfin session cache.
+///
+/// Kept as a free function because this module reaches for it constantly and
+/// `guard(sink())` reads better than the alternative; the recovery itself is
+/// `crate::sync`'s, which is now what every lock in the crate goes through.
 fn guard<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
-    m.lock().unwrap_or_else(|e| e.into_inner())
+    crate::sync::LockExt::guard(m)
 }
 
 fn now_ms() -> i64 {

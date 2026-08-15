@@ -8,6 +8,7 @@
 //! Uses the built-in application ID or a user override from the settings.
 
 use crate::db::Db;
+use crate::sync::LockExt;
 use crate::playback::scrobbler::{NowPlaying, PlaybackState, ScrobbleSession};
 use discord_rich_presence::{
     activity::{Activity, ActivityType, Assets, Button, Timestamps},
@@ -62,7 +63,7 @@ fn now_secs() -> i64 {
 /// else now — so the elapsed timer starts fresh.
 fn session_start(app: &AppHandle, np: &NowPlaying) -> i64 {
     let state = app.state::<ScrobbleSession>();
-    let guard = state.0.lock().unwrap();
+    let guard = state.0.guard();
     match guard.as_ref() {
         Some(s) if Some(s.media_id) == np.media_id => s.started_ms / 1000,
         _ => now_secs(),
@@ -72,7 +73,7 @@ fn session_start(app: &AppHandle, np: &NowPlaying) -> i64 {
 /// Re-syncs the presence using the current playback state (used after a UI
 /// page change, where the caller has no NowPlaying at hand).
 pub fn sync_current(app: &AppHandle) {
-    let now = app.state::<PlaybackState>().0.lock().unwrap().clone();
+    let now = app.state::<PlaybackState>().0.guard().clone();
     sync(app, now.as_ref());
 }
 
@@ -84,7 +85,7 @@ pub fn sync(app: &AppHandle, now: Option<&NowPlaying>) {
     let app_id = effective_app_id(&db.kv_get("discord_app_id").unwrap_or_default());
 
     let state = app.state::<Discord>();
-    let mut guard = state.0.lock().unwrap();
+    let mut guard = state.0.guard();
 
     if !enabled || app_id.is_empty() {
         disconnect(&mut guard);
@@ -148,7 +149,7 @@ pub fn sync(app: &AppHandle, now: Option<&NowPlaying>) {
             (title, state_text, timestamps, kind)
         }
         None => {
-            let page = app.state::<UiPage>().0.lock().unwrap().clone();
+            let page = app.state::<UiPage>().0.guard().clone();
             (
                 format!("Looking at {page}"),
                 "Idle".to_string(),

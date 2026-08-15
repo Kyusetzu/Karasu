@@ -10,6 +10,7 @@
 //! `http://localhost:46231/callback`.
 
 use crate::anilist::client::AniList;
+use crate::sync::LockExt;
 use crate::db::Db;
 use std::io::{Read, Write};
 use std::net::{Shutdown, TcpListener, TcpStream};
@@ -91,7 +92,7 @@ pub fn start<R: Runtime>(app: AppHandle<R>) -> Result<String, String> {
             return Err(e);
         }
     };
-    *PENDING_STATE.lock().unwrap() = Some(state.clone());
+    *PENDING_STATE.guard() = Some(state.clone());
     std::thread::spawn(move || {
         // Validates the token, persists it and notifies the frontend.
         let on_token = |token: &str| -> Result<(), String> {
@@ -118,7 +119,7 @@ pub fn start<R: Runtime>(app: AppHandle<R>) -> Result<String, String> {
         };
         serve(&listener, LOGIN_WINDOW, &on_token);
         // The window is over: no further reply can be legitimate.
-        *PENDING_STATE.lock().unwrap() = None;
+        *PENDING_STATE.guard() = None;
         ACTIVE.store(false, Ordering::SeqCst);
     });
     Ok(state)
@@ -240,7 +241,7 @@ fn handle_connection(
 
 /// Whether the query carries the nonce this login attempt was started with.
 fn state_ok(query: &str) -> bool {
-    let expected = PENDING_STATE.lock().unwrap();
+    let expected = PENDING_STATE.guard();
     match (expected.as_deref(), query_param(query, "state")) {
         (Some(want), Some(got)) => state_matches(want, got),
         // No pending login means nothing legitimate can arrive here.
@@ -334,7 +335,7 @@ mod tests {
         accept: &'static str,
         done: mpsc::Sender<()>,
     ) -> (u16, std::thread::JoinHandle<()>) {
-        *PENDING_STATE.lock().unwrap() = Some(TEST_STATE.to_string());
+        *PENDING_STATE.guard() = Some(TEST_STATE.to_string());
         let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
         listener.set_nonblocking(true).unwrap();
         let port = listener.local_addr().unwrap().port();

@@ -1,4 +1,5 @@
 use crate::db::Db;
+use crate::sync::LockExt;
 use serde_json::Value;
 use tauri::State;
 
@@ -9,7 +10,7 @@ use super::*;
 
 /// Monotonic commit counter — the 4th version segment
 /// (`MAJOR.MINOR.PATCH.COMMIT#`). Bumped by one on every commit.
-pub const COMMIT_NUMBER: u32 = 333;
+pub const COMMIT_NUMBER: u32 = 334;
 
 /// Full four-part display version, e.g. `0.1.1.38`. The `MAJOR.MINOR.PATCH`
 /// core comes from the crate version (kept in sync across the manifests).
@@ -358,7 +359,7 @@ pub async fn download_pending_update(
         .await
         .map_err(|e| e.to_string())?;
 
-    *pending.0.lock().unwrap() = Some((update, bytes));
+    *pending.0.guard() = Some((update, bytes));
     crate::alerts::notify::notify(
         &app,
         "update",
@@ -381,7 +382,7 @@ pub async fn download_pending_update(
 /// check again and download the identical installer a second time.
 #[tauri::command]
 pub fn pending_update(pending: State<'_, PendingUpdate>) -> Option<DownloadedUpdate> {
-    let guard = pending.0.lock().unwrap();
+    let guard = pending.0.guard();
     let (update, _) = guard.as_ref()?;
     Some(DownloadedUpdate {
         version: display_version(&update.version),
@@ -403,7 +404,7 @@ pub fn install_pending_update(
     // second click then answered "No update has been downloaded yet" directly
     // underneath a line saying it had been, and the only recovery was to
     // download the whole thing again.
-    let guard = pending.0.lock().unwrap();
+    let guard = pending.0.guard();
     let Some((update, bytes)) = guard.as_ref() else {
         return Err("No update has been downloaded yet".into());
     };

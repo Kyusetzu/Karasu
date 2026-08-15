@@ -10,7 +10,9 @@ mod library;
 mod logging;
 mod playback;
 mod portable;
+mod sync;
 
+use crate::sync::LockExt;
 use std::sync::Mutex;
 use tauri::{
     menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem},
@@ -83,7 +85,7 @@ pub struct TrayItems {
 /// been English ("Open Karasu"/"Quit") since it existed.
 pub fn tray_set_now_playing(app: &AppHandle, title: Option<&str>) {
     if let Some(handles) = app.try_state::<TrayHandles>() {
-        if let Some(items) = handles.0.lock().unwrap().as_ref() {
+        if let Some(items) = handles.0.guard().as_ref() {
             let _ = items.now_playing.set_text(match title {
                 Some(t) => format!("▶ {t}"),
                 None => "Nothing playing".into(),
@@ -198,7 +200,7 @@ fn build_tray(app: &tauri::App) -> tauri::Result<()> {
             // reads the key per tick, so it takes effect within one cycle.
             "detection" => {
                 if let Some(handles) = app.try_state::<TrayHandles>() {
-                    if let Some(items) = handles.0.lock().unwrap().as_ref() {
+                    if let Some(items) = handles.0.guard().as_ref() {
                         let enabled = items.detection.is_checked().unwrap_or(true);
                         let db = app.state::<db::Db>();
                         let _ = commands::write_media_detection(&db, enabled);

@@ -1,4 +1,5 @@
 use crate::db::Db;
+use crate::sync::LockExt;
 use tauri::State;
 
 // Siblings in the same module tree; `mod.rs` re-exports all of it, so
@@ -11,7 +12,7 @@ use super::*;
 pub fn get_now_playing(
     state: State<'_, crate::playback::scrobbler::PlaybackState>,
 ) -> Option<crate::playback::scrobbler::NowPlaying> {
-    state.0.lock().unwrap().clone()
+    state.0.guard().clone()
 }
 
 // --- Scrobbler settings and control ------------------------------------------

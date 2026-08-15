@@ -31,6 +31,7 @@
 //! "only this device" narrowing lives.
 
 use super::Playback;
+use crate::sync::LockExt;
 use crate::playback::recognition::parser::Parsed;
 use std::sync::Mutex;
 
@@ -122,7 +123,7 @@ fn cached_or<F>(cache: &Mutex<Option<Option<String>>>, read: F) -> Option<String
 where
     F: FnOnce() -> Result<Option<String>, ()>,
 {
-    let mut guard = cache.lock().unwrap_or_else(|e| e.into_inner());
+    let mut guard = cache.guard();
     if let Some(known) = guard.as_ref() {
         return known.clone();
     }
@@ -134,7 +135,7 @@ where
 }
 
 fn set_cached_token(token: Option<String>) {
-    *TOKEN_CACHE.lock().unwrap_or_else(|e| e.into_inner()) = Some(token);
+    *TOKEN_CACHE.guard() = Some(token);
 }
 
 pub fn delete_token() -> Result<(), String> {
@@ -562,7 +563,7 @@ static LAST_GOOD: Mutex<Option<(Playback, u8)>> = Mutex::new(None);
 
 /// Records a successful poll and hands the answer straight back.
 fn remember(found: Option<Playback>) -> Option<Playback> {
-    let mut guard = LAST_GOOD.lock().unwrap_or_else(|e| e.into_inner());
+    let mut guard = LAST_GOOD.guard();
     *guard = found.clone().map(|p| (p, 0));
     found
 }
@@ -573,7 +574,7 @@ fn remember(found: Option<Playback>) -> Option<Playback> {
 /// says nothing is playing" is an answer and clears the memory through
 /// `remember`, so this can never keep a finished episode alive.
 fn hold_last_good() -> Option<Playback> {
-    let mut guard = LAST_GOOD.lock().unwrap_or_else(|e| e.into_inner());
+    let mut guard = LAST_GOOD.guard();
     let Some((playback, used)) = guard.as_mut() else {
         return None;
     };
@@ -628,7 +629,7 @@ mod tests {
 
     /// A failed assertion in one locked test must not poison the other.
     fn serialize_hold() -> std::sync::MutexGuard<'static, ()> {
-        HOLD_STATE.lock().unwrap_or_else(|e| e.into_inner())
+        HOLD_STATE.guard()
     }
 
     fn some_playback(title: &str) -> Playback {
@@ -646,7 +647,7 @@ mod tests {
     #[test]
     fn a_failed_poll_holds_the_last_answer_but_not_for_ever() {
         let _guard = serialize_hold();
-        *LAST_GOOD.lock().unwrap() = None;
+        *LAST_GOOD.guard() = None;
 
         // Nothing to hold yet: a failure before any success stays a failure.
         assert!(hold_last_good().is_none());
@@ -672,7 +673,7 @@ mod tests {
     #[test]
     fn a_clean_nothing_playing_clears_the_memory_at_once() {
         let _guard = serialize_hold();
-        *LAST_GOOD.lock().unwrap() = None;
+        *LAST_GOOD.guard() = None;
         remember(Some(some_playback("Frieren")));
         assert!(remember(None).is_none());
         assert!(hold_last_good().is_none());
@@ -962,13 +963,13 @@ mod tests {
     #[test]
     fn signing_in_or_out_replaces_what_was_cached() {
         let cache = Mutex::new(Some(Some("old".to_string())));
-        *cache.lock().unwrap() = Some(Some("new".to_string()));
+        *cache.guard() = Some(Some("new".to_string()));
         assert_eq!(
             cached_or(&cache, || panic!("must not read the credential store")),
             Some("new".to_string()),
         );
 
-        *cache.lock().unwrap() = Some(None);
+        *cache.guard() = Some(None);
         assert_eq!(
             cached_or(&cache, || panic!("must not read the credential store")),
             None,

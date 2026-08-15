@@ -1,4 +1,5 @@
 use crate::db::Db;
+use crate::sync::LockExt;
 use tauri::{Manager, State};
 
 // Siblings in the same module tree; `mod.rs` re-exports all of it, so
@@ -16,7 +17,7 @@ pub(crate) const LOG_DEBUG_KEY: &str = "log_debug";
 /// can show "Looking at <page>".
 #[tauri::command]
 pub fn set_ui_page(app: tauri::AppHandle, page: String) {
-    *app.state::<crate::discord::UiPage>().0.lock().unwrap() = page;
+    *app.state::<crate::discord::UiPage>().0.guard() = page;
     crate::discord::sync_current(&app);
 }
 

@@ -467,6 +467,7 @@ pub fn run() {
             commands::open_text,
             commands::get_backup_settings,
             commands::set_backup_settings,
+            commands::open_backup_dir,
             commands::get_mpv_ipc,
             commands::set_mpv_ipc,
             commands::list_detection_overrides,

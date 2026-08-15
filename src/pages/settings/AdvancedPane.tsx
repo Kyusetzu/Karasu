@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { ChevronRight, RefreshCw } from "lucide-react";
+import { ChevronRight, FolderOpen, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,7 @@ import { getLogDebug, getLogs, setLogDebug, type LogEntry } from "@/api/diagnost
 import { planRescale } from "@/lib/rescale";
 import { buildJsonExport, buildMalXml } from "@/lib/malExport";
 import { parseMalXml } from "@/lib/malImport";
+import { parseJsonExport } from "@/lib/jsonImport";
 import { resolveMalChunk } from "@/api/queries";
 import { scoreScale } from "@/lib/scoreFormat";
 import { useAuth, useScoreFormat } from "@/stores/auth";
@@ -462,6 +463,76 @@ export function ImportSection() {
     }
   };
 
+  /**
+   * Karasu's own JSON, which the app could write and not read — which makes it
+   * an export rather than a backup.
+   *
+   * Costs no requests at all, unlike the MAL path above: the file already
+   * carries the AniList media id and a format-independent `scoreRaw`, so there
+   * is nothing to resolve and nothing to guess. It also carries what a MAL
+   * round-trip cannot — notes, both progress axes, the private flag, and the
+   * dates as fuzzy dates rather than as MAL's all-or-nothing `0000-00-00`.
+   */
+  const importJson = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      const text = await invoke<string | null>("open_text", {
+        filterLabel: "Karasu JSON",
+        extension: "json",
+      });
+      if (text == null) return;
+      const parsed = parseJsonExport(text);
+      if (parsed.rows.length === 0) {
+        showToast({ kind: "error", text: t("settings.importNothing") });
+        return;
+      }
+
+      setProgress(t("settings.importWriting"));
+      for (const row of parsed.rows) {
+        await api.saveListEntry(
+          {
+            mediaId: row.mediaId,
+            status: row.status,
+            // Local scores are ten-point; the raw scale is the one place every
+            // format converges, so this is the only conversion needed.
+            score: row.scoreRaw / 10,
+            progress: row.progress,
+            progressVolumes: row.progressVolumes,
+            repeat: row.repeat,
+            notes: row.notes ?? undefined,
+            private: row.private,
+            startedAt: row.startedAt ?? undefined,
+            completedAt: row.completedAt ?? undefined,
+          },
+          // Second argument, exactly as the MAL path passes it: local mode
+          // stores this beside the row so the list renders offline. Without it
+          // an imported entry is a title-less card waiting on a fetch that
+          // local mode never makes.
+          row.media,
+        );
+      }
+
+      await qc.invalidateQueries({ queryKey: ["mediaList"] });
+      showToast({
+        kind: "success",
+        text:
+          parsed.skipped > 0
+            ? t("settings.importDoneUnmatched", {
+                n: parsed.rows.length,
+                unmatched: parsed.skipped,
+              })
+            : t("settings.importDone", { n: parsed.rows.length }),
+      });
+    } catch (e) {
+      showToast({ kind: "error", text: t("settings.importFailed"), detail: String(e) });
+    } finally {
+      setBusy(false);
+      setProgress(null);
+    }
+  };
+
   return (
     <Card>
       <CardTitle>{t("settings.import")}</CardTitle>
@@ -470,8 +541,12 @@ export function ImportSection() {
         <Button variant="secondary" disabled={busy} onClick={importMal}>
           {t("settings.importMal")}
         </Button>
+        <Button variant="secondary" disabled={busy} onClick={importJson}>
+          {t("settings.importJson")}
+        </Button>
         {progress && <span className="text-xs text-ink-500">{progress}</span>}
       </div>
+      <p className="mt-2 text-xs text-ink-600">{t("settings.importJsonHint")}</p>
     </Card>
   );
 }
@@ -536,6 +611,18 @@ export function BackupSection() {
           label={t("settings.backupEnabled")}
           hint={t("settings.backupEnabledHint", { dir: settings.dir })}
         />
+        <Row label={t("settings.backupOpen")} hint={t("settings.backupRestoreHint")}>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={async () => {
+              const { invoke } = await import("@tauri-apps/api/core");
+              await invoke("open_backup_dir").catch((e) => setError(String(e)));
+            }}
+          >
+            <FolderOpen className="size-3.5" /> {t("settings.backupOpenButton")}
+          </Button>
+        </Row>
         <Row label={t("settings.backupKeep")} hint={t("settings.backupKeepHint")}>
           <Input
             type="number"

@@ -1119,6 +1119,9 @@ export const en = {
     importHint:
       "Reads a MyAnimeList XML export into your local list — status, progress, scores and rewatch counts. Existing entries for the same title are updated.",
     importMal: "Import MAL XML…",
+    importJson: "Import Karasu JSON…",
+    importJsonHint:
+      "The JSON export reads back exactly as it was written — notes, dates, both progress axes and the private flag — and costs no requests, because the file already carries the AniList ids.",
     importNothing: "That file holds no importable entries.",
     importResolving: "Matching titles… {{done}} / {{total}}",
     importWriting: "Writing entries…",
@@ -1128,6 +1131,10 @@ export const en = {
     backup: "Backups",
     backupEnabled: "Back up the database daily",
     backupEnabledHint: "One snapshot per day, written to {{dir}}.",
+    backupOpen: "Backup folder",
+    backupOpenButton: "Open folder",
+    backupRestoreHint:
+      "Restoring is deliberately manual: close Karasu, then replace karasu.db with the snapshot you want. Doing it from in here would mean overwriting the database the app is holding open.",
     backupKeep: "Snapshots to keep",
     backupKeepHint: "Older daily snapshots are pruned automatically.",
     alScoreFormat: "Score format",

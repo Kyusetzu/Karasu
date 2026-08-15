@@ -575,6 +575,30 @@ pub fn get_backup_settings(app: tauri::AppHandle, db: State<'_, Db>) -> BackupSe
     }
 }
 
+/// Opens the backup folder in the file manager.
+///
+/// The card has always *named* the directory, which is one step short of
+/// useful: restoring a backup means replacing `karasu.db` with one of these
+/// files while the app is closed, and the first move in that is getting to
+/// them. Karasu deliberately does not do the replacing itself — see the hint
+/// beside this button — but it can at least open the door.
+///
+/// Creates the folder when the daily backup has not run yet, so the button is
+/// never a dead end on a fresh install.
+#[tauri::command]
+pub fn open_backup_dir(app: tauri::AppHandle, db: State<'_, Db>) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+
+    let dir = get_backup_settings(app.clone(), db).dir;
+    if dir.is_empty() {
+        return Err("No backup folder".into());
+    }
+    std::fs::create_dir_all(&dir).map_err(|e| format!("Could not create {dir}: {e}"))?;
+    app.opener()
+        .open_path(&dir, None::<&str>)
+        .map_err(|e| format!("Could not open {dir}: {e}"))
+}
+
 #[tauri::command]
 pub fn set_backup_settings(
     app: tauri::AppHandle,

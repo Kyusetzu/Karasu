@@ -1129,6 +1129,9 @@ export const de: typeof en = {
     importHint:
       "Liest einen MyAnimeList-XML-Export in deine lokale Liste — Status, Fortschritt, Bewertungen und Rewatch-Zähler. Vorhandene Einträge desselben Titels werden aktualisiert.",
     importMal: "MAL-XML importieren…",
+    importJson: "Karasu-JSON importieren…",
+    importJsonHint:
+      "Der JSON-Export wird genau so eingelesen, wie er geschrieben wurde — Notizen, Daten, beide Fortschrittsachsen und die Privat-Markierung — und kostet keine Anfragen, weil die Datei die AniList-IDs schon enthält.",
     importNothing: "Diese Datei enthält keine importierbaren Einträge.",
     importResolving: "Titel werden zugeordnet… {{done}} / {{total}}",
     importWriting: "Einträge werden geschrieben…",
@@ -1139,6 +1142,10 @@ export const de: typeof en = {
     backup: "Backups",
     backupEnabled: "Datenbank täglich sichern",
     backupEnabledHint: "Ein Snapshot pro Tag, gespeichert unter {{dir}}.",
+    backupOpen: "Backup-Ordner",
+    backupOpenButton: "Ordner öffnen",
+    backupRestoreHint:
+      "Das Wiederherstellen ist bewusst manuell: Schließe Karasu und ersetze dann karasu.db durch den gewünschten Snapshot. Von hier aus hieße es, die gerade geöffnete Datenbank zu überschreiben.",
     backupKeep: "Aufzubewahrende Snapshots",
     backupKeepHint: "Ältere tägliche Snapshots werden automatisch entfernt.",
     alScoreFormat: "Bewertungsformat",

@@ -18,9 +18,17 @@ import { showToast } from "@/stores/toast";
 import type { ListResult, Media, MediaType } from "@/api/types";
 import { cn } from "@/lib/utils";
 import { Row, SELECT, Toggle } from "./shared";
+interface DatabaseInfo {
+  path: string;
+  bytes: number;
+  modifiedMs: number;
+}
+
 interface PortableStatus {
   portable: boolean;
   dir: string;
+  /** A database in the folder this switch would move away from using. */
+  other: DatabaseInfo | null;
 }
 
 /**
@@ -158,11 +166,18 @@ export function PortableSection() {
 
   if (!status) return null;
 
-  const toggle = async () => {
+  /**
+   * `replace` is only read when enabling, and only matters when a database is
+   * already beside the exe: true takes the current one along, false adopts the
+   * one that is there. The backend refuses when neither was said, so the two
+   * buttons below are the only way in.
+   */
+  const toggle = async (replace?: boolean) => {
     setError(null);
     const { invoke } = await import("@tauri-apps/api/core");
     try {
-      await invoke(status.portable ? "disable_portable" : "enable_portable");
+      if (status.portable) await invoke("disable_portable");
+      else await invoke("enable_portable", { replace: replace ?? null });
       setRestart(true);
     } catch (e) {
       setError(String(e));
@@ -174,6 +189,11 @@ export function PortableSection() {
     await invoke<PortableStatus>("get_portable_status").then(setStatus);
   };
 
+  const other = status.other;
+  const otherWhen = other
+    ? new Date(other.modifiedMs).toLocaleDateString()
+    : "";
+
   return (
     <Card>
       <CardTitle>{t("settings.portable")}</CardTitle>
@@ -182,15 +202,42 @@ export function PortableSection() {
         <span className="text-sm text-ink-300">
           {status.portable ? t("settings.portableOn") : t("settings.portableOff")}
         </span>
-        <Button variant="secondary" onClick={toggle}>
-          {status.portable
-            ? t("settings.portableDisable")
-            : t("settings.portableEnable")}
-        </Button>
+        {/* With a database already waiting, there is no single "enable" that
+            is safe to guess at — one of the two copies is about to be set
+            aside, and only the user knows which. */}
+        {!status.portable && other ? (
+          <>
+            <Button variant="secondary" onClick={() => toggle(false)}>
+              {t("settings.portableKeepExisting")}
+            </Button>
+            <Button variant="secondary" onClick={() => toggle(true)}>
+              {t("settings.portableReplaceExisting")}
+            </Button>
+          </>
+        ) : (
+          <Button variant="secondary" onClick={() => toggle()}>
+            {status.portable
+              ? t("settings.portableDisable")
+              : t("settings.portableEnable")}
+          </Button>
+        )}
       </div>
       <p className="mt-2 break-all text-xs text-ink-600">
         {t("settings.portableLocation")}: {status.dir}
       </p>
+      {other && (
+        <p className="mt-2 break-all text-xs text-gold">
+          {status.portable
+            ? t("settings.portableOtherOnDisable", {
+                path: other.path,
+                date: otherWhen,
+              })
+            : t("settings.portableOtherOnEnable", {
+                path: other.path,
+                date: otherWhen,
+              })}
+        </p>
+      )}
       {platform?.appImage && (
         <p className="mt-1 text-xs text-ink-600">
           {t("settings.portableAppImage")}

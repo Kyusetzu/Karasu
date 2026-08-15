@@ -162,19 +162,66 @@ pub struct PortableStatus {
     pub portable: bool,
     /// Absolute path where the database currently lives.
     pub dir: String,
+    /// A database sitting in the folder this switch would move *away* from
+    /// using — the portable one while running from AppData, and the AppData one
+    /// while running portable. `None` when that folder holds nothing.
+    pub other: Option<DatabaseInfo>,
+}
+
+/// Enough about a database file to say how old it is and whether it looks used.
+#[derive(serde::Serialize)]
+pub struct DatabaseInfo {
+    pub path: String,
+    pub bytes: u64,
+    /// Last modified, in milliseconds since the epoch. 0 when the filesystem
+    /// will not say — a date is a nice-to-have here, the file's existence is
+    /// the part that decides anything.
+    #[serde(rename = "modifiedMs")]
+    pub modified_ms: i64,
+}
+
+/// Describes the database at `path`, or `None` if there is none.
+///
+/// Split out from the command because it is the whole basis of the warning:
+/// enabling portable mode used to copy the database only `if !dest.exists()`,
+/// so enable → disable → months of ordinary use → enable again silently went
+/// back to the months-old file left behind the first time. Nothing was deleted,
+/// but nothing said the current list had been put aside either.
+pub(crate) fn describe_database(path: &std::path::Path) -> Option<DatabaseInfo> {
+    let meta = std::fs::metadata(path).ok()?;
+    if !meta.is_file() {
+        return None;
+    }
+    let modified_ms = meta
+        .modified()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0);
+    Some(DatabaseInfo {
+        path: path.to_string_lossy().to_string(),
+        bytes: meta.len(),
+        modified_ms,
+    })
 }
 
 #[tauri::command]
 pub fn get_portable_status(app: tauri::AppHandle) -> PortableStatus {
     let portable = crate::portable::is_portable();
-    let dir = if portable {
-        crate::portable::portable_data_dir()
+    let here = crate::portable::portable_data_dir();
+    let there = app.path().app_data_dir().ok();
+    let (active, inactive) = if portable {
+        (here, there)
     } else {
-        app.path().app_data_dir().ok()
+        (there, here)
+    };
+    PortableStatus {
+        portable,
+        dir: active
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_default(),
+        other: inactive.and_then(|d| describe_database(&d.join("karasu.db"))),
     }
-    .map(|p| p.to_string_lossy().to_string())
-    .unwrap_or_default();
-    PortableStatus { portable, dir }
 }
 
 /// Enables portable mode: copies the current database next to the exe, moves
@@ -188,20 +235,46 @@ pub fn get_portable_status(app: tauri::AppHandle) -> PortableStatus {
 /// the app had in fact already switched, to a folder holding no token and
 /// possibly no database. Done in this order, a failure leaves an unused folder
 /// and nothing else.
+///
+/// `replace` decides what happens when a database is already sitting beside the
+/// exe, and the command refuses rather than picking for you. It used to copy
+/// only `if !dest.exists()`, which reads as "don't clobber" and behaves as
+/// "adopt whatever is there": enable → disable → months of AppData use → enable
+/// again came back on a months-old list, with no warning and nothing on screen
+/// to explain where the recent one went. `get_portable_status` reports the file
+/// so the pane can ask before this is ever called with either answer.
 #[tauri::command]
-pub fn enable_portable(db: State<'_, Db>) -> Result<(), String> {
+pub fn enable_portable(db: State<'_, Db>, replace: Option<bool>) -> Result<(), String> {
     let dest_dir = crate::portable::portable_data_dir().ok_or("No portable path")?;
     std::fs::create_dir_all(&dest_dir).map_err(|e| e.to_string())?;
 
     let dest = dest_dir.join("karasu.db");
-    if !dest.exists() {
-        db.snapshot_to(&dest)?;
+    match (dest.exists(), replace) {
+        (false, _) => db.snapshot_to(&dest)?,
+        (true, Some(true)) => db.snapshot_to(&dest)?,
+        (true, Some(false)) => {
+            crate::logging::info(
+                "portable",
+                "keeping the database already beside the executable",
+            );
+        }
+        (true, None) => {
+            return Err(format!(
+                "A database already exists at {}. Say whether to keep it or replace it with the current one.",
+                dest.to_string_lossy()
+            ))
+        }
     }
     crate::anilist::auth::migrate_to_portable_file()?;
     crate::portable::create_marker()
 }
 
 /// Disables portable mode (removes the marker). Takes effect after a restart.
+///
+/// Deliberately leaves the portable folder alone: it is the user's data and
+/// this is a switch, not a delete. What that means — the app comes back on
+/// whatever is in AppData, which may be much older — is the pane's job to say,
+/// and `PortableStatus::other` is what it says it with.
 #[tauri::command]
 pub fn disable_portable() -> Result<(), String> {
     crate::portable::remove_marker()
@@ -561,7 +634,33 @@ pub fn mark_all_notifications_read(db: State<'_, Db>) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    use super::close_hides_window;
+    use super::{close_hides_window, describe_database};
+
+    /// The portable warning stands or falls on this: an existing file has to
+    /// be reported, and a folder that merely exists must not be mistaken for
+    /// one holding a database.
+    #[test]
+    fn only_a_real_file_is_described() {
+        let dir = std::env::temp_dir().join("karasu-portable-probe");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+
+        let db = dir.join("karasu.db");
+        assert!(describe_database(&db).is_none(), "nothing there yet");
+
+        std::fs::write(&db, b"SQLite format 3\0").unwrap();
+        let info = describe_database(&db).expect("the file is there now");
+        assert_eq!(info.bytes, 16);
+        assert!(info.path.ends_with("karasu.db"));
+
+        // A directory of that name is not a database, and `is_file` is what
+        // keeps `metadata` from reporting one.
+        let as_dir = dir.join("folder.db");
+        std::fs::create_dir_all(&as_dir).unwrap();
+        assert!(describe_database(&as_dir).is_none());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     /// The default has to follow the desktop, because the failure is not
     /// symmetric: hiding with no tray loses the window, while quitting with a

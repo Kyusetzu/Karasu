@@ -1269,6 +1269,12 @@ export const en = {
     portableOff: "Using the default application data folder.",
     portableEnable: "Enable portable mode",
     portableDisable: "Disable portable mode",
+    portableKeepExisting: "Enable and keep the data already there",
+    portableReplaceExisting: "Enable and take the current data along",
+    portableOtherOnEnable:
+      "A database from {{date}} is already at {{path}} — probably from the last time portable mode was on. Choose which copy to continue with; the other one is left where it is.",
+    portableOtherOnDisable:
+      "Turning this off goes back to the database at {{path}}, last changed {{date}}. Nothing in the portable folder is deleted, but anything newer there will not be in use.",
     portableLocation: "Data folder",
     portableRestart: "Restart Karasu for this to take effect.",
     content: "Content filter",

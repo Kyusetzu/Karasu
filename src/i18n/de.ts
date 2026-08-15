@@ -1280,6 +1280,12 @@ export const de: typeof en = {
     portableOff: "Standard-Ordner für Anwendungsdaten wird verwendet.",
     portableEnable: "Portablen Modus aktivieren",
     portableDisable: "Portablen Modus deaktivieren",
+    portableKeepExisting: "Aktivieren und vorhandene Daten behalten",
+    portableReplaceExisting: "Aktivieren und aktuelle Daten mitnehmen",
+    portableOtherOnEnable:
+      "Unter {{path}} liegt bereits eine Datenbank vom {{date}} — vermutlich vom letzten portablen Modus. Wähle, mit welcher Kopie es weitergeht; die andere bleibt unangetastet liegen.",
+    portableOtherOnDisable:
+      "Ohne portablen Modus gilt wieder die Datenbank unter {{path}}, zuletzt geändert am {{date}}. Im portablen Ordner wird nichts gelöscht, aber neuere Daten dort werden nicht mehr verwendet.",
     portableLocation: "Datenordner",
     portableRestart: "Starte Karasu neu, damit die Änderung wirkt.",
     content: "Inhaltsfilter",

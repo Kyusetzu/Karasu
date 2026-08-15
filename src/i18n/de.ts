@@ -790,6 +790,12 @@ export const de: typeof en = {
     later: "Später",
     progress: "Führe zusammen {{done}} / {{total}} …",
     done: "Zusammenführung abgeschlossen ({{count}} Einträge).",
+    doneQueued:
+      "{{count}} Einträge konnten noch nicht gesendet werden und warten in der Offline-Warteschlange. Bis sie ankommen, bleiben sie in deiner lokalen Liste.",
+    doneFailed:
+      "{{count}} Einträge konnten nicht zusammengeführt werden und blieben unverändert.",
+    blocked:
+      "Karasu konnte deine AniList-Liste gerade nicht lesen und kann daher nicht sagen, welche Seite neuer ist. Ohne sie würde die lokale Liste über deinen Account geschrieben. Versuch es erneut, sobald du wieder online bist.",
   },
   franchise: {
     title: "Franchise",

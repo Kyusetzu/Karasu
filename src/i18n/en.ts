@@ -788,6 +788,11 @@ export const en = {
     later: "Not now",
     progress: "Merging {{done}} / {{total}} …",
     done: "Merge complete ({{count}} entries).",
+    doneQueued:
+      "{{count}} entries could not be sent yet and are waiting in the offline queue. They are still in your local list until they land.",
+    doneFailed: "{{count}} entries could not be merged and were left in place.",
+    blocked:
+      "Karasu could not read your AniList list just now, so it cannot tell which side is newer. Merging without it would push the local list over your account. Try again once you are back online.",
   },
   franchise: {
     title: "Franchise",

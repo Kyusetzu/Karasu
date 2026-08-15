@@ -436,7 +436,28 @@ export function AniListListOptionsSection() {
                 `MediaListOptionsInput.customLists` is a full replacement with no
                 undo on AniList's side, so sending the object at all risks
                 deleting lists the user built by hand. See
-                `lib/anilistUserFields` and its test. */}
+                `lib/anilistUserFields` and its test.
+
+                Creating, renaming and reordering were scoped for 1.0 and
+                dropped after introspecting the input type, for three reasons
+                that are worth writing down so nobody re-derives them:
+
+                - `MediaListOptionsInput.theme` is **write-only**. It exists on
+                  the input and on no output type in the schema — a full-schema
+                  field scan for /theme/ returns nothing — so a send cannot read
+                  it back to preserve it, and if an absent field nulls, any save
+                  here silently resets the user's list theme on anilist.co.
+                - Three more full-replacement arrays ride in the same object:
+                  `sectionOrder`, `advancedScoring` and `customLists` itself.
+                  Getting `sectionOrder` wrong scrambles the *status* sections
+                  too, and it is also where display order actually lives — so
+                  "reorder" was never `customLists` in the first place.
+                - Whether an omitted field inside that input means "leave alone"
+                  or "null it" cannot be settled by introspection, and settling
+                  it by experiment means editing a real account's settings.
+
+                A feature whose safety rests on an untested assumption about a
+                field the app cannot read is not one to ship into a 1.0. */}
             <div className="rounded-lg border border-surface-800 bg-surface-950 p-3">
               <p className="text-xs font-medium text-ink-300">
                 {t("settings.alCustomLists")}

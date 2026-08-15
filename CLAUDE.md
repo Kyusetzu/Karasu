@@ -188,7 +188,7 @@ of AniList's own list fields, it costs nothing to carry, and the local list has
 stored it since schema v7. The rejected idea is tracking **purchases**, which
 would need price data the app has no source for.
 
-The schema is at **v13**. `library_match` (v8) holds the scanner's per-title
+The schema is at **v14**. `library_match` (v8) holds the scanner's per-title
 match confidence, which is what the local library's `exact` / `close` column
 reads. v9 adds `library_override` — the user's corrections, keyed on the parsed
 `(title, season)` with `season = -1` for a release name that carried none, and
@@ -228,6 +228,29 @@ numbered entry into cours, where S2E1 is episode 13. Signed, applied as
 keeps `source_episode` beside `episode` because `requeue_match` re-resolves
 from that object rather than from a fresh detection — shifting an
 already-shifted number would drift further on every correction.
+
+v14 gives the **local** list `started_at`, `completed_at` and `private` — three
+fields the app reads, charts and exports everywhere else, which the account-free
+profile answered with a hard-coded `false` and two nulls. The dates are the JSON
+text of AniList's own `FuzzyDate` rather than an ISO string, because every part
+is independently nullable and "2019" is a real answer. All three are `COALESCE`d
+on write, so an absent one means "leave it alone" exactly as an absent GraphQL
+variable does — which is what the editor relies on when it sends a date only
+once the user has touched it. Three `ALTER TABLE ADD COLUMN`s in one
+transaction, so they carry v7's `has_column` guard and the first column decides
+for all three. "Private" locally means left out of the MAL export; the JSON
+backup keeps the entry and carries the flag.
+
+**AniList has two name spaces for a custom list, and only one is writable.**
+`MediaListCollection.lists[].name` is a *display* value: it upper-cases the
+first character and invents section names that exist nowhere else (an account
+with split-by-format has a "Completed TV" group and no such list). The names
+that identify a list are the raw ones — the keys of each entry's `customLists`
+map, and what `SaveMediaListEntry(customLists:)` writes. Reading the display
+name and looking it up in the raw map is a bug with three faces, and it shipped
+for a while: the membership checkbox never ticked, the filter returned nothing,
+and saving sent a name the account did not have. `lib/customLists` is the one
+reader; do not go back to `g.name`.
 
 **The season is inert for matching unless the *title* carries it.**
 `matcher::variants` only re-spells a marker already in the string; it never

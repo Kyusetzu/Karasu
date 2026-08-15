@@ -43,6 +43,7 @@ import RandomPickModal from "@/components/overlays/RandomPickModal";
 import PresetModal from "@/components/overlays/PresetModal";
 import { loadPresets, savePresets, type Preset } from "@/lib/presets";
 import { formatLabel, MEDIA_FORMATS, ORIGINS, originLabel } from "@/lib/format";
+import { customListNames } from "@/lib/customLists";
 import { collectTags, tagsOf } from "@/lib/tags";
 import { searchHaystack } from "@/lib/search";
 import { Button } from "@/components/ui/button";
@@ -311,16 +312,11 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
     [byStatus],
   );
 
-  // The account's custom lists for this media type — the groups byStatus
-  // deliberately skips are exactly where their names live.
-  const customListNames = useMemo(
-    () =>
-      (data?.lists ?? [])
-        .filter((g) => g.isCustomList)
-        .map((g) => g.name)
-        .sort(),
-    [data],
-  );
+  // The account's custom lists for this media type. Read from the entries'
+  // own membership maps rather than from the custom groups' `name`, because
+  // those two are different name spaces and only one of them is writable —
+  // see `lib/customLists` for what reading the wrong one broke.
+  const listNames = useMemo(() => customListNames(data?.lists ?? []), [data]);
 
   // A tag that no longer exists anywhere must not keep the list empty.
   useEffect(() => {
@@ -330,8 +326,8 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
 
   // Same for a custom list deleted on anilist.co since the URL was minted.
   useEffect(() => {
-    if (data && listFilter && !customListNames.includes(listFilter)) setView({ list: "" });
-  }, [data, customListNames, listFilter, setView]);
+    if (data && listFilter && !listNames.includes(listFilter)) setView({ list: "" });
+  }, [data, listNames, listFilter, setView]);
 
   /**
    * Search and sort keys, derived once per list change instead of once per
@@ -727,13 +723,13 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
               options={ORIGINS.map((c) => ({ value: c, label: originLabel(c, t) }))}
             />
           )}
-          {customListNames.length > 0 && (
+          {listNames.length > 0 && (
             <FilterSelect
               label={t("list.listLabel")}
               value={listFilter}
               onChange={(v) => setView({ list: v })}
               placeholder={t("list.allLists")}
-              options={customListNames.map((n) => ({ value: n, label: n }))}
+              options={listNames.map((n) => ({ value: n, label: n }))}
             />
           )}
           {allTags.length > 0 && (
@@ -919,7 +915,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
             media={{ ...entry.media, type }}
             entry={entry}
             tagSuggestions={allTags}
-            customListNames={customListNames}
+            customListNames={listNames}
             onClose={() => setEditing(null)}
             onSave={(input) => {
               save.mutate(input);

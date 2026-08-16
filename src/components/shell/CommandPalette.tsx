@@ -161,6 +161,17 @@ export default function CommandPalette() {
   // behind cannot act on a keypress meant for a palette still on screen.
   if (!presence.mounted) return null;
 
+  // The keyboard cursor is state, and nothing tied it to the scroll box. The
+  // twelve navigation items are ~415px inside a `max-h-96` (384px) container,
+  // so on a bare Ctrl+K the last one is already below the fold: arrowing down
+  // moved an invisible highlight and Enter opened something never on screen.
+  //
+  // `block: "nearest"` so it only scrolls when it has to — jumping the list on
+  // every keypress is its own kind of disorienting.
+  const rowRef = (i: number) => (el: HTMLLIElement | null) => {
+    if (el && i === sel) el.scrollIntoView({ block: "nearest" });
+  };
+
   const go = (item: Item | undefined) => {
     if (!item) return;
     navigate(item.path);
@@ -204,6 +215,15 @@ export default function CommandPalette() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onInputKey}
+            // The cursor lives on the input while the highlight is on a row, so
+            // a screen reader had no way to know which row was current — the
+            // visual selection was the only signal.
+            role="combobox"
+            aria-expanded
+            aria-controls="palette-results"
+            aria-activedescendant={
+              results.length > 0 ? `palette-item-${sel}` : undefined
+            }
             placeholder={t("palette.placeholder")}
             className="h-12 flex-1 bg-transparent text-sm text-ink-100 placeholder:text-ink-600 focus:outline-none"
           />
@@ -212,7 +232,7 @@ export default function CommandPalette() {
           </kbd>
         </div>
 
-        <div className="max-h-96 overflow-y-auto py-1">
+        <div id="palette-results" role="listbox" className="max-h-96 overflow-y-auto py-1">
           {results.length === 0 ? (
             <p className="px-4 py-3 text-sm text-ink-600">{t("palette.empty")}</p>
           ) : (
@@ -225,8 +245,11 @@ export default function CommandPalette() {
                   {group.items.map((item) => {
                     const i = results.indexOf(item);
                     return (
-                      <li key={item.id}>
+                      <li key={item.id} ref={rowRef(i)}>
                         <button
+                          id={`palette-item-${i}`}
+                          role="option"
+                          aria-selected={i === sel}
                           onMouseEnter={() => setSel(i)}
                           onClick={() => go(item)}
                           className={cn(

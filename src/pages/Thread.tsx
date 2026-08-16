@@ -16,6 +16,7 @@ import BackButton from "@/components/shell/BackButton";
 import { Button } from "@/components/ui/button";
 import { UserLockup } from "@/components/ui/user-lockup";
 import { EmptyState, PerchRule, StruckQuery } from "@/components/EmptyState";
+import { isNotFound } from "@/lib/apiError";
 import { Shimmer } from "@/components/Skeleton";
 import { Markdown } from "@/components/social/Markdown";
 import { CommentTree } from "@/components/social/CommentTree";
@@ -128,6 +129,26 @@ export default function Thread() {
         <Shimmer className="h-6 w-2/3 rounded" />
         <Shimmer className="h-3 w-40 rounded" index={1} />
         <Shimmer className="h-24 w-full rounded-xl" index={2} />
+      </div>
+    );
+  }
+
+  // A rejection is only "does not exist" when it says so. Anything else — an
+  // expired token, a rate limit, no connection — is a failure to ask, and
+  // asserting the thread is gone because the network is down is a definite
+  // claim about someone else's data. See `lib/apiError`.
+  if (th.error && !isNotFound(th.error)) {
+    return (
+      <div className="px-8 pt-7">
+        <EmptyState
+          visual={<StruckQuery query={id} />}
+          title={t("common.error", { message: String(th.error) })}
+          actions={
+            <Button variant="outline" size="control" onClick={() => void th.refetch()}>
+              {t("common.retry")}
+            </Button>
+          }
+        />
       </div>
     );
   }

@@ -16,6 +16,8 @@ import BackButton from "@/components/shell/BackButton";
 import { Avatar } from "@/components/ui/user-lockup";
 import { SectionHeader } from "@/components/ui/section-header";
 import { EmptyState, StruckQuery } from "@/components/EmptyState";
+import { isNotFound } from "@/lib/apiError";
+import { Button } from "@/components/ui/button";
 import { Shimmer } from "@/components/Skeleton";
 import { Markdown } from "@/components/social/Markdown";
 import { MediaStrip } from "@/components/media/MediaStrip";
@@ -136,6 +138,26 @@ export default function Person({ kind }: { kind: Kind }) {
   // with it — so without this the not-found state below would claim the id does
   // not exist whenever the query simply never ran.
   if (q.fetchStatus === "idle" && !q.data && !q.error) return null;
+
+  // A rejection is only "does not exist" when it says so. Anything else — an
+  // expired token, a rate limit, no connection — is a failure to ask, and
+  // asserting the person is gone because the network is down is a definite
+  // claim about someone else's data. See `lib/apiError`.
+  if (q.error && !isNotFound(q.error)) {
+    return (
+      <div className="px-8 pt-7">
+        <EmptyState
+          visual={<StruckQuery query={id} />}
+          title={t("common.error", { message: String(q.error) })}
+          actions={
+            <Button variant="outline" size="control" onClick={() => void q.refetch()}>
+              {t("common.retry")}
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
 
   if (q.error || !q.data) {
     return (

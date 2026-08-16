@@ -97,6 +97,11 @@ short version, grouped by what it means for someone using the app.
   used to replay every episode that had aired in between.
 - A title hidden by the content filter can no longer surface in an on-hold
   reminder.
+- **"No such user" is no longer what a dropped connection looks like.** Profiles,
+  threads and character/staff pages rendered every failure as "this does not
+  exist" — a definite claim about someone else's account, made because the
+  network was down. A real not-found still reads as one; everything else says
+  what failed and offers a retry.
 - An offline edit is no longer deleted when AniList answers with something
   recoverable — an expired token, a rate limit, a server fault. Only a payload
   AniList rejects on its own terms is dropped, and when one is, it says so.

@@ -18,6 +18,7 @@ import { UserLists } from "@/components/social/UserLists";
 import { ActivityFeed } from "@/components/social/ActivityFeed";
 import { UserThreads } from "@/components/social/UserThreads";
 import { CoverOutline, EmptyState, PerchRule, StruckQuery } from "@/components/EmptyState";
+import { isNotFound } from "@/lib/apiError";
 import { Shimmer } from "@/components/Skeleton";
 import { SectionHeader } from "@/components/ui/section-header";
 import { Button } from "@/components/ui/button";
@@ -85,6 +86,26 @@ export default function UserProfile() {
   }
 
   if (profile.isLoading) return <ProfileSkeleton />;
+
+  // A rejection is only "does not exist" when it says so. Anything else — an
+  // expired token, a rate limit, no connection — is a failure to ask, and
+  // asserting the user is gone because the network is down is a definite
+  // claim about someone else's data. See `lib/apiError`.
+  if (profile.error && !isNotFound(profile.error)) {
+    return (
+      <div className="px-8 pt-7">
+        <EmptyState
+          visual={<StruckQuery query={name} />}
+          title={t("common.error", { message: String(profile.error) })}
+          actions={
+            <Button variant="outline" size="control" onClick={() => void profile.refetch()}>
+              {t("common.retry")}
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
 
   if (profile.error || !profile.data) {
     return (

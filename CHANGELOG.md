@@ -135,6 +135,13 @@ short version, grouped by what it means for someone using the app.
   announces the highlighted row to a screen reader now.
 - On Linux, mpv's IPC socket defaults to your own runtime directory rather than
   a `/tmp` path shared with every other account on the machine.
+- The detail page's play button appears as soon as a library scan finds the next
+  episode, instead of waiting for something else to redraw the page.
+- An episode that has just aired no longer shows an empty pair of brackets where
+  its countdown was.
+- The franchise graph says when it stopped expanding, instead of only when it ran
+  out of room for nodes.
+- The match picker shows "TV Short" rather than `TV_SHORT`.
 - An offline edit is no longer deleted when AniList answers with something
   recoverable — an expired token, a rate limit, a server fault. Only a payload
   AniList rejects on its own terms is dropped, and when one is, it says so.

@@ -83,7 +83,12 @@ export default function AnimeDetail() {
   const { t, i18n } = useTranslation();
   const { id } = useParams();
   const mediaId = Number(id);
-  const hasNext = useLibrary((s) => s.hasNext);
+  // Subscribe to the *data*, not to `hasNext` — the same fix `ListRow` already
+  // carries with the same comment. A selector returning the store's function
+  // has an identity that never changes, so this page never re-rendered after a
+  // library scan and the play button stayed missing until something else
+  // happened to re-render it.
+  const episodes = useLibrary((s) => s.episodes[mediaId]);
   const play = useLibrary((s) => s.play);
   const level = useContentFilter((s) => s.level);
   const [revealed, setRevealed] = useState(false);
@@ -276,7 +281,12 @@ export default function AnimeDetail() {
                     minute: "2-digit",
                   }),
                 })}
-                {untilNext && (
+                {/* `> 0`, not truthiness. `countdown` returns "" once the time
+                    has passed, so a negative value — which is every moment
+                    between an episode airing and AniList moving to the next —
+                    rendered an empty pair of brackets; and at exactly zero,
+                    `0 && …` renders the literal 0. */}
+                {untilNext > 0 && (
                   <span className="ml-2 text-ink-500">
                     ({countdown(untilNext, t)})
                   </span>
@@ -284,7 +294,7 @@ export default function AnimeDetail() {
               </p>
             )}
             {data.type === "ANIME" &&
-              hasNext(data.id, data.mediaListEntry?.progress ?? 0) && (
+              episodes?.some((e) => e > (data.mediaListEntry?.progress ?? 0)) && (
                 <Button
                   className="mt-3"
                   onClick={() => play(data.id)}

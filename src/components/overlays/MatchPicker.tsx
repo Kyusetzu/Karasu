@@ -6,6 +6,7 @@ import { searchMedia, sequelsOf } from "@/api/queries";
 import { displayTitle, type MediaTitle } from "@/api/types";
 import { useContentFilter } from "@/stores/contentFilter";
 import { isBlocked } from "@/lib/contentFilter";
+import { formatLabel } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { useDialogFocus } from "@/hooks/useDialogFocus";
 import { Input } from "@/components/ui/input";
@@ -327,7 +328,10 @@ function ResultRow({
         </span>
         <span className="mt-0.5 block text-2xs text-ink-600">
           {[
-            media.format,
+            // `formatLabel`, not the raw enum. Its whole purpose is that no
+            // AniList enum reaches the screen, and this row printed `TV_SHORT`
+            // and `ONE_SHOT` verbatim — untranslated on top of unformatted.
+            formatLabel(media.format, t),
             media.seasonYear,
             media.episodes ? t("library.epCount", { n: media.episodes }) : null,
           ]

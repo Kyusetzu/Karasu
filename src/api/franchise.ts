@@ -145,7 +145,13 @@ export async function loadFranchise(
     );
 
   for (let depth = 0; depth <= MAX_DEPTH && frontier.length; depth++) {
-    const ids = frontier.filter((id) => !visited.has(id)).slice(0, 50);
+    // 50 is `Page.media(id_in:)`'s own limit, so the cap is not negotiable —
+    // but dropping the remainder silently was. A frontier wider than one page
+    // left reachable nodes unexpanded while the graph rendered as though it
+    // were complete, which is the one thing a relations view must not do.
+    const pending = frontier.filter((id) => !visited.has(id));
+    if (pending.length > 50) truncated = true;
+    const ids = pending.slice(0, 50);
     if (ids.length === 0) break;
     ids.forEach((id) => visited.add(id));
 
@@ -179,7 +185,11 @@ export async function loadFranchise(
         if (
           depth < MAX_DEPTH &&
           TRAVERSE.has(edge.relationType) &&
-          !visited.has(node.id)
+          !visited.has(node.id) &&
+          // Deduped: a hub — a long-running parent story, say — is reachable
+          // from most of its own frontier, and pushing it once per parent ate
+          // slots out of the 50 above that other nodes then never got.
+          !next.includes(node.id)
         ) {
           next.push(node.id);
         }

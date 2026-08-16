@@ -148,6 +148,12 @@ short version, grouped by what it means for someone using the app.
   while fully transparent.
 - The review composer's body label no longer points at a field that isn't there
   in preview mode.
+
+
+### Added
+
+- Arrow keys move a cursor across the Seasonal and Search grids, and Enter opens
+  the highlighted title — the same movement the list view has had.
 - An offline edit is no longer deleted when AniList answers with something
   recoverable — an expired token, a rate limit, a server fault. Only a payload
   AniList rejects on its own terms is dropped, and when one is, it says so.

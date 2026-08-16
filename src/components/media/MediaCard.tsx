@@ -18,7 +18,14 @@ import { PresenceIf } from "@/components/ui/presence";
  * Card for discovery grids (search, season): quick add and full editing
  * (status/progress/score) straight from the results.
  */
-export default function MediaCard({ media }: { media: MediaWithListStatus }) {
+export default function MediaCard({
+  media,
+  focused = false,
+}: {
+  media: MediaWithListStatus;
+  /** The roving keyboard cursor is on this card — see `useGridRoving`. */
+  focused?: boolean;
+}) {
   const { t } = useTranslation();
   const viewer = useAuth((s) => s.viewer);
   const mode = useAuth((s) => s.mode);
@@ -50,6 +57,10 @@ export default function MediaCard({ media }: { media: MediaWithListStatus }) {
   return (
     <CoverCell
       to={`/media/${media.id}`}
+      // The roving cursor is not real DOM focus — the card that has it may be
+      // any of hundreds — so the ring is drawn rather than inherited from
+      // `:focus-visible`. Same reasoning as the list view's.
+      className={focused ? "rounded-[.625rem] ring-2 ring-accent-500" : undefined}
       cover={media.coverImage.large}
       score={media.averageScore != null ? `${media.averageScore}%` : null}
       data-media-id={media.id}

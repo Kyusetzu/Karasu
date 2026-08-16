@@ -1,4 +1,7 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { useNavigate } from "react-router";
+import { useColumnCount } from "@/hooks/useColumnCount";
+import { useGridRoving } from "@/hooks/useGridRoving";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -35,6 +38,22 @@ export default function Seasonal() {
   });
 
   const results = (data?.media ?? []).filter((m) => !isBlocked(m, level));
+
+  // Arrow keys over the wall of cards, the same movement and the same
+  // ownership rule the list view uses. `useColumnCount` reads the browser's
+  // resolved `grid-template-columns` rather than recomputing the CSS here,
+  // which is what keeps it right across a breakpoint and a cover-size change.
+  const gridRef = useRef<HTMLDivElement>(null);
+  const columns = useColumnCount(gridRef, results.length);
+  const navigate = useNavigate();
+  const { focus } = useGridRoving({
+    count: results.length,
+    columns,
+    onOpen: (i) => {
+      const m = results[i];
+      if (m) navigate(`/media/${m.id}`);
+    },
+  });
 
   return (
     <div className="flex h-full flex-col">
@@ -77,9 +96,9 @@ export default function Seasonal() {
           <EmptyState visual={<TickMarks count={4} />} title={t("seasonal.empty")} />
         )}
         {results.length > 0 && (
-          <div className="media-grid gap-x-4 gap-y-6">
-            {results.map((m) => (
-              <MediaCard key={m.id} media={m} />
+          <div ref={gridRef} className="media-grid gap-x-4 gap-y-6">
+            {results.map((m, i) => (
+              <MediaCard key={m.id} media={m} focused={i === focus} />
             ))}
           </div>
         )}

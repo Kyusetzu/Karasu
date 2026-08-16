@@ -280,7 +280,7 @@ export default function SyncPanel({
                           headroom runs low, and a 429 the server asked us to
                           wait out. Saying which is the difference between "the
                           app is pacing itself" and "something went wrong". */}
-                      {rate.throttleKind === "retry-after"
+                      {rate.throttleKind === "retryAfter"
                         ? t("syncPanel.throttleLimited", {
                             s: seconds(rate.throttledForMs),
                           })

@@ -157,9 +157,20 @@ export interface RateSnapshot {
    * pre-429 value while the client waits out a two-minute `Retry-After`.
    */
   throttledForMs: number | null;
-  /** `"preflight"` (self-imposed breather) or `"retry-after"` (a real 429). */
-  throttleKind: string | null;
+  /**
+   * Why it is parked, spelled **exactly** as the Rust side emits it.
+   *
+   * A union rather than `string`, because it was `string` and the panel
+   * compared against `"retry-after"` while `client.rs` emits `"retryAfter"` —
+   * so for a release every genuine 429 rendered as the app pacing itself, which
+   * is the one distinction this field exists to draw. A typo is now a type
+   * error instead of a silent mislabel.
+   */
+  throttleKind: ThrottleKind | null;
 }
+
+/** `preflight` = a self-imposed breather; `retryAfter` = AniList said no. */
+export type ThrottleKind = "preflight" | "retryAfter";
 
 /** One unsent edit, described rather than carried — the payload stays in Rust. */
 export interface QueuedEdit {

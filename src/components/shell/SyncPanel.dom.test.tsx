@@ -114,17 +114,35 @@ describe("SyncPanel", () => {
     );
   });
 
+  /**
+   * This test used to assert on `"retry-after"` — a string `client.rs` has
+   * never emitted. It passed, and the app was wrong: every real 429 rendered as
+   * the app pacing itself, which is the one distinction the field exists to
+   * draw. Both branches are pinned now, and `ThrottleKind` makes a third
+   * spelling a type error.
+   */
   it("names a 429 and a self-imposed pause differently", async () => {
     status.mockResolvedValue({
       ...IDLE,
-      rate: { ...IDLE.rate, throttledForMs: 117_400, throttleKind: "retry-after" },
+      rate: { ...IDLE.rate, throttledForMs: 117_400, throttleKind: "retryAfter" },
     });
-    renderWithProviders(panel());
+    const { unmount } = renderWithProviders(panel());
     fireEvent.click(screen.getByRole("button", { name: "Show sync details" }));
     // Rounded up: a countdown that reaches 0 while the client is still parked
     // is worse than one second of over-reporting.
     await waitFor(() =>
       expect(screen.getByText('syncPanel.throttleLimited:{"s":118}')).toBeTruthy(),
+    );
+    unmount();
+
+    status.mockResolvedValue({
+      ...IDLE,
+      rate: { ...IDLE.rate, throttledForMs: 400, throttleKind: "preflight" },
+    });
+    renderWithProviders(panel());
+    fireEvent.click(screen.getByRole("button", { name: "Show sync details" }));
+    await waitFor(() =>
+      expect(screen.getByText('syncPanel.throttlePacing:{"s":1}')).toBeTruthy(),
     );
   });
 

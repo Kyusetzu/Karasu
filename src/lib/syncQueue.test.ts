@@ -50,7 +50,7 @@ describe("syncPhase", () => {
         status({
           draining: true,
           queued: [edit()],
-          rate: { ...quiet, throttledForMs: 118_000, throttleKind: "retry-after" },
+          rate: { ...quiet, throttledForMs: 118_000, throttleKind: "retryAfter" },
         }),
       ),
     ).toBe("draining");

@@ -80,8 +80,48 @@ pub struct AniList {
     rate: Mutex<RateState>,
 }
 
+/// The budget assumed before any header has been seen.
+///
+/// A guess, not a measurement — `observed` is what separates the two. Worth
+/// knowing when reading the panel: a cold client's *first* response reports
+/// `x-ratelimit-remaining: 28` of a limit of 30, measured twice against the live
+/// API 70 s apart. AniList never reports 29 or 30, so "28 while idle" is its
+/// accounting rather than two requests Karasu spent.
+const SEED: u32 = 30;
+
+/// Requests held in reserve before the client starts pacing itself.
+///
+/// Not 1. At a threshold of one the guard engages only when the next request is
+/// already the last one available, which is far too late to avoid the 429 it
+/// exists to avoid.
+const RESERVE: u32 = 2;
+
+/// AniList's accounting window.
+///
+/// Load-bearing, because `remaining` is otherwise a number that only ever falls:
+/// it is assigned from a response header and from nothing else. One response
+/// reporting 0 used to pin the limiter at 0 for the life of the process, and
+/// every later request then paid the pre-flight nap for nothing — while the only
+/// way to learn a better number was to send a request, which napped first. That
+/// was the whole of the "everything is slow" bug.
+const WINDOW: Duration = Duration::from_secs(60);
+
+/// One pacing slice. Short on purpose: the point is to re-check, not to sleep.
+/// The window rolls continuously, so the budget can return at any moment.
+const SLICE: Duration = Duration::from_millis(400);
+
+/// The longest one caller paces before sending regardless.
+///
+/// Sending into a 429 costs a `Retry-After`; stalling costs the whole screen,
+/// with nothing on it to explain why. The 429 path is a backstop and a better
+/// one than an app that never answers, so the self-imposed wait is bounded and
+/// the server's own instruction is not.
+const MAX_PACE: Duration = Duration::from_secs(5);
+
 struct RateState {
-    /// Remaining requests according to the last X-RateLimit-Remaining header.
+    /// The working count: assigned from `x-ratelimit-remaining`, decremented by
+    /// `claim` for requests in flight, and reset by `headroom` when the window
+    /// has rolled.
     remaining: u32,
     /// `x-ratelimit-limit`. AniList sends it — verified against the live API —
     /// and it was read by nothing until the sync panel needed a denominator.
@@ -105,7 +145,19 @@ struct RateState {
     ///   `Retry-After` would shorten the reported wait to 5s.
     sleeping_until: Option<Instant>,
     /// `"preflight" | "retryAfter"`, replaced only together with the deadline.
+    ///
+    /// **These exact strings are the contract with the panel.** `SyncPanel`
+    /// branches on them to tell "the app is pacing itself" from "AniList refused
+    /// us", which is the whole reason the field exists — and it compared against
+    /// `"retry-after"` for a release, so every real 429 rendered as self-pacing.
     sleeping_kind: Option<&'static str>,
+    /// When the limiter last reset its own count because `WINDOW` had elapsed.
+    ///
+    /// Deliberately *not* `observed`. That one means a header landed and is what
+    /// the panel reports the age of; folding a local reset into it would render
+    /// a guess as a fresh measurement, which is the one thing the headroom
+    /// display must not do.
+    reset_at: Option<Instant>,
 }
 
 impl RateState {
@@ -124,6 +176,41 @@ impl RateState {
         self.sleeping_until
             .filter(|t| *t > now)
             .map(|t| t.duration_since(now))
+    }
+
+    /// The last moment `remaining` meant anything — a header landing, or a local
+    /// reset once the window rolled.
+    fn counted_at(&self) -> Option<Instant> {
+        match (self.observed, self.reset_at) {
+            (Some(a), Some(b)) => Some(a.max(b)),
+            (a, b) => a.or(b),
+        }
+    }
+
+    /// What is available *now*, healing a count that belongs to a window which
+    /// has since rolled.
+    ///
+    /// `&mut` because it repairs rather than merely reports: a stale count is
+    /// not evidence of a low budget, it is the absence of evidence, and the old
+    /// code treated the two as the same thing.
+    fn headroom(&mut self, now: Instant) -> u32 {
+        if self.counted_at().is_none_or(|t| now.duration_since(t) >= WINDOW) {
+            self.remaining = self.limit.unwrap_or(SEED);
+            self.reset_at = Some(now);
+        }
+        self.remaining
+    }
+
+    /// Books a request against the budget before it goes out.
+    ///
+    /// Without this the limiter is blind to its own in-flight work: `remaining`
+    /// was only ever assigned from a response header, so a burst of concurrent
+    /// callers all read the same pre-burst value, all cleared the guard, and all
+    /// arrived together — which is how a 429 was earned while the panel showed
+    /// comfortable headroom. The header stays authoritative when it lands; this
+    /// only covers the gap between sending and hearing back.
+    fn claim(&mut self) {
+        self.remaining = self.remaining.saturating_sub(1);
     }
 }
 
@@ -158,11 +245,12 @@ impl AniList {
             // reports, but it is a seed rather than an observation — see
             // `observed`.
             rate: Mutex::new(RateState {
-                remaining: 30,
+                remaining: SEED,
                 limit: None,
                 observed: None,
                 sleeping_until: None,
                 sleeping_kind: None,
+                reset_at: None,
             }),
         }
     }
@@ -196,28 +284,40 @@ impl AniList {
         query: &str,
         variables: Value,
     ) -> Result<Value, ApiError> {
-        // Keep a buffer: when almost nothing is left, take a short breather
-        // instead of running into the 429.
+        // Pace into the budget rather than run into the 429, then book the
+        // request before sending it.
         //
-        // The decision and the `park` are one critical section on purpose. This
-        // used to drop the lock and *then* sleep, which left a window where the
-        // client was about to nap and any reader saw it as clear.
+        // Each decision and its `park` are one critical section on purpose: the
+        // original dropped the lock and *then* slept, leaving a window in which
+        // the client was about to nap and every reader saw it as clear.
         //
-        // Note what this deliberately does *not* do, because the panel makes it
-        // visible and it will look like a panel bug: it neither decrements
-        // `remaining` nor re-checks after waking, so after a breather the next
-        // request naps again. That is existing behaviour, surfaced rather than
-        // caused, and changing it belongs in its own commit.
-        let nap = {
-            let mut rate = self.rate.lock().await;
-            if rate.remaining <= 1 {
-                rate.park(Duration::from_secs(5), "preflight");
-                Some(Duration::from_secs(5))
-            } else {
-                None
+        // The loop is the fix for the bug this used to have. It slept a flat 5 s
+        // and then sent unconditionally, decrementing nothing and re-checking
+        // nothing — so once any response reported a low count, every request for
+        // the rest of the session paid 5 s up front, and the only way to learn a
+        // better number was to send a request, which napped first. Re-checking in
+        // short slices means the wait ends the moment the budget returns; the
+        // `claim` means a burst can see itself; and `headroom` heals a count left
+        // over from a window that has since rolled.
+        let started = Instant::now();
+        loop {
+            let nap = {
+                let mut rate = self.rate.lock().await;
+                let now = Instant::now();
+                if rate.headroom(now) > RESERVE {
+                    rate.claim();
+                    None
+                } else {
+                    rate.park(SLICE, "preflight");
+                    Some(SLICE)
+                }
+            };
+            let Some(d) = nap else { break };
+            if started.elapsed() >= MAX_PACE {
+                // Bounded, and the request goes out anyway. See `MAX_PACE`.
+                self.rate.lock().await.claim();
+                break;
             }
-        };
-        if let Some(d) = nap {
             tokio::time::sleep(d).await;
         }
 
@@ -251,8 +351,13 @@ impl AniList {
             if remaining.is_some() || limit.is_some() {
                 let mut rate = self.rate.lock().await;
                 if let Some(rem) = remaining {
+                    // Authoritative: it overwrites whatever `claim` guessed, and
+                    // it retires the local reset — otherwise `counted_at` would
+                    // keep answering with a stale repair that is now older than
+                    // the measurement standing beside it.
                     rate.remaining = rem;
                     rate.observed = Some(Instant::now());
+                    rate.reset_at = None;
                 }
                 if let Some(l) = limit {
                     rate.limit = Some(l);
@@ -325,11 +430,12 @@ mod tests {
 
     fn fresh() -> RateState {
         RateState {
-            remaining: 30,
+            remaining: SEED,
             limit: None,
             observed: None,
             sleeping_until: None,
             sleeping_kind: None,
+            reset_at: None,
         }
     }
 
@@ -380,6 +486,88 @@ mod tests {
         assert_eq!(snap.limit, None);
         assert_eq!(snap.observed_ago_ms, None);
         assert_eq!(snap.throttled_for_ms, None);
+    }
+
+    /// **The sticky-nap bug.** `remaining` is only ever assigned from a response
+    /// header, so one response reporting 0 used to pin the limiter at 0 for the
+    /// life of the process — every later request paying a flat 5 s for nothing,
+    /// while the only way to learn a better number was to send a request, which
+    /// napped first. A count belonging to a window that has since rolled is the
+    /// absence of evidence, not evidence of a low budget.
+    #[test]
+    fn a_count_from_a_rolled_window_stops_counting() {
+        let now = Instant::now();
+        let mut r = fresh();
+        r.remaining = 0;
+        r.observed = Some(now);
+        r.limit = Some(30);
+
+        // Inside the window the reading stands, and pacing is correct.
+        assert_eq!(r.headroom(now + Duration::from_secs(5)), 0);
+        // Past it the window has rolled and the budget is back.
+        assert_eq!(r.headroom(now + WINDOW + Duration::from_secs(1)), 30);
+    }
+
+    /// A limiter that never sees its own in-flight work lets a burst through:
+    /// every caller reads the same pre-burst value, every one clears the guard,
+    /// and they all arrive together — earning a 429 while the panel showed
+    /// comfortable headroom.
+    #[test]
+    fn a_claim_is_visible_to_the_next_caller() {
+        let now = Instant::now();
+        let mut r = fresh();
+        let before = r.headroom(now);
+        r.claim();
+        assert_eq!(r.headroom(now), before - 1, "the next caller sees it");
+    }
+
+    /// Saturating, because the count is `u32` and a burst can outrun the budget.
+    /// An underflow here would wrap to ~4 billion and disable pacing entirely.
+    #[test]
+    fn claiming_past_empty_stops_at_zero() {
+        let mut r = fresh();
+        r.remaining = 1;
+        r.claim();
+        r.claim();
+        r.claim();
+        assert_eq!(r.remaining, 0);
+    }
+
+    /// A local repair is not a measurement. The panel gates its headroom display
+    /// on `observed` precisely to keep the two apart, so `headroom` healing a
+    /// stale count must not make the seed look like something AniList said.
+    #[tokio::test]
+    async fn healing_the_count_does_not_fake_an_observation() {
+        let now = Instant::now();
+        let mut r = fresh();
+        r.headroom(now);
+        assert!(r.reset_at.is_some(), "it did repair");
+        assert!(r.observed.is_none(), "but nothing was measured");
+    }
+
+    /// The exact strings `SyncPanel` branches on. It compared against
+    /// `"retry-after"` for a release while this side emitted `"retryAfter"`, so
+    /// every genuine 429 rendered as the app pacing itself — the one distinction
+    /// the field exists to draw.
+    #[test]
+    fn the_throttle_kinds_are_the_strings_the_panel_compares() {
+        let now = Instant::now();
+        let mut r = fresh();
+        r.park(SLICE, "preflight");
+        assert_eq!(r.throttled_for(now).and(r.sleeping_kind), Some("preflight"));
+
+        let mut r = fresh();
+        r.park(Duration::from_secs(60), "retryAfter");
+        assert_eq!(r.throttled_for(now).and(r.sleeping_kind), Some("retryAfter"));
+    }
+
+    /// The reserve has to leave room to act on. At a threshold of one the guard
+    /// engages only when the next request is already the last one available.
+    #[test]
+    fn the_reserve_is_more_than_the_last_request() {
+        assert!(RESERVE > 1, "a threshold of 1 is too late to be a guard");
+        assert!(MAX_PACE < WINDOW, "a caller must not wait out a whole window");
+        assert!(SLICE < MAX_PACE, "the point of a slice is to re-check");
     }
 
     /// The bug this file's classification was written for: every one of these

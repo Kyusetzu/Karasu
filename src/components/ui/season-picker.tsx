@@ -77,7 +77,13 @@ export default function SeasonPicker({
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full z-10 mt-1.5 w-64 animate-pop-in rounded-xl border border-hair bg-surface-900 p-3 shadow-xl panel-wash">
+        // `data-overlay` like every other popover — the Bell, the context menu,
+        // the filter selects. Without it the screen-level key handlers stayed
+        // live while this was open, so `/` and Ctrl+1/2/3 fired underneath it.
+        <div
+          data-overlay
+          className="absolute left-0 top-full z-10 mt-1.5 w-64 animate-pop-in rounded-xl border border-hair bg-surface-900 p-3 shadow-xl panel-wash"
+        >
           <div className="flex gap-1">
             {years.map((y) => (
               <button

@@ -57,6 +57,15 @@ export default function CommandPalette() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        // Not while another overlay is up. Ctrl+K over the open entry editor
+        // opened the palette *behind* it — both scrims are `fixed inset-0
+        // z-50` in one stacking context — and picking a result navigated,
+        // remounting `<main key={pathname}>` and discarding every unsaved
+        // field with no prompt.
+        //
+        // Conditional on `!open`, because the palette carries `data-overlay`
+        // itself: an unconditional bail would break Ctrl+K-to-close.
+        if (!open && document.querySelector("[data-overlay]")) return;
         e.preventDefault();
         setOpen((o) => !o);
       }
@@ -69,7 +78,11 @@ export default function CommandPalette() {
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("open-command-palette", onOpen);
     };
-  }, []);
+    // `open` is read, not just written, since the overlay guard above has to
+    // know whether the overlay in the DOM is this one. The toggle itself still
+    // uses the functional form; this dependency is only about that read, and
+    // re-registering two listeners on a toggle costs nothing.
+  }, [open]);
 
   useEffect(() => {
     if (open) {

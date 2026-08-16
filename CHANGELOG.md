@@ -66,6 +66,16 @@ short version, grouped by what it means for someone using the app.
   planned real score writes from a stale snapshot.
 - A daily backup that was truncated (a full disk, a process killed mid-write) is
   checked and rewritten instead of occupying a retained slot unusably.
+- **Clicking the tag box no longer deletes a tag.** A `<label>` around the tag
+  editor made the first chip's remove button its target, so clicking the caption,
+  the box's padding, or another chip's text removed the first tag silently.
+- **The list view's keyboard shortcuts no longer fire against the wrong entry.**
+  After one arrow press, Enter/Space/e/c/s acted on the highlighted row whatever
+  else had focus — Space on a focused button wrote a `+1` to your real list for a
+  title you weren't looking at, and cancelled the button you actually pressed.
+- Ctrl+K no longer opens the command palette behind an open editor and discards
+  what you were typing; the season picker no longer lets `/` and Ctrl+1/2/3 fire
+  underneath it.
 - An offline edit is no longer deleted when AniList answers with something
   recoverable — an expired token, a rate limit, a server fault. Only a payload
   AniList rejects on its own terms is dropped, and when one is, it says so.

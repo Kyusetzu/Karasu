@@ -220,9 +220,12 @@ describe("mergeListActivity", () => {
 });
 
 describe("LOCAL_OVERRIDES", () => {
-  it("names exactly the three settings Karasu ignores", () => {
+  it("names exactly the three settings whose effect lands elsewhere", () => {
     // scoreFormat left this list on purpose: since the scoreRaw change the
     // whole app follows the account's format, so the setting simply works.
+    // `airingNotifications` is here for the opposite reason to the other two —
+    // Karasu reads it rather than ignoring it, and the note cross-references
+    // the Detection pane it is coupled to.
     expect(Object.keys(LOCAL_OVERRIDES).sort()).toEqual([
       "airingNotifications",
       "displayAdultContent",

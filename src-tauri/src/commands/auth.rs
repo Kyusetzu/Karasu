@@ -24,6 +24,15 @@ pub const BUILTIN_ANILIST_CLIENT_ID: &str = "46231";
 /// account-wide flag would be wrong. The names are populated even when the
 /// flag is off (verified on a real account), so `advancedScoringEnabled` is
 /// the signal and a non-empty name list is not.
+///
+/// `options` rides along for the airing watcher, which needs to know whether
+/// the account will get AniList's *own* AIRING notification before deciding to
+/// write a bell row of its own. Two switches govern that on AniList's side and
+/// they are separate settings on separate pages, so both are carried — see
+/// `alerts::airing::anilist_covers_airing` for why it takes both. One scalar
+/// and twenty small pairs on a query that already runs at connect and on
+/// `refresh_viewer`, so it costs no extra request, and this is the only
+/// token-bearing path that runs with nobody waiting on it.
 const VIEWER_QUERY: &str = "
 query {
   Viewer {
@@ -35,6 +44,10 @@ query {
       scoreFormat
       animeList { advancedScoring advancedScoringEnabled }
       mangaList { advancedScoring advancedScoringEnabled }
+    }
+    options {
+      airingNotifications
+      notificationOptions { type enabled }
     }
   }
 }";

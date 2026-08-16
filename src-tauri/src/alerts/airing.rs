@@ -57,13 +57,56 @@ fn now_secs() -> i64 {
         .unwrap_or(0)
 }
 
-/// Media IDs the user is actively watching (CURRENT/REPEATING), from cache.
-fn watching_ids(db: &Db) -> Vec<i64> {
-    let Some(user_id) = db
-        .kv_get("anilist_viewer")
+/// The cached viewer blob, parsed. Both readers below want it, so the pass
+/// parses it once rather than once each.
+fn cached_viewer(db: &Db) -> Option<Value> {
+    db.kv_get("anilist_viewer")
         .and_then(|s| serde_json::from_str::<Value>(&s).ok())
-        .and_then(|v| v.get("id").and_then(|i| i.as_i64()))
+}
+
+/// Whether AniList will raise its own AIRING notification for this account.
+///
+/// Two switches govern that, and they are separate settings on separate AniList
+/// pages: the account-wide `options.airingNotifications`, and the per-type
+/// `notificationOptions[AIRING].enabled` from the twenty-checkbox grid. Which
+/// of the two the server consults when it *creates* the notification is
+/// undocumented, and cannot be settled by introspection or without flipping a
+/// real account's settings and waiting for an episode. So this asks for both.
+///
+/// The asymmetry is the whole design. Being wrong towards "AniList has it"
+/// costs the user a notice they will never see; being wrong the other way costs
+/// a duplicate bell row, which is precisely the behaviour this replaces. So
+/// anything unknown reads as `false`: no `options` block (a viewer blob cached
+/// before it was queried, or no account at all), either switch off, either
+/// switch absent.
+///
+/// The one thing read as on without being said so is an *entry* missing from
+/// `notificationOptions`, or the array being absent entirely — that is
+/// AniList's own default for a type it has never stored, and the same default
+/// `mergeNotificationOptions` applies on the frontend.
+fn anilist_covers_airing(viewer: Option<&Value>) -> bool {
+    let Some(options) = viewer
+        .and_then(|v| v.get("options"))
+        .filter(|v| !v.is_null())
     else {
+        return false;
+    };
+    if options.get("airingNotifications").and_then(Value::as_bool) != Some(true) {
+        return false;
+    }
+    match options.get("notificationOptions").and_then(Value::as_array) {
+        None => true,
+        Some(list) => list
+            .iter()
+            .find(|o| o.get("type").and_then(Value::as_str) == Some("AIRING"))
+            .and_then(|o| o.get("enabled").and_then(Value::as_bool))
+            .unwrap_or(true),
+    }
+}
+
+/// Media IDs the user is actively watching (CURRENT/REPEATING), from cache.
+fn watching_ids(db: &Db, viewer: Option<&Value>) -> Vec<i64> {
+    let Some(user_id) = viewer.and_then(|v| v.get("id").and_then(|i| i.as_i64())) else {
         return Vec::new();
     };
     let Some(lists) = db
@@ -111,10 +154,14 @@ async fn check(app: &AppHandle) {
     if db.kv_get("airing_notify").as_deref() == Some("0") {
         return;
     }
-    let ids = watching_ids(&db);
+    let viewer = cached_viewer(&db);
+    let ids = watching_ids(&db, viewer.as_ref());
     if ids.is_empty() {
         return;
     }
+    // Decided once per pass, not per episode: it is an account setting, and the
+    // blob cannot change mid-loop.
+    let anilist_has_it = anilist_covers_airing(viewer.as_ref());
 
     let now = now_secs();
     // First run: only look back a little so we don't spam old episodes.
@@ -169,15 +216,26 @@ async fn check(app: &AppHandle) {
             }
         }
         let title = pick_title(sched.pointer("/media/title"));
-        crate::alerts::notify::notify(
-            app,
-            "airing",
-            crate::i18n::Msg::AiringTitle,
-            crate::i18n::Msg::AiringBody { title: &title, episode },
-            // `media_id` above falls back to 0, and a row carrying that would
-            // mint a `/media/0` route the bell would happily open.
-            (media_id > 0).then_some(media_id),
-        );
+        let head = crate::i18n::Msg::AiringTitle;
+        let body = crate::i18n::Msg::AiringBody { title: &title, episode };
+        if anilist_has_it {
+            // AniList's own row is strictly the better of the two — it links to
+            // the entry and names the episode — so writing a second one beside
+            // it in the same panel is a duplicate. The desktop toast is the
+            // half AniList cannot do, and is why this pass exists at all.
+            crate::alerts::notify::notify_toast(app, "airing", head, body);
+        } else {
+            crate::alerts::notify::notify(
+                app,
+                "airing",
+                head,
+                body,
+                // `media_id` above falls back to 0, and a row carrying that
+                // would mint a `/media/0` route the bell would happily open.
+                (media_id > 0).then_some(media_id),
+            );
+        }
+        // Either way the episode is done: the toast fired.
         let _ = db.kv_set(&key, &now.to_string());
     }
 
@@ -213,5 +271,80 @@ mod tests {
             AIRING_QUERY.contains(&format!("perPage: {PAGE_SIZE}")),
             "AIRING_QUERY no longer asks for {PAGE_SIZE} results per page",
         );
+    }
+
+    /// Both switches on, spelled out. The only state in which Karasu leaves the
+    /// bell row to AniList.
+    #[test]
+    fn both_switches_on_means_anilist_covers_it() {
+        let viewer = json!({
+            "id": 6421433,
+            "options": {
+                "airingNotifications": true,
+                "notificationOptions": [
+                    { "type": "FOLLOWING", "enabled": true },
+                    { "type": "AIRING", "enabled": true },
+                ],
+            },
+        });
+        assert!(anilist_covers_airing(Some(&viewer)));
+    }
+
+    /// An entry AniList has never stored for this account is on, which is
+    /// AniList's own default and the one `mergeNotificationOptions` applies.
+    #[test]
+    fn an_unlisted_airing_entry_reads_as_on() {
+        let listed = json!({
+            "options": {
+                "airingNotifications": true,
+                "notificationOptions": [{ "type": "FOLLOWING", "enabled": true }],
+            },
+        });
+        assert!(anilist_covers_airing(Some(&listed)));
+
+        let no_array = json!({ "options": { "airingNotifications": true } });
+        assert!(anilist_covers_airing(Some(&no_array)));
+    }
+
+    /// Either switch off is enough to put the row back. They are separate
+    /// settings on separate AniList pages, and which one the server consults is
+    /// undocumented — so neither is allowed to speak for the other.
+    #[test]
+    fn either_switch_off_keeps_karasus_own_row() {
+        let account_wide_off = json!({
+            "options": {
+                "airingNotifications": false,
+                "notificationOptions": [{ "type": "AIRING", "enabled": true }],
+            },
+        });
+        assert!(!anilist_covers_airing(Some(&account_wide_off)));
+
+        let per_type_off = json!({
+            "options": {
+                "airingNotifications": true,
+                "notificationOptions": [{ "type": "AIRING", "enabled": false }],
+            },
+        });
+        assert!(!anilist_covers_airing(Some(&per_type_off)));
+    }
+
+    /// The direction that costs something, pinned by name.
+    ///
+    /// A blob cached before `options` was ever queried — and the signed-out case
+    /// — must read as "AniList will not cover this". The wrong answer here is a
+    /// notice the user never sees anywhere; the wrong answer the other way is
+    /// the duplicate row this change exists to remove, which is merely today.
+    #[test]
+    fn anything_unknown_keeps_karasus_own_row() {
+        assert!(!anilist_covers_airing(None), "signed out");
+
+        let older = json!({ "id": 6421433, "name": "Kyusetzu" });
+        assert!(!anilist_covers_airing(Some(&older)), "no options block");
+
+        let explicit_null = json!({ "options": null });
+        assert!(!anilist_covers_airing(Some(&explicit_null)));
+
+        let no_flag = json!({ "options": { "notificationOptions": [] } });
+        assert!(!anilist_covers_airing(Some(&no_flag)), "flag absent");
     }
 }

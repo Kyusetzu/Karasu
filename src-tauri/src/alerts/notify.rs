@@ -2,6 +2,11 @@
 //! notification centre (SQLite), shows the native desktop toast, and tells the
 //! frontend to refresh its bell. The background watchers (airing, stale,
 //! sequel) all go through here so nothing is shown without also being logged.
+//!
+//! Two functions here skip the bell row on purpose, and each says why beside
+//! itself: `notify_scrobble_confirm`, and `notify_toast` for news that gets its
+//! row somewhere else. In both cases the log lines are what serve the rule
+//! above.
 
 use crate::db::Db;
 use crate::i18n::Msg;
@@ -19,15 +24,10 @@ fn now_ms() -> i64 {
 /// Record + toast + notify the UI. `kind` groups notifications
 /// ("airing" | "stale" | "sequel").
 ///
-/// All three steps used to discard their result, which made "Karasu never tells
-/// me anything" undiagnosable: a desktop that refuses toasts (Focus Assist on
-/// Windows, no notification daemon on a bare Linux WM) looked exactly like a
-/// watcher that had found nothing to say. The failures are still not fatal —
-/// the bell entry is worth keeping even when the toast will not show — but each
-/// one now leaves a line.
-/// Takes messages rather than sentences, and renders them in the user's
-/// language here — one place, so the toast, the bell row and the log cannot
-/// disagree about what was said.
+/// Every step reports its own failure without any of them being fatal — the
+/// bell entry is worth keeping even when the toast will not show, and vice
+/// versa. Takes messages rather than sentences, rendered in `render` so the
+/// toast, the bell row and the log cannot disagree about what was said.
 ///
 /// What this does *not* do is re-render a bell row when the language changes
 /// later: the row is stored as text, so yesterday's news stays in yesterday's
@@ -43,23 +43,68 @@ fn now_ms() -> i64 {
 /// nothing else, which is what every row did before schema v15.
 pub fn notify(app: &AppHandle, kind: &str, title: Msg<'_>, body: Msg<'_>, media_id: Option<i64>) {
     let db = app.state::<Db>();
-    let lang = crate::i18n::lang(&db);
-    let title = &crate::i18n::text(lang, title);
-    let body = &crate::i18n::text(lang, body);
+    let (title, body) = render(app, title, body);
 
-    if let Err(e) = db.notif_insert(kind, title, body, now_ms(), media_id) {
+    if let Err(e) = db.notif_insert(kind, &title, &body, now_ms(), media_id) {
         crate::logging::error("notify", format!("cannot record the {kind} notification: {e}"));
     }
-    if let Err(e) = app.notification().builder().title(title).body(body).show() {
-        crate::logging::warn(
-            "notify",
-            format!(
-                "the desktop refused a {kind} notification: {e}. It is still in the bell."
-            ),
-        );
-    }
+    toast(app, kind, &title, &body, true);
     if let Err(e) = app.emit("notifications-changed", ()) {
         crate::logging::warn("notify", format!("cannot refresh the bell: {e}"));
+    }
+}
+
+/// The toast without the bell row — for news that gets its row somewhere else.
+///
+/// The second function in this file to skip the bell on purpose, and for a
+/// cousin of the reason `notify_scrobble_confirm` does: a row is worth writing
+/// only when it is *the* record of the news. The one caller is the airing
+/// watcher, on an account whose own AniList airing notifications are on.
+/// AniList's row is strictly the better of the two there — it links to the
+/// entry, it names the episode, and it is one segment away in the same panel —
+/// so two rows are one row and a duplicate. What AniList cannot do is put a
+/// toast on the desktop while Karasu sits in the tray, which is the entire
+/// reason that watcher exists, so that half is untouched.
+///
+/// A separate function rather than a `record: bool` on `notify`: the flag would
+/// have to sit beside the `media_id` of a row it is not writing, which is both
+/// expressible and meaningless. And "does this belong in the bell" is a
+/// property of the kind of news, settled once per call site, not a runtime
+/// choice.
+pub fn notify_toast(app: &AppHandle, kind: &str, title: Msg<'_>, body: Msg<'_>) {
+    let (title, body) = render(app, title, body);
+    toast(app, kind, &title, &body, false);
+}
+
+/// Compose once, in the user's language — the toast, the bell row and the log
+/// cannot then disagree about what was said.
+fn render(app: &AppHandle, title: Msg<'_>, body: Msg<'_>) -> (String, String) {
+    let lang = crate::i18n::lang(&app.state::<Db>());
+    (
+        crate::i18n::text(lang, title),
+        crate::i18n::text(lang, body),
+    )
+}
+
+/// The desktop half.
+///
+/// All three steps used to discard their result, which made "Karasu never tells
+/// me anything" undiagnosable: a desktop that refuses toasts (Focus Assist on
+/// Windows, no notification daemon on a bare Linux WM) looked exactly like a
+/// watcher that had found nothing to say. Still not fatal — but it leaves a
+/// line, and `in_bell` decides whether that line can honestly promise the news
+/// survived the refusal.
+fn toast(app: &AppHandle, kind: &str, title: &str, body: &str, in_bell: bool) {
+    if let Err(e) = app.notification().builder().title(title).body(body).show() {
+        let fallback = if in_bell {
+            "It is still in the bell."
+        } else {
+            "AniList's own notification carries it instead."
+        };
+        crate::logging::warn(
+            "notify",
+            format!("the desktop refused a {kind} notification: {e}. {fallback}"),
+        );
     }
 }
 

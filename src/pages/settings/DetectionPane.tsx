@@ -29,7 +29,8 @@ import {
 } from "@/stores/nowPlaying";
 import { isLinux, usePlatform } from "@/stores/platform";
 import { useAuth } from "@/stores/auth";
-import { Row, Toggle } from "./shared";
+import { ExternalNote, Row, Toggle } from "./shared";
+import { anilistCoversAiring } from "@/lib/airingCoverage";
 export function ScrobbleSection() {
   const { t } = useTranslation();
   const [settings, setSettings] = useState<ScrobbleSettings | null>(null);
@@ -130,12 +131,22 @@ export function ScrobbleSection() {
           />
         </Row>
         {airing !== null && (
-          <Toggle
-            checked={airing}
-            onChange={updateAiring}
-            label={t("settings.airingNotify")}
-            hint={t("settings.airingNotifyHint")}
-          />
+          <>
+            <Toggle
+              checked={airing}
+              onChange={updateAiring}
+              label={t("settings.airingNotify")}
+              hint={t("settings.airingNotifyHint")}
+            />
+            {/* Says what the watcher will actually do, from the same cached
+                viewer blob the watcher itself reads — so a blob that has gone
+                stale against anilist.co is visibly wrong here rather than
+                silently wrong in the background. Costs nothing: the blob is
+                already in the auth store. */}
+            {airing && anilistCoversAiring(viewer) && (
+              <ExternalNote>{t("settings.airingNotifyAniList")}</ExternalNote>
+            )}
+          </>
         )}
         {sequel !== null && (
           <Toggle

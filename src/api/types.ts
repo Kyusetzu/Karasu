@@ -14,6 +14,15 @@ export interface Viewer {
     animeList?: AdvancedScoringOptions | null;
     mangaList?: AdvancedScoringOptions | null;
   } | null;
+  /** Carried by `VIEWER_QUERY` for the airing watcher — see
+   *  `alerts/airing.rs`, which holds the copy of the rules that actually
+   *  decides. Optional for the same reason as above: a viewer blob cached
+   *  before the field existed lacks it, and reads as "AniList will not cover
+   *  this", which is the safe answer. */
+  options?: {
+    airingNotifications: boolean | null;
+    notificationOptions: { type: string | null; enabled: boolean | null }[] | null;
+  } | null;
 }
 
 export interface AdvancedScoringOptions {

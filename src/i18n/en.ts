@@ -1089,14 +1089,14 @@ export const en = {
     alSaved: "Saved on AniList",
     alSaveFailed: "That setting wasn’t saved",
     alSaveFailedDetail: "Nothing was sent. Account changes are not queued offline.",
-    // The three Karasu overrides. Each names where the effect actually lands —
-    // a generic "affects AniList" would not tell anyone what to expect.
+    // The three cross-referenced settings. Each names where the effect actually
+    // lands — a generic "affects AniList" would not tell anyone what to expect.
     alOverrideTitleLanguage:
       "Karasu picks titles with its own setting and ignores this one.",
     alOverrideAdult:
       "Karasu filters adult content with its own setting, which is the stricter of the two.",
     alOverrideAiring:
-      "Karasu raises its own airing alerts and is unaffected by this.",
+      "Karasu reads this one. While it is on, a new episode reaches you as a desktop notification and its bell row comes from AniList — the row that opens the entry. Switch it off and Karasu writes that row itself.",
     alOverrideWhere: "Karasu’s setting →",
     alListOptions: "List display",
     rescale: "Rescale scores",
@@ -1280,7 +1280,9 @@ export const en = {
     thresholdHint: "0 = automatic (two thirds of the episode length)",
     airingNotify: "New-episode notifications",
     airingNotifyHint:
-      "Desktop notification when a new episode of a show you are watching airs.",
+      "Desktop notification when a new episode of a show you are watching airs — the one thing the website cannot do while Karasu sits in the tray.",
+    airingNotifyAniList:
+      "AniList raises its own notification for this account, so Karasu shows the desktop notification and leaves the bell row to the AniList tab, where it opens the entry.",
     sequelNotify: "Sequel announcements",
     sequelNotifyHint:
       "Notify me when a sequel or side story is announced for something on my list.",

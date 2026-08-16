@@ -82,3 +82,11 @@ short version, grouped by what it means for someone using the app.
 - A one-pass score rescale that prints the request count before it runs.
 - The airing week exports to any calendar app.
 - Profiles gained a Lists tab with an affinity score.
+
+### Changed
+
+- An aired episode no longer arrives twice. When your AniList account raises its
+  own airing notification, Karasu still shows the desktop notification — the one
+  thing the website cannot do while Karasu sits in the tray — and leaves the bell
+  row to the AniList tab, where it opens the entry. Turn AniList's off and Karasu
+  writes that row itself, as before. Both settings say so, on both screens.

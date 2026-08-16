@@ -111,12 +111,20 @@ export function mergeListActivity(
 }
 
 /**
- * The three AniList settings Karasu deliberately ignores.
+ * The three AniList settings whose effect lands somewhere else in Karasu.
  *
  * Editing them is still legitimate — they are the user's settings and other
  * clients honour them — but a row that appears to do nothing is a bug report
  * waiting to happen, so each carries a note naming *where* its effect lands.
  * The hint keys are literals so `i18nKeys.test.ts` can see them.
+ *
+ * Two are overrides outright: Karasu picks titles and filters adult content
+ * with its own setting and ignores AniList's. `airingNotifications` is the odd
+ * one and is kept here for the opposite reason — Karasu *reads* it. While it is
+ * on, the airing watcher shows the desktop notification and leaves the bell row
+ * to AniList's own, so the two toggles are coupled, and the cross-reference to
+ * the Detection pane is more load-bearing than when it was a plain override:
+ * nobody would guess the coupling from either screen alone.
  *
  * `scoreFormat` used to be the fourth: Karasu pinned ten-point everywhere,
  * so the row truthfully said its own display would not move. Since the

@@ -1106,7 +1106,7 @@ export const de: typeof en = {
     alOverrideAdult:
       "Karasu filtert Adult-Inhalte mit seiner eigenen Einstellung, und zwar der strengeren von beiden.",
     alOverrideAiring:
-      "Karasu erzeugt seine eigenen Airing-Hinweise und ist davon unberührt.",
+      "Diese Einstellung liest Karasu. Solange sie an ist, erreicht dich eine neue Folge als Desktop-Benachrichtigung, und die Zeile in der Glocke kommt von AniList — die Zeile, die den Eintrag öffnet. Schaltest du sie aus, schreibt Karasu die Zeile selbst.",
     alOverrideWhere: "Karasus Einstellung →",
     alListOptions: "Listenanzeige",
     rescale: "Bewertungen umskalieren",
@@ -1292,7 +1292,9 @@ export const de: typeof en = {
     thresholdHint: "0 = automatisch (zwei Drittel der Episodenlänge)",
     airingNotify: "Benachrichtigung bei neuer Folge",
     airingNotifyHint:
-      "Desktop-Benachrichtigung, wenn eine neue Folge einer laufenden Serie erscheint.",
+      "Desktop-Benachrichtigung, wenn eine neue Folge einer laufenden Serie erscheint — das Einzige, was die Website nicht kann, während Karasu im Tray liegt.",
+    airingNotifyAniList:
+      "AniList erzeugt für dieses Konto eine eigene Benachrichtigung. Karasu zeigt daher nur die Desktop-Benachrichtigung und überlässt die Zeile in der Glocke dem AniList-Tab, wo sie den Eintrag öffnet.",
     sequelNotify: "Fortsetzungs-Ankündigungen",
     sequelNotifyHint:
       "Benachrichtige mich, wenn eine Fortsetzung oder Nebengeschichte zu etwas auf meiner Liste angekündigt wird.",

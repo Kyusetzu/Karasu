@@ -59,14 +59,21 @@ export function useUpdateUser(viewerName: string | undefined) {
           updated.options.notificationOptions,
         );
       }
-      // A score-format change rescales every score in the app: refresh the
-      // stored viewer (which recaches the format the save paths convert
-      // through), then drop the whole query cache — a rare, whole-scale
-      // event, and the one place a blanket invalidation is proportionate.
-      if (form.scoreFormat !== undefined) {
-        await useAuth.getState().refreshViewer();
-        await qc.invalidateQueries();
-      }
+      // Three fields the *Rust* side reads off the cached viewer blob, which
+      // only `refresh_viewer` ever rewrites. The score format is recached
+      // because every save path converts through it; the two airing switches
+      // because the background watcher consults them to decide whether AniList
+      // will raise its own row (see `alerts/airing.rs`). Without this, a flip
+      // made right here would not reach either until the next sign-in.
+      const needsViewer =
+        form.scoreFormat !== undefined ||
+        form.airingNotifications !== undefined ||
+        form.notificationOptions !== undefined;
+      if (needsViewer) await useAuth.getState().refreshViewer();
+      // The blanket invalidation stays the score format's alone: it rescales
+      // every score in the app — a rare, whole-scale event, and the one place
+      // dropping the whole cache is proportionate. Nothing else here is.
+      if (form.scoreFormat !== undefined) await qc.invalidateQueries();
       showToast({ kind: "success", text: t("settings.alSaved") });
     },
     onError: () => {

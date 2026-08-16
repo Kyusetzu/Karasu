@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Globe } from "lucide-react";
+import { AlertTriangle, Globe } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { hexToHsv, hsvToHex, type Hsv } from "@/lib/contrast";
 
@@ -99,6 +99,37 @@ export function NeedsAccount({
     <div className="rounded-xl border border-dashed border-surface-700 p-5">
       <p className="text-sm font-medium text-ink-300">{title}</p>
       <p className="mt-1.5 text-sm leading-relaxed text-ink-500">{children}</p>
+    </div>
+  );
+}
+
+/**
+ * "You can break something here."
+ *
+ * The third note in the set, and the one that was missing. `ExternalNote` is
+ * gold — a caveat, nothing at risk. `NeedsAccount` is muted — an explanation.
+ * This is danger, and it is the only one of the three that describes a control
+ * rather than a limitation: rescaling every score, moving the whole database to
+ * a portable folder, and reading a log that carries what detection saw are not
+ * things to discover by clicking.
+ *
+ * A block rather than an inline line, because it heads a whole pane. Filled
+ * rather than outlined so it cannot be mistaken for one more section.
+ */
+export function DangerNote({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex items-start gap-3 rounded-xl border border-danger/35 bg-danger/8 p-4">
+      <AlertTriangle className="mt-0.5 size-4 shrink-0 text-danger" />
+      <div className="min-w-0">
+        <p className="text-sm font-medium text-danger">{title}</p>
+        <p className="mt-1 text-sm leading-relaxed text-ink-300">{children}</p>
+      </div>
     </div>
   );
 }

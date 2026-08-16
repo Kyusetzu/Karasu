@@ -178,10 +178,10 @@ Because a desktop app can do things anilist.co simply can't:
   <kbd>Ctrl</kbd>+<kbd>1</kbd>–<kbd>3</kbd> between screens, and arrows,
   <kbd>Space</kbd>, <kbd>E</kbd> and <kbd>C</kbd> inside a list
 - **Settings in eight panes** — account, AniList account, appearance,
-  detection, library, content, integrations and advanced. The AniList pane
-  edits your *account's* settings in place — title language, score format,
-  activity posting, AniList's own notification toggles — so they apply on
-  anilist.co and in every client at once
+  detection, library, desktop, import & export, and a marked-dangerous
+  advanced pane. The AniList pane edits your *account's* settings in place —
+  title language, score format, activity posting, AniList's own notification
+  toggles — so they apply on anilist.co and in every client at once
 - An app-appropriate in-app right-click menu, system tray, single instance,
   autostart
 - English / German with automatic system-language detection

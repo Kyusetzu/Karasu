@@ -672,14 +672,18 @@ interface CloseToTray {
   tray: boolean;
 }
 
-export function AdvancedSection() {
+/**
+ * How Karasu behaves as a program on this desktop.
+ *
+ * Split from the update settings it used to share a card with: "start with the
+ * system" and "install pre-releases" are unrelated decisions, and the second is
+ * the one people go looking for.
+ */
+export function SystemSection() {
   const { t } = useTranslation();
   const platform = usePlatform((s) => s.info);
   const [autostart, setAutostart] = useState<boolean | null>(null);
-  const [updateAuto, setUpdateAuto] = useState<boolean | null>(null);
   const [closeTray, setCloseTray] = useState<CloseToTray | null>(null);
-  const [updateChannel, setUpdateChannelState] =
-    useState<api.UpdateChannel>("prerelease");
   const [hotkey, setHotkey] = useState<string | null>(null);
   const [hotkeyDraft, setHotkeyDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -694,8 +698,6 @@ export function AdvancedSection() {
         setHotkeyDraft(v ?? "");
       });
     });
-    api.getUpdateCheckAuto().then(setUpdateAuto);
-    api.getUpdateChannel().then(setUpdateChannelState);
   }, []);
 
   // Both of these paint the switch first and then await a command that can
@@ -745,16 +747,6 @@ export function AdvancedSection() {
       setHotkeyDraft(hotkey);
       setError(String(e));
     }
-  };
-
-  const toggleUpdateAuto = (enabled: boolean) => {
-    setUpdateAuto(enabled);
-    api.setUpdateCheckAuto(enabled);
-  };
-
-  const changeUpdateChannel = (channel: api.UpdateChannel) => {
-    setUpdateChannelState(channel);
-    api.setUpdateChannel(channel);
   };
 
   return (
@@ -807,33 +799,65 @@ export function AdvancedSection() {
           </Row>
         )}
 
-        {updateAuto !== null && (
+        {error && <p className="text-sm text-danger">{error}</p>}
+      </div>
+    </Card>
+  );
+}
+
+/** Whether Karasu looks for a new version, and which kind it accepts. */
+export function UpdatesSection() {
+  const { t } = useTranslation();
+  const [auto, setAuto] = useState<boolean | null>(null);
+  // Null until the stored value lands. It used to default to `"prerelease"`,
+  // so a stable-channel install rendered the wrong answer for one frame — and
+  // a settings row that flashes something the account is not set to is worse
+  // than one that arrives a moment late.
+  const [channel, setChannel] = useState<api.UpdateChannel | null>(null);
+
+  useEffect(() => {
+    if (!api.isTauri) return;
+    api.getUpdateCheckAuto().then(setAuto);
+    api.getUpdateChannel().then(setChannel);
+  }, []);
+
+  return (
+    <Card>
+      <CardTitle>{t("settings.updates")}</CardTitle>
+      <div className="mt-3 space-y-3">
+        {auto !== null && (
           <Toggle
-            checked={updateAuto}
-            onChange={toggleUpdateAuto}
+            checked={auto}
+            onChange={(enabled) => {
+              setAuto(enabled);
+              api.setUpdateCheckAuto(enabled);
+            }}
             label={t("settings.updateAuto")}
             hint={t("settings.updateAutoHint")}
           />
         )}
 
-        <Row
-          label={t("settings.updateChannel")}
-          hint={t("settings.updateChannelHint")}
-        >
-          <select
-            value={updateChannel}
-            onChange={(e) =>
-              changeUpdateChannel(e.target.value as api.UpdateChannel)
-            }
-            className={SELECT}
+        {channel !== null && (
+          <Row
+            label={t("settings.updateChannel")}
+            hint={t("settings.updateChannelHint")}
           >
-            <option value="prerelease">
-              {t("settings.updateChannelPrerelease")}
-            </option>
-            <option value="stable">{t("settings.updateChannelStable")}</option>
-          </select>
-        </Row>
-        {error && <p className="text-sm text-danger">{error}</p>}
+            <select
+              value={channel}
+              onChange={(e) => {
+                const next = e.target.value as api.UpdateChannel;
+                setChannel(next);
+                api.setUpdateChannel(next);
+              }}
+              className={SELECT}
+            >
+              <option value="prerelease">
+                {t("settings.updateChannelPrerelease")}
+              </option>
+              <option value="stable">{t("settings.updateChannelStable")}</option>
+            </select>
+          </Row>
+        )}
       </div>
     </Card>
   );

@@ -139,7 +139,9 @@ export const LOCAL_OVERRIDES = {
   },
   displayAdultContent: {
     hintKey: "settings.alOverrideAdult",
-    pane: "content",
+    // The content filter moved in with Appearance — it was one slider, and it
+    // answers the same question the rest of that pane does.
+    pane: "appearance",
   },
   airingNotifications: {
     hintKey: "settings.alOverrideAiring",

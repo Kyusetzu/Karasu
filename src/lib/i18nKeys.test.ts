@@ -62,7 +62,6 @@ const DYNAMIC_PREFIXES = [
   "country.",
   "sort.",
   "merge.strategy.",
-  "settings.pane_",
   "settings.theme_",
   "settings.coverSize_",
   "settings.contentLevel_",
@@ -85,6 +84,19 @@ const DYNAMIC_KEYS = [
   "stats.years",
   "stats.genresTags",
   "stats.people",
+  // `PANES` in `pages/Settings.tsx`, via `t(`settings.pane_${p.id}`)`. Listed
+  // rather than prefixed because a prefix only *exempts*: a pane whose label
+  // went missing in a reshuffle rendered `settings.pane_data` on the button and
+  // nothing in the suite noticed. These are asserted to exist, so a rename has
+  // to move both ends.
+  "settings.pane_account",
+  "settings.pane_anilist",
+  "settings.pane_appearance",
+  "settings.pane_detection",
+  "settings.pane_library",
+  "settings.pane_desktop",
+  "settings.pane_data",
+  "settings.pane_advanced",
 ];
 
 // `src/i18n/index.ts` initialises i18next on import, which reads the browser's

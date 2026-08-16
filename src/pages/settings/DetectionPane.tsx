@@ -212,7 +212,6 @@ export function ScrobbleSection() {
             )}
           </>
         )}
-        <MediaSessionDiagnostic />
       </div>
     </Card>
   );
@@ -225,8 +224,15 @@ export function ScrobbleSection() {
  * episode, and some publish nothing at all. Without this there is no way to
  * tell "Karasu ignored it" from "the player never told the system" — which is
  * exactly the question when a title isn't picked up.
+ *
+ * Its own card rather than a footnote under the scrobble settings, which is
+ * where it used to live. On Linux the media-session pass *is* local detection —
+ * there is no window enumerator and Wayland forbids one — so this is the first
+ * screen to look at when nothing is picked up, not the last line of another
+ * one. Still collapsed by default and still fetched on first expand: it is a
+ * thing you go looking for, not a round trip every visit to Settings costs.
  */
-function MediaSessionDiagnostic() {
+export function MediaSessionSection() {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [sessions, setSessions] = useState<MediaSession[] | null>(null);
@@ -258,11 +264,12 @@ function MediaSessionDiagnostic() {
   };
 
   return (
-    <div className="border-t border-surface-800 pt-3">
+    <Card>
+      <CardTitle>{t("settings.mediaSessionsTitle")}</CardTitle>
       <button
         type="button"
         onClick={toggle}
-        className="flex items-center gap-1 text-xs text-ink-500 hover:text-ink-300"
+        className="mt-3 flex items-center gap-1 text-xs text-ink-500 hover:text-ink-300"
       >
         <ChevronRight
           className={cn("size-3 transition-transform", open && "rotate-90")}
@@ -323,7 +330,7 @@ function MediaSessionDiagnostic() {
           ))}
         </div>
       )}
-    </div>
+    </Card>
   );
 }
 

@@ -47,7 +47,12 @@ short version, grouped by what it means for someone using the app.
   the truth across all three library tables — reported as a successful scan, and
   surviving a restart. The folder is checked before anything is replaced, and
   finding nothing where something was indexed before keeps the index and says so.
-
+- **Queued offline edits can no longer land on a different account.** Signing out
+  left them in the database with no record of who made them, so the next account
+  to sign in drained them onto its own list. Each queued edit is now stamped with
+  the account that made it and is only ever replayed for that account — so
+  signing back in still syncs what you were waiting on, and nobody else's client
+  ever sees it.
 - An offline edit is no longer deleted when AniList answers with something
   recoverable — an expired token, a rate limit, a server fault. Only a payload
   AniList rejects on its own terms is dropped, and when one is, it says so.

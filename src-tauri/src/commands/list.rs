@@ -121,6 +121,24 @@ pub(crate) fn viewer_advanced_scoring(db: &Db, media_type: &str) -> bool {
         .unwrap_or(false)
 }
 
+/// The signed-in account, from the cached viewer blob.
+///
+/// Every queue read and write is scoped by this. `None` means no account is
+/// connected, which for the queue means there is nothing to drain and nothing
+/// may be enqueued: a queued row is a write waiting for a token, and one that
+/// cannot name its account is one that would land on whoever signs in next.
+pub(crate) fn viewer_id(db: &Db) -> Option<i64> {
+    db.kv_get("anilist_viewer")
+        .and_then(|blob| serde_json::from_str::<Value>(&blob).ok())
+        .and_then(|v| v.get("id").and_then(|i| i.as_i64()))
+}
+
+/// How many edits the signed-in account is waiting to sync. Zero when signed
+/// out — another account's rows are not this account's business.
+pub(crate) fn pending(db: &Db) -> usize {
+    viewer_id(db).map_or(0, |u| db.queue_len(u))
+}
+
 /// `startedAt`/`completedAt` are `FuzzyDateInput` — `{ year, month, day }`, each
 /// nullable, because AniList lets a date be partial ("2024", "March 2024"). That
 /// is why they are not plain dates on the frontend either.
@@ -209,7 +227,7 @@ pub fn cached_media_list(
     let cached = db.cached_list(user_id, media_type)?;
     Some(ListResult {
         from_cache: false,
-        pending: db.queue_len(),
+        pending: db.queue_len(user_id),
         lists: serde_json::from_str(&cached).ok()?,
     })
 }
@@ -262,7 +280,7 @@ pub async fn fetch_media_list(
             }
             Ok(ListResult {
                 from_cache: false,
-                pending: db.queue_len(),
+                pending: db.queue_len(user_id),
                 lists,
             })
         }
@@ -272,7 +290,7 @@ pub async fn fetch_media_list(
                 .ok_or("Offline and no local list cache available yet")?;
             Ok(ListResult {
                 from_cache: true,
-                pending: db.queue_len(),
+                pending: db.queue_len(user_id),
                 lists: serde_json::from_str(&cached)
                     .map_err(|e| format!("Cache corrupted: {e}"))?,
             })
@@ -304,7 +322,7 @@ pub(crate) async fn save_entry_core(
     if let Some(vars) = input.as_object_mut() {
         vars.insert("scoreFormat".into(), json!(viewer_score_format(db)));
     }
-    if db.queue_len() > 0 && process_queue(db, api, Some(token)).await.is_err() {
+    if pending(db) > 0 && process_queue(db, api, Some(token)).await.is_err() {
         queue_push_deduped(db, "save", &input.to_string())?;
         return Ok(MutationResult { queued: true, entry: None });
     }
@@ -408,7 +426,7 @@ pub async fn bulk_save_list_entries(
 
     // Anything already queued has to land first, or this write would be
     // overwritten by an older one replaying on top of it.
-    if db.queue_len() > 0 {
+    if pending(&db) > 0 {
         let drained = process_queue(&db, &api, Some(&token)).await?;
         report_dropped(&app, &drained.dropped);
     }
@@ -465,7 +483,7 @@ pub async fn delete_list_entry(
     let token = auth::load_token().ok_or("Not connected to AniList")?;
     let input = json!({ "id": id });
 
-    if db.queue_len() > 0 && process_queue(&db, &api, Some(&token)).await.is_err() {
+    if pending(&db) > 0 && process_queue(&db, &api, Some(&token)).await.is_err() {
         queue_push_deduped(&db, "delete", &input.to_string())?;
         return Ok(MutationResult { queued: true, entry: None });
     }
@@ -706,16 +724,23 @@ pub(crate) fn queue_key(kind: &str, payload: &str) -> Option<String> {
     Some(format!("{kind}:{subject}:{}", fields.join(",")))
 }
 
-/// Queues a mutation, dropping any queued one it makes redundant.
+/// Queues a mutation against the signed-in account, dropping any queued one it
+/// makes redundant.
+///
+/// Refuses outright when there is no account. Every caller here already holds a
+/// token, so this is unreachable in practice — but a queued row with no owner is
+/// precisely the shape that used to replay onto whoever signed in next, and the
+/// type is what keeps that unwritable rather than merely unwritten.
 fn queue_push_deduped(db: &Db, kind: &str, payload: &str) -> Result<(), String> {
+    let user_id = viewer_id(db).ok_or("Not connected to AniList")?;
     if let Some(key) = queue_key(kind, payload) {
-        for (id, queued_kind, queued_payload) in db.queue_all() {
+        for (id, queued_kind, queued_payload) in db.queue_all(user_id) {
             if queue_key(&queued_kind, &queued_payload).as_deref() == Some(key.as_str()) {
                 db.queue_remove(id);
             }
         }
     }
-    db.queue_push(kind, payload)
+    db.queue_push(user_id, kind, payload)
 }
 
 /// Drains the offline queue in order.
@@ -738,7 +763,14 @@ async fn process_queue(
 ) -> Result<Drained, String> {
     let mut flushed = 0;
     let mut dropped = Vec::new();
-    for (id, kind, payload) in db.queue_all() {
+    // Only this account's rows. The drain runs on every list fetch with
+    // whatever token is loaded now, and the queue outlives a sign-out, so an
+    // unscoped read here is what wrote one user's pending edits onto another
+    // user's list. Signed out there is nothing to drain at all.
+    let Some(user_id) = viewer_id(db) else {
+        return Ok(Drained { flushed, dropped });
+    };
+    for (id, kind, payload) in db.queue_all(user_id) {
         let mut variables: Value =
             serde_json::from_str(&payload).unwrap_or_else(|_| json!({}));
         // Re-stamped at drain time: the format may have changed since the

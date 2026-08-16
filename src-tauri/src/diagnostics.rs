@@ -167,7 +167,9 @@ pub fn collect(app: &tauri::AppHandle) -> Diagnostics {
         data_dir,
         tray: app.state::<crate::TrayPresent>().0,
         schema: db.schema_version(),
-        queued: db.queue_len(),
+        // This account's, matching what the pending badge shows. Another
+        // account's rows exist but are neither drained nor counted here.
+        queued: crate::commands::pending(&db),
         // A boolean. The token itself must never leave the backend.
         signed_in: crate::anilist::auth::load_token().is_some(),
         profile_mode: db

@@ -302,6 +302,33 @@ ALTER TABLE notifications ADD COLUMN media_id INTEGER;
 PRAGMA user_version = 15;
 ";
 
+/// Schema v16: which account a queued edit belongs to.
+///
+/// `anilist_logout` deletes the token and the cached viewer and left the queue
+/// alone, and a queued row carried only a `mediaId` — so edits made under one
+/// account were drained under whatever token signed in next. Signing out of A
+/// and into B wrote A's unsynced progress onto B's list, silently, on B's first
+/// list fetch.
+///
+/// Clearing the queue on logout would have closed it without a migration, but
+/// an offline queue exists precisely so unsynced edits survive; discarding them
+/// because someone signed out to fix a token is the same class of loss one step
+/// removed. Stamping the row is what lets both hold.
+///
+/// Rows that predate the column are attributed to the cached viewer, which is
+/// the only account that could have written them. With no cached viewer there
+/// is nobody to attribute them to, and an unattributable queued write is the
+/// exact hazard this closes — so those are dropped rather than guessed at.
+/// `json_extract` is built into SQLite itself since 3.38, well below what
+/// rusqlite bundles.
+const MIGRATION_V16: &str = "
+ALTER TABLE offline_queue ADD COLUMN user_id INTEGER;
+UPDATE offline_queue
+   SET user_id = (SELECT json_extract(value, '$.id') FROM kv WHERE key = 'anilist_viewer');
+DELETE FROM offline_queue WHERE user_id IS NULL;
+PRAGMA user_version = 16;
+";
+
 /// One detection correction: what was detected, and what it really is.
 ///
 /// A struct rather than the tuple this started as, because the row grew a
@@ -518,6 +545,18 @@ impl Db {
                 apply(&conn, 15, MIGRATION_V15)?;
             }
         }
+        if version < 16 {
+            // The fifth `ALTER TABLE ADD COLUMN`, so v7's guard again. The
+            // attribution and the delete ride in the same step, and `apply`
+            // wraps the whole thing in a transaction — a database that gained
+            // the column but not the attribution would be one where every
+            // pre-existing row is unowned and therefore invisible.
+            if has_column(&conn, "offline_queue", "user_id") {
+                apply(&conn, 16, "PRAGMA user_version = 16;")?;
+            } else {
+                apply(&conn, 16, MIGRATION_V16)?;
+            }
+        }
         Ok(Db(Mutex::new(conn)))
     }
 
@@ -647,26 +686,33 @@ impl Db {
 
     // --- Offline queue ------------------------------------------------------
 
-    pub fn queue_push(&self, kind: &str, payload: &str) -> Result<(), String> {
+    /// Queues an edit against the account that made it.
+    ///
+    /// `user_id` is not optional and the drain filters on it: a queued row is a
+    /// write waiting to happen, and the one thing it must never do is happen to
+    /// somebody else's list. See `MIGRATION_V16`.
+    pub fn queue_push(&self, user_id: i64, kind: &str, payload: &str) -> Result<(), String> {
         let conn = self.0.guard();
         conn.execute(
-            "INSERT INTO offline_queue (kind, payload, created_at)
-             VALUES (?1, ?2, strftime('%s','now'))",
-            [kind, payload],
+            "INSERT INTO offline_queue (kind, payload, created_at, user_id)
+             VALUES (?1, ?2, strftime('%s','now'), ?3)",
+            rusqlite::params![kind, payload, user_id],
         )
         .map(|_| ())
         .map_err(|e| format!("Queue write failed: {e}"))
     }
 
-    pub fn queue_all(&self) -> Vec<(i64, String, String)> {
+    /// Everything queued by `user_id`, oldest first. Another account's rows are
+    /// not returned — not as an empty-list fallback, not at all.
+    pub fn queue_all(&self, user_id: i64) -> Vec<(i64, String, String)> {
         let conn = self.0.guard();
-        let mut stmt = match conn
-            .prepare("SELECT id, kind, payload FROM offline_queue ORDER BY id")
-        {
+        let mut stmt = match conn.prepare(
+            "SELECT id, kind, payload FROM offline_queue WHERE user_id = ?1 ORDER BY id",
+        ) {
             Ok(s) => s,
             Err(_) => return Vec::new(),
         };
-        stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
+        stmt.query_map([user_id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
             .map(|rows| rows.filter_map(Result::ok).collect())
             .unwrap_or_default()
     }
@@ -689,11 +735,15 @@ impl Db {
             .unwrap_or(0)
     }
 
-    pub fn queue_len(&self) -> usize {
+    /// The pending badge. Scoped like the drain, so it counts what *this*
+    /// account is waiting on rather than what is in the table.
+    pub fn queue_len(&self, user_id: i64) -> usize {
         let conn = self.0.guard();
-        conn.query_row("SELECT COUNT(*) FROM offline_queue", [], |r| {
-            r.get::<_, i64>(0)
-        })
+        conn.query_row(
+            "SELECT COUNT(*) FROM offline_queue WHERE user_id = ?1",
+            [user_id],
+            |r| r.get::<_, i64>(0),
+        )
         .map(|n| n as usize)
         .unwrap_or(0)
     }
@@ -1339,6 +1389,7 @@ mod tests {
         conn.execute_batch(MIGRATION_V13).unwrap();
         conn.execute_batch(MIGRATION_V14).unwrap();
         conn.execute_batch(MIGRATION_V15).unwrap();
+        conn.execute_batch(MIGRATION_V16).unwrap();
         Db(Mutex::new(conn))
     }
 
@@ -1570,7 +1621,7 @@ mod tests {
         let version: i64 = conn
             .query_row("PRAGMA user_version", [], |r| r.get(0))
             .unwrap();
-        assert_eq!(version, 15, "and must end up fully migrated");
+        assert_eq!(version, 16, "and must end up fully migrated");
         drop(conn);
 
         // v13, v14 and v15 are the other `ALTER TABLE ADD COLUMN` steps, so
@@ -1581,6 +1632,7 @@ mod tests {
             (12, "detection_override", "episode_offset"),
             (13, "local_list", "started_at"),
             (14, "notifications", "media_id"),
+            (15, "offline_queue", "user_id"),
         ] {
             let conn = Connection::open(dir.join("karasu.db")).unwrap();
             assert!(has_column(&conn, table, column));
@@ -1595,7 +1647,7 @@ mod tests {
             let version: i64 = conn
                 .query_row("PRAGMA user_version", [], |r| r.get(0))
                 .unwrap();
-            assert_eq!(version, 15);
+            assert_eq!(version, 16);
         }
 
         let _ = std::fs::remove_dir_all(&dir);
@@ -1962,6 +2014,7 @@ mod tests {
         conn.execute_batch(MIGRATION_V13).unwrap();
         conn.execute_batch(MIGRATION_V14).unwrap();
         conn.execute_batch(MIGRATION_V15).unwrap();
+        conn.execute_batch(MIGRATION_V16).unwrap();
 
         let db = Db(Mutex::new(conn));
         let row = db.local_all().into_iter().find(|r| r.media_id == 3).unwrap();
@@ -2072,6 +2125,81 @@ mod tests {
             db.notif_insert("airing", "t", "b", i, None).unwrap();
         }
         assert_eq!(db.notif_all(3).len(), 3);
+    }
+
+    /// v16. A queued edit belongs to the account that made it.
+    ///
+    /// `anilist_logout` clears the token and the cached viewer and leaves the
+    /// queue standing, and the drain runs on every list fetch with whatever
+    /// token is loaded *now* — so before this, signing out of one account and
+    /// into another replayed the first account's unsynced edits onto the
+    /// second's list.
+    #[test]
+    fn a_queued_edit_is_invisible_to_another_account() {
+        let db = mem_db();
+        db.queue_push(111, "save", r#"{"mediaId":1,"progress":5}"#).unwrap();
+        db.queue_push(111, "save", r#"{"mediaId":2,"progress":9}"#).unwrap();
+        db.queue_push(222, "save", r#"{"mediaId":3,"progress":1}"#).unwrap();
+
+        assert_eq!(db.queue_all(111).len(), 2);
+        assert_eq!(db.queue_len(111), 2);
+        // The account that signed in next sees its own row and nothing else —
+        // not the other two, and not an empty-list fallback that would hide the
+        // distinction.
+        let theirs = db.queue_all(222);
+        assert_eq!(theirs.len(), 1);
+        assert!(theirs[0].2.contains("\"mediaId\":3"));
+        assert_eq!(db.queue_len(222), 1);
+        // A third account with nothing queued drains nothing.
+        assert!(db.queue_all(333).is_empty());
+        assert_eq!(db.queue_len(333), 0);
+    }
+
+    /// The v16 backfill. Rows written before the column existed belong to
+    /// whoever was cached at upgrade time — the only account that could have
+    /// written them.
+    #[test]
+    fn the_queue_migration_attributes_rows_to_the_cached_viewer() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(MIGRATIONS).unwrap();
+        conn.execute(
+            "INSERT INTO kv (key, value) VALUES ('anilist_viewer', ?1)",
+            [r#"{"id":6421433,"name":"Kyusetzu"}"#],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO offline_queue (kind, payload, created_at) VALUES ('save', '{}', 1)",
+            [],
+        )
+        .unwrap();
+
+        conn.execute_batch(MIGRATION_V16).unwrap();
+
+        let owner: i64 = conn
+            .query_row("SELECT user_id FROM offline_queue", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(owner, 6421433);
+    }
+
+    /// And with nobody cached there is nobody to attribute them to. An
+    /// unattributable queued write is the exact hazard v16 closes, so those
+    /// rows are dropped rather than left for the next account to inherit.
+    #[test]
+    fn the_queue_migration_drops_rows_it_cannot_attribute() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(MIGRATIONS).unwrap();
+        conn.execute(
+            "INSERT INTO offline_queue (kind, payload, created_at) VALUES ('save', '{}', 1)",
+            [],
+        )
+        .unwrap();
+
+        conn.execute_batch(MIGRATION_V16).unwrap();
+
+        let n: i64 = conn
+            .query_row("SELECT COUNT(*) FROM offline_queue", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(n, 0);
     }
 
     /// v15. A bell row that cannot say which title it is about is a sentence,

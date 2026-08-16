@@ -144,7 +144,7 @@ pub(crate) fn mpv_ipc_config(
     let path = db
         .kv_get(MPV_IPC_PATH_KEY)
         .filter(|p| !p.trim().is_empty())
-        .unwrap_or_else(|| crate::playback::detection::mpv_ipc::DEFAULT_PIPE.to_string());
+        .unwrap_or_else(|| crate::playback::detection::mpv_ipc::default_pipe());
     if !is_pipe_path(&path) {
         crate::logging::debug_changed(
             "mpv",
@@ -170,7 +170,7 @@ pub(crate) fn mpv_launch_config(db: &Db) -> Option<(String, String)> {
     let pipe = db
         .kv_get(MPV_IPC_PATH_KEY)
         .filter(|p| !p.trim().is_empty())
-        .unwrap_or_else(|| crate::playback::detection::mpv_ipc::DEFAULT_PIPE.to_string());
+        .unwrap_or_else(|| crate::playback::detection::mpv_ipc::default_pipe());
     Some((player, pipe))
 }
 
@@ -188,7 +188,7 @@ pub struct MpvIpcSettings {
 
 #[tauri::command]
 pub fn get_mpv_ipc(db: State<'_, Db>) -> MpvIpcSettings {
-    let default_path = crate::playback::detection::mpv_ipc::DEFAULT_PIPE.to_string();
+    let default_path = crate::playback::detection::mpv_ipc::default_pipe();
     MpvIpcSettings {
         enabled: db.kv_get(MPV_IPC_ENABLED_KEY).as_deref() == Some("1"),
         path: db

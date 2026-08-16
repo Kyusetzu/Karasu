@@ -39,8 +39,7 @@ pub fn set_discord_settings(
     let now = app
         .state::<crate::playback::scrobbler::PlaybackState>()
         .0
-        .lock()
-        .unwrap()
+        .guard()
         .clone();
     crate::discord::sync(&app, now.as_ref());
     Ok(())

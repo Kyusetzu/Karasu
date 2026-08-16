@@ -255,20 +255,36 @@ fn build_tray(app: &tauri::App) -> tauri::Result<()> {
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
+/// WebKitGTK's DMA-BUF renderer paints a blank window on a long list of
+/// driver/compositor combinations — the NVIDIA proprietary driver most often.
+/// The app starts, the process runs, and the user sees nothing, which is the
+/// single most common way a Tauri app "fails" on Linux. Only set when the user
+/// has not chosen for themselves.
+///
+/// A cfg'd **pair** rather than `#[cfg(target_os = "linux")]` on the `if` this
+/// used to be. An attribute on a *statement* is stripped wholesale on every
+/// other platform, so nothing inside it is ever compiled here — CLAUDE.md names
+/// that trap, and it was sitting in the file whose own doc explains it. The
+/// body is still Linux-only by nature; what the pair buys is a call site that
+/// is type-checked on Windows too, so this cannot be renamed or given arguments
+/// without the local build noticing.
+#[cfg(target_os = "linux")]
+fn avoid_blank_webkit_window() {
+    if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
+        std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+    }
+}
+
+/// Nothing to do: WebView2 and WebKit-on-macOS have no DMA-BUF renderer.
+#[cfg(not(target_os = "linux"))]
+fn avoid_blank_webkit_window() {}
+
 pub fn run() {
     // First, before anything can panic. Until this existed every panic in the
     // app went to a stderr no packaged build has — see `logging`.
     logging::install_panic_hook();
 
-    // WebKitGTK's DMA-BUF renderer paints a blank window on a long list of
-    // driver/compositor combinations — the NVIDIA proprietary driver most
-    // often. The app starts, the process runs, and the user sees nothing,
-    // which is the single most common way a Tauri app "fails" on Linux.
-    // Only set when the user has not chosen for themselves.
-    #[cfg(target_os = "linux")]
-    if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
-        std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
-    }
+    avoid_blank_webkit_window();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {

@@ -632,7 +632,6 @@ mod tests {
         assert_eq!(ERR_BAD_CREDENTIALS, "jellyfin.badCredentials");
     }
 
-    use super::*;
     use serde_json::json;
 
     #[test]

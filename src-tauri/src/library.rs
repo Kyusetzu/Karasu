@@ -363,8 +363,7 @@ pub fn get_library_episodes(
 ) -> std::collections::HashMap<i64, Vec<u32>> {
     state
         .0
-        .lock()
-        .unwrap()
+        .guard()
         .summary
         .iter()
         .map(|e| (e.media_id, e.episodes.clone()))

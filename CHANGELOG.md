@@ -133,6 +133,8 @@ short version, grouped by what it means for someone using the app.
   items do not fit its box, so the last one was unreachable: arrowing down moved
   an invisible highlight and Enter opened something never on screen. It also
   announces the highlighted row to a screen reader now.
+- On Linux, mpv's IPC socket defaults to your own runtime directory rather than
+  a `/tmp` path shared with every other account on the machine.
 - An offline edit is no longer deleted when AniList answers with something
   recoverable — an expired token, a rate limit, a server fault. Only a payload
   AniList rejects on its own terms is dropped, and when one is, it says so.

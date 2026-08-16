@@ -1,6 +1,6 @@
 [package]
 name = "karasu"
-version = "0.136.13"
+version = "0.136.14"
 description = "A modern anime and manga tracker built exclusively for AniList"
 authors = ["Kyu"]
 license = "MIT"
@@ -73,7 +73,11 @@ serde_json = "1"
 reqwest = { version = "0.13", features = ["json", "gzip"] }
 # `net` + `io-util` are for the mpv IPC probe (named pipe / unix socket with
 # a real timeout); both were already compiled into the tree via tauri.
-tokio = { version = "1", features = ["time", "sync", "macros", "net", "io-util"] }
+# `rt` is for `spawn_blocking`, which three call sites use. It compiled
+# without it only because tauri pulls the same feature in and cargo unifies
+# them — so a dependency change elsewhere could have broken this build for a
+# reason nothing here would explain.
+tokio = { version = "1", features = ["time", "sync", "macros", "net", "io-util", "rt"] }
 rusqlite = { version = "0.40", features = ["bundled"] }
 regex = "1"
 discord-rich-presence = "1"

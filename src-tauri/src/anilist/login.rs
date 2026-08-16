@@ -73,8 +73,7 @@ pub fn start<R: Runtime>(app: AppHandle<R>) -> Result<String, String> {
         // A previous login attempt is still waiting — reuse its listener, and
         // its nonce, since that is what the running server will check against.
         return PENDING_STATE
-            .lock()
-            .unwrap()
+            .guard()
             .clone()
             .ok_or_else(|| "A login is already in progress".to_string());
     }

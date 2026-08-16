@@ -30,10 +30,33 @@ pub struct MpvConfig {
 }
 
 /// The name the settings hint suggests for `mpv.conf`.
+///
+/// A named pipe on Windows lives in a per-session namespace, so a constant is
+/// right there. A unix socket is a path, and `/tmp/karasu-mpv` is one path
+/// shared by every account on the machine: on a multi-user box the first user
+/// to run mpv owns the name, and the next either collides with it or connects
+/// to a socket somebody else is holding. `$XDG_RUNTIME_DIR` exists precisely
+/// for this — per-user, mode 0700, cleared at logout — with `/tmp` kept as the
+/// fallback for a session that has none, which is what shipped before.
+///
+/// A function rather than a `const`, because the answer is only known at
+/// runtime. The settings hint reads the same one, so the path the pane tells
+/// the user to put in `mpv.conf` is always the path Karasu will connect to.
 #[cfg(windows)]
-pub const DEFAULT_PIPE: &str = r"\\.\pipe\karasu-mpv";
+pub fn default_pipe() -> String {
+    r"\\.\pipe\karasu-mpv".to_string()
+}
+
 #[cfg(not(windows))]
-pub const DEFAULT_PIPE: &str = "/tmp/karasu-mpv";
+pub fn default_pipe() -> String {
+    match std::env::var_os("XDG_RUNTIME_DIR") {
+        Some(dir) if !dir.is_empty() => std::path::Path::new(&dir)
+            .join("karasu-mpv")
+            .to_string_lossy()
+            .into_owned(),
+        _ => "/tmp/karasu-mpv".to_string(),
+    }
+}
 
 /// One property per request id, ids being 1-based indexes into this list.
 const PROPS: [&str; 5] = ["media-title", "path", "playback-time", "duration", "pause"];

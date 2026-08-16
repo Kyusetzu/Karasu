@@ -12,6 +12,7 @@ import {
   LayoutDashboard,
   Library,
   BookOpen,
+  CloudUpload,
   PanelLeftClose,
   PanelLeftOpen,
   Search,
@@ -35,6 +36,7 @@ import { useAniListLogin } from "@/hooks/useAniListLogin";
 import { useListSummary } from "@/hooks/useListSummary";
 import { useManualSync } from "@/hooks/useManualSync";
 import { Avatar, UserLockup } from "@/components/ui/user-lockup";
+import SyncPanel from "./SyncPanel";
 
 /** The rail is the state change — one marker slides between items rather than
     each growing its own. See `useRailMarker`. */
@@ -216,7 +218,35 @@ function Account({
 
   const name = viewer?.name ?? t("sync.localProfile");
   const avatar = viewer?.avatar?.large ?? null;
-  const sync = syncLine(t, mode === "local", pending, syncedAt);
+  const local = mode === "local";
+  const sync = syncLine(t, local, pending, syncedAt);
+
+  const line = (
+    <span
+      className={cn(
+        "flex items-center gap-1.25 text-2xs leading-snug",
+        sync.accent ? "text-accent-400" : "text-ink-600",
+      )}
+    >
+      <span className="size-1.25 shrink-0 rounded-full bg-current" />
+      <span className="truncate">{sync.text}</span>
+    </span>
+  );
+
+  /**
+   * The line, and behind it the panel that explains it — except in local mode.
+   *
+   * A local list issues no request ever, so "0 queued · 30/30 · not throttled"
+   * would be three true statements implying a sync relationship that does not
+   * exist. There the line stays what it always was: a fact, not a button.
+   */
+  const syncNode = local ? (
+    <span className="mt-1 block px-1">{line}</span>
+  ) : (
+    <SyncPanel label={t("syncPanel.open")} className="mt-1">
+      <span className="block px-1 py-0.5">{line}</span>
+    </SyncPanel>
+  );
 
   // Collapsed, the sync line has nowhere to go — but "something is unsent" is
   // the one thing on it that must not disappear with the labels, so it becomes
@@ -231,7 +261,7 @@ function Account({
       </span>
     );
     return (
-      <div className="mx-2.5 mb-2 flex justify-center border-b border-surface-800 pb-3 pt-2">
+      <div className="mx-2.5 mb-2 flex flex-col items-center gap-1.5 border-b border-surface-800 pb-3 pt-2">
         {viewer ? (
           <NavLink
             to={`/user/${encodeURIComponent(viewer.name)}`}
@@ -243,6 +273,28 @@ function Account({
         ) : (
           body
         )}
+        {/* The panel survives the collapse — it is the only way to *read* what
+            the dot above is warning about, and losing it with the labels would
+            make the collapsed rail the one place the queue is unreadable. */}
+        {!local && (
+          <SyncPanel label={t("syncPanel.open")} className="w-auto">
+            <span
+              title={sync.text}
+              className={cn(
+                "grid size-6 place-items-center rounded-md",
+                sync.accent ? "text-accent-400" : "text-ink-600",
+              )}
+            >
+              {pending > 0 ? (
+                <span className="text-2xs font-semibold tabular-nums">
+                  {pending > 9 ? "9+" : pending}
+                </span>
+              ) : (
+                <CloudUpload className="size-3.25" />
+              )}
+            </span>
+          </SyncPanel>
+        )}
       </div>
     );
   }
@@ -253,17 +305,6 @@ function Account({
       src={avatar}
       size="sm"
       nameClassName="text-xs font-medium leading-snug text-ink-300"
-      sub={
-        <span
-          className={cn(
-            "flex items-center gap-1.25 text-2xs leading-snug",
-            sync.accent ? "text-accent-400" : "text-ink-600",
-          )}
-        >
-          <span className="size-1.25 shrink-0 rounded-full bg-current" />
-          <span className="truncate">{sync.text}</span>
-        </span>
-      }
     />
   );
 
@@ -282,6 +323,10 @@ function Account({
       ) : (
         lockup
       )}
+      {/* A sibling of the lockup rather than its `sub`, because the lockup is
+          wrapped in a link to the profile and a button inside an anchor is
+          invalid markup — the browser is free to drop either one. */}
+      {syncNode}
     </div>
   );
 }

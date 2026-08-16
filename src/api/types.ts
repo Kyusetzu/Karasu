@@ -138,6 +138,49 @@ export interface ListResult {
   lists: MediaListGroup[];
 }
 
+/**
+ * What the client knows about the ~30/min budget, as of the last response.
+ *
+ * Everything is nullable and each null means something different. `remaining`
+ * and `limit` are null until a response header has actually been seen — the
+ * client seeds a 30 to start with, and reporting a seed as a measurement is the
+ * one thing a headroom display must not do.
+ */
+export interface RateSnapshot {
+  remaining: number | null;
+  limit: number | null;
+  /** How long ago those numbers were read off a response. */
+  observedAgoMs: number | null;
+  /**
+   * How much longer the client is parked. **Never derived from `remaining`**:
+   * if AniList omits the header on a 429, `remaining` keeps its comfortable
+   * pre-429 value while the client waits out a two-minute `Retry-After`.
+   */
+  throttledForMs: number | null;
+  /** `"preflight"` (self-imposed breather) or `"retry-after"` (a real 429). */
+  throttleKind: string | null;
+}
+
+/** One unsent edit, described rather than carried — the payload stays in Rust. */
+export interface QueuedEdit {
+  id: number;
+  kind: "save" | "delete";
+  /** Media id for a save, list-entry id for a delete; null if unparsable. */
+  subject: number | null;
+  /** The fields this edit changes. Empty for a delete. */
+  fields: string[];
+  /** Unix *seconds*, from SQLite's clock. */
+  queuedAt: number;
+}
+
+export interface SyncStatus {
+  /** False in local mode, where nothing syncs by design. */
+  connected: boolean;
+  draining: boolean;
+  queued: QueuedEdit[];
+  rate: RateSnapshot;
+}
+
 export interface SaveEntryInput {
   mediaId: number;
   status?: MediaListStatus;

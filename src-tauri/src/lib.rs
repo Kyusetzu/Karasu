@@ -418,6 +418,7 @@ pub fn run() {
             commands::bulk_save_list_entries,
             commands::delete_list_entry,
             commands::flush_queue,
+            commands::sync_status,
             commands::get_profile_mode,
             commands::enable_local_mode,
             commands::local_fetch_list,

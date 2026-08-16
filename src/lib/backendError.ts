@@ -29,6 +29,8 @@ export function backendErrorText(
       return t("settings.jfErrNoUserId");
     case "jellyfin.badCredentials":
       return t("settings.jfErrBadCredentials");
+    case "queue.busy":
+      return t("receipt.syncBusy");
     default:
       return text;
   }

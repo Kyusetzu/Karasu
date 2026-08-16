@@ -1,9 +1,10 @@
 use crate::anilist::{
     auth,
-    client::{AniList, ApiError},
+    client::{AniList, ApiError, RateSnapshot},
 };
 use crate::db::Db;
 use serde_json::{json, Value};
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{AppHandle, State};
 
 // Siblings in the same module tree; `mod.rs` re-exports all of it, so
@@ -328,10 +329,16 @@ pub(crate) async fn save_entry_core(
     // and this path used to discard that list — so a permanently-rejected edit
     // vanished with only a log line, while the pending badge fell to zero and
     // the list simply did not contain the change.
+    //
+    // A drain that *skipped* leaves the queue standing, so it takes the same
+    // exit as a drain that failed. Otherwise this write goes out live while a
+    // concurrent drain still holds older rows for the same entry, and the older
+    // one lands on top of it — the ordering this block exists to preserve,
+    // undone by a case that used to be indistinguishable from success.
     if pending(db) > 0 {
         match process_queue(db, api, Some(token)).await {
-            Ok(drained) => report_dropped(app, &drained.dropped),
-            Err(_) => {
+            Ok(drained) if !drained.skipped => report_dropped(app, &drained.dropped),
+            _ => {
                 queue_push_deduped(db, "save", &input.to_string())?;
                 return Ok(MutationResult { queued: true, entry: None });
             }
@@ -438,8 +445,19 @@ pub async fn bulk_save_list_entries(
 
     // Anything already queued has to land first, or this write would be
     // overwritten by an older one replaying on top of it.
+    //
+    // A bulk edit cannot be queued itself (see below), so a drain that skipped
+    // has no safe continuation: the precondition is simply unmet. Refusing with
+    // a reason is the honest answer, and the sync it is waiting on is the one
+    // the panel is showing.
     if pending(&db) > 0 {
         let drained = process_queue(&db, &api, Some(&token)).await?;
+        if drained.skipped {
+            // A stable code, not a sentence — `lib/backendError.ts` turns it
+            // into the reader's language, the way every other user-facing
+            // failure composed in Rust does.
+            return Err("queue.busy".into());
+        }
         report_dropped(&app, &drained.dropped);
     }
 
@@ -706,6 +724,50 @@ pub(crate) struct Drained {
     pub flushed: usize,
     /// One message per queued edit AniList refused permanently.
     pub dropped: Vec<String>,
+    /// Another drain held the lock, so this call did nothing at all.
+    ///
+    /// Without this, the contention path returns `Ok { flushed: 0 }` — the exact
+    /// shape of "the queue was empty" — and a status surface reading that would
+    /// report "nothing to sync" at the precise moment a sync is running. That is
+    /// the lie the panel exists to end, so the distinction is in the type rather
+    /// than inferred by any one caller.
+    pub skipped: bool,
+}
+
+/// What a queued payload is *about*, before it is spelled as a dedupe key.
+///
+/// The formatter below is the only thing that turns this into a string. Two
+/// readers of the same payload — the dedupe and the sync panel — cannot then
+/// disagree about which entry a row touches or which fields it changes, which is
+/// what re-parsing the key string would have risked.
+pub(crate) struct QueueParts {
+    /// `mediaId` for a save, the list-entry `id` for a delete. The two number
+    /// spaces overlap freely; `kind` is what disambiguates them.
+    pub subject: i64,
+    /// The non-null fields the payload changes, sorted, `scoreFormat` excluded.
+    pub fields: Vec<String>,
+}
+
+pub(crate) fn queue_parts(kind: &str, payload: &str) -> Option<QueueParts> {
+    let value: Value = serde_json::from_str(payload).ok()?;
+    let obj = value.as_object()?;
+    let subject = match kind {
+        "save" => obj.get("mediaId")?.as_i64()?,
+        "delete" => obj.get("id")?.as_i64()?,
+        _ => return None,
+    };
+    let mut fields: Vec<String> = obj
+        .iter()
+        .filter(|(k, v)| {
+            k.as_str() != "scoreFormat"
+                && !v.is_null()
+                // The subject names the entry, it is not a change to it.
+                && k.as_str() != if kind == "save" { "mediaId" } else { "id" }
+        })
+        .map(|(k, _)| k.clone())
+        .collect();
+    fields.sort_unstable();
+    Some(QueueParts { subject, fields })
 }
 
 /// The identity a newly queued mutation supersedes.
@@ -726,19 +788,7 @@ pub(crate) struct Drained {
 /// `None` for a payload with no identifiable subject: it is left alone rather
 /// than guessed at.
 pub(crate) fn queue_key(kind: &str, payload: &str) -> Option<String> {
-    let value: Value = serde_json::from_str(payload).ok()?;
-    let obj = value.as_object()?;
-    let subject = match kind {
-        "save" => obj.get("mediaId")?.as_i64()?,
-        "delete" => obj.get("id")?.as_i64()?,
-        _ => return None,
-    };
-    let mut fields: Vec<&str> = obj
-        .iter()
-        .filter(|(k, v)| k.as_str() != "scoreFormat" && !v.is_null())
-        .map(|(k, _)| k.as_str())
-        .collect();
-    fields.sort_unstable();
+    let QueueParts { subject, fields } = queue_parts(kind, payload)?;
     Some(format!("{kind}:{subject}:{}", fields.join(",")))
 }
 
@@ -752,9 +802,9 @@ pub(crate) fn queue_key(kind: &str, payload: &str) -> Option<String> {
 fn queue_push_deduped(db: &Db, kind: &str, payload: &str) -> Result<(), String> {
     let user_id = viewer_id(db).ok_or("Not connected to AniList")?;
     if let Some(key) = queue_key(kind, payload) {
-        for (id, queued_kind, queued_payload) in db.queue_all(user_id) {
-            if queue_key(&queued_kind, &queued_payload).as_deref() == Some(key.as_str()) {
-                db.queue_remove(id);
+        for row in db.queue_all(user_id) {
+            if queue_key(&row.kind, &row.payload).as_deref() == Some(key.as_str()) {
+                db.queue_remove(row.id);
             }
         }
     }
@@ -788,6 +838,39 @@ fn queue_push_deduped(db: &Db, kind: &str, payload: &str) -> Result<(), String> 
 /// to avoid duplicate requests, which is the worse trade.
 static DRAIN: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
+/// Whether a drain is running right now, readable without touching `DRAIN`.
+///
+/// Deliberately *not* `DRAIN.try_lock().is_err()`. That takes the real lock, and
+/// since `process_queue` also acquires it with `try_lock`, a status read polling
+/// at 1 Hz would every so often be the reason a genuine drain skipped its pass.
+/// A status surface must not be able to change what it reports on.
+static DRAINING: AtomicBool = AtomicBool::new(false);
+
+/// Sets `DRAINING` for as long as it lives.
+///
+/// A `Drop` guard rather than a pair of stores because `process_queue` has three
+/// exits — the loop's `return Err` on a retryable failure, the normal end, and a
+/// panic — and a flag left standing after any of them would report a drain that
+/// is not happening for the rest of the process's life.
+struct DrainMark;
+
+impl DrainMark {
+    fn set() -> Self {
+        DRAINING.store(true, Ordering::Release);
+        DrainMark
+    }
+}
+
+impl Drop for DrainMark {
+    fn drop(&mut self) {
+        DRAINING.store(false, Ordering::Release);
+    }
+}
+
+pub(crate) fn drain_in_flight() -> bool {
+    DRAINING.load(Ordering::Acquire)
+}
+
 async fn process_queue(
     db: &Db,
     api: &AniList,
@@ -797,16 +880,18 @@ async fn process_queue(
     let mut dropped = Vec::new();
     // Someone else is already draining; their pass covers these rows.
     let Ok(_drain) = DRAIN.try_lock() else {
-        return Ok(Drained { flushed, dropped });
+        return Ok(Drained { flushed, dropped, skipped: true });
     };
+    let _mark = DrainMark::set();
     // Only this account's rows. The drain runs on every list fetch with
     // whatever token is loaded now, and the queue outlives a sign-out, so an
     // unscoped read here is what wrote one user's pending edits onto another
     // user's list. Signed out there is nothing to drain at all.
     let Some(user_id) = viewer_id(db) else {
-        return Ok(Drained { flushed, dropped });
+        return Ok(Drained { flushed, dropped, skipped: false });
     };
-    for (id, kind, payload) in db.queue_all(user_id) {
+    for row in db.queue_all(user_id) {
+        let (id, kind, payload) = (row.id, row.kind, row.payload);
         let mut variables: Value =
             serde_json::from_str(&payload).unwrap_or_else(|_| json!({}));
         // Re-stamped at drain time: the format may have changed since the
@@ -845,7 +930,7 @@ async fn process_queue(
             }
         }
     }
-    Ok(Drained { flushed, dropped })
+    Ok(Drained { flushed, dropped, skipped: false })
 }
 
 /// Tells the user when a queued edit was thrown away.
@@ -867,6 +952,77 @@ fn report_dropped(app: &AppHandle, dropped: &[String]) {
     crate::alerts::notify::notify(app, "queue", crate::i18n::Msg::QueueTitle, body, None);
 }
 
+/// One queued edit, described rather than replayed.
+///
+/// The payload itself never crosses to the frontend. It carries a `scoreRaw`, a
+/// notes body and whatever else the user typed, and none of that is needed to
+/// say "progress and status, waiting since 10 minutes ago".
+#[derive(serde::Serialize)]
+pub struct QueuedEdit {
+    pub id: i64,
+    /// `"save"` or `"delete"`.
+    pub kind: String,
+    /// The media id for a save, the list-entry id for a delete — and `None`
+    /// when the payload does not parse.
+    ///
+    /// A row with no subject is still a row. Dropping it would make the panel's
+    /// count disagree with the pending badge, which reads `COUNT(*)`, and the
+    /// unlabelled row is exactly the one a user would want to see.
+    pub subject: Option<i64>,
+    /// The fields this edit changes, for the row's summary line.
+    pub fields: Vec<String>,
+    #[serde(rename = "queuedAt")]
+    pub queued_at: i64,
+}
+
+/// Everything the sync panel renders.
+///
+/// Costs no AniList request: SQLite and two in-process values. That is what
+/// makes polling it acceptable at all — the ~30/min budget is shared with the
+/// scrobbler and three alert passes, and a status surface that spent it would be
+/// the problem it is meant to show.
+#[derive(serde::Serialize)]
+pub struct SyncStatus {
+    /// Signed in to AniList. False in local mode, where nothing syncs by
+    /// design and an empty queue is not the same statement.
+    pub connected: bool,
+    pub draining: bool,
+    pub queued: Vec<QueuedEdit>,
+    pub rate: RateSnapshot,
+}
+
+/// The state of the sync, for the panel behind the pending badge.
+#[tauri::command]
+pub async fn sync_status(
+    db: State<'_, Db>,
+    api: State<'_, AniList>,
+) -> Result<SyncStatus, String> {
+    let viewer = viewer_id(&db);
+    let queued = viewer
+        .map(|user_id| {
+            db.queue_all(user_id)
+                .into_iter()
+                .map(|row| {
+                    let parts = queue_parts(&row.kind, &row.payload);
+                    QueuedEdit {
+                        id: row.id,
+                        subject: parts.as_ref().map(|p| p.subject),
+                        fields: parts.map(|p| p.fields).unwrap_or_default(),
+                        kind: row.kind,
+                        queued_at: row.created_at,
+                    }
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    Ok(SyncStatus {
+        connected: viewer.is_some(),
+        draining: drain_in_flight(),
+        queued,
+        rate: api.rate_snapshot().await,
+    })
+}
+
 /// Manually triggered sync of the offline queue (e.g. a button in the UI).
 #[tauri::command]
 pub async fn flush_queue(
@@ -882,7 +1038,46 @@ pub async fn flush_queue(
 
 #[cfg(test)]
 mod tests {
-    use super::{bulk_chunks, queue_key, BULK_CHUNK};
+    use super::{bulk_chunks, queue_key, queue_parts, BULK_CHUNK};
+
+    /// The panel and the dedupe read one function, so they cannot disagree
+    /// about what a payload touches. This is that agreement, spelled out.
+    #[test]
+    fn the_parts_and_the_key_describe_the_same_edit() {
+        for (kind, payload) in [
+            ("save", r#"{"mediaId":7,"progress":3,"status":"CURRENT"}"#),
+            ("delete", r#"{"id":42}"#),
+        ] {
+            let parts = queue_parts(kind, payload).unwrap();
+            let key = queue_key(kind, payload).unwrap();
+            assert!(key.starts_with(&format!("{kind}:{}:", parts.subject)));
+            assert!(parts.fields.iter().all(|f| key.contains(f.as_str())));
+        }
+        // And they agree about a payload with no subject at all.
+        assert!(queue_parts("save", r#"{"progress":3}"#).is_none());
+        assert!(queue_key("save", r#"{"progress":3}"#).is_none());
+    }
+
+    /// The subject names the entry rather than describing a change to it, so
+    /// it does not appear in the row's summary. Equivalence is untouched: a
+    /// save always carries `mediaId`, so removing it removes a constant.
+    #[test]
+    fn the_subject_is_not_one_of_the_changed_fields() {
+        let parts = queue_parts("save", r#"{"mediaId":7,"progress":3}"#).unwrap();
+        assert_eq!(parts.fields, ["progress"]);
+        assert!(queue_parts("delete", r#"{"id":42}"#).unwrap().fields.is_empty());
+    }
+
+    /// Same exclusion as the key's, for the same reason: `scoreFormat` is
+    /// re-stamped at drain time and describes the app, not the edit. A row
+    /// reading "score format, score" would name a field the user never set.
+    #[test]
+    fn the_score_format_is_never_a_changed_field() {
+        let parts =
+            queue_parts("save", r#"{"mediaId":1,"scoreRaw":80,"scoreFormat":"POINT_5"}"#)
+                .unwrap();
+        assert_eq!(parts.fields, ["scoreRaw"]);
+    }
 
     /// The case the dedupe exists for: bump progress five times offline and
     /// five identical mutations replay into a ~30/min budget to reach the

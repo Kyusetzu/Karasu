@@ -12,6 +12,9 @@ describe("backendErrorText", () => {
     expect(backendErrorText(new Error("jellyfin.badCredentials"), t)).toBe(
       "T:settings.jfErrBadCredentials",
     );
+    // A bulk edit refused because a drain already holds the queue lock. It
+    // cannot be queued itself, so the refusal has to say why.
+    expect(backendErrorText("queue.busy", t)).toBe("T:receipt.syncBusy");
   });
 
   /**

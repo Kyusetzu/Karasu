@@ -7,6 +7,7 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import * as api from "@/api/anilist";
 import { getLogDebug, getLogs, setLogDebug, type LogEntry } from "@/api/diagnostics";
+import { backendErrorText } from "@/lib/backendError";
 import { planRescale } from "@/lib/rescale";
 import { buildJsonExport, buildMalXml } from "@/lib/malExport";
 import { parseMalXml } from "@/lib/malImport";
@@ -100,7 +101,13 @@ export function RescaleSection() {
       });
       await qc.invalidateQueries({ queryKey: ["mediaList", type] });
     } catch (e) {
-      showToast({ kind: "error", text: t("settings.rescaleFailed"), detail: String(e) });
+      // Through the mapper, not `String(e)`: the backend answers with stable
+      // codes now, and a German UI showed them raw.
+      showToast({
+        kind: "error",
+        text: t("settings.rescaleFailed"),
+        detail: backendErrorText(e, t),
+      });
     } finally {
       setApplying(false);
     }

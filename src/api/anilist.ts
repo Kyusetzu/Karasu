@@ -8,6 +8,7 @@ import type {
   MediaType,
   MutationResult,
   SaveEntryInput,
+  SyncStatus,
   Viewer,
 } from "./types";
 
@@ -210,6 +211,16 @@ export const bulkSaveEntries = async (
 };
 
 export const flushQueue = () => invoke<number>("flush_queue");
+
+/**
+ * What the sync is doing, for the panel behind the pending line.
+ *
+ * Costs no AniList request — it reads SQLite and two in-process values — which
+ * is the only reason polling it is acceptable at all. The ~30/min budget it
+ * reports on is shared with the scrobbler and three alert passes, and a status
+ * surface that spent it would be the problem it exists to show.
+ */
+export const syncStatus = () => invoke<SyncStatus>("sync_status");
 
 // --- Sign-in merge (local list -> AniList) ---------------------------------
 

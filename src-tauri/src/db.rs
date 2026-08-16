@@ -369,6 +369,23 @@ pub struct NotificationRow {
     pub read: bool,
 }
 
+/// One row of the offline queue.
+///
+/// `created_at` has been written since the table existed and was never read
+/// back — the drain does not care how old a write is, it just sends it. The
+/// sync panel does care: "queued 20 minutes ago" is the difference between a
+/// backlog that is moving and one that is stuck, and it is the only thing in a
+/// queued row that a user can sanity-check against their own memory. No
+/// migration; the column was always there.
+#[derive(Debug, Clone)]
+pub struct QueuedRow {
+    pub id: i64,
+    pub kind: String,
+    pub payload: String,
+    /// Unix seconds, from SQLite's own clock (`strftime('%s','now')`).
+    pub created_at: i64,
+}
+
 /// Statuses emitted as list groups in local mode. Emitting all of them
 /// (even when empty) mirrors the AniList response shape so the shared
 /// optimistic-cache logic finds a target group on every status change.
@@ -730,17 +747,24 @@ impl Db {
 
     /// Everything queued by `user_id`, oldest first. Another account's rows are
     /// not returned — not as an empty-list fallback, not at all.
-    pub fn queue_all(&self, user_id: i64) -> Vec<(i64, String, String)> {
+    pub fn queue_all(&self, user_id: i64) -> Vec<QueuedRow> {
         let conn = self.0.guard();
         let mut stmt = match conn.prepare(
-            "SELECT id, kind, payload FROM offline_queue WHERE user_id = ?1 ORDER BY id",
+            "SELECT id, kind, payload, created_at FROM offline_queue WHERE user_id = ?1 ORDER BY id",
         ) {
             Ok(s) => s,
             Err(_) => return Vec::new(),
         };
-        stmt.query_map([user_id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
-            .map(|rows| rows.filter_map(Result::ok).collect())
-            .unwrap_or_default()
+        stmt.query_map([user_id], |r| {
+            Ok(QueuedRow {
+                id: r.get(0)?,
+                kind: r.get(1)?,
+                payload: r.get(2)?,
+                created_at: r.get(3)?,
+            })
+        })
+        .map(|rows| rows.filter_map(Result::ok).collect())
+        .unwrap_or_default()
     }
 
     pub fn queue_remove(&self, id: i64) {
@@ -2202,7 +2226,10 @@ mod tests {
         // distinction.
         let theirs = db.queue_all(222);
         assert_eq!(theirs.len(), 1);
-        assert!(theirs[0].2.contains("\"mediaId\":3"));
+        assert!(theirs[0].payload.contains("\"mediaId\":3"));
+        // `created_at` is read back rather than merely written. It is stamped by
+        // SQLite, so any positive value proves the column reached the struct.
+        assert!(theirs[0].created_at > 0);
         assert_eq!(db.queue_len(222), 1);
         // A third account with nothing queued drains nothing.
         assert!(db.queue_all(333).is_empty());

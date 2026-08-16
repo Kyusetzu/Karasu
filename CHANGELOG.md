@@ -30,6 +30,13 @@ short version, grouped by what it means for someone using the app.
 
 ### Fixed
 
+- **Account-free mode no longer wipes an entry when you edit one field of it.**
+  Every quick control — `+1`, the status dropdown, the score select, the bulk
+  bar, the detail editor — sends only the field you changed, and the local list
+  was filling in the rest with defaults: a `+1` reset the status to Planning and
+  zeroed the score, repeat count, volume count, notes and tags. Absent now means
+  "leave it alone" for every field, as it always has for AniList.
+
 - An offline edit is no longer deleted when AniList answers with something
   recoverable — an expired token, a rate limit, a server fault. Only a payload
   AniList rejects on its own terms is dropped, and when one is, it says so.

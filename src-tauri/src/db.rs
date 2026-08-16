@@ -376,21 +376,27 @@ pub struct LocalRow {
 /// One write to the local list.
 ///
 /// A struct rather than the thirteen positional arguments this would otherwise
-/// be — the same reason `DetectionOverride` stopped being a tuple. Three of
-/// these fields are `Option` and mean "leave it alone" rather than "set it to
-/// nothing", which is a distinction no reader of `local_upsert(…, None, None,
-/// …)` would have made.
+/// be — the same reason `DetectionOverride` stopped being a tuple.
+///
+/// **Every field but the key and the timestamp is `Option`, and `None` means
+/// "leave it alone" rather than "set it to nothing"** — the same contract
+/// AniList gives an absent GraphQL variable. That has to hold for all of them,
+/// because almost nothing in the UI sends a whole entry: `+1` on a list row
+/// sends `progress` alone, the status dropdown sends `status` alone, the bulk
+/// bar sends one field across a whole selection, and the detail editor omits
+/// `progressVolumes` entirely. v14 gave the contract to `private` and the two
+/// dates and left the other six defaulting to `PLANNING`/`0`/`""`, so a `+1`
+/// reset the status, score, repeat, volume count and notes of the row it was
+/// incrementing — and the tags with the notes, since they share the column.
 pub struct LocalWrite<'a> {
     pub media_id: i64,
     pub media_type: &'a str,
-    pub status: &'a str,
-    pub progress: i64,
-    pub progress_volumes: i64,
-    pub score: f64,
-    pub repeat: i64,
-    pub notes: &'a str,
-    /// `None` leaves the stored value alone, matching what AniList does with an
-    /// absent variable — which is what the editor sends for an untouched field.
+    pub status: Option<&'a str>,
+    pub progress: Option<i64>,
+    pub progress_volumes: Option<i64>,
+    pub score: Option<f64>,
+    pub repeat: Option<i64>,
+    pub notes: Option<&'a str>,
     pub private: Option<bool>,
     pub started_at: Option<&'a str>,
     pub completed_at: Option<&'a str>,
@@ -700,23 +706,28 @@ impl Db {
     pub fn local_upsert(&self, w: LocalWrite<'_>) -> Result<(), String> {
         let conn = self.0.guard();
         conn.execute(
-            // The three `COALESCE`d columns are the ones whose absence means
-            // "unchanged" — the same contract AniList gives an absent GraphQL
-            // variable, and what the editor relies on when it sends a date only
-            // once the user has touched it. Clearing a date is spelled the way
-            // AniList spells it, as an object with every part null, which is a
-            // present value here rather than an absent one.
+            // Absent means "unchanged" for every column here — the same contract
+            // AniList gives an absent GraphQL variable, and what the whole UI
+            // relies on, since almost nothing sends a complete entry. A first
+            // insert has no previous value to keep, so the `VALUES` list carries
+            // the neutral defaults; the `DO UPDATE` clause keeps what is there.
+            //
+            // Clearing a date is spelled the way AniList spells it, as an object
+            // with every part null, which is a present value here rather than an
+            // absent one.
             "INSERT INTO local_list
                 (media_id, media_type, status, progress, progress_volumes, score, repeat,
                  notes, tags, private, started_at, completed_at, updated_ms, media_json)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, '', COALESCE(?9, 0), ?10, ?11, ?12, ?13)
+             VALUES (?1, ?2, COALESCE(?3, 'PLANNING'), COALESCE(?4, 0), COALESCE(?5, 0),
+                     COALESCE(?6, 0.0), COALESCE(?7, 0), COALESCE(?8, ''), '',
+                     COALESCE(?9, 0), ?10, ?11, ?12, ?13)
              ON CONFLICT(media_id, media_type) DO UPDATE SET
-                status = excluded.status,
-                progress = excluded.progress,
-                progress_volumes = excluded.progress_volumes,
-                score = excluded.score,
-                repeat = excluded.repeat,
-                notes = excluded.notes,
+                status = COALESCE(?3, local_list.status),
+                progress = COALESCE(?4, local_list.progress),
+                progress_volumes = COALESCE(?5, local_list.progress_volumes),
+                score = COALESCE(?6, local_list.score),
+                repeat = COALESCE(?7, local_list.repeat),
+                notes = COALESCE(?8, local_list.notes),
                 private = COALESCE(?9, local_list.private),
                 started_at = COALESCE(?10, local_list.started_at),
                 completed_at = COALESCE(?11, local_list.completed_at),
@@ -1625,7 +1636,7 @@ mod tests {
         // progress` from a list row sends none of the three. Absent has to mean
         // "leave it alone" or an unrelated save would quietly wipe all of them.
         db.local_upsert(LocalWrite {
-            progress: 5,
+            progress: Some(5),
             updated_ms: 2_000,
             ..write(4, "ANIME")
         })
@@ -1647,6 +1658,83 @@ mod tests {
         let e = entry(&db);
         assert_eq!(e["private"], false);
         assert_eq!(e["startedAt"]["year"], Value::Null);
+    }
+
+    /// The contract above, for the other six columns.
+    ///
+    /// v14 gave "absent means unchanged" to `private` and the two dates and left
+    /// status, progress, volumes, score, repeat and notes writing `excluded.*`
+    /// unconditionally — so a `+1` from a list row, which sends `progress` and
+    /// nothing else, reset the status to PLANNING and the rest to zero, taking
+    /// the tags with the notes they share a column with. Every quick control in
+    /// the app sends exactly one field, so this was the common case, not an edge.
+    ///
+    /// Built from `patch()` rather than `write()` on purpose: the older helper
+    /// always supplies a status, which is what kept the test above blind to this.
+    #[test]
+    fn a_partial_local_save_leaves_every_untouched_field_alone() {
+        let db = mem_db();
+        db.local_upsert(LocalWrite {
+            status: Some("CURRENT"),
+            progress: Some(3),
+            progress_volumes: Some(12),
+            score: Some(8.0),
+            repeat: Some(2),
+            notes: Some("a note"),
+            media_json: Some("{}"),
+            ..write(4, "ANIME")
+        })
+        .unwrap();
+
+        // What `local_save_entry` builds for `{ mediaId, progress }`.
+        db.local_upsert(LocalWrite {
+            progress: Some(4),
+            ..patch(4, "ANIME")
+        })
+        .unwrap();
+
+        let row = db.local_all().into_iter().find(|r| r.media_id == 4).unwrap();
+        assert_eq!(row.progress, 4, "the field that was sent");
+        assert_eq!(row.status, "CURRENT", "not reset to PLANNING");
+        assert_eq!(row.score, 8.0);
+        assert_eq!(row.repeat, 2);
+        assert_eq!(row.progress_volumes, 12);
+        assert_eq!(row.notes, "a note", "and so the tags sharing the column");
+
+        // The status dropdown is the same shape and used to zero `progress`
+        // too — an entry at episode 137 came back at 0 for being paused.
+        db.local_upsert(LocalWrite {
+            status: Some("PAUSED"),
+            ..patch(4, "ANIME")
+        })
+        .unwrap();
+        let row = db.local_all().into_iter().find(|r| r.media_id == 4).unwrap();
+        assert_eq!(row.status, "PAUSED");
+        assert_eq!(row.progress, 4, "not zeroed by a status-only save");
+        assert_eq!(row.score, 8.0);
+    }
+
+    /// A row that does not exist yet has no previous value to keep, so the
+    /// neutral defaults still apply — they just moved to the `VALUES` list.
+    /// `LocalLibrary`'s "add to list" sends `{mediaId, status}` and relies on it.
+    #[test]
+    fn a_first_local_write_still_gets_the_neutral_defaults() {
+        let db = mem_db();
+        db.local_upsert(LocalWrite {
+            status: Some("PLANNING"),
+            media_json: Some("{}"),
+            ..patch(42, "ANIME")
+        })
+        .unwrap();
+
+        let row = db.local_all().into_iter().find(|r| r.media_id == 42).unwrap();
+        assert_eq!(row.status, "PLANNING");
+        assert_eq!(row.progress, 0);
+        assert_eq!(row.score, 0.0);
+        assert_eq!(row.repeat, 0);
+        assert_eq!(row.progress_volumes, 0);
+        assert_eq!(row.notes, "");
+        assert!(!row.private);
     }
 
     /// Portable mode's copy step. Also pins that SQLite accepts a bound
@@ -1754,16 +1842,21 @@ mod tests {
     /// local list dropped the volume half entirely before this.
     /// Every field a test does not care about, so the ones it does care about
     /// are the only ones written out at the call site.
+    ///
+    /// `status` is `Some("CURRENT")` because most tests here read the row back
+    /// out of `local_list_json`, which groups by status. That makes this helper
+    /// blind to the partial-save bug by construction — a `LocalWrite` built
+    /// from it always *sends* a status — so the test for that uses `patch()`.
     fn write(media_id: i64, media_type: &'static str) -> LocalWrite<'static> {
         LocalWrite {
             media_id,
             media_type,
-            status: "CURRENT",
-            progress: 0,
-            progress_volumes: 0,
-            score: 0.0,
-            repeat: 0,
-            notes: "",
+            status: Some("CURRENT"),
+            progress: Some(0),
+            progress_volumes: Some(0),
+            score: Some(0.0),
+            repeat: Some(0),
+            notes: Some(""),
             private: None,
             started_at: None,
             completed_at: None,
@@ -1772,12 +1865,34 @@ mod tests {
         }
     }
 
+    /// What the UI actually sends: a key, a timestamp, and nothing else.
+    ///
+    /// The shape `local_save_entry` produces for `{mediaId, progress}` — a `+1`
+    /// from a list row. Every absent field must survive the write.
+    fn patch(media_id: i64, media_type: &'static str) -> LocalWrite<'static> {
+        LocalWrite {
+            media_id,
+            media_type,
+            status: None,
+            progress: None,
+            progress_volumes: None,
+            score: None,
+            repeat: None,
+            notes: None,
+            private: None,
+            started_at: None,
+            completed_at: None,
+            media_json: None,
+            updated_ms: 2_000,
+        }
+    }
+
     #[test]
     fn local_list_round_trips_volumes() {
         let db = mem_db();
         db.local_upsert(LocalWrite {
-            progress: 120,
-            progress_volumes: 12,
+            progress: Some(120),
+            progress_volumes: Some(12),
             media_json: Some("{}"),
             ..write(7, "MANGA")
         })
@@ -1797,8 +1912,8 @@ mod tests {
 
         // A chapter-only edit must not silently reset the volume count.
         db.local_upsert(LocalWrite {
-            progress: 121,
-            progress_volumes: 12,
+            progress: Some(121),
+            progress_volumes: Some(12),
             updated_ms: 2_000,
             ..write(7, "MANGA")
         })
@@ -1863,10 +1978,10 @@ mod tests {
     fn local_upsert_and_render() {
         let db = mem_db();
         db.local_upsert(LocalWrite {
-            progress: 3,
-            score: 8.0,
-            repeat: 1,
-            notes: "note",
+            progress: Some(3),
+            score: Some(8.0),
+            repeat: Some(1),
+            notes: Some("note"),
             media_json: Some(r#"{"id":5,"title":{"romaji":"X"}}"#),
             updated_ms: 2_000,
             ..write(5, "ANIME")
@@ -1894,15 +2009,15 @@ mod tests {
     fn local_upsert_keeps_media_json_on_field_edit() {
         let db = mem_db();
         db.local_upsert(LocalWrite {
-            status: "PLANNING",
+            status: Some("PLANNING"),
             media_json: Some("{\"id\":1}"),
             ..write(1, "MANGA")
         })
         .unwrap();
         // Edit without re-supplying media metadata.
         db.local_upsert(LocalWrite {
-            progress: 2,
-            progress_volumes: 1,
+            progress: Some(2),
+            progress_volumes: Some(1),
             updated_ms: 3_000,
             ..write(1, "MANGA")
         })
@@ -1917,9 +2032,9 @@ mod tests {
     fn local_delete_removes_row() {
         let db = mem_db();
         db.local_upsert(LocalWrite {
-            status: "COMPLETED",
-            progress: 12,
-            score: 10.0,
+            status: Some("COMPLETED"),
+            progress: Some(12),
+            score: Some(10.0),
             media_json: Some("{}"),
             ..write(9, "ANIME")
         })

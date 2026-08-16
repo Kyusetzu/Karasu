@@ -542,24 +542,28 @@ pub fn local_save_entry(
         .ok_or("mediaType required for a new local entry")?;
     validate_media_type(&media_type)?;
 
-    let status = input.get("status").and_then(|v| v.as_str()).unwrap_or("PLANNING");
-    let progress = input.get("progress").and_then(|v| v.as_i64()).unwrap_or(0);
-    let progress_volumes = input
-        .get("progressVolumes")
-        .and_then(|v| v.as_i64())
-        .unwrap_or(0);
-    let score = input.get("score").and_then(|v| v.as_f64()).unwrap_or(0.0);
-    let repeat = input.get("repeat").and_then(|v| v.as_i64()).unwrap_or(0);
-    let notes = input.get("notes").and_then(|v| v.as_str()).unwrap_or("");
+    // Absent means "leave it alone", exactly as it does for AniList, and that
+    // has to hold for every field rather than some of them: a `+1` from a list
+    // row sends `progress` alone, the status dropdown sends `status` alone, the
+    // bulk bar sends one field across a whole selection, and the detail editor
+    // never sends `progressVolumes`. Defaulting the absent ones here is what
+    // used to reset the rest of the row on every quick edit — the neutral
+    // values now live in `local_upsert`'s `VALUES` list, where they apply only
+    // to a row that has no previous value to keep.
+    //
+    // Dates are stored as the `FuzzyDate` object the frontend already speaks;
+    // clearing one arrives as that object with every part null, which is a
+    // value rather than an absence.
+    let status = input.get("status").and_then(|v| v.as_str());
+    let progress = input.get("progress").and_then(|v| v.as_i64());
+    let progress_volumes = input.get("progressVolumes").and_then(|v| v.as_i64());
+    let score = input.get("score").and_then(|v| v.as_f64());
+    let repeat = input.get("repeat").and_then(|v| v.as_i64());
+    let notes = input.get("notes").and_then(|v| v.as_str());
     let media_json = input
         .get("media")
         .filter(|m| !m.is_null())
         .map(|m| m.to_string());
-    // Absent means "leave it alone", exactly as it does for AniList — the
-    // editor sends a date only once the user has touched one, and a `+1
-    // progress` from a list row sends neither. Stored as the `FuzzyDate` object
-    // the frontend already speaks; clearing a date arrives as that object with
-    // every part null, which is a value rather than an absence.
     let private = input.get("private").and_then(|v| v.as_bool());
     let started_at = fuzzy_date_text(&input, "startedAt");
     let completed_at = fuzzy_date_text(&input, "completedAt");
@@ -581,17 +585,18 @@ pub fn local_save_entry(
         updated_ms: ts,
     })?;
 
+    // Only the facts this call actually established. It used to echo all six
+    // scalars, which after the change above would be a fabrication: an absent
+    // `score` is not `0`, it is whatever the row already held, and this function
+    // no longer knows. Nothing reads them today — `MediaCard` takes `entry.id`
+    // and `useListMutations` takes `advancedScores`, which local mode never
+    // sends — but a future reconcile-from-response would have inherited the very
+    // bug this commit removes.
     Ok(MutationResult {
         queued: false,
         entry: Some(json!({
             "id": media_id,
             "mediaId": media_id,
-            "status": status,
-            "progress": progress,
-            "progressVolumes": progress_volumes,
-            "score": score,
-            "repeat": repeat,
-            "notes": notes,
             "updatedAt": ts / 1000,
         })),
     })

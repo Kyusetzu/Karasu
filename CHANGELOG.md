@@ -102,6 +102,11 @@ short version, grouped by what it means for someone using the app.
   exist" — a definite claim about someone else's account, made because the
   network was down. A real not-found still reads as one; everything else says
   what failed and offers a retry.
+- Relative timestamps ("3m", "5h", "2d") are translated. They were hardcoded
+  English sitting directly beside a translated "now"; German now reads 3 Min. /
+  3 h / 3 T.
+- The franchise graph's status legend uses the right vocabulary — it said
+  "Watching" over a manga graph whose own cards said "Reading".
 - An offline edit is no longer deleted when AniList answers with something
   recoverable — an expired token, a rate limit, a server fault. Only a payload
   AniList rejects on its own terms is dropped, and when one is, it says so.

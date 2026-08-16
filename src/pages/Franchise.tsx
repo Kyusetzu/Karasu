@@ -114,6 +114,9 @@ export default function Franchise() {
     [data],
   );
 
+  /** Which vocabulary the status legend speaks — see its comment below. */
+  const legendType = byId.get(data?.rootId ?? -1)?.type ?? "ANIME";
+
   const links = useMemo(
     () =>
       !data || !layout
@@ -180,7 +183,15 @@ export default function Franchise() {
                 className="size-2.5 rounded-[.1875rem]"
                 style={{ border: outline(status) }}
               />
-              {status ? t(`status.ANIME.${status}`) : t("franchise.notOnList")}
+              {/* The graph carries manga by construction — an adaptation edge
+                  is the usual reason to open it — and the node cards below
+                  resolve `status.${node.type}`, so a pinned ANIME here read
+                  "Watching" for a legend sitting over "Reading". The root's own
+                  type is the franchise's, and it is what the user navigated
+                  from. */}
+              {status
+                ? t(`status.${legendType}.${status}`)
+                : t("franchise.notOnList")}
             </span>
           ))}
         </div>

@@ -444,7 +444,6 @@ export const en = {
     view: "View",
     gridView: "Grid view",
     listView: "List view",
-    empty: "No entries.",
     progressMax: "Progress (max. {{max}})",
   },
   search: {
@@ -796,7 +795,6 @@ export const en = {
     label: "Tags",
     placeholder: "Add a tag …",
     remove: "Remove {{tag}}",
-    filter: "Filter by tag",
     allTags: "All tags",
   },
   merge: {

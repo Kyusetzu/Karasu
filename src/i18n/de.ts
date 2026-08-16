@@ -445,7 +445,6 @@ export const de: typeof en = {
     view: "Ansicht",
     gridView: "Rasteransicht",
     listView: "Listenansicht",
-    empty: "Keine Einträge.",
     progressMax: "Fortschritt (max. {{max}})",
   },
   search: {
@@ -799,7 +798,6 @@ export const de: typeof en = {
     label: "Tags",
     placeholder: "Tag hinzufügen …",
     remove: "{{tag}} entfernen",
-    filter: "Nach Tag filtern",
     allTags: "Alle Tags",
   },
   merge: {

@@ -198,6 +198,22 @@ AniList, you approve access, and Karasu logs you in automatically. (A manual
 token paste is available as a fallback.) You can also pick **Use without an
 account** to track locally and connect later.
 
+It installs for the current user only — into `%LOCALAPPDATA%`, with no UAC
+prompt and nothing written outside your own profile.
+
+> **Upgrading over an existing install.** Run the installer with `/UPDATE` and
+> it skips the "uninstall the existing version or keep it" page and simply
+> replaces what is there:
+>
+> ```
+> Karasu_0.140.0_x64-setup.exe /UPDATE
+> ```
+>
+> Add `/P` for a passive run, which also skips the Welcome and Finish pages and
+> shows only a progress bar. Karasu's own updater already passes `/P /R /UPDATE`,
+> so **none of this applies to an in-app update** — it is only worth knowing
+> when you have downloaded a `setup.exe` and are running it by hand.
+
 > **About the SmartScreen warning.** The installer is **unsigned** — Karasu
 > is a small solo-maintained project, and a Windows code-signing certificate
 > costs money that doesn't currently make sense here. On first run, Windows

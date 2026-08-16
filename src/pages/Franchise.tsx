@@ -70,7 +70,10 @@ export default function Franchise() {
 
   const level = useContentFilter((s) => s.level);
   const filterReady = useContentFilter((s) => s.ready);
-  const userId = useAuth((s) => s.viewer?.id);
+  // `?? 0` for the same reason as every other screen: in local mode the cached
+  // list lives under `0`, so keying on `undefined` meant the rail could not see
+  // a local entry — no status badge, and the editor opened on nothing.
+  const userId = useAuth((s) => s.viewer?.id) ?? 0;
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["franchise", rootId, level],

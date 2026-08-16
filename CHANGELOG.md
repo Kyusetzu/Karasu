@@ -109,6 +109,16 @@ short version, grouped by what it means for someone using the app.
   "Watching" over a manga graph whose own cards said "Reading".
 - Jellyfin's sign-in errors are translated. "Wrong username or password" was
   composed in Rust and printed verbatim, so a German UI showed it in English.
+- **Five things that were reading or writing the wrong cache entry.** The
+  sidebar's Anime and Manga counts were blank for the whole of account-free mode
+  and the franchise rail could not see a local entry (both keyed on `undefined`
+  where every other screen keys on `0`); the favourite heart on a character,
+  staff or studio page patched a *media* entry keyed by a character id and never
+  moved; liking a thread updated nothing on screen; and the thread author's
+  avatar was always missing, because the query asked for a size the page does
+  not read.
+- Fetching media in bulk no longer fires every batch at once into a shared
+  ~30/min budget.
 - An offline edit is no longer deleted when AniList answers with something
   recoverable — an expired token, a rate limit, a server fault. Only a payload
   AniList rejects on its own terms is dropped, and when one is, it says so.

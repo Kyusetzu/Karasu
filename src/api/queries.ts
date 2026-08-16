@@ -387,15 +387,25 @@ query ($ids: [Int], $scoreFormat: ScoreFormat) {
  */
 export async function mediaByIds(ids: number[]): Promise<Media[]> {
   if (ids.length === 0) return [];
-  const pages = await Promise.all(
-    chunk(ids).map((batch) =>
-      gql<{ Page: { media: Media[] } }>(MEDIA_BY_IDS_QUERY, {
-        ids: batch,
-        ...scoreFormatVar(),
-      }),
-    ),
-  );
-  return pages.flatMap((p) => p.Page.media);
+  // Sequential, not `Promise.all`. The chunks are 50 ids each, and a large
+  // unmatched library is several of them — fired at once they arrive as one
+  // burst against a ~30/min budget shared with the scrobbler and three alert
+  // passes, and `LocalLibrary` mounts two of these. The limiter in
+  // `anilist/client.rs` reads its budget and drops the lock before any response
+  // header lands, so it cannot see a burst it has not sent yet; spacing them
+  // here is what keeps it able to.
+  //
+  // The cost is latency on a screen that is already waiting for a scan, which
+  // is the right side of that trade.
+  const out: Media[] = [];
+  for (const batch of chunk(ids)) {
+    const page = await gql<{ Page: { media: Media[] } }>(MEDIA_BY_IDS_QUERY, {
+      ids: batch,
+      ...scoreFormatVar(),
+    });
+    out.push(...page.Page.media);
+  }
+  return out;
 }
 
 // --- Recommendations -------------------------------------------------------

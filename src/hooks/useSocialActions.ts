@@ -52,6 +52,27 @@ export function useSocialActions() {
     }
   };
 
+  /**
+   * And for a thread, which is a single cached object rather than a page.
+   *
+   * Without this the `else` branch below patched an *activity* with the
+   * thread's id — nothing on the thread page, and a same-numbered activity
+   * elsewhere if one happened to be loaded. The heart on a thread simply did
+   * not move, while the request behind it succeeded.
+   */
+  const patchThread = (
+    id: number,
+    apply: (a: { likeCount: number; isLiked: boolean }) => { likeCount: number; isLiked: boolean },
+  ) => {
+    qc.setQueryData<{ likeCount: number; isLiked: boolean } | null>(
+      ["social", "thread", id],
+      (old) =>
+        old
+          ? { ...old, ...apply({ likeCount: old.likeCount ?? 0, isLiked: old.isLiked === true }) }
+          : old,
+    );
+  };
+
   /** The same for a reply, which lives in its own per-activity key. */
   const patchReply = (
     activityId: number,
@@ -74,6 +95,8 @@ export function useSocialActions() {
       await qc.cancelQueries({ queryKey: ["social"] });
       if (vars.type === "ACTIVITY_REPLY" && vars.activityId !== undefined) {
         patchReply(vars.activityId, vars.id, flipLike);
+      } else if (vars.type === "THREAD") {
+        patchThread(vars.id, flipLike);
       } else {
         patchActivity(vars.id, flipLike);
       }
@@ -85,6 +108,8 @@ export function useSocialActions() {
       const settle = () => ({ likeCount: result.likeCount, isLiked: result.isLiked });
       if (vars.type === "ACTIVITY_REPLY" && vars.activityId !== undefined) {
         patchReply(vars.activityId, vars.id, settle);
+      } else if (vars.type === "THREAD") {
+        patchThread(vars.id, settle);
       } else {
         patchActivity(vars.id, settle);
       }
@@ -94,6 +119,8 @@ export function useSocialActions() {
       // same call again rather than a stored snapshot.
       if (vars.type === "ACTIVITY_REPLY" && vars.activityId !== undefined) {
         patchReply(vars.activityId, vars.id, flipLike);
+      } else if (vars.type === "THREAD") {
+        patchThread(vars.id, flipLike);
       } else {
         patchActivity(vars.id, flipLike);
       }

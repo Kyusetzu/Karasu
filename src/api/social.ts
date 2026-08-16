@@ -675,7 +675,7 @@ query ($id: Int!) {
   Thread(id: $id) {
     id title body replyCount viewCount likeCount isLiked isLocked isSticky
     isSubscribed repliedAt createdAt siteUrl
-    user { id name avatar { large } isFollowing isFollower }
+    user { ${SOCIAL_USER} }
     categories { id name }
     mediaCategories { ${SOCIAL_MEDIA} }
   }

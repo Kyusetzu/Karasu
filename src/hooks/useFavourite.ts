@@ -26,16 +26,30 @@ export function useFavourite(kind: FavouriteKind) {
   const qc = useQueryClient();
   const { t } = useTranslation();
 
+  /**
+   * Where this kind's detail actually lives.
+   *
+   * `["mediaDetail", id]` is where `AnimeDetail` caches, but `Person` caches
+   * under `["person", kind, id]` — so on a character, staff or studio page the
+   * heart patched a *media* entry keyed by a character id and never touched the
+   * one on screen. Two separate id namespaces, so it was silent both ways: the
+   * heart did not fill, and an unrelated media detail could be edited.
+   */
+  const cacheKey = (id: number): unknown[] =>
+    kind === "anime" || kind === "manga"
+      ? ["mediaDetail", id]
+      : ["person", kind, id];
+
   return useMutation({
     mutationFn: (vars: { id: number }) => toggleFavourite(kind, vars.id),
     onMutate: async ({ id }) => {
-      const key = ["mediaDetail", id];
+      const key = cacheKey(id);
       await qc.cancelQueries({ queryKey: key });
       const previous = qc.getQueryData<MediaDetail>(key);
       qc.setQueryData<MediaDetail>(key, (old) =>
         old ? { ...old, isFavourite: !old.isFavourite } : old,
       );
-      return { previous };
+      return { previous, key };
     },
     onSuccess: () => {
       // Only the profile's strip, and only the *lists*, not the detail entry we
@@ -43,8 +57,10 @@ export function useFavourite(kind: FavouriteKind) {
       // learn one boolean we already know.
       void qc.invalidateQueries({ queryKey: ["social", "user"] });
     },
-    onError: (_err, { id }, ctx) => {
-      if (ctx?.previous) qc.setQueryData(["mediaDetail", id], ctx.previous);
+    onError: (_err, _vars, ctx) => {
+      // The same key the patch used, not a rebuilt one — a rollback that
+      // restores into a different entry than it edited is worse than none.
+      if (ctx?.previous && ctx.key) qc.setQueryData(ctx.key, ctx.previous);
       showToast({
         kind: "error",
         text: t("detail.favouriteFailed"),

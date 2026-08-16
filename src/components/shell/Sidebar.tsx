@@ -234,7 +234,12 @@ export default function Sidebar() {
   const mode = useAuth((s) => s.mode);
   const login = useAniListLogin();
   const manualSync = useManualSync();
-  const { counts, pending, syncedAt } = useListSummary(viewer?.id);
+  // `?? 0`, matching every list screen. Local mode has no viewer, so `viewer?.id`
+  // keyed these queries on `undefined` while `MediaList`, `Dashboard`, `Calendar`
+  // and `LocalLibrary` all key theirs on `0` — a different cache entry, never
+  // written by anything, so the sidebar's Anime and Manga counts were blank for
+  // the whole of account-free mode.
+  const { counts, pending, syncedAt } = useListSummary(viewer?.id ?? 0);
   const { pathname } = useLocation();
   // Re-measured when the route changes and when the item set does — the
   // link-account button exists only in local mode.

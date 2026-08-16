@@ -35,6 +35,25 @@ use crate::sync::LockExt;
 use crate::playback::recognition::parser::Parsed;
 use std::sync::Mutex;
 
+/// Stable codes for the failures a user actually sees, rather than sentences.
+///
+/// A command's `Err(String)` is rendered verbatim by the frontend — there is no
+/// mapping layer — so an English sentence composed here reached a German UI in
+/// English. These are the `BlockReason` treatment applied to the one path a
+/// user hits routinely: Settings → Detection → Jellyfin, with the wrong
+/// password. `lib/backendError` maps each through a literal `t()`, and an
+/// unrecognised string still falls through and is shown as-is, so a code that
+/// loses its translation degrades to what shipped before rather than to
+/// nothing.
+///
+/// Transport detail deliberately stays untranslated: "Could not reach the
+/// server: <reqwest error>" carries the diagnosis in the part no dictionary
+/// covers.
+pub const ERR_SIGNED_OUT: &str = "jellyfin.signedOut";
+pub const ERR_NO_TOKEN: &str = "jellyfin.noToken";
+pub const ERR_NO_USER_ID: &str = "jellyfin.noUserId";
+pub const ERR_BAD_CREDENTIALS: &str = "jellyfin.badCredentials";
+
 const SERVICE: &str = "dev.kyu.karasu";
 /// Credential-store entry for the Jellyfin access token.
 const TOKEN_USER: &str = "jellyfin_token";
@@ -268,7 +287,7 @@ async fn get_json(
 ) -> Result<serde_json::Value, String> {
     let base = normalize_base_url(&cfg.url);
     if base.is_empty() || cfg.token.is_empty() {
-        return Err("Sign in to your Jellyfin server first".into());
+        return Err(ERR_SIGNED_OUT.into());
     }
     let resp = http()
         .get(format!("{base}{path}"))
@@ -308,12 +327,12 @@ pub struct AuthSession {
 pub fn parse_auth_result(body: &serde_json::Value) -> Result<AuthSession, String> {
     let token = str_field(body, "AccessToken");
     if token.is_empty() {
-        return Err("The server's reply contained no access token".into());
+        return Err(ERR_NO_TOKEN.into());
     }
     let user = get_ci(body, "User").cloned().unwrap_or_default();
     let user_id = str_field(&user, "Id");
     if user_id.is_empty() {
-        return Err("The server's reply contained no user id".into());
+        return Err(ERR_NO_USER_ID.into());
     }
     Ok(AuthSession {
         token,
@@ -352,7 +371,7 @@ pub async fn authenticate(
     if resp.status() == reqwest::StatusCode::UNAUTHORIZED {
         // Deliberately not the server's body: it can echo back detail that
         // does not belong on screen, and the cause is always the same.
-        return Err("Wrong username or password".into());
+        return Err(ERR_BAD_CREDENTIALS.into());
     }
     if !resp.status().is_success() {
         return Err(format!("Sign-in failed: HTTP {}", resp.status()));
@@ -598,6 +617,21 @@ fn hold_last_good() -> Option<Playback> {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
+    /// These four strings are a contract with `src/lib/backendError.ts`, which
+    /// maps each to a translated sentence. Nothing in either language's
+    /// tooling can see across the boundary, so the coupling is pinned here —
+    /// renaming a code in Rust alone makes this fail rather than silently
+    /// showing the raw code to a user.
+    #[test]
+    fn the_error_codes_match_what_the_frontend_maps() {
+        assert_eq!(ERR_SIGNED_OUT, "jellyfin.signedOut");
+        assert_eq!(ERR_NO_TOKEN, "jellyfin.noToken");
+        assert_eq!(ERR_NO_USER_ID, "jellyfin.noUserId");
+        assert_eq!(ERR_BAD_CREDENTIALS, "jellyfin.badCredentials");
+    }
+
     use super::*;
     use serde_json::json;
 

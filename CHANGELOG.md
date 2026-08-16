@@ -107,6 +107,8 @@ short version, grouped by what it means for someone using the app.
   3 h / 3 T.
 - The franchise graph's status legend uses the right vocabulary — it said
   "Watching" over a manga graph whose own cards said "Reading".
+- Jellyfin's sign-in errors are translated. "Wrong username or password" was
+  composed in Rust and printed verbatim, so a German UI showed it in English.
 - An offline edit is no longer deleted when AniList answers with something
   recoverable — an expired token, a rate limit, a server fault. Only a payload
   AniList rejects on its own terms is dropped, and when one is, it says so.

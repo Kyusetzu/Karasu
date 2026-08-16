@@ -1294,6 +1294,10 @@ export const de: typeof en = {
     thresholdHint: "0 = automatisch (zwei Drittel der Episodenlänge)",
     trackingSaveFailed:
       "Diese Einstellung wurde nicht gespeichert ({{message}}) und daher zurückgesetzt.",
+    jfErrSignedOut: "Melde dich zuerst an deinem Jellyfin-Server an.",
+    jfErrNoToken: "Die Antwort des Servers enthielt kein Zugriffstoken.",
+    jfErrNoUserId: "Die Antwort des Servers enthielt keine Benutzer-ID.",
+    jfErrBadCredentials: "Falscher Benutzername oder falsches Passwort.",
     airingNotify: "Benachrichtigung bei neuer Folge",
     airingNotifyHint:
       "Desktop-Benachrichtigung, wenn eine neue Folge einer laufenden Serie erscheint — das Einzige, was die Website nicht kann, während Karasu im Tray liegt.",

@@ -31,6 +31,7 @@ import { isLinux, usePlatform } from "@/stores/platform";
 import { useAuth } from "@/stores/auth";
 import { ExternalNote, Row, Toggle } from "./shared";
 import { anilistCoversAiring } from "@/lib/airingCoverage";
+import { backendErrorText } from "@/lib/backendError";
 export function ScrobbleSection() {
   const { t } = useTranslation();
   const [settings, setSettings] = useState<ScrobbleSettings | null>(null);
@@ -571,7 +572,7 @@ export function JellyfinSection() {
       // signing in doesn't quietly discard an edit.
       await setJellyfinSettings(url, device);
     } catch (e) {
-      setError(String(e));
+      setError(backendErrorText(e, t));
     } finally {
       setSigningIn(false);
     }
@@ -583,7 +584,7 @@ export function JellyfinSection() {
     try {
       setSettings(await jellyfinSignOut());
     } catch (e) {
-      setError(String(e));
+      setError(backendErrorText(e, t));
     }
   };
 
@@ -594,7 +595,7 @@ export function JellyfinSection() {
       await setJellyfinSettings(url, device);
       setSettings(await getJellyfinSettings());
     } catch (e) {
-      setError(String(e));
+      setError(backendErrorText(e, t));
     }
   };
 
@@ -605,7 +606,7 @@ export function JellyfinSection() {
     try {
       setSessions(await testJellyfin());
     } catch (e) {
-      setError(String(e));
+      setError(backendErrorText(e, t));
     } finally {
       setBusy(false);
     }

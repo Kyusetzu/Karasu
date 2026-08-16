@@ -1282,6 +1282,10 @@ export const en = {
     thresholdHint: "0 = automatic (two thirds of the episode length)",
     trackingSaveFailed:
       "That setting was not saved ({{message}}), so it has been put back.",
+    jfErrSignedOut: "Sign in to your Jellyfin server first.",
+    jfErrNoToken: "The server's reply contained no access token.",
+    jfErrNoUserId: "The server's reply contained no user id.",
+    jfErrBadCredentials: "Wrong username or password.",
     airingNotify: "New-episode notifications",
     airingNotifyHint:
       "Desktop notification when a new episode of a show you are watching airs — the one thing the website cannot do while Karasu sits in the tray.",

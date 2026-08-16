@@ -21,6 +21,8 @@ export const de: typeof en = {
     wrapped: "Wrapped",
     library: "Lokale Bibliothek",
     linkAccount: "AniList-Konto verknüpfen",
+    collapseSidebar: "Seitenleiste einklappen",
+    expandSidebar: "Seitenleiste ausklappen",
     about: "Über",
     settings: "Einstellungen",
   },

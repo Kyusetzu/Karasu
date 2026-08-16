@@ -156,6 +156,9 @@ short version, grouped by what it means for someone using the app.
   the highlighted title — the same movement the list view has had.
 - A clear button in the search and filter boxes — Search, the list filter, the
   forum search, the unplaced-titles filter and the filter dropdowns.
+- The sidebar collapses to icons, and remembers it. The button sits below the
+  navigation; collapsed, every icon keeps its name as a tooltip, the group
+  headings become dividers, and an unsent-changes dot stays on your avatar.
 - An offline edit is no longer deleted when AniList answers with something
   recoverable — an expired token, a rate limit, a server fault. Only a payload
   AniList rejects on its own terms is dropped, and when one is, it says so.

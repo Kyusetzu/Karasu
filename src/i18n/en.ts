@@ -23,6 +23,8 @@ export const en = {
     wrapped: "Wrapped",
     library: "Local library",
     linkAccount: "Link AniList account",
+    collapseSidebar: "Collapse sidebar",
+    expandSidebar: "Expand sidebar",
     about: "About",
     settings: "Settings",
   },

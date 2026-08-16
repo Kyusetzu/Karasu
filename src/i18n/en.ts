@@ -620,6 +620,7 @@ export const en = {
     showSpoilerTags: "Show {{n}} spoiler tags",
     links: "External & streaming links",
     trailer: "Trailer",
+    trailerPlay: "Play the trailer in your browser",
     episodes: "Episodes",
     episodesNone: "AniList lists no episode details for this title.",
     cast: "Cast & staff",

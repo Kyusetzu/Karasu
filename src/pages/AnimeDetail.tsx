@@ -355,22 +355,27 @@ export default function AnimeDetail() {
 
             <ReviewsSection mediaId={data.id} />
 
-            {data.trailer?.thumbnail && (
+            {data.trailer?.id && (
               <Card>
                 <CardTitle>{t("detail.trailer")}</CardTitle>
+                {/* No `<img>`. The thumbnail is on a YouTube/Dailymotion host,
+                    and `img-src` allows `self`, `data:` and `*.anilist.co` only
+                    — so this rendered a broken-image box on every detail page
+                    that has a trailer. Widening the policy is refused on
+                    principle: it hands a third party the user's IP and what
+                    they are looking at, for a thumbnail. CLAUDE.md measured the
+                    same question for bio images and settled it there.
+
+                    The card keeps its shape and its click; the art is what
+                    goes. `aria-label` because its only content was the alt-less
+                    image and two decorative spans, so it had no name at all. */}
                 <button
                   onClick={() => openUrl(trailerUrl(data.trailer!))}
-                  className="group relative mt-3 block w-full max-w-md overflow-hidden rounded-lg"
+                  aria-label={t("detail.trailerPlay")}
+                  className="group mt-3 grid aspect-video w-full max-w-md place-items-center overflow-hidden rounded-lg bg-surface-800 transition-surface hover:bg-surface-700"
                 >
-                  <img
-                    src={data.trailer.thumbnail}
-                    alt=""
-                    className="w-full transition-transform group-hover:scale-105"
-                  />
-                  <span className="absolute inset-0 grid place-items-center bg-black/30 transition-colors group-hover:bg-black/15">
-                    <span className="grid h-12 w-12 place-items-center rounded-full bg-black/70">
-                      <Play fill="currentColor" className="size-5 text-white" />
-                    </span>
+                  <span className="grid h-12 w-12 place-items-center rounded-full bg-surface-950/70 transition-surface group-hover:bg-surface-950">
+                    <Play fill="currentColor" className="size-5 text-ink-100" />
                   </span>
                 </button>
               </Card>
@@ -493,16 +498,11 @@ function EpisodesSection({ mediaId }: { mediaId: number }) {
                   className="group block text-left"
                   title={ep.site ?? undefined}
                 >
-                  <div className="aspect-video w-full overflow-hidden rounded-lg bg-surface-800">
-                    {ep.thumbnail && (
-                      <img
-                        src={ep.thumbnail}
-                        alt=""
-                        loading="lazy"
-                        decoding="async"
-                        className="size-full object-cover transition-transform group-hover:scale-105"
-                      />
-                    )}
+                  {/* Same policy as the trailer above: these thumbnails live on
+                      streaming CDNs the CSP does not allow, so they were broken
+                      boxes. The tile stays as the click target. */}
+                  <div className="grid aspect-video w-full place-items-center overflow-hidden rounded-lg bg-surface-800 transition-surface group-hover:bg-surface-700">
+                    <Play className="size-5 text-ink-600" />
                   </div>
                   <p className="mt-1 line-clamp-2 text-xs text-ink-300">{ep.title}</p>
                 </button>

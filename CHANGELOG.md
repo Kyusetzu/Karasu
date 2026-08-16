@@ -124,6 +124,11 @@ short version, grouped by what it means for someone using the app.
   error — the only route to a portable copy was deleting the old file by hand.
 - Two list screens opening at once no longer each send the whole offline queue,
   and a queued edit AniList refuses outright now says so instead of vanishing.
+- The trailer card and the streaming-episode tiles no longer render as broken
+  images. Their thumbnails live on hosts the content-security policy does not
+  allow, and widening it to cover them would hand those hosts your IP and what
+  you are looking at — so the cards are drawn instead, and still open the same
+  link.
 - An offline edit is no longer deleted when AniList answers with something
   recoverable — an expired token, a rate limit, a server fault. Only a payload
   AniList rejects on its own terms is dropped, and when one is, it says so.

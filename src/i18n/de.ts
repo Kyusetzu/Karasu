@@ -621,6 +621,7 @@ export const de: typeof en = {
     showSpoilerTags: "{{n}} Spoiler-Tags anzeigen",
     links: "Externe & Streaming-Links",
     trailer: "Trailer",
+    trailerPlay: "Trailer im Browser abspielen",
     episodes: "Episoden",
     episodesNone: "AniList führt für diesen Titel keine Episodendetails.",
     cast: "Besetzung & Staff",

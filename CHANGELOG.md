@@ -142,6 +142,12 @@ short version, grouped by what it means for someone using the app.
 - The franchise graph says when it stopped expanding, instead of only when it ran
   out of room for nodes.
 - The match picker shows "TV Short" rather than `TV_SHORT`.
+- The context menu takes focus when it opens and announces itself as a menu, so
+  it can be used from the keyboard at all.
+- Grid-card buttons become visible when tabbed to, instead of being focusable
+  while fully transparent.
+- The review composer's body label no longer points at a field that isn't there
+  in preview mode.
 - An offline edit is no longer deleted when AniList answers with something
   recoverable — an expired token, a rate limit, a server fault. Only a payload
   AniList rejects on its own terms is dropped, and when one is, it says so.

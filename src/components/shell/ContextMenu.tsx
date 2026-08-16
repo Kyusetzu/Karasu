@@ -58,6 +58,14 @@ export default function ContextMenu() {
   // list to keep drawing while it scales away.
   const menu = usePresentValue(ctx);
   const ref = useRef<HTMLDivElement>(null);
+  const firstItemRef = useRef<HTMLButtonElement>(null);
+
+  // Focus lands in the menu once it is on screen, so it is operable from the
+  // keyboard immediately. Only on open — re-running while it is up would drag
+  // focus back off whichever item the user has arrowed to.
+  useEffect(() => {
+    if (ctx) firstItemRef.current?.focus();
+  }, [ctx]);
 
   useEffect(() => {
     const onContext = (e: MouseEvent) => {
@@ -188,6 +196,13 @@ export default function ContextMenu() {
       // Same convention as every dialog: while this is up it owns the
       // keyboard, so a list shortcut cannot fire behind it.
       data-overlay
+      // A menu, and announced as one. Without these it was a `div` of buttons:
+      // a screen reader had no way to say how many items there were or that
+      // they belonged together, and nothing moved focus into it, so a menu
+      // opened from the keyboard left focus behind on the element that opened
+      // it — the first Tab then walked the page rather than the menu.
+      role="menu"
+      aria-label={t("ctx.menuLabel")}
       className={cn(
         "fixed z-[100] w-55 overflow-hidden rounded-lg border border-hair bg-surface-850 p-1.25 shadow-2xl panel-wash",
         // Scales from the corner it was opened at rather than always the
@@ -202,6 +217,10 @@ export default function ContextMenu() {
       {items.map((item, i) => (
         <button
           key={i}
+          role="menuitem"
+          // The first item takes focus so the menu is operable from the
+          // keyboard the moment it appears, and Escape/outside-click return it.
+          ref={i === 0 ? firstItemRef : undefined}
           onClick={item.onClick}
           className="flex h-7.5 w-full items-center gap-2.5 rounded-md px-2.5 text-left text-[.78125rem] text-ink-300 transition-surface hover:bg-surface-800 hover:text-ink-100"
         >

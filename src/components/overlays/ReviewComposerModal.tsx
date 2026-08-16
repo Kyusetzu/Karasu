@@ -136,7 +136,15 @@ export function ReviewComposerModal({
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-ink-300" htmlFor="review-body">
+          {/* `htmlFor` only when the textarea it names is rendered. In preview
+              mode the field is replaced by the rendered markdown, so the id
+              pointed at nothing — a label referencing a missing control is
+              worse than a plain caption, because assistive tech reports the
+              association and then cannot follow it. */}
+          <label
+            className="block text-xs font-medium text-ink-300"
+            htmlFor={preview ? undefined : "review-body"}
+          >
             {t("review.bodyLabel")}
           </label>
           {preview ? (

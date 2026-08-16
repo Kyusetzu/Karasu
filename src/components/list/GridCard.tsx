@@ -80,8 +80,13 @@ export const GridCard = memo(function GridCard({
       }
       actions={
         // Suppressed entirely in select mode: one interaction model at a time.
+        //
+        // `group-focus-within` alongside `group-hover`: these buttons are
+        // tabbable, so without it Tab moved focus onto controls that were fully
+        // transparent — a focus ring around nothing, and no way to tell what
+        // was about to be activated.
         !selectMode && (
-          <div className="flex gap-1.5 opacity-0 transition-opacity group-hover:opacity-100">
+          <div className="flex gap-1.5 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
             <IconButton
               variant="onCover"
               size="sm"

@@ -107,6 +107,7 @@ export const en = {
     andMore: "+{{n}} more",
   },
   ctx: {
+    menuLabel: "Context menu",
     open: "Open",
     openAniList: "Open on AniList",
     copy: "Copy",

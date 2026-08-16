@@ -105,6 +105,7 @@ export const de: typeof en = {
     andMore: "+{{n}} weitere",
   },
   ctx: {
+    menuLabel: "Kontextmenü",
     open: "Öffnen",
     openAniList: "Auf AniList öffnen",
     copy: "Kopieren",

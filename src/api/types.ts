@@ -184,12 +184,36 @@ export interface QueuedEdit {
   queuedAt: number;
 }
 
+/** One AniList request the client has finished, for the panel's traffic list. */
+export interface RequestLogEntry {
+  /** Monotonic within a session — a stable React key, not an AniList id. */
+  seq: number;
+  /**
+   * The root field the request asked for (`Media`, `Page`,
+   * `SaveMediaListEntry`). Never the variables: they carry notes and scores.
+   */
+  operation: string;
+  startedAgoMs: number;
+  durationMs: number;
+  /**
+   * How long the client made this request wait on its own pacing before
+   * sending. Separate from `durationMs` on purpose — self-inflicted delay and
+   * AniList being slow look identical from outside and have different fixes.
+   */
+  pacedMs: number;
+  status: number | null;
+  remainingAfter: number | null;
+  outcome: "ok" | "throttled" | "error";
+}
+
 export interface SyncStatus {
   /** False in local mode, where nothing syncs by design. */
   connected: boolean;
   draining: boolean;
   queued: QueuedEdit[];
   rate: RateSnapshot;
+  /** Recent traffic, newest first. */
+  recent: RequestLogEntry[];
 }
 
 export interface SaveEntryInput {

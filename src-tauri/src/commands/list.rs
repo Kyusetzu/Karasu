@@ -1,6 +1,6 @@
 use crate::anilist::{
     auth,
-    client::{AniList, ApiError, RateSnapshot},
+    client::{AniList, ApiError, RateSnapshot, RequestLogEntry},
 };
 use crate::db::Db;
 use serde_json::{json, Value};
@@ -989,6 +989,12 @@ pub struct SyncStatus {
     pub draining: bool,
     pub queued: Vec<QueuedEdit>,
     pub rate: RateSnapshot,
+    /// Recent AniList traffic, newest first.
+    ///
+    /// The answer to "the number changes and no data is shown": an idle app has
+    /// no queued edits, so the panel had nothing to list while the headroom
+    /// moved underneath it. This is what moved it.
+    pub recent: Vec<RequestLogEntry>,
 }
 
 /// The state of the sync, for the panel behind the pending badge.
@@ -1020,6 +1026,7 @@ pub async fn sync_status(
         draining: drain_in_flight(),
         queued,
         rate: api.rate_snapshot().await,
+        recent: api.request_log().await,
     })
 }
 

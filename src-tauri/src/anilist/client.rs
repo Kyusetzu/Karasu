@@ -1,10 +1,64 @@
 use serde_json::{json, Value};
+use std::collections::VecDeque;
 use std::time::Duration;
 use tokio::sync::Mutex;
 // Monotonic, so a user moving their clock cannot invent or erase a throttle.
 use tokio::time::Instant;
 
 const API_URL: &str = "https://graphql.anilist.co";
+
+/// How many recent requests the sync panel can show.
+///
+/// Bounded because this is an in-memory ring on the hot path of every AniList
+/// call, and because a panel is for glancing at. Fifty covers a page load and
+/// its retries several times over.
+const LOG_CAP: usize = 50;
+
+/// The root field a query asks for — `Media`, `Page`, `SaveMediaListEntry`.
+///
+/// **The query text and nothing else.** Every query in this tree is a compile
+/// -time constant, so naming one leaks nothing; the *variables* carry notes, a
+/// score and sometimes a Jellyfin password, and they are never touched here.
+/// That is the same rule `logging::scrub` exists to enforce elsewhere.
+///
+/// AniList's operations are anonymous (`query ($id: Int!) { … }`), so there is
+/// no operation name to read — the first root selection is the informative part
+/// anyway, since it is what the request is *for*.
+fn operation_name(query: &str) -> String {
+    // The selection set opens at the first `{` outside the variable list.
+    let mut depth = 0usize;
+    let mut rest = query;
+    loop {
+        let Some(i) = rest.find(['(', ')', '{']) else {
+            return "query".into();
+        };
+        let (c, tail) = (&rest[i..i + 1], &rest[i + 1..]);
+        rest = tail;
+        match c {
+            "(" => depth += 1,
+            ")" => depth = depth.saturating_sub(1),
+            _ if depth == 0 => break,
+            _ => {}
+        }
+    }
+    // First identifier in the selection, and if it is an alias (`a: Thread`)
+    // take what it aliases — `FOLLOW_COUNTS_QUERY` aliases two `Page` roots and
+    // "a" would say nothing.
+    fn ident(s: &str) -> Option<(String, &str)> {
+        let s = s.trim_start();
+        let end = s
+            .find(|c: char| !c.is_ascii_alphanumeric() && c != '_')
+            .unwrap_or(s.len());
+        (end > 0).then(|| (s[..end].to_string(), &s[end..]))
+    }
+    let Some((first, after)) = ident(rest) else {
+        return "query".into();
+    };
+    match after.trim_start().strip_prefix(':') {
+        Some(aliased) => ident(aliased).map(|(n, _)| n).unwrap_or(first),
+        None => first,
+    }
+}
 
 /// How a failed request should be treated by anything holding an unsent write.
 ///
@@ -78,6 +132,49 @@ fn classify(code: u16, msg: String) -> ApiError {
 pub struct AniList {
     http: reqwest::Client,
     rate: Mutex<RateState>,
+    /// The recent-traffic ring behind the sync panel. See `LOG_CAP`.
+    ///
+    /// In memory only — it is never written to `karasu.log` and never leaves the
+    /// process except through `rate_snapshot`'s sibling command. A panel that
+    /// said "28 of 30" with nothing to attribute it to was the complaint this
+    /// answers: the number moved and there was no way to see what moved it.
+    log: Mutex<VecDeque<Recorded>>,
+}
+
+/// One finished request, stored with a monotonic instant so its age is computed
+/// at read time rather than frozen at write time.
+struct Recorded {
+    seq: u64,
+    operation: String,
+    at: Instant,
+    duration: Duration,
+    paced: Duration,
+    status: Option<u16>,
+    remaining_after: Option<u32>,
+    outcome: &'static str,
+}
+
+/// One row of the panel's traffic list.
+#[derive(serde::Serialize)]
+pub struct RequestLogEntry {
+    /// Monotonic within a session, so the panel has a stable React key.
+    pub seq: u64,
+    /// The root field asked for. Never the variables — see `operation_name`.
+    pub operation: String,
+    #[serde(rename = "startedAgoMs")]
+    pub started_ago_ms: u64,
+    #[serde(rename = "durationMs")]
+    pub duration_ms: u64,
+    /// How long this request waited on the client's own pacing before going
+    /// out. Separate from `durationMs` on purpose: self-inflicted delay and
+    /// AniList being slow are different problems with different fixes.
+    #[serde(rename = "pacedMs")]
+    pub paced_ms: u64,
+    pub status: Option<u16>,
+    #[serde(rename = "remainingAfter")]
+    pub remaining_after: Option<u32>,
+    /// `"ok" | "throttled" | "error"`.
+    pub outcome: &'static str,
 }
 
 /// The budget assumed before any header has been seen.
@@ -252,7 +349,55 @@ impl AniList {
                 sleeping_kind: None,
                 reset_at: None,
             }),
+            log: Mutex::new(VecDeque::with_capacity(LOG_CAP)),
         }
+    }
+
+    /// Appends one finished request, evicting the oldest past `LOG_CAP`.
+    #[allow(clippy::too_many_arguments)]
+    async fn record(
+        &self,
+        operation: &str,
+        at: Instant,
+        paced: Duration,
+        status: Option<u16>,
+        remaining_after: Option<u32>,
+        outcome: &'static str,
+    ) {
+        let mut log = self.log.lock().await;
+        let seq = log.back().map_or(0, |r: &Recorded| r.seq) + 1;
+        if log.len() >= LOG_CAP {
+            log.pop_front();
+        }
+        log.push_back(Recorded {
+            seq,
+            operation: operation.to_string(),
+            at,
+            duration: at.elapsed(),
+            paced,
+            status,
+            remaining_after,
+            outcome,
+        });
+    }
+
+    /// The recent traffic, newest first.
+    pub async fn request_log(&self) -> Vec<RequestLogEntry> {
+        let now = Instant::now();
+        let log = self.log.lock().await;
+        log.iter()
+            .rev()
+            .map(|r| RequestLogEntry {
+                seq: r.seq,
+                operation: r.operation.clone(),
+                started_ago_ms: now.duration_since(r.at).as_millis() as u64,
+                duration_ms: r.duration.as_millis() as u64,
+                paced_ms: r.paced.as_millis() as u64,
+                status: r.status,
+                remaining_after: r.remaining_after,
+                outcome: r.outcome,
+            })
+            .collect()
     }
 
     /// A snapshot of the limiter for the sync panel.
@@ -320,8 +465,14 @@ impl AniList {
             }
             tokio::time::sleep(d).await;
         }
+        // Recorded per request so the panel can separate our own pacing from
+        // AniList being slow. They look identical from the outside and have
+        // completely different fixes.
+        let paced = started.elapsed();
+        let operation = operation_name(query);
 
         for attempt in 0..2 {
+            let sent = Instant::now();
             let mut req = self
                 .http
                 .post(API_URL)
@@ -330,15 +481,19 @@ impl AniList {
                 req = req.bearer_auth(t);
             }
 
-            let resp = req.send().await.map_err(|e| {
-                // The status class only. Never the body and never the headers:
-                // the request carries `Authorization: Bearer <token>` and the
-                // response to a Jellyfin sign-in carries an access token, so a
-                // logger that reached for either would be the leak this whole
-                // module exists to prevent.
-                crate::logging::warn("anilist", format!("request failed: {e}"));
-                ApiError::Network(e.to_string())
-            })?;
+            let resp = match req.send().await {
+                Ok(r) => r,
+                Err(e) => {
+                    // The status class only. Never the body and never the
+                    // headers: the request carries `Authorization: Bearer
+                    // <token>` and the response to a Jellyfin sign-in carries an
+                    // access token, so a logger that reached for either would be
+                    // the leak this whole module exists to prevent.
+                    crate::logging::warn("anilist", format!("request failed: {e}"));
+                    self.record(&operation, sent, paced, None, None, "error").await;
+                    return Err(ApiError::Network(e.to_string()));
+                }
+            };
 
             let header_u32 = |name: &str| {
                 resp.headers()
@@ -380,15 +535,24 @@ impl AniList {
                     .lock()
                     .await
                     .park(Duration::from_secs(wait), "retryAfter");
+                self.record(&operation, sent, paced, Some(429), remaining, "throttled")
+                    .await;
                 tokio::time::sleep(Duration::from_secs(wait)).await;
                 continue;
             }
 
             let status = resp.status().as_u16();
-            let body: Value = resp
-                .json()
-                .await
-                .map_err(|e| classify(status, format!("Unreadable response (HTTP {status}): {e}")))?;
+            let body: Value = match resp.json::<Value>().await {
+                Ok(b) => b,
+                Err(e) => {
+                    self.record(&operation, sent, paced, Some(status), remaining, "error")
+                        .await;
+                    return Err(classify(
+                        status,
+                        format!("Unreadable response (HTTP {status}): {e}"),
+                    ));
+                }
+            };
 
             if let Some(errors) = body.get("errors").and_then(|e| e.as_array()) {
                 let msg = errors
@@ -403,6 +567,8 @@ impl AniList {
                     })
                     .collect::<Vec<_>>()
                     .join("; ");
+                self.record(&operation, sent, paced, Some(status), remaining, "error")
+                    .await;
                 return Err(classify(
                     status,
                     if msg.is_empty() {
@@ -413,7 +579,17 @@ impl AniList {
                 ));
             }
 
-            return body.get("data").cloned().ok_or_else(|| {
+            let data = body.get("data").cloned();
+            self.record(
+                &operation,
+                sent,
+                paced,
+                Some(status),
+                remaining,
+                if data.is_some() { "ok" } else { "error" },
+            )
+            .await;
+            return data.ok_or_else(|| {
                 classify(status, format!("Empty response from AniList (HTTP {status})"))
             });
         }
@@ -568,6 +744,58 @@ mod tests {
         assert!(RESERVE > 1, "a threshold of 1 is too late to be a guard");
         assert!(MAX_PACE < WINDOW, "a caller must not wait out a whole window");
         assert!(SLICE < MAX_PACE, "the point of a slice is to re-check");
+    }
+
+    /// The panel's whole point is attribution: "28 of 30" with nothing to
+    /// attribute it to was the complaint. So the name has to be the root field
+    /// the request is *for*, read past the variable list — the `(` and `)` of
+    /// `query ($id: Int!)` contain no selection set.
+    #[test]
+    fn a_request_is_named_by_what_it_asks_for() {
+        for (query, want) in [
+            ("query ($id: Int!) { Media(id: $id) { id } }", "Media"),
+            ("\nquery ($p: Int) {\n  Page(page: $p) {\n    media { id }\n", "Page"),
+            ("mutation ($id: Int) { SaveMediaListEntry(mediaId: $id) { id } }", "SaveMediaListEntry"),
+            ("{ Viewer { id } }", "Viewer"),
+        ] {
+            assert_eq!(operation_name(query), want, "for {query:?}");
+        }
+    }
+
+    /// `FOLLOW_COUNTS_QUERY` aliases two `Page` roots, and a row reading "a"
+    /// would say nothing at all.
+    #[test]
+    fn an_alias_is_reported_as_what_it_aliases() {
+        assert_eq!(
+            operation_name("query { followers: Page(page: 1) { pageInfo { total } } }"),
+            "Page"
+        );
+    }
+
+    /// Never a panic and never a variable. Anything unrecognisable degrades to
+    /// a generic label rather than reaching for the payload for a better one.
+    #[test]
+    fn an_unreadable_query_is_named_generically() {
+        for query in ["", "query", "query (", "{", "{ }", "((("] {
+            let name = operation_name(query);
+            assert!(!name.is_empty(), "{query:?} produced an empty name");
+        }
+    }
+
+    /// Bounded, because this is an in-memory ring on the hot path of every call.
+    #[tokio::test]
+    async fn the_log_keeps_the_newest_and_reports_newest_first() {
+        let api = AniList::new();
+        let now = Instant::now();
+        for _ in 0..(LOG_CAP + 10) {
+            api.record("Media", now, Duration::ZERO, Some(200), Some(28), "ok")
+                .await;
+        }
+        let rows = api.request_log().await;
+        assert_eq!(rows.len(), LOG_CAP, "capped");
+        assert!(rows[0].seq > rows[1].seq, "newest first");
+        // The eviction is from the front, so the oldest sequence numbers went.
+        assert_eq!(rows[0].seq, (LOG_CAP + 10) as u64);
     }
 
     /// The bug this file's classification was written for: every one of these

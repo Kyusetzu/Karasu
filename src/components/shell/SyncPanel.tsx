@@ -272,6 +272,25 @@ export default function SyncPanel({
                       : t("syncPanel.headroomUnknown")}
                   </dd>
                 </div>
+                {/* The age, which the panel computed and threw away. Without it
+                    an hours-old reading renders as if it were live — and the
+                    number only moves when a request lands, so an idle app pins
+                    it indefinitely. Worth knowing while reading it: AniList's
+                    own first response after an idle window reports 28 of 30,
+                    measured, so a steady 28 is its accounting rather than two
+                    requests Karasu spent. */}
+                {rate?.observedAgoMs != null && (
+                  <div className="flex items-baseline justify-between gap-3">
+                    <dt className="text-ink-600">{t("syncPanel.measured")}</dt>
+                    <dd className="tabular-nums text-ink-500">
+                      {rate.observedAgoMs < 2_000
+                        ? t("syncPanel.measuredNow")
+                        : t("syncPanel.measuredAgo", {
+                            s: Math.round(rate.observedAgoMs / 1000),
+                          })}
+                    </dd>
+                  </div>
+                )}
                 {rate?.throttledForMs != null && (
                   <div className="flex items-baseline justify-between gap-3">
                     <dt className="text-ink-600">{t("syncPanel.throttle")}</dt>
@@ -293,12 +312,64 @@ export default function SyncPanel({
               </dl>
 
               {data.queued.length === 0 ? (
-                <p className="px-3 py-4 text-center text-xs text-ink-600">
+                <p className="px-3 py-3 text-center text-xs text-ink-600">
                   {t("syncPanel.empty")}
                 </p>
               ) : (
-                <ul className="max-h-72 overflow-y-auto">{data.queued.map(row)}</ul>
+                <ul className="max-h-52 overflow-y-auto">{data.queued.map(row)}</ul>
               )}
+
+              {/* The traffic. An idle app has nothing queued, so the panel had
+                  nothing to list while the headroom moved underneath it — "the
+                  value changes and no data is shown". This is what moves it. */}
+              <div className="border-t border-hair">
+                <h3 className="px-3 pb-1 pt-2 text-[.5625rem] font-semibold uppercase tracking-[.14em] text-ink-600">
+                  {t("syncPanel.recent")}
+                </h3>
+                {data.recent.length === 0 ? (
+                  <p className="px-3 pb-3 text-2xs text-ink-600">
+                    {t("syncPanel.recentEmpty")}
+                  </p>
+                ) : (
+                  <ul className="max-h-44 overflow-y-auto pb-1">
+                    {data.recent.map((r) => (
+                      <li
+                        key={r.seq}
+                        className="flex items-baseline gap-2 px-3 py-1 text-2xs"
+                      >
+                        <span
+                          aria-hidden
+                          className={cn(
+                            "size-1.25 shrink-0 rounded-full",
+                            r.outcome === "ok"
+                              ? "bg-success"
+                              : r.outcome === "throttled"
+                                ? "bg-gold"
+                                : "bg-danger",
+                          )}
+                        />
+                        <span className="min-w-0 flex-1 truncate text-ink-300">
+                          {r.operation}
+                        </span>
+                        {/* Only when it happened. Self-inflicted waiting is the
+                            thing worth spotting, and a 0 ms column on every
+                            healthy row would bury it. */}
+                        {r.pacedMs > 0 && (
+                          <span className="shrink-0 tabular-nums text-gold">
+                            {t("syncPanel.paced", { ms: r.pacedMs })}
+                          </span>
+                        )}
+                        <span className="shrink-0 tabular-nums text-ink-500">
+                          {t("syncPanel.tookMs", { ms: r.durationMs })}
+                        </span>
+                        <span className="w-9 shrink-0 text-right tabular-nums text-ink-600">
+                          {r.remainingAfter ?? "—"}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
 
               {manual.available && (
                 <div className="border-t border-hair p-2">

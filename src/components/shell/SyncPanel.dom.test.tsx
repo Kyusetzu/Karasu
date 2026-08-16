@@ -23,6 +23,7 @@ const IDLE: SyncStatus = {
   connected: true,
   draining: false,
   queued: [],
+  recent: [],
   rate: {
     remaining: 24,
     limit: 30,
@@ -144,6 +145,52 @@ describe("SyncPanel", () => {
     await waitFor(() =>
       expect(screen.getByText('syncPanel.throttlePacing:{"s":1}')).toBeTruthy(),
     );
+  });
+
+  /**
+   * The complaint this list answers: an idle app has nothing queued, so the
+   * panel had nothing to show while the headroom moved underneath it. The
+   * traffic is what moves it, and the pacing figure is broken out because
+   * self-inflicted delay and AniList being slow look identical from outside.
+   */
+  it("shows recent traffic even with an empty queue", async () => {
+    status.mockResolvedValue({
+      ...IDLE,
+      recent: [
+        {
+          seq: 2,
+          operation: "MediaListCollection",
+          startedAgoMs: 1_200,
+          durationMs: 940,
+          pacedMs: 0,
+          status: 200,
+          remainingAfter: 28,
+          outcome: "ok",
+        },
+        {
+          seq: 1,
+          operation: "Page",
+          startedAgoMs: 9_000,
+          durationMs: 1_100,
+          pacedMs: 800,
+          status: 200,
+          remainingAfter: 29,
+          outcome: "ok",
+        },
+      ],
+    });
+    renderWithProviders(panel());
+    fireEvent.click(screen.getByRole("button", { name: "Show sync details" }));
+
+    await waitFor(() => expect(screen.getByText("MediaListCollection")).toBeTruthy());
+    expect(screen.getByText("syncPanel.empty")).toBeTruthy();
+    expect(screen.getByText('syncPanel.tookMs:{"ms":940}')).toBeTruthy();
+    // Only the row that actually waited carries the pacing figure — a 0 ms
+    // column on every healthy row would bury the one that matters.
+    expect(screen.getByText('syncPanel.paced:{"ms":800}')).toBeTruthy();
+    expect(screen.queryByText('syncPanel.paced:{"ms":0}')).toBeNull();
+    // And the reading's age, which the panel computed and discarded before.
+    expect(screen.getByText("syncPanel.measuredNow")).toBeTruthy();
   });
 
   it("labels a queued row by what it changes", async () => {

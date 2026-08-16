@@ -681,7 +681,7 @@ async fn perform_update(
 
     let db = app.state::<Db>();
     let api = app.state::<crate::anilist::client::AniList>();
-    crate::commands::save_entry_core(&db, &api, &token, input).await?;
+    crate::commands::save_entry_core(app, &db, &api, &token, input).await?;
 
     // Patch the local cache so the next detection sees the new state
     if let Some(user_id) = cached_user_id(&db) {

@@ -119,6 +119,11 @@ short version, grouped by what it means for someone using the app.
   not read.
 - Fetching media in bulk no longer fires every batch at once into a shared
   ~30/min budget.
+- Portable mode's "replace the database that's already there" works. It called
+  a copy that refuses an existing file, so it could only ever print a raw SQLite
+  error — the only route to a portable copy was deleting the old file by hand.
+- Two list screens opening at once no longer each send the whole offline queue,
+  and a queued edit AniList refuses outright now says so instead of vanishing.
 - An offline edit is no longer deleted when AniList answers with something
   recoverable — an expired token, a rate limit, a server fault. Only a payload
   AniList rejects on its own terms is dropped, and when one is, it says so.

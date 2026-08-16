@@ -252,7 +252,9 @@ pub fn enable_portable(db: State<'_, Db>, replace: Option<bool>) -> Result<(), S
     let dest = dest_dir.join("karasu.db");
     match (dest.exists(), replace) {
         (false, _) => db.snapshot_to(&dest)?,
-        (true, Some(true)) => db.snapshot_to(&dest)?,
+        // `snapshot_over`, because `VACUUM INTO` refuses a destination that
+        // exists — which is every case that reaches this arm.
+        (true, Some(true)) => db.snapshot_over(&dest)?,
         (true, Some(false)) => {
             crate::logging::info(
                 "portable",

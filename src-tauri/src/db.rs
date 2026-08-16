@@ -640,6 +640,32 @@ impl Db {
             .map_err(|e| format!("Could not copy the database: {e}"))
     }
 
+    /// `snapshot_to`, but over a file that may already be there.
+    ///
+    /// `VACUUM INTO` refuses an existing destination — there is a test in this
+    /// file asserting exactly that — so portable mode's "replace the database
+    /// beside the executable" branch could never succeed: it printed a raw
+    /// SQLite error, and the only route to a portable copy was deleting the old
+    /// file by hand.
+    ///
+    /// Written beside the destination and renamed over it, rather than deleting
+    /// first: a rename within one directory is atomic, so an interrupted copy
+    /// leaves the old database intact instead of neither. The temp file is
+    /// cleaned up on the failure path, since a half-written `.tmp` next to a
+    /// user's database is its own small alarm.
+    pub fn snapshot_over(&self, dest: &std::path::Path) -> Result<(), String> {
+        if !dest.exists() {
+            return self.snapshot_to(dest);
+        }
+        let tmp = dest.with_extension("db.replacing");
+        let _ = std::fs::remove_file(&tmp);
+        self.snapshot_to(&tmp)?;
+        std::fs::rename(&tmp, dest).map_err(|e| {
+            let _ = std::fs::remove_file(&tmp);
+            format!("Could not replace the database: {e}")
+        })
+    }
+
     pub fn cached_list(&self, user_id: i64, media_type: &str) -> Option<String> {
         let conn = self.0.guard();
         conn.query_row(
@@ -1810,6 +1836,34 @@ mod tests {
         // VACUUM INTO refuses to overwrite, which is what makes the caller's
         // "only when the destination is absent" guard load-bearing.
         assert!(db.snapshot_to(&dest).is_err());
+
+        drop(copy);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The other half of the line above: portable mode's "replace what is
+    /// there" branch called `snapshot_to` on a path that by definition exists,
+    /// so it could never succeed — it printed a raw SQLite error and the only
+    /// way to a portable copy was deleting the file by hand.
+    #[test]
+    fn a_snapshot_can_replace_the_database_already_there() {
+        let db = mem_db();
+        db.kv_set("anilist_viewer", r#"{"id":7}"#).unwrap();
+
+        let dir = std::env::temp_dir().join(format!("karasu-over-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let dest = dir.join("karasu.db");
+        let _ = std::fs::remove_file(&dest);
+
+        // A first write, then a second over it with different contents.
+        db.snapshot_over(&dest).unwrap();
+        db.kv_set("anilist_viewer", r#"{"id":42}"#).unwrap();
+        db.snapshot_over(&dest).unwrap();
+
+        let copy = Db(Mutex::new(Connection::open(&dest).unwrap()));
+        assert_eq!(copy.kv_get("anilist_viewer").as_deref(), Some(r#"{"id":42}"#));
+        // And the temp file it renames through does not survive.
+        assert!(!dest.with_extension("db.replacing").exists());
 
         drop(copy);
         let _ = std::fs::remove_dir_all(&dir);

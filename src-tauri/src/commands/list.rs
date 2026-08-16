@@ -309,6 +309,7 @@ pub struct MutationResult {
 /// Core of list saving, also used by the scrobbler: straight to the API
 /// when online, into the queue when offline (order is preserved).
 pub(crate) async fn save_entry_core(
+    app: &AppHandle,
     db: &Db,
     api: &AniList,
     token: &str,
@@ -322,9 +323,19 @@ pub(crate) async fn save_entry_core(
     if let Some(vars) = input.as_object_mut() {
         vars.insert("scoreFormat".into(), json!(viewer_score_format(db)));
     }
-    if pending(db) > 0 && process_queue(db, api, Some(token)).await.is_err() {
-        queue_push_deduped(db, "save", &input.to_string())?;
-        return Ok(MutationResult { queued: true, entry: None });
+    // The drain's drops are reported here rather than swallowed. A payload
+    // AniList refuses outright is removed from the queue by `process_queue`,
+    // and this path used to discard that list — so a permanently-rejected edit
+    // vanished with only a log line, while the pending badge fell to zero and
+    // the list simply did not contain the change.
+    if pending(db) > 0 {
+        match process_queue(db, api, Some(token)).await {
+            Ok(drained) => report_dropped(app, &drained.dropped),
+            Err(_) => {
+                queue_push_deduped(db, "save", &input.to_string())?;
+                return Ok(MutationResult { queued: true, entry: None });
+            }
+        }
     }
 
     match api.query(Some(token), SAVE_MUTATION, input.clone()).await {
@@ -347,12 +358,13 @@ pub(crate) async fn save_entry_core(
 /// queued and synced later.
 #[tauri::command]
 pub async fn save_list_entry(
+    app: AppHandle,
     db: State<'_, Db>,
     api: State<'_, AniList>,
     input: Value,
 ) -> Result<MutationResult, String> {
     let token = auth::load_token().ok_or("Not connected to AniList")?;
-    save_entry_core(&db, &api, &token, input).await
+    save_entry_core(&app, &db, &api, &token, input).await
 }
 
 /// What a bulk edit managed, and what stopped it if anything did.
@@ -476,6 +488,7 @@ pub async fn bulk_save_list_entries(
 
 #[tauri::command]
 pub async fn delete_list_entry(
+    app: AppHandle,
     db: State<'_, Db>,
     api: State<'_, AniList>,
     id: i64,
@@ -483,9 +496,14 @@ pub async fn delete_list_entry(
     let token = auth::load_token().ok_or("Not connected to AniList")?;
     let input = json!({ "id": id });
 
-    if pending(&db) > 0 && process_queue(&db, &api, Some(&token)).await.is_err() {
-        queue_push_deduped(&db, "delete", &input.to_string())?;
-        return Ok(MutationResult { queued: true, entry: None });
+    if pending(&db) > 0 {
+        match process_queue(&db, &api, Some(&token)).await {
+            Ok(drained) => report_dropped(&app, &drained.dropped),
+            Err(_) => {
+                queue_push_deduped(&db, "delete", &input.to_string())?;
+                return Ok(MutationResult { queued: true, entry: None });
+            }
+        }
     }
 
     match api.query(Some(&token), DELETE_MUTATION, input.clone()).await {
@@ -756,6 +774,20 @@ fn queue_push_deduped(db: &Db, kind: &str, payload: &str) -> Result<(), String> 
 /// `client.rs` classed an expired token and a surviving 429 as exactly that:
 /// the pending badge fell to zero and the edits were gone, with no error and no
 /// log line, because the `Ok(0)` it returned told the caller all was well.
+/// One drain at a time, process-wide.
+///
+/// `fetch_media_list` drains before it fetches, and the Dashboard mounts an
+/// anime and a manga list in the same render. Both calls read `queue_all`
+/// before either removes a row, so both sent the same N mutations — into a
+/// ~30/min budget shared with the scrobbler and three alert passes. No data is
+/// corrupted (the payloads are absolute values) but the budget is spent twice.
+///
+/// `try_lock` and skip, never a held lock. Awaiting this one would park the
+/// second list behind however long the first drain takes, and a drain that hits
+/// a 429 sleeps out its `Retry-After` — up to two minutes of a blank Dashboard
+/// to avoid duplicate requests, which is the worse trade.
+static DRAIN: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
 async fn process_queue(
     db: &Db,
     api: &AniList,
@@ -763,6 +795,10 @@ async fn process_queue(
 ) -> Result<Drained, String> {
     let mut flushed = 0;
     let mut dropped = Vec::new();
+    // Someone else is already draining; their pass covers these rows.
+    let Ok(_drain) = DRAIN.try_lock() else {
+        return Ok(Drained { flushed, dropped });
+    };
     // Only this account's rows. The drain runs on every list fetch with
     // whatever token is loaded now, and the queue outlives a sign-out, so an
     // unscoped read here is what wrote one user's pending edits onto another

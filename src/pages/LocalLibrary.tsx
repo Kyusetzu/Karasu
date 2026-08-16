@@ -11,6 +11,7 @@ import {
   RefreshCw,
   Search,
   Wand2,
+  X,
 } from "lucide-react";
 import { fetchMediaList, isTauri, saveListEntry } from "@/api/anilist";
 import { mediaByIds } from "@/api/queries";
@@ -767,8 +768,22 @@ function Unplaced({
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
               placeholder={t("library.filterUnplaced")}
-              className="h-7 w-full rounded-md border border-surface-800 bg-surface-900 pl-7 pr-2 text-2xs text-ink-200 placeholder:text-ink-600 focus:border-accent-500 focus:outline-none"
+              className="h-7 w-full rounded-md border border-surface-800 bg-surface-900 pl-7 pr-6 text-2xs text-ink-200 placeholder:text-ink-600 focus:border-accent-500 focus:outline-none"
             />
+            {/* Hand-rolled rather than `IconButton`: its smallest size is
+                1.75rem and this box is `h-7` (1.75rem), so the button would be
+                the whole field. */}
+            {filter && (
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => setFilter("")}
+                className="absolute right-1 top-1/2 grid size-4.5 -translate-y-1/2 place-items-center rounded text-ink-600 transition-surface hover:bg-surface-800 hover:text-ink-100"
+              >
+                <X className="size-2.75" />
+                <span className="sr-only">{t("common.clear")}</span>
+              </button>
+            )}
           </div>
         )}
       </div>

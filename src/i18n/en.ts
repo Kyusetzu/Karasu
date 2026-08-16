@@ -123,6 +123,7 @@ export const en = {
     home: "Back to the dashboard",
   },
   common: {
+    clear: "Clear",
     copied: "Copied ✓",
     save: "Save",
     saved: "Saved ✓",

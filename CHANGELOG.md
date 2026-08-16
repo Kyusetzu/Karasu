@@ -154,6 +154,8 @@ short version, grouped by what it means for someone using the app.
 
 - Arrow keys move a cursor across the Seasonal and Search grids, and Enter opens
   the highlighted title — the same movement the list view has had.
+- A clear button in the search and filter boxes — Search, the list filter, the
+  forum search, the unplaced-titles filter and the filter dropdowns.
 - An offline edit is no longer deleted when AniList answers with something
   recoverable — an expired token, a rate limit, a server fault. Only a payload
   AniList rejects on its own terms is dropped, and when one is, it says so.

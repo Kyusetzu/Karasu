@@ -686,6 +686,8 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
               placeholder={t("list.filterPlaceholder")}
+              onClear={() => setFilter("")}
+              clearLabel={t("common.clear")}
               className="h-8.5 pl-8"
             />
           </div>

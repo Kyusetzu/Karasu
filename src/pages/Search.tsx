@@ -225,6 +225,8 @@ export default function Search() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder={t("search.placeholder")}
+              onClear={() => setInput("")}
+              clearLabel={t("common.clear")}
               className="h-11 pl-9"
             />
           </div>

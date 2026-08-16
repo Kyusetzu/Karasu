@@ -121,6 +121,7 @@ export const de: typeof en = {
     home: "Zurück zum Dashboard",
   },
   common: {
+    clear: "Leeren",
     copied: "Kopiert ✓",
     save: "Speichern",
     saved: "Gespeichert ✓",

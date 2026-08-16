@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Check, ChevronDown, Minus, Search } from "lucide-react";
+import { Check, ChevronDown, Minus, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   cycle,
@@ -129,8 +129,22 @@ export function MultiFilterSelect({
                 onChange={(e) => setTerm(e.target.value)}
                 placeholder={t("search.filterOptions")}
                 aria-label={t("search.filterOptions")}
-                className="h-9 w-full bg-transparent pl-8 pr-2.5 text-xs text-ink-100 placeholder:text-ink-600 focus:outline-none"
+                className="h-9 w-full bg-transparent pl-8 pr-8 text-xs text-ink-100 placeholder:text-ink-600 focus:outline-none"
               />
+              {/* Clears the *search term*, not the selection — the footer's
+                  "Clear" already owns that, and conflating the two would make
+                  one of them a trap. */}
+              {term && (
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => setTerm("")}
+                  className="absolute right-1.5 top-1/2 grid size-5 -translate-y-1/2 place-items-center rounded text-ink-600 transition-surface hover:bg-surface-800 hover:text-ink-100"
+                >
+                  <X className="size-3" />
+                  <span className="sr-only">{t("common.clear")}</span>
+                </button>
+              )}
             </div>
           )}
           <ul className="max-h-72 overflow-y-auto p-1">

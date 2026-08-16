@@ -120,6 +120,8 @@ export default function Forum() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder={t("forum.searchPlaceholder")}
+              onClear={() => setInput("")}
+              clearLabel={t("common.clear")}
               className="h-10 pl-9"
             />
           </div>

@@ -174,6 +174,9 @@ async fn check(app: &AppHandle) {
             "airing",
             crate::i18n::Msg::AiringTitle,
             crate::i18n::Msg::AiringBody { title: &title, episode },
+            // `media_id` above falls back to 0, and a row carrying that would
+            // mint a `/media/0` route the bell would happily open.
+            (media_id > 0).then_some(media_id),
         );
         let _ = db.kv_set(&key, &now.to_string());
     }

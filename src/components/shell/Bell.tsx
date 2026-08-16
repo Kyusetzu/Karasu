@@ -11,6 +11,7 @@ import { listen } from "@tauri-apps/api/event";
 import {
   Bell as BellIcon,
   CalendarClock,
+  ChevronRight,
   Clock,
   Film,
   Heart,
@@ -284,6 +285,19 @@ export default function Bell() {
     navigate(row.target);
   };
 
+  // The local twin of `openRow`, and deliberately not the same shape: an
+  // AniList row with no target is `disabled`, because marking read is
+  // AniList's own job and a dead row has nothing left to do. A Karasu row
+  // always has something to do — mark itself read — so it stays enabled and
+  // the navigation is the extra. Rows written before schema v15 carry no media
+  // id and simply stop there, which is exactly what every row did until now.
+  const openLocal = async (n: AppNotification) => {
+    await readOne(n);
+    if (n.mediaId == null) return;
+    setOpen(false);
+    navigate(`/media/${n.mediaId}`);
+  };
+
   return (
     <div ref={ref} className="relative flex items-center">
       <button
@@ -383,7 +397,7 @@ export default function Bell() {
                           return (
                             <li key={n.id}>
                               <button
-                                onClick={() => readOne(n)}
+                                onClick={() => openLocal(n)}
                                 className={cn(
                                   "flex w-full items-start gap-2.5 px-3 py-2.5 text-left transition-surface hover:bg-surface-850",
                                   !n.read && "bg-[rgba(255,255,255,.018)]",
@@ -413,6 +427,16 @@ export default function Bell() {
                                     {relTime(n.createdMs, i18n.language, t("notif.now"))}
                                   </span>
                                 </span>
+                                {/* Two rows that look identical must not behave
+                                    differently. An app-update or dropped-queue
+                                    row, and anything written before v15, has
+                                    nowhere to go and says so by omitting this. */}
+                                {n.mediaId != null && (
+                                  <ChevronRight
+                                    aria-hidden
+                                    className="mt-1 size-3 shrink-0 self-start text-ink-600"
+                                  />
+                                )}
                               </button>
                             </li>
                           );

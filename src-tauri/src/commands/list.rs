@@ -787,7 +787,11 @@ fn report_dropped(app: &AppHandle, dropped: &[String]) {
         1 => crate::i18n::Msg::QueueBodyOne { reason: first },
         n => crate::i18n::Msg::QueueBodyMany { count: n, reason: first },
     };
-    crate::alerts::notify::notify(app, "queue", crate::i18n::Msg::QueueTitle, body);
+    // No media id, though `process_queue` one frame up does have them in its
+    // payloads. One report can stand for several dropped edits across several
+    // titles, so a row that opened *one* of them would misreport the rest —
+    // and splitting into a row per drop turns one drain into n bell rows.
+    crate::alerts::notify::notify(app, "queue", crate::i18n::Msg::QueueTitle, body, None);
 }
 
 /// Manually triggered sync of the offline queue (e.g. a button in the UI).

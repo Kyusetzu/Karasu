@@ -364,6 +364,10 @@ export interface AppNotification {
   title: string;
   body: string;
   createdMs: number;
+  /** What the row opens, or `null`: the app-update notice, a dropped-queue
+   *  report and every row written before schema v15 have nowhere to go.
+   *  `null` rather than `undefined` — serde emits `None` as JSON null. */
+  mediaId: number | null;
   read: boolean;
 }
 

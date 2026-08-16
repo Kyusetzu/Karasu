@@ -282,6 +282,26 @@ ALTER TABLE local_list ADD COLUMN private INTEGER NOT NULL DEFAULT 0;
 PRAGMA user_version = 14;
 ";
 
+/// Schema v15: which media a notification is about.
+///
+/// The table stored rendered sentences and nothing else, so the one thing
+/// anyone wants from a "new episode aired" row — the show it is about — was a
+/// search away. AniList's own rows in the same panel have opened the title
+/// since they landed, which left Karasu's half of the bell looking inert beside
+/// them. Every writer already had the id in hand and dropped it on the floor.
+///
+/// Nullable rather than defaulted, because two of the five callers genuinely
+/// have nothing to point at: the app-update notice is not about a title, and a
+/// dropped-queue report with `n > 1` covers several. NULL therefore reads as
+/// "nothing to open" rather than "not migrated" — which is also the truth about
+/// every row written before this step, so they need no backfill and could not
+/// have one: their rendered title is the only handle, and matching that back to
+/// an id would be a guess.
+const MIGRATION_V15: &str = "
+ALTER TABLE notifications ADD COLUMN media_id INTEGER;
+PRAGMA user_version = 15;
+";
+
 /// One detection correction: what was detected, and what it really is.
 ///
 /// A struct rather than the tuple this started as, because the row grew a
@@ -313,6 +333,12 @@ pub struct NotificationRow {
     pub body: String,
     #[serde(rename = "createdMs")]
     pub created_ms: i64,
+    /// What the bell row opens, when there is something to open. `None` for the
+    /// app-update notice, for a dropped-queue report, and for every row written
+    /// before schema v15. Renamed individually because this struct carries no
+    /// `rename_all` — `created_ms` above is the precedent.
+    #[serde(rename = "mediaId")]
+    pub media_id: Option<i64>,
     pub read: bool,
 }
 
@@ -475,6 +501,15 @@ impl Db {
                 apply(&conn, 14, "PRAGMA user_version = 14;")?;
             } else {
                 apply(&conn, 14, MIGRATION_V14)?;
+            }
+        }
+        if version < 15 {
+            // The fourth `ALTER TABLE ADD COLUMN` in the schema, so v7's guard
+            // for the fourth time and for the same reason.
+            if has_column(&conn, "notifications", "media_id") {
+                apply(&conn, 15, "PRAGMA user_version = 15;")?;
+            } else {
+                apply(&conn, 15, MIGRATION_V15)?;
             }
         }
         Ok(Db(Mutex::new(conn)))
@@ -867,12 +902,13 @@ impl Db {
         title: &str,
         body: &str,
         created_ms: i64,
+        media_id: Option<i64>,
     ) -> Result<(), String> {
         let conn = self.0.guard();
         conn.execute(
-            "INSERT INTO notifications (kind, title, body, created_ms)
-             VALUES (?1, ?2, ?3, ?4)",
-            rusqlite::params![kind, title, body, created_ms],
+            "INSERT INTO notifications (kind, title, body, created_ms, media_id)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            rusqlite::params![kind, title, body, created_ms, media_id],
         )
         .map_err(|e| format!("Notification write failed: {e}"))?;
 
@@ -893,7 +929,7 @@ impl Db {
     pub fn notif_all(&self, limit: i64) -> Vec<NotificationRow> {
         let conn = self.0.guard();
         let mut stmt = match conn.prepare(
-            "SELECT id, kind, title, body, created_ms, read
+            "SELECT id, kind, title, body, created_ms, media_id, read
              FROM notifications ORDER BY id DESC LIMIT ?1",
         ) {
             Ok(s) => s,
@@ -906,7 +942,8 @@ impl Db {
                 title: r.get(2)?,
                 body: r.get(3)?,
                 created_ms: r.get(4)?,
-                read: r.get::<_, i64>(5)? != 0,
+                media_id: r.get(5)?,
+                read: r.get::<_, i64>(6)? != 0,
             })
         })
         .map(|rows| rows.filter_map(Result::ok).collect())
@@ -1290,6 +1327,7 @@ mod tests {
         conn.execute_batch(MIGRATION_V12).unwrap();
         conn.execute_batch(MIGRATION_V13).unwrap();
         conn.execute_batch(MIGRATION_V14).unwrap();
+        conn.execute_batch(MIGRATION_V15).unwrap();
         Db(Mutex::new(conn))
     }
 
@@ -1482,7 +1520,8 @@ mod tests {
     fn notifications_stop_at_the_retention_limit() {
         let db = mem_db();
         for i in 0..(NOTIF_KEEP + 25) {
-            db.notif_insert("airing", "New episode", "body", i).unwrap();
+            db.notif_insert("airing", "New episode", "body", i, None)
+                .unwrap();
         }
         let count: i64 = db
             .0
@@ -1520,16 +1559,17 @@ mod tests {
         let version: i64 = conn
             .query_row("PRAGMA user_version", [], |r| r.get(0))
             .unwrap();
-        assert_eq!(version, 14, "and must end up fully migrated");
+        assert_eq!(version, 15, "and must end up fully migrated");
         drop(conn);
 
-        // v13 and v14 are the other `ALTER TABLE ADD COLUMN` steps, so each
-        // needs the same guard and the same proof: the column present, the
+        // v13, v14 and v15 are the other `ALTER TABLE ADD COLUMN` steps, so
+        // each needs the same guard and the same proof: the column present, the
         // version behind. v14 adds three columns in one transaction, which is
         // why checking the first one is enough to decide for all three.
         for (version_behind, table, column) in [
             (12, "detection_override", "episode_offset"),
             (13, "local_list", "started_at"),
+            (14, "notifications", "media_id"),
         ] {
             let conn = Connection::open(dir.join("karasu.db")).unwrap();
             assert!(has_column(&conn, table, column));
@@ -1544,7 +1584,7 @@ mod tests {
             let version: i64 = conn
                 .query_row("PRAGMA user_version", [], |r| r.get(0))
                 .unwrap();
-            assert_eq!(version, 14);
+            assert_eq!(version, 15);
         }
 
         let _ = std::fs::remove_dir_all(&dir);
@@ -1806,6 +1846,7 @@ mod tests {
         conn.execute_batch(MIGRATION_V12).unwrap();
         conn.execute_batch(MIGRATION_V13).unwrap();
         conn.execute_batch(MIGRATION_V14).unwrap();
+        conn.execute_batch(MIGRATION_V15).unwrap();
 
         let db = Db(Mutex::new(conn));
         let row = db.local_all().into_iter().find(|r| r.media_id == 3).unwrap();
@@ -1890,8 +1931,10 @@ mod tests {
     #[test]
     fn notifications_insert_list_and_read() {
         let db = mem_db();
-        db.notif_insert("airing", "New episode", "Ep 5 is out", 1_000).unwrap();
-        db.notif_insert("sequel", "Sequel announced", "A sequel", 2_000).unwrap();
+        db.notif_insert("airing", "New episode", "Ep 5 is out", 1_000, None)
+            .unwrap();
+        db.notif_insert("sequel", "Sequel announced", "A sequel", 2_000, None)
+            .unwrap();
 
         let all = db.notif_all(50);
         assert_eq!(all.len(), 2);
@@ -1911,9 +1954,25 @@ mod tests {
     fn notif_all_respects_limit() {
         let db = mem_db();
         for i in 0..5 {
-            db.notif_insert("airing", "t", "b", i).unwrap();
+            db.notif_insert("airing", "t", "b", i, None).unwrap();
         }
         assert_eq!(db.notif_all(3).len(), 3);
+    }
+
+    /// v15. A bell row that cannot say which title it is about is a sentence,
+    /// and the AniList rows in the same panel have opened theirs all along.
+    #[test]
+    fn a_notification_remembers_the_media_it_is_about() {
+        let db = mem_db();
+        db.notif_insert("airing", "New episode", "Ep 5 is out", 1_000, Some(16498))
+            .unwrap();
+        db.notif_insert("update", "Update ready", "0.24.0", 2_000, None)
+            .unwrap();
+
+        // Newest first.
+        let all = db.notif_all(50);
+        assert_eq!(all[0].media_id, None, "an app update is not about a title");
+        assert_eq!(all[1].media_id, Some(16498));
     }
 }
 

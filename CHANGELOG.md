@@ -62,6 +62,9 @@ short version, grouped by what it means for someone using the app.
 
 ### Added
 
+- Karasu's own bell rows open the title they are about, the way the AniList rows
+  beside them already did. Rows from before this update carry no title to open
+  and behave as they always have.
 - Detection corrections: tell Karasu which entry a detected title really is, and
   which episode number that season starts at.
 - Position-aware scrobbling — Jellyfin's playback position and a direct mpv IPC

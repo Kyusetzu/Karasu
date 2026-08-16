@@ -36,13 +36,18 @@ fn now_ms() -> i64 {
 /// for rows that expire at 500 and are read the day they arrive. The toast has
 /// to be composed in Rust either way, since the OS shows it and no WebView is
 /// involved.
-pub fn notify(app: &AppHandle, kind: &str, title: Msg<'_>, body: Msg<'_>) {
+///
+/// `media_id` is what the bell row opens, and `None` is a real answer rather
+/// than a gap: the app-update notice and an aggregated queue report are not
+/// about a title. A row without one still marks itself read on click and does
+/// nothing else, which is what every row did before schema v15.
+pub fn notify(app: &AppHandle, kind: &str, title: Msg<'_>, body: Msg<'_>, media_id: Option<i64>) {
     let db = app.state::<Db>();
     let lang = crate::i18n::lang(&db);
     let title = &crate::i18n::text(lang, title);
     let body = &crate::i18n::text(lang, body);
 
-    if let Err(e) = db.notif_insert(kind, title, body, now_ms()) {
+    if let Err(e) = db.notif_insert(kind, title, body, now_ms(), media_id) {
         crate::logging::error("notify", format!("cannot record the {kind} notification: {e}"));
     }
     if let Err(e) = app.notification().builder().title(title).body(body).show() {

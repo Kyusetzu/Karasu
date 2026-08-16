@@ -124,6 +124,7 @@ fn check(app: &AppHandle) {
                 "stale",
                 crate::i18n::Msg::StaleTitle,
                 crate::i18n::Msg::StaleBody { title: &title, months },
+                Some(media_id),
             );
             let _ = db.kv_set(&key, &updated.to_string());
         }

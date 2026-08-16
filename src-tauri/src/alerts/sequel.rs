@@ -225,6 +225,10 @@ async fn check(app: &AppHandle) {
                         "sequel",
                         crate::i18n::Msg::SequelTitle { side_story: rel != "SEQUEL" },
                         crate::i18n::Msg::SequelBody { title: &title },
+                        // The *sequel's* id, not the entry it was announced
+                        // from: the row names the sequel, so that is what it
+                        // should open.
+                        Some(node_id),
                     );
                 }
             }

@@ -10,7 +10,7 @@ use super::*;
 
 /// Monotonic commit counter — the 4th version segment
 /// (`MAJOR.MINOR.PATCH.COMMIT#`). Bumped by one on every commit.
-pub const COMMIT_NUMBER: u32 = 351;
+pub const COMMIT_NUMBER: u32 = 352;
 
 /// Full four-part display version, e.g. `0.1.1.38`. The `MAJOR.MINOR.PATCH`
 /// core comes from the crate version (kept in sync across the manifests).
@@ -380,6 +380,8 @@ pub async fn download_pending_update(
         // announcing, and the next check downloaded the whole installer again.
         // The wording is in `i18n.rs` now, with that note beside it.
         crate::i18n::Msg::UpdateBody { version: &version },
+        // An app update is not about a title, so there is nothing to open.
+        None,
     );
 
     Ok(Some(DownloadedUpdate { version, notes }))

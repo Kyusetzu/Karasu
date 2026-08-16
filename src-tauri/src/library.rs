@@ -431,9 +431,40 @@ pub async fn scan_library(app: AppHandle) -> Result<ScanSummary, String> {
         (root, candidates, override_map(&db), redirect_rules(&db), stored, cursor)
     };
 
+    // Everything below ends in `library_replace_all` and its two siblings, each
+    // of which DELETEs its whole table before inserting what this scan found.
+    // So an unreachable folder — an offline NAS, an unplugged drive, a renamed
+    // directory — must not reach that point: it yields zero files, and zero
+    // files used to be written down as the truth and then survive a restart
+    // through `hydrate`, while the command returned Ok and the pane rendered
+    // the result in success styling.
+    let previously_indexed = {
+        let db = app.state::<Db>();
+        db.library_all().len()
+    };
+    if let Err(e) = std::fs::read_dir(Path::new(&root)) {
+        return Err(format!(
+            "Cannot read the library folder ({e}). Nothing was changed — check \
+             that the drive or network share is connected, then scan again."
+        ));
+    }
+
     let mut files = Vec::new();
-    collect_videos(Path::new(&root), 0, &mut files);
+    let unreadable = collect_videos(Path::new(&root), 0, &mut files);
     let total = files.len();
+    // A mount point that is still mounted but no longer carries its contents
+    // reads as an empty directory rather than an error, which is exactly what a
+    // disconnected NAS looks like. Finding nothing where there was something is
+    // therefore treated as a failure to look, not as an emptied library. A
+    // genuinely emptied folder reports the same thing once and is resolved by
+    // pointing the setting somewhere else.
+    if total == 0 && (unreadable > 0 || previously_indexed > 0) {
+        return Err(format!(
+            "Found no video files in the library folder, but {previously_indexed} \
+             were indexed before. The index was kept — check that the drive or \
+             network share is connected, then scan again."
+        ));
+    }
 
     let mut data = LibraryData {
         files: index_files(&files, &candidates, &overrides, &redirects),
@@ -1271,24 +1302,40 @@ fn open_path(app: &AppHandle, path: &str) -> Result<(), String> {
 }
 
 /// Recursively collects video files up to the depth/size caps.
-fn collect_videos(dir: &Path, depth: usize, out: &mut Vec<String>) {
+///
+/// Returns how many directories could not be read. A scan ends by replacing
+/// all three library tables, so "found nothing" and "could not look" must not
+/// arrive here as the same answer: an unreadable directory used to `return`
+/// silently at every level, root included, and the empty result was then
+/// persisted as the truth.
+#[must_use]
+fn collect_videos(dir: &Path, depth: usize, out: &mut Vec<String>) -> usize {
     if depth > MAX_DEPTH || out.len() >= MAX_FILES {
-        return;
+        return 0;
     }
-    let Ok(entries) = std::fs::read_dir(dir) else {
-        return;
+    let entries = match std::fs::read_dir(dir) {
+        Ok(e) => e,
+        Err(e) => {
+            crate::logging::warn(
+                "library",
+                format!("cannot read {}: {e}", dir.display()),
+            );
+            return 1;
+        }
     };
+    let mut unreadable = 0;
     for entry in entries.flatten() {
         if out.len() >= MAX_FILES {
-            return;
+            return unreadable;
         }
         let path = entry.path();
         if path.is_dir() {
-            collect_videos(&path, depth + 1, out);
+            unreadable += collect_videos(&path, depth + 1, out);
         } else if is_video(&path) {
             out.push(path.to_string_lossy().to_string());
         }
     }
+    unreadable
 }
 
 fn is_video(path: &Path) -> bool {
@@ -1766,5 +1813,38 @@ mod tests {
             1,
             "exactly the corrected parse carries the flag, not both",
         );
+    }
+
+    /// "Found nothing" and "could not look" used to be the same answer.
+    ///
+    /// `collect_videos` swallowed a `read_dir` failure at every level including
+    /// the root, so an offline NAS or an unplugged drive produced an empty
+    /// result — which the scan then persisted through three `DELETE`-everything
+    /// writes and reported as a success. The count it returns is what
+    /// `scan_library` now refuses on.
+    #[test]
+    fn an_unreadable_directory_is_counted_rather_than_swallowed() {
+        let missing = std::env::temp_dir().join("karasu-no-such-library-dir");
+        let _ = std::fs::remove_dir_all(&missing);
+
+        let mut out = Vec::new();
+        assert_eq!(collect_videos(&missing, 0, &mut out), 1, "the root counts");
+        assert!(out.is_empty());
+
+        // A real folder that is genuinely empty is a different answer, and has
+        // to stay one — it is the only way to empty a library on purpose.
+        let empty = std::env::temp_dir().join(format!("karasu-empty-{}", std::process::id()));
+        std::fs::create_dir_all(&empty).unwrap();
+        let mut out = Vec::new();
+        assert_eq!(collect_videos(&empty, 0, &mut out), 0);
+        assert!(out.is_empty());
+
+        // And one with a video in it finds the video and reports no failures.
+        std::fs::write(empty.join("Show - 01.mkv"), b"").unwrap();
+        let mut out = Vec::new();
+        assert_eq!(collect_videos(&empty, 0, &mut out), 0);
+        assert_eq!(out.len(), 1);
+
+        let _ = std::fs::remove_dir_all(&empty);
     }
 }

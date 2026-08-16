@@ -42,6 +42,11 @@ short version, grouped by what it means for someone using the app.
   both dates that existed only locally were lost, and the merge reported
   success. It now pushes whatever the AniList row is missing before clearing,
   and never overwrites a value AniList already has.
+- **A library scan can no longer wipe the index because the drive was offline.**
+  An unreachable folder produced zero files, and zero files were written down as
+  the truth across all three library tables — reported as a successful scan, and
+  surviving a restart. The folder is checked before anything is replaced, and
+  finding nothing where something was indexed before keeps the index and says so.
 
 - An offline edit is no longer deleted when AniList answers with something
   recoverable — an expired token, a rate limit, a server fault. Only a payload

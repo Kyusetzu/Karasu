@@ -63,7 +63,16 @@ fn pick_title(title: Option<&Value>) -> String {
 
 /// (media_id, updated_at, title) of every PAUSED entry in a cached list that
 /// has been untouched for at least `cutoff` seconds.
-fn stale_entries(lists: &Value, now: i64, cutoff: i64) -> Vec<(i64, i64, String)> {
+/// `level` is applied here rather than at the call site because the media
+/// object is only in scope inside this loop. Airing and sequel both filter
+/// before they speak; this pass did not, and a desktop toast naming a title the
+/// user asked never to see is the least undoable place to leak one.
+fn stale_entries(
+    lists: &Value,
+    now: i64,
+    cutoff: i64,
+    level: &str,
+) -> Vec<(i64, i64, String)> {
     let mut out = Vec::new();
     for group in lists.as_array().into_iter().flatten() {
         for entry in group
@@ -78,6 +87,11 @@ fn stale_entries(lists: &Value, now: i64, cutoff: i64) -> Vec<(i64, i64, String)
             let updated = entry.get("updatedAt").and_then(|v| v.as_i64()).unwrap_or(0);
             if updated == 0 || now - updated < cutoff {
                 continue;
+            }
+            if let Some(media) = entry.get("media") {
+                if crate::commands::media_blocked(media, level) {
+                    continue;
+                }
             }
             if let Some(id) = entry.pointer("/media/id").and_then(|v| v.as_i64()) {
                 out.push((id, updated, pick_title(entry.pointer("/media/title"))));
@@ -103,6 +117,10 @@ fn check(app: &AppHandle) {
     let now = now_secs();
     let months = stale_months(&db);
     let cutoff = months * SECS_PER_MONTH;
+    // Airing and sequel both filter before they speak; this pass did not, so a
+    // title the user has asked never to see could still arrive as a desktop
+    // toast naming it — the one place the filter is least able to be undone.
+    let level = crate::commands::read_content_filter(&db);
 
     for media_type in ["ANIME", "MANGA"] {
         let Some(lists) = db
@@ -111,7 +129,7 @@ fn check(app: &AppHandle) {
         else {
             continue;
         };
-        for (media_id, updated, title) in stale_entries(&lists, now, cutoff) {
+        for (media_id, updated, title) in stale_entries(&lists, now, cutoff, &level) {
             // Notify at most once per (entry, updatedAt): touching the entry
             // bumps updatedAt and makes it eligible again, otherwise it stays
             // quiet — this is the built-in dismiss.
@@ -150,7 +168,7 @@ mod tests {
                   "media": { "id": 3, "title": { "romaji": "Old Current" } } },
             ]
         }]);
-        let got = stale_entries(&lists, now, cutoff);
+        let got = stale_entries(&lists, now, cutoff, "off");
         assert_eq!(got.len(), 1);
         assert_eq!(got[0].0, 1);
         assert_eq!(got[0].2, "Old Paused");
@@ -165,6 +183,32 @@ mod tests {
                   "media": { "id": 1, "title": { "romaji": "No Time" } } },
             ]
         }]);
-        assert!(stale_entries(&lists, now, 100).is_empty());
+        assert!(stale_entries(&lists, now, 100, "off").is_empty());
+    }
+
+    /// Airing and sequel both call `media_blocked` before they speak. This pass
+    /// did not, so a filtered title could arrive as a desktop toast naming it —
+    /// which is the one place the filter cannot be taken back.
+    #[test]
+    fn a_filtered_title_never_becomes_a_reminder() {
+        let now = 1_000_000_000;
+        let cutoff = 3 * SECS_PER_MONTH;
+        let lists = json!([{
+            "entries": [
+                { "status": "PAUSED", "updatedAt": now - cutoff - 10,
+                  "media": { "id": 1, "isAdult": true, "genres": [],
+                             "title": { "romaji": "Filtered" } } },
+                { "status": "PAUSED", "updatedAt": now - cutoff - 10,
+                  "media": { "id": 2, "isAdult": false, "genres": [],
+                             "title": { "romaji": "Ordinary" } } },
+            ]
+        }]);
+
+        let strict = stale_entries(&lists, now, cutoff, "strict");
+        assert_eq!(strict.len(), 1, "the adult entry is left out");
+        assert_eq!(strict[0].0, 2);
+
+        // And the filter being off is still the filter being off.
+        assert_eq!(stale_entries(&lists, now, cutoff, "off").len(), 2);
     }
 }

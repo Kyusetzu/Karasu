@@ -1265,6 +1265,8 @@ export const de: typeof en = {
     detectionDebug: "Was dein System gerade meldet",
     detectionDebugHint:
       "Alle Mediensitzungen, die dein System aktuell kennt. Damit siehst du, was ein Player veröffentlicht, wenn er nicht erkannt wird.",
+    detectionDebugFailed:
+      "Die Medien-Sitzungen konnten nicht gelesen werden ({{message}}). Das ist der Systemdienst, an den Player melden, nicht Karasu.",
     detectionDebugEmpty: "Zurzeit meldet keine Mediensitzung etwas.",
     refreshDebug: "Aktualisieren",
     jellyfin: "Jellyfin-Server",
@@ -1292,6 +1294,8 @@ export const de: typeof en = {
       "Keine dieser Sitzungen passt zu deinem Gerät, es wird also nichts erfasst. Übernimm den Gerätenamen aus deiner Zeile ins Gerätefeld, oder leere das Feld, um alle deine Geräte zu akzeptieren.",
     threshold: "Schwelle (Minuten)",
     thresholdHint: "0 = automatisch (zwei Drittel der Episodenlänge)",
+    trackingSaveFailed:
+      "Diese Einstellung wurde nicht gespeichert ({{message}}) und daher zurückgesetzt.",
     airingNotify: "Benachrichtigung bei neuer Folge",
     airingNotifyHint:
       "Desktop-Benachrichtigung, wenn eine neue Folge einer laufenden Serie erscheint — das Einzige, was die Website nicht kann, während Karasu im Tray liegt.",
@@ -1343,6 +1347,8 @@ export const de: typeof en = {
     contentHint_moderate:
       "Blendet explizite (18+) Titel aus. Anzügliches wie Ecchi bleibt sichtbar.",
     contentHint_strict: "Blendet explizite (18+) und anzügliche Titel aus.",
+    contentSaveFailed:
+      "Diese Einstellung wurde nicht gespeichert ({{message}}) und daher zurückgesetzt.",
     contentNote:
       "Gilt überall, auch für deine eigene Liste. Tracking und Wiedergabe funktionieren für ausgeblendete Titel weiterhin.",
     discord: "Discord Rich Presence",

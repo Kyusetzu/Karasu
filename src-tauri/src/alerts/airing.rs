@@ -152,6 +152,12 @@ fn pick_title(title: Option<&Value>) -> String {
 async fn check(app: &AppHandle) {
     let db = app.state::<Db>();
     if db.kv_get("airing_notify").as_deref() == Some("0") {
+        // The checkpoint moves even while the setting is off. It used to return
+        // before touching it, so `airing_last_check` froze at whatever second
+        // the toggle was flipped — and switching the feature back on months
+        // later replayed every episode that had aired in between, as a desktop
+        // toast and a bell row each. Turning a notification off must not arm it.
+        let _ = db.kv_set("airing_last_check", &now_secs().to_string());
         return;
     }
     let viewer = cached_viewer(&db);

@@ -13,6 +13,7 @@ export function ContentSection() {
   const level = useContentFilter((s) => s.level);
   const ready = useContentFilter((s) => s.ready);
   const setLevel = useContentFilter((s) => s.setLevel);
+  const error = useContentFilter((s) => s.error);
   const index = CONTENT_FILTER_LEVELS.indexOf(level);
 
   return (
@@ -53,6 +54,13 @@ export function ContentSection() {
             {t(`settings.contentHint_${level}`)}
           </p>
           <p className="text-xs text-ink-600">{t("settings.contentNote")}</p>
+          {/* The slider reverts on a failed save, so without this the control
+              would simply snap back with no explanation. */}
+          {error && (
+            <p className="text-xs text-danger">
+              {t("settings.contentSaveFailed", { message: error })}
+            </p>
+          )}
         </div>
       )}
     </Card>

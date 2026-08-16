@@ -323,20 +323,46 @@ pub fn detect() -> Option<Playback> {
     found
 }
 
+/// What the platform reports, or why it could not be asked.
+///
+/// The detection pass wants a plain list and treats "nothing" as a normal
+/// answer — most polls find nothing playing. The *diagnostic* wants the
+/// difference: "no session is reporting anything" and "the session service
+/// could not be reached" were byte-identical on screen, and on Linux this pass
+/// is the whole of local detection, so the second one means the feature is
+/// down. Telling someone their player is at fault when the session bus is
+/// missing sends them to debug the wrong thing.
 #[cfg(windows)]
-pub fn sessions() -> Vec<MediaSession> {
-    smtc::read_sessions().unwrap_or_default()
+pub fn sessions_result() -> Result<Vec<MediaSession>, String> {
+    smtc::read_sessions().map_err(|e| e.to_string())
 }
 
 #[cfg(target_os = "linux")]
-pub fn sessions() -> Vec<MediaSession> {
-    mpris::read_sessions().unwrap_or_default()
+pub fn sessions_result() -> Result<Vec<MediaSession>, String> {
+    mpris::read_sessions().map_err(|e| e.to_string())
 }
 
 /// No media-session API on this platform.
 #[cfg(not(any(windows, target_os = "linux")))]
+pub fn sessions_result() -> Result<Vec<MediaSession>, String> {
+    Ok(Vec::new())
+}
+
+/// The list alone, for the detection pass.
+///
+/// A failure is an empty list here on purpose — the poll runs every 5 s and has
+/// nothing useful to do with an error — but it does not pass silently: the
+/// reason goes through `debug_changed`, which records a line only when it
+/// differs from the last one under the same key. A plain `warn` on this path is
+/// 17,280 lines a day and rotates the interesting part of the log off disk.
 pub fn sessions() -> Vec<MediaSession> {
-    Vec::new()
+    match sessions_result() {
+        Ok(list) => list,
+        Err(e) => {
+            crate::logging::debug_changed("detect", "sessions_error", &e);
+            Vec::new()
+        }
+    }
 }
 
 #[cfg(test)]

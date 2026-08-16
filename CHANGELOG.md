@@ -85,6 +85,18 @@ short version, grouped by what it means for someone using the app.
   offering to install a build the new channel does not have.
 - On Linux, an update is only offered to a running AppImage. A self-built binary
   was offered one whose install would have overwritten the user's own build.
+- **Settings that failed to save no longer look saved.** The content filter and
+  every detection toggle were fire-and-forget: the switch moved, the write was
+  dropped, and the choice quietly did not survive a restart. They put the
+  control back and say what went wrong.
+- The bell no longer answers a failed read with "You're all caught up."
+- The media-session diagnostic distinguishes "no player is reporting anything"
+  from "the system service could not be reached" — on Linux the second means
+  detection is down, and it used to send you to debug your player.
+- Turning airing notifications off no longer arms them: re-enabling months later
+  used to replay every episode that had aired in between.
+- A title hidden by the content filter can no longer surface in an on-hold
+  reminder.
 - An offline edit is no longer deleted when AniList answers with something
   recoverable — an expired token, a rate limit, a server fault. Only a payload
   AniList rejects on its own terms is dropped, and when one is, it says so.

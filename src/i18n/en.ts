@@ -1253,6 +1253,8 @@ export const en = {
     detectionDebug: "What your system currently reports",
     detectionDebugHint:
       "Every media session your desktop knows about right now. Use this to see what a player publishes when it isn't being detected.",
+    detectionDebugFailed:
+      "Could not read the media sessions ({{message}}). This is the system service players report to, not Karasu.",
     detectionDebugEmpty: "No media session is reporting anything right now.",
     refreshDebug: "Refresh",
     jellyfin: "Jellyfin server",
@@ -1280,6 +1282,8 @@ export const en = {
       "None of these match your device, so nothing is being tracked. Copy the device name from the row that is yours into the device field, or clear the field to accept any of your devices.",
     threshold: "Threshold (minutes)",
     thresholdHint: "0 = automatic (two thirds of the episode length)",
+    trackingSaveFailed:
+      "That setting was not saved ({{message}}), so it has been put back.",
     airingNotify: "New-episode notifications",
     airingNotifyHint:
       "Desktop notification when a new episode of a show you are watching airs — the one thing the website cannot do while Karasu sits in the tray.",
@@ -1331,6 +1335,8 @@ export const en = {
     contentHint_moderate:
       "Hides explicit (18+) titles. Suggestive ones, like Ecchi, are still shown.",
     contentHint_strict: "Hides explicit (18+) and suggestive titles.",
+    contentSaveFailed:
+      "That setting was not saved ({{message}}), so it has been put back.",
     contentNote:
       "Applies everywhere, including your own list. Scrobbling and playback keep working for hidden titles you already track.",
     discord: "Discord Rich Presence",

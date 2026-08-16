@@ -161,9 +161,19 @@ export default function Bell() {
   const panel = usePresence(open);
   const ref = useRef<HTMLDivElement>(null);
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   const load = useCallback(() => {
     if (!isTauri) return;
-    getNotifications().then(setItems).catch(() => {});
+    // A swallowed failure rendered the empty state, so a bell that could not
+    // read its own table said "You're all caught up." — the most reassuring
+    // possible way to report a broken database.
+    getNotifications()
+      .then((rows) => {
+        setItems(rows);
+        setLoadError(null);
+      })
+      .catch((e) => setLoadError(String(e)));
   }, []);
 
   // `load` guards itself, but `listen` does not — outside Tauri it reaches for
@@ -378,7 +388,11 @@ export default function Bell() {
           )}
 
           {shownView === "local" ? (
-            items.length === 0 ? (
+            loadError ? (
+              <p className="px-3 py-6 text-center text-sm text-danger">
+                {t("common.error", { message: loadError })}
+              </p>
+            ) : items.length === 0 ? (
               <EmptyState visual={<TickMarks />} title={t("notif.empty")} className="py-6" />
             ) : (
               <div className="max-h-96 overflow-y-auto">

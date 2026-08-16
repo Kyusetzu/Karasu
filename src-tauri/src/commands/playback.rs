@@ -370,12 +370,18 @@ pub async fn test_jellyfin(
 /// Every media session the desktop currently knows about, for the Settings
 /// diagnostic. Players fill these fields inconsistently, so this is the only
 /// honest way to see why something was or wasn't detected.
+/// `Result`, not a bare `Vec`: an empty list and a session service that could
+/// not be reached are different diagnoses, and the whole point of this command
+/// is telling someone which one they have. Returning `Vec` made the frontend's
+/// own `.catch` unreachable — the command could not fail — so both rendered as
+/// "no media session is reporting anything".
 #[tauri::command]
-pub async fn media_sessions() -> Vec<crate::playback::detection::media_session::MediaSession> {
+pub async fn media_sessions(
+) -> Result<Vec<crate::playback::detection::media_session::MediaSession>, String> {
     // Blocking WinRT / D-Bus work: off the main thread, like the detection loop.
-    tokio::task::spawn_blocking(crate::playback::detection::media_session::sessions)
+    tokio::task::spawn_blocking(crate::playback::detection::media_session::sessions_result)
         .await
-        .unwrap_or_default()
+        .map_err(|e| format!("Could not read the media sessions: {e}"))?
 }
 
 /// Confirms the pending auto-update immediately (also from Blocked).

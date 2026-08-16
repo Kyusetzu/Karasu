@@ -38,6 +38,7 @@ export function ScrobbleSection() {
   const [stale, setStale] = useState<api.StaleSettings | null>(null);
   const [sequel, setSequel] = useState<boolean | null>(null);
   const [mediaOn, setMediaOn] = useState<boolean | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const platform = usePlatform((s) => s.info);
   const viewer = useAuth((s) => s.viewer);
 
@@ -52,27 +53,47 @@ export function ScrobbleSection() {
 
   if (!settings) return null;
 
+  /**
+   * Paint, persist, and put the control back if persisting failed.
+   *
+   * Every write on this pane was fire-and-forget, so a rejected `kv_set` left
+   * the switch showing one thing while the watcher that reads the key kept
+   * doing another — and nothing on screen said so. Same shape as
+   * `AdvancedPane`'s rollback, which is the house pattern for this.
+   */
+  const persist = (save: Promise<unknown>, revert: () => void) => {
+    setSaveError(null);
+    save.catch((e) => {
+      revert();
+      setSaveError(String(e));
+    });
+  };
+
   const update = (patch: Partial<ScrobbleSettings>) => {
+    const previous = settings;
     const next = { ...settings, ...patch };
     setSettings(next);
-    setScrobbleSettings(next);
+    persist(setScrobbleSettings(next), () => setSettings(previous));
   };
 
   const updateAiring = (v: boolean) => {
     setAiring(v);
-    api.setAiringNotify(v);
+    persist(api.setAiringNotify(v), () => setAiring(!v));
   };
 
   const updateSequel = (v: boolean) => {
     setSequel(v);
-    api.setSequelNotify(v);
+    persist(api.setSequelNotify(v), () => setSequel(!v));
   };
 
   const updateStale = (patch: Partial<api.StaleSettings>) => {
     if (!stale) return;
+    const previous = stale;
     const next = { ...stale, ...patch };
     setStale(next);
-    api.setStaleSettings(next.enabled, next.months);
+    persist(api.setStaleSettings(next.enabled, next.months), () =>
+      setStale(previous),
+    );
   };
 
   return (
@@ -84,6 +105,11 @@ export function ScrobbleSection() {
           than leaving someone to conclude the feature is broken. */}
       {!viewer && (
         <p className="mt-2 text-sm text-gold">{t("settings.trackingNeedsAccount")}</p>
+      )}
+      {saveError && (
+        <p className="mt-2 text-sm text-danger">
+          {t("settings.trackingSaveFailed", { message: saveError })}
+        </p>
       )}
       <div className="mt-3 space-y-3">
         <Toggle
@@ -103,7 +129,7 @@ export function ScrobbleSection() {
             checked={mediaOn}
             onChange={(v) => {
               setMediaOn(v);
-              setMediaDetection(v);
+              persist(setMediaDetection(v), () => setMediaOn(!v));
             }}
             label={t("settings.mediaSessions")}
             hint={
@@ -203,14 +229,22 @@ function MediaSessionDiagnostic() {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [sessions, setSessions] = useState<MediaSession[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const refresh = async () => {
     setBusy(true);
     try {
       setSessions(await mediaSessions());
-    } catch {
-      setSessions([]);
+      setError(null);
+    } catch (e) {
+      // Not `setSessions([])`. An empty list is "no player is reporting
+      // anything", which is a normal state and a completely different answer
+      // from "the session service could not be reached" — and on Linux this
+      // pass is the whole of local detection, so the second one means the
+      // feature is down rather than idle.
+      setSessions(null);
+      setError(String(e));
     } finally {
       setBusy(false);
     }
@@ -248,7 +282,12 @@ function MediaSessionDiagnostic() {
             <RefreshCw className={cn("size-3.5", busy && "animate-spin")} />{" "}
             {t("settings.refreshDebug")}
           </Button>
-          {sessions?.length === 0 && (
+          {error && (
+            <p className="text-xs text-danger">
+              {t("settings.detectionDebugFailed", { message: error })}
+            </p>
+          )}
+          {!error && sessions?.length === 0 && (
             <p className="text-xs text-ink-600">
               {t("settings.detectionDebugEmpty")}
             </p>

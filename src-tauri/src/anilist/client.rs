@@ -1,5 +1,6 @@
 use serde_json::{json, Value};
 use std::collections::VecDeque;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use tokio::sync::Mutex;
 // Monotonic, so a user moving their clock cannot invent or erase a throttle.
@@ -76,14 +77,36 @@ fn operation_name(query: &str) -> String {
 #[derive(Debug)]
 pub enum ApiError {
     Network(String),
+    /// AniList rejected the *token*, not the payload.
+    ///
+    /// Split out of `Retryable` because the two need opposite handling on
+    /// screen while needing the same handling in the queue. A 429 is "wait";
+    /// this is "nothing will change until you sign in again", and rendering it
+    /// as one more load failure is what made a dead token look like the app
+    /// randomly breaking. The queued write is still perfectly good — it is the
+    /// credential that went stale — so `is_retryable` still holds.
+    Auth(String),
     Retryable(String),
     Api(String),
 }
 
+/// What the frontend gets for an `Auth` failure. `lib/backendError.ts` turns it
+/// into a sentence; `stores/auth` turns it into one banner for the whole app.
+pub const TOKEN_REJECTED: &str = "anilist.tokenRejected";
+
+/// Whether the current run of rejections has already been logged.
+///
+/// Cleared by the next success, so a *later* rejection is reported rather than
+/// swallowed as a repeat of one the user has already dealt with.
+static AUTH_REPORTED: AtomicBool = AtomicBool::new(false);
+
 impl ApiError {
     /// Whether sending the same request later could plausibly succeed.
     pub fn is_retryable(&self) -> bool {
-        matches!(self, ApiError::Network(_) | ApiError::Retryable(_))
+        matches!(
+            self,
+            ApiError::Network(_) | ApiError::Retryable(_) | ApiError::Auth(_)
+        )
     }
 }
 
@@ -91,6 +114,10 @@ impl From<ApiError> for String {
     fn from(e: ApiError) -> Self {
         match e {
             ApiError::Network(m) => format!("Network error: {m}"),
+            // A stable code rather than AniList's wording. "Invalid token" is
+            // English, is not actionable, and was rendered raw into
+            // "Failed to load: Invalid token" on every screen at once.
+            ApiError::Auth(_) => TOKEN_REJECTED.into(),
             ApiError::Retryable(m) | ApiError::Api(m) => m,
         }
     }
@@ -116,8 +143,21 @@ fn message_is_retryable(msg: &str) -> bool {
     m.contains("invalid token") || m.contains("unauthorized") || m.contains("too many requests")
 }
 
+/// The token rather than the payload or the pace.
+///
+/// Checked *before* the retryable set, which also claims 401 and 403 — order is
+/// the whole distinction. "too many requests" is deliberately absent: a 429 is
+/// about how fast we asked, and calling it an auth failure would sign the user
+/// out for being busy.
+fn is_auth_failure(code: u16, msg: &str) -> bool {
+    let m = msg.to_ascii_lowercase();
+    matches!(code, 401 | 403) || m.contains("invalid token") || m.contains("unauthorized")
+}
+
 fn classify(code: u16, msg: String) -> ApiError {
-    if status_is_retryable(code) || message_is_retryable(&msg) {
+    if is_auth_failure(code, &msg) {
+        ApiError::Auth(msg)
+    } else if status_is_retryable(code) || message_is_retryable(&msg) {
         ApiError::Retryable(msg)
     } else {
         ApiError::Api(msg)
@@ -569,17 +609,37 @@ impl AniList {
                     .join("; ");
                 self.record(&operation, sent, paced, Some(status), remaining, "error")
                     .await;
-                return Err(classify(
+                let err = classify(
                     status,
                     if msg.is_empty() {
                         format!("AniList error (HTTP {status})")
                     } else {
                         msg
                     },
-                ));
+                );
+                // The status and AniList's own wording, once per transition.
+                // A screen fires several queries, so an unguarded warn would
+                // write the same line a dozen times and rotate the interesting
+                // part of a 1 MB log off disk — the `debug_changed` lesson.
+                // Never the header and never the body: the request carries the
+                // bearer token this whole module exists to keep in Rust.
+                if let ApiError::Auth(ref reason) = err {
+                    if !AUTH_REPORTED.swap(true, Ordering::Relaxed) {
+                        crate::logging::warn(
+                            "anilist",
+                            format!("token rejected (HTTP {status}): {reason}"),
+                        );
+                    }
+                }
+                return Err(err);
             }
 
             let data = body.get("data").cloned();
+            if data.is_some() {
+                // Armed again, so a *later* rejection is logged rather than
+                // swallowed as a repeat of one the user has already fixed.
+                AUTH_REPORTED.store(false, Ordering::Relaxed);
+            }
             self.record(
                 &operation,
                 sent,
@@ -832,6 +892,49 @@ mod tests {
         assert!(classify(400, "Too Many Requests".into()).is_retryable());
     }
 
+    /// The split this commit exists for. Both keep a queued edit — the write is
+    /// good either way, it is the credential that went stale — but only one of
+    /// them means "nothing will change until you sign in again".
+    #[test]
+    fn a_rejected_token_is_not_the_same_as_a_busy_server() {
+        for (code, msg) in [(400, "Invalid token"), (401, "nope"), (403, "nope")] {
+            assert!(
+                matches!(classify(code, msg.into()), ApiError::Auth(_)),
+                "HTTP {code} / {msg:?} is an auth failure"
+            );
+        }
+        // A 429 is about how fast we asked. Calling it an auth failure would
+        // sign the user out for being busy.
+        for (code, msg) in [(429, "Too Many Requests."), (400, "Too Many Requests")] {
+            assert!(
+                matches!(classify(code, msg.into()), ApiError::Retryable(_)),
+                "HTTP {code} / {msg:?} is pace, not auth"
+            );
+        }
+        // And a payload AniList refuses stays permanent, or one bad row wedges
+        // every edit behind it.
+        assert!(matches!(
+            classify(400, "validation: {\"progress\":[\"invalid\"]}".into()),
+            ApiError::Api(_)
+        ));
+    }
+
+    /// Every auth failure has to keep its queued write. The queue drops `Api`.
+    #[test]
+    fn a_rejected_token_never_drops_an_edit() {
+        assert!(classify(401, "Invalid token".into()).is_retryable());
+    }
+
+    /// The frontend branches on this exact code, and AniList's own wording is
+    /// English, unactionable, and was rendered raw on every screen at once.
+    #[test]
+    fn an_auth_failure_reaches_the_frontend_as_a_stable_code() {
+        assert_eq!(
+            String::from(classify(400, "Invalid token".into())),
+            TOKEN_REJECTED
+        );
+    }
+
     #[test]
     fn message_matching_ignores_case() {
         assert!(message_is_retryable("INVALID TOKEN"));
@@ -864,7 +967,7 @@ mod tests {
             String::from(ApiError::Network("timed out".into())),
             "Network error: timed out"
         );
-        assert_eq!(String::from(ApiError::Retryable("Invalid token".into())), "Invalid token");
+        assert_eq!(String::from(ApiError::Retryable("slow down".into())), "slow down");
         assert_eq!(String::from(ApiError::Api("validation".into())), "validation");
     }
 }

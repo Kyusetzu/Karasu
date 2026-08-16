@@ -28,6 +28,14 @@ export const en = {
     about: "About",
     settings: "Settings",
   },
+  auth: {
+    expiredTitle: "AniList session expired.",
+    expiredBody:
+      "Your saved sign-in is no longer accepted, so nothing can load or sync until you sign in again. Anything you have edited is still queued and will be sent afterwards.",
+    expiredAction: "Sign in again",
+    expiredWaiting: "Waiting for AniList…",
+    tokenRejected: "AniList rejected the saved sign-in. Sign in again.",
+  },
   sync: {
     button: "Sync now",
     failed: "Sync failed",

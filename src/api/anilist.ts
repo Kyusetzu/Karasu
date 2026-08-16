@@ -37,8 +37,50 @@ export const logout = () => invoke<void>("anilist_logout");
 
 // --- GraphQL --------------------------------------------------------------
 
+/**
+ * The stable code `client.rs` returns when AniList rejects the token.
+ *
+ * Matched exactly rather than by substring: an entry's notes can contain any
+ * text at all, and a queued edit whose body happened to mention this must not
+ * sign the user out.
+ */
+export const TOKEN_REJECTED = "anilist.tokenRejected";
+
+export const isTokenRejected = (e: unknown): boolean =>
+  (e instanceof Error ? e.message : String(e)).trim() === TOKEN_REJECTED;
+
+/**
+ * Told when the token is rejected, so the auth store can raise **one** banner
+ * instead of every screen rendering its own load failure.
+ *
+ * A callback the store registers rather than an import, mirroring
+ * `setProfileModeCache` below: `stores/auth` imports this module, so importing
+ * the store from here would be a cycle.
+ */
+let onTokenRejected: () => void = () => {};
+export const setTokenRejectedHandler = (fn: () => void) => {
+  onTokenRejected = fn;
+};
+
+/**
+ * Every read goes through here, which is why the rejection is caught here.
+ *
+ * `anilist_query` attaches the bearer to *every* query — including the public
+ * ones behind search, seasonal, the forum and detail pages — so one dead token
+ * fails all of them at once. That is why it read as the app randomly breaking
+ * rather than as a sign-in problem.
+ */
+async function guarded<T>(call: Promise<T>): Promise<T> {
+  try {
+    return await call;
+  } catch (e) {
+    if (isTokenRejected(e)) onTokenRejected();
+    throw e;
+  }
+}
+
 export function gql<T>(query: string, variables?: object): Promise<T> {
-  return invoke<T>("anilist_query", { query, variables });
+  return guarded(invoke<T>("anilist_query", { query, variables }));
 }
 
 // --- Profile mode (AniList account vs. account-free local list) ------------
@@ -86,7 +128,9 @@ export const enableLocalMode = () => invoke<void>("enable_local_mode");
 export const fetchMediaList = (userId: number, mediaType: MediaType) =>
   profileMode === "local"
     ? invoke<ListResult>("local_fetch_list", { mediaType })
-    : invoke<ListResult>("fetch_media_list", { userId, mediaType });
+    : // Guarded like `gql`: this is the one AniList read that does not go
+      // through it, and it is the request behind every list screen.
+      guarded(invoke<ListResult>("fetch_media_list", { userId, mediaType }));
 
 /**
  * The last cached list, read straight from SQLite with no network access.

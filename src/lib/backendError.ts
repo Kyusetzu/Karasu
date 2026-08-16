@@ -31,6 +31,12 @@ export function backendErrorText(
       return t("settings.jfErrBadCredentials");
     case "queue.busy":
       return t("receipt.syncBusy");
+    // The banner in `shell/SessionExpired` is the real answer to this one, but
+    // the code still reaches a toast or an inline error on paths the banner
+    // does not cover — and rendering the raw code would be worse than the
+    // English sentence it replaced.
+    case "anilist.tokenRejected":
+      return t("auth.tokenRejected");
     default:
       return text;
   }

@@ -26,6 +26,14 @@ export const de: typeof en = {
     about: "Über",
     settings: "Einstellungen",
   },
+  auth: {
+    expiredTitle: "AniList-Sitzung abgelaufen.",
+    expiredBody:
+      "Die gespeicherte Anmeldung wird nicht mehr akzeptiert, daher lädt und synchronisiert nichts mehr, bis du dich erneut anmeldest. Bearbeitungen bleiben in der Warteschlange und werden danach gesendet.",
+    expiredAction: "Erneut anmelden",
+    expiredWaiting: "Warte auf AniList…",
+    tokenRejected: "AniList hat die gespeicherte Anmeldung abgelehnt. Bitte erneut anmelden.",
+  },
   sync: {
     button: "Jetzt synchronisieren",
     failed: "Synchronisierung fehlgeschlagen",

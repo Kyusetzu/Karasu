@@ -13,6 +13,18 @@ interface AuthState {
   mode: ProfileMode;
   /** true while the stored session is still being restored */
   loading: boolean;
+  /**
+   * AniList has rejected the stored token.
+   *
+   * One flag for the whole app, because one dead token fails everything at
+   * once: `anilist_query` attaches the bearer to every request, including the
+   * public ones behind search, the forum and detail pages. Before this, each of
+   * those screens rendered its own "Failed to load: Invalid token", which is
+   * what made an expired session read as the app randomly breaking.
+   *
+   * Never set in local mode — there is no token to reject.
+   */
+  sessionExpired: boolean;
   /** true once a profile (AniList or local) is active */
   hasProfile: () => boolean;
   init: () => Promise<void>;
@@ -21,6 +33,8 @@ interface AuthState {
   logout: () => Promise<void>;
   /** Refetches the viewer — how a scoreFormat change reaches the store. */
   refreshViewer: () => Promise<void>;
+  /** Raised by the api layer when a request comes back `anilist.tokenRejected`. */
+  reportSessionExpired: () => void;
 }
 
 /** Keep the api-layer routing cache aligned with the store. */
@@ -86,6 +100,14 @@ export const useAuth = create<AuthState>((set, get) => ({
   viewer: null,
   mode: "none",
   loading: true,
+  sessionExpired: false,
+
+  // Idempotent on purpose: a screen fires several queries and every one of them
+  // fails, so this is called in a burst. Setting an already-set flag would
+  // re-render every subscriber for nothing.
+  reportSessionExpired: () => {
+    if (!get().sessionExpired) set({ sessionExpired: true });
+  },
 
   hasProfile: () => {
     const s = get();
@@ -97,10 +119,18 @@ export const useAuth = create<AuthState>((set, get) => ({
       set({ loading: false });
       return;
     }
+    // The api layer cannot import this store (it imports the api layer), so
+    // the rejection arrives through a registered callback — the same shape as
+    // `setProfileModeCache`.
+    api.setTokenRejectedHandler(() => get().reportSessionExpired());
     // The one-click login completes in the backend (callback server) and
     // announces the fresh viewer through this event.
     listen<Viewer>("anilist-auth", (e) =>
-      set({ viewer: applyViewer(e.payload), mode: applyMode("anilist") }),
+      set({
+        viewer: applyViewer(e.payload),
+        mode: applyMode("anilist"),
+        sessionExpired: false,
+      }),
     );
     try {
       const viewer = await api.session();
@@ -118,7 +148,14 @@ export const useAuth = create<AuthState>((set, get) => ({
 
   connect: async (token: string) => {
     const viewer = await api.connect(token);
-    set({ viewer: applyViewer(viewer), mode: applyMode("anilist") });
+    // Cleared here and on the `anilist-auth` event above, which are the only
+    // two ways a working token arrives. Leaving it set would strand the banner
+    // over a session that has just been fixed.
+    set({
+      viewer: applyViewer(viewer),
+      mode: applyMode("anilist"),
+      sessionExpired: false,
+    });
   },
 
   enableLocal: async () => {
@@ -129,7 +166,9 @@ export const useAuth = create<AuthState>((set, get) => ({
 
   logout: async () => {
     await api.logout();
-    set({ viewer: applyViewer(null), mode: applyMode("none") });
+    // Signed out is not "expired": there is no session left to be stale, and
+    // the sign-in screen is already the thing the banner would ask for.
+    set({ viewer: applyViewer(null), mode: applyMode("none"), sessionExpired: false });
   },
 
   refreshViewer: async () => {

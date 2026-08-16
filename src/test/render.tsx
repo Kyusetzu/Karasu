@@ -60,7 +60,15 @@ export function signIn(overrides: Partial<Viewer> = {}): Viewer {
 }
 
 export function signOut(): void {
-  useAuth.setState({ viewer: null, mode: "none", loading: false });
+  // `sessionExpired` too, mirroring the real `logout`. It is plain state that
+  // nothing else resets, so an `afterEach(signOut)` that left it set would make
+  // every later test in the file depend on the order it ran in.
+  useAuth.setState({
+    viewer: null,
+    mode: "none",
+    loading: false,
+    sessionExpired: false,
+  });
 }
 
 export function useLocalProfile(): void {

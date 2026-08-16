@@ -18,6 +18,7 @@ import {
 } from "@/api/anilist";
 import Titlebar from "@/components/shell/Titlebar";
 import Sidebar from "@/components/shell/Sidebar";
+import SessionExpired from "@/components/shell/SessionExpired";
 import Toast from "@/components/shell/Toast";
 import CommandPalette from "@/components/shell/CommandPalette";
 import KeyboardSheet from "@/components/shell/KeyboardSheet";
@@ -137,6 +138,10 @@ export default function App() {
           element is not focusable, which is the whole trick: it is off-screen
           and comes back on focus. */}
       <SkipLink />
+      {/* Above the split, so it spans the sidebar too: a rejected token is a
+          property of the session rather than of any one screen, and the
+          sidebar's account line is one of the things it makes untrue. */}
+      <SessionExpired />
       <div className="flex min-h-0 flex-1">
         <Sidebar />
         {/* Keyed on the route so the pane re-mounts and the animation replays.

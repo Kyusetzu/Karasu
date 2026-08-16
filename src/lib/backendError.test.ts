@@ -15,6 +15,9 @@ describe("backendErrorText", () => {
     // A bulk edit refused because a drain already holds the queue lock. It
     // cannot be queued itself, so the refusal has to say why.
     expect(backendErrorText("queue.busy", t)).toBe("T:receipt.syncBusy");
+    // AniList's own wording for this is "Invalid token" — English, not
+    // actionable, and it used to be rendered raw on every screen at once.
+    expect(backendErrorText("anilist.tokenRejected", t)).toBe("T:auth.tokenRejected");
   });
 
   /**

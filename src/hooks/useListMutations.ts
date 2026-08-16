@@ -40,6 +40,10 @@ export function useListMutations(userId: number, mediaType: MediaType) {
     score: entry.score,
     repeat: entry.repeat,
     notes: entry.notes,
+    private: entry.private,
+    hiddenFromStatusLists: entry.hiddenFromStatusLists ?? null,
+    startedAt: entry.startedAt,
+    completedAt: entry.completedAt,
   });
 
   /** The one line the receipt leads with. */

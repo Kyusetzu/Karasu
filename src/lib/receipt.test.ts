@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 import { headline, inverse, type EntrySnapshot } from "./receipt";
 
 const before: EntrySnapshot = {
+  private: false,
+  hiddenFromStatusLists: null,
+  startedAt: null,
+  completedAt: null,
   status: "CURRENT",
   progress: 13,
   progressVolumes: 1,
@@ -103,5 +107,51 @@ describe("headline", () => {
 
   it("is null when nothing changed", () => {
     expect(headline({ mediaId: 1, progress: 13 }, before)).toBeNull();
+  });
+});
+
+describe("inverse, for the fields it cannot reverse", () => {
+  /**
+   * `customLists` and `advancedScores` are read as maps and written as arrays —
+   * the second one *positional*, ordered by the account's own category list. A
+   * snapshot cannot reconstruct either, so an Undo that silently skipped them
+   * reversed five-sixths of a write while claiming to reverse it. No button is
+   * better than a button the user stops trusting.
+   */
+  it("declines to undo a save that touched a whole-value field", () => {
+    expect(
+      inverse({ mediaId: 1, progress: 14, customLists: ["Rewatching"] }, before),
+    ).toBeNull();
+    expect(
+      inverse({ mediaId: 1, score: 9, advancedScores: [8, 7, 9] }, before),
+    ).toBeNull();
+  });
+
+  /** The four plain fields it gained are reversed like any other. */
+  it("reverses privacy, hidden-from-status and both dates", () => {
+    const undo = inverse(
+      {
+        mediaId: 1,
+        private: true,
+        hiddenFromStatusLists: true,
+        startedAt: { year: 2024, month: 3, day: 1 },
+      },
+      before,
+    );
+    expect(undo).toEqual({
+      mediaId: 1,
+      private: false,
+      hiddenFromStatusLists: null,
+      // Clearing a date is AniList's own spelling of one.
+      startedAt: { year: null, month: null, day: null },
+    });
+  });
+
+  /** Dates are objects, so identity comparison would call every save a change. */
+  it("treats an unchanged date as unchanged", () => {
+    const same = { year: 2024, month: 3, day: 1 };
+    expect(
+      inverse({ mediaId: 1, startedAt: { ...same } }, { ...before, startedAt: same }),
+    ).toBeNull();
   });
 });

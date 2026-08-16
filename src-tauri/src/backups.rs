@@ -11,6 +11,7 @@
 //! a laptop that sleeps through the appointed hour still get its backup.
 
 use crate::db::Db;
+use std::path::Path;
 use tauri::{AppHandle, Manager};
 
 const BACKUP_ENABLED_KEY: &str = "backup_enabled";
@@ -71,6 +72,23 @@ fn now_secs() -> i64 {
         .unwrap_or(0)
 }
 
+/// Whether a file on disk is a database that would actually open.
+///
+/// `quick_check` rather than `integrity_check`: it reads the pages it needs
+/// instead of the whole file, which is what catches the failures that matter
+/// here — a truncated or half-written snapshot — without spending seconds on a
+/// large database once an hour. A file SQLite refuses to open at all fails at
+/// the first step, which is the most common shape of the problem.
+fn is_readable_database(path: &Path) -> bool {
+    rusqlite::Connection::open_with_flags(
+        path,
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    )
+    .and_then(|c| c.query_row("PRAGMA quick_check", [], |r| r.get::<_, String>(0)))
+    .map(|answer| answer == "ok")
+    .unwrap_or(false)
+}
+
 /// One pass: today's snapshot if absent, then the prune. Also called
 /// directly when the setting is switched on, so enabling produces a backup
 /// now rather than within the hour.
@@ -90,7 +108,24 @@ pub(crate) fn run_once(app: &AppHandle) {
 
     let name = backup_name(now_secs());
     let today = dir.join(&name);
-    if !today.exists() {
+    // Presence used to be the whole test, so a file truncated by a full disk or
+    // a process killed mid-`VACUUM` was never rewritten and still occupied one
+    // of the retained slots — a backup that cannot be restored, held in the
+    // place of one that could. Rewriting an unreadable one is cheap; finding
+    // out at restore time is not.
+    if !today.exists() || !is_readable_database(&today) {
+        if today.exists() {
+            crate::logging::warn(
+                "backup",
+                format!("{name} is not a readable database; writing it again"),
+            );
+            if let Err(e) = std::fs::remove_file(&today) {
+                // `VACUUM INTO` refuses an existing destination, so a file that
+                // cannot be removed cannot be replaced either.
+                crate::logging::warn("backup", format!("could not remove {name}: {e}"));
+                return;
+            }
+        }
         match db.snapshot_to(&today) {
             Ok(()) => crate::logging::info("backup", format!("wrote {name}")),
             Err(e) => {

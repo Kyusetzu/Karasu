@@ -53,6 +53,19 @@ short version, grouped by what it means for someone using the app.
   the account that made it and is only ever replayed for that account — so
   signing back in still syncs what you were waiting on, and nobody else's client
   ever sees it.
+- **The JSON backup carries every list field again.** It dropped advanced
+  scores, custom-list membership and hidden-from-status-lists — the three that
+  AniList writes wholesale with no undo, and so the three a backup is most
+  needed for.
+- **Undo is no longer offered for a save it cannot reverse.** It covered six
+  fields and silently skipped the rest; it now reverses dates, privacy and
+  hidden-from-status-lists too, and declines outright when a save touched custom
+  lists or advanced scores.
+- **The score rescale reads the list as it is now**, not as it was when you
+  opened Settings — it could claim there was no list at all, and otherwise
+  planned real score writes from a stale snapshot.
+- A daily backup that was truncated (a full disk, a process killed mid-write) is
+  checked and rewritten instead of occupying a retained slot unusably.
 - An offline edit is no longer deleted when AniList answers with something
   recoverable — an expired token, a rate limit, a server fault. Only a payload
   AniList rejects on its own terms is dropped, and when one is, it says so.

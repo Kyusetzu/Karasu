@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { ChevronRight, FolderOpen, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -54,16 +54,29 @@ export function RescaleSection() {
   const [toMax, setToMax] = useState(scale.max);
   const [applying, setApplying] = useState(false);
 
+  // A `useQuery` on the same key the list screens use, not `getQueryData`.
+  //
+  // `getQueryData` is a point-in-time read: opening Settings before the list
+  // had landed left this section permanently claiming there was no list, and
+  // when there *was* one it planned — and then wrote — from whatever snapshot
+  // happened to be in the cache when the component mounted. This section
+  // rewrites real scores across a whole list, so it has to be looking at the
+  // list as it is now. Sharing the key means an already-fetched list costs
+  // nothing and a stale one refreshes itself.
+  const { data } = useQuery<ListResult>({
+    queryKey: ["mediaList", type, viewer?.id ?? 0],
+    queryFn: () => api.fetchMediaList(viewer!.id, type),
+    enabled: mode === "anilist" && !!viewer,
+  });
+
   const entries = useMemo(() => {
-    if (!viewer) return [];
-    const data = qc.getQueryData<ListResult>(["mediaList", type, viewer.id]);
     const seen = new Set<number>();
     return (data?.lists ?? [])
       .filter((g) => !g.isCustomList)
       .flatMap((g) => g.entries)
       .filter((e) => (seen.has(e.mediaId) ? false : (seen.add(e.mediaId), true)))
       .map((e) => ({ id: e.id, mediaId: e.mediaId, score: e.score }));
-  }, [qc, viewer, type, applying]);
+  }, [data]);
 
   if (mode !== "anilist" || !viewer) return null;
 

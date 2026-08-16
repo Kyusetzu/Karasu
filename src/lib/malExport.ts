@@ -158,6 +158,13 @@ export function buildMalXml(
  * beside the account's format, so a re-import (or anyone else's script) never
  * has to guess what "4" meant. Media is trimmed to identity: the list data is
  * the export, not the cover art.
+ *
+ * **Every list field the app can read is here.** It dropped `advancedScores`,
+ * `customLists` and `hiddenFromStatusLists` for a while — all three already
+ * fetched, and all three whole-value writes on AniList with no undo, so they
+ * are the fields a backup is *most* needed for. A file named "backup" is either
+ * complete or it says what it omits, and the only honest omission here is the
+ * cover art.
  */
 export function buildJsonExport(
   anime: MediaListEntry[],
@@ -184,6 +191,13 @@ export function buildJsonExport(
     startedAt: e.startedAt,
     completedAt: e.completedAt,
     private: e.private,
+    hiddenFromStatusLists: e.hiddenFromStatusLists ?? null,
+    // Read as a name→value map; a re-import has to turn both back into the
+    // array shapes AniList writes. Carried as read rather than pre-converted,
+    // because the positional order `advancedScores` writes in comes from the
+    // account's own category list, which a backup file cannot pin.
+    customLists: e.customLists ?? null,
+    advancedScores: e.advancedScores ?? null,
   });
   return `${JSON.stringify(
     {

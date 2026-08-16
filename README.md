@@ -267,7 +267,9 @@ running version is shown in the About window.
 Contributions are welcome — [CONTRIBUTING.md](CONTRIBUTING.md) has the commit
 loop (which is mandatory), where code goes, and the list of things that are
 refused on purpose so nobody builds one by accident.
-[CHANGELOG.md](CHANGELOG.md) is the short version of what has landed.
+[CHANGELOG.md](CHANGELOG.md) is the short version of what has landed, and
+[ROADMAP.md](ROADMAP.md) is the honest version of what might come next — what
+each idea would actually cost, rather than a list of promises.
 
 ### Architecture
 

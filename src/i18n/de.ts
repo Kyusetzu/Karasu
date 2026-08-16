@@ -387,6 +387,8 @@ export const de: typeof en = {
     checking: "Prüfe …",
     upToDate: "Du hast die neueste Version ({{version}}).",
     updateAvailable: "Version {{version}} verfügbar",
+    channelEmpty:
+      "Dieser Update-Kanal hat noch kein Release, es gibt also nichts zu vergleichen.",
     downloading: "Update wird heruntergeladen …",
     updateReady: "Update {{version}} heruntergeladen und bereit zur Installation.",
     restartUpdate: "Neustarten & Aktualisieren",

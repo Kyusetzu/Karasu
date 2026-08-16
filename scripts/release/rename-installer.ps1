@@ -3,7 +3,22 @@
   Renames the freshly-built NSIS installer to include the full 4-part
   MAJOR.MINOR.PATCH.COMMIT# version instead of just the 3-part semver core
   Tauri's bundler uses by default.
+
+.PARAMETER Suffix
+  A tag's prerelease part, without the leading dash — "rc1" for `v1.0.0-rc1`.
+
+  The bundler names the installer from `package.json`, which carries only the
+  semver core, so a release-candidate tag and the final release produced
+  byte-identically *named* installers. Someone who downloaded the rc could not
+  tell it apart from the real thing afterwards, and the rolling prune keeps
+  assets by name. The suffix is on the filename only: `latest.json`'s `version`
+  stays clean semver plus build metadata, so nothing has to teach
+  `version_parts` about prerelease markers.
 #>
+
+param(
+    [string]$Suffix = ""
+)
 
 $ErrorActionPreference = "Stop"
 
@@ -33,6 +48,7 @@ $commitNumber = $commitMatch.Matches[0].Groups[1].Value
 
 $packageVersion = (Get-Content $packageJson -Raw | ConvertFrom-Json).version
 $fullVersion = "$packageVersion.$commitNumber"
+if ($Suffix) { $fullVersion = "$fullVersion-$Suffix" }
 
 $newName = $installer.Name -replace [regex]::Escape($packageVersion), $fullVersion
 $newPath = Join-Path $installer.DirectoryName $newName

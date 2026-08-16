@@ -89,9 +89,35 @@ jobs:
       - name: List bundle output
         run: ls -la src-tauri/target/release/bundle/appimage
 
+      # The suffix is recomputed here rather than plumbed across jobs: this job
+      # runs in parallel with the one that resolves the release target, so
+      # there is no output to read yet. Same rule, one line, from the same ref.
       - name: Rename AppImage to the full 4-part version
         shell: pwsh
-        run: ./scripts/release/rename-appimage.ps1
+        run: |
+          $ref = "${env:GITHUB_REF}"
+          $suffix = ""
+          if ($ref -like "refs/tags/*") {
+            $core = ($ref -replace "^refs/tags/", "") -replace "^v", ""
+            if ($core -match "-") { $suffix = ($core -split "-", 2)[1] }
+          }
+          ./scripts/release/rename-appimage.ps1 -Suffix $suffix
+
+      # The tray library is dlopen'd, never linked, so linuxdeploy's DT_NEEDED
+      # walk cannot find it — it is copied in only if Tauri's own bundler step
+      # does so. ci.yml has had this check since the tray landed; this job is
+      # the one whose artifact actually reaches users, and it did not.
+      #
+      # A warning rather than a failure, exactly as in ci.yml: the app survives
+      # a missing tray, so this reports packaging quality and must not hold back
+      # a release. If it fires, map the library in bundle.linux.appimage.files.
+      - name: Check the AppImage carries the tray library
+        working-directory: src-tauri/target/release/bundle/appimage
+        run: |
+          ./*.AppImage --appimage-extract > /dev/null
+          ls squashfs-root/usr/lib | grep -i appindicator \
+            || echo "::warning::AppImage carries no appindicator library; the tray will be absent"
+          rm -rf squashfs-root
 
       - name: Upload AppImage
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -152,7 +178,14 @@ jobs:
             # `-` in the tag is semver's prerelease marker; GitHub should mark
             # those as prereleases and a bare v1.0.0 as a real one.
             $pre = if ($core -match "-") { "true" } else { "false" }
-            $out = @("tag=$tag", "name=Karasu $core", "prerelease=$pre", "rolling=false", "version=$core")
+            # Everything after the first dash, for the artifact filenames. The
+            # bundler names them from package.json's semver core alone, so
+            # v1.0.0-rc1 and v1.0.0 produced identically-named installers —
+            # indistinguishable once downloaded, and the rolling prune keeps
+            # assets by name. Filenames only: latest.json's `version` stays
+            # clean semver + build metadata.
+            $suffix = if ($core -match "-") { ($core -split "-", 2)[1] } else { "" }
+            $out = @("tag=$tag", "name=Karasu $core", "prerelease=$pre", "rolling=false", "version=$core", "suffix=$suffix")
             # The notes are composed after the build, from CHANGELOG.md, and
             # the slicer throws when the section is missing. Checked here too,
             # so a tag with no changelog entry costs seconds rather than
@@ -163,7 +196,7 @@ jobs:
             Remove-Item notes-precheck.md -ErrorAction SilentlyContinue
           }
           else {
-            $out = @("tag=latest", "name=Latest build", "prerelease=true", "rolling=true", "version=")
+            $out = @("tag=latest", "name=Latest build", "prerelease=true", "rolling=true", "version=", "suffix=")
           }
           # `Out-File -Append -Encoding utf8`, the same idiom rename-installer.ps1
           # already uses, rather than `>>` — the redirect's default encoding is
@@ -216,17 +249,27 @@ jobs:
       - name: Rename installer to the full 4-part version
         id: installer
         shell: pwsh
-        run: ./scripts/release/rename-installer.ps1
+        env:
+          RELEASE_SUFFIX: ${{ steps.target.outputs.suffix }}
+        run: ./scripts/release/rename-installer.ps1 -Suffix $env:RELEASE_SUFFIX
 
       # The tag matters here more than anywhere else: the manifest's download
       # URL is built from it, and a stable release whose manifest points into
       # the rolling tag has its installer deleted by the prune step on the next
       # unrelated push to main.
+      # `-Notes` matters because the default is a sentence about `main`. A
+      # tagged release published that verbatim into its own public latest.json,
+      # so the manifest for Karasu 1.0.0 described itself as an automated build
+      # from the latest commit.
       - name: Generate update manifest (latest.json)
         shell: pwsh
         env:
           RELEASE_TAG: ${{ steps.target.outputs.tag }}
-        run: ./scripts/release/generate-update-manifest.ps1 -Tag $env:RELEASE_TAG
+          RELEASE_NAME: ${{ steps.target.outputs.name }}
+        run: >
+          ./scripts/release/generate-update-manifest.ps1
+          -Tag $env:RELEASE_TAG
+          -Notes "$env:RELEASE_NAME -- see https://github.com/Kyusetzu/Karasu/releases/tag/$env:RELEASE_TAG"
 
       - name: Generate checksum
         shell: pwsh
@@ -283,6 +326,26 @@ jobs:
           -Sha $env:NOTES_SHA
           -VirusTotal $env:NOTES_VT
           -OutFile notes.md
+
+      # `softprops/action-gh-release` creates a tag that does not exist and
+      # reuses one that does — it never *moves* it. So the rolling `latest` tag
+      # still pointed at the commit it was first created on, hundreds of commits
+      # back, while its assets were rebuilt every push. GitHub attaches
+      # auto-generated source archives to the tag, so the release paired a
+      # current installer with source from months earlier — and that release page
+      # is the exact URL the app hands users as "what's new".
+      #
+      # Rolling only: a version tag must never move, which is the entire point
+      # of having one.
+      - name: Move the rolling tag to this commit
+        if: ${{ steps.target.outputs.rolling == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          gh api -X PATCH "repos/${env:GITHUB_REPOSITORY}/git/refs/tags/latest" `
+            -f sha="${env:GITHUB_SHA}" -F force=true | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw "Could not move the rolling tag to ${env:GITHUB_SHA}." }
 
       # One publish step for both shapes. A second copy would duplicate the
       # whole file list, and the two would drift the first time one changed.

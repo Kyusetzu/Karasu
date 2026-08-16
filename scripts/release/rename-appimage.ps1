@@ -13,7 +13,15 @@
   PowerShell on a Linux runner is not a mistake — pwsh is preinstalled on
   GitHub's Ubuntu images, and keeping scripts/release/ one toolchain is worth
   more than avoiding it.
+
+.PARAMETER Suffix
+  A tag's prerelease part, without the leading dash. See rename-installer.ps1,
+  whose reasoning this shares.
 #>
+
+param(
+    [string]$Suffix = ""
+)
 
 $ErrorActionPreference = "Stop"
 
@@ -41,6 +49,7 @@ $commitNumber = $commitMatch.Matches[0].Groups[1].Value
 
 $packageVersion = (Get-Content $packageJson -Raw | ConvertFrom-Json).version
 $fullVersion = "$packageVersion.$commitNumber"
+if ($Suffix) { $fullVersion = "$fullVersion-$Suffix" }
 
 $newName = $appimage.Name -replace [regex]::Escape($packageVersion), $fullVersion
 
@@ -54,8 +63,11 @@ if ($appimage.Name -ne $newName) {
 
     Rename-Item -Path $appimage.FullName -NewName $newName
     foreach ($s in $siblings) {
-        $suffix = $s.Name.Substring($appimage.Name.Length)
-        Rename-Item -Path $s.FullName -NewName "$newName$suffix"
+        # `$tail`, not `$suffix`: PowerShell variable names are case-insensitive,
+        # so a local `$suffix` here *is* the `$Suffix` parameter and the first
+        # sibling would overwrite it for every rename after it.
+        $tail = $s.Name.Substring($appimage.Name.Length)
+        Rename-Item -Path $s.FullName -NewName "$newName$tail"
     }
 }
 

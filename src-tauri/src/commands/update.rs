@@ -10,7 +10,7 @@ use super::*;
 
 /// Monotonic commit counter — the 4th version segment
 /// (`MAJOR.MINOR.PATCH.COMMIT#`). Bumped by one on every commit.
-pub const COMMIT_NUMBER: u32 = 361;
+pub const COMMIT_NUMBER: u32 = 362;
 
 /// Full four-part display version, e.g. `0.1.1.38`. The `MAJOR.MINOR.PATCH`
 /// core comes from the crate version (kept in sync across the manifests).
@@ -36,6 +36,14 @@ pub struct UpdateInfo {
     pub url: Option<String>,
     #[serde(rename = "isNewer")]
     pub is_newer: bool,
+    /// The selected channel has no release to compare against.
+    ///
+    /// Distinct from "up to date", which is what a 404 used to report. On
+    /// `stable` that was a standing false claim — no non-prerelease release has
+    /// ever been published, so `/releases/latest/` 404s and the manual check on
+    /// the About page said, in green with a tick, that the app was current.
+    #[serde(rename = "channelEmpty")]
+    pub channel_empty: bool,
 }
 
 /// Update channel: `"prerelease"` (the rolling `latest` tag, default — the
@@ -49,10 +57,21 @@ pub fn get_update_channel(db: State<'_, Db>) -> String {
 }
 
 #[tauri::command]
-pub fn set_update_channel(db: State<'_, Db>, channel: String) -> Result<(), String> {
+pub fn set_update_channel(
+    db: State<'_, Db>,
+    pending: State<'_, PendingUpdate>,
+    channel: String,
+) -> Result<(), String> {
     if channel != "prerelease" && channel != "stable" {
         return Err("Unknown update channel".into());
     }
+    // Both stashes belong to the channel that produced them. A download held in
+    // memory for the rolling build is not an update on `stable`, and the daily
+    // throttle would otherwise keep the new channel unchecked for up to 24
+    // hours — so About kept offering to install a build the selected channel
+    // does not have.
+    *pending.0.guard() = None;
+    db.kv_delete("last_update_check_ms");
     db.kv_set("update_channel", &channel)
 }
 
@@ -105,11 +124,16 @@ pub async fn check_for_updates(db: State<'_, Db>, force: bool) -> Result<UpdateI
             .and_then(|s| s.parse::<i64>().ok());
         if let Some(last) = last_check {
             if now_ms() - last < UPDATE_CHECK_THROTTLE_MS {
-                return Ok(UpdateInfo { current, latest: None, url: None, is_newer: false });
+                return Ok(UpdateInfo {
+                    current,
+                    latest: None,
+                    url: None,
+                    is_newer: false,
+                    channel_empty: false,
+                });
             }
         }
     }
-    let _ = db.kv_set("last_update_check_ms", &now_ms().to_string());
 
     // Read the version from `latest.json`, not from the release's tag name.
     // The prerelease channel publishes to a rolling tag literally called
@@ -117,26 +141,44 @@ pub async fn check_for_updates(db: State<'_, Db>, force: bool) -> Result<UpdateI
     // never report an update. The manifest carries the real four-part version
     // (see scripts/release/generate-update-manifest.ps1) and is what the updater
     // downloads from anyway.
-    let resp = reqwest::Client::new()
+    // A timeout, like every other outbound client in this codebase. Without one
+    // this inherits `reqwest`'s default of *none*, so a connection that opens
+    // and then stalls parks the About page's spinner until the OS gives up —
+    // and on the startup path, holds a task open for as long as that takes.
+    let resp = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .map_err(|e| format!("Update check failed: {e}"))?
         .get(update_channel_manifest_url(&channel))
         .header("User-Agent", concat!("Karasu/", env!("CARGO_PKG_VERSION")))
         .send()
         .await
         .map_err(|e| format!("Update check failed: {e}"))?;
 
-    // Treat as "up to date". On the prerelease channel this is a real state —
-    // the rolling tag has always existed, so a 404 there means GitHub is having
-    // a bad minute. On `stable` it meant "no non-prerelease release exists",
-    // which was the truth for as long as none did: `/releases/latest/` 404s
-    // until the first tagged non-prerelease, and the channel was silently
-    // green the whole time. It stops being that the moment one is published —
-    // after which a 404 here means the release was deleted or GitHub is down.
+    // The throttle is written here, not before the request: it used to be
+    // stamped on entry, so a check that failed — offline, DNS not up yet —
+    // burned the whole day. With autostart the startup check runs at exactly
+    // the moment the network is least likely to be ready.
+    let _ = db.kv_set("last_update_check_ms", &now_ms().to_string());
+
+    // 404 is not "up to date". On the prerelease channel the rolling tag has
+    // always existed, so it means GitHub is having a bad minute. On `stable` it
+    // means no non-prerelease release exists at all — which has been true for
+    // the whole life of the channel, and the app answered a manual check with a
+    // green tick and "you are on the latest version". That is a standing lie
+    // about a channel with nothing behind it.
     //
-    // Still silent, deliberately: this runs as a daily background check, and a
-    // toast about a transient 404 is worse than saying nothing. The manual
-    // button on the About page is the path that should report.
+    // The background pass stays silent either way: a toast about a transient
+    // 404 is worse than saying nothing. `channel_empty` is what the About page
+    // reads to say so on a check the user asked for.
     if resp.status() == reqwest::StatusCode::NOT_FOUND {
-        return Ok(UpdateInfo { current, latest: None, url: None, is_newer: false });
+        return Ok(UpdateInfo {
+            current,
+            latest: None,
+            url: Some(update_channel_release_url(&channel).to_string()),
+            is_newer: false,
+            channel_empty: true,
+        });
     }
     if !resp.status().is_success() {
         return Err(format!("Update check failed: HTTP {}", resp.status()));
@@ -149,12 +191,27 @@ pub async fn check_for_updates(db: State<'_, Db>, force: bool) -> Result<UpdateI
         .ok_or("Update manifest has no version")?
         .trim_start_matches('v')
         .to_string();
-    let is_newer = version_gt(&latest, &current);
+    // A manifest that does not describe this platform is not an update for it.
+    // `release.yml` publishes a Windows-only manifest whenever the Linux leg
+    // fails — deliberately, so a packaging hiccup cannot hold back a Windows
+    // release — and a Linux client used to be told an update was available and
+    // then fail at the download, once a day, with no way to tell why.
+    let platform_key = if cfg!(target_os = "linux") {
+        "linux-x86_64"
+    } else {
+        "windows-x86_64"
+    };
+    let has_platform = body
+        .pointer("/platforms")
+        .and_then(|p| p.get(platform_key))
+        .is_some();
+    let is_newer = has_platform && version_gt(&latest, &current);
     Ok(UpdateInfo {
         current,
         latest: Some(display_version(&latest)),
         url: Some(update_channel_release_url(&channel).to_string()),
         is_newer,
+        channel_empty: false,
     })
 }
 
@@ -176,6 +233,19 @@ fn display_version(s: &str) -> String {
     s.replace('+', ".")
 }
 
+/// Whether an in-place update can actually be installed over this build.
+///
+/// Both arguments rather than reading the world, because the shape of this
+/// predicate is the whole risk. `running_from_appimage()` is false on Windows —
+/// there are no AppImages there — so the natural-looking
+/// `if !running_from_appimage() { return }` disables the updater for **every**
+/// Windows user, which is all of them. The `is_linux` half is what keeps that
+/// from happening, and the first assertion in the test below is the one that
+/// would catch it.
+fn can_install(is_linux: bool, from_appimage: bool) -> bool {
+    !is_linux || from_appimage
+}
+
 /// True if dotted-numeric version `a` is strictly greater than `b`.
 fn version_gt(a: &str, b: &str) -> bool {
     let (va, vb) = (version_parts(a), version_parts(b));
@@ -191,7 +261,50 @@ fn version_gt(a: &str, b: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{display_version, version_gt};
+    use super::{can_install, display_version, version_gt, version_parts};
+
+    /// Windows first, and deliberately: `running_from_appimage()` is false
+    /// there, so the obvious one-line form of this gate —
+    /// `if !running_from_appimage() { return }` — disables the updater for
+    /// every actual user of the app. This assertion is the one that catches it.
+    #[test]
+    fn only_a_linux_build_outside_an_appimage_refuses_to_install() {
+        assert!(can_install(false, false), "Windows, where the users are");
+        assert!(can_install(false, true));
+        assert!(can_install(true, true), "a mounted AppImage updates itself");
+        assert!(
+            !can_install(true, false),
+            "a self-built Linux binary has nothing to install into"
+        );
+    }
+
+    /// The `+` in `latest.json`'s version field is load-bearing and was the one
+    /// line with no automated check.
+    ///
+    /// `tauri-plugin-updater` parses that field with `semver::Version::from_str`,
+    /// which rejects a fourth dotted segment outright — every install then dies
+    /// with "unexpected character '.' after patch version number". So the
+    /// manifest spells the commit number as build metadata, and `version_parts`
+    /// has to read both spellings identically or the comparator stops matching
+    /// the running build.
+    #[test]
+    fn the_manifest_spelling_compares_equal_to_the_dotted_one() {
+        let manifest = "0.136.4+361";
+        let running = "0.136.4.361";
+        assert_eq!(version_parts(manifest), version_parts(running));
+        assert!(!version_gt(manifest, running));
+        assert!(!version_gt(running, manifest));
+        // And the commit number still decides, which is the whole reason the
+        // fourth segment exists.
+        assert!(version_gt("0.136.4+362", running));
+
+        // The shape the generator emits, pinned so a "tidy" back to a dot is a
+        // test failure rather than a broken release.
+        let re_core: Vec<&str> = manifest.split('+').collect();
+        assert_eq!(re_core.len(), 2, "exactly one '+'");
+        assert_eq!(re_core[0].split('.').count(), 3, "a three-part semver core");
+        assert!(re_core[1].chars().all(|c| c.is_ascii_digit()));
+    }
 
     #[test]
     fn version_comparison() {
@@ -322,6 +435,24 @@ pub async fn download_pending_update(
     pending: State<'_, PendingUpdate>,
 ) -> Result<Option<DownloadedUpdate>, String> {
     use tauri_plugin_updater::UpdaterExt;
+
+    // Nothing to install into. `tauri-plugin-updater` replaces
+    // `current_exe()` — it has no notion of `$APPIMAGE` — so on a Linux build
+    // that is not a mounted AppImage the best outcome of "Install" is
+    // overwriting the binary the user compiled, in place, with a different
+    // build. Karasu ships exactly one Linux artifact, so today that means every
+    // Linux user who did not download the AppImage.
+    //
+    // Downloading is the expensive half (~100 MB held in memory) and the
+    // notification is the misleading half, so this refuses before either.
+    if !can_install(cfg!(target_os = "linux"), crate::portable::running_from_appimage()) {
+        crate::logging::debug_changed(
+            "update",
+            "install",
+            "not an AppImage; skipping the update download",
+        );
+        return Ok(None);
+    }
 
     let channel = db
         .kv_get("update_channel")

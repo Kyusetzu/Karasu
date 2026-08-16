@@ -8,6 +8,7 @@ import {
   Mail,
   MessageCircle,
   RefreshCw,
+  AlertTriangle,
   CheckCircle2,
   Download,
   ExternalLink,
@@ -324,6 +325,14 @@ function UpdateSection() {
           (info.isNewer ? (
             <span className="flex items-center gap-1.5 text-sm text-ink-500">
               {t("about.updateAvailable", { version: info.latest })}
+            </span>
+          ) : info.channelEmpty ? (
+            // Not a tick and not "up to date". This channel has no release to
+            // compare against, and answering a check the user asked for with
+            // "you are on the latest version" is a claim about a thing that
+            // does not exist.
+            <span className="flex items-center gap-1.5 text-sm text-gold">
+              <AlertTriangle className="size-4" /> {t("about.channelEmpty")}
             </span>
           ) : (
             <span className="flex items-center gap-1.5 text-sm text-success">

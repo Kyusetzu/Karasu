@@ -76,6 +76,15 @@ short version, grouped by what it means for someone using the app.
 - Ctrl+K no longer opens the command palette behind an open editor and discards
   what you were typing; the season picker no longer lets `/` and Ctrl+1/2/3 fire
   underneath it.
+- **The Stable update channel no longer claims you are up to date.** No stable
+  release has ever been published, so its manifest 404s — and a manual check
+  answered that with a green tick. It now says the channel has no release yet.
+- An update check that fails no longer burns the once-a-day throttle, and the
+  request has a timeout like every other one in the app.
+- Switching update channel clears the download held for the old one, instead of
+  offering to install a build the new channel does not have.
+- On Linux, an update is only offered to a running AppImage. A self-built binary
+  was offered one whose install would have overwritten the user's own build.
 - An offline edit is no longer deleted when AniList answers with something
   recoverable — an expired token, a rate limit, a server fault. Only a payload
   AniList rejects on its own terms is dropped, and when one is, it says so.

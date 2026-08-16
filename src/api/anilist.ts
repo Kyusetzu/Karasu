@@ -260,6 +260,9 @@ export interface UpdateInfo {
   latest: string | null;
   url: string | null;
   isNewer: boolean;
+  /** The selected channel has no release at all — distinct from being current.
+   *  A 404 used to render as "you're on the latest version". */
+  channelEmpty: boolean;
 }
 
 /** `force: true` always hits the network; `false` respects the 24h background throttle. */

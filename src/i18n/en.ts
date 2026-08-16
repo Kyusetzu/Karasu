@@ -387,6 +387,8 @@ export const en = {
     checking: "Checking …",
     upToDate: "You're on the latest version ({{version}}).",
     updateAvailable: "Version {{version}} available",
+    channelEmpty:
+      "This update channel has no release yet, so there is nothing to compare against.",
     downloading: "Downloading update …",
     updateReady: "Update {{version}} downloaded and ready to install.",
     restartUpdate: "Restart & Update",

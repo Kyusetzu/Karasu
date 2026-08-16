@@ -1370,10 +1370,10 @@ function ListEditor({
         )}
       </div>
       <div className="mt-3">
-        <span className="mb-1 block text-sm text-ink-500">
+        <span id="detail-tags-label" className="mb-1 block text-sm text-ink-500">
           {t("tags.label")}
         </span>
-        <TagEditor tags={tags} onChange={setTags} />
+        <TagEditor tags={tags} onChange={setTags} labelledBy="detail-tags-label" />
       </div>
       <label className="mt-3 block text-sm">
         <span className="mb-1 block text-ink-500">{t("entry.notes")}</span>

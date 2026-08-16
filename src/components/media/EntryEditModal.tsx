@@ -377,14 +377,28 @@ export default function EntryEditModal({
             )}
           </>
         )}
-        <label className="block text-sm">
-          <span className="mb-1 block text-ink-500">{t("tags.label")}</span>
+        {/* A `div`, not a `label`, and the sibling at `AnimeDetail.tsx:1372`
+            already had it right. `TagEditor` renders each tag's remove button
+            before its input, and a `<button>` is a labelable element — so the
+            label's labelled control was the *first chip's ×*, and every click
+            inside the label that was not on interactive content forwarded to
+            it: the caption, the box's padding (the gesture that means "start
+            typing a tag"), and the text of any chip. Clicking "beta" deleted
+            "alpha", silently, with no undo, persisted on Save.
+
+            `htmlFor` is not the fix either — the input's id lives inside
+            `TagEditor`, so the caption names it through `aria-labelledby`. */}
+        <div className="block text-sm">
+          <span id="entry-tags-label" className="mb-1 block text-ink-500">
+            {t("tags.label")}
+          </span>
           <TagEditor
             tags={tags}
             onChange={setTags}
             suggestions={tagSuggestions}
+            labelledBy="entry-tags-label"
           />
-        </label>
+        </div>
         <label className="block text-sm">
           <span className="mb-1 block text-ink-500">{t("entry.notes")}</span>
           <textarea

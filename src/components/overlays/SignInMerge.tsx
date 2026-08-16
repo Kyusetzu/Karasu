@@ -12,7 +12,10 @@ import {
 import { toRaw } from "@/lib/scoreFormat";
 import {
   conflicts as sidesDiffer,
+  hasResidual,
   localWins,
+  residual,
+  type MergeExtras,
   type MergeSide,
   type MergeStrategy,
 } from "@/lib/mergeDecision";
@@ -40,7 +43,13 @@ export default function SignInMerge() {
   const qc = useQueryClient();
 
   const [rows, setRows] = useState<LocalEntryRow[] | null>(null);
-  const [online, setOnline] = useState<Map<number, MergeSide>>(new Map());
+  // The extras ride along because the merge *deletes* the local row: a row that
+  // agrees on status/progress/score still has to be checked for what only it
+  // holds before anything is dropped. `LIST_QUERY` already returns all six, so
+  // carrying them costs no request.
+  const [online, setOnline] = useState<Map<number, MergeSide & MergeExtras>>(
+    new Map(),
+  );
   const [strategy, setStrategy] = useState<MergeStrategy>("newest");
   const [phase, setPhase] = useState<"review" | "blocked" | "running" | "done">(
     "review",
@@ -55,7 +64,7 @@ export default function SignInMerge() {
     (async () => {
       const local = await localAllEntries().catch(() => []);
       if (local.length === 0) return;
-      const map = new Map<number, MergeSide>();
+      const map = new Map<number, MergeSide & MergeExtras>();
       for (const type of ["ANIME", "MANGA"] as const) {
         const res = await anilistFetchList(viewer.id, type).catch(() => null);
         if (!res || res.fromCache) {
@@ -75,6 +84,12 @@ export default function SignInMerge() {
               // dialog mounts.)
               scoreRaw: toRaw(currentScoreFormat(), e.score),
               updatedAt: e.updatedAt,
+              progressVolumes: e.progressVolumes,
+              repeat: e.repeat,
+              notes: e.notes,
+              private: e.private,
+              startedAt: e.startedAt,
+              completedAt: e.completedAt,
             });
           }
         }
@@ -104,7 +119,8 @@ export default function SignInMerge() {
     const tally = { merged: 0, queued: 0, failed: 0 };
     for (const r of rows) {
       try {
-        if (localWins(asSide(r), online.get(r.mediaId) ?? null, strategy)) {
+        const o = online.get(r.mediaId) ?? null;
+        if (localWins(asSide(r), o, strategy)) {
           // Everything the local row holds. The merge deletes that row once
           // the push lands, so anything left out here is gone for good —
           // which is what happened to manga volumes, privacy and both dates
@@ -130,6 +146,28 @@ export default function SignInMerge() {
             done += 1;
             setProgress(done);
             continue;
+          }
+        } else if (o) {
+          // AniList's side won on status/progress/score — but those are three
+          // of nine fields, and the next line deletes the local row. Anything
+          // it holds that the online row does not is about to be destroyed by
+          // a step that reports success, so push that remainder first.
+          //
+          // Additive only, and a patch: absent variables leave AniList's own
+          // values alone, so this can add a volume count or a start date
+          // without touching the status the user just chose to keep.
+          const extra = residual(r, o);
+          if (hasResidual(extra)) {
+            const res = await anilistSaveEntry({ mediaId: r.mediaId, ...extra });
+            // Same reasoning as above: a queued write has not landed, and
+            // clearing on the strength of it leaves the only copy in a queue
+            // the user cannot see.
+            if (res.queued) {
+              tally.queued += 1;
+              done += 1;
+              setProgress(done);
+              continue;
+            }
           }
         }
         // Resolved (pushed or intentionally kept AniList's) → drop local row.

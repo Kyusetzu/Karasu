@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { conflicts, localWins, type MergeSide } from "./mergeDecision";
+import {
+  conflicts,
+  hasResidual,
+  localWins,
+  residual,
+  type MergeExtras,
+  type MergeSide,
+} from "./mergeDecision";
 
 const side = (over: Partial<MergeSide> = {}): MergeSide => ({
   status: "CURRENT",
@@ -7,6 +14,22 @@ const side = (over: Partial<MergeSide> = {}): MergeSide => ({
   scoreRaw: 0,
   updatedAt: 1_000,
   ...over,
+});
+
+/** An AniList row as AniList actually spells an empty one. */
+const bare = (over: Partial<MergeExtras> = {}): MergeExtras => ({
+  progressVolumes: 0,
+  repeat: 0,
+  notes: null,
+  private: false,
+  startedAt: null,
+  completedAt: null,
+  ...over,
+});
+
+/** A local row as the local list actually spells an empty one. */
+const localBare = (over: Partial<MergeExtras> = {}): MergeExtras => ({
+  ...bare({ notes: "", ...over }),
 });
 
 describe("conflicts", () => {
@@ -63,5 +86,87 @@ describe("localWins", () => {
   /** A tie goes to the local side — it is the one being merged away. */
   it("breaks a tie towards local", () => {
     expect(localWins(side({ progress: 3 }), side({ progress: 50 }), "newest")).toBe(true);
+  });
+});
+
+describe("residual", () => {
+  /**
+   * The defect: `conflicts` weighs three fields, the merge deletes the local
+   * row on the strength of that answer, and the other six went with it while
+   * the tally said "merged". A row agreeing on status, progress and score can
+   * still be the only place a rewatch count or a start date exists.
+   */
+  it("reports what only the local row holds", () => {
+    const out = residual(
+      localBare({
+        progressVolumes: 12,
+        repeat: 2,
+        notes: "borrowed from Ana",
+        private: true,
+        startedAt: { year: 2019, month: 4, day: null },
+      }),
+      bare(),
+    );
+    expect(out).toEqual({
+      progressVolumes: 12,
+      repeat: 2,
+      notes: "borrowed from Ana",
+      private: true,
+      startedAt: { year: 2019, month: 4, day: null },
+    });
+    expect(hasResidual(out)).toBe(true);
+  });
+
+  /**
+   * Why this is not simply `conflicts` widened to nine fields.
+   *
+   * AniList returns `notes: null` and all-null `FuzzyDate`s exactly where the
+   * local list stores `""` and nulls. Comparing them raw makes every untouched
+   * row look like a conflict, and under the default "newest" strategy — where
+   * ties go local — those phantom conflicts resolve by overwriting a real
+   * AniList entry. Empty is empty in both dialects.
+   */
+  it("finds nothing between two empty rows spelled differently", () => {
+    expect(hasResidual(residual(localBare(), bare()))).toBe(false);
+    expect(
+      hasResidual(
+        residual(
+          localBare({ startedAt: { year: null, month: null, day: null } }),
+          bare({ startedAt: null }),
+        ),
+      ),
+    ).toBe(false);
+    expect(hasResidual(residual(localBare({ notes: "   " }), bare()))).toBe(false);
+  });
+
+  /**
+   * Additive only. Where both sides have a value it is a conflict, and
+   * `localWins` plus the user's chosen strategy already own that decision —
+   * a residual push must never be a second, silent arbiter.
+   */
+  it("never overwrites a value AniList already has", () => {
+    const out = residual(
+      localBare({
+        progressVolumes: 3,
+        repeat: 1,
+        notes: "mine",
+        startedAt: { year: 2019, month: null, day: null },
+      }),
+      bare({
+        progressVolumes: 12,
+        repeat: 5,
+        notes: "theirs",
+        startedAt: { year: 2024, month: 1, day: 1 },
+      }),
+    );
+    expect(hasResidual(out)).toBe(false);
+  });
+
+  /** Privacy only ever tightens: a merge must not publish, nor un-publish. */
+  it("carries private across but never clears it", () => {
+    expect(residual(localBare({ private: true }), bare()).private).toBe(true);
+    expect(
+      hasResidual(residual(localBare({ private: false }), bare({ private: true }))),
+    ).toBe(false);
   });
 });

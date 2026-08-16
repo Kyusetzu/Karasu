@@ -36,6 +36,12 @@ short version, grouped by what it means for someone using the app.
   was filling in the rest with defaults: a `+1` reset the status to Planning and
   zeroed the score, repeat count, volume count, notes and tags. Absent now means
   "leave it alone" for every field, as it always has for AniList.
+- **The sign-in merge no longer deletes local rows it never pushed.** A local
+  entry that agreed with AniList on status, progress and score was cleared
+  without being sent — so notes, tags, rewatch count, volume count, privacy and
+  both dates that existed only locally were lost, and the merge reported
+  success. It now pushes whatever the AniList row is missing before clearing,
+  and never overwrites a value AniList already has.
 
 - An offline edit is no longer deleted when AniList answers with something
   recoverable — an expired token, a rate limit, a server fault. Only a payload

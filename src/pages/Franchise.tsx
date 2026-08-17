@@ -26,24 +26,18 @@ import { EmptyState, PerchRule } from "@/components/EmptyState";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { cn } from "@/lib/utils";
+import { statusColorVar } from "@/lib/statusColors";
 
 /**
- * List status → node outline. Watching rides the accent because it is the one
- * state the user is actually in; everything else is a fixed hue, so a graph
- * doesn't repaint half its outlines when the accent changes.
+ * List status → node outline, from the user's own palette.
+ *
+ * This map used to live here, with Watching on the accent and Completed on a
+ * fixed green. It moved to `lib/statusColors` when cover rings needed the same
+ * idea: two maps would have meant a colour saying one thing on a card and
+ * another in this graph. Watching no longer rides the accent, which also stops
+ * the graph repainting half its outlines when the accent changes.
  */
-const STATUS_COLOR: Record<MediaListStatus, string> = {
-  CURRENT: "var(--color-accent-400)",
-  REPEATING: "var(--color-accent-400)",
-  COMPLETED: "var(--color-graph-completed)",
-  PAUSED: "var(--color-gold)",
-  DROPPED: "var(--color-danger)",
-  PLANNING: "var(--color-surface-600)",
-};
-const NO_STATUS = "var(--color-graph-none)";
-
-const colorOf = (status: MediaListStatus | null) =>
-  status ? STATUS_COLOR[status] : NO_STATUS;
+const colorOf = statusColorVar;
 
 /**
  * Planning and not-on-list are the two muted greys in the palette, and they

@@ -95,6 +95,17 @@
   --color-graph-completed: #5ec98a;
   --color-graph-none: #3a3f4d;
 
+  /* List-status colours. Overwritten at runtime by `stores/theme` from the
+     user's palette — these are the same defaults `lib/statusColors` ships, and
+     they exist here so a cover ring paints correctly on the very first frame,
+     before the store's `init()` has written anything. */
+  --color-status-current: #3fb950;
+  --color-status-repeating: #1a7f37;
+  --color-status-completed: #4b8dd6;
+  --color-status-paused: #d9a13b;
+  --color-status-dropped: #d1495b;
+  --color-status-planning: #6b7280;
+
   --color-accent-400: #8b9dff;
   --color-accent-500: #6c7fff;
   --color-accent-600: #5563e8;

@@ -1,5 +1,13 @@
 import { create } from "zustand";
 import { accentShades } from "@/lib/contrast";
+import type { MediaListStatus } from "@/api/types";
+import {
+  STATUS_COLOR_ORDER,
+  isStatusHex,
+  normalizeStatusColors,
+  statusVar,
+  type StatusPalette,
+} from "@/lib/statusColors";
 
 export type ThemeMode = "system" | "light" | "dark";
 
@@ -34,6 +42,7 @@ const MODE_KEY = "karasu-theme";
 const ACCENT_KEY = "karasu-accent";
 const DENSITY_KEY = "karasu-density";
 const REDUCE_MOTION_KEY = "karasu-reduce-motion";
+const STATUS_COLORS_KEY = "karasu-status-colors";
 
 /**
  * Kills every transition for one frame.
@@ -93,6 +102,7 @@ function apply(
   accent: string,
   density: Density,
   reduceMotion: boolean,
+  statusColors: StatusPalette,
 ): void {
   const dark = mode === "dark" || (mode === "system" && systemDark());
   const html = document.documentElement;
@@ -115,6 +125,15 @@ function apply(
   root.setProperty("--w2", w2);
   root.setProperty("--hair", hair);
 
+  // Written as variables so a palette change repaints every cover ring without
+  // re-rendering a single component — the same trick the accent uses. Not
+  // derived through `accentShades`: these are read as flat fills at ring width
+  // rather than as a surface with text on it, and shading them toward the page
+  // would pull six deliberately distinct hues toward each other.
+  for (const status of STATUS_COLOR_ORDER) {
+    root.setProperty(statusVar(status), statusColors[status]);
+  }
+
   // Resolve the new palette while `data-swapping` is still on — see
   // `suspendTransitions`. Deferring this past the frame that clears the
   // attribute leaves every swap rendering the previous one's colours.
@@ -126,10 +145,15 @@ interface ThemeState {
   accent: string;
   density: Density;
   reduceMotion: boolean;
+  /** One colour per list status — see `lib/statusColors`. */
+  statusColors: StatusPalette;
   setMode: (mode: ThemeMode) => void;
   setAccent: (accent: string) => void;
   setDensity: (density: Density) => void;
   setReduceMotion: (reduceMotion: boolean) => void;
+  /** Sets one status's colour, leaving the other five alone. */
+  setStatusColor: (status: MediaListStatus, hex: string) => void;
+  resetStatusColors: () => void;
   init: () => void;
 }
 
@@ -154,12 +178,37 @@ const storedAccent = (): string => {
   return saved && isHex(saved) ? saved : DEFAULT_ACCENT;
 };
 
+/**
+ * The one setting here that is not a scalar, which matters: `commit` below
+ * writes `String(value)`, and an object would land in localStorage as
+ * `[object Object]` and read back as the defaults forever — silently, since
+ * `normalizeStatusColors` repairs whatever it is given.
+ */
+const storedStatusColors = (): StatusPalette => {
+  try {
+    return normalizeStatusColors(JSON.parse(localStorage.getItem(STATUS_COLORS_KEY) ?? "null"));
+  } catch {
+    return normalizeStatusColors(null);
+  }
+};
+
 export const useTheme = create<ThemeState>((set, get) => {
   /** Writes whatever the store currently holds, so no call site has to
       remember the full argument list. */
   const flush = () => {
-    const { mode, accent, density, reduceMotion } = get();
-    apply(mode, accent, density, reduceMotion);
+    const { mode, accent, density, reduceMotion, statusColors } = get();
+    apply(mode, accent, density, reduceMotion, statusColors);
+  };
+
+  /** The palette's own writer. See `storedStatusColors` for why it is not
+      `commit` — and the `try` because private-mode storage throws on write,
+      where losing the preference is better than losing the colour change. */
+  const writeStatusColors = (palette: StatusPalette) => {
+    try {
+      localStorage.setItem(STATUS_COLORS_KEY, JSON.stringify(palette));
+    } catch {
+      // Same trade every other setting here makes silently.
+    }
   };
 
   /** Persist, update, and push to the document — the shape every setter has. */
@@ -178,12 +227,32 @@ export const useTheme = create<ThemeState>((set, get) => {
     accent: storedAccent(),
     density: storedDensity(),
     reduceMotion: localStorage.getItem(REDUCE_MOTION_KEY) === "true",
+    statusColors: storedStatusColors(),
 
     setMode: (mode) => commit(MODE_KEY, "mode", mode),
     setAccent: (accent) => commit(ACCENT_KEY, "accent", accent),
     setDensity: (density) => commit(DENSITY_KEY, "density", density),
     setReduceMotion: (reduceMotion) =>
       commit(REDUCE_MOTION_KEY, "reduceMotion", reduceMotion),
+
+    // Not through `commit`: that stringifies, and a palette needs JSON on both
+    // sides. Per status rather than whole-palette because the picker drives one
+    // swatch at a time and a caller holding a stale copy of the other five
+    // would quietly undo them.
+    setStatusColor: (status, hex) => {
+      if (!isStatusHex(hex)) return;
+      const statusColors = { ...get().statusColors, [status]: hex };
+      writeStatusColors(statusColors);
+      set({ statusColors });
+      flush();
+    },
+
+    resetStatusColors: () => {
+      const statusColors = normalizeStatusColors(null);
+      writeStatusColors(statusColors);
+      set({ statusColors });
+      flush();
+    },
 
     init: () => {
       flush();

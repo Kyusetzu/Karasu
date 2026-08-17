@@ -1419,6 +1419,10 @@ export const en = {
     theme_light: "Light",
     theme_dark: "Dark",
     accent: "Accent color",
+    statusColors: "List status colours",
+    statusColorsHint:
+      "The border drawn around a cover, and the tint of its badge. Click a status to change it.",
+    statusColorsReset: "Reset to defaults",
     accentCustom: "Custom colour …",
     coverSize: "Cover size",
     coverSizeHint: "A wider window shows more covers, not bigger ones.",

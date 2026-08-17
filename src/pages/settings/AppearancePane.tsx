@@ -17,12 +17,17 @@ import {
   type LanguageSetting,
 } from "@/i18n";
 import { ColorPicker, Row, SELECT, Toggle } from "./shared";
+import { STATUS_COLOR_ORDER, isDefaultPalette } from "@/lib/statusColors";
+import type { MediaListStatus } from "@/api/types";
 const THEME_MODES: ThemeMode[] = ["system", "light", "dark"];
 
 export function AppearanceSection() {
   const { t } = useTranslation();
   const [lang, setLang] = useState<LanguageSetting>(getLanguageSetting());
   const [showCustomAccent, setShowCustomAccent] = useState(false);
+  // One picker at a time. Six open pickers would be a wall, and the swatch
+  // itself is the affordance — same shape as the accent's Palette toggle.
+  const [editingStatus, setEditingStatus] = useState<MediaListStatus | null>(null);
   const themeMode = useTheme((s) => s.mode);
   const accent = useTheme((s) => s.accent);
   const density = useTheme((s) => s.density);
@@ -31,6 +36,9 @@ export function AppearanceSection() {
   const setReduceMotion = useTheme((s) => s.setReduceMotion);
   const setThemeMode = useTheme((s) => s.setMode);
   const setAccent = useTheme((s) => s.setAccent);
+  const statusColors = useTheme((s) => s.statusColors);
+  const setStatusColor = useTheme((s) => s.setStatusColor);
+  const resetStatusColors = useTheme((s) => s.resetStatusColors);
 
   const changeLanguage = (setting: LanguageSetting) => {
     setLang(setting);
@@ -130,6 +138,59 @@ export function AppearanceSection() {
           </div>
           {showCustomAccent && (
             <ColorPicker value={accent} onChange={setAccent} />
+          )}
+        </div>
+
+        {/* Six colours that have to be told apart at ring width, so this is a
+            list of labelled swatches rather than the accent's unlabelled row:
+            picking one means nothing without knowing which status it is. */}
+        <div className="space-y-2 border-t border-surface-800 pt-3">
+          <div className="flex items-center justify-between gap-4">
+            <span className="block text-sm text-ink-100">
+              {t("settings.statusColors")}
+            </span>
+            {!isDefaultPalette(statusColors) && (
+              <button
+                type="button"
+                onClick={resetStatusColors}
+                className="text-xs text-accent-400 hover:underline"
+              >
+                {t("settings.statusColorsReset")}
+              </button>
+            )}
+          </div>
+          <p className="text-xs text-ink-600">{t("settings.statusColorsHint")}</p>
+          <div className="space-y-1">
+            {STATUS_COLOR_ORDER.map((status) => (
+              <div key={status} className="flex items-center justify-between gap-4 py-0.5">
+                <button
+                  type="button"
+                  onClick={() => setEditingStatus(editingStatus === status ? null : status)}
+                  aria-expanded={editingStatus === status}
+                  className="flex flex-1 items-center gap-2.5 rounded-md py-0.5 text-left text-sm text-ink-300 transition-surface hover:text-ink-100"
+                >
+                  <span
+                    className="size-4 shrink-0 rounded-full"
+                    style={{
+                      backgroundColor: statusColors[status],
+                      boxShadow:
+                        editingStatus === status
+                          ? "0 0 0 2px var(--color-surface-900), 0 0 0 3.5px var(--color-accent-500)"
+                          : undefined,
+                    }}
+                  />
+                  {/* Anime wording: the two lists share a palette, and
+                      "Watching"/"Reading" is the same status either way. */}
+                  {t(`status.ANIME.${status}`)}
+                </button>
+              </div>
+            ))}
+          </div>
+          {editingStatus && (
+            <ColorPicker
+              value={statusColors[editingStatus]}
+              onChange={(hex) => setStatusColor(editingStatus, hex)}
+            />
           )}
         </div>
       </div>

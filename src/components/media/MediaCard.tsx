@@ -9,6 +9,7 @@ import { CoverCell, CoverMeta } from "@/components/media/CoverCell";
 import { saveListEntry } from "@/api/anilist";
 
 import { formatLabel } from "@/lib/format";
+import { statusColorVar } from "@/lib/statusColors";
 import type { MediaWithListStatus } from "@/api/queries";
 import { useAuth } from "@/stores/auth";
 import EntryEditModal, { type EntrySaveInput } from "@/components/media/EntryEditModal";
@@ -62,6 +63,12 @@ export default function MediaCard({
       // `:focus-visible`. Same reasoning as the list view's.
       className={focused ? "rounded-[.625rem] ring-2 ring-accent-500" : undefined}
       cover={media.coverImage.large}
+      // `mediaListEntry { status }` has been in `MEDIA_FIELDS` all along, so
+      // every search and seasonal card already knew this and threw it away —
+      // the only trace was a tooltip on the check circle below. Null when the
+      // title is not on the list, which is the honest answer for a discovery
+      // grid and is why not-on-list has no ring rather than a grey one.
+      statusRing={entry ? statusColorVar(entry.status) : null}
       score={media.averageScore != null ? `${media.averageScore}%` : null}
       data-media-id={media.id}
       data-media-type={media.type}
@@ -79,8 +86,12 @@ export default function MediaCard({
               <Pencil className="size-3.5" />
             </IconButton>
             {entry ? (
+              // Tinted to match the ring, so the badge and the border are
+              // saying the same thing. It was `bg-success` for every status —
+              // one green check whether you had completed it or dropped it.
               <span
-                className="grid size-7.5 place-items-center rounded-full bg-success text-surface-950"
+                className="grid size-7.5 place-items-center rounded-full text-surface-950"
+                style={{ background: statusColorVar(entry.status) }}
                 title={t(`status.${media.type}.${entry.status}`)}
               >
                 <Check className="size-3.75" />

@@ -1431,6 +1431,10 @@ export const de: typeof en = {
     theme_light: "Hell",
     theme_dark: "Dunkel",
     accent: "Akzentfarbe",
+    statusColors: "Farben der Listenstatus",
+    statusColorsHint:
+      "Der Rahmen um ein Cover und die Tönung seines Abzeichens. Klicke einen Status an, um ihn zu ändern.",
+    statusColorsReset: "Auf Standard zurücksetzen",
     accentCustom: "Eigene Farbe …",
     coverSize: "Covergröße",
     coverSizeHint: "Ein breiteres Fenster zeigt mehr Cover, nicht größere.",

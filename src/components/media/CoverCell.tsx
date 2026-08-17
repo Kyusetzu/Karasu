@@ -20,6 +20,7 @@ export function CoverCell({
   progress,
   actions,
   overlay,
+  statusRing,
   onCoverClick,
   coverLabel,
   selected,
@@ -46,6 +47,17 @@ export function CoverCell({
   coverLabel?: string;
   /** Bulk-edit selection ring. */
   selected?: boolean;
+  /**
+   * A colour for the list status this title is in, drawn as a ring *inside* the
+   * frame — see `lib/statusColors`.
+   *
+   * Inset on purpose. `selected` draws an `outline` two pixels outside the
+   * frame and `MediaCard` draws a focus `ring` outside that; a third band out
+   * there would either sit on top of one of them or be mistaken for it. Inside
+   * the artwork it reads as a property of the title rather than of the
+   * interaction, which is what it is.
+   */
+  statusRing?: string | null;
   className?: string;
   /** The metadata lines below the cover. */
   children?: ReactNode;
@@ -96,6 +108,16 @@ export function CoverCell({
         <div className="cover-scrim pointer-events-none absolute inset-x-0 bottom-0 h-14" />
 
         {overlay}
+
+        {/* Above the hover scrim, below the badges: a wash that dimmed the ring
+            would make an entry look like it had left the list. */}
+        {statusRing && (
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-0 rounded-lg"
+            style={{ boxShadow: `inset 0 0 0 2px ${statusRing}` }}
+          />
+        )}
 
         {score != null && (
           <span className="absolute left-2 top-2 flex items-center gap-1 rounded-[.625rem] bg-[rgba(4,5,8,.93)] px-1.5 py-0.5 text-2xs font-semibold text-gold">

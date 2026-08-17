@@ -8,6 +8,7 @@ import { useScoreFormat } from "@/stores/auth";
 import { IconButton } from "@/components/ui/icon-button";
 import { TitleLockup } from "@/components/media/TitleLockup";
 import { CoverCell, CoverMeta } from "@/components/media/CoverCell";
+import { statusColorVar } from "@/lib/statusColors";
 import { SelectBox } from "./SelectBox";
 import { TagChips } from "./TagChips";
 import { canIncrement } from "./shared";
@@ -46,6 +47,11 @@ export const GridCard = memo(function GridCard({
     <CoverCell
       to={`/media/${media.id}`}
       cover={media.coverImage.large}
+      // Every card in this grid is on the list by definition, so the ring is
+      // never absent here — unlike a discovery grid, where its absence is the
+      // useful signal. It is what makes a status legible without reading the
+      // row, which is the point of a grid view.
+      statusRing={statusColorVar(entry.status)}
       data-media-id={media.id}
       data-media-type={media.type}
       // The focused cell wears the same outline a selected one does. They

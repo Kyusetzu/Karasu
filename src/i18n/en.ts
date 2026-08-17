@@ -1037,6 +1037,11 @@ export const en = {
     affinityDisagree: "Biggest disagreements:",
     loadMore: "Load {{n}} more",
     // Used where AniList's total is not a real count — see USER_SEARCH_QUERY.
+    viewNewest: "View newest replies",
+    fromTheStart: "Back to the start",
+    jumping: "Finding the newest…",
+    newestViaAuthor:
+      "AniList will not page past 5,000 comments, so these are {{name}}'s own recent comments — the newest reply is among them, but the conversation around it is not.",
     loadMorePlain: "Load more",
     loadingMore: "Loading …",
     // Favourites

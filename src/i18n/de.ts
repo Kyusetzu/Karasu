@@ -1045,6 +1045,11 @@ export const de: typeof en = {
     affinityDisagree: "Größte Meinungsverschiedenheiten:",
     loadMore: "{{n}} weitere laden",
     // Dort verwendet, wo AniLists total keine echte Anzahl ist.
+    viewNewest: "Neueste Antworten ansehen",
+    fromTheStart: "Zurück zum Anfang",
+    jumping: "Suche die neuesten…",
+    newestViaAuthor:
+      "AniList blättert nicht über 5.000 Kommentare hinaus, daher sind dies die eigenen letzten Kommentare von {{name}} — die neueste Antwort ist dabei, das Gespräch drumherum nicht.",
     loadMorePlain: "Mehr laden",
     loadingMore: "Lädt …",
     // Favoriten

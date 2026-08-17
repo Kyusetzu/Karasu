@@ -1,9 +1,18 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { Bell, BellOff, ExternalLink, Eye, Heart, Lock, MessageSquare } from "lucide-react";
+import {
+  ArrowDownToLine,
+  Bell,
+  BellOff,
+  ExternalLink,
+  Eye,
+  Heart,
+  Lock,
+  MessageSquare,
+} from "lucide-react";
 import {
   saveThreadComment,
   thread as fetchThread,
@@ -22,6 +31,7 @@ import { Markdown } from "@/components/social/Markdown";
 import { CommentTree } from "@/components/social/CommentTree";
 import { flattenComments } from "@/lib/comments";
 import { nextPageParam } from "@/lib/paging";
+import { canJump, jumpTarget } from "@/lib/threadJump";
 import { relTimeFromSeconds } from "@/lib/relTime";
 import { validatePost } from "@/lib/composer";
 import { displayTitle } from "@/api/types";
@@ -30,11 +40,59 @@ import { showToast } from "@/stores/toast";
 import { useSocialActions } from "@/hooks/useSocialActions";
 import { cn } from "@/lib/utils";
 
+/** What the newest-reply jump came back with, and how it got there. */
+interface Newest extends CommentPage {
+  /** True when the second tier was needed — the copy differs. */
+  viaAuthor: boolean;
+}
+
+/**
+ * The newest reply, in one tier or two.
+ *
+ * **Tier 1** — the thread's own last page, when AniList will serve it. That is
+ * nearly every thread (your thread 2340 is `lastPage: 70`) and it comes with
+ * the surrounding conversation, which is what you actually want to read.
+ *
+ * **Tier 2** — when the 5,000-entry cap puts the end out of reach. Thread 1 is
+ * the case: `lastPage: 703`, and page 500 — the deepest that answers — ends in
+ * 2021 while the thread was replied to today. So it goes at the newest comment
+ * through its *author* instead: `threadComments(threadId, userId:)` narrows to
+ * the last replier's own comments, 123 of them there, well inside the cap, and
+ * that set's final page holds the comment `repliedAt` refers to. Two requests,
+ * behind an explicit press.
+ *
+ * See `lib/threadJump` for the arithmetic and why `sort` cannot do any of this.
+ */
+async function fetchNewest(
+  threadId: number,
+  lastPage: number,
+  replyUserId: number | null,
+): Promise<Newest> {
+  const target = jumpTarget(lastPage);
+  if (target.reachable) {
+    return { ...(await threadComments(threadId, target.page)), viaAuthor: false };
+  }
+  // Past the cap. Without an author to narrow by there is nothing better to do
+  // than land as deep as allowed, and the caller says so on screen.
+  if (replyUserId == null) {
+    return { ...(await threadComments(threadId, target.page)), viaAuthor: false };
+  }
+  const first = await threadComments(threadId, 1, replyUserId);
+  const authorEnd = jumpTarget(first.pageInfo.lastPage ?? 1);
+  // One page of theirs is the whole set — no second request needed.
+  if (authorEnd.page <= 1) return { ...first, viaAuthor: true };
+  return {
+    ...(await threadComments(threadId, authorEnd.page, replyUserId)),
+    viaAuthor: true,
+  };
+}
+
 /**
  * One forum thread: its body, its comments, and a box to add one.
  *
- * Two requests cold — the thread and the first page of comments — which is the
- * same cap the profile keeps, and for the same reason.
+ * Two requests cold — the thread and the first page of comments — issued *in
+ * parallel*, which they were not: the comments used to wait for the thread body
+ * they do not need.
  *
  * Deliberately reachable by id and from a profile's Forum tab only. A browsable
  * forum index (categories, sort, search, subscriptions) is a second feature with
@@ -63,10 +121,41 @@ export default function Thread() {
     queryFn: ({ pageParam }) => threadComments(threadId, pageParam),
     initialPageParam: 1,
     getNextPageParam: (last: CommentPage) => nextPageParam(last.pageInfo),
-    enabled: isTauri && !!th.data,
+    // Deliberately *not* gated on `th.data`. It was, and that made a cold
+    // thread two round-trips in series — AniList answers in ~1 s warm and much
+    // worse cold, so the wait was doubled for nothing. `threadId` comes from
+    // the route, so this needs the thread body for exactly no reason.
+    enabled: isTauri && Number.isFinite(threadId) && threadId > 0,
     // You post into this and read it back, so it goes stale quickly.
     staleTime: 60 * 1000,
   });
+
+  // The newest reply, on demand. Its own query rather than pages appended to
+  // the infinite one above: that cache is contiguous from page 1, and dropping
+  // page 70 into it would leave a hole nothing renders correctly.
+  const [showNewest, setShowNewest] = useState(false);
+  const lastPage = comments.data?.pages[0]?.pageInfo?.lastPage ?? null;
+  const replyUserId = th.data?.replyUser?.id ?? null;
+
+  const newest = useQuery({
+    queryKey: ["social", "threadNewest", threadId, lastPage, replyUserId],
+    queryFn: () => fetchNewest(threadId, lastPage ?? 1, replyUserId),
+    enabled: isTauri && showNewest && lastPage != null,
+    staleTime: 60 * 1000,
+  });
+
+  // Memoized because it is not cheap and it ran on *every* render: it walks
+  // every retained page and recurses through `childComments` to count what it
+  // hides — and `draft` lives in this component, so it re-ran on every
+  // keystroke in the reply box.
+  const flat = useMemo(
+    () => flattenComments((comments.data?.pages ?? []).flatMap((p) => p.comments)),
+    [comments.data],
+  );
+  const newestFlat = useMemo(
+    () => flattenComments(newest.data?.comments ?? []),
+    [newest.data],
+  );
 
   const subscribe = useMutation({
     mutationFn: (next: boolean) => toggleThreadSubscription(threadId, next),
@@ -166,7 +255,6 @@ export default function Thread() {
   }
 
   const data = th.data;
-  const flat = flattenComments((comments.data?.pages ?? []).flatMap((p) => p.comments));
   const check = validatePost(draft);
 
   return (
@@ -267,25 +355,85 @@ export default function Thread() {
       )}
 
       <section className="mt-6">
-        {comments.isLoading && <Shimmer className="h-16 w-full rounded-xl" />}
-        {!comments.isLoading && flat.length === 0 && (
-          <p className="text-sm text-ink-600">{t("social.noComments")}</p>
-        )}
-        <CommentTree comments={flat} />
-
-        {comments.hasNextPage && (
-          <div className="pt-3">
+        {/* Page 1 is the oldest and there is no way to reverse that — see
+            `lib/threadJump`. So on any thread past one page, the newest reply
+            is somewhere the reader cannot get to by scrolling. */}
+        {canJump(lastPage) && (
+          <div className="mb-3 flex items-center gap-2">
             <Button
-              variant="secondary"
+              variant={showNewest ? "outline" : "secondary"}
               size="sm"
-              disabled={comments.isFetchingNextPage}
-              onClick={() => void comments.fetchNextPage()}
+              disabled={newest.isFetching}
+              onClick={() => setShowNewest((v) => !v)}
             >
-              {comments.isFetchingNextPage
-                ? t("social.loadingMore")
-                : t("social.loadMorePlain")}
+              <ArrowDownToLine className="size-3.5" />
+              {showNewest ? t("social.fromTheStart") : t("social.viewNewest")}
             </Button>
+            {newest.isFetching && (
+              <span className="text-2xs text-ink-600">{t("social.jumping")}</span>
+            )}
           </div>
+        )}
+
+        {showNewest ? (
+          <>
+            {newest.isPending || newest.isFetching ? (
+              <div className="space-y-3">
+                <Shimmer className="h-16 w-full rounded-xl" />
+                <Shimmer className="h-16 w-full rounded-xl" />
+              </div>
+            ) : newest.error ? (
+              <p className="text-sm text-danger">
+                {t("common.error", { message: String(newest.error) })}
+              </p>
+            ) : (
+              <>
+                {/* Said plainly, because tier 2 is a different thing from what
+                    the button promises: one person's recent comments rather
+                    than the tail of the conversation. Silently showing the
+                    narrower view would be the lie. */}
+                {newest.data?.viaAuthor && (
+                  <p className="mb-3 rounded-lg border border-gold/30 bg-gold/8 px-3 py-2 text-2xs leading-relaxed text-ink-300">
+                    {t("social.newestViaAuthor", {
+                      name: th.data?.replyUser?.name ?? "—",
+                    })}{" "}
+                    {data.siteUrl && (
+                      <button
+                        onClick={() => void openUrl(data.siteUrl!)}
+                        className="text-accent-400 hover:underline"
+                      >
+                        {t("social.openOnAniList")}
+                      </button>
+                    )}
+                  </p>
+                )}
+                <CommentTree comments={newestFlat} />
+              </>
+            )}
+          </>
+        ) : (
+          <>
+            {comments.isLoading && <Shimmer className="h-16 w-full rounded-xl" />}
+            {!comments.isLoading && flat.length === 0 && (
+              <p className="text-sm text-ink-600">{t("social.noComments")}</p>
+            )}
+            <CommentTree comments={flat} />
+
+            {comments.hasNextPage && (
+              <div className="pt-3">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={comments.isFetchingNextPage}
+                  onClick={() => void comments.fetchNextPage()}
+                >
+                  {comments.isFetchingNextPage
+                    ? t("social.loadingMore")
+                    : t("social.loadMorePlain")}
+                </Button>
+              </div>
+            )}
+          </>
         )}
       </section>
 

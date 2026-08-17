@@ -670,12 +670,24 @@ export async function threads(
   return { pageInfo: data.Page.pageInfo, threads: data.Page.threads ?? [] };
 }
 
+/**
+ * `replyUser` and `replyCommentId` are what make "jump to the newest reply"
+ * possible on a thread too big to page to the end of.
+ *
+ * Two scalars on a request already being made. AniList caps paging at 5,000
+ * entries, so on thread 1 (7,030 comments) the last *reachable* page ends in
+ * 2021 while the thread was replied to today — but `threadComments(threadId,
+ * userId:)` narrows to the last replier's own comments, a set small enough to
+ * page to the end of, and its final page holds `replyCommentId` with a
+ * `createdAt` equal to `repliedAt`. Verified end to end. See `lib/threadJump`.
+ */
 export const THREAD_QUERY = `
 query ($id: Int!) {
   Thread(id: $id) {
     id title body replyCount viewCount likeCount isLiked isLocked isSticky
-    isSubscribed repliedAt createdAt siteUrl
+    isSubscribed repliedAt createdAt siteUrl replyCommentId
     user { ${SOCIAL_USER} }
+    replyUser { ${SOCIAL_USER} }
     categories { id name }
     mediaCategories { ${SOCIAL_MEDIA} }
   }
@@ -685,6 +697,9 @@ export interface ThreadDetail extends Omit<ThreadSummary, "replyUser"> {
   body: string | null;
   isSubscribed: boolean | null;
   mediaCategories: SocialMedia[] | null;
+  /** Who posted the newest reply, and which comment that is. */
+  replyUser: SocialUser | null;
+  replyCommentId: number | null;
 }
 
 export async function thread(id: number): Promise<ThreadDetail> {
@@ -703,14 +718,21 @@ export async function thread(id: number): Promise<ThreadDetail> {
  * and it is one request either way; the page size is what pays for it.
  * `lib/comments` flattens the result to two levels and reports the rest.
  *
- * `ThreadCommentSort` offers only `ID`/`ID_DESC`, so oldest-first (the default)
- * is the only reading order available — which is the right one for a thread.
+ * **`sort` does nothing here, and is deliberately not passed.** `ThreadCommentSort`
+ * declares `ID`/`ID_DESC` and AniList accepts either — then returns the
+ * byte-identical page. Measured on two threads in every spelling (`[ID_DESC]`,
+ * `ID_DESC`, `[ID]`), so oldest-first is not a choice, it is the only order
+ * there is. Wiring it would look like it worked and quietly change nothing. The
+ * `id` argument is inert in the same way; only `threadId` and `userId` filter.
+ *
+ * `$userId` is what tier 2 of the jump uses — see `THREAD_QUERY`. Null on the
+ * ordinary read, which is how a nullable GraphQL argument means "unfiltered".
  */
 export const THREAD_COMMENTS_QUERY = `
-query ($threadId: Int!, $page: Int) {
+query ($threadId: Int!, $page: Int, $userId: Int) {
   Page(page: $page, perPage: 10) {
     ${PAGE_INFO}
-    threadComments(threadId: $threadId) {
+    threadComments(threadId: $threadId, userId: $userId) {
       id comment likeCount isLiked createdAt siteUrl
       user { ${SOCIAL_USER} }
       childComments
@@ -724,10 +746,15 @@ export interface CommentPage {
   comments: unknown[];
 }
 
-export async function threadComments(threadId: number, page = 1): Promise<CommentPage> {
+export async function threadComments(
+  threadId: number,
+  page = 1,
+  /** Narrows to one author — the second tier of the newest-reply jump. */
+  userId?: number,
+): Promise<CommentPage> {
   const data = await gql<{ Page: { pageInfo: PageInfo; threadComments: unknown[] } }>(
     THREAD_COMMENTS_QUERY,
-    { threadId, page },
+    { threadId, page, userId: userId ?? null },
   );
   return { pageInfo: data.Page.pageInfo, comments: data.Page.threadComments ?? [] };
 }

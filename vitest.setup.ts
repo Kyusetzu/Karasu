@@ -42,3 +42,21 @@ vi.mock("@tauri-apps/plugin-opener", () => ({
 vi.mock("@tauri-apps/api/event", () => ({
   listen: vi.fn(() => Promise.resolve(() => {})),
 }));
+
+/**
+ * jsdom implements no layout, so it ships no `ResizeObserver` — and
+ * `useColumnCount` constructs one in an effect. Without this, *any* test that
+ * renders a card grid dies in `commitPassiveMountEffects` with an uncaught
+ * `ReferenceError`, which surfaces as six unrelated failures and no clue.
+ *
+ * A stub rather than a measuring shim: nothing here has a layout to observe, so
+ * the callback would only ever report zeroes. `useColumnCount` already treats a
+ * non-laid-out element as one column, which is exactly the jsdom case.
+ */
+if (!("ResizeObserver" in globalThis)) {
+  globalThis.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof ResizeObserver;
+}

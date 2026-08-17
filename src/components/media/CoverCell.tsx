@@ -17,6 +17,7 @@ export function CoverCell({
   to,
   cover,
   score,
+  adult,
   progress,
   actions,
   overlay,
@@ -33,6 +34,15 @@ export function CoverCell({
   /** Whatever belongs in the gold star badge — already formatted, since the
       user's own score and AniList's average are on different scales. */
   score?: ReactNode;
+  /**
+   * Marks the title 18+. Top-right, because the score badge has top-left and
+   * the select checkbox shares it.
+   *
+   * Only ever visible with the content filter off: at `moderate` and `strict`
+   * the adult titles are excluded *server-side* by `adultQueryArg`, so they
+   * never reach a card at all. That is correct rather than a gap.
+   */
+  adult?: boolean;
   /** Draws the bar flush to the bottom edge. Omit when there is no total. */
   progress?: { current: number; total: number } | null;
   /** Overlaid bottom-right — the action circles. */
@@ -123,6 +133,15 @@ export function CoverCell({
           <span className="absolute left-2 top-2 flex items-center gap-1 rounded-[.625rem] bg-[rgba(4,5,8,.93)] px-1.5 py-0.5 text-2xs font-semibold text-gold">
             <Star className="size-2.5" fill="currentColor" />
             {score}
+          </span>
+        )}
+
+        {/* Matched to the score badge deliberately — same radius, same padding,
+            same near-opaque fill. Cover art is arbitrary (white, busy, bright),
+            so a translucent badge has no contrast floor at all. */}
+        {adult && (
+          <span className="absolute right-2 top-2 rounded-[.625rem] bg-[rgba(4,5,8,.93)] px-1.5 py-0.5 text-2xs font-semibold text-danger">
+            18+
           </span>
         )}
 

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { isTyping } from "@/components/shell/KeyboardSheet";
+import { nextFocusGrouped } from "@/lib/formatGroups";
 import { nextFocus, ownsKeyboard, type Move } from "@/lib/roving";
 
 /**
@@ -26,19 +27,30 @@ export function useGridRoving({
   columns,
   onOpen,
   enabled = true,
+  sections,
 }: {
   count: number;
   columns: number;
   /** Enter on the focused card. */
   onOpen: (index: number) => void;
   enabled?: boolean;
+  /**
+   * Item counts per visual section, when the grid is split into several — as
+   * Seasonal is, by format.
+   *
+   * Without it, movement treats the results as one uniform rectangle, so "down"
+   * from a section's ragged last row lands at the wrong offset in the next one
+   * and can skip a whole row on the way. Omit for a single grid, which is what
+   * Search still is.
+   */
+  sections?: readonly number[];
 }) {
   const [focus, setFocus] = useState<number | null>(null);
   // Read through a ref so the listener can stay mounted for the life of the
   // screen: re-registering it on every focus change would be a subscription
   // churning once per keypress.
-  const state = useRef({ focus, count, columns, onOpen });
-  state.current = { focus, count, columns, onOpen };
+  const state = useRef({ focus, count, columns, onOpen, sections });
+  state.current = { focus, count, columns, onOpen, sections };
 
   // A result set that shrank under the cursor — a filter typed, a page
   // changed — must not leave the focus pointing past the end.
@@ -58,12 +70,20 @@ export function useGridRoving({
       if (!ownsKeyboard(document.activeElement, document.body, null)) return;
       if (e.altKey || e.ctrlKey || e.metaKey) return;
 
-      const { focus: at, count: n, columns: cols, onOpen: open } = state.current;
+      const {
+        focus: at,
+        count: n,
+        columns: cols,
+        onOpen: open,
+        sections: parts,
+      } = state.current;
       if (n === 0) return;
 
       const move = (direction: Move) => {
         e.preventDefault();
-        const next = nextFocus(at, direction, cols, n);
+        const next = parts?.length
+          ? nextFocusGrouped(at, direction, cols, parts)
+          : nextFocus(at, direction, cols, n);
         if (next !== null) setFocus(next);
       };
 

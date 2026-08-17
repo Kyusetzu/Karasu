@@ -70,6 +70,7 @@ export default function MediaCard({
       // grid and is why not-on-list has no ring rather than a grey one.
       statusRing={entry ? statusColorVar(entry.status) : null}
       score={media.averageScore != null ? `${media.averageScore}%` : null}
+      adult={media.isAdult === true}
       data-media-id={media.id}
       data-media-type={media.type}
       actions={

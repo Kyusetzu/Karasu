@@ -563,6 +563,7 @@ export const en = {
     createFailedDetail: "AniList didn't accept it — your draft is still here.",
   },
   seasonal: {
+    otherFormats: "Other",
     title: "Seasonal",
     prev: "Previous season",
     next: "Next season",

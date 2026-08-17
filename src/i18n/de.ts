@@ -564,6 +564,7 @@ export const de: typeof en = {
     createFailedDetail: "AniList hat ihn nicht angenommen — dein Entwurf ist noch da.",
   },
   seasonal: {
+    otherFormats: "Sonstige",
     title: "Saison",
     prev: "Vorherige Saison",
     next: "Nächste Saison",

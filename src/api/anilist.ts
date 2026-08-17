@@ -266,6 +266,17 @@ export const flushQueue = () => invoke<number>("flush_queue");
  */
 export const syncStatus = () => invoke<SyncStatus>("sync_status");
 
+/**
+ * Fetches a bio image in Rust and returns it as a `data:` URI.
+ *
+ * Rejects on anything at all — refused host, wrong content type, too large,
+ * unreachable — and the caller falls back to the chip. See
+ * `commands/images.rs` for what the backend will and will not fetch, and
+ * `components/RichText.tsx` for why this exists rather than a wider CSP.
+ */
+export const fetchBioImage = (url: string) =>
+  invoke<string>("fetch_bio_image", { url });
+
 // --- Sign-in merge (local list -> AniList) ---------------------------------
 
 export interface LocalEntryRow {

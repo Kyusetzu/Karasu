@@ -1,8 +1,9 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { ExternalLink, Image, Play } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { fetchBioImage, isTauri } from "@/api/anilist";
 import { cn } from "@/lib/utils";
 import type { MdInline } from "@/lib/anilistMarkdown";
 
@@ -43,29 +44,78 @@ export function ExternalAnchor({
 }
 
 /**
- * An image or embed, as a link rather than the thing itself.
+ * An image, fetched by Rust and inlined — or the chip below if that fails.
  *
- * **Measured, after the CSP landed and made inlining look possible.** Across 89
- * real bios containing 350 images, **6 — two per cent — were on `*.anilist.co`**.
- * The rest were imgur (147), tumblr (57), pinimg, postimg, catbox, discord and a
- * dozen one-offs. So `img-src` cannot be widened to cover them without
- * allowlisting an unbounded set of third parties, each of which then learns the
- * user's IP and that they opened a particular profile — from a desktop app
- * holding an OAuth token. Inlining the 2% that *are* permitted would change
- * almost nothing on screen.
+ * **The measurement this replaces, and what it did and did not say.** Across 89
+ * real bios containing 350 images, only 6 (2%) were on `*.anilist.co`; the rest
+ * were imgur (147), tumblr (57), pinimg, postimg, catbox and discord. That
+ * killed the idea of *widening `img-src`*, and it still does: an allowlist over
+ * that tail hands an unbounded set of third parties the user's IP and which
+ * profile they opened, and every render would repeat the request from the page
+ * itself.
  *
- * The chip is therefore the answer, and the reason is stronger than the one this
- * comment used to give. It was "there is no CSP"; there is one now, and the point
- * stands anyway. Note what the policy *does* permit and what already renders
- * because of it: avatars, banners and cover art are all AniList-hosted and go
- * through plain `<img>`, so the images that carry meaning are inline and only
- * decorative bio art is a chip.
+ * Proxying is a different trade, and the maintainer took it. **The CSP does not
+ * move.** `img-src 'self' data:` already permits the result, so the WebView
+ * still never talks to imgur — what crosses the network is one bounded request
+ * made in Rust, with a size cap, a content-type allowlist, a timeout, no cookies
+ * and no `Referer`, and with local and private hosts refused so a crafted bio
+ * cannot make the app probe the LAN. See `commands/images.rs`.
  *
- * A pleasant side effect either way: bios routinely embed 2000px-wide GIFs, and a
- * chip has no layout problem to solve.
+ * The host still learns the user's IP. That is unavoidable in any design that
+ * shows the image at all, and it is the honest residue rather than the part that
+ * was solved.
  *
- * About one profile in twelve is images and nothing else, so this chip is the
- * entire visible content of those. It has to look deliberate.
+ * Anything that fails — refused host, wrong type, too large, unreachable, or not
+ * running under Tauri at all — falls back to the chip, which is exactly what
+ * shipped before. About one profile in twelve is images and nothing else, so
+ * that fallback is still the entire visible content of those.
+ */
+function InlineImage({ host, href }: { host: string; href: string }) {
+  const [src, setSrc] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    if (!isTauri) return setFailed(true);
+    let live = true;
+    fetchBioImage(href)
+      .then((uri) => live && setSrc(uri))
+      .catch(() => live && setFailed(true));
+    return () => {
+      live = false;
+    };
+  }, [href]);
+
+  if (failed) return <Chip kind="image" host={host} href={href} />;
+  // Nothing while it is in flight: a chip that turns into an image would reflow
+  // the paragraph around it, and a bio is mostly one paragraph.
+  if (!src) return null;
+
+  return (
+    <button
+      type="button"
+      onClick={() => void openUrl(href)}
+      title={href}
+      className="my-1 block max-w-full overflow-hidden rounded-lg border border-surface-800"
+    >
+      {/* Bios embed 2000px GIFs, which is why the chip never had a layout
+          problem and this does. Capped rather than scaled to the column so a
+          small image is not blown up into a blurry one. */}
+      <img
+        src={src}
+        alt=""
+        loading="lazy"
+        className="max-h-80 max-w-full object-contain"
+      />
+    </button>
+  );
+}
+
+/**
+ * The fallback, and the only rendering for a video embed.
+ *
+ * Video is never inlined: it would be a media element pointed at a third party,
+ * which is the exposure the proxy exists to avoid, and `media-src` does not
+ * permit it anyway.
  */
 function Chip({ kind, host, href }: { kind: "image" | "video"; host: string; href: string }) {
   const { t } = useTranslation();
@@ -172,7 +222,12 @@ export function RichText({ nodes }: { nodes: MdInline[] }) {
               </Spoiler>
             );
           case "chip":
-            return <Chip key={i} kind={n.kind} host={n.host} href={n.href} />;
+            // Images are attempted inline; video is always a chip.
+            return n.kind === "image" ? (
+              <InlineImage key={i} host={n.host} href={n.href} />
+            ) : (
+              <Chip key={i} kind={n.kind} host={n.host} href={n.href} />
+            );
         }
       })}
     </>

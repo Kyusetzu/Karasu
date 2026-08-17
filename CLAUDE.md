@@ -475,14 +475,20 @@ import it.
 - **A CSP cannot be checked from the Vite dev server** — it applies to the Tauri
   webview, so the browser-pane tooling is blind to it. Only a real
   `tauri dev`/`tauri build` run proves it.
-- **Widening `img-src` to inline bio images is not worth attempting — measured.**
+- **Bio images are proxied through Rust, and `img-src` is still not widened.**
   Across 89 real bios holding 350 images, **6 (2%) were on `*.anilist.co`**; the
-  rest were imgur (147), tumblr (57), pinimg, postimg, catbox and discord. So the
-  chips in `components/RichText.tsx` are not a stopgap waiting on a policy: no
-  allowlist can cover that tail without handing an unbounded set of third parties
-  the user's IP and which profile they opened. What the policy *does* permit is
-  the part that matters — avatars, banners and covers are AniList-hosted and
-  render as ordinary `<img>`.
+  rest were imgur (147), tumblr (57), pinimg, postimg, catbox and discord — so no
+  allowlist covers that tail without handing an unbounded set of third parties
+  the user's IP and which profile they opened, *from the page, on every render*.
+  `commands::fetch_bio_image` makes one bounded request in Rust instead and
+  returns a `data:` URI, which the existing `img-src 'self' data:` already
+  permits: size cap, content-type allowlist (no SVG — it is a scripting
+  context), timeout, no cookies, no `Referer`, and local/private hosts refused on
+  the URL *and every redirect hop* so a crafted bio cannot probe the LAN. The
+  host still learns the user's IP; that is unavoidable in any design that shows
+  the image, and it is the residue rather than the part that was solved. Anything
+  that fails falls back to the chip. **Do not "simplify" this into a CSP
+  change** — that is the thing the measurement rejected.
 - **MSVC writes an 11 MB `karasu.pdb` on every release build and there is no
   flag reaching the linker to stop it.** `debug = 0` and `strip = true` are
   already set, `cargo build --release -v` shows no `/DEBUG`, no `-Cdebuginfo=`

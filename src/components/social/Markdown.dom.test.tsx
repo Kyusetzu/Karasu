@@ -35,12 +35,28 @@ const HOSTILE = [
 ];
 
 describe("Markdown renders no executable content", () => {
-  it("never emits an img element, for any input", () => {
-    // The deliberate compromise: every image is a chip. If this ever fails, an
-    // inline image has appeared and the no-CSP reasoning needs revisiting first.
+  /**
+   * This used to assert **zero** `<img>` for any input, with a note saying that
+   * if it ever failed, the no-CSP reasoning had to be revisited first. It has
+   * been revisited, deliberately: bio images are fetched by Rust and handed back
+   * as a `data:` URI, so the CSP is unchanged and the WebView still never talks
+   * to imgur. See `commands/images.rs` and `components/RichText.tsx`.
+   *
+   * So the property that actually matters is now the one pinned here: **no
+   * `<img>` may ever carry a remote `src`.** A `data:` URI is the proxy's own
+   * output; anything with a scheme and a host would mean the page is fetching
+   * for itself, which is exactly what was rejected.
+   *
+   * Under jsdom `isTauri` is false, so the proxy is never attempted and every
+   * image falls back to the chip — which is also the shipped behaviour whenever
+   * a fetch fails, and is what makes the loop below meaningful for HOSTILE.
+   */
+  it("never emits an img with a remote src, for any input", () => {
     for (const src of [...HOSTILE, `img(https://i.imgur.com/a.png)`, `![alt](https://i.imgur.com/a.png)`]) {
       const { container, unmount } = draw(src);
-      expect(container.querySelectorAll("img"), src).toHaveLength(0);
+      for (const img of container.querySelectorAll("img")) {
+        expect(img.getAttribute("src") ?? "", src).toMatch(/^data:/);
+      }
       unmount();
     }
   });

@@ -6,6 +6,7 @@
 //! frontend, and renaming one is a runtime break the compiler cannot see.
 
 mod auth;
+mod images;
 mod list;
 mod playback;
 mod prefs;
@@ -13,6 +14,7 @@ mod system;
 mod update;
 
 pub use auth::*;
+pub use images::*;
 pub use list::*;
 pub use playback::*;
 pub use prefs::*;

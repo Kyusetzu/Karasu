@@ -419,6 +419,7 @@ pub fn run() {
             commands::delete_list_entry,
             commands::flush_queue,
             commands::sync_status,
+            commands::fetch_bio_image,
             commands::get_profile_mode,
             commands::enable_local_mode,
             commands::local_fetch_list,

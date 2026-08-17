@@ -23,13 +23,17 @@
  * Escaping the tags into visible `<div style=…>` was the alternative and it is
  * worse: a wall of markup reads as a bug in Karasu, where a plain bio does not.
  *
- * **Images and embeds become chips, not pictures** — and this survived the
- * arrival of a real CSP rather than being made obsolete by it. Measured across
- * 89 bios holding 350 images: **6 were on `*.anilist.co`**, the two per cent the
- * policy permits. The rest were imgur, tumblr, pinimg, catbox and discord, which
- * `img-src` cannot cover without allowlisting an unbounded set of third parties
- * that would each learn the user's IP and which profile they opened. See the
- * `Chip` comment in `components/RichText.tsx` for the full figures.
+ * **Images and embeds are parsed into `chip` nodes either way** — what the
+ * renderer does with one is its business, not the parser's. `RichText` now
+ * fetches an image through Rust and inlines it as a `data:` URI, falling back to
+ * a chip when that fails; a video is always a chip.
+ *
+ * The measurement behind that split is worth keeping here: across 89 bios
+ * holding 350 images, **6 were on `*.anilist.co`** and the rest were imgur,
+ * tumblr, pinimg, catbox and discord. That is why `img-src` was never widened —
+ * an allowlist over that tail hands an unbounded set of third parties the user's
+ * IP — and why the images arrive through a proxy instead. See
+ * `components/RichText.tsx` and `commands/images.rs`.
  *
  * Grounded in real data rather than the docs. Of those 44 bios: 36 relied on
  * single newlines (hence `br`, see `LIMIT`), 25 used `~~~centered~~~`, 24 used

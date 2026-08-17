@@ -32,6 +32,7 @@ import {
   Shimmer,
 } from "@/components/Skeleton";
 import NowPlayingCard from "@/components/media/NowPlayingCard";
+import SeasonHero from "@/components/media/SeasonHero";
 import RecommendedSection from "@/components/media/RecommendedSection";
 
 export default function Dashboard() {
@@ -109,6 +110,13 @@ function DashboardContent({ userId }: { userId: number }) {
       {/* Pinned above the rest: this is the "right now" card, and it is only
           useful while something is actually playing. */}
       <NowPlayingCard />
+
+      {/* Below the now-playing card, which is pinned above the loading gate:
+          what you are watching right now outranks what the season is popular
+          for. Above everything else, because it is the only section that is
+          not about your own list — and outside the gate for the same reason,
+          since it does not need the list to render. */}
+      <SeasonHero />
 
       {isLoading ? (
         <DashboardSkeleton />

@@ -294,6 +294,8 @@ export const en = {
     CONTAINS: "Contains",
   },
   dashboard: {
+    heroKicker: "Most popular",
+    heroLabel: "This season's most popular anime",
     birthdays: "Birthdays today",
     birthdayCharacter: "Favourite character",
     birthdayStaff: "Favourite staff",

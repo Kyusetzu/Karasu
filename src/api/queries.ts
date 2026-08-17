@@ -216,6 +216,68 @@ query ($season: MediaSeason!, $year: Int!, $page: Int, $isAdult: Boolean, $score
   }
 }`;
 
+/**
+ * The season's most popular titles, with artwork wide enough to be a banner.
+ *
+ * Separate from `SEASONAL_QUERY` on purpose, and the split is the point.
+ * CLAUDE.md forbids `bannerImage` and `coverImage.extraLarge` on the list and
+ * grid queries because those run at 30–50 titles a page and nothing renders
+ * them there. This runs at **five**, and the hero is the one place in the app
+ * that genuinely needs a 2:1 image — a 2:3 poster stretched across the top of
+ * the Overview looks exactly as bad as it sounds. Same reasoning
+ * `social.ts:164` uses for the profile banner: the rule is about pages of
+ * thirty, not about the field being forbidden everywhere.
+ *
+ * Deliberately narrow beyond that. No `mediaListEntry`, no `genres`, no
+ * `synonyms` — the hero draws a title, an image and a link, so it asks for a
+ * title, an image and a link, plus the two fields `isBlocked` needs to filter
+ * it. `MEDIA_FIELDS` would have been ten times the payload for nothing.
+ */
+const SEASON_HERO_QUERY = `
+query ($season: MediaSeason!, $year: Int!, $isAdult: Boolean) {
+  Page(page: 1, perPage: 5) {
+    media(season: $season, seasonYear: $year, type: ANIME, sort: POPULARITY_DESC, isAdult: $isAdult) {
+      id
+      type
+      title { romaji english native }
+      bannerImage
+      coverImage { extraLarge large }
+      format
+      episodes
+      averageScore
+      genres
+      isAdult
+    }
+  }
+}`;
+
+/** What the Overview's hero draws. A deliberate subset of `Media`. */
+export interface HeroMedia {
+  id: number;
+  type: MediaType;
+  title: MediaTitle;
+  bannerImage: string | null;
+  coverImage: { extraLarge: string | null; large: string | null };
+  format: string | null;
+  episodes: number | null;
+  averageScore: number | null;
+  genres: string[] | null;
+  isAdult: boolean | null;
+}
+
+export async function seasonHero(
+  season: Season,
+  year: number,
+  isAdult?: boolean,
+): Promise<HeroMedia[]> {
+  const data = await gql<{ Page: { media: HeroMedia[] } }>(SEASON_HERO_QUERY, {
+    season,
+    year,
+    ...adultVars(isAdult),
+  });
+  return data.Page.media ?? [];
+}
+
 export type Season = "WINTER" | "SPRING" | "SUMMER" | "FALL";
 
 export function currentSeason(): { season: Season; year: number } {

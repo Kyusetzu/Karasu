@@ -292,6 +292,8 @@ export const de: typeof en = {
     CONTAINS: "Enthält",
   },
   dashboard: {
+    heroKicker: "Beliebteste",
+    heroLabel: "Beliebteste Anime dieser Saison",
     birthdays: "Geburtstage heute",
     birthdayCharacter: "Lieblingscharakter",
     birthdayStaff: "Lieblings-Staff",

@@ -203,7 +203,17 @@ export default function Thread() {
     [likes],
   );
 
+  /**
+   * Which comment the box is open under, and which row a reply is parented to.
+   *
+   * They are not the same number. `replyTo` is the row that was pressed — it
+   * positions the box — while `replyRoot` is that row's top-level ancestor,
+   * which is what AniList must be given. Parenting to a *reply* creates a
+   * depth-2 comment that `flattenComments` never draws, so the post succeeds
+   * and disappears.
+   */
   const [replyTo, setReplyTo] = useState<number | null>(null);
+  const [replyRoot, setReplyRoot] = useState<number | null>(null);
   const [replyDraft, setReplyDraft] = useState("");
 
   const likeComment = (c: FlatComment) => {
@@ -227,9 +237,10 @@ export default function Thread() {
 
   const openReply = (c: FlatComment) => {
     setReplyTo((open) => (open === c.id ? null : c.id));
-    // Pre-filled with the mention, because a reply two levels deep renders
-    // beside its sibling rather than under it — naming who it answers is the
-    // only thing that keeps the thread readable.
+    setReplyRoot(c.rootId);
+    // Pre-filled with the mention. Every reply is parented to the top-level
+    // row, so an answer to a reply renders beside it rather than under it —
+    // naming who it answers is the only thing that keeps that readable.
     setReplyDraft(c.user?.name ? `@${c.user.name} ` : "");
   };
 
@@ -249,6 +260,7 @@ export default function Thread() {
     // Same non-optimistic rule as the top-level box below, for the same reason.
     onSuccess: () => {
       setReplyTo(null);
+      setReplyRoot(null);
       setReplyDraft("");
       // The reply lands inside its parent's `childComments`, so the page it is
       // on has to be re-read. Page 1 only — `refetch()` would re-read every
@@ -301,8 +313,8 @@ export default function Thread() {
       onSubmit={(e) => {
         e.preventDefault();
         const check = validatePost(replyDraft);
-        if (!check.ok || replyTo == null || replyMutation.isPending) return;
-        replyMutation.mutate({ text: check.text, parentId: replyTo });
+        if (!check.ok || replyRoot == null || replyMutation.isPending) return;
+        replyMutation.mutate({ text: check.text, parentId: replyRoot });
       }}
       className="mt-2 space-y-1.5"
     >

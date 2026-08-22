@@ -103,3 +103,42 @@ describe("flattenComments", () => {
     expect(flattenComments([node])).toHaveLength(2);
   });
 });
+
+describe("rootId", () => {
+  /**
+   * The bug this exists for: a reply parented to a *reply* becomes a depth-2
+   * comment, which the flatten folds into `hiddenReplies` and never renders.
+   * The post succeeds and disappears. Every row must therefore name the
+   * top-level comment it hangs off, not itself.
+   */
+  it("points every reply at its top-level comment", () => {
+    const flat = flattenComments([
+      {
+        id: 1,
+        comment: "top",
+        childComments: [
+          { id: 2, comment: "reply", childComments: [] },
+          { id: 3, comment: "another", childComments: [] },
+        ],
+      },
+    ]);
+    expect(flat.map((c) => [c.id, c.depth, c.rootId])).toEqual([
+      [1, 0, 1],
+      [2, 1, 1],
+      [3, 1, 1],
+    ]);
+  });
+
+  it("makes a top-level comment its own root", () => {
+    const flat = flattenComments([{ id: 9, comment: "alone" }]);
+    expect(flat[0].rootId).toBe(9);
+  });
+
+  /** A row that reached `normalize` by any other path is never parentless. */
+  it("never leaves rootId unset", () => {
+    const flat = flattenComments([
+      { id: 4, comment: "a", childComments: [{ id: 5, comment: "b" }] },
+    ]);
+    expect(flat.every((c) => typeof c.rootId === "number" && c.rootId > 0)).toBe(true);
+  });
+});

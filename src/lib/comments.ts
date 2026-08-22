@@ -33,6 +33,17 @@ export interface FlatComment {
   user: SocialUser | null;
   /** 0 for a top-level comment, 1 for a reply. Never deeper — see above. */
   depth: 0 | 1;
+  /**
+   * The top-level comment this row belongs to — itself, when `depth` is 0.
+   *
+   * **This is what a reply must be parented to.** AniList nests arbitrarily
+   * deep, but only two levels are rendered: a comment parented to a *reply*
+   * lands at depth 2, which `flattenComments` folds into `hiddenReplies` and
+   * never draws. Posting one therefore succeeds and then vanishes, with the
+   * only trace being a "N more on AniList" counter ticking up. Measured chains
+   * run 48 deep, so that is the ordinary case rather than an edge.
+   */
+  rootId: number;
   /** Replies that exist but sit below the depth cap. */
   hiddenReplies: number;
 }
@@ -93,6 +104,10 @@ function normalize(raw: unknown, depth: 0 | 1): FlatComment | null {
     siteUrl: typeof c.siteUrl === "string" ? c.siteUrl : "",
     user: asUser(c.user),
     depth,
+    // Overwritten by the caller, which is the only place that knows the row
+    // this one hangs off. Seeded to itself so a normalized row is never
+    // parentless, whatever path reaches it.
+    rootId: c.id,
     hiddenReplies: 0,
   };
 }
@@ -111,6 +126,7 @@ export function flattenComments(rows: unknown): FlatComment[] {
   for (const row of rows) {
     const top = normalize(row, 0);
     if (!top) continue;
+    top.rootId = top.id;
 
     const children = (row as RawComment)?.childComments;
     const kids = Array.isArray(children) ? children : [];
@@ -122,6 +138,8 @@ export function flattenComments(rows: unknown): FlatComment[] {
       if (!reply) continue;
       // Everything below this reply is beyond the cap; count it so the row can
       // say so instead of silently losing a conversation.
+      // Parented to the top-level row, not to `reply.id` — see `rootId`.
+      reply.rootId = top.id;
       reply.hiddenReplies = countDescendants((kid as RawComment)?.childComments);
       hidden += reply.hiddenReplies;
       direct.push(reply);

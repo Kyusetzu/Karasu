@@ -28,10 +28,13 @@ export function CommentTree({
   /** Omitted when there is nobody to like as — the button then does not exist. */
   onLike?: (c: FlatComment) => void;
   /**
-   * Opens a reply box under this comment. AniList nests arbitrarily deep but
-   * `lib/comments` renders two levels, so a reply to a *reply* is still
-   * parented to the reply — the API accepts it, and it lands where the second
-   * level already is rather than inventing a third that nothing would draw.
+   * Opens a reply box under this comment.
+   *
+   * This docstring used to claim that a reply to a reply "lands where the
+   * second level already is rather than inventing a third that nothing would
+   * draw". That was exactly backwards, and shipped: AniList accepted the
+   * depth-2 comment, `flattenComments` folded it into `hiddenReplies`, and the
+   * post vanished. The caller parents to `c.rootId`, never `c.id`.
    */
   onReply?: (c: FlatComment) => void;
   /** Which comment currently has the box open, if any. */

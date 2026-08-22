@@ -119,6 +119,64 @@ That is not a gap to close later. It is the design, and an Android entry that
 does not say so up front sets up the first feature request that cannot be
 granted.
 
+### The framework decision
+
+**Tauri 2, targeting Android.** Not React Native, not a rewrite.
+
+Tauri 2 ships Android support, and it is the only option that keeps the parts
+of Karasu that are actually expensive. The AniList layer, the rate limiter, the
+release-name parser, the fuzzy matcher, the relations redirects, SQLite through
+rusqlite and the offline queue are all Rust with no desktop assumptions in them
+— roughly the half of this codebase that took the longest to get right. React
+Native would mean porting every one of them to TypeScript or to a native module,
+and then maintaining two implementations of the matcher.
+
+What the choice costs, stated up front so it is not discovered later:
+
+- **The WebView is the renderer**, so performance is Android WebView's, not a
+  native toolkit's. The list is already virtualized, which is the part that
+  would hurt.
+- **`tauri-plugin-*` coverage is thinner on Android.** `single-instance`,
+  `global-shortcut` and the tray are desktop-only and simply do not apply;
+  `notification` and `opener` do work. The updater does not — distribution is
+  the Play Store or a sideloaded APK.
+- **The keyring crate does not cover Android.** Token storage needs a Keystore
+  implementation behind the same interface, and the rule it has to preserve is
+  the one that already governs the desktop: the token stays in Rust and never
+  reaches the WebView.
+- **Two build targets in CI**, and the Android one needs the NDK.
+
+### The first slice, in order
+
+Small, sequenced so each step is independently checkable. None of it is
+scheduled — this is what "first efforts" would actually mean.
+
+1. **Prove the shell.** `tauri android init`, get a debug APK onto a device
+   showing the existing UI. Nothing else. This is where WebView rendering,
+   build times and the NDK either become a problem or stop being a question.
+2. **Split the platform-only Rust behind cfg.** `library.rs`, the Win32
+   enumerator, SMTC/MPRIS, tray, hotkey, portable mode and the updater need
+   `#[cfg]` gates that leave a compiling Android build. The house rule applies:
+   a cfg'd **pair of functions**, never a cfg'd statement, or the arm nobody
+   compiles rots.
+3. **Token storage on Keystore**, behind the existing `auth.rs` interface.
+   Sign-in, sign-out and a rejected token have to behave exactly as they do
+   now — `sessionExpired` and the one banner are already the right shape.
+4. **A phone tier for the layout.** `minWidth: 940` goes; the 208px sidebar
+   becomes a bottom bar; `columns.ts` and `useRowTier` need a tier that is
+   honestly "one card per row"; every `group-hover` reveal needs a persistent
+   affordance; right-click becomes long-press. This is the largest single
+   piece and it is UI work, not plumbing.
+5. **Jellyfin as the only detection source.** It is plain HTTP and already
+   works. The now-playing card, the scrobbler and the correction flow can then
+   be exercised end to end without any of the platform detection.
+6. **Decide about `MediaSessionManager`** — see below. Until that is answered,
+   step 5 is the whole of detection.
+
+Deliberately *not* in the first slice: Wrapped (a canvas poster sized for a
+desktop screen), the local library scanner (scoped storage), Discord presence,
+and anything that assumes a keyboard.
+
 ### What would have to be decided first
 
 1. Whether the app is worth building *without* detection. If the answer is no,

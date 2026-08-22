@@ -26,6 +26,30 @@ GitHub complains about, so the script does. So before pushing `v1.0.0`:
 Commit subjects are the real record and are written to be read; this file is the
 short version, grouped by what it means for someone using the app.
 
+**How this file is maintained, decided after it drifted.** It is *not* updated
+per commit any more, and the `Unreleased` section below is deliberately behind —
+it stops around 0.138 while the tree is well past that. Keeping two records of
+the same work in step by hand is the kind of chore that gets skipped under
+pressure, and skipping it silently is worse than not doing it: a half-updated
+changelog reads as complete.
+
+It is kept rather than deleted for two concrete reasons:
+
+1. **`scripts/release/release-notes.ps1` throws without it.** No `## <version>`
+   section, or an empty one, and the tag build fails by design — a release
+   published with an empty body is not something GitHub complains about, so the
+   script does. The file is load-bearing at tag time whether or not it is
+   pleasant to maintain.
+2. **It is not the same artefact as the log.** Four hundred commit subjects
+   ordered by when they happened, several of them internal, is not what someone
+   deciding whether to update wants to read. This is grouped by what changed for
+   *them*.
+
+So the policy is: write the section **at tag time**, from `git log`, and curate
+it then. The subjects are written to be read precisely so that pass is quick,
+and doing it once with the whole release in view produces better grouping than
+183 lines accreted a commit at a time ever did.
+
 ## Unreleased
 
 ### Fixed

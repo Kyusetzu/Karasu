@@ -13,7 +13,7 @@ import {
 } from "@/api/types";
 import { asScoreFormat, formatScore, toRaw } from "@/lib/scoreFormat";
 import { affinity } from "@/lib/affinity";
-import { isBlocked } from "@/lib/contentFilter";
+import { isBlocked, shouldBlur } from "@/lib/contentFilter";
 import { useContentFilter } from "@/stores/contentFilter";
 import { useAuth, useScoreFormat } from "@/stores/auth";
 import { CoverCell, CoverMeta } from "@/components/media/CoverCell";
@@ -40,6 +40,9 @@ export function UserLists({ user }: { user: UserProfile }) {
   const viewer = useAuth((s) => s.viewer);
   const viewerFormat = useScoreFormat();
   const level = useContentFilter((s) => s.level);
+  // Someone else's list is still rendered under *this* user's filter, so the
+  // veil applies here exactly as it does to their own grid.
+  const blurAdult = useContentFilter((s) => s.blurAdult);
   const [type, setType] = useState<MediaType>("ANIME");
   const [status, setStatus] = useState<MediaListStatus>("CURRENT");
 
@@ -155,6 +158,9 @@ export function UserLists({ user }: { user: UserProfile }) {
                 key={e.mediaId}
                 to={`/media/${e.mediaId}`}
                 cover={e.media.coverImage.large}
+                adult={e.media.isAdult === true}
+                blurred={shouldBlur(e.media, level, blurAdult)}
+                revealLabel={displayTitle(e.media.title)}
                 score={e.score > 0 ? formatScore(theirFormat, e.score) : undefined}
                 progress={total ? { current: e.progress, total } : null}
               >

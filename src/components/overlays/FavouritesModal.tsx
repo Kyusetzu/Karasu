@@ -20,6 +20,7 @@ import { Avatar } from "@/components/ui/user-lockup";
 import { Shimmer } from "@/components/Skeleton";
 import { showToast } from "@/stores/toast";
 import { cn } from "@/lib/utils";
+import { useContentFilter } from "@/stores/contentFilter";
 
 /**
  * Reorder and remove favourites, one kind at a time.
@@ -43,6 +44,12 @@ interface Row {
   image: string | null;
   /** Cover-shaped art (media) versus a round disc (people). */
   cover: boolean;
+  /**
+   * Veil the thumbnail. Never used to *drop* a row: saving replaces the whole
+   * favourites set, so a row hidden from this list would be deleted from the
+   * account by the next reorder. Only the picture is hidden, never the entry.
+   */
+  adult: boolean;
 }
 
 function toRows(data: AllFavourites, kind: FavouriteKind): Row[] {
@@ -54,6 +61,7 @@ function toRows(data: AllFavourites, kind: FavouriteKind): Row[] {
         label: displayTitle(m.title),
         image: m.coverImage?.large ?? null,
         cover: true,
+        adult: m.isAdult === true,
       }));
     case "character":
     case "staff":
@@ -62,6 +70,7 @@ function toRows(data: AllFavourites, kind: FavouriteKind): Row[] {
         label: p.name.full ?? "—",
         image: p.image?.medium ?? null,
         cover: false,
+        adult: false,
       }));
     case "studio":
       return data.studios.map((s) => ({
@@ -69,6 +78,7 @@ function toRows(data: AllFavourites, kind: FavouriteKind): Row[] {
         label: s.name ?? "—",
         image: null,
         cover: false,
+        adult: false,
       }));
   }
 }
@@ -119,6 +129,11 @@ export function FavouritesModal({
     );
   }, [q.data]);
 
+  // `Row` has already discarded genres, so this is `shouldBlur` spelled out
+  // rather than called: with `isAdult` the only input it looks at, the level
+  // cannot change the answer. Filtering rows out is what must not happen here
+  // — see `Row.adult`.
+  const blurAdult = useContentFilter((s) => s.blurAdult);
   const rows = useMemo(() => drafts?.[kind] ?? [], [drafts, kind]);
   const dirty =
     baseline !== null &&
@@ -214,7 +229,15 @@ export function FavouritesModal({
                 {row.cover ? (
                   <div className="h-10 w-7 shrink-0 overflow-hidden rounded bg-surface-850">
                     {row.image && (
-                      <img src={row.image} alt="" loading="lazy" className="size-full object-cover" />
+                      <img
+                        src={row.image}
+                        alt=""
+                        loading="lazy"
+                        className={cn(
+                          "size-full object-cover",
+                          row.adult && blurAdult && "blur-[5px]",
+                        )}
+                      />
                     )}
                   </div>
                 ) : (

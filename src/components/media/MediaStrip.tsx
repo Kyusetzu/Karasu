@@ -1,7 +1,7 @@
 import { Link } from "react-router";
 import type { PersonMediaEdge } from "@/api/social";
 import { displayTitle } from "@/api/types";
-import { isBlocked } from "@/lib/contentFilter";
+import { isBlocked, shouldBlur } from "@/lib/contentFilter";
 import { useContentFilter } from "@/stores/contentFilter";
 import { staggerDelay } from "@/lib/motion";
 import { cn } from "@/lib/utils";
@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
  */
 export function MediaStrip({ edges }: { edges: PersonMediaEdge[] }) {
   const level = useContentFilter((s) => s.level);
+  const blurAdult = useContentFilter((s) => s.blurAdult);
   const visible = edges.filter((e) => e.node && !isBlocked(e.node, level));
   if (!visible.length) return null;
 
@@ -45,7 +46,10 @@ export function MediaStrip({ edges }: { edges: PersonMediaEdge[] }) {
                   alt=""
                   loading="lazy"
                   decoding="async"
-                  className="size-full object-cover transition-transform group-hover:scale-[1.03]"
+                  className={cn(
+                    "size-full object-cover transition-transform group-hover:scale-[1.03]",
+                    shouldBlur(e.node, level, blurAdult) && "blur-[6px]",
+                  )}
                 />
               )}
             </div>

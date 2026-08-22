@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/stores/auth";
 import { useContentFilter } from "@/stores/contentFilter";
-import { isBlocked } from "@/lib/contentFilter";
+import { isBlocked, shouldBlur } from "@/lib/contentFilter";
 import { fetchMediaList, flushQueue } from "@/api/anilist";
 import {
   displayTitle,
@@ -282,6 +282,10 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
   const { save, bulkSave, remove, bulkRemove } = useListMutations(userId, type);
 
   const level = useContentFilter((s) => s.level);
+  // Read here rather than in the row, because both row components are memoized
+  // and a store subscription inside one would re-render every card in the list
+  // whenever any part of that store moved. See `GridCard`'s `blurred`.
+  const blurAdult = useContentFilter((s) => s.blurAdult);
 
   // The content filter is applied here rather than further down, so every
   // consumer of byStatus — the tabs, the random pick, the tag union — is
@@ -855,6 +859,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
                 entry={entry}
                 focused={i === focus}
                 unit={unit}
+                blurred={shouldBlur(entry.media, level, blurAdult)}
                 onPlusOne={plusOne}
                 onComplete={complete}
                 onEdit={startEdit}
@@ -884,6 +889,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
                   entry={entry}
                   tier={tier}
                   focused={i === focus}
+                  blurred={shouldBlur(entry.media, level, blurAdult)}
                   onQuickSave={quickSave}
                   onComplete={complete}
                   onEdit={startEdit}

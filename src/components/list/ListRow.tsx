@@ -49,6 +49,7 @@ const CELL =
 export const ListRow = memo(function ListRow({
   entry,
   tier,
+  blurred,
   onQuickSave,
   onComplete,
   onEdit,
@@ -59,6 +60,8 @@ export const ListRow = memo(function ListRow({
 }: {
   entry: MediaListEntry;
   tier: Tier;
+  /** Computed by the page — see `GridCard` for why it is not read here. */
+  blurred: boolean;
   onQuickSave: (entry: MediaListEntry, patch: RowPatch) => void;
   onComplete: (entry: MediaListEntry) => void;
   onEdit: (entry: MediaListEntry) => void;
@@ -169,11 +172,21 @@ export const ListRow = memo(function ListRow({
         onClick={(e) => selectMode && e.preventDefault()}
         tabIndex={selectMode ? -1 : undefined}
       >
+        {/* No reveal control here, unlike the grid, and that is a decision
+            rather than an omission: this thumbnail is ~2rem wide, the title is
+            spelled out beside it, and the row's whole job is to be clicked
+            through to the detail page — where the same artwork has a "Show"
+            button. A reveal affordance at this size would have to sit on top of
+            the link it replaces, so the row would gain a click target that
+            means something different from the rest of the row. */}
         <img
           src={media.coverImage.large ?? ""}
           alt=""
           loading="lazy"
-          className="aspect-[2/3] w-full rounded-md bg-surface-800 object-cover"
+          className={cn(
+            "aspect-[2/3] w-full rounded-md bg-surface-800 object-cover",
+            blurred && "blur-[6px]",
+          )}
         />
       </Link>
 

@@ -7,7 +7,7 @@ import { currentSeason, seasonHero, type HeroMedia } from "@/api/queries";
 import { displayTitle } from "@/api/types";
 import { DecodedImage } from "@/components/media/DecodedImage";
 import { Shimmer } from "@/components/Skeleton";
-import { adultQueryArg, isBlocked } from "@/lib/contentFilter";
+import { adultQueryArg, isBlocked, shouldBlur } from "@/lib/contentFilter";
 import { useContentFilter } from "@/stores/contentFilter";
 import { formatLabel } from "@/lib/format";
 import { prefersReducedMotion } from "@/lib/motion";
@@ -34,6 +34,7 @@ export default function SeasonHero() {
   const { t } = useTranslation();
   const [{ season, year }] = useState(currentSeason);
   const level = useContentFilter((s) => s.level);
+  const blurAdult = useContentFilter((s) => s.blurAdult);
   const filterReady = useContentFilter((s) => s.ready);
 
   const { data, isLoading } = useQuery({
@@ -80,7 +81,12 @@ export default function SeasonHero() {
             swapped: swapping unmounts the decoded image, so each rotation would
             re-decode and flash. The inactive ones are inert to the pointer. */}
         {items.map((m, i) => (
-          <Slide key={m.id} media={m} active={i === at} />
+          <Slide
+            key={m.id}
+            media={m}
+            active={i === at}
+            veiled={shouldBlur(m, level, blurAdult)}
+          />
         ))}
 
         {/* Over the art, under the text. `from-surface-950` matches the page,
@@ -142,7 +148,16 @@ export default function SeasonHero() {
  * dimmed and treated as a backdrop rather than as the picture — the same trick
  * `AnimeDetail` uses when a title has no banner.
  */
-function Slide({ media, active }: { media: HeroMedia; active: boolean }) {
+function Slide({
+  media,
+  active,
+  veiled,
+}: {
+  media: HeroMedia;
+  active: boolean;
+  /** Computed by the carousel, which already holds both store values. */
+  veiled: boolean;
+}) {
   const banner = media.bannerImage;
   const fallback = media.coverImage.extraLarge ?? media.coverImage.large;
   return (
@@ -160,7 +175,11 @@ function Slide({ media, active }: { media: HeroMedia; active: boolean }) {
           src={banner ?? fallback ?? undefined}
           className={cn(
             "h-full w-full object-cover",
+            // The fallback is already a blurred backdrop, so only a real
+            // banner needs veiling — but a veiled one goes further than the
+            // backdrop blur, since here it is the picture rather than a wash.
             !banner && "scale-110 blur-lg",
+            veiled && banner && "scale-110 blur-2xl",
           )}
           loadedOpacity={banner ? 1 : 0.55}
         />

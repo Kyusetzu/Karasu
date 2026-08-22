@@ -1412,7 +1412,7 @@ export const en = {
       "That setting was not saved ({{message}}), so it has been put back.",
     blurAdult: "Blur explicit artwork",
     blurAdultHint:
-      "Covers are blurred until you click them. Only affects titles the filter above lets through.",
+      "Artwork is blurred everywhere it appears. Grid covers and the detail page have a Show button; small thumbnails stay blurred. Only affects titles the filter above lets through.",
     blurReveal: "Show",
     contentNote:
       "Applies everywhere, including your own list. Scrobbling and playback keep working for hidden titles you already track.",

@@ -65,7 +65,7 @@ import { useAuth } from "@/stores/auth";
 import { useCachedEntry } from "@/hooks/useCachedEntry";
 import { useLibrary } from "@/stores/library";
 import { useContentFilter } from "@/stores/contentFilter";
-import { isBlocked } from "@/lib/contentFilter";
+import { isBlocked, shouldBlur } from "@/lib/contentFilter";
 import BackButton from "@/components/shell/BackButton";
 import { DetailSkeleton, Shimmer } from "@/components/Skeleton";
 import { cn } from "@/lib/utils";
@@ -95,6 +95,7 @@ export default function AnimeDetail() {
   const episodes = useLibrary((s) => s.episodes[mediaId]);
   const play = useLibrary((s) => s.play);
   const level = useContentFilter((s) => s.level);
+  const blurAdult = useContentFilter((s) => s.blurAdult);
   const profileMode = useAuth((s) => s.mode);
   // The raw hexes, not the `var()`: `readableInk` needs a colour it can
   // measure, and a CSS variable is opaque to it.
@@ -180,6 +181,19 @@ export default function AnimeDetail() {
 
   const coverSrc = data.coverImage.extraLarge ?? data.coverImage.large ?? "";
 
+  /**
+   * The banner and the cover, veiled together and revealed together.
+   *
+   * Sharing `revealed` with the filter gate above is the point: someone who
+   * has already pressed "Show anyway" to reach a blocked title has answered
+   * this question, and asking it again on the same screen would be the app not
+   * listening. One flag, one press, both images.
+   *
+   * The no-banner fallback is left alone — it is the cover at `blur-2xl` and
+   * 40% opacity already, which is a wash of colour rather than an image.
+   */
+  const veiled = shouldBlur(data, level, blurAdult) && !revealed;
+
   const studioEdges = data.studios?.edges ?? [];
   const mainStudios = studioEdges.filter((e) => e.isMain).map((e) => e.node);
   const producers = studioEdges.filter((e) => !e.isMain).map((e) => e.node);
@@ -205,7 +219,10 @@ export default function AnimeDetail() {
         {data.bannerImage ? (
           <DecodedImage
             src={data.bannerImage}
-            className="h-full w-full object-cover"
+            className={cn(
+              "h-full w-full object-cover",
+              veiled && "scale-110 blur-2xl",
+            )}
           />
         ) : (
           coverSrc && (
@@ -228,12 +245,28 @@ export default function AnimeDetail() {
           {/* The incoming half of the cover-to-hero morph. Unconditional here
               because this page shows exactly one cover, so the name is unique
               by construction — the grid side has to be applied per click. */}
-          <img
-            src={coverSrc}
-            alt=""
-            style={{ viewTransitionName: "karasu-hero" }}
-            className="h-57 w-38 shrink-0 rounded-[.625rem] border border-surface-700 object-cover shadow-[0_1.25rem_2.5rem_rgba(0,0,0,.65)]"
-          />
+          <div className="relative h-57 w-38 shrink-0">
+            <img
+              src={coverSrc}
+              alt=""
+              style={{ viewTransitionName: "karasu-hero" }}
+              className={cn(
+                "h-57 w-38 rounded-[.625rem] border border-surface-700 object-cover shadow-[0_1.25rem_2.5rem_rgba(0,0,0,.65)]",
+                veiled && "blur-xl",
+              )}
+            />
+            {veiled && (
+              <button
+                onClick={() => setRevealed(true)}
+                aria-label={title}
+                className="absolute inset-0 grid place-items-center rounded-[.625rem] bg-surface-950/45 text-2xs font-semibold text-ink-200 transition hover:bg-surface-950/30"
+              >
+                <span className="rounded-full bg-surface-900/90 px-2.5 py-1">
+                  {t("settings.blurReveal")}
+                </span>
+              </button>
+            )}
+          </div>
           <div className="min-w-0 flex-1 pt-16">
             <h1 className="text-[1.625rem] font-bold leading-tight text-ink-100">
               {title}

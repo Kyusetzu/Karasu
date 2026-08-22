@@ -113,4 +113,24 @@ describe("shouldBlur", () => {
     expect(shouldBlur(undefined, "off", true)).toBe(false);
     expect(shouldBlur({}, "off", true)).toBe(false);
   });
+
+  /**
+   * The two levels the suite never asked about, and the reason the last line
+   * of `shouldBlur` is not the tautology it looks like.
+   *
+   * At moderate and strict an adult title is excluded server-side and never
+   * reaches a render site — so this is unreachable in practice. It still has to
+   * answer *veil* rather than *bare*, because the one way it becomes reachable
+   * is a render site that forgot `isBlocked`, and failing open there would show
+   * the artwork to precisely the person who set the filter to strict.
+   */
+  it("still veils at moderate and strict, where it should never be asked", () => {
+    expect(shouldBlur(adult, "moderate", true)).toBe(true);
+    expect(shouldBlur(adult, "strict", true)).toBe(true);
+  });
+
+  it("respects the setting at every level, not just off", () => {
+    expect(shouldBlur(adult, "moderate", false)).toBe(false);
+    expect(shouldBlur(adult, "strict", false)).toBe(false);
+  });
 });

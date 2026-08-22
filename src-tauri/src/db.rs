@@ -329,6 +329,35 @@ DELETE FROM offline_queue WHERE user_id IS NULL;
 PRAGMA user_version = 16;
 ";
 
+/// Schema v17: `blur_adult` defaults on for new installs only.
+///
+/// The setting arrived defaulting to on for everyone, and `get_blur_adult`
+/// reads absence as on — so an existing user who had never opened the setting
+/// would have their covers blurred by an update they did not ask for. Turning
+/// it on for people choosing their settings for the first time is the wanted
+/// behaviour; changing it under people who already had a working screen is not.
+///
+/// Absence of the key cannot tell those two populations apart, so the answer is
+/// written down once, here, while the difference is still observable: **an
+/// empty `kv` table means nothing has ever been stored, which only happens on a
+/// database being created right now.** Every migration below runs before any
+/// setting is written, so on a fresh install this sees an empty table.
+///
+/// The imprecision, stated rather than hidden: a long-standing install that
+/// never signed in and never changed a single setting also has an empty `kv`,
+/// and is read as new. That user gets the blur on — the same answer a new
+/// install gets, for someone who has expressed no preference either way.
+///
+/// `WHERE NOT EXISTS` on the key itself keeps the step re-runnable, which the
+/// `ALTER TABLE` steps above cannot be, and means an explicit choice already
+/// made is never overwritten.
+const MIGRATION_V17: &str = "
+INSERT INTO kv (key, value)
+SELECT 'blur_adult', CASE WHEN EXISTS (SELECT 1 FROM kv) THEN '0' ELSE '1' END
+WHERE NOT EXISTS (SELECT 1 FROM kv WHERE key = 'blur_adult');
+PRAGMA user_version = 17;
+";
+
 /// One detection correction: what was detected, and what it really is.
 ///
 /// A struct rather than the tuple this started as, because the row grew a
@@ -573,6 +602,11 @@ impl Db {
             } else {
                 apply(&conn, 16, MIGRATION_V16)?;
             }
+        }
+        if version < 17 {
+            // Re-runnable on its own terms, so no `has_column` guard: it is an
+            // INSERT guarded on the key it inserts.
+            apply(&conn, 17, MIGRATION_V17)?;
         }
         Ok(Db(Mutex::new(conn)))
     }
@@ -1440,7 +1474,40 @@ mod tests {
         conn.execute_batch(MIGRATION_V14).unwrap();
         conn.execute_batch(MIGRATION_V15).unwrap();
         conn.execute_batch(MIGRATION_V16).unwrap();
+        conn.execute_batch(MIGRATION_V17).unwrap();
         Db(Mutex::new(conn))
+    }
+
+    /// v17 has to tell two populations apart that the key itself cannot.
+    #[test]
+    fn v17_blurs_by_default_only_where_nothing_was_ever_stored() {
+        // A database being created right now: kv is empty when v17 runs, so
+        // the person choosing settings for the first time gets the blur on.
+        let fresh = mem_db();
+        assert_eq!(fresh.kv_get("blur_adult").as_deref(), Some("1"));
+
+        // A database that has been in use: something is already stored, so the
+        // screen the user already had does not change under them on an update.
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(MIGRATIONS).unwrap();
+        conn.execute_batch("INSERT INTO kv (key, value) VALUES ('theme', 'karasu');")
+            .unwrap();
+        conn.execute_batch(MIGRATION_V17).unwrap();
+        let existing = Db(Mutex::new(conn));
+        assert_eq!(existing.kv_get("blur_adult").as_deref(), Some("0"));
+    }
+
+    /// Re-runnable, and — more to the point — it never argues with a choice.
+    #[test]
+    fn v17_leaves_an_explicit_choice_alone() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(MIGRATIONS).unwrap();
+        conn.execute_batch("INSERT INTO kv (key, value) VALUES ('blur_adult', '0');")
+            .unwrap();
+        conn.execute_batch(MIGRATION_V17).unwrap();
+        conn.execute_batch(MIGRATION_V17).unwrap();
+        let db = Db(Mutex::new(conn));
+        assert_eq!(db.kv_get("blur_adult").as_deref(), Some("0"));
     }
 
     /// The offset is what makes a correction able to say *which episode*, not
@@ -1671,7 +1738,7 @@ mod tests {
         let version: i64 = conn
             .query_row("PRAGMA user_version", [], |r| r.get(0))
             .unwrap();
-        assert_eq!(version, 16, "and must end up fully migrated");
+        assert_eq!(version, 17, "and must end up fully migrated");
         drop(conn);
 
         // v13, v14 and v15 are the other `ALTER TABLE ADD COLUMN` steps, so
@@ -1697,7 +1764,7 @@ mod tests {
             let version: i64 = conn
                 .query_row("PRAGMA user_version", [], |r| r.get(0))
                 .unwrap();
-            assert_eq!(version, 16);
+            assert_eq!(version, 17);
         }
 
         let _ = std::fs::remove_dir_all(&dir);

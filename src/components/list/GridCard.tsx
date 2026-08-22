@@ -2,7 +2,7 @@ import { memo } from "react";
 import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
 import { CheckCheck, Pencil, Plus } from "lucide-react";
-import { maxProgress, type MediaListEntry } from "@/api/types";
+import { displayTitle, maxProgress, type MediaListEntry } from "@/api/types";
 import { formatScore } from "@/lib/scoreFormat";
 import { useScoreFormat } from "@/stores/auth";
 import { IconButton } from "@/components/ui/icon-button";
@@ -21,6 +21,7 @@ import { canIncrement } from "./shared";
 export const GridCard = memo(function GridCard({
   entry,
   unit,
+  blurred,
   onPlusOne,
   onComplete,
   onEdit,
@@ -31,6 +32,15 @@ export const GridCard = memo(function GridCard({
 }: {
   entry: MediaListEntry;
   unit: string;
+  /**
+   * Computed by the page, not read from the store here.
+   *
+   * This component is memoized because a few hundred of these re-render on
+   * every keystroke, and a `useContentFilter` subscription inside it would
+   * re-render all of them whenever any part of that store moved. A boolean
+   * prop compares shallowly and costs nothing.
+   */
+  blurred: boolean;
   onPlusOne: (entry: MediaListEntry) => void;
   onComplete: (entry: MediaListEntry) => void;
   onEdit: (entry: MediaListEntry) => void;
@@ -47,6 +57,11 @@ export const GridCard = memo(function GridCard({
     <CoverCell
       to={`/media/${media.id}`}
       cover={media.coverImage.large}
+      // The badge shows through the veil, so a blurred cell reads as "18+,
+      // hidden" rather than as artwork that failed to load.
+      adult={media.isAdult === true}
+      blurred={blurred}
+      revealLabel={displayTitle(media.title)}
       // Every card in this grid is on the list by definition, so the ring is
       // never absent here — unlike a discovery grid, where its absence is the
       // useful signal. It is what makes a status legible without reading the

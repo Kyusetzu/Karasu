@@ -7,11 +7,11 @@ import { fetchMediaList, isTauri } from "@/api/anilist";
 import { favouriteBirthdays } from "@/api/social";
 import { birthdaysOn } from "@/lib/birthdays";
 import { Avatar } from "@/components/ui/user-lockup";
-import type { MediaListEntry } from "@/api/types";
+import { displayTitle, type MediaListEntry } from "@/api/types";
 import { useAuth, useScoreFormat } from "@/stores/auth";
 import { formatMeanScore, formatScore } from "@/lib/scoreFormat";
 import { useContentFilter } from "@/stores/contentFilter";
-import { isBlocked } from "@/lib/contentFilter";
+import { isBlocked, shouldBlur } from "@/lib/contentFilter";
 import { useListMutations } from "@/hooks/useListMutations";
 import { fromList } from "@/lib/calendar";
 import { SectionHeader } from "@/components/ui/section-header";
@@ -191,6 +191,9 @@ function ContinueWatching({
   save: ReturnType<typeof useListMutations>["save"];
 }) {
   const { t } = useTranslation();
+  // Read here, not in the memoized card — see `GridCard`'s `blurred`.
+  const level = useContentFilter((s) => s.level);
+  const blurAdult = useContentFilter((s) => s.blurAdult);
   const watching = useMemo(
     () =>
       entries
@@ -225,7 +228,12 @@ function ContinueWatching({
       ) : (
         <div className="media-grid mt-4 gap-x-4 gap-y-5">
           {watching.map((entry) => (
-            <ContinueCard key={entry.id} entry={entry} onPlusOne={plusOne} />
+            <ContinueCard
+              key={entry.id}
+              entry={entry}
+              onPlusOne={plusOne}
+              blurred={shouldBlur(entry.media, level, blurAdult)}
+            />
           ))}
         </div>
       )}
@@ -459,9 +467,12 @@ function Stats({ entries }: { entries: MediaListEntry[] }) {
 const ContinueCard = memo(function ContinueCard({
   entry,
   onPlusOne,
+  blurred,
 }: {
   entry: MediaListEntry;
   onPlusOne: (entry: MediaListEntry) => void;
+  /** Computed by the parent — see `GridCard` for why it is not read here. */
+  blurred: boolean;
 }) {
   const { t } = useTranslation();
   const scoreFormat = useScoreFormat();
@@ -472,6 +483,9 @@ const ContinueCard = memo(function ContinueCard({
     <CoverCell
       to={`/media/${media.id}`}
       cover={media.coverImage.large}
+      adult={media.isAdult === true}
+      blurred={blurred}
+      revealLabel={displayTitle(media.title)}
       score={entry.score > 0 ? formatScore(scoreFormat, entry.score) : null}
       progress={
         media.episodes

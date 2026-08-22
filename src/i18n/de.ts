@@ -1424,7 +1424,7 @@ export const de: typeof en = {
       "Diese Einstellung wurde nicht gespeichert ({{message}}) und daher zurückgesetzt.",
     blurAdult: "Explizite Bilder unkenntlich machen",
     blurAdultHint:
-      "Cover werden verwischt, bis du sie anklickst. Betrifft nur Titel, die der Filter oben durchlässt.",
+      "Bilder werden überall unkenntlich gemacht. Cover im Raster und die Detailseite haben einen Anzeigen-Knopf, kleine Vorschaubilder bleiben verwischt. Betrifft nur Titel, die der Filter oben durchlässt.",
     blurReveal: "Anzeigen",
     contentNote:
       "Gilt überall, auch für deine eigene Liste. Tracking und Wiedergabe funktionieren für ausgeblendete Titel weiterhin.",

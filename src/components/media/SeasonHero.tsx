@@ -69,14 +69,14 @@ export default function SeasonHero() {
   // Nothing is a better hero than a broken one — no skeleton once it is known
   // there is nothing to show, so the Overview simply starts at its first
   // section as it always did.
-  if (isLoading) return <Shimmer className="h-56 w-full rounded-2xl" />;
+  if (isLoading) return <Shimmer className="h-72 w-full rounded-2xl" />;
   if (items.length === 0) return null;
 
   const current = items[Math.min(at, items.length - 1)];
 
   return (
     <section aria-label={t("dashboard.heroLabel")} className="relative">
-      <div className="relative h-56 overflow-hidden rounded-2xl bg-surface-900">
+      <div className="relative h-72 overflow-hidden rounded-2xl bg-surface-900">
         {/* Every slide is mounted and cross-faded by opacity rather than
             swapped: swapping unmounts the decoded image, so each rotation would
             re-decode and flash. The inactive ones are inert to the pointer. */}

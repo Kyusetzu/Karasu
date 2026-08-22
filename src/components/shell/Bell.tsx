@@ -207,14 +207,18 @@ export default function Bell() {
 
   const anilist = mode === "anilist";
 
-  // One scalar off the viewer, spent when the panel opens — this is what the
-  // AniList segment's chip shows. No background polling by design: the count
-  // is as fresh as the last open, which is the only moment it is looked at.
+  // One scalar off the viewer. It used to be gated on `open`, which meant it
+  // could never feed the always-visible badge — so an account with twelve
+  // AniList notifications and no Karasu ones showed no badge at all, and
+  // opening the bell landed on an empty tab. One request at startup and a
+  // 5-minute staleness is what a visible badge costs; still no polling loop,
+  // and the mark-seen reset below keeps zeroing it the moment the feed is
+  // actually read.
   const count = useQuery({
     queryKey: ["social", "notifCount"],
     queryFn: siteNotifCount,
-    enabled: isTauri && open && anilist,
-    staleTime: 60_000,
+    enabled: isTauri && anilist,
+    staleTime: 5 * 60_000,
   });
 
   // The feed itself costs a request only when the AniList view is chosen —
@@ -262,6 +266,20 @@ export default function Bell() {
 
   const unread = items.filter((n) => !n.read).length;
 
+  // When the panel opens onto a tab with nothing unread while the AniList
+  // side has news, start there — the alternative is a blank panel above a
+  // badge that promised something. Rising edge only: a manual tab choice
+  // while the panel is open is the user's and stays theirs, and the count
+  // being zeroed by mark-seen must not bounce the view around.
+  const wasOpen = useRef(false);
+  useEffect(() => {
+    const rising = open && !wasOpen.current;
+    wasOpen.current = open;
+    if (!rising || !anilist) return;
+    if (items.some((n) => !n.read)) return;
+    if ((count.data ?? 0) > 0) setView("site");
+  }, [open, anilist, items, count.data]);
+
   const readOne = async (n: AppNotification) => {
     if (n.read) return;
     await markNotificationRead(n.id).catch(() => {});
@@ -281,7 +299,12 @@ export default function Bell() {
   ];
 
   const siteRows = (site.data?.pages ?? []).flatMap((p) => p.rows);
-  const siteUnread = count.data ?? 0;
+  const siteUnread = anilist ? (count.data ?? 0) : 0;
+
+  // Both sides of the story on one badge: Karasu's own unread rows plus
+  // AniList's server-side count. Either alone lied by omission — the reported
+  // case was twelve AniList notifications behind a silent bell.
+  const badge = unread + siteUnread;
 
   // `view` is plain state nothing resets on sign-out, and the Segmented — its
   // only writer — hides outside anilist mode. Rendering from the raw state
@@ -317,14 +340,14 @@ export default function Bell() {
         title={t("notif.title")}
       >
         <BellIcon className="size-3.75" />
-        {unread > 0 && (
+        {badge > 0 && (
           // The `s950` ring is what separates the badge from the bell glyph
           // beneath it — without it the two silhouettes merge at this size.
           // Breathes while there is something unread. The count is small and
           // sits in the corner of a quiet titlebar, so a badge that merely
           // appears is easy to walk past; this stops the moment it is read.
           <span className="animate-idle-pulse absolute right-1.5 top-1.5 grid h-3.25 min-w-3.25 place-items-center rounded-[.4375rem] border border-surface-950 bg-accent-500 px-1 text-[.5625rem] font-semibold text-accent-ink">
-            {unread > 9 ? "9+" : unread}
+            {badge > 9 ? "9+" : badge}
           </span>
         )}
       </button>

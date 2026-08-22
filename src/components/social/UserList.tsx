@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useInfiniteQuery, type QueryKey } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { isTauri } from "@/api/anilist";
@@ -30,11 +31,26 @@ import { UserRow } from "./UserRow";
  *   far end, so a user who loaded six pages scrolls back up to find pages one
  *   and two gone from the list they are reading.
  */
+/**
+ * The three states a paginated list gets wrong if it renders them naively.
+ *
+ * 1. **An empty first page with `hasNextPage: true` was a dead end.** Returning
+ *    only the empty state means the "Load more" button never renders, so page 2
+ *    is unreachable forever — and AniList does serve empty pages with more
+ *    behind them. A second, client-side mechanism producing exactly the "my
+ *    subscribed threads are empty" symptom.
+ * 2. **An error threw away every loaded page.** A failure on page 4 replaced
+ *    pages 1–3 — on screen, correct, and being read — with one line of red
+ *    text. The bare error is now only for having nothing at all to show.
+ * 3. **`EmptyState` takes `actions` and neither list forwarded it**, so an empty
+ *    list could not offer the one thing that would fix it.
+ */
 export function UserList({
   queryKey,
   fetchPage,
   emptyTitle,
   emptyHint,
+  emptyActions,
   staleTime = 30 * 60 * 1000,
   enabled = true,
   countRemaining = true,
@@ -43,6 +59,8 @@ export function UserList({
   fetchPage: (page: number) => Promise<UserPage>;
   emptyTitle: string;
   emptyHint?: string;
+  /** Offered when the list is empty — `EmptyState` has always taken these. */
+  emptyActions?: ReactNode;
   staleTime?: number;
   enabled?: boolean;
   /**
@@ -84,17 +102,14 @@ export function UserList({
     );
   }
 
-  if (q.error) {
+  const users = (q.data?.pages ?? []).flatMap((p) => p.users);
+  // Only when there is nothing on screen to lose. See the note above.
+  if (q.error && !users.length && !q.hasNextPage) {
     return (
       <p className="text-sm text-danger">
         {t("common.error", { message: String(q.error) })}
       </p>
     );
-  }
-
-  const users = (q.data?.pages ?? []).flatMap((p) => p.users);
-  if (!users.length) {
-    return <EmptyState visual={<PerchRule />} title={emptyTitle} hint={emptyHint} />;
   }
 
   // Counted from what was *fetched*, so the label never promises rows a further
@@ -110,21 +125,15 @@ export function UserList({
     fetchedCount(pages),
   );
 
-  return (
-    <div className="space-y-2">
-      {users.map((u, i) => (
-        <div
-          key={u.id}
-          className="animate-rise-in"
-          // Cycles every six, so the fiftieth row does not wait two seconds —
-          // and goes to zero under reduced motion rather than becoming a
-          // staggered wait.
-          style={{ animationDelay: `${staggerDelay(i)}ms` }}
-        >
-          <UserRow user={u} />
-        </div>
-      ))}
-
+  // Shared by the empty and populated returns: both need the button, and the
+  // empty one needing it is the whole of point 1 above.
+  const footer = (
+    <>
+      {q.error && (
+        <p className="pt-1 text-2xs text-danger">
+          {t("common.error", { message: String(q.error) })}
+        </p>
+      )}
       {q.hasNextPage && (
         <div className="pt-1">
           <Button
@@ -141,6 +150,39 @@ export function UserList({
           </Button>
         </div>
       )}
+    </>
+  );
+
+  if (!users.length) {
+    return (
+      <>
+        <EmptyState
+          visual={<PerchRule />}
+          title={emptyTitle}
+          hint={emptyHint}
+          actions={emptyActions}
+        />
+        {footer}
+      </>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {users.map((u, i) => (
+        <div
+          key={u.id}
+          className="animate-rise-in"
+          // Cycles every six, so the fiftieth row does not wait two seconds —
+          // and goes to zero under reduced motion rather than becoming a
+          // staggered wait.
+          style={{ animationDelay: `${staggerDelay(i)}ms` }}
+        >
+          <UserRow user={u} />
+        </div>
+      ))}
+
+      {footer}
     </div>
   );
 }

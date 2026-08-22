@@ -62,6 +62,7 @@ import {
   type MediaType,
 } from "@/api/types";
 import { useAuth } from "@/stores/auth";
+import { useCachedEntry } from "@/hooks/useCachedEntry";
 import { useLibrary } from "@/stores/library";
 import { useContentFilter } from "@/stores/contentFilter";
 import { isBlocked } from "@/lib/contentFilter";
@@ -94,6 +95,7 @@ export default function AnimeDetail() {
   const episodes = useLibrary((s) => s.episodes[mediaId]);
   const play = useLibrary((s) => s.play);
   const level = useContentFilter((s) => s.level);
+  const profileMode = useAuth((s) => s.mode);
   // The raw hexes, not the `var()`: `readableInk` needs a colour it can
   // measure, and a CSS variable is opaque to it.
   const statusColors = useTheme((st) => st.statusColors);
@@ -104,6 +106,33 @@ export default function AnimeDetail() {
     queryFn: () => animeDetail(mediaId),
     enabled: isTauri && Number.isFinite(mediaId),
   });
+  /**
+   * The local list's entry, for the account-free profile.
+   *
+   * `mediaListEntry` rides `DETAIL_QUERY`, but in local mode `anilist_query`
+   * sends no token and AniList has never heard of the local list — so it is
+   * null for every title, including ones being actively tracked. Reading the
+   * cached local list is what makes the pill true and, far more importantly,
+   * what stops `ListEditor` seeding PLANNING/0/0 over a real entry.
+   *
+   * Above the early returns because it is a hook. `useCachedEntry` no-ops in
+   * AniList mode, where `mediaListEntry` is authoritative.
+   */
+  /**
+   * The local list's entry, for the account-free profile.
+   *
+   * `mediaListEntry` rides `DETAIL_QUERY`, but in local mode `anilist_query`
+   * sends no token and AniList has never heard of the local list — so it comes
+   * back null for every title, including ones being actively tracked. Reading
+   * the cached local list is what makes the pill below true and, far more
+   * importantly, what stops `ListEditor` seeding PLANNING/0/0 over a real entry
+   * the moment Save is pressed.
+   *
+   * `useCachedEntry` no-ops in AniList mode, where `mediaListEntry` is
+   * authoritative. The local list is keyed on user 0, the `?? 0` convention
+   * every list screen uses.
+   */
+  const cachedEntry = useCachedEntry(0, data?.type, mediaId);
 
   // A skeleton at the hero's real proportions rather than a line of text:
   // the text sat at the top-left and then the whole page arrived underneath
@@ -137,7 +166,10 @@ export default function AnimeDetail() {
 
   // The list entry, for the badge under the title. `mediaListEntry` rides on
   // `DETAIL_QUERY`, so this costs nothing beyond what the page already fetched.
-  const entry = data.mediaListEntry;
+  const entry = data.mediaListEntry ?? cachedEntry;
+  // Local mode only: the pill must not claim "not on your list" before the
+  // local list has been read. See `useCachedEntry`'s null-vs-undefined note.
+  const localPending = profileMode === "local" && cachedEntry === undefined;
   const total = data.type === "MANGA" ? data.chapters : data.episodes;
   const progressLabel =
     entry && entry.progress > 0
@@ -243,9 +275,14 @@ export default function AnimeDetail() {
                   {progressLabel && <span className="opacity-80">{progressLabel}</span>}
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-surface-700 px-2.5 py-0.5 text-2xs text-ink-500">
-                  {t("detail.notOnList")}
-                </span>
+                // `undefined` from `useCachedEntry` means "not loaded yet" and
+                // "not on the list" alike, so in local mode the honest thing
+                // before it resolves is to say nothing rather than the second.
+                localPending ? null : (
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-surface-700 px-2.5 py-0.5 text-2xs text-ink-500">
+                    {t("detail.notOnList")}
+                  </span>
+                )
               )}
             </p>
             <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[.8125rem] text-ink-300">
@@ -382,7 +419,7 @@ export default function AnimeDetail() {
               media={data}
               mediaType={data.type}
               max={maxProgress(data)}
-              entry={data.mediaListEntry}
+              entry={entry ?? null}
             />
 
             {data.description && (

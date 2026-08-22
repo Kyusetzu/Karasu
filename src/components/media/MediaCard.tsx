@@ -10,6 +10,7 @@ import { saveListEntry } from "@/api/anilist";
 
 import { formatLabel } from "@/lib/format";
 import { statusColorVar } from "@/lib/statusColors";
+import { useCachedEntry } from "@/hooks/useCachedEntry";
 import { shouldBlur } from "@/lib/contentFilter";
 import { useContentFilter } from "@/stores/contentFilter";
 import type { MediaWithListStatus } from "@/api/queries";
@@ -55,7 +56,18 @@ export default function MediaCard({
     },
   });
 
-  const entry = media.mediaListEntry;
+  /**
+   * The list entry, from AniList or — in the account-free profile — from the
+   * local list.
+   *
+   * `mediaListEntry` is null for *every* title in local mode: `anilist_query`
+   * sends no token there and AniList has never heard of the local list. Without
+   * the fallback this card offered "add to Planning" for a title already being
+   * watched, and handed `EntryEditModal` a null that it seeded PLANNING/0/0
+   * from — which `local_save_entry` then wrote over the real entry.
+   */
+  const cached = useCachedEntry(0, media.type, media.id);
+  const entry = media.mediaListEntry ?? cached ?? null;
   const level = useContentFilter((s) => s.level);
   const blurAdult = useContentFilter((s) => s.blurAdult);
 

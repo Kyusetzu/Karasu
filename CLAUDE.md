@@ -480,7 +480,13 @@ import it.
   userId:)` are different resolvers.** The root field returned **1** comment for
   a user in thread 1; the `Page` field returned **144**, because it includes
   their nested replies and the root field does not. Unbounded
-  `ThreadComment(threadId:)` with no other filter answers **HTTP 500**.
+  `ThreadComment(threadId:)` with no other filter answers **HTTP 500** — but
+  `Page.threadComments(userId:)` with **no `threadId` works**, resolves
+  `thread { id title }` per row, reports an honest `total`, and — unlike every
+  `threadId` call — **actually honours `sort: [ID_DESC]`** (ids measured
+  reversed against the unsorted call). "sort is inert" is a fact about the
+  `threadId` shape only; `USER_FORUM_COMMENTS_QUERY` is the one place the app
+  passes `sort` to this field, and why.
 - **`Page.threadComments` returns `perPage + 1` rows, and the extra one is out
   of sequence.** At `perPage: 10`, page 1 of thread 1 came back as
   `17,18,19,23,30,`**`2088149`**`,32,40,43,44,53` and page 2 carried `1618189`

@@ -624,10 +624,10 @@ export async function toggleActivityPin(
  * as everywhere else in this file, so thread lists show no remaining count.
  */
 export const THREADS_QUERY = `
-query ($userId: Int, $replyUserId: Int, $page: Int) {
+query ($userId: Int, $page: Int) {
   Page(page: $page, perPage: 25) {
     ${PAGE_INFO}
-    threads(userId: $userId, replyUserId: $replyUserId, sort: REPLIED_AT_DESC) {
+    threads(userId: $userId, sort: REPLIED_AT_DESC) {
       id title replyCount viewCount likeCount isLiked isSticky isLocked
       repliedAt createdAt siteUrl
       user { ${SOCIAL_USER} }
@@ -659,8 +659,15 @@ export interface ThreadPage {
   threads: ThreadSummary[];
 }
 
+/**
+ * Threads one user started. This used to also take `{ replyUserId }`, and the
+ * variant was dropped with the "Replied to" lens it fed: that argument lists
+ * threads where the user is the *most recent* replier, so anyone whose reply
+ * was answered vanished from their own tab. `userForumComments` answers the
+ * question that lens was pretending to.
+ */
 export async function threads(
-  vars: { userId: number } | { replyUserId: number },
+  vars: { userId: number },
   page = 1,
 ): Promise<ThreadPage> {
   const data = await gql<{ Page: { pageInfo: PageInfo; threads: ThreadSummary[] } }>(
@@ -816,6 +823,63 @@ export async function threadCommentTree(id: number): Promise<unknown[]> {
     { id },
   );
   return data.ThreadComment ?? [];
+}
+
+/**
+ * Everything one user has said in the forum, across every thread, newest
+ * first.
+ *
+ * Two measured facts make this query what it is:
+ *
+ * 1. **`threadComments` with `userId` alone works** — `threadId` is genuinely
+ *    optional at the API, and the result is what anilist.co's own "Forum
+ *    Comments" profile page draws, nested replies included. `thread { id
+ *    title }` resolves on each row, and `total` is honest (a real count, not
+ *    the 5,000 sentinel — measured `total: 3` for a 3-comment user).
+ * 2. **`sort: [ID_DESC]` works here, and only here.** With a `threadId` the
+ *    sort argument is inert — the byte-identical page comes back however it
+ *    is spelled, which `THREAD_COMMENTS_QUERY` documents. With only `userId`
+ *    the ids actually reverse, measured against the unsorted call. Newest
+ *    first is exactly what a profile wants, so this is the one place the app
+ *    passes `sort` to this field.
+ *
+ * No `childComments` — that field is the untyped 13×-cost blob, and a
+ * comments list has no use for reply trees — which is why `perPage` can be 25
+ * where the thread view pays for the blob with 10.
+ */
+export const USER_FORUM_COMMENTS_QUERY = `
+query ($userId: Int!, $page: Int) {
+  Page(page: $page, perPage: 25) {
+    ${PAGE_INFO}
+    threadComments(userId: $userId, sort: [ID_DESC]) {
+      id comment likeCount createdAt siteUrl
+      thread { id title }
+    }
+  }
+}`;
+
+export interface UserForumComment {
+  id: number;
+  comment: string | null;
+  likeCount: number | null;
+  createdAt: number | null;
+  siteUrl: string | null;
+  thread: { id: number; title: string | null } | null;
+}
+
+export interface UserCommentPage {
+  pageInfo: PageInfo;
+  comments: UserForumComment[];
+}
+
+export async function userForumComments(
+  userId: number,
+  page = 1,
+): Promise<UserCommentPage> {
+  const data = await gql<{
+    Page: { pageInfo: PageInfo; threadComments: UserForumComment[] };
+  }>(USER_FORUM_COMMENTS_QUERY, { userId, page });
+  return { pageInfo: data.Page.pageInfo, comments: data.Page.threadComments ?? [] };
 }
 
 export const SAVE_THREAD_COMMENT_MUTATION = `

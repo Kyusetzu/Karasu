@@ -3,18 +3,24 @@ import { useTranslation } from "react-i18next";
 import { threads } from "@/api/social";
 import { Pill } from "@/components/ui/pill";
 import { ThreadList } from "./ThreadList";
+import { UserComments } from "./UserComments";
 
 /**
- * A profile's Forum tab: threads they started, and threads they replied to.
+ * A profile's Forum tab: threads they started, and everything they have said.
  *
- * Two lenses rather than one list, because AniList models them as two different
- * arguments (`userId` and `replyUserId`) with no way to ask for the union. Chips,
- * matching the search page and the forum index.
+ * The two lenses mirror anilist.co's own profile ("Forum Threads" / "Forum
+ * Comments"). A third lens used to sit here — `threads(replyUserId:)`,
+ * labelled "Replied to" — and it was quietly misleading: that argument lists
+ * threads where the user is the *most recent* replier, so someone whose reply
+ * was answered five minutes later vanished from their own tab. A real case
+ * proved it: a user with three comments in thread 1 showed an empty "Replied
+ * to" because someone replied after them. The comments lens answers the
+ * question that tab was pretending to.
  *
- * The paging itself belongs to `ThreadList`, which the forum index shares — this
- * only chooses what to feed it.
+ * The paging itself belongs to `ThreadList` / `UserComments`; this only
+ * chooses what to feed.
  */
-type Lens = "created" | "replied";
+type Lens = "created" | "comments";
 
 export function UserThreads({ userId, name }: { userId: number; name: string }) {
   const { t } = useTranslation();
@@ -23,9 +29,9 @@ export function UserThreads({ userId, name }: { userId: number; name: string }) 
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap gap-1.5">
-        {(["created", "replied"] as const).map((l) => (
+        {(["created", "comments"] as const).map((l) => (
           <Pill key={l} active={lens === l} onClick={() => setLens(l)}>
-            {l === "created" ? t("social.threadsCreated") : t("social.threadsReplied")}
+            {l === "created" ? t("social.threadsCreated") : t("social.threadsComments")}
           </Pill>
         ))}
       </div>
@@ -33,17 +39,18 @@ export function UserThreads({ userId, name }: { userId: number; name: string }) 
       {/* Keyed so the other lens unmounts rather than sitting behind this one
           with a live query observer. */}
       <div key={lens}>
-        <ThreadList
-          queryKey={["social", "threads", userId, lens]}
-          fetchPage={(page) =>
-            threads(lens === "created" ? { userId } : { replyUserId: userId }, page)
-          }
-          emptyTitle={
-            lens === "created"
-              ? t("social.noThreadsCreated", { name })
-              : t("social.noThreadsReplied", { name })
-          }
-        />
+        {lens === "created" ? (
+          <ThreadList
+            queryKey={["social", "threads", userId, lens]}
+            fetchPage={(page) => threads({ userId }, page)}
+            emptyTitle={t("social.noThreadsCreated", { name })}
+          />
+        ) : (
+          <UserComments
+            userId={userId}
+            emptyTitle={t("social.noUserComments", { name })}
+          />
+        )}
       </div>
     </div>
   );

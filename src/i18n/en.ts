@@ -382,6 +382,11 @@ export const en = {
     activityDays: "Days at the list",
     activityDaysHint:
       "Every action AniList recorded on your account, one cell per day, shaded by how busy it was. This is AniList’s own history rather than anything rebuilt here, so it covers whatever range it keeps.",
+    // The legend under the day grid. The range is spelled out because
+    // AniList's history window is not a year and the grid must not imply one.
+    activityRange: "{{from}} – {{to}} · {{total}} actions",
+    legendLess: "Less",
+    legendMore: "More",
     activityHeatmap: "Months at the list",
     activityHeatmapHint:
       "Every dated start and completion, by month — from your own list's dates, so a date AniList only half knows is skipped rather than guessed. Shown when there is no account history to draw instead.",

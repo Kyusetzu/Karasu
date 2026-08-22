@@ -378,6 +378,9 @@ export const de: typeof en = {
     activityDays: "Tage an der Liste",
     activityDaysHint:
       "Jede Aktion, die AniList auf deinem Konto erfasst hat, eine Zelle pro Tag, eingefärbt nach Betrieb. Das ist AniLists eigene Historie und nichts hier Nachgebautes, sie umfasst also genau den Zeitraum, den AniList vorhält.",
+    activityRange: "{{from}} – {{to}} · {{total}} Aktionen",
+    legendLess: "Wenig",
+    legendMore: "Viel",
     activityHeatmap: "Monate an der Liste",
     activityHeatmapHint:
       "Jeder datierte Start und Abschluss, nach Monat — aus den Daten deiner eigenen Liste; ein nur halb bekanntes Datum wird übersprungen statt geraten. Wird gezeigt, wenn es keine Konto-Historie zu zeichnen gibt.",

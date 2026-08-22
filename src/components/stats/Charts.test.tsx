@@ -305,16 +305,41 @@ describe("DayHeatmap", () => {
       monthLabels={MONTHS}
       dayLabels={DAYS}
       formatDay={(d) => new Date(d * 1000).toISOString().slice(0, 10)}
+      rangeLabel="2026-01-05 – 2026-01-11 · 13 actions"
+      legendLess="Less"
+      legendMore="More"
     />,
   );
 
   /**
    * The count is the assertion: a week is seven cells whether or not anything
    * happened in them, and a grid that silently drew only the busy days would
-   * still look plausible in a screenshot.
+   * still look plausible in a screenshot. Seven day cells plus the legend's
+   * five swatches.
    */
   it("draws every day in the range, not only the busy ones", () => {
-    expect(markup.match(/rounded-\[\.1875rem\]/g) ?? []).toHaveLength(7);
+    expect(markup.match(/rounded-\[\.1875rem\]/g) ?? []).toHaveLength(12);
+  });
+
+  /**
+   * The legend is visible, never hover-only: the range with its total, and
+   * exactly one swatch per intensity bucket — five, matching HISTORY_LEVELS.
+   */
+  it("spells out the range and one swatch per bucket", () => {
+    expect(markup).toContain("2026-01-05 – 2026-01-11 · 13 actions");
+    expect(markup).toContain("Less");
+    expect(markup).toContain("More");
+    for (const a of [0.14, 0.32, 0.5, 0.7, 0.92]) {
+      expect(markup).toContain(`rgba(var(--accent-rgb), ${a})`);
+    }
+  });
+
+  /** Alignment regression pin: no column may hold a month label inside the
+   *  day rows — the label is its own h-3 band, so every column (the weekday
+   *  axis included) starts with one. That eighth-child-in-grid-rows-7 layout
+   *  is what drifted the cells off their weekday labels. */
+  it("gives every column the same h-3 label band", () => {
+    expect(markup).not.toContain("grid-rows-7");
   });
 
   /**
@@ -337,6 +362,9 @@ describe("DayHeatmap", () => {
           monthLabels={MONTHS}
           dayLabels={DAYS}
           formatDay={() => ""}
+          rangeLabel=""
+          legendLess="Less"
+          legendMore="More"
         />,
       ),
     ).toBe("");

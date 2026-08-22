@@ -872,6 +872,13 @@ function YearsView({
             monthLabels={monthLabels}
             dayLabels={dayLabels}
             formatDay={formatDay}
+            rangeLabel={t("stats.activityRange", {
+              from: formatDay(dayHeatmap.from),
+              to: formatDay(dayHeatmap.to),
+              total: dayHeatmap.total,
+            })}
+            legendLess={t("stats.legendLess")}
+            legendMore={t("stats.legendMore")}
           />
         </div>
       )}

@@ -375,9 +375,12 @@ export const de: typeof en = {
     legendCommunity: "Community",
     releaseYearsHint: "Wann das entstand, was du schaust.",
     startYearsHint: "Wann du es geschaut hast.",
+    activityDays: "Tage an der Liste",
+    activityDaysHint:
+      "Jede Aktion, die AniList auf deinem Konto erfasst hat, eine Zelle pro Tag, eingefärbt nach Betrieb. Das ist AniLists eigene Historie und nichts hier Nachgebautes, sie umfasst also genau den Zeitraum, den AniList vorhält.",
     activityHeatmap: "Monate an der Liste",
     activityHeatmapHint:
-      "Jeder datierte Start und Abschluss, nach Monat — aus den Daten deiner eigenen Liste; ein nur halb bekanntes Datum wird übersprungen statt geraten.",
+      "Jeder datierte Start und Abschluss, nach Monat — aus den Daten deiner eigenen Liste; ein nur halb bekanntes Datum wird übersprungen statt geraten. Wird gezeigt, wenn es keine Konto-Historie zu zeichnen gibt.",
     meanByStartYear: "Ø Bewertung nach Startjahr",
     meanByStartYearHint: "Ob das Ich jedes Jahres leichter zufrieden war.",
     seasonHabits: "Saison-Gewohnheiten",

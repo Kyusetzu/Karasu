@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { Link, useSearchParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -40,12 +40,14 @@ import { GradientBars } from "@/components/stats/GradientBars";
 import { DotPlot } from "@/components/stats/DotPlot";
 import { AreaChart } from "@/components/stats/AreaChart";
 import { Heatmap } from "@/components/stats/Heatmap";
+import { DayHeatmap } from "@/components/stats/DayHeatmap";
 import {
   activityHeatmap,
-  heatmapFromHistory,
+  dayHeatmapFromHistory,
   scoreDelta,
   seasonalHistory,
   type ActivityHeatmap,
+  type DayHeatmap as DayHeatmapData,
   type ScoreDeltaSummary,
   type SeasonCount,
 } from "@/lib/localStats";
@@ -233,9 +235,22 @@ function StatisticsContent({
    * The fallback is not dead code: it is what local mode uses, where there is
    * no account to ask, and what covers an account whose history is empty.
    */
+  /**
+   * AniList's history at day resolution, which is the shape its own profile
+   * draws and the one that was asked for. Null in local mode and for an
+   * account whose history is empty — `activityHistory` belongs to an account,
+   * so there is no local equivalent to build one from.
+   */
+  const dayHeatmap = useMemo(
+    () => dayHeatmapFromHistory(data?.stats?.activityHistory),
+    [data],
+  );
+  // The month grid, still built from the local list's own dates. Only reached
+  // when the day grid has nothing, so the two never draw at once and the copy
+  // below can name whichever one is on screen.
   const heatmap = useMemo(
-    () => heatmapFromHistory(data?.stats?.activityHistory) ?? activityHeatmap(localEntries),
-    [data, localEntries],
+    () => (dayHeatmap ? null : activityHeatmap(localEntries)),
+    [dayHeatmap, localEntries],
   );
   const seasons = useMemo(() => seasonalHistory(localEntries), [localEntries]);
 
@@ -329,6 +344,7 @@ function StatisticsContent({
             breakdown={breakdown}
             delta={delta}
             heatmap={heatmap}
+            dayHeatmap={dayHeatmap}
             seasons={seasons}
           />
         ) : (
@@ -338,6 +354,7 @@ function StatisticsContent({
             breakdown={breakdown}
             delta={delta}
             heatmap={heatmap}
+            dayHeatmap={dayHeatmap}
             seasons={seasons}
           />
         ))}
@@ -371,6 +388,7 @@ function AnimeView({
   breakdown,
   delta,
   heatmap,
+  dayHeatmap,
   seasons,
 }: {
   stats: AnimeStats;
@@ -378,6 +396,7 @@ function AnimeView({
   breakdown: Slice[];
   delta: ScoreDeltaSummary | null;
   heatmap: ActivityHeatmap | null;
+  dayHeatmap: DayHeatmapData | null;
   seasons: SeasonCount[];
 }) {
   const { t, i18n } = useTranslation();
@@ -388,7 +407,14 @@ function AnimeView({
   }
 
   if (category === "years") {
-    return <YearsView stats={stats} heatmap={heatmap} seasons={seasons} />;
+    return (
+      <YearsView
+        stats={stats}
+        heatmap={heatmap}
+        dayHeatmap={dayHeatmap}
+        seasons={seasons}
+      />
+    );
   }
 
   if (category === "genresTags") {
@@ -431,6 +457,7 @@ function MangaView({
   breakdown,
   delta,
   heatmap,
+  dayHeatmap,
   seasons,
 }: {
   stats: MangaStats;
@@ -438,6 +465,7 @@ function MangaView({
   breakdown: Slice[];
   delta: ScoreDeltaSummary | null;
   heatmap: ActivityHeatmap | null;
+  dayHeatmap: DayHeatmapData | null;
   seasons: SeasonCount[];
 }) {
   const { t, i18n } = useTranslation();
@@ -448,7 +476,14 @@ function MangaView({
   }
 
   if (category === "years") {
-    return <YearsView stats={stats} heatmap={heatmap} seasons={seasons} />;
+    return (
+      <YearsView
+        stats={stats}
+        heatmap={heatmap}
+        dayHeatmap={dayHeatmap}
+        seasons={seasons}
+      />
+    );
   }
 
   if (category === "genresTags") {
@@ -722,17 +757,27 @@ function RatingsView({
 
 /**
  * The Years tab: the list along its time axes. Release years say what you
- * watch, start years say when you were watching it, the heatmap says which
- * months you were actually at it — the last one from the local list's fuzzy
- * dates, a figure AniList's endpoint does not have.
+ * watch, start years say when you were watching it, and the last panel says
+ * when you were actually at it.
+ *
+ * That last one is **two panels and only ever one of them is on screen.** With
+ * an account, `activityHistory` gives a real per-day record of everything the
+ * account did, which is what AniList draws on its own profile and what this
+ * draws too. Without one — local mode, or an account whose history is empty —
+ * there is nothing to ask, so the month grid built from the local list's fuzzy
+ * start and completion dates stays as the fallback. They are different
+ * questions answered from different data, so the copy names which is showing
+ * rather than describing one while the other is drawn.
  */
 function YearsView({
   stats,
   heatmap,
+  dayHeatmap,
   seasons,
 }: {
   stats: AnimeStats | MangaStats;
   heatmap: ActivityHeatmap | null;
+  dayHeatmap: DayHeatmapData | null;
   seasons: SeasonCount[];
 }) {
   const { t, i18n } = useTranslation();
@@ -760,6 +805,28 @@ function YearsView({
       Array.from({ length: 12 }, (_, m) =>
         new Date(2000, m, 1).toLocaleDateString(i18n.language, { month: "narrow" }),
       ),
+    [i18n.language],
+  );
+  // Monday first, matching `dayHeatmapFromHistory`'s rotation. 2024-01-01 was a
+  // Monday, which is the whole trick.
+  const dayLabels = useMemo(
+    () =>
+      Array.from({ length: 7 }, (_, d) =>
+        new Date(Date.UTC(2024, 0, 1 + d)).toLocaleDateString(i18n.language, {
+          weekday: "short",
+          timeZone: "UTC",
+        }),
+      ),
+    [i18n.language],
+  );
+  // The cell dates are UTC midnights by construction, so they are read back as
+  // UTC — a local read would shift the label for anyone east or west of it.
+  const formatDay = useCallback(
+    (daySeconds: number) =>
+      new Date(daySeconds * 1000).toLocaleDateString(i18n.language, {
+        dateStyle: "medium",
+        timeZone: "UTC",
+      }),
     [i18n.language],
   );
 
@@ -792,6 +859,18 @@ function YearsView({
             />
           </div>
         </Card>
+      )}
+      {dayHeatmap && (
+        <div className="lg:col-span-2">
+          <DayHeatmap
+            title={t("stats.activityDays")}
+            hint={t("stats.activityDaysHint")}
+            data={dayHeatmap}
+            monthLabels={monthLabels}
+            dayLabels={dayLabels}
+            formatDay={formatDay}
+          />
+        </div>
       )}
       {heatmap && (
         <div className="lg:col-span-2">

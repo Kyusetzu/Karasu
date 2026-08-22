@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   activityHeatmap,
+  dayHeatmapFromHistory,
   heatmapFromHistory,
+  historyDay,
   localTotals,
   scoreDelta,
   seasonalHistory,
@@ -268,5 +270,77 @@ describe("heatmapFromHistory", () => {
     expect(heatmapFromHistory(days, 3)!.years.map((y) => y.year)).toEqual([
       2019, 2020, 2021,
     ]);
+  });
+});
+
+describe("dayHeatmapFromHistory", () => {
+  const day = (iso: string) => Math.floor(Date.parse(`${iso}T00:00:00Z`) / 1000);
+
+  /**
+   * The measurement this exists for. AniList's `date` values sit either on UTC
+   * midnight or 82,800s before one, and an account spanning late March carries
+   * both — midnight in Europe/London, which is UTC in winter and UTC+1 in
+   * summer. Rounding recovers the London date from either spelling without
+   * consulting a timezone.
+   */
+  it("reads both spellings of a day bucket as the same day", () => {
+    expect(historyDay(day("2026-01-05"))).toBe(day("2026-01-05"));
+    // 23:00Z on the 16th is London's 17th.
+    expect(historyDay(day("2026-07-17") - 3600)).toBe(day("2026-07-17"));
+  });
+
+  it("returns null when there is nothing to draw", () => {
+    expect(dayHeatmapFromHistory(null)).toBeNull();
+    expect(dayHeatmapFromHistory([])).toBeNull();
+    expect(dayHeatmapFromHistory([{ date: day("2026-01-05"), amount: 0 }])).toBeNull();
+  });
+
+  it("lays the days out in Monday-first weeks", () => {
+    // 2026-01-05 is a Monday; 2026-01-11 the Sunday that closes that week.
+    const grid = dayHeatmapFromHistory([
+      { date: day("2026-01-05"), amount: 3, level: 3 },
+      { date: day("2026-01-11"), amount: 1, level: 1 },
+    ])!;
+
+    expect(grid.weeks).toHaveLength(1);
+    expect(grid.weeks[0]).toHaveLength(7);
+    expect(grid.weeks[0][0]).toMatchObject({ amount: 3, level: 3 });
+    expect(grid.weeks[0][6]).toMatchObject({ amount: 1, level: 1 });
+    // A day inside the range with no activity is a cell, not a gap.
+    expect(grid.weeks[0][3]).toMatchObject({ amount: 0, level: 0 });
+    expect(grid.total).toBe(4);
+  });
+
+  /** A week that starts mid-range is padded, so every column is seven tall. */
+  it("pads the days before the first one with nulls", () => {
+    // 2026-01-07 is a Wednesday, so Mon and Tue lead with padding.
+    const grid = dayHeatmapFromHistory([
+      { date: day("2026-01-07"), amount: 2, level: 5 },
+    ])!;
+    expect(grid.weeks[0][0]).toBeNull();
+    expect(grid.weeks[0][1]).toBeNull();
+    expect(grid.weeks[0][2]).toMatchObject({ amount: 2 });
+    expect(grid.weeks[0][3]).toBeNull();
+  });
+
+  it("labels each month once, at the column it starts in", () => {
+    const grid = dayHeatmapFromHistory([
+      { date: day("2026-01-26"), amount: 1, level: 1 },
+      { date: day("2026-02-09"), amount: 1, level: 1 },
+    ])!;
+    const months = grid.months.map((m) => m.month);
+    expect(months).toEqual([0, 1]);
+    expect(new Set(grid.months.map((m) => m.column)).size).toBe(grid.months.length);
+  });
+
+  /** Two rows for one day is not a shape AniList has shown, so it is folded
+   *  rather than trusted to be absent. */
+  it("folds a repeated day instead of dropping one", () => {
+    const grid = dayHeatmapFromHistory([
+      { date: day("2026-01-05"), amount: 2, level: 1 },
+      { date: day("2026-01-05"), amount: 3, level: 7 },
+    ])!;
+    expect(grid.weeks[0][0]).toMatchObject({ amount: 5, level: 7 });
+    expect(grid.total).toBe(5);
   });
 });

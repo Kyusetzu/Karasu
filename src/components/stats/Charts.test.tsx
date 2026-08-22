@@ -5,6 +5,8 @@ import { GradientBars } from "./GradientBars";
 import { DotPlot } from "./DotPlot";
 import { AreaChart } from "./AreaChart";
 import { Heatmap } from "./Heatmap";
+import { DayHeatmap } from "./DayHeatmap";
+import { dayHeatmapFromHistory } from "@/lib/localStats";
 
 /**
  * These charts kept their numbers in `<title>` elements, which is to say behind
@@ -283,5 +285,60 @@ describe("Sunburst", () => {
     expect(out).toContain("1000");
     // 1 of 1001 is a third of a degree; there is nowhere to put the number.
     expect(out.filter((t) => t === "1")).toHaveLength(0);
+  });
+});
+
+describe("DayHeatmap", () => {
+  const day = (iso: string) => Math.floor(Date.parse(`${iso}T00:00:00Z`) / 1000);
+  const MONTHS = ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"];
+  const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+  const grid = dayHeatmapFromHistory([
+    { date: day("2026-01-05"), amount: 4, level: 3 },
+    { date: day("2026-01-11"), amount: 9, level: 9 },
+  ])!;
+
+  const markup = html(
+    <DayHeatmap
+      title="Days at the list"
+      data={grid}
+      monthLabels={MONTHS}
+      dayLabels={DAYS}
+      formatDay={(d) => new Date(d * 1000).toISOString().slice(0, 10)}
+    />,
+  );
+
+  /**
+   * The count is the assertion: a week is seven cells whether or not anything
+   * happened in them, and a grid that silently drew only the busy days would
+   * still look plausible in a screenshot.
+   */
+  it("draws every day in the range, not only the busy ones", () => {
+    expect(markup.match(/rounded-\[\.1875rem\]/g) ?? []).toHaveLength(7);
+  });
+
+  /**
+   * The counts live in `title`, same as the other charts here — and unlike
+   * them, a day grid has no room to write them in. The date is spelled out so
+   * the tooltip is readable on its own.
+   */
+  it("names the day and its count on each busy cell", () => {
+    expect(markup).toContain("2026-01-05 · 4");
+    expect(markup).toContain("2026-01-11 · 9");
+  });
+
+  /** An empty grid renders nothing rather than an axis with no cells. */
+  it("renders nothing when there are no weeks", () => {
+    expect(
+      html(
+        <DayHeatmap
+          title="x"
+          data={{ weeks: [], months: [], total: 0, from: 0, to: 0 }}
+          monthLabels={MONTHS}
+          dayLabels={DAYS}
+          formatDay={() => ""}
+        />,
+      ),
+    ).toBe("");
   });
 });

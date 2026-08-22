@@ -376,9 +376,15 @@ export const en = {
     legendCommunity: "community",
     releaseYearsHint: "When what you watch was made.",
     startYearsHint: "When you were watching it.",
+    // Two grids, two sources, and the copy has to say which is on screen — the
+    // hint below described the local one while the account's history was being
+    // drawn. See `dayHeatmapFromHistory`.
+    activityDays: "Days at the list",
+    activityDaysHint:
+      "Every action AniList recorded on your account, one cell per day, shaded by how busy it was. This is AniList’s own history rather than anything rebuilt here, so it covers whatever range it keeps.",
     activityHeatmap: "Months at the list",
     activityHeatmapHint:
-      "Every dated start and completion, by month — from your own list's dates, so a date AniList only half knows is skipped rather than guessed.",
+      "Every dated start and completion, by month — from your own list's dates, so a date AniList only half knows is skipped rather than guessed. Shown when there is no account history to draw instead.",
     meanByStartYear: "Mean score by start year",
     meanByStartYearHint: "Whether the you of each year was easier to please.",
     seasonHabits: "Season habits",

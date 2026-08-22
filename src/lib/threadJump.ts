@@ -65,3 +65,43 @@ export function jumpTarget(lastPage: number, perPage = COMMENTS_PER_PAGE): JumpT
 export function canJump(lastPage: number | null | undefined): boolean {
   return typeof lastPage === "number" && lastPage > 1;
 }
+
+/** Which comment view is on screen — see `refreshPlan`. */
+export type ThreadView = "paged" | "jump";
+
+/**
+ * Which view to re-read after posting.
+ *
+ * Exactly one, never both. `Thread.tsx` used to fire `comments.refetch()` *and*
+ * `newest.refetch()` unconditionally, and `refetch()` **ignores `enabled`** —
+ * verified against `@tanstack/query-core` 5.101.4, where the only `enabled`
+ * read on that path is `isActive()`, used by filters. So from the ordinary
+ * paged view the jump query fired with `target === null`, took the numeric
+ * branch and sent `page: null` (the `page = 1` default only fires for
+ * `undefined`), spending a request out of the ~30/min budget to fetch nothing
+ * anyone was looking at. It also flipped `newest.isFetching`, which disabled
+ * the jump controls and printed "Finding the newest…" while nothing jumped.
+ */
+export function refreshPlan(target: "newest" | number | null): ThreadView {
+  return target === null ? "paged" : "jump";
+}
+
+/**
+ * Where a newly posted top-level comment will be.
+ *
+ * Comments are oldest-first and that order cannot be changed — `sort` on
+ * `threadComments` is inert, measured — so a new one is on the **last** page,
+ * never the first. Re-reading page 1 after posting (which is what shipped) is
+ * correct only on a single-page thread, which is why it survived development.
+ *
+ * `null` when the thread's end is past the 5,000-entry cap: the comment exists
+ * but no page request can reach it, and saying so is better than landing
+ * somewhere else and implying it is there.
+ */
+export function pageAfterPosting(
+  lastPage: number,
+  perPage = COMMENTS_PER_PAGE,
+): number | null {
+  const target = jumpTarget(lastPage, perPage);
+  return target.reachable ? target.page : null;
+}

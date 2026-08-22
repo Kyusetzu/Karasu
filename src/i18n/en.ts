@@ -920,6 +920,8 @@ export const en = {
     addPlanning: "Add to Planning",
   },
   social: {
+    replyPosted: "Reply posted",
+    commentPosted: "Comment posted",
     pageOf: "Page (1–{{max}})",
     goToPage: "Go",
     reply: "Reply",

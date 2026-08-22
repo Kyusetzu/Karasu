@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   COMMENTS_PER_PAGE,
+  pageAfterPosting,
+  refreshPlan,
   PAGE_DEPTH_CAP,
   canJump,
   jumpTarget,
@@ -96,5 +98,34 @@ describe("the page box's ceiling", () => {
     expect(jumpTarget(703).page).toBeLessThan(703);
     // And on an ordinary thread the two agree, so nothing is taken away.
     expect(jumpTarget(70).page).toBe(70);
+  });
+});
+
+describe("refreshPlan", () => {
+  /**
+   * One view, never both. `refetch()` ignores `enabled`, so refreshing the
+   * view that is not on screen spends a request from the ~30/min budget and
+   * flips an `isFetching` that disables controls for a jump nobody started.
+   */
+  it("re-reads only the view on screen", () => {
+    expect(refreshPlan(null)).toBe("paged");
+    expect(refreshPlan("newest")).toBe("jump");
+    expect(refreshPlan(70)).toBe("jump");
+  });
+});
+
+describe("pageAfterPosting", () => {
+  /** Oldest-first and unreorderable, so a new comment is on the LAST page.
+   *  Re-reading page 1 is right only when there is only one page. */
+  it("points at the last page, not the first", () => {
+    expect(pageAfterPosting(1)).toBe(1);
+    expect(pageAfterPosting(70)).toBe(70);
+  });
+
+  /** Past the cap the comment exists and no page request can reach it.
+   *  Null so the caller can say that instead of landing elsewhere. */
+  it("admits when the end is unreachable", () => {
+    expect(pageAfterPosting(703)).toBeNull();
+    expect(pageAfterPosting(1706)).toBeNull();
   });
 });

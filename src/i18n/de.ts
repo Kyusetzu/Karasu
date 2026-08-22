@@ -926,6 +926,8 @@ export const de: typeof en = {
     addPlanning: "Zu Geplant hinzufügen",
   },
   social: {
+    replyPosted: "Antwort gesendet",
+    commentPosted: "Kommentar gesendet",
     pageOf: "Seite (1–{{max}})",
     goToPage: "Los",
     reply: "Antworten",

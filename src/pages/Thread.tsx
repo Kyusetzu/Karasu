@@ -33,7 +33,12 @@ import { Markdown } from "@/components/social/Markdown";
 import { CommentTree } from "@/components/social/CommentTree";
 import { flattenComments, type FlatComment } from "@/lib/comments";
 import { nextPageParam } from "@/lib/paging";
-import { canJump, jumpTarget } from "@/lib/threadJump";
+import {
+  canJump,
+  jumpTarget,
+  pageAfterPosting,
+  refreshPlan,
+} from "@/lib/threadJump";
 import { relTimeFromSeconds } from "@/lib/relTime";
 import { validatePost } from "@/lib/composer";
 import { displayTitle } from "@/api/types";
@@ -175,10 +180,19 @@ export default function Thread() {
   // every retained page and recurses through `childComments` to count what it
   // hides — and `draft` lives in this component, so it re-ran on every
   // keystroke in the reply box.
-  const flat = useMemo(
-    () => flattenComments((comments.data?.pages ?? []).flatMap((p) => p.comments)),
-    [comments.data],
-  );
+  // Flattened, plus which loaded page each comment came from. The map is what
+  // lets a reply re-read *its own* page instead of collapsing the thread back
+  // to page 1, and it is built in the same pass so nothing flattens twice.
+  const { flat, pageOfComment } = useMemo(() => {
+    const pages = comments.data?.pages ?? [];
+    const map = new Map<number, number>();
+    const rows = pages.flatMap((p, i) => {
+      const page = flattenComments(p.comments);
+      for (const c of page) map.set(c.id, i);
+      return page;
+    });
+    return { flat: rows, pageOfComment: map };
+  }, [comments.data]);
   const newestFlat = useMemo(
     () => flattenComments(newest.data?.comments ?? []),
     [newest.data],
@@ -236,13 +250,50 @@ export default function Thread() {
   };
 
   const openReply = (c: FlatComment) => {
-    setReplyTo((open) => (open === c.id ? null : c.id));
-    setReplyRoot(c.rootId);
+    const closing = replyTo === c.id;
+    setReplyTo(closing ? null : c.id);
+    setReplyRoot(closing ? null : c.rootId);
+    if (closing) return;
+    // Only seed a draft that is empty or is nothing but a previous prefill.
+    // It used to overwrite unconditionally, so clicking Reply on a second
+    // comment mid-sentence discarded what was typed — twelve lines from a
+    // comment saying erasing the user's own words is the thing to avoid.
+    setReplyDraft((d) =>
+      d.trim() === "" || /^@\S+\s*$/.test(d) ? (c.user?.name ? `@${c.user.name} ` : "") : d,
+    );
     // Pre-filled with the mention. Every reply is parented to the top-level
     // row, so an answer to a reply renders beside it rather than under it —
     // naming who it answers is the only thing that keeps that readable.
     setReplyDraft(c.user?.name ? `@${c.user.name} ` : "");
   };
+
+  /**
+   * Re-reads one loaded page and splices it back where it was.
+   *
+   * The alternative is `comments.refetch()`, which re-reads **every** retained
+   * page — one request per page out of the ~30/min budget to show one new
+   * reply, which is the trap `UserList`'s comment documents.
+   */
+  const rereadPage = useCallback(
+    async (index: number) => {
+      const cached = qc.getQueryData<{ pages: CommentPage[]; pageParams: unknown[] }>([
+        "social",
+        "threadComments",
+        threadId,
+      ]);
+      const param = cached?.pageParams[index];
+      if (typeof param !== "number") return void comments.refetch();
+      const fresh = await threadComments(threadId, param);
+      qc.setQueryData<{ pages: CommentPage[]; pageParams: unknown[] }>(
+        ["social", "threadComments", threadId],
+        (old) =>
+          old
+            ? { ...old, pages: old.pages.map((p, i) => (i === index ? fresh : p)) }
+            : old,
+      );
+    },
+    [qc, threadId, comments],
+  );
 
   const subscribe = useMutation({
     mutationFn: (next: boolean) => toggleThreadSubscription(threadId, next),
@@ -258,20 +309,25 @@ export default function Thread() {
     mutationFn: (vars: { text: string; parentId: number }) =>
       saveThreadComment(threadId, vars.text, vars.parentId),
     // Same non-optimistic rule as the top-level box below, for the same reason.
-    onSuccess: () => {
+    onSuccess: (_res, vars) => {
+      const parent = vars.parentId;
       setReplyTo(null);
       setReplyRoot(null);
       setReplyDraft("");
-      // The reply lands inside its parent's `childComments`, so the page it is
-      // on has to be re-read. Page 1 only — `refetch()` would re-read every
-      // retained page, which on a long thread is a handful of requests.
-      qc.setQueryData<{ pages: CommentPage[]; pageParams: unknown[] }>(
-        ["social", "threadComments", threadId],
-        (old) =>
-          old ? { pages: old.pages.slice(0, 1), pageParams: old.pageParams.slice(0, 1) } : old,
-      );
-      void comments.refetch();
-      void newest.refetch();
+      showToast({ kind: "success", text: t("social.replyPosted") });
+      // The reply lands inside its parent's `childComments`, so exactly that
+      // page has to be re-read — and only that one. This used to truncate the
+      // cache to page 1 and refetch, which on a reply made from page 7 threw
+      // away six loaded pages, bounced the reader to the top, and did not show
+      // the reply. `refetch()` is still avoided: it re-reads *every* retained
+      // page, the trap `UserList` documents.
+      if (refreshPlan(target) === "jump") {
+        void newest.refetch();
+        return;
+      }
+      const idx = pageOfComment.get(parent);
+      if (idx === undefined) return void comments.refetch();
+      void rereadPage(idx);
     },
     onError: () =>
       showToast({
@@ -285,17 +341,26 @@ export default function Thread() {
     mutationFn: (text: string) => saveThreadComment(threadId, text),
     // Not optimistic: it is the user's own words, and a failure that erased them
     // would be worse than a moment of waiting.
-    onSuccess: () => {
+    onSuccess: async () => {
       setDraft("");
-      // Only the first page is refetched. `refetch()` on an infinite query
-      // refetches *every* retained page, which on a busy thread is a handful of
-      // requests to show one new comment.
+      showToast({ kind: "success", text: t("social.commentPosted") });
+      // A new top-level comment is on the **last** page — comments are
+      // oldest-first and `sort` is inert, so it can never be on page 1. This
+      // used to re-read page 1 and call it done, which showed the new comment
+      // only on a single-page thread.
+      //
+      // Page 1 is read anyway for a fresh `lastPage`; if the thread has grown
+      // past one page, jump to where the comment actually is. Past the 5,000
+      // cap `pageAfterPosting` returns null: the comment exists and no page
+      // request can reach it, so the reader is left where they are rather than
+      // dropped somewhere that implies otherwise.
+      const first = await threadComments(threadId, 1);
       qc.setQueryData<{ pages: CommentPage[]; pageParams: unknown[] }>(
         ["social", "threadComments", threadId],
-        (old) =>
-          old ? { pages: old.pages.slice(0, 1), pageParams: old.pageParams.slice(0, 1) } : old,
+        () => ({ pages: [first], pageParams: [1] }),
       );
-      void comments.refetch();
+      const landing = pageAfterPosting(first.pageInfo.lastPage ?? 1);
+      if (landing != null && landing > 1) setTarget(landing);
     },
     onError: (_e, text) =>
       showToast({

@@ -335,11 +335,14 @@ Security issues go to the email above, privately — see
 
 ## Star History
 
-<a href="https://www.star-history.com/?type=date&repos=Kyusetzu%2FKarasu">
+<!-- The free /svg endpoint, not the tokenised /chart one: the sealed_token
+     embed answers an error outside the star-history site, so the chart never
+     rendered on GitHub. Verified by loading all three URLs. -->
+<a href="https://www.star-history.com/#Kyusetzu/Karasu&Date">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=Kyusetzu/Karasu&type=date&theme=dark&legend=top-left&sealed_token=Jj6NQBXfw0uCgsX0uOjYYviVyxJGU2VSphsY9y7GfRGt4XL9iKWk5UyamsuCP_pta5oWa_O-SpBO14_yzZ5mGs0K1BcXOc_S7t856ox8E_nTpBZ1KvwgjKNczjPo4B0eCET3tE1Iuieo_oGZ9_B2-u5Zk6b1V5aGx8F-qOBj9ZelUGqsE59CdhITcMZ4" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=Kyusetzu/Karasu&type=date&legend=top-left&sealed_token=Jj6NQBXfw0uCgsX0uOjYYviVyxJGU2VSphsY9y7GfRGt4XL9iKWk5UyamsuCP_pta5oWa_O-SpBO14_yzZ5mGs0K1BcXOc_S7t856ox8E_nTpBZ1KvwgjKNczjPo4B0eCET3tE1Iuieo_oGZ9_B2-u5Zk6b1V5aGx8F-qOBj9ZelUGqsE59CdhITcMZ4" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=Kyusetzu/Karasu&type=date&legend=top-left&sealed_token=Jj6NQBXfw0uCgsX0uOjYYviVyxJGU2VSphsY9y7GfRGt4XL9iKWk5UyamsuCP_pta5oWa_O-SpBO14_yzZ5mGs0K1BcXOc_S7t856ox8E_nTpBZ1KvwgjKNczjPo4B0eCET3tE1Iuieo_oGZ9_B2-u5Zk6b1V5aGx8F-qOBj9ZelUGqsE59CdhITcMZ4" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=Kyusetzu/Karasu&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=Kyusetzu/Karasu&type=Date" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=Kyusetzu/Karasu&type=Date" width="600" />
  </picture>
 </a>
 

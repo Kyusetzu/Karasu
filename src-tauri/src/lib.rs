@@ -326,6 +326,7 @@ pub fn run() {
             app.manage(playback::relations::Relations(std::sync::RwLock::new(Vec::new())));
             app.manage(discord::Discord(std::sync::Mutex::new(None)));
             app.manage(discord::UiPage::default());
+            app.manage(discord::LastPresence::default());
             app.manage(library::LibraryIndex::default());
             app.manage(commands::PendingUpdate::default());
             library::hydrate(app.handle());

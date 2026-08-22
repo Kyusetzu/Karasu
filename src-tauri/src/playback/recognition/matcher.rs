@@ -12,6 +12,10 @@ pub struct Candidate {
     pub episodes: Option<u32>,
     /// Episode length in minutes (for the scrobble threshold)
     pub duration_min: Option<u32>,
+    /// `coverImage.large`, for the Discord presence card. Carried from the
+    /// cached list the way `duration_min` is, and for the same reason:
+    /// re-finding the entry later means deserializing the whole list again.
+    pub cover_url: Option<String>,
     pub progress: u32,
     pub status: String,
 }
@@ -215,6 +219,7 @@ mod tests {
                 ],
                 episodes: Some(28),
                 duration_min: Some(24),
+                cover_url: None,
                 progress: 27,
                 status: "CURRENT".into(),
             },
@@ -223,6 +228,7 @@ mod tests {
                 titles: vec!["One Piece".into()],
                 episodes: None,
                 duration_min: Some(24),
+                cover_url: None,
                 progress: 1070,
                 status: "CURRENT".into(),
             },
@@ -234,6 +240,7 @@ mod tests {
                 ],
                 episodes: Some(24),
                 duration_min: Some(24),
+                cover_url: None,
                 progress: 4,
                 status: "CURRENT".into(),
             },
@@ -357,6 +364,7 @@ mod tests {
                 titles: vec!["Sousou no Frieren Extra".into()],
                 episodes: None,
                 duration_min: None,
+                cover_url: None,
                 progress: 0,
                 status: "CURRENT".into(),
             },
@@ -365,6 +373,7 @@ mod tests {
                 titles: vec!["Sousou no Frieren Extra".into()],
                 episodes: None,
                 duration_min: None,
+                cover_url: None,
                 progress: 0,
                 status: "CURRENT".into(),
             },
@@ -389,6 +398,7 @@ mod tests {
                 titles: vec!["Sousou no Frieren Extra".into()],
                 episodes: None,
                 duration_min: None,
+                cover_url: None,
                 progress: 0,
                 status: "CURRENT".into(),
             },
@@ -397,6 +407,7 @@ mod tests {
                 titles: vec!["Sousou no Frieren".into()],
                 episodes: None,
                 duration_min: None,
+                cover_url: None,
                 progress: 0,
                 status: "CURRENT".into(),
             },

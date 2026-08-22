@@ -26,6 +26,22 @@ const REPO_URL: &str = "https://github.com/Kyusetzu/Karasu";
 
 pub struct Discord(pub Mutex<Option<DiscordIpcClient>>);
 
+/// Fingerprint of the last activity actually sent, or empty.
+///
+/// `sync` fires on every detection change, scrobble, correction, settings
+/// change and — via `set_ui_page` — every route change, while Discord accepts
+/// roughly one update per 15 seconds and silently drops the excess. Most of
+/// those calls describe the exact presence already showing, so identical
+/// consecutive payloads are skipped here instead of spent there. Cleared on
+/// disconnect, so a reconnected client always gets the first send.
+pub struct LastPresence(pub Mutex<String>);
+
+impl Default for LastPresence {
+    fn default() -> Self {
+        LastPresence(Mutex::new(String::new()))
+    }
+}
+
 /// The page the user is currently looking at, shown as the idle presence.
 pub struct UiPage(pub Mutex<String>);
 
@@ -45,11 +61,13 @@ pub fn effective_app_id(custom: &str) -> String {
     }
 }
 
-fn disconnect(guard: &mut Option<DiscordIpcClient>) {
+fn disconnect(app: &AppHandle, guard: &mut Option<DiscordIpcClient>) {
     if let Some(mut client) = guard.take() {
         let _ = client.clear_activity();
         let _ = client.close();
     }
+    // Whatever was showing is gone with the connection.
+    app.state::<LastPresence>().0.guard().clear();
 }
 
 fn now_secs() -> i64 {
@@ -88,7 +106,7 @@ pub fn sync(app: &AppHandle, now: Option<&NowPlaying>) {
     let mut guard = state.0.guard();
 
     if !enabled || app_id.is_empty() {
-        disconnect(&mut guard);
+        disconnect(app, &mut guard);
         return;
     }
 
@@ -113,8 +131,10 @@ pub fn sync(app: &AppHandle, now: Option<&NowPlaying>) {
             .unwrap_or(true)
     });
 
-    // Build the two presence strings and the timestamps.
-    let (details, state_text, timestamps, kind) = match now {
+    // Build the two presence strings and the timestamps. The start second
+    // rides along for the fingerprint below: it pins the elapsed timer, so
+    // two payloads with different starts are different presences.
+    let (details, state_text, timestamps, kind, fingerprint_start) = match now {
         Some(np) => {
             let title = np
                 .matched_title
@@ -146,7 +166,7 @@ pub fn sync(app: &AppHandle, now: Option<&NowPlaying>) {
             } else {
                 ActivityType::Watching
             };
-            (title, state_text, timestamps, kind)
+            (title, state_text, timestamps, kind, start)
         }
         None => {
             let page = app.state::<UiPage>().0.guard().clone();
@@ -155,6 +175,7 @@ pub fn sync(app: &AppHandle, now: Option<&NowPlaying>) {
                 "Idle".to_string(),
                 Timestamps::new(),
                 ActivityType::Playing,
+                0,
             )
         }
     };
@@ -172,20 +193,53 @@ pub fn sync(app: &AppHandle, now: Option<&NowPlaying>) {
         buttons.push(Button::new("View on AniList", url));
     }
 
-    // A large image asset makes the presence card look complete in every
-    // state. The "logo" key must be uploaded as an art asset in the Discord
-    // developer portal for the built-in application id.
+    // The matched entry's cover, when there is one. Discord accepts a plain
+    // https URL in `large_image` and proxies it server-side, so no asset
+    // upload is involved; the bird moves to the small badge so the card still
+    // says which app it came from. Everything unmatched — idle, an unplaced
+    // title — keeps the "logo" key, which must stay uploaded as an art asset
+    // in the developer portal for the built-in application id.
+    let cover = now.and_then(|np| np.cover_url.as_deref());
+    let assets = match cover {
+        Some(url) => Assets::new()
+            .large_image(url)
+            .large_text(&details)
+            .small_image("logo")
+            .small_text("Karasu"),
+        None => Assets::new().large_image("logo").large_text("Karasu"),
+    };
+
+    // Skip a payload identical to the one already showing — see
+    // `LastPresence`. The session start pins the elapsed timer, so it is part
+    // of the identity; the derived end moves with it.
+    // `ActivityType` has no Debug; the manga/anime split it encodes is a
+    // function of `media_type`, which `details`+`state_text` already pin.
+    let fingerprint = format!(
+        "{details}|{state_text}|{cover}|{buttons}|{start}",
+        cover = cover.unwrap_or(""),
+        buttons = anilist_url.as_deref().unwrap_or(""),
+        start = fingerprint_start,
+    );
+    {
+        let last = app.state::<LastPresence>();
+        let mut last = last.0.guard();
+        if *last == fingerprint {
+            return;
+        }
+        *last = fingerprint;
+    }
+
     let activity = Activity::new()
         .activity_type(kind)
         .details(&details)
         .state(&state_text)
-        .assets(Assets::new().large_image("logo").large_text("Karasu"))
+        .assets(assets)
         .timestamps(timestamps)
         .buttons(buttons);
 
     if let Some(client) = guard.as_mut() {
         if client.set_activity(activity).is_err() {
-            disconnect(&mut guard);
+            disconnect(app, &mut guard);
         }
     }
 }

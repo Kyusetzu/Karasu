@@ -68,6 +68,11 @@ pub struct NowPlaying {
     /// for either of these, so they stay off the `now-playing` payload.
     #[serde(skip)]
     pub duration_min: Option<u32>,
+    /// `coverImage.large` of the matched entry, for the Discord presence
+    /// card. Same carriage as `duration_min`, same reason, same `skip` — the
+    /// frontend draws its covers from its own cache and has no use for this.
+    #[serde(skip)]
+    pub cover_url: Option<String>,
     /// Playback position in seconds, refreshed every poll when the source
     /// reports one (Jellyfin). Internal like `duration_min`: the deadline
     /// check reads it, the frontend does not.
@@ -316,6 +321,11 @@ pub fn candidates_from_cache(db: &Db, media_type: &str) -> Vec<matcher::Candidat
                     .get("duration")
                     .and_then(|v| v.as_u64())
                     .map(|n| n as u32),
+                cover_url: media
+                    .get("coverImage")
+                    .and_then(|c| c.get("large"))
+                    .and_then(|v| v.as_str())
+                    .map(str::to_string),
                 progress: entry
                     .get("progress")
                     .and_then(|v| v.as_u64())
@@ -371,26 +381,41 @@ pub(crate) fn shift_episode(episode: u32, offset: i32) -> u32 {
 /// A forced id that is not on the list yet resolves to the stored display
 /// title with no progress — honest, and it self-heals on the first scrobble,
 /// since `SaveMediaListEntry` creates the entry.
+/// What `resolve_match` found. A struct rather than the 5-tuple this grew out
+/// of: at six fields, `(Option<String>, Option<u32>, Option<u32>, …)` at two
+/// call sites is a puzzle, not a signature — the same call `DetectionOverride`
+/// made in db.rs.
+struct Resolved {
+    title: Option<String>,
+    progress: Option<u32>,
+    total: Option<u32>,
+    duration_min: Option<u32>,
+    cover_url: Option<String>,
+    status: String,
+}
+
 fn resolve_match(
     candidates: &[matcher::Candidate],
     media_id: i64,
     fallback_title: Option<&str>,
-) -> (Option<String>, Option<u32>, Option<u32>, Option<u32>, String) {
+) -> Resolved {
     match candidates.iter().find(|c| c.media_id == media_id) {
-        Some(c) => (
-            Some(c.titles[0].clone()),
-            Some(c.progress),
-            c.episodes,
-            c.duration_min,
-            c.status.clone(),
-        ),
-        None => (
-            fallback_title.map(str::to_string),
-            None,
-            None,
-            None,
-            String::new(),
-        ),
+        Some(c) => Resolved {
+            title: Some(c.titles[0].clone()),
+            progress: Some(c.progress),
+            total: c.episodes,
+            duration_min: c.duration_min,
+            cover_url: c.cover_url.clone(),
+            status: c.status.clone(),
+        },
+        None => Resolved {
+            title: fallback_title.map(str::to_string),
+            progress: None,
+            total: None,
+            duration_min: None,
+            cover_url: None,
+            status: String::new(),
+        },
     }
 }
 
@@ -485,24 +510,34 @@ fn build_now_playing(
         (m.media_id, parsed.episode)
     });
 
-    let (media_id, episode, matched_title, progress, total, duration_min, list_status) =
-        match matched {
-            Some((mid, ep)) => {
-                let (title, progress, total, duration, status) = resolve_match(
-                    &candidates,
-                    mid,
-                    // Only when the id is the one *this* correction forced: a
-                    // redirect may have moved on to another entry, whose title
-                    // the stored one would misreport.
-                    forced
-                        .as_ref()
-                        .filter(|o| o.media_id == mid)
-                        .map(|o| o.display_title.as_str()),
-                );
-                (Some(mid), ep, title, progress, total, duration, status)
-            }
-            None => (None, parsed.episode, None, None, None, None, String::new()),
-        };
+    let (media_id, episode, resolved) = match matched {
+        Some((mid, ep)) => {
+            let r = resolve_match(
+                &candidates,
+                mid,
+                // Only when the id is the one *this* correction forced: a
+                // redirect may have moved on to another entry, whose title
+                // the stored one would misreport.
+                forced
+                    .as_ref()
+                    .filter(|o| o.media_id == mid)
+                    .map(|o| o.display_title.as_str()),
+            );
+            (Some(mid), ep, r)
+        }
+        None => (
+            None,
+            parsed.episode,
+            Resolved {
+                title: None,
+                progress: None,
+                total: None,
+                duration_min: None,
+                cover_url: None,
+                status: String::new(),
+            },
+        ),
+    };
 
     NowPlaying {
         process: playback.process,
@@ -514,14 +549,15 @@ fn build_now_playing(
         episode,
         source_episode,
         media_id,
-        matched_title,
+        matched_title: resolved.title,
         overridden: forced.is_some(),
-        progress,
-        total_episodes: total,
-        duration_min,
+        progress: resolved.progress,
+        total_episodes: resolved.total,
+        duration_min: resolved.duration_min,
+        cover_url: resolved.cover_url,
         position_sec: playback.position_sec,
         duration_sec: playback.duration_sec,
-        list_status,
+        list_status: resolved.status,
     }
 }
 
@@ -780,15 +816,17 @@ pub fn requeue_match(app: &AppHandle) {
     };
 
     let resolved = picked.map(|mid| {
-        let (title, progress, total, duration, status) = resolve_match(
-            &candidates,
+        (
             mid,
-            forced
-                .as_ref()
-                .filter(|o| o.media_id == mid)
-                .map(|o| o.display_title.as_str()),
-        );
-        (mid, title, progress, total, duration, status)
+            resolve_match(
+                &candidates,
+                mid,
+                forced
+                    .as_ref()
+                    .filter(|o| o.media_id == mid)
+                    .map(|o| o.display_title.as_str()),
+            ),
+        )
     });
 
     // Patch under the lock, then let go of it before telling anyone: the poll
@@ -804,13 +842,14 @@ pub fn requeue_match(app: &AppHandle) {
             // on the episode the correction actually names.
             np.episode = episode;
             match resolved {
-                Some((mid, title, progress, total, duration, status)) => {
+                Some((mid, r)) => {
                     np.media_id = Some(mid);
-                    np.matched_title = title;
-                    np.progress = progress;
-                    np.total_episodes = total;
-                    np.duration_min = duration;
-                    np.list_status = status;
+                    np.matched_title = r.title;
+                    np.progress = r.progress;
+                    np.total_episodes = r.total;
+                    np.duration_min = r.duration_min;
+                    np.cover_url = r.cover_url;
+                    np.list_status = r.status;
                 }
                 None => {
                     np.media_id = None;
@@ -818,6 +857,7 @@ pub fn requeue_match(app: &AppHandle) {
                     np.progress = None;
                     np.total_episodes = None;
                     np.duration_min = None;
+                    np.cover_url = None;
                     np.list_status = String::new();
                 }
             }
@@ -1170,6 +1210,7 @@ mod tests {
             progress: Some(0),
             total_episodes: Some(12),
             duration_min,
+            cover_url: None,
             position_sec: None,
             duration_sec: None,
             list_status: "CURRENT".into(),

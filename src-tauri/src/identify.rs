@@ -100,6 +100,9 @@ fn candidate_from(node: &Value) -> Option<matcher::Candidate> {
         titles,
         episodes: node.get("episodes").and_then(|v| v.as_u64()).map(|n| n as u32),
         duration_min: None,
+        // The identify pass scores titles; nothing downstream of it renders
+        // a presence card, so there is no cover to carry.
+        cover_url: None,
         progress: 0,
         status: String::new(),
     })

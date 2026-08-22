@@ -1355,6 +1355,7 @@ mod tests {
             titles: vec!["Sousou no Frieren".into()],
             episodes: Some(28),
             duration_min: Some(24),
+            cover_url: None,
             progress: 12,
             status: "CURRENT".into(),
         }]
@@ -1463,6 +1464,7 @@ mod tests {
             titles: vec!["Bocchi the Rock".into()],
             episodes,
             duration_min: Some(24),
+            cover_url: None,
             progress: 0,
             status: "CURRENT".into(),
         }]

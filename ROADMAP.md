@@ -95,9 +95,10 @@ quick look suggests.
   each needs a persistent affordance or a gesture.
 - **Right-click context menus become long-press**, and the app's own context
   menu (`shell/ContextMenu.tsx`) is built on `contextmenu` events.
-- **Ctrl+K, `/`, `j`/`k` and the roving arrow keys are meaningless** without a
-  keyboard. The command palette is a genuine loss; the keyboard sheet simply
-  would not ship.
+- **Ctrl+K, `/` and the roving arrow keys are meaningless** without a keyboard.
+  The command palette is a genuine loss; the keyboard sheet simply would not
+  ship. (This used to list `j`/`k` as well. There are no such bindings — the
+  only `k` in a handler is Ctrl+K for the palette.)
 - **The 1.44 MB Japanese woff2 subset.** CLAUDE.md documents why it cannot be
   trimmed — it renders arbitrary `title.native` in five call sites — and on a
   desktop that cost is paid once at install. On mobile data it is a real number,
@@ -136,14 +137,37 @@ What the choice costs, stated up front so it is not discovered later:
 - **The WebView is the renderer**, so performance is Android WebView's, not a
   native toolkit's. The list is already virtualized, which is the part that
   would hurt.
-- **`tauri-plugin-*` coverage is thinner on Android.** `single-instance`,
-  `global-shortcut` and the tray are desktop-only and simply do not apply;
-  `notification` and `opener` do work. The updater does not — distribution is
-  the Play Store or a sideloaded APK.
+- **`tauri-plugin-*` coverage is thinner on Android, and three of them are
+  compile errors rather than no-ops.** `tauri-plugin-single-instance`,
+  `tauri-plugin-global-shortcut` and `tauri-plugin-autostart` each carry
+  `#![cfg(not(any(target_os = "android", target_os = "ios")))]` at the *crate*
+  root — checked in the vendored sources, not assumed — so on Android the crate
+  compiles to nothing at all and every `tauri_plugin_x::init()` call in `lib.rs`
+  is an unresolved path. They have to be `#[cfg]`-gated at the call site.
+  `notification` and `opener` do work, and `updater` compiles but is not the
+  distribution model — that is the Play Store or a sideloaded APK.
 - **The keyring crate does not cover Android.** Token storage needs a Keystore
   implementation behind the same interface, and the rule it has to preserve is
   the one that already governs the desktop: the token stays in Rust and never
-  reaches the WebView.
+  reaches the WebView. Note *where* it is called from: `anilist/auth.rs` and
+  `playback/detection/jellyfin.rs` both use `keyring::Entry` with **no `cfg`
+  at all**, so neither compiles on Android as written.
+- **TLS needs an explicit init, and it fails at runtime rather than at build.**
+  `reqwest` 0.13 defaults to rustls, and the lockfile resolves
+  `rustls-platform-verifier` — which pulls `rustls-platform-verifier-android`.
+  That backend needs the JVM handed to it from the app's `Context` before any
+  request is made; without it every AniList call fails certificate validation
+  on a build that compiled cleanly. This is exactly the class of problem step 1
+  cannot find.
+- **The WebView has a hard floor: Chromium 111.** The emitted stylesheet uses
+  `color-mix()` **90 times** (counted in `dist/`, not estimated) — it is how
+  every accent shade is derived. Android System WebView updates through Play
+  and is current on most devices, but on one that is behind, the app does not
+  degrade: it renders unstyled.
+- **Sign-in is a localhost callback server.** `anilist/login.rs` binds
+  `TcpListener` on `127.0.0.1:46231` and AniList redirects to it. That model is
+  a desktop one; Android wants a custom scheme or an App Link, which means the
+  redirect URI registered with AniList differs per platform.
 - **Two build targets in CI**, and the Android one needs the NDK.
 
 ### The first slice, in order
@@ -154,11 +178,19 @@ scheduled — this is what "first efforts" would actually mean.
 1. **Prove the shell.** `tauri android init`, get a debug APK onto a device
    showing the existing UI. Nothing else. This is where WebView rendering,
    build times and the NDK either become a problem or stop being a question.
+
+   **This step cannot succeed as the tree stands.** `src-tauri/Cargo.toml` is
+   `crate-type = ["rlib"]`; an Android build links the Rust side as a shared
+   library, so `["staticlib", "cdylib", "rlib"]` has to come back first. The
+   comment above that line already calls it the one-line revert — it is step
+   zero, not a detail of step 2.
 2. **Split the platform-only Rust behind cfg.** `library.rs`, the Win32
    enumerator, SMTC/MPRIS, tray, hotkey, portable mode and the updater need
-   `#[cfg]` gates that leave a compiling Android build. The house rule applies:
-   a cfg'd **pair of functions**, never a cfg'd statement, or the arm nobody
-   compiles rots.
+   `#[cfg]` gates that leave a compiling Android build — and so do the two
+   `keyring` call sites (`anilist/auth.rs`, `playback/detection/jellyfin.rs`)
+   and the three plugin `init()` calls named above, none of which are gated
+   today. The house rule applies: a cfg'd **pair of functions**, never a cfg'd
+   statement, or the arm nobody compiles rots.
 3. **Token storage on Keystore**, behind the existing `auth.rs` interface.
    Sign-in, sign-out and a rejected token have to behave exactly as they do
    now — `sessionExpired` and the one banner are already the right shape.
@@ -185,3 +217,9 @@ and anything that assumes a keyboard.
    "without detection" is permanent.
 3. Whether the UI is a second set of screens in this repo or a separate one.
    Sharing `api/` and `lib/` is clearly right; sharing `pages/` is clearly not.
+
+### Already done, so nobody re-does it
+
+The Android **launcher icons are committed** — `src-tauri/icons/android/` holds
+the full `mipmap-*` set including `mipmap-anydpi-v26`. `tauri android init`
+generates these, so a first run will appear to have produced them; it did not.

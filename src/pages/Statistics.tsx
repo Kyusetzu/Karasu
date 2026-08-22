@@ -42,6 +42,7 @@ import { AreaChart } from "@/components/stats/AreaChart";
 import { Heatmap } from "@/components/stats/Heatmap";
 import {
   activityHeatmap,
+  heatmapFromHistory,
   scoreDelta,
   seasonalHistory,
   type ActivityHeatmap,
@@ -219,8 +220,23 @@ function StatisticsContent({
     () => scoreDelta(localEntries, 5, scoreScale(scoreFormat).max),
     [localEntries, scoreFormat],
   );
-  // When the list was worked on, from the fuzzy start/completion dates.
-  const heatmap = useMemo(() => activityHeatmap(localEntries), [localEntries]);
+  /**
+   * When the list was worked on.
+   *
+   * AniList's own record first, derived-from-the-list second. They are not the
+   * same measurement: the derived one can only ever see two events per entry —
+   * a start and a completion — and has to skip any fuzzy date with no month,
+   * because pinning "2019" to January fabricates a cell that reads exactly like
+   * a real one. The account's own history counts every recorded action and
+   * carries real timestamps.
+   *
+   * The fallback is not dead code: it is what local mode uses, where there is
+   * no account to ask, and what covers an account whose history is empty.
+   */
+  const heatmap = useMemo(
+    () => heatmapFromHistory(data?.stats?.activityHistory) ?? activityHeatmap(localEntries),
+    [data, localEntries],
+  );
   const seasons = useMemo(() => seasonalHistory(localEntries), [localEntries]);
 
   const breakdown = useMemo<Slice[]>(() => {

@@ -248,3 +248,49 @@ export function seasonalHistory(entries: MediaListEntry[]): SeasonCount[] {
     };
   });
 }
+
+/**
+ * AniList's own activity record, folded into the same year×month grid.
+ *
+ * Preferred over `activityHeatmap` wherever there is an account to ask,
+ * because the two are not the same measurement wearing different clothes:
+ *
+ * - `activityHeatmap` can only ever see **two** events per entry — a start and
+ *   a completion — so a year of steady episode-by-episode watching registers
+ *   as two cells. This counts every recorded action.
+ * - It also has to skip any fuzzy date with no month, since pinning "2019" to
+ *   January would fabricate a cell that reads exactly like a real one. AniList
+ *   stamps real timestamps, so nothing is dropped.
+ *
+ * The daily rows are summed into months rather than drawn per day: the grid
+ * the `Heatmap` component draws is year×month, and changing that is a
+ * different change from changing where the numbers come from.
+ *
+ * `date` is unix **seconds** and read in local time on purpose — the question
+ * "which month was I busy in" is asked from where the user is sitting.
+ */
+export function heatmapFromHistory(
+  history: { date: number; amount: number }[] | null | undefined,
+  maxYears = 8,
+): ActivityHeatmap | null {
+  const byYear = new Map<number, number[]>();
+  let total = 0;
+  for (const day of history ?? []) {
+    if (!Number.isFinite(day?.date) || !Number.isFinite(day?.amount)) continue;
+    const amount = Math.max(0, Math.trunc(day.amount));
+    if (amount === 0) continue;
+    const when = new Date(day.date * 1000);
+    const year = when.getFullYear();
+    const months = byYear.get(year) ?? Array.from({ length: 12 }, () => 0);
+    months[when.getMonth()] += amount;
+    byYear.set(year, months);
+    total += amount;
+  }
+  if (total === 0) return null;
+
+  const years = [...byYear.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .slice(-maxYears)
+    .map(([year, months]) => ({ year, months }));
+  return { years, max: Math.max(...years.flatMap((y) => y.months), 1), total };
+}

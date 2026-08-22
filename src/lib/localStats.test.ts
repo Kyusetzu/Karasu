@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   activityHeatmap,
+  heatmapFromHistory,
   localTotals,
   scoreDelta,
   seasonalHistory,
@@ -217,5 +218,55 @@ describe("localTotals", () => {
     expect(out.count).toBe(0);
     expect(out.meanScore).toBe(0);
     expect(out.byStatus).toEqual([]);
+  });
+});
+
+describe("heatmapFromHistory", () => {
+  // 2024-03-15 and 2024-03-20 UTC, then one in April.
+  const march = Math.floor(Date.UTC(2024, 2, 15, 12) / 1000);
+  const march2 = Math.floor(Date.UTC(2024, 2, 20, 12) / 1000);
+  const april = Math.floor(Date.UTC(2024, 3, 2, 12) / 1000);
+
+  it("sums days into the month grid the heatmap draws", () => {
+    const out = heatmapFromHistory([
+      { date: march, amount: 3 },
+      { date: march2, amount: 4 },
+      { date: april, amount: 1 },
+    ]);
+    expect(out).not.toBeNull();
+    expect(out!.years).toHaveLength(1);
+    expect(out!.years[0].year).toBe(2024);
+    expect(out!.years[0].months[2]).toBe(7);
+    expect(out!.years[0].months[3]).toBe(1);
+    expect(out!.total).toBe(8);
+    expect(out!.max).toBe(7);
+  });
+
+  /** Null, not an empty grid: the caller falls back to the derived heatmap,
+   *  and an empty grid would render as "you have never done anything". */
+  it("returns null when there is nothing recorded", () => {
+    expect(heatmapFromHistory([])).toBeNull();
+    expect(heatmapFromHistory(null)).toBeNull();
+    expect(heatmapFromHistory(undefined)).toBeNull();
+    expect(heatmapFromHistory([{ date: march, amount: 0 }])).toBeNull();
+  });
+
+  it("ignores malformed days rather than throwing", () => {
+    const out = heatmapFromHistory([
+      { date: NaN, amount: 5 },
+      { date: march, amount: NaN },
+      { date: march, amount: 2 },
+    ] as { date: number; amount: number }[]);
+    expect(out!.total).toBe(2);
+  });
+
+  it("keeps only the most recent years", () => {
+    const days = Array.from({ length: 12 }, (_, i) => ({
+      date: Math.floor(Date.UTC(2010 + i, 0, 15, 12) / 1000),
+      amount: 1,
+    }));
+    expect(heatmapFromHistory(days, 3)!.years.map((y) => y.year)).toEqual([
+      2019, 2020, 2021,
+    ]);
   });
 });

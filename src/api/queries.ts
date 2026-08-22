@@ -890,6 +890,8 @@ export interface MangaStats extends CommonStats {
 export interface UserStats {
   id: number;
   name: string;
+  /** AniList's own per-day activity record. Null on an account with none. */
+  stats: { activityHistory: ActivityHistoryDay[] | null } | null;
   statistics: { anime: AnimeStats; manga: MangaStats };
 }
 
@@ -902,6 +904,12 @@ query ($id: Int!) {
   User(id: $id) {
     id
     name
+    # AniList's own record of when the account was active, per day. Karasu used
+    # to derive a heatmap from list start/completion dates instead, which can
+    # only ever see two events per entry and skips every fuzzy date that has no
+    # month. This is the real thing, and it is two scalars on a request the
+    # statistics screen already makes.
+    stats { activityHistory { date amount } }
     statistics {
       anime {
         count
@@ -956,6 +964,12 @@ query ($id: Int!) {
  * `startYears.meanScore` arriving hundred-point for years, fetched and never
  * shown.
  */
+/** One day of AniList's own activity record. `date` is unix seconds, UTC. */
+export interface ActivityHistoryDay {
+  date: number;
+  amount: number;
+}
+
 export async function userStatistics(
   userId: number,
   format: ScoreFormat,

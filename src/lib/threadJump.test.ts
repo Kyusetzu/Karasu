@@ -5,8 +5,10 @@ import {
   refreshPlan,
   PAGE_DEPTH_CAP,
   canJump,
+  jumpRoute,
   jumpTarget,
   maxReachablePage,
+  parsePageInput,
 } from "./threadJump";
 
 describe("maxReachablePage", () => {
@@ -127,5 +129,73 @@ describe("pageAfterPosting", () => {
   it("admits when the end is unreachable", () => {
     expect(pageAfterPosting(703)).toBeNull();
     expect(pageAfterPosting(1706)).toBeNull();
+  });
+});
+
+describe("jumpRoute", () => {
+  /**
+   * The ordinary thread, and the one most at risk of regressing: everything
+   * inside the cap must keep taking the plain page, because a page arrives with
+   * ten root comments of context and a tree arrives with one conversation.
+   */
+  it("pages when AniList will serve the last page", () => {
+    expect(jumpRoute(1, 3236565)).toBe("page");
+    expect(jumpRoute(70, 3236565)).toBe("page");
+    // The exact boundary at the query's own page size — 500 x 10 = 5,000.
+    expect(jumpRoute(500, 3236565)).toBe("page");
+    // No reply comment to resolve does not matter while paging still reaches.
+    expect(jumpRoute(70, null)).toBe("page");
+  });
+
+  /**
+   * Thread 1 measured: 7,045 root comments, `lastPage: 705` at perPage 10, and
+   * the deepest servable page ends in 2021. `replyCommentId` is the only thing
+   * that reaches the reply posted today.
+   */
+  it("resolves the newest comment once paging cannot reach it", () => {
+    expect(jumpRoute(501, 3236565)).toBe("tree");
+    expect(jumpRoute(705, 3236565)).toBe("tree");
+    // Thread 15346: 70,348 root comments, 93% of it past the cap.
+    expect(jumpRoute(7035, 3236662)).toBe("tree");
+  });
+
+  /**
+   * Past the cap with nothing to resolve. A deleted newest comment is the real
+   * case — AniList answers "Not Found." for it — and the screen has to say the
+   * end was not reached rather than implying it was.
+   */
+  it("admits defeat rather than implying it reached the end", () => {
+    expect(jumpRoute(705, null)).toBe("capped");
+    expect(jumpRoute(705, undefined)).toBe("capped");
+    expect(jumpRoute(705, 0)).toBe("capped");
+  });
+
+  /** The cap is on entries, so the page size moves where the tier changes. */
+  it("follows the page size it is given", () => {
+    expect(jumpRoute(334, 1, 15)).toBe("tree");
+    expect(jumpRoute(333, 1, 15)).toBe("page");
+  });
+});
+
+describe("parsePageInput", () => {
+  /** The bug this exists for: Number("") is 0, and 0 is finite. */
+  it("treats an empty box as no instruction", () => {
+    expect(parsePageInput("", 500)).toBeNull();
+    expect(parsePageInput("   ", 500)).toBeNull();
+  });
+
+  it("refuses anything that is not a page", () => {
+    expect(parsePageInput("abc", 500)).toBeNull();
+    expect(parsePageInput("NaN", 500)).toBeNull();
+    expect(parsePageInput("Infinity", 500)).toBeNull();
+  });
+
+  it("clamps into what AniList will actually serve", () => {
+    expect(parsePageInput("1", 500)).toBe(1);
+    expect(parsePageInput("42", 500)).toBe(42);
+    expect(parsePageInput("0", 500)).toBe(1);
+    expect(parsePageInput("-7", 500)).toBe(1);
+    expect(parsePageInput("9999", 500)).toBe(500);
+    expect(parsePageInput("12.8", 500)).toBe(12);
   });
 });

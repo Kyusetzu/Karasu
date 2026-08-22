@@ -17,6 +17,7 @@ import {
   saveThreadComment,
   thread as fetchThread,
   threadComments,
+  threadCommentTree,
   toggleLike,
   toggleThreadSubscription,
   type CommentPage,
@@ -35,9 +36,12 @@ import { flattenComments, type FlatComment } from "@/lib/comments";
 import { nextPageParam } from "@/lib/paging";
 import {
   canJump,
+  jumpRoute,
   jumpTarget,
   pageAfterPosting,
+  parsePageInput,
   refreshPlan,
+  type JumpRoute,
 } from "@/lib/threadJump";
 import { relTimeFromSeconds } from "@/lib/relTime";
 import { validatePost } from "@/lib/composer";
@@ -47,50 +51,68 @@ import { showToast } from "@/stores/toast";
 import { useSocialActions } from "@/hooks/useSocialActions";
 import { cn } from "@/lib/utils";
 
+/**
+ * A tree is not a page, and this is what saying so looks like.
+ *
+ * `threadCommentTree` reaches the newest comment through a root LIST field, so
+ * there is no `pageInfo` to report and nothing downstream may act as if there
+ * were: `hasNextPage: false` is the load-bearing part, since a "Load more" under
+ * a conversation that has no next page would be a button to nowhere.
+ */
+const EMPTY_PAGE_INFO = { total: 0, currentPage: 1, lastPage: 1, hasNextPage: false };
+
 /** What the newest-reply jump came back with, and how it got there. */
 interface Newest extends CommentPage {
-  /** True when the second tier was needed — the copy differs. */
-  viaAuthor: boolean;
+  /**
+   * Which route answered — the copy differs per tier, and a boolean could not
+   * carry three outcomes.
+   */
+  via: JumpRoute;
 }
 
 /**
- * The newest reply, in one tier or two.
+ * The newest reply, by whichever route can actually reach it.
  *
- * **Tier 1** — the thread's own last page, when AniList will serve it. That is
- * nearly every thread (your thread 2340 is `lastPage: 70`) and it comes with
- * the surrounding conversation, which is what you actually want to read.
+ * **`"page"`** — the thread's own last page, when AniList will serve it. Nearly
+ * every thread (thread 2340 is `lastPage: 70`), and it arrives with ten root
+ * comments of surrounding conversation.
  *
- * **Tier 2** — when the 5,000-entry cap puts the end out of reach. Thread 1 is
- * the case: `lastPage: 703`, and page 500 — the deepest that answers — ends in
- * 2021 while the thread was replied to today. So it goes at the newest comment
- * through its *author* instead: `threadComments(threadId, userId:)` narrows to
- * the last replier's own comments, 123 of them there, well inside the cap, and
- * that set's final page holds the comment `repliedAt` refers to. Two requests,
- * behind an explicit press.
+ * **`"tree"`** — past the 5,000-entry cap. `Thread.replyCommentId` names the
+ * newest comment and `threadCommentTree` resolves it through a root LIST field
+ * the cap does not apply to, answering with the root of its conversation and
+ * everything under it. **One request, at any thread size** — thread 15346 is
+ * 70,348 root comments and costs exactly the same as thread 1.
  *
- * See `lib/threadJump` for the arithmetic and why `sort` cannot do any of this.
+ * This replaced a two-request walk through the last replier's own comments,
+ * which worked but returned that person's history rather than the exchange the
+ * newest reply belongs to. The screen had to apologise for the difference; now
+ * it does not have to.
+ *
+ * **`"capped"`** — past the cap with nothing to resolve. Lands as deep as
+ * allowed and says so.
+ *
+ * See `lib/threadJump` for the arithmetic, why `sort` cannot do any of this,
+ * and what the website does instead.
  */
 async function fetchNewest(
   threadId: number,
   lastPage: number,
-  replyUserId: number | null,
+  replyCommentId: number | null,
 ): Promise<Newest> {
-  const target = jumpTarget(lastPage);
-  if (target.reachable) {
-    return { ...(await threadComments(threadId, target.page)), viaAuthor: false };
+  const deepest = jumpTarget(lastPage).page;
+  if (jumpRoute(lastPage, replyCommentId) === "tree") {
+    const comments = await threadCommentTree(replyCommentId as number);
+    // A deleted newest comment answers "Not Found." and arrives as an empty
+    // list rather than an error, so the capped page is the honest fallback
+    // rather than an empty screen under a banner promising the newest reply.
+    if (comments.length > 0) {
+      return { pageInfo: EMPTY_PAGE_INFO, comments, via: "tree" };
+    }
+    return { ...(await threadComments(threadId, deepest)), via: "capped" };
   }
-  // Past the cap. Without an author to narrow by there is nothing better to do
-  // than land as deep as allowed, and the caller says so on screen.
-  if (replyUserId == null) {
-    return { ...(await threadComments(threadId, target.page)), viaAuthor: false };
-  }
-  const first = await threadComments(threadId, 1, replyUserId);
-  const authorEnd = jumpTarget(first.pageInfo.lastPage ?? 1);
-  // One page of theirs is the whole set — no second request needed.
-  if (authorEnd.page <= 1) return { ...first, viaAuthor: true };
   return {
-    ...(await threadComments(threadId, authorEnd.page, replyUserId)),
-    viaAuthor: true,
+    ...(await threadComments(threadId, deepest)),
+    via: jumpRoute(lastPage, replyCommentId),
   };
 }
 
@@ -152,17 +174,26 @@ export default function Thread() {
   const [target, setTarget] = useState<"newest" | number | null>(null);
   const [pageDraft, setPageDraft] = useState("");
   const lastPage = comments.data?.pages[0]?.pageInfo?.lastPage ?? null;
-  const replyUserId = th.data?.replyUser?.id ?? null;
+  /** What the uncapped route resolves — see `fetchNewest`. */
+  const replyCommentId = th.data?.replyCommentId ?? null;
 
   const newest = useQuery({
-    queryKey: ["social", "threadJump", threadId, target, lastPage, replyUserId],
+    // `lastPage` and `replyCommentId` decide the *route*, so they belong to the
+    // key only while a route is being chosen. On a numeric target they are
+    // noise that re-fetches an unchanged page whenever the thread gains a reply.
+    queryKey: [
+      "social",
+      "threadJump",
+      threadId,
+      target,
+      ...(target === "newest" ? [lastPage, replyCommentId] : []),
+    ],
     queryFn: () =>
       target === "newest"
-        ? fetchNewest(threadId, lastPage ?? 1, replyUserId)
-        : threadComments(threadId, target as number).then((p) => ({
-            ...p,
-            viaAuthor: false,
-          })),
+        ? fetchNewest(threadId, lastPage ?? 1, replyCommentId)
+        : threadComments(threadId, target as number).then(
+            (p): Newest => ({ ...p, via: "page" }),
+          ),
     enabled: isTauri && target != null && lastPage != null,
     staleTime: 60 * 1000,
   });
@@ -171,9 +202,8 @@ export default function Thread() {
   const maxPage = lastPage != null ? jumpTarget(lastPage).page : 1;
 
   const goToPage = () => {
-    const n = Number(pageDraft);
-    if (!Number.isFinite(n)) return;
-    setTarget(Math.min(Math.max(Math.trunc(n), 1), maxPage));
+    const page = parsePageInput(pageDraft, maxPage);
+    if (page !== null) setTarget(page);
   };
 
   // Memoized because it is not cheap and it ran on *every* render: it walks
@@ -583,45 +613,62 @@ export default function Thread() {
         {/* Page 1 is the oldest and there is no way to reverse that — see
             `lib/threadJump`. So on any thread past one page, the newest reply
             is somewhere the reader cannot get to by scrolling. */}
-        {canJump(lastPage) && (
+        {/* `|| target != null` so the way back never disappears. These controls
+            lived entirely under `canJump`, which reads `lastPage` from the
+            *paged* query — so a jump taken while that was known, followed by
+            anything that made it unknown, left the reader inside the jump view
+            with no button to leave it. */}
+        {(canJump(lastPage) || target != null) && (
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            <Button
-              variant={target === "newest" ? "outline" : "secondary"}
-              size="sm"
-              disabled={newest.isFetching}
-              onClick={() => setTarget((v) => (v === "newest" ? null : "newest"))}
-            >
-              <ArrowDownToLine className="size-3.5" />
-              {target === "newest" ? t("social.fromTheStart") : t("social.viewNewest")}
-            </Button>
+            {canJump(lastPage) && (
+              <>
+                {/* Deliberately *not* disabled while fetching: this is the way
+                    out, and a slow request is exactly when it is wanted. */}
+                <Button
+                  variant={target === "newest" ? "outline" : "secondary"}
+                  size="sm"
+                  onClick={() => setTarget((v) => (v === "newest" ? null : "newest"))}
+                >
+                  <ArrowDownToLine className="size-3.5" />
+                  {target === "newest"
+                    ? t("social.fromTheStart")
+                    : t("social.viewNewest")}
+                </Button>
 
             {/* One press to anywhere, including the deepest readable page.
                 Capped at what AniList will actually serve rather than at
                 `lastPage`, which on a big thread is a number you cannot ask
                 for — see `lib/threadJump`. */}
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                goToPage();
-              }}
-              className="flex items-center gap-1.5"
-            >
-              <label className="text-2xs text-ink-600" htmlFor="thread-page">
-                {t("social.pageOf", { max: maxPage })}
-              </label>
-              <Input
-                id="thread-page"
-                type="number"
-                min={1}
-                max={maxPage}
-                value={pageDraft}
-                onChange={(e) => setPageDraft(e.target.value)}
-                className="w-20"
-              />
-              <Button variant="ghost" size="sm" type="submit" disabled={newest.isFetching}>
-                {t("social.goToPage")}
-              </Button>
-            </form>
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    goToPage();
+                  }}
+                  className="flex items-center gap-1.5"
+                >
+                  <label className="text-2xs text-ink-600" htmlFor="thread-page">
+                    {t("social.pageOf", { max: maxPage })}
+                  </label>
+                  <Input
+                    id="thread-page"
+                    type="number"
+                    min={1}
+                    max={maxPage}
+                    value={pageDraft}
+                    onChange={(e) => setPageDraft(e.target.value)}
+                    className="w-20"
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    type="submit"
+                    disabled={newest.isFetching}
+                  >
+                    {t("social.goToPage")}
+                  </Button>
+                </form>
+              </>
+            )}
 
             {typeof target === "number" && (
               <Button variant="ghost" size="sm" onClick={() => setTarget(null)}>
@@ -636,7 +683,7 @@ export default function Thread() {
 
         {target != null ? (
           <>
-            {newest.isPending || newest.isFetching ? (
+            {newest.isPending ? (
               <div className="space-y-3">
                 <Shimmer className="h-16 w-full rounded-xl" />
                 <Shimmer className="h-16 w-full rounded-xl" />
@@ -647,13 +694,15 @@ export default function Thread() {
               </p>
             ) : (
               <>
-                {/* Said plainly, because tier 2 is a different thing from what
-                    the button promises: one person's recent comments rather
-                    than the tail of the conversation. Silently showing the
-                    narrower view would be the lie. */}
-                {newest.data?.viaAuthor && (
+                {/* Said plainly whenever the cap decided what arrived, because
+                    both of those tiers are a different thing from what the
+                    button promises. `"tree"` reaches the newest reply exactly
+                    but brings its conversation instead of its page; `"capped"`
+                    does not reach it at all. Showing either silently would be
+                    the lie. */}
+                {newest.data && newest.data.via !== "page" && (
                   <p className="mb-3 rounded-lg border border-gold/30 bg-gold/8 px-3 py-2 text-2xs leading-relaxed text-ink-300">
-                    {t("social.newestViaAuthor", {
+                    {t(newest.data.via === "tree" ? "social.newestViaTree" : "social.newestCapped", {
                       name: th.data?.replyUser?.name ?? "—",
                     })}{" "}
                     {data.siteUrl && (

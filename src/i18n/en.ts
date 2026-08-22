@@ -1049,8 +1049,11 @@ export const en = {
     viewNewest: "View newest replies",
     fromTheStart: "Back to the start",
     jumping: "Finding the newest…",
-    newestViaAuthor:
-      "AniList will not page past 5,000 comments, so these are {{name}}'s own recent comments — the newest reply is among them, but the conversation around it is not.",
+    // Two tiers past the 5,000-entry paging cap — see `lib/threadJump`.
+    newestViaTree:
+      "AniList will not page past 5,000 comments, so this is the newest reply — by {{name}} — shown with the conversation it belongs to rather than the page it is on.",
+    newestCapped:
+      "AniList will not page past 5,000 comments and this thread is longer, so this is as deep as it can be read. The newest replies are only on the website.",
     loadMorePlain: "Load more",
     loadingMore: "Loading …",
     // Favourites

@@ -64,9 +64,10 @@ src/
   pages/             one per route; settings/ holds the eight panes
   stores/            Zustand stores (auth, theme, library, nowPlaying, …)
 src-tauri/src/
-  commands/          76 of the 90 frontend-facing commands, by subject:
-                     auth · list · playback · prefs · system · update. The
-                     other 14 are the library scanner's, in `library.rs`.
+  commands/          93 of the 107 frontend-facing commands, by subject:
+                     auth · images · list · playback · prefs · system ·
+                     update. The other 14 are the library scanner's, in
+                     `library.rs`.
                      `mod.rs` re-exports all of it, so `commands::x` paths and
                      `generate_handler!` do not care which file a command is in.
                      Note what is *not* here: the entire social surface adds no
@@ -188,7 +189,7 @@ of AniList's own list fields, it costs nothing to carry, and the local list has
 stored it since schema v7. The rejected idea is tracking **purchases**, which
 would need price data the app has no source for.
 
-The schema is at **v14**. `library_match` (v8) holds the scanner's per-title
+The schema is at **v16**. `library_match` (v8) holds the scanner's per-title
 match confidence, which is what the local library's `exact` / `close` column
 reads. v9 adds `library_override` — the user's corrections, keyed on the parsed
 `(title, season)` with `season = -1` for a release name that carried none, and
@@ -240,6 +241,14 @@ once the user has touched it. Three `ALTER TABLE ADD COLUMN`s in one
 transaction, so they carry v7's `has_column` guard and the first column decides
 for all three. "Private" locally means left out of the MAL export; the JSON
 backup keeps the entry and carries the flag.
+
+v15 adds `media_id` to `notifications`, so a notification can link to the entry
+it is about. v16 adds `user_id` to `offline_queue`, and is a data-loss fix rather
+than a feature: `anilist_logout` cleared the token and the cached viewer but left
+the queue, and a queued row carried only a `mediaId` — so signing out of A and
+into B drained A's unsynced edits onto B's list, silently, on B's first list
+fetch. It backfills from the cached viewer and drops rows it cannot attribute,
+because clearing the queue on logout would defeat the point of having one.
 
 **AniList has two name spaces for a custom list, and only one is writable.**
 `MediaListCollection.lists[].name` is a *display* value: it upper-cases the
@@ -445,6 +454,40 @@ import it.
   query keeps it, pays for it with `perPage: 10`, and `lib/comments` flattens to
   two levels while reporting what it hides. Being untyped, "unexpected shape" is
   a normal outcome there rather than a defensive hypothetical.
+- **The website reaches a forum page Karasu cannot, and that is deliberate.**
+  anilist.co renders page 470 of thread 1 because its **Web Worker** posts to
+  **`anilist.co/graphql`** — a different endpoint from `graphql.anilist.co` —
+  with an `x-csrf-token` bound to a site session. That endpoint does not enforce
+  the 5,000-entry page-depth cap; without the header it answers **403
+  `Forbidden. (Use graphql subdomain)`**. An account does not lift the cap
+  either: the measurement was taken logged *out*, and the site needs the
+  separate endpoint for its own signed-in users too. Using it would mean
+  scraping a CSRF token and impersonating the website past an explicit access
+  control. **Do not.** The supported route is `Thread.replyCommentId` → the root
+  `ThreadComment(id:)` field, which is a **LIST rather than a `Page` and so is
+  not capped at all**; it resolves any id to the **root of its tree** and returns
+  the whole conversation in one request. `lib/threadJump` holds the arithmetic
+  and the rejected alternatives — the worker is also why a normal network trace
+  of anilist.co shows no GraphQL at all.
+- **One not-found root nulls every sibling on `ThreadComment` too.** The trap
+  `FOLLOW_COUNTS_QUERY` documents for `User` is not special to `User`: forty
+  aliased `ThreadComment(id:)` roots in one request all came back `null` with a
+  single `"Not Found."` because one comment had been deleted. Alias-batching
+  otherwise works there (20 roots for one request), which is exactly what makes
+  it tempting. Deleted comments are ordinary, so any id-walking scheme built on
+  it fails most times it runs.
+- **`ThreadComment(threadId:, userId:)` and `Page.threadComments(threadId:,
+  userId:)` are different resolvers.** The root field returned **1** comment for
+  a user in thread 1; the `Page` field returned **144**, because it includes
+  their nested replies and the root field does not. Unbounded
+  `ThreadComment(threadId:)` with no other filter answers **HTTP 500**.
+- **`Page.threadComments` returns `perPage + 1` rows, and the extra one is out
+  of sequence.** At `perPage: 10`, page 1 of thread 1 came back as
+  `17,18,19,23,30,`**`2088149`**`,32,40,43,44,53` and page 2 carried `1618189`
+  between `163` and `165` — eleven rows both times, while `pageInfo` kept
+  reporting `perPage: 10`. **Cause unknown**; it is recorded because each "Load
+  more" therefore draws one chronologically wrong row, not because it is
+  understood.
 - **Never round-trip source text through `encode("utf-8").decode("unicode_escape")`.**
   A script inserting i18n keys did, over text Python had already decoded, and
   every em-dash, arrow and umlaut came back a byte at a time as latin-1 —

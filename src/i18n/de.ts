@@ -1057,8 +1057,11 @@ export const de: typeof en = {
     viewNewest: "Neueste Antworten ansehen",
     fromTheStart: "Zurück zum Anfang",
     jumping: "Suche die neuesten…",
-    newestViaAuthor:
-      "AniList blättert nicht über 5.000 Kommentare hinaus, daher sind dies die eigenen letzten Kommentare von {{name}} — die neueste Antwort ist dabei, das Gespräch drumherum nicht.",
+    // Zwei Stufen jenseits der 5.000-Einträge-Grenze — siehe `lib/threadJump`.
+    newestViaTree:
+      "AniList blättert nicht über 5.000 Kommentare hinaus, daher ist dies die neueste Antwort — von {{name}} — gezeigt mit dem Gespräch, zu dem sie gehört, statt mit der Seite, auf der sie steht.",
+    newestCapped:
+      "AniList blättert nicht über 5.000 Kommentare hinaus und dieser Thread ist länger, daher ist dies das Tiefste, was lesbar ist. Die neuesten Antworten gibt es nur auf der Website.",
     loadMorePlain: "Mehr laden",
     loadingMore: "Lädt …",
     // Favoriten

@@ -675,11 +675,20 @@ export async function threads(
  * possible on a thread too big to page to the end of.
  *
  * Two scalars on a request already being made. AniList caps paging at 5,000
- * entries, so on thread 1 (7,030 comments) the last *reachable* page ends in
- * 2021 while the thread was replied to today — but `threadComments(threadId,
- * userId:)` narrows to the last replier's own comments, a set small enough to
- * page to the end of, and its final page holds `replyCommentId` with a
- * `createdAt` equal to `repliedAt`. Verified end to end. See `lib/threadJump`.
+ * entries, so on thread 1 (7,045 root comments) the last *reachable* page ends
+ * in 2021 while the thread was replied to today. `replyCommentId` is the way
+ * out: `THREAD_COMMENT_TREE_QUERY` resolves it through a root LIST field that
+ * the cap does not apply to, and answers with the whole conversation it sits
+ * in. One request, and it does not care how big the thread is.
+ *
+ * `replyUser` is no longer load-bearing for the jump — it names the last
+ * replier on screen. The route it used to drive (`threadComments(threadId,
+ * userId:)`, paged to that author's own last page) did work and was verified:
+ * Kento46 has 144 comments in thread 1 and the final page of them does hold
+ * `replyCommentId`. It was replaced because it arrives without the conversation
+ * around it, which is the thing a reader opened the thread for.
+ *
+ * See `lib/threadJump`.
  */
 export const THREAD_QUERY = `
 query ($id: Int!) {
@@ -757,6 +766,56 @@ export async function threadComments(
     { threadId, page, userId: userId ?? null },
   );
   return { pageInfo: data.Page.pageInfo, comments: data.Page.threadComments ?? [] };
+}
+
+/**
+ * One comment and everything under it, with **no page-depth cap**.
+ *
+ * `Page.threadComments` cannot reach past 5,000 entries, which puts the end of
+ * every big thread out of reach — thread 1 is 7,045 root comments and thread
+ * 15346 is 70,348, so 71% and 7% of them are readable that way. This is the way
+ * around it, and the difference is that `ThreadComment` is a **root LIST field
+ * rather than a `Page`**: the cap is a property of paging, so nothing here is
+ * capped.
+ *
+ * Two measured behaviours it depends on:
+ *
+ * 1. **It resolves to the *root* of the tree, not to the id asked for.**
+ *    `ThreadComment(id: 3236565)` — thread 1's `replyCommentId` — answers with
+ *    comment `3236562` by a different user, and the id asked for is three
+ *    levels down inside its `childComments`. That is the whole point: the reply
+ *    arrives with the conversation around it rather than on its own.
+ * 2. **A missing id answers `"Not Found."` and returns `null`.** Deleted
+ *    comments are ordinary, so the caller treats an empty list as "no tree",
+ *    not as an error. It is also why this is never aliased beside anything
+ *    else: one not-found root nulls every sibling in the same request, the way
+ *    `FOLLOW_COUNTS_QUERY` documents for `User`. Verified here too — forty
+ *    aliased `ThreadComment` roots all came back null because one id was gone.
+ *
+ * `sort` is not passed for the same reason `THREAD_COMMENTS_QUERY` omits it.
+ */
+export const THREAD_COMMENT_TREE_QUERY = `
+query ($id: Int!) {
+  ThreadComment(id: $id) {
+    id comment likeCount isLiked createdAt siteUrl
+    user { ${SOCIAL_USER} }
+    childComments
+  }
+}`;
+
+/**
+ * The newest reply's conversation, in one request.
+ *
+ * Returns the raw list `flattenComments` already takes — same shape as
+ * `threadComments().comments`, so the render path does not change. Empty when
+ * the comment has been deleted.
+ */
+export async function threadCommentTree(id: number): Promise<unknown[]> {
+  const data = await gql<{ ThreadComment: unknown[] | null }>(
+    THREAD_COMMENT_TREE_QUERY,
+    { id },
+  );
+  return data.ThreadComment ?? [];
 }
 
 export const SAVE_THREAD_COMMENT_MUTATION = `

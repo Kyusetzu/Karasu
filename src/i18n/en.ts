@@ -1166,8 +1166,11 @@ export const en = {
       "Karasu picks titles with its own setting and ignores this one.",
     alOverrideAdult:
       "Karasu filters adult content with its own setting, which is the stricter of the two.",
+    // The coupling needs *both* switches on, which is what `anilistCoversAiring`
+    // checks and what the note on the Detection pane is gated behind. Stating it
+    // unconditionally here contradicted that screen.
     alOverrideAiring:
-      "Karasu reads this one. While it is on, a new episode reaches you as a desktop notification and its bell row comes from AniList — the row that opens the entry. Switch it off and Karasu writes that row itself.",
+      "Karasu reads this one. While it and Karasu’s own airing notifications are both on, a new episode reaches you as a desktop notification and its bell row comes from AniList — the row that opens the entry. With either one off, Karasu writes that row itself.",
     alOverrideWhere: "Karasu’s setting →",
     alListOptions: "List display",
     rescale: "Rescale scores",
@@ -1235,8 +1238,10 @@ export const en = {
       "Shown, not editable. AniList replaces the whole set when it is written, and has no undo — so Karasu will not send them. Edit these on anilist.co.",
     alCustomListsNone: "None",
     alNotifications: "AniList notifications",
+    // Not "AniList's own site" — these decide what AniList *creates*, and
+    // Karasu's bell has an AniList tab that renders all of it. See `Bell`.
     alNotificationsHint:
-      "What AniList notifies you about, on its own site. Karasu’s notifications are separate and live under Detection.",
+      "What AniList notifies you about. Nineteen of these also decide what appears in Karasu’s own bell, under its AniList tab — turning one off means the notification is never created, so neither place shows it. Karasu’s own notifications are separate and live under Detection.",
     alNotifActivityMessage: "Private messages",
     alNotifActivityReply: "Replies to my activity",
     alNotifFollowing: "New followers",
@@ -1249,7 +1254,10 @@ export const en = {
     alNotifActivityReplyLike: "Likes on my replies",
     alNotifThreadLike: "Likes on my threads",
     alNotifThreadCommentLike: "Likes on my forum comments",
-    alNotifReplySubscribed: "Replies to threads I follow",
+    // *Activity*, not threads — `alNotifThreadSubscribed` above is the forum
+    // one, and this was labelled as a second copy of it. Karasu's own bell
+    // renders this type as "replied to an activity you follow".
+    alNotifReplySubscribed: "Replies to activity I follow",
     alNotifRelatedMedia: "Related titles added",
     alNotifMediaDataChange: "Title data changed",
     alNotifMediaMerge: "Titles merged",

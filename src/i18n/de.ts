@@ -1177,7 +1177,7 @@ export const de: typeof en = {
     alOverrideAdult:
       "Karasu filtert Adult-Inhalte mit seiner eigenen Einstellung, und zwar der strengeren von beiden.",
     alOverrideAiring:
-      "Diese Einstellung liest Karasu. Solange sie an ist, erreicht dich eine neue Folge als Desktop-Benachrichtigung, und die Zeile in der Glocke kommt von AniList — die Zeile, die den Eintrag öffnet. Schaltest du sie aus, schreibt Karasu die Zeile selbst.",
+      "Diese Einstellung liest Karasu. Solange sie und Karasus eigene Folgen-Benachrichtigungen beide an sind, erreicht dich eine neue Folge als Desktop-Benachrichtigung, und die Zeile in der Glocke kommt von AniList — die Zeile, die den Eintrag öffnet. Ist eine von beiden aus, schreibt Karasu die Zeile selbst.",
     alOverrideWhere: "Karasus Einstellung →",
     alListOptions: "Listenanzeige",
     rescale: "Bewertungen umskalieren",
@@ -1247,7 +1247,7 @@ export const de: typeof en = {
     alCustomListsNone: "Keine",
     alNotifications: "AniList-Benachrichtigungen",
     alNotificationsHint:
-      "Worüber AniList dich auf seiner eigenen Seite benachrichtigt. Karasus Benachrichtigungen sind davon getrennt und liegen unter Erkennung.",
+      "Worüber AniList dich benachrichtigt. Neunzehn davon bestimmen auch, was in Karasus eigener Glocke im AniList-Tab erscheint — ist eine aus, wird die Benachrichtigung gar nicht erst erzeugt und taucht an keiner der beiden Stellen auf. Karasus eigene Benachrichtigungen sind davon getrennt und liegen unter Erkennung.",
     alNotifActivityMessage: "Private Nachrichten",
     alNotifActivityReply: "Antworten auf meine Aktivität",
     alNotifFollowing: "Neue Follower",
@@ -1260,7 +1260,7 @@ export const de: typeof en = {
     alNotifActivityReplyLike: "Likes auf meine Antworten",
     alNotifThreadLike: "Likes auf meine Threads",
     alNotifThreadCommentLike: "Likes auf meine Forenkommentare",
-    alNotifReplySubscribed: "Antworten in abonnierten Threads",
+    alNotifReplySubscribed: "Antworten auf abonnierte Aktivitäten",
     alNotifRelatedMedia: "Verwandte Titel hinzugefügt",
     alNotifMediaDataChange: "Titeldaten geändert",
     alNotifMediaMerge: "Titel zusammengeführt",

@@ -496,7 +496,8 @@ export function AniListListOptionsSection() {
  * Twenty toggles, collapsed.
  *
  * Seventeen of them are about AniList's own site and email, which a Karasu user
- * will never touch — unrolled they bury the four override warnings above, which
+ * will never touch — unrolled they bury the three override warnings above
+ * (`LOCAL_OVERRIDES` has exactly three keys, and a test pins the list), which
  * are the important content of this pane.
  *
  * Its own query with `staleTime: 0`, because `UpdateUser(notificationOptions:)`

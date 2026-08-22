@@ -1,11 +1,26 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { ExternalLink, Image, Play } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { fetchBioImage, isTauri } from "@/api/anilist";
 import { cn } from "@/lib/utils";
-import type { MdInline } from "@/lib/anilistMarkdown";
+import type { ChipWidth, MdInline } from "@/lib/anilistMarkdown";
+
+/**
+ * Whether the nodes being rendered are already inside a link.
+ *
+ * A linked image — `[img33(pic)](target)` — puts the chip *inside* the link's
+ * children, which `anilistMarkdown.test.ts` pins as the real shape bios use. So
+ * both the anchor and the image's own button called `openUrl`, and one click
+ * opened two tabs: the picture and the link's target. `Chip` and `Spoiler` sit
+ * in the same position and double-fired identically.
+ *
+ * Context rather than a prop because `RichText` recurses into its own children:
+ * a prop would have to be threaded through every branch of the switch, and the
+ * one branch that forgot would be the bug all over again.
+ */
+const InLink = createContext(false);
 
 /**
  * Renders inline nodes as React elements. The only renderer for user-written
@@ -70,7 +85,16 @@ export function ExternalAnchor({
  * shipped before. About one profile in twelve is images and nothing else, so
  * that fallback is still the entire visible content of those.
  */
-function InlineImage({ host, href }: { host: string; href: string }) {
+function InlineImage({
+  host,
+  href,
+  width,
+}: {
+  host: string;
+  href: string;
+  width?: ChipWidth;
+}) {
+  const inLink = useContext(InLink);
   const [src, setSrc] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -90,11 +114,30 @@ function InlineImage({ host, href }: { host: string; href: string }) {
   // the paragraph around it, and a bio is mostly one paragraph.
   if (!src) return null;
 
+  // The author's declared width, applied as an inline style rather than a
+  // class: Tailwind's scanner only ever sees literal source, so a computed
+  // `w-[33px]` would emit no rule at all and silently do nothing.
+  const style = width ? { width: `${width.value}${width.unit}` } : undefined;
+
+  // Inside a link the surrounding anchor is already the click target, so this
+  // renders as a plain image. See `InLink`.
+  if (inLink) {
+    return (
+      <span
+        style={style}
+        className="my-1 inline-block max-w-full overflow-hidden rounded-lg border border-surface-800 align-middle"
+      >
+        <img src={src} alt="" loading="lazy" className="max-h-80 w-full object-contain" />
+      </span>
+    );
+  }
+
   return (
     <button
       type="button"
       onClick={() => void openUrl(href)}
       title={href}
+      style={style}
       // **Inline-level, not `block`.** `~~~centered~~~` renders as
       // `text-align: center` (see the `center` case in `Markdown.tsx`, whose
       // comment says exactly this), and `text-align` does nothing to a block
@@ -111,7 +154,10 @@ function InlineImage({ host, href }: { host: string; href: string }) {
         src={src}
         alt=""
         loading="lazy"
-        className="max-h-80 max-w-full object-contain"
+        // `w-full` rather than `max-w-full` so a declared width on the wrapper
+        // is what decides the size; without a declared width the wrapper is
+        // shrink-to-fit and the two are the same thing.
+        className="max-h-80 w-full object-contain"
       />
     </button>
   );
@@ -126,20 +172,36 @@ function InlineImage({ host, href }: { host: string; href: string }) {
  */
 function Chip({ kind, host, href }: { kind: "image" | "video"; host: string; href: string }) {
   const { t } = useTranslation();
+  const inLink = useContext(InLink);
   const Icon = kind === "image" ? Image : Play;
-  return (
-    <button
-      type="button"
-      onClick={() => void openUrl(href)}
-      title={href}
-      className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-surface-700 bg-surface-850 px-2 py-1 align-middle text-xs text-ink-300 transition-surface hover:border-surface-600 hover:text-ink-100"
-    >
+  const className =
+    "inline-flex max-w-full items-center gap-1.5 rounded-lg border border-surface-700 bg-surface-850 px-2 py-1 align-middle text-xs text-ink-300 transition-surface hover:border-surface-600 hover:text-ink-100";
+  const body = (
+    <>
       <Icon className="size-3.25 shrink-0 text-ink-500" />
       <span className="truncate">
         {kind === "image" ? t("social.mdImage") : t("social.mdVideo")}
       </span>
       {host && <span className="shrink-0 truncate text-ink-600">· {host}</span>}
       <ExternalLink className="size-2.75 shrink-0 text-ink-600" />
+    </>
+  );
+  // Inside a link the anchor is already the click target — see `InLink`.
+  if (inLink) {
+    return (
+      <span title={href} className={className}>
+        {body}
+      </span>
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={() => void openUrl(href)}
+      title={href}
+      className={className}
+    >
+      {body}
     </button>
   );
 }
@@ -156,7 +218,12 @@ function Spoiler({ children }: { children: ReactNode }) {
   return (
     <button
       type="button"
-      onClick={() => setShown(true)}
+      onClick={(e) => {
+        // Revealing a spoiler inside a link must not also follow the link —
+        // `ExternalAnchor` listens on the bubble. See `InLink`.
+        e.stopPropagation();
+        setShown(true);
+      }}
       className="rounded bg-surface-700 px-1.5 text-xs text-ink-500 transition-surface hover:text-ink-300"
     >
       {t("social.mdSpoiler")}
@@ -205,11 +272,15 @@ export function RichText({ nodes }: { nodes: MdInline[] }) {
             // internal path is safe to hand to the router.
             return n.href.startsWith("/") ? (
               <Link key={i} to={n.href} className="text-accent-400 hover:underline">
-                <RichText nodes={n.children} />
+                <InLink.Provider value={true}>
+                  <RichText nodes={n.children} />
+                </InLink.Provider>
               </Link>
             ) : (
               <ExternalAnchor key={i} href={n.href}>
-                <RichText nodes={n.children} />
+                <InLink.Provider value={true}>
+                  <RichText nodes={n.children} />
+                </InLink.Provider>
               </ExternalAnchor>
             );
           case "mention":
@@ -229,11 +300,23 @@ export function RichText({ nodes }: { nodes: MdInline[] }) {
               </Spoiler>
             );
           case "chip":
-            // Images are attempted inline; video is always a chip.
-            return n.kind === "image" ? (
-              <InlineImage key={i} host={n.host} href={n.href} />
+            // Keyed by href as well as position. `InlineImage` holds `failed`
+            // in state, and an index-only key makes React reuse the instance
+            // when the *document* changes under it — so the undebounced live
+            // preview in `ProfileEditModal` latched one 404 and every image
+            // typed after it rendered as a failure.
+            //
+            // Images are attempted inline; video is always a chip, and so is an
+            // image past `MAX_INLINE_IMAGES`.
+            return n.kind === "image" && !n.capped ? (
+              <InlineImage
+                key={`${i}:${n.href}`}
+                host={n.host}
+                href={n.href}
+                width={n.width}
+              />
             ) : (
-              <Chip key={i} kind={n.kind} host={n.host} href={n.href} />
+              <Chip key={`${i}:${n.href}`} kind={n.kind} host={n.host} href={n.href} />
             );
         }
       })}

@@ -54,8 +54,63 @@ export type MdInline =
   | { type: "link"; href: string; children: MdInline[] }
   | { type: "mention"; name: string }
   | { type: "spoiler"; children: MdInline[] }
-  | { type: "chip"; kind: "image" | "video"; host: string; href: string }
+  | {
+      type: "chip";
+      kind: "image" | "video";
+      host: string;
+      href: string;
+      /** The author's declared width, if they gave one. See `ChipWidth`. */
+      width?: ChipWidth;
+      /**
+       * Render as a chip and make no request. See `capExcessImages`.
+       *
+       * Only ever set on `kind: "image"`; a video is never fetched anyway.
+       */
+      capped?: true;
+    }
   | { type: "br" };
+
+/**
+ * The width an author asked for, parsed and clamped.
+ *
+ * AniList documents `img###(url)` as "the width in **pixels**, such as `420`"
+ * (thread 6125, "Anilist-Flavored Markdown"), which settles a reading that
+ * could otherwise only be guessed at: `img33(u)` is a 33px icon, not a third of
+ * the column. The `%` spelling is not in that documentation but is accepted by
+ * the same syntax and appears in real bios, so it is carried through as a
+ * percentage rather than silently read as pixels.
+ *
+ * This was being **discarded**: the size group was non-capturing, so `img33(u)`
+ * and `img200%(u)` rendered identically to `img(u)`. This module's own header
+ * records that 24 of 44 sampled bios use this form, so it was the common case
+ * that was being ignored, not an edge.
+ *
+ * Clamped here rather than at the render site so that no consumer can be handed
+ * a number it has to re-validate — a width is either absent or usable.
+ */
+export interface ChipWidth {
+  value: number;
+  unit: "px" | "%";
+}
+
+/** Beyond this a declared pixel width is a mistake or an attack, not a layout. */
+const MAX_IMAGE_PX = 2000;
+
+/**
+ * `undefined` for no declared size, and for any size that is not a width.
+ *
+ * A percentage above 100 is clamped rather than dropped: the author did mean
+ * "as wide as possible", and `max-w-full` would bound it anyway.
+ */
+export function parseImageWidth(token: string | undefined): ChipWidth | undefined {
+  if (!token) return undefined;
+  const percent = token.endsWith("%");
+  const value = Number.parseInt(percent ? token.slice(0, -1) : token, 10);
+  if (!Number.isFinite(value) || value < 1) return undefined;
+  return percent
+    ? { value: Math.min(value, 100), unit: "%" }
+    : { value: Math.min(value, MAX_IMAGE_PX), unit: "px" };
+}
 
 /** Block content. `center` is the only nesting container. */
 export type MdNode =
@@ -112,7 +167,7 @@ const RE = {
   emScore: /_(?!\s)([^_\n]+?)_/y,
   code: /`([^`\n]+)`/y,
   // AniList's own image form, with an optional size: img(u) img33(u) img200%(u)
-  image: /img(?:\d+%?)?\(\s*([^)\s]+)\s*\)/iy,
+  image: /img(\d+%?)?\(\s*([^)\s]+)\s*\)/iy,
   mdImage: /!\[[^\]]*\]\(\s*([^)\s]+)\s*\)/y,
   video: /(?:youtube|webm)\(\s*([^)\s]+)\s*\)/iy,
   link: /\[([^\]]*)\]\(\s*([^)\s]+)\s*\)/y,
@@ -260,7 +315,9 @@ function parseInline(src: string): MdInline[] {
       const img = at(RE.image, src, i);
       if (img) {
         flush();
-        pushChip(out, "image", img[1]);
+        // Group 1 is the declared size, group 2 the URL — the size group used
+        // to be non-capturing, which is why the URL was `img[1]`.
+        pushChip(out, "image", img[2], parseImageWidth(img[1]));
         i += img[0].length;
         continue;
       }
@@ -330,11 +387,25 @@ function parseInline(src: string): MdInline[] {
   return out;
 }
 
-function pushChip(out: MdInline[], kind: "image" | "video", raw: string) {
+function pushChip(
+  out: MdInline[],
+  kind: "image" | "video",
+  raw: string,
+  width?: ChipWidth,
+) {
   const href = safeHref(raw);
   // An unusable URL leaves nothing behind — better than a chip that goes
   // nowhere. This is also what swallows `img(data:…)`.
-  if (href) out.push({ type: "chip", kind, host: hostOf(href), href });
+  if (!href) return;
+  // `width` is omitted rather than set to undefined: the safety test in
+  // `anilistMarkdown.test.ts` walks `Object.keys`, and a key that is always
+  // present but usually meaningless is noise in exactly the check that exists
+  // to make an unexpected field visible.
+  out.push(
+    width
+      ? { type: "chip", kind, host: hostOf(href), href, width }
+      : { type: "chip", kind, host: hostOf(href), href },
+  );
 }
 
 // --- Blocks ---------------------------------------------------------------
@@ -512,6 +583,65 @@ function startsBlock(line: string): boolean {
 }
 
 /**
+ * How many images one document may fetch.
+ *
+ * Every inlined image is a separate bounded request made by Rust
+ * (`commands/images.rs`), issued from an effect the moment the node mounts —
+ * so the count is decided by whoever wrote the bio, and they are all in flight
+ * at once. Nothing stops a crafted profile reaching several hundred, and that
+ * is a request fan-out a single page view should not be able to ask for.
+ *
+ * Past the cap the chip is still rendered, so nothing disappears — it is the
+ * same fallback a refused host or an oversized file already produces.
+ */
+export const MAX_INLINE_IMAGES = 24;
+
+/**
+ * Marks image chips past `MAX_INLINE_IMAGES`, in document order.
+ *
+ * A walk over the finished tree rather than a counter threaded through the
+ * parser: the cap is a property of the whole document, and the inline parser
+ * runs per block with no idea what came before it.
+ */
+function capExcessImages(nodes: MdNode[]): void {
+  let seen = 0;
+  const inline = (list: MdInline[]) => {
+    for (const n of list) {
+      switch (n.type) {
+        case "chip":
+          if (n.kind === "image" && ++seen > MAX_INLINE_IMAGES) n.capped = true;
+          break;
+        case "strong":
+        case "em":
+        case "strike":
+        case "link":
+        case "spoiler":
+          inline(n.children);
+          break;
+      }
+    }
+  };
+  const block = (list: MdNode[]) => {
+    for (const n of list) {
+      switch (n.type) {
+        case "p":
+        case "h":
+        case "quote":
+          inline(n.children);
+          break;
+        case "list":
+          for (const item of n.items) inline(item);
+          break;
+        case "center":
+          block(n.children);
+          break;
+      }
+    }
+  };
+  block(nodes);
+}
+
+/**
  * Parses AniList markdown. Never throws, and never returns a node carrying
  * markup — see the union above.
  */
@@ -523,7 +653,9 @@ export function parseAniListMarkdown(
   const truncated = text.length > limit;
   // Before anything else: this is what bounds the parse, not just the output.
   const bounded = truncated ? text.slice(0, limit) : text;
-  return { nodes: parseBlocks(bounded.replace(/\r\n?/g, "\n").split("\n")), truncated };
+  const nodes = parseBlocks(bounded.replace(/\r\n?/g, "\n").split("\n"));
+  capExcessImages(nodes);
+  return { nodes, truncated };
 }
 
 /**

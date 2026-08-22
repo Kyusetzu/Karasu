@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  MAX_INLINE_IMAGES,
   parseAniListMarkdown,
+  parseImageWidth,
   renderPlain,
   type MdInline,
   type MdNode,
@@ -18,6 +20,9 @@ const INLINE_TYPES = new Set([
  *  smuggled through as data. */
 const ALLOWED_FIELDS = new Set([
   "type", "text", "children", "level", "items", "ordered", "href", "name", "kind", "host",
+  // Both are plain data on a chip and neither can carry markup: `width` is a
+  // clamped number plus a unit from a closed union, `capped` is a boolean.
+  "width", "capped",
 ]);
 
 function walk(
@@ -33,6 +38,15 @@ function walk(
 
 function parse(src: string) {
   return parseAniListMarkdown(src).nodes;
+}
+
+/** Every chip in a document, in order — `walk` already knows the whole union. */
+function chipsOf(src: string) {
+  const out: Extract<MdInline, { type: "chip" }>[] = [];
+  walk(parse(src), (n) => {
+    if (n.type === "chip") out.push(n);
+  });
+  return out;
 }
 
 /** Concatenated text of a tree, for asserting "the tag went, the words stayed". */
@@ -300,6 +314,54 @@ describe("images and embeds become chips, never pictures", () => {
   it("emits no img element anywhere — the whole point", () => {
     expect(types(parse(`img(https://i.imgur.com/a.png)`))).not.toContain("image");
     expect(types(parse(`img(https://i.imgur.com/a.png)`))).toContain("chip");
+  });
+
+  /**
+   * The size group was non-capturing, so every one of these rendered at the
+   * same size as a bare `img(u)` — and this module's header records that 24 of
+   * 44 sampled bios use the sized form.
+   */
+  it("keeps the width the author asked for", () => {
+    const chip = (src: string) => chipsOf(src)[0];
+
+    expect(chip("img33(https://i.imgur.com/a.png)")).toMatchObject({
+      href: "https://i.imgur.com/a.png",
+      width: { value: 33, unit: "px" },
+    });
+    expect(chip("img200%(https://i.imgur.com/a.png)")).toMatchObject({
+      width: { value: 100, unit: "%" },
+    });
+    // No declared size carries no width at all, rather than a default.
+    expect(chip("img(https://i.imgur.com/a.png)")).not.toHaveProperty("width");
+  });
+
+  /** AniList documents `###` as pixels (thread 6125); absurd values are not a
+   *  layout, so they clamp rather than reaching the DOM. */
+  it("clamps a width that is not a layout", () => {
+    expect(parseImageWidth("999999")).toEqual({ value: 2000, unit: "px" });
+    expect(parseImageWidth("500%")).toEqual({ value: 100, unit: "%" });
+    expect(parseImageWidth("0")).toBeUndefined();
+    expect(parseImageWidth(undefined)).toBeUndefined();
+    expect(parseImageWidth("")).toBeUndefined();
+  });
+
+  /**
+   * Each inlined image is its own bounded request in Rust, all issued at mount.
+   * Past the cap the chip still renders — nothing disappears, it just stops
+   * being a network call a stranger's bio gets to make.
+   */
+  it("stops inlining past the per-document cap", () => {
+    const src = Array.from(
+      { length: MAX_INLINE_IMAGES + 3 },
+      (_, i) => `img(https://i.imgur.com/${i}.png)`,
+    ).join(" ");
+    const chips = chipsOf(src);
+
+    expect(chips).toHaveLength(MAX_INLINE_IMAGES + 3);
+    expect(chips.filter((c) => !("capped" in c))).toHaveLength(MAX_INLINE_IMAGES);
+    expect(chips.filter((c) => "capped" in c)).toHaveLength(3);
+    // In document order: it is the last ones that stop, not an arbitrary set.
+    expect(chips.slice(0, MAX_INLINE_IMAGES).every((c) => !("capped" in c))).toBe(true);
   });
 
   it("handles an image nested inside a link, as real bios write it", () => {

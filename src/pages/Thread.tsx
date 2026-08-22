@@ -301,6 +301,18 @@ export default function Thread() {
       qc.setQueryData(["social", "thread", threadId], (old: typeof th.data) =>
         old ? { ...old, isSubscribed: res?.isSubscribed ?? !old.isSubscribed } : old,
       );
+      // The Forum's Subscribed lens is a different query key with a ten-minute
+      // `staleTime`, `refetchOnWindowFocus: false` and a thirty-minute
+      // `gcTime`, and `/forum` is a separate route — so it unmounts and
+      // remounts against a still-fresh cache. Subscribe, go back within ten
+      // minutes, and it serves the cached empty page without issuing a
+      // request. `NewThreadModal` already does the equivalent after creating a
+      // thread, which AniList auto-subscribes you to.
+      //
+      // `removeQueries`, not `invalidateQueries`: this is an infinite query, so
+      // invalidation makes the next mount refetch *every* retained page out of
+      // the shared ~30/min budget. Dropping the pages makes it cost one.
+      qc.removeQueries({ queryKey: ["social", "forum", "subscribed"] });
     },
     onError: () => showToast({ kind: "error", text: t("social.subscribeFailed") }),
   });

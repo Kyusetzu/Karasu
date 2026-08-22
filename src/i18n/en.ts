@@ -550,7 +550,7 @@ export const en = {
     searchPrompt: "Two characters is enough to start.",
     noThreads: "No threads here.",
     noSearchResults: "Nothing matches that.",
-    noSubscriptions: "You aren't subscribed to any threads.",
+    noSubscriptions: "Nothing subscribed here yet.",
     noSubscriptionsHint: "Open a thread and subscribe to follow its replies.",
     subscribedNeedsAccount: "Subscriptions need an AniList account.",
     newThread: "New thread",

@@ -551,7 +551,7 @@ export const de: typeof en = {
     searchPrompt: "Zwei Zeichen genügen.",
     noThreads: "Hier gibt es keine Threads.",
     noSearchResults: "Dafür gibt es keine Treffer.",
-    noSubscriptions: "Du hast keine Threads abonniert.",
+    noSubscriptions: "Hier ist noch nichts abonniert.",
     noSubscriptionsHint: "Öffne einen Thread und abonniere ihn, um Antworten zu folgen.",
     subscribedNeedsAccount: "Abos brauchen ein AniList-Konto.",
     newThread: "Neuer Thread",

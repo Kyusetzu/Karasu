@@ -20,6 +20,7 @@ export function CoverCell({
   score,
   adult,
   blurred,
+  revealLabel,
   progress,
   actions,
   overlay,
@@ -45,6 +46,9 @@ export function CoverCell({
    * never reach a card at all. That is correct rather than a gap.
    */
   adult?: boolean;
+  /** Accessible name for the reveal button — the title, so a grid does not
+      announce thirty identical "Show"s. */
+  revealLabel?: string;
   /**
    * Blur the artwork until it is clicked — the softer half of the content
    * filter, for someone who wants explicit titles *present* but not on display.
@@ -90,7 +94,9 @@ export function CoverCell({
   // uncovered is exactly when you would want it covered again.
   const { t } = useTranslation();
   const [revealed, setRevealed] = useState(false);
-  const veiled = blurred && !revealed;
+  // `cover != null` because a missing cover has nothing to veil: it used to
+  // put a 45% wash and a "Show" pill over an empty `bg-surface-800` box.
+  const veiled = blurred && !revealed && cover != null;
 
   const art = cover && (
     <img
@@ -145,13 +151,23 @@ export function CoverCell({
         {veiled && (
           <button
             type="button"
+            aria-label={revealLabel ?? t("settings.blurReveal")}
             onClick={(e) => {
               // The cover is a link; revealing must not also navigate.
               e.preventDefault();
               e.stopPropagation();
               setRevealed(true);
             }}
-            className="absolute inset-0 z-10 grid place-items-center bg-[rgba(4,5,8,.45)] text-2xs font-semibold text-ink-100"
+            // **No `z-` class.** It had `z-10`, and the status ring, both
+            // badges, the action circles and the progress bar all sit at
+            // `z-index: auto` — CSS paints a positive z-index positioned
+            // descendant after auto ones regardless of tree order, and
+            // hit-testing follows paint order. So the veil covered the edit
+            // pencil and the add/status circle: a visibly-enabled control that
+            // did nothing on click, while Tab+Enter still fired it. Plain
+            // `absolute` is enough — the veil follows the art and the scrim in
+            // tree order and precedes everything that must sit above it.
+            className="absolute inset-0 grid place-items-center bg-[rgba(4,5,8,.45)] text-2xs font-semibold text-ink-100"
           >
             <span className="rounded-full bg-[rgba(4,5,8,.85)] px-2.5 py-1">
               {t("settings.blurReveal")}

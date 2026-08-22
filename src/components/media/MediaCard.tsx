@@ -9,6 +9,7 @@ import { CoverCell, CoverMeta } from "@/components/media/CoverCell";
 import { saveListEntry } from "@/api/anilist";
 
 import { formatLabel } from "@/lib/format";
+import { displayTitle } from "@/api/types";
 import { statusColorVar } from "@/lib/statusColors";
 import { useCachedEntry } from "@/hooks/useCachedEntry";
 import { shouldBlur } from "@/lib/contentFilter";
@@ -88,6 +89,7 @@ export default function MediaCard({
       score={media.averageScore != null ? `${media.averageScore}%` : null}
       adult={media.isAdult === true}
       blurred={shouldBlur(media, level, blurAdult)}
+      revealLabel={displayTitle(media.title)}
       data-media-id={media.id}
       data-media-type={media.type}
       actions={

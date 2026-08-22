@@ -40,6 +40,7 @@ import { GradientBars } from "@/components/stats/GradientBars";
 import { DotPlot } from "@/components/stats/DotPlot";
 import { AreaChart } from "@/components/stats/AreaChart";
 import { Heatmap } from "@/components/stats/Heatmap";
+import { ExternalAnchor } from "@/components/RichText";
 import { DayHeatmap } from "@/components/stats/DayHeatmap";
 import {
   activityHeatmap,
@@ -305,14 +306,16 @@ function StatisticsContent({
               統計
             </span>
           </div>
-          <a
+          {/* The one place in the app that used a raw target="_blank"
+              anchor. The WebView has no tabs to open one in, so the click
+              went nowhere; `ExternalAnchor` routes it through the opener
+              plugin like every other outbound link. */}
+          <ExternalAnchor
             href={siteUrl}
-            target="_blank"
-            rel="noreferrer"
             className="flex items-center gap-1 text-xs text-accent-400 hover:underline"
           >
             {name} <ExternalLink className="size-2.75" />
-          </a>
+          </ExternalAnchor>
         </div>
         <Link to="/wrapped">
           <Button variant="secondary" size="sm">

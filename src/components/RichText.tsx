@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import { fetchBioImage, isTauri } from "@/api/anilist";
 import { cn } from "@/lib/utils";
 import type { ChipWidth, MdInline } from "@/lib/anilistMarkdown";
+import { internalRoute } from "@/lib/anilistUrl";
 
 /**
  * Whether the nodes being rendered are already inside a link.
@@ -267,11 +268,14 @@ export function RichText({ nodes }: { nodes: MdInline[] }) {
                 {n.text}
               </code>
             );
-          case "link":
-            // The parsers guarantee http/https or a leading slash, so an
-            // internal path is safe to hand to the router.
-            return n.href.startsWith("/") ? (
-              <Link key={i} to={n.href} className="text-accent-400 hover:underline">
+          case "link": {
+            // The parsers guarantee http/https or a leading slash. A leading
+            // slash is already ours; an anilist.co URL the app can draw is
+            // routed inward too — `internalRoute` says which, and answers
+            // null for everything that must stay in the browser.
+            const to = n.href.startsWith("/") ? n.href : internalRoute(n.href);
+            return to !== null ? (
+              <Link key={i} to={to} className="text-accent-400 hover:underline">
                 <InLink.Provider value={true}>
                   <RichText nodes={n.children} />
                 </InLink.Provider>
@@ -283,6 +287,7 @@ export function RichText({ nodes }: { nodes: MdInline[] }) {
                 </InLink.Provider>
               </ExternalAnchor>
             );
+          }
           case "mention":
             return (
               <Link

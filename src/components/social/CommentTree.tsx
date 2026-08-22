@@ -1,7 +1,8 @@
+import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { CornerDownRight, ExternalLink } from "lucide-react";
+import { CornerDownRight, ExternalLink, Heart, Reply } from "lucide-react";
 import type { FlatComment } from "@/lib/comments";
 import { UserLockup } from "@/components/ui/user-lockup";
 import { Markdown } from "./Markdown";
@@ -16,7 +17,28 @@ import { cn } from "@/lib/utils";
  * dropping a 48-deep chain silently — makes Karasu look like it lost the
  * conversation rather than declined to render it.
  */
-export function CommentTree({ comments }: { comments: FlatComment[] }) {
+export function CommentTree({
+  comments,
+  onLike,
+  onReply,
+  replyingTo,
+  children,
+}: {
+  comments: FlatComment[];
+  /** Omitted when there is nobody to like as — the button then does not exist. */
+  onLike?: (c: FlatComment) => void;
+  /**
+   * Opens a reply box under this comment. AniList nests arbitrarily deep but
+   * `lib/comments` renders two levels, so a reply to a *reply* is still
+   * parented to the reply — the API accepts it, and it lands where the second
+   * level already is rather than inventing a third that nothing would draw.
+   */
+  onReply?: (c: FlatComment) => void;
+  /** Which comment currently has the box open, if any. */
+  replyingTo?: number | null;
+  /** The box itself, supplied by the caller so this file stays a renderer. */
+  children?: ReactNode;
+}) {
   const { t, i18n } = useTranslation();
 
   return (
@@ -66,6 +88,33 @@ export function CommentTree({ comments }: { comments: FlatComment[] }) {
           </div>
 
           <Markdown source={c.comment} className="mt-2" />
+
+          <div className="mt-2 flex items-center gap-1">
+            {onLike && (
+              <button
+                onClick={() => onLike(c)}
+                aria-pressed={c.isLiked}
+                className={cn(
+                  "flex items-center gap-1 rounded-md px-1.5 py-0.5 text-2xs transition-surface hover:bg-surface-850",
+                  c.isLiked ? "text-danger" : "text-ink-600 hover:text-ink-300",
+                )}
+              >
+                <Heart className={cn("size-2.75", c.isLiked && "fill-current")} />
+                <span className="tabular-nums">{c.likeCount}</span>
+              </button>
+            )}
+            {onReply && (
+              <button
+                onClick={() => onReply(c)}
+                className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-2xs text-ink-600 transition-surface hover:bg-surface-850 hover:text-ink-300"
+              >
+                <Reply className="size-2.75" />
+                {t("social.reply")}
+              </button>
+            )}
+          </div>
+
+          {replyingTo === c.id && children}
 
           {c.hiddenReplies > 0 && c.depth === 1 && (
             <button

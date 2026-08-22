@@ -920,6 +920,7 @@ export const en = {
     addPlanning: "Add to Planning",
   },
   social: {
+    reply: "Reply",
     // Profile
     notFound: "No such user",
     notFoundHint: "AniList has no account by that name. It may have been renamed or deleted.",

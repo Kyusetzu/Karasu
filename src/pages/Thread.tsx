@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router";
 import { useTranslation } from "react-i18next";
@@ -17,6 +17,7 @@ import {
   saveThreadComment,
   thread as fetchThread,
   threadComments,
+  toggleLike,
   toggleThreadSubscription,
   type CommentPage,
 } from "@/api/social";
@@ -29,7 +30,7 @@ import { isNotFound } from "@/lib/apiError";
 import { Shimmer } from "@/components/Skeleton";
 import { Markdown } from "@/components/social/Markdown";
 import { CommentTree } from "@/components/social/CommentTree";
-import { flattenComments } from "@/lib/comments";
+import { flattenComments, type FlatComment } from "@/lib/comments";
 import { nextPageParam } from "@/lib/paging";
 import { canJump, jumpTarget } from "@/lib/threadJump";
 import { relTimeFromSeconds } from "@/lib/relTime";
@@ -157,6 +158,55 @@ export default function Thread() {
     [newest.data],
   );
 
+  /**
+   * Optimistic like state for comments, kept here rather than in the query
+   * cache.
+   *
+   * Thread comments arrive inside a raw `childComments` JSON blob that
+   * `lib/comments` flattens on read, so there is no tidy cached shape to patch
+   * — and `useSocialActions` deliberately skips `THREAD_COMMENT` for exactly
+   * that reason. An overlay applied after flattening is the honest version:
+   * it survives a re-render, and it is dropped the moment the page unmounts,
+   * which is also when the cache it is overlaying goes.
+   */
+  const [likes, setLikes] = useState<Map<number, { likeCount: number; isLiked: boolean }>>(
+    new Map(),
+  );
+  const applyLikes = useCallback(
+    (list: FlatComment[]) => list.map((c) => ({ ...c, ...(likes.get(c.id) ?? {}) })),
+    [likes],
+  );
+
+  const [replyTo, setReplyTo] = useState<number | null>(null);
+  const [replyDraft, setReplyDraft] = useState("");
+
+  const likeComment = (c: FlatComment) => {
+    const now = likes.get(c.id) ?? { likeCount: c.likeCount, isLiked: c.isLiked };
+    const next = {
+      likeCount: now.likeCount + (now.isLiked ? -1 : 1),
+      isLiked: !now.isLiked,
+    };
+    setLikes((m) => new Map(m).set(c.id, next));
+    toggleLike(c.id, "THREAD_COMMENT")
+      .then((res) => {
+        // AniList returns the authoritative count; replace the guess rather
+        // than keeping it, which is where a race with the website resolves.
+        if (res) setLikes((m) => new Map(m).set(c.id, { likeCount: res.likeCount, isLiked: res.isLiked }));
+      })
+      .catch(() => {
+        setLikes((m) => new Map(m).set(c.id, now));
+        showToast({ kind: "error", text: t("social.likeFailed") });
+      });
+  };
+
+  const openReply = (c: FlatComment) => {
+    setReplyTo((open) => (open === c.id ? null : c.id));
+    // Pre-filled with the mention, because a reply two levels deep renders
+    // beside its sibling rather than under it — naming who it answers is the
+    // only thing that keeps the thread readable.
+    setReplyDraft(c.user?.name ? `@${c.user.name} ` : "");
+  };
+
   const subscribe = useMutation({
     mutationFn: (next: boolean) => toggleThreadSubscription(threadId, next),
     onSuccess: (res) => {
@@ -165,6 +215,32 @@ export default function Thread() {
       );
     },
     onError: () => showToast({ kind: "error", text: t("social.subscribeFailed") }),
+  });
+
+  const replyMutation = useMutation({
+    mutationFn: (vars: { text: string; parentId: number }) =>
+      saveThreadComment(threadId, vars.text, vars.parentId),
+    // Same non-optimistic rule as the top-level box below, for the same reason.
+    onSuccess: () => {
+      setReplyTo(null);
+      setReplyDraft("");
+      // The reply lands inside its parent's `childComments`, so the page it is
+      // on has to be re-read. Page 1 only — `refetch()` would re-read every
+      // retained page, which on a long thread is a handful of requests.
+      qc.setQueryData<{ pages: CommentPage[]; pageParams: unknown[] }>(
+        ["social", "threadComments", threadId],
+        (old) =>
+          old ? { pages: old.pages.slice(0, 1), pageParams: old.pageParams.slice(0, 1) } : old,
+      );
+      void comments.refetch();
+      void newest.refetch();
+    },
+    onError: () =>
+      showToast({
+        kind: "error",
+        text: t("social.commentFailed"),
+        detail: t("social.commentFailedDetail"),
+      }),
   });
 
   const comment = useMutation({
@@ -191,6 +267,37 @@ export default function Thread() {
         action: { label: t("common.retry"), run: () => comment.mutate(text) },
       }),
   });
+
+  // One reply box, rendered under whichever comment asked for it. Shared by
+  // both views, so the newest-replies jump can be answered into as well.
+  const replyBox = (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        const check = validatePost(replyDraft);
+        if (!check.ok || replyTo == null || replyMutation.isPending) return;
+        replyMutation.mutate({ text: check.text, parentId: replyTo });
+      }}
+      className="mt-2 space-y-1.5"
+    >
+      <textarea
+        value={replyDraft}
+        onChange={(e) => setReplyDraft(e.target.value)}
+        rows={3}
+        autoFocus
+        placeholder={t("social.replyPlaceholder")}
+        className="w-full resize-y rounded-lg border border-surface-700 bg-surface-950 p-2 text-sm text-ink-100 placeholder:text-ink-600 focus:border-accent-500 focus:outline-none"
+      />
+      <div className="flex items-center gap-2">
+        <Button size="sm" type="submit" disabled={!validatePost(replyDraft).ok || replyMutation.isPending}>
+          {replyMutation.isPending ? t("social.posting") : t("social.postReply")}
+        </Button>
+        <Button size="sm" variant="ghost" type="button" onClick={() => setReplyTo(null)}>
+          {t("common.cancel")}
+        </Button>
+      </div>
+    </form>
+  );
 
   if (!Number.isFinite(threadId) || threadId <= 0) {
     return (
@@ -256,6 +363,9 @@ export default function Thread() {
 
   const data = th.data;
   const check = validatePost(draft);
+  // No like or reply affordance without an account or on a locked thread — a
+  // button that can only fail is worse than no button.
+  const canPost = mode === "anilist" && !data.isLocked;
 
   return (
     <div className="mx-auto max-w-3xl px-8 pb-12 pt-7">
@@ -407,7 +517,14 @@ export default function Thread() {
                     )}
                   </p>
                 )}
-                <CommentTree comments={newestFlat} />
+                <CommentTree
+                  comments={applyLikes(newestFlat)}
+                  onLike={canPost ? likeComment : undefined}
+                  onReply={canPost ? openReply : undefined}
+                  replyingTo={replyTo}
+                >
+                  {replyBox}
+                </CommentTree>
               </>
             )}
           </>
@@ -417,7 +534,14 @@ export default function Thread() {
             {!comments.isLoading && flat.length === 0 && (
               <p className="text-sm text-ink-600">{t("social.noComments")}</p>
             )}
-            <CommentTree comments={flat} />
+            <CommentTree
+              comments={applyLikes(flat)}
+              onLike={canPost ? likeComment : undefined}
+              onReply={canPost ? openReply : undefined}
+              replyingTo={replyTo}
+            >
+              {replyBox}
+            </CommentTree>
 
             {comments.hasNextPage && (
               <div className="pt-3">

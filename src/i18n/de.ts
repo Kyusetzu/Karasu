@@ -926,6 +926,7 @@ export const de: typeof en = {
     addPlanning: "Zu Geplant hinzufügen",
   },
   social: {
+    reply: "Antworten",
     // Profil
     notFound: "Kein solcher Nutzer",
     notFoundHint:

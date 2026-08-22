@@ -88,6 +88,20 @@ export function useSocialActions() {
     );
   };
 
+  /**
+   * `THREAD_COMMENT` is handled by the caller, not here — the three arms below
+   * skip it explicitly rather than letting it fall through.
+   *
+   * It used to fall into the `patchActivity` branch, which is a real bug and
+   * not a cosmetic one: a comment id and an activity id are different id
+   * spaces that overlap numerically, so liking a comment could flip the like
+   * state of whichever unrelated activity happened to share its number. The
+   * same trap the offline queue documents for `save` versus `delete`.
+   *
+   * It is not patched here instead because thread comments live inside a raw
+   * `childComments` JSON blob that `lib/comments` flattens on read — there is
+   * no tidy cache shape to patch. `Thread.tsx` keeps a small overlay of its own.
+   */
   const like = useMutation({
     mutationFn: (vars: { id: number; type: LikeableType; activityId?: number }) =>
       toggleLikeApi(vars.id, vars.type),
@@ -97,7 +111,7 @@ export function useSocialActions() {
         patchReply(vars.activityId, vars.id, flipLike);
       } else if (vars.type === "THREAD") {
         patchThread(vars.id, flipLike);
-      } else {
+      } else if (vars.type !== "THREAD_COMMENT") {
         patchActivity(vars.id, flipLike);
       }
     },
@@ -110,7 +124,7 @@ export function useSocialActions() {
         patchReply(vars.activityId, vars.id, settle);
       } else if (vars.type === "THREAD") {
         patchThread(vars.id, settle);
-      } else {
+      } else if (vars.type !== "THREAD_COMMENT") {
         patchActivity(vars.id, settle);
       }
     },
@@ -121,7 +135,7 @@ export function useSocialActions() {
         patchReply(vars.activityId, vars.id, flipLike);
       } else if (vars.type === "THREAD") {
         patchThread(vars.id, flipLike);
-      } else {
+      } else if (vars.type !== "THREAD_COMMENT") {
         patchActivity(vars.id, flipLike);
       }
       showToast({

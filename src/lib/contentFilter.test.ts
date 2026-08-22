@@ -4,6 +4,7 @@ import {
   isBlocked,
   isBlockedGenre,
   toLevel,
+  shouldBlur,
 } from "./contentFilter";
 
 const hentai = { isAdult: true, genres: ["Hentai"] };
@@ -82,5 +83,34 @@ describe("toLevel", () => {
     expect(toLevel(undefined)).toBe("strict");
     expect(toLevel("")).toBe("strict");
     expect(toLevel("nonsense")).toBe("strict");
+  });
+});
+
+describe("shouldBlur", () => {
+  const adult = { isAdult: true, genres: ["Hentai"] };
+  const ecchi = { isAdult: false, genres: ["Ecchi"] };
+  const plain = { isAdult: false, genres: ["Action"] };
+
+  /** The case it exists for: filter Off, so the title is on screen, but the
+   *  artwork should not arrive unannounced. */
+  it("veils an explicit title when the filter lets it through", () => {
+    expect(shouldBlur(adult, "off", true)).toBe(true);
+  });
+
+  it("does nothing when the setting is off", () => {
+    expect(shouldBlur(adult, "off", false)).toBe(false);
+  });
+
+  /** Ecchi is an ordinary genre — blurring it would blur a large slice of an
+   *  ordinary list, which is the level's job to decide, not this one's. */
+  it("only ever veils isAdult, never a suggestive genre", () => {
+    expect(shouldBlur(ecchi, "off", true)).toBe(false);
+    expect(shouldBlur(plain, "off", true)).toBe(false);
+  });
+
+  it("survives a missing media object", () => {
+    expect(shouldBlur(null, "off", true)).toBe(false);
+    expect(shouldBlur(undefined, "off", true)).toBe(false);
+    expect(shouldBlur({}, "off", true)).toBe(false);
   });
 });

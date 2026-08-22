@@ -634,6 +634,7 @@ export const de: typeof en = {
     hintClose: "Ctrl K schließen",
   },
   detail: {
+    notOnList: "Nicht auf deiner Liste",
     favourite: "Favorit",
     favourited: "Favorisiert",
     favouriteAria: "Zu Favoriten hinzufügen",
@@ -1413,6 +1414,10 @@ export const de: typeof en = {
     contentHint_strict: "Blendet explizite (18+) und anzügliche Titel aus.",
     contentSaveFailed:
       "Diese Einstellung wurde nicht gespeichert ({{message}}) und daher zurückgesetzt.",
+    blurAdult: "Explizite Bilder unkenntlich machen",
+    blurAdultHint:
+      "Cover werden verwischt, bis du sie anklickst. Betrifft nur Titel, die der Filter oben durchlässt.",
+    blurReveal: "Anzeigen",
     contentNote:
       "Gilt überall, auch für deine eigene Liste. Tracking und Wiedergabe funktionieren für ausgeblendete Titel weiterhin.",
     discord: "Discord Rich Presence",

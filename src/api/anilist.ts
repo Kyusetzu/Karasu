@@ -277,6 +277,11 @@ export const syncStatus = () => invoke<SyncStatus>("sync_status");
 export const fetchBioImage = (url: string) =>
   invoke<string>("fetch_bio_image", { url });
 
+/** Blur explicit artwork until clicked. Independent of the filter level. */
+export const getBlurAdult = () => invoke<boolean>("get_blur_adult");
+export const setBlurAdult = (blur: boolean) =>
+  invoke<void>("set_blur_adult", { blur });
+
 // --- Sign-in merge (local list -> AniList) ---------------------------------
 
 export interface LocalEntryRow {

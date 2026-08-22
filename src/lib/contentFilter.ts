@@ -78,3 +78,27 @@ export function toLevel(value: string | null | undefined): ContentFilterLevel {
     ? value
     : "strict";
 }
+
+/**
+ * Whether explicit artwork should arrive blurred rather than bare.
+ *
+ * Deliberately *not* folded into `isBlocked`. The level decides what reaches
+ * the screen at all; this decides how what does reach it looks — and the two
+ * cannot both apply, because a title the level blocks is never rendered. In
+ * practice that means this only ever matters with the filter Off, which is
+ * exactly when someone is most likely to want the softer option: see the work
+ * rather than hide it, but not have it appear unannounced.
+ *
+ * `isAdult` only. Ecchi is an ordinary genre and blurring every ecchi cover
+ * would blur a large slice of an ordinary list.
+ */
+export function shouldBlur(
+  media: Filterable | null | undefined,
+  level: ContentFilterLevel,
+  blurAdult: boolean,
+): boolean {
+  if (!blurAdult || !media?.isAdult) return false;
+  // Belt and braces: a blocked title is not rendered, so this is unreachable
+  // for it — but a render site that forgot `isBlocked` should still blur.
+  return !isBlocked(media, level) || level !== "off";
+}

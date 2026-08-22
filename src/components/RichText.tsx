@@ -95,7 +95,14 @@ function InlineImage({ host, href }: { host: string; href: string }) {
       type="button"
       onClick={() => void openUrl(href)}
       title={href}
-      className="my-1 block max-w-full overflow-hidden rounded-lg border border-surface-800"
+      // **Inline-level, not `block`.** `~~~centered~~~` renders as
+      // `text-align: center` (see the `center` case in `Markdown.tsx`, whose
+      // comment says exactly this), and `text-align` does nothing to a block
+      // box — so a `block` image sat hard left inside a centred bio while the
+      // text around it centred correctly. The chip this replaced was
+      // `inline-flex` and inherited the alignment for free; this has to be
+      // inline-level for the same reason.
+      className="my-1 inline-block max-w-full overflow-hidden rounded-lg border border-surface-800 align-middle"
     >
       {/* Bios embed 2000px GIFs, which is why the chip never had a layout
           problem and this does. Capped rather than scaled to the column so a

@@ -190,6 +190,28 @@ pub fn get_content_filter(db: State<'_, Db>) -> String {
     read_content_filter(&db)
 }
 
+/// Whether explicit artwork is blurred until clicked.
+///
+/// Separate from the *level*, because they answer different questions. The
+/// level decides what reaches the screen at all; this decides how what does
+/// reach it arrives. It is only ever consulted for titles the level allowed
+/// through, which in practice means the filter is Off — at moderate and strict
+/// an adult title is excluded server-side and never gets here.
+///
+/// Defaults to **on**: the cost of a blur the user did not want is one click,
+/// and the cost of the opposite is explicit art appearing unasked.
+const BLUR_ADULT_KEY: &str = "blur_adult";
+
+#[tauri::command]
+pub fn get_blur_adult(db: State<'_, Db>) -> bool {
+    db.kv_get(BLUR_ADULT_KEY).as_deref() != Some("0")
+}
+
+#[tauri::command]
+pub fn set_blur_adult(db: State<'_, Db>, blur: bool) -> Result<(), String> {
+    db.kv_set(BLUR_ADULT_KEY, if blur { "1" } else { "0" })
+}
+
 #[tauri::command]
 pub fn set_content_filter(db: State<'_, Db>, level: String) -> Result<(), String> {
     if level != "off" && level != "moderate" && level != "strict" {

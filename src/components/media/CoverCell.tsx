@@ -1,8 +1,9 @@
-import type { HTMLAttributes, ReactNode } from "react";
+import { useState, type HTMLAttributes, type ReactNode } from "react";
 import { Link } from "react-router";
 import { Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { HERO_ATTR } from "@/hooks/useViewTransitions";
+import { useTranslation } from "react-i18next";
 
 /**
  * One cover in a grid: the artwork, whatever is laid over it, and the lines
@@ -18,6 +19,7 @@ export function CoverCell({
   cover,
   score,
   adult,
+  blurred,
   progress,
   actions,
   overlay,
@@ -43,6 +45,13 @@ export function CoverCell({
    * never reach a card at all. That is correct rather than a gap.
    */
   adult?: boolean;
+  /**
+   * Blur the artwork until it is clicked — the softer half of the content
+   * filter, for someone who wants explicit titles *present* but not on display.
+   * See `shouldBlur`; the badge above still shows through, so the cell is never
+   * an unexplained grey rectangle.
+   */
+  blurred?: boolean;
   /** Draws the bar flush to the bottom edge. Omit when there is no total. */
   progress?: { current: number; total: number } | null;
   /** Overlaid bottom-right — the action circles. */
@@ -76,6 +85,13 @@ export function CoverCell({
     ? Math.min((progress.current / progress.total) * 100, 100)
     : 0;
 
+  // Revealed per cell and forgotten on unmount: a reveal that persisted would
+  // be a second setting nobody asked for, and scrolling back to a grid you had
+  // uncovered is exactly when you would want it covered again.
+  const { t } = useTranslation();
+  const [revealed, setRevealed] = useState(false);
+  const veiled = blurred && !revealed;
+
   const art = cover && (
     <img
       src={cover}
@@ -87,7 +103,12 @@ export function CoverCell({
       // snapshot make the browser skip the pairing altogether — and a grid
       // holds dozens of these.
       {...{ [HERO_ATTR]: "" }}
-      className="h-full w-full object-cover"
+      className={cn(
+        "h-full w-full object-cover transition-[filter] duration-(--duration-expressive)",
+        // `scale-105` because a blur samples past the element's edge and would
+        // otherwise leave a soft transparent rim around the artwork.
+        veiled && "scale-105 blur-xl",
+      )}
     />
   );
 
@@ -118,6 +139,25 @@ export function CoverCell({
         <div className="cover-scrim pointer-events-none absolute inset-x-0 bottom-0 h-14" />
 
         {overlay}
+
+        {/* Over the art and under the badges, so the 18+ mark stays legible —
+            the cell has to say *why* it is covered. */}
+        {veiled && (
+          <button
+            type="button"
+            onClick={(e) => {
+              // The cover is a link; revealing must not also navigate.
+              e.preventDefault();
+              e.stopPropagation();
+              setRevealed(true);
+            }}
+            className="absolute inset-0 z-10 grid place-items-center bg-[rgba(4,5,8,.45)] text-2xs font-semibold text-ink-100"
+          >
+            <span className="rounded-full bg-[rgba(4,5,8,.85)] px-2.5 py-1">
+              {t("settings.blurReveal")}
+            </span>
+          </button>
+        )}
 
         {/* Above the hover scrim, below the badges: a wash that dimmed the ring
             would make an entry look like it had left the list. */}

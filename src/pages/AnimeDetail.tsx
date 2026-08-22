@@ -49,6 +49,9 @@ import {
   mediaStatusLabel,
   sourceLabel,
 } from "@/lib/format";
+import { statusColorVar } from "@/lib/statusColors";
+import { readableInk, UI_INK } from "@/lib/contrast";
+import { useTheme } from "@/stores/theme";
 import { formatMinutes, remainingMinutes } from "@/lib/estimate";
 import { isTauri, saveListEntry } from "@/api/anilist";
 import {
@@ -91,6 +94,9 @@ export default function AnimeDetail() {
   const episodes = useLibrary((s) => s.episodes[mediaId]);
   const play = useLibrary((s) => s.play);
   const level = useContentFilter((s) => s.level);
+  // The raw hexes, not the `var()`: `readableInk` needs a colour it can
+  // measure, and a CSS variable is opaque to it.
+  const statusColors = useTheme((st) => st.statusColors);
   const [revealed, setRevealed] = useState(false);
 
   const { data, isLoading, error } = useQuery({
@@ -128,6 +134,17 @@ export default function AnimeDetail() {
   }
 
   const title = displayTitle(data.title);
+
+  // The list entry, for the badge under the title. `mediaListEntry` rides on
+  // `DETAIL_QUERY`, so this costs nothing beyond what the page already fetched.
+  const entry = data.mediaListEntry;
+  const total = data.type === "MANGA" ? data.chapters : data.episodes;
+  const progressLabel =
+    entry && entry.progress > 0
+      ? total
+        ? `· ${entry.progress} / ${total}`
+        : `· ${entry.progress}`
+      : null;
 
   const coverSrc = data.coverImage.extraLarge ?? data.coverImage.large ?? "";
 
@@ -202,6 +219,35 @@ export default function AnimeDetail() {
                 <p className="text-sm text-ink-500">{data.title.romaji}</p>
               )
             )}
+            {/* Whether this is on your list, said where the title is rather
+                than only inside the editor panel far below — which is where it
+                was, and is why the answer was not visible without scrolling.
+                Coloured from the same palette as the cover rings, so the badge
+                here and the border on the card you arrived from agree. */}
+            <p className="mt-2.5">
+              {entry ? (
+                <span
+                  className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-2xs font-semibold"
+                  style={{
+                    backgroundColor: statusColorVar(entry.status),
+                    // The palette is user-chosen, so the ink cannot be assumed:
+                    // `readableInk` picks whichever of the app's two ink ends
+                    // actually has contrast against the hue they picked.
+                    color: readableInk(
+                      statusColors[entry.status] ?? "#000000",
+                      UI_INK,
+                    ),
+                  }}
+                >
+                  {t(`status.${data.type}.${entry.status}`)}
+                  {progressLabel && <span className="opacity-80">{progressLabel}</span>}
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-surface-700 px-2.5 py-0.5 text-2xs text-ink-500">
+                  {t("detail.notOnList")}
+                </span>
+              )}
+            </p>
             <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[.8125rem] text-ink-300">
               {data.averageScore !== null && (
                 <span className="flex items-center gap-1 text-gold">

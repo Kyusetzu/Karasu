@@ -3,6 +3,7 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useContentFilter } from "@/stores/contentFilter";
 import { CONTENT_FILTER_LEVELS } from "@/lib/contentFilter";
+import { Toggle } from "./shared";
 /**
  * Content filter. A three-stop slider rather than a toggle: "hide everything
  * 18+" and "hide suggestive material too" are genuinely different asks, and
@@ -14,6 +15,8 @@ export function ContentSection() {
   const ready = useContentFilter((s) => s.ready);
   const setLevel = useContentFilter((s) => s.setLevel);
   const error = useContentFilter((s) => s.error);
+  const blurAdult = useContentFilter((s) => s.blurAdult);
+  const setBlurAdult = useContentFilter((s) => s.setBlurAdult);
   const index = CONTENT_FILTER_LEVELS.indexOf(level);
 
   return (
@@ -54,6 +57,16 @@ export function ContentSection() {
             {t(`settings.contentHint_${level}`)}
           </p>
           <p className="text-xs text-ink-600">{t("settings.contentNote")}</p>
+          {/* Separate from the slider on purpose: the slider decides what is
+              shown at all, this decides how it arrives. See `shouldBlur`. */}
+          <div className="border-t border-surface-800 pt-3">
+            <Toggle
+              checked={blurAdult}
+              onChange={(v) => void setBlurAdult(v)}
+              label={t("settings.blurAdult")}
+              hint={t("settings.blurAdultHint")}
+            />
+          </div>
           {/* The slider reverts on a failed save, so without this the control
               would simply snap back with no explanation. */}
           {error && (

@@ -10,6 +10,8 @@ import { saveListEntry } from "@/api/anilist";
 
 import { formatLabel } from "@/lib/format";
 import { statusColorVar } from "@/lib/statusColors";
+import { shouldBlur } from "@/lib/contentFilter";
+import { useContentFilter } from "@/stores/contentFilter";
 import type { MediaWithListStatus } from "@/api/queries";
 import { useAuth } from "@/stores/auth";
 import EntryEditModal, { type EntrySaveInput } from "@/components/media/EntryEditModal";
@@ -54,6 +56,8 @@ export default function MediaCard({
   });
 
   const entry = media.mediaListEntry;
+  const level = useContentFilter((s) => s.level);
+  const blurAdult = useContentFilter((s) => s.blurAdult);
 
   return (
     <CoverCell
@@ -71,6 +75,7 @@ export default function MediaCard({
       statusRing={entry ? statusColorVar(entry.status) : null}
       score={media.averageScore != null ? `${media.averageScore}%` : null}
       adult={media.isAdult === true}
+      blurred={shouldBlur(media, level, blurAdult)}
       data-media-id={media.id}
       data-media-type={media.type}
       actions={

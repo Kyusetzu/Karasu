@@ -633,6 +633,7 @@ export const en = {
     hintClose: "Ctrl K close",
   },
   detail: {
+    notOnList: "Not on your list",
     favourite: "Favourite",
     favourited: "Favourited",
     favouriteAria: "Add to favourites",
@@ -1401,6 +1402,10 @@ export const en = {
     contentHint_strict: "Hides explicit (18+) and suggestive titles.",
     contentSaveFailed:
       "That setting was not saved ({{message}}), so it has been put back.",
+    blurAdult: "Blur explicit artwork",
+    blurAdultHint:
+      "Covers are blurred until you click them. Only affects titles the filter above lets through.",
+    blurReveal: "Show",
     contentNote:
       "Applies everywhere, including your own list. Scrobbling and playback keep working for hidden titles you already track.",
     discord: "Discord Rich Presence",

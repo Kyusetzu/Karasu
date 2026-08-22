@@ -84,3 +84,17 @@ describe("the page size the query actually uses", () => {
     expect(COMMENTS_PER_PAGE).toBe(10);
   });
 });
+
+describe("the page box's ceiling", () => {
+  /**
+   * The box must cap at what AniList will *serve*, not at `lastPage`. On
+   * thread 1 those differ by two hundred pages, and offering 703 would be
+   * offering a press that answers HTTP 400.
+   */
+  it("is the reachable page, not the reported one", () => {
+    expect(jumpTarget(703).page).toBe(500);
+    expect(jumpTarget(703).page).toBeLessThan(703);
+    // And on an ordinary thread the two agree, so nothing is taken away.
+    expect(jumpTarget(70).page).toBe(70);
+  });
+});

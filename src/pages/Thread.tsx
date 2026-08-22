@@ -24,6 +24,7 @@ import {
 import { isTauri } from "@/api/anilist";
 import BackButton from "@/components/shell/BackButton";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { UserLockup } from "@/components/ui/user-lockup";
 import { EmptyState, PerchRule, StruckQuery } from "@/components/EmptyState";
 import { isNotFound } from "@/lib/apiError";
@@ -134,16 +135,41 @@ export default function Thread() {
   // The newest reply, on demand. Its own query rather than pages appended to
   // the infinite one above: that cache is contiguous from page 1, and dropping
   // page 70 into it would leave a hole nothing renders correctly.
-  const [showNewest, setShowNewest] = useState(false);
+  /**
+   * Which comments are on screen: the normal paged read (`null`), the
+   * newest-reply jump, or one page asked for by number.
+   *
+   * A page number is the practical half of the 5,000-entry cap. On a long
+   * thread the deepest *readable* comment is hundreds of "Load more" presses
+   * away, and pressing a button five hundred times is not a feature — this
+   * reaches it in one, and reaches anywhere else in one too.
+   */
+  const [target, setTarget] = useState<"newest" | number | null>(null);
+  const [pageDraft, setPageDraft] = useState("");
   const lastPage = comments.data?.pages[0]?.pageInfo?.lastPage ?? null;
   const replyUserId = th.data?.replyUser?.id ?? null;
 
   const newest = useQuery({
-    queryKey: ["social", "threadNewest", threadId, lastPage, replyUserId],
-    queryFn: () => fetchNewest(threadId, lastPage ?? 1, replyUserId),
-    enabled: isTauri && showNewest && lastPage != null,
+    queryKey: ["social", "threadJump", threadId, target, lastPage, replyUserId],
+    queryFn: () =>
+      target === "newest"
+        ? fetchNewest(threadId, lastPage ?? 1, replyUserId)
+        : threadComments(threadId, target as number).then((p) => ({
+            ...p,
+            viaAuthor: false,
+          })),
+    enabled: isTauri && target != null && lastPage != null,
     staleTime: 60 * 1000,
   });
+
+  /** The deepest page AniList will serve here — the ceiling on the box. */
+  const maxPage = lastPage != null ? jumpTarget(lastPage).page : 1;
+
+  const goToPage = () => {
+    const n = Number(pageDraft);
+    if (!Number.isFinite(n)) return;
+    setTarget(Math.min(Math.max(Math.trunc(n), 1), maxPage));
+  };
 
   // Memoized because it is not cheap and it ran on *every* render: it walks
   // every retained page and recurses through `childComments` to count what it
@@ -469,23 +495,57 @@ export default function Thread() {
             `lib/threadJump`. So on any thread past one page, the newest reply
             is somewhere the reader cannot get to by scrolling. */}
         {canJump(lastPage) && (
-          <div className="mb-3 flex items-center gap-2">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
             <Button
-              variant={showNewest ? "outline" : "secondary"}
+              variant={target === "newest" ? "outline" : "secondary"}
               size="sm"
               disabled={newest.isFetching}
-              onClick={() => setShowNewest((v) => !v)}
+              onClick={() => setTarget((v) => (v === "newest" ? null : "newest"))}
             >
               <ArrowDownToLine className="size-3.5" />
-              {showNewest ? t("social.fromTheStart") : t("social.viewNewest")}
+              {target === "newest" ? t("social.fromTheStart") : t("social.viewNewest")}
             </Button>
+
+            {/* One press to anywhere, including the deepest readable page.
+                Capped at what AniList will actually serve rather than at
+                `lastPage`, which on a big thread is a number you cannot ask
+                for — see `lib/threadJump`. */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                goToPage();
+              }}
+              className="flex items-center gap-1.5"
+            >
+              <label className="text-2xs text-ink-600" htmlFor="thread-page">
+                {t("social.pageOf", { max: maxPage })}
+              </label>
+              <Input
+                id="thread-page"
+                type="number"
+                min={1}
+                max={maxPage}
+                value={pageDraft}
+                onChange={(e) => setPageDraft(e.target.value)}
+                className="w-20"
+              />
+              <Button variant="ghost" size="sm" type="submit" disabled={newest.isFetching}>
+                {t("social.goToPage")}
+              </Button>
+            </form>
+
+            {typeof target === "number" && (
+              <Button variant="ghost" size="sm" onClick={() => setTarget(null)}>
+                {t("social.fromTheStart")}
+              </Button>
+            )}
             {newest.isFetching && (
               <span className="text-2xs text-ink-600">{t("social.jumping")}</span>
             )}
           </div>
         )}
 
-        {showNewest ? (
+        {target != null ? (
           <>
             {newest.isPending || newest.isFetching ? (
               <div className="space-y-3">

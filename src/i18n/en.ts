@@ -920,6 +920,8 @@ export const en = {
     addPlanning: "Add to Planning",
   },
   social: {
+    pageOf: "Page (1–{{max}})",
+    goToPage: "Go",
     reply: "Reply",
     // Profile
     notFound: "No such user",

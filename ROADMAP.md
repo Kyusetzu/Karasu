@@ -17,8 +17,13 @@ needing a hosted backend.
 
 ## An Android app
 
-**Status:** not started, not committed to. Written up because the question keeps
-coming back and the answer has real shape.
+**Status: in progress** (August 2026). The maintainer decided: this repo, a
+sideloaded APK first, and the whole first slice. Steps 0–2 are code —
+`crate-type` restored, the desktop-only Rust behind `cfg(desktop)`/`cfg(mobile)`
+pairs, file-based token storage on mobile with Keystore as the named follow-up
+— and the toolchain (JDK 17, SDK 34, NDK 27, both Rust targets) lives at
+`%LOCALAPPDATA%\Android\Sdk`. What follows below is the original write-up,
+kept because its costs and constraints still govern the remaining steps.
 
 ### What it would be
 

@@ -102,12 +102,7 @@ pub fn start<R: Runtime>(app: AppHandle<R>) -> Result<String, String> {
             )) {
                 Ok(viewer) => {
                     let _ = app.emit("anilist-auth", &viewer);
-                    // Bring Karasu back to the front now that the browser is done.
-                    if let Some(window) = app.get_webview_window("main") {
-                        let _ = window.show();
-                        let _ = window.unminimize();
-                        let _ = window.set_focus();
-                    }
+                    surface_main_window(&app);
                     Ok(())
                 }
                 Err(e) => {
@@ -535,3 +530,20 @@ mod tests {
         assert_eq!(query_param("xaccess_token=abc", "access_token"), None);
     }
 }
+
+/// Brings Karasu back to the front once the browser half of the sign-in is
+/// done. `unminimize` does not exist on a mobile `WebviewWindow`, and the
+/// system brings the app forward itself when the callback URL resolves — so
+/// the mobile arm is a real no-op rather than a stub.
+#[cfg(desktop)]
+fn surface_main_window<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
+    use tauri::Manager;
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+    }
+}
+
+#[cfg(mobile)]
+fn surface_main_window<R: tauri::Runtime>(_app: &tauri::AppHandle<R>) {}

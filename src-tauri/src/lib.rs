@@ -13,9 +13,16 @@ mod i18n;
 mod portable;
 mod sync;
 
+use tauri::{AppHandle, Manager, Wry};
+// These three are used only from the desktop half of this file (the tray's
+// menu handles and its emits), so they gate with it — an unconditional import
+// is an unused-import warning on every Android check.
+#[cfg(desktop)]
 use crate::sync::LockExt;
+#[cfg(desktop)]
 use std::sync::Mutex;
-use tauri::{AppHandle, Emitter, Manager, Wry};
+#[cfg(desktop)]
+use tauri::Emitter;
 // The menu and tray modules do not exist in a mobile build of tauri, so the
 // imports gate with the code that uses them. `cfg(desktop)` / `cfg(mobile)`
 // are tauri-build's own flags — the blessed spelling for this split, where a

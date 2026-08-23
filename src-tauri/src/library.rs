@@ -331,12 +331,26 @@ pub fn set_library_path(db: State<'_, Db>, path: String) -> Result<(), String> {
 /// Opens a native folder picker and returns the chosen path.
 #[tauri::command]
 pub fn pick_library_folder(app: AppHandle) -> Option<String> {
+    pick_folder(&app)
+}
+
+#[cfg(desktop)]
+fn pick_folder(app: &AppHandle) -> Option<String> {
     use tauri_plugin_dialog::DialogExt;
     app.dialog()
         .file()
         .blocking_pick_folder()
         .and_then(|p| p.into_path().ok())
         .map(|p| p.to_string_lossy().to_string())
+}
+
+/// The scanner is desktop-only — scoped storage does not hand out folder
+/// walks — so on mobile there is nothing a picked folder could feed. The
+/// command answers "no choice made" rather than erroring, which is also what
+/// dismissing the picker answers.
+#[cfg(mobile)]
+fn pick_folder(_app: &AppHandle) -> Option<String> {
+    None
 }
 
 /// The most recent scan's index (empty before the first scan).

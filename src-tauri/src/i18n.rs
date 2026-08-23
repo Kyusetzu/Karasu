@@ -49,6 +49,9 @@ pub fn lang(db: &Db) -> Lang {
 /// An enum rather than string keys so the parameters are typed and the match
 /// below is exhaustive: a new message cannot be added without both languages,
 /// and a renamed field cannot silently stop being interpolated.
+// The tray and toast variants are constructed only by desktop code; on the
+// Android check that reads as "never constructed" without being wrong.
+#[cfg_attr(mobile, allow(dead_code))]
 pub enum Msg<'a> {
     AiringTitle,
     AiringBody { title: &'a str, episode: i64 },

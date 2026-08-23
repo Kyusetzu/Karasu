@@ -891,6 +891,7 @@ pub async fn confirm_pending(app: AppHandle, accept: bool) -> Result<(), String>
 /// for. The check happens under the same lock that reads the session out, so
 /// a click arriving after the next episode started fails here instead of
 /// stamping its confirmation onto whatever is pending now.
+#[cfg(any(windows, target_os = "linux"))]
 pub async fn confirm_pending_for(
     app: AppHandle,
     media_id: i64,

@@ -161,6 +161,13 @@ async fn connect(path: &str) -> std::io::Result<tokio::net::UnixStream> {
     tokio::net::UnixStream::connect(path).await
 }
 
+/// No mpv on mobile — there is no pipe to open, so the probe's `.ok()?` turns
+/// this into "nothing playing" the same way a desktop with mpv closed does.
+#[cfg(mobile)]
+async fn connect(_path: &str) -> std::io::Result<tokio::net::UnixStream> {
+    Err(std::io::Error::from(std::io::ErrorKind::Unsupported))
+}
+
 async fn probe(path: &str) -> Option<MpvState> {
     use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 

@@ -148,6 +148,7 @@ pub fn notify_scrobble_confirm(
 /// Read per toast rather than cached: the language can change between two
 /// scrobbles, and this costs a kv lookup on a path that already talks to the
 /// OS notification service.
+#[cfg(any(windows, target_os = "linux"))]
 fn action_label(app: &AppHandle) -> String {
     crate::i18n::text(
         crate::i18n::lang(&app.state::<Db>()),
@@ -160,6 +161,19 @@ fn action_label(app: &AppHandle) -> String {
 /// registered the bundle identifier through NSIS, while a dev build has no
 /// registration at all — the PowerShell id is the same stand-in the plugin
 /// uses there.
+/// Mobile: the notification plugin shows plain toasts and nothing here can
+/// carry a button, so the fallback path below is simply the path.
+#[cfg(mobile)]
+fn toast_with_action(
+    _app: &AppHandle,
+    _title: &str,
+    _body: &str,
+    _media_id: i64,
+    _episode: u32,
+) -> Result<(), String> {
+    Err("action toasts are desktop-only".into())
+}
+
 #[cfg(windows)]
 fn toast_with_action(
     app: &AppHandle,

@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 
 const MARKER: &str = "karasu.portable";
 const DATA_DIR: &str = "data";
+#[cfg(any(windows, target_os = "linux"))]
 const TOKEN_FILE: &str = "token.dat";
 
 /// Whether `$APPIMAGE` names something we should believe.
@@ -84,7 +85,9 @@ pub fn portable_data_dir() -> Option<PathBuf> {
     Some(exe_dir()?.join(DATA_DIR))
 }
 
-/// Path to the encrypted token file (portable mode only).
+/// Path to the encrypted token file (portable mode only). Gated with its only
+/// callers, the desktop token store — portable mode is an exe-relative idea.
+#[cfg(any(windows, target_os = "linux"))]
 pub fn token_file() -> Option<PathBuf> {
     Some(portable_data_dir()?.join(TOKEN_FILE))
 }

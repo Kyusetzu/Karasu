@@ -100,7 +100,10 @@ fn delete_portable_key() {
         }
     }
 }
-#[cfg(not(target_os = "linux"))]
+// Windows, not "everything that is not Linux": the desktop `delete_token`
+// above is this stub's only caller, and on mobile that caller does not exist
+// — a not-linux gate left this as dead code on every Android check.
+#[cfg(windows)]
 fn delete_portable_key() {}
 
 /// Moves the current credential-store token into the encrypted portable file
@@ -221,17 +224,6 @@ fn protect(data: &[u8]) -> Result<Vec<u8>, String> {
 #[cfg(target_os = "linux")]
 fn unprotect(data: &[u8]) -> Result<Vec<u8>, String> {
     open(&portable_key()?, data)
-}
-
-/// No at-rest protection available, so portable mode is refused outright
-/// rather than writing a bearer token in the clear.
-#[cfg(not(any(windows, target_os = "linux")))]
-fn protect(_data: &[u8]) -> Result<Vec<u8>, String> {
-    Err("Portable mode is not supported on this platform".into())
-}
-#[cfg(not(any(windows, target_os = "linux")))]
-fn unprotect(_data: &[u8]) -> Result<Vec<u8>, String> {
-    Err("Portable mode is not supported on this platform".into())
 }
 
 /// Encrypts bytes with the Windows Data Protection API (per-user).

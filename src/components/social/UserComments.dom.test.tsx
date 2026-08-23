@@ -22,7 +22,6 @@ const comment = (id: number, title: string, text: string): UserForumComment => (
   comment: text,
   likeCount: 2,
   createdAt: 1_700_000_000,
-  siteUrl: null,
   thread: { id: 1, title },
 });
 

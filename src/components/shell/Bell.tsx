@@ -155,6 +155,10 @@ export default function Bell() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const mode = useAuth((s) => s.mode);
+  // Part of both AniList query keys below. Without it, sign out of A and into
+  // B within a staleTime and B's badge shows A's count — and the open nudge
+  // then jumps B to the AniList tab on the strength of A's notifications.
+  const viewerId = useAuth((s) => s.viewer?.id ?? null);
   const [items, setItems] = useState<AppNotification[]>([]);
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<"local" | "site">("local");
@@ -210,15 +214,21 @@ export default function Bell() {
   // One scalar off the viewer. It used to be gated on `open`, which meant it
   // could never feed the always-visible badge — so an account with twelve
   // AniList notifications and no Karasu ones showed no badge at all, and
-  // opening the bell landed on an empty tab. One request at startup and a
-  // 5-minute staleness is what a visible badge costs; still no polling loop,
-  // and the mark-seen reset below keeps zeroing it the moment the feed is
-  // actually read.
+  // opening the bell landed on an empty tab.
+  //
+  // The badge has to keep being true after startup, and nothing else ever
+  // touches this key: with `refetchOnWindowFocus` off globally and the bell
+  // mounted exactly once, `staleTime` alone would freeze the badge at its
+  // boot value for the whole session. Hence the interval — six requests an
+  // hour against a ~30/minute budget — and a refetch on every open (below),
+  // which is the freshness the old `enabled: open` gate used to provide.
+  // The feed's mark-seen still zeroes it the moment it is actually read.
   const count = useQuery({
-    queryKey: ["social", "notifCount"],
+    queryKey: ["social", "notifCount", viewerId],
     queryFn: siteNotifCount,
     enabled: isTauri && anilist,
-    staleTime: 5 * 60_000,
+    staleTime: 60_000,
+    refetchInterval: 10 * 60_000,
   });
 
   // The feed itself costs a request only when the AniList view is chosen —
@@ -228,13 +238,13 @@ export default function Bell() {
   // optimistic write, because an in-flight count read that was computed
   // before the reset would otherwise land afterwards and resurrect the chip.
   const site = useInfiniteQuery({
-    queryKey: ["social", "siteNotifs"],
+    queryKey: ["social", "siteNotifs", viewerId],
     queryFn: async ({ pageParam }) => {
       const reset = pageParam === 1;
       const page = await siteNotifications(pageParam, reset);
       if (reset) {
-        await qc.cancelQueries({ queryKey: ["social", "notifCount"] });
-        qc.setQueryData(["social", "notifCount"], 0);
+        await qc.cancelQueries({ queryKey: ["social", "notifCount", viewerId] });
+        qc.setQueryData(["social", "notifCount", viewerId], 0);
       }
       return page;
     },
@@ -253,32 +263,42 @@ export default function Bell() {
   // keeps glancing at the bell. Same lesson `usePrimedLists` backdates for.
   useEffect(() => {
     if (open) return;
-    const updatedAt = qc.getQueryState(["social", "siteNotifs"])?.dataUpdatedAt;
+    const updatedAt = qc.getQueryState(["social", "siteNotifs", viewerId])?.dataUpdatedAt;
     qc.setQueryData<InfiniteData<SiteNotifPage>>(
-      ["social", "siteNotifs"],
+      ["social", "siteNotifs", viewerId],
       (old) =>
         old && old.pages.length > 1
           ? { pages: old.pages.slice(0, 1), pageParams: old.pageParams.slice(0, 1) }
           : undefined,
       { updatedAt },
     );
-  }, [open, qc]);
+  }, [open, qc, viewerId]);
 
   const unread = items.filter((n) => !n.read).length;
 
-  // When the panel opens onto a tab with nothing unread while the AniList
-  // side has news, start there — the alternative is a blank panel above a
-  // badge that promised something. Rising edge only: a manual tab choice
-  // while the panel is open is the user's and stays theirs, and the count
-  // being zeroed by mark-seen must not bounce the view around.
+  // When the panel opens, land on the tab that actually has news — in either
+  // direction. The first version only ever nudged local→site, which created
+  // its own mirror of the bug it fixed: once you had been switched to the
+  // AniList tab, a later Karasu-only notification put a badge over a panel
+  // that opened onto the wrong tab with nothing pointing at the right one.
+  // Karasu's own rows win a tie, being the rows only this bell can show.
+  //
+  // Rising edge only: a manual tab choice while the panel is open is the
+  // user's and stays theirs, and the count being zeroed by mark-seen must not
+  // bounce the view around. The open also refetches the count when stale —
+  // the freshness the old `enabled: open` gate provided.
   const wasOpen = useRef(false);
   useEffect(() => {
     const rising = open && !wasOpen.current;
     wasOpen.current = open;
     if (!rising || !anilist) return;
-    if (items.some((n) => !n.read)) return;
-    if ((count.data ?? 0) > 0) setView("site");
-  }, [open, anilist, items, count.data]);
+    void qc.invalidateQueries({ queryKey: ["social", "notifCount", viewerId] });
+    if (items.some((n) => !n.read)) {
+      setView("local");
+    } else if ((count.data ?? 0) > 0) {
+      setView("site");
+    }
+  }, [open, anilist, items, count.data, qc, viewerId]);
 
   const readOne = async (n: AppNotification) => {
     if (n.read) return;

@@ -852,7 +852,7 @@ query ($userId: Int!, $page: Int) {
   Page(page: $page, perPage: 25) {
     ${PAGE_INFO}
     threadComments(userId: $userId, sort: [ID_DESC]) {
-      id comment likeCount createdAt siteUrl
+      id comment likeCount createdAt
       thread { id title }
     }
   }
@@ -863,7 +863,6 @@ export interface UserForumComment {
   comment: string | null;
   likeCount: number | null;
   createdAt: number | null;
-  siteUrl: string | null;
   thread: { id: number; title: string | null } | null;
 }
 
@@ -1383,8 +1382,9 @@ export async function siteNotifications(page: number, reset: boolean): Promise<S
   };
 }
 
-/** How much is waiting, for the tab's chip. Cheap by construction: one
-    scalar off the viewer, spent when the bell opens. */
+/** How much is waiting — the bell's badge and the tab's chip. Cheap by
+    construction: one scalar off the viewer, fetched at startup, on a slow
+    interval, and when the panel opens; the feed's mark-seen zeroes it. */
 export const SITE_NOTIF_COUNT_QUERY = `
 query { Viewer { unreadNotificationCount } }`;
 

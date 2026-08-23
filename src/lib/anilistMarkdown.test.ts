@@ -109,6 +109,20 @@ describe("the tree cannot carry executable content", () => {
     }
   });
 
+  /**
+   * `//evil.example` starts with a slash and would take the *internal* branch
+   * in RichText, handing a foreign host to the router. The HashRouter defangs
+   * it today; the parser refuses it so nothing ever depends on that.
+   */
+  it("refuses protocol-relative URLs outright", () => {
+    const nodes = parse("[click](//evil.example/pwn) and //evil.example/raw");
+    walk(nodes, (n) => {
+      expect(n.type, "no link node may come from a protocol-relative href").not.toBe("link");
+    });
+    // The label's words survive as plain text — the link just is not one.
+    expect(textOf(nodes)).toContain("click");
+  });
+
   it("every link href is http, https or an internal path — never a scheme URL", () => {
     for (const src of HOSTILE) {
       walk(parse(src), (n) => {

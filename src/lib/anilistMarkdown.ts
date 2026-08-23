@@ -141,11 +141,17 @@ const LIMIT = 8000;
 
 /** `http`/`https` for the world, a leading `/` for our own routes. Anything else
  *  — `javascript:`, `data:`, `vbscript:`, and AniList's `json…` layout blob —
- *  is not a link, and the node is never created. */
+ *  is not a link, and the node is never created.
+ *
+ *  `//` is excluded from the "our own routes" arm on purpose: a
+ *  protocol-relative URL like `//evil.example/x` starts with a slash but names
+ *  another *host*, and the internal branch hands its href straight to the
+ *  router. The HashRouter happens to defang it today by prefixing `#`; the
+ *  parser does not get to rely on which router the renderer mounts. */
 function safeHref(raw: string): string | null {
   const href = raw.trim();
   if (/^https?:\/\/\S+$/i.test(href)) return href;
-  if (/^\/[^\s]*$/.test(href)) return href;
+  if (/^\/(?!\/)[^\s]*$/.test(href)) return href;
   return null;
 }
 

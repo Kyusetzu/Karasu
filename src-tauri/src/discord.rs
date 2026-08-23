@@ -26,7 +26,7 @@ const REPO_URL: &str = "https://github.com/Kyusetzu/Karasu";
 
 pub struct Discord(pub Mutex<Option<DiscordIpcClient>>);
 
-/// Fingerprint of the last activity actually sent, or empty.
+/// Fingerprint of the last activity actually sent, and when it went.
 ///
 /// `sync` fires on every detection change, scrobble, correction, settings
 /// change and — via `set_ui_page` — every route change, while Discord accepts
@@ -34,11 +34,23 @@ pub struct Discord(pub Mutex<Option<DiscordIpcClient>>);
 /// those calls describe the exact presence already showing, so identical
 /// consecutive payloads are skipped here instead of spent there. Cleared on
 /// disconnect, so a reconnected client always gets the first send.
-pub struct LastPresence(pub Mutex<String>);
+///
+/// **The timestamp is what keeps the skip from hiding a dead pipe.** The only
+/// way this side learns Discord went away is `set_activity` failing — and a
+/// pure fingerprint skip means a payload that never changes (a whole episode,
+/// fingerprint-identical by construction) never touches the client again, so
+/// a Discord restart mid-episode dropped the presence until the next title
+/// change. An identical payload is therefore re-sent once the last real send
+/// is older than `RESEND_SECS`: cheap enough to be nothing, frequent enough
+/// that a killed pipe is noticed and reconnected within a minute.
+pub struct LastPresence(pub Mutex<(String, std::time::Instant)>);
+
+/// How long an identical presence may coast before it is re-sent anyway.
+const RESEND_SECS: u64 = 60;
 
 impl Default for LastPresence {
     fn default() -> Self {
-        LastPresence(Mutex::new(String::new()))
+        LastPresence(Mutex::new((String::new(), std::time::Instant::now())))
     }
 }
 
@@ -67,7 +79,7 @@ fn disconnect(app: &AppHandle, guard: &mut Option<DiscordIpcClient>) {
         let _ = client.close();
     }
     // Whatever was showing is gone with the connection.
-    app.state::<LastPresence>().0.guard().clear();
+    app.state::<LastPresence>().0.guard().0.clear();
 }
 
 fn now_secs() -> i64 {
@@ -214,19 +226,23 @@ pub fn sync(app: &AppHandle, now: Option<&NowPlaying>) {
     // of the identity; the derived end moves with it.
     // `ActivityType` has no Debug; the manga/anime split it encodes is a
     // function of `media_type`, which `details`+`state_text` already pin.
+    // `duration` is here because the *end* timestamp — the progress bar — is
+    // derived from it, and it can appear on its own (an entry created by the
+    // first scrobble gains a length) with every other field unchanged.
     let fingerprint = format!(
-        "{details}|{state_text}|{cover}|{buttons}|{start}",
+        "{details}|{state_text}|{cover}|{buttons}|{start}|{duration:?}",
         cover = cover.unwrap_or(""),
         buttons = anilist_url.as_deref().unwrap_or(""),
         start = fingerprint_start,
+        duration = now.and_then(|np| np.duration_min),
     );
     {
         let last = app.state::<LastPresence>();
         let mut last = last.0.guard();
-        if *last == fingerprint {
+        if last.0 == fingerprint && last.1.elapsed().as_secs() < RESEND_SECS {
             return;
         }
-        *last = fingerprint;
+        *last = (fingerprint, std::time::Instant::now());
     }
 
     let activity = Activity::new()

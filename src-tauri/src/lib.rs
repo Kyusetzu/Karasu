@@ -15,12 +15,19 @@ mod sync;
 
 use crate::sync::LockExt;
 use std::sync::Mutex;
+use tauri::{AppHandle, Emitter, Manager, Wry};
+// The menu and tray modules do not exist in a mobile build of tauri, so the
+// imports gate with the code that uses them. `cfg(desktop)` / `cfg(mobile)`
+// are tauri-build's own flags — the blessed spelling for this split, where a
+// hand-rolled `not(target_os = "android")` would silently miss iOS.
+#[cfg(desktop)]
 use tauri::{
     menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    AppHandle, Emitter, Manager, WindowEvent, Wry,
+    WindowEvent,
 };
 
+#[cfg(desktop)]
 fn show_main_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
@@ -33,6 +40,7 @@ fn show_main_window(app: &AppHandle) {
 /// thing on top right now. Focus decides, not visibility — a window that is
 /// technically visible but buried under something else should come forward,
 /// not vanish.
+#[cfg(desktop)]
 fn toggle_main_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let focused = window.is_focused().unwrap_or(false);
@@ -50,6 +58,7 @@ fn toggle_main_window(app: &AppHandle) {
 /// simply leaves everything unbound. Lives here beside the window helpers it
 /// drives — `commands::set_global_hotkey` and startup both call through this,
 /// so a registration failure looks identical from either path.
+#[cfg(desktop)]
 pub(crate) fn apply_global_hotkey(app: &AppHandle, accel: Option<&str>) -> Result<(), String> {
     use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
     let shortcuts = app.global_shortcut();
@@ -66,13 +75,23 @@ pub(crate) fn apply_global_hotkey(app: &AppHandle, accel: Option<&str>) -> Resul
     Ok(())
 }
 
+/// No global shortcuts on mobile — quietly, not as an error: the setting can
+/// never be *stored* there (separate database), so the only caller is the
+/// startup path reading an absent key.
+#[cfg(mobile)]
+pub(crate) fn apply_global_hotkey(_app: &AppHandle, _accel: Option<&str>) -> Result<(), String> {
+    Ok(())
+}
+
 /// The tray menu items that change at runtime. Held in managed state because
 /// the builder's handles are the only way to mutate a menu after `build` —
 /// rebuilding the whole menu per update would tear it down under an open
 /// click. `None` when the tray itself failed to build (Linux without an
 /// AppIndicator host), and every writer tolerates that.
+#[cfg(desktop)]
 pub struct TrayHandles(pub Mutex<Option<TrayItems>>);
 
+#[cfg(desktop)]
 pub struct TrayItems {
     pub now_playing: MenuItem<Wry>,
     pub detection: CheckMenuItem<Wry>,
@@ -93,6 +112,7 @@ pub struct TrayItems {
 /// The labels are only rebuilt when this runs, which is on every detection
 /// tick — so a language change reaches the tray within five seconds rather
 /// than at the next launch.
+#[cfg(desktop)]
 pub fn tray_set_now_playing(app: &AppHandle, title: Option<&str>) {
     let lang = i18n::lang(&app.state::<db::Db>());
     if let Some(handles) = app.try_state::<TrayHandles>() {
@@ -116,10 +136,18 @@ pub fn tray_set_now_playing(app: &AppHandle, title: Option<&str>) {
     }
 }
 
+/// There is no tray to reflect anything into on a phone; the scrobbler and
+/// the prefs command call this on every state change, so the pair keeps those
+/// call sites compiling everywhere.
+#[cfg(mobile)]
+pub fn tray_set_now_playing(_app: &AppHandle, _title: Option<&str>) {}
+
 /// Whether a tray icon exists.
 ///
 /// Nothing may hide the window without asking this first: on a desktop with no
 /// StatusNotifier host there is nothing left to click to bring it back.
+/// Managed on every platform — always `false` on mobile — because
+/// `close_hides_window` and the diagnostics read it unconditionally.
 pub struct TrayPresent(pub bool);
 
 /// A debug build starts in the tray instead of in front of you.
@@ -138,7 +166,7 @@ pub struct TrayPresent(pub bool);
 /// A cfg'd statement is stripped before type-checking, so the release build
 /// would never compile the debug arm and the first anyone would hear of a
 /// mistake in it is a broken dev loop.
-#[cfg(debug_assertions)]
+#[cfg(all(desktop, debug_assertions))]
 fn hide_window_in_dev(app: &tauri::App, tray_present: bool) {
     use tauri::Manager as _;
     if !tray_present {
@@ -150,13 +178,14 @@ fn hide_window_in_dev(app: &tauri::App, tray_present: bool) {
     }
 }
 
-#[cfg(not(debug_assertions))]
+#[cfg(all(desktop, not(debug_assertions)))]
 fn hide_window_in_dev(_app: &tauri::App, _tray_present: bool) {}
 
 /// Builds the tray, or reports why it could not be built.
 ///
 /// Split out of `setup` so the whole thing can be wrapped in `catch_unwind` —
 /// see the call site for why an ordinary `?` is not enough.
+#[cfg(desktop)]
 fn build_tray(app: &tauri::App) -> tauri::Result<()> {
     let db = app.state::<db::Db>();
     let detection_on = commands::read_media_detection(&db);
@@ -286,21 +315,15 @@ pub fn run() {
 
     avoid_blank_webkit_window();
 
-    tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            show_main_window(app);
-        }))
+    let builder = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
-        .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_updater::Builder::new().build())
-        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
-        .plugin(tauri_plugin_autostart::init(
-            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
-            None,
-        ))
+        .plugin(tauri_plugin_dialog::init());
+
+    attach_desktop(builder)
         .setup(|app| {
             let data_dir = portable::data_dir(app.path().app_data_dir()?);
+            portable::remember_data_dir(&data_dir);
             // Before the database, so a failure to open *that* is the first
             // thing the log records rather than something it misses.
             logging::init(data_dir.clone());
@@ -339,69 +362,9 @@ pub fn run() {
             // Show the idle presence right away (if Discord is enabled).
             discord::sync_current(app.handle());
 
-            // `catch_unwind`, not `?`, because the tray does not fail politely
-            // on Linux: `libappindicator-sys` *panics* when it cannot dlopen
-            // libayatana-appindicator3.so.1, and a panic walks straight past
-            // `?`. That aborted startup on every desktop without the library
-            // installed — the app did not merely lose its tray, it never came
-            // up. A dlopen probe would not be enough either: `build()` can
-            // also return Err and the menu can panic on its own.
-            //
-            // The outcome goes to the log, not to stderr. This is the single
-            // most-asked Linux question ("why does closing quit?") and until
-            // there was a log the answer was written to a handle nobody has.
-            let built = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                build_tray(app)
-            }));
-            let built = match built {
-                Ok(Ok(())) => {
-                    logging::info("tray", "tray icon built");
-                    true
-                }
-                Ok(Err(e)) => {
-                    logging::warn("tray", format!("no tray icon ({e})"));
-                    false
-                }
-                Err(_) => {
-                    logging::warn(
-                        "tray",
-                        "no tray icon (the desktop has no AppIndicator library). \
-                         Closing the window will quit instead of hiding.",
-                    );
-                    false
-                }
-            };
-            app.manage(TrayPresent(built));
-            // Debug builds only, and only with a tray to come back from.
-            hide_window_in_dev(app, built);
-
-            // A stored hotkey that no longer registers (another app claimed
-            // it, a layout changed) must not fail the launch — it goes to the
-            // log and the setting stays put for the user to see and change.
-            if let Some(accel) = commands::read_global_hotkey(&app.state::<db::Db>()) {
-                if let Err(e) = apply_global_hotkey(app.handle(), Some(&accel)) {
-                    logging::warn(
-                        "hotkey",
-                        format!("global hotkey '{accel}' failed to register: {e}"),
-                    );
-                }
-            }
+            setup_platform(app);
 
             Ok(())
-        })
-        .on_window_event(|window, event| {
-            // Closing minimizes to the tray instead of quitting (quit via tray
-            // menu) — but only where there is a tray to minimize *to*. Hiding
-            // into a tray that does not exist leaves no way back to the window.
-            if let WindowEvent::CloseRequested { api, .. } = event {
-                let app = window.app_handle();
-                let tray = app.state::<TrayPresent>().0;
-                let setting = app.state::<db::Db>().kv_get(commands::CLOSE_TO_TRAY_KEY);
-                if commands::close_hides_window(setting.as_deref(), tray) {
-                    api.prevent_close();
-                    let _ = window.hide();
-                }
-            }
         })
         .invoke_handler(tauri::generate_handler![
             commands::anilist_auth_info,
@@ -515,3 +478,104 @@ pub fn run() {
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
+
+/// The four desktop-only plugins and the close-to-tray window handler.
+///
+/// Three of the plugin crates are `#![cfg(not(android/ios))]` at the *crate*
+/// root, so on mobile every `init()` path here would be unresolved — this is
+/// the cfg'd-pair spelling of that fact, per the house rule that a statement
+/// is never cfg'd. The updater rides along: its distribution model is the
+/// desktop's.
+#[cfg(desktop)]
+fn attach_desktop(builder: tauri::Builder<Wry>) -> tauri::Builder<Wry> {
+    builder
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            show_main_window(app);
+        }))
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            None,
+        ))
+        .on_window_event(|window, event| {
+            // Closing minimizes to the tray instead of quitting (quit via tray
+            // menu) — but only where there is a tray to minimize *to*. Hiding
+            // into a tray that does not exist leaves no way back to the window.
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                let app = window.app_handle();
+                let tray = app.state::<TrayPresent>().0;
+                let setting = app.state::<db::Db>().kv_get(commands::CLOSE_TO_TRAY_KEY);
+                if commands::close_hides_window(setting.as_deref(), tray) {
+                    api.prevent_close();
+                    let _ = window.hide();
+                }
+            }
+        })
+}
+
+#[cfg(mobile)]
+fn attach_desktop(builder: tauri::Builder<Wry>) -> tauri::Builder<Wry> {
+    builder
+}
+
+/// The desktop half of setup: the tray, the dev-build hide, the hotkey.
+#[cfg(desktop)]
+fn setup_platform(app: &tauri::App) {
+    // `catch_unwind`, not `?`, because the tray does not fail politely
+    // on Linux: `libappindicator-sys` *panics* when it cannot dlopen
+    // libayatana-appindicator3.so.1, and a panic walks straight past
+    // `?`. That aborted startup on every desktop without the library
+    // installed — the app did not merely lose its tray, it never came
+    // up. A dlopen probe would not be enough either: `build()` can
+    // also return Err and the menu can panic on its own.
+    //
+    // The outcome goes to the log, not to stderr. This is the single
+    // most-asked Linux question ("why does closing quit?") and until
+    // there was a log the answer was written to a handle nobody has.
+    let built = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        build_tray(app)
+    }));
+    let built = match built {
+        Ok(Ok(())) => {
+            logging::info("tray", "tray icon built");
+            true
+        }
+        Ok(Err(e)) => {
+            logging::warn("tray", format!("no tray icon ({e})"));
+            false
+        }
+        Err(_) => {
+            logging::warn(
+                "tray",
+                "no tray icon (the desktop has no AppIndicator library). \
+                 Closing the window will quit instead of hiding.",
+            );
+            false
+        }
+    };
+    app.manage(TrayPresent(built));
+    // Debug builds only, and only with a tray to come back from.
+    hide_window_in_dev(app, built);
+
+    // A stored hotkey that no longer registers (another app claimed
+    // it, a layout changed) must not fail the launch — it goes to the
+    // log and the setting stays put for the user to see and change.
+    if let Some(accel) = commands::read_global_hotkey(&app.state::<db::Db>()) {
+        if let Err(e) = apply_global_hotkey(app.handle(), Some(&accel)) {
+            logging::warn(
+                "hotkey",
+                format!("global hotkey '{accel}' failed to register: {e}"),
+            );
+        }
+    }
+
+}
+
+/// Mobile has no tray, so the single bit of platform state everything else
+/// reads unconditionally is managed at its honest value.
+#[cfg(mobile)]
+fn setup_platform(app: &tauri::App) {
+    app.manage(TrayPresent(false));
+}
+

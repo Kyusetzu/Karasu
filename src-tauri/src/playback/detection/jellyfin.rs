@@ -54,11 +54,14 @@ pub const ERR_NO_TOKEN: &str = "jellyfin.noToken";
 pub const ERR_NO_USER_ID: &str = "jellyfin.noUserId";
 pub const ERR_BAD_CREDENTIALS: &str = "jellyfin.badCredentials";
 
+#[cfg(any(windows, target_os = "linux"))]
 const SERVICE: &str = "dev.kyu.karasu";
 /// Credential-store entry for the Jellyfin access token.
+#[cfg(any(windows, target_os = "linux"))]
 const TOKEN_USER: &str = "jellyfin_token";
 /// The pre-0.26 entry, which held an admin API key. Deleted on sign-in — a
 /// dead secret has no business lingering in the user's credential store.
+#[cfg(any(windows, target_os = "linux"))]
 const LEGACY_KEY_USER: &str = "jellyfin";
 
 /// Everything the source needs to poll one user's playback on one device.
@@ -72,6 +75,7 @@ pub struct JellyfinConfig {
     pub device_id: String,
 }
 
+#[cfg(any(windows, target_os = "linux"))]
 fn entry(user: &str) -> Result<keyring::Entry, String> {
     keyring::Entry::new(SERVICE, user).map_err(|e| format!("Credential store: {e}"))
 }
@@ -79,6 +83,7 @@ fn entry(user: &str) -> Result<keyring::Entry, String> {
 /// The access token lives in the OS credential store, next to the AniList
 /// token, and is never handed back to the WebView — the UI only ever learns
 /// whether one is stored and which account it belongs to.
+#[cfg(any(windows, target_os = "linux"))]
 pub fn save_token(token: &str) -> Result<(), String> {
     let token = token.trim();
     if token.is_empty() {
@@ -86,6 +91,30 @@ pub fn save_token(token: &str) -> Result<(), String> {
     }
     entry(TOKEN_USER)?
         .set_password(token)
+        .map_err(|e| format!("Could not save the access token: {e}"))?;
+    set_cached_token(Some(token.to_string()));
+    Ok(())
+}
+
+/// Mobile: the token file next to the AniList one, same trade, same follow-up
+/// (Keystore), same preserved invariant — see `anilist::auth`'s mobile block.
+/// `cfg(mobile)` rather than not-windows-not-linux keeps the macOS stance:
+/// that build still fails to compile rather than gaining an untested backend.
+#[cfg(mobile)]
+const MOBILE_TOKEN_FILE: &str = "jellyfin_token.dat";
+
+#[cfg(mobile)]
+pub fn save_token(token: &str) -> Result<(), String> {
+    let token = token.trim();
+    if token.is_empty() {
+        return delete_token();
+    }
+    let path = crate::portable::mobile_secret_file(MOBILE_TOKEN_FILE)
+        .ok_or("The data directory is not known yet")?;
+    if let Some(dir) = path.parent() {
+        std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    }
+    std::fs::write(path, token.as_bytes())
         .map_err(|e| format!("Could not save the access token: {e}"))?;
     set_cached_token(Some(token.to_string()));
     Ok(())
@@ -103,6 +132,7 @@ pub fn save_token(token: &str) -> Result<(), String> {
 /// credential store on every single tick, which is the case being fixed.
 static TOKEN_CACHE: Mutex<Option<Option<String>>> = Mutex::new(None);
 
+#[cfg(any(windows, target_os = "linux"))]
 pub fn load_token() -> Option<String> {
     cached_or(&TOKEN_CACHE, || {
         let Ok(entry) = entry(TOKEN_USER) else {
@@ -157,6 +187,7 @@ fn set_cached_token(token: Option<String>) {
     *TOKEN_CACHE.guard() = Some(token);
 }
 
+#[cfg(any(windows, target_os = "linux"))]
 pub fn delete_token() -> Result<(), String> {
     if let Ok(e) = entry(TOKEN_USER) {
         let _ = e.delete_credential();
@@ -165,13 +196,46 @@ pub fn delete_token() -> Result<(), String> {
     Ok(())
 }
 
+#[cfg(mobile)]
+pub fn load_token() -> Option<String> {
+    cached_or(&TOKEN_CACHE, || {
+        let Some(path) = crate::portable::mobile_secret_file(MOBILE_TOKEN_FILE) else {
+            // Startup has not recorded the data dir yet — "could not look",
+            // which must not be cached as "nothing is stored".
+            return Err(());
+        };
+        match std::fs::read(&path) {
+            Ok(raw) => Ok(String::from_utf8(raw).ok().filter(|t| !t.is_empty())),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(e) => {
+                crate::logging::warn("jellyfin", format!("could not read the token: {e}"));
+                Err(())
+            }
+        }
+    })
+}
+
+#[cfg(mobile)]
+pub fn delete_token() -> Result<(), String> {
+    if let Some(path) = crate::portable::mobile_secret_file(MOBILE_TOKEN_FILE) {
+        let _ = std::fs::remove_file(path);
+    }
+    set_cached_token(None);
+    Ok(())
+}
+
 /// Removes the admin API key stored by earlier versions. It is useless now,
 /// and it grants more on the server than Karasu ever needs.
+#[cfg(any(windows, target_os = "linux"))]
 pub fn delete_legacy_api_key() {
     if let Ok(e) = entry(LEGACY_KEY_USER) {
         let _ = e.delete_credential();
     }
 }
+
+/// The legacy key predates any mobile build, so there is nothing to clean up.
+#[cfg(mobile)]
+pub fn delete_legacy_api_key() {}
 
 /// Trims a user-entered server URL into a base we can append paths to.
 pub fn normalize_base_url(raw: &str) -> String {

@@ -618,12 +618,30 @@ pub fn set_backup_settings(
 
 #[tauri::command]
 pub fn get_autostart(app: tauri::AppHandle) -> bool {
-    use tauri_plugin_autostart::ManagerExt;
-    app.autolaunch().is_enabled().unwrap_or(false)
+    autostart_enabled(&app)
 }
 
 #[tauri::command]
 pub fn set_autostart(app: tauri::AppHandle, enabled: bool) -> Result<(), String> {
+    autostart_apply(&app, enabled)
+}
+
+// The autostart plugin is `#![cfg(not(android/ios))]` at the crate root, so
+// on mobile these paths would be unresolved — the commands stay registered
+// (the handler list is shared) and the platform split lives in this pair.
+#[cfg(desktop)]
+fn autostart_enabled(app: &tauri::AppHandle) -> bool {
+    use tauri_plugin_autostart::ManagerExt;
+    app.autolaunch().is_enabled().unwrap_or(false)
+}
+
+#[cfg(mobile)]
+fn autostart_enabled(_app: &tauri::AppHandle) -> bool {
+    false
+}
+
+#[cfg(desktop)]
+fn autostart_apply(app: &tauri::AppHandle, enabled: bool) -> Result<(), String> {
     use tauri_plugin_autostart::ManagerExt;
     let manager = app.autolaunch();
     if enabled {
@@ -632,6 +650,11 @@ pub fn set_autostart(app: tauri::AppHandle, enabled: bool) -> Result<(), String>
         manager.disable()
     }
     .map_err(|e| e.to_string())
+}
+
+#[cfg(mobile)]
+fn autostart_apply(_app: &tauri::AppHandle, _enabled: bool) -> Result<(), String> {
+    Err("Autostart is not available on this platform".into())
 }
 
 // --- Notification centre -----------------------------------------------------

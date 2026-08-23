@@ -89,6 +89,34 @@ pub fn token_file() -> Option<PathBuf> {
     Some(portable_data_dir()?.join(TOKEN_FILE))
 }
 
+/// The resolved data directory, remembered at startup.
+///
+/// Desktop token storage never needs it — the credential store is ambient and
+/// the portable file is exe-relative — but on mobile the app-private data dir
+/// is the only sane root and nothing exe-relative exists, so `lib.rs`'s setup
+/// records the answer it already computed for the database.
+#[cfg(mobile)]
+static RESOLVED_DATA_DIR: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+
+#[cfg(mobile)]
+pub fn remember_data_dir(dir: &std::path::Path) {
+    let _ = RESOLVED_DATA_DIR.set(dir.to_path_buf());
+}
+
+/// A cfg'd pair, per the house rule — the call site in setup compiles
+/// everywhere and the desktop half has nothing to remember.
+#[cfg(desktop)]
+pub fn remember_data_dir(_dir: &std::path::Path) {}
+
+/// Where a secret lives on mobile: a plain file in the app-private data dir,
+/// which Android sandboxes per app. Weaker than a desktop credential store —
+/// Keystore-backed encryption is the named follow-up — but the invariant that
+/// matters holds: the token stays in Rust and never reaches the WebView.
+#[cfg(mobile)]
+pub fn mobile_secret_file(name: &str) -> Option<PathBuf> {
+    Some(RESOLVED_DATA_DIR.get()?.join(name))
+}
+
 /// Where the DB/settings live: exe-relative in portable mode, else the
 /// provided AppData fallback.
 pub fn data_dir(app_data_fallback: PathBuf) -> PathBuf {

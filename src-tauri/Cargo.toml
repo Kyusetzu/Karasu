@@ -1,6 +1,6 @@
 [package]
 name = "karasu"
-version = "0.156.1"
+version = "0.157.0"
 description = "A modern anime and manga tracker built exclusively for AniList"
 authors = ["Kyu"]
 license = "MIT"
@@ -40,10 +40,13 @@ name = "karasu_lib"
 # (verified by mtime), so this is ~170 MB of pointless writes per build that an
 # SSD no longer has to take.
 #
-# Restoring the two entries is the one-line revert if mobile ever happens; the
-# `#[cfg_attr(mobile, tauri::mobile_entry_point)]` in `lib.rs` stays as the
-# marker for where that would start.
-crate-type = ["rlib"]
+# Mobile happened (August 2026), so the two entries are back: Android links
+# the app as a cdylib and iOS as a staticlib, and without them `tauri android
+# build` has nothing to link. The ~170 MB of per-build writes is the price of
+# the target and is paid knowingly this time — the measurement above still
+# holds, so do not re-measure it, and do not "tidy" the list back down to
+# rlib without killing the Android target with it.
+crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

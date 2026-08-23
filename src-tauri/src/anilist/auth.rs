@@ -11,13 +11,17 @@
 //! machine either. The folder is portable; the sign-in is not, on either
 //! platform.
 
+#[cfg(any(windows, target_os = "linux"))]
 const SERVICE: &str = "dev.kyu.karasu";
+#[cfg(any(windows, target_os = "linux"))]
 const USER: &str = "anilist";
 
+#[cfg(any(windows, target_os = "linux"))]
 fn entry() -> Result<keyring::Entry, String> {
     keyring::Entry::new(SERVICE, USER).map_err(|e| format!("Credential store: {e}"))
 }
 
+#[cfg(any(windows, target_os = "linux"))]
 pub fn save_token(token: &str) -> Result<(), String> {
     if crate::portable::is_portable() {
         return save_token_file(token);
@@ -27,6 +31,7 @@ pub fn save_token(token: &str) -> Result<(), String> {
         .map_err(|e| format!("Could not save token: {e}"))
 }
 
+#[cfg(any(windows, target_os = "linux"))]
 pub fn load_token() -> Option<String> {
     if crate::portable::is_portable() {
         return load_token_file();
@@ -44,6 +49,7 @@ pub fn load_token() -> Option<String> {
 /// case left `token.dat` on disk forever after disabling portable mode.
 ///
 /// Sign-out means signed out, so it clears everywhere a token can live.
+#[cfg(any(windows, target_os = "linux"))]
 pub fn delete_token() {
     if let Some(path) = crate::portable::token_file() {
         // `NotFound` is the ordinary case (not portable, or never migrated) and
@@ -105,6 +111,7 @@ fn delete_portable_key() {}
 /// `get_password().ok()` does — reported a successful migration for a user
 /// whose keyring was merely locked, and the sign-in was then unreachable
 /// through a portable folder that had never received it.
+#[cfg(any(windows, target_os = "linux"))]
 pub fn migrate_to_portable_file() -> Result<(), String> {
     let entry = entry()?;
     let token = match entry.get_password() {
@@ -126,6 +133,60 @@ pub fn migrate_to_portable_file() -> Result<(), String> {
     Ok(())
 }
 
+// --- Mobile ------------------------------------------------------------------
+//
+// `cfg(mobile)`, not `cfg(not(any(windows, linux)))`, and the difference is
+// macOS: the module header's stance is that a macOS build fails to compile
+// rather than silently getting a backend nobody has tested, and a
+// not-windows-not-linux arm would hand it this one. Android and iOS get a
+// plain file in the app-private data dir — sandboxed per app by the OS,
+// weaker than a credential store, Keystore-backed encryption the named
+// follow-up. The invariant that holds regardless: the token stays in Rust
+// and never reaches the WebView.
+
+#[cfg(mobile)]
+const MOBILE_TOKEN_FILE: &str = "anilist_token.dat";
+
+#[cfg(mobile)]
+pub fn save_token(token: &str) -> Result<(), String> {
+    let path = crate::portable::mobile_secret_file(MOBILE_TOKEN_FILE)
+        .ok_or("The data directory is not known yet")?;
+    if let Some(dir) = path.parent() {
+        std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    }
+    std::fs::write(path, token.as_bytes()).map_err(|e| format!("Could not save token: {e}"))
+}
+
+#[cfg(mobile)]
+pub fn load_token() -> Option<String> {
+    let path = crate::portable::mobile_secret_file(MOBILE_TOKEN_FILE)?;
+    let raw = std::fs::read(path).ok()?;
+    String::from_utf8(raw).ok().filter(|t| !t.is_empty())
+}
+
+#[cfg(mobile)]
+pub fn delete_token() {
+    let Some(path) = crate::portable::mobile_secret_file(MOBILE_TOKEN_FILE) else {
+        return;
+    };
+    if let Err(e) = std::fs::remove_file(&path) {
+        if e.kind() != std::io::ErrorKind::NotFound {
+            crate::logging::error(
+                "auth",
+                format!("sign-out could not remove {}: {e}", path.display()),
+            );
+        }
+    }
+}
+
+/// Portable mode is an exe-relative concept and phones have no exe dir, so
+/// there is never anything to migrate.
+#[cfg(mobile)]
+pub fn migrate_to_portable_file() -> Result<(), String> {
+    Ok(())
+}
+
+#[cfg(any(windows, target_os = "linux"))]
 fn save_token_file(token: &str) -> Result<(), String> {
     let path = crate::portable::token_file().ok_or("No portable path")?;
     if let Some(dir) = path.parent() {
@@ -135,6 +196,7 @@ fn save_token_file(token: &str) -> Result<(), String> {
     std::fs::write(path, bytes).map_err(|e| format!("Could not save token: {e}"))
 }
 
+#[cfg(any(windows, target_os = "linux"))]
 fn load_token_file() -> Option<String> {
     let path = crate::portable::token_file()?;
     let raw = std::fs::read(path).ok()?;

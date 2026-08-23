@@ -96,7 +96,7 @@ function useRailMarker(deps: unknown[]) {
 
 const labelClass = "text-[.8125rem] font-medium tracking-[.005em]";
 
-interface NavItem {
+export interface NavItem {
   to: string;
   key: string;
   icon: LucideIcon;
@@ -105,7 +105,7 @@ interface NavItem {
   count?: "ANIME" | "MANGA";
 }
 
-const GROUPS: { label: string; items: NavItem[] }[] = [
+export const GROUPS: { label: string; items: NavItem[] }[] = [
   {
     label: "nav.groupLibrary",
     items: [

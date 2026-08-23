@@ -18,6 +18,8 @@ import {
 } from "@/api/anilist";
 import Titlebar from "@/components/shell/Titlebar";
 import Sidebar from "@/components/shell/Sidebar";
+import BottomBar from "@/components/shell/BottomBar";
+import { usePhoneShell } from "@/hooks/usePhoneShell";
 import SessionExpired from "@/components/shell/SessionExpired";
 import Toast from "@/components/shell/Toast";
 import CommandPalette from "@/components/shell/CommandPalette";
@@ -63,6 +65,7 @@ const StudioPage = lazy(() =>
 
 export default function App() {
   const { pathname } = useLocation();
+  const phone = usePhoneShell();
   const init = useAuth((s) => s.init);
   const initNowPlaying = useNowPlaying((s) => s.init);
   const refreshLibrary = useLibrary((s) => s.refresh);
@@ -143,7 +146,10 @@ export default function App() {
           sidebar's account line is one of the things it makes untrue. */}
       <SessionExpired />
       <div className="flex min-h-0 flex-1">
-        <Sidebar />
+        {/* The phone shell swaps the sidebar for a bottom bar — width-keyed,
+            so it can be exercised on a desktop by narrowing the window. See
+            `usePhoneShell` for why width and where the breakpoint sits. */}
+        {!phone && <Sidebar />}
         {/* Keyed on the route so the pane re-mounts and the animation replays.
             One direction only — down from above, like a bird landing. No
             slide-left/right, which would imply a history axis the app has
@@ -200,6 +206,7 @@ export default function App() {
           </ErrorBoundary>
         </main>
       </div>
+      {phone && <BottomBar />}
     </div>
   );
 }

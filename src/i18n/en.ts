@@ -12,6 +12,8 @@ export const en = {
     groupDiscover: "Discover",
     groupInsight: "Insight",
     dashboard: "Overview",
+    more: "More",
+    groupApp: "App",
     list: "Anime",
     manga: "Manga",
     search: "Search",

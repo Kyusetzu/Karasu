@@ -10,6 +10,8 @@ export const de: typeof en = {
     groupDiscover: "Entdecken",
     groupInsight: "Einblicke",
     dashboard: "Übersicht",
+    more: "Mehr",
+    groupApp: "App",
     list: "Anime",
     manga: "Manga",
     search: "Suche",

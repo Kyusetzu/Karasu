@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useTranslation } from "react-i18next";
 import { Minus, Square, X } from "lucide-react";
+import { usePhoneShell } from "@/hooks/usePhoneShell";
 import Bell from "@/components/shell/Bell";
 import DetectionPill from "@/components/shell/DetectionPill";
 import KarasuMark from "@/components/KarasuMark";
@@ -15,6 +16,7 @@ const controlClass =
   "grid h-full w-12 place-items-center text-ink-500 transition-surface hover:bg-surface-850 hover:text-ink-100";
 
 export default function Titlebar() {
+  const phone = usePhoneShell();
   const { t } = useTranslation();
   const [version, setVersion] = useState<string | null>(null);
 
@@ -48,6 +50,12 @@ export default function Titlebar() {
 
       <div className="flex h-full items-center">
         <Bell />
+        {/* Min/max/close are window furniture a phone has not got — Android
+            supplies its own task management, and `minimize` on a mobile
+            WebviewWindow is at best a no-op. The bell stays: it is content,
+            not chrome. */}
+        {!phone && (
+          <>
         <button
           onClick={() => appWindow?.minimize()}
           className={controlClass}
@@ -75,6 +83,8 @@ export default function Titlebar() {
         >
           <X className="size-4" />
         </button>
+          </>
+        )}
       </div>
     </header>
   );

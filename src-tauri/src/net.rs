@@ -41,10 +41,19 @@ pub fn client_builder() -> reqwest::ClientBuilder {
 
 #[cfg(target_os = "android")]
 fn android_tls_config() -> rustls::ClientConfig {
+    // The provider is named, never defaulted: `ClientConfig::builder()` asks
+    // rustls for a process-level default, and with more than one provider in
+    // the crate graph rustls refuses to guess — with a *panic*, at line 249
+    // of its crypto module, which on the first device build aborted the app
+    // during setup before a window ever existed. aws-lc-rs is the provider
+    // reqwest's own rustls already compiles in, so this adds nothing new.
+    let provider = std::sync::Arc::new(rustls::crypto::aws_lc_rs::default_provider());
     let roots = rustls::RootCertStore {
         roots: webpki_roots::TLS_SERVER_ROOTS.to_vec(),
     };
-    rustls::ClientConfig::builder()
+    rustls::ClientConfig::builder_with_provider(provider)
+        .with_safe_default_protocol_versions()
+        .expect("aws-lc-rs supports the default TLS protocol versions")
         .with_root_certificates(roots)
         .with_no_client_auth()
 }

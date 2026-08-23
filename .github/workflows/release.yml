@@ -451,7 +451,7 @@ jobs:
       # The runner images ship the SDK; the NDK pin matches the local
       # toolchain (scripts/android-check.ps1) so the two builds cannot drift.
       - name: Install NDK
-        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;27.1.12297006" "platforms;android-36" "build-tools;36.0.0" > /dev/null
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;27.1.12297006" "platforms;android-36" "build-tools;36.0.0" "build-tools;35.0.0" > /dev/null
 
       - name: Install dependencies
         run: npm ci

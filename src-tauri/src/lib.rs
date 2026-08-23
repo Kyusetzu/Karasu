@@ -293,7 +293,6 @@ fn build_tray(app: &tauri::App) -> tauri::Result<()> {
     Ok(())
 }
 
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
 /// WebKitGTK's DMA-BUF renderer paints a blank window on a long list of
 /// driver/compositor combinations — the NVIDIA proprietary driver most often.
 /// The app starts, the process runs, and the user sees nothing, which is the
@@ -318,6 +317,13 @@ fn avoid_blank_webkit_window() {
 #[cfg(not(target_os = "linux"))]
 fn avoid_blank_webkit_window() {}
 
+// The mobile entry point — on `run`, where it must be. It spent its whole
+// life decorating `avoid_blank_webkit_window` two items up: inert on every
+// desktop build (`cfg_attr(mobile, …)` compiles to nothing there), and on
+// Android it decorated a function that `#[cfg(target_os = "linux")]` had
+// already removed, so no entry symbol was emitted at all. The first APK
+// build's "missing required runtime symbols" is what finally proved it.
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // First, before anything can panic. Until this existed every panic in the
     // app went to a stderr no packaged build has — see `logging`.

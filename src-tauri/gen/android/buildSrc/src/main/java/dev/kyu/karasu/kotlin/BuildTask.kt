@@ -16,39 +16,22 @@ open class BuildTask : DefaultTask() {
 
     @TaskAction
     fun assemble() {
-        val executable = """npm""";
-        try {
-            runTauriCli(executable)
-        } catch (e: Exception) {
-            if (Os.isFamily(Os.FAMILY_WINDOWS)) {
-                // Try different Windows-specific extensions
-                val fallbacks = listOf(
-                    "$executable.exe",
-                    "$executable.cmd",
-                    "$executable.bat",
-                )
-                
-                var lastException: Exception = e
-                for (fallback in fallbacks) {
-                    try {
-                        runTauriCli(fallback)
-                        return
-                    } catch (fallbackException: Exception) {
-                        lastException = fallbackException
-                    }
-                }
-                throw lastException
-            } else {
-                throw e;
-            }
-        }
+        // Hand-edited from the generated `npm` + extension-fallback dance:
+        // on Windows with nvm4w, Gradle's process launcher failed to spawn
+        // every one of npm/.exe/.cmd/.bat (cmd-script shims and Java's
+        // hardened ProcessBuilder do not mix). `node` is a real executable
+        // and spawns cleanly everywhere, so the tauri CLI is invoked through
+        // its JS entry directly. Re-running `tauri android init` will
+        // regenerate this file and undo the fix — re-apply it if the build
+        // dies with "A problem occurred starting process 'command npm'".
+        runTauriCli("node")
     }
 
     fun runTauriCli(executable: String) {
         val rootDirRel = rootDirRel ?: throw GradleException("rootDirRel cannot be null")
         val target = target ?: throw GradleException("target cannot be null")
         val release = release ?: throw GradleException("release cannot be null")
-        val args = listOf("run", "--", "tauri", "android", "android-studio-script");
+        val args = listOf("../node_modules/@tauri-apps/cli/tauri.js", "android", "android-studio-script");
 
         project.exec {
             workingDir(File(project.projectDir, rootDirRel))

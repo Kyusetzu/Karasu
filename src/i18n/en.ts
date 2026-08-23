@@ -14,6 +14,7 @@ export const en = {
     dashboard: "Overview",
     more: "More",
     groupApp: "App",
+    primary: "Navigation",
     list: "Anime",
     manga: "Manga",
     search: "Search",

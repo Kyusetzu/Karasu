@@ -12,6 +12,7 @@ export const de: typeof en = {
     dashboard: "Übersicht",
     more: "Mehr",
     groupApp: "App",
+    primary: "Navigation",
     list: "Anime",
     manga: "Manga",
     search: "Suche",

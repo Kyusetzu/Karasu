@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { NavLink, useLocation } from "react-router";
 import { useTranslation } from "react-i18next";
 import { Info, LayoutGrid, Settings, X } from "lucide-react";
 import { GROUPS, type NavItem } from "@/components/shell/Sidebar";
 import { usePresence } from "@/hooks/usePresence";
+import { useDialogFocus } from "@/hooks/useDialogFocus";
 import { cn } from "@/lib/utils";
 
 /**
@@ -53,6 +54,17 @@ export default function BottomBar() {
   const { t } = useTranslation();
   const [moreOpen, setMoreOpen] = useState(false);
   const sheet = usePresence(moreOpen);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  // The sheet claims `data-overlay`, which silences every screen-level key
+  // handler — so it must supply what it silenced: Escape closes it, and Tab
+  // stays inside while it is up, like every other overlay in the app.
+  useDialogFocus(sheetRef, moreOpen && !sheet.leaving);
+  useEffect(() => {
+    if (!moreOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setMoreOpen(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [moreOpen]);
   const { pathname } = useLocation();
   // "More" reads active when the current page is none of the four slots —
   // the bar must always show where you are, even off its slots.
@@ -77,6 +89,9 @@ export default function BottomBar() {
             onClick={() => setMoreOpen(false)}
           />
           <div
+            ref={sheetRef}
+            role="dialog"
+            aria-label={t("nav.more")}
             className={cn(
               "absolute inset-x-2 bottom-16 rounded-2xl border border-surface-700 bg-surface-900 p-3 shadow-[0_1rem_3rem_rgba(0,0,0,.6)]",
               sheet.leaving ? "animate-rise-out" : "animate-rise-in",
@@ -126,8 +141,12 @@ export default function BottomBar() {
         </div>
       )}
 
+      {/* The primary navigation landmark — named as such, not "More": a
+          screen reader lists landmarks by these labels, and the app's whole
+          navigation announcing as the overflow button's name is wrong on its
+          face. Matches no other landmark, which is the one rule that matters. */}
       <nav
-        aria-label={t("nav.more")}
+        aria-label={t("nav.primary")}
         className="flex shrink-0 items-stretch gap-1 border-t border-hair bg-surface-900 px-2 pb-[max(env(safe-area-inset-bottom),0.375rem)] pt-1.5"
       >
         {slotItems().map((item) => (
@@ -150,10 +169,17 @@ export default function BottomBar() {
           type="button"
           onClick={() => setMoreOpen((v) => !v)}
           aria-expanded={moreOpen}
+          // One exclusive ternary, not stacked conditions: `cn` runs
+          // tailwind-merge, and two text-colour classes in one call keep only
+          // the *last* — the stacked version deleted the accent every time,
+          // so the bar showed nothing as current on any off-slot route.
           className={cn(
             slotClass,
-            inSheet && !moreOpen ? "text-accent-400" : "",
-            moreOpen ? "text-ink-100" : "text-ink-500 hover:text-ink-200",
+            moreOpen
+              ? "text-ink-100"
+              : inSheet
+                ? "text-accent-400"
+                : "text-ink-500 hover:text-ink-200",
           )}
         >
           <LayoutGrid className="size-5" />

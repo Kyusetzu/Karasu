@@ -82,12 +82,15 @@ pub(crate) fn apply_global_hotkey(app: &AppHandle, accel: Option<&str>) -> Resul
     Ok(())
 }
 
-/// No global shortcuts on mobile — quietly, not as an error: the setting can
-/// never be *stored* there (separate database), so the only caller is the
-/// startup path reading an absent key.
+/// No global shortcuts on mobile — and that is an *error*, not a quiet Ok.
+/// The first version returned Ok on the theory that only startup calls this;
+/// wrong twice over: mobile's `setup_platform` never reads the stored hotkey,
+/// and the `set_global_hotkey` command is registered everywhere — so a
+/// vacuous Ok let the settings field accept and store an accelerator that
+/// would never fire, the exact silent-success the autostart pair refuses.
 #[cfg(mobile)]
 pub(crate) fn apply_global_hotkey(_app: &AppHandle, _accel: Option<&str>) -> Result<(), String> {
-    Ok(())
+    Err("Global shortcuts are not available on this platform".into())
 }
 
 /// The tray menu items that change at runtime. Held in managed state because

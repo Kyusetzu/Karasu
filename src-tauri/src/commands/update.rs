@@ -10,7 +10,7 @@ use super::*;
 
 /// Monotonic commit counter — the 4th version segment
 /// (`MAJOR.MINOR.PATCH.COMMIT#`). Bumped by one on every commit.
-pub const COMMIT_NUMBER: u32 = 418;
+pub const COMMIT_NUMBER: u32 = 419;
 
 /// Full four-part display version, e.g. `0.1.1.38`. The `MAJOR.MINOR.PATCH`
 /// core comes from the crate version (kept in sync across the manifests).
@@ -242,6 +242,18 @@ fn display_version(s: &str) -> String {
 /// Windows user, which is all of them. The `is_linux` half is what keeps that
 /// from happening, and the first assertion in the test below is the one that
 /// would catch it.
+/// Whether the updater plugin exists in this build at all — the cfg'd pair
+/// for `attach_desktop` registering it only on desktop.
+#[cfg(desktop)]
+fn updater_available() -> bool {
+    true
+}
+
+#[cfg(mobile)]
+fn updater_available() -> bool {
+    false
+}
+
 fn can_install(is_linux: bool, from_appimage: bool) -> bool {
     !is_linux || from_appimage
 }
@@ -435,6 +447,22 @@ pub async fn download_pending_update(
     pending: State<'_, PendingUpdate>,
 ) -> Result<Option<DownloadedUpdate>, String> {
     use tauri_plugin_updater::UpdaterExt;
+
+    // The updater plugin is registered only on desktop (`attach_desktop`), and
+    // `updater_builder()` reaches for its managed state — which *panics* when
+    // the plugin never ran. The guard below cannot catch this: it asks "is
+    // this Linux?", and Android answers no, which reads as Windows. Same
+    // quiet-refusal shape as the AppImage case, so the auto check stays
+    // silent and the About button reports "nothing downloaded" — mobile
+    // distribution is the store or a sideloaded APK, never this plugin.
+    if !updater_available() {
+        crate::logging::debug_changed(
+            "update",
+            "install",
+            "no updater on this platform; skipping the update download",
+        );
+        return Ok(None);
+    }
 
     // Nothing to install into. `tauri-plugin-updater` replaces
     // `current_exe()` — it has no notion of `$APPIMAGE` — so on a Linux build

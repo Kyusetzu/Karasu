@@ -33,7 +33,9 @@ export default function Toast() {
       role="status"
       aria-live="polite"
       className={cn(
-        "panel-wash panel-top pointer-events-auto fixed bottom-5 left-1/2 z-50 flex",
+        // `--shell-bottom` lifts this clear of the phone shell's bottom bar;
+        // on desktop the variable is 0px and nothing moves.
+        "panel-wash panel-top pointer-events-auto fixed bottom-[calc(1.25rem+var(--shell-bottom,0px))] left-1/2 z-50 flex",
         "max-w-[calc(100vw-4rem)] items-center gap-3",
         // The existing -translate-x-1/2 is what centres this, so the exit has
         // to animate opacity and a *nested* transform rather than replacing it.

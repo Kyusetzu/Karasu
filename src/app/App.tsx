@@ -125,7 +125,14 @@ export default function App() {
   }, []);
 
   return (
-    <div className="flex h-full flex-col">
+    <div
+      className="flex h-full flex-col"
+      // What bottom-anchored floaters (the toast, the playback error) must
+      // clear. Zero on desktop; the bar's height on the phone shell — a
+      // variable rather than per-component width checks, so anything else
+      // that ever anchors to the bottom inherits the answer.
+      style={{ "--shell-bottom": phone ? "3.5rem" : "0px" } as React.CSSProperties}
+    >
       <PresenceReporter />
       <CommandPalette />
       <KeyboardSheet />
@@ -270,7 +277,7 @@ function PlaybackError() {
 
   if (!error) return null;
   return (
-    <div className="fixed bottom-4 right-4 z-50 flex max-w-sm items-start gap-3 rounded-lg border border-surface-700 bg-surface-850 px-4 py-3 shadow-xl">
+    <div className="fixed bottom-[calc(1rem+var(--shell-bottom,0px))] right-4 z-50 flex max-w-sm items-start gap-3 rounded-lg border border-surface-700 bg-surface-850 px-4 py-3 shadow-xl">
       <span className="text-sm text-ink-300">{error}</span>
       <button
         onClick={clearError}

@@ -36,7 +36,10 @@ pub fn load_token() -> Option<String> {
     if crate::portable::is_portable() {
         return load_token_file();
     }
-    entry().ok()?.get_password().ok()
+    // The empty filter the mobile arm has always had: a zero-length stored
+    // credential would otherwise become `Authorization: Bearer ` — which
+    // AniList rejects as an invalid token even on public queries.
+    entry().ok()?.get_password().ok().filter(|t| !t.is_empty())
 }
 
 /// Clears the sign-in from **both** stores, whichever mode is active.
@@ -204,7 +207,7 @@ fn load_token_file() -> Option<String> {
     let path = crate::portable::token_file()?;
     let raw = std::fs::read(path).ok()?;
     let plain = unprotect(&raw).ok()?;
-    String::from_utf8(plain).ok()
+    String::from_utf8(plain).ok().filter(|t| !t.is_empty())
 }
 
 /// Per-platform at-rest protection for the portable token file.

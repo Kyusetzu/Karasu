@@ -545,16 +545,31 @@ pub(super) fn now_ms() -> i64 {
 }
 
 /// Current profile mode: "anilist" (default) or "local".
-#[tauri::command]
-pub fn get_profile_mode(db: State<'_, Db>) -> String {
+pub(crate) fn profile_mode(db: &Db) -> String {
     db.kv_get("profile_mode")
         .unwrap_or_else(|| "anilist".to_string())
 }
 
+#[tauri::command]
+pub fn get_profile_mode(db: State<'_, Db>) -> String {
+    profile_mode(&db)
+}
+
 /// Switches into account-free local mode. Connecting AniList later flips it
 /// back to "anilist" (and offers to merge — see the frontend merge flow).
+///
+/// **Deletes any stored token, and that is the fix for a real bug.** The token
+/// lives in the OS credential store, which survives a reinstall that the
+/// SQLite database does not — so a "fresh" install choosing local mode looked
+/// account-free to the UI (no cached viewer) while `anilist_query` kept
+/// attaching the stale bearer to every request. AniList answers a bad bearer
+/// with "Invalid token" even on public queries, and Search rendered
+/// `anilist.tokenRejected` in an app that supposedly had no account. Choosing
+/// to use Karasu without an account *means* no token; someone switching back
+/// signs in again, which is the flow's shape anyway.
 #[tauri::command]
 pub fn enable_local_mode(db: State<'_, Db>) -> Result<(), String> {
+    crate::anilist::auth::delete_token();
     db.kv_set("profile_mode", "local")
 }
 

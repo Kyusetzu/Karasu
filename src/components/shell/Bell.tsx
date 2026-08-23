@@ -32,7 +32,10 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
   type AppNotification,
+  downloadPendingUpdate,
+  installPendingUpdate,
 } from "@/api/anilist";
+import { showToast } from "@/stores/toast";
 import { siteNotifCount, siteNotifications, type SiteNotifPage } from "@/api/social";
 import type { SiteNotifKind, SiteNotifRow } from "@/lib/siteNotifications";
 
@@ -346,6 +349,22 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
   // id and simply stop there, which is exactly what every row did until now.
   const openLocal = async (n: AppNotification) => {
     await readOne(n);
+    // An update row's whole message is "ready to install" — tapping it does
+    // that, rather than opening a page that offers the same button again.
+    // `download` first because a restart empties the in-memory pending: it
+    // answers instantly when the bytes are already held, re-fetches when they
+    // are not, and `install` does not return on success (the installer takes
+    // over and the process exits).
+    if (n.kind === "update") {
+      setOpen(false);
+      try {
+        await downloadPendingUpdate();
+        await installPendingUpdate();
+      } catch (e) {
+        showToast({ kind: "error", text: t("common.error", { message: String(e) }) });
+      }
+      return;
+    }
     if (n.mediaId == null) return;
     setOpen(false);
     navigate(`/media/${n.mediaId}`);

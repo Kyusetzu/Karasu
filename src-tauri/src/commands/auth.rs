@@ -187,10 +187,18 @@ pub async fn refresh_viewer(
 #[tauri::command]
 pub async fn anilist_query(
     api: State<'_, AniList>,
+    db: State<'_, Db>,
     query: String,
     variables: Option<Value>,
 ) -> Result<Value, String> {
-    let token = auth::load_token();
+    // Local mode sends no bearer, whatever the credential store still holds —
+    // the second half of `enable_local_mode`'s fix, so a token that survives
+    // by any path at all still cannot poison public queries.
+    let token = if crate::commands::profile_mode(&db) == "local" {
+        None
+    } else {
+        auth::load_token()
+    };
     Ok(api
         .query(
             token.as_deref(),

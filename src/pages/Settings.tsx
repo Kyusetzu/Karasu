@@ -138,11 +138,31 @@ const _panesAreComplete: _EveryPaneIsRendered = true;
  * instead of silently un-hiding a pane.
  */
 const PHONE_HIDDEN_PANES: ReadonlySet<PaneId> = new Set(["library", "desktop"] as const);
-const PHONE_HIDDEN_SECTIONS: ReadonlySet<unknown> = new Set([
+const PHONE_HIDDEN_SECTIONS: ReadonlySet<unknown> = new Set([PortableSection]);
+
+/**
+ * Desktop-only detection machinery, greyed rather than hidden on the phone —
+ * the user's call: seeing what the desktop can do explains what the phone
+ * deliberately does not, where silent absence reads as a missing feature.
+ * Jellyfin and the corrections come first there, being the parts that work.
+ */
+const PHONE_DESKTOP_ONLY: ReadonlySet<unknown> = new Set([
+  ScrobbleSection,
   MediaSessionSection,
   MpvSection,
-  PortableSection,
 ]);
+
+function DesktopOnly({ children }: { children: React.ReactNode }) {
+  const { t } = useTranslation();
+  return (
+    <div aria-disabled className="relative">
+      <span className="absolute right-0 top-0 z-10 rounded-full bg-surface-800 px-2 py-0.5 text-[.625rem] font-medium text-ink-500">
+        {t("settings.desktopOnly")}
+      </span>
+      <div className="pointer-events-none select-none opacity-45">{children}</div>
+    </div>
+  );
+}
 
 function AdvancedWarning() {
   const { t } = useTranslation();
@@ -162,7 +182,10 @@ export default function Settings() {
   // rendering a blank one.
   const pane = panes.find((p) => p.id === active) ?? panes[0];
   const sections = phone
-    ? pane.sections.filter((S) => !PHONE_HIDDEN_SECTIONS.has(S))
+    ? [...pane.sections]
+        .filter((S) => !PHONE_HIDDEN_SECTIONS.has(S))
+        // The working sections above the greyed desktop ones.
+        .sort((a, b) => Number(PHONE_DESKTOP_ONLY.has(a)) - Number(PHONE_DESKTOP_ONLY.has(b)))
     : pane.sections;
 
   /**
@@ -215,9 +238,15 @@ export default function Settings() {
             <ChevronLeft className="size-4" />
             {t("settings.title")}
           </Button>
-          {sections.map((Section, i) => (
-            <Section key={i} />
-          ))}
+          {sections.map((Section, i) =>
+            phone && PHONE_DESKTOP_ONLY.has(Section) ? (
+              <DesktopOnly key={i}>
+                <Section />
+              </DesktopOnly>
+            ) : (
+              <Section key={i} />
+            ),
+          )}
         </div>
       </div>
     );

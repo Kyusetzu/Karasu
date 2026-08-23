@@ -154,9 +154,19 @@ fn is_auth_failure(code: u16, msg: &str) -> bool {
     matches!(code, 401 | 403) || m.contains("invalid token") || m.contains("unauthorized")
 }
 
-fn classify(code: u16, msg: String) -> ApiError {
+/// `sent_token` is what keeps "your session expired" honest. A request that
+/// carried no bearer cannot have had its token rejected — yet a Cloudflare or
+/// captive-portal 403 in front of graphql.anilist.co matches the same status
+/// check, and used to sign the message "token rejected" to a user who never
+/// had a token. Tokenless auth-shaped failures are retryable network weather
+/// instead.
+fn classify(code: u16, msg: String, sent_token: bool) -> ApiError {
     if is_auth_failure(code, &msg) {
-        ApiError::Auth(msg)
+        if sent_token {
+            ApiError::Auth(msg)
+        } else {
+            ApiError::Retryable(msg)
+        }
     } else if status_is_retryable(code) || message_is_retryable(&msg) {
         ApiError::Retryable(msg)
     } else {
@@ -590,6 +600,7 @@ impl AniList {
                     return Err(classify(
                         status,
                         format!("Unreadable response (HTTP {status}): {e}"),
+                        token.is_some(),
                     ));
                 }
             };
@@ -616,6 +627,7 @@ impl AniList {
                     } else {
                         msg
                     },
+                    token.is_some(),
                 );
                 // The status and AniList's own wording, once per transition.
                 // A screen fires several queries, so an unguarded warn would
@@ -650,7 +662,11 @@ impl AniList {
             )
             .await;
             return data.ok_or_else(|| {
-                classify(status, format!("Empty response from AniList (HTTP {status})"))
+                classify(
+                    status,
+                    format!("Empty response from AniList (HTTP {status})"),
+                    token.is_some(),
+                )
             });
         }
 
@@ -864,7 +880,7 @@ mod tests {
     fn recoverable_failures_survive() {
         for code in [401, 403, 429, 500, 502, 503, 504] {
             assert!(
-                classify(code, "whatever".into()).is_retryable(),
+                classify(code, "whatever".into(), true).is_retryable(),
                 "HTTP {code} must be retryable"
             );
         }
@@ -876,7 +892,8 @@ mod tests {
     fn payload_failures_are_permanent() {
         for code in [200, 400, 404, 422] {
             assert!(
-                !classify(code, "validation: {\"progress\":[\"invalid\"]}".into()).is_retryable(),
+                !classify(code, "validation: {\"progress\":[\"invalid\"]}".into(), true)
+                    .is_retryable(),
                 "HTTP {code} with a validation message must be permanent"
             );
         }
@@ -887,9 +904,20 @@ mod tests {
     /// write away. This is the one case the message has to decide.
     #[test]
     fn an_expired_token_is_read_out_of_the_message() {
-        assert!(classify(400, "Invalid token".into()).is_retryable());
-        assert!(classify(400, "Unauthorized".into()).is_retryable());
-        assert!(classify(400, "Too Many Requests".into()).is_retryable());
+        assert!(classify(400, "Invalid token".into(), true).is_retryable());
+        assert!(classify(400, "Unauthorized".into(), true).is_retryable());
+        // A request that carried no bearer cannot have had its token
+        // rejected: a proxy or Cloudflare 403 on a tokenless request is
+        // weather, not a sign-out.
+        assert!(matches!(
+            classify(403, "Forbidden".into(), false),
+            ApiError::Retryable(_)
+        ));
+        assert!(matches!(
+            classify(401, "Unauthorized".into(), true),
+            ApiError::Auth(_)
+        ));
+        assert!(classify(400, "Too Many Requests".into(), true).is_retryable());
     }
 
     /// The split this commit exists for. Both keep a queued edit — the write is
@@ -899,7 +927,7 @@ mod tests {
     fn a_rejected_token_is_not_the_same_as_a_busy_server() {
         for (code, msg) in [(400, "Invalid token"), (401, "nope"), (403, "nope")] {
             assert!(
-                matches!(classify(code, msg.into()), ApiError::Auth(_)),
+                matches!(classify(code, msg.into(), true), ApiError::Auth(_)),
                 "HTTP {code} / {msg:?} is an auth failure"
             );
         }
@@ -907,14 +935,14 @@ mod tests {
         // sign the user out for being busy.
         for (code, msg) in [(429, "Too Many Requests."), (400, "Too Many Requests")] {
             assert!(
-                matches!(classify(code, msg.into()), ApiError::Retryable(_)),
+                matches!(classify(code, msg.into(), true), ApiError::Retryable(_)),
                 "HTTP {code} / {msg:?} is pace, not auth"
             );
         }
         // And a payload AniList refuses stays permanent, or one bad row wedges
         // every edit behind it.
         assert!(matches!(
-            classify(400, "validation: {\"progress\":[\"invalid\"]}".into()),
+            classify(400, "validation: {\"progress\":[\"invalid\"]}".into(), true),
             ApiError::Api(_)
         ));
     }
@@ -922,7 +950,7 @@ mod tests {
     /// Every auth failure has to keep its queued write. The queue drops `Api`.
     #[test]
     fn a_rejected_token_never_drops_an_edit() {
-        assert!(classify(401, "Invalid token".into()).is_retryable());
+        assert!(classify(401, "Invalid token".into(), true).is_retryable());
     }
 
     /// The frontend branches on this exact code, and AniList's own wording is
@@ -930,7 +958,7 @@ mod tests {
     #[test]
     fn an_auth_failure_reaches_the_frontend_as_a_stable_code() {
         assert_eq!(
-            String::from(classify(400, "Invalid token".into())),
+            String::from(classify(400, "Invalid token".into(), true)),
             TOKEN_REJECTED
         );
     }

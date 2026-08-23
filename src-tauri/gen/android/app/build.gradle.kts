@@ -13,6 +13,16 @@ val tauriProperties = Properties().apply {
     }
 }
 
+// Hand-edited (init regenerates this file): release signing from
+// key.properties (gitignored here), falling back to the debug keystore so a
+// machine without one — CI — still emits an installable APK.
+val keyProperties = Properties().apply {
+    val propFile = file("key.properties")
+    if (propFile.exists()) {
+        propFile.inputStream().use { load(it) }
+    }
+}
+
 android {
     compileSdk = 36
     namespace = "dev.kyu.karasu"
@@ -23,6 +33,16 @@ android {
         targetSdk = 36
         versionCode = tauriProperties.getProperty("tauri.android.versionCode", "1").toInt()
         versionName = tauriProperties.getProperty("tauri.android.versionName", "1.0")
+    }
+    signingConfigs {
+        create("release") {
+            if (keyProperties.containsKey("storeFile")) {
+                storeFile = file(keyProperties.getProperty("storeFile"))
+                storePassword = keyProperties.getProperty("storePassword")
+                keyAlias = keyProperties.getProperty("keyAlias")
+                keyPassword = keyProperties.getProperty("keyPassword")
+            }
+        }
     }
     buildTypes {
         getByName("debug") {
@@ -37,6 +57,16 @@ android {
             }
         }
         getByName("release") {
+            // Cleartext stays allowed in release, deliberately: Android
+            // detection is Jellyfin-only, LAN Jellyfin over plain HTTP is the
+            // documented answer to self-signed certificates (see net.rs), and
+            // a release build that silently blocks exactly that would strand
+            // the one detection source the platform has.
+            manifestPlaceholders["usesCleartextTraffic"] = "true"
+            signingConfig = if (keyProperties.containsKey("storeFile"))
+                signingConfigs.getByName("release")
+            else
+                signingConfigs.getByName("debug")
             isMinifyEnabled = true
             proguardFiles(
                 *fileTree(".") { include("**/*.pro") }

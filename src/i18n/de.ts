@@ -1435,6 +1435,7 @@ export const de: typeof en = {
     blurAdultHint:
       "Bilder werden überall unkenntlich gemacht. Cover im Raster und die Detailseite haben einen Anzeigen-Knopf, kleine Vorschaubilder bleiben verwischt. Betrifft nur Titel, die der Filter oben durchlässt.",
     blurReveal: "Anzeigen",
+    desktopOnly: "Nur am Desktop",
     contentNote:
       "Gilt überall, auch für deine eigene Liste. Tracking und Wiedergabe funktionieren für ausgeblendete Titel weiterhin.",
     discord: "Discord Rich Presence",

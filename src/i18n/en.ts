@@ -1436,6 +1436,7 @@ export const en = {
     blurAdultHint:
       "Artwork is blurred everywhere it appears. Grid covers and the detail page have a Show button; small thumbnails stay blurred. Only affects titles the filter above lets through.",
     blurReveal: "Show",
+    desktopOnly: "Desktop only",
     contentNote:
       "Applies everywhere, including your own list. Scrobbling and playback keep working for hidden titles you already track.",
     discord: "Discord Rich Presence",

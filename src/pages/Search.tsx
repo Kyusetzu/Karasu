@@ -4,6 +4,7 @@ import { useColumnCount } from "@/hooks/useColumnCount";
 import { useGridRoving } from "@/hooks/useGridRoving";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { backendErrorText } from "@/lib/backendError";
 import { Search as SearchIcon } from "lucide-react";
 import {
   browseMedia,
@@ -451,7 +452,10 @@ function MediaResults({
     <>
       {error != null && (
         <p className="text-sm text-danger">
-          {t("common.error", { message: String(error) })}
+          {/* Through the code translator: a backend error is a stable code
+              (`anilist.tokenRejected` reached users verbatim here), and
+              `backendErrorText` turns known codes into sentences. */}
+          {t("common.error", { message: backendErrorText(error, t) })}
         </p>
       )}
       {isFetching && (

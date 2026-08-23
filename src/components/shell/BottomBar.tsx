@@ -7,6 +7,7 @@ import { usePresence } from "@/hooks/usePresence";
 import { useDialogFocus } from "@/hooks/useDialogFocus";
 import { cn } from "@/lib/utils";
 import Bell from "@/components/shell/Bell";
+import { useNotifBadge } from "@/hooks/useNotifBadge";
 
 /**
  * The phone shell's navigation: a five-slot bottom bar.
@@ -72,6 +73,7 @@ export default function BottomBar() {
     return () => window.removeEventListener("keydown", onKey);
   }, [moreOpen]);
   const { pathname } = useLocation();
+  const badge = useNotifBadge();
   // "More" reads active when the current page is none of the four slots —
   // the bar must always show where you are, even off its slots.
   const inSheet = !SLOTS.some((s) =>
@@ -107,14 +109,21 @@ export default function BottomBar() {
               <span className="text-2xs font-semibold uppercase tracking-wide text-ink-600">
                 {t("nav.more")}
               </span>
-              <button
-                type="button"
-                aria-label={t("window.close")}
-                onClick={() => setMoreOpen(false)}
-                className="rounded p-1 text-ink-500 transition-surface hover:text-ink-200"
-              >
-                <X className="size-4" />
-              </button>
+              <div className="flex items-center gap-1">
+                {/* The bell lives here on the phone — an unlabeled icon in
+                    the nav row read as decoration; inside the sheet it sits
+                    with the other destinations, and the More button outside
+                    carries its count. */}
+                <Bell barSlot />
+                <button
+                  type="button"
+                  aria-label={t("window.close")}
+                  onClick={() => setMoreOpen(false)}
+                  className="rounded p-1 text-ink-500 transition-surface hover:text-ink-200"
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
             </div>
             {sheetGroups().map((g) => (
               <div key={g.label} className="mb-2 last:mb-0">
@@ -171,9 +180,6 @@ export default function BottomBar() {
             <span className="truncate">{t(item.key)}</span>
           </NavLink>
         ))}
-        {/* The one unlabeled slot: with the titlebar gone on the phone shell,
-            this is where notifications live, badge and panel included. */}
-        <Bell barSlot />
         <button
           type="button"
           onClick={() => setMoreOpen((v) => !v)}
@@ -191,7 +197,14 @@ export default function BottomBar() {
                 : "text-ink-500 hover:text-ink-200",
           )}
         >
-          <LayoutGrid className="size-5" />
+          <span className="relative">
+            <LayoutGrid className="size-5" />
+            {badge > 0 && (
+              <span className="absolute -right-2.5 -top-1.5 grid h-3.5 min-w-3.5 place-items-center rounded-[.4375rem] border border-surface-950 bg-accent-500 px-1 text-[.5625rem] font-semibold tabular-nums text-accent-ink">
+                {badge > 9 ? "9+" : badge}
+              </span>
+            )}
+          </span>
           <span className="truncate">{t("nav.more")}</span>
         </button>
       </nav>

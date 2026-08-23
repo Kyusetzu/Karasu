@@ -32,11 +32,15 @@ export default function FirstRun() {
       />
 
       <div className="relative flex w-full max-w-6xl items-center">
-        <div className="max-w-120 shrink-0 py-8 pl-14 pr-8">
+        {/* Phone: one centred column with the mark above the words — the
+            desktop's 56px left gutter and 480px text column overflowed a
+            375px viewport, cutting the title mid-word. */}
+        <div className="w-full max-w-120 px-6 py-8 md:w-auto md:shrink-0 md:px-0 md:py-8 md:pl-14 md:pr-8">
+          <KarasuMark className="mb-6 w-20 md:hidden" />
           <p className="text-2xs font-semibold uppercase tracking-[.18em] text-accent-400">
             {t("dashboard.welcomeTitle")}
           </p>
-          <h1 className="mt-2 font-brand text-[2.25rem] font-bold leading-[1.1] tracking-[-.03em] text-ink-100">
+          <h1 className="mt-2 font-brand text-[1.75rem] font-bold leading-[1.12] tracking-[-.03em] text-ink-100 md:text-[2.25rem]">
             {t("firstRun.headline")}
           </h1>
           <p className="mt-3 text-sm leading-relaxed text-ink-500">

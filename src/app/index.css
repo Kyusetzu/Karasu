@@ -574,6 +574,13 @@ nav a {
   main .p-8 {
     padding: 1rem;
   }
+  /* Two flexible columns instead of auto-fill fixed tracks: 150px tracks at
+     a 343px content width leave a ~27px dead strip on the right (the
+     reported gap). Two minmax(0,1fr) columns fill the width exactly, and the
+     covers scale with their aspect ratio. */
+  main .media-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @utility media-grid {

@@ -95,8 +95,11 @@ export const GridCard = memo(function GridCard({
         ) : (
           // Deepens the foot of the cover only while the actions are showing,
           // so the three circles have a ground without dimming every poster
-          // in the grid permanently.
-          <div className="cover-scrim pointer-events-none absolute inset-x-0 bottom-0 h-[45%] opacity-0 transition-opacity group-hover:opacity-100" />
+          // in the grid permanently. `pointer-coarse:`: touch has no hover
+          // state to reveal from, so on a coarse pointer the scrim and the
+          // actions below are simply there — width is the wrong key for this,
+          // since a touch laptop at desktop width has the same problem.
+          <div className="cover-scrim pointer-events-none absolute inset-x-0 bottom-0 h-[45%] opacity-0 transition-opacity group-hover:opacity-100 pointer-coarse:opacity-100" />
         )
       }
       actions={
@@ -107,7 +110,7 @@ export const GridCard = memo(function GridCard({
         // transparent — a focus ring around nothing, and no way to tell what
         // was about to be activated.
         !selectMode && (
-          <div className="flex gap-1.5 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
+          <div className="flex gap-1.5 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100">
             <IconButton
               variant="onCover"
               size="sm"

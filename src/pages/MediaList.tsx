@@ -63,6 +63,7 @@ import { ListHeader } from "@/components/list/ListHeader";
 import { ROW_HEIGHT_PX } from "@/components/list/columns";
 import { useRowTier } from "@/hooks/useRowTier";
 import { loadViewMode, saveViewMode, type ViewMode } from "@/lib/viewMode";
+import { usePhoneShell } from "@/hooks/usePhoneShell";
 import { BulkBar } from "@/components/list/BulkBar";
 import { canIncrement } from "@/components/list/shared";
 
@@ -146,7 +147,18 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
   const [filter, setFilter] = useState(() => params.get("q") ?? "");
   // Remembered per media type: the screen remounts on every navigation, so
   // component state meant re-picking the view every single time.
-  const [grid, setGrid] = useState(() => loadViewMode(type) === "grid");
+  const [gridChoice, setGrid] = useState(() => loadViewMode(type) === "grid");
+  /**
+   * The phone shell always gets cards. The row layout is a table whose fixed
+   * tracks need ~580px before they stop overflowing (`minRowWidth`), and a
+   * phone tier of that table would be a fourth layout duplicating what
+   * `GridCard` already does — cards *are* the honest one-per-row answer the
+   * ROADMAP asks for, and `media-grid`'s auto-fill sizes them to the width.
+   * The stored preference is left alone, so a tablet rotated back past the
+   * breakpoint returns to whatever the user chose.
+   */
+  const phone = usePhoneShell();
+  const grid = phone || gridChoice;
   const [editing, setEditing] = useState<MediaListEntry | null>(null);
   const [showRandom, setShowRandom] = useState(false);
   const [presets, setPresets] = useState<Preset[]>(() => loadPresets(type));
@@ -777,6 +789,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
           >
             <Dices className="size-4" />
           </IconButton>
+          {!phone && (
           <Segmented
             className="ml-auto"
             aria-label={t("list.view")}
@@ -798,6 +811,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
               },
             ]}
           />
+          )}
       </div>
 
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-8 pb-12 pt-1">

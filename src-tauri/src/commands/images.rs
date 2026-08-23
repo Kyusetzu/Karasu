@@ -98,7 +98,7 @@ pub async fn fetch_bio_image(url: String) -> Result<String, String> {
     }
 
     // Every hop re-checked, because a public URL may redirect anywhere.
-    let client = reqwest::Client::builder()
+    let client = crate::net::client_builder()
         .user_agent(concat!("Karasu/", env!("CARGO_PKG_VERSION")))
         .timeout(TIMEOUT)
         .redirect(reqwest::redirect::Policy::custom(|attempt| {

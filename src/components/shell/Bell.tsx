@@ -150,7 +150,7 @@ function siteVerb(
   }
 }
 
-export default function Bell() {
+export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -355,11 +355,18 @@ export default function Bell() {
     <div ref={ref} className="relative flex items-center">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="relative grid h-9 w-11 place-items-center text-ink-500 transition-surface hover:bg-surface-850 hover:text-ink-100"
+        // On the phone shell this button is a bottom-bar slot rather than a
+        // titlebar corner, so it wears the bar's proportions there.
+        className={cn(
+          "relative transition-surface",
+          barSlot
+            ? "flex h-full min-w-11 flex-col items-center justify-center rounded-lg px-2 text-ink-500 hover:text-ink-200"
+            : "grid h-9 w-11 place-items-center text-ink-500 hover:bg-surface-850 hover:text-ink-100",
+        )}
         aria-label={t("notif.title")}
         title={t("notif.title")}
       >
-        <BellIcon className="size-3.75" />
+        <BellIcon className={barSlot ? "size-5" : "size-3.75"} />
         {badge > 0 && (
           // The `s950` ring is what separates the badge from the bell glyph
           // beneath it — without it the two silhouettes merge at this size.
@@ -380,7 +387,12 @@ export default function Bell() {
           // like every other overlay.
           data-overlay
           className={cn(
-            "absolute right-0 top-full z-50 mt-1 w-88 origin-top-right overflow-hidden rounded-xl border border-hair bg-surface-900 shadow-2xl panel-wash",
+            // Anchored under the titlebar bell on desktop; on the phone shell
+            // the anchor sits in the bottom bar, so the panel becomes a sheet
+            // pinned above it instead — `fixed` to escape the bar's box.
+            barSlot
+              ? "fixed inset-x-2 bottom-[calc(var(--shell-bottom,0px)+0.5rem)] z-50 origin-bottom overflow-hidden rounded-xl border border-hair bg-surface-900 shadow-2xl panel-wash"
+              : "absolute right-0 top-full z-50 mt-1 w-88 origin-top-right overflow-hidden rounded-xl border border-hair bg-surface-900 shadow-2xl panel-wash",
             panel.leaving ? "animate-pop-out" : "animate-spring-in",
           )}
         >

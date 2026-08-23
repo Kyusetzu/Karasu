@@ -373,7 +373,7 @@ pub struct RateSnapshot {
 impl AniList {
     pub fn new() -> Self {
         Self {
-            http: reqwest::Client::builder()
+            http: crate::net::client_builder()
                 .user_agent(concat!("Karasu/", env!("CARGO_PKG_VERSION")))
                 .timeout(Duration::from_secs(30))
                 .build()

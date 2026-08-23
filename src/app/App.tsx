@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect } from "react";
-import { Link, Routes, Route, useLocation } from "react-router";
+import { Link, Routes, Route, useLocation, useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
 import { X } from "lucide-react";
@@ -20,6 +20,8 @@ import Titlebar from "@/components/shell/Titlebar";
 import Sidebar from "@/components/shell/Sidebar";
 import BottomBar from "@/components/shell/BottomBar";
 import { usePhoneShell } from "@/hooks/usePhoneShell";
+import { onOpenUrl } from "@tauri-apps/plugin-deep-link";
+import { internalRoute } from "@/lib/anilistUrl";
 import SessionExpired from "@/components/shell/SessionExpired";
 import Toast from "@/components/shell/Toast";
 import CommandPalette from "@/components/shell/CommandPalette";
@@ -65,6 +67,7 @@ const StudioPage = lazy(() =>
 
 export default function App() {
   const { pathname } = useLocation();
+  const navigate = useNavigate();
   const phone = usePhoneShell();
   const init = useAuth((s) => s.init);
   const initNowPlaying = useNowPlaying((s) => s.init);
@@ -83,6 +86,22 @@ export default function App() {
     refreshLibrary();
     initContentFilter();
   }, [init, initNowPlaying, refreshLibrary, initContentFilter]);
+
+  // An anilist.co link tapped anywhere on the phone can arrive here (the
+  // deep-link plugin's generated intent filter), and it lands on the same
+  // route mapping in-app links use. Anything `internalRoute` refuses is
+  // dropped — the app never claims a page it cannot draw. Outside Tauri the
+  // listener would throw reaching for internals, hence the guard.
+  useEffect(() => {
+    if (!isTauri) return;
+    const un = onOpenUrl((urls) => {
+      const to = urls.map(internalRoute).find((r) => r !== null);
+      if (to) navigate(to);
+    });
+    return () => {
+      void un.then((f) => f());
+    };
+  }, [navigate]);
 
   // Paint the list from SQLite as soon as the viewer is known, rather than
   // waiting out a full AniList round trip on every launch.
@@ -141,7 +160,10 @@ export default function App() {
       <SignInMerge />
       <PlaybackError />
       <Toast />
-      <Titlebar />
+      {/* The titlebar is desktop window furniture — drag region, window
+          controls, the pill. The phone has the system status bar above and
+          the bottom bar below; the bell rides in the bar there. */}
+      {!phone && <Titlebar />}
       {/* The first Tab stop in the window, and invisible until it is one. The
           sidebar is fourteen links, so reaching the page by keyboard meant
           fourteen presses on every single navigation. Not `hidden` — a hidden

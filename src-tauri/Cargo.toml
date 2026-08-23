@@ -1,6 +1,6 @@
 [package]
 name = "karasu"
-version = "0.160.2"
+version = "0.161.0"
 description = "A modern anime and manga tracker built exclusively for AniList"
 authors = ["Kyu"]
 license = "MIT"
@@ -100,6 +100,15 @@ base64 = "0.22"
 # friends; this makes the one use that must be cryptographically random an
 # explicit dependency rather than a borrowed one.
 getrandom = "0.3"
+tauri-plugin-deep-link = "2.4.9"
+
+# Android: TLS trust comes from webpki's baked Mozilla roots — see `net.rs`
+# for why the platform verifier cannot be used there without Gradle surgery
+# in the generated tree. `rustls` must track the version reqwest's own rustls
+# resolves to (Cargo.lock), or `use_preconfigured_tls` fails at runtime.
+[target.'cfg(target_os = "android")'.dependencies]
+rustls = "0.23"
+webpki-roots = "1"
 
 # --- Platform-specific -------------------------------------------------------
 # Windows: Credential Manager keyring + DPAPI (via the `windows` crate).

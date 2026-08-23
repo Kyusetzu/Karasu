@@ -337,7 +337,7 @@ fn str_field(v: &serde_json::Value, name: &str) -> String {
 fn http() -> &'static reqwest::Client {
     static HTTP: std::sync::OnceLock<reqwest::Client> = std::sync::OnceLock::new();
     HTTP.get_or_init(|| {
-        reqwest::Client::builder()
+        crate::net::client_builder()
             .user_agent(concat!("Karasu/", env!("CARGO_PKG_VERSION")))
             .build()
             .expect("reqwest client")

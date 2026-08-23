@@ -6,6 +6,7 @@ import { GROUPS, type NavItem } from "@/components/shell/Sidebar";
 import { usePresence } from "@/hooks/usePresence";
 import { useDialogFocus } from "@/hooks/useDialogFocus";
 import { cn } from "@/lib/utils";
+import Bell from "@/components/shell/Bell";
 
 /**
  * The phone shell's navigation: a five-slot bottom bar.
@@ -29,10 +30,15 @@ function slotItems(): NavItem[] {
   );
 }
 
+/** What the phone shell does not offer at all — the scanner needs a
+ *  filesystem scoped storage will not hand out, so its screen would be a
+ *  permanent empty state pointing at a settings pane that is also hidden. */
+const PHONE_HIDDEN = new Set(["/library"]);
+
 function sheetGroups(): { label: string; items: NavItem[] }[] {
   const groups = GROUPS.map((g) => ({
     label: g.label,
-    items: g.items.filter((i) => !SLOTS.includes(i.to)),
+    items: g.items.filter((i) => !SLOTS.includes(i.to) && !PHONE_HIDDEN.has(i.to)),
   })).filter((g) => g.items.length > 0);
   // Settings and About sit *outside* `GROUPS` in the sidebar (its footer), so
   // without this the phone shell simply has no way to reach either — found by
@@ -165,6 +171,9 @@ export default function BottomBar() {
             <span className="truncate">{t(item.key)}</span>
           </NavLink>
         ))}
+        {/* The one unlabeled slot: with the titlebar gone on the phone shell,
+            this is where notifications live, badge and panel included. */}
+        <Bell barSlot />
         <button
           type="button"
           onClick={() => setMoreOpen((v) => !v)}

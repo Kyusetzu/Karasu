@@ -563,6 +563,19 @@ nav a {
    theme store, but `repeat(auto-fill, var(--cover-track))` with the variable
    unset is an invalid declaration — `grid-template-columns` then computes to
    `none` and the grid silently collapses to a single column. */
+/* The phone shell compresses the pages' desktop gutters. One rule instead of
+   a phone variant on every page container: `main .px-8` outranks the utility
+   (0,1,1 vs 0,1,0), and the pages keep reading as themselves on desktop.
+   Overlays and dialogs are outside <main> and keep their own padding. */
+@media (max-width: 767px) {
+  main .px-8 {
+    padding-inline: 1rem;
+  }
+  main .p-8 {
+    padding: 1rem;
+  }
+}
+
 @utility media-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, var(--cover-track, 9.375rem));

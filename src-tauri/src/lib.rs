@@ -8,6 +8,7 @@ mod discord;
 mod identify;
 mod library;
 mod logging;
+mod net;
 mod playback;
 mod i18n;
 mod portable;
@@ -333,6 +334,12 @@ pub fn run() {
 
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        // Android's manifest intent-filter for anilist.co is *generated* from
+        // the tauri.conf `deep-link` block at build time — the regeneration-
+        // safe alternative to hand-editing the gen manifest. The frontend
+        // listens via onOpenUrl and routes through `lib/anilistUrl`, the same
+        // mapping in-app links already use.
+        .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_dialog::init());
 

@@ -10,7 +10,7 @@ use super::*;
 
 /// Monotonic commit counter — the 4th version segment
 /// (`MAJOR.MINOR.PATCH.COMMIT#`). Bumped by one on every commit.
-pub const COMMIT_NUMBER: u32 = 420;
+pub const COMMIT_NUMBER: u32 = 421;
 
 /// Full four-part display version, e.g. `0.1.1.38`. The `MAJOR.MINOR.PATCH`
 /// core comes from the crate version (kept in sync across the manifests).
@@ -145,7 +145,7 @@ pub async fn check_for_updates(db: State<'_, Db>, force: bool) -> Result<UpdateI
     // this inherits `reqwest`'s default of *none*, so a connection that opens
     // and then stalls parks the About page's spinner until the OS gives up —
     // and on the startup path, holds a task open for as long as that takes.
-    let resp = reqwest::Client::builder()
+    let resp = crate::net::client_builder()
         .timeout(std::time::Duration::from_secs(30))
         .build()
         .map_err(|e| format!("Update check failed: {e}"))?

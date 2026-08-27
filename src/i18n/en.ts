@@ -509,6 +509,7 @@ export const en = {
     pending: "{{count}} change(s) waiting to sync.",
     syncNow: "Sync now",
     filterPlaceholder: "Search your list …",
+    hiddenByFilter: "{{n}} hidden by your content filter",
     view: "View",
     gridView: "Grid view",
     listView: "List view",
@@ -520,6 +521,7 @@ export const en = {
     searching: "Searching …",
     noResults: "Nothing matches that.",
     noResultsHint: "Check the spelling, or try the romaji title.",
+    hiddenByFilter: "{{n}} results hidden by your content filter",
     prompt: "Search AniList.",
     promptHint:
       "Two characters is enough to start. Romaji, English and native titles all match.",

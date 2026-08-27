@@ -183,6 +183,22 @@ function LibraryView({ userId }: { userId: number }) {
     [fetched],
   );
 
+  // What the filter kept off this screen: on-list ids the blocked-aware map
+  // deliberately lacks, plus off-list titles AniList resolved as blocked.
+  // Counted from the same structures the rows are built from, so the line
+  // and the list cannot disagree.
+  const hiddenCount = useMemo(() => {
+    let n = 0;
+    for (const lib of entries) {
+      if (onList.has(lib.mediaId) && !byMedia.has(lib.mediaId)) n++;
+      else {
+        const m = byId.get(lib.mediaId);
+        if (m && isBlocked(m, level)) n++;
+      }
+    }
+    return n;
+  }, [entries, onList, byMedia, byId, level]);
+
   const rows = useMemo<Row[]>(() => {
     const built = entries.flatMap((lib) => {
       const entry = byMedia.get(lib.mediaId) ?? null;
@@ -497,6 +513,14 @@ function LibraryView({ userId }: { userId: number }) {
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-10">
+        {hiddenCount > 0 && (
+          <Link
+            to="/settings?pane=appearance"
+            className="mb-2 inline-block text-2xs font-medium text-accent-400 hover:underline"
+          >
+            {t("list.hiddenByFilter", { n: hiddenCount })}
+          </Link>
+        )}
         {rows.length === 0 && !unmatched?.length ? (
           <EmptyState
             visual={<FolderStack />}

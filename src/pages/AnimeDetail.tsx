@@ -158,7 +158,14 @@ export default function AnimeDetail() {
       <div className="grid h-full place-items-center p-8">
         <div className="max-w-sm text-center">
           <p className="text-sm text-ink-300">{t("detail.filtered")}</p>
-          <p className="mt-1 text-xs text-ink-600">{t("detail.filteredHint")}</p>
+          {/* The sentence always said "you can change this in Settings" —
+              now it goes there. */}
+          <Link
+            to="/settings?pane=appearance"
+            className="mt-1 block text-xs text-accent-400 hover:underline"
+          >
+            {t("detail.filteredHint")}
+          </Link>
           <Button className="mt-4" onClick={() => setRevealed(true)}>
             {t("detail.filteredShow")}
           </Button>

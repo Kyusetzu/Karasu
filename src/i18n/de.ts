@@ -505,6 +505,7 @@ export const de: typeof en = {
     pending: "{{count}} Änderung(en) warten auf Synchronisation.",
     syncNow: "Jetzt synchronisieren",
     filterPlaceholder: "In der Liste suchen …",
+    hiddenByFilter: "{{n}} durch deinen Inhaltsfilter ausgeblendet",
     view: "Ansicht",
     gridView: "Rasteransicht",
     listView: "Listenansicht",
@@ -516,6 +517,7 @@ export const de: typeof en = {
     searching: "Suche …",
     noResults: "Dafür gibt es keine Treffer.",
     noResultsHint: "Prüf die Schreibweise oder versuch den Romaji-Titel.",
+    hiddenByFilter: "{{n}} Ergebnisse durch deinen Inhaltsfilter ausgeblendet",
     prompt: "Durchsuche AniList.",
     promptHint:
       "Zwei Zeichen genügen. Romaji, Englisch und Originaltitel passen alle.",

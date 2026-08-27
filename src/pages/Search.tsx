@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { useColumnCount } from "@/hooks/useColumnCount";
 import { useGridRoving } from "@/hooks/useGridRoving";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
@@ -188,9 +188,14 @@ export default function Search() {
 
   // Server-side isAdult covers explicit works; the strict level additionally
   // drops Ecchi, which AniList does not flag as adult.
-  const results = (media.data?.pages ?? [])
-    .flatMap((p) => p.media)
-    .filter((m) => !isBlocked(m, level));
+  // What arrived minus what the filter dropped locally. At `moderate` the
+  // server already omits adult titles (`adultQueryArg`), so this counts only
+  // real local drops — Ecchi at `strict` — rather than claiming a number
+  // nobody can know. Moving the filtering client-side to count "everything"
+  // is the sparse-page bug queries.ts documents; not doing that is the point.
+  const fetched = (media.data?.pages ?? []).flatMap((p) => p.media);
+  const results = fetched.filter((m) => !isBlocked(m, level));
+  const hiddenCount = fetched.length - results.length;
 
   const applyChip = (chip: (typeof BROWSE_CHIPS)[number]) => {
     const now = currentSeasonOf();
@@ -358,6 +363,7 @@ export default function Search() {
             active={active}
             term={term}
             results={results}
+            hidden={hiddenCount}
             hasNextPage={media.hasNextPage === true}
             fetchingMore={media.isFetchingNextPage}
             onMore={() => media.fetchNextPage()}
@@ -417,6 +423,7 @@ function MediaResults({
   active,
   term,
   results,
+  hidden,
   hasNextPage,
   fetchingMore,
   onMore,
@@ -427,6 +434,8 @@ function MediaResults({
   active: boolean;
   term: string;
   results: MediaWithListStatus[];
+  /** Results that arrived and were dropped by the content filter. */
+  hidden: number;
   hasNextPage: boolean;
   fetchingMore: boolean;
   onMore: () => void;
@@ -465,6 +474,14 @@ function MediaResults({
         // No mark here, deliberately: on every other empty screen the visual
         // is the subject, and on this one the field above it is.
         <EmptyState title={t("search.prompt")} hint={t("search.promptHint")} />
+      )}
+      {!isFetching && active && hidden > 0 && (
+        <Link
+          to="/settings?pane=appearance"
+          className="mb-3 inline-block text-2xs font-medium text-accent-400 hover:underline"
+        >
+          {t("search.hiddenByFilter", { n: hidden })}
+        </Link>
       )}
       {!isFetching && active && results.length === 0 && (
         <EmptyState

@@ -6,6 +6,7 @@ import {
   type RefObject,
   type WheelEvent,
 } from "react";
+import { pinchUpdate, zoomAboutPoint, type ZoomView } from "@/lib/zoomMath";
 
 export const MIN_ZOOM = 0.4;
 export const MAX_ZOOM = 1.6;
@@ -15,49 +16,49 @@ export const BUTTON_STEP = 1.15;
 /** Below this, a drag is a click that wobbled. */
 const MOVE_THRESHOLD = 3;
 
-interface View {
-  tx: number;
-  ty: number;
-  zoom: number;
-}
-const RESTING: View = { tx: 0, ty: 0, zoom: 1 };
-
-const clamp = (z: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z));
+const RESTING: ZoomView = { tx: 0, ty: 0, zoom: 1 };
 
 /**
  * Pan and zoom for a `translate3d(tx, ty, 0) scale(zoom)` canvas with
- * `transform-origin: 0 0`.
+ * `transform-origin: 0 0`. The arithmetic lives in `lib/zoomMath`, tested.
  *
- * Zoom is anchored to a point — the cursor for the wheel, the viewport centre
- * for the buttons — because zooming about the origin instead walks the content
- * out of view after two notches.
+ * Zoom is anchored to a point — the cursor for the wheel, the pinch midpoint
+ * for two fingers, the viewport centre for the buttons — because zooming
+ * about the origin instead walks the content out of view after two notches.
  *
  * The view is mirrored in a ref as well as in state: a pointer handler needs
  * the current offset to compute the next one, and reading it out of the state
  * closure gives whatever it was when the handler was created.
+ *
+ * Two pointers are a pinch: the second `pointerdown` suspends the one-finger
+ * pan, each move rescales about the moving midpoint, and the last finger to
+ * lift re-seeds an ordinary drag so the image does not jump. The default
+ * clamp is the franchise graph's; the cover viewer widens it via `opts`.
  */
-export function usePanZoom(viewport: RefObject<HTMLElement | null>) {
-  const [view, setView] = useState<View>(RESTING);
+export function usePanZoom(
+  viewport: RefObject<HTMLElement | null>,
+  opts?: { minZoom?: number; maxZoom?: number },
+) {
+  const min = opts?.minZoom ?? MIN_ZOOM;
+  const max = opts?.maxZoom ?? MAX_ZOOM;
+  const [view, setView] = useState<ZoomView>(RESTING);
   const [dragging, setDragging] = useState(false);
-  const current = useRef<View>(RESTING);
+  const current = useRef<ZoomView>(RESTING);
   const origin = useRef<{ x: number; y: number; tx: number; ty: number } | null>(null);
   const moved = useRef(false);
+  const pointers = useRef(new Map<number, { x: number; y: number }>());
 
-  const commit = useCallback((next: View) => {
+  const commit = useCallback((next: ZoomView) => {
     current.current = next;
     setView(next);
   }, []);
 
   const zoomAt = useCallback(
     (factor: number, px: number, py: number) => {
-      const v = current.current;
-      const zoom = clamp(v.zoom * factor);
-      if (zoom === v.zoom) return;
-      // Keep the content point under (px, py) exactly where it is.
-      const scale = zoom / v.zoom;
-      commit({ zoom, tx: px - (px - v.tx) * scale, ty: py - (py - v.ty) * scale });
+      const next = zoomAboutPoint(current.current, factor, px, py, min, max);
+      if (next !== current.current) commit(next);
     },
-    [commit],
+    [commit, min, max],
   );
 
   const zoomBy = useCallback(
@@ -81,7 +82,24 @@ export function usePanZoom(viewport: RefObject<HTMLElement | null>) {
   );
 
   const onPointerDown = useCallback((e: PointerEvent<HTMLElement>) => {
-    if (e.button !== 0) return;
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.current.size === 2) {
+      // Entering a pinch: the one-finger pan stands down, and both pointers
+      // are captured — a two-finger gesture is never a click, so the
+      // capture-late discipline below does not apply to it.
+      origin.current = null;
+      moved.current = true;
+      for (const id of pointers.current.keys()) {
+        try {
+          e.currentTarget.setPointerCapture(id);
+        } catch {
+          // A pointer that ended between the map write and here is fine.
+        }
+      }
+      setDragging(true);
+      return;
+    }
     const { tx, ty } = current.current;
     origin.current = { x: e.clientX, y: e.clientY, tx, ty };
     moved.current = false;
@@ -95,6 +113,31 @@ export function usePanZoom(viewport: RefObject<HTMLElement | null>) {
 
   const onPointerMove = useCallback(
     (e: PointerEvent<HTMLElement>) => {
+      const pts = pointers.current;
+      if (pts.size === 2 && pts.has(e.pointerId)) {
+        const ids = [...pts.keys()];
+        const prev = ids.map((id) => pts.get(id)!);
+        pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        const next = ids.map((id) => pts.get(id)!);
+        const box = e.currentTarget.getBoundingClientRect();
+        const rel = (p: { x: number; y: number }) => ({
+          x: p.x - box.left,
+          y: p.y - box.top,
+        });
+        commit(
+          pinchUpdate(
+            current.current,
+            [rel(prev[0]), rel(prev[1])],
+            [rel(next[0]), rel(next[1])],
+            min,
+            max,
+          ),
+        );
+        return;
+      }
+      if (pts.has(e.pointerId)) {
+        pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      }
       const from = origin.current;
       if (!from) return;
       // No capture is held before the threshold, so a press whose release
@@ -102,6 +145,7 @@ export function usePanZoom(viewport: RefObject<HTMLElement | null>) {
       // this guard the stale origin would make bare hovers pan the canvas.
       if (e.buttons === 0) {
         origin.current = null;
+        pts.delete(e.pointerId);
         setDragging(false);
         return;
       }
@@ -115,16 +159,26 @@ export function usePanZoom(viewport: RefObject<HTMLElement | null>) {
       moved.current = true;
       commit({ ...current.current, tx: from.tx + dx, ty: from.ty + dy });
     },
-    [commit],
+    [commit, min, max],
   );
 
   const onPointerUp = useCallback((e: PointerEvent<HTMLElement>) => {
-    if (!origin.current) return;
-    origin.current = null;
-    setDragging(false);
+    const pts = pointers.current;
+    pts.delete(e.pointerId);
     if (e.currentTarget.hasPointerCapture(e.pointerId)) {
       e.currentTarget.releasePointerCapture(e.pointerId);
     }
+    if (pts.size === 1) {
+      // Pinch down to one finger: re-seed an ordinary drag from the survivor
+      // so the image stays put instead of jumping to a stale origin.
+      const [rest] = pts.values();
+      const { tx, ty } = current.current;
+      origin.current = { x: rest.x, y: rest.y, tx, ty };
+      return;
+    }
+    if (!origin.current) return;
+    origin.current = null;
+    setDragging(false);
     // `click` fires *after* `pointerup`, so the flag has to outlive this
     // handler and die on the next tick. Clearing it here would let every pan
     // end in a selection; never clearing it would suppress selection forever.
@@ -141,6 +195,7 @@ export function usePanZoom(viewport: RefObject<HTMLElement | null>) {
     dragging,
     dragged,
     reset,
+    zoomAt,
     zoomBy,
     handlers: {
       onPointerDown,

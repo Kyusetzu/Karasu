@@ -39,7 +39,9 @@ import { AreaChart } from "@/components/stats/AreaChart";
 import { Avatar, UserLockup } from "@/components/ui/user-lockup";
 import { Markdown } from "@/components/social/Markdown";
 import { ReviewComposerModal } from "@/components/overlays/ReviewComposerModal";
+import CoverViewer from "@/components/overlays/CoverViewer";
 import { Presence } from "@/components/ui/presence";
+import { usePresence } from "@/hooks/usePresence";
 import { relTimeFromSeconds } from "@/lib/relTime";
 import { showToast } from "@/stores/toast";
 import {
@@ -101,6 +103,8 @@ export default function AnimeDetail() {
   // measure, and a CSS variable is opaque to it.
   const statusColors = useTheme((st) => st.statusColors);
   const [revealed, setRevealed] = useState(false);
+  const [coverOpen, setCoverOpen] = useState(false);
+  const coverViewer = usePresence(coverOpen);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["mediaDetail", mediaId],
@@ -266,7 +270,25 @@ export default function AnimeDetail() {
                 </span>
               </button>
             )}
+            {/* Only once revealed — a lightbox must not be a way around the
+                blur. Same overlay-button shape as the veil above. */}
+            {!veiled && coverSrc && (
+              <button
+                type="button"
+                onClick={() => setCoverOpen(true)}
+                aria-label={t("detail.viewCover")}
+                className="absolute inset-0 cursor-zoom-in rounded-[.625rem] focus-visible:outline-2 focus-visible:outline-accent-500"
+              />
+            )}
           </div>
+          {coverViewer.mounted && (
+            <CoverViewer
+              src={coverSrc}
+              alt={title}
+              leaving={coverViewer.leaving}
+              onClose={() => setCoverOpen(false)}
+            />
+          )}
           <div className="min-w-0 flex-1 pt-16">
             <h1 className="text-[1.625rem] font-bold leading-tight text-ink-100">
               {title}

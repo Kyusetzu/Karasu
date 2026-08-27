@@ -710,6 +710,7 @@ export const de: typeof en = {
     filtered: "Dieser Titel ist durch deinen Inhaltsfilter ausgeblendet.",
     filteredHint: "Du kannst den Filter in den Einstellungen ändern.",
     filteredShow: "Trotzdem anzeigen",
+    viewCover: "Cover im Vollbild ansehen",
   },
   review: {
     write: "Review schreiben",

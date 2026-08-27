@@ -714,6 +714,7 @@ export const en = {
     filtered: "This title is hidden by your content filter.",
     filteredHint: "You can change the filter in Settings.",
     filteredShow: "Show anyway",
+    viewCover: "View the cover full screen",
   },
   review: {
     write: "Write a review",

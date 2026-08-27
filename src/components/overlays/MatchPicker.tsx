@@ -9,6 +9,7 @@ import { isBlocked } from "@/lib/contentFilter";
 import { formatLabel } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { useDialogFocus } from "@/hooks/useDialogFocus";
+import { useBackClose } from "@/hooks/useBackClose";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
@@ -77,6 +78,7 @@ export default function MatchPicker({
   // This one focuses its own search field, which `useDialogFocus` leaves alone
   // — it only places focus when nothing inside has claimed it.
   useDialogFocus(panel, !leaving);
+  useBackClose(!leaving, onCancel);
   const level = useContentFilter((s) => s.level);
   const [term, setTerm] = useState(parsedTitle);
   const [debounced, setDebounced] = useState(parsedTitle);

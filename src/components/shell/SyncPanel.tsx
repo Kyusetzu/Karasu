@@ -15,6 +15,7 @@ import {
   type SyncPhase,
 } from "@/lib/syncQueue";
 import { usePresence } from "@/hooks/usePresence";
+import { useBackClose } from "@/hooks/useBackClose";
 import { useSyncStatus } from "@/hooks/useSyncStatus";
 import { useManualSync } from "@/hooks/useManualSync";
 
@@ -98,6 +99,7 @@ export default function SyncPanel({
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
+  useBackClose(open, () => setOpen(false));
   const panel = usePresence(open);
   const wrap = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);

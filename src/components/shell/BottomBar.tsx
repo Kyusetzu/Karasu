@@ -5,6 +5,7 @@ import { Info, LayoutGrid, Settings, X } from "lucide-react";
 import { GROUPS, type NavItem } from "@/components/shell/Sidebar";
 import { usePresence } from "@/hooks/usePresence";
 import { useDialogFocus } from "@/hooks/useDialogFocus";
+import { useBackClose } from "@/hooks/useBackClose";
 import { cn } from "@/lib/utils";
 import Bell from "@/components/shell/Bell";
 import { useNotifBadge } from "@/hooks/useNotifBadge";
@@ -60,6 +61,7 @@ const slotClass =
 export default function BottomBar() {
   const { t } = useTranslation();
   const [moreOpen, setMoreOpen] = useState(false);
+  useBackClose(moreOpen, () => setMoreOpen(false));
   const sheet = usePresence(moreOpen);
   const sheetRef = useRef<HTMLDivElement>(null);
   // The sheet claims `data-overlay`, which silences every screen-level key

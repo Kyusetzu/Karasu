@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useDialogFocus } from "@/hooks/useDialogFocus";
+import { useBackClose } from "@/hooks/useBackClose";
 import { cn } from "@/lib/utils";
 
 /**
@@ -41,6 +42,7 @@ export default function ConfirmDialog({
   // Not routed through `Modal` — this one has its own layout — so it takes the
   // same hook directly rather than going without.
   useDialogFocus(panel, !leaving);
+  useBackClose(!leaving, onCancel);
 
   useEffect(() => {
     if (leaving) return;

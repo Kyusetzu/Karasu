@@ -25,6 +25,7 @@ import { Shimmer } from "@/components/Skeleton";
 import { cn } from "@/lib/utils";
 import { relTime, relTimeFromSeconds } from "@/lib/relTime";
 import { usePresence } from "@/hooks/usePresence";
+import { useBackClose } from "@/hooks/useBackClose";
 import { useAuth } from "@/stores/auth";
 import {
   getNotifications,
@@ -164,6 +165,7 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
   const viewerId = useAuth((s) => s.viewer?.id ?? null);
   const [items, setItems] = useState<AppNotification[]>([]);
   const [open, setOpen] = useState(false);
+  useBackClose(open, () => setOpen(false));
   const [view, setView] = useState<"local" | "site">("local");
   const panel = usePresence(open);
   const ref = useRef<HTMLDivElement>(null);

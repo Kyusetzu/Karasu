@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePresentValue } from "@/hooks/usePresence";
+import { useBackClose } from "@/hooks/useBackClose";
 
 interface Ctx {
   x: number;
@@ -54,6 +55,7 @@ export default function ContextMenu() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [ctx, setCtx] = useState<Ctx | null>(null);
+  useBackClose(ctx !== null, () => setCtx(null));
   // Retained through the exit: the menu needs its position and its item
   // list to keep drawing while it scales away.
   const menu = usePresentValue(ctx);

@@ -11,6 +11,7 @@ import {
   type MultiValue,
 } from "@/lib/multiFilter";
 import { usePresence } from "@/hooks/usePresence";
+import { useBackClose } from "@/hooks/useBackClose";
 
 /**
  * `FilterSelect`'s bigger sibling: many answers, and each one can be a "not".
@@ -47,6 +48,7 @@ export function MultiFilterSelect({
   const [term, setTerm] = useState("");
   const box = useRef<HTMLDivElement>(null);
   const panel = usePresence(open);
+  useBackClose(open, () => setOpen(false));
 
   // Escape and click-outside, the two ways a popover closes. Registered only
   // while it is open, so nothing listens for a control nobody is using.

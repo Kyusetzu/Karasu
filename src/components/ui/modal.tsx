@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useDialogFocus } from "@/hooks/useDialogFocus";
+import { useBackClose } from "@/hooks/useBackClose";
 import { Button } from "./button";
 
 interface ModalProps {
@@ -32,6 +33,9 @@ export function Modal({
   // One hook here covers every dialog in the app, because they all render
   // through this component.
   useDialogFocus(panel, !leaving);
+  // Same economy: the Android back gesture (and the browser back button)
+  // closes the dialog instead of leaving the page.
+  useBackClose(!leaving, onClose);
 
   useEffect(() => {
     // Nothing to close once it is already leaving — and Escape during the exit

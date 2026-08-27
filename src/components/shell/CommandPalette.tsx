@@ -16,6 +16,7 @@ import {
 } from "@/lib/fuzzy";
 import { cn } from "@/lib/utils";
 import { usePresence } from "@/hooks/usePresence";
+import { useBackClose } from "@/hooks/useBackClose";
 
 interface Item {
   id: string;
@@ -57,6 +58,7 @@ export default function CommandPalette() {
   const level = useContentFilter((s) => s.level);
   const [open, setOpen] = useState(false);
   const presence = usePresence(open);
+  useBackClose(open, () => setOpen(false));
   const [query, setQuery] = useState("");
   const [sel, setSel] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);

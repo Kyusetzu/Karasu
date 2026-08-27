@@ -122,11 +122,13 @@ export default function RecommendedSection({
 
   return (
     <section>
-      <SectionHeader
-        icon={Sparkles}
-        title={title}
-        meta={t("dashboard.recommendedHint")}
-      />
+      <SectionHeader icon={Sparkles} title={title} />
+      {/* Not `meta`: that slot is `shrink-0` for short phrases, and this is a
+          three-clause sentence — as unshrinkable metadata it forced the whole
+          page to scroll sideways on a phone. A paragraph wraps. */}
+      <p className="mt-1.5 text-2xs text-ink-600">
+        {t("dashboard.recommendedHint")}
+      </p>
       <div className="mt-4 media-grid gap-y-5 gap-x-4">
         {ranked.map((r) => (
           <div key={r.media.id}>

@@ -199,7 +199,13 @@ function Tabbed({ user }: { user: UserProfileData }) {
 
   return (
     <div className="mt-7 px-8">
-      <div role="tablist" className="flex gap-1 border-b border-surface-800">
+      {/* Scrollable rather than wrapping: six tabs do not fit a phone, and a
+          sideways flick is the one horizontal gesture the shell allows —
+          per-tab, not per-page. */}
+      <div
+        role="tablist"
+        className="flex gap-1 overflow-x-auto border-b border-surface-800"
+      >
         {TABS.map((id) => {
           const active = id === tab;
           return (
@@ -216,7 +222,7 @@ function Tabbed({ user }: { user: UserProfileData }) {
                 setParams(next, { replace: true });
               }}
               className={cn(
-                "-mb-px border-b-2 px-3 py-2 text-sm transition-surface",
+                "-mb-px shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm transition-surface",
                 active
                   ? "border-accent-500 text-ink-100"
                   : "border-transparent text-ink-600 hover:text-ink-300",

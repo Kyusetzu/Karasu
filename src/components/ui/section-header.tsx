@@ -24,7 +24,11 @@ export function SectionHeader({
   return (
     <div className={cn("flex items-center gap-2.5", className)}>
       <Icon className="size-4 shrink-0 text-accent-400" />
-      <h2 className="text-[.9375rem] font-semibold text-ink-100">{title}</h2>
+      {/* `min-w-0`, or the flex default of `min-width: auto` makes a long
+          title the row's minimum width and hands <main> a sideways scroll. */}
+      <h2 className="min-w-0 truncate text-[.9375rem] font-semibold text-ink-100">
+        {title}
+      </h2>
       {meta && (
         <span className="shrink-0 text-2xs uppercase tracking-[.09em] text-ink-600">
           {meta}

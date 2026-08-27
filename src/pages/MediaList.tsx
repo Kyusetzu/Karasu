@@ -45,7 +45,8 @@ import { loadPresets, savePresets, type Preset } from "@/lib/presets";
 import { formatLabel, MEDIA_FORMATS, ORIGINS, originLabel } from "@/lib/format";
 import { customListNames } from "@/lib/customLists";
 import { collectTags, tagsOf } from "@/lib/tags";
-import { searchHaystack } from "@/lib/search";
+import { searchTitles } from "@/lib/search";
+import { fuzzyScore, prepareDoc, prepareQuery, type FuzzyDoc } from "@/lib/fuzzy";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { Segmented } from "@/components/ui/segmented";
@@ -354,12 +355,12 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
   const searchKeys = useMemo(() => {
     const map = new Map<
       number,
-      { haystack: string; tags: string[]; title: string }
+      { doc: FuzzyDoc; tags: string[]; title: string }
     >();
     for (const list of byStatus.values()) {
       for (const e of list) {
         map.set(e.id, {
-          haystack: searchHaystack(e.media),
+          doc: prepareDoc(searchTitles(e.media)),
           tags: tagsOf(e.notes).map((x) => x.toLowerCase()),
           title: displayTitle(e.media.title),
         });
@@ -374,9 +375,21 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
 
   const entries = useMemo(() => {
     let list = byStatus.get(tab) ?? [];
-    const q = deferredFilter.trim().toLowerCase();
+    const q = deferredFilter.trim();
+    // While a query is set, relevance owns the order — a fuzzy hit sorted by
+    // "recently updated" reads as a random result. The chosen sort survives
+    // as the tiebreak below.
+    let scores: Map<number, number> | null = null;
     if (q) {
-      list = list.filter((e) => searchKeys.get(e.id)?.haystack.includes(q));
+      const pq = prepareQuery(q);
+      const found = new Map<number, number>();
+      list = list.filter((e) => {
+        const doc = searchKeys.get(e.id)?.doc;
+        const s = doc ? fuzzyScore(doc, pq) : 0;
+        if (s > 0) found.set(e.id, s);
+        return s > 0;
+      });
+      scores = found;
     }
     if (tagFilter) {
       const tag = tagFilter.toLowerCase();
@@ -398,6 +411,10 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
     // negates it wholesale rather than each branch knowing about `dir`.
     const flip = dir === SORT_DEFAULT_DIR[sort] ? 1 : -1;
     return [...list].sort((a, b) => {
+      if (scores) {
+        const d = (scores.get(b.id) ?? 0) - (scores.get(a.id) ?? 0);
+        if (d !== 0) return d;
+      }
       const cmp = (() => {
         switch (sort) {
           case "title":

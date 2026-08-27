@@ -17,6 +17,7 @@ import { fetchMediaList, isTauri, saveListEntry } from "@/api/anilist";
 import { mediaByIds } from "@/api/queries";
 import { displayTitle, type Media, type MediaListEntry } from "@/api/types";
 import { missingIds } from "@/lib/chunk";
+import { fuzzyScore, prepareDoc, prepareQuery } from "@/lib/fuzzy";
 import {
   clearLibraryMatch,
   getLibraryStatus,
@@ -739,10 +740,22 @@ function Unplaced({
   const [expanded, setExpanded] = useState(false);
   const [filter, setFilter] = useState("");
 
+  // Parsed release titles are exactly where typos and odd spellings live, so
+  // the filter matches them fuzzily and orders by how well.
+  const docs = useMemo(
+    () => new Map(groups.map((g) => [g, prepareDoc([g.title])] as const)),
+    [groups],
+  );
   const matching = useMemo(() => {
-    const q = filter.trim().toLowerCase();
-    return q ? groups.filter((g) => g.title.toLowerCase().includes(q)) : groups;
-  }, [groups, filter]);
+    const q = filter.trim();
+    if (!q) return groups;
+    const pq = prepareQuery(q);
+    return groups
+      .map((g) => ({ g, score: fuzzyScore(docs.get(g)!, pq) }))
+      .filter((x) => x.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .map((x) => x.g);
+  }, [groups, docs, filter]);
 
   if (groups.length === 0) return null;
 

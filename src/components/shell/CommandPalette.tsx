@@ -7,6 +7,13 @@ import { displayTitle, type ListResult, type MediaType } from "@/api/types";
 import { useAuth } from "@/stores/auth";
 import { useContentFilter } from "@/stores/contentFilter";
 import { isBlocked } from "@/lib/contentFilter";
+import { searchTitles } from "@/lib/search";
+import {
+  fuzzyScore,
+  prepareDoc,
+  prepareQuery,
+  type FuzzyDoc,
+} from "@/lib/fuzzy";
 import { cn } from "@/lib/utils";
 import { usePresence } from "@/hooks/usePresence";
 
@@ -97,7 +104,7 @@ export default function CommandPalette() {
   // so it needs its own content-filter check — MediaList's does not apply.
   const entries = useMemo(() => {
     if (!open || !viewer) return [];
-    const out: { item: Item; haystack: string }[] = [];
+    const out: { item: Item; doc: FuzzyDoc }[] = [];
     const seen = new Set<number>();
     for (const type of ["ANIME", "MANGA"] as MediaType[]) {
       const data = qc.getQueryData<ListResult>(["mediaList", type, viewer.id]);
@@ -117,10 +124,7 @@ export default function CommandPalette() {
               cover: e.media.coverImage.large,
               native: ti.native && ti.native !== displayTitle(ti) ? ti.native : null,
             },
-            haystack: [ti.romaji, ti.english, ti.native, ...e.media.synonyms]
-              .filter(Boolean)
-              .join(" ")
-              .toLowerCase(),
+            doc: prepareDoc(searchTitles(e.media)),
           });
         }
       }
@@ -132,18 +136,27 @@ export default function CommandPalette() {
   // you to a screen, the other to a title. A single ranked list makes the user
   // read every row to work out which kind they are looking at.
   const groups = useMemo<Group[]>(() => {
-    const q = query.trim().toLowerCase();
+    const q = query.trim();
     const navItems: Item[] = NAV.map((n) => ({
       id: n.path,
       label: t(n.key),
       path: n.path,
     }));
     if (!q) return [{ key: "palette.groupGoTo", items: navItems }];
-    const nav = navItems.filter((i) => i.label.toLowerCase().includes(q));
+    const pq = prepareQuery(q);
+    // Ranked within each group; the sort is stable, so equal scores keep
+    // cache-insertion order the way the old filter did.
+    const nav = navItems
+      .map((item) => ({ item, score: fuzzyScore(prepareDoc([item.label]), pq) }))
+      .filter((x) => x.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .map((x) => x.item);
     const media = entries
-      .filter((e) => e.haystack.includes(q))
-      .map((e) => e.item)
-      .slice(0, MAX_RESULTS);
+      .map((e) => ({ item: e.item, score: fuzzyScore(e.doc, pq) }))
+      .filter((x) => x.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, MAX_RESULTS)
+      .map((x) => x.item);
     return [
       { key: "palette.groupList", items: media },
       { key: "palette.groupGoTo", items: nav },

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Check, ChevronDown, Minus, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { fuzzyScore, prepareDoc, prepareQuery } from "@/lib/fuzzy";
 import {
   cycle,
   isEmpty,
@@ -68,16 +69,32 @@ export function MultiFilterSelect({
     };
   }, [open]);
 
+  // Prepared once per vocabulary, not per keystroke — AniList ships roughly
+  // six hundred tags.
+  const docs = useMemo(
+    () => new Map(options.map((o) => [o, prepareDoc([o])] as const)),
+    [options],
+  );
+
   // The chosen options first, so a filter set from a six-hundred-item list can
-  // still be read and undone without scrolling for it.
+  // still be read and undone without scrolling for it. Within each half the
+  // fuzzy score orders (the sort is stable), so a typo still surfaces its tag.
   const shown = useMemo(() => {
-    const needle = term.trim().toLowerCase();
-    const matches = needle
-      ? options.filter((o) => o.toLowerCase().includes(needle))
-      : options;
+    const needle = term.trim();
+    let matches: string[];
+    if (needle) {
+      const pq = prepareQuery(needle);
+      matches = options
+        .map((o) => ({ o, score: fuzzyScore(docs.get(o)!, pq) }))
+        .filter((x) => x.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .map((x) => x.o);
+    } else {
+      matches = options;
+    }
     const rank = (o: string) => (triOf(value, o) === "off" ? 1 : 0);
     return [...matches].sort((a, b) => rank(a) - rank(b) || 0).slice(0, 300);
-  }, [options, term, value]);
+  }, [options, docs, term, value]);
 
   const summary = summarize(value);
 

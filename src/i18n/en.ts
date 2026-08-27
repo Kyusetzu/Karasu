@@ -1071,6 +1071,7 @@ export const en = {
     newestCapped:
       "AniList will not page past 5,000 comments and this thread is longer, so this is as deep as it can be read. The newest replies are only on the website.",
     loadMorePlain: "Load more",
+    activityGone: "This activity is gone — deleted, or mail Karasu does not show.",
     loadingMore: "Loading …",
     // Favourites
     favAnime: "Favourite anime",

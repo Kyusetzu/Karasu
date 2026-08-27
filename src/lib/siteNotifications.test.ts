@@ -28,6 +28,23 @@ describe("normalizeSiteNotification", () => {
     });
   });
 
+  it("targets the activity itself when the row carries one", () => {
+    const row = normalizeSiteNotification({
+      __typename: "ActivityLikeNotification",
+      id: 3,
+      createdAt: 5,
+      activityId: 4242,
+      user: { id: 7, name: "Alice" },
+    });
+    expect(row?.kind).toBe("ACTIVITY_LIKE");
+    expect(row?.title).toBe("Alice");
+    // The press goes to the news; the bell renders the name as the
+    // profile's own link off `actorName`/`userId`.
+    expect(row?.target).toBe("/activity/4242");
+    expect(row?.activityId).toBe(4242);
+    expect(row?.userId).toBe(7);
+  });
+
   it("leads a follow with the follower and targets their profile", () => {
     const row = normalizeSiteNotification({
       __typename: "FollowingNotification",

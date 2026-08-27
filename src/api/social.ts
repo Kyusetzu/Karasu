@@ -399,6 +399,34 @@ query ($userId: Int, $isFollowing: Boolean, $page: Int, $sort: [ActivitySort]) {
   }
 }`;
 
+/**
+ * One activity by id — where a notification row lands. The same two fragments
+ * as the feed, so `normalizeActivity` and `ActivityCard` serve unchanged;
+ * `MessageActivity` gets no fragment here either, and the normalizer refuses
+ * it besides. A deleted id answers 404/"Not Found.", which reaches the page
+ * as an ordinary query error.
+ */
+export const SINGLE_ACTIVITY_QUERY = `
+query ($id: Int!) {
+  Activity(id: $id) {
+    __typename
+    ... on ListActivity {
+      id status progress createdAt likeCount isLiked isPinned replyCount siteUrl
+      user { ${SOCIAL_USER} }
+      media { ${SOCIAL_MEDIA} }
+    }
+    ... on TextActivity {
+      id text createdAt likeCount isLiked isPinned replyCount siteUrl
+      user { ${SOCIAL_USER} }
+    }
+  }
+}`;
+
+export async function singleActivity(id: number): Promise<unknown | null> {
+  const data = await gql<{ Activity: unknown | null }>(SINGLE_ACTIVITY_QUERY, { id });
+  return data.Activity ?? null;
+}
+
 export interface ActivityPage {
   pageInfo: PageInfo;
   /** Raw union members — `normalizeActivity` in `lib/activity` tightens these. */

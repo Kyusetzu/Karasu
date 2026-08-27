@@ -9,8 +9,6 @@
  *
  * What deliberately maps to `null`, and therefore stays external:
  *
- * - **Activity permalinks** (`/activity/N`) — there is no `/activity/:id`
- *   route to land on.
  * - **Forum category and search pages** (`/forum/overview`,
  *   `/forum/recent?category=…`) — Karasu's forum index is deliberately not a
  *   browsable mirror of the website's.
@@ -32,6 +30,8 @@ const RULES: [RegExp, (m: RegExpExecArray) => string][] = [
   // A comment permalink still lands on its thread — the app has no
   // per-comment anchor, and the thread is where the conversation is.
   [/^forum\/thread\/(\d+)(?:\/|$)/i, (m) => `/thread/${m[1]}`],
+  // Landed by the bell's activity notifications too, not just pasted links.
+  [/^activity\/(\d+)(?:\/|$)/i, (m) => `/activity/${m[1]}`],
   [/^user\/([A-Za-z0-9_-]+)(?:\/|$)/, (m) => `/user/${encodeURIComponent(m[1])}`],
   [/^character\/(\d+)(?:\/|$)/i, (m) => `/character/${m[1]}`],
   [/^staff\/(\d+)(?:\/|$)/i, (m) => `/staff/${m[1]}`],

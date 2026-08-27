@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 import {
   useInfiniteQuery,
   useQuery,
@@ -454,17 +454,18 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
     );
   };
 
+  // The actor's own page, for rows whose *press* goes to the activity — the
+  // name is then the profile's only door, so it becomes a link of its own.
+  const profileOf = (row: SiteNotifRow): string | null =>
+    row.activityId != null && row.actorName
+      ? `/user/${encodeURIComponent(row.actorName)}`
+      : null;
+
   const renderSite = (row: SiteNotifRow, isUnread: boolean) => {
     const Icon = SITE_ICON[row.kind];
-    return (
-      <button
-        onClick={() => openSite(row)}
-        disabled={!row.target}
-        className={cn(
-          "flex w-full items-start gap-2.5 px-3 py-2.5 text-left transition-surface hover:bg-surface-850 disabled:hover:bg-transparent",
-          isUnread && "bg-[rgba(255,255,255,.018)]",
-        )}
-      >
+    const profile = profileOf(row);
+    const body = (
+      <>
         <span
           className={cn(
             "mt-0.5 grid size-6 shrink-0 place-items-center rounded-md",
@@ -475,9 +476,25 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
         </span>
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-2">
-            <span className="truncate text-[.8125rem] font-medium text-ink-100">
-              {row.title}
-            </span>
+            {profile ? (
+              // Nested target, so the container is a div-button below — a
+              // real <button> cannot legally hold a link. `stopPropagation`
+              // is the ListRow idiom for a control inside a clickable row.
+              <Link
+                to={profile}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setOpen(false);
+                }}
+                className="truncate text-[.8125rem] font-medium text-ink-100 hover:underline"
+              >
+                {row.title}
+              </Link>
+            ) : (
+              <span className="truncate text-[.8125rem] font-medium text-ink-100">
+                {row.title}
+              </span>
+            )}
             {isUnread && <span className="size-1.5 shrink-0 rounded-full bg-accent-500" />}
           </span>
           <span className="mt-0.5 block text-xs text-ink-500">{siteVerb(row, t)}</span>
@@ -488,6 +505,37 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
             {rowTime(row.createdAt * 1000)}
           </span>
         </span>
+      </>
+    );
+    const rowClass = cn(
+      "flex w-full items-start gap-2.5 px-3 py-2.5 text-left transition-surface hover:bg-surface-850",
+      isUnread && "bg-[rgba(255,255,255,.018)]",
+    );
+    if (profile) {
+      return (
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => openSite(row)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              openSite(row);
+            }
+          }}
+          className={cn(rowClass, "cursor-pointer")}
+        >
+          {body}
+        </div>
+      );
+    }
+    return (
+      <button
+        onClick={() => openSite(row)}
+        disabled={!row.target}
+        className={cn(rowClass, "disabled:hover:bg-transparent")}
+      >
+        {body}
       </button>
     );
   };
@@ -499,6 +547,13 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
     const label = g.label!;
     const isOpen = expanded.has(g.key);
     const lead = label.kind === "airing" ? label.title : label.name;
+    // An actor group's press unfolds it, so the name carries the profile —
+    // the same split every activity row makes. Nested link means the
+    // container is a div-button, like `renderSite`'s.
+    const leadProfile =
+      label.kind !== "airing" && g.items[0]?.site?.actorName
+        ? `/user/${encodeURIComponent(g.items[0].site.actorName)}`
+        : null;
     const Icon =
       label.kind === "airing" ? CalendarClock : label.kind === "replies" ? MessageCircle : Heart;
     const tint =
@@ -509,11 +564,19 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
           : "bg-danger/14 text-danger";
     return (
       <li key={g.key}>
-        <button
+        <div
+          role="button"
+          tabIndex={0}
           onClick={() => openGroup(g)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              openGroup(g);
+            }
+          }}
           aria-expanded={label.kind === "airing" ? undefined : isOpen}
           className={cn(
-            "flex w-full items-start gap-2.5 px-3 py-2.5 text-left transition-surface hover:bg-surface-850",
+            "flex w-full cursor-pointer items-start gap-2.5 px-3 py-2.5 text-left transition-surface hover:bg-surface-850",
             g.unread && "bg-[rgba(255,255,255,.018)]",
           )}
         >
@@ -522,7 +585,20 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
           </span>
           <span className="min-w-0 flex-1">
             <span className="flex items-center gap-2">
-              <span className="truncate text-[.8125rem] font-medium text-ink-100">{lead}</span>
+              {leadProfile ? (
+                <Link
+                  to={leadProfile}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setOpen(false);
+                  }}
+                  className="truncate text-[.8125rem] font-medium text-ink-100 hover:underline"
+                >
+                  {lead}
+                </Link>
+              ) : (
+                <span className="truncate text-[.8125rem] font-medium text-ink-100">{lead}</span>
+              )}
               <span className="rounded bg-surface-800 px-1 text-2xs tabular-nums text-ink-400">
                 {label.n}
               </span>
@@ -542,7 +618,7 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
               )}
             />
           )}
-        </button>
+        </div>
         {isOpen && (
           <ul className="border-l border-surface-800 pl-2 ml-5.5">
             {g.items.map((m) => (

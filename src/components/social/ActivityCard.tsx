@@ -247,9 +247,16 @@ function ActivityReplies({ activityId }: { activityId: number }) {
   );
 }
 
-export function ActivityCard({ item }: { item: FeedItem }) {
+export function ActivityCard({
+  item,
+  openReplies = false,
+}: {
+  item: FeedItem;
+  /** Start with the reply thread unfolded — the activity page's case. */
+  openReplies?: boolean;
+}) {
   const { t, i18n } = useTranslation();
-  const [repliesOpen, setRepliesOpen] = useState(false);
+  const [repliesOpen, setRepliesOpen] = useState(openReplies);
   const viewer = useAuth((s) => s.viewer);
   const self = viewer !== null && viewer.id === item.user.id;
   const { pin } = useActivityPost(viewer?.id);

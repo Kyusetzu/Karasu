@@ -54,6 +54,7 @@ const About = lazy(() => import("@/pages/About"));
 const UserProfile = lazy(() => import("@/pages/UserProfile"));
 const Social = lazy(() => import("@/pages/Social"));
 const Thread = lazy(() => import("@/pages/Thread"));
+const Activity = lazy(() => import("@/pages/Activity"));
 const Forum = lazy(() => import("@/pages/Forum"));
 const CharacterPage = lazy(() =>
   import("@/pages/Person").then((m) => ({ default: m.CharacterPage })),
@@ -218,6 +219,7 @@ export default function App() {
                 <Route path="/user/:name" element={<UserProfile />} />
                 <Route path="/forum" element={<Forum />} />
                 <Route path="/thread/:id" element={<Thread />} />
+                <Route path="/activity/:id" element={<Activity />} />
                 <Route path="/character/:id" element={<CharacterPage />} />
                 <Route path="/staff/:id" element={<StaffPage />} />
                 <Route path="/studio/:id" element={<StudioPage />} />

@@ -29,9 +29,12 @@ describe("internalRoute", () => {
     expect(internalRoute("https://anilist.co/user/hori#about")).toBe("/user/hori");
   });
 
+  it("maps an activity permalink onto the activity page", () => {
+    expect(internalRoute("https://anilist.co/activity/12345")).toBe("/activity/12345");
+  });
+
   /** No route exists for these, so sending them inward would strand the reader. */
   it("refuses what the app cannot draw", () => {
-    expect(internalRoute("https://anilist.co/activity/12345")).toBeNull();
     expect(internalRoute("https://anilist.co/forum/overview")).toBeNull();
     expect(internalRoute("https://anilist.co/forum/recent?category=1")).toBeNull();
     expect(internalRoute("https://anilist.co/settings/developer")).toBeNull();

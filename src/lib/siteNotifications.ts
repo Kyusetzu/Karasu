@@ -137,20 +137,26 @@ export function normalizeSiteNotification(raw: RawSiteNotification | null): Site
     raw.submittedTitle ??
     "—";
 
-  // Where a click goes. Threads before users: thread rows carry both, and the
-  // thread is the news. Null is honest for a deletion — there is nowhere left.
+  // Where a click goes. The activity itself first: only the five Activity*
+  // kinds carry `activityId`, and for them the activity is the news — the
+  // actor's profile is the *name's* target, which the bell renders as its own
+  // link. Threads before users for the same reason: thread rows carry both,
+  // and the thread is the news. Null is honest for a deletion — there is
+  // nowhere left.
   const target =
-    raw.thread?.id != null
-      ? `/thread/${raw.thread.id}`
-      : raw.media?.id != null
-        ? `/media/${raw.media.id}`
-        : raw.staff?.id != null
-          ? `/staff/${raw.staff.id}`
-          : raw.character?.id != null
-            ? `/character/${raw.character.id}`
-            : userName
-              ? `/user/${encodeURIComponent(userName)}`
-              : null;
+    raw.activityId != null
+      ? `/activity/${raw.activityId}`
+      : raw.thread?.id != null
+        ? `/thread/${raw.thread.id}`
+        : raw.media?.id != null
+          ? `/media/${raw.media.id}`
+          : raw.staff?.id != null
+            ? `/staff/${raw.staff.id}`
+            : raw.character?.id != null
+              ? `/character/${raw.character.id}`
+              : userName
+                ? `/user/${encodeURIComponent(userName)}`
+                : null;
 
   return {
     id: raw.id,

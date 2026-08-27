@@ -1074,6 +1074,7 @@ export const de: typeof en = {
     newestCapped:
       "AniList blättert nicht über 5.000 Kommentare hinaus und dieser Thread ist länger, daher ist dies das Tiefste, was lesbar ist. Die neuesten Antworten gibt es nur auf der Website.",
     loadMorePlain: "Mehr laden",
+    activityGone: "Diese Aktivität gibt es nicht mehr — gelöscht, oder Post, die Karasu nicht anzeigt.",
     loadingMore: "Lädt …",
     // Favoriten
     favAnime: "Lieblings-Anime",

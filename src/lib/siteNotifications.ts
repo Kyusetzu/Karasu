@@ -65,6 +65,7 @@ export interface RawSiteNotification {
   __typename?: string;
   id?: number | null;
   createdAt?: number | null;
+  activityId?: number | null;
   episode?: number | null;
   reason?: string | null;
   status?: string | null;
@@ -95,6 +96,13 @@ export interface SiteNotifRow {
   detail: string | null;
   /** Route to open on click, or null when the subject no longer exists. */
   target: string | null;
+  /** Grouping identity — `notifGroups` collapses runs on these. The route
+      string cannot serve: reverse-parsing it re-derives what the API already
+      said, and the ids were thrown away here for exactly as long as nothing
+      needed them. */
+  userId: number | null;
+  mediaId: number | null;
+  activityId: number | null;
 }
 
 /** One notification, or null for anything the bell does not render. */
@@ -153,5 +161,8 @@ export function normalizeSiteNotification(raw: RawSiteNotification | null): Site
     episode: raw.episode ?? null,
     detail: merged.length > 0 ? merged.join(", ") : (raw.reason ?? raw.status ?? null),
     target,
+    userId: raw.user?.id ?? null,
+    mediaId: raw.media?.id ?? null,
+    activityId: raw.activityId ?? null,
   };
 }

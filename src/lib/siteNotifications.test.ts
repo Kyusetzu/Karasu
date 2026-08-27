@@ -22,6 +22,9 @@ describe("normalizeSiteNotification", () => {
       episode: 12,
       detail: null,
       target: "/media/42",
+      userId: null,
+      mediaId: 42,
+      activityId: null,
     });
   });
 

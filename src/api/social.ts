@@ -1344,11 +1344,11 @@ query ($page: Int, $reset: Boolean) {
       __typename
       ... on AiringNotification { id createdAt episode media { id title { romaji english native } } }
       ... on FollowingNotification { id createdAt user { id name } }
-      ... on ActivityMentionNotification { id createdAt user { id name } }
-      ... on ActivityReplyNotification { id createdAt user { id name } }
-      ... on ActivityReplySubscribedNotification { id createdAt user { id name } }
-      ... on ActivityLikeNotification { id createdAt user { id name } }
-      ... on ActivityReplyLikeNotification { id createdAt user { id name } }
+      ... on ActivityMentionNotification { id createdAt activityId user { id name } }
+      ... on ActivityReplyNotification { id createdAt activityId user { id name } }
+      ... on ActivityReplySubscribedNotification { id createdAt activityId user { id name } }
+      ... on ActivityLikeNotification { id createdAt activityId user { id name } }
+      ... on ActivityReplyLikeNotification { id createdAt activityId user { id name } }
       ... on ThreadCommentMentionNotification { id createdAt user { id name } thread { id title } }
       ... on ThreadCommentReplyNotification { id createdAt user { id name } thread { id title } }
       ... on ThreadCommentSubscribedNotification { id createdAt user { id name } thread { id title } }

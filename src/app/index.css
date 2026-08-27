@@ -574,12 +574,21 @@ nav a {
   main .p-8 {
     padding: 1rem;
   }
-  /* Two flexible columns instead of auto-fill fixed tracks: 150px tracks at
-     a 343px content width leave a ~27px dead strip on the right (the
-     reported gap). Two minmax(0,1fr) columns fill the width exactly, and the
-     covers scale with their aspect ratio. */
+  /* Flexible tracks instead of fixed ones: a 150px track at a 343px content
+     width leaves a ~27px dead strip on the right (the reported gap), so the
+     tracks grow to fill the row exactly — but their *floor* is still
+     `--cover-track`, so the cover-size setting keeps working on phones. The
+     first version of this rule hard-coded `repeat(2, minmax(0,1fr))` and,
+     being unlayered (deliberately — it must beat the utility layer below),
+     silently overrode the setting for every phone grid. `min(…, 100%)`
+     guards the track against a container narrower than the setting. At the
+     large size the narrowest phones get one column; if that reads as too
+     much, floor the track at `calc((100% - 1rem) / 2)` instead. */
   main .media-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(
+      auto-fill,
+      minmax(min(var(--cover-track, 9.375rem), 100%), 1fr)
+    );
   }
 }
 

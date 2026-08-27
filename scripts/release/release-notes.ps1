@@ -32,7 +32,11 @@ param(
     [string]$Version = "",
     [string]$Sha = "",
     [string]$VirusTotal = "",
-    [string]$OutFile = "notes.md"
+    [string]$OutFile = "notes.md",
+    # Set when this release actually carries APKs -- the workflow passes it
+    # after looking in the downloaded artifact folder. A static paragraph
+    # would describe assets that are absent until the signing secrets exist.
+    [switch]$Android
 )
 
 $ErrorActionPreference = "Stop"
@@ -59,6 +63,21 @@ Karasu's built-in updater (About page, or automatic daily checks) verifies
 updates against its own signing key regardless -- see ``latest.json`` for the
 update manifest.
 "@
+
+if ($Android) {
+    $androidPara = @"
+**Android** -- the ``.apk``, sideloaded. Take the ``_arm64`` one; ``_universal``
+is the fallback for anything that refuses it (old 32-bit phones, emulators).
+Both are signed with the project key, so installing over a previous release
+keeps your data. The built-in updater covers desktop only -- on Android a new
+version is installed the same way, over the top.
+"@
+    # Before the updater paragraph, so the desktop-only caveat lands right
+    # above the sentence describing the updater.
+    $marker = "Karasu's built-in updater"
+    $idx = $boilerplate.IndexOf($marker)
+    $boilerplate = $boilerplate.Substring(0, $idx) + $androidPara + "`n`n" + $boilerplate.Substring($idx)
+}
 
 if ([string]::IsNullOrWhiteSpace($Version)) {
     $head = "Automated build from the latest commit on ``main`` ($Sha)."

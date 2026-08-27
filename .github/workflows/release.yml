@@ -492,7 +492,14 @@ jobs:
       # The runner images ship the SDK; the NDK pin matches the local
       # toolchain (scripts/android-check.ps1) so the two builds cannot drift.
       - name: Install NDK
-        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;27.1.12297006" "platforms;android-36" "build-tools;36.0.0" "build-tools;35.0.0" > /dev/null
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;27.1.12297006" "platforms;android-36" "build-tools;36.0.0" "build-tools;35.0.0" > /dev/null
+          # Exported at run time, where $ANDROID_HOME is the runner's real
+          # machine environment. A step-level `env: NDK_HOME: ${{ env.ANDROID_HOME }}/…`
+          # resolves against the workflow's env *context*, which does not
+          # contain machine variables — it evaluated to "/ndk/…" and the leg
+          # died with "Android NDK invalid" on its first real run.
+          echo "NDK_HOME=$ANDROID_HOME/ndk/27.1.12297006" >> "$GITHUB_ENV"
 
       - name: Install dependencies
         run: npm ci
@@ -501,8 +508,6 @@ jobs:
 
       - name: Build debug APK
         if: env.HAS_ANDROID_KEYSTORE != 'true'
-        env:
-          NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/27.1.12297006
         run: npx tauri android build --apk --target aarch64 --debug
 
       - name: Upload debug APK
@@ -544,8 +549,6 @@ jobs:
       # the second run is mostly Gradle.
       - name: Build release APKs (universal + arm64)
         if: env.HAS_ANDROID_KEYSTORE == 'true'
-        env:
-          NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/27.1.12297006
         run: |
           npx tauri android build --apk
           npx tauri android build --apk --target aarch64 --split-per-abi

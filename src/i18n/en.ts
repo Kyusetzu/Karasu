@@ -1465,11 +1465,8 @@ export const en = {
       "The border drawn around a cover, and the tint of its badge. Click a status to change it.",
     statusColorsReset: "Reset to defaults",
     accentCustom: "Custom colour …",
-    coverSize: "Cover size",
-    coverSizeHint: "A wider window shows more covers, not bigger ones.",
-    coverSize_s: "Small",
-    coverSize_m: "Medium",
-    coverSize_l: "Large",
+    coverCols: "Covers per row",
+    coverColsHint: "How many covers share a row — they scale to fit.",
     reduceMotion: "Reduce motion",
     reduceMotionHint:
       "Skip animations and transitions. Already on if your system asks for it.",

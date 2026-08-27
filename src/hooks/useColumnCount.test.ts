@@ -21,21 +21,21 @@ describe("parseColumnCount", () => {
   });
 
   /**
-   * `repeat(auto-fill, var(--cover-track))` with the variable unset is an
-   * invalid declaration, and the property then computes to `none`. That must
-   * read as one column rather than throwing — but the real defence is the
-   * fallback baked into the `media-grid` utility, so it never gets here.
+   * `repeat(var(--cover-cols))` with the variable unset is an invalid
+   * declaration, and the property then computes to `none`. That must read as
+   * one column rather than throwing — but the real defence is the fallback
+   * baked into the `media-grid` utility, so it never gets here.
    */
   it("survives the unset-token case that would collapse the grid", () => {
     expect(parseColumnCount("none")).toBe(1);
     expect(parseColumnCount("repeat(auto-fill, )")).toBe(1);
   });
 
-  /** Density only changes the track width, so the count must follow it. */
-  it("counts the tracks each density step actually produces", () => {
-    expect(parseColumnCount("120px 120px 120px 120px 120px 120px 120px")).toBe(7);
-    expect(parseColumnCount("150px 150px 150px 150px 150px 150px")).toBe(6);
-    expect(parseColumnCount("180px 180px 180px 180px 180px")).toBe(5);
+  /** The covers-per-row setting resolves to that many equal used tracks. */
+  it("counts the tracks the column setting actually produces", () => {
+    expect(parseColumnCount("171.5px 171.5px")).toBe(2);
+    expect(parseColumnCount("109px 109px 109px")).toBe(3);
+    expect(parseColumnCount("120px 120px 120px 120px 120px 120px 120px 120px")).toBe(8);
   });
 
   it("falls back rather than guessing at units it cannot resolve", () => {

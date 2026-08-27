@@ -549,20 +549,6 @@ nav a {
   user-select: none;
 }
 
-/* The cover grid shared by the list, search and seasonal pages. One
-   definition rather than three copies that could drift apart.
-
-   A wider window earns more covers, never bigger ones. That needs a **fixed**
-   track, not `minmax(…, 1fr)` — `1fr` absorbs the leftover space, so covers
-   grew about 10% at 1536px, which is exactly the magnification this file is
-   supposed to prevent. `justify-content: start` for the same reason: the
-   default would spread the remainder into the gutters, and a wider window
-   would look *less* dense.
-
-   The fallback is load-bearing. `--cover-track` is written to the root by the
-   theme store, but `repeat(auto-fill, var(--cover-track))` with the variable
-   unset is an invalid declaration — `grid-template-columns` then computes to
-   `none` and the grid silently collapses to a single column. */
 /* The phone shell compresses the pages' desktop gutters. One rule instead of
    a phone variant on every page container: `main .px-8` outranks the utility
    (0,1,1 vs 0,1,0), and the pages keep reading as themselves on desktop.
@@ -574,28 +560,27 @@ nav a {
   main .p-8 {
     padding: 1rem;
   }
-  /* Flexible tracks instead of fixed ones: a 150px track at a 343px content
-     width leaves a ~27px dead strip on the right (the reported gap), so the
-     tracks grow to fill the row exactly — but their *floor* is still
-     `--cover-track`, so the cover-size setting keeps working on phones. The
-     first version of this rule hard-coded `repeat(2, minmax(0,1fr))` and,
-     being unlayered (deliberately — it must beat the utility layer below),
-     silently overrode the setting for every phone grid. `min(…, 100%)`
-     guards the track against a container narrower than the setting. At the
-     large size the narrowest phones get one column; if that reads as too
-     much, floor the track at `calc((100% - 1rem) / 2)` instead. */
-  main .media-grid {
-    grid-template-columns: repeat(
-      auto-fill,
-      minmax(min(var(--cover-track, 9.375rem), 100%), 1fr)
-    );
-  }
 }
 
+/* The cover grid shared by the list, search and seasonal pages. One
+   definition rather than three copies that could drift apart.
+
+   `--cover-cols` is the covers-per-row setting, written to the root by the
+   theme store; equal flexible tracks mean the covers scale to share the
+   width exactly — no dead strip, and the third device round's finding that
+   fixed-size tracks could not tell "medium" from "large" on a phone cannot
+   recur, because the setting *is* the column count now. This replaced two
+   earlier shapes: fixed `--cover-track` tracks (auto-fill), and an unlayered
+   phone override of them whose cascade trap is documented above the selects
+   rule — one rule again, no override, nothing to outrank.
+
+   The fallback is load-bearing. `repeat(var(--cover-cols))` with the
+   variable unset is an invalid declaration — `grid-template-columns` then
+   computes to `none` and the grid silently collapses. It only shows for the
+   frames before the store's `init()` runs. */
 @utility media-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, var(--cover-track, 9.375rem));
-  justify-content: start;
+  grid-template-columns: repeat(var(--cover-cols, 8), minmax(0, 1fr));
 }
 
 /* The iridescent wash. Two companion sheens rotated off the accent's own hue,

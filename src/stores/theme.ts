@@ -26,20 +26,30 @@ export const ACCENT_PRESETS = [
 ];
 
 /**
- * Cover size. One token — the grid track — is the whole feature: every other
- * measurement on a cover cell already sizes off the cover, so S/M/L needs no
- * second layout and no separate compact-mode component.
+ * Covers per row. One token — the column count — is the whole feature: the
+ * tracks are equal flexible columns, so the covers scale to share the width
+ * and every other measurement on a cover cell sizes off the cover.
+ *
+ * A count, not a track size, after the second device round: fixed-size tracks
+ * meant the setting could not tell "medium" from "large" on a phone (both
+ * resolved to two columns), and what the maintainer actually wanted to steer
+ * was how many covers share a row. The default differs by form factor — more
+ * on a monitor, fewer on a phone — measured at first run by the same 767px
+ * boundary the shell uses, because the two installs have separate storage and
+ * a desktop window is wide at startup even when it can be squeezed later.
  */
-export type Density = "s" | "m" | "l";
-export const DENSITY_STEPS: Density[] = ["s", "m", "l"];
-const COVER_TRACK: Record<Density, string> = {
-  s: "7.5rem",
-  m: "9.375rem",
-  l: "11.25rem",
-};
+export const COVER_COLS_MIN = 2;
+export const COVER_COLS_MAX = 12;
+const clampCols = (n: number): number =>
+  Math.min(COVER_COLS_MAX, Math.max(COVER_COLS_MIN, Math.round(n)));
+const narrowShell = (): boolean =>
+  window.matchMedia?.("(max-width: 767px)").matches ?? false;
+const defaultCoverCols = (): number => (narrowShell() ? 2 : 8);
 
 const MODE_KEY = "karasu-theme";
 const ACCENT_KEY = "karasu-accent";
+const COVER_COLS_KEY = "karasu-cover-cols";
+/** The pre-slider setting, read once for migration and then deleted. */
 const DENSITY_KEY = "karasu-density";
 const REDUCE_MOTION_KEY = "karasu-reduce-motion";
 const STATUS_COLORS_KEY = "karasu-status-colors";
@@ -100,7 +110,7 @@ function systemDark(): boolean {
 function apply(
   mode: ThemeMode,
   accent: string,
-  density: Density,
+  coverCols: number,
   reduceMotion: boolean,
   statusColors: StatusPalette,
 ): void {
@@ -109,7 +119,7 @@ function apply(
   suspendTransitions(html);
   html.dataset.theme = dark ? "dark" : "light";
   html.toggleAttribute("data-reduce-motion", reduceMotion);
-  html.style.setProperty("--cover-track", COVER_TRACK[density] ?? COVER_TRACK.m);
+  html.style.setProperty("--cover-cols", String(clampCols(coverCols)));
 
   const base = isHex(accent) ? accent : DEFAULT_ACCENT;
   const { a400, a500, a600, ink, rgb, w1, w2, hair } = accentShades(base, {
@@ -143,13 +153,13 @@ function apply(
 interface ThemeState {
   mode: ThemeMode;
   accent: string;
-  density: Density;
+  coverCols: number;
   reduceMotion: boolean;
   /** One colour per list status — see `lib/statusColors`. */
   statusColors: StatusPalette;
   setMode: (mode: ThemeMode) => void;
   setAccent: (accent: string) => void;
-  setDensity: (density: Density) => void;
+  setCoverCols: (coverCols: number) => void;
   setReduceMotion: (reduceMotion: boolean) => void;
   /** Sets one status's colour, leaving the other five alone. */
   setStatusColor: (status: MediaListStatus, hex: string) => void;
@@ -157,9 +167,27 @@ interface ThemeState {
   init: () => void;
 }
 
-const storedDensity = (): Density => {
-  const saved = localStorage.getItem(DENSITY_KEY);
-  return saved === "s" || saved === "l" ? saved : "m";
+const storedCoverCols = (): number => {
+  const saved = Number(localStorage.getItem(COVER_COLS_KEY));
+  if (Number.isFinite(saved) && saved > 0) return clampCols(saved);
+  // Migrate the old s/m/l track setting once, keeping its intent: on a phone
+  // small really did mean three-across and the other two meant two; on a
+  // desktop the mapping is the column count a typical window resolved to.
+  const density = localStorage.getItem(DENSITY_KEY);
+  if (density === "s" || density === "m" || density === "l") {
+    localStorage.removeItem(DENSITY_KEY);
+    const map = narrowShell()
+      ? { s: 3, m: 2, l: 2 }
+      : { s: 10, m: 8, l: 7 };
+    const cols = map[density];
+    try {
+      localStorage.setItem(COVER_COLS_KEY, String(cols));
+    } catch {
+      // The same trade every other setting here makes silently.
+    }
+    return cols;
+  }
+  return defaultCoverCols();
 };
 
 /**
@@ -196,8 +224,8 @@ export const useTheme = create<ThemeState>((set, get) => {
   /** Writes whatever the store currently holds, so no call site has to
       remember the full argument list. */
   const flush = () => {
-    const { mode, accent, density, reduceMotion, statusColors } = get();
-    apply(mode, accent, density, reduceMotion, statusColors);
+    const { mode, accent, coverCols, reduceMotion, statusColors } = get();
+    apply(mode, accent, coverCols, reduceMotion, statusColors);
   };
 
   /** The palette's own writer. See `storedStatusColors` for why it is not
@@ -225,13 +253,14 @@ export const useTheme = create<ThemeState>((set, get) => {
   return {
     mode: storedMode(),
     accent: storedAccent(),
-    density: storedDensity(),
+    coverCols: storedCoverCols(),
     reduceMotion: localStorage.getItem(REDUCE_MOTION_KEY) === "true",
     statusColors: storedStatusColors(),
 
     setMode: (mode) => commit(MODE_KEY, "mode", mode),
     setAccent: (accent) => commit(ACCENT_KEY, "accent", accent),
-    setDensity: (density) => commit(DENSITY_KEY, "density", density),
+    setCoverCols: (coverCols) =>
+      commit(COVER_COLS_KEY, "coverCols", clampCols(coverCols)),
     setReduceMotion: (reduceMotion) =>
       commit(REDUCE_MOTION_KEY, "reduceMotion", reduceMotion),
 

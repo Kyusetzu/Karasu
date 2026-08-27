@@ -1464,11 +1464,8 @@ export const de: typeof en = {
       "Der Rahmen um ein Cover und die Tönung seines Abzeichens. Klicke einen Status an, um ihn zu ändern.",
     statusColorsReset: "Auf Standard zurücksetzen",
     accentCustom: "Eigene Farbe …",
-    coverSize: "Covergröße",
-    coverSizeHint: "Ein breiteres Fenster zeigt mehr Cover, nicht größere.",
-    coverSize_s: "Klein",
-    coverSize_m: "Mittel",
-    coverSize_l: "Groß",
+    coverCols: "Cover pro Reihe",
+    coverColsHint: "Wie viele Cover sich eine Reihe teilen — sie skalieren passend.",
     reduceMotion: "Bewegung reduzieren",
     reduceMotionHint:
       "Animationen und Übergänge überspringen. Bereits aktiv, wenn dein System es verlangt.",

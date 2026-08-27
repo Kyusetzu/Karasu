@@ -40,10 +40,11 @@ export function VirtualGrid({
   onColumns?: (columns: number) => void;
 }) {
   const probeRef = useRef<HTMLDivElement>(null);
-  // Density moves the grid track without changing the probe's own size, so the
-  // ResizeObserver inside the hook never fires for it — see `watch` there.
-  const density = useTheme((s) => s.density);
-  const columns = useColumnCount(probeRef, density);
+  // The column setting re-flows the grid tracks without changing the probe's
+  // own size, so the ResizeObserver inside the hook never fires for it — see
+  // `watch` there.
+  const coverCols = useTheme((s) => s.coverCols);
+  const columns = useColumnCount(probeRef, coverCols);
   const rowCount = Math.ceil(items.length / columns);
 
   const virtualizer = useVirtualizer({

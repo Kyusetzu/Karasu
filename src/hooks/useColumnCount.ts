@@ -37,12 +37,13 @@ export function useColumnCount(
    * Re-measure whenever this changes.
    *
    * A `ResizeObserver` only fires when the *element* changes size, and the
-   * column count can change without that happening: the cover-size setting
-   * moves `--cover-track`, which re-flows the tracks inside an element whose
-   * own width is untouched. The observer stays silent, the count goes stale,
-   * and a virtualized grid then chunks its rows by the wrong number — wrong
-   * row count, wrong total height, cells overflowing their row. Pass whatever
-   * drives the track (the density setting) so the measurement follows it.
+   * column count can change without that happening: the covers-per-row
+   * setting moves `--cover-cols`, which re-flows the tracks inside an element
+   * whose own width is untouched. The observer stays silent, the count goes
+   * stale, and a virtualized grid then chunks its rows by the wrong number —
+   * wrong row count, wrong total height, cells overflowing their row. Pass
+   * whatever drives the tracks (the column setting) so the measurement
+   * follows it.
    */
   watch?: unknown,
 ): number {

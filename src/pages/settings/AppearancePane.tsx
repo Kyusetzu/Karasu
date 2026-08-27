@@ -5,9 +5,9 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import {
   ACCENT_PRESETS,
-  DENSITY_STEPS,
+  COVER_COLS_MAX,
+  COVER_COLS_MIN,
   useTheme,
-  type Density,
   type ThemeMode,
 } from "@/stores/theme";
 import {
@@ -30,8 +30,8 @@ export function AppearanceSection() {
   const [editingStatus, setEditingStatus] = useState<MediaListStatus | null>(null);
   const themeMode = useTheme((s) => s.mode);
   const accent = useTheme((s) => s.accent);
-  const density = useTheme((s) => s.density);
-  const setDensity = useTheme((s) => s.setDensity);
+  const coverCols = useTheme((s) => s.coverCols);
+  const setCoverCols = useTheme((s) => s.setCoverCols);
   const reduceMotion = useTheme((s) => s.reduceMotion);
   const setReduceMotion = useTheme((s) => s.setReduceMotion);
   const setThemeMode = useTheme((s) => s.setMode);
@@ -77,18 +77,24 @@ export function AppearanceSection() {
           </select>
         </Row>
 
-        <Row label={t("settings.coverSize")} hint={t("settings.coverSizeHint")}>
-          <select
-            value={density}
-            onChange={(e) => setDensity(e.target.value as Density)}
-            className={SELECT}
-          >
-            {DENSITY_STEPS.map((d) => (
-              <option key={d} value={d}>
-                {t(`settings.coverSize_${d}`)}
-              </option>
-            ))}
-          </select>
+        <Row label={t("settings.coverCols")} hint={t("settings.coverColsHint")}>
+          {/* The content filter's slider idiom, with the number shown beside
+              it — a count is exact, so the value is the label. */}
+          <span className="flex w-44 items-center gap-2.5">
+            <input
+              type="range"
+              min={COVER_COLS_MIN}
+              max={COVER_COLS_MAX}
+              step={1}
+              value={coverCols}
+              onChange={(e) => setCoverCols(Number(e.target.value))}
+              aria-label={t("settings.coverCols")}
+              className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-surface-700 accent-accent-500"
+            />
+            <span className="w-5 text-right text-xs tabular-nums text-ink-300">
+              {coverCols}
+            </span>
+          </span>
         </Row>
 
         <Toggle

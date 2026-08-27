@@ -23,7 +23,8 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/stores/auth";
 import { useContentFilter } from "@/stores/contentFilter";
-import { isBlocked, shouldBlur } from "@/lib/contentFilter";
+import { blockReason, shouldBlur } from "@/lib/contentFilter";
+import { FilteredNotice } from "@/components/FilteredNotice";
 import { fetchMediaList, flushQueue } from "@/api/anilist";
 import {
   displayTitle,
@@ -307,23 +308,26 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
   // Deliberately not applied at the cache layer: that same cache feeds the
   // scrobbler and the library matcher, which must keep recognising every
   // title the user actually tracks.
-  const { byStatus, hiddenCount } = useMemo(() => {
+  const { byStatus, hiddenAdult, hiddenSuggestive } = useMemo(() => {
     const map = new Map<MediaListStatus, MediaListEntry[]>();
-    let hidden = 0;
+    let adult = 0;
+    let suggestive = 0;
     for (const status of STATUS_ORDER) map.set(status, []);
     for (const group of data?.lists ?? []) {
       if (group.isCustomList) continue;
       for (const entry of group.entries) {
-        if (isBlocked(entry.media, level)) {
-          // Counted in the same pass that drops them, so the disclosure line
-          // below and the rendered list can never disagree.
-          hidden++;
+        // Counted by reason in the same pass that drops them, so the
+        // disclosure line below and the rendered list can never disagree.
+        const reason = blockReason(entry.media, level);
+        if (reason) {
+          if (reason === "adult") adult++;
+          else suggestive++;
           continue;
         }
         map.get(entry.status)?.push(entry);
       }
     }
-    return { byStatus: map, hiddenCount: hidden };
+    return { byStatus: map, hiddenAdult: adult, hiddenSuggestive: suggestive };
   }, [data, level]);
 
   // Union of tags across the whole list, for the filter + editor autocomplete.
@@ -842,14 +846,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
             The whole-list count, not the tab's: the filter hides from the
             list, and a per-tab number would jump around while meaning the
             same titles. */}
-        {hiddenCount > 0 && (
-          <Link
-            to="/settings?pane=appearance"
-            className="mb-2 inline-block text-2xs font-medium text-accent-400 hover:underline"
-          >
-            {t("list.hiddenByFilter", { n: hiddenCount })}
-          </Link>
-        )}
+        <FilteredNotice adult={hiddenAdult} suggestive={hiddenSuggestive} className="mb-2" />
         {entries.length === 0 ? (
           // Two different nothings. A tab with no entries is a fact about the
           // list; a search that matched none is a fact about the query, and

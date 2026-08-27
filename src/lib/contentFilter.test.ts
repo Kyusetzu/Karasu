@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   adultQueryArg,
+  blockReason,
   isBlocked,
   isBlockedGenre,
   toLevel,
@@ -10,6 +11,25 @@ import {
 const hentai = { isAdult: true, genres: ["Hentai"] };
 const ecchi = { isAdult: false, genres: ["Comedy", "Ecchi"] };
 const plain = { isAdult: false, genres: ["Action", "Drama"] };
+
+describe("blockReason", () => {
+  it("names why a title is hidden, adult first", () => {
+    expect(blockReason(hentai, "moderate")).toBe("adult");
+    expect(blockReason(hentai, "strict")).toBe("adult");
+    expect(blockReason(ecchi, "strict")).toBe("suggestive");
+  });
+
+  it("an adult title that is also Ecchi counts once, as adult", () => {
+    expect(blockReason({ isAdult: true, genres: ["Ecchi"] }, "strict")).toBe("adult");
+  });
+
+  it("is null whenever nothing is hidden", () => {
+    expect(blockReason(ecchi, "moderate")).toBeNull();
+    expect(blockReason(plain, "strict")).toBeNull();
+    expect(blockReason(hentai, "off")).toBeNull();
+    expect(blockReason(null, "strict")).toBeNull();
+  });
+});
 
 describe("isBlocked", () => {
   it("hides nothing when off", () => {

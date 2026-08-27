@@ -23,19 +23,34 @@ export interface Filterable {
   genres?: string[] | null;
 }
 
+export type BlockReason = "adult" | "suggestive";
+
+/**
+ * Why `media` is hidden at `level`, or null when it is not. Adult wins when a
+ * title is both — an adult+Ecchi title is counted once, as adult, which is
+ * also the order the disclosure banners report the split in.
+ */
+export function blockReason(
+  media: Filterable | null | undefined,
+  level: ContentFilterLevel,
+): BlockReason | null {
+  if (level === "off" || !media) return null;
+  if (media.isAdult) return "adult";
+  if (
+    level === "strict" &&
+    (media.genres ?? []).some((g) => SUGGESTIVE_GENRES.includes(g.toLowerCase()))
+  ) {
+    return "suggestive";
+  }
+  return null;
+}
+
 /** Whether `media` should be hidden at `level`. */
 export function isBlocked(
   media: Filterable | null | undefined,
   level: ContentFilterLevel,
 ): boolean {
-  if (level === "off" || !media) return false;
-  if (media.isAdult) return true;
-  if (level === "strict") {
-    return (media.genres ?? []).some((g) =>
-      SUGGESTIVE_GENRES.includes(g.toLowerCase()),
-    );
-  }
-  return false;
+  return blockReason(media, level) !== null;
 }
 
 /**

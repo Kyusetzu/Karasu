@@ -38,7 +38,8 @@ import { useAuth } from "@/stores/auth";
 import { useLibrary } from "@/stores/library";
 import { showToast } from "@/stores/toast";
 import { useContentFilter } from "@/stores/contentFilter";
-import { isBlocked } from "@/lib/contentFilter";
+import { blockReason, isBlocked, type BlockReason } from "@/lib/contentFilter";
+import { FilteredNotice } from "@/components/FilteredNotice";
 import { Button } from "@/components/ui/button";
 import { Presence } from "@/components/ui/presence";
 import { EmptyState, FolderStack } from "@/components/EmptyState";
@@ -183,21 +184,36 @@ function LibraryView({ userId }: { userId: number }) {
     [fetched],
   );
 
-  // What the filter kept off this screen: on-list ids the blocked-aware map
-  // deliberately lacks, plus off-list titles AniList resolved as blocked.
-  // Counted from the same structures the rows are built from, so the line
-  // and the list cannot disagree.
-  const hiddenCount = useMemo(() => {
-    let n = 0;
-    for (const lib of entries) {
-      if (onList.has(lib.mediaId) && !byMedia.has(lib.mediaId)) n++;
-      else {
-        const m = byId.get(lib.mediaId);
-        if (m && isBlocked(m, level)) n++;
+  // Why each blocked ON-LIST id is hidden. `byMedia` deliberately lacks these
+  // rows, so their absence used to be countable but not explainable — the
+  // reason has to come from the list data itself.
+  const blockedOnList = useMemo(() => {
+    const map = new Map<number, BlockReason>();
+    for (const group of data?.lists ?? []) {
+      if (group.isCustomList) continue;
+      for (const e of group.entries) {
+        const reason = blockReason(e.media, level);
+        if (reason) map.set(e.mediaId, reason);
       }
     }
-    return n;
-  }, [entries, onList, byMedia, byId, level]);
+    return map;
+  }, [data, level]);
+
+  // What the filter kept off this screen, by reason: blocked on-list titles,
+  // plus off-list titles AniList resolved as blocked. Counted from the same
+  // structures the rows are built from, so the line and the list cannot
+  // disagree.
+  const { hiddenAdult, hiddenSuggestive } = useMemo(() => {
+    let adult = 0;
+    let suggestive = 0;
+    for (const lib of entries) {
+      const reason =
+        blockedOnList.get(lib.mediaId) ?? blockReason(byId.get(lib.mediaId), level);
+      if (reason === "adult") adult++;
+      else if (reason === "suggestive") suggestive++;
+    }
+    return { hiddenAdult: adult, hiddenSuggestive: suggestive };
+  }, [entries, blockedOnList, byId, level]);
 
   const rows = useMemo<Row[]>(() => {
     const built = entries.flatMap((lib) => {
@@ -513,14 +529,7 @@ function LibraryView({ userId }: { userId: number }) {
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-10">
-        {hiddenCount > 0 && (
-          <Link
-            to="/settings?pane=appearance"
-            className="mb-2 inline-block text-2xs font-medium text-accent-400 hover:underline"
-          >
-            {t("list.hiddenByFilter", { n: hiddenCount })}
-          </Link>
-        )}
+        <FilteredNotice adult={hiddenAdult} suggestive={hiddenSuggestive} className="mb-2" />
         {rows.length === 0 && !unmatched?.length ? (
           <EmptyState
             visual={<FolderStack />}

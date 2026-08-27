@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { useNavigate } from "react-router";
 import { useColumnCount } from "@/hooks/useColumnCount";
 import { useGridRoving } from "@/hooks/useGridRoving";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
@@ -31,7 +31,8 @@ import { Button } from "@/components/ui/button";
 import { FilterSelect } from "@/components/ui/filter-select";
 import MediaCard from "@/components/media/MediaCard";
 import { isTauri } from "@/api/anilist";
-import { adultQueryArg, isBlocked } from "@/lib/contentFilter";
+import { adultQueryArg, blockReason } from "@/lib/contentFilter";
+import { FilteredNotice } from "@/components/FilteredNotice";
 import { useContentFilter } from "@/stores/contentFilter";
 import { useAuth } from "@/stores/auth";
 import { EmptyState, PerchRule, StruckQuery } from "@/components/EmptyState";
@@ -188,14 +189,22 @@ export default function Search() {
 
   // Server-side isAdult covers explicit works; the strict level additionally
   // drops Ecchi, which AniList does not flag as adult.
-  // What arrived minus what the filter dropped locally. At `moderate` the
-  // server already omits adult titles (`adultQueryArg`), so this counts only
-  // real local drops — Ecchi at `strict` — rather than claiming a number
-  // nobody can know. Moving the filtering client-side to count "everything"
-  // is the sparse-page bug queries.ts documents; not doing that is the point.
+  // What arrived minus what the filter dropped locally, split by reason. The
+  // server already omits adult titles at both filtering levels
+  // (`adultQueryArg`), so in practice the adult bucket stays 0 and the drops
+  // are Ecchi at `strict` — the split is carried anyway so the sentence stays
+  // honest if that ever changes. Moving the filtering client-side to count
+  // "everything" is the sparse-page bug queries.ts documents; not doing that
+  // is the point.
   const fetched = (media.data?.pages ?? []).flatMap((p) => p.media);
-  const results = fetched.filter((m) => !isBlocked(m, level));
-  const hiddenCount = fetched.length - results.length;
+  let hiddenAdult = 0;
+  let hiddenSuggestive = 0;
+  const results = fetched.filter((m) => {
+    const reason = blockReason(m, level);
+    if (reason === "adult") hiddenAdult++;
+    else if (reason === "suggestive") hiddenSuggestive++;
+    return reason === null;
+  });
 
   const applyChip = (chip: (typeof BROWSE_CHIPS)[number]) => {
     const now = currentSeasonOf();
@@ -363,7 +372,8 @@ export default function Search() {
             active={active}
             term={term}
             results={results}
-            hidden={hiddenCount}
+            hiddenAdult={hiddenAdult}
+            hiddenSuggestive={hiddenSuggestive}
             hasNextPage={media.hasNextPage === true}
             fetchingMore={media.isFetchingNextPage}
             onMore={() => media.fetchNextPage()}
@@ -423,7 +433,8 @@ function MediaResults({
   active,
   term,
   results,
-  hidden,
+  hiddenAdult,
+  hiddenSuggestive,
   hasNextPage,
   fetchingMore,
   onMore,
@@ -434,8 +445,9 @@ function MediaResults({
   active: boolean;
   term: string;
   results: MediaWithListStatus[];
-  /** Results that arrived and were dropped by the content filter. */
-  hidden: number;
+  /** Results that arrived and were dropped by the content filter, by why. */
+  hiddenAdult: number;
+  hiddenSuggestive: number;
   hasNextPage: boolean;
   fetchingMore: boolean;
   onMore: () => void;
@@ -475,13 +487,8 @@ function MediaResults({
         // is the subject, and on this one the field above it is.
         <EmptyState title={t("search.prompt")} hint={t("search.promptHint")} />
       )}
-      {!isFetching && active && hidden > 0 && (
-        <Link
-          to="/settings?pane=appearance"
-          className="mb-3 inline-block text-2xs font-medium text-accent-400 hover:underline"
-        >
-          {t("search.hiddenByFilter", { n: hidden })}
-        </Link>
+      {!isFetching && active && (
+        <FilteredNotice adult={hiddenAdult} suggestive={hiddenSuggestive} className="mb-3" />
       )}
       {!isFetching && active && results.length === 0 && (
         <EmptyState

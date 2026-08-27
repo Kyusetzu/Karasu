@@ -228,3 +228,30 @@ and anything that assumes a keyboard.
 The Android **launcher icons are committed** — `src-tauri/icons/android/` holds
 the full `mipmap-*` set including `mipmap-anydpi-v26`. `tauri android init`
 generates these, so a first run will appear to have produced them; it did not.
+
+## Chosen from the Aluminium review (August 2026)
+
+Four additions the maintainer picked after surveying Aluminium (the Play-Store
+AniList client) in the third device round. Inspiration only — its source is
+unreleased and nothing is copied; each of these is designed fresh against
+Karasu's own conventions. The airing calendar it advertises already exists
+here (`/calendar`), so it is not on this list.
+
+1. **Quick +1 on the Dashboard.** One tap advances progress on the
+   continue-watching strip without opening the detail page. Reuses
+   `useListMutations` and its receipt toast; scores and rate limiting are
+   already right there.
+2. **Search scopes: characters, staff, studios.** The pages and routes exist
+   (`/character/:id`, `/staff/:id`, `/studio/:id`); each scope costs one
+   user-initiated query when activated, and needs a `USER_SEARCH_MIN`-style
+   minimum before firing — AniList's short-query behaviour on `Page.users`
+   is documented in CLAUDE.md and should be re-measured per entity.
+3. **Small UX pack.** A clear-✕ in the search and filter inputs, and a
+   setting for the default status when adding a title (Planning today,
+   hard-coded).
+4. **Android system notifications.** Two honest halves. *While the app runs*,
+   the alert passes can post real system notifications through the
+   notification plugin — cheap, and worth doing first. *In the background*
+   they cannot: Android suspends the process, FCM would need a hosted backend
+   (forbidden), so background delivery is a research item (WorkManager-style
+   periodic wake or nothing) and stays uncommitted until measured.

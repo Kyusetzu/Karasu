@@ -251,3 +251,35 @@ fn toast_with_action(
     });
     Ok(())
 }
+
+/// Asks the OS for notification permission, once, at startup.
+///
+/// Not a cfg'd pair, deliberately: the desktop backends answer `Granted`
+/// unconditionally, so this is a no-op everywhere the question does not
+/// exist. On Android 13+ the first launch shows the system dialog — the
+/// honest moment, because the airing alert defaults *on* and a fresh
+/// install would otherwise `show()` into the void with nothing ever asking.
+/// Its own thread because the mobile request blocks until the user answers,
+/// and `Denied` is respected: asked once by us, again only by the OS's own
+/// rules, never nagged.
+pub fn ensure_permission(app: &AppHandle) {
+    let app = app.clone();
+    std::thread::spawn(move || {
+        use tauri_plugin_notification::PermissionState;
+        match app.notification().permission_state() {
+            Ok(PermissionState::Granted) | Ok(PermissionState::Denied) => {}
+            Ok(_) => {
+                if let Err(e) = app.notification().request_permission() {
+                    crate::logging::warn(
+                        "notify",
+                        format!("notification permission request failed: {e}"),
+                    );
+                }
+            }
+            Err(e) => crate::logging::warn(
+                "notify",
+                format!("notification permission state unreadable: {e}"),
+            ),
+        }
+    });
+}

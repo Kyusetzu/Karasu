@@ -381,6 +381,9 @@ pub fn run() {
             alerts::airing::spawn(app.handle().clone());
             alerts::stale::spawn(app.handle().clone());
             alerts::sequel::spawn(app.handle().clone());
+            // Before their first toast can land: on Android this is the
+            // system permission dialog, everywhere else a granted no-op.
+            alerts::notify::ensure_permission(app.handle());
             backups::spawn(app.handle().clone());
             // Show the idle presence right away (if Discord is enabled).
             discord::sync_current(app.handle());

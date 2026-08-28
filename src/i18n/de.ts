@@ -526,6 +526,11 @@ export const de: typeof en = {
     anime: "Anime",
     manga: "Manga",
     users: "Personen",
+    characters: "Charaktere",
+    staffScope: "Staff",
+    studios: "Studios",
+    entityPrompt: "Auf AniList nach Namen suchen.",
+    noMatches: "Nichts mit diesem Namen.",
     userPrompt: "Finde jemanden auf AniList.",
     userPromptHint:
       "Mindestens {{n}} Zeichen — bei weniger antwortet AniList mit beliebigen Konten.",

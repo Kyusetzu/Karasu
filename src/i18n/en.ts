@@ -530,6 +530,11 @@ export const en = {
     anime: "Anime",
     manga: "Manga",
     users: "People",
+    characters: "Characters",
+    staffScope: "Staff",
+    studios: "Studios",
+    entityPrompt: "Search AniList by name.",
+    noMatches: "Nothing by that name.",
     userPrompt: "Find someone on AniList.",
     userPromptHint:
       "At least {{n}} characters — shorter than that and AniList answers with whoever it likes.",

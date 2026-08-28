@@ -354,6 +354,103 @@ export async function searchUsers(search: string, page = 1): Promise<UserPage> {
 /** The shortest query this endpoint answers usefully. See `USER_SEARCH_QUERY`. */
 export const USER_SEARCH_MIN = 3;
 
+/**
+ * The other three searchable entities, one lean query each — modelled on
+ * `USER_SEARCH_QUERY` above and deliberately NOT on the id-based detail
+ * queries below it: a result row needs a name and a face, and pulling a
+ * description or a media connection per row is the half-megabyte mistake
+ * `UserRow` documents for bios.
+ *
+ * The three-character minimum is `USER_SEARCH_MIN`, and it was re-measured
+ * per entity rather than assumed: at two characters all three return an
+ * exactish match followed by a fixed set of popular filler ("ky" answered
+ * Levi and Gojou for characters, MADHOUSE and MAPPA for studios); at three
+ * the answers become real prefix matches. Same capped `total` sentinel too,
+ * so nothing here shows a remaining count.
+ */
+export const CHARACTER_SEARCH_QUERY = `
+query ($search: String!, $page: Int) {
+  Page(page: $page, perPage: 25) {
+    ${PAGE_INFO}
+    characters(search: $search, sort: SEARCH_MATCH) {
+      id name { full } image { medium }
+    }
+  }
+}`;
+
+export const STAFF_SEARCH_QUERY = `
+query ($search: String!, $page: Int) {
+  Page(page: $page, perPage: 25) {
+    ${PAGE_INFO}
+    staff(search: $search, sort: SEARCH_MATCH) {
+      id name { full } image { medium }
+    }
+  }
+}`;
+
+export const STUDIO_SEARCH_QUERY = `
+query ($search: String!, $page: Int) {
+  Page(page: $page, perPage: 25) {
+    ${PAGE_INFO}
+    studios(search: $search, sort: SEARCH_MATCH) { id name }
+  }
+}`;
+
+/** A character or staff hit — just enough to draw a row and link the page. */
+export interface PersonHit {
+  id: number;
+  name: { full: string | null } | null;
+  image: { medium: string | null } | null;
+}
+
+export interface StudioHit {
+  id: number;
+  name: string;
+}
+
+export interface PersonSearchPage {
+  pageInfo: PageInfo;
+  rows: PersonHit[];
+}
+
+export interface StudioSearchPage {
+  pageInfo: PageInfo;
+  rows: StudioHit[];
+}
+
+export async function searchCharacters(
+  term: string,
+  page: number,
+): Promise<PersonSearchPage> {
+  const data = await gql<{ Page: { pageInfo: PageInfo; characters: PersonHit[] | null } }>(
+    CHARACTER_SEARCH_QUERY,
+    { search: term, page },
+  );
+  return { pageInfo: data.Page.pageInfo, rows: data.Page.characters ?? [] };
+}
+
+export async function searchStaff(
+  term: string,
+  page: number,
+): Promise<PersonSearchPage> {
+  const data = await gql<{ Page: { pageInfo: PageInfo; staff: PersonHit[] | null } }>(
+    STAFF_SEARCH_QUERY,
+    { search: term, page },
+  );
+  return { pageInfo: data.Page.pageInfo, rows: data.Page.staff ?? [] };
+}
+
+export async function searchStudios(
+  term: string,
+  page: number,
+): Promise<StudioSearchPage> {
+  const data = await gql<{ Page: { pageInfo: PageInfo; studios: StudioHit[] | null } }>(
+    STUDIO_SEARCH_QUERY,
+    { search: term, page },
+  );
+  return { pageInfo: data.Page.pageInfo, rows: data.Page.studios ?? [] };
+}
+
 // --- Activities -----------------------------------------------------------
 
 /**

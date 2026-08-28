@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { useColumnCount } from "@/hooks/useColumnCount";
 import { useGridRoving } from "@/hooks/useGridRoving";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
@@ -17,7 +17,15 @@ import {
 import { EMPTY, encode, isEmpty, toQueryArgs } from "@/lib/multiFilter";
 import { MultiFilterSelect } from "@/components/ui/multi-filter-select";
 import type { MediaType } from "@/api/types";
-import { searchUsers, USER_SEARCH_MIN } from "@/api/social";
+import {
+  searchCharacters,
+  searchStaff,
+  searchStudios,
+  searchUsers,
+  USER_SEARCH_MIN,
+  type PersonHit,
+  type StudioHit,
+} from "@/api/social";
 import {
   formatLabel,
   MEDIA_FORMATS,
@@ -27,6 +35,7 @@ import {
   sourceLabel,
 } from "@/lib/format";
 import { Input } from "@/components/ui/input";
+import { UserLockup } from "@/components/ui/user-lockup";
 import { Button } from "@/components/ui/button";
 import { FilterSelect } from "@/components/ui/filter-select";
 import MediaCard from "@/components/media/MediaCard";
@@ -44,7 +53,11 @@ import { UserList } from "@/components/social/UserList";
  * the two mediums were "one choice among several the search will grow" — people
  * are the third.
  */
-type Scope = MediaType | "USERS";
+type Scope = MediaType | "USERS" | "CHARACTERS" | "STAFF" | "STUDIOS";
+
+/** The two scopes that browse media — everything the filter toolbar serves. */
+const isMediaScope = (s: Scope): s is MediaType =>
+  s === "ANIME" || s === "MANGA";
 
 const SEASONS: Season[] = ["WINTER", "SPRING", "SUMMER", "FALL"];
 const STATUSES = ["RELEASING", "FINISHED", "NOT_YET_RELEASED", "CANCELLED", "HIATUS"];
@@ -101,7 +114,7 @@ export default function Search() {
   const [source, setSource] = useState("");
   const [country, setCountry] = useState("");
   const [sort, setSort] = useState("SEARCH_MATCH");
-  const type: MediaType = scope === "USERS" ? "ANIME" : scope;
+  const type: MediaType = isMediaScope(scope) ? scope : "ANIME";
 
   // Debounce: search only after 500 ms of typing pause (spare the rate limit)
   useEffect(() => {
@@ -183,7 +196,7 @@ export default function Search() {
     queryFn: ({ pageParam }) => browseMedia(type, filters, pageParam, adultQueryArg(level)),
     initialPageParam: 1,
     getNextPageParam: (last, all) => (last.pageInfo.hasNextPage ? all.length + 1 : undefined),
-    enabled: isTauri && filterReady && active && scope !== "USERS",
+    enabled: isTauri && filterReady && active && isMediaScope(scope),
     staleTime: 5 * 60 * 1000,
   });
 
@@ -250,16 +263,24 @@ export default function Search() {
               search will grow". People are the third, and the chips took it
               without a layout change — which is what the shape was chosen for. */}
           <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-            {(["ANIME", "MANGA", "USERS"] as const).map((sc) => (
+            {(
+              ["ANIME", "MANGA", "USERS", "CHARACTERS", "STAFF", "STUDIOS"] as const
+            ).map((sc) => (
               <Pill key={sc} active={scope === sc} onClick={() => setScope(sc)}>
                 {sc === "ANIME"
                   ? t("search.anime")
                   : sc === "MANGA"
                     ? t("search.manga")
-                    : t("search.users")}
+                    : sc === "USERS"
+                      ? t("search.users")
+                      : sc === "CHARACTERS"
+                        ? t("search.characters")
+                        : sc === "STAFF"
+                          ? t("search.staffScope")
+                          : t("search.studios")}
               </Pill>
             ))}
-            {scope !== "USERS" && (
+            {isMediaScope(scope) && (
               <>
                 <span className="mx-1 h-4 w-px bg-surface-700" />
                 {BROWSE_CHIPS.map((chip) => (
@@ -270,7 +291,7 @@ export default function Search() {
               </>
             )}
           </div>
-          {scope !== "USERS" && (
+          {isMediaScope(scope) && (
             <div className="mt-2.5 flex flex-wrap gap-2">
               <MultiFilterSelect
                 label={t("search.genreLabel")}
@@ -365,7 +386,11 @@ export default function Search() {
 
       <div className="min-h-0 flex-1 overflow-y-auto px-8 py-6">
         {scope === "USERS" && <UserSearchResults term={term} />}
-        {scope !== "USERS" && (
+        {(scope === "CHARACTERS" || scope === "STAFF") && (
+          <PersonSearchResults kind={scope === "CHARACTERS" ? "character" : "staff"} term={term} />
+        )}
+        {scope === "STUDIOS" && <StudioSearchResults term={term} />}
+        {isMediaScope(scope) && (
           <MediaResults
             error={media.error}
             isFetching={media.isFetching && !media.isFetchingNextPage}
@@ -424,6 +449,173 @@ function UserSearchResults({ term }: { term: string }) {
       countRemaining={false}
       staleTime={5 * 60 * 1000}
     />
+  );
+}
+
+/**
+ * Characters and staff share one list: same row, same page shape, different
+ * fetcher and route. No account gate — these are public reads and work
+ * signed out and in local mode — and the three-character floor is the
+ * users' own, re-measured per entity (see `CHARACTER_SEARCH_QUERY`).
+ * Paging is a button, as everywhere.
+ */
+function PersonSearchResults({
+  kind,
+  term,
+}: {
+  kind: "character" | "staff";
+  term: string;
+}) {
+  const { t } = useTranslation();
+  const query = useInfiniteQuery({
+    queryKey: ["search", kind, term],
+    queryFn: ({ pageParam }) =>
+      kind === "character"
+        ? searchCharacters(term, pageParam)
+        : searchStaff(term, pageParam),
+    initialPageParam: 1,
+    getNextPageParam: (last, all) =>
+      last.pageInfo.hasNextPage ? all.length + 1 : undefined,
+    enabled: isTauri && term.length >= USER_SEARCH_MIN,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  if (term.length < USER_SEARCH_MIN) {
+    return (
+      <EmptyState
+        title={t("search.entityPrompt")}
+        hint={t("search.userPromptHint", { n: USER_SEARCH_MIN })}
+      />
+    );
+  }
+  const rows = query.data?.pages.flatMap((p) => p.rows) ?? [];
+  return (
+    <EntityResultList
+      loading={query.isLoading}
+      error={query.error}
+      empty={rows.length === 0}
+      term={term}
+      hasNextPage={query.hasNextPage === true}
+      fetchingMore={query.isFetchingNextPage}
+      onMore={() => query.fetchNextPage()}
+    >
+      {rows.map((hit: PersonHit) => (
+        <EntityRow
+          key={hit.id}
+          to={`/${kind}/${hit.id}`}
+          name={hit.name?.full ?? "—"}
+          src={hit.image?.medium ?? undefined}
+        />
+      ))}
+    </EntityResultList>
+  );
+}
+
+function StudioSearchResults({ term }: { term: string }) {
+  const { t } = useTranslation();
+  const query = useInfiniteQuery({
+    queryKey: ["search", "studio", term],
+    queryFn: ({ pageParam }) => searchStudios(term, pageParam),
+    initialPageParam: 1,
+    getNextPageParam: (last, all) =>
+      last.pageInfo.hasNextPage ? all.length + 1 : undefined,
+    enabled: isTauri && term.length >= USER_SEARCH_MIN,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  if (term.length < USER_SEARCH_MIN) {
+    return (
+      <EmptyState
+        title={t("search.entityPrompt")}
+        hint={t("search.userPromptHint", { n: USER_SEARCH_MIN })}
+      />
+    );
+  }
+  const rows = query.data?.pages.flatMap((p) => p.rows) ?? [];
+  return (
+    <EntityResultList
+      loading={query.isLoading}
+      error={query.error}
+      empty={rows.length === 0}
+      term={term}
+      hasNextPage={query.hasNextPage === true}
+      fetchingMore={query.isFetchingNextPage}
+      onMore={() => query.fetchNextPage()}
+    >
+      {rows.map((hit: StudioHit) => (
+        <EntityRow key={hit.id} to={`/studio/${hit.id}`} name={hit.name} />
+      ))}
+    </EntityResultList>
+  );
+}
+
+/** The states around any entity result list, shared so they cannot drift. */
+function EntityResultList({
+  loading,
+  error,
+  empty,
+  term,
+  hasNextPage,
+  fetchingMore,
+  onMore,
+  children,
+}: {
+  loading: boolean;
+  error: unknown;
+  empty: boolean;
+  term: string;
+  hasNextPage: boolean;
+  fetchingMore: boolean;
+  onMore: () => void;
+  children: React.ReactNode;
+}) {
+  const { t } = useTranslation();
+  if (error != null) {
+    return (
+      <p className="text-sm text-danger">
+        {t("common.error", { message: backendErrorText(error, t) })}
+      </p>
+    );
+  }
+  if (loading) {
+    return <p className="text-sm text-ink-600">{t("search.searching")}</p>;
+  }
+  if (empty) {
+    return (
+      <EmptyState
+        visual={<StruckQuery query={term} />}
+        title={t("search.noMatches")}
+      />
+    );
+  }
+  return (
+    <>
+      <div className="space-y-2">{children}</div>
+      {hasNextPage && (
+        <div className="mt-3">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onMore}
+            disabled={fetchingMore}
+            className="w-full"
+          >
+            {t("social.loadMorePlain")}
+          </Button>
+        </div>
+      )}
+    </>
+  );
+}
+
+/** `UserRow`'s frame without the follow button — the whole row is the link. */
+function EntityRow({ to, name, src }: { to: string; name: string; src?: string }) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-surface-800 bg-surface-900 p-3 transition-surface hover:border-surface-700">
+      <Link to={to} className="min-w-0 flex-1">
+        <UserLockup name={name} src={src} size="md" titleAttr nameClassName="text-sm" />
+      </Link>
+    </div>
   );
 }
 

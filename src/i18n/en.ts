@@ -306,6 +306,7 @@ export const en = {
       "Your anime tracker for AniList. Connect your account to manage your list and track your progress automatically.",
     connect: "Connect with AniList",
     continueWatching: "Continue watching",
+    continueReading: "Continue reading",
     nothingWatching: "Nothing in flight.",
     currentSeason: "Browse the current season →",
     upcoming: "Airing soon",
@@ -333,6 +334,7 @@ export const en = {
     airingInDays: "in {{d}}d {{h}}h",
     airingInHours: "in {{h}}h {{m}}m",
     markWatched: "Mark episode {{n}} as watched",
+    markRead: "Mark chapter {{n}} as read",
   },
   firstRun: {
     headline: "Never lose your place again.",

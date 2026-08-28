@@ -2,17 +2,18 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
-import { BarChart3, Cake, CalendarClock, CalendarDays, Play, Plus } from "lucide-react";
+import { BarChart3, BookOpen, Cake, CalendarClock, CalendarDays, Play, Plus } from "lucide-react";
 import { fetchMediaList, isTauri } from "@/api/anilist";
 import { favouriteBirthdays } from "@/api/social";
 import { birthdaysOn } from "@/lib/birthdays";
 import { Avatar } from "@/components/ui/user-lockup";
-import { displayTitle, type MediaListEntry } from "@/api/types";
+import { displayTitle, maxProgress, type MediaListEntry, type MediaType } from "@/api/types";
 import { useAuth, useScoreFormat } from "@/stores/auth";
 import { formatMeanScore, formatScore } from "@/lib/scoreFormat";
 import { useContentFilter } from "@/stores/contentFilter";
 import { isBlocked, shouldBlur } from "@/lib/contentFilter";
 import { useListMutations } from "@/hooks/useListMutations";
+import { canIncrement } from "@/components/list/shared";
 import { fromList } from "@/lib/calendar";
 import { SectionHeader } from "@/components/ui/section-header";
 import { DigestRow } from "@/components/media/DigestRow";
@@ -69,6 +70,7 @@ function DashboardContent({ userId }: { userId: number }) {
     queryFn: () => fetchMediaList(userId, "MANGA"),
   });
   const { save } = useListMutations(userId, "ANIME");
+  const { save: mangaSave } = useListMutations(userId, "MANGA");
   const level = useContentFilter((s) => s.level);
 
   // One content-filtered base for every section below, so a new section can't
@@ -135,16 +137,19 @@ function DashboardContent({ userId }: { userId: number }) {
           <Birthdays userId={userId} settled={!mangaLoading} />
           <WeeklyDigest entries={allAnime} />
           <AiringSoon entries={allAnime} />
-          <ContinueWatching entries={allAnime} save={save} />
+          <ContinueStrip type="ANIME" entries={allAnime} save={save} />
           <RecommendedSection type="ANIME" entries={allAnime} />
         </>
       )}
       {!mangaLoading && (
-        <RecommendedSection
-          type="MANGA"
-          entries={allManga}
-          listUnavailable={!!mangaError}
-        />
+        <>
+          <ContinueStrip type="MANGA" entries={allManga} save={mangaSave} />
+          <RecommendedSection
+            type="MANGA"
+            entries={allManga}
+            listUnavailable={!!mangaError}
+          />
+        </>
       )}
     </div>
   );
@@ -183,10 +188,12 @@ function DashboardSkeleton() {
 }
 
 /** Shows in progress, most recently touched first, with a +1 shortcut. */
-function ContinueWatching({
+function ContinueStrip({
+  type,
   entries,
   save,
 }: {
+  type: MediaType;
   entries: MediaListEntry[];
   save: ReturnType<typeof useListMutations>["save"];
 }) {
@@ -212,9 +219,21 @@ function ContinueWatching({
     [mutate],
   );
 
+  // The anime strip keeps its empty state — it is the screen's anchor and
+  // the nudge toward the season. A manga twin saying "you read nothing" to
+  // every anime-only user is noise, so that one simply is not there.
+  if (type === "MANGA" && watching.length === 0) return null;
+
   return (
     <section>
-      <SectionHeader icon={Play} title={t("dashboard.continueWatching")} />
+      <SectionHeader
+        icon={type === "ANIME" ? Play : BookOpen}
+        title={t(
+          type === "ANIME"
+            ? "dashboard.continueWatching"
+            : "dashboard.continueReading",
+        )}
+      />
       {watching.length === 0 ? (
         <EmptyState
           visual={<PerchRule />}
@@ -230,6 +249,7 @@ function ContinueWatching({
           {watching.map((entry) => (
             <ContinueCard
               key={entry.id}
+              type={type}
               entry={entry}
               onPlusOne={plusOne}
               blurred={shouldBlur(entry.media, level, blurAdult)}
@@ -465,10 +485,12 @@ function Stats({ entries }: { entries: MediaListEntry[] }) {
  * `onPlusOne` takes the entry so the parent can hand out one stable callback.
  */
 const ContinueCard = memo(function ContinueCard({
+  type,
   entry,
   onPlusOne,
   blurred,
 }: {
+  type: MediaType;
   entry: MediaListEntry;
   onPlusOne: (entry: MediaListEntry) => void;
   /** Computed by the parent — see `GridCard` for why it is not read here. */
@@ -477,7 +499,10 @@ const ContinueCard = memo(function ContinueCard({
   const { t } = useTranslation();
   const scoreFormat = useScoreFormat();
   const { media } = entry;
-  const canPlus = media.episodes === null || entry.progress < media.episodes;
+  // The list's own check — `maxProgress` knows chapters, `media.episodes`
+  // does not, which is what kept this card anime-only for so long.
+  const canPlus = canIncrement(entry);
+  const total = maxProgress(media);
 
   return (
     <CoverCell
@@ -487,11 +512,7 @@ const ContinueCard = memo(function ContinueCard({
       blurred={blurred}
       revealLabel={displayTitle(media.title)}
       score={entry.score > 0 ? formatScore(scoreFormat, entry.score) : null}
-      progress={
-        media.episodes
-          ? { current: entry.progress, total: media.episodes }
-          : null
-      }
+      progress={total ? { current: entry.progress, total } : null}
       actions={
         // Always visible, not hover-only: this is the most-used action in the
         // app, and hiding it behind a hover costs a deliberate movement every
@@ -503,7 +524,10 @@ const ContinueCard = memo(function ContinueCard({
             round
             onClick={() => onPlusOne(entry)}
             aria-label={t("common.plusOne")}
-            title={t("dashboard.markWatched", { n: entry.progress + 1 })}
+            title={t(
+              type === "ANIME" ? "dashboard.markWatched" : "dashboard.markRead",
+              { n: entry.progress + 1 },
+            )}
             className="shadow-[0_.25rem_.75rem_rgba(0,0,0,.5)]"
           >
             <Plus className="size-4" />
@@ -520,10 +544,10 @@ const ContinueCard = memo(function ContinueCard({
         />
       </Link>
       <CoverMeta>
-        {t("common.progressEpisodes", {
-          n: entry.progress,
-          total: media.episodes ?? "?",
-        })}
+        {t(
+          type === "ANIME" ? "common.progressEpisodes" : "common.progressChapters",
+          { n: entry.progress, total: total ?? "?" },
+        )}
       </CoverMeta>
     </CoverCell>
   );

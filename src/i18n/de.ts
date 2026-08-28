@@ -304,6 +304,7 @@ export const de: typeof en = {
       "Dein Anime-Tracker für AniList. Verbinde deinen Account, um deine Liste zu verwalten und deinen Fortschritt automatisch zu tracken.",
     connect: "Mit AniList verbinden",
     continueWatching: "Weiterschauen",
+    continueReading: "Weiterlesen",
     nothingWatching: "Nichts unterwegs.",
     currentSeason: "Aktuelle Saison ansehen →",
     upcoming: "Demnächst",
@@ -332,6 +333,7 @@ export const de: typeof en = {
     airingInDays: "in {{d}} T {{h}} Std",
     airingInHours: "in {{h}} Std {{m}} min",
     markWatched: "Episode {{n}} gesehen",
+    markRead: "Kapitel {{n}} gelesen",
   },
   firstRun: {
     headline: "Verlier nie wieder den Faden.",

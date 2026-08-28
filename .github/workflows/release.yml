@@ -339,10 +339,13 @@ jobs:
           NOTES_VT: ${{ steps.virustotal.outputs.analysis || 'unavailable for this release' }}
         run: |
           # `-Android` only when APKs actually came down -- the paragraph must
-          # not describe assets the release does not carry.
-          $android = @()
+          # not describe assets the release does not carry. A HASHTABLE splat:
+          # array splatting passes "-Android" as a positional string and the
+          # switch stays false, which is how the first signed release shipped
+          # its APKs with notes that never mentioned them.
+          $android = @{}
           if (Get-ChildItem -Path "android-artifacts" -Filter *.apk -ErrorAction SilentlyContinue) {
-            $android = @("-Android")
+            $android = @{ Android = $true }
           }
           ./scripts/release/release-notes.ps1 `
             -Version $env:NOTES_VERSION `

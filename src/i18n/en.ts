@@ -936,7 +936,7 @@ export const en = {
     presetDetailed: "Detailed",
   },
   media: {
-    addPlanning: "Add to Planning",
+    addDefault: "Add to your list",
   },
   social: {
     replyPosted: "Reply posted",
@@ -1469,6 +1469,9 @@ export const en = {
       "The border drawn around a cover, and the tint of its badge. Click a status to change it.",
     statusColorsReset: "Reset to defaults",
     accentCustom: "Custom colour …",
+    listDefaults: "Lists",
+    defaultAddStatus: "Default status when adding",
+    defaultAddStatusHint: "New titles join your list with this status.",
     coverCols: "Covers per row",
     coverColsHint: "How many covers share a row — they scale to fit.",
     reduceMotion: "Reduce motion",

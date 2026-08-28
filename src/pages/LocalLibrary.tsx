@@ -18,6 +18,7 @@ import { mediaByIds } from "@/api/queries";
 import { displayTitle, type Media, type MediaListEntry } from "@/api/types";
 import { missingIds } from "@/lib/chunk";
 import { fuzzyScore, prepareDoc, prepareQuery } from "@/lib/fuzzy";
+import { loadDefaultAddStatus } from "@/lib/defaultAddStatus";
 import {
   clearLibraryMatch,
   getLibraryStatus,
@@ -432,7 +433,10 @@ function LibraryView({ userId }: { userId: number }) {
   const addToList = useCallback(
     async (media: Media) => {
       try {
-        await saveListEntry({ mediaId: media.id, status: "PLANNING" }, media);
+        await saveListEntry(
+          { mediaId: media.id, status: loadDefaultAddStatus() },
+          media,
+        );
         await qc.invalidateQueries({ queryKey: ["mediaList", "ANIME", userId] });
       } catch (e) {
         setError(typeof e === "string" ? e : t("library.addFailed"));

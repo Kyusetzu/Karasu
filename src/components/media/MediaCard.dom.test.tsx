@@ -79,7 +79,7 @@ describe("MediaCard in the account-free profile", () => {
     // The status circle, not the add-to-Planning plus: proof the card resolved
     // the entry rather than believing AniList's null.
     await waitFor(() =>
-      expect(screen.queryByRole("button", { name: "media.addPlanning" })).toBeNull(),
+      expect(screen.queryByRole("button", { name: "media.addDefault" })).toBeNull(),
     );
     expect(screen.getByTitle("status.ANIME.CURRENT")).toBeTruthy();
   });
@@ -91,7 +91,7 @@ describe("MediaCard in the account-free profile", () => {
     );
     queryClient.setQueryData(["mediaList", "ANIME", 0], localList());
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "media.addPlanning" })).toBeTruthy(),
+      expect(screen.getByRole("button", { name: "media.addDefault" })).toBeTruthy(),
     );
   });
 });

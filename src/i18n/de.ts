@@ -937,7 +937,7 @@ export const de: typeof en = {
     presetDetailed: "Detailliert",
   },
   media: {
-    addPlanning: "Zu Geplant hinzufügen",
+    addDefault: "Zur Liste hinzufügen",
   },
   social: {
     replyPosted: "Antwort gesendet",
@@ -1468,6 +1468,9 @@ export const de: typeof en = {
       "Der Rahmen um ein Cover und die Tönung seines Abzeichens. Klicke einen Status an, um ihn zu ändern.",
     statusColorsReset: "Auf Standard zurücksetzen",
     accentCustom: "Eigene Farbe …",
+    listDefaults: "Listen",
+    defaultAddStatus: "Standardstatus beim Hinzufügen",
+    defaultAddStatusHint: "Neue Titel landen mit diesem Status auf deiner Liste.",
     coverCols: "Cover pro Reihe",
     coverColsHint: "Wie viele Cover sich eine Reihe teilen — sie skalieren passend.",
     reduceMotion: "Bewegung reduzieren",

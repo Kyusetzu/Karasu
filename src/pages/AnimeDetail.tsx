@@ -40,6 +40,7 @@ import { Avatar, UserLockup } from "@/components/ui/user-lockup";
 import { Markdown } from "@/components/social/Markdown";
 import { ReviewComposerModal } from "@/components/overlays/ReviewComposerModal";
 import CoverViewer from "@/components/overlays/CoverViewer";
+import { loadDefaultAddStatus } from "@/lib/defaultAddStatus";
 import { Presence } from "@/components/ui/presence";
 import { usePresence } from "@/hooks/usePresence";
 import { relTimeFromSeconds } from "@/lib/relTime";
@@ -1408,7 +1409,7 @@ function ListEditor({
   const mode = useAuth((s) => s.mode);
   const qc = useQueryClient();
   const [status, setStatus] = useState<MediaListStatus>(
-    entry?.status ?? "PLANNING",
+    entry?.status ?? loadDefaultAddStatus(),
   );
   const [progress, setProgress] = useState(entry?.progress ?? 0);
   const [score, setScore] = useState(entry?.score ?? 0);
@@ -1419,7 +1420,7 @@ function ListEditor({
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    setStatus(entry?.status ?? "PLANNING");
+    setStatus(entry?.status ?? loadDefaultAddStatus());
     setProgress(entry?.progress ?? 0);
     setScore(entry?.score ?? 0);
     setRepeat(entry?.repeat ?? 0);

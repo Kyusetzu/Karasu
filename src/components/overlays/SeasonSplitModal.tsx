@@ -210,6 +210,8 @@ export function SeasonSplitModal({
             <Input
               value={term}
               onChange={(e) => setTerm(e.target.value)}
+              onClear={() => setTerm("")}
+              clearLabel={t("common.clear")}
               placeholder={t("library.splitSearchPlaceholder")}
               className="h-9 pl-8"
             />

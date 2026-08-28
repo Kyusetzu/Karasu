@@ -21,6 +21,7 @@ import { Pill } from "@/components/ui/pill";
 import { ScoreBars } from "@/components/ui/score-bars";
 import TagEditor from "@/components/media/TagEditor";
 import { parseNotes, serializeNotes } from "@/lib/tags";
+import { loadDefaultAddStatus } from "@/lib/defaultAddStatus";
 
 export interface EditableMedia {
   id: number;
@@ -147,7 +148,7 @@ export default function EntryEditModal({
   const mode = useAuth((s) => s.mode);
   const initial = parseNotes(entry?.notes);
   const [status, setStatus] = useState<MediaListStatus>(
-    entry?.status ?? "PLANNING",
+    entry?.status ?? loadDefaultAddStatus(),
   );
   const [progress, setProgress] = useState(entry?.progress ?? 0);
   const [volumes, setVolumes] = useState(entry?.progressVolumes ?? 0);

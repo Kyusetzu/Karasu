@@ -8,9 +8,60 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { UserLockup } from "@/components/ui/user-lockup";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/stores/auth";
+import { Row, SELECT } from "./shared";
+import { STATUS_ORDER, type MediaListStatus } from "@/api/types";
+import {
+  loadDefaultAddStatus,
+  saveDefaultAddStatus,
+} from "@/lib/defaultAddStatus";
 import { useAniListLogin } from "@/hooks/useAniListLogin";
 import * as api from "@/api/anilist";
 const CALLBACK_URL = "http://localhost:46231/callback";
+
+/**
+ * How the list gets written from this machine — beside the account section
+ * because "you and your list" is one subject, and this pane is the only one
+ * every platform and both profile modes can see.
+ */
+export function DefaultsSection() {
+  const { t } = useTranslation();
+  const [status, setStatus] = useState<MediaListStatus>(() =>
+    loadDefaultAddStatus(),
+  );
+  const change = (s: MediaListStatus) => {
+    setStatus(s);
+    saveDefaultAddStatus(s);
+  };
+  return (
+    <Card>
+      <CardTitle>{t("settings.listDefaults")}</CardTitle>
+      <div className="mt-3">
+        <Row
+          label={t("settings.defaultAddStatus")}
+          hint={t("settings.defaultAddStatusHint")}
+        >
+          <select
+            value={status}
+            onChange={(e) => change(e.target.value as MediaListStatus)}
+            className={SELECT}
+          >
+            {STATUS_ORDER.map((s) => {
+              const anime = t(`status.ANIME.${s}`);
+              const manga = t(`status.MANGA.${s}`);
+              return (
+                <option key={s} value={s}>
+                  {/* One stored value serves both media types, so the two
+                      vocabularies share the label where they differ. */}
+                  {anime === manga ? anime : `${anime} / ${manga}`}
+                </option>
+              );
+            })}
+          </select>
+        </Row>
+      </div>
+    </Card>
+  );
+}
 
 export function AccountSection() {
   const { t } = useTranslation();

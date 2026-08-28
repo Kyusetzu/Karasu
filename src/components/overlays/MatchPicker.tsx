@@ -184,11 +184,19 @@ export default function MatchPicker({
               ref={box}
               value={term}
               onChange={(e) => setTerm(e.target.value)}
+              onClear={() => setTerm("")}
+              clearLabel={t("common.clear")}
               placeholder={t("library.searchAniList")}
               className="pl-8"
             />
             {isFetching && (
-              <Loader2 className="absolute right-2.5 top-1/2 size-3.5 -translate-y-1/2 animate-spin text-ink-600" />
+              <Loader2
+                className={cn(
+                  "absolute top-1/2 size-3.5 -translate-y-1/2 animate-spin text-ink-600",
+                  // Left of the clear button whenever there is one.
+                  term ? "right-8" : "right-2.5",
+                )}
+              />
             )}
           </div>
           {/* Only where an episode number is on the table. The library's own

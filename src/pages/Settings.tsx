@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { resolvePane, type PaneId } from "@/lib/settingsPanes";
-import { AccountSection } from "./settings/AccountPane";
+import { AccountSection, DefaultsSection } from "./settings/AccountPane";
 import {
   AniListListOptionsSection,
   AniListNotificationsSection,
@@ -60,7 +60,7 @@ import { Button } from "@/components/ui/button";
  * two that genuinely went away.
  */
 const PANES = [
-  { id: "account", icon: User, sections: [AccountSection] },
+  { id: "account", icon: User, sections: [AccountSection, DefaultsSection] },
   // Second, right after the account it belongs to: these are that account's own
   // settings rather than Karasu's, and four of them are ones Karasu overrides —
   // which is a thing to find while thinking about the account, not later.

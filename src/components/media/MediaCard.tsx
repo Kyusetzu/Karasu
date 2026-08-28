@@ -12,6 +12,7 @@ import { formatLabel } from "@/lib/format";
 import { displayTitle } from "@/api/types";
 import { statusColorVar } from "@/lib/statusColors";
 import { useCachedEntry } from "@/hooks/useCachedEntry";
+import { loadDefaultAddStatus } from "@/lib/defaultAddStatus";
 import { shouldBlur } from "@/lib/contentFilter";
 import { useContentFilter } from "@/stores/contentFilter";
 import type { MediaWithListStatus } from "@/api/queries";
@@ -125,11 +126,14 @@ export default function MediaCard({
                 size="sm"
                 round
                 onClick={() =>
-                  saveEntry.mutate({ mediaId: media.id, status: "PLANNING" })
+                  saveEntry.mutate({
+                    mediaId: media.id,
+                    status: loadDefaultAddStatus(),
+                  })
                 }
                 disabled={saveEntry.isPending}
-                aria-label={t("media.addPlanning")}
-                title={t("media.addPlanning")}
+                aria-label={t("media.addDefault")}
+                title={t("media.addDefault")}
               >
                 <Plus className="size-4" />
               </IconButton>

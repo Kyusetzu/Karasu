@@ -78,24 +78,34 @@ export function AppearanceSection() {
         </Row>
 
         <Row label={t("settings.coverCols")} hint={t("settings.coverColsHint")}>
-          {/* The content filter's slider idiom, with the number shown beside
-              it — a count is exact, so the value is the label. */}
-          <span className="flex w-44 items-center gap-2.5">
-            <input
-              type="range"
-              min={COVER_COLS_MIN}
-              max={COVER_COLS_MAX}
-              step={1}
-              value={coverCols}
-              onChange={(e) => setCoverCols(Number(e.target.value))}
-              aria-label={t("settings.coverCols")}
-              className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-surface-700 accent-accent-500"
-            />
-            <span className="w-5 text-right text-xs tabular-nums text-ink-300">
-              {coverCols}
-            </span>
-          </span>
+          {/* A typed number, not a slider — the third device round asked to
+              go past a slider's sensible track length. The store clamps. */}
+          <input
+            type="number"
+            min={COVER_COLS_MIN}
+            max={COVER_COLS_MAX}
+            step={1}
+            value={coverCols}
+            onChange={(e) => {
+              const n = Number(e.target.value);
+              if (Number.isFinite(n) && n >= COVER_COLS_MIN) setCoverCols(n);
+            }}
+            aria-label={t("settings.coverCols")}
+            className="h-8 w-16 rounded-lg border border-surface-700 bg-surface-900 px-2 text-right text-sm tabular-nums text-ink-100 focus:border-accent-500 focus:outline-none"
+          />
         </Row>
+        {/* One example row at the chosen count — proportional to this card's
+            width, which is the point: the number becomes a picture before the
+            pane is even closed. */}
+        <div
+          aria-hidden
+          className="grid gap-1.5"
+          style={{ gridTemplateColumns: `repeat(${coverCols}, minmax(0, 1fr))` }}
+        >
+          {Array.from({ length: coverCols }, (_, i) => (
+            <div key={i} className="aspect-[2/3] rounded bg-surface-800" />
+          ))}
+        </div>
 
         <Toggle
           checked={reduceMotion}
@@ -105,9 +115,11 @@ export function AppearanceSection() {
         />
 
         <div className="space-y-3 py-1">
-          <div className="flex items-center justify-between gap-4 text-sm">
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-sm">
             <span className="block text-ink-100">{t("settings.accent")}</span>
-            <div className="flex items-center gap-2">
+            {/* Wraps: nine swatches plus the custom button outgrow a phone
+                card, and the custom button was the one pushed outside it. */}
+            <div className="flex flex-wrap items-center justify-end gap-2">
               {ACCENT_PRESETS.map((hex) => (
                 <button
                   key={hex}

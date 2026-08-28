@@ -334,6 +334,9 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
 
   const readAll = async () => {
     await markAllNotificationsRead().catch(() => {});
+    // The AniList half was already marked seen server-side by the page-1
+    // fetch's reset; what remains is the client face — the dots.
+    setSiteUnseen(0);
     load();
   };
 
@@ -680,13 +683,17 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
               <span className="text-2xs font-semibold uppercase tracking-[.14em] text-ink-600">
                 {t("notif.title")}
               </span>
-              {unread > 0 && (
-                <span className="text-2xs tabular-nums text-ink-500">{unread}</span>
+              {unread + siteUnseen > 0 && (
+                <span className="text-2xs tabular-nums text-ink-500">
+                  {unread + siteUnseen}
+                </span>
               )}
             </span>
-            {/* Karasu's rows only: read state is the one thing this button can
-                actually change — AniList's side was marked seen by fetching. */}
-            {unread > 0 && (
+            {/* Both sides: Karasu's rows get their read bit written, and the
+                AniList dots clear — their server half already happened when
+                the page-1 fetch reset the count on open. Gated on the sum, so
+                a site-only backlog still gets its button. */}
+            {unread + siteUnseen > 0 && (
               <button onClick={readAll} className="text-xs text-accent-400 hover:underline">
                 {t("notif.markAll")}
               </button>

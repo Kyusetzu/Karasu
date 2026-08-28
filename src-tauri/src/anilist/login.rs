@@ -196,14 +196,7 @@ fn handle_connection(
         match query_param(query, "access_token") {
             Some(token) if !token.is_empty() => match on_token(token) {
                 Ok(()) => {
-                    respond(
-                        &mut stream,
-                        200,
-                        &page(
-                            "You're logged in",
-                            "Karasu is now connected to your AniList account. You can close this tab.",
-                        ),
-                    );
+                    respond(&mut stream, 200, &success_page());
                     true
                 }
                 Err(e) => {
@@ -301,6 +294,38 @@ fn respond(stream: &mut TcpStream, status: u16, body: &str) {
     // `Connection: close`) instead of inferring it from the socket being
     // dropped, which can surface as a reset mid-read.
     let _ = stream.shutdown(Shutdown::Write);
+}
+
+/// The landing page a finished login shows — a cfg'd pair, per the house
+/// rule, because the two platforms owe the reader different things.
+///
+/// On desktop the app is already frontmost and the browser tab was the
+/// detour, so the page only has to say it is over.
+#[cfg(not(target_os = "android"))]
+fn success_page() -> String {
+    page(
+        "You're logged in",
+        "Karasu is now connected to your AniList account. You can close this tab.",
+    )
+}
+
+/// On Android the browser is now the foreground app and has no way to yield
+/// by itself, so the page carries the hop back: a `karasu://login` link — the
+/// custom scheme the deep-link plugin registers from `tauri.conf.json`, which
+/// re-enters the running `singleTask` activity — plus an automatic attempt.
+/// The attempt is best-effort (Chrome may demand a user gesture for scheme
+/// navigation); the button is the load-bearing half. The message string is
+/// trusted HTML into `page`'s `<p>`, like every other call site's.
+#[cfg(target_os = "android")]
+fn success_page() -> String {
+    page(
+        "You're logged in",
+        "Karasu is now connected to your AniList account.</p>\
+         <p><a href=\"karasu://login\" style=\"display:inline-block;margin-top:.75rem;\
+         padding:.7rem 1.5rem;border-radius:.7rem;background:#4b3fc7;color:#fff;\
+         text-decoration:none;font-weight:600\">Return to Karasu</a></p>\
+         <script>setTimeout(function(){location.href=\"karasu://login\"},350)</script><p>",
+    )
 }
 
 /// Minimal dark result page shown in the user's browser.

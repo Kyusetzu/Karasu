@@ -38,7 +38,7 @@ export const ACCENT_PRESETS = [
  * boundary the shell uses, because the two installs have separate storage and
  * a desktop window is wide at startup even when it can be squeezed later.
  */
-export const COVER_COLS_MIN = 2;
+export const COVER_COLS_MIN = 1;
 export const COVER_COLS_MAX = 40;
 const clampCols = (n: number): number =>
   Math.min(COVER_COLS_MAX, Math.max(COVER_COLS_MIN, Math.round(n)));

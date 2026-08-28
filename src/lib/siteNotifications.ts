@@ -66,6 +66,7 @@ export interface RawSiteNotification {
   id?: number | null;
   createdAt?: number | null;
   activityId?: number | null;
+  commentId?: number | null;
   episode?: number | null;
   reason?: string | null;
   status?: string | null;
@@ -147,7 +148,9 @@ export function normalizeSiteNotification(raw: RawSiteNotification | null): Site
     raw.activityId != null
       ? `/activity/${raw.activityId}`
       : raw.thread?.id != null
-        ? `/thread/${raw.thread.id}`
+        ? raw.commentId != null
+          ? `/thread/${raw.thread.id}?comment=${raw.commentId}`
+          : `/thread/${raw.thread.id}`
         : raw.media?.id != null
           ? `/media/${raw.media.id}`
           : raw.staff?.id != null

@@ -118,6 +118,30 @@ export function jumpRoute(
   return typeof replyCommentId === "number" && replyCommentId > 0 ? "tree" : "capped";
 }
 
+/**
+ * Everything the thread page can be looking at: the paged read (`null`), the
+ * newest-reply jump, one page by number, or one specific comment's
+ * conversation — the `?comment=` landing, which rides the same uncapped tree
+ * field the newest jump uses and therefore works at any thread size.
+ */
+export type ThreadTarget = "newest" | number | { comment: number } | null;
+
+export function isCommentTarget(t: ThreadTarget): t is { comment: number } {
+  return typeof t === "object" && t !== null;
+}
+
+/**
+ * The `?comment=` search param, or nothing. Digits only and at least 1 —
+ * `Number("")` is 0 and 0 is finite, the same lesson `parsePageInput` carries.
+ * An absurdly large id still parses: whether it exists is AniList's to judge,
+ * and the empty-tree fallback handles the answer.
+ */
+export function parseCommentParam(raw: string | null): number | null {
+  if (raw == null || !/^\d+$/.test(raw.trim())) return null;
+  const n = Number(raw.trim());
+  return n >= 1 ? n : null;
+}
+
 /** Which comment view is on screen — see `refreshPlan`. */
 export type ThreadView = "paged" | "jump";
 
@@ -134,7 +158,7 @@ export type ThreadView = "paged" | "jump";
  * anyone was looking at. It also flipped `newest.isFetching`, which disabled
  * the jump controls and printed "Finding the newest…" while nothing jumped.
  */
-export function refreshPlan(target: "newest" | number | null): ThreadView {
+export function refreshPlan(target: ThreadTarget): ThreadView {
   return target === null ? "paged" : "jump";
 }
 

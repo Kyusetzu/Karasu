@@ -72,6 +72,29 @@ describe("normalizeSiteNotification", () => {
     expect(row?.target).toBe("/thread/99");
   });
 
+  it("lands a thread reply on the comment itself when the id is carried", () => {
+    const row = normalizeSiteNotification({
+      __typename: "ThreadCommentReplyNotification",
+      id: 4,
+      createdAt: 5,
+      commentId: 555,
+      user: { id: 7, name: "someone" },
+      thread: { id: 99, title: "Weekly chapter talk" },
+    });
+    expect(row?.target).toBe("/thread/99?comment=555");
+  });
+
+  it("a thread like stays thread-level — it has no comment to land on", () => {
+    const row = normalizeSiteNotification({
+      __typename: "ThreadLikeNotification",
+      id: 5,
+      createdAt: 5,
+      user: { id: 7, name: "someone" },
+      thread: { id: 99, title: "Weekly chapter talk" },
+    });
+    expect(row?.target).toBe("/thread/99");
+  });
+
   it("normalises private mail to null — ActivityMessageNotification is never rendered", () => {
     expect(
       normalizeSiteNotification({

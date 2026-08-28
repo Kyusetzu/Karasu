@@ -27,8 +27,13 @@ const HOST = /^https?:\/\/(?:www\.)?anilist\.co\//i;
 const RULES: [RegExp, (m: RegExpExecArray) => string][] = [
   // The slug after the id is decorative and optional, on every media URL.
   [/^(?:anime|manga)\/(\d+)(?:\/|$)/i, (m) => `/media/${m[1]}`],
-  // A comment permalink still lands on its thread — the app has no
-  // per-comment anchor, and the thread is where the conversation is.
+  // A comment permalink carries its comment: the thread page resolves the id
+  // through the uncapped tree field and highlights the row. Before the plain
+  // thread rule, or the shorter pattern would eat it.
+  [
+    /^forum\/thread\/(\d+)\/comment\/(\d+)(?:\/|$)/i,
+    (m) => `/thread/${m[1]}?comment=${m[2]}`,
+  ],
   [/^forum\/thread\/(\d+)(?:\/|$)/i, (m) => `/thread/${m[1]}`],
   // Landed by the bell's activity notifications too, not just pasted links.
   [/^activity\/(\d+)(?:\/|$)/i, (m) => `/activity/${m[1]}`],

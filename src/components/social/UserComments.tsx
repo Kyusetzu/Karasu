@@ -54,7 +54,14 @@ export function UserComments({
     );
   }
 
-  const rows = (q.data?.pages ?? []).flatMap((p) => p.comments);
+  // First occurrence wins: ID_DESC pages shift when comments are posted
+  // between fetches, so the last row of one page can reappear on the next —
+  // and CLAUDE.md records this field returning perPage+1 rows besides. Either
+  // way a repeat would be a duplicate React key.
+  const seen = new Set<number>();
+  const rows = (q.data?.pages ?? [])
+    .flatMap((p) => p.comments)
+    .filter((c) => !seen.has(c.id) && (seen.add(c.id), true));
 
   // Only when there is nothing on screen to lose — the `ThreadList` rule.
   if (q.error && !rows.length && !q.hasNextPage) {
@@ -105,9 +112,11 @@ export function UserComments({
       {rows.map((c, i) => (
         <Link
           key={c.id}
-          // A comment whose thread failed to resolve still renders; the
-          // forum index is the least-wrong place for its click to land.
-          to={c.thread ? `/thread/${c.thread.id}` : "/forum"}
+          // The comment's own anchor: the thread page resolves it through
+          // the uncapped tree field and highlights it. A comment whose
+          // thread failed to resolve still renders; the forum index is the
+          // least-wrong place for that click to land.
+          to={c.thread ? `/thread/${c.thread.id}?comment=${c.id}` : "/forum"}
           className="block animate-rise-in rounded-xl border border-surface-800 p-3 transition-surface hover:border-surface-700 hover:bg-surface-900"
           style={{ animationDelay: `${staggerDelay(i)}ms` }}
         >

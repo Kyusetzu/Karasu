@@ -1078,6 +1078,12 @@ export const en = {
       "AniList will not page past 5,000 comments, so this is the newest reply — by {{name}} — shown with the conversation it belongs to rather than the page it is on.",
     newestCapped:
       "AniList will not page past 5,000 comments and this thread is longer, so this is as deep as it can be read. The newest replies are only on the website.",
+    // The `?comment=` landing — same tree field, fed the linked id.
+    commentContext:
+      "Showing the conversation this comment belongs to, not the page it is on.",
+    commentDeeper:
+      "The linked reply is nested deeper than Karasu draws — its conversation is highlighted, and the exact reply is on AniList.",
+    commentGone: "That comment is gone — deleted, or its thread no longer carries it.",
     loadMorePlain: "Load more",
     activityGone: "This activity is gone — deleted, or mail Karasu does not show.",
     loadingMore: "Loading …",

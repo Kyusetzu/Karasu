@@ -1474,10 +1474,10 @@ query ($page: Int, $reset: Boolean) {
       ... on ActivityReplySubscribedNotification { id createdAt activityId user { id name } }
       ... on ActivityLikeNotification { id createdAt activityId user { id name } }
       ... on ActivityReplyLikeNotification { id createdAt activityId user { id name } }
-      ... on ThreadCommentMentionNotification { id createdAt user { id name } thread { id title } }
-      ... on ThreadCommentReplyNotification { id createdAt user { id name } thread { id title } }
-      ... on ThreadCommentSubscribedNotification { id createdAt user { id name } thread { id title } }
-      ... on ThreadCommentLikeNotification { id createdAt user { id name } thread { id title } }
+      ... on ThreadCommentMentionNotification { id createdAt commentId user { id name } thread { id title } }
+      ... on ThreadCommentReplyNotification { id createdAt commentId user { id name } thread { id title } }
+      ... on ThreadCommentSubscribedNotification { id createdAt commentId user { id name } thread { id title } }
+      ... on ThreadCommentLikeNotification { id createdAt commentId user { id name } thread { id title } }
       ... on ThreadLikeNotification { id createdAt user { id name } thread { id title } }
       ... on RelatedMediaAdditionNotification { id createdAt media { id title { romaji english native } } }
       ... on MediaDataChangeNotification { id createdAt reason media { id title { romaji english native } } }

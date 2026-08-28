@@ -24,7 +24,10 @@ type Lens = "created" | "comments";
 
 export function UserThreads({ userId, name }: { userId: number; name: string }) {
   const { t } = useTranslation();
-  const [lens, setLens] = useState<Lens>("created");
+  // Comments first: almost everyone has said something, almost nobody has
+  // started a thread — and the per-comment landing makes this the lens the
+  // profile's visitors actually come for.
+  const [lens, setLens] = useState<Lens>("comments");
 
   return (
     <div className="space-y-3">

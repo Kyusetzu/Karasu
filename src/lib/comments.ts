@@ -152,3 +152,43 @@ export function flattenComments(rows: unknown): FlatComment[] {
 
   return out;
 }
+
+
+/**
+ * The row `flattenComments` will actually draw for `targetId`.
+ *
+ * The tree query resolves a comment id to the root of its conversation, but
+ * the flatten renders two levels — so a deeply nested target may not be a row
+ * at all. This answers with the target itself when it is visible (`exact`),
+ * its depth-1 ancestor when it is folded below the cap (`exact: false`), the
+ * top-level root when a malformed child hides it, and null when the id is
+ * nowhere in the rows. Same untyped-blob rules as the flatten: never throws.
+ */
+export function visibleAnchor(
+  rows: unknown,
+  targetId: number,
+): { id: number; exact: boolean } | null {
+  if (!Array.isArray(rows)) return null;
+  const contains = (node: unknown): boolean => {
+    if (!node || typeof node !== "object") return false;
+    const n = node as RawComment;
+    if (n.id === targetId) return true;
+    const kids = Array.isArray(n.childComments) ? n.childComments : [];
+    return kids.some(contains);
+  };
+  for (const row of rows) {
+    const top = row as RawComment;
+    if (!top || typeof top !== "object" || typeof top.id !== "number") continue;
+    if (top.id === targetId) return { id: top.id, exact: true };
+    const kids = Array.isArray(top.childComments) ? top.childComments : [];
+    for (const kid of kids) {
+      const k = kid as RawComment;
+      if (!k || typeof k !== "object" || typeof k.id !== "number") continue;
+      if (k.id === targetId) return { id: k.id, exact: true };
+      if (contains(k)) return { id: k.id, exact: false };
+    }
+    // Under this top but under no drawable child — a malformed kid subtree.
+    if (contains(top)) return { id: top.id, exact: false };
+  }
+  return null;
+}

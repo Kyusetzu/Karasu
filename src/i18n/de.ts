@@ -1081,6 +1081,12 @@ export const de: typeof en = {
       "AniList blättert nicht über 5.000 Kommentare hinaus, daher ist dies die neueste Antwort — von {{name}} — gezeigt mit dem Gespräch, zu dem sie gehört, statt mit der Seite, auf der sie steht.",
     newestCapped:
       "AniList blättert nicht über 5.000 Kommentare hinaus und dieser Thread ist länger, daher ist dies das Tiefste, was lesbar ist. Die neuesten Antworten gibt es nur auf der Website.",
+    // Die `?comment=`-Landung — dasselbe Baumfeld, gefüttert mit der verlinkten Id.
+    commentContext:
+      "Zeigt das Gespräch, zu dem dieser Kommentar gehört, nicht die Seite, auf der er steht.",
+    commentDeeper:
+      "Die verlinkte Antwort liegt tiefer, als Karasu zeichnet — ihr Gespräch ist markiert, die genaue Antwort gibt es auf AniList.",
+    commentGone: "Diesen Kommentar gibt es nicht mehr — gelöscht, oder sein Thread trägt ihn nicht mehr.",
     loadMorePlain: "Mehr laden",
     activityGone: "Diese Aktivität gibt es nicht mehr — gelöscht, oder Post, die Karasu nicht anzeigt.",
     loadingMore: "Lädt …",

@@ -36,6 +36,20 @@ const page = (comments: UserForumComment[], hasNextPage: boolean): UserCommentPa
  * fails against a naive implementation.
  */
 describe("UserComments paging states", () => {
+  it("renders a comment repeated across pages once — ID_DESC pages shift", async () => {
+    fetchPage.mockReset();
+    fetchPage.mockResolvedValueOnce(
+      page([comment(1, "Thread A", "first"), comment(2, "Thread B", "second")], true),
+    );
+    fetchPage.mockResolvedValueOnce(page([comment(2, "Thread B", "second"), comment(3, "Thread C", "third")], false));
+
+    renderWithProviders(<UserComments userId={1} emptyTitle="empty" />);
+    await waitFor(() => expect(screen.getByText("Thread A")).toBeTruthy());
+    screen.getByRole("button", { name: "social.loadMorePlain" }).click();
+    await waitFor(() => expect(screen.getByText("Thread C")).toBeTruthy());
+    expect(screen.getAllByText("Thread B")).toHaveLength(1);
+  });
+
   it("renders a comment under its thread's title, markdown flattened", async () => {
     fetchPage.mockReset();
     fetchPage.mockResolvedValue(

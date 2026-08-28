@@ -1,6 +1,6 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useParams } from "react-router";
+import { Link, useParams, useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
@@ -32,16 +32,19 @@ import { isNotFound } from "@/lib/apiError";
 import { Shimmer } from "@/components/Skeleton";
 import { Markdown } from "@/components/social/Markdown";
 import { CommentTree } from "@/components/social/CommentTree";
-import { flattenComments, type FlatComment } from "@/lib/comments";
+import { flattenComments, visibleAnchor, type FlatComment } from "@/lib/comments";
 import { nextPageParam } from "@/lib/paging";
 import {
   canJump,
+  isCommentTarget,
   jumpRoute,
   jumpTarget,
   pageAfterPosting,
+  parseCommentParam,
   parsePageInput,
   refreshPlan,
   type JumpRoute,
+  type ThreadTarget,
 } from "@/lib/threadJump";
 import { relTimeFromSeconds } from "@/lib/relTime";
 import { validatePost } from "@/lib/composer";
@@ -61,13 +64,14 @@ import { cn } from "@/lib/utils";
  */
 const EMPTY_PAGE_INFO = { total: 0, currentPage: 1, lastPage: 1, hasNextPage: false };
 
-/** What the newest-reply jump came back with, and how it got there. */
+/** What the jump view came back with, and how it got there. */
 interface Newest extends CommentPage {
   /**
    * Which route answered — the copy differs per tier, and a boolean could not
-   * carry three outcomes.
+   * carry the outcomes. `"comment"` is the `?comment=` landing: the same
+   * uncapped tree field as `"tree"`, fed the linked id instead of the newest.
    */
-  via: JumpRoute;
+  via: JumpRoute | "comment";
 }
 
 /**
@@ -137,6 +141,46 @@ export default function Thread() {
   const { like } = useSocialActions();
   const [draft, setDraft] = useState("");
 
+  const [params, setParams] = useSearchParams();
+  const urlComment = parseCommentParam(params.get("comment"));
+  // Lazy initializer, load-bearing: derived in an effect instead, the first
+  // render would have `target === null`, the paged query would fire page 1,
+  // and a `?comment=` mount would cost a third request.
+  const [target, setTarget] = useState<ThreadTarget>(() =>
+    urlComment != null ? { comment: urlComment } : null,
+  );
+  // Adopt a *changed* param: `<main key={pathname}>` does not remount on a
+  // query-string change, so the bell navigating to another comment of the
+  // same thread lands here rather than in the initializer.
+  useEffect(() => {
+    if (urlComment == null) return;
+    setTarget((t) =>
+      isCommentTarget(t) && t.comment === urlComment ? t : { comment: urlComment },
+    );
+  }, [urlComment]);
+  /**
+   * Every way of leaving or changing the view goes through this, so the
+   * `?comment=` param cannot outlive the view it describes. `replace` keeps
+   * history clean: no entry to walk back through, `lib/backStack` untouched,
+   * and F5 lands on the comment only while the reader is still looking at it.
+   */
+  const changeView = useCallback(
+    (next: ThreadTarget) => {
+      setTarget(next);
+      if (!isCommentTarget(next)) {
+        setParams(
+          (p) => {
+            const q = new URLSearchParams(p);
+            q.delete("comment");
+            return q;
+          },
+          { replace: true },
+        );
+      }
+    },
+    [setParams],
+  );
+
   const th = useQuery({
     queryKey: ["social", "thread", threadId],
     queryFn: () => fetchThread(threadId),
@@ -154,7 +198,12 @@ export default function Thread() {
     // thread two round-trips in series — AniList answers in ~1 s warm and much
     // worse cold, so the wait was doubled for nothing. `threadId` comes from
     // the route, so this needs the thread body for exactly no reason.
-    enabled: isTauri && Number.isFinite(threadId) && threadId > 0,
+    //
+    // It IS gated off while a `?comment=` landing owns the screen: page 1
+    // fetches when the reader leaves that view — a user-initiated moment —
+    // keeping the cold comment mount at two requests.
+    enabled:
+      isTauri && Number.isFinite(threadId) && threadId > 0 && !isCommentTarget(target),
     // You post into this and read it back, so it goes stale quickly.
     staleTime: 60 * 1000,
   });
@@ -171,7 +220,6 @@ export default function Thread() {
    * away, and pressing a button five hundred times is not a feature — this
    * reaches it in one, and reaches anywhere else in one too.
    */
-  const [target, setTarget] = useState<"newest" | number | null>(null);
   const [pageDraft, setPageDraft] = useState("");
   const lastPage = comments.data?.pages[0]?.pageInfo?.lastPage ?? null;
   /** What the uncapped route resolves — see `fetchNewest`. */
@@ -180,7 +228,8 @@ export default function Thread() {
   const newest = useQuery({
     // `lastPage` and `replyCommentId` decide the *route*, so they belong to the
     // key only while a route is being chosen. On a numeric target they are
-    // noise that re-fetches an unchanged page whenever the thread gains a reply.
+    // noise that re-fetches an unchanged page whenever the thread gains a
+    // reply; on a comment target the route is already decided by the id.
     queryKey: [
       "social",
       "threadJump",
@@ -188,13 +237,26 @@ export default function Thread() {
       target,
       ...(target === "newest" ? [lastPage, replyCommentId] : []),
     ],
-    queryFn: () =>
-      target === "newest"
+    queryFn: () => {
+      if (isCommentTarget(target)) {
+        // The linked comment's whole conversation, uncapped — works past the
+        // page cap where no page number could. An empty answer (deleted id)
+        // is handled by the effect below, not here.
+        return threadCommentTree(target.comment).then(
+          (comments): Newest => ({ pageInfo: EMPTY_PAGE_INFO, comments, via: "comment" }),
+        );
+      }
+      return target === "newest"
         ? fetchNewest(threadId, lastPage ?? 1, replyCommentId)
         : threadComments(threadId, target as number).then(
             (p): Newest => ({ ...p, via: "page" }),
-          ),
-    enabled: isTauri && target != null && lastPage != null,
+          );
+    },
+    // The comment route needs nothing from the paged query, and must not wait
+    // for it — a cold `?comment=` mount is th + tree, in parallel, two
+    // requests exactly.
+    enabled:
+      isTauri && target != null && (isCommentTarget(target) || lastPage != null),
     staleTime: 60 * 1000,
   });
 
@@ -203,8 +265,27 @@ export default function Thread() {
 
   const goToPage = () => {
     const page = parsePageInput(pageDraft, maxPage);
-    if (page !== null) setTarget(page);
+    if (page !== null) changeView(page);
   };
+
+  // A deleted (or never-existing) linked comment answers an empty tree, not
+  // an error — say so and fall back to the ordinary paged view.
+  useEffect(() => {
+    if (!isCommentTarget(target) || newest.data?.via !== "comment") return;
+    if (newest.data.comments.length === 0) {
+      showToast({ kind: "error", text: t("social.commentGone") });
+      changeView(null);
+    }
+  }, [newest.data, target, changeView, t]);
+
+  /** Which visible row carries the `?comment=` highlight — see `visibleAnchor`. */
+  const anchor = useMemo(
+    () =>
+      isCommentTarget(target) && newest.data?.via === "comment"
+        ? visibleAnchor(newest.data.comments, target.comment)
+        : null,
+    [target, newest.data],
+  );
 
   // Memoized because it is not cheap and it ran on *every* render: it walks
   // every retained page and recurses through `childComments` to count what it
@@ -402,7 +483,7 @@ export default function Thread() {
         () => ({ pages: [first], pageParams: [1] }),
       );
       const landing = pageAfterPosting(first.pageInfo.lastPage ?? 1);
-      if (landing != null && landing > 1) setTarget(landing);
+      if (landing != null && landing > 1) changeView(landing);
     },
     onError: (_e, text) =>
       showToast({
@@ -627,7 +708,7 @@ export default function Thread() {
                 <Button
                   variant={target === "newest" ? "outline" : "secondary"}
                   size="sm"
-                  onClick={() => setTarget((v) => (v === "newest" ? null : "newest"))}
+                  onClick={() => changeView(target === "newest" ? null : "newest")}
                 >
                   <ArrowDownToLine className="size-3.5" />
                   {target === "newest"
@@ -670,8 +751,8 @@ export default function Thread() {
               </>
             )}
 
-            {typeof target === "number" && (
-              <Button variant="ghost" size="sm" onClick={() => setTarget(null)}>
+            {(typeof target === "number" || isCommentTarget(target)) && (
+              <Button variant="ghost" size="sm" onClick={() => changeView(null)}>
                 {t("social.fromTheStart")}
               </Button>
             )}
@@ -702,9 +783,18 @@ export default function Thread() {
                     the lie. */}
                 {newest.data && newest.data.via !== "page" && (
                   <p className="mb-3 rounded-lg border border-gold/30 bg-gold/8 px-3 py-2 text-2xs leading-relaxed text-ink-300">
-                    {t(newest.data.via === "tree" ? "social.newestViaTree" : "social.newestCapped", {
-                      name: th.data?.replyUser?.name ?? "—",
-                    })}{" "}
+                    {newest.data.via === "comment"
+                      ? t(
+                          anchor && !anchor.exact
+                            ? "social.commentDeeper"
+                            : "social.commentContext",
+                        )
+                      : t(
+                          newest.data.via === "tree"
+                            ? "social.newestViaTree"
+                            : "social.newestCapped",
+                          { name: th.data?.replyUser?.name ?? "—" },
+                        )}{" "}
                     {data.siteUrl && (
                       <button
                         onClick={() => void openUrl(data.siteUrl!)}
@@ -720,6 +810,7 @@ export default function Thread() {
                   onLike={canPost ? likeComment : undefined}
                   onReply={canPost ? openReply : undefined}
                   replyingTo={replyTo}
+                  highlightId={anchor?.id}
                 >
                   {replyBox}
                 </CommentTree>

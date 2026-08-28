@@ -9,11 +9,8 @@ describe("internalRoute", () => {
     expect(internalRoute("http://www.anilist.co/anime/21")).toBe("/media/21");
   });
 
-  it("lands a thread link on the thread, comment permalinks included", () => {
+  it("lands a thread link on the thread", () => {
     expect(internalRoute("https://anilist.co/forum/thread/1")).toBe("/thread/1");
-    expect(internalRoute("https://anilist.co/forum/thread/1/comment/3236562")).toBe(
-      "/thread/1",
-    );
   });
 
   it("maps people and companies", () => {
@@ -31,6 +28,14 @@ describe("internalRoute", () => {
 
   it("maps an activity permalink onto the activity page", () => {
     expect(internalRoute("https://anilist.co/activity/12345")).toBe("/activity/12345");
+  });
+
+  it("carries a comment permalink's comment into the thread page", () => {
+    expect(internalRoute("https://anilist.co/forum/thread/1/comment/3236562")).toBe(
+      "/thread/1?comment=3236562",
+    );
+    // Malformed comment ids fall through to the plain thread rule.
+    expect(internalRoute("https://anilist.co/forum/thread/1/comment/abc")).toBe("/thread/1");
   });
 
   /** No route exists for these, so sending them inward would strand the reader. */

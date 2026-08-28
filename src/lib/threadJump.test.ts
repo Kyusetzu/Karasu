@@ -9,6 +9,8 @@ import {
   jumpTarget,
   maxReachablePage,
   parsePageInput,
+  isCommentTarget,
+  parseCommentParam,
 } from "./threadJump";
 
 describe("maxReachablePage", () => {
@@ -113,6 +115,34 @@ describe("refreshPlan", () => {
     expect(refreshPlan(null)).toBe("paged");
     expect(refreshPlan("newest")).toBe("jump");
     expect(refreshPlan(70)).toBe("jump");
+    // A reply posted from the comment landing re-reads the tree, never the
+    // paged cache it is not looking at.
+    expect(refreshPlan({ comment: 5 })).toBe("jump");
+  });
+});
+
+describe("isCommentTarget", () => {
+  it("recognises only the comment flavour", () => {
+    expect(isCommentTarget({ comment: 5 })).toBe(true);
+    expect(isCommentTarget(null)).toBe(false);
+    expect(isCommentTarget("newest")).toBe(false);
+    expect(isCommentTarget(70)).toBe(false);
+  });
+});
+
+describe("parseCommentParam", () => {
+  it("accepts only digits of at least one", () => {
+    expect(parseCommentParam("123")).toBe(123);
+    expect(parseCommentParam("007")).toBe(7);
+    // Validity past the shape is AniList's to judge — the empty-tree
+    // fallback answers for ids that do not exist.
+    expect(parseCommentParam("99999999999")).toBe(99999999999);
+  });
+
+  it("refuses everything that is not a comment id", () => {
+    for (const bad of [null, "", "  ", "abc", "NaN", "1e3", "1.5", "-4", "0"]) {
+      expect(parseCommentParam(bad), String(bad)).toBeNull();
+    }
   });
 });
 

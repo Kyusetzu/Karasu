@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { flattenComments } from "./comments";
+import { flattenComments, visibleAnchor } from "./comments";
 
 const USER = { id: 1, name: "kyu", avatar: { medium: "x" } };
 
@@ -140,5 +140,43 @@ describe("rootId", () => {
       { id: 4, comment: "a", childComments: [{ id: 5, comment: "b" }] },
     ]);
     expect(flat.every((c) => typeof c.rootId === "number" && c.rootId > 0)).toBe(true);
+  });
+});
+
+
+describe("visibleAnchor", () => {
+  it("finds a top-level target exactly", () => {
+    expect(visibleAnchor([c(1), c(2)], 2)).toEqual({ id: 2, exact: true });
+  });
+
+  it("finds a direct reply exactly", () => {
+    expect(visibleAnchor([c(1, [c(11), c(12)])], 12)).toEqual({ id: 12, exact: true });
+  });
+
+  it("answers a grandchild with its drawable parent, inexact", () => {
+    expect(visibleAnchor([c(1, [c(11, [c(111)])])], 111)).toEqual({
+      id: 11,
+      exact: false,
+    });
+  });
+
+  it("climbs a deep chain to the depth-1 ancestor", () => {
+    let node: unknown = c(9000);
+    for (let i = 0; i < 48; i++) node = c(9000 - i - 1, [node]);
+    // node is now the top; its single child chain runs 48 deep.
+    const top = node as { id: number; childComments: unknown };
+    const kid = (top.childComments as unknown[])[0] as { id: number };
+    expect(visibleAnchor([top], 9000)).toEqual({ id: kid.id, exact: false });
+  });
+
+  it("answers null when the id is nowhere", () => {
+    expect(visibleAnchor([c(1, [c(11)])], 999)).toBeNull();
+    expect(visibleAnchor("not rows", 1)).toBeNull();
+    expect(visibleAnchor([], 1)).toBeNull();
+  });
+
+  it("falls back to the root when a malformed child hides the target", () => {
+    const malformed = { comment: "no id", childComments: [c(77)] };
+    expect(visibleAnchor([c(1, [malformed])], 77)).toEqual({ id: 1, exact: false });
   });
 });

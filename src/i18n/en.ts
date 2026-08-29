@@ -533,6 +533,7 @@ export const en = {
     characters: "Characters",
     staffScope: "Staff",
     studios: "Studios",
+    filters: "Filters",
     entityPrompt: "Search AniList by name.",
     noMatches: "Nothing by that name.",
     userPrompt: "Find someone on AniList.",

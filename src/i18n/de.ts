@@ -529,6 +529,7 @@ export const de: typeof en = {
     characters: "Charaktere",
     staffScope: "Staff",
     studios: "Studios",
+    filters: "Filter",
     entityPrompt: "Auf AniList nach Namen suchen.",
     noMatches: "Nichts mit diesem Namen.",
     userPrompt: "Finde jemanden auf AniList.",

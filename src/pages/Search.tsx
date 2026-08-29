@@ -44,6 +44,8 @@ import { adultQueryArg, blockReason } from "@/lib/contentFilter";
 import { FilteredNotice } from "@/components/FilteredNotice";
 import { useContentFilter } from "@/stores/contentFilter";
 import { useAuth } from "@/stores/auth";
+import { usePhoneShell } from "@/hooks/usePhoneShell";
+import { cn } from "@/lib/utils";
 import { EmptyState, PerchRule, StruckQuery } from "@/components/EmptyState";
 import { Pill } from "@/components/ui/pill";
 import { UserList } from "@/components/social/UserList";
@@ -102,6 +104,10 @@ export default function Search() {
   const [input, setInput] = useState("");
   const [term, setTerm] = useState("");
   const [scope, setScope] = useState<Scope>("ANIME");
+  const phone = usePhoneShell();
+  // Phone only: the nine filter chips collapse behind this. Desktop has the
+  // room and keeps its inline row.
+  const [filtersOpen, setFiltersOpen] = useState(false);
   // Include *and* exclude, many at a time — `Page.media` takes `genre_in` /
   // `genre_not_in` and the tag pair, which is what AniList's own browse page
   // is built on. One genre and one tag was a lens, not a filter.
@@ -123,7 +129,12 @@ export default function Search() {
   }, [input]);
 
   // A format from the other medium is meaningless after a scope flip.
-  useEffect(() => setFormat(""), [scope]);
+  useEffect(() => {
+    setFormat("");
+    // Season too: it only renders for ANIME, and an invisible stale season
+    // kept filtering MANGA after a scope flip.
+    setSeason("");
+  }, [scope]);
 
   const level = useContentFilter((s) => s.level);
   const filterReady = useContentFilter((s) => s.ready);
@@ -150,6 +161,24 @@ export default function Search() {
     !isEmpty(genre) ||
     !isEmpty(tag) ||
     !!(year || season || format || status || source || country);
+
+  // The toggle's badge — the same predicate as `hasFilters`, summed. Sort is
+  // deliberately not counted, matching that predicate's semantics.
+  const activeFilterCount =
+    Number(!isEmpty(genre)) +
+    Number(!isEmpty(tag)) +
+    [year, season, format, status, source, country].filter(Boolean).length;
+
+  const clearFilters = () => {
+    setGenre(EMPTY);
+    setTag(EMPTY);
+    setYear("");
+    setSeason("");
+    setFormat("");
+    setStatus("");
+    setSource("");
+    setCountry("");
+  };
   // Relevance without a query is meaningless; popularity is the browse default.
   const effectiveSort = term || sort !== "SEARCH_MATCH" ? sort : "POPULARITY_DESC";
   const active = term.length >= 2 || hasFilters;
@@ -262,11 +291,25 @@ export default function Search() {
               were two mediums and called them "one choice among several the
               search will grow". People are the third, and the chips took it
               without a layout change — which is what the shape was chosen for. */}
-          <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+          {/* One scrollable line on phone — the profile-tabs gesture — and
+              the old wrap on desktop. The divider travels with the chips in
+              one non-breaking group, so it can never orphan onto its own
+              wrapped line again. */}
+          <div
+            className={cn(
+              "mt-2.5 flex items-center gap-1.5",
+              phone ? "flex-nowrap overflow-x-auto pb-1" : "flex-wrap",
+            )}
+          >
             {(
               ["ANIME", "MANGA", "USERS", "CHARACTERS", "STAFF", "STUDIOS"] as const
             ).map((sc) => (
-              <Pill key={sc} active={scope === sc} onClick={() => setScope(sc)}>
+              <Pill
+                key={sc}
+                active={scope === sc}
+                onClick={() => setScope(sc)}
+                className="shrink-0 whitespace-nowrap"
+              >
                 {sc === "ANIME"
                   ? t("search.anime")
                   : sc === "MANGA"
@@ -281,18 +324,45 @@ export default function Search() {
               </Pill>
             ))}
             {isMediaScope(scope) && (
-              <>
+              <span className="flex shrink-0 items-center gap-1.5">
                 <span className="mx-1 h-4 w-px bg-surface-700" />
                 {BROWSE_CHIPS.map((chip) => (
-                  <Pill key={chip.key} onClick={() => applyChip(chip)}>
+                  <Pill
+                    key={chip.key}
+                    onClick={() => applyChip(chip)}
+                    className="shrink-0 whitespace-nowrap"
+                  >
                     {t(`search.${chip.key}`)}
                   </Pill>
                 ))}
-              </>
+              </span>
             )}
           </div>
-          {isMediaScope(scope) && (
-            <div className="mt-2.5 flex flex-wrap gap-2">
+          {isMediaScope(scope) && phone && (
+            <div className="mt-2.5 flex items-center gap-2.5">
+              <Pill
+                active={filtersOpen}
+                aria-expanded={filtersOpen}
+                onClick={() => setFiltersOpen((v) => !v)}
+              >
+                {t("search.filters")}
+                {activeFilterCount > 0 && (
+                  <span className="tabular-nums">({activeFilterCount})</span>
+                )}
+              </Pill>
+              {activeFilterCount > 0 && (
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  className="text-2xs font-medium text-accent-400 hover:underline"
+                >
+                  {t("list.clearFilter")}
+                </button>
+              )}
+            </div>
+          )}
+          {isMediaScope(scope) && (!phone || filtersOpen) && (
+            <div className={cn("mt-2.5 flex flex-wrap gap-2", phone && "animate-pop-in")}>
               <MultiFilterSelect
                 label={t("search.genreLabel")}
                 value={genre}

@@ -208,13 +208,18 @@ export function CoverCell({
         )}
 
         {progress && (
-          <div className="absolute inset-x-0 bottom-0 h-0.75 bg-[rgba(4,5,8,.6)]">
-            {/* The most-repeated interaction in the app had no feedback at
-                all: the bar was an inline percentage, so a +1 snapped. It
-                grows now, on the house curve. */}
+          // Borders, not bars: a straight strip inside the `rounded-lg` clip
+          // had its ends eaten by the corner circles and read as a floating
+          // stub. A bottom border on an inset-0 overlay follows the frame's
+          // own curve — full progress bends into both corners, partial
+          // progress bends at the left and cuts flat at its live edge. The
+          // fill is revealed by clip-path, so a +1 still grows the line on
+          // the house curve instead of snapping.
+          <div aria-hidden className="pointer-events-none absolute inset-0">
+            <div className="absolute inset-0 rounded-lg border-b-[3px] border-[rgba(4,5,8,.6)]" />
             <div
-              className="h-full bg-accent-500 transition-[width] duration-(--duration-expressive) ease-(--ease-out-expo)"
-              style={{ width: `${pct}%` }}
+              className="absolute inset-0 rounded-lg border-b-[3px] border-accent-500 transition-[clip-path] duration-(--duration-expressive) ease-(--ease-out-expo)"
+              style={{ clipPath: `inset(0 ${100 - pct}% 0 0)` }}
             />
           </div>
         )}

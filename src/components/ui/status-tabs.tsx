@@ -42,15 +42,23 @@ export function StatusTabs<T extends string>({
   // belong to. Measured from the active tab, it follows wherever that lands.
   const measure = useCallback(() => {
     const el = refs.current.get(value);
-    setBar(
-      el
-        ? {
-            left: el.offsetLeft,
-            width: el.offsetWidth,
-            top: el.offsetTop + el.offsetHeight,
-          }
-        : null,
-    );
+    if (!el) return setBar(null);
+    // Whether the active tab sits on the LAST wrapped row. The +14 below is
+    // calibrated to the consumer's own bottom padding and is only right
+    // there; applied to an earlier row it put the 2px bar six pixels into
+    // the next row's line boxes — an accent strike-through, photographed on
+    // the second device round of the phone shell.
+    let maxTop = 0;
+    for (const tab of refs.current.values()) {
+      if (tab.offsetTop > maxTop) maxTop = tab.offsetTop;
+    }
+    const lastRow = el.offsetTop >= maxTop;
+    setBar({
+      left: el.offsetLeft,
+      width: el.offsetWidth,
+      // On an earlier row the bar lives inside the 8px `gap-y-2` instead.
+      top: el.offsetTop + el.offsetHeight + (lastRow ? 14 : 2),
+    });
   }, [value]);
 
   // The signature covers everything that can change a tab's width: the active
@@ -58,14 +66,23 @@ export function StatusTabs<T extends string>({
   const signature = tabs.map((tab) => `${tab.label}:${tab.count ?? ""}`).join("|");
   useLayoutEffect(measure, [measure, signature]);
 
-  // A resize can rewrap the row even though no tab's own width changed.
+  // A resize can rewrap the row even though no tab's own width changed —
+  // and so can a *container* resize with no window resize at all (the
+  // sidebar collapsing), which is what the ResizeObserver is for.
+  const listRef = useRef<HTMLDivElement | null>(null);
   useLayoutEffect(() => {
     window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
+    const ro = listRef.current ? new ResizeObserver(() => measure()) : null;
+    if (ro && listRef.current) ro.observe(listRef.current);
+    return () => {
+      window.removeEventListener("resize", measure);
+      ro?.disconnect();
+    };
   }, [measure]);
 
   return (
     <div
+      ref={listRef}
       role="tablist"
       className={cn("relative flex flex-wrap gap-x-5.5 gap-y-2", className)}
     >
@@ -100,9 +117,8 @@ export function StatusTabs<T extends string>({
         <span
           aria-hidden="true"
           className="absolute h-0.5 rounded-full bg-accent-500 transition-[left,width] duration-140 ease-karasu"
-          // 14px clears the header's own bottom padding, so the bar lands on
-          // the header's bottom border rather than floating above it.
-          style={{ left: bar.left, width: bar.width, top: bar.top + 14 }}
+          // The row-aware offset is measured in — see `measure`.
+          style={{ left: bar.left, width: bar.width, top: bar.top }}
         />
       )}
     </div>

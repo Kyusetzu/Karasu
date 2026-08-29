@@ -288,7 +288,7 @@ function AiringSoon({ entries }: { entries: MediaListEntry[] }) {
       {upcoming.length === 0 ? (
         <EmptyState visual={<TickMarks />} title={t("dashboard.noUpcoming")} />
       ) : (
-        <div className="mt-3 grid gap-0.5 2xl:grid-cols-2">
+        <div className="mt-3 grid grid-cols-1 gap-0.5 2xl:grid-cols-2">
           {upcoming.slice(0, 10).map((entry) => (
             <AiringRow key={entry.id} entry={entry} />
           ))}
@@ -328,7 +328,7 @@ function WeeklyDigest({ entries }: { entries: MediaListEntry[] }) {
         title={t("dashboard.thisWeek")}
         meta={t("dashboard.thisWeekSummary", { count: thisWeek.length, shows })}
       />
-      <div className="mt-3 grid gap-0.5 2xl:grid-cols-2">
+      <div className="mt-3 grid grid-cols-1 gap-0.5 2xl:grid-cols-2">
         {thisWeek.map((item) => (
           <DigestRow
             key={item.entry.id}

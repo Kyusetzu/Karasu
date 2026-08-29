@@ -39,9 +39,13 @@ export function DigestRow({
         className="h-11.5 w-8.5 shrink-0 rounded-[.3125rem] object-cover"
       />
       <TitleLockup title={media.title} className="flex-1" />
-      <div className="shrink-0 text-right">
-        <p className="text-2xs text-ink-600">{note}</p>
-        <p className="text-xs tabular-nums text-accent-400">{when}</p>
+      {/* `min-w-0`, not `shrink-0`: pinned at max-content this block could
+          never give width back, and one long German note was enough to hand
+          the whole page a sideways scroll. The note truncates; the countdown
+          is short and keeps its line. */}
+      <div className="min-w-0 text-right">
+        <p className="truncate text-2xs text-ink-600">{note}</p>
+        <p className="whitespace-nowrap text-xs tabular-nums text-accent-400">{when}</p>
       </div>
       {marker}
     </Link>

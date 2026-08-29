@@ -373,7 +373,9 @@ function ScrobbleActions({ playing }: { playing: NowPlaying }) {
 
   return (
     <>
-      <div className="flex shrink-0 gap-2">
+      {/* Wrappable: two labelled buttons beside the icon outgrow a phone in
+          German, and `shrink-0` let them push the page wide instead. */}
+      <div className="flex flex-wrap justify-end gap-2">
         {canScrobble && (
           <>
             <Button

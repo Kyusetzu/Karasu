@@ -12,6 +12,7 @@
   <a href="https://github.com/Kyusetzu/Karasu/actions/workflows/release.yml"><img src="https://github.com/Kyusetzu/Karasu/actions/workflows/release.yml/badge.svg" alt="Build" /></a>
   <img src="https://img.shields.io/badge/platform-Windows-0078D6?logo=windows&logoColor=white" alt="Windows" />
   <img src="https://img.shields.io/badge/platform-Linux-FCC624?logo=linux&logoColor=black" alt="Linux" />
+  <img src="https://img.shields.io/badge/platform-Android-3DDC84?logo=android&logoColor=white" alt="Android" />
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT" /></a>
   <img src="https://img.shields.io/github/v/release/Kyusetzu/Karasu?include_prereleases&label=release" alt="Release" />
   <a href="https://discord.gg/yeHNSGyM8F"><img src="https://img.shields.io/badge/Discord-Kyu's%20Cozy%20Corner-5865F2?logo=discord&logoColor=white" alt="Discord" /></a>
@@ -26,13 +27,14 @@ chapter in your browser, and Karasu recognizes it and updates your AniList
 progress automatically — no buttons to press. It lives in your system tray
 where your desktop has one,
 speaks English and German, and is built as a small native app with Tauri, React
-and Rust.
+and Rust — for Windows, Linux and, as a sideloaded APK, Android, where the same
+app trades the tray for a bottom navigation bar.
 
 It's inspired by the wonderful [Taiga](https://github.com/erengy/taiga).
 
 ## Why use it over the website?
 
-Because a desktop app can do things anilist.co simply can't:
+Because a local app can do things anilist.co simply can't:
 
 - **It knows what you're actually watching.** Local players and browser tabs are
   detected and scrobbled for you.
@@ -85,16 +87,17 @@ Because a desktop app can do things anilist.co simply can't:
 - Automatic detection in local players (mpv, VLC, MPC-HC/BE, PotPlayer, SMPlayer)
   and in the browser (Crunchyroll and more)
 - Manga reading detection (MangaDex, MANGA Plus, Comick, Bato, MangaFire, Asura Scans)
-- **Windows media-session detection** for players that report to the system
-  media controls instead of writing the title into their window — Jellyfin
-  Media Player, Plex and browser video
+- **Media-session detection** (SMTC on Windows, MPRIS on Linux) for players
+  that report to the system media controls instead of writing the title into
+  their window — Jellyfin Media Player, Plex and browser video
 - **Jellyfin server integration** (optional) — ask your server instead of
   guessing from a window title, and it reports the series, season and episode
   as exact fields rather than a filename to parse. Sign in with your ordinary
   Jellyfin account (no administrator rights, no API key); the server then only
   ever reports your own playback, so nobody else on a shared server ends up on
   your list. Your password is exchanged once for an access token and never
-  stored
+  stored. On Android this is the whole of detection — a phone shows no window
+  titles and hands out no media sessions
 - Automatic scrobbling after a configurable threshold, with optional
   confirmation, episode-gap protection and
   [anime-relations](https://github.com/erengy/anime-relations) episode redirects
@@ -104,6 +107,8 @@ Because a desktop app can do things anilist.co simply can't:
   that syncs once you're back online
 - Taiga-style quick editing (progress/score dropdowns, +1, one-click *Completed*)
   and a shared edit dialog straight from search results
+- A **default status for new adds** — decide once, in settings, what *Add to
+  list* means, instead of answering per title
 - **Bulk multi-select** edits, saved **filter/sort presets**, a **random pick**,
   private **notes**, custom **tags** (with a tag filter), and a
   **rewatch/reread counter**
@@ -116,7 +121,14 @@ Because a desktop app can do things anilist.co simply can't:
   says so, queues itself and offers a retry
 
 **Discovery**
-- Search with an anime/manga toggle, seasonal charts, rich detail pages
+- Search with an anime/manga toggle, seasonal charts, rich detail pages —
+  and a **fullscreen cover viewer** on every detail page, with pinch zoom
+- Search scopes for **users, characters, staff and studios** too. These ask
+  for three characters before firing — below that AniList answers with
+  noise, measured rather than assumed
+- **Typo-tolerant local search** — your own lists and the command palette
+  match with per-title trigram scoring, so a misspelled title still finds
+  its show
 - **Person, character and studio pages** — voice actors, staff and studios each
   get a page of their own, with their roles and works, reachable from any
   detail page or statistic
@@ -125,17 +137,24 @@ Because a desktop app can do things anilist.co simply can't:
 - **Recommendations** for anime and manga on the dashboard, built from the
   titles you've completed — the higher you scored something, the more its
   suggestions count, and anything already on your list is left out
+- The dashboard's continue-watching strip has a **continue-reading twin** for
+  manga, chapter +1 right on the card
 - **Franchise graph** — the whole franchise as a relation map (sequels, side
   stories, cross-medium sources/adaptations), each node coloured by your status,
   pan and zoom, any branch foldable, double-click to open a title
 
 **Social**
 - **Profiles** — yours and anyone's: bio, banner, favourites, statistics and
-  their lists, with follow/unfollow and a follower browser
+  their lists, with follow/unfollow, a follower browser, and a forum tab that
+  opens on their comment history
 - **Activity feeds** — what the people you follow watched, read, posted and
-  replied to, with likes, replies and a status composer of your own
+  replied to, with likes, replies and a status composer of your own. Activity
+  permalinks open in-app: a link to a post lands on the post
 - **Forum** — browse and read AniList's forums, follow comment threads, and
-  start threads or reply from inside the app
+  start threads or reply from inside the app. Comment permalinks land **on the
+  comment**, highlighted — even in threads deeper than AniList's own
+  5,000-entry paging cap, which Karasu routes around via the uncapped
+  comment tree
 - All of it is AniList's own data, fetched live — Karasu stores none of it
 
 **Insights**
@@ -151,8 +170,13 @@ Because a desktop app can do things anilist.co simply can't:
 **Notifications**
 - New-episode desktop toasts, opt-in **sequel-announcement** alerts and
   **on-hold reminders**
-- A bundled in-app **notification centre** (the bell in the title bar) with
-  read / mark-all-read
+- A bundled in-app **notification centre** — the bell in the title bar on
+  desktop, in the bottom bar's More area on the phone — with read /
+  mark-all-read. Karasu's own alerts and your AniList notifications arrive
+  as **one merged stream**, and bursts collapse: one person liking five
+  posts is one row, and so are consecutive airings of the same series
+- A notification row opens the thing it is about — an activity notification
+  lands on the activity itself, the actor's name on their profile
 
 **Integrations &amp; flexibility**
 - **Local library** — your folder scanned and matched to your list, each title
@@ -172,7 +196,11 @@ Because a desktop app can do things anilist.co simply can't:
 - Light / dark themes and a full **accent colour picker** — every shade, the
   panel washes and the readable ink on top are derived from the one colour you
   pick, so nothing is hardcoded
-- **Cover size** in three steps and a **reduce motion** switch
+- **Covers per row** as a typed number, 1–40, previewed live as you type —
+  and a **reduce motion** switch
+- A **content filter** for adult and suggestive titles, with a disclosure
+  line wherever it hides something — explicit (18+) and suggestive (Ecchi)
+  counted separately, linking straight to the setting
 - **Keyboard shortcuts** throughout, with a <kbd>?</kbd> reference sheet: a
   command palette on <kbd>Ctrl</kbd>+<kbd>K</kbd>, <kbd>/</kbd> to search,
   <kbd>Ctrl</kbd>+<kbd>1</kbd>–<kbd>3</kbd> between screens, and arrows,
@@ -181,32 +209,41 @@ Because a desktop app can do things anilist.co simply can't:
   detection, library, desktop, import & export, and a marked-dangerous
   advanced pane. The AniList pane edits your *account's* settings in place —
   title language, score format, activity posting, AniList's own notification
-  toggles — so they apply on anilist.co and in every client at once
+  toggles — so they apply on anilist.co and in every client at once. On the
+  phone shell the library and desktop panes are hidden, because nothing
+  behind them exists there
 - An app-appropriate in-app right-click menu, system tray, single instance,
   autostart
 - English / German with automatic system-language detection
-- One-click AniList login and a built-in *Check for updates*
+- One-click AniList login and a built-in *Check for updates* — the update
+  check is desktop-only; on Android a new version is simply installed over
+  the old one
 
 ## Installation
 
-Download the installer (`Karasu_<version>_x64-setup.exe`) from the
-[releases page](https://github.com/Kyusetzu/Karasu/releases) and run it. Each
-release carries exactly one installer — the newest build.
+Download from the
+[releases page](https://github.com/Kyusetzu/Karasu/releases). Each release
+carries one build per platform, always the newest: the Windows installer
+(`Karasu_<version>_x64-setup.exe`), the Linux `.AppImage`, and two Android
+APKs (`Karasu_<version>_arm64.apk`, plus a `_universal` fallback) — alongside
+`SHA256SUMS.txt` and `latest.json`, the manifest the desktop updater reads.
 
 On first start, open **Settings → Log in with AniList** — your browser opens
 AniList, you approve access, and Karasu logs you in automatically. (A manual
-token paste is available as a fallback.) You can also pick **Use without an
-account** to track locally and connect later.
+token paste is available as a fallback.) On Android the way back is one tap:
+the page you land on after approving shows a **Return to Karasu** button — a
+`karasu://` link — that brings the app forward. You can also pick **Use
+without an account** to track locally and connect later.
 
-It installs for the current user only — into `%LOCALAPPDATA%`, with no UAC
-prompt and nothing written outside your own profile.
+On Windows it installs for the current user only — into `%LOCALAPPDATA%`,
+with no UAC prompt and nothing written outside your own profile.
 
 > **Upgrading over an existing install.** Run the installer with `/UPDATE` and
 > it skips the "uninstall the existing version or keep it" page and simply
 > replaces what is there:
 >
 > ```
-> Karasu_0.140.0_x64-setup.exe /UPDATE
+> Karasu_<version>_x64-setup.exe /UPDATE
 > ```
 >
 > Add `/P` for a passive run, which also skips the Welcome and Finish pages and
@@ -225,7 +262,8 @@ prompt and nothing written outside your own profile.
 > independently verifies every update it installs against its own signing
 > key, regardless of SmartScreen.
 
-> **Platforms.** Windows and Linux, both x86_64.
+> **Platforms.** Windows and Linux, both x86_64, and Android as a sideloaded
+> APK.
 >
 > Linux ships as an **AppImage** — one file for Ubuntu, Debian and Arch alike.
 > It is built on Ubuntu 22.04, so it needs **glibc ≥ 2.35**, and it expects
@@ -234,12 +272,25 @@ prompt and nothing written outside your own profile.
 > StatusNotifier host — on GNOME, the AppIndicator extension — and without one
 > Karasu still runs, but closing the window quits instead of hiding it.
 >
+> Android ships as two APKs — take `Karasu_<version>_arm64.apk`, and fall
+> back to `_universal` only if your device refuses it. Both are
+> release-signed by CI with the same key every time, which is what lets a
+> newer version install straight over the older one with your data intact;
+> there is no in-app updater on Android, and installing over the top *is*
+> the update path. The phone gets its own shell — keyed on width (767px),
+> not on the device, so a narrow enough window gets it anywhere: navigation
+> moves to a bottom bar, the back gesture closes whatever is open instead
+> of leaving the page, and system notifications ask for their runtime
+> permission before the first one is sent.
+>
 > Detection differs. Window titles are read on Windows only: there is no
 > X11/Wayland enumerator, and under Wayland one application cannot read
 > another's windows at all. On Linux the sources are **MPRIS** — which covers
 > mpv (with the `mpv-mpris` plugin), VLC, SMPlayer and browser video — plus the
 > optional Jellyfin server. Manga sites, which publish no MPRIS, are not
-> detected there.
+> detected there. On Android the answer is shorter still: Jellyfin is the
+> whole of detection, and the desktop detection settings sit greyed out
+> under a "desktop only" badge rather than pretending to work.
 
 ## Development
 
@@ -248,16 +299,20 @@ Prerequisites: [Node.js](https://nodejs.org) ≥ 22.22, [Rust](https://rustup.rs
 (included in Windows 11). On Ubuntu, install `libwebkit2gtk-4.1-dev`,
 `libgtk-3-dev`, `libayatana-appindicator3-dev`, `librsvg2-dev`,
 `libglib2.0-dev`, `libdbus-1-dev`, `patchelf` and `file` — the same list
-`.github/workflows/ci.yml` installs, so the two cannot drift.
+`.github/workflows/ci.yml` installs, so the two cannot drift. Android builds
+additionally need JDK 17 (Temurin), the Android SDK (platform 36, build-tools
+36 and 35) and NDK 27.1.12297006.
 
 ```sh
 npm install
-npm run tauri dev    # development build with hot reload
-npm run tauri build  # release build (NSIS on Windows, AppImage on Linux)
+npm run tauri dev                # development build with hot reload
+npm run tauri build              # release build (NSIS on Windows, AppImage on Linux)
+npx tauri android build --apk    # Android release APK
 
 npm run typecheck    # TypeScript
 npm test             # frontend unit tests (vitest)
 cargo test --manifest-path src-tauri/Cargo.toml   # backend tests
+scripts/android-check.ps1   # fast cfg(mobile) compile gate — the checks above build none of the Android-only Rust
 ```
 
 **Versioning.** Every commit bumps a four-part version
@@ -275,12 +330,12 @@ each idea would actually cost, rather than a list of promises.
 
 | Layer | Technology |
 |---|---|
-| Shell | Tauri 2 (Rust backend, WebView2) |
+| Shell | Tauri 2 (Rust backend; WebView2 on Windows, WebKitGTK on Linux, the system WebView on Android) |
 | Frontend | React 19 + TypeScript + Vite + Tailwind CSS v4 |
 | State | TanStack Query (server), Zustand (client), i18next (i18n) |
 | Rendering | `@tanstack/react-virtual` for the anime and manga lists, so a several-thousand-entry list only mounts the rows near the viewport |
-| Storage | SQLite via rusqlite (cache, offline queue, local list, notifications, settings); tokens in the OS credential store (Windows Credential Manager, Secret Service on Linux). In portable mode the token is a file instead, encrypted with DPAPI on Windows and XChaCha20-Poly1305 under a Secret Service-held key on Linux — bound to the machine and account either way |
-| Detection | System media sessions (SMTC on Windows, MPRIS on Linux) + Win32 window enumeration (Windows only) + an optional Jellyfin `/Sessions` source; titles resolved by a custom release-name parser (Anitomy equivalent) |
+| Storage | SQLite via rusqlite (cache, offline queue, local list, notifications, settings) on every platform; tokens in the OS credential store on desktop (Windows Credential Manager, Secret Service on Linux) and, on Android, in a file sealed by the Android Keystore — AES-256-GCM, with a key that never leaves the Keystore. In portable mode the token is a file instead, encrypted with DPAPI on Windows and XChaCha20-Poly1305 under a Secret Service-held key on Linux — bound to the machine and account either way |
+| Detection | System media sessions (SMTC on Windows, MPRIS on Linux) + Win32 window enumeration (Windows only) + an optional Jellyfin `/Sessions` source on all three platforms — and the only source on Android; titles resolved by a custom release-name parser (Anitomy equivalent) |
 | Theming | One accent colour in, a whole palette out — shades, the two companion wash hues and a readable ink are derived at runtime in `src/lib/contrast.ts`, contrast-checked against both themes |
 
 ### Shared application IDs
@@ -290,7 +345,10 @@ Karasu ships with a built-in AniList client ID and Discord application ID (see
 `BUILTIN_DISCORD_APP_ID` in `src-tauri/src/discord.rs`), so users don't need
 to register anything themselves. Discord uses the built-in application. If you
 build with your own AniList API client, set its redirect URL to
-`http://localhost:46231/callback` so the one-click login works.
+`http://localhost:46231/callback` so the one-click login works — that is
+where desktop sign-in lands. On Android the app additionally registers the
+`karasu://` scheme, which is what the post-login page's *Return to Karasu*
+button uses to bring the app back.
 
 ## Built with AI
 

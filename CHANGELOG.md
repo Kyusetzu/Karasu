@@ -7,9 +7,10 @@ versions are `MAJOR.MINOR.PATCH.COMMIT#`, where the fourth segment is a commit
 counter that moves on every commit (see `CONTRIBUTING.md`).
 
 **There has been no tagged release yet.** Everything published so far went to
-the rolling `latest` prerelease, which is force-moved on every push to `main`,
-so there is nothing under a version heading below to compare against. The first
-tagged release will close the `Unreleased` section rather than adding to it.
+the rolling `latest` prerelease, which is force-moved on every push to `main`.
+The workflow publishes tagged `v*` releases too — none has been cut yet, which
+is why there is nothing under a version heading below to compare against. The
+first will close the `Unreleased` section rather than adding to it.
 
 **Cutting a release reads this file.** `scripts/release/release-notes.ps1`
 slices the section between `## <version>` and the next `## `, and *throws* if
@@ -28,7 +29,8 @@ short version, grouped by what it means for someone using the app.
 
 **How this file is maintained, decided after it drifted.** It is *not* updated
 per commit any more, and the `Unreleased` section below is deliberately behind —
-it stops around 0.138 while the tree is well past that. Keeping two records of
+well behind the tree (this sentence used to say by how much; the number
+decayed, the policy did not). Keeping two records of
 the same work in step by hand is the kind of chore that gets skipped under
 pressure, and skipping it silently is worse than not doing it: a half-updated
 changelog reads as complete.
@@ -219,7 +221,8 @@ and doing it once with the whole release in view produces better grouping than
 - Position-aware scrobbling — Jellyfin's playback position and a direct mpv IPC
   probe, so progress is written where you actually are in the episode.
 - Reviews on the detail page, with a composer that knows AniList's rules.
-- AniList's own notifications in the bell, beside Karasu's.
+- AniList's own notifications in the bell, merged with Karasu's into one
+  stream (the grouping is presentation only — `lib/notifGroups`).
 - Export: MAL XML per medium and Karasu's own JSON; MAL import into the local
   list; a daily local database backup.
 - A global hotkey, a real tray menu, and a working button on the scrobble

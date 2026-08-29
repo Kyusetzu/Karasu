@@ -17,241 +17,78 @@ needing a hosted backend.
 
 ## An Android app
 
-**Status: in progress** (August 2026). The maintainer decided: this repo, a
-sideloaded APK first, and the whole first slice. Steps 0–2 are code —
-`crate-type` restored, the desktop-only Rust behind `cfg(desktop)`/`cfg(mobile)`
-pairs, file-based token storage on mobile with Keystore as the named follow-up
-— and the toolchain (JDK 17, SDK 34, NDK 27, both Rust targets) lives at
-`%LOCALAPPDATA%\Android\Sdk`. What follows below is the original write-up,
-kept because its costs and constraints still govern the remaining steps.
+**Status: shipped** (August 2026). "Could we?" got its answer, so the long
+write-up that lived here — costs, constraints, a six-step slice — is replaced
+by the record of what actually happened, kept so nobody re-plans it or
+re-argues the parts that are settled.
 
-### What it would be
+What shipped:
 
-Not a port. **A different product sharing a codebase: a list client without
-detection.**
+- **The APK exists** — arm64 and universal, release-signed in CI when the four
+  `ANDROID_*` secrets exist. The debug APK stays a workflow artifact, because
+  debug- and release-signed builds refuse to install over each other.
+- **The phone shell exists**: a bottom bar, keyed on width (`usePhoneShell`,
+  767px), not on user agent. This is *not* the `minWidth` removal the plan
+  called for — `minWidth: 940` is still in `tauri.conf.json` and never needed
+  to go; it governs the desktop window, and Android does not read it.
+- **Detection is Jellyfin-only, by decision** in the first device round. The
+  desktop detection machinery is greyed out in Settings under a "desktop only"
+  badge, never hidden.
+- **The back gesture closes overlays** instead of leaving the page —
+  `useBackClose` in every dialog, the history protocol pure and tested in
+  `lib/backStack`.
+- **System notifications post while the app runs**, and ask for their runtime
+  permission once at startup (`alerts/notify.rs`).
+- **Login hops back into the app via `karasu://`.** See the misprediction note
+  below for why that is the whole of what changed.
+- **Tokens are Android-Keystore-sealed** — the plan's step 3, done:
+  `keystore.rs` plus `TokenCipher.kt`, KRSA1 framing, migrating the interim
+  file-based storage in place. The rule it preserves is the one that governed
+  the desktop all along: the token stays in Rust and never reaches the WebView.
+- The launcher icons in `src-tauri/icons/android/` are committed, not
+  generated — `tauri android init` will appear to have produced them on a
+  fresh run; it did not.
 
-That sentence is the whole entry. Karasu's identity on the desktop is that it
-watches what you play and updates AniList without being asked. On Android almost
-none of that is available, so what is left is a fast, offline-capable AniList
-client — browsing, editing, statistics, social — which is a perfectly good thing
-to want, and is *not* the thing the desktop app is.
+What the write-up got wrong, kept for honesty:
 
-Anyone who plans this as "Karasu, on a phone" will build the shell and then
-discover the feature is missing.
+- **The layout needed no `minWidth` removal and no new row tier.** It predicted
+  a list view "rewritten rather than adapted"; cards were already the
+  one-per-row answer, and the fixed desktop tracks simply never render on a
+  phone.
+- **The sign-in flow was not desktop-shaped after all.** It predicted the
+  localhost callback replaced by a per-platform redirect URI; the
+  `127.0.0.1:46231` listener binds and answers on Android as written, and the
+  `karasu://` scheme's only job is the return hop from the browser, which was
+  the one missing piece.
+- **The TLS cost landed exactly as predicted** — the compiles-cleanly,
+  fails-at-runtime class it flagged. `net.rs` is the fix and documents the
+  trade (webpki roots, a named provider, user-installed CAs not honoured).
 
-### What carries over
+Still open, deliberately:
 
-Nearly all of it, and that is why the idea is tempting at all.
-
-- The entire AniList layer — `api/` queries, types, the franchise walker, the
-  library and social surfaces. It is HTTP and GraphQL; nothing in it is
-  desktop-shaped.
-- The list, search, statistics, social and forum screens, as logic. Not as
-  layout — see below.
-- SQLite via rusqlite. Android ships SQLite; rusqlite bundles its own.
-- The rate limiter in `anilist/client.rs`. The ~30/min budget is a property of
-  AniList, not of the platform, and the paging-is-a-button rule follows it.
-- **Jellyfin**, and it is the *only* detection source that survives, because it
-  is just HTTP against a server the user already runs. A phone that plays an
-  episode through the Jellyfin app would still scrobble.
-- The offline queue. It matters *more* on a phone than on a desktop.
-
-### What does not carry over
-
-- **Win32 window enumeration.** Windows-only already.
-- **SMTC and MPRIS.** Android's nearest equivalent is `MediaSessionManager`,
-  which needs the notification-listener permission — and Google Play restricts
-  that permission to apps whose core function requires it. An anime tracker is
-  not obviously one of those, so this is a policy question before it is a
-  technical one.
-- **The local library scanner.** Scoped storage and SAF make walking arbitrary
-  directories impractical; `library.rs`'s fourteen commands assume a filesystem
-  Android does not hand out.
-- **Tray, global hotkey, toast action buttons, close-to-tray, autostart, the
-  custom titlebar, portable mode, Discord Rich Presence.** All desktop shell.
-- **The updater.** `tauri-plugin-updater` is not the distribution model; Play
-  Store or sideload is. `COMMIT_NUMBER`, the `version_comparator` and
-  `latest.json`'s `+` build metadata are all desktop machinery.
-- **Token storage.** `keyring` is taken twice in `Cargo.toml`, once per
-  platform: `windows-native` under `cfg(windows)`, `sync-secret-service` under
-  `cfg(target_os = "linux")`. Android is neither — it needs Keystore, which is a
-  third backend rather than one more cfg arm. The rule that matters survives
-  intact, though: **the token stays in Rust and never reaches the WebView**, and
-  that is what would have to be true of any Keystore path too.
-
-### View — the part worth thinking hardest about
-
-The desktop layout assumes a wide window and a mouse, in more places than a
-quick look suggests.
-
-- **The sidebar is 208px of permanent chrome.** It collapses to 56px now, but
-  even that is a rail beside the content. On a phone it becomes a bottom bar or
-  a drawer, and the accent rail marker (`useRailMarker`) has no meaning in
-  either.
-- **`minWidth: 940`** in `tauri.conf.json` versus a phone's ~360–430dp. That is
-  not a breakpoint away; it is a different information density.
-- **`components/list/columns.ts` is fixed tracks**, sized so `★ 10` and
-  `500 / 500` cannot clip, and `useRowTier` changes the column *set* by measured
-  container width. Neither has a phone tier, and the honest one is probably "no
-  columns at all — one card per row", which means the list view is rewritten
-  rather than adapted.
-- **Every `group-hover` reveal is invisible on touch.** The +1 button, the row
-  actions, the cover overlays. Touch has no hover state to reveal them from, so
-  each needs a persistent affordance or a gesture.
-- **Right-click context menus become long-press**, and the app's own context
-  menu (`shell/ContextMenu.tsx`) is built on `contextmenu` events.
-- **Ctrl+K, `/` and the roving arrow keys are meaningless** without a keyboard.
-  The command palette is a genuine loss; the keyboard sheet simply would not
-  ship. (This used to list `j`/`k` as well. There are no such bindings — the
-  only `k` in a handler is Ctrl+K for the palette.)
-- **The 1.44 MB Japanese woff2 subset.** CLAUDE.md documents why it cannot be
-  trimmed — it renders arbitrary `title.native` in five call sites — and on a
-  desktop that cost is paid once at install. On mobile data it is a real number,
-  and the alternative (falling back per missing glyph) is worse-looking, not
-  cheaper.
-
-### The constraint that shapes everything
-
-CLAUDE.md rejects settings cloud-sync and any hosted backend, and that stands.
-So **a phone and a desktop would share nothing but the AniList account**:
-
-- separate databases, separate detection corrections, separate library indexes,
-  separate preferences, separate offline queues;
-- no push notifications, because push needs a server — only local polling, or
-  AniList's own notifications read on open;
-- a correction made on the phone does not reach the desktop, and vice versa.
-
-That is not a gap to close later. It is the design, and an Android entry that
-does not say so up front sets up the first feature request that cannot be
-granted.
-
-### The framework decision
-
-**Tauri 2, targeting Android.** Not React Native, not a rewrite.
-
-Tauri 2 ships Android support, and it is the only option that keeps the parts
-of Karasu that are actually expensive. The AniList layer, the rate limiter, the
-release-name parser, the fuzzy matcher, the relations redirects, SQLite through
-rusqlite and the offline queue are all Rust with no desktop assumptions in them
-— roughly the half of this codebase that took the longest to get right. React
-Native would mean porting every one of them to TypeScript or to a native module,
-and then maintaining two implementations of the matcher.
-
-What the choice costs, stated up front so it is not discovered later:
-
-- **The WebView is the renderer**, so performance is Android WebView's, not a
-  native toolkit's. The list is already virtualized, which is the part that
-  would hurt.
-- **`tauri-plugin-*` coverage is thinner on Android, and three of them are
-  compile errors rather than no-ops.** `tauri-plugin-single-instance`,
-  `tauri-plugin-global-shortcut` and `tauri-plugin-autostart` each carry
-  `#![cfg(not(any(target_os = "android", target_os = "ios")))]` at the *crate*
-  root — checked in the vendored sources, not assumed — so on Android the crate
-  compiles to nothing at all and every `tauri_plugin_x::init()` call in `lib.rs`
-  is an unresolved path. They have to be `#[cfg]`-gated at the call site.
-  `notification` and `opener` do work, and `updater` compiles but is not the
-  distribution model — that is the Play Store or a sideloaded APK.
-- **The keyring crate does not cover Android.** Token storage needs a Keystore
-  implementation behind the same interface, and the rule it has to preserve is
-  the one that already governs the desktop: the token stays in Rust and never
-  reaches the WebView. Note *where* it is called from: `anilist/auth.rs` and
-  `playback/detection/jellyfin.rs` both use `keyring::Entry` with **no `cfg`
-  at all**, so neither compiles on Android as written.
-- **TLS needs an explicit init, and it fails at runtime rather than at build.**
-  `reqwest` 0.13 defaults to rustls, and the lockfile resolves
-  `rustls-platform-verifier` — which pulls `rustls-platform-verifier-android`.
-  That backend needs the JVM handed to it from the app's `Context` before any
-  request is made; without it every AniList call fails certificate validation
-  on a build that compiled cleanly. This is exactly the class of problem step 1
-  cannot find.
-- **The WebView has a hard floor: Chromium 111.** The emitted stylesheet uses
-  `color-mix()` **90 times** (counted in `dist/`, not estimated) — it is how
-  every accent shade is derived. Android System WebView updates through Play
-  and is current on most devices, but on one that is behind, the app does not
-  degrade: it renders unstyled.
-- **Sign-in is a localhost callback server.** `anilist/login.rs` binds
-  `TcpListener` on `127.0.0.1:46231` and AniList redirects to it. That model is
-  a desktop one; Android wants a custom scheme or an App Link, which means the
-  redirect URI registered with AniList differs per platform.
-- **Two build targets in CI**, and the Android one needs the NDK.
-
-### The first slice, in order
-
-Small, sequenced so each step is independently checkable. None of it is
-scheduled — this is what "first efforts" would actually mean.
-
-1. **Prove the shell.** `tauri android init`, get a debug APK onto a device
-   showing the existing UI. Nothing else. This is where WebView rendering,
-   build times and the NDK either become a problem or stop being a question.
-
-   **This step cannot succeed as the tree stands.** `src-tauri/Cargo.toml` is
-   `crate-type = ["rlib"]`; an Android build links the Rust side as a shared
-   library, so `["staticlib", "cdylib", "rlib"]` has to come back first. The
-   comment above that line already calls it the one-line revert — it is step
-   zero, not a detail of step 2.
-2. **Split the platform-only Rust behind cfg.** `library.rs`, the Win32
-   enumerator, SMTC/MPRIS, tray, hotkey, portable mode and the updater need
-   `#[cfg]` gates that leave a compiling Android build — and so do the two
-   `keyring` call sites (`anilist/auth.rs`, `playback/detection/jellyfin.rs`)
-   and the three plugin `init()` calls named above, none of which are gated
-   today. The house rule applies: a cfg'd **pair of functions**, never a cfg'd
-   statement, or the arm nobody compiles rots.
-3. **Token storage on Keystore**, behind the existing `auth.rs` interface.
-   Sign-in, sign-out and a rejected token have to behave exactly as they do
-   now — `sessionExpired` and the one banner are already the right shape.
-4. **A phone tier for the layout.** `minWidth: 940` goes; the 208px sidebar
-   becomes a bottom bar; `columns.ts` and `useRowTier` need a tier that is
-   honestly "one card per row"; every `group-hover` reveal needs a persistent
-   affordance; right-click becomes long-press. This is the largest single
-   piece and it is UI work, not plumbing.
-5. **Jellyfin as the only detection source.** It is plain HTTP and already
-   works. The now-playing card, the scrobbler and the correction flow can then
-   be exercised end to end without any of the platform detection.
-6. **Decide about `MediaSessionManager`** — see below. Until that is answered,
-   step 5 is the whole of detection.
-
-Deliberately *not* in the first slice: Wrapped (a canvas poster sized for a
-desktop screen), the local library scanner (scoped storage), Discord presence,
-and anything that assumes a keyboard.
-
-### What would have to be decided first
-
-1. Whether the app is worth building *without* detection. If the answer is no,
-   the rest is moot.
-2. Whether `MediaSessionManager` is reachable on Play — that decides whether
-   "without detection" is permanent.
-3. Whether the UI is a second set of screens in this repo or a separate one.
-   Sharing `api/` and `lib/` is clearly right; sharing `pages/` is clearly not.
-
-### Already done, so nobody re-does it
-
-The Android **launcher icons are committed** — `src-tauri/icons/android/` holds
-the full `mipmap-*` set including `mipmap-anydpi-v26`. `tauri android init`
-generates these, so a first run will appear to have produced them; it did not.
+- **`MediaSessionManager` detection.** Moot while the app is sideloaded: the
+  notification-listener permission is a Play policy question, and it only
+  matters if Play distribution — see below — is ever revisited.
+- **Background notification delivery.** Android suspends the process, and FCM
+  needs a hosted backend, which is forbidden. The while-running half shipped;
+  the background half stays a research item (WorkManager-style periodic wake
+  or nothing) until measured.
+- **Play Store distribution itself.** Not planned — per the maintainer,
+  August 2026. Sideload is the model and updates are `adb install -r`;
+  Android has no updater and must not gain one by accident.
 
 ## Chosen from the Aluminium review (August 2026)
 
-Four additions the maintainer picked after surveying Aluminium (the Play-Store
-AniList client) in the third device round. Inspiration only — its source is
-unreleased and nothing is copied; each of these is designed fresh against
-Karasu's own conventions. The airing calendar it advertises already exists
-here (`/calendar`), so it is not on this list.
-
-1. **Quick +1 on the Dashboard.** One tap advances progress on the
-   continue-watching strip without opening the detail page. Reuses
-   `useListMutations` and its receipt toast; scores and rate limiting are
-   already right there.
-2. **Search scopes: characters, staff, studios.** The pages and routes exist
-   (`/character/:id`, `/staff/:id`, `/studio/:id`); each scope costs one
-   user-initiated query when activated, and needs a `USER_SEARCH_MIN`-style
-   minimum before firing — AniList's short-query behaviour on `Page.users`
-   is documented in CLAUDE.md and should be re-measured per entity.
-3. **Small UX pack.** A clear-✕ in the search and filter inputs, and a
-   setting for the default status when adding a title (Planning today,
-   hard-coded).
-4. **Android system notifications.** Two honest halves. *While the app runs*,
-   the alert passes can post real system notifications through the
-   notification plugin — cheap, and worth doing first. *In the background*
-   they cannot: Android suspends the process, FCM would need a hosted backend
-   (forbidden), so background delivery is a research item (WorkManager-style
-   periodic wake or nothing) and stays uncommitted until measured.
+**Status: all four shipped.** Picked after surveying Aluminium (the Play-Store
+AniList client) in the third device round — inspiration only, each designed
+fresh against Karasu's conventions. Where they landed: the quick +1 is on the
+Dashboard's continue-watching strip and was extended to a continue-reading
+strip for manga, both through `useListMutations` and its receipt toast; the
+character, staff and studio search scopes are live in `Search.tsx`, each
+behind the three-character floor, re-measured per entity as the entry demanded
+(`USER_SEARCH_MIN` in `api/social.ts` records the measurement); the clear-✕
+is in every search and filter box, and the default status when adding a title
+is a setting rather than a hard-coded Planning (`lib/defaultAddStatus`, set in
+the Account pane); and Android system notifications post while the app runs,
+with the runtime permission requested at startup. Background delivery is the
+one caveat that survives — see "still open" above.

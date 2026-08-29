@@ -46,6 +46,7 @@ import { useContentFilter } from "@/stores/contentFilter";
 import { useAuth } from "@/stores/auth";
 import { usePhoneShell } from "@/hooks/usePhoneShell";
 import { usePresence } from "@/hooks/usePresence";
+import { Loader } from "@/components/ui/loader";
 import { cn } from "@/lib/utils";
 import { EmptyState, PerchRule, StruckQuery } from "@/components/EmptyState";
 import { Pill } from "@/components/ui/pill";
@@ -658,7 +659,7 @@ function EntityResultList({
     );
   }
   if (loading) {
-    return <p className="text-sm text-ink-600">{t("search.searching")}</p>;
+    return <Loader size="sm" label={t("search.searching")} />;
   }
   if (empty) {
     return (
@@ -751,9 +752,7 @@ function MediaResults({
           {t("common.error", { message: backendErrorText(error, t) })}
         </p>
       )}
-      {isFetching && (
-        <p className="text-sm text-ink-600">{t("search.searching")}</p>
-      )}
+      {isFetching && <Loader size="sm" label={t("search.searching")} />}
       {!isFetching && !active && (
         // No mark here, deliberately: on every other empty screen the visual
         // is the subject, and on this one the field above it is.

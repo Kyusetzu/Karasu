@@ -263,6 +263,15 @@
   }
 }
 
+/* The chevron wipe — see `@utility loader-sweep` below. The overshoot inset
+   is exactly one 1em cell, matching the original's -30px over 30px cells, so
+   `steps(7)` lands each step on a cell boundary. */
+@keyframes loaderSweep {
+  100% {
+    clip-path: inset(0 -1em 0 0);
+  }
+}
+
 /* Exits. `forwards` on each animation above holds the end state, so the node
    stays invisible for the frame between the animation finishing and React
    unmounting it — without that it flashes back to full opacity. */
@@ -402,6 +411,46 @@
   );
   background-size: 200% 100%;
   animation: var(--animate-shimmer);
+}
+
+/* The chevron loader (`ui/loader.tsx`): one currentColor chevron, the
+   drop-shadow chain stamping it across a row, and a stepped clip-path wipe
+   revealing them left to right. Everything is in em so one class scales from
+   a popover to a page — the caller's font-size is the cell size, and the
+   caller's text colour is the ink (set *on* the element, deliberately:
+   WebKitGTK has resolved inherited currentColor inside filter lists stalely).
+
+   `forwards` is load-bearing under reduced motion: the global collapse below
+   forces one 0.01ms iteration, and without a fill the element would snap
+   back to its fully-clipped base — an invisible loading state. With it the
+   forced single iteration holds the final, fully revealed frame. While the
+   animation is `infinite` the fill never applies, so normal playback is
+   untouched. */
+@utility loader-sweep {
+  width: 6em;
+  height: 1.667em;
+  display: flex;
+  filter: drop-shadow(1em 0.833em 0 currentColor) drop-shadow(2em 0 0 currentColor)
+    drop-shadow(4em 0 0 currentColor);
+  clip-path: inset(0 100% 0 0);
+  animation: loaderSweep 2s infinite steps(7) forwards;
+
+  &::before {
+    content: "";
+    width: 1em;
+    height: 0.833em;
+    background: currentColor;
+    clip-path: polygon(
+      0 50%,
+      30% 40%,
+      100% 0,
+      60% 40%,
+      100% 50%,
+      60% 60%,
+      100% 100%,
+      30% 60%
+    );
+  }
 }
 
 /* RGB triplets, for `rgba(var(--scrim), α)` in banner and cover gradients.

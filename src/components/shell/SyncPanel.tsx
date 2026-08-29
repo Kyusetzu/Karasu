@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Loader } from "@/components/ui/loader";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
@@ -256,7 +257,7 @@ export default function SyncPanel({
               {t("common.error", { message: String(status.error) })}
             </p>
           ) : !data ? (
-            <p className="px-3 py-4 text-xs text-ink-600">{t("syncPanel.loading")}</p>
+            <Loader size="sm" label={t("syncPanel.loading")} className="px-3 py-4" />
           ) : (
             <>
               <dl className="space-y-1.5 border-b border-hair px-3 py-2.5 text-2xs">

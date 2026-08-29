@@ -22,6 +22,7 @@ import { useAuth } from "@/stores/auth";
 import { useContentFilter } from "@/stores/contentFilter";
 import { isBlocked, isBlockedGenre } from "@/lib/contentFilter";
 import { Button } from "@/components/ui/button";
+import { Loader } from "@/components/ui/loader";
 import { Pill } from "@/components/ui/pill";
 import { EmptyState, OutlineYear } from "@/components/EmptyState";
 import markUrl from "@/assets/karasu-mark.svg";
@@ -775,7 +776,7 @@ export default function Wrapped() {
       )}
 
       {loading ? (
-        <p className="text-ink-500">{t("common.loading")}</p>
+        <Loader label={t("common.loading")} />
       ) : error ? (
         <div>
           <p className="text-danger">

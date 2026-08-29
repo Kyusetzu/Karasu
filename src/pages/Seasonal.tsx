@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from "react";
+import { Loader } from "@/components/ui/loader";
 import { useNavigate } from "react-router";
 import { useColumnCount } from "@/hooks/useColumnCount";
 import { useGridRoving } from "@/hooks/useGridRoving";
@@ -121,9 +122,7 @@ export default function Seasonal() {
             {t("common.error", { message: String(error) })}
           </p>
         )}
-        {isLoading && (
-          <p className="text-sm text-ink-600">{t("seasonal.loading")}</p>
-        )}
+        {isLoading && <Loader label={t("seasonal.loading")} />}
         {!isLoading && !error && results.length === 0 && (
           // Four verticals rather than the schedule's seven: a season is a
           // shorter unit than a week's worth of episodes.

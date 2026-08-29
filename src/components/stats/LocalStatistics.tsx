@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { Loader } from "@/components/ui/loader";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { BarChart3 } from "lucide-react";
@@ -130,7 +131,7 @@ export default function LocalStatistics({
 
       <Tabs options={typeOptions} value={type} onChange={onType} />
 
-      {isLoading && <p className="text-ink-500">{t("common.loading")}</p>}
+      {isLoading && <Loader label={t("common.loading")} />}
       {error && (
         <p className="text-danger">{t("common.error", { message: String(error) })}</p>
       )}

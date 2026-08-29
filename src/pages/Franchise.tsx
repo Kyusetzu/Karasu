@@ -25,6 +25,7 @@ import EntryEditModal from "@/components/media/EntryEditModal";
 import { Presence } from "@/components/ui/presence";
 import { EmptyState, PerchRule } from "@/components/EmptyState";
 import { Button } from "@/components/ui/button";
+import { Loader } from "@/components/ui/loader";
 import { IconButton } from "@/components/ui/icon-button";
 import { cn } from "@/lib/utils";
 import { statusColorVar } from "@/lib/statusColors";
@@ -195,7 +196,7 @@ export default function Franchise() {
         </div>
       </header>
 
-      {isLoading && <p className="text-ink-500">{t("common.loading")}</p>}
+      {isLoading && <Loader label={t("common.loading")} />}
       {error && (
         <p className="text-danger">{t("common.error", { message: String(error) })}</p>
       )}

@@ -22,6 +22,7 @@ import {
   type ContentFilterLevel,
 } from "@/lib/contentFilter";
 import { Button } from "@/components/ui/button";
+import { Loader } from "@/components/ui/loader";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Avatar } from "@/components/ui/user-lockup";
 import { Tabs, type TabOption } from "@/components/ui/tabs";
@@ -333,7 +334,7 @@ function StatisticsContent({
         />
       </div>
 
-      {isLoading && <p className="text-ink-500">{t("common.loading")}</p>}
+      {isLoading && <Loader label={t("common.loading")} />}
       {error && (
         <p className="text-danger">
           {t("common.error", { message: String(error) })}

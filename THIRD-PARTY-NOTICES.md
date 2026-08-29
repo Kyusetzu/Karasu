@@ -1,8 +1,8 @@
 # Third-party notices
 
-Karasu is MIT-licensed (see [LICENSE](LICENSE)). The installers and the
-AppImage carry third-party components whose licences travel with them, and this
-file is where they travel. It covers what a **shipped build** contains, not what
+Karasu is MIT-licensed (see [LICENSE](LICENSE)). The installers, the AppImage
+and the Android APK carry third-party components whose licences travel with
+them, and this file is where they travel. It covers what a **shipped build** contains, not what
 a development checkout does.
 
 Two of these are here because their licences require it rather than as a
@@ -24,7 +24,8 @@ cargo metadata --manifest-path src-tauri/Cargo.toml --format-version 1 --all-fea
 ## Fonts
 
 Both are embedded as `woff2` in the frontend bundle, so they are redistributed
-with every installer and every auto-update. Their full licence texts are
+with every installer, AppImage and APK, and with every desktop auto-update —
+Android has no auto-update, so there they travel only with each new APK. Their full licence texts are
 reproduced at the end of this file, which is what OFL-1.1 §2 and Apache-2.0
 §4(a) ask for when a font is bundled with software.
 

@@ -13,9 +13,10 @@ Fixes #
 ## How it was checked
 
 <!-- `npm run verify` is the gate, but say what you actually exercised beyond
-     it: which screen, which detection source, which account format. Anything
-     you could not test — a Linux-only path from Windows, a live Jellyfin
-     server — say so plainly rather than leaving it implied. -->
+     it: which screen, which detection source, which account format — and for
+     UI changes, which shell you looked at (desktop window, phone shell, or
+     both). Anything you could not test — a Linux-only path from Windows, a
+     live Jellyfin server — say so plainly rather than leaving it implied. -->
 
 ## Checklist
 
@@ -26,6 +27,9 @@ Fixes #
       test beside it
 - [ ] Any new i18n key exists in **both** `en.ts` and `de.ts`
 - [ ] Any new AniList field was validated against the live schema
+- [ ] `scripts/android-check.ps1` was run if this touches Rust that compiles
+      on Android (`cfg(mobile)` / `cfg(target_os = "android")`) — or the
+      description says why that does not apply
 - [ ] Commit message is prose and ends with a `Co-Authored-By:` trailer
 - [ ] Nothing here is on CONTRIBUTING.md's rejected list
 

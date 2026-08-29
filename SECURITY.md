@@ -2,25 +2,41 @@
 
 ## Scope
 
-Karasu is a local desktop app with **no hosted backend** — it talks directly
-to the AniList GraphQL API from your machine. There's no server of ours to
-compromise; the realistic attack surface is the app itself and the secrets it
-holds in your OS credential store (Windows Credential Manager, or the Secret
-Service on Linux):
+Karasu is a local app (desktop and Android) with **no hosted backend** — it
+talks directly to the AniList GraphQL API from your device. There's no server
+of ours to compromise; the realistic attack surface is the app itself and the
+secrets it holds:
 
 - your **AniList OAuth token**, and
 - your **Jellyfin access token**, if you connected a Jellyfin server.
 
-Neither is ever handed to the WebView — the UI only ever learns *whether* one
-is stored.
+On desktop both live in your OS credential store (Windows Credential Manager,
+or the Secret Service on Linux). On Android they are files in the app-private
+data directory, sealed with AES-256-GCM under a key held by the **Android
+Keystore** (`TokenCipher.kt`; the file is `KRSA1 || iv || ciphertext`). The
+key never leaves the Keystore — it is hardware-backed where the device offers
+that and not extractable, so the ciphertext is useless copied off the device.
+What the Keystore does *not* give is worth stating just as plainly: an
+attacker with code execution inside the app's sandbox can call the same
+sealing API the app does. It protects the bytes at rest, not against a
+compromised app. A token a pre-Keystore build wrote in plain text migrates
+into the sealed format on first read; a file that does not decrypt reads as
+signed out rather than as somebody's token. (iOS, which is neither compiled
+nor shipped, would still use a plain file.)
 
-In the default layout the credential store is the only place either token is
-persisted. **Portable mode is the one exception**: it keeps the AniList token in
-a file beside the executable so the folder travels, encrypted at rest — DPAPI on
-Windows, XChaCha20-Poly1305 under a Secret Service-held key on Linux. Both bind
-the file to that machine and user account, so a portable folder copied elsewhere
-does not carry a usable sign-in. Signing out clears the file, the credential
-store entry and the Linux encryption key.
+Neither token is ever handed to the WebView — the UI only ever learns
+*whether* one is stored.
+
+In the default desktop layout the credential store is the only place either
+token is persisted. Two layouts keep tokens in files instead, each encrypted at
+rest in its own way. **Portable mode** keeps the AniList token in a file beside
+the executable so the folder travels — DPAPI on Windows, XChaCha20-Poly1305
+under a Secret Service-held key on Linux (the `KRSU1` format). Both bind the
+file to that machine and user account, so a portable folder copied elsewhere
+does not carry a usable sign-in. **Android** is the Keystore-sealed file
+described above, bound to the device the same way. Signing out clears the
+file, the credential store entry and the encryption key — whichever of those
+exist on the platform.
 
 The Jellyfin token is additionally held in memory by the Rust process while the
 app runs, so that the detection poll does not reach for the credential store
@@ -34,15 +50,21 @@ An ordinary account is enough; Karasu deliberately does not use an admin API
 key, because an API key makes Jellyfin report every session on the server
 rather than only your own.
 
-Karasu contacts AniList, GitHub (update checks and downloads) and a localhost
-callback during login. A Jellyfin server you configure yourself is contacted
-too; that is your machine, not ours, and the "no hosted backend" guarantee is
-unaffected.
+Karasu contacts AniList, GitHub (update checks and downloads — desktop only,
+Android never checks for updates) and a localhost callback during login. On
+Android the callback server still runs on localhost; its success page hands
+control back to the app through the `karasu://` custom scheme. A Jellyfin
+server you configure yourself is contacted too; that is your machine, not
+ours, and the "no hosted backend" guarantee is unaffected.
 
 Things worth reporting: the app mishandling or leaking either secret, a way to
 execute arbitrary code via a malicious media title/filename/response, or a
-flaw in the update mechanism (Karasu verifies every downloaded update
-against its own signing key — a way to bypass that would be serious).
+flaw in the desktop update mechanism (Karasu verifies every downloaded update
+against its own signing key — a way to bypass that would be serious). Android
+has no update mechanism to attack: the APK updates by `adb install -r` or a
+store, and its trust anchor is the Android signing key — CI signs release APKs
+from repository secrets, and Android itself refuses to install over an APK
+whose signature does not match.
 
 ## The log file
 
@@ -89,8 +111,10 @@ key will not verify against yours and vice versa.
 ## Supported versions
 
 Karasu ships as a single rolling `latest` prerelease — there's no separate
-LTS/stable branch to track yet. Please report issues against the current
-`latest` release.
+LTS/stable branch to track yet. The release workflow can also publish tagged
+`v*` releases, but that is machinery rather than a channel until the first tag
+lands; rolling `latest` remains the only published channel. Please report
+issues against the current `latest` release.
 
 ## Dependency advisories
 

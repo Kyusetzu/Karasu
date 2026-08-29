@@ -1,7 +1,7 @@
 # Contributing to Karasu
 
-Karasu is a desktop anime and manga tracker for AniList, built with Tauri 2,
-Rust and React. It is developed with heavy AI assistance and every change is
+Karasu is an anime and manga tracker for AniList — desktop (Windows and
+Linux) and Android — built with Tauri 2, Rust and React. It is developed with heavy AI assistance and every change is
 reviewed and verified by a human maintainer before it lands.
 
 Issues, ideas and pull requests are all welcome. Read the two short sections
@@ -79,7 +79,10 @@ Co-Authored-By: <your name> <your email>
 One commit per feature. For anything touching dependencies,
 `tauri.conf.json`, or the bundle, also run `npm run tauri build` as a smoke
 check and read its warnings — `cargo test` compiles `#[cfg(test)]` code and so
-cannot see a function that is dead in a release build.
+cannot see a function that is dead in a release build. The Android
+equivalents: `scripts/android-check.ps1` for anything touching `cfg`-gated
+Rust, and a real `npx tauri android build` for anything touching
+`src-tauri/gen/android/` or the plugin set.
 
 ## Where code goes
 
@@ -90,9 +93,12 @@ cannot see a function that is dead in a release build.
 - `src/components/ui/` — primitives that know nothing about Karasu.
   `shell/` is the frame, `media/` renders titles, `overlays/` opens over things.
 - `src-tauri/src/commands/` — frontend-facing commands, grouped by subject.
-- Platform-specific Rust is `#[cfg(...)]`-gated, and both Windows and Linux are
-  real implementations. Keep the decisions out of the gated modules so their
-  tests run on both.
+- Platform-specific Rust is `#[cfg(...)]`-gated, and Windows, Linux and
+  Android (`cfg(mobile)` / `cfg(target_os = "android")`) are all real
+  implementations — no stubs. iOS is deliberately not among them: like macOS,
+  it is left to fail at compile rather than compile code nobody has tested
+  there. Keep the decisions out of the gated modules so their tests run
+  everywhere.
 
 Two test projects, and the **filename** picks one: everything runs in node, and
 only `*.dom.test.tsx` boots jsdom. That is a name rather than an inference on
@@ -116,6 +122,9 @@ ones most likely to bite a first contribution.
 - **A missing i18n key renders as the key**, silently. i18next does not throw.
 - **Linux-only Rust does not compile on Windows**, so a green local run proves
   nothing about it. Let CI's `linux-build` job be the check.
+- **The same goes for the `cfg(mobile)` arm** — `npm run verify` cannot see it.
+  `scripts/android-check.ps1` (a cargo check for `aarch64-linux-android` with
+  the NDK toolchain exported) is the local gate for Android-only Rust.
 - **A suite that finishes far faster than usual failed early.** The Rust tests
   take about half a second; 0.02 s means something bailed.
 
@@ -139,6 +148,12 @@ single-instance mutex. Drop an empty `karasu.portable` file beside
 `src-tauri/target/debug/karasu.exe` and everything goes to `target/debug/data/`
 instead. It lives inside the ignored `target/`, so `cargo clean` deletes it —
 recreate it before trusting a dev run.
+
+Building the Android APK additionally needs JDK 17 (Temurin), the Android SDK
+(platform 36) and NDK 27.1.12297006; then `npx tauri android build --apk`. One
+trap worth knowing up front: the Gradle daemon caches SDK-package resolution,
+so a package installed after a failed build stays "not installed" until
+`gradlew --stop`.
 
 ## Reporting bugs
 

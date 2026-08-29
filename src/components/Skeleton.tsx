@@ -1,8 +1,5 @@
+import { skeletonDelay } from "@/lib/motion";
 import { cn } from "@/lib/utils";
-
-/** The stagger, so a wall of cells resolves like a flock landing. */
-const STEP_MS = 90;
-const CYCLE = 6;
 
 /** Title and metadata bar widths — coprime lengths, so the pair doesn't
     repeat every six cells the way the stagger does. */
@@ -26,7 +23,9 @@ export function Shimmer({
   return (
     <div
       className={cn("shimmer-fill rounded-md", className)}
-      style={{ animationDelay: `${(index % CYCLE) * STEP_MS}ms` }}
+      // The phase offset lives in lib/motion with the other stagger
+      // vocabulary, so the two rhythms are defined side by side.
+      style={{ animationDelay: `${skeletonDelay(index)}ms` }}
     />
   );
 }

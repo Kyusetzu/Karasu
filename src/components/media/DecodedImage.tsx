@@ -33,7 +33,9 @@ export function DecodedImage({
       onError={() => setReady(true)}
       style={{
         opacity: ready ? loadedOpacity : 0,
-        transition: "opacity 420ms cubic-bezier(0.16, 1, 0.3, 1)",
+        // `land`'s duration on the expo token — a raw curve here drifted the
+        // moment the token was ever retuned.
+        transition: "opacity 420ms var(--ease-out-expo)",
         ...rest.style,
       }}
       className={cn(className)}

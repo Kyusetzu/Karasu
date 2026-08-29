@@ -48,9 +48,29 @@ export function motionDuration(
   return reduced ? 0 : ms;
 }
 
-/** One rhythm for every staggered surface. Mirrors `Skeleton`'s cycle. */
+/**
+ * One rhythm for every staggered *entrance*. The skeleton shimmer below
+ * shares the cycle but not the step — an entrance lands twice as tight as a
+ * loop phase, and this file used to claim they mirrored each other when only
+ * the cycle did.
+ */
 export const STAGGER_STEP_MS = 45;
 export const STAGGER_CYCLE = 6;
+
+/**
+ * The shimmer's phase offset for cell `index`, in ms.
+ *
+ * Not an entrance stagger: the shimmer loops, so this only decides where in
+ * the loop a cell starts — six offsets make the sweep travel across a grid
+ * instead of pulsing the whole page at once. Deliberately no reduced-motion
+ * branch: the delay rides an animation the CSS collapse already zeroes,
+ * inline style included, so a JS guard here would be a second answer to a
+ * question CSS has settled.
+ */
+export const SKELETON_STEP_MS = 90;
+export function skeletonDelay(index: number): number {
+  return (index % STAGGER_CYCLE) * SKELETON_STEP_MS;
+}
 
 /**
  * The stagger delay for item `index`, in ms.

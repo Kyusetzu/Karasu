@@ -1,6 +1,6 @@
 import { area, curveMonotoneX, line } from "d3-shape";
 import { scaleLinear, scalePoint } from "d3-scale";
-import { motionDuration, seriesDelay } from "@/lib/motion";
+import { seriesDelay } from "@/lib/motion";
 
 /**
  * A smoothed area over time — `LineChart`'s successor for year series.
@@ -62,14 +62,14 @@ export function AreaChart({
         style={{
           strokeDasharray: 1,
           ["--draw-length" as string]: 1,
-          animation: "drawLine 900ms cubic-bezier(0.16, 1, 0.3, 1) forwards",
+          animation: "drawLine 900ms var(--ease-out-expo) forwards",
         }}
       />
       {pts.map((p, i) => (
         <g
           key={data[i].label}
           className="chart-in"
-          style={{ animationDelay: `${motionDuration(seriesDelay(i, pts.length))}ms` }}
+          style={{ animationDelay: `${seriesDelay(i, pts.length)}ms` }}
         >
           <circle cx={p.x} cy={p.y} r={2.5} fill="var(--color-accent-400)" />
           <text

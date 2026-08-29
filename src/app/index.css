@@ -148,14 +148,16 @@
   --duration-exit: 120ms;
 
   /* A bird landing on a branch — down from above, no bounce. On every screen
-     root, and on the palette, the bell and the graph rail. */
-  --animate-settle: settle 150ms cubic-bezier(0.2, 0, 0, 1);
+     root, and on the palette, the bell and the graph rail.
+     These consume the ease tokens above rather than retyping the curves, so
+     retuning a token retunes every animation built on it. */
+  --animate-settle: settle 150ms var(--ease-karasu);
   /* Things that arrive from the bottom edge: toasts, the bulk bar. */
-  --animate-rise-in: riseIn 160ms cubic-bezier(0.2, 0, 0, 1);
-  --animate-pop-in: popIn 120ms cubic-bezier(0.2, 0, 0, 1);
+  --animate-rise-in: riseIn 160ms var(--ease-karasu);
+  --animate-pop-in: popIn 120ms var(--ease-karasu);
   --animate-fade-in: fadeIn 120ms linear;
   /* The progress counter acknowledging a +1. */
-  --animate-tick: tick 180ms cubic-bezier(0.2, 0, 0, 1);
+  --animate-tick: tick 180ms var(--ease-karasu);
   /* The titlebar detection dot: the app quietly proving it is watching. */
   --animate-blip: blip 2.4s ease-in-out infinite;
   /* `steps(1)` so a caret blinks rather than fades. Deliberately unused: it was
@@ -171,19 +173,14 @@
      Every overlay in the app now leaves through one of these rather than
      vanishing mid-frame; `usePresence` is what keeps the node alive long
      enough for that to be visible. */
-  --animate-settle-out: settleOut var(--duration-exit) cubic-bezier(0.4, 0, 1, 1)
-    forwards;
-  --animate-rise-out: riseOut var(--duration-exit) cubic-bezier(0.4, 0, 1, 1)
-    forwards;
-  --animate-pop-out: popOut var(--duration-exit) cubic-bezier(0.4, 0, 1, 1)
-    forwards;
+  --animate-settle-out: settleOut var(--duration-exit) var(--ease-exit) forwards;
+  --animate-rise-out: riseOut var(--duration-exit) var(--ease-exit) forwards;
+  --animate-pop-out: popOut var(--duration-exit) var(--ease-exit) forwards;
   --animate-fade-out: fadeOut var(--duration-exit) linear forwards;
   /* The dialog arrival: scales up past 1 and settles. */
-  --animate-spring-in: springIn 280ms cubic-bezier(0.34, 1.42, 0.64, 1);
+  --animate-spring-in: springIn var(--duration-expressive) var(--ease-spring);
   /* A success landing — the scrobble confirmation. */
-  --animate-land: land 420ms cubic-bezier(0.16, 1, 0.3, 1);
-  /* Staggered arrivals (skeleton to content, list cells, chart series). */
-  --animate-reveal: reveal 320ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  --animate-land: land 420ms var(--ease-out-expo);
 
   /* --- Idle motion -------------------------------------------------------
      Ambient rather than attention-seeking: long periods, small amplitudes,
@@ -320,15 +317,6 @@
   }
 }
 
-/* The staggered arrival. `backwards` on the animation matters: with a delay,
-   the element would otherwise render at full opacity until its turn came. */
-@keyframes reveal {
-  from {
-    opacity: 0;
-    transform: translateY(0.5rem);
-  }
-}
-
 /* Idle loops. Every one of these is a `box-shadow`/`opacity`/`transform`
    animation and therefore already collapses under the reduce-motion rules at
    the bottom of this file — none of them needs a JS guard. */
@@ -397,7 +385,7 @@
 @utility chart-in {
   transform-box: fill-box;
   transform-origin: center;
-  animation: chartIn 320ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  animation: chartIn 320ms var(--ease-out-expo) backwards;
 }
 
 /* The one skeleton fill: a light sweep travelling across the placeholder

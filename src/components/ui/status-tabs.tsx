@@ -116,7 +116,7 @@ export function StatusTabs<T extends string>({
       {bar && (
         <span
           aria-hidden="true"
-          className="absolute h-0.5 rounded-full bg-accent-500 transition-[left,width] duration-140 ease-karasu"
+          className="absolute h-0.5 rounded-full bg-accent-500 transition-[left,width]"
           // The row-aware offset is measured in — see `measure`.
           style={{ left: bar.left, width: bar.width, top: bar.top }}
         />

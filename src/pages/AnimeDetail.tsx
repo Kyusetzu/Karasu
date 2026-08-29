@@ -581,7 +581,7 @@ export default function AnimeDetail() {
                       src={e.node.coverImage.large ?? ""}
                       alt=""
                       loading="lazy"
-                      className="aspect-[2/3] w-full rounded-lg object-cover transition-transform duration-(--duration-expressive) ease-(--ease-out-expo) group-hover:-translate-y-1"
+                      className="aspect-[2/3] w-full rounded-lg object-cover transition-transform group-hover:-translate-y-1"
                     />
                     <p className="mt-1 text-xs text-accent-400">
                       {t(`relation.${e.relationType}`, {

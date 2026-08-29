@@ -1,6 +1,6 @@
 import { scaleLinear } from "d3-scale";
 import { Card, CardTitle } from "@/components/ui/card";
-import { motionDuration, seriesDelay } from "@/lib/motion";
+import { seriesDelay } from "@/lib/motion";
 
 /**
  * A dumbbell plot: two scores per row on one 0–max axis, joined by a line
@@ -58,7 +58,7 @@ export function DotPlot({
               viewBox="0 0 100 12"
               preserveAspectRatio="none"
               aria-hidden="true"
-              style={{ animationDelay: `${motionDuration(seriesDelay(i, rows.length))}ms` }}
+              style={{ animationDelay: `${seriesDelay(i, rows.length)}ms` }}
             >
               {/* The axis, faint, so a lone pair still reads as a position. */}
               <line x1="3" y1="6" x2="97" y2="6" stroke="var(--color-surface-800)" strokeWidth="1" />

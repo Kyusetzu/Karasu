@@ -198,7 +198,7 @@ export function DistributionCard({
               <div
                 // Only fires when the figure changes — switching ANIME/MANGA
                 // re-measures the bars rather than cutting to new lengths.
-                className="h-full rounded bg-accent-500 transition-[width] duration-[280ms] ease-out-expo"
+                className="h-full rounded bg-accent-500 transition-[width] duration-(--duration-expressive) ease-out-expo"
                 style={{ width: `${(d.count / max) * 100}%` }}
               />
             </div>

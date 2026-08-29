@@ -1,6 +1,6 @@
 import { Card, CardTitle } from "@/components/ui/card";
 import { HISTORY_LEVELS, type DayHeatmap as DayHeatmapData } from "@/lib/localStats";
-import { motionDuration, seriesDelay } from "@/lib/motion";
+import { seriesDelay } from "@/lib/motion";
 
 /**
  * AniList's own activity history, drawn the way AniList draws it: one cell per
@@ -104,7 +104,7 @@ export function DayHeatmap({
                 key={wi}
                 className="chart-in flex flex-col gap-1"
                 style={{
-                  animationDelay: `${motionDuration(seriesDelay(wi, data.weeks.length))}ms`,
+                  animationDelay: `${seriesDelay(wi, data.weeks.length)}ms`,
                 }}
               >
                 {/* The month band rides on the column it belongs to, so it

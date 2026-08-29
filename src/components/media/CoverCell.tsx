@@ -110,7 +110,7 @@ export function CoverCell({
       // holds dozens of these.
       {...{ [HERO_ATTR]: "" }}
       className={cn(
-        "h-full w-full object-cover transition-[filter] duration-(--duration-expressive)",
+        "h-full w-full object-cover transition-[filter] duration-(--duration-expressive) ease-(--ease-out-expo)",
         // `scale-105` because a blur samples past the element's edge and would
         // otherwise leave a soft transparent rim around the artwork.
         veiled && "scale-105 blur-xl",

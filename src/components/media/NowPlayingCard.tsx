@@ -80,8 +80,9 @@ export default function NowPlayingCard() {
   const qc = useQueryClient();
   const { t } = useTranslation();
   // Retained through the exit so the card can animate away with its title
-  // rather than emptying first.
-  const shown = usePresentValue(current, 160);
+  // rather than emptying first. Default hold: the old 160 outlived the
+  // 120ms rise-out by 40ms of frozen end-state.
+  const shown = usePresentValue(current);
 
   // Reload the list after a successful auto-update. Only the collection that
   // actually changed: an anime scrobble cannot alter the manga list, and

@@ -22,6 +22,7 @@ import { useListMutations } from "@/hooks/useListMutations";
 import { displayTitle, type MediaListStatus } from "@/api/types";
 import BackButton from "@/components/shell/BackButton";
 import EntryEditModal from "@/components/media/EntryEditModal";
+import { Presence } from "@/components/ui/presence";
 import { EmptyState, PerchRule } from "@/components/EmptyState";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
@@ -267,7 +268,9 @@ export default function Franchise() {
                           ? "rgba(var(--accent-rgb), .85)"
                           : "var(--color-surface-700)",
                         strokeWidth: lit ? 1.75 : 1,
-                        transition: "stroke 140ms var(--ease-karasu, ease), stroke-width 140ms",
+                        transition:
+                          "stroke var(--default-transition-duration) var(--ease-karasu), " +
+                          "stroke-width var(--default-transition-duration) var(--ease-karasu)",
                       }}
                     />
                   );
@@ -354,14 +357,19 @@ export default function Franchise() {
         </div>
       )}
 
-      {editing !== null && (
-        <EntryEditor
-          mediaId={editing}
-          type={byId.get(editing)?.type ?? "ANIME"}
-          userId={userId}
-          onClose={() => setEditing(null)}
-        />
-      )}
+      {/* The one EntryEditModal call site that had no exit — every other one
+          already goes through Presence/PresenceIf. */}
+      <Presence value={editing}>
+        {(mediaId, leaving) => (
+          <EntryEditor
+            mediaId={mediaId}
+            leaving={leaving}
+            type={byId.get(mediaId)?.type ?? "ANIME"}
+            userId={userId}
+            onClose={() => setEditing(null)}
+          />
+        )}
+      </Presence>
     </div>
   );
 }
@@ -403,7 +411,7 @@ function GraphNode({
 
   return (
     <div
-      className="absolute flex flex-col items-center transition-[opacity,transform] duration-140"
+      className="absolute flex flex-col items-center transition-[opacity,transform]"
       style={{
         left: `${x}em`,
         top: `${y}em`,
@@ -614,11 +622,13 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
  */
 function EntryEditor({
   mediaId,
+  leaving,
   type,
   userId,
   onClose,
 }: {
   mediaId: number;
+  leaving: boolean;
   type: "ANIME" | "MANGA";
   userId: number | undefined;
   onClose: () => void;
@@ -639,6 +649,7 @@ function EntryEditor({
 
   return (
     <EntryEditModal
+      leaving={leaving}
       media={{ ...entry.media, type }}
       entry={entry}
       onClose={onClose}

@@ -102,7 +102,7 @@ export function ScoreBars({
               ) : (
                 <span
                   className={cn(
-                    "w-full rounded-[.1875rem] transition-[height] duration-160 ease-karasu",
+                    "w-full rounded-[.1875rem] transition-[height]",
                     filled ? "bg-gold" : "bg-surface-700",
                   )}
                   style={{ height: `${fillFor(i, options.length)}%` }}

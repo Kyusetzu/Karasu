@@ -192,9 +192,10 @@ function DiagnosticsSection() {
           {copied ? t("common.copied") : t("about.copyDiagnostics")}
         </Button>
         <Button variant="secondary" onClick={save} disabled={saving}>
-          {/* The spinning RefreshCw is the house busy idiom; `animate-bounce`
-              is Tailwind's overshoot and index.css says plainly that this app
-              has no springs and no overshoot. */}
+          {/* The spinning RefreshCw is the house busy idiom. (`index.css`
+              does allow overshoot for feature motion these days — but a
+              busy indicator is not a feature moment, and Tailwind's
+              `animate-bounce` is not one of the app's registers.) */}
           {saving ? (
             <RefreshCw className="size-3.5 animate-spin" />
           ) : (
@@ -303,8 +304,7 @@ function UpdateSection() {
 
         {downloading && (
           <span className="flex items-center gap-1.5 text-sm text-ink-500">
-            <Download className="size-4 animate-bounce" />{" "}
-            {t("about.downloading")}
+            <RefreshCw className="size-4 animate-spin" /> {t("about.downloading")}
           </span>
         )}
 

@@ -2,7 +2,7 @@ import { useId } from "react";
 import { scaleLinear } from "d3-scale";
 import { max } from "d3-array";
 import { Card, CardTitle } from "@/components/ui/card";
-import { motionDuration, seriesDelay } from "@/lib/motion";
+import { seriesDelay } from "@/lib/motion";
 
 /**
  * Horizontal bars with the Wrapped poster's accent gradient, one row per
@@ -72,7 +72,7 @@ export function GradientBars({
                 rx="3"
                 fill={`url(#${gradientId})`}
                 className="chart-in"
-                style={{ animationDelay: `${motionDuration(seriesDelay(i, rows.length))}ms` }}
+                style={{ animationDelay: `${seriesDelay(i, rows.length)}ms` }}
               />
             </svg>
           </div>

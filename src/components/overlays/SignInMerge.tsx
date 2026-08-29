@@ -23,6 +23,7 @@ import { displayTitle, type MediaListGroup } from "@/api/types";
 import { useAuth } from "@/stores/auth";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
+import { usePresentValue } from "@/hooks/usePresence";
 
 /**
  * When a local-only user connects AniList, offer to merge the local list into
@@ -99,7 +100,12 @@ export default function SignInMerge() {
     })();
   }, [viewer]);
 
-  if (!rows) return null;
+  // Held through the exit: `setRows(null)` used to unmount the Modal in the
+  // same commit, so this was the one dialog in the app that faded in and cut
+  // out. `held` keeps the last rows alive while `leaving` plays the exit.
+  const held = usePresentValue(rows);
+  if (!held.value) return null;
+  const shown = held.value;
 
   const asSide = (r: LocalEntryRow): MergeSide => ({
     status: r.status,
@@ -107,17 +113,17 @@ export default function SignInMerge() {
     scoreRaw: toRaw("POINT_10", r.score),
     updatedAt: r.updatedAt,
   });
-  const conflicts = rows.filter((r) => {
+  const conflicts = shown.filter((r) => {
     const o = online.get(r.mediaId);
     return !!o && sidesDiffer(asSide(r), o);
   });
-  const additions = rows.filter((r) => !online.has(r.mediaId));
+  const additions = shown.filter((r) => !online.has(r.mediaId));
 
   const run = async () => {
     setPhase("running");
     let done = 0;
     const tally = { merged: 0, queued: 0, failed: 0 };
-    for (const r of rows) {
+    for (const r of shown) {
       try {
         const o = online.get(r.mediaId) ?? null;
         if (localWins(asSide(r), o, strategy)) {
@@ -188,7 +194,11 @@ export default function SignInMerge() {
   const close = () => setRows(null);
 
   return (
-    <Modal title={t("merge.title")} onClose={phase === "running" ? () => {} : close}>
+    <Modal
+      title={t("merge.title")}
+      leaving={held.leaving}
+      onClose={phase === "running" ? () => {} : close}
+    >
       {phase === "blocked" ? (
         <div className="space-y-4">
           <p className="text-sm text-ink-300">{t("merge.blocked")}</p>
@@ -219,7 +229,7 @@ export default function SignInMerge() {
         <div className="space-y-4">
           <p className="text-sm text-ink-300">
             {t("merge.summary", {
-              total: rows.length,
+              total: shown.length,
               add: additions.length,
               conflicts: conflicts.length,
             })}
@@ -255,7 +265,7 @@ export default function SignInMerge() {
 
           {phase === "running" && (
             <p className="text-xs text-accent-400">
-              {t("merge.progress", { done: progress, total: rows.length })}
+              {t("merge.progress", { done: progress, total: shown.length })}
             </p>
           )}
 

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ChevronDown } from "lucide-react";
 import type { Season } from "@/api/queries";
+import { usePresence } from "@/hooks/usePresence";
 import { cn } from "@/lib/utils";
 
 const SEASONS: Season[] = ["WINTER", "SPRING", "SUMMER", "FALL"];
@@ -34,6 +35,9 @@ export default function SeasonPicker({
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
+  // Exit through `usePresence`, like its sibling `multi-filter-select`: with
+  // `{open && …}` alone the panel popped in and vanished mid-frame.
+  const panel = usePresence(open);
 
   // The years on offer end at the newest season anyone can browse, which is
   // next year's Winter — AniList lists it well before it airs.
@@ -76,13 +80,16 @@ export default function SeasonPicker({
         />
       </button>
 
-      {open && (
+      {panel.mounted && (
         // `data-overlay` like every other popover — the Bell, the context menu,
         // the filter selects. Without it the screen-level key handlers stayed
         // live while this was open, so `/` and Ctrl+1/2/3 fired underneath it.
         <div
           data-overlay
-          className="absolute left-0 top-full z-10 mt-1.5 w-64 animate-pop-in rounded-xl border border-hair bg-surface-900 p-3 shadow-xl panel-wash"
+          className={cn(
+            "absolute left-0 top-full z-10 mt-1.5 w-64 origin-top-left rounded-xl border border-hair bg-surface-900 p-3 shadow-xl panel-wash",
+            panel.leaving ? "animate-pop-out" : "animate-pop-in",
+          )}
         >
           <div className="flex gap-1">
             {years.map((y) => (

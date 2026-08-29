@@ -26,7 +26,15 @@ export interface Presence {
  * is in flight cancels it, so a fast toggle cannot unmount a node that is open
  * again by the time the timer fires.
  */
-export function usePresence(open: boolean, exitMs = 120): Presence {
+/**
+ * The default exit hold, and it MUST match `--duration-exit` in `index.css`:
+ * the CSS plays the exit for that long, this keeps the node alive exactly as
+ * long. A JS constant because a hook cannot read a CSS token without a DOM
+ * round trip on every close.
+ */
+export const EXIT_MS = 120;
+
+export function usePresence(open: boolean, exitMs = EXIT_MS): Presence {
   const [mounted, setMounted] = useState(open);
   const [leaving, setLeaving] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -86,7 +94,7 @@ export interface ValuePresence<T> extends Presence {
  */
 export function usePresentValue<T>(
   value: T | null | undefined,
-  exitMs = 120,
+  exitMs = EXIT_MS,
 ): ValuePresence<T> {
   const presence = usePresence(value != null, exitMs);
   const last = useRef<T | null>(null);

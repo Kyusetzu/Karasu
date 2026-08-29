@@ -1,7 +1,7 @@
 import { scaleQuantize } from "d3-scale";
 import { Card, CardTitle } from "@/components/ui/card";
 import type { HeatmapYear } from "@/lib/localStats";
-import { motionDuration, seriesDelay } from "@/lib/motion";
+import { seriesDelay } from "@/lib/motion";
 
 /**
  * A year × month activity grid — when the list was actually being worked on.
@@ -49,7 +49,7 @@ export function Heatmap({
           <div
             key={row.year}
             className="chart-in grid grid-cols-[2.5rem_repeat(12,1fr)] gap-1"
-            style={{ animationDelay: `${motionDuration(seriesDelay(yi, years.length))}ms` }}
+            style={{ animationDelay: `${seriesDelay(yi, years.length)}ms` }}
           >
             <span className="self-center text-2xs tabular-nums text-ink-500">{row.year}</span>
             {row.months.map((count, mi) => (

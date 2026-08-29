@@ -45,6 +45,7 @@ import { FilteredNotice } from "@/components/FilteredNotice";
 import { useContentFilter } from "@/stores/contentFilter";
 import { useAuth } from "@/stores/auth";
 import { usePhoneShell } from "@/hooks/usePhoneShell";
+import { usePresence } from "@/hooks/usePresence";
 import { cn } from "@/lib/utils";
 import { EmptyState, PerchRule, StruckQuery } from "@/components/EmptyState";
 import { Pill } from "@/components/ui/pill";
@@ -108,6 +109,10 @@ export default function Search() {
   // Phone only: the nine filter chips collapse behind this. Desktop has the
   // room and keeps its inline row.
   const [filtersOpen, setFiltersOpen] = useState(false);
+  // The phone fold pops in, so it must pop out — `{filtersOpen && …}` alone
+  // cut it away mid-frame on collapse. Desktop renders it statically either
+  // way and never consults this.
+  const filterPanel = usePresence(filtersOpen);
   // Include *and* exclude, many at a time — `Page.media` takes `genre_in` /
   // `genre_not_in` and the tag pair, which is what AniList's own browse page
   // is built on. One genre and one tag was a lens, not a filter.
@@ -361,8 +366,13 @@ export default function Search() {
               )}
             </div>
           )}
-          {isMediaScope(scope) && (!phone || filtersOpen) && (
-            <div className={cn("mt-2.5 flex flex-wrap gap-2", phone && "animate-pop-in")}>
+          {isMediaScope(scope) && (!phone || filterPanel.mounted) && (
+            <div
+              className={cn(
+                "mt-2.5 flex flex-wrap gap-2",
+                phone && (filterPanel.leaving ? "animate-pop-out" : "animate-pop-in"),
+              )}
+            >
               <MultiFilterSelect
                 label={t("search.genreLabel")}
                 value={genre}

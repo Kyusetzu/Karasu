@@ -103,7 +103,28 @@ pub fn save_token(token: &str) -> Result<(), String> {
 #[cfg(mobile)]
 const MOBILE_TOKEN_FILE: &str = "jellyfin_token.dat";
 
-#[cfg(mobile)]
+#[cfg(target_os = "android")]
+pub fn save_token(token: &str) -> Result<(), String> {
+    let token = token.trim();
+    if token.is_empty() {
+        return delete_token();
+    }
+    let path = crate::portable::mobile_secret_file(MOBILE_TOKEN_FILE)
+        .ok_or("The data directory is not known yet")?;
+    if let Some(dir) = path.parent() {
+        std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    }
+    // Sealed through the Keystore, exactly like the AniList token — the
+    // follow-up this block's comment always promised. Same key alias, same
+    // `KRSA1` framing, same migration on read below.
+    let sealed = crate::keystore::seal(token.as_bytes())?;
+    std::fs::write(path, crate::keystore::frame(&sealed))
+        .map_err(|e| format!("Could not save the access token: {e}"))?;
+    set_cached_token(Some(token.to_string()));
+    Ok(())
+}
+
+#[cfg(all(mobile, not(target_os = "android")))]
 pub fn save_token(token: &str) -> Result<(), String> {
     let token = token.trim();
     if token.is_empty() {
@@ -196,7 +217,71 @@ pub fn delete_token() -> Result<(), String> {
     Ok(())
 }
 
-#[cfg(mobile)]
+#[cfg(target_os = "android")]
+pub fn load_token() -> Option<String> {
+    cached_or(&TOKEN_CACHE, || {
+        let Some(path) = crate::portable::mobile_secret_file(MOBILE_TOKEN_FILE) else {
+            // Startup has not recorded the data dir yet — "could not look",
+            // which must not be cached as "nothing is stored".
+            return Err(());
+        };
+        match std::fs::read(&path) {
+            Ok(raw) => match crate::keystore::classify(&raw) {
+                crate::keystore::Stored::Sealed(sealed) => match crate::keystore::open(sealed) {
+                    Ok(plain) => Ok(String::from_utf8(plain).ok().filter(|t| !t.is_empty())),
+                    Err(e) => {
+                        // Signed out, not a crash loop — same stance as the
+                        // AniList arm; cached, since retrying cannot help.
+                        crate::logging::warn(
+                            "jellyfin",
+                            format!("stored token would not decrypt; signed out: {e}"),
+                        );
+                        Ok(None)
+                    }
+                },
+                // Written before sealing existed: re-wrap in place; a failed
+                // re-wrap keeps the session on the old bytes and retries on
+                // the next launch.
+                crate::keystore::Stored::Legacy(plain) => {
+                    let token = String::from_utf8(plain.to_vec())
+                        .ok()
+                        .filter(|t| !t.is_empty());
+                    if let Some(t) = &token {
+                        match crate::keystore::seal(t.as_bytes()) {
+                            Ok(sealed) => {
+                                if let Err(e) =
+                                    std::fs::write(&path, crate::keystore::frame(&sealed))
+                                {
+                                    crate::logging::warn(
+                                        "jellyfin",
+                                        format!("could not rewrite the migrated token: {e}"),
+                                    );
+                                } else {
+                                    crate::logging::info(
+                                        "jellyfin",
+                                        "token migrated to the Keystore",
+                                    );
+                                }
+                            }
+                            Err(e) => crate::logging::warn(
+                                "jellyfin",
+                                format!("token migration failed, keeping plaintext: {e}"),
+                            ),
+                        }
+                    }
+                    Ok(token)
+                }
+            },
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(e) => {
+                crate::logging::warn("jellyfin", format!("could not read the token: {e}"));
+                Err(())
+            }
+        }
+    })
+}
+
+#[cfg(all(mobile, not(target_os = "android")))]
 pub fn load_token() -> Option<String> {
     cached_or(&TOKEN_CACHE, || {
         let Some(path) = crate::portable::mobile_secret_file(MOBILE_TOKEN_FILE) else {

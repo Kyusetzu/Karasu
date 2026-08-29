@@ -19,3 +19,8 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# Hand-added (init does not regenerate this file's content, but keep the note
+# anyway): TokenCipher is reached from Rust over JNI by name — minification
+# renaming or stripping it fails only at runtime, as a failed sign-in.
+-keep class dev.kyu.karasu.TokenCipher { *; }

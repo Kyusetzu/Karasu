@@ -144,16 +144,118 @@ pub fn migrate_to_portable_file() -> Result<(), String> {
 // `cfg(mobile)`, not `cfg(not(any(windows, linux)))`, and the difference is
 // macOS: the module header's stance is that a macOS build fails to compile
 // rather than silently getting a backend nobody has tested, and a
-// not-windows-not-linux arm would hand it this one. Android and iOS get a
-// plain file in the app-private data dir — sandboxed per app by the OS,
-// weaker than a credential store, Keystore-backed encryption the named
-// follow-up. The invariant that holds regardless: the token stays in Rust
-// and never reaches the WebView.
-
+// not-windows-not-linux arm would hand it this one.
+//
+// On Android the file is sealed through the Keystore (`crate::keystore` —
+// `KRSA1 || iv || ct`, key hardware-backed, `TokenCipher.kt` on the other
+// side), with a plaintext token from an earlier build re-wrapped in place on
+// first read. iOS keeps the plain file: nothing has ever tested a Keychain
+// arm, and an untested crypto path is the thing this module's macOS stance
+// exists to prevent. The invariant that holds regardless: the token stays in
+// Rust and never reaches the WebView.
 #[cfg(mobile)]
 const MOBILE_TOKEN_FILE: &str = "anilist_token.dat";
 
-#[cfg(mobile)]
+/// One read per process, not one per scrobbler tick: `load_token` sits on the
+/// 5-second detection loop, and a JNI round-trip per tick is the
+/// 17,280-reads-a-day mistake jellyfin's own cache documents. `None` = not
+/// yet looked; `Some(None)` = looked, signed out.
+#[cfg(target_os = "android")]
+static TOKEN_CACHE: std::sync::Mutex<Option<Option<String>>> = std::sync::Mutex::new(None);
+
+#[cfg(target_os = "android")]
+pub fn save_token(token: &str) -> Result<(), String> {
+    let path = crate::portable::mobile_secret_file(MOBILE_TOKEN_FILE)
+        .ok_or("The data directory is not known yet")?;
+    if let Some(dir) = path.parent() {
+        std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    }
+    let sealed = crate::keystore::seal(token.as_bytes())?;
+    std::fs::write(path, crate::keystore::frame(&sealed))
+        .map_err(|e| format!("Could not save token: {e}"))?;
+    *TOKEN_CACHE.lock().unwrap() = Some(Some(token.to_string()));
+    Ok(())
+}
+
+#[cfg(target_os = "android")]
+pub fn load_token() -> Option<String> {
+    if let Some(cached) = TOKEN_CACHE.lock().unwrap().clone() {
+        return cached;
+    }
+    // The data dir not being recorded yet is "could not look", never cached —
+    // the same distinction jellyfin's mobile arm draws.
+    let path = crate::portable::mobile_secret_file(MOBILE_TOKEN_FILE)?;
+    let token = match std::fs::read(&path) {
+        Ok(raw) => match crate::keystore::classify(&raw) {
+            crate::keystore::Stored::Sealed(sealed) => match crate::keystore::open(sealed) {
+                Ok(plain) => String::from_utf8(plain).ok().filter(|t| !t.is_empty()),
+                Err(e) => {
+                    // Undecryptable reads as signed out — the quiet sign-in
+                    // screen — never a crash loop. Named in the log, because
+                    // from the UI it is indistinguishable from "never signed
+                    // in".
+                    crate::logging::warn(
+                        "auth",
+                        format!("stored token would not decrypt; signed out: {e}"),
+                    );
+                    None
+                }
+            },
+            // A token written before sealing existed: re-wrap it in place.
+            // A failed re-wrap keeps the session alive on the old bytes —
+            // migration must never cost a sign-in — and retries next launch.
+            crate::keystore::Stored::Legacy(plain) => {
+                let token = String::from_utf8(plain.to_vec())
+                    .ok()
+                    .filter(|t| !t.is_empty());
+                if let Some(t) = &token {
+                    match crate::keystore::seal(t.as_bytes()) {
+                        Ok(sealed) => {
+                            if let Err(e) =
+                                std::fs::write(&path, crate::keystore::frame(&sealed))
+                            {
+                                crate::logging::warn(
+                                    "auth",
+                                    format!("could not rewrite the migrated token: {e}"),
+                                );
+                            } else {
+                                crate::logging::info("auth", "token migrated to the Keystore");
+                            }
+                        }
+                        Err(e) => crate::logging::warn(
+                            "auth",
+                            format!("token migration failed, keeping plaintext for now: {e}"),
+                        ),
+                    }
+                }
+                token
+            }
+        },
+        Err(_) => None,
+    };
+    *TOKEN_CACHE.lock().unwrap() = Some(token.clone());
+    token
+}
+
+#[cfg(target_os = "android")]
+pub fn delete_token() {
+    *TOKEN_CACHE.lock().unwrap() = Some(None);
+    // The Keystore key alias stays: it holds no secret without the file, and
+    // dropping it would orphan a sealed Jellyfin token sharing the same key.
+    let Some(path) = crate::portable::mobile_secret_file(MOBILE_TOKEN_FILE) else {
+        return;
+    };
+    if let Err(e) = std::fs::remove_file(&path) {
+        if e.kind() != std::io::ErrorKind::NotFound {
+            crate::logging::error(
+                "auth",
+                format!("sign-out could not remove {}: {e}", path.display()),
+            );
+        }
+    }
+}
+
+#[cfg(all(mobile, not(target_os = "android")))]
 pub fn save_token(token: &str) -> Result<(), String> {
     let path = crate::portable::mobile_secret_file(MOBILE_TOKEN_FILE)
         .ok_or("The data directory is not known yet")?;
@@ -163,14 +265,14 @@ pub fn save_token(token: &str) -> Result<(), String> {
     std::fs::write(path, token.as_bytes()).map_err(|e| format!("Could not save token: {e}"))
 }
 
-#[cfg(mobile)]
+#[cfg(all(mobile, not(target_os = "android")))]
 pub fn load_token() -> Option<String> {
     let path = crate::portable::mobile_secret_file(MOBILE_TOKEN_FILE)?;
     let raw = std::fs::read(path).ok()?;
     String::from_utf8(raw).ok().filter(|t| !t.is_empty())
 }
 
-#[cfg(mobile)]
+#[cfg(all(mobile, not(target_os = "android")))]
 pub fn delete_token() {
     let Some(path) = crate::portable::mobile_secret_file(MOBILE_TOKEN_FILE) else {
         return;

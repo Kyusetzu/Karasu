@@ -6,6 +6,7 @@ mod db;
 mod diagnostics;
 mod discord;
 mod identify;
+mod keystore;
 mod library;
 mod logging;
 mod net;

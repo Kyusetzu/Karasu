@@ -52,6 +52,7 @@ pub const ANILIST_LOGIN: &str = "<CREDENTIAL_anilist-login>";
 pub const JELLYFIN_LOGIN: &str = "<CREDENTIAL_jellyfin-login>";
 pub const JELLYFIN_PASSWORD: &str = "<CREDENTIAL_jellyfin-password>";
 pub const PORTABLE_KEY: &str = "<CREDENTIAL_portable-key>";
+pub const MOBILE_SEALED: &str = "<CREDENTIAL_mobile-sealed-token>";
 /// Anything secret-shaped that matched no specific rule. This is what makes an
 /// unforeseen leak fail *safe* rather than land in the file unnoticed.
 pub const UNKNOWN_CREDENTIAL: &str = "<CREDENTIAL_unknown>";
@@ -199,6 +200,12 @@ fn rules() -> &'static [(regex::Regex, String)] {
             (
                 r(r"KRSU1[A-Za-z0-9+/=]*"),
                 PORTABLE_KEY.to_string(),
+            ),
+            // The Keystore-sealed mobile token file. `KRSA1` is its magic
+            // (keystore.rs).
+            (
+                r(r"KRSA1[A-Za-z0-9+/=]*"),
+                MOBILE_SEALED.to_string(),
             ),
             // Catch-all. A long unbroken run of base64 alphabet with no
             // separators is not something this app legitimately writes: release
@@ -574,6 +581,8 @@ mod tests {
     fn a_sealed_portable_token_is_labelled() {
         let out = scrub("read token.dat: KRSU1AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
         assert!(out.contains(PORTABLE_KEY), "{out}");
+        let out = scrub("read anilist_token.dat: KRSA1AAAAAAAAAAAAAAAAAAAAAAAAAAAA");
+        assert!(out.contains(MOBILE_SEALED), "{out}");
         assert!(!out.contains("KRSU1AAAA"), "{out}");
     }
 

@@ -2325,12 +2325,13 @@ dependencies = [
 
 [[package]]
 name = "karasu"
-version = "0.179.0"
+version = "0.180.0"
 dependencies = [
  "base64 0.22.1",
  "chacha20poly1305",
  "discord-rich-presence",
  "getrandom 0.3.4",
+ "jni 0.21.1",
  "keyring",
  "notify-rust",
  "percent-encoding",
@@ -2340,6 +2341,7 @@ dependencies = [
  "rustls",
  "serde",
  "serde_json",
+ "tao",
  "tauri",
  "tauri-build",
  "tauri-plugin-autostart",

@@ -78,7 +78,7 @@ export default function LocalLibrary() {
         <div className="text-center">
           <p className="text-ink-500">{t("list.connectPrompt")}</p>
           {/* Account, not Library: this prompt is about being signed out. */}
-          <Link to="/settings">
+          <Link to="/settings?pane=account">
             <Button className="mt-4">{t("list.toSettings")}</Button>
           </Link>
         </div>

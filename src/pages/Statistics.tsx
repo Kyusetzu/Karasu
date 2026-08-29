@@ -103,7 +103,7 @@ export default function Statistics() {
           <p className="mt-3 text-sm leading-relaxed text-ink-500">
             {t("stats.signInText")}
           </p>
-          <Link to="/settings">
+          <Link to="/settings?pane=account">
             <Button className="mt-5">{t("dashboard.connect")}</Button>
           </Link>
         </div>

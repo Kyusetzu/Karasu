@@ -1,7 +1,8 @@
-import { Link } from "react-router";
+import { useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import KarasuMark from "@/components/KarasuMark";
+import { useAniListLogin } from "@/hooks/useAniListLogin";
 import { useAuth } from "@/stores/auth";
 
 /**
@@ -15,8 +16,18 @@ import { useAuth } from "@/stores/auth";
  */
 export default function FirstRun() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const enableLocal = useAuth((s) => s.enableLocal);
+  const login = useAniListLogin();
   const steps = [t("firstRun.step1"), t("firstRun.step2"), t("firstRun.step3")];
+
+  // The button used to be a bare link to /settings — which on the phone shell
+  // is the pane *list*, putting the actual OAuth button three taps away from
+  // the very first screen. Start the handoff here; only a failed start (no
+  // browser, port taken) falls back to the Account pane's manual paste.
+  const connect = async () => {
+    if (!(await login.start())) navigate("/settings?pane=account");
+  };
 
   return (
     <div className="relative grid h-full place-items-center overflow-hidden">
@@ -48,15 +59,25 @@ export default function FirstRun() {
           </p>
 
           <div className="mt-6 flex flex-wrap items-center gap-3">
-            <Link to="/settings">
-              <Button>{t("dashboard.connect")}</Button>
-            </Link>
+            {/* Deliberately NOT disabled while waiting: this is the one moment
+                where a closed browser tab must be recoverable by pressing
+                again (the backend reuses the pending login), and the hook's
+                in-flight guard already stops a double-tap opening two tabs.
+                "Look around" during a pending login is fine too — a late
+                completion still signs in through the auth store's listener. */}
+            <Button onClick={() => void connect()}>{t("dashboard.connect")}</Button>
             {/* Switches to the account-free list in place — the store flips
                 `mode`, which re-renders straight into the dashboard. */}
             <Button variant="ghost" onClick={() => enableLocal()}>
               {t("firstRun.lookAround")}
             </Button>
           </div>
+          {login.waiting && (
+            <p className="mt-3 text-xs text-accent-400">{t("settings.loginWaiting")}</p>
+          )}
+          {login.error && !login.waiting && (
+            <p className="mt-3 text-xs text-danger">{login.error}</p>
+          )}
 
           <ol className="mt-8 space-y-3">
             {steps.map((step, i) => (

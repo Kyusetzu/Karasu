@@ -359,7 +359,7 @@ export default function Sidebar() {
   // If the browser handoff can't start, Settings is where the manual token
   // paste lives — so send the user there rather than failing silently.
   const linkAccount = async () => {
-    if (!(await login.start())) navigate("/settings");
+    if (!(await login.start())) navigate("/settings?pane=account");
   };
 
   return (

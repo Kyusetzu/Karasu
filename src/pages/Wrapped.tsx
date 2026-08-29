@@ -675,7 +675,7 @@ export default function Wrapped() {
       <div className="grid h-full place-items-center p-8">
         <div className="text-center">
           <p className="text-ink-500">{t("wrapped.connectPrompt")}</p>
-          <Link to="/settings">
+          <Link to="/settings?pane=account">
             <Button className="mt-4">{t("list.toSettings")}</Button>
           </Link>
         </div>

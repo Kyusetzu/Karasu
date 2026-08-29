@@ -34,7 +34,7 @@ export default function Social() {
           title={t("social.needsAccount")}
           hint={t("social.needsAccountHint")}
           actions={
-            <Link to="/settings">
+            <Link to="/settings?pane=account">
               <Button variant="secondary" size="sm">
                 {t("social.goToSettings")}
               </Button>

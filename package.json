@@ -1,7 +1,7 @@
 {
   "name": "karasu",
   "private": true,
-  "version": "0.180.6",
+  "version": "0.180.7",
   "type": "module",
   "author": "Kyu",
   "license": "MIT",

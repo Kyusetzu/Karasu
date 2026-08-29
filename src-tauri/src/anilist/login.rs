@@ -95,6 +95,12 @@ pub fn start<R: Runtime>(app: AppHandle<R>) -> Result<String, String> {
     std::thread::spawn(move || {
         // Validates the token, persists it and notifies the frontend.
         let on_token = |token: &str| -> Result<(), String> {
+            // Front the app *before* the connect rather than after: the
+            // browser tab resolves immediately now (see the respond-early
+            // note in `handle_connection`), so this window is where the
+            // outcome — the signed-in flip or `anilist-auth-error` — lands,
+            // and it should be on screen while its waiting state shows.
+            surface_main_window(&app);
             let db = app.state::<Db>();
             let api = app.state::<AniList>();
             match tauri::async_runtime::block_on(crate::commands::connect_with_token(
@@ -102,7 +108,6 @@ pub fn start<R: Runtime>(app: AppHandle<R>) -> Result<String, String> {
             )) {
                 Ok(viewer) => {
                     let _ = app.emit("anilist-auth", &viewer);
-                    surface_main_window(&app);
                     Ok(())
                 }
                 Err(e) => {
@@ -132,7 +137,7 @@ fn bind(port: u16) -> Result<TcpListener, String> {
     Ok(listener)
 }
 
-/// Accept loop. Runs until a token was accepted or the window elapsed.
+/// Accept loop. Runs until a token was delivered or the window elapsed.
 fn serve(
     listener: &TcpListener,
     window: Duration,
@@ -154,7 +159,8 @@ fn serve(
     }
 }
 
-/// Handles one HTTP request. Returns true once a token was accepted.
+/// Handles one HTTP request. Returns true once a state-valid token was
+/// delivered — whether the connect then succeeds is the app's story.
 fn handle_connection(
     mut stream: TcpStream,
     on_token: &dyn Fn(&str) -> Result<(), String>,
@@ -194,20 +200,23 @@ fn handle_connection(
             return false;
         }
         match query_param(query, "access_token") {
-            Some(token) if !token.is_empty() => match on_token(token) {
-                Ok(()) => {
-                    respond(&mut stream, 200, &success_page());
-                    true
-                }
-                Err(e) => {
-                    respond(
-                        &mut stream,
-                        502,
-                        &page("Login failed", &format!("{e} — please try again from Karasu.")),
-                    );
-                    false // keep listening so a retry within the window still works
-                }
-            },
+            Some(token) if !token.is_empty() => {
+                // The page goes out *before* the connect. The connect is a
+                // network viewer fetch plus the token write — seconds on a
+                // cold path, and on Android the `karasu://` hop back to the
+                // app lives inside this very page, so serving it afterwards
+                // kept the user staring at a blank tab for the whole
+                // connect. The page claims only the handoff, never success:
+                // on a failed connect it is all the browser ever shows.
+                respond(&mut stream, 200, &handoff_page());
+                // `true` either way: the browser's job ended at delivery, so
+                // the window closes and a transient connect failure can no
+                // longer be retried by the still-open tab. The in-app button
+                // is the retry now, with the error visible in the app
+                // through `anilist-auth-error` instead of a dead tab.
+                let _ = on_token(token);
+                true
+            }
             _ => {
                 respond(
                     &mut stream,
@@ -281,7 +290,7 @@ fn respond(stream: &mut TcpStream, status: u16, body: &str) {
     let reason = match status {
         200 => "OK",
         400 => "Bad Request",
-        502 => "Bad Gateway",
+        403 => "Forbidden",
         _ => "Not Found",
     };
     let response = format!(
@@ -296,16 +305,20 @@ fn respond(stream: &mut TcpStream, status: u16, body: &str) {
     let _ = stream.shutdown(Shutdown::Write);
 }
 
-/// The landing page a finished login shows — a cfg'd pair, per the house
-/// rule, because the two platforms owe the reader different things.
+/// The page a delivered token shows — a cfg'd pair, per the house rule,
+/// because the two platforms owe the reader different things.
 ///
-/// On desktop the app is already frontmost and the browser tab was the
-/// detour, so the page only has to say it is over.
+/// It is served *before* the connect runs (see `handle_connection`), so it
+/// claims only the handoff, never success — on a failed connect this page is
+/// all the browser ever shows, and the outcome lands in the app instead.
+///
+/// On desktop the app has already been fronted and the browser tab was the
+/// detour, so the page only has to say the tab's part is over.
 #[cfg(not(target_os = "android"))]
-fn success_page() -> String {
+fn handoff_page() -> String {
     page(
-        "You're logged in",
-        "Karasu is now connected to your AniList account. You can close this tab.",
+        "Finishing sign-in",
+        "Karasu is finishing the sign-in — you can close this tab and return to the app.",
     )
 }
 
@@ -317,10 +330,10 @@ fn success_page() -> String {
 /// navigation); the button is the load-bearing half. The message string is
 /// trusted HTML into `page`'s `<p>`, like every other call site's.
 #[cfg(target_os = "android")]
-fn success_page() -> String {
+fn handoff_page() -> String {
     page(
-        "You're logged in",
-        "Karasu is now connected to your AniList account.</p>\
+        "Finishing sign-in",
+        "Karasu is finishing the sign-in.</p>\
          <p><a href=\"karasu://login\" style=\"display:inline-block;margin-top:.75rem;\
          padding:.7rem 1.5rem;border-radius:.7rem;background:#4b3fc7;color:#fff;\
          text-decoration:none;font-weight:600\">Return to Karasu</a></p>\
@@ -446,23 +459,33 @@ mod tests {
             "a rejected state must not end the login window"
         );
 
-        let rejected = get(
-            port,
-            &format!("/token?access_token=BAD&token_type=Bearer&state={TEST_STATE}"),
-        );
-        assert!(rejected.contains("Login failed"), "bad token: {rejected}");
-        assert!(
-            rx.try_recv().is_err(),
-            "server must keep running after a rejected token"
-        );
-
         let accepted = get(
             port,
             &format!("/token?access_token=GOOD&token_type=Bearer&state={TEST_STATE}"),
         );
-        assert!(accepted.contains("logged in"), "good token: {accepted}");
+        assert!(accepted.contains("Finishing sign-in"), "good token: {accepted}");
         rx.recv_timeout(Duration::from_secs(5))
-            .expect("server must shut down after a successful login");
+            .expect("server must shut down after a state-valid token delivery");
+        handle.join().unwrap();
+    }
+
+    /// The other half of the respond-early contract: a token the connect
+    /// later rejects gets the *same* handoff page and still ends the window.
+    /// The browser's job ended at delivery; the outcome — here a failure —
+    /// reaches the app through `anilist-auth-error`, not this tab.
+    #[test]
+    fn a_rejected_token_still_ends_the_window_with_the_handoff_page() {
+        let (tx, rx) = mpsc::channel();
+        let (port, handle) = spawn_server("GOOD", tx);
+
+        let rejected = get(
+            port,
+            &format!("/token?access_token=BAD&token_type=Bearer&state={TEST_STATE}"),
+        );
+        assert!(rejected.contains("200 OK"), "bad token still hands off: {rejected}");
+        assert!(rejected.contains("Finishing sign-in"), "bad token: {rejected}");
+        rx.recv_timeout(Duration::from_secs(5))
+            .expect("server must shut down after any state-valid token delivery");
         handle.join().unwrap();
     }
 
@@ -502,7 +525,7 @@ mod tests {
             port,
             &format!("/token?access_token=GOOD&token_type=Bearer&state={TEST_STATE}"),
         );
-        assert!(accepted.contains("logged in"), "good token: {accepted}");
+        assert!(accepted.contains("Finishing sign-in"), "good token: {accepted}");
         handle.join().unwrap();
     }
 

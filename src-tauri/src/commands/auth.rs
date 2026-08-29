@@ -107,17 +107,34 @@ pub async fn connect_with_token(db: &Db, api: &AniList, input: &str) -> Result<V
     if token.is_empty() {
         return Err("Please paste the token from the AniList page".into());
     }
+    // Timed per phase: a slow first sign-in was reported on Android, and the
+    // three suspects — the viewer fetch over a cold TLS handshake, the token
+    // write (whose first Keystore use also generates the hardware key), and
+    // the kv writes — cannot be told apart from the outside. Debug level, so
+    // an ordinary sign-in stays quiet unless verbose logging is on.
+    let t0 = std::time::Instant::now();
     let data = api.query(Some(&token), VIEWER_QUERY, json!({})).await?;
     let viewer = data
         .get("Viewer")
         .filter(|v| !v.is_null())
         .cloned()
         .ok_or("Token invalid or expired")?;
+    let t1 = std::time::Instant::now();
     auth::save_token(&token)?;
+    let t2 = std::time::Instant::now();
     db.kv_set("anilist_viewer", &viewer.to_string())?;
     // A successful connection makes AniList the active profile. Any local
     // entries stay untouched until an explicit merge (see local_merge_*).
     db.kv_set("profile_mode", "anilist")?;
+    crate::logging::debug(
+        "auth",
+        format!(
+            "connect timings: viewer {}ms, token save {}ms, kv {}ms",
+            (t1 - t0).as_millis(),
+            (t2 - t1).as_millis(),
+            t2.elapsed().as_millis()
+        ),
+    );
     Ok(viewer)
 }
 

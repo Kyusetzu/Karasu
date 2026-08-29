@@ -59,7 +59,8 @@ pub fn get_text_scale() -> f64 {
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PlatformInfo {
-    /// "windows" | "linux" | "macos"
+    /// "windows" | "linux" | "android" — whatever `std::env::consts::OS`
+    /// says (macOS never ships, but the string would be honest there too).
     pub os: String,
     /// Running from an AppImage. The updater can only replace one of those on
     /// Linux, and it is the only Linux layout portable mode can write beside.

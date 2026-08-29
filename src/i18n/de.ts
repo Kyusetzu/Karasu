@@ -302,6 +302,8 @@ export const de: typeof en = {
     welcomeTitle: "Willkommen bei Karasu",
     welcomeText:
       "Dein Anime-Tracker für AniList. Verbinde deinen Account, um deine Liste zu verwalten und deinen Fortschritt automatisch zu tracken.",
+    welcomeTextAndroid:
+      "Dein Anime-Tracker für AniList. Verbinde deinen Account, um deine Liste zu verwalten — und wenn du über Jellyfin schaust, trackt Karasu das automatisch.",
     connect: "Mit AniList verbinden",
     continueWatching: "Weiterschauen",
     continueReading: "Weiterlesen",
@@ -341,6 +343,8 @@ export const de: typeof en = {
     step1: "Verbinde deinen AniList-Account — ein Klick, kein Passwort hier.",
     step2: "Spiel eine Folge in dem Player ab, den du sowieso nutzt.",
     step3: "Karasu erkennt sie und zählt deine Liste weiter.",
+    step2Android: "Füge deinen Jellyfin-Server hinzu — Adresse und Login.",
+    step3Android: "Schau über Jellyfin und Karasu zählt deine Liste weiter.",
   },
   stats: {
     title: "Statistik",

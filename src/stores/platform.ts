@@ -32,3 +32,13 @@ export const usePlatform = create<PlatformState>((set, get) => ({
 
 /** True only when we know it is Linux — never as a default. */
 export const isLinux = (info: PlatformInfo | null) => info?.os === "linux";
+
+/**
+ * True only when we know it is Android — never as a default, and this is the
+ * capability signal, not `usePhoneShell`: the shell is a *width* (a narrowed
+ * desktop window takes the phone layout on purpose), while what the platform
+ * can do — scan a library, watch SMTC, spawn mpv — does not change with the
+ * window. The one frame before `load()` resolves reads as not-Android, which
+ * is the desktop-correct guess and at worst a flicker on a phone.
+ */
+export const isAndroid = (info: PlatformInfo | null) => info?.os === "android";

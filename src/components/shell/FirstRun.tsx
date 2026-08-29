@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import KarasuMark from "@/components/KarasuMark";
 import { useAniListLogin } from "@/hooks/useAniListLogin";
 import { useAuth } from "@/stores/auth";
+import { isAndroid, usePlatform } from "@/stores/platform";
 
 /**
  * The first thing anyone sees.
@@ -19,7 +20,13 @@ export default function FirstRun() {
   const navigate = useNavigate();
   const enableLocal = useAuth((s) => s.enableLocal);
   const login = useAniListLogin();
-  const steps = [t("firstRun.step1"), t("firstRun.step2"), t("firstRun.step3")];
+  // The desktop steps promise player detection a phone has not got — on
+  // Android, Jellyfin is the whole of detection, so the story says so
+  // instead of describing machinery the Settings pane greys out.
+  const android = isAndroid(usePlatform((s) => s.info));
+  const steps = android
+    ? [t("firstRun.step1"), t("firstRun.step2Android"), t("firstRun.step3Android")]
+    : [t("firstRun.step1"), t("firstRun.step2"), t("firstRun.step3")];
 
   // The button used to be a bare link to /settings — which on the phone shell
   // is the pane *list*, putting the actual OAuth button three taps away from
@@ -55,7 +62,7 @@ export default function FirstRun() {
             {t("firstRun.headline")}
           </h1>
           <p className="mt-3 text-sm leading-relaxed text-ink-500">
-            {t("dashboard.welcomeText")}
+            {android ? t("dashboard.welcomeTextAndroid") : t("dashboard.welcomeText")}
           </p>
 
           <div className="mt-6 flex flex-wrap items-center gap-3">

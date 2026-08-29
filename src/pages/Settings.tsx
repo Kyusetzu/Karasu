@@ -44,6 +44,7 @@ import {
 } from "./settings/AdvancedPane";
 import { DangerNote } from "./settings/shared";
 import { usePhoneShell } from "@/hooks/usePhoneShell";
+import { isAndroid, usePlatform } from "@/stores/platform";
 import { Button } from "@/components/ui/button";
 
 /**
@@ -126,7 +127,7 @@ type _EveryPaneIsRendered = Exclude<PaneId, (typeof PANES)[number]["id"]> extend
 const _panesAreComplete: _EveryPaneIsRendered = true;
 
 /**
- * What the phone shell hides, by identity rather than by file.
+ * What Android hides, by identity rather than by file.
  *
  * Whole panes: the local library scanner cannot exist under scoped storage,
  * and everything in Desktop — autostart, the updater, Discord IPC — is
@@ -134,19 +135,25 @@ const _panesAreComplete: _EveryPaneIsRendered = true;
  * sources a phone has not got (Jellyfin is the whole of detection there, per
  * the ROADMAP), and portable mode is an exe-relative idea.
  *
+ * Keyed on the *platform*, not `usePhoneShell`: these are capabilities, and
+ * they were width-keyed for a while — which hid the Library and Desktop panes
+ * from anyone who narrowed a desktop window, and would have handed an Android
+ * tablet (≥768px takes the desktop layout) live SMTC/mpv controls. Only the
+ * master-detail layout below stays width-keyed.
+ *
  * Component identity, not a string list, so a rename breaks the build here
  * instead of silently un-hiding a pane.
  */
-const PHONE_HIDDEN_PANES: ReadonlySet<PaneId> = new Set(["library", "desktop"] as const);
-const PHONE_HIDDEN_SECTIONS: ReadonlySet<unknown> = new Set([PortableSection]);
+const ANDROID_HIDDEN_PANES: ReadonlySet<PaneId> = new Set(["library", "desktop"] as const);
+const ANDROID_HIDDEN_SECTIONS: ReadonlySet<unknown> = new Set([PortableSection]);
 
 /**
- * Desktop-only detection machinery, greyed rather than hidden on the phone —
+ * Desktop-only detection machinery, greyed rather than hidden on Android —
  * the user's call: seeing what the desktop can do explains what the phone
  * deliberately does not, where silent absence reads as a missing feature.
  * Jellyfin and the corrections come first there, being the parts that work.
  */
-const PHONE_DESKTOP_ONLY: ReadonlySet<unknown> = new Set([
+const ANDROID_DESKTOP_ONLY: ReadonlySet<unknown> = new Set([
   ScrobbleSection,
   MediaSessionSection,
   MpvSection,
@@ -173,20 +180,33 @@ export default function Settings() {
   const { t } = useTranslation();
   const [params, setParams] = useSearchParams();
   const phone = usePhoneShell();
+  const android = isAndroid(usePlatform((s) => s.info));
   const rawPane = params.get("pane");
   const active = resolvePane(rawPane);
   void _panesAreComplete;
 
-  const panes = phone ? PANES.filter((p) => !PHONE_HIDDEN_PANES.has(p.id)) : PANES;
-  // A deep link can name a pane the phone hides; falling to the list beats
-  // rendering a blank one.
+  const panes = android ? PANES.filter((p) => !ANDROID_HIDDEN_PANES.has(p.id)) : PANES;
+  // A deep link can name a pane Android hides; falling back beats rendering
+  // a blank one.
   const pane = panes.find((p) => p.id === active) ?? panes[0];
-  const sections = phone
+  const sections = android
     ? [...pane.sections]
-        .filter((S) => !PHONE_HIDDEN_SECTIONS.has(S))
+        .filter((S) => !ANDROID_HIDDEN_SECTIONS.has(S))
         // The working sections above the greyed desktop ones.
-        .sort((a, b) => Number(PHONE_DESKTOP_ONLY.has(a)) - Number(PHONE_DESKTOP_ONLY.has(b)))
+        .sort(
+          (a, b) => Number(ANDROID_DESKTOP_ONLY.has(a)) - Number(ANDROID_DESKTOP_ONLY.has(b)),
+        )
     : pane.sections;
+  // The badge follows the platform into *both* layout branches — an Android
+  // tablet takes the desktop layout and still has no SMTC to configure.
+  const wrap = (Section: (typeof sections)[number], i: number) =>
+    android && ANDROID_DESKTOP_ONLY.has(Section) ? (
+      <DesktopOnly key={i}>
+        <Section />
+      </DesktopOnly>
+    ) : (
+      <Section key={i} />
+    );
 
   /**
    * Master-detail on the phone: the pane *list* first, a chosen pane
@@ -238,15 +258,7 @@ export default function Settings() {
             <ChevronLeft className="size-4" />
             {t("settings.title")}
           </Button>
-          {sections.map((Section, i) =>
-            phone && PHONE_DESKTOP_ONLY.has(Section) ? (
-              <DesktopOnly key={i}>
-                <Section />
-              </DesktopOnly>
-            ) : (
-              <Section key={i} />
-            ),
-          )}
+          {sections.map(wrap)}
         </div>
       </div>
     );
@@ -292,11 +304,7 @@ export default function Settings() {
       {/* Keyed on the pane so switching replays `settle` — otherwise a pane
           swap in place is indistinguishable from the page not reacting. */}
       <div key={active} className="min-w-0 flex-1 animate-settle overflow-y-auto">
-        <div className="mx-auto max-w-2xl space-y-6 p-8">
-          {sections.map((Section, i) => (
-            <Section key={i} />
-          ))}
-        </div>
+        <div className="mx-auto max-w-2xl space-y-6 p-8">{sections.map(wrap)}</div>
       </div>
     </div>
   );

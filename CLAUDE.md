@@ -32,8 +32,12 @@ and in the browser and scrobbles your AniList progress automatically.
   titles are only seen where the browser publishes MPRIS. On Android detection
   is Jellyfin alone, decided in the first device round: the desktop detection
   machinery is greyed out in Settings under a "desktop only" badge, never
-  hidden. The phone shell is width-keyed (`usePhoneShell`, 767px), not
-  user-agent-keyed.
+  hidden. Two different keys, and they must not swap: the *shell shape* is
+  width-keyed (`usePhoneShell`, 767px), while *capability* gating — the badge,
+  the hidden Library/Desktop panes, the bottom bar's missing library — is
+  platform-keyed (`isAndroid` over `platform_info`), because a narrowed
+  desktop window still has SMTC and a filesystem, and an Android tablet at
+  desktop width still has neither.
 
 ## Layout
 

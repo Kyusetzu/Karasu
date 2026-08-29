@@ -7,6 +7,7 @@ import { usePresence } from "@/hooks/usePresence";
 import { useDialogFocus } from "@/hooks/useDialogFocus";
 import { useBackClose } from "@/hooks/useBackClose";
 import { cn } from "@/lib/utils";
+import { isAndroid, usePlatform } from "@/stores/platform";
 import Bell from "@/components/shell/Bell";
 import { useNotifBadge } from "@/hooks/useNotifBadge";
 
@@ -32,15 +33,19 @@ function slotItems(): NavItem[] {
   );
 }
 
-/** What the phone shell does not offer at all — the scanner needs a
- *  filesystem scoped storage will not hand out, so its screen would be a
- *  permanent empty state pointing at a settings pane that is also hidden. */
-const PHONE_HIDDEN = new Set(["/library"]);
+/** What Android does not offer at all — the scanner needs a filesystem
+ *  scoped storage will not hand out, so its screen would be a permanent
+ *  empty state pointing at a settings pane that is also hidden. Keyed on the
+ *  platform, not the shell width, so a narrowed desktop window keeps its
+ *  library — the same capability-vs-width split Settings draws. */
+const ANDROID_HIDDEN = new Set(["/library"]);
 
-function sheetGroups(): { label: string; items: NavItem[] }[] {
+function sheetGroups(android: boolean): { label: string; items: NavItem[] }[] {
   const groups = GROUPS.map((g) => ({
     label: g.label,
-    items: g.items.filter((i) => !SLOTS.includes(i.to) && !PHONE_HIDDEN.has(i.to)),
+    items: g.items.filter(
+      (i) => !SLOTS.includes(i.to) && !(android && ANDROID_HIDDEN.has(i.to)),
+    ),
   })).filter((g) => g.items.length > 0);
   // Settings and About sit *outside* `GROUPS` in the sidebar (its footer), so
   // without this the phone shell simply has no way to reach either — found by
@@ -60,6 +65,7 @@ const slotClass =
 
 export default function BottomBar() {
   const { t } = useTranslation();
+  const android = isAndroid(usePlatform((s) => s.info));
   const [moreOpen, setMoreOpen] = useState(false);
   useBackClose(moreOpen, () => setMoreOpen(false));
   const sheet = usePresence(moreOpen);
@@ -127,7 +133,7 @@ export default function BottomBar() {
                 </button>
               </div>
             </div>
-            {sheetGroups().map((g) => (
+            {sheetGroups(android).map((g) => (
               <div key={g.label} className="mb-2 last:mb-0">
                 <p className="px-1 pb-1 text-[.625rem] font-medium uppercase tracking-wide text-ink-700">
                   {t(g.label)}

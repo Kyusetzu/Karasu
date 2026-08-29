@@ -14,6 +14,7 @@ import {
 const BLOCK_TYPES = new Set(["p", "h", "quote", "list", "codeBlock", "hr", "center"]);
 const INLINE_TYPES = new Set([
   "text", "strong", "em", "strike", "code", "link", "mention", "spoiler", "chip", "br",
+  "accent",
 ]);
 
 /** Fields a node is allowed to carry. Anything else could be unrendered markup
@@ -84,6 +85,8 @@ describe("the tree cannot carry executable content", () => {
     `img(javascript:alert(1))`,
     `img(data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=)`,
     `<a href="javascript:alert(1)">x</a>`,
+    `<a href=javascript:alert(1)>y</a>`,
+    `<a href='DATA:text/html,x'>z</a>`,
     `~!<script>alert(1)</script>!~`,
     `**<script>alert(1)</script>**`,
     `<div\nunclosed`,
@@ -568,6 +571,11 @@ describe("bounds", () => {
       "|".repeat(2000),
       "#".repeat(1000),
       "> ".repeat(2000),
+      "<b>".repeat(2600),
+      "<a href=x>".repeat(800),
+      `${'<div align="center">'.repeat(400)}x`,
+      "&amp".repeat(2000),
+      "&#x2605;".repeat(1000),
     ]) {
       expect(() => parseAniListMarkdown(src)).not.toThrow();
     }
@@ -628,5 +636,214 @@ describe("renderPlain", () => {
     // preview is not a place to put a spoiler, so callers must not use this for
     // one. The renderer, not this, is what hides them.
     expect(renderPlain(`~!secret!~`)).toBe("secret");
+  });
+
+  it("flattens accent decoration into its text", () => {
+    // Without the `accent` case in the walk, `18<a>&#8593;</a>` previews as
+    // just "18" — the arrow silently gone.
+    expect(renderPlain(`18<a>&#8593;</a>`)).toBe("18↑");
+  });
+});
+
+// --- HTML entities ---------------------------------------------------------
+// Mirrors the `entities` block in anilistHtml.test.ts — same decoder, shared
+// via lib/htmlEntities, exercised through the *markdown* path this time,
+// because that is the path that never decoded and real bios showed literal
+// `&nbsp;` on screen.
+
+describe("entities", () => {
+  it("decodes named, decimal and hex forms in text", () => {
+    // The non-ASCII expectations here were verified by codepoint
+    // (hex(ord(c))), not by eye — the console codepage once hid a mojibake
+    // regression behind identical-looking glyphs.
+    expect(textOf(parse(`stars &starf; and &#9825; and &#x2605;`))).toBe(
+      "stars ★ and ♡ and ★",
+    );
+    expect(textOf(parse(`likes back &sol; follows back`))).toBe(
+      "likes back / follows back",
+    );
+    expect(textOf(parse(`A &amp; B&hellip;`))).toBe("A & B…");
+  });
+
+  it("keeps &nbsp; as a real no-break space", () => {
+    expect(textOf(parse(`a&nbsp;b`))).toBe("a b");
+  });
+
+  it("leaves an unknown or malformed entity as literal text", () => {
+    expect(textOf(parse(`&doesnotexist; &fake`))).toBe("&doesnotexist; &fake");
+  });
+
+  it("refuses surrogate and out-of-range codepoints", () => {
+    expect(textOf(parse(`&#xD800; &#1114112; &#0;`))).toBe("&#xD800; &#1114112; &#0;");
+  });
+
+  it("decodes an entity-encoded tag to characters, never to markup", () => {
+    // The decode runs after parsing, in text position — so this is visible
+    // text that React will escape, not a script element and not a dropped
+    // one. Deliberately not in HOSTILE: the strict no-angle-bracket walk
+    // there asserts about *source* markup, and these brackets are content.
+    const nodes = parse(`&lt;script&gt;alert(1)&lt;/script&gt;`);
+    expect(types(nodes)).not.toContain("codeBlock");
+    expect(textOf(nodes)).toBe("<script>alert(1)</script>");
+  });
+
+  it("keeps entities raw inside code spans", () => {
+    // markdown-it does the same: a code span is verbatim.
+    expect(textOf(parse("`a &amp; b`"))).toBe("a &amp; b");
+  });
+
+  it("never decodes inside a URL — the href keeps its bytes", () => {
+    const n = (parse(`[x](https://a.co/?a=1&amp;b=2)`)[0] as { children: MdInline[] })
+      .children[0];
+    expect(n).toMatchObject({ type: "link", href: "https://a.co/?a=1&amp;b=2" });
+  });
+});
+
+// --- The inline HTML subset ------------------------------------------------
+
+describe("inline HTML kept as structure", () => {
+  const first = (src: string) => (parse(src)[0] as { children: MdInline[] }).children;
+
+  it("maps every paired styling tag onto its markdown node", () => {
+    for (const [tag, type] of [
+      ["b", "strong"],
+      ["strong", "strong"],
+      ["i", "em"],
+      ["em", "em"],
+      ["s", "strike"],
+      ["del", "strike"],
+      ["strike", "strike"],
+    ] as const) {
+      const n = first(`<${tag}>x</${tag}>`)[0];
+      expect(n.type, tag).toBe(type);
+      expect(textOf([n]), tag).toBe("x");
+    }
+  });
+
+  it("parses the pair's inner content", () => {
+    const n = first(`<b>bold &amp; **strong**</b>`)[0];
+    expect(n.type).toBe("strong");
+    expect(textOf([n])).toBe("bold & strong");
+  });
+
+  it("degrades an unclosed styling tag to plain text, as before", () => {
+    const nodes = parse(`<b>never closed`);
+    expect(types(nodes)).not.toContain("strong");
+    expect(textOf(nodes)).toBe("never closed");
+  });
+
+  it("turns <a href> into a link with parsed children", () => {
+    const n = first(`<a href="https://anilist.co/user/x">me</a>`)[0];
+    expect(n).toMatchObject({ type: "link", href: "https://anilist.co/user/x" });
+    expect(textOf([n])).toBe("me");
+  });
+
+  it("keeps a linked image inside the link — the favicon-row idiom", () => {
+    // `<a href="…">img16(favicon)</a>` must be one click target: the chip
+    // sits inside the link's children, the same shape `[img33(u)](t)`
+    // produces, and RichText's InLink context does the rest.
+    const n = first(
+      `<a href="https://steamcommunity.com/id/x">img16(https://a.favicon.im/steamcommunity.com)</a>`,
+    )[0];
+    expect(n).toMatchObject({ type: "link", href: "https://steamcommunity.com/id/x" });
+    expect(types([n])).toContain("chip");
+  });
+
+  it("turns a bare <a> into accent decoration", () => {
+    const n = first(`<a>&#x2605;</a>`)[0];
+    expect(n.type).toBe("accent");
+    expect(textOf([n])).toBe("★");
+  });
+
+  it("degrades a rejected href to plain children, never accent", () => {
+    for (const src of [
+      `<a href="javascript:alert(1)">x</a>`,
+      `<a href="">x</a>`,
+      `<a href="jsonN4IgDg">x</a>`,
+    ]) {
+      const kinds = types(parse(src));
+      expect(kinds, src).not.toContain("link");
+      expect(kinds, src).not.toContain("accent");
+      expect(textOf(parse(src)), src).toBe("x");
+    }
+  });
+});
+
+// --- The block HTML subset -------------------------------------------------
+
+describe("block HTML kept as structure", () => {
+  it("centres <center> and align=center in every real spelling", () => {
+    for (const src of [
+      `<center>x</center>`,
+      `<div align="center">x</div>`,
+      `<div align='center'>x</div>`,
+      `<div align=center>x</div>`,
+      `<DIV ALIGN="CENTER">x</DIV>`,
+      `<p align="center">x</p>`,
+    ]) {
+      const nodes = parse(src);
+      expect(nodes[0]?.type, src).toBe("center");
+      expect(textOf(nodes), src).toBe("x");
+    }
+  });
+
+  it("leaves a div without align=center as dropped-tag prose", () => {
+    const nodes = parse(`<div class="x">art</div>`);
+    expect(types(nodes)).not.toContain("center");
+    expect(textOf(nodes)).toBe("art");
+  });
+
+  it("spans multiple lines and is not closed early by a nested div", () => {
+    const nodes = parse(
+      `<div align="center">\nline one\n<div>nested</div>\nline two\n</div>\nafter`,
+    );
+    expect(nodes[0].type).toBe("center");
+    const centred = textOf([nodes[0]]);
+    expect(centred).toContain("line one");
+    expect(centred).toContain("nested");
+    expect(centred).toContain("line two");
+    expect(textOf([nodes[1]])).toBe("after");
+  });
+
+  it("keeps the rest of the input when the opener never closes — like ~~~", () => {
+    const nodes = parse(`<div align="center">\neverything\nhere`);
+    expect(nodes[0].type).toBe("center");
+    expect(textOf(nodes)).toContain("everything");
+    expect(textOf(nodes)).toContain("here");
+  });
+
+  it("breaks a paragraph before a centred line instead of swallowing it", () => {
+    const nodes = parse(`prose line\n<div align="center">centred</div>`);
+    expect(types(nodes)).toContain("center");
+    expect(textOf([nodes[0]])).toContain("prose line");
+  });
+
+  it("parses an HTML heading alone on its line", () => {
+    const n = parse(`<h5>small title</h5>`)[0];
+    expect(n).toMatchObject({ type: "h", level: 5 });
+    expect(textOf([n])).toBe("small title");
+  });
+
+  it("renders the fixture profile's shape — the bug that started this", () => {
+    // Distilled from a real bio (User "cheesxcxke"): entity spacers, centred
+    // divs, an h5 with bare-<a> decoration, a linked favicon image.
+    const real =
+      `&nbsp;\n` +
+      `<div align="center"><h5>˗ˏˋ <a>&#x2605;</a> ˎˊ˗</h5></div>\n` +
+      `<div align="center">18<a>&#8593;</a></div>\n` +
+      `<div align="center">likes back <a>&sol;</a> follows back</div>\n` +
+      `<div align="center">img89(https://static2.klipy.com/x.gif)</div>\n` +
+      `<div align="center"><a href="https://steamcommunity.com/id/x">img16(https://a.favicon.im/steamcommunity.com)</a></div>`;
+    const r = parseAniListMarkdown(real);
+    const kinds = types(r.nodes);
+    expect(kinds).toContain("center");
+    expect(kinds).toContain("h");
+    expect(kinds).toContain("accent");
+    expect(kinds).toContain("link");
+    expect(kinds).toContain("chip");
+    const text = textOf(r.nodes);
+    expect(text).toContain("★");
+    expect(text).toContain("18↑");
+    expect(text).toContain("likes back / follows back");
   });
 });

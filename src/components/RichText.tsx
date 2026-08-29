@@ -304,6 +304,15 @@ export function RichText({ nodes }: { nodes: MdInline[] }) {
                 <RichText nodes={n.children} />
               </Spoiler>
             );
+          case "accent":
+            // A bare `<a>` — anilist.co colours it like a link, and profile
+            // decoration relies on exactly that. Colour only: it goes
+            // nowhere, so no underline and no cursor.
+            return (
+              <span key={i} className="text-accent-400">
+                <RichText nodes={n.children} />
+              </span>
+            );
           case "chip":
             // Keyed by href as well as position. `InlineImage` holds `failed`
             // in state, and an index-only key makes React reuse the instance

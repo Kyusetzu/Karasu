@@ -150,6 +150,36 @@ describe("Markdown renders the real structures", () => {
     expect(container.querySelectorAll("p")).toHaveLength(1);
   });
 
+  it("renders a real bio's HTML shape — entities, centring, decoration", () => {
+    // Distilled from a live profile: the star arrives as `&#x2605;` inside a
+    // bare `<a>` inside an `<h5>` inside `<div align="center">`, and every
+    // layer used to be lost — literal entity text, no centring, no accent.
+    const { container } = draw(
+      `<div align="center"><h5>˗ˏˋ <a>&#x2605;</a> ˎˊ˗</h5></div>\n` +
+        `<div align="center">likes back <a>&sol;</a> follows back</div>`,
+    );
+    const centred = container.querySelectorAll(".text-center");
+    expect(centred.length).toBeGreaterThanOrEqual(2);
+    expect(container.querySelector("h5")?.textContent).toContain("★");
+    // The bare <a> renders as an accent-coloured span, not an anchor.
+    expect(container.querySelectorAll("a")).toHaveLength(0);
+    expect(container.querySelector(".text-accent-400")?.textContent).toBe("★");
+    expect(container.textContent).toContain("likes back / follows back");
+  });
+
+  it("renders <a href> as one link even when it wraps an image", () => {
+    const { container } = draw(
+      `<a href="https://steamcommunity.com/id/x">img16(https://a.favicon.im/steamcommunity.com)</a>`,
+    );
+    const anchors = container.querySelectorAll("a");
+    expect(anchors).toHaveLength(1);
+    expect(anchors[0].getAttribute("href")).toBe("https://steamcommunity.com/id/x");
+    // Under jsdom the proxy never runs, so the image is its chip — inside the
+    // anchor, as a span rather than a nested button (the InLink rule).
+    expect(anchors[0].querySelectorAll("button")).toHaveLength(0);
+    expect(anchors[0].textContent).toContain("social.mdImage");
+  });
+
   it("renders nothing for empty input rather than an empty box", () => {
     const { container } = draw("   ");
     expect(container.firstChild).toBeNull();

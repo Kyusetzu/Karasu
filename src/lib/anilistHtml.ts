@@ -1,4 +1,5 @@
 import type { MdInline } from "./anilistMarkdown";
+import { ENTITY_RE, decodeEntity } from "./htmlEntities";
 
 /**
  * AniList *descriptions*, which are HTML rather than markdown, parsed to the
@@ -42,44 +43,7 @@ const RE = {
   dangling: /<\/?[a-zA-Z][^>]*$/y,
   /** AniList's spoiler markup, which descriptions use for plot reveals. */
   spoiler: /~!([\s\S]*?)!~/y,
-  entity: /&(#\d{1,7}|#[xX][0-9a-fA-F]{1,6}|[a-zA-Z][a-zA-Z0-9]{1,31});/y,
 };
-
-const NAMED: Record<string, string> = {
-  amp: "&",
-  lt: "<",
-  gt: ">",
-  quot: '"',
-  apos: "'",
-  // An explicit U+00A0, not a space: an author writing `&nbsp;` wants the
-  // line not to break there, and collapsing it discards that.
-  nbsp: "\u00a0",
-  mdash: "—",
-  ndash: "–",
-  hellip: "…",
-  rsquo: "’",
-  lsquo: "‘",
-  ldquo: "“",
-  rdquo: "”",
-};
-
-/**
- * Decodes one entity, or returns null to leave it as literal text.
- *
- * A closed table rather than a DOM round trip: `innerHTML = s; return textContent`
- * is the usual trick and it is exactly the thing this module exists to avoid.
- */
-function entity(body: string): string | null {
-  if (body.startsWith("#")) {
-    const hex = body[1] === "x" || body[1] === "X";
-    const code = Number.parseInt(hex ? body.slice(2) : body.slice(1), hex ? 16 : 10);
-    // Surrogates and out-of-range values would produce a lone half or throw.
-    if (!Number.isFinite(code) || code <= 0 || code > 0x10ffff) return null;
-    if (code >= 0xd800 && code <= 0xdfff) return null;
-    return String.fromCodePoint(code);
-  }
-  return NAMED[body.toLowerCase()] ?? null;
-}
 
 /** Which node an open tag becomes. `b`/`strong` and `i`/`em` collapse. */
 function nodeFor(tag: string): "strong" | "em" {
@@ -188,9 +152,11 @@ export function parseAniListHtml(html: string, limit = 8000): MdInline[] {
     }
 
     if (c === "&") {
-      const ent = at(RE.entity, src, i);
+      // The decoder lives in `htmlEntities.ts`, shared with the markdown
+      // parser so descriptions and bios can never disagree about `&amp;`.
+      const ent = at(ENTITY_RE, src, i);
       if (ent) {
-        const decoded = entity(ent[1]);
+        const decoded = decodeEntity(ent[1]);
         if (decoded !== null) {
           buf += decoded;
           i += ent[0].length;

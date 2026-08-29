@@ -18,10 +18,15 @@
  *
  * **What it deliberately gets wrong.** A visible minority of AniList profiles
  * are HTML art: absolutely-positioned `div`s, inline CSS, background images. In
- * a sample of 44 real bios, 24 contained raw tags. Those cannot survive here,
- * so tags are *dropped and their text kept* — an art bio degrades to its prose.
- * Escaping the tags into visible `<div style=…>` was the alternative and it is
- * worse: a wall of markup reads as a bug in Karasu, where a plain bio does not.
+ * a sample of 44 real bios, 24 contained raw tags. A *structural* subset now
+ * survives as tree nodes — entities, paired styling tags, `<a>` (see
+ * `pushHtmlAnchor`), centred `<div>`/`<p>`/`<center>` blocks and `<h1>`–`<h6>`
+ * — because that subset is most of what real bios are made of. Everything
+ * else keeps the old rule: tags *dropped and their text kept*, so an art bio
+ * degrades to its prose. Escaping the tags into visible `<div style=…>` was
+ * the alternative and it is worse: a wall of markup reads as a bug in Karasu,
+ * where a plain bio does not. Inline CSS in particular stays dropped on
+ * purpose — colour and geometry are where a bio starts scripting the page.
  *
  * **Images and embeds are parsed into `chip` nodes either way** — what the
  * renderer does with one is its business, not the parser's. `RichText` now
@@ -44,6 +49,8 @@
  * whitelist and not a `javascript:` blacklist.
  */
 
+import { ENTITY_RE, decodeEntity } from "./htmlEntities";
+
 /** Inline content. No member carries markup — only text and structure. */
 export type MdInline =
   | { type: "text"; text: string }
@@ -54,6 +61,15 @@ export type MdInline =
   | { type: "link"; href: string; children: MdInline[] }
   | { type: "mention"; name: string }
   | { type: "spoiler"; children: MdInline[] }
+  /**
+   * `<a>` with no href attribute at all. anilist.co styles a bare anchor in
+   * the accent colour, and profile art leans on it — half the fixture bio is
+   * stars and arrows between `<a>` tags. Only the no-href form lands here: an
+   * `<a>` whose href is *rejected* (a `javascript:` scheme, the layout blob)
+   * degrades to plain children instead, so hostile input never earns accent
+   * styling.
+   */
+  | { type: "accent"; children: MdInline[] }
   | {
       type: "chip";
       kind: "image" | "video";
@@ -184,11 +200,30 @@ const RE = {
   // meant to be read, and showing it produced `bold bitalert(1)` on a real bio.
   dropWhole: /<\s*(script|style)\b[^>]*>[\s\S]*?<\/\s*\1\s*>/iy,
   dropDangling: /<\s*(?:script|style)\b[\s\S]*$/iy,
+  // Paired styling tags kept as structure rather than dropped: they map onto
+  // the nodes markdown already has, so `<b>x</b>` and `**x**` are the same
+  // tree. Lazy body, so a nested same-name tag flattens instead of matching
+  // across two elements; an unclosed one falls through to `htmlTag` below and
+  // degrades to today's tag-dropped text.
+  htmlPair: /<(b|strong|i|em|s|del|strike)\b[^>]*>([\s\S]*?)<\/\1\s*>/iy,
+  // `<a>` is three different things — see `pushHtmlAnchor`.
+  htmlA: /<a\b([^>]*)>([\s\S]*?)<\/a\s*>/iy,
   htmlTag: /<\/?[a-zA-Z][^>]*>|<!--[\s\S]*?-->|<![^>]*>/y,
   // An unclosed `<div` at the very end still has to be consumed, or the scanner
   // emits it as literal text and the art bio shows a stray fragment.
   htmlDangling: /<\/?[a-zA-Z][^>]*$/y,
   brTag: /<br\s*\/?>/iy,
+};
+
+/** The pairs `htmlPair` keeps, mapped to the nodes they already mean. */
+const TAG_NODE: Record<string, "strong" | "em" | "strike"> = {
+  b: "strong",
+  strong: "strong",
+  i: "em",
+  em: "em",
+  s: "strike",
+  del: "strike",
+  strike: "strike",
 };
 
 /**
@@ -264,12 +299,45 @@ function parseInline(src: string): MdInline[] {
         i += br[0].length;
         continue;
       }
+      const pair = at(RE.htmlPair, src, i);
+      if (pair) {
+        flush();
+        i += pair[0].length;
+        out.push({ type: TAG_NODE[pair[1].toLowerCase()], children: parseInline(pair[2]) });
+        continue;
+      }
+      const anchor = at(RE.htmlA, src, i);
+      if (anchor) {
+        flush();
+        i += anchor[0].length;
+        pushHtmlAnchor(out, anchor[1], parseInline(anchor[2]));
+        continue;
+      }
       // Every other tag, comment and doctype: gone, contents kept. The text
       // between tags is reached by simply continuing the scan.
       const tag = at(RE.htmlTag, src, i) ?? at(RE.htmlDangling, src, i);
       if (tag) {
         i += tag[0].length;
         continue;
+      }
+    }
+
+    if (c === "&") {
+      // Decoded *after* parsing, in text position only — never the source
+      // string, so `&lt;script&gt;` becomes visible characters rather than a
+      // tag upstream of the scanner (anilistHtml.test.ts pins the same
+      // ordering for descriptions), and never inside `safeHref`/`pushChip`,
+      // so a URL keeps its bytes. Code spans keep entities raw: the backtick
+      // branch consumes a span whole, so the scan never lands on an `&`
+      // inside one.
+      const ent = at(ENTITY_RE, src, i);
+      if (ent) {
+        const decoded = decodeEntity(ent[1]);
+        if (decoded !== null) {
+          buf += decoded;
+          i += ent[0].length;
+          continue;
+        }
       }
     }
 
@@ -393,6 +461,29 @@ function parseInline(src: string): MdInline[] {
   return out;
 }
 
+/**
+ * `<a>` in a bio is three different things.
+ *
+ * With a usable href it is a link, and its children go *inside* the link
+ * node — the same shape `[img33(pic)](target)` produces, which is what lets
+ * `RichText`'s `InLink` context keep a linked image to one click target.
+ * With no href attribute at all it is AniList's decoration idiom, kept as an
+ * `accent` node. And with a href `safeHref` rejects — `javascript:`, `data:`,
+ * the layout blob — it is neither: the children are spliced in as plain
+ * content, exactly like the markdown-link branch above, so hostile input
+ * never earns a node.
+ */
+function pushHtmlAnchor(out: MdInline[], attrs: string, children: MdInline[]) {
+  const raw = /\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(attrs);
+  if (!raw) {
+    out.push({ type: "accent", children });
+    return;
+  }
+  const href = safeHref(raw[1] ?? raw[2] ?? raw[3] ?? "");
+  if (href) out.push({ type: "link", href, children });
+  else out.push(...children);
+}
+
 function pushChip(
   out: MdInline[],
   kind: "image" | "video",
@@ -433,6 +524,66 @@ const CENTER_OPEN = /^\s*~~~(.*)$/;
 /** The whole block on one line — the other common form, `~~~img28(url)~~~`. */
 const CENTER_ONE_LINE = /^\s*~~~([\s\S]*?)~~~\s*$/;
 const HEADING = /^(#{1,6})\s+(.*)$/;
+/** A heading written as HTML, alone on its line — the form centred bios use
+ *  (`<div align="center"><h5>…</h5></div>` recurses into exactly this). */
+const HTML_HEADING = /^\s*<h([1-6])\b[^>]*>([\s\S]*?)<\/h\1\s*>\s*$/i;
+/**
+ * The HTML spelling of a centred block: `<center>`, or a `<div>`/`<p>`
+ * carrying `align=center` in any quoting and case. The whole open tag is
+ * group 1 (its first word is the tag name), the rest of the line group 2.
+ * `tryHtmlCenter` below does the closing arithmetic.
+ */
+const CENTER_TAG_OPEN =
+  /^\s*<(center\b[^>]*|(?:div|p)\b[^>]*\balign\s*=\s*["']?center["']?[^>]*)>([\s\S]*)$/i;
+
+/**
+ * Reads one HTML-centred block starting at `lines[start]`, or answers null.
+ *
+ * Mirrors the `~~~` machinery: content on the opening and closing lines
+ * belongs to the block, and an unclosed opener keeps the rest of the input,
+ * exactly like an unclosed `~~~`. The depth count covers *every* open and
+ * close of the opener's own tag, so a nested plain `<div>` inside a centred
+ * one cannot close it early; the nested tags themselves are inline HTML and
+ * degrade there.
+ */
+function tryHtmlCenter(
+  lines: string[],
+  start: number,
+): { body: string[]; next: number } | null {
+  const m = CENTER_TAG_OPEN.exec(lines[start]);
+  if (!m) return null;
+  const tag = /^[a-z]+/i.exec(m[1])![0].toLowerCase();
+  const open = new RegExp(`<${tag}\\b[^>]*>`, "gi");
+  const close = new RegExp(`<\\/\\s*${tag}\\s*>`, "gi");
+  const count = (re: RegExp, s: string) => {
+    re.lastIndex = 0;
+    let n = 0;
+    while (re.exec(s)) n += 1;
+    return n;
+  };
+
+  const body: string[] = [];
+  let depth = 1;
+  let j = start;
+  // Everything after the opening tag is the block's first content.
+  let content = m[2];
+  for (;;) {
+    depth += count(open, content) - count(close, content);
+    if (depth <= 0) {
+      // Closed on this line: everything up to the *last* close tag belongs
+      // to the block. (Prose after `</div>` on the same line would join the
+      // block rather than be lost — a shape no real bio produces.)
+      const cut = content.toLowerCase().lastIndexOf(`</${tag}`);
+      const inner = cut === -1 ? content : content.slice(0, cut);
+      if (inner.trim()) body.push(inner);
+      return { body, next: j + 1 };
+    }
+    if (content.trim()) body.push(content);
+    j += 1;
+    if (j >= lines.length) return { body, next: j };
+    content = lines[j];
+  }
+}
 const QUOTE = /^\s*>\s?(.*)$/;
 const HR = /^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/;
 const UL = /^\s*[-*+]\s+(.*)$/;
@@ -476,6 +627,15 @@ function parseBlocks(lines: string[]): MdNode[] {
       continue;
     }
 
+    // The HTML spelling, same node: the fixture profile is entirely
+    // one-line `<div align="center">…</div>` rows.
+    const htmlCenter = tryHtmlCenter(lines, i);
+    if (htmlCenter) {
+      out.push({ type: "center", children: parseBlocks(htmlCenter.body) });
+      i = htmlCenter.next;
+      continue;
+    }
+
     const opener = CENTER_OPEN.exec(line);
     if (opener) {
       // Anything after the fence on the opening line is the block's first line.
@@ -508,6 +668,17 @@ function parseBlocks(lines: string[]): MdNode[] {
         type: "h",
         level: h[1].length as 1 | 2 | 3 | 4 | 5 | 6,
         children: parseInline(h[2]),
+      });
+      i += 1;
+      continue;
+    }
+
+    const hh = HTML_HEADING.exec(line);
+    if (hh) {
+      out.push({
+        type: "h",
+        level: Number(hh[1]) as 1 | 2 | 3 | 4 | 5 | 6,
+        children: parseInline(hh[2]),
       });
       i += 1;
       continue;
@@ -580,8 +751,10 @@ function startsBlock(line: string): boolean {
   return (
     FENCE.test(line) ||
     CENTER_OPEN.test(line) ||
+    CENTER_TAG_OPEN.test(line) ||
     HR.test(line) ||
     HEADING.test(line) ||
+    HTML_HEADING.test(line) ||
     QUOTE.test(line) ||
     UL.test(line) ||
     OL.test(line)
@@ -622,6 +795,9 @@ function capExcessImages(nodes: MdNode[]): void {
         case "strike":
         case "link":
         case "spoiler":
+        // `accent` too, or an image inside a bare `<a>` would escape the
+        // fan-out cap this walk exists to enforce.
+        case "accent":
           inline(n.children);
           break;
       }
@@ -695,6 +871,8 @@ export function renderPlain(src: string, max = 200): string {
         case "strike":
         case "link":
         case "spoiler":
+        // Without this, `18<a>&#8593;</a>` previews as "18".
+        case "accent":
           inline(n.children);
           break;
       }

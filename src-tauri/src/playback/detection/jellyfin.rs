@@ -368,9 +368,17 @@ pub fn session_matches(session: &serde_json::Value, user_id: &str, device: &str)
 /// time it started.
 fn auth_header(device: &str, device_id: &str, token: Option<&str>) -> String {
     let version = env!("CARGO_PKG_VERSION");
+    // An empty field is not a smaller header, it is a rejected one: Jellyfin
+    // answers `Device=""` with HTTP 400 before it ever looks at the
+    // credentials — which is how Android, with no `/etc/hostname` to read,
+    // turned the right password into "Bad Request". Floored after escaping,
+    // since escaping is itself able to empty a quotes-only name.
+    let device = match escape(device) {
+        d if d.trim().is_empty() => "Karasu".to_string(),
+        d => d,
+    };
     let mut header = format!(
-        "MediaBrowser Client=\"Karasu\", Device=\"{}\", DeviceId=\"{}\", Version=\"{version}\"",
-        escape(device),
+        "MediaBrowser Client=\"Karasu\", Device=\"{device}\", DeviceId=\"{}\", Version=\"{version}\"",
         escape(device_id),
     );
     if let Some(t) = token {
@@ -1080,6 +1088,17 @@ mod tests {
         let h = auth_header("we\"ird", "i", None);
         assert!(h.contains("Device=\"weird\""));
         assert_eq!(h.matches('"').count() % 2, 0);
+    }
+
+    /// Jellyfin rejects `Device=""` with HTTP 400 before checking the
+    /// credentials — Android's missing `/etc/hostname` made every sign-in
+    /// there a "Bad Request" with the right password.
+    #[test]
+    fn an_empty_device_never_reaches_the_wire() {
+        assert!(auth_header("", "i", None).contains("Device=\"Karasu\""));
+        assert!(auth_header("  ", "i", None).contains("Device=\"Karasu\""));
+        // Escaping alone can empty a name; the floor comes after it.
+        assert!(auth_header("\"\"", "i", None).contains("Device=\"Karasu\""));
     }
 
     #[test]

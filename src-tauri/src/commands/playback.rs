@@ -235,22 +235,71 @@ fn jellyfin_device_id(db: &Db) -> String {
     id
 }
 
-/// This machine's name, used to prefill the device filter. Jellyfin Media
-/// Player reports the Windows computer name by default, so this is usually
-/// the right answer — but it is configurable in JMP, and a browser session
-/// reports the browser instead, which is why the field stays editable and the
-/// Test button lists what the server actually sees.
+/// This machine's name, used to prefill the device filter and as the
+/// `Device` field of the Jellyfin auth header. Jellyfin Media Player reports
+/// the Windows computer name by default, so this is usually the right
+/// answer — but it is configurable in JMP, and a browser session reports the
+/// browser instead, which is why the field stays editable and the Test
+/// button lists what the server actually sees. The cfg'd trio below is the
+/// house pattern (`protect`/`unprotect`): Android has no `/etc/hostname`,
+/// and the empty string that read produced there became `Device=""` — which
+/// Jellyfin answers with HTTP 400 before looking at the credentials.
 pub fn local_device_name() -> String {
-    #[cfg(windows)]
-    {
-        std::env::var("COMPUTERNAME").unwrap_or_default()
-    }
-    #[cfg(not(windows))]
-    {
-        std::fs::read_to_string("/etc/hostname")
-            .map(|s| s.trim().to_string())
-            .unwrap_or_default()
-    }
+    raw_device_name()
+}
+
+#[cfg(windows)]
+fn raw_device_name() -> String {
+    std::env::var("COMPUTERNAME").unwrap_or_default()
+}
+
+#[cfg(all(not(windows), not(target_os = "android")))]
+fn raw_device_name() -> String {
+    std::fs::read_to_string("/etc/hostname")
+        .map(|s| s.trim().to_string())
+        .unwrap_or_default()
+}
+
+/// `android.os.Build.MODEL` — "Pixel 8", not a hostname the platform does
+/// not have. The constant fallback keeps the name non-empty even before the
+/// tao context is ready; `auth_header` floors the empty case once more on
+/// its own, so this is quality, not the guarantee.
+#[cfg(target_os = "android")]
+fn raw_device_name() -> String {
+    android_device_model().unwrap_or_else(|| "Android".to_string())
+}
+
+/// `None` when the JNI context is not ready or the value is not clean
+/// ASCII — the name goes into an HTTP header, where reqwest rejects
+/// non-visible bytes at send time.
+#[cfg(target_os = "android")]
+fn android_device_model() -> Option<String> {
+    let ctx = tao::platform::android::prelude::main_android_context()?;
+    let vm = unsafe { jni::JavaVM::from_raw(ctx.java_vm.cast()) }.ok()?;
+    let mut env = vm.attach_current_thread().ok()?;
+    // `Build` is a boot-classpath class, so plain `find_class` works even
+    // from an attached native thread — the app-classloader dance the
+    // keystore needs is only for `dev.kyu.karasu.*`.
+    let got = (|| -> jni::errors::Result<String> {
+        let class = env.find_class("android/os/Build")?;
+        let value = env
+            .get_static_field(class, "MODEL", "Ljava/lang/String;")?
+            .l()?;
+        Ok(env
+            .get_string(&jni::objects::JString::from(value))?
+            .into())
+    })();
+    let s = match got {
+        Ok(s) => s,
+        Err(_) => {
+            if env.exception_check().unwrap_or(false) {
+                let _ = env.exception_clear();
+            }
+            return None;
+        }
+    };
+    let s = s.trim().to_string();
+    (!s.is_empty() && s.chars().all(|c| c.is_ascii_graphic() || c == ' ')).then_some(s)
 }
 
 #[derive(serde::Serialize)]

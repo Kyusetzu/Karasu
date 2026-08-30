@@ -24,3 +24,13 @@
 # anyway): TokenCipher is reached from Rust over JNI by name — minification
 # renaming or stripping it fails only at runtime, as a failed sign-in.
 -keep class dev.kyu.karasu.TokenCipher { *; }
+
+# The background notification job. NotifScheduler is the load-bearing one:
+# it is reached from Rust over JNI by name, has no native methods and no
+# manifest entry, so *neither* default keep rule protects it — the same
+# runtime-only failure mode TokenCipher's note describes. KarasuNative and
+# the JobService are covered by defaults (native methods / manifest), kept
+# explicitly anyway so a default-rule change cannot break them silently.
+-keep class dev.kyu.karasu.NotifScheduler { *; }
+-keep class dev.kyu.karasu.KarasuNative { *; }
+-keep class dev.kyu.karasu.NotifJobService { *; }

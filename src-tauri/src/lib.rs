@@ -6,6 +6,7 @@ mod db;
 mod diagnostics;
 mod discord;
 mod identify;
+mod background;
 mod keystore;
 mod library;
 mod logging;
@@ -383,6 +384,7 @@ pub fn run() {
             alerts::stale::spawn(app.handle().clone());
             alerts::sequel::spawn(app.handle().clone());
         alerts::site::spawn(app.handle().clone());
+        assert_notif_schedule(app.handle());
             // Before their first toast can land: on Android this is the
             // system permission dialog, everywhere else a granted no-op.
             alerts::notify::ensure_permission(app.handle());
@@ -610,3 +612,12 @@ fn setup_platform(app: &tauri::App) {
     app.manage(TrayPresent(false));
 }
 
+/// Cfg'd pair, per the house rule: the setup call site compiles on every
+/// platform while only Android re-asserts its JobScheduler registration.
+#[cfg(target_os = "android")]
+fn assert_notif_schedule(app: &tauri::AppHandle) {
+    background::spawn_schedule_assert(app.clone());
+}
+
+#[cfg(not(target_os = "android"))]
+fn assert_notif_schedule(_app: &tauri::AppHandle) {}

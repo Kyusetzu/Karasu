@@ -130,8 +130,23 @@ pub fn set_notif_schedule(db: State<'_, Db>, minutes: i64) -> Result<(), String>
             crate::alerts::site::INTERVAL_MAX,
         )
     };
-    db.kv_set(crate::alerts::site::INTERVAL_KEY, &clamped.to_string())
+    db.kv_set(crate::alerts::site::INTERVAL_KEY, &clamped.to_string())?;
+    reassert_notif_job(clamped);
+    Ok(())
 }
+
+/// Cfg'd pair: Android mirrors the setting into its JobScheduler so the
+/// dead-app half fires on the same cadence; everywhere else the in-app pass
+/// reads the kv on its next tick and nothing more is needed.
+#[cfg(target_os = "android")]
+fn reassert_notif_job(minutes: i64) {
+    if let Err(e) = crate::background::assert_schedule(minutes) {
+        crate::logging::warn("prefs", format!("job reschedule failed: {e}"));
+    }
+}
+
+#[cfg(not(target_os = "android"))]
+fn reassert_notif_job(_minutes: i64) {}
 
 /// Whether sequel-announcement notifications are enabled (default off).
 #[tauri::command]

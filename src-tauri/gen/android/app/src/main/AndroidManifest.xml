@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Hand-added: setPersisted(true) on the notification job throws without
+         it. The notification plugin's AAR happens to donate the same
+         permission through the manifest merge, but a persisted job must not
+         depend on a dependency's manifest — the merger dedupes. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <!-- AndroidTV support -->
     <uses-feature android:name="android.software.leanback" android:required="false" />
@@ -88,5 +93,13 @@
             android:name="android.support.FILE_PROVIDER_PATHS"
             android:resource="@xml/file_paths" />
         </provider>
+
+        <!-- Hand-added, outside the deep-link markers (that block is
+             rewritten on every build): the background notification job.
+             See NotifJob.kt for the whole story. -->
+        <service
+          android:name=".NotifJobService"
+          android:permission="android.permission.BIND_JOB_SERVICE"
+          android:exported="false" />
     </application>
 </manifest>

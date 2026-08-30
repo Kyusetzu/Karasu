@@ -64,7 +64,7 @@ pub fn interval_min(db: &Db) -> i64 {
 /// the price of `notifications` being a union with no common id field;
 /// `ActivityMessageNotification` is excluded exactly as everywhere else
 /// (absent from `type_in`, no fragment).
-const SITE_QUERY: &str = "
+pub(crate) const SITE_QUERY: &str = "
 query {
   Viewer { unreadNotificationCount }
   Page(page: 1, perPage: 1) {

@@ -8,6 +8,7 @@ mod discord;
 mod identify;
 mod background;
 mod keystore;
+mod widgets;
 mod library;
 mod logging;
 mod net;

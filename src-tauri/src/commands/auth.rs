@@ -207,6 +207,9 @@ pub fn anilist_session(db: State<'_, Db>) -> Option<Value> {
 pub fn anilist_logout(db: State<'_, Db>) {
     auth::delete_token();
     db.kv_delete("anilist_viewer");
+    // The widget projection holds this account's titles and must not
+    // outlive it, exactly like the token beside it.
+    crate::widgets::clear();
 }
 
 /// Refetches the viewer and replaces the cached blob.

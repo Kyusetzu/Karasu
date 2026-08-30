@@ -57,6 +57,8 @@ pub fn set_discord_settings(
 #[tauri::command]
 pub fn set_ui_language(app: tauri::AppHandle, db: State<'_, Db>, language: String) -> Result<(), String> {
     db.kv_set(crate::i18n::LANGUAGE_KEY, &language)?;
+    // The widget projection carries pre-rendered labels in this language.
+    crate::widgets::refresh(&app);
     // The tray's labels are set once at launch, so it needs telling; every
     // other Rust-composed string reads the mirror at the moment it composes.
     //
@@ -247,14 +249,25 @@ pub fn get_blur_adult(db: State<'_, Db>) -> bool {
 }
 
 #[tauri::command]
-pub fn set_blur_adult(db: State<'_, Db>, blur: bool) -> Result<(), String> {
-    db.kv_set(BLUR_ADULT_KEY, if blur { "1" } else { "0" })
+pub fn set_blur_adult(app: tauri::AppHandle, db: State<'_, Db>, blur: bool) -> Result<(), String> {
+    db.kv_set(BLUR_ADULT_KEY, if blur { "1" } else { "0" })?;
+    // The widgets hide what this blurs — a home screen cannot blur.
+    crate::widgets::refresh(&app);
+    Ok(())
 }
 
 #[tauri::command]
-pub fn set_content_filter(db: State<'_, Db>, level: String) -> Result<(), String> {
+pub fn set_content_filter(
+    app: tauri::AppHandle,
+    db: State<'_, Db>,
+    level: String,
+) -> Result<(), String> {
     if level != "off" && level != "moderate" && level != "strict" {
         return Err("Unknown content filter level".into());
     }
-    db.kv_set("content_filter", &level)
+    db.kv_set("content_filter", &level)?;
+    // Without this, a blocked title lingers on the home screen until the
+    // next list fetch happens to rewrite the projection.
+    crate::widgets::refresh(&app);
+    Ok(())
 }

@@ -279,6 +279,9 @@ pub async fn fetch_media_list(
                 // Every cold start then hits the network instead of the cache.
                 crate::logging::warn("cache", format!("cannot cache the {media_type} list: {e}"));
             }
+            // The home-screen widgets render a projection of exactly this
+            // cache; a fresh list is the moment it moves.
+            crate::widgets::refresh(&app);
             Ok(ListResult {
                 from_cache: false,
                 pending: db.queue_len(user_id),

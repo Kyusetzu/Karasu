@@ -722,6 +722,8 @@ async fn perform_update(
     // Patch the local cache so the next detection sees the new state
     if let Some(user_id) = cached_user_id(&db) {
         db.update_cached_progress(user_id, media_type, media_id, episode, Some(status));
+        // A scrobble is the other writer of that cache; the widgets follow.
+        crate::widgets::refresh(app);
     }
     // Refresh the now-playing display
     {

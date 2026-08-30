@@ -434,6 +434,12 @@
     drop-shadow(4em 0 0 currentColor);
   clip-path: inset(0 100% 0 0);
   animation: loaderSweep 2s infinite steps(7) forwards;
+  /* Layer promotion, so Chromium can composite the clip-path steps and the
+     loader keeps sweeping while the main thread is busy — a loader is
+     exactly the element on screen during long tasks, and a frozen one
+     reads as a static image. Where unsupported this is a harmless extra
+     layer; the reduced-motion collapse above is untouched by it. */
+  will-change: clip-path;
 
   &::before {
     content: "";

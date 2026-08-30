@@ -109,6 +109,25 @@ function loadMark(): Promise<HTMLImageElement | null> {
   return markPromise;
 }
 
+/**
+ * Requests the two poster faces, once. `document.fonts.ready` is not
+ * enough here: it resolves immediately when a face was never *requested*,
+ * and Kosugi Maru may never have rendered in the DOM before this page
+ * mounts — the first draw then rasterized fallback glyphs into the canvas
+ * and nothing ever redrew for the webfont. `load()` initiates the fetch;
+ * weight 400 is the only registered face (the poster's heavier weights are
+ * synthesized off it either way). Failure resolves rather than rejects —
+ * a missing font is a cosmetic downgrade, not a reason to draw nothing.
+ */
+let fontsPromise: Promise<unknown> | null = null;
+function ensurePosterFonts(): Promise<unknown> {
+  fontsPromise ??= Promise.all([
+    document.fonts.load('400 16px "SN Pro"'),
+    document.fonts.load('400 16px "Kosugi Maru"'),
+  ]).catch(() => null);
+  return fontsPromise;
+}
+
 /** How tall the mark is for a given width, from its own aspect. */
 const markHeight = (mark: HTMLImageElement, size: number) =>
   size * (mark.naturalHeight / mark.naturalWidth || 978.44 / 890.73);
@@ -720,18 +739,75 @@ export default function Wrapped() {
 
   // The mark is decoded once and then held: the poster redraws on every
   // preset change, and a fresh decode per draw would flash an empty corner.
-  const [mark, setMark] = useState<HTMLImageElement | null>(null);
+  // Three-valued on purpose — `undefined` is "decode still pending" and
+  // gates the first draw, `null` is "decode failed" and draws without the
+  // bird. Gating on truthiness instead would never draw on a failed decode,
+  // and gating on nothing drew the whole poster twice at mount.
+  const [mark, setMark] = useState<HTMLImageElement | null | undefined>(undefined);
   useEffect(() => {
     loadMark().then(setMark);
   }, []);
 
+  // The preview canvas's CSS width (rounded, so the observer can't loop on
+  // subpixel churn). It decides the draw resolution below; 0 means the
+  // canvas hasn't mounted or been measured yet.
+  const [previewWidth, setPreviewWidth] = useState(0);
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !stats || !heading) return;
-    drawCard(canvas, stats, heading, viewer?.name ?? "", t, i18n.language, preset, mark);
+    if (!canvas) return;
+    const measure = () => {
+      const w = Math.round(canvas.clientWidth);
+      setPreviewWidth((prev) => (prev === w ? prev : w));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(canvas);
+    return () => ro.disconnect();
+    // The canvas exists only on the data branch, so re-run when that
+    // branch's inputs settle.
+  }, [loading, error, years.length]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !stats || !heading || mark === undefined || previewWidth === 0) {
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      await ensurePosterFonts();
+      // Checked after every await: preset pills can be clicked faster than
+      // the first font load resolves.
+      if (cancelled) return;
+      // The preview draws at its *displayed* size × devicePixelRatio, not at
+      // poster resolution — `scale` transforms the same design-unit layout
+      // the export uses, so preview and export stay bit-identical in layout
+      // while the preview rasters 4-25× fewer pixels (the phone shows ~340
+      // CSS px of a 1080-2010 px design). Never shrink `preset.W` instead:
+      // the fixed-pixel rules and fitText's 2px quantization don't scale
+      // with W, and the preview would lie about the export. Capped at 2 —
+      // beyond that the pixels outrun every display this renders on.
+      const previewScale = Math.min(
+        2,
+        (previewWidth * (window.devicePixelRatio || 1)) / preset.W,
+      );
+      drawCard(
+        canvas,
+        stats,
+        heading,
+        viewer?.name ?? "",
+        t,
+        i18n.language,
+        preset,
+        mark,
+        previewScale,
+      );
+    })();
+    return () => {
+      cancelled = true;
+    };
     // `heading` derives from the same inputs as `stats`; its pieces are listed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stats, mode, year, seasonPick, viewer, t, i18n.language, preset, mark]);
+  }, [stats, mode, year, seasonPick, viewer, t, i18n.language, preset, mark, previewWidth]);
 
   if (!viewer) {
     return (
@@ -757,7 +833,10 @@ export default function Wrapped() {
     if (!stats || !heading || period === null) return;
     const out = document.createElement("canvas");
     // Awaited rather than read from state: an export fired before the decode
-    // landed would write a poster with no bird on it.
+    // landed would write a poster with no bird on it. The fonts likewise —
+    // resolved long since in the normal case, but an export is the one draw
+    // that must never rasterize fallback glyphs.
+    await ensurePosterFonts();
     const art = mark ?? (await loadMark());
     drawCard(out, stats, heading, viewer?.name ?? "", t, i18n.language, preset, art, scale);
 

@@ -512,6 +512,14 @@ impl Db {
             .map_err(|e| format!("Could not create app data folder: {e}"))?;
         let conn = Connection::open(data_dir.join("karasu.db"))
             .map_err(|e| format!("Could not open database: {e}"))?;
+        // Before the migrations, which run DDL on *every* open: SQLite's
+        // default is an immediate SQLITE_BUSY, and on Android a background
+        // job (JobScheduler) can hold a second connection on this file while
+        // the app cold-starts — whose open failing aborts startup outright.
+        // Five seconds of retry protects both directions. Deliberately not
+        // WAL: `snapshot_to` encodes rollback-journal assumptions.
+        conn.busy_timeout(std::time::Duration::from_secs(5))
+            .map_err(|e| format!("Could not set the lock timeout: {e}"))?;
         conn.execute_batch(MIGRATIONS)
             .map_err(|e| format!("Migration failed: {e}"))?;
         let version: i64 = conn

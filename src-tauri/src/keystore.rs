@@ -63,26 +63,36 @@ pub fn frame(sealed: &[u8]) -> Vec<u8> {
 }
 
 #[cfg(target_os = "android")]
-mod jni_impl {
-    use jni::objects::{JByteArray, JObject, JValue};
+pub mod jni_impl {
+    use jni::objects::{JByteArray, JClass, JObject, JValue};
+    use jni::JNIEnv;
 
     fn err<E: std::fmt::Display>(what: &str) -> impl FnOnce(E) -> String + '_ {
         move |e| format!("keystore {what}: {e}")
     }
 
-    fn call(method: &str, data: &[u8]) -> Result<Vec<u8>, String> {
-        let ctx = tao::platform::android::prelude::main_android_context()
-            .ok_or("keystore: the android context is not ready yet")?;
-        let vm = unsafe { jni::JavaVM::from_raw(ctx.java_vm.cast()) }
-            .map_err(err("vm"))?;
-        let mut env = vm.attach_current_thread().map_err(err("attach"))?;
-        let activity = unsafe { JObject::from_raw(ctx.context_jobject.cast()) };
-
-        // Through the activity's ClassLoader, not FindClass: a native thread's
-        // JNI FindClass only sees system classes.
+    /// The core, parameterized over any JVM thread's env and any `Context`.
+    ///
+    /// Two callers with two lifecycles: the running app reaches it through
+    /// tao's context in `call` below, and a background JobScheduler worker
+    /// hands in its own env and service context — a thread that already
+    /// belongs to the JVM (no attach), in a process where tao may never
+    /// have started (no `main_android_context`). The split is what lets the
+    /// token stay in Rust even on the dead-app path.
+    // Consumed by the background-notification entry point; the allow goes
+    // when that lands in the same round.
+    #[allow(dead_code)]
+    pub fn call_with_env(
+        env: &mut JNIEnv,
+        context: &JObject,
+        method: &str,
+        data: &[u8],
+    ) -> Result<Vec<u8>, String> {
+        // Through the context's ClassLoader, not FindClass: a native
+        // thread's JNI FindClass only sees system classes.
         let result = (|| -> jni::errors::Result<Vec<u8>> {
             let loader = env
-                .call_method(&activity, "getClassLoader", "()Ljava/lang/ClassLoader;", &[])?
+                .call_method(context, "getClassLoader", "()Ljava/lang/ClassLoader;", &[])?
                 .l()?;
             let name = env.new_string("dev.kyu.karasu.TokenCipher")?;
             let class = env
@@ -96,7 +106,7 @@ mod jni_impl {
             let arr = env.byte_array_from_slice(data)?;
             let out = env
                 .call_static_method(
-                    &jni::objects::JClass::from(class),
+                    &JClass::from(class),
                     method,
                     "([B)[B",
                     &[JValue::Object(&arr)],
@@ -115,6 +125,16 @@ mod jni_impl {
         })
     }
 
+    fn call(method: &str, data: &[u8]) -> Result<Vec<u8>, String> {
+        let ctx = tao::platform::android::prelude::main_android_context()
+            .ok_or("keystore: the android context is not ready yet")?;
+        let vm = unsafe { jni::JavaVM::from_raw(ctx.java_vm.cast()) }
+            .map_err(err("vm"))?;
+        let mut env = vm.attach_current_thread().map_err(err("attach"))?;
+        let activity = unsafe { JObject::from_raw(ctx.context_jobject.cast()) };
+        call_with_env(&mut env, &activity, method, data)
+    }
+
     pub fn seal(plain: &[u8]) -> Result<Vec<u8>, String> {
         call("seal", plain)
     }
@@ -124,6 +144,9 @@ mod jni_impl {
     }
 }
 
+// `call_with_env` stays addressed as `keystore::jni_impl::call_with_env` by
+// the background entry point; re-exporting it here tripped unused-import
+// until that caller landed, so the module path is the address.
 #[cfg(target_os = "android")]
 pub use jni_impl::{open, seal};
 

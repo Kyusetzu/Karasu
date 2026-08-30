@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import type { HeroMedia } from "@/api/queries";
 import { useContentFilter } from "@/stores/contentFilter";
 import { renderWithProviders } from "@/test/render";
@@ -81,13 +81,42 @@ describe("SeasonHero", () => {
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "A" })).toBeTruthy(),
     );
-    expect(screen.getAllByRole("button")).toHaveLength(3);
+    // Three dots plus the prev/next pair.
+    expect(screen.getAllByRole("button")).toHaveLength(5);
     unmount();
 
     hero.mockResolvedValue([media(9, "Only")]);
     renderWithProviders(<SeasonHero />);
     await waitFor(() => expect(screen.getByRole("link", { name: "Only" })).toBeTruthy());
+    // No dots and no arrows: there is nowhere to go.
     expect(screen.queryAllByRole("button")).toHaveLength(0);
+  });
+
+  /** Five parallel banner downloads at first paint were the hero's whole
+   *  wait, so a slide mounts only as the active one or its successor —
+   *  and stays mounted once seen, because unmounting drops the decode. */
+  it("mounts a slide only once it is needed, and the arrows step and wrap", async () => {
+    hero.mockResolvedValue([media(1, "A"), media(2, "B"), media(3, "C")]);
+    const { container } = renderWithProviders(<SeasonHero />);
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { level: 2 }).textContent).toBe("A"),
+    );
+    // Probed by the banner img, not by role: an inactive slide is
+    // aria-hidden, which also empties its accessible name — a name query
+    // could never tell "not mounted" from "mounted and hidden".
+    expect(container.querySelector('img[src*="banner/3"]')).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "dashboard.heroNext" }));
+    expect(screen.getByRole("heading", { level: 2 }).textContent).toBe("B");
+    // B's successor is C, so its banner exists now — preloaded for the
+    // crossfade, still hidden until it becomes the active slide.
+    expect(container.querySelector('img[src*="banner/3"]')).toBeTruthy();
+
+    // Backwards from the second, twice: past the first, wrapping to the last.
+    const prev = screen.getByRole("button", { name: "dashboard.heroPrev" });
+    fireEvent.click(prev);
+    fireEvent.click(prev);
+    expect(screen.getByRole("heading", { level: 2 }).textContent).toBe("C");
   });
 
   it("advances on its own", async () => {

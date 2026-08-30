@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { IconButton } from "@/components/ui/icon-button";
 import { isTauri } from "@/api/anilist";
 import { currentSeason, seasonHero, type HeroMedia } from "@/api/queries";
 import { displayTitle } from "@/api/types";
@@ -66,6 +68,27 @@ export default function SeasonHero() {
     // tab that was hidden does not wake up owing several transitions at once.
   }, [at, items.length]);
 
+  // Which slides have earned a mount. All five used to mount at once, which
+  // started five banner downloads in parallel at first paint — the whole
+  // hero waited on the slowest of them. Now the active slide and its
+  // successor (so the crossfade has something decoded to fade to) mount;
+  // once seen, a slide stays mounted, because unmounting drops the decoded
+  // image and each return visit would re-decode and flash.
+  const [seen, setSeen] = useState(() => new Set([0, 1]));
+  useEffect(() => {
+    setSeen((prev) => {
+      const next = (at + 1) % Math.max(1, count.current);
+      if (prev.has(at) && prev.has(next)) return prev;
+      const grown = new Set(prev);
+      grown.add(at);
+      grown.add(next);
+      return grown;
+    });
+  }, [at]);
+
+  const step = (dir: 1 | -1) =>
+    setAt((i) => (i + dir + count.current) % Math.max(1, count.current));
+
   // Nothing is a better hero than a broken one — no skeleton once it is known
   // there is nothing to show, so the Overview simply starts at its first
   // section as it always did.
@@ -80,14 +103,16 @@ export default function SeasonHero() {
         {/* Every slide is mounted and cross-faded by opacity rather than
             swapped: swapping unmounts the decoded image, so each rotation would
             re-decode and flash. The inactive ones are inert to the pointer. */}
-        {items.map((m, i) => (
-          <Slide
-            key={m.id}
-            media={m}
-            active={i === at}
-            veiled={shouldBlur(m, level, blurAdult)}
-          />
-        ))}
+        {items.map((m, i) =>
+          seen.has(i) ? (
+            <Slide
+              key={m.id}
+              media={m}
+              active={i === at}
+              veiled={shouldBlur(m, level, blurAdult)}
+            />
+          ) : null,
+        )}
 
         {/* Over the art, under the text. `from-surface-950` matches the page,
             so the image reads as the page rather than as a card on it. */}
@@ -117,6 +142,34 @@ export default function SeasonHero() {
             )}
           </p>
         </div>
+
+        {/* Prev/next, over the art and above the slide links. Always
+            visible: with reduced motion the rotation never runs, so these
+            are the only way to the other four titles there. */}
+        {items.length > 1 && (
+          <>
+            <IconButton
+              variant="onCover"
+              round
+              onClick={() => step(-1)}
+              aria-label={t("dashboard.heroPrev")}
+              title={t("dashboard.heroPrev")}
+              className="absolute left-3 top-1/2 -translate-y-1/2"
+            >
+              <ChevronLeft className="size-4.5" />
+            </IconButton>
+            <IconButton
+              variant="onCover"
+              round
+              onClick={() => step(1)}
+              aria-label={t("dashboard.heroNext")}
+              title={t("dashboard.heroNext")}
+              className="absolute right-3 top-1/2 -translate-y-1/2"
+            >
+              <ChevronRight className="size-4.5" />
+            </IconButton>
+          </>
+        )}
       </div>
 
       {items.length > 1 && (

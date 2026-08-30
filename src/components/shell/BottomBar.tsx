@@ -108,7 +108,10 @@ export default function BottomBar() {
             role="dialog"
             aria-label={t("nav.more")}
             className={cn(
-              "absolute inset-x-2 bottom-16 rounded-2xl border border-surface-700 bg-surface-900 p-3 shadow-[0_1rem_3rem_rgba(0,0,0,.6)]",
+              // max-h + scroll: the vertical list is taller than the tile
+              // grid was, and a short phone must never push the top rows
+              // under the status bar.
+              "absolute inset-x-2 bottom-16 max-h-[70vh] overflow-y-auto rounded-2xl border border-surface-700 bg-surface-900 p-3 shadow-[0_1rem_3rem_rgba(0,0,0,.6)]",
               sheet.leaving ? "animate-rise-out" : "animate-rise-in",
             )}
           >
@@ -137,7 +140,11 @@ export default function BottomBar() {
                 <p className="px-1 pb-1 text-[.625rem] font-medium uppercase tracking-wide text-ink-700">
                   {t(g.label)}
                 </p>
-                <div className="grid grid-cols-3 gap-1">
+                {/* One destination per row, not a 3-wide tile grid: rows
+                    read top to bottom the way a menu does, give every label
+                    its full width instead of truncating at a third of the
+                    screen, and make the whole row the touch target. */}
+                <div className="flex flex-col gap-0.5">
                   {g.items.map((item) => (
                     <NavLink
                       key={item.to}
@@ -145,15 +152,15 @@ export default function BottomBar() {
                       onClick={() => setMoreOpen(false)}
                       className={({ isActive }) =>
                         cn(
-                          "flex flex-col items-center gap-1 rounded-xl px-1 py-2.5 text-[.6875rem] transition-surface",
+                          "flex items-center gap-2.5 rounded-lg px-2 py-2 text-sm transition-surface",
                           isActive
                             ? "bg-surface-800 text-accent-400"
                             : "text-ink-400 hover:bg-surface-850 hover:text-ink-200",
                         )
                       }
                     >
-                      <item.icon className="size-4.5" />
-                      <span className="truncate">{t(item.key)}</span>
+                      <item.icon className="size-4.5 shrink-0" />
+                      <span>{t(item.key)}</span>
                     </NavLink>
                   ))}
                 </div>

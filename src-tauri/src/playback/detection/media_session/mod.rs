@@ -45,13 +45,17 @@ const AUDIO_EXTENSIONS: &[&str] = &[
     ".m4b", ".ape", ".wv",
 ];
 
-#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
-/// Players that only ever play music. Matched on the shortened app name, so
-/// this is the MPRIS bus suffix in practice.
+/// Players that only ever play music, matched on the shortened app name with
+/// any `.exe` stripped — so this covers the MPRIS bus suffix ("spotify"), the
+/// Windows executable ("Spotify.exe") and the Store package family
+/// ("SpotifyAB.SpotifyMusic_…" → "spotifymusic") in one list. Used both to
+/// infer a type where MPRIS reports none and to believe a "music" label
+/// outright where the episode carve-out in `is_watchable` would otherwise
+/// second-guess it.
 const MUSIC_PLAYERS: &[&str] = &[
-    "spotify", "spotifyd", "ncspot", "rhythmbox", "clementine", "strawberry",
-    "audacious", "elisa", "lollypop", "amberol", "mpd", "cmus", "moc", "quodlibet",
-    "deadbeef", "tauon", "gnome-music", "sayonara",
+    "spotify", "spotifyd", "spotifymusic", "ncspot", "rhythmbox", "clementine",
+    "strawberry", "audacious", "elisa", "lollypop", "amberol", "mpd", "cmus",
+    "moc", "quodlibet", "deadbeef", "tauon", "gnome-music", "sayonara",
 ];
 
 /// One media session as the desktop sees it. Serialized straight into the
@@ -86,27 +90,33 @@ impl MediaSession {
     /// detected. Getting a false positive from an unset video player is
     /// recoverable — the title simply won't match anything on the list.
     ///
-    /// One carve-out, measured on a real site: a *browser's* "music" label
-    /// is the browser's own default for anything with sound, not the site's
-    /// claim — an anime episode playing in a tab reported
-    /// `type: music` and was invisible to the whole pass. So a music-typed
-    /// browser session whose composed title parses to an explicit episode is
-    /// treated as video the browser mislabelled. Real music has no episode
-    /// marker and stays out (the Spotify *web player* included), and a music
-    /// **app** saying "music" is believed even about a song called
-    /// "Episode 3" — the override needs both halves.
+    /// One carve-out, measured on a real site: a "music" label is usually
+    /// the *player's* default for anything with sound, not the site's claim
+    /// — an anime episode in a browser tab reported `type: music` and was
+    /// invisible to the whole pass. The label yields to a title that
+    /// *spells out* an episode ("Episode 2", S01E05, "#28"): the title is
+    /// evidence about the media, the type only a guess by the player — the
+    /// same primacy `infer_playback_type` gives the URL. Deliberately not
+    /// keyed on the app being a browser: Windows reports browsers under
+    /// opaque install-hash AUMIDs (`6F940AC27A98DD61` was the real one), so
+    /// an app-id test cannot recognise the very sessions this exists for.
+    /// Real music has no episode marker and stays out — and a known
+    /// music-only player is believed outright, even about a song that
+    /// happens to be called like an episode.
     fn is_watchable(&self) -> bool {
         if self.playback_type != "music" {
             return true;
         }
-        super::profiles::is_browser(&short_app_name(&self.app_id))
-            && crate::playback::recognition::parser::parse(&compose_title(
-                &self.artist,
-                &self.title,
-                &self.album,
-            ))
-            .episode
-            .is_some()
+        let name = short_app_name(&self.app_id);
+        if MUSIC_PLAYERS.contains(&name.trim_end_matches(".exe")) {
+            return false;
+        }
+        crate::playback::recognition::parser::parse(&compose_title(
+            &self.artist,
+            &self.title,
+            &self.album,
+        ))
+        .episode_marked
     }
 }
 
@@ -462,16 +472,37 @@ mod tests {
         assert_eq!(p.process, "chrome.exe");
     }
 
-    /// The override needs the episode half: a browser really playing music
-    /// (the Spotify web player included) has no episode marker and stays out.
+    /// The second real report: Windows names browsers by opaque install-hash
+    /// AUMIDs, so the first fix — keyed on the app id being a browser —
+    /// never fired for the very session it was written for. The override
+    /// must work with an app id nothing can classify.
     #[test]
-    fn real_music_in_a_browser_stays_invisible() {
-        let sessions = vec![browser_session("Some Band - Some Song", "music", "playing")];
+    fn an_opaque_app_id_cannot_hide_a_spelled_out_episode() {
+        let mut s = browser_session(
+            "That Time I Got Reincarnated as a Slime: Visions of Coleus - Episode 2 | Re:ANIME",
+            "music",
+            "playing",
+        );
+        s.app_id = "6F940AC27A98DD61".into();
+        let sessions = vec![s];
+        let p = watchable(&sessions).find_map(playback_from).unwrap();
+        assert!(p.streaming);
+    }
+
+    /// The override needs a *spelled-out* episode: real music has none —
+    /// the Spotify web player included — and a bare trailing number in a
+    /// song name is inference, not a marker.
+    #[test]
+    fn real_music_stays_invisible_without_a_marker() {
+        let sessions = vec![
+            browser_session("Some Band - Some Song", "music", "playing"),
+            browser_session("Some Band - Great Song 2", "music", "playing"),
+        ];
         assert!(pick(&sessions).is_none());
     }
 
-    /// And the browser half: a music *app* saying "music" is believed, even
-    /// about a song that happens to be called like an episode.
+    /// A known music-only player is believed outright, even about a song
+    /// that happens to be called like an episode.
     #[test]
     fn a_music_apps_episode_titled_song_stays_invisible() {
         let mut s = session("Yorushika", "Episode 3", "music", "playing");

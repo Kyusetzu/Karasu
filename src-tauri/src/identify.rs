@@ -119,6 +119,7 @@ fn score(item: &Unidentified, node: &Value) -> Option<Suggestion> {
     let parsed = Parsed {
         title: item.title.clone(),
         episode: None,
+        episode_marked: false,
         season: if item.season < 0 { None } else { Some(item.season as u32) },
         release_group: None,
     };

@@ -599,6 +599,7 @@ fn unplaceable_season(now: &NowPlaying) -> Option<u32> {
     let parsed = parser::Parsed {
         title: now.parsed_title.clone(),
         episode: now.episode,
+        episode_marked: now.episode.is_some(),
         season: Some(season),
         release_group: None,
     };
@@ -793,6 +794,7 @@ pub fn requeue_match(app: &AppHandle) {
             &parser::Parsed {
                 title: parsed_title.clone(),
                 episode,
+                episode_marked: episode.is_some(),
                 season,
                 release_group: None,
             },

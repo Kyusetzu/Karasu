@@ -35,21 +35,6 @@ const BROWSERS: &[&str] = &[
     "librewolf.exe",
 ];
 
-/// Shared with `media_session`: whether a process-like name is a browser,
-/// wherever the name came from — Win32 enumeration ("chrome.exe"), an SMTC
-/// app id shortened to the same shape, or an MPRIS bus name ("firefox",
-/// "chromium"). One vocabulary on top of the same list, so the two passes
-/// cannot disagree about what a browser is; the extras are MPRIS-only
-/// spellings the window pass can never see (KDE bridges every browser
-/// through "plasma-browser-integration").
-pub(crate) fn is_browser(process: &str) -> bool {
-    let bare = process.strip_suffix(".exe").unwrap_or(process);
-    BROWSERS
-        .iter()
-        .any(|b| b.strip_suffix(".exe").unwrap_or(b) == bare)
-        || matches!(bare, "chromium" | "plasma-browser-integration")
-}
-
 /// Browser window titles end with the browser name — strip it.
 const BROWSER_SUFFIXES: &[&str] = &[
     " - Google Chrome",

@@ -660,6 +660,8 @@ pub fn playback_from_session(session: &serde_json::Value) -> Option<Playback> {
         parsed: Some(Parsed {
             title: title.to_string(),
             episode,
+            // An API field, not a parse: as explicit as a spelling gets.
+            episode_marked: episode.is_some(),
             // Season 1 carries no information for matching and would only
             // confuse the "S2" title variants the matcher generates.
             season: season.filter(|s| *s > 1),

@@ -788,8 +788,9 @@ them away without re-measuring.
   computes `overflow-x: auto`, so any too-wide element scrolls everything).
   The same lesson as `SectionHeader`'s h2.
 - **The cover grid is `repeat(var(--cover-cols), minmax(0, 1fr))`** — the
-  covers-per-row slider, one token written by the theme store, defaulting by
-  form factor at first run (8 wide, 2 narrow) with a one-time migration from
+  covers-per-row field, one token written by the theme store, defaulting by
+  platform at first run (10 desktop, 4 Android — UA-keyed, since the store
+  boots before `platform_info` answers) with a one-time migration from
   the old s/m/l keys. Two shapes died here and should stay dead: fixed-size
   tracks (could not tell medium from large on a phone) and an unlayered phone
   override of them (silently beat the utility layer and killed the setting).

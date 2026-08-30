@@ -33,10 +33,13 @@ export const ACCENT_PRESETS = [
  * A count, not a track size, after the second device round: fixed-size tracks
  * meant the setting could not tell "medium" from "large" on a phone (both
  * resolved to two columns), and what the maintainer actually wanted to steer
- * was how many covers share a row. The default differs by form factor — more
- * on a monitor, fewer on a phone — measured at first run by the same 767px
- * boundary the shell uses, because the two installs have separate storage and
- * a desktop window is wide at startup even when it can be squeezed later.
+ * was how many covers share a row. The default differs by *platform* — 10 on
+ * desktop, 4 on Android, the maintainer's numbers — and is read off the user
+ * agent rather than `platform_info`: this store boots synchronously before
+ * that command can answer, and a first-run default is a one-shot guess about
+ * the device, not the capability gating the platform store exists for. A
+ * narrowed desktop window still gets the desktop count, which is the point —
+ * the old width-keyed default handed it a phone's.
  */
 export const COVER_COLS_MIN = 1;
 export const COVER_COLS_MAX = 40;
@@ -44,7 +47,8 @@ const clampCols = (n: number): number =>
   Math.min(COVER_COLS_MAX, Math.max(COVER_COLS_MIN, Math.round(n)));
 const narrowShell = (): boolean =>
   window.matchMedia?.("(max-width: 767px)").matches ?? false;
-const defaultCoverCols = (): number => (narrowShell() ? 2 : 8);
+const defaultCoverCols = (): number =>
+  /android/i.test(navigator.userAgent) ? 4 : 10;
 
 const MODE_KEY = "karasu-theme";
 const ACCENT_KEY = "karasu-accent";

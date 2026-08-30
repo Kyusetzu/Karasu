@@ -111,6 +111,13 @@ pub fn start<R: Runtime>(app: AppHandle<R>) -> Result<String, String> {
                     Ok(())
                 }
                 Err(e) => {
+                    // Logged as well as emitted: the emit paints one screen
+                    // once, and a user reporting "it showed an error" needs
+                    // that error to still exist somewhere afterwards.
+                    crate::logging::warn(
+                        "auth",
+                        format!("connect after the callback failed: {e}"),
+                    );
                     let _ = app.emit("anilist-auth-error", &e);
                     Err(e)
                 }

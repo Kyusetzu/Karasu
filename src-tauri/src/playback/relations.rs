@@ -149,7 +149,21 @@ pub fn spawn_loader(app: tauri::AppHandle) {
         if !stale {
             return;
         }
-        let resp = match reqwest::get(SOURCE_URL).await {
+        // Through `net::client_builder`, never bare `reqwest::get`: this was
+        // the one request in the tree that bypassed the seam, and on Android
+        // the default client's platform verifier panicked the task on every
+        // launch — before the cache was ever written, so the staleness check
+        // re-fired forever and the redirect rules never loaded there at all.
+        // Exactly the "fix applied to three of four builders" failure the
+        // seam's own header warns about.
+        let client = match crate::net::client_builder().build() {
+            Ok(c) => c,
+            Err(e) => {
+                crate::logging::warn("relations", format!("cannot build the client: {e}"));
+                return;
+            }
+        };
+        let resp = match client.get(SOURCE_URL).send().await {
             Ok(r) => r,
             Err(e) => {
                 crate::logging::warn("relations", format!("cannot fetch the rules: {e}"));

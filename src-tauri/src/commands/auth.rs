@@ -113,12 +113,34 @@ pub async fn connect_with_token(db: &Db, api: &AniList, input: &str) -> Result<V
     // the kv writes — cannot be told apart from the outside. Debug level, so
     // an ordinary sign-in stays quiet unless verbose logging is on.
     let t0 = std::time::Instant::now();
-    let data = api.query(Some(&token), VIEWER_QUERY, json!({})).await?;
-    let viewer = data
-        .get("Viewer")
-        .filter(|v| !v.is_null())
-        .cloned()
-        .ok_or("Token invalid or expired")?;
+    // One bounded retry, in this path only. The token arrived seconds ago
+    // from AniList's own redirect, so a rejection here is far more likely a
+    // replication race than a genuinely bad token — and that is exactly what
+    // a device showed: the first viewer fetch after the callback failed, an
+    // immediate second press succeeded. The client already retries transport
+    // errors internally; this covers the GraphQL-level rejection those
+    // retries deliberately do not touch. A truly dead token still fails the
+    // second attempt and surfaces exactly as before.
+    let viewer = {
+        let fetch = || async {
+            let data = api.query(Some(&token), VIEWER_QUERY, json!({})).await?;
+            data.get("Viewer")
+                .filter(|v| !v.is_null())
+                .cloned()
+                .ok_or_else(|| "Token invalid or expired".to_string())
+        };
+        match fetch().await {
+            Ok(v) => v,
+            Err(first) => {
+                crate::logging::warn(
+                    "auth",
+                    format!("first viewer fetch after connect failed, retrying once: {first}"),
+                );
+                tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+                fetch().await?
+            }
+        }
+    };
     let t1 = std::time::Instant::now();
     auth::save_token(&token)?;
     let t2 = std::time::Instant::now();

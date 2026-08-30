@@ -7,8 +7,10 @@ import { cn } from "@/lib/utils";
 
 const SEASONS: Season[] = ["WINTER", "SPRING", "SUMMER", "FALL"];
 
-/** Not translated: the kanji is the same in every language Karasu speaks. */
-const KANJI: Record<Season, string> = {
+/** Not translated: the kanji is the same in every language Karasu speaks.
+ *  Exported for the Wrapped poster's seasonal caption, so the two surfaces
+ *  spell a season the same way. */
+export const SEASON_KANJI: Record<Season, string> = {
   WINTER: "冬",
   SPRING: "春",
   SUMMER: "夏",
@@ -27,10 +29,17 @@ export default function SeasonPicker({
   season,
   year,
   onPick,
+  years,
 }: {
   season: Season;
   year: number;
   onPick: (next: { season: Season; year: number }) => void;
+  /**
+   * The years on offer. Defaults to the rolling four-year window the
+   * seasonal page browses; Wrapped passes its own list, because a
+   * completion history reaches years no rolling window does.
+   */
+  years?: number[];
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -39,10 +48,10 @@ export default function SeasonPicker({
   // `{open && …}` alone the panel popped in and vanished mid-frame.
   const panel = usePresence(open);
 
-  // The years on offer end at the newest season anyone can browse, which is
+  // The default years end at the newest season anyone can browse, which is
   // next year's Winter — AniList lists it well before it airs.
   const latest = new Date().getFullYear() + 1;
-  const years = [latest - 3, latest - 2, latest - 1, latest];
+  const shownYears = years ?? [latest - 3, latest - 2, latest - 1, latest];
 
   useEffect(() => {
     if (!open) return;
@@ -70,7 +79,7 @@ export default function SeasonPicker({
           {t(`season.${season}`)} {year}
         </span>
         <span className="font-brand-jp text-xs text-ink-600">
-          {KANJI[season]}アニメ
+          {SEASON_KANJI[season]}アニメ
         </span>
         <ChevronDown
           className={cn(
@@ -91,14 +100,16 @@ export default function SeasonPicker({
             panel.leaving ? "animate-pop-out" : "animate-pop-in",
           )}
         >
-          <div className="flex gap-1">
-            {years.map((y) => (
+          {/* Wraps rather than stretching: a data-driven year list can hold
+              a decade where the default window holds four. */}
+          <div className="flex flex-wrap gap-1">
+            {shownYears.map((y) => (
               <button
                 key={y}
                 type="button"
                 onClick={() => onPick({ season, year: y })}
                 className={cn(
-                  "flex-1 rounded-md py-1 text-xs tabular-nums transition-surface",
+                  "min-w-12 flex-1 rounded-md py-1 text-xs tabular-nums transition-surface",
                   y === year
                     ? "bg-accent-500 text-accent-ink"
                     : "text-ink-500 hover:bg-surface-850 hover:text-ink-100",
@@ -126,7 +137,7 @@ export default function SeasonPicker({
               >
                 {t(`season.${s}`)}
                 <span className="mt-0.5 block font-brand-jp text-2xs text-ink-600">
-                  {KANJI[s]}
+                  {SEASON_KANJI[s]}
                 </span>
               </button>
             ))}

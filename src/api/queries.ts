@@ -1001,6 +1001,8 @@ query ($userId: Int!, $type: MediaType!, $scoreFormat: ScoreFormat) {
           duration
           genres
           isAdult
+          season
+          seasonYear
           title { romaji english native }
         }
       }
@@ -1016,6 +1018,10 @@ export interface WrappedEntry {
   duration: number | null;
   genres: string[];
   isAdult: boolean;
+  /** The *broadcast* season — what "Winter 2026" means everywhere else in
+   *  the app — as opposed to `year`, which is the completion year. */
+  season: Season | null;
+  seasonYear: number | null;
   title: MediaTitle;
 }
 
@@ -1037,6 +1043,8 @@ export async function wrappedEntries(
             duration: number | null;
             genres: string[];
             isAdult: boolean;
+            season: Season | null;
+            seasonYear: number | null;
             title: MediaTitle;
           };
         }[];
@@ -1059,6 +1067,8 @@ export async function wrappedEntries(
         duration: e.media.duration,
         genres: e.media.genres,
         isAdult: e.media.isAdult,
+        season: e.media.season,
+        seasonYear: e.media.seasonYear,
         title: e.media.title,
       });
     }

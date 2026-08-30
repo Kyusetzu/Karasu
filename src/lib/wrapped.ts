@@ -1,5 +1,17 @@
-import type { WrappedEntry } from "@/api/queries";
+import type { Season, WrappedEntry } from "@/api/queries";
 import { displayTitle } from "@/api/types";
+
+/**
+ * What one card covers. Two different questions, named so neither is guessed:
+ * a year is bucketed by *completion* (`completedAt.year` — "what I finished
+ * in 2026"), a season by *broadcast* (`media.season`/`seasonYear` — "the
+ * Winter 2026 shows I finished, whenever I finished them"). Broadcast is
+ * what `/seasonal` and `SeasonPicker` mean by season, so the picker can be
+ * reused without the word quietly changing meaning.
+ */
+export type WrappedPeriod =
+  | { kind: "year"; year: number }
+  | { kind: "season"; season: Season; year: number };
 
 /** Per-medium, per-year aggregate for the year-in-review card. */
 export interface MediaYearStats {
@@ -23,11 +35,15 @@ const TOP_TITLES = 5;
 
 function statsFor(
   entries: WrappedEntry[],
-  year: number,
+  period: WrappedPeriod,
   withMinutes: boolean,
   hideGenre: (name: string) => boolean,
 ): MediaYearStats {
-  const rows = entries.filter((e) => e.year === year);
+  const rows = entries.filter((e) =>
+    period.kind === "year"
+      ? e.year === period.year
+      : e.season === period.season && e.seasonYear === period.year,
+  );
 
   const genres = new Map<string, number>();
   for (const e of rows) for (const g of e.genres) {
@@ -65,12 +81,12 @@ function statsFor(
 export function aggregate(
   anime: WrappedEntry[],
   manga: WrappedEntry[],
-  year: number,
+  period: WrappedPeriod,
   hideGenre: (name: string) => boolean = () => false,
 ): WrappedStats {
   return {
-    anime: statsFor(anime, year, true, hideGenre),
-    manga: statsFor(manga, year, false, hideGenre),
+    anime: statsFor(anime, period, true, hideGenre),
+    manga: statsFor(manga, period, false, hideGenre),
   };
 }
 
@@ -82,4 +98,33 @@ export function availableYears(
   const set = new Set<number>();
   for (const e of [...anime, ...manga]) if (e.year) set.add(e.year);
   return [...set].sort((a, b) => b - a);
+}
+
+/** In-year display order, newest last — the broadcast calendar's own. */
+const SEASON_ORDER: Season[] = ["WINTER", "SPRING", "SUMMER", "FALL"];
+
+/**
+ * Distinct broadcast seasons with at least one completed title, newest first
+ * (year descending, Fall before Winter within one). Data-driven where the
+ * seasonal page's picker is a rolling window — a completion list reaches
+ * back a decade, and an empty season is not worth offering.
+ */
+export function availableSeasons(
+  anime: WrappedEntry[],
+  manga: WrappedEntry[],
+): { season: Season; year: number }[] {
+  const seen = new Set<string>();
+  const out: { season: Season; year: number }[] = [];
+  for (const e of [...anime, ...manga]) {
+    if (!e.season || !e.seasonYear) continue;
+    const key = `${e.seasonYear}-${e.season}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ season: e.season, year: e.seasonYear });
+  }
+  return out.sort(
+    (a, b) =>
+      b.year - a.year ||
+      SEASON_ORDER.indexOf(b.season) - SEASON_ORDER.indexOf(a.season),
+  );
 }

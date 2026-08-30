@@ -4,7 +4,7 @@ import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { Download, Sparkles } from "lucide-react";
-import { wrappedEntries, type WrappedEntry } from "@/api/queries";
+import { wrappedEntries, type Season, type WrappedEntry } from "@/api/queries";
 import {
   currentScoreFormat,
   isTauri,
@@ -14,10 +14,13 @@ import {
 import { formatMeanScore } from "@/lib/scoreFormat";
 import {
   aggregate,
+  availableSeasons,
   availableYears,
   type MediaYearStats,
+  type WrappedPeriod,
   type WrappedStats,
 } from "@/lib/wrapped";
+import SeasonPicker, { SEASON_KANJI } from "@/components/ui/season-picker";
 import { useAuth } from "@/stores/auth";
 import { useContentFilter } from "@/stores/contentFilter";
 import { isBlocked, isBlockedGenre } from "@/lib/contentFilter";
@@ -182,14 +185,25 @@ interface Section {
 }
 
 /**
- * Draws the year-in-review card. Sections are laid out with a running cursor
+ * Draws the review card. Sections are laid out with a running cursor
  * (each contributes a fixed height), so nothing can overlap, and the canvas
  * height is computed to fit the content exactly — no clipping, no dead space.
  */
+
+/** What the headline says — the one place the card knows year from season. */
+interface CardHeading {
+  /** The big numeral (the year, in both modes). */
+  numeral: string;
+  /** The accent flourish beside it — 一年のまとめ, or the season's twin. */
+  caption: string;
+  /** The line an empty medium block shows. */
+  emptyLine: string;
+}
+
 function drawCard(
   canvas: HTMLCanvasElement,
   stats: WrappedStats,
-  year: number,
+  heading: CardHeading,
   name: string,
   t: TFunction,
   lang: string,
@@ -290,13 +304,13 @@ function drawCard(
         ctx.fillStyle = INK;
         face(800, u(8.4));
         track(`${u(-0.045)}px`);
-        ctx.fillText(String(year), P, y + u(11.4));
-        const yearW = ctx.measureText(String(year)).width;
+        ctx.fillText(heading.numeral, P, y + u(11.4));
+        const yearW = ctx.measureText(heading.numeral).width;
         track("0px");
 
         ctx.fillStyle = a4;
         face(400, u(2), true);
-        ctx.fillText("一年のまとめ", P + yearW + u(1.4), y + u(11.4));
+        ctx.fillText(heading.caption, P + yearW + u(1.4), y + u(11.4));
 
         const rule = ctx.createLinearGradient(P, 0, W - P, 0);
         rule.addColorStop(0, a5);
@@ -327,7 +341,7 @@ function drawCard(
             ctx.textAlign = "left";
             ctx.fillStyle = INK_FAINT;
             face(500, u(1.4));
-            ctx.fillText(t("wrapped.noneThisYear"), P, y + u(2));
+            ctx.fillText(heading.emptyLine, P, y + u(2));
           },
         });
         sections.push({ height: u(2), paint: () => {} });
@@ -594,6 +608,10 @@ export default function Wrapped() {
   const level = useContentFilter((s) => s.level);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [year, setYear] = useState<number | null>(null);
+  // Which cut the card covers. Year is completion-bucketed, season is
+  // broadcast-bucketed - see WrappedPeriod's comment for why the words differ.
+  const [mode, setMode] = useState<"year" | "season">("year");
+  const [seasonPick, setSeasonPick] = useState<{ season: Season; year: number } | null>(null);
   const [saved, setSaved] = useState(false);
   const [presetKey, setPresetKey] = useState<PresetKey>("page");
   const [format, setFormat] = useState<ImageFormat>("png");
@@ -648,14 +666,56 @@ export default function Wrapped() {
     if (year === null && years.length) setYear(years[0]);
   }, [years, year]);
 
+  const seasons = useMemo(
+    () => availableSeasons(visibleAnime, visibleManga),
+    [visibleAnime, visibleManga],
+  );
+  useEffect(() => {
+    if (seasonPick === null && seasons.length) setSeasonPick(seasons[0]);
+  }, [seasons, seasonPick]);
+
+  const period: WrappedPeriod | null =
+    mode === "year"
+      ? year !== null
+        ? { kind: "year", year }
+        : null
+      : seasonPick !== null
+        ? { kind: "season", ...seasonPick }
+        : null;
+
+  /** The headline in the chosen mode - the poster's one period-aware input.
+   *  The caption keeps the JP flourish; the season one leads with the
+   *  translated season name so the poster is legible without the kanji. */
+  const heading: CardHeading | null =
+    period === null
+      ? null
+      : period.kind === "year"
+        ? {
+            numeral: String(period.year),
+            caption: "一年のまとめ",
+            emptyLine: t("wrapped.noneThisYear"),
+          }
+        : {
+            numeral: String(period.year),
+            caption:
+              t(`season.${period.season}`) +
+              " · " +
+              SEASON_KANJI[period.season] +
+              "のまとめ",
+            emptyLine: t("wrapped.noneThisSeason"),
+          };
+
   const stats = useMemo(
     () =>
-      year !== null
-        ? aggregate(visibleAnime, visibleManga, year, (g) =>
+      period !== null
+        ? aggregate(visibleAnime, visibleManga, period, (g) =>
             isBlockedGenre(g, level),
           )
         : null,
-    [visibleAnime, visibleManga, year, level],
+    // `period` is derived fresh each render from mode/year/seasonPick, so its
+    // pieces are listed rather than the object identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [visibleAnime, visibleManga, mode, year, seasonPick, level],
   );
 
   // The mark is decoded once and then held: the poster redraws on every
@@ -667,9 +727,11 @@ export default function Wrapped() {
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !stats || year === null) return;
-    drawCard(canvas, stats, year, viewer?.name ?? "", t, i18n.language, preset, mark);
-  }, [stats, year, viewer, t, i18n.language, preset, mark]);
+    if (!canvas || !stats || !heading) return;
+    drawCard(canvas, stats, heading, viewer?.name ?? "", t, i18n.language, preset, mark);
+    // `heading` derives from the same inputs as `stats`; its pieces are listed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stats, mode, year, seasonPick, viewer, t, i18n.language, preset, mark]);
 
   if (!viewer) {
     return (
@@ -692,12 +754,12 @@ export default function Wrapped() {
    * 4800px canvas mounted until the next preset change.
    */
   const save = async () => {
-    if (!stats || year === null) return;
+    if (!stats || !heading || period === null) return;
     const out = document.createElement("canvas");
     // Awaited rather than read from state: an export fired before the decode
     // landed would write a poster with no bird on it.
     const art = mark ?? (await loadMark());
-    drawCard(out, stats, year, viewer?.name ?? "", t, i18n.language, preset, art, scale);
+    drawCard(out, stats, heading, viewer?.name ?? "", t, i18n.language, preset, art, scale);
 
     const blob = await new Promise<Blob | null>((resolve) =>
       // Quality only applies to JPEG; PNG ignores it. 0.92 is the browser
@@ -707,9 +769,13 @@ export default function Wrapped() {
     if (!blob) return;
 
     const suffix = scale === 1 ? "" : `@${scale}x`;
+    const slug =
+      period.kind === "year"
+        ? String(period.year)
+        : `${period.year}-${period.season.toLowerCase()}`;
     const ok = await saveImage(
       toBase64(new Uint8Array(await blob.arrayBuffer())),
-      `karasu-wrapped-${year}-${presetKey}${suffix}.${format === "png" ? "png" : "jpg"}`,
+      `karasu-wrapped-${slug}-${presetKey}${suffix}.${format === "png" ? "png" : "jpg"}`,
       format,
     ).catch(() => false);
     if (ok) {
@@ -725,17 +791,43 @@ export default function Wrapped() {
           <Sparkles className="size-5 text-accent-400" /> {t("wrapped.title")}
         </h1>
         {years.length > 0 && (
-          <select
-            value={year ?? ""}
-            onChange={(e) => setYear(Number(e.target.value))}
-            className="h-9 rounded-lg border border-surface-700 bg-surface-900 px-2 text-sm focus:border-accent-500 focus:outline-none"
-          >
-            {years.map((y) => (
-              <option key={y} value={y}>
-                {y}
-              </option>
-            ))}
-          </select>
+          <>
+            <div className="flex items-center gap-1.5">
+              <Pill active={mode === "year"} onClick={() => setMode("year")}>
+                {t("wrapped.modeYear")}
+              </Pill>
+              {/* A completion list can be all movies and specials - no
+                  broadcast seasons at all - in which case the mode has
+                  nothing to offer and the pill would be a dead end. */}
+              {seasons.length > 0 && (
+                <Pill active={mode === "season"} onClick={() => setMode("season")}>
+                  {t("wrapped.modeSeason")}
+                </Pill>
+              )}
+            </div>
+            {mode === "year" ? (
+              <select
+                value={year ?? ""}
+                onChange={(e) => setYear(Number(e.target.value))}
+                className="h-9 rounded-lg border border-surface-700 bg-surface-900 px-2 text-sm focus:border-accent-500 focus:outline-none"
+              >
+                {years.map((y) => (
+                  <option key={y} value={y}>
+                    {y}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              seasonPick && (
+                <SeasonPicker
+                  season={seasonPick.season}
+                  year={seasonPick.year}
+                  years={[...new Set(seasons.map((sn) => sn.year))]}
+                  onPick={setSeasonPick}
+                />
+              )
+            )}
+          </>
         )}
         <Button className="ml-auto" onClick={save} disabled={!stats}>
           <Download className="size-4" /> {saved ? t("common.saved") : t("wrapped.save")}

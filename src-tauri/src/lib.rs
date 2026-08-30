@@ -369,6 +369,9 @@ pub fn run() {
                 "startup",
                 format!("Karasu {}", commands::app_version_string()),
             );
+            // The "new release" bell row dies with the install it announced —
+            // on both platforms, before the frontend ever reads the bell.
+            commands::clear_stale_update_notice(&app.state::<db::Db>());
             app.manage(anilist::client::AniList::new());
             app.manage(playback::scrobbler::PlaybackState(std::sync::Mutex::new(None)));
             app.manage(playback::scrobbler::ScrobbleSession(std::sync::Mutex::new(None)));

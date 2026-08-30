@@ -1148,6 +1148,17 @@ impl Db {
             .map_err(|e| format!("Notification update failed: {e}"))
     }
 
+    /// Removes every row of one kind — the update notice's exit. A "new
+    /// release" row must not outlive the install it announces, and the
+    /// retention trim above (newest 500) never reaches it on a quiet
+    /// account, so without this the row was effectively permanent.
+    pub fn notif_clear_kind(&self, kind: &str) -> Result<(), String> {
+        let conn = self.0.guard();
+        conn.execute("DELETE FROM notifications WHERE kind = ?1", [kind])
+            .map(|_| ())
+            .map_err(|e| format!("Notification delete failed: {e}"))
+    }
+
     pub fn notif_unread_count(&self) -> i64 {
         let conn = self.0.guard();
         conn.query_row(
@@ -2300,6 +2311,21 @@ mod tests {
         db.notif_mark_all_read().unwrap();
         assert_eq!(db.notif_unread_count(), 0);
         assert!(db.notif_all(50).iter().all(|n| n.read));
+    }
+
+    #[test]
+    fn clearing_one_kind_spares_the_rest() {
+        let db = mem_db();
+        db.notif_insert("update", "Update ready", "1.0 is out", 1_000, None)
+            .unwrap();
+        db.notif_insert("airing", "New episode", "Ep 5 is out", 2_000, None)
+            .unwrap();
+
+        db.notif_clear_kind("update").unwrap();
+
+        let all = db.notif_all(50);
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].kind, "airing");
     }
 
     #[test]

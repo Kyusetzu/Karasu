@@ -10,7 +10,7 @@ use super::*;
 
 /// Monotonic commit counter — the 4th version segment
 /// (`MAJOR.MINOR.PATCH.COMMIT#`). Bumped by one on every commit.
-pub const COMMIT_NUMBER: u32 = 488;
+pub const COMMIT_NUMBER: u32 = 489;
 
 /// Full four-part display version, e.g. `0.1.1.38`. The `MAJOR.MINOR.PATCH`
 /// core comes from the crate version (kept in sync across the manifests).
@@ -310,6 +310,24 @@ fn version_gt(a: &str, b: &str) -> bool {
     false
 }
 
+/// Startup: a "new release" bell row must not outlive the install it
+/// announces. Both notify paths record the announced version in this kv
+/// (manifest form — `version_parts` reads `+` and `.` alike), so once the
+/// running build has caught up the rows and the marker go together. The
+/// row's own body can't be consulted — it froze the version as display
+/// text — which is why the kv is the key. Nothing here touches a notice
+/// that is still ahead of the running build.
+pub fn clear_stale_update_notice(db: &crate::db::Db) {
+    let Some(notified) = db.kv_get("last_notified_update_version") else {
+        return;
+    };
+    if version_gt(&notified, &app_version_string()) {
+        return;
+    }
+    db.kv_delete("last_notified_update_version");
+    let _ = db.notif_clear_kind("update");
+}
+
 #[cfg(test)]
 mod tests {
     use super::{can_install, display_version, version_gt, version_parts};
@@ -561,6 +579,11 @@ pub async fn download_pending_update(
     };
 
     let version = display_version(&update.version);
+    // Manifest form, not display form: it is what `clear_stale_update_notice`
+    // compares against the running build at the next startup, so the "new
+    // release" row cannot outlive its own install. The same marker the
+    // Android arm writes.
+    let raw_version = update.version.clone();
     let notes = update.body.clone();
     let bytes = update
         .download(|_, _| {}, || {})
@@ -568,6 +591,7 @@ pub async fn download_pending_update(
         .map_err(|e| e.to_string())?;
 
     *pending.0.guard() = Some((update, bytes));
+    let _ = db.kv_set("last_notified_update_version", &raw_version);
     crate::alerts::notify::notify(
         &app,
         "update",

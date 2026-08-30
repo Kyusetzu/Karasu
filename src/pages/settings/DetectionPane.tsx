@@ -125,6 +125,12 @@ export function ScrobbleSection() {
           label={t("settings.trackingConfirm")}
           hint={t("settings.trackingConfirmHint")}
         />
+        <Toggle
+          checked={settings.gapAuto}
+          onChange={(v) => update({ gapAuto: v })}
+          label={t("settings.trackingGapAuto")}
+          hint={t("settings.trackingGapAutoHint")}
+        />
         {mediaOn !== null && (
           <Toggle
             checked={mediaOn}

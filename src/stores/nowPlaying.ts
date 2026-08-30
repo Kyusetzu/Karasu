@@ -133,6 +133,8 @@ export interface ScrobbleSettings {
   enabled: boolean;
   confirm: boolean;
   delayMin: number;
+  /** Whether an episode-gap block lifts itself after five minutes. */
+  gapAuto: boolean;
 }
 
 export const getScrobbleSettings = () =>
@@ -142,6 +144,7 @@ export const setScrobbleSettings = (s: ScrobbleSettings) =>
     enabled: s.enabled,
     confirm: s.confirm,
     delayMin: s.delayMin,
+    gapAuto: s.gapAuto,
   });
 
 /** Whether the system media-session pass runs (SMTC on Windows, MPRIS on Linux). */

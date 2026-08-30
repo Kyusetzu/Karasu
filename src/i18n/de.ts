@@ -1143,6 +1143,7 @@ export const de: typeof en = {
     blockedAlreadyWatched:
       "Folge {{n}} ist bereits gesehen — deine Liste steht bei {{progress}}.",
     blockedGap: "Folge {{n}}, deine Liste steht aber bei {{progress}}.",
+    blockedGapAuto: "trackt trotzdem in {{time}}",
     blockedFailed: "Update fehlgeschlagen: {{message}}",
     blockedSeason:
       "Staffel {{n}} — sag Karasu, welcher AniList-Eintrag das ist, dann merkt es sich das.",
@@ -1349,6 +1350,9 @@ export const de: typeof en = {
     trackingConfirm: "Vorher nachfragen",
     trackingConfirmHint:
       "Vor jedem Update eine Bestätigung in der App anzeigen.",
+    trackingGapAuto: "Trotz Episodenlücke tracken",
+    trackingGapAutoHint:
+      "Eine Episode weiter vorn als deine Liste wird zunächst blockiert, falls es ein Fehlklick war. Mit dieser Option gelten fünf Minuten Weiterschauen als Bestätigung und das Update läuft von selbst — „Jetzt aktualisieren“ geht weiterhin sofort.",
     mediaSessionsLinuxOnly:
       "Unter Linux ist das die einzige Quelle, die lokale Player sieht — Fenstertitel sind dort nicht lesbar. Ausschalten lässt nur noch Jellyfin übrig. Manga, die du im Browser liest, werden unter Linux gar nicht erkannt: Dieser Durchgang liest Fenstertitel, die Wayland nicht bereitstellt.",
     mediaSessions: "System-Medieninfos nutzen",

@@ -1140,6 +1140,7 @@ export const en = {
     blockedAlreadyWatched:
       "Episode {{n}} is already watched — your list is at {{progress}}.",
     blockedGap: "Episode {{n}}, but your list is at {{progress}}.",
+    blockedGapAuto: "tracking anyway in {{time}}",
     blockedFailed: "Update failed: {{message}}",
     blockedSeason:
       "Season {{n}} — tell Karasu which AniList entry that is, and it will remember.",
@@ -1348,6 +1349,9 @@ export const en = {
       "Mark detected episodes as watched on AniList after the threshold.",
     trackingConfirm: "Ask before updating",
     trackingConfirmHint: "Show a confirmation in the app before every update.",
+    trackingGapAuto: "Track past an episode gap",
+    trackingGapAutoHint:
+      "An episode further ahead than your list is blocked at first, in case it was a mis-click. With this on, five minutes of watching counts as being sure and the update runs by itself — Update now still works immediately.",
     trackingNeedsAccount:
       "Without an AniList account, detection can show what you are playing but cannot recognise the title or record progress: it matches against your AniList list, and there is nothing to write to.",
     mediaSessionsLinuxOnly:

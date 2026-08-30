@@ -75,7 +75,11 @@ export default function NowPlayingCard() {
   const current = useNowPlaying((s) => s.current);
   const scrobble = useNowPlaying((s) => s.scrobble);
   const countdown = useCountdown(
-    scrobble.phase === "watching" ? scrobble.updateAtMs : null,
+    // Blocked carries a time only for an armed episode gap — the backend
+    // emits none otherwise — so the same hook serves both phases.
+    scrobble.phase === "watching" || scrobble.phase === "blocked"
+      ? scrobble.updateAtMs
+      : null,
   );
   const qc = useQueryClient();
   const { t } = useTranslation();
@@ -266,6 +270,14 @@ function ScrobbleStatus({ countdown }: { countdown: string | null }) {
       return (
         <p className="text-xs text-gold">
           {scrobble.reason ? blockedText(scrobble.reason, t) : t("nowPlaying.blocked")}
+          {/* Only an armed episode gap ever has a countdown here: the grace
+              setting is on and watching on is about to count as being sure. */}
+          {countdown && (
+            <span className="text-ink-500">
+              {" "}
+              · {t("nowPlaying.blockedGapAuto", { time: countdown })}
+            </span>
+          )}
         </p>
       );
     case "cancelled":

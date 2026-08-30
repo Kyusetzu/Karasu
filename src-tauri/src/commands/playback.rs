@@ -25,6 +25,11 @@ pub struct ScrobbleSettings {
     /// threshold in minutes; 0 = automatic (2/3 of the episode length)
     #[serde(rename = "delayMin")]
     pub delay_min: u32,
+    /// Whether an episode-gap block lifts itself after the grace period —
+    /// off by default: writing past a gap is a choice, and the default
+    /// choice is asking.
+    #[serde(rename = "gapAuto")]
+    pub gap_auto: bool,
 }
 
 pub(crate) fn read_scrobble_settings(db: &Db) -> ScrobbleSettings {
@@ -35,6 +40,7 @@ pub(crate) fn read_scrobble_settings(db: &Db) -> ScrobbleSettings {
             .kv_get("scrobble_delay_min")
             .and_then(|v| v.parse().ok())
             .unwrap_or(0),
+        gap_auto: db.kv_get("scrobble_gap_auto").as_deref() == Some("1"),
     }
 }
 
@@ -49,10 +55,12 @@ pub fn set_scrobble_settings(
     enabled: bool,
     confirm: bool,
     delay_min: u32,
+    gap_auto: bool,
 ) -> Result<(), String> {
     db.kv_set("scrobble_enabled", if enabled { "1" } else { "0" })?;
     db.kv_set("scrobble_confirm", if confirm { "1" } else { "0" })?;
-    db.kv_set("scrobble_delay_min", &delay_min.to_string())
+    db.kv_set("scrobble_delay_min", &delay_min.to_string())?;
+    db.kv_set("scrobble_gap_auto", if gap_auto { "1" } else { "0" })
 }
 
 /// Still spelled `smtc_enabled`, deliberately. The setting is no longer

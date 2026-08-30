@@ -239,8 +239,12 @@ fn emit_session(app: &AppHandle, session: Option<&Session>) {
             },
             media_id: Some(s.media_id),
             episode: Some(s.episode),
-            update_at_ms: match s.phase {
+            update_at_ms: match &s.phase {
                 Phase::Watching => s.update_at_epoch_ms,
+                // An armed gap block carries its lift time, so the card can
+                // say *when* rather than only *that* — unarmed blocks have
+                // no epoch to leak, since `auto_arm` never set one.
+                Phase::Blocked(BlockReason::EpisodeGap { .. }) => s.update_at_epoch_ms,
                 _ => None,
             },
         },
@@ -558,6 +562,36 @@ fn build_now_playing(
         position_sec: playback.position_sec,
         duration_sec: playback.duration_sec,
         list_status: resolved.status,
+    }
+}
+
+/// The grace an episode-gap block can earn its way past: five minutes of
+/// simply continuing to watch.
+const GAP_GRACE: Duration = Duration::from_secs(5 * 60);
+
+/// How long until this session's automatic update arms, or `None` for never.
+///
+/// Watching arms at the normal threshold. An episode-gap block arms only
+/// when the user opted in (`gap_auto`) — and at the *later* of the threshold
+/// and [`GAP_GRACE`], so continuing to watch is what counts as being sure
+/// and a mis-clicked episode has time to be walked away from. Every other
+/// phase stays unarmed: a backwards write and an unplaced season have no
+/// timer to earn, and a failed update is retried by hand.
+fn auto_arm(
+    enabled: bool,
+    gap_auto: bool,
+    phase: &Phase,
+    threshold: Duration,
+) -> Option<Duration> {
+    if !enabled {
+        return None;
+    }
+    match phase {
+        Phase::Watching => Some(threshold),
+        Phase::Blocked(BlockReason::EpisodeGap { .. }) if gap_auto => {
+            Some(threshold.max(GAP_GRACE))
+        }
+        _ => None,
     }
 }
 
@@ -1070,7 +1104,7 @@ async fn drive_session(app: &AppHandle) {
                     let phase = block_reason(&np, ep, progress)
                         .map(Phase::Blocked)
                         .unwrap_or(Phase::Watching);
-                    let auto = settings.enabled && phase == Phase::Watching;
+                    let armed_in = auto_arm(settings.enabled, settings.gap_auto, &phase, threshold);
                     let session = Session {
                         media_id: mid,
                         media_type: np.media_type.clone(),
@@ -1078,8 +1112,8 @@ async fn drive_session(app: &AppHandle) {
                         total: np.total_episodes,
                         list_status: np.list_status.clone(),
                         started_ms: now_ms(),
-                        update_at: auto.then(|| Instant::now() + threshold),
-                        update_at_epoch_ms: auto.then(|| epoch_ms_in(threshold)),
+                        update_at: armed_in.map(|d| Instant::now() + d),
+                        update_at_epoch_ms: armed_in.map(epoch_ms_in),
                         phase,
                     };
                     // The two `Blocked` reasons are the most-asked "why didn't it
@@ -1089,7 +1123,8 @@ async fn drive_session(app: &AppHandle) {
                         "scrobble",
                         format!(
                             "session #{mid} ep {ep} (progress {progress}) → {:?}, auto {}",
-                            session.phase, auto
+                            session.phase,
+                            armed_in.is_some()
                         ),
                     );
                     emit_session(app, Some(&session));
@@ -1100,9 +1135,18 @@ async fn drive_session(app: &AppHandle) {
                     // the source is believed over the wall clock — it is the
                     // clock, one that pausing actually stops — but only while
                     // the auto-update is armed at all (`update_at` present).
+                    // An armed gap block rides the same check: the settings
+                    // are re-read every tick, so switching the grace off
+                    // disarms a waiting gap immediately, while `update_at`
+                    // was only ever set if it was on when the session began.
                     let session = guard.as_mut().unwrap();
-                    let due = session.phase == Phase::Watching
-                        && session.update_at.is_some()
+                    let armed = session.update_at.is_some()
+                        && match &session.phase {
+                            Phase::Watching => true,
+                            Phase::Blocked(BlockReason::EpisodeGap { .. }) => settings.gap_auto,
+                            _ => false,
+                        };
+                    let due = armed
                         && position_due(
                             np.position_sec,
                             np.duration_sec,
@@ -1126,8 +1170,9 @@ async fn drive_session(app: &AppHandle) {
                         emit_session(app, Some(session));
                         // The window may be hidden in the tray, so the ask
                         // also goes to the desk — with the one button that is
-                        // the whole point. Fires once per session: this branch
-                        // is only reachable from `Watching`.
+                        // the whole point. Fires once per session: reachable
+                        // only from `Watching` or an armed gap block, and both
+                        // leave those phases here.
                         let lang = crate::i18n::lang(&app.state::<Db>());
                         let body = crate::i18n::text(
                             lang,
@@ -1194,8 +1239,9 @@ async fn drive_session(app: &AppHandle) {
 #[cfg(test)]
 mod tests {
     use super::{
-        applies_to, block_reason, position_due, shift_episode, threshold, would_regress,
-        BlockReason, NowPlaying, Phase, Session, DEFAULT_THRESHOLD, MANGA_THRESHOLD,
+        applies_to, auto_arm, block_reason, position_due, shift_episode, threshold,
+        would_regress, BlockReason, NowPlaying, Phase, Session, DEFAULT_THRESHOLD,
+        GAP_GRACE, MANGA_THRESHOLD,
     };
     use std::time::Duration;
 
@@ -1261,6 +1307,42 @@ mod tests {
         ));
         // The ordinary case: the very next episode.
         assert!(block_reason(&np, 3, 2).is_none());
+    }
+
+    /// The gap grace: continuing to watch is what counts as being sure.
+    /// Opt-in, never under five minutes, never earlier than the normal
+    /// threshold — and no other block can earn a timer.
+    #[test]
+    fn a_gap_block_arms_only_when_opted_in_and_never_under_five_minutes() {
+        let gap = Phase::Blocked(BlockReason::EpisodeGap { episode: 9, progress: 2 });
+        let short = Duration::from_secs(60);
+        let long = Duration::from_secs(20 * 60);
+
+        assert_eq!(auto_arm(true, true, &Phase::Watching, short), Some(short));
+        assert_eq!(auto_arm(true, true, &gap, short), Some(GAP_GRACE));
+        assert_eq!(auto_arm(true, true, &gap, long), Some(long));
+        assert_eq!(auto_arm(true, false, &gap, short), None, "opt-in only");
+        assert_eq!(auto_arm(false, true, &gap, short), None, "scrobbling off");
+        assert_eq!(
+            auto_arm(
+                true,
+                true,
+                &Phase::Blocked(BlockReason::AlreadyWatched { episode: 1, progress: 5 }),
+                short,
+            ),
+            None,
+            "a backwards write earns no timer"
+        );
+        assert_eq!(
+            auto_arm(
+                true,
+                true,
+                &Phase::Blocked(BlockReason::UnknownSeason { season: 2 }),
+                short,
+            ),
+            None,
+            "an unplaced season earns no timer"
+        );
     }
 
     /// The Beyblade case. Jellyfin reports season 2 beside a bare series

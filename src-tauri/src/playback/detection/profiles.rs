@@ -33,6 +33,8 @@ const BROWSERS: &[&str] = &[
     "vivaldi.exe",
     "zen.exe",
     "librewolf.exe",
+    "waterfox.exe",
+    "helium.exe",
 ];
 
 /// Browser window titles end with the browser name — strip it.
@@ -47,6 +49,11 @@ const BROWSER_SUFFIXES: &[&str] = &[
     " - Vivaldi",
     " — Zen Browser",
     " - LibreWolf",
+    // Firefox forks keep Firefox's em-dash habit; the hyphen twin is kept
+    // for older builds. Helium is Chromium-family and hyphenates.
+    " — Waterfox",
+    " - Waterfox",
+    " - Helium",
 ];
 
 /// Streaming sites: (marker in the title, suffixes removed to obtain the

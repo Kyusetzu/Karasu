@@ -82,6 +82,16 @@
                 
             </intent-filter>
             <!-- DEEP LINK PLUGIN. AUTO-GENERATED. DO NOT REMOVE. -->
+            <!-- Hand-added, OUTSIDE the markers above (that block is
+                 rewritten on every build): the share target. MainActivity
+                 rewrites a SEND into a synthetic VIEW so the deep-link
+                 plugin's own validation and routing carry it — see the
+                 comment there. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
         </activity>
 
         <provider

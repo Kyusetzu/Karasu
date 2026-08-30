@@ -64,8 +64,9 @@ pub fn enumerate_windows() -> Vec<WindowInfo> {
     result
 }
 
-/// Non-Windows groundwork: window enumeration isn't wired up yet (it needs an
-/// X11/Wayland backend), so detection is a no-op here for now.
+/// Windows-only by design, not groundwork: Wayland forbids reading another
+/// application's windows and an X11-only backend was declined, so on Linux
+/// the media-session pass and Jellyfin are the whole of detection.
 #[cfg(not(windows))]
 pub fn enumerate_windows() -> Vec<WindowInfo> {
     Vec::new()

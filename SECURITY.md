@@ -50,8 +50,10 @@ An ordinary account is enough; Karasu deliberately does not use an admin API
 key, because an API key makes Jellyfin report every session on the server
 rather than only your own.
 
-Karasu contacts AniList, GitHub (update checks and downloads — desktop only,
-Android never checks for updates) and a localhost callback during login. On
+Karasu contacts AniList, GitHub (update checks on every platform, downloads
+on desktop only — on Android the check is a notice pointing at the releases
+page, and nothing is downloaded or installed) and a localhost callback during
+login. On
 Android the callback server still runs on localhost; its success page hands
 control back to the app through the `karasu://` custom scheme. A Jellyfin
 server you configure yourself is contacted too; that is your machine, not

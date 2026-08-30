@@ -78,7 +78,7 @@ src/
   pages/             one per route; settings/ holds the eight panes
   stores/            Zustand stores (auth, theme, library, nowPlaying, …)
 src-tauri/src/
-  commands/          92 of the 107 frontend-facing commands, by subject:
+  commands/          95 of the 110 frontend-facing commands, by subject:
                      auth · images · list · playback · prefs · system ·
                      update. The other 15 are the library scanner's, in
                      `library.rs`.

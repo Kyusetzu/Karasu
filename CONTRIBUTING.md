@@ -34,7 +34,7 @@ architecture document, so it is worth reading whoever you are.
 Two hard limits shape almost everything else:
 
 - **The AniList rate limit is about 30 requests a minute**, shared between the
-  UI, the scrobbler and three background alert passes. Batch reads
+  UI, the scrobbler and four background alert passes. Batch reads
   (`Page.media(id_in:)`, ≤50 ids), bound any traversal, and never fetch because
   the user scrolled — paging is a button here, deliberately.
 - **i18n key parity is enforced by the type system.** `de` is typed

@@ -104,7 +104,8 @@ Because a local app can do things anilist.co simply can't:
 
 **Lists &amp; editing**
 - Anime and manga lists with status tabs, grid/list views and an **offline queue**
-  that syncs once you're back online
+  that syncs once you're back online — inspectable in Settings down to the
+  single queued edit, each one discardable, with a sync button beside it
 - Taiga-style quick editing (progress/score dropdowns, +1, one-click *Completed*)
   and a shared edit dialog straight from search results
 - A **default status for new adds** — decide once, in settings, what *Add to
@@ -163,13 +164,18 @@ Because a local app can do things anilist.co simply can't:
   charts, gradient bars, dot plots and an activity heatmap
 - **Your scores against the crowd's** — mean deltas and the titles you disagree
   on hardest, computed from the list you already have, at zero request cost
-- **Year in review** — a shareable poster of your year in five crops (banner,
-  square, page, compressed, detailed), exported as PNG or JPEG at 1×, 2× or 3×
+- **Year in review** — a shareable poster of your year, or of a single
+  season, in five crops (banner, square, page, compressed, detailed),
+  exported as PNG or JPEG at 1×, 2× or 3×
 - Time-to-finish estimates and a Dashboard "this week" digest
 
 **Notifications**
 - New-episode desktop toasts, opt-in **sequel-announcement** alerts and
   **on-hold reminders**
+- An opt-in **background check for your AniList notifications** — off by
+  default, with 15/30/60-minute presets or your own interval. On desktop it
+  runs while Karasu sits in the tray; on Android it runs even with the app
+  closed, and the summary notification opens the bell
 - A bundled in-app **notification centre** — the bell in the title bar on
   desktop, in the bottom bar's More area on the phone — with read /
   mark-all-read. Karasu's own alerts and your AniList notifications arrive
@@ -209,15 +215,15 @@ Because a local app can do things anilist.co simply can't:
   detection, library, desktop, import & export, and a marked-dangerous
   advanced pane. The AniList pane edits your *account's* settings in place —
   title language, score format, activity posting, AniList's own notification
-  toggles — so they apply on anilist.co and in every client at once. On the
-  phone shell the library and desktop panes are hidden, because nothing
-  behind them exists there
+  toggles — so they apply on anilist.co and in every client at once. On
+  Android the library and desktop panes are hidden, because nothing behind
+  them exists there
 - An app-appropriate in-app right-click menu, system tray, single instance,
   autostart
 - English / German with automatic system-language detection
-- One-click AniList login and a built-in *Check for updates* — the update
-  check is desktop-only; on Android a new version is simply installed over
-  the old one
+- One-click AniList login and a built-in *Check for updates* — on Android
+  the check only announces a new release and links to it; installing the new
+  APK over the old one stays the update path
 
 ## Installation
 
@@ -281,7 +287,10 @@ with no UAC prompt and nothing written outside your own profile.
 > not on the device, so a narrow enough window gets it anywhere: navigation
 > moves to a bottom bar, the back gesture closes whatever is open instead
 > of leaving the page, and system notifications ask for their runtime
-> permission before the first one is sent.
+> permission before the first one is sent. Four home-screen widgets —
+> Airing Today, Continue Watching, Continue Reading and a weekly airing
+> calendar — render straight from the cached list, no network needed; and
+> sharing an anilist.co link from any browser opens it in Karasu.
 >
 > Detection differs. Window titles are read on Windows only: there is no
 > X11/Wayland enumerator, and under Wayland one application cannot read

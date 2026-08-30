@@ -35,7 +35,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import KarasuMark from "@/components/KarasuMark";
 import { cn } from "@/lib/utils";
-import { isLinux, usePlatform } from "@/stores/platform";
+import { isAndroid, isLinux, usePlatform } from "@/stores/platform";
 
 const REPO_URL = "https://github.com/Kyusetzu/Karasu";
 const DISCORD_HANDLE = "Kyusetzu";
@@ -269,7 +269,9 @@ function UpdateSection() {
     try {
       const result = await checkForUpdates(true);
       setInfo(result);
-      if (result.isNewer) await startDownload();
+      // Android checks and never downloads — the notice plus the release
+      // link below are the whole feature there, per the no-updater rule.
+      if (result.isNewer && !isAndroid(platform)) await startDownload();
     } catch (e) {
       setError(String(e));
     } finally {
@@ -362,6 +364,11 @@ function UpdateSection() {
         <p className="mt-3 text-sm text-ink-500">
           {t("about.updateAppImageOnly")}
         </p>
+      )}
+      {/* Android's twin of the AppImage note: nothing installs from here —
+          a new version is a fresh APK from the release page. */}
+      {isAndroid(platform) && (
+        <p className="mt-3 text-sm text-ink-500">{t("about.updateAndroidHint")}</p>
       )}
       {error && <p className="mt-3 text-sm text-danger">{error}</p>}
     </Card>

@@ -61,6 +61,9 @@ pub enum Msg<'a> {
     SequelBody { title: &'a str },
     UpdateTitle,
     UpdateBody { version: &'a str },
+    /// Android's wording: nothing downloads and nothing installs there, so
+    /// "open About to install it" would be a lie — the APK lives on GitHub.
+    UpdateBodyAndroid { version: &'a str },
     QueueTitle,
     QueueBodyOne { reason: &'a str },
     QueueBodyMany { count: usize, reason: &'a str },
@@ -119,6 +122,12 @@ pub fn text(lang: Lang, msg: Msg<'_>) -> String {
         }
         (De, UpdateBody { version }) => {
             format!("Karasu {version} ist bereit. Zum Installieren „Über“ öffnen.")
+        }
+        (En, UpdateBodyAndroid { version }) => {
+            format!("Karasu {version} is out. The APK is on the GitHub release.")
+        }
+        (De, UpdateBodyAndroid { version }) => {
+            format!("Karasu {version} ist draußen. Die APK liegt im GitHub-Release.")
         }
 
         (En, QueueTitle) => "Offline changes were not saved".into(),

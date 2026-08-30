@@ -28,6 +28,7 @@ import { usePresence } from "@/hooks/usePresence";
 import { useBackClose } from "@/hooks/useBackClose";
 import { useNotifBadge } from "@/hooks/useNotifBadge";
 import { useAuth } from "@/stores/auth";
+import { isAndroid, usePlatform } from "@/stores/platform";
 import {
   getNotifications,
   isTauri,
@@ -183,6 +184,7 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const android = isAndroid(usePlatform((s) => s.info));
   const mode = useAuth((s) => s.mode);
   // Part of both AniList query keys below. Without it, sign out of A and into
   // B within a staleTime and B's badge shows A's count.
@@ -383,6 +385,13 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
     // over and the process exits).
     if (n.kind === "update") {
       setOpen(false);
+      // Android never downloads or installs — its update row is a notice,
+      // and About holds the release link. download→install there produced
+      // an error toast off a row that was working as designed.
+      if (android) {
+        navigate("/about");
+        return;
+      }
       try {
         await downloadPendingUpdate();
         await installPendingUpdate();

@@ -462,6 +462,8 @@ export const de: typeof en = {
     restartUpdate: "Neustarten & Aktualisieren",
     updateAppImageOnly:
       "Updates in der App funktionieren mit der AppImage-Version. Diese Installation stammt woanders her — aktualisiere sie so, wie du sie installiert hast.",
+    updateAndroidHint:
+      "Auf Android installiert sich hier nichts — eine neue Version ist eine frische APK von der Release-Seite.",
     installing: "Installiere …",
     viewRelease: "Release-Seite öffnen",
     contact: "Kontakt",

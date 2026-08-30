@@ -467,6 +467,8 @@ export const en = {
     restartUpdate: "Restart & Update",
     updateAppImageOnly:
       "In-app updates work for the AppImage build. This install came from somewhere else, so update it the way you installed it.",
+    updateAndroidHint:
+      "Nothing installs from here on Android — a new version is a fresh APK from the release page.",
     installing: "Installing …",
     viewRelease: "View release page",
     contact: "Contact",

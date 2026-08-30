@@ -10,7 +10,7 @@ use super::*;
 
 /// Monotonic commit counter — the 4th version segment
 /// (`MAJOR.MINOR.PATCH.COMMIT#`). Bumped by one on every commit.
-pub const COMMIT_NUMBER: u32 = 471;
+pub const COMMIT_NUMBER: u32 = 472;
 
 /// Full four-part display version, e.g. `0.1.1.38`. The `MAJOR.MINOR.PATCH`
 /// core comes from the crate version (kept in sync across the manifests).
@@ -110,7 +110,14 @@ const UPDATE_CHECK_THROTTLE_MS: i64 = 24 * 60 * 60 * 1000;
 /// a 24h throttle so startup checks don't hit the API every launch); the
 /// manual "Check for Updates" button always passes `force: true`.
 #[tauri::command]
-pub async fn check_for_updates(db: State<'_, Db>, force: bool) -> Result<UpdateInfo, String> {
+pub async fn check_for_updates(
+    app: tauri::AppHandle,
+    db: State<'_, Db>,
+    force: bool,
+) -> Result<UpdateInfo, String> {
+    // Desktop never reads `app` on this path — the notify below is Android's.
+    #[cfg(not(target_os = "android"))]
+    let _ = &app;
     // Compare the full four-part version so a release tagged with the commit
     // number lines up with what's running.
     let current = app_version_string();
@@ -196,16 +203,48 @@ pub async fn check_for_updates(db: State<'_, Db>, force: bool) -> Result<UpdateI
     // fails — deliberately, so a packaging hiccup cannot hold back a Windows
     // release — and a Linux client used to be told an update was available and
     // then fail at the download, once a day, with no way to tell why.
-    let platform_key = if cfg!(target_os = "linux") {
-        "linux-x86_64"
-    } else {
-        "windows-x86_64"
+    // Android is the exception to the platform gate: the APK is never in
+    // `platforms` (the manifest is desktop-only on purpose, and until this
+    // branch existed Android fell into the windows-x86_64 arm and reported
+    // "up to date" against a build that never matches). The check here is a
+    // *notice* and nothing more — per the ROADMAP, "Android has no updater
+    // and must not gain one by accident" — so the version alone decides and
+    // `url` already points at the release page where the APK lives.
+    #[cfg(target_os = "android")]
+    let is_newer = version_gt(&latest, &current);
+    #[cfg(not(target_os = "android"))]
+    let is_newer = {
+        let platform_key = if cfg!(target_os = "linux") {
+            "linux-x86_64"
+        } else {
+            "windows-x86_64"
+        };
+        let has_platform = body
+            .pointer("/platforms")
+            .and_then(|p| p.get(platform_key))
+            .is_some();
+        has_platform && version_gt(&latest, &current)
     };
-    let has_platform = body
-        .pointer("/platforms")
-        .and_then(|p| p.get(platform_key))
-        .is_some();
-    let is_newer = has_platform && version_gt(&latest, &current);
+
+    // The desktop learns about an update from the bell row the *download*
+    // posts; Android never downloads, so the check itself is where the row
+    // comes from. Only on the background path (`!force` — a manual check has
+    // the About page open in front of it), and once per version rather than
+    // once per 24 h throttle window.
+    #[cfg(target_os = "android")]
+    if !force && is_newer && db.kv_get("last_notified_update_version").as_deref() != Some(&latest)
+    {
+        let _ = db.kv_set("last_notified_update_version", &latest);
+        let shown = display_version(&latest);
+        crate::alerts::notify::notify(
+            &app,
+            "update",
+            crate::i18n::Msg::UpdateTitle,
+            crate::i18n::Msg::UpdateBodyAndroid { version: &shown },
+            None,
+        );
+    }
+
     Ok(UpdateInfo {
         current,
         latest: Some(display_version(&latest)),

@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
 import { X } from "lucide-react";
 import { useAuth } from "@/stores/auth";
-import { usePlatform } from "@/stores/platform";
+import { isAndroid, usePlatform } from "@/stores/platform";
 import { useNowPlaying } from "@/stores/nowPlaying";
 import { useLibrary } from "@/stores/library";
 import { useContentFilter } from "@/stores/contentFilter";
@@ -138,7 +138,12 @@ export default function App() {
       if (!enabled) return;
       checkForUpdates(false)
         .then((info) => {
-          if (info.isNewer) downloadPendingUpdate().catch(() => {});
+          // Android checks and never downloads — the notice comes from the
+          // Rust check itself (a bell row), and installing is a fresh APK.
+          // Platform read at decision time: the store loaded at mount, and
+          // the network round trip above has long since resolved it.
+          const android = isAndroid(usePlatform.getState().info);
+          if (info.isNewer && !android) downloadPendingUpdate().catch(() => {});
         })
         .catch(() => {});
     });

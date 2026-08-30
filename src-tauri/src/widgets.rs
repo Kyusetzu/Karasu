@@ -162,6 +162,11 @@ fn airing_rows(entries: &[&Value], now_ms: i64) -> Value {
 }
 
 /// The whole projection, pure and tested: payloads in, widget document out.
+/// On the desktop compile only the tests call this — the sole non-Android
+/// consumer is `write_projection` above the `cfg`. The allow roots the whole
+/// pure chain (the helpers and both consts) as live for the lint, which is
+/// what keeps the media_session pattern warning-free here.
+#[cfg_attr(not(target_os = "android"), allow(dead_code))]
 pub fn project(
     anime_payload: Option<&Value>,
     manga_payload: Option<&Value>,

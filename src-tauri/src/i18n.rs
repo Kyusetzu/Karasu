@@ -63,6 +63,9 @@ pub enum Msg<'a> {
     UpdateBody { version: &'a str },
     /// Android's wording: nothing downloads and nothing installs there, so
     /// "open About to install it" would be a lie — the APK lives on GitHub.
+    /// The mirror image of the enum-level attribute: constructed only on
+    /// mobile, dead on the desktop compile without being wrong.
+    #[cfg_attr(not(mobile), allow(dead_code))]
     UpdateBodyAndroid { version: &'a str },
     SiteNotifTitle,
     SiteNotifBody { count: i64 },

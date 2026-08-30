@@ -122,6 +122,13 @@ export const GridCard = memo(function GridCard({
               <Pencil className="size-3.5" />
             </IconButton>
             {entry.status !== "COMPLETED" && (
+              // Hidden on coarse pointers, where all three buttons are
+              // permanently visible and three 30px circles need ~110px of a
+              // cover that is ~78px wide at the phone's 4-per-row default —
+              // the row overflowed leftward and the cover's overflow-hidden
+              // ate exactly the edit button. Two fit; complete is the one a
+              // touch user can spare, since +1 on the last episode completes
+              // and the editor is one tap away. A mouse keeps all three.
               <IconButton
                 variant="onCover"
                 size="sm"
@@ -129,7 +136,7 @@ export const GridCard = memo(function GridCard({
                 onClick={() => onComplete(entry)}
                 aria-label={t("common.complete")}
                 title={t("common.complete")}
-                className="text-success"
+                className="text-success pointer-coarse:hidden"
               >
                 <CheckCheck className="size-3.5" />
               </IconButton>

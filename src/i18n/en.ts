@@ -1427,6 +1427,11 @@ export const en = {
     libraryScan: "Rescan",
     libraryScanning: "Scanning …",
     libraryMatched: "{{n}} titles matched on disk.",
+    splits: "Season splits",
+    splitsHint:
+      "Ranges you have re-pointed at another entry. Removing one gives its episodes back to whatever the rest of the release name still matches.",
+    splitsRange: "episodes {{from}}–{{to}} → from {{start}}",
+    splitsRemove: "Remove this split",
     portable: "Portable mode",
     portableHint:
       "Keep the database and token next to the executable, so everything lives in one folder instead of your user profile. The token is encrypted to this machine and account, so a copy carried elsewhere asks you to sign in again.",

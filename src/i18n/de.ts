@@ -1426,6 +1426,11 @@ export const de: typeof en = {
     libraryScan: "Neu scannen",
     libraryScanning: "Scanne …",
     libraryMatched: "{{n}} Titel auf der Platte zugeordnet.",
+    splits: "Staffel-Splits",
+    splitsHint:
+      "Bereiche, die du auf einen anderen Eintrag umgeleitet hast. Beim Entfernen fallen die Episoden an das zurück, was der Rest des Release-Namens noch trifft.",
+    splitsRange: "Episoden {{from}}–{{to}} → ab {{start}}",
+    splitsRemove: "Diesen Split entfernen",
     portable: "Portabler Modus",
     portableHint:
       "Datenbank und Token neben der Anwendung speichern, damit alles in einem Ordner liegt statt im Benutzerprofil. Der Token ist an diesen Rechner und dieses Konto gebunden — eine anderswo geöffnete Kopie verlangt eine neue Anmeldung.",

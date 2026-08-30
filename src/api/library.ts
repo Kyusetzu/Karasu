@@ -123,6 +123,24 @@ export const setLibraryRedirect = (
     dstStart,
   });
 
+/** One confirmed split, keyed on the parse the clear command deletes by. */
+export interface LibraryRedirectRow {
+  title: string;
+  season: number;
+  epFrom: number;
+  epTo: number;
+  mediaId: number;
+  dstStart: number;
+}
+
+export const listLibraryRedirects = () =>
+  invoke<LibraryRedirectRow[]>("list_library_redirects");
+
+/** Removes one split range, giving the files back to whatever the rest of
+ *  the parse still answers to. */
+export const clearLibraryRedirect = (title: string, season: number, epFrom: number) =>
+  invoke<LibraryEntry[]>("clear_library_redirect", { title, season, epFrom });
+
 export const playNext = (mediaId: number) =>
   invoke<void>("play_next", { mediaId });
 export const playEpisode = (mediaId: number, episode: number) =>

@@ -29,7 +29,7 @@ import {
   JellyfinSection,
   DetectionCorrectionsSection,
 } from "./settings/DetectionPane";
-import { LibrarySection } from "./settings/LibraryPane";
+import { LibrarySection, LibrarySplitsSection } from "./settings/LibraryPane";
 import { ContentSection } from "./settings/ContentPane";
 import { DiscordSection } from "./settings/IntegrationsPane";
 import {
@@ -92,7 +92,7 @@ const PANES = [
       DetectionCorrectionsSection,
     ],
   },
-  { id: "library", icon: FolderOpen, sections: [LibrarySection] },
+  { id: "library", icon: FolderOpen, sections: [LibrarySection, LibrarySplitsSection] },
   // New. Everything about Karasu as a program on this desktop — which the old
   // arrangement scattered between "Advanced" and a one-toggle "Integrations".
   {

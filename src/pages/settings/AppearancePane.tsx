@@ -28,6 +28,13 @@ export function AppearanceSection() {
   // One picker at a time. Six open pickers would be a wall, and the swatch
   // itself is the affordance — same shape as the accent's Palette toggle.
   const [editingStatus, setEditingStatus] = useState<MediaListStatus | null>(null);
+  // The covers field's *text* while it is being edited, `null` when at rest.
+  // Binding the input straight to the committed number made the field
+  // uneditable on Android: clearing it fires onChange with "", the guard
+  // rejects that, React re-renders the old value — so the 2 snapped back and
+  // every keystroke appended to it (2 → 20 → 207). A draft lets "" exist
+  // while typing; blur snaps the text back to whatever actually committed.
+  const [colsDraft, setColsDraft] = useState<string | null>(null);
   const themeMode = useTheme((s) => s.mode);
   const accent = useTheme((s) => s.accent);
   const coverCols = useTheme((s) => s.coverCols);
@@ -85,11 +92,18 @@ export function AppearanceSection() {
             min={COVER_COLS_MIN}
             max={COVER_COLS_MAX}
             step={1}
-            value={coverCols}
+            value={colsDraft ?? coverCols}
             onChange={(e) => {
-              const n = Number(e.target.value);
-              if (Number.isFinite(n) && n >= COVER_COLS_MIN) setCoverCols(n);
+              const raw = e.target.value;
+              setColsDraft(raw);
+              const n = Number(raw);
+              // The store clamps to the 1..40 range; the guard here only
+              // keeps transient states ("", a lone "0") from committing.
+              if (raw !== "" && Number.isFinite(n) && n >= COVER_COLS_MIN) {
+                setCoverCols(n);
+              }
             }}
+            onBlur={() => setColsDraft(null)}
             aria-label={t("settings.coverCols")}
             className="h-8 w-16 rounded-lg border border-surface-700 bg-surface-900 px-2 text-right text-sm tabular-nums text-ink-100 focus:border-accent-500 focus:outline-none"
           />

@@ -21,6 +21,8 @@ import {
   type WrappedStats,
 } from "@/lib/wrapped";
 import SeasonPicker, { SEASON_KANJI } from "@/components/ui/season-picker";
+import { usePhoneShell } from "@/hooks/usePhoneShell";
+import { cn } from "@/lib/utils";
 import { useAuth } from "@/stores/auth";
 import { useContentFilter } from "@/stores/contentFilter";
 import { isBlocked, isBlockedGenre } from "@/lib/contentFilter";
@@ -921,6 +923,7 @@ export default function Wrapped() {
                 key={p.key}
                 active={presetKey === p.key}
                 onClick={() => setPresetKey(p.key)}
+                className="shrink-0 whitespace-nowrap"
               >
                 {t(p.labelKey)}
               </Pill>
@@ -928,17 +931,28 @@ export default function Wrapped() {
           </ExportRow>
           <ExportRow label={t("wrapped.format")}>
             {(["png", "jpeg"] as const).map((f) => (
-              <Pill key={f} active={format === f} onClick={() => setFormat(f)}>
+              <Pill
+                key={f}
+                active={format === f}
+                onClick={() => setFormat(f)}
+                className="shrink-0 whitespace-nowrap"
+              >
                 {f.toUpperCase()}
               </Pill>
             ))}
           </ExportRow>
-          {/* Not a preview control — the poster on screen is always drawn at
-              1x. Scale is what gets written to disk, so the pixel size is
-              shown rather than left to be inferred from "2x". */}
+          {/* Not a preview control — the on-screen poster draws at its own
+              display resolution regardless. Scale is what gets written to
+              disk, so the pixel size is shown rather than left to be
+              inferred from "2x". */}
           <ExportRow label={t("wrapped.size")}>
             {[1, 2, 3].map((n) => (
-              <Pill key={n} active={scale === n} onClick={() => setScale(n)}>
+              <Pill
+                key={n}
+                active={scale === n}
+                onClick={() => setScale(n)}
+                className="shrink-0 whitespace-nowrap"
+              >
                 {n}× · {preset.W * n}px
               </Pill>
             ))}
@@ -969,7 +983,13 @@ export default function Wrapped() {
   );
 }
 
-/** One labelled row of the export controls. */
+/** One labelled row of the export controls.
+ *
+ *  One scrollable line on the phone — the Search pill row's gesture — and
+ *  the old wrap on desktop: five shape pills minus the label column is
+ *  wider than a phone, and a picker that breaks onto a second line reads
+ *  as two controls. The pills carry `shrink-0` at the call sites; without
+ *  it they compress instead of scrolling. */
 function ExportRow({
   label,
   children,
@@ -977,8 +997,14 @@ function ExportRow({
   label: string;
   children: React.ReactNode;
 }) {
+  const phone = usePhoneShell();
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div
+      className={cn(
+        "flex items-center gap-2",
+        phone ? "flex-nowrap overflow-x-auto pb-1" : "flex-wrap",
+      )}
+    >
       <span className="w-14 shrink-0 text-2xs uppercase tracking-[.13em] text-ink-600">
         {label}
       </span>

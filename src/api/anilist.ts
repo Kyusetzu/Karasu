@@ -256,6 +256,10 @@ export const bulkSaveEntries = async (
 };
 
 export const flushQueue = () => invoke<number>("flush_queue");
+/** Background notification interval in minutes; 0 = off. */
+export const getNotifSchedule = () => invoke<number>("get_notif_schedule");
+export const setNotifSchedule = (minutes: number) =>
+  invoke<void>("set_notif_schedule", { minutes });
 /** Discards one queued edit — scoped to the signed-in account in Rust. */
 export const discardQueuedEdit = (id: number) =>
   invoke<boolean>("discard_queued_edit", { id });

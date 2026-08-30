@@ -109,6 +109,30 @@ pub fn set_stale_settings(
     db.kv_set("stale_months", &months.clamp(1, 24).to_string())
 }
 
+/// The background-notification interval in minutes; 0 = off (the default).
+///
+/// One number rather than an enabled/value pair: "off" and "how often" are
+/// the same question here, and Android's JobScheduler consumes the identical
+/// kv key, so the two platforms cannot disagree about what is configured.
+#[tauri::command]
+pub fn get_notif_schedule(db: State<'_, Db>) -> i64 {
+    crate::alerts::site::interval_min(&db)
+}
+
+#[tauri::command]
+pub fn set_notif_schedule(db: State<'_, Db>, minutes: i64) -> Result<(), String> {
+    // Clamped on write as well as on read, the stale_months discipline.
+    let clamped = if minutes <= 0 {
+        0
+    } else {
+        minutes.clamp(
+            crate::alerts::site::INTERVAL_MIN,
+            crate::alerts::site::INTERVAL_MAX,
+        )
+    };
+    db.kv_set(crate::alerts::site::INTERVAL_KEY, &clamped.to_string())
+}
+
 /// Whether sequel-announcement notifications are enabled (default off).
 #[tauri::command]
 pub fn get_sequel_notify(db: State<'_, Db>) -> bool {

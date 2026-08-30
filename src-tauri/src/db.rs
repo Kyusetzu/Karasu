@@ -625,6 +625,22 @@ impl Db {
             .ok()
     }
 
+    /// Sets `key` to `value` only when it grows — a compare-and-set in the
+    /// UPDATE itself, so two connections racing the same cursor (the app's
+    /// pass and Android's background job) cannot both believe they advanced
+    /// it. Returns whether this call was the one that moved it.
+    pub fn kv_advance_max(&self, key: &str, value: i64) -> bool {
+        let conn = self.0.guard();
+        conn.execute(
+            "INSERT INTO kv (key, value) VALUES (?1, ?2)
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value
+             WHERE CAST(kv.value AS INTEGER) < CAST(excluded.value AS INTEGER)",
+            rusqlite::params![key, value.to_string()],
+        )
+        .map(|n| n > 0)
+        .unwrap_or(false)
+    }
+
     pub fn kv_set(&self, key: &str, value: &str) -> Result<(), String> {
         let conn = self.0.guard();
         conn.execute(

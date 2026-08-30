@@ -20,6 +20,7 @@ import {
   AniListNotificationsSection,
   AniListProfileSection,
   AniListSignedOutNote,
+  NotificationScheduleSection,
 } from "./settings/AniListPane";
 import { AppearanceSection } from "./settings/AppearancePane";
 import {
@@ -76,6 +77,7 @@ const PANES = [
       AniListProfileSection,
       AniListListOptionsSection,
       AniListNotificationsSection,
+      NotificationScheduleSection,
     ],
   },
   // Content joins Appearance rather than holding a pane of its own. It was one

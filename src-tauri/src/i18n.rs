@@ -64,6 +64,8 @@ pub enum Msg<'a> {
     /// Android's wording: nothing downloads and nothing installs there, so
     /// "open About to install it" would be a lie — the APK lives on GitHub.
     UpdateBodyAndroid { version: &'a str },
+    SiteNotifTitle,
+    SiteNotifBody { count: i64 },
     QueueTitle,
     QueueBodyOne { reason: &'a str },
     QueueBodyMany { count: usize, reason: &'a str },
@@ -128,6 +130,23 @@ pub fn text(lang: Lang, msg: Msg<'_>) -> String {
         }
         (De, UpdateBodyAndroid { version }) => {
             format!("Karasu {version} ist draußen. Die APK liegt im GitHub-Release.")
+        }
+
+        (En, SiteNotifTitle) => "AniList notifications".into(),
+        (De, SiteNotifTitle) => "AniList-Benachrichtigungen".into(),
+        (En, SiteNotifBody { count }) => {
+            if count == 1 {
+                "1 unread notification is waiting.".into()
+            } else {
+                format!("{count} unread notifications are waiting.")
+            }
+        }
+        (De, SiteNotifBody { count }) => {
+            if count == 1 {
+                "1 ungelesene Benachrichtigung wartet.".into()
+            } else {
+                format!("{count} ungelesene Benachrichtigungen warten.")
+            }
         }
 
         (En, QueueTitle) => "Offline changes were not saved".into(),

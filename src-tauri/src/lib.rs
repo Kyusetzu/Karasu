@@ -382,6 +382,7 @@ pub fn run() {
             alerts::airing::spawn(app.handle().clone());
             alerts::stale::spawn(app.handle().clone());
             alerts::sequel::spawn(app.handle().clone());
+        alerts::site::spawn(app.handle().clone());
             // Before their first toast can land: on Android this is the
             // system permission dialog, everywhere else a granted no-op.
             alerts::notify::ensure_permission(app.handle());
@@ -433,6 +434,8 @@ pub fn run() {
             commands::set_ui_language,
             commands::get_airing_notify,
             commands::set_airing_notify,
+            commands::get_notif_schedule,
+            commands::set_notif_schedule,
             commands::get_stale_settings,
             commands::set_stale_settings,
             commands::get_sequel_notify,

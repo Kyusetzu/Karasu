@@ -1431,6 +1431,16 @@ export const de: typeof en = {
     libraryScan: "Neu scannen",
     libraryScanning: "Scanne …",
     libraryMatched: "{{n}} Titel auf der Platte zugeordnet.",
+    notifSchedule: "Benachrichtigungen im Hintergrund",
+    notifScheduleHint:
+      "Eine Systembenachrichtigung, wenn ungelesene AniList-Benachrichtigungen warten — am Desktop, während Karasu im Tray sitzt, auf Android auch bei geschlossener App. Standardmäßig aus; ein Check kostet eine Anfrage.",
+    notifScheduleLabel: "Prüfen alle",
+    notifScheduleOff: "Aus",
+    notifSchedule15: "15 Minuten",
+    notifSchedule30: "30 Minuten",
+    notifSchedule60: "Stunde",
+    notifScheduleCustom: "Eigener Wert …",
+    notifScheduleCustomLabel: "Minuten (15–720)",
     queueTitle: "Nicht synchronisierte Änderungen",
     queueHint:
       "Schreibvorgänge, die AniList noch nicht erreicht haben — sie versuchen es von selbst wieder, sobald eine Liste lädt. Jede Zeile ist die einzige Kopie dieser Änderung.",

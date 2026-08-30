@@ -1,13 +1,14 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { ChevronRight, ExternalLink } from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { isTauri } from "@/api/anilist";
+import { getNotifSchedule, isTauri, setNotifSchedule } from "@/api/anilist";
 import { notificationOptions, userProfile } from "@/api/social";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Shimmer } from "@/components/Skeleton";
 import { ExternalNote, NeedsAccount, Row, SELECT, Toggle } from "./shared";
 import {
@@ -614,4 +615,91 @@ function notificationLabel(
     case "STAFF_SUBMISSION_UPDATE": return t("settings.alNotifStaffSubmission");
     case "CHARACTER_SUBMISSION_UPDATE": return t("settings.alNotifCharacterSubmission");
   }
+}
+
+/**
+ * How often Karasu checks AniList for unread notifications in the
+ * background, as a system notification. Off by default: it is the first
+ * thing in the app that spends the shared request budget with nobody
+ * asking, so enabling it is a choice. One number on both platforms - the
+ * kv key drives the in-app pass here and Android's JobScheduler alike,
+ * which is why the floor is 15 minutes (Android's) everywhere.
+ */
+export function NotificationScheduleSection() {
+  const { t } = useTranslation();
+  const viewer = useAuth((s) => s.viewer);
+  const [minutes, setMinutes] = useState<number | null>(null);
+  const [custom, setCustom] = useState(false);
+  // The field's text while editing - the covers-per-row lesson: binding a
+  // number input straight to committed state makes it uneditable.
+  const [draft, setDraft] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isTauri) return;
+    getNotifSchedule().then((m) => {
+      setMinutes(m);
+      setCustom(m !== 0 && ![15, 30, 60].includes(m));
+    });
+  }, []);
+
+  if (!viewer || minutes === null) return null;
+
+  const commit = (m: number) => {
+    setMinutes(m);
+    setNotifSchedule(m).catch(() => {});
+  };
+
+  return (
+    <Card>
+      <CardTitle>{t("settings.notifSchedule")}</CardTitle>
+      <p className="mt-2 text-sm text-ink-500">{t("settings.notifScheduleHint")}</p>
+      <div className="mt-3">
+        <Row label={t("settings.notifScheduleLabel")}>
+          <select
+            className={SELECT}
+            value={custom ? "custom" : String(minutes)}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v === "custom") {
+                setCustom(true);
+                setDraft(String(minutes || 15));
+                if (minutes === 0) commit(15);
+                return;
+              }
+              setCustom(false);
+              setDraft(null);
+              commit(Number(v));
+            }}
+          >
+            <option value="0">{t("settings.notifScheduleOff")}</option>
+            <option value="15">{t("settings.notifSchedule15")}</option>
+            <option value="30">{t("settings.notifSchedule30")}</option>
+            <option value="60">{t("settings.notifSchedule60")}</option>
+            <option value="custom">{t("settings.notifScheduleCustom")}</option>
+          </select>
+        </Row>
+        {custom && (
+          <Row label={t("settings.notifScheduleCustomLabel")}>
+            <Input
+              type="number"
+              min={15}
+              max={720}
+              step={5}
+              className="max-w-24 text-right tabular-nums"
+              value={draft ?? String(minutes)}
+              onChange={(e) => {
+                const raw = e.target.value;
+                setDraft(raw);
+                const n = Number(raw);
+                if (raw !== "" && Number.isFinite(n) && n >= 15) {
+                  commit(Math.min(720, Math.round(n)));
+                }
+              }}
+              onBlur={() => setDraft(null)}
+            />
+          </Row>
+        )}
+      </div>
+    </Card>
+  );
 }

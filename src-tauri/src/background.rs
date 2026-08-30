@@ -3,7 +3,7 @@
 //! `NotifJobService` (Kotlin, JobScheduler) calls the one exported symbol
 //! here on its own background thread, in a process where Tauri may never
 //! have started: no `AppHandle`, no managed state, no tao context. Every
-//! dependency is therefore taken by hand — the files dir from the passed
+//! dependency is therefore taken by hand — the data dir from the passed
 //! `Context`, the token file read directly (`RESOLVED_DATA_DIR` is unset
 //! cold, so `auth::load_token` cannot serve), the seal opened through the
 //! env-parameterized keystore core, the database opened by path. The token
@@ -40,12 +40,16 @@ fn now_ms() -> i64 {
         .unwrap_or(0)
 }
 
-/// `context.getFilesDir().getAbsolutePath()`, by hand.
-fn files_dir(env: &mut JNIEnv, context: &JObject) -> Result<PathBuf, String> {
+/// `context.getDataDir().getAbsolutePath()`, by hand — the package root,
+/// matching tauri's own `app_data_dir` (its PathPlugin resolves `getDataDir`
+/// to `activity.dataDir`), which is where the token, the database and the
+/// widget projection all live. `getFilesDir` is one level below and finds
+/// none of them — measured, not guessed: four empty widgets.
+fn data_dir(env: &mut JNIEnv, context: &JObject) -> Result<PathBuf, String> {
     let file = env
-        .call_method(context, "getFilesDir", "()Ljava/io/File;", &[])
+        .call_method(context, "getDataDir", "()Ljava/io/File;", &[])
         .and_then(|v| v.l())
-        .map_err(|e| format!("getFilesDir: {e}"))?;
+        .map_err(|e| format!("getDataDir: {e}"))?;
     let path = env
         .call_method(&file, "getAbsolutePath", "()Ljava/lang/String;", &[])
         .and_then(|v| v.l())
@@ -76,7 +80,7 @@ fn read_token(env: &mut JNIEnv, context: &JObject, dir: &PathBuf) -> Option<Stri
 /// The whole check, returning the rendered `{"title","body"}` JSON when a
 /// summary should be posted, or an empty string for "nothing to say".
 fn check(env: &mut JNIEnv, context: &JObject) -> Result<String, String> {
-    let dir = files_dir(env, context)?;
+    let dir = data_dir(env, context)?;
     let db = Db::open(dir.clone())?;
 
     let interval = {

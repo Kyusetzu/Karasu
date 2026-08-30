@@ -2,7 +2,7 @@
 //!
 //! Android's four widgets (Airing Today, Continue Watching, Continue
 //! Reading, Weekly Calendar) are classic RemoteViews with no network and no
-//! schema knowledge: they render `<filesDir>/widgets.json`, which this
+//! schema knowledge: they render `<dataDir>/widgets.json` (tauri's app_data_dir = the package root), which this
 //! module writes whenever the list cache moves. A new pattern for this
 //! repo — nothing else writes a file for an outside consumer — named as
 //! such on purpose: Rust owns the format the way `keystore.rs` owns

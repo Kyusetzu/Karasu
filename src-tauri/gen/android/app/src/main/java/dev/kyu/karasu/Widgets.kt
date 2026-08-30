@@ -72,7 +72,11 @@ abstract class KarasuWidgetBase : AppWidgetProvider() {
     )
 
     fun doc(context: Context): JSONObject? = try {
-      JSONObject(File(context.filesDir, "widgets.json").readText())
+      // dataDir, NOT filesDir: tauri's app_data_dir resolves to
+      // Context.getDataDir() (the package root — see the PathPlugin's
+      // getDataDir), and that is where widgets.rs writes beside karasu.db.
+      // filesDir is one level below and was the four-empty-widgets bug.
+      JSONObject(File(context.dataDir, "widgets.json").readText())
     } catch (t: Throwable) {
       null
     }

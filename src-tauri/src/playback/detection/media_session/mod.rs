@@ -85,8 +85,28 @@ impl MediaSession {
     /// a player that leaves the type unset would otherwise never be
     /// detected. Getting a false positive from an unset video player is
     /// recoverable — the title simply won't match anything on the list.
+    ///
+    /// One carve-out, measured on a real site: a *browser's* "music" label
+    /// is the browser's own default for anything with sound, not the site's
+    /// claim — an anime episode playing in a tab reported
+    /// `type: music` and was invisible to the whole pass. So a music-typed
+    /// browser session whose composed title parses to an explicit episode is
+    /// treated as video the browser mislabelled. Real music has no episode
+    /// marker and stays out (the Spotify *web player* included), and a music
+    /// **app** saying "music" is believed even about a song called
+    /// "Episode 3" — the override needs both halves.
     fn is_watchable(&self) -> bool {
-        self.playback_type != "music"
+        if self.playback_type != "music" {
+            return true;
+        }
+        super::profiles::is_browser(&short_app_name(&self.app_id))
+            && crate::playback::recognition::parser::parse(&compose_title(
+                &self.artist,
+                &self.title,
+                &self.album,
+            ))
+            .episode
+            .is_some()
     }
 }
 
@@ -412,6 +432,51 @@ mod tests {
     #[test]
     fn music_is_never_picked() {
         let sessions = vec![session("Some Band", "Some Song", "music", "playing")];
+        assert!(pick(&sessions).is_none());
+    }
+
+    fn browser_session(title: &str, kind: &str, status: &str) -> MediaSession {
+        MediaSession {
+            app_id: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe".into(),
+            title: title.into(),
+            artist: String::new(),
+            album: String::new(),
+            playback_type: kind.into(),
+            status: status.into(),
+            url: String::new(),
+        }
+    }
+
+    /// The carve-out's fixture is the real thing: an anime episode in a tab,
+    /// reported by the browser as `type: music`, invisible to the whole pass.
+    #[test]
+    fn a_browsers_music_label_yields_to_an_episode_title() {
+        let s = browser_session(
+            "That Time I Got Reincarnated as a Slime: Visions of Coleus - Episode 1 | Re:ANIME",
+            "music",
+            "playing",
+        );
+        let sessions = vec![s];
+        let p = watchable(&sessions).find_map(playback_from).unwrap();
+        assert!(p.streaming);
+        assert_eq!(p.process, "chrome.exe");
+    }
+
+    /// The override needs the episode half: a browser really playing music
+    /// (the Spotify web player included) has no episode marker and stays out.
+    #[test]
+    fn real_music_in_a_browser_stays_invisible() {
+        let sessions = vec![browser_session("Some Band - Some Song", "music", "playing")];
+        assert!(pick(&sessions).is_none());
+    }
+
+    /// And the browser half: a music *app* saying "music" is believed, even
+    /// about a song that happens to be called like an episode.
+    #[test]
+    fn a_music_apps_episode_titled_song_stays_invisible() {
+        let mut s = session("Yorushika", "Episode 3", "music", "playing");
+        s.app_id = "C:\\Users\\x\\AppData\\Roaming\\Spotify\\Spotify.exe".into();
+        let sessions = vec![s];
         assert!(pick(&sessions).is_none());
     }
 

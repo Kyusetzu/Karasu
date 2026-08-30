@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { NavLink, useLocation } from "react-router";
 import { useTranslation } from "react-i18next";
 import { Info, LayoutGrid, Settings, X } from "lucide-react";
-import { GROUPS, type NavItem } from "@/components/shell/Sidebar";
+import { GROUPS, visibleGroups, type NavItem } from "@/components/shell/Sidebar";
 import { usePresence } from "@/hooks/usePresence";
 import { useDialogFocus } from "@/hooks/useDialogFocus";
 import { useBackClose } from "@/hooks/useBackClose";
@@ -33,20 +33,16 @@ function slotItems(): NavItem[] {
   );
 }
 
-/** What Android does not offer at all — the scanner needs a filesystem
- *  scoped storage will not hand out, so its screen would be a permanent
- *  empty state pointing at a settings pane that is also hidden. Keyed on the
- *  platform, not the shell width, so a narrowed desktop window keeps its
- *  library — the same capability-vs-width split Settings draws. */
-const ANDROID_HIDDEN = new Set(["/library"]);
-
 function sheetGroups(android: boolean): { label: string; items: NavItem[] }[] {
-  const groups = GROUPS.map((g) => ({
-    label: g.label,
-    items: g.items.filter(
-      (i) => !SLOTS.includes(i.to) && !(android && ANDROID_HIDDEN.has(i.to)),
-    ),
-  })).filter((g) => g.items.length > 0);
+  // Platform filtering lives in `visibleGroups` beside GROUPS itself, shared
+  // with the sidebar and the palette so the three ways to navigate cannot
+  // disagree; this sheet only subtracts what the bar already shows.
+  const groups = visibleGroups(android)
+    .map((g) => ({
+      label: g.label,
+      items: g.items.filter((i) => !SLOTS.includes(i.to)),
+    }))
+    .filter((g) => g.items.length > 0);
   // Settings and About sit *outside* `GROUPS` in the sidebar (its footer), so
   // without this the phone shell simply has no way to reach either — found by
   // opening the sheet and counting.

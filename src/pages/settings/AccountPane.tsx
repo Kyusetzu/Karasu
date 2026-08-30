@@ -16,7 +16,6 @@ import {
 } from "@/lib/defaultAddStatus";
 import { useAniListLogin } from "@/hooks/useAniListLogin";
 import * as api from "@/api/anilist";
-const CALLBACK_URL = "http://localhost:46231/callback";
 
 /**
  * How the list gets written from this machine — beside the account section
@@ -167,7 +166,9 @@ export function AccountSection() {
       <div className="mt-4 space-y-4 text-sm text-ink-300">
         {!canLogin && (
           <div className="space-y-2 rounded-lg bg-surface-850 p-3">
-            <p>{t("settings.stepClientId", { url: CALLBACK_URL })}</p>
+            {/* Rust owns the callback port; this block only renders once
+                `info` has answered, so the URL is always present here. */}
+            <p>{t("settings.stepClientId", { url: info?.callbackUrl ?? "" })}</p>
             <Button
               variant="secondary"
               size="sm"

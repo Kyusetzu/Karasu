@@ -59,6 +59,12 @@ pub struct AuthInfo {
     pub has_builtin_client_id: bool,
     #[serde(rename = "customClientId")]
     pub custom_client_id: Option<String>,
+    /// The redirect URL an API client must register — built from
+    /// `login::AUTH_CALLBACK_PORT` so the port has one origin. The frontend
+    /// used to hardcode this string, which is exactly the drift a type
+    /// checker cannot see across the IPC boundary.
+    #[serde(rename = "callbackUrl")]
+    pub callback_url: String,
 }
 
 #[tauri::command]
@@ -66,6 +72,10 @@ pub fn anilist_auth_info(db: State<'_, Db>) -> AuthInfo {
     AuthInfo {
         has_builtin_client_id: !BUILTIN_ANILIST_CLIENT_ID.is_empty(),
         custom_client_id: db.kv_get("anilist_client_id"),
+        callback_url: format!(
+            "http://localhost:{}/callback",
+            crate::anilist::login::AUTH_CALLBACK_PORT
+        ),
     }
 }
 

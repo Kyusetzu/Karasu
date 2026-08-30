@@ -15,6 +15,8 @@ import {
   type FuzzyDoc,
 } from "@/lib/fuzzy";
 import { cn } from "@/lib/utils";
+import { isAndroid, usePlatform } from "@/stores/platform";
+import { ANDROID_HIDDEN_ROUTES } from "@/components/shell/Sidebar";
 import { usePresence } from "@/hooks/usePresence";
 import { useBackClose } from "@/hooks/useBackClose";
 
@@ -42,6 +44,7 @@ const NAV: { path: string; key: string }[] = [
   { path: "/social", key: "nav.social" },
   { path: "/forum", key: "nav.forum" },
   { path: "/stats", key: "nav.stats" },
+  { path: "/wrapped", key: "nav.wrapped" },
   { path: "/library", key: "nav.library" },
   { path: "/about", key: "nav.about" },
   { path: "/settings", key: "nav.settings" },
@@ -56,6 +59,7 @@ export default function CommandPalette() {
   const qc = useQueryClient();
   const viewer = useAuth((s) => s.viewer);
   const level = useContentFilter((s) => s.level);
+  const android = isAndroid(usePlatform((s) => s.info));
   const [open, setOpen] = useState(false);
   const presence = usePresence(open);
   useBackClose(open, () => setOpen(false));
@@ -139,7 +143,11 @@ export default function CommandPalette() {
   // read every row to work out which kind they are looking at.
   const groups = useMemo<Group[]>(() => {
     const q = query.trim();
-    const navItems: Item[] = NAV.map((n) => ({
+    // The same platform set the sidebar and bottom bar consult — Ctrl+K must
+    // not be the one way an Android tablet still reaches the library.
+    const navItems: Item[] = NAV.filter(
+      (n) => !(android && ANDROID_HIDDEN_ROUTES.has(n.path)),
+    ).map((n) => ({
       id: n.path,
       label: t(n.key),
       path: n.path,
@@ -163,7 +171,7 @@ export default function CommandPalette() {
       { key: "palette.groupList", items: media },
       { key: "palette.groupGoTo", items: nav },
     ].filter((g) => g.items.length > 0);
-  }, [query, entries, t]);
+  }, [query, entries, t, android]);
 
   // One flat order for the keyboard, so ↑↓ crosses group boundaries the way
   // the eye does.
@@ -177,9 +185,9 @@ export default function CommandPalette() {
   if (!presence.mounted) return null;
 
   // The keyboard cursor is state, and nothing tied it to the scroll box. The
-  // twelve navigation items are ~415px inside a `max-h-96` (384px) container,
-  // so on a bare Ctrl+K the last one is already below the fold: arrowing down
-  // moved an invisible highlight and Enter opened something never on screen.
+  // navigation list overflows a `max-h-96` (384px) container, so on a bare
+  // Ctrl+K the last items are already below the fold: arrowing down moved an
+  // invisible highlight and Enter opened something never on screen.
   //
   // `block: "nearest"` so it only scrolls when it has to — jumping the list on
   // every keypress is its own kind of disorienting.

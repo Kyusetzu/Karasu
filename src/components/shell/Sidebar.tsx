@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { loadCollapsed, saveCollapsed } from "@/lib/sidebarWidth";
+import { isAndroid, usePlatform } from "@/stores/platform";
 import { useAuth } from "@/stores/auth";
 import { useAniListLogin } from "@/hooks/useAniListLogin";
 import { useListSummary } from "@/hooks/useListSummary";
@@ -135,6 +136,25 @@ export const GROUPS: { label: string; items: NavItem[] }[] = [
     ],
   },
 ];
+
+/**
+ * What Android does not offer at all — the scanner needs a filesystem scoped
+ * storage will not hand out. Keyed on the platform, never the shell width
+ * (the Settings sets' lesson): an Android *tablet* takes the desktop layout
+ * and still has no files, while a narrowed desktop window still does.
+ * One set, consumed by the sidebar, the bottom bar's sheet and the palette,
+ * so the three ways to navigate cannot disagree.
+ */
+export const ANDROID_HIDDEN_ROUTES = new Set(["/library"]);
+
+/** `GROUPS` minus what this platform cannot do. */
+export function visibleGroups(android: boolean): { label: string; items: NavItem[] }[] {
+  if (!android) return GROUPS;
+  return GROUPS.map((g) => ({
+    label: g.label,
+    items: g.items.filter((i) => !ANDROID_HIDDEN_ROUTES.has(i.to)),
+  })).filter((g) => g.items.length > 0);
+}
 
 function Item({
   item,
@@ -344,6 +364,7 @@ export default function Sidebar() {
   // written by anything, so the sidebar's Anime and Manga counts were blank for
   // the whole of account-free mode.
   const { counts, pending, syncedAt } = useListSummary(viewer?.id ?? 0);
+  const android = isAndroid(usePlatform((s) => s.info));
   const [collapsed, setCollapsed] = useState(loadCollapsed);
 
   const toggleCollapsed = () => {
@@ -353,8 +374,9 @@ export default function Sidebar() {
   };
   const { pathname } = useLocation();
   // Re-measured when the route changes and when the item set does — the
-  // link-account button exists only in local mode.
-  const { navRef, top } = useRailMarker([pathname, mode, collapsed]);
+  // link-account button exists only in local mode, and Android drops the
+  // library entry.
+  const { navRef, top } = useRailMarker([pathname, mode, collapsed, android]);
 
   // If the browser handoff can't start, Settings is where the manual token
   // paste lives — so send the user there rather than failing silently.
@@ -385,7 +407,7 @@ export default function Sidebar() {
         />
       )}
       <div className="flex flex-1 flex-col gap-px px-2.5">
-        {GROUPS.map((group, i) => (
+        {visibleGroups(android).map((group, i) => (
           <div key={group.label} className="contents">
             {/* Collapsed, the heading is text with no room and no icon to
                 stand in for it — a rule keeps the grouping the labels carried,

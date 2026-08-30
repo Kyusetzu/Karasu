@@ -19,6 +19,8 @@ export const isTauri = "__TAURI_INTERNALS__" in window;
 export interface AuthInfo {
   hasBuiltinClientId: boolean;
   customClientId: string | null;
+  /** The redirect URL an API client must register — Rust owns the port. */
+  callbackUrl: string;
 }
 
 export const authInfo = () => invoke<AuthInfo>("anilist_auth_info");

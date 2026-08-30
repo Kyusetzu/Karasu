@@ -545,6 +545,15 @@ impl AniList {
                 }
             };
 
+            // One line when it changes, so a device log can prove which
+            // protocol the TLS handshake actually negotiated — the Android
+            // ALPN regression (net.rs) was invisible without it.
+            crate::logging::debug_changed(
+                "anilist",
+                "http-version",
+                format!("negotiated {:?}", resp.version()),
+            );
+
             let header_u32 = |name: &str| {
                 resp.headers()
                     .get(name)

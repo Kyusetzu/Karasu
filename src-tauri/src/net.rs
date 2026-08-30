@@ -51,9 +51,19 @@ fn android_tls_config() -> rustls::ClientConfig {
     let roots = rustls::RootCertStore {
         roots: webpki_roots::TLS_SERVER_ROOTS.to_vec(),
     };
-    rustls::ClientConfig::builder_with_provider(provider)
+    let mut config = rustls::ClientConfig::builder_with_provider(provider)
         .with_safe_default_protocol_versions()
         .expect("aws-lc-rs supports the default TLS protocol versions")
         .with_root_certificates(roots)
-        .with_no_client_auth()
+        .with_no_client_auth();
+    // ALPN is the caller's job on this path. reqwest's own rustls arm
+    // advertises h2 + http/1.1 itself, but `use_preconfigured_tls` forwards
+    // this config verbatim — and rustls defaults to offering *nothing*, so
+    // the server could never pick h2 and every Android request ran HTTP/1.1:
+    // one TCP+TLS handshake per concurrent request over the phone's radio
+    // where the desktop multiplexes them all onto one connection. The offer
+    // is a preference list, not a demand — an http/1.1-only server still
+    // negotiates http/1.1, and plain-HTTP Jellyfin never touches TLS at all.
+    config.alpn_protocols = vec![b"h2".to_vec(), b"http/1.1".to_vec()];
+    config
 }

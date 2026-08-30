@@ -292,6 +292,11 @@ pub async fn fetch_media_list(
             let cached = db
                 .cached_list(user_id, media_type)
                 .ok_or("Offline and no local list cache available yet")?;
+            // The cache did not move, but the projection file can still be
+            // missing (an update shipped the widgets after the cache was
+            // written) — refreshing here is idempotent and closes that gap
+            // for the offline path too.
+            crate::widgets::refresh(&app);
             Ok(ListResult {
                 from_cache: true,
                 pending: db.queue_len(user_id),

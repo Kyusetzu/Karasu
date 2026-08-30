@@ -386,6 +386,17 @@ pub fn run() {
             alerts::sequel::spawn(app.handle().clone());
         alerts::site::spawn(app.handle().clone());
         assert_notif_schedule(app.handle());
+        {
+            // The widget projection used to exist only after a network list
+            // fetch wrote it — a fresh install (or update) showed four empty
+            // widgets until then. Project once from the cache at startup,
+            // delayed a beat so the JNI poke finds the tao context ready.
+            let handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+                widgets::refresh(&handle);
+            });
+        }
             // Before their first toast can land: on Android this is the
             // system permission dialog, everywhere else a granted no-op.
             alerts::notify::ensure_permission(app.handle());

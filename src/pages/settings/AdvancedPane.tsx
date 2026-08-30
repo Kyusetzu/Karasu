@@ -15,6 +15,7 @@ import { parseJsonExport } from "@/lib/jsonImport";
 import { resolveMalChunk } from "@/api/queries";
 import { scoreScale } from "@/lib/scoreFormat";
 import { useAuth, useScoreFormat } from "@/stores/auth";
+import { useManualSync } from "@/hooks/useManualSync";
 import { usePlatform } from "@/stores/platform";
 import { showToast } from "@/stores/toast";
 import type { ListResult, Media, MediaType } from "@/api/types";
@@ -1021,8 +1022,11 @@ export function QueueSection() {
   const viewer = useAuth((s) => s.viewer);
   const [status, setStatus] = useState<SyncStatus | null>(null);
   const [confirming, setConfirming] = useState<QueuedEdit | null>(null);
-  const [flushing, setFlushing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The whole-app sync, not a bare queue flush: on the phone this pane is
+  // the only sync surface at all (the sidebar and its panel never render
+  // there), so the button must do what the desktop button does.
+  const manual = useManualSync();
 
   const load = () => {
     if (!api.isTauri) return;
@@ -1044,17 +1048,10 @@ export function QueueSection() {
 
   const rows = status?.queued ?? [];
 
-  const flush = async () => {
-    setFlushing(true);
+  const runSync = async () => {
     setError(null);
-    try {
-      await api.flushQueue();
-      load();
-    } catch (e) {
-      setError(backendErrorText(e, t));
-    } finally {
-      setFlushing(false);
-    }
+    await manual.sync();
+    load();
   };
 
   const discard = async (edit: QueuedEdit) => {
@@ -1081,8 +1078,7 @@ export function QueueSection() {
       {rows.length === 0 ? (
         <p className="mt-3 text-sm text-ink-600">{t("settings.queueEmpty")}</p>
       ) : (
-        <>
-          <ul className="mt-3 space-y-1.5">
+        <ul className="mt-3 space-y-1.5">
             {rows.map((edit) => (
               <li
                 key={edit.id}
@@ -1111,15 +1107,14 @@ export function QueueSection() {
                 </IconButton>
               </li>
             ))}
-          </ul>
-          <div className="mt-3">
-            <Button onClick={flush} disabled={flushing}>
-              <RefreshCw className={cn("size-4", flushing && "animate-spin")} />{" "}
-              {flushing ? t("settings.queueFlushing") : t("settings.queueFlush")}
-            </Button>
-          </div>
-        </>
+        </ul>
       )}
+      <div className="mt-3">
+        <Button onClick={() => void runSync()} disabled={manual.syncing || !manual.available}>
+          <RefreshCw className={cn("size-4", manual.syncing && "animate-spin")} />{" "}
+          {manual.syncing ? t("settings.queueFlushing") : t("settings.queueFlush")}
+        </Button>
+      </div>
       {error && <p className="mt-2 text-sm text-danger">{error}</p>}
       <Presence value={confirming}>
         {(edit, leaving) => (

@@ -30,6 +30,7 @@ export const en = {
     expandSidebar: "Expand sidebar",
     about: "About",
     settings: "Settings",
+    sync: "Sync",
   },
   auth: {
     expiredTitle: "AniList session expired.",

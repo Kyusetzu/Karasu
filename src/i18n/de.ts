@@ -28,6 +28,7 @@ export const de: typeof en = {
     expandSidebar: "Seitenleiste ausklappen",
     about: "Über",
     settings: "Einstellungen",
+    sync: "Sync",
   },
   auth: {
     expiredTitle: "AniList-Sitzung abgelaufen.",

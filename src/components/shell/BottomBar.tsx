@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { NavLink, useLocation } from "react-router";
 import { useTranslation } from "react-i18next";
-import { Info, LayoutGrid, Settings, X } from "lucide-react";
+import { Info, LayoutGrid, RefreshCw, Settings, X } from "lucide-react";
 import { GROUPS, visibleGroups, type NavItem } from "@/components/shell/Sidebar";
 import { usePresence } from "@/hooks/usePresence";
 import { useDialogFocus } from "@/hooks/useDialogFocus";
@@ -49,6 +49,9 @@ function sheetGroups(android: boolean): { label: string; items: NavItem[] }[] {
   groups.push({
     label: "nav.groupApp",
     items: [
+      // The phone's one road to the queue and the sync button — the
+      // desktop's sidebar panel never renders here.
+      { to: "/settings?pane=data", key: "nav.sync", icon: RefreshCw },
       { to: "/settings", key: "nav.settings", icon: Settings },
       { to: "/about", key: "nav.about", icon: Info },
     ],

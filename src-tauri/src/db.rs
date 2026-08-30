@@ -806,6 +806,21 @@ impl Db {
         let _ = conn.execute("DELETE FROM offline_queue WHERE id = ?1", [id]);
     }
 
+    /// `queue_remove` with the owner in the WHERE clause. The unscoped one is
+    /// fine for the drain, which only ever holds ids it read via `queue_all`;
+    /// a user-triggered discard resolves its id from a UI snapshot that can be
+    /// stale across a sign-out, and v16 exists precisely because rows crossing
+    /// accounts was a real data-loss bug. Returns whether a row went.
+    pub fn queue_remove_for(&self, user_id: i64, id: i64) -> bool {
+        let conn = self.0.guard();
+        conn.execute(
+            "DELETE FROM offline_queue WHERE id = ?1 AND user_id = ?2",
+            [id, user_id],
+        )
+        .map(|n| n > 0)
+        .unwrap_or(false)
+    }
+
     /// The schema version the database is actually on.
     ///
     /// A diagnostics fact worth having because several readers here return an
@@ -2301,6 +2316,24 @@ mod tests {
         // A third account with nothing queued drains nothing.
         assert!(db.queue_all(333).is_empty());
         assert_eq!(db.queue_len(333), 0);
+    }
+
+    /// The scoped discard: another account's id must not delete, and the
+    /// answer says whether anything went — the UI reports "already gone"
+    /// honestly instead of pretending a stale row was removed.
+    #[test]
+    fn a_discard_only_removes_the_owners_row() {
+        let db = mem_db();
+        db.queue_push(111, "save", r#"{"mediaId":1,"progress":5}"#).unwrap();
+        let id = db.queue_all(111)[0].id;
+
+        assert!(!db.queue_remove_for(222, id));
+        assert_eq!(db.queue_len(111), 1);
+
+        assert!(db.queue_remove_for(111, id));
+        assert_eq!(db.queue_len(111), 0);
+        // Gone means gone: a second discard reports nothing removed.
+        assert!(!db.queue_remove_for(111, id));
     }
 
     /// The v16 backfill. Rows written before the column existed belong to

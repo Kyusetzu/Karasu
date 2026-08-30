@@ -1427,6 +1427,19 @@ export const en = {
     libraryScan: "Rescan",
     libraryScanning: "Scanning …",
     libraryMatched: "{{n}} titles matched on disk.",
+    queueTitle: "Unsynced edits",
+    queueHint:
+      "Writes that have not reached AniList yet — they retry on their own whenever a list loads. Each row is the only copy of that edit.",
+    queueEmpty: "Nothing waiting. Every edit has reached AniList.",
+    queueNeedsAccount:
+      "The queue holds edits waiting to reach your AniList account, so there is nothing to show without one.",
+    queueKindDelete: "Remove from list",
+    queueDiscard: "Discard this edit",
+    queueDiscardTitle: "Discard this unsent edit?",
+    queueDiscardNote:
+      "This edit exists nowhere else. Discarding it means the change never reaches AniList.",
+    queueFlush: "Sync now",
+    queueFlushing: "Syncing …",
     splits: "Season splits",
     splitsHint:
       "Ranges you have re-pointed at another entry. Removing one gives its episodes back to whatever the rest of the release name still matches.",

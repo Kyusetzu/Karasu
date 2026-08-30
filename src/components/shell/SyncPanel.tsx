@@ -26,7 +26,7 @@ import { useManualSync } from "@/hooks/useManualSync";
  * falls through to the raw name, which is worse than a label and much better
  * than an empty cell.
  */
-function fieldLabel(field: QueueField, t: (k: string) => string): string {
+export function fieldLabel(field: QueueField, t: (k: string) => string): string {
   switch (field) {
     case "status":
       return t("syncPanel.fieldStatus");

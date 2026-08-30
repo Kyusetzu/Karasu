@@ -256,6 +256,9 @@ export const bulkSaveEntries = async (
 };
 
 export const flushQueue = () => invoke<number>("flush_queue");
+/** Discards one queued edit — scoped to the signed-in account in Rust. */
+export const discardQueuedEdit = (id: number) =>
+  invoke<boolean>("discard_queued_edit", { id });
 
 /**
  * What the sync is doing, for the panel behind the pending line.

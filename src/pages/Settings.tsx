@@ -38,6 +38,7 @@ import {
   ImportSection,
   PortableSection,
   LogSection,
+  QueueSection,
   RescaleSection,
   SystemSection,
   UpdatesSection,
@@ -102,7 +103,12 @@ const PANES = [
   },
   // New. Moving a list in or out is not an advanced operation, it is the thing
   // people come to a tracker's settings to do.
-  { id: "data", icon: Database, sections: [ExportSection, ImportSection, BackupSection] },
+  // The queue first: it is the live state, the others are file operations.
+  {
+    id: "data",
+    icon: Database,
+    sections: [QueueSection, ExportSection, ImportSection, BackupSection],
+  },
   // What is left is what the warning is actually about: rewriting every score,
   // reading a log that records what detection saw, and moving the database.
   {

@@ -1045,6 +1045,19 @@ pub async fn sync_status(
     })
 }
 
+/// Discards one queued edit — the user saying "that write should not land".
+///
+/// Scoped to the signed-in account in the DELETE itself, never trusting the
+/// id alone: the id comes from a UI snapshot that can straddle a sign-out,
+/// and an unscoped delete would reopen v16's cross-account hole from a new
+/// direction. Deleting a queued edit is a loss class (the queue is the only
+/// copy), which is why the UI confirms before calling this.
+#[tauri::command]
+pub fn discard_queued_edit(db: State<'_, Db>, id: i64) -> Result<bool, String> {
+    let user_id = viewer_id(&db).ok_or("Not connected to AniList")?;
+    Ok(db.queue_remove_for(user_id, id))
+}
+
 /// Manually triggered sync of the offline queue (e.g. a button in the UI).
 #[tauri::command]
 pub async fn flush_queue(

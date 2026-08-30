@@ -1426,6 +1426,19 @@ export const de: typeof en = {
     libraryScan: "Neu scannen",
     libraryScanning: "Scanne …",
     libraryMatched: "{{n}} Titel auf der Platte zugeordnet.",
+    queueTitle: "Nicht synchronisierte Änderungen",
+    queueHint:
+      "Schreibvorgänge, die AniList noch nicht erreicht haben — sie versuchen es von selbst wieder, sobald eine Liste lädt. Jede Zeile ist die einzige Kopie dieser Änderung.",
+    queueEmpty: "Nichts wartet. Jede Änderung hat AniList erreicht.",
+    queueNeedsAccount:
+      "Die Warteschlange hält Änderungen für dein AniList-Konto — ohne Konto gibt es hier nichts zu zeigen.",
+    queueKindDelete: "Von der Liste entfernen",
+    queueDiscard: "Diese Änderung verwerfen",
+    queueDiscardTitle: "Diese ungesendete Änderung verwerfen?",
+    queueDiscardNote:
+      "Diese Änderung existiert nirgendwo sonst. Verwerfen heißt, sie erreicht AniList nie.",
+    queueFlush: "Jetzt synchronisieren",
+    queueFlushing: "Synchronisiere …",
     splits: "Staffel-Splits",
     splitsHint:
       "Bereiche, die du auf einen anderen Eintrag umgeleitet hast. Beim Entfernen fallen die Episoden an das zurück, was der Rest des Release-Namens noch trifft.",

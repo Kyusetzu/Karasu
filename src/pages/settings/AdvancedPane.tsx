@@ -20,6 +20,13 @@ import { showToast } from "@/stores/toast";
 import type { ListResult, Media, MediaType } from "@/api/types";
 import { cn } from "@/lib/utils";
 import { NeedsAccount, Row, SELECT, Toggle } from "./shared";
+import { Trash2 } from "lucide-react";
+import { displayTitle, type QueuedEdit, type SyncStatus } from "@/api/types";
+import { isQueueField, queuedMediaId } from "@/lib/syncQueue";
+import { fieldLabel } from "@/components/shell/SyncPanel";
+import { IconButton } from "@/components/ui/icon-button";
+import { Presence } from "@/components/ui/presence";
+import ConfirmDialog from "@/components/overlays/ConfirmDialog";
 interface DatabaseInfo {
   path: string;
   bytes: number;
@@ -990,6 +997,143 @@ export function LogSection() {
           )}
         </div>
       </div>
+    </Card>
+  );
+}
+
+
+/**
+ * The offline queue, face to face.
+ *
+ * The queue was "the one copy the user cannot see" — the merge dialog's own
+ * words — visible only as a count in the sidebar and the sync popover. This
+ * is its management surface: every unsent edit as a row, and a per-row
+ * discard behind a confirm, because a queued edit is the only copy of that
+ * write and deleting one is a loss the schema notes name as such.
+ *
+ * Titles join from the list caches exactly like the sync popover — no
+ * request, unlabelled when the list has never been fetched this session.
+ */
+export function QueueSection() {
+  const { t } = useTranslation();
+  const qc = useQueryClient();
+  const mode = useAuth((s) => s.mode);
+  const viewer = useAuth((s) => s.viewer);
+  const [status, setStatus] = useState<SyncStatus | null>(null);
+  const [confirming, setConfirming] = useState<QueuedEdit | null>(null);
+  const [flushing, setFlushing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = () => {
+    if (!api.isTauri) return;
+    api.syncStatus().then(setStatus).catch(() => {});
+  };
+  useEffect(load, []);
+
+  if (mode !== "anilist" || !viewer) {
+    return (
+      <NeedsAccount title={t("settings.queueTitle")}>
+        {t("settings.queueNeedsAccount")}
+      </NeedsAccount>
+    );
+  }
+
+  const entries = qc
+    .getQueriesData<ListResult>({ queryKey: ["mediaList"] })
+    .flatMap(([, data]) => data?.lists.flatMap((g) => g.entries) ?? []);
+
+  const rows = status?.queued ?? [];
+
+  const flush = async () => {
+    setFlushing(true);
+    setError(null);
+    try {
+      await api.flushQueue();
+      load();
+    } catch (e) {
+      setError(backendErrorText(e, t));
+    } finally {
+      setFlushing(false);
+    }
+  };
+
+  const discard = async (edit: QueuedEdit) => {
+    setConfirming(null);
+    setError(null);
+    try {
+      await api.discardQueuedEdit(edit.id);
+      load();
+    } catch (e) {
+      setError(backendErrorText(e, t));
+    }
+  };
+
+  const label = (edit: QueuedEdit) => {
+    const mediaId = queuedMediaId(edit, entries);
+    const entry = entries.find((e) => e.mediaId === mediaId);
+    return entry ? displayTitle(entry.media.title) : `#${edit.subject ?? "?"}`;
+  };
+
+  return (
+    <Card>
+      <CardTitle>{t("settings.queueTitle")}</CardTitle>
+      <p className="mt-2 text-sm text-ink-500">{t("settings.queueHint")}</p>
+      {rows.length === 0 ? (
+        <p className="mt-3 text-sm text-ink-600">{t("settings.queueEmpty")}</p>
+      ) : (
+        <>
+          <ul className="mt-3 space-y-1.5">
+            {rows.map((edit) => (
+              <li
+                key={edit.id}
+                className="flex items-center gap-3 rounded-lg bg-surface-900 px-3 py-2"
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-xs text-ink-100">
+                    {label(edit)}
+                  </span>
+                  <span className="mt-0.5 block truncate text-2xs text-ink-600">
+                    {edit.kind === "delete"
+                      ? t("settings.queueKindDelete")
+                      : edit.fields
+                          .filter(isQueueField)
+                          .map((f) => fieldLabel(f, t))
+                          .join(", ")}
+                  </span>
+                </span>
+                <IconButton
+                  variant="ghost"
+                  onClick={() => setConfirming(edit)}
+                  aria-label={t("settings.queueDiscard")}
+                  title={t("settings.queueDiscard")}
+                >
+                  <Trash2 className="size-3.5" />
+                </IconButton>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-3">
+            <Button onClick={flush} disabled={flushing}>
+              <RefreshCw className={cn("size-4", flushing && "animate-spin")} />{" "}
+              {flushing ? t("settings.queueFlushing") : t("settings.queueFlush")}
+            </Button>
+          </div>
+        </>
+      )}
+      {error && <p className="mt-2 text-sm text-danger">{error}</p>}
+      <Presence value={confirming}>
+        {(edit, leaving) => (
+          <ConfirmDialog
+            leaving={leaving}
+            title={t("settings.queueDiscardTitle")}
+            names={[label(edit)]}
+            note={t("settings.queueDiscardNote")}
+            confirmLabel={t("settings.queueDiscard")}
+            onConfirm={() => void discard(edit)}
+            onCancel={() => setConfirming(null)}
+          />
+        )}
+      </Presence>
     </Card>
   );
 }

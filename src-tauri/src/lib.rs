@@ -409,6 +409,7 @@ pub fn run() {
             commands::bulk_save_list_entries,
             commands::delete_list_entry,
             commands::flush_queue,
+            commands::discard_queued_edit,
             commands::sync_status,
             commands::fetch_bio_image,
             commands::get_blur_adult,

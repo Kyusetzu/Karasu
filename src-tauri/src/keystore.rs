@@ -23,9 +23,16 @@
 
 /// Distinguishes the sealed format from the plaintext files that shipped
 /// before it — the legacy branch of `classify` is what migrates them.
+// The framing half is deliberately compiled everywhere so its tests run on
+// desktop (see the header) — which a desktop *release* build reads as "never
+// used", since the Android arms and `#[cfg(test)]` are both absent there.
+// Same shape as `diagnostics::parse_os_release`; visible in `tauri build`
+// alone, never in `cargo test`.
+#[cfg_attr(not(target_os = "android"), allow(dead_code))]
 pub const MAGIC: &[u8; 5] = b"KRSA1";
 
 /// What a mobile secret file holds.
+#[cfg_attr(not(target_os = "android"), allow(dead_code))]
 pub enum Stored<'a> {
     /// `MAGIC` was present; the rest is `iv || ciphertext` for `open`.
     /// May still fail to decrypt — truncation, tampering, a vanished key.
@@ -35,6 +42,7 @@ pub enum Stored<'a> {
     Legacy(&'a [u8]),
 }
 
+#[cfg_attr(not(target_os = "android"), allow(dead_code))]
 pub fn classify(blob: &[u8]) -> Stored<'_> {
     // Length first, so a short file is a branch rather than a panic on the
     // slice below — the same note `open` in anilist/auth.rs carries.
@@ -46,6 +54,7 @@ pub fn classify(blob: &[u8]) -> Stored<'_> {
 }
 
 /// Frames a `TokenCipher.seal` result into the on-disk format.
+#[cfg_attr(not(target_os = "android"), allow(dead_code))]
 pub fn frame(sealed: &[u8]) -> Vec<u8> {
     let mut out = Vec::with_capacity(MAGIC.len() + sealed.len());
     out.extend_from_slice(MAGIC);

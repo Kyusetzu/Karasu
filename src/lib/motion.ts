@@ -67,7 +67,7 @@ export const STAGGER_CYCLE = 6;
  * inline style included, so a JS guard here would be a second answer to a
  * question CSS has settled.
  */
-export const SKELETON_STEP_MS = 90;
+const SKELETON_STEP_MS = 90;
 export function skeletonDelay(index: number): number {
   return (index % STAGGER_CYCLE) * SKELETON_STEP_MS;
 }

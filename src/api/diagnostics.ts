@@ -55,7 +55,6 @@ export const diagnosticsReport = (redact = true) =>
 export const getLogs = (limit = 200) =>
   invoke<LogEntry[]>("get_logs", { limit });
 
-export const logFilePath = () => invoke<string | null>("log_file_path");
 
 export const getLogDebug = () => invoke<boolean>("get_log_debug");
 export const setLogDebug = (enabled: boolean) =>

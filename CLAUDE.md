@@ -78,9 +78,9 @@ src/
   pages/             one per route; settings/ holds the eight panes
   stores/            Zustand stores (auth, theme, library, nowPlaying, …)
 src-tauri/src/
-  commands/          93 of the 107 frontend-facing commands, by subject:
+  commands/          92 of the 105 frontend-facing commands, by subject:
                      auth · images · list · playback · prefs · system ·
-                     update. The other 14 are the library scanner's, in
+                     update. The other 13 are the library scanner's, in
                      `library.rs`.
                      `mod.rs` re-exports all of it, so `commands::x` paths and
                      `generate_handler!` do not care which file a command is in.

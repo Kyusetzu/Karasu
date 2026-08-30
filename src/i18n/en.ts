@@ -1326,6 +1326,7 @@ export const en = {
     manualFallback: "Having trouble? Enter the token manually",
     manualHint:
       "Paste the access token or the full redirect URL from your browser's address bar.",
+    manualOpen: "Open the AniList login page",
     tokenPlaceholder: "Paste access token",
     connect: "Connect",
     checking: "Checking …",

@@ -10,6 +10,14 @@ export interface Presence {
 }
 
 /**
+ * The default exit hold, and it MUST match `--duration-exit` in `index.css`:
+ * the CSS plays the exit for that long, this keeps the node alive exactly as
+ * long. A JS constant because a hook cannot read a CSS token without a DOM
+ * round trip on every close.
+ */
+const EXIT_MS = 120;
+
+/**
  * Keeps a node mounted for the length of its exit animation.
  *
  * CSS cannot animate an element React has already removed, and every overlay in
@@ -26,14 +34,6 @@ export interface Presence {
  * is in flight cancels it, so a fast toggle cannot unmount a node that is open
  * again by the time the timer fires.
  */
-/**
- * The default exit hold, and it MUST match `--duration-exit` in `index.css`:
- * the CSS plays the exit for that long, this keeps the node alive exactly as
- * long. A JS constant because a hook cannot read a CSS token without a DOM
- * round trip on every close.
- */
-export const EXIT_MS = 120;
-
 export function usePresence(open: boolean, exitMs = EXIT_MS): Presence {
   const [mounted, setMounted] = useState(open);
   const [leaving, setLeaving] = useState(false);

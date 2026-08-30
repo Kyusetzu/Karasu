@@ -2,6 +2,8 @@ import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 import { en } from "./en";
 
+// Not dead: `i18nKeys.test.ts` reaches it as a property of the module object,
+// which a name-level grep for `import { en }` does not see.
 export { en };
 
 /**

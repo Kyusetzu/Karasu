@@ -440,7 +440,6 @@ pub fn run() {
             commands::diagnostics,
             commands::diagnostics_report,
             commands::get_logs,
-            commands::log_file_path,
             commands::log_frontend_error,
             commands::get_log_debug,
             commands::set_log_debug,
@@ -498,7 +497,6 @@ pub fn run() {
             library::set_library_match,
             library::clear_library_match,
             library::set_library_redirect,
-            library::clear_library_redirect,
             library::play_next,
             library::play_episode,
         ])

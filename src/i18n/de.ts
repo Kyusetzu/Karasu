@@ -1324,6 +1324,7 @@ export const de: typeof en = {
     manualFallback: "Probleme? Token manuell eingeben",
     manualHint:
       "Füge den Access-Token oder die komplette Redirect-URL aus der Adressleiste deines Browsers ein.",
+    manualOpen: "AniList-Loginseite öffnen",
     tokenPlaceholder: "Access-Token einfügen",
     connect: "Verbinden",
     checking: "Prüfe …",

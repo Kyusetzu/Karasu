@@ -16,7 +16,7 @@ import {
   NODE_W,
   type FranchiseTreeNode,
 } from "@/lib/franchiseLayout";
-import { usePanZoom } from "@/hooks/usePanZoom";
+import { BUTTON_STEP, usePanZoom } from "@/hooks/usePanZoom";
 import { useCachedEntry } from "@/hooks/useCachedEntry";
 import { useListMutations } from "@/hooks/useListMutations";
 import { displayTitle, type MediaListStatus } from "@/api/types";
@@ -313,7 +313,7 @@ export default function Franchise() {
               <IconButton
                 size="xs"
                 aria-label={t("franchise.zoomOut")}
-                onClick={() => pan.zoomBy(1 / 1.15)}
+                onClick={() => pan.zoomBy(1 / BUTTON_STEP)}
               >
                 <Minus className="size-3.5" />
               </IconButton>
@@ -328,7 +328,7 @@ export default function Franchise() {
               <IconButton
                 size="xs"
                 aria-label={t("franchise.zoomIn")}
-                onClick={() => pan.zoomBy(1.15)}
+                onClick={() => pan.zoomBy(BUTTON_STEP)}
               >
                 <Plus className="size-3.5" />
               </IconButton>

@@ -371,12 +371,6 @@ pub fn get_logs(limit: Option<usize>) -> Vec<crate::logging::LogEntry> {
     crate::logging::entries(limit.unwrap_or(200).min(crate::logging::RING_CAPACITY))
 }
 
-/// Where the log file lives, for the "show me the folder" affordance.
-#[tauri::command]
-pub fn log_file_path() -> Option<String> {
-    crate::logging::log_path().map(|p| p.to_string_lossy().to_string())
-}
-
 /// A crash or unhandled rejection from the WebView.
 ///
 /// The frontend had no error boundary and no `onerror`, so a render throw blanked

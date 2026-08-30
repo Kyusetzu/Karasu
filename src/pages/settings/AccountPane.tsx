@@ -133,6 +133,21 @@ export function AccountSection() {
     if (!(await login.start())) setShowManual(true);
   };
 
+  // The manual fallback's missing half: when the handoff cannot even start
+  // (callback port taken, no default browser), no browser tab ever opened —
+  // so there is no address bar to copy a token from. This opens the same
+  // authorize page with no callback server behind it; the redirect fails on
+  // purpose and the token sits in the address bar, which is exactly what the
+  // hint below tells the user to paste.
+  const openManual = async () => {
+    setError(null);
+    try {
+      await openUrl(await api.loginUrl());
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
   const submitToken = async () => {
     setBusy(true);
     setError(null);
@@ -215,6 +230,9 @@ export function AccountSection() {
           {showManual && (
             <div className="mt-2 space-y-2">
               <p className="text-xs text-ink-500">{t("settings.manualHint")}</p>
+              <Button variant="secondary" size="sm" onClick={() => void openManual()}>
+                {t("settings.manualOpen")} <ExternalLink className="size-3.5" />
+              </Button>
               <div className="flex gap-2">
                 <Input
                   type="password"

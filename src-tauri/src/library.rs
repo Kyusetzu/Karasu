@@ -1096,68 +1096,6 @@ pub fn set_library_redirect(
     Ok(guard.summary.clone())
 }
 
-/// Removes a season split, giving the range back to whatever the rest of the
-/// parse still answers to — the sibling files outside every remaining split
-/// know their media id, and a freed episode 13 belongs with them rather than
-/// in "unplaced". When no sibling knows (the whole key was split), the range
-/// honestly lands unplaced until the next scan, like `clear_library_match`.
-#[tauri::command]
-pub fn clear_library_redirect(
-    app: AppHandle,
-    title: String,
-    season: i32,
-    ep_from: u32,
-) -> Result<Vec<LibraryEntry>, String> {
-    let state = app.state::<LibraryIndex>();
-    if state.1.load(Ordering::Acquire) {
-        return Err("A scan is running — try again when it finishes".into());
-    }
-
-    let db = app.state::<Db>();
-    // The rule itself is needed to know which files it governed, so it is read
-    // before it is deleted.
-    let rule = redirect_rules(&db)
-        .into_iter()
-        .find(|r| r.title == title && r.season == season && r.ep_from == ep_from)
-        .ok_or("There is no season split on that range to remove")?;
-    db.library_redirect_clear(&title, season, ep_from)?;
-    let remaining = redirect_rules(&db);
-
-    let mut guard = state.0.guard();
-    // The answer the freed files fall back to: any sibling of the same parse
-    // that no remaining split claims.
-    let fallback = guard.files.iter().find_map(|f| {
-        if f.title != title || f.season != season || f.media_id.is_none() {
-            return None;
-        }
-        let (_, _, disk) = reparse(&f.path);
-        let still_split = disk
-            .is_some_and(|ep| remaining.iter().any(|r| r.apply(&title, season, ep).is_some()));
-        (!still_split).then(|| (f.media_id, f.score, f.manual))
-    });
-
-    for f in &mut guard.files {
-        if f.title != title || f.season != season {
-            continue;
-        }
-        let (_, _, disk) = reparse(&f.path);
-        let Some(ep) = disk else { continue };
-        let was_governed = rule.apply(&title, season, ep).is_some();
-        let still_split = remaining.iter().any(|r| r.apply(&title, season, ep).is_some());
-        if !was_governed || still_split {
-            continue;
-        }
-        let (media_id, score, manual) = fallback.unwrap_or((None, 0.0, false));
-        f.episode = ep;
-        f.media_id = media_id;
-        f.score = if media_id.is_some() { score } else { 0.0 };
-        f.manual = manual && media_id.is_some();
-    }
-    guard.reindex();
-    persist(&db, &guard)?;
-    Ok(guard.summary.clone())
-}
-
 /// Drops a correction and gives the file back to the matcher's own answer.
 ///
 /// The matcher is not re-run here — its candidates are the cached list and

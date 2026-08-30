@@ -18,6 +18,7 @@ import {
   NOTIFICATION_TYPES,
   type ListActivityStatus,
   type NotificationTypeName,
+  type OverriddenField,
 } from "@/lib/anilistUserFields";
 import { useUpdateUser } from "@/hooks/useUpdateUser";
 import { useAuth } from "@/stores/auth";
@@ -106,7 +107,7 @@ function rowOrderLabel(v: (typeof ROW_ORDERS)[number], t: (k: string) => string)
 }
 
 /** The note for a setting Karasu overrides, with a link to what wins instead. */
-function OverrideNote({ field }: { field: keyof typeof LOCAL_OVERRIDES }) {
+function OverrideNote({ field }: { field: OverriddenField }) {
   const { t } = useTranslation();
   const o = LOCAL_OVERRIDES[field];
   return (

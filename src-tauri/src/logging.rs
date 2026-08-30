@@ -256,11 +256,6 @@ pub fn init(dir: PathBuf) {
     );
 }
 
-/// Where the log lives, once known.
-pub fn log_path() -> Option<PathBuf> {
-    guard(sink()).clone()
-}
-
 pub fn set_debug(on: bool) {
     DEBUG_ON.store(on, Ordering::Relaxed);
 }

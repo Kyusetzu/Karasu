@@ -93,7 +93,6 @@ let profileMode: ProfileMode = "anilist";
 export const setProfileModeCache = (mode: ProfileMode) => {
   profileMode = mode;
 };
-export const isLocalMode = () => profileMode === "local";
 
 // The account's score format, cached the same way and by the same owner (the
 // auth store), so the save paths below can convert display-format scores to

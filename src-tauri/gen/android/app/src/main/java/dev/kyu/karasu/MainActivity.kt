@@ -56,6 +56,17 @@ class MainActivity : TauriActivity() {
     WindowInsetsControllerCompat(window, root).isAppearanceLightStatusBars = false
   }
 
+  override fun onPause() {
+    super.onPause()
+    // Hand-edited: leaving the app is the moment the home screen becomes
+    // visible again, and whatever this session changed should be on it.
+    try {
+      WidgetRefresher.refresh(applicationContext)
+    } catch (t: Throwable) {
+      // A widget refresh must never take the activity lifecycle down.
+    }
+  }
+
   override fun onNewIntent(intent: Intent) {
     // Warm path of the share target: singleTask delivers here, and the
     // plugin reads the *parameter*, so both it and the activity's stored

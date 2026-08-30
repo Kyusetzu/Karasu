@@ -91,6 +91,9 @@ class NotifJobService : JobService() {
       } catch (t: Throwable) {
         Log.w("KarasuNotifJob", "check failed", t)
       }
+      // Bonus tick for the widgets: their date bucketing shifts at
+      // midnight even when the data file has not moved.
+      WidgetRefresher.refresh(applicationContext)
       jobFinished(params, false)
     }.start()
     return true

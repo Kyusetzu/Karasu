@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Hand-written (restore from git after a wiped re-init): widget launcher
+     labels live in their own file so a re-init of the generated strings.xml
+     cannot take them along. English is the fallback; values-de mirrors. -->
+<resources>
+    <string name="widget_airing_label">Karasu · Airing today</string>
+    <string name="widget_airing_desc">Today\'s episodes from your list</string>
+    <string name="widget_watching_label">Karasu · Continue watching</string>
+    <string name="widget_watching_desc">Your current anime with progress</string>
+    <string name="widget_reading_label">Karasu · Continue reading</string>
+    <string name="widget_reading_desc">Your current manga with progress</string>
+    <string name="widget_week_label">Karasu · This week</string>
+    <string name="widget_week_desc">Next episodes across the coming week</string>
+</resources>

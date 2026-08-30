@@ -111,5 +111,51 @@
           android:name=".NotifJobService"
           android:permission="android.permission.BIND_JOB_SERVICE"
           android:exported="false" />
+
+        <!-- Hand-added: the four home-screen widgets. See Widgets.kt. -->
+        <receiver
+          android:name=".Widgets$AiringToday"
+          android:label="@string/widget_airing_label"
+          android:exported="false">
+          <intent-filter>
+            <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+          </intent-filter>
+          <meta-data
+            android:name="android.appwidget.provider"
+            android:resource="@xml/widget_airing" />
+        </receiver>
+        <receiver
+          android:name=".Widgets$ContinueWatching"
+          android:label="@string/widget_watching_label"
+          android:exported="false">
+          <intent-filter>
+            <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+          </intent-filter>
+          <meta-data
+            android:name="android.appwidget.provider"
+            android:resource="@xml/widget_watching" />
+        </receiver>
+        <receiver
+          android:name=".Widgets$ContinueReading"
+          android:label="@string/widget_reading_label"
+          android:exported="false">
+          <intent-filter>
+            <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+          </intent-filter>
+          <meta-data
+            android:name="android.appwidget.provider"
+            android:resource="@xml/widget_reading" />
+        </receiver>
+        <receiver
+          android:name=".Widgets$Week"
+          android:label="@string/widget_week_label"
+          android:exported="false">
+          <intent-filter>
+            <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+          </intent-filter>
+          <meta-data
+            android:name="android.appwidget.provider"
+            android:resource="@xml/widget_week" />
+        </receiver>
     </application>
 </manifest>

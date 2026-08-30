@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Hand-written (restore from git after a wiped re-init). -->
+<resources>
+    <string name="widget_airing_label">Karasu · Läuft heute</string>
+    <string name="widget_airing_desc">Heutige Folgen aus deiner Liste</string>
+    <string name="widget_watching_label">Karasu · Weiterschauen</string>
+    <string name="widget_watching_desc">Deine laufenden Anime mit Fortschritt</string>
+    <string name="widget_reading_label">Karasu · Weiterlesen</string>
+    <string name="widget_reading_desc">Deine laufenden Manga mit Fortschritt</string>
+    <string name="widget_week_label">Karasu · Diese Woche</string>
+    <string name="widget_week_desc">Nächste Folgen der kommenden Woche</string>
+</resources>

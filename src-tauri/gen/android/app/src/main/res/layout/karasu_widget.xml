@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Hand-written (restore from git after a wiped re-init): the one layout
+     all four widgets share — a title, up to eight text rows, a footer.
+     RemoteViews-safe views only. Colors are fixed dark, the poster's own
+     stance: a widget should look like Karasu whatever the wallpaper. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/karasu_widget_bg"
+    android:padding="12dp">
+
+    <TextView
+        android:id="@+id/w_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textColor="#8B9DFF"
+        android:textSize="11sp"
+        android:textStyle="bold"
+        android:letterSpacing="0.12"
+        android:maxLines="1" />
+
+    <TextView android:id="@+id/w_row1" style="@style/KarasuWidgetRow" />
+    <TextView android:id="@+id/w_row2" style="@style/KarasuWidgetRow" />
+    <TextView android:id="@+id/w_row3" style="@style/KarasuWidgetRow" />
+    <TextView android:id="@+id/w_row4" style="@style/KarasuWidgetRow" />
+    <TextView android:id="@+id/w_row5" style="@style/KarasuWidgetRow" />
+    <TextView android:id="@+id/w_row6" style="@style/KarasuWidgetRow" />
+    <TextView android:id="@+id/w_row7" style="@style/KarasuWidgetRow" />
+    <TextView android:id="@+id/w_row8" style="@style/KarasuWidgetRow" />
+
+    <TextView
+        android:id="@+id/w_footer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:textColor="#6B7288"
+        android:textSize="11sp"
+        android:maxLines="1"
+        android:visibility="gone" />
+</LinearLayout>

@@ -231,6 +231,57 @@ fn write_projection(app: &tauri::AppHandle) {
     };
     if let Err(e) = std::fs::write(&path, doc.to_string()) {
         crate::logging::warn("widgets", format!("cannot write the projection: {e}"));
+        return;
+    }
+    poke_refresher();
+}
+
+/// Broadcasts the standard widget update through Kotlin's `WidgetRefresher`
+/// so placed widgets re-render the fresh file — the same tao-context JNI
+/// route the keystore and the job scheduler ride. Failures are per-write
+/// noise, logged only on transition.
+#[cfg(target_os = "android")]
+fn poke_refresher() {
+    let go = || -> Result<(), String> {
+        let ctx = tao::platform::android::prelude::main_android_context()
+            .ok_or("widgets: the android context is not ready yet")?;
+        let vm = unsafe { jni::JavaVM::from_raw(ctx.java_vm.cast()) }
+            .map_err(|e| format!("widgets vm: {e}"))?;
+        let mut env = vm
+            .attach_current_thread()
+            .map_err(|e| format!("widgets attach: {e}"))?;
+        let activity =
+            unsafe { jni::objects::JObject::from_raw(ctx.context_jobject.cast()) };
+        let result = (|| -> jni::errors::Result<()> {
+            let loader = env
+                .call_method(&activity, "getClassLoader", "()Ljava/lang/ClassLoader;", &[])?
+                .l()?;
+            let name = env.new_string("dev.kyu.karasu.WidgetRefresher")?;
+            let class = env
+                .call_method(
+                    &loader,
+                    "loadClass",
+                    "(Ljava/lang/String;)Ljava/lang/Class;",
+                    &[jni::objects::JValue::Object(&name)],
+                )?
+                .l()?;
+            env.call_static_method(
+                &jni::objects::JClass::from(class),
+                "refresh",
+                "(Landroid/content/Context;)V",
+                &[jni::objects::JValue::Object(&activity)],
+            )?;
+            Ok(())
+        })();
+        result.map_err(|e| {
+            if env.exception_check().unwrap_or(false) {
+                let _ = env.exception_clear();
+            }
+            format!("widgets refresh: {e}")
+        })
+    };
+    if let Err(e) = go() {
+        crate::logging::debug_changed("widgets", "poke", e);
     }
 }
 

@@ -34,3 +34,9 @@
 -keep class dev.kyu.karasu.NotifScheduler { *; }
 -keep class dev.kyu.karasu.KarasuNative { *; }
 -keep class dev.kyu.karasu.NotifJobService { *; }
+
+# The widgets. WidgetRefresher shares NotifScheduler's failure mode
+# (JNI-by-name, nothing else keeps it); the receivers are manifest-kept by
+# aapt but pinned anyway so a default-rule change cannot break them silently.
+-keep class dev.kyu.karasu.WidgetRefresher { *; }
+-keep class dev.kyu.karasu.Widgets$* { *; }

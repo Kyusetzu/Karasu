@@ -235,7 +235,7 @@ query ($season: MediaSeason!, $year: Int!, $page: Int, $isAdult: Boolean, $score
  */
 const SEASON_HERO_QUERY = `
 query ($season: MediaSeason!, $year: Int!, $isAdult: Boolean) {
-  Page(page: 1, perPage: 5) {
+  Page(page: 1, perPage: 10) {
     media(season: $season, seasonYear: $year, type: ANIME, sort: POPULARITY_DESC, isAdult: $isAdult) {
       id
       type

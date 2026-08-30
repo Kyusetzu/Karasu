@@ -5,7 +5,6 @@ import { useContentFilter } from "@/stores/contentFilter";
 import { renderWithProviders } from "@/test/render";
 
 const hero = vi.fn<() => Promise<HeroMedia[]>>();
-const reduced = vi.fn(() => false);
 
 vi.mock("@/api/anilist", async (orig) => ({
   ...(await orig<typeof import("@/api/anilist")>()),
@@ -15,11 +14,6 @@ vi.mock("@/api/anilist", async (orig) => ({
 vi.mock("@/api/queries", async (orig) => ({
   ...(await orig<typeof import("@/api/queries")>()),
   seasonHero: () => hero(),
-}));
-
-vi.mock("@/lib/motion", async (orig) => ({
-  ...(await orig<typeof import("@/lib/motion")>()),
-  prefersReducedMotion: () => reduced(),
 }));
 
 import SeasonHero from "./SeasonHero";
@@ -40,7 +34,6 @@ const media = (id: number, romaji: string, over: Partial<HeroMedia> = {}): HeroM
 
 beforeEach(() => {
   hero.mockReset();
-  reduced.mockReturnValue(false);
   useContentFilter.setState({ level: "off", ready: true, error: null });
 });
 
@@ -138,23 +131,8 @@ describe("SeasonHero", () => {
     expect(screen.getByRole("heading", { level: 2 }).textContent).toBe("Second");
   });
 
-  /**
-   * The rotation is a `setTimeout`, and the `!important` reduce-motion rules in
-   * `index.css` act on animation and transition properties — they cannot see a
-   * timer. So it has to ask, and holding on the first slide is right twice
-   * over: it is also the most popular title.
-   */
-  it("holds on the first title under reduced motion", async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    reduced.mockReturnValue(true);
-    hero.mockResolvedValue([media(1, "First"), media(2, "Second")]);
-    renderWithProviders(<SeasonHero />);
-    await waitFor(() =>
-      expect(screen.getByRole("heading", { level: 2 }).textContent).toBe("First"),
-    );
-    await act(async () => {
-      vi.advanceTimersByTime(60_000);
-    });
-    expect(screen.getByRole("heading", { level: 2 }).textContent).toBe("First");
-  });
+  // No reduced-motion hold any more, deliberately: advancing is content,
+  // not motion — the crossfade is the motion, and the global CSS overrides
+  // collapse it to a cut. The "advances on its own" test above is the whole
+  // behavior now; the component no longer consults `prefersReducedMotion`.
 });

@@ -12,7 +12,6 @@ import { Shimmer } from "@/components/Skeleton";
 import { adultQueryArg, isBlocked, shouldBlur } from "@/lib/contentFilter";
 import { useContentFilter } from "@/stores/contentFilter";
 import { formatLabel } from "@/lib/format";
-import { prefersReducedMotion } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
 /** How long each title holds before the next fades in. */
@@ -21,16 +20,18 @@ const HOLD_MS = 7000;
 /**
  * The season's most popular anime, across the top of the Overview.
  *
- * One request per mount, `perPage: 5`, cached for half an hour — the season's
- * popularity ranking does not move minute to minute. It is the app's third
- * dashboard query and the only one that needs `bannerImage`, which is why it
- * has a query of its own rather than widening the 50-a-page seasonal one.
+ * One request per mount, `perPage: 10`, cached for half an hour — the
+ * season's popularity ranking does not move minute to minute. It is the
+ * app's third dashboard query and the only one that needs `bannerImage`,
+ * which is why it has a query of its own rather than widening the 50-a-page
+ * seasonal one.
  *
- * The rotation is a `setTimeout`, and **CSS reduce-motion cannot see a
- * `setTimeout`** — the `!important` overrides in `index.css` act on animation
- * and transition properties and nothing else. So it asks `prefersReducedMotion`
- * directly and simply holds on the first title, which is also the most popular
- * one and therefore the right one to hold on.
+ * The rotation runs under reduced motion too, deliberately: advancing to
+ * the next title is *content*, not motion — the crossfade is the motion,
+ * and the `!important` overrides in `index.css` already collapse that
+ * transition to an instant cut. Holding forever on slide one (what this
+ * used to do) muted the carousel entirely for anyone whose system flips
+ * the flag, battery savers included, and read as simply broken.
  */
 export default function SeasonHero() {
   const { t } = useTranslation();
@@ -58,7 +59,7 @@ export default function SeasonHero() {
   count.current = items.length;
 
   useEffect(() => {
-    if (items.length < 2 || prefersReducedMotion()) return;
+    if (items.length < 2) return;
     const tick = window.setTimeout(
       () => setAt((i) => (i + 1) % Math.max(1, count.current)),
       HOLD_MS,
@@ -143,18 +144,19 @@ export default function SeasonHero() {
           </p>
         </div>
 
-        {/* Prev/next, over the art and above the slide links. Always
-            visible: with reduced motion the rotation never runs, so these
-            are the only way to the other four titles there. */}
+        {/* Prev/next as a pair in the top-right corner, over the art and
+            above the slide links. Not vertically centred: the text block is
+            bottom-anchored and reaches mid-banner on the phone's h-48, so a
+            centred arrow sat on top of the title. The top edge holds
+            nothing. */}
         {items.length > 1 && (
-          <>
+          <div className="absolute right-3 top-3 flex gap-1.5">
             <IconButton
               variant="onCover"
               round
               onClick={() => step(-1)}
               aria-label={t("dashboard.heroPrev")}
               title={t("dashboard.heroPrev")}
-              className="absolute left-3 top-1/2 -translate-y-1/2"
             >
               <ChevronLeft className="size-4.5" />
             </IconButton>
@@ -164,11 +166,10 @@ export default function SeasonHero() {
               onClick={() => step(1)}
               aria-label={t("dashboard.heroNext")}
               title={t("dashboard.heroNext")}
-              className="absolute right-3 top-1/2 -translate-y-1/2"
             >
               <ChevronRight className="size-4.5" />
             </IconButton>
-          </>
+          </div>
         )}
       </div>
 

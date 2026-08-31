@@ -155,8 +155,29 @@ pub enum Phase {
     Pending,
     Updating,
     Updated,
+    /// Written locally, not yet accepted by AniList.
+    ///
+    /// A distinct phase because `Updated` is a claim about the server. The
+    /// write went to the offline queue — offline, throttled, or behind a drain
+    /// that was already running — and saying "Updated ✓" for it is the one
+    /// assurance a tracker cannot get wrong.
+    Queued,
     Blocked(BlockReason),
     Cancelled,
+}
+
+/// What a write actually did.
+///
+/// `save_entry_core` answers `queued` for anything that could still work
+/// later, and that answer used to be discarded by every caller in this file:
+/// the session went to `Updated`, the local cache was patched with progress
+/// the account did not have, and `scrobble-done` fired. If the queued row was
+/// later refused for good, the cache kept a number that had never landed — and
+/// `would_regress`, which reads that cache, then refused the correct rewrite.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Outcome {
+    Landed,
+    Queued,
 }
 
 #[derive(Debug, Clone)]
@@ -233,6 +254,7 @@ fn emit_session(app: &AppHandle, session: Option<&Session>) {
                 Phase::Pending => "pending",
                 Phase::Updating => "updating",
                 Phase::Updated => "updated",
+                Phase::Queued => "queued",
                 Phase::Blocked(_) => "blocked",
                 Phase::Cancelled => "cancelled",
             }
@@ -766,7 +788,7 @@ async fn perform_update(
     episode: u32,
     total: Option<u32>,
     list_status: &str,
-) -> Result<(), String> {
+) -> Result<Outcome, String> {
     let token =
         crate::anilist::auth::load_token().ok_or("Not connected to AniList")?;
 
@@ -797,7 +819,17 @@ async fn perform_update(
 
     let db = app.state::<Db>();
     let api = app.state::<crate::anilist::client::AniList>();
-    crate::commands::save_entry_core(app, &db, &api, &token, input).await?;
+    let result = crate::commands::save_entry_core(app, &db, &api, &token, input).await?;
+    if result.queued {
+        // Nothing reached AniList, so nothing here may claim it did: no cache
+        // patch, no widget refresh, no `scrobble-done`. The queue owns it now
+        // and the card says so.
+        crate::logging::debug(
+            "scrobble",
+            format!("#{media_id} ep {episode} queued — not claiming it landed"),
+        );
+        return Ok(Outcome::Queued);
+    }
 
     // Patch the local cache so the next detection sees the new state
     if let Some(user_id) = cached_user_id(&db) {
@@ -824,7 +856,7 @@ async fn perform_update(
         "scrobble-done",
         json!({ "mediaId": media_id, "episode": episode }),
     );
-    Ok(())
+    Ok(Outcome::Landed)
 }
 
 /// Re-resolves what is playing against the corrections table, right now.
@@ -1040,13 +1072,16 @@ async fn confirm_pending_impl(
     if let Some(session) = guard.as_mut() {
         if applies_to(session, data.0, data.2) {
             session.phase = match &result {
-                Ok(()) => Phase::Updated,
+                Ok(Outcome::Landed) => Phase::Updated,
+                Ok(Outcome::Queued) => Phase::Queued,
                 Err(e) => Phase::Blocked(BlockReason::Failed { message: e.clone() }),
             };
             emit_session(&app, Some(session));
         }
     }
-    result
+    // The caller only needs to know it did not fail; which of the two ways it
+    // succeeded is already on the card.
+    result.map(|_| ())
 }
 
 /// Starts the detection and scrobble loop (runs for the app's lifetime).
@@ -1307,7 +1342,8 @@ async fn drive_session(app: &AppHandle) {
         if let Some(session) = guard.as_mut() {
             if applies_to(session, mid, ep) {
                 session.phase = match result {
-                    Ok(()) => Phase::Updated,
+                    Ok(Outcome::Landed) => Phase::Updated,
+                    Ok(Outcome::Queued) => Phase::Queued,
                     Err(e) => Phase::Blocked(BlockReason::Failed { message: e }),
                 };
                 emit_session(app, Some(session));

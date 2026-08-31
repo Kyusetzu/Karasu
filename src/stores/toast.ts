@@ -8,7 +8,12 @@ export interface ToastAction {
 export interface Toast {
   /** Bumped per toast so the component can re-run its entrance animation. */
   id: number;
-  kind: "success" | "error";
+  /**
+   * `info` is for a real outcome that is not yet the promised one — a save
+   * that went to the offline queue rather than to AniList. It exists so the
+   * green check cannot be shown for a write the server has not seen.
+   */
+  kind: "success" | "error" | "info";
   text: string;
   /** Second line — the consequence, not a repeat of the first. */
   detail?: string;

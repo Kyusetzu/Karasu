@@ -850,6 +850,7 @@ export const de: typeof en = {
     score: "{{title}} mit {{n}} bewertet",
     undo: "Rückgängig",
     failed: "{{title}} konnte nicht gespeichert werden",
+    queued: "{{title}} gespeichert — wird synchronisiert",
     failedDetail: "In der Warteschlange — Karasu versucht es erneut.",
     syncBusy: "Eine Synchronisierung läuft bereits. Bitte gleich erneut versuchen.",
     bulkSaved: "{{count}} aktualisiert",
@@ -1139,6 +1140,7 @@ export const de: typeof en = {
     confirmPromptManga: "Kapitel {{n}} als gelesen markieren?",
     updating: "Aktualisiere …",
     updated: "Fortschritt aktualisiert ({{n}})",
+    queued: "Gespeichert ({{n}}) — wird synchronisiert, sobald AniList erreichbar ist",
     blocked: "Auto-Update nicht möglich",
     blockedAlreadyWatched:
       "Folge {{n}} ist bereits gesehen — deine Liste steht bei {{progress}}.",

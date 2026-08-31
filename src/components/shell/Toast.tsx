@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { Check, TriangleAlert, X } from "lucide-react";
+import { Check, CloudUpload, TriangleAlert, X } from "lucide-react";
 import { useToast } from "@/stores/toast";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
@@ -26,6 +26,9 @@ export default function Toast() {
   if (!shown.value) return null;
   const current = shown.value;
   const error = current.kind === "error";
+  // Queued work gets neither the alarm nor the checkmark: it has not failed,
+  // and it has not landed either.
+  const info = current.kind === "info";
 
   return (
     <div
@@ -47,11 +50,17 @@ export default function Toast() {
       <span
         className={cn(
           "grid size-7 shrink-0 place-items-center rounded-full",
-          error ? "bg-danger/15 text-danger" : "bg-accent-500/15 text-accent-400",
+          error
+            ? "bg-danger/15 text-danger"
+            : info
+              ? "bg-surface-800 text-ink-400"
+              : "bg-accent-500/15 text-accent-400",
         )}
       >
         {error ? (
           <TriangleAlert className="size-3.75" />
+        ) : info ? (
+          <CloudUpload className="size-3.75" />
         ) : (
           <Check className="size-3.75" strokeWidth={3} />
         )}

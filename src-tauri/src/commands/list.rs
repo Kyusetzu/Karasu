@@ -588,10 +588,17 @@ pub async fn delete_list_entry(
     let token = auth::load_token().ok_or("Not connected to AniList")?;
     let input = json!({ "id": id });
 
+    // A drain that *skipped* leaves the queue standing, so it takes the same
+    // exit as one that failed — the exit `save_entry_core` has always taken and
+    // this path did not. Deleting live while a concurrent drain still holds an
+    // older `save` for the same entry meant the drain replayed it afterwards,
+    // and `SaveMediaListEntry(mediaId:)` creates an entry: the row the user had
+    // just confirmed deleting came back, carrying only the fields that save
+    // knew about.
     if pending(&db) > 0 {
         match process_queue(&db, &api, Some(&token)).await {
-            Ok(drained) => report_dropped(&app, &drained.dropped),
-            Err(_) => {
+            Ok(drained) if !drained.skipped => report_dropped(&app, &drained.dropped),
+            _ => {
                 queue_push_deduped(&db, "delete", &input.to_string())?;
                 return Ok(MutationResult { queued: true, entry: None });
             }

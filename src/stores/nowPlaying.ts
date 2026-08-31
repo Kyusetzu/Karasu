@@ -26,6 +26,8 @@ export type ScrobblePhase =
   | "pending"
   | "updating"
   | "updated"
+  /** Written locally, waiting for the queue to reach AniList. */
+  | "queued"
   | "blocked"
   | "cancelled";
 

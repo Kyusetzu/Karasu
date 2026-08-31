@@ -266,6 +266,22 @@ function ScrobbleStatus({ countdown }: { countdown: string | null }) {
           })}
         </p>
       );
+    case "queued":
+      return (
+        // Deliberately not the success green with its checkmark: the write is
+        // real but it is in SQLite, not on AniList, and the card is the one
+        // place that difference is visible while it lasts.
+        <p className="text-xs text-ink-500">
+          {t("nowPlaying.queued", {
+            n: t(
+              current?.mediaType === "MANGA"
+                ? "common.chapter"
+                : "common.episode",
+              { n: scrobble.episode },
+            ),
+          })}
+        </p>
+      );
     case "blocked":
       return (
         <p className="text-xs text-gold">

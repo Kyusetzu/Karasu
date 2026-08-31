@@ -853,6 +853,7 @@ export const en = {
     score: "{{title}} scored {{n}}",
     undo: "Undo",
     failed: "Couldn't save {{title}}",
+    queued: "{{title}} saved — will sync",
     failedDetail: "Queued — Karasu will retry.",
     syncBusy: "A sync is already running. Try again in a moment.",
     bulkSaved: "{{count}} updated",
@@ -1136,6 +1137,7 @@ export const en = {
     confirmPromptManga: "Mark chapter {{n}} as read?",
     updating: "Updating …",
     updated: "Progress updated ({{n}})",
+    queued: "Saved ({{n}}) — will sync when AniList is reachable",
     blocked: "Auto-update not possible",
     blockedAlreadyWatched:
       "Episode {{n}} is already watched — your list is at {{progress}}.",

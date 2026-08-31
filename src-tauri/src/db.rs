@@ -1371,6 +1371,17 @@ impl Db {
         let tx = conn
             .transaction()
             .map_err(|e| format!("Library write failed: {e}"))?;
+        Self::write_index(&tx, rows, scores)?;
+        tx.commit()
+            .map_err(|e| format!("Library write failed: {e}"))
+    }
+
+    /// The index half of a scan result, inside a caller's transaction.
+    fn write_index(
+        tx: &rusqlite::Transaction<'_>,
+        rows: &[(i64, u32, String)],
+        scores: &[(i64, f64)],
+    ) -> Result<(), String> {
         tx.execute("DELETE FROM library_files", [])
             .map_err(|e| format!("Library write failed: {e}"))?;
         {
@@ -1393,8 +1404,7 @@ impl Db {
                     .map_err(|e| format!("Library write failed: {e}"))?;
             }
         }
-        tx.commit()
-            .map_err(|e| format!("Library write failed: {e}"))
+                Ok(())
     }
 
     /// Match confidence per media, for the rows the library screen draws.
@@ -1659,6 +1669,30 @@ impl Db {
     /// `library_override` is deliberately untouched: it is the user's, not the
     /// scan's, and wiping it here would undo every correction on the next scan
     /// — which is precisely the failure the whole design exists to avoid.
+    /// Publishes a whole scan result — index, scores and unmatched list — in
+    /// **one** transaction.
+    ///
+    /// `library_replace_all` and `library_replace_unmatched` are each atomic on
+    /// their own, and calling them in sequence is not: a failure between them
+    /// left an index describing this scan beside an unmatched list describing
+    /// the previous one, which is the state the "N files could not be placed"
+    /// screen reads. The tables are one answer and are written as one.
+    pub fn library_publish(
+        &self,
+        rows: &[(i64, u32, String)],
+        scores: &[(i64, f64)],
+        unmatched: &[(String, i32, u32, String)],
+    ) -> Result<(), String> {
+        let mut conn = self.0.guard();
+        let tx = conn
+            .transaction()
+            .map_err(|e| format!("Library write failed: {e}"))?;
+        Self::write_index(&tx, rows, scores)?;
+        Self::write_unmatched(&tx, unmatched)?;
+        tx.commit()
+            .map_err(|e| format!("Library write failed: {e}"))
+    }
+
     pub fn library_replace_unmatched(
         &self,
         unmatched: &[(String, i32, u32, String)],
@@ -1667,6 +1701,16 @@ impl Db {
         let tx = conn
             .transaction()
             .map_err(|e| format!("Library write failed: {e}"))?;
+        Self::write_unmatched(&tx, unmatched)?;
+        tx.commit()
+            .map_err(|e| format!("Library write failed: {e}"))
+    }
+
+    /// The unmatched half of a scan result, inside a caller's transaction.
+    fn write_unmatched(
+        tx: &rusqlite::Transaction<'_>,
+        unmatched: &[(String, i32, u32, String)],
+    ) -> Result<(), String> {
         tx.execute("DELETE FROM library_unmatched", [])
             .map_err(|e| format!("Library write failed: {e}"))?;
         {
@@ -1681,8 +1725,7 @@ impl Db {
                     .map_err(|e| format!("Library write failed: {e}"))?;
             }
         }
-        tx.commit()
-            .map_err(|e| format!("Library write failed: {e}"))
+        Ok(())
     }
 }
 
@@ -2656,6 +2699,28 @@ mod tests {
     /// scrobbler alone, so a manual "24 / COMPLETED" left it holding the old
     /// number — and a scrobble of episode 5 then passed both anti-regression
     /// checks and wrote the list backwards.
+    /// The index and the unmatched list are one answer, so they land together
+    /// or not at all. Written as two transactions, a failure in between left an
+    /// index from this scan beside an unmatched list from the previous one —
+    /// and the "could not be placed" screen reads the second.
+    #[test]
+    fn a_scan_publishes_both_tables_at_once() {
+        let db = mem_db();
+        db.library_publish(
+            &[(100, 1, "/a/ep1.mkv".into())],
+            &[(100, 0.95)],
+            &[("Unplaceable".into(), -1, 3, "/a/x.mkv".into())],
+        )
+        .unwrap();
+        assert_eq!(db.library_all().len(), 1);
+        assert_eq!(db.library_unmatched().len(), 1);
+
+        // A second publish replaces both, rather than merging into either.
+        db.library_publish(&[], &[], &[]).unwrap();
+        assert!(db.library_all().is_empty());
+        assert!(db.library_unmatched().is_empty(), "no stale leftovers");
+    }
+
     #[test]
     fn a_saved_entry_reaches_the_cache_the_guards_read() {
         let db = mem_db();

@@ -621,7 +621,7 @@ pub fn open_backup_dir(app: tauri::AppHandle, db: State<'_, Db>) -> Result<(), S
         .map_err(|e| format!("Could not open {dir}: {e}"))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn set_backup_settings(
     app: tauri::AppHandle,
     db: State<'_, Db>,

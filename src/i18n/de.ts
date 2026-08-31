@@ -351,6 +351,8 @@ export const de: typeof en = {
   },
   stats: {
     title: "Statistik",
+    listUnavailable:
+      "Deine Liste konnte nicht geladen werden — die daraus berechneten Auswertungen fehlen daher, statt leer zu wirken.",
     signInText: "Verbinde deinen AniList-Account, um deine Statistik zu sehen.",
     localSubtitle: "Aus deiner lokalen Liste gezählt — kein Konto, keine Anfragen.",
     localMissing:

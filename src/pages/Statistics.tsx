@@ -180,12 +180,21 @@ function StatisticsContent({
   // page and the SQLite priming use, so this shares their result rather than
   // adding a request.
   const level = useContentFilter((s) => s.level);
-  const { data: animeList } = useQuery({
+  // `isError` as well as `data`, for the reason `Dashboard` documents at its
+  // own loading gate: a query in the error state has `isLoading === false` and
+  // no data, so everything derived from the list below renders its empty
+  // answer — 0 minutes remaining, an empty sunburst, a blank heatmap — as
+  // settled fact, with nothing on screen separating "offline" from "you have
+  // watched nothing".
+  const { data: animeList, isError: animeListFailed } = useQuery({
     queryKey: ["mediaList", "ANIME", userId],
     queryFn: () => fetchMediaList(userId, "ANIME"),
     enabled: isTauri,
   });
-  const remainingTotal = useMemo(() => {
+  const remainingTotal = useMemo<number | null>(() => {
+    // No list, no answer. Zero is a claim, and "you have nothing left to
+    // watch" is the opposite of what a failed fetch knows.
+    if (animeListFailed) return null;
     let sum = 0;
     for (const group of animeList?.lists ?? []) {
       if (group.isCustomList) continue;
@@ -203,11 +212,13 @@ function StatisticsContent({
   // one-dimensional, so "what formats are inside each status" has to be
   // counted from the list itself. Same query key as the list screens, so on
   // anime this is the request already in flight above rather than a new one.
-  const { data: typeList } = useQuery({
+  const { data: typeList, isError: typeListFailed } = useQuery({
     queryKey: ["mediaList", type, userId],
     queryFn: () => fetchMediaList(userId, type),
     enabled: isTauri,
   });
+  /** Whether anything drawn from the list itself can be trusted right now. */
+  const listFailed = typeListFailed || (type === "ANIME" && animeListFailed);
   // The list already in the cache, once, for every local panel below —
   // filtered here so no panel can forget the check. Zero requests.
   const localEntries = useMemo(
@@ -335,6 +346,12 @@ function StatisticsContent({
       </div>
 
       {isLoading && <Loader label={t("common.loading")} />}
+      {/* The account's own statistics can arrive while the list does not, and
+          several panels below are counted from the list rather than fetched.
+          Without this they would simply be empty, which reads as an answer. */}
+      {!isLoading && listFailed && (
+        <p className="text-sm text-gold">{t("stats.listUnavailable")}</p>
+      )}
       {error && (
         <p className="text-danger">
           {t("common.error", { message: String(error) })}
@@ -363,9 +380,10 @@ function StatisticsContent({
           />
         ))}
 
-      {stats && type === "ANIME" && activeCategory === "overview" && (
-        <WatchTimeEstimate total={remainingTotal} />
-      )}
+      {stats &&
+        type === "ANIME" &&
+        activeCategory === "overview" &&
+        remainingTotal !== null && <WatchTimeEstimate total={remainingTotal} />}
     </div>
   );
 }

@@ -352,6 +352,8 @@ export const en = {
   },
   stats: {
     title: "Statistics",
+    listUnavailable:
+      "Your list could not be loaded, so the panels counted from it are missing rather than empty.",
     signInText: "Connect your AniList account to see your statistics.",
     localSubtitle: "Counted from your local list — no account, no requests.",
     localMissing:

@@ -162,6 +162,53 @@ if (args.includes("--print")) {
   process.exit(0);
 }
 
+/**
+ * Checks that every place the version lives already agrees, and changes
+ * nothing.
+ *
+ * The four-part scheme is spread over five files and only this script ever
+ * writes all of them at once — so a hand-edit, a bad merge or an interrupted
+ * bump can leave them disagreeing, and nothing said so. That is not cosmetic:
+ * `latest.json` is built from `package.json` plus `COMMIT_NUMBER`, while the
+ * running app compares against the `COMMIT_NUMBER` compiled into it. If the
+ * two ever describe different builds, every install downloads and reinstalls
+ * an update it already has, on a loop, and only a new release stops it.
+ *
+ * Run in CI before a release is published, and cheap enough to run by hand.
+ */
+if (args.includes("--check")) {
+  const problems = [];
+  const cargo = readFileSync(CARGO_TOML, "utf8").match(
+    new RegExp(`^version\\s*=\\s*"(${SEMVER})"`, "m"),
+  );
+  const conf = readFileSync(TAURI_CONF, "utf8").match(
+    new RegExp(`"version":\\s*"(${SEMVER})"`),
+  );
+  if (!cargo) problems.push("could not read the version from Cargo.toml");
+  else if (cargo[1] !== current.core)
+    problems.push(`Cargo.toml says ${cargo[1]}, package.json says ${current.core}`);
+  if (!conf) problems.push("could not read the version from tauri.conf.json");
+  else if (conf[1] !== current.core)
+    problems.push(`tauri.conf.json says ${conf[1]}, package.json says ${current.core}`);
+
+  const lock = readFileSync(CARGO_LOCK, "utf8");
+  if (!lock.includes(`name = "karasu"`) || !new RegExp(`name = "karasu"\\nversion = "${current.core.replace(/\./g, "\\.")}"`).test(lock)) {
+    problems.push(`Cargo.lock does not carry ${current.core} for the karasu package`);
+  }
+
+  if (problems.length) {
+    console.error("Version files disagree:");
+    for (const p of problems) console.error(`  - ${p}`);
+    console.error(
+      "\nAn install built from a mismatched pair re-downloads its own update forever.\n" +
+        "Run `node scripts/bump-version.mjs patch --force` to write all five from one source.",
+    );
+    process.exit(1);
+  }
+  console.log(`${current.core}.${current.commit} (all five agree)`);
+  process.exit(0);
+}
+
 const part = parts[0] ?? "patch";
 if (!["major", "minor", "patch"].includes(part)) {
   fail(`unknown segment "${part}" — expected major, minor or patch`);

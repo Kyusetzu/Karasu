@@ -1,6 +1,6 @@
 use crate::db::Db;
 use crate::sync::LockExt;
-use tauri::{Manager, State};
+use tauri::{AppHandle, Manager, State};
 
 // Siblings in the same module tree; `mod.rs` re-exports all of it, so
 // every command keeps the path it had when they shared one file.
@@ -246,7 +246,11 @@ pub fn get_portable_status(app: tauri::AppHandle) -> PortableStatus {
 /// to explain where the recent one went. `get_portable_status` reports the file
 /// so the pane can ask before this is ever called with either answer.
 #[tauri::command]
-pub fn enable_portable(db: State<'_, Db>, replace: Option<bool>) -> Result<(), String> {
+pub fn enable_portable(
+    app: AppHandle,
+    db: State<'_, Db>,
+    replace: Option<bool>,
+) -> Result<(), String> {
     let dest_dir = crate::portable::portable_data_dir().ok_or("No portable path")?;
     std::fs::create_dir_all(&dest_dir).map_err(|e| e.to_string())?;
 
@@ -269,8 +273,22 @@ pub fn enable_portable(db: State<'_, Db>, replace: Option<bool>) -> Result<(), S
             ))
         }
     }
-    crate::anilist::auth::migrate_to_portable_file()?;
-    crate::portable::create_marker()
+    // Copy before the marker, clear after it. Doing both first meant a failed
+    // marker write left the token gone from the credential store while
+    // `is_portable()` was still false, so a switch that *reported failure* came
+    // back signed out.
+    crate::anilist::auth::copy_token_to_portable_file()?;
+    crate::portable::create_marker()?;
+    crate::anilist::auth::clear_credential_store_token();
+
+    // `Db` was opened once against the startup-resolved directory and is never
+    // reopened, while `is_portable()` is a live check of the marker. Between
+    // this call and the next launch, every scrobble, queued edit and setting
+    // would therefore be written to the database the app is about to stop
+    // using — and silently discarded. Restarting here is what makes the
+    // snapshot taken above the last word.
+    crate::logging::info("portable", "portable mode on — restarting onto it");
+    app.restart();
 }
 
 /// Disables portable mode (removes the marker). Takes effect after a restart.
@@ -280,8 +298,15 @@ pub fn enable_portable(db: State<'_, Db>, replace: Option<bool>) -> Result<(), S
 /// whatever is in AppData, which may be much older — is the pane's job to say,
 /// and `PortableStatus::other` is what it says it with.
 #[tauri::command]
-pub fn disable_portable() -> Result<(), String> {
-    crate::portable::remove_marker()
+pub fn disable_portable(app: AppHandle) -> Result<(), String> {
+    // Mirror of the way in, in mirrored order: the token goes back to the
+    // credential store *before* the marker leaves, because `load_token`
+    // follows `is_portable()` and would otherwise read an empty store. Without
+    // this, enable → disable → restart signed the user out with no message.
+    crate::anilist::auth::copy_token_from_portable_file()?;
+    crate::portable::remove_marker()?;
+    crate::logging::info("portable", "portable mode off — restarting onto AppData");
+    app.restart();
 }
 
 /// Opens a native save dialog and writes the image (e.g. the yearly wrap-up

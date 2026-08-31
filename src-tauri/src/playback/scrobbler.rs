@@ -45,7 +45,13 @@ pub struct NowPlaying {
     /// Kept because `requeue_match` re-resolves from this object rather than
     /// from a fresh detection: without the untouched number it would shift an
     /// already-shifted one and drift a little further on every correction.
-    #[serde(skip)]
+    ///
+    /// Serialised for the same reason the correction dialog needs it: an
+    /// offset is `chosen - detected`, and `episode` below is already shifted
+    /// and already redirected. Measuring against that number stored a wrong
+    /// offset the moment a correction was edited a second time, and confirming
+    /// the pre-filled figure stored `0` — destroying a working correction.
+    #[serde(rename = "sourceEpisode")]
     pub source_episode: Option<u32>,
     /// AniList media ID on a successful match against the list
     #[serde(rename = "mediaId")]

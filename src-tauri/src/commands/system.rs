@@ -657,12 +657,12 @@ fn autostart_apply(_app: &tauri::AppHandle, _enabled: bool) -> Result<(), String
 /// Recent notifications, newest first (for the bell dropdown).
 #[tauri::command]
 pub fn get_notifications(db: State<'_, Db>) -> Vec<crate::db::NotificationRow> {
-    db.notif_all(100)
+    db.notif_all(100, crate::commands::list::viewer_id(&db))
 }
 
 #[tauri::command]
 pub fn unread_notification_count(db: State<'_, Db>) -> i64 {
-    db.notif_unread_count()
+    db.notif_unread_count(crate::commands::list::viewer_id(&db))
 }
 
 #[tauri::command]

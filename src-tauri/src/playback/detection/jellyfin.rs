@@ -739,6 +739,16 @@ const HOLD_TICKS: u8 = 3;
 /// covered with it since.
 static LAST_GOOD: Mutex<Option<(Playback, u8)>> = Mutex::new(None);
 
+/// Drops the held session.
+///
+/// The hold exists so one failed poll does not blank the card, but it is the
+/// *previous* user's playback: after a Jellyfin sign-out, or when the app
+/// changes which AniList account it acts as, replaying it would hand the next
+/// session someone else's episode for up to `HOLD_TICKS`.
+pub fn forget_last_good() {
+    *LAST_GOOD.guard() = None;
+}
+
 /// Records a successful poll and hands the answer straight back.
 fn remember(found: Option<Playback>) -> Option<Playback> {
     let mut guard = LAST_GOOD.guard();

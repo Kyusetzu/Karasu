@@ -152,12 +152,23 @@ pub async fn connect_with_token(db: &Db, api: &AniList, input: &str) -> Result<V
         }
     };
     let t1 = std::time::Instant::now();
-    auth::save_token(&token)?;
+    // Identity first, credential second — and both through the one switch, so
+    // the previous account's bell rows, dedupe keys, widget projection and
+    // held Jellyfin session go with it. A successful connection makes AniList
+    // the active profile; any local entries stay untouched until an explicit
+    // merge (see local_merge_*).
+    //
+    // The order matters on failure: if `save_token` below fails now, the
+    // install is left as "this account, no credential" — signed out, and the
+    // queue drain finds no rows to send. Writing the token first left "new
+    // credential, old identity", under which the drain sent one account's
+    // queued edits with another account's bearer.
+    switch_identity(&db, Identity::AniList(viewer.clone()))?;
     let t2 = std::time::Instant::now();
-    db.kv_set("anilist_viewer", &viewer.to_string())?;
-    // A successful connection makes AniList the active profile. Any local
-    // entries stay untouched until an explicit merge (see local_merge_*).
-    db.kv_set("profile_mode", "anilist")?;
+    auth::save_token(&token).inspect_err(|_| {
+        // Do not leave a viewer nobody can act as.
+        let _ = switch_identity(&db, Identity::None);
+    })?;
     crate::logging::debug(
         "auth",
         format!(
@@ -203,13 +214,70 @@ pub fn anilist_session(db: State<'_, Db>) -> Option<Value> {
     serde_json::from_str(&cached).ok()
 }
 
+/// Which account the app is about to act as.
+pub enum Identity {
+    /// A signed-in AniList account, with its cached viewer blob.
+    AniList(Value),
+    /// The account-free local list.
+    Local,
+    /// Signed out entirely.
+    None,
+}
+
+/// **The only way the app changes which account it acts as.**
+///
+/// Identity was spread over eight stores updated by four code paths, and each
+/// path cleared a different subset: the token, the cached viewer, the profile
+/// mode, the per-account tables, the alert passes' dedupe keys and Jellyfin's
+/// held session. What one path forgot, the next account inherited — B reading
+/// A's bell rows, or being denied notifications A had already consumed.
+///
+/// Two ordering rules are load-bearing here:
+///
+/// 1. **The previous account's state goes first.** Nothing may survive into a
+///    session that is already answering as someone else.
+/// 2. **The identity is written before the credential.** A failure between the
+///    two then leaves "new identity, no credential" — for which the queue
+///    drain finds no rows and does nothing — rather than "new credential, old
+///    identity", which is the pairing that drains one account's edits under
+///    another account's bearer.
+pub fn switch_identity(db: &Db, next: Identity) -> Result<(), String> {
+    // 1. Forget the outgoing account.
+    db.notif_clear_owned()?;
+    // The dedupe keys record what the *previous* account was already told.
+    db.kv_delete_prefix("aired:");
+    db.kv_delete_prefix("sequel_seen:");
+    db.kv_delete_prefix("stale_done:");
+    // The widget projection holds this account's titles and must not outlive
+    // it, exactly like the token beside it.
+    crate::widgets::clear();
+    // A held Jellyfin session belongs to whoever was signed in to Jellyfin.
+    crate::playback::detection::jellyfin::forget_last_good();
+
+    // 2. Then become the next one, identity before credential.
+    match next {
+        Identity::AniList(viewer) => {
+            db.kv_set("anilist_viewer", &viewer.to_string())?;
+            db.kv_set("profile_mode", "anilist")?;
+        }
+        Identity::Local => {
+            db.kv_delete("anilist_viewer");
+            db.kv_set("profile_mode", "local")?;
+            auth::delete_token();
+        }
+        Identity::None => {
+            db.kv_delete("anilist_viewer");
+            auth::delete_token();
+        }
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub fn anilist_logout(db: State<'_, Db>) {
-    auth::delete_token();
-    db.kv_delete("anilist_viewer");
-    // The widget projection holds this account's titles and must not
-    // outlive it, exactly like the token beside it.
-    crate::widgets::clear();
+    if let Err(e) = switch_identity(&db, Identity::None) {
+        crate::logging::error("auth", format!("sign-out could not clear everything: {e}"));
+    }
 }
 
 /// Refetches the viewer and replaces the cached blob.
@@ -230,6 +298,10 @@ pub async fn refresh_viewer(
         .filter(|v| !v.is_null())
         .cloned()
         .ok_or("Token invalid or expired")?;
+    // Deliberately not `switch_identity`: this is the *same* account with
+    // fresher data (a `scoreFormat` changed on anilist.co), not a different
+    // one. Routing it through the switch would throw away this account's own
+    // bell rows and dedupe keys every time the pane refreshed.
     db.kv_set("anilist_viewer", &viewer.to_string())?;
     Ok(viewer)
 }

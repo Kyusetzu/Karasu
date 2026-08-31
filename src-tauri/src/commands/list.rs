@@ -577,8 +577,10 @@ pub fn get_profile_mode(db: State<'_, Db>) -> String {
 /// signs in again, which is the flow's shape anyway.
 #[tauri::command]
 pub fn enable_local_mode(db: State<'_, Db>) -> Result<(), String> {
-    crate::anilist::auth::delete_token();
-    db.kv_set("profile_mode", "local")
+    // Through the one switch, so the outgoing account's bell rows, dedupe keys
+    // and widget projection do not sit behind the account-free list — and so
+    // the stale viewer blob cannot keep scoping a queue nothing can drain.
+    crate::commands::auth::switch_identity(&db, crate::commands::auth::Identity::Local)
 }
 
 /// Loads the local list for a media type, shaped exactly like the online

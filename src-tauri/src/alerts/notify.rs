@@ -41,11 +41,26 @@ pub(crate) fn now_ms() -> i64 {
 /// than a gap: the app-update notice and an aggregated queue report are not
 /// about a title. A row without one still marks itself read on click and does
 /// nothing else, which is what every row did before schema v15.
+/// Who a bell row belongs to.
+///
+/// Everything the alert passes produce is about *this account's* list — an
+/// episode that aired for a title it holds, an announced sequel, a paused
+/// entry, a queued edit that was refused. Only the app-update notice is about
+/// the install, and it must stay readable while signed out and in local mode,
+/// so it alone is stored unowned.
+fn owner_for(kind: &str, db: &Db) -> Option<i64> {
+    if kind == "update" {
+        None
+    } else {
+        crate::commands::list::viewer_id(db)
+    }
+}
+
 pub fn notify(app: &AppHandle, kind: &str, title: Msg<'_>, body: Msg<'_>, media_id: Option<i64>) {
     let db = app.state::<Db>();
     let (title, body) = render(app, title, body);
 
-    if let Err(e) = db.notif_insert(kind, &title, &body, now_ms(), media_id) {
+    if let Err(e) = db.notif_insert(kind, &title, &body, now_ms(), media_id, owner_for(kind, &db)) {
         crate::logging::error("notify", format!("cannot record the {kind} notification: {e}"));
     }
     toast(app, kind, &title, &body, true);

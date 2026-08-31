@@ -324,7 +324,8 @@ PRAGMA user_version = 15;
 const MIGRATION_V16: &str = "
 ALTER TABLE offline_queue ADD COLUMN user_id INTEGER;
 UPDATE offline_queue
-   SET user_id = (SELECT json_extract(value, '$.id') FROM kv WHERE key = 'anilist_viewer');
+   SET user_id = (SELECT json_extract(value, '$.id') FROM kv
+                   WHERE key = 'anilist_viewer' AND json_valid(value));
 DELETE FROM offline_queue WHERE user_id IS NULL;
 PRAGMA user_version = 16;
 ";
@@ -356,6 +357,36 @@ INSERT INTO kv (key, value)
 SELECT 'blur_adult', CASE WHEN EXISTS (SELECT 1 FROM kv) THEN '0' ELSE '1' END
 WHERE NOT EXISTS (SELECT 1 FROM kv WHERE key = 'blur_adult');
 PRAGMA user_version = 17;
+";
+
+/// v18 gives `notifications` an owner, for the reason v16 gave one to
+/// `offline_queue`: the table had no account column at all, so every bell row
+/// the app wrote for one account was read back for the next one. Signing out
+/// of A and into B showed B a list of A's aired episodes and sequel
+/// announcements.
+///
+/// `user_id` is **nullable, and the null is a real answer**: an app-update
+/// notice belongs to the install rather than to an account, and must stay
+/// readable while signed out and in local mode. Account-scoped rows carry an
+/// id; app-wide rows carry null; the readers ask for `user_id IS NULL OR
+/// user_id = ?`.
+///
+/// The backfill attributes existing rows to the cached viewer, skipping the
+/// `update` kind so the one app-wide row that predates this keeps its meaning.
+/// A row that cannot be attributed (nobody signed in) simply stays null, which
+/// is the harmless direction here — unlike v16, where an unattributable queue
+/// row could be *written* to the wrong account and was therefore deleted.
+///
+/// `json_valid(value)` guards the extract because `json_extract` raises on
+/// malformed JSON rather than returning null, and a migration that throws
+/// leaves an app that will not start.
+const MIGRATION_V18: &str = "
+ALTER TABLE notifications ADD COLUMN user_id INTEGER;
+UPDATE notifications
+   SET user_id = (SELECT json_extract(value, '$.id') FROM kv
+                   WHERE key = 'anilist_viewer' AND json_valid(value))
+ WHERE kind <> 'update';
+PRAGMA user_version = 18;
 ";
 
 /// One detection correction: what was detected, and what it really is.
@@ -616,6 +647,15 @@ impl Db {
             // INSERT guarded on the key it inserts.
             apply(&conn, 17, MIGRATION_V17)?;
         }
+        if version < 18 {
+            // The sixth `ALTER TABLE ADD COLUMN`, so v7's guard once more: the
+            // column and its backfill land together or not at all.
+            if has_column(&conn, "notifications", "user_id") {
+                apply(&conn, 18, "PRAGMA user_version = 18;")?;
+            } else {
+                apply(&conn, 18, MIGRATION_V18)?;
+            }
+        }
         Ok(Db(Mutex::new(conn)))
     }
 
@@ -673,6 +713,22 @@ impl Db {
              WHERE substr(key, 1, length(?1)) = ?1
                AND CAST(value AS INTEGER) < ?2",
             rusqlite::params![prefix, cutoff],
+        )
+        .unwrap_or(0)
+    }
+
+    /// Deletes every key under a prefix, whatever its value.
+    ///
+    /// The sibling of `kv_prune_older` for the case where age is not the
+    /// question: on an account change the alert passes' dedupe keys
+    /// (`aired:`, `sequel_seen:`, `stale_done:`) are about what the *previous*
+    /// account had already been told, and holding them would silently deny the
+    /// next account notifications it has never seen.
+    pub fn kv_delete_prefix(&self, prefix: &str) -> usize {
+        let conn = self.0.guard();
+        conn.execute(
+            "DELETE FROM kv WHERE substr(key, 1, length(?1)) = ?1",
+            rusqlite::params![prefix],
         )
         .unwrap_or(0)
     }
@@ -1087,12 +1143,13 @@ impl Db {
         body: &str,
         created_ms: i64,
         media_id: Option<i64>,
+        user_id: Option<i64>,
     ) -> Result<(), String> {
         let conn = self.0.guard();
         conn.execute(
-            "INSERT INTO notifications (kind, title, body, created_ms, media_id)
-             VALUES (?1, ?2, ?3, ?4, ?5)",
-            rusqlite::params![kind, title, body, created_ms, media_id],
+            "INSERT INTO notifications (kind, title, body, created_ms, media_id, user_id)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            rusqlite::params![kind, title, body, created_ms, media_id, user_id],
         )
         .map_err(|e| format!("Notification write failed: {e}"))?;
 
@@ -1109,17 +1166,25 @@ impl Db {
         Ok(())
     }
 
-    /// Most recent notifications first, capped at `limit`.
-    pub fn notif_all(&self, limit: i64) -> Vec<NotificationRow> {
+    /// Most recent notifications first, capped at `limit`, for one account.
+    ///
+    /// `viewer` is who is asking. A row with a null `user_id` belongs to the
+    /// install rather than to an account — the app-update notice — and is
+    /// returned to everyone, including a signed-out or local-mode caller.
+    /// Everything else answers only to its owner, which is what stops one
+    /// account's aired-episode rows appearing in the next account's bell.
+    pub fn notif_all(&self, limit: i64, viewer: Option<i64>) -> Vec<NotificationRow> {
         let conn = self.0.guard();
         let mut stmt = match conn.prepare(
             "SELECT id, kind, title, body, created_ms, media_id, read
-             FROM notifications ORDER BY id DESC LIMIT ?1",
+             FROM notifications
+             WHERE user_id IS NULL OR user_id = ?2
+             ORDER BY id DESC LIMIT ?1",
         ) {
             Ok(s) => s,
             Err(_) => return Vec::new(),
         };
-        stmt.query_map([limit], |r| {
+        stmt.query_map(rusqlite::params![limit, viewer], |r| {
             Ok(NotificationRow {
                 id: r.get(0)?,
                 kind: r.get(1)?,
@@ -1159,14 +1224,28 @@ impl Db {
             .map_err(|e| format!("Notification delete failed: {e}"))
     }
 
-    pub fn notif_unread_count(&self) -> i64 {
+    /// Unread rows this account may see — same scoping rule as `notif_all`.
+    pub fn notif_unread_count(&self, viewer: Option<i64>) -> i64 {
         let conn = self.0.guard();
         conn.query_row(
-            "SELECT COUNT(*) FROM notifications WHERE read = 0",
-            [],
+            "SELECT COUNT(*) FROM notifications
+              WHERE read = 0 AND (user_id IS NULL OR user_id = ?1)",
+            rusqlite::params![viewer],
             |r| r.get(0),
         )
         .unwrap_or(0)
+    }
+
+    /// Forgets every account-scoped bell row, keeping the install's own.
+    ///
+    /// Called when the app changes which account it acts as. The app-update
+    /// notice survives because it is not about an account and the user has not
+    /// acted on it yet.
+    pub fn notif_clear_owned(&self) -> Result<(), String> {
+        let conn = self.0.guard();
+        conn.execute("DELETE FROM notifications WHERE user_id IS NOT NULL", [])
+            .map(|_| ())
+            .map_err(|e| format!("Notification clear failed: {e}"))
     }
 
     // --- Local library ------------------------------------------------------
@@ -1525,6 +1604,7 @@ mod tests {
         conn.execute_batch(MIGRATION_V15).unwrap();
         conn.execute_batch(MIGRATION_V16).unwrap();
         conn.execute_batch(MIGRATION_V17).unwrap();
+        conn.execute_batch(MIGRATION_V18).unwrap();
         Db(Mutex::new(conn))
     }
 
@@ -1749,7 +1829,7 @@ mod tests {
     fn notifications_stop_at_the_retention_limit() {
         let db = mem_db();
         for i in 0..(NOTIF_KEEP + 25) {
-            db.notif_insert("airing", "New episode", "body", i, None)
+            db.notif_insert("airing", "New episode", "body", i, None, None)
                 .unwrap();
         }
         let count: i64 = db
@@ -1760,7 +1840,7 @@ mod tests {
             .unwrap();
         assert_eq!(count, NOTIF_KEEP);
         // And it is the newest that survive.
-        assert_eq!(db.notif_all(1)[0].created_ms, NOTIF_KEEP + 24);
+        assert_eq!(db.notif_all(1, None)[0].created_ms, NOTIF_KEEP + 24);
     }
 
     /// v7 adds a column, and `ALTER TABLE ADD COLUMN` cannot be re-run. A
@@ -1788,18 +1868,19 @@ mod tests {
         let version: i64 = conn
             .query_row("PRAGMA user_version", [], |r| r.get(0))
             .unwrap();
-        assert_eq!(version, 17, "and must end up fully migrated");
+        assert_eq!(version, 18, "and must end up fully migrated");
         drop(conn);
 
-        // v13, v14 and v15 are the other `ALTER TABLE ADD COLUMN` steps, so
-        // each needs the same guard and the same proof: the column present, the
-        // version behind. v14 adds three columns in one transaction, which is
-        // why checking the first one is enough to decide for all three.
+        // v13, v14, v15 and v18 are the other `ALTER TABLE ADD COLUMN` steps,
+        // so each needs the same guard and the same proof: the column present,
+        // the version behind. v14 adds three columns in one transaction, which
+        // is why checking the first one is enough to decide for all three.
         for (version_behind, table, column) in [
             (12, "detection_override", "episode_offset"),
             (13, "local_list", "started_at"),
             (14, "notifications", "media_id"),
             (15, "offline_queue", "user_id"),
+            (17, "notifications", "user_id"),
         ] {
             let conn = Connection::open(dir.join("karasu.db")).unwrap();
             assert!(has_column(&conn, table, column));
@@ -1814,7 +1895,7 @@ mod tests {
             let version: i64 = conn
                 .query_row("PRAGMA user_version", [], |r| r.get(0))
                 .unwrap();
-            assert_eq!(version, 17);
+            assert_eq!(version, 18);
         }
 
         let _ = std::fs::remove_dir_all(&dir);
@@ -2294,36 +2375,36 @@ mod tests {
     #[test]
     fn notifications_insert_list_and_read() {
         let db = mem_db();
-        db.notif_insert("airing", "New episode", "Ep 5 is out", 1_000, None)
+        db.notif_insert("airing", "New episode", "Ep 5 is out", 1_000, None, None)
             .unwrap();
-        db.notif_insert("sequel", "Sequel announced", "A sequel", 2_000, None)
+        db.notif_insert("sequel", "Sequel announced", "A sequel", 2_000, None, None)
             .unwrap();
 
-        let all = db.notif_all(50);
+        let all = db.notif_all(50, None);
         assert_eq!(all.len(), 2);
         // Newest first.
         assert_eq!(all[0].kind, "sequel");
-        assert_eq!(db.notif_unread_count(), 2);
+        assert_eq!(db.notif_unread_count(None), 2);
 
         db.notif_mark_read(all[0].id).unwrap();
-        assert_eq!(db.notif_unread_count(), 1);
+        assert_eq!(db.notif_unread_count(None), 1);
 
         db.notif_mark_all_read().unwrap();
-        assert_eq!(db.notif_unread_count(), 0);
-        assert!(db.notif_all(50).iter().all(|n| n.read));
+        assert_eq!(db.notif_unread_count(None), 0);
+        assert!(db.notif_all(50, None).iter().all(|n| n.read));
     }
 
     #[test]
     fn clearing_one_kind_spares_the_rest() {
         let db = mem_db();
-        db.notif_insert("update", "Update ready", "1.0 is out", 1_000, None)
+        db.notif_insert("update", "Update ready", "1.0 is out", 1_000, None, None)
             .unwrap();
-        db.notif_insert("airing", "New episode", "Ep 5 is out", 2_000, None)
+        db.notif_insert("airing", "New episode", "Ep 5 is out", 2_000, None, None)
             .unwrap();
 
         db.notif_clear_kind("update").unwrap();
 
-        let all = db.notif_all(50);
+        let all = db.notif_all(50, None);
         assert_eq!(all.len(), 1);
         assert_eq!(all[0].kind, "airing");
     }
@@ -2332,9 +2413,9 @@ mod tests {
     fn notif_all_respects_limit() {
         let db = mem_db();
         for i in 0..5 {
-            db.notif_insert("airing", "t", "b", i, None).unwrap();
+            db.notif_insert("airing", "t", "b", i, None, None).unwrap();
         }
-        assert_eq!(db.notif_all(3).len(), 3);
+        assert_eq!(db.notif_all(3, None).len(), 3);
     }
 
     /// v16. A queued edit belongs to the account that made it.
@@ -2435,16 +2516,106 @@ mod tests {
 
     /// v15. A bell row that cannot say which title it is about is a sentence,
     /// and the AniList rows in the same panel have opened theirs all along.
+    /// The v18 rule, and the reason it exists: bell rows had no owner at all,
+    /// so signing out of A and into B showed B a list of A's aired episodes.
+    #[test]
+    fn a_bell_row_is_invisible_to_another_account() {
+        let db = mem_db();
+        db.notif_insert("airing", "Ep 5", "is out", 1_000, Some(16498), Some(1))
+            .unwrap();
+        db.notif_insert("sequel", "A sequel", "announced", 2_000, None, Some(2))
+            .unwrap();
+
+        let mine = db.notif_all(50, Some(1));
+        assert_eq!(mine.len(), 1, "only this account's row");
+        assert_eq!(mine[0].title, "Ep 5");
+        assert_eq!(db.notif_unread_count(Some(1)), 1);
+        assert_eq!(db.notif_unread_count(Some(2)), 1);
+    }
+
+    /// The null is a real answer: the app-update notice belongs to the install,
+    /// not to an account, so it must survive a sign-out and stay readable in
+    /// local mode — where there is no viewer to match against at all.
+    #[test]
+    fn the_update_notice_belongs_to_the_install() {
+        let db = mem_db();
+        db.notif_insert("update", "Update ready", "1.0 is out", 1_000, None, None)
+            .unwrap();
+        db.notif_insert("airing", "Ep 5", "is out", 2_000, None, Some(1))
+            .unwrap();
+
+        assert_eq!(db.notif_all(50, Some(1)).len(), 2);
+        assert_eq!(db.notif_all(50, Some(2)).len(), 1, "the update notice only");
+        assert_eq!(db.notif_all(50, None).len(), 1, "signed out, same answer");
+
+        db.notif_clear_owned().unwrap();
+        let left = db.notif_all(50, None);
+        assert_eq!(left.len(), 1, "the account's row goes, the install's stays");
+        assert_eq!(left[0].kind, "update");
+    }
+
+    /// The dedupe keys record what the *previous* account was already told.
+    /// Keeping them would silently deny the next account notifications it has
+    /// never seen.
+    #[test]
+    fn the_alert_dedupe_keys_do_not_outlive_an_account() {
+        let db = mem_db();
+        db.kv_set("aired:1:5", "9000").unwrap();
+        db.kv_set("sequel_seen:42", "1").unwrap();
+        db.kv_set("stale_done:7", "1").unwrap();
+        db.kv_set("blur_adult", "1").unwrap();
+
+        assert_eq!(db.kv_delete_prefix("aired:"), 1);
+        assert_eq!(db.kv_delete_prefix("sequel_seen:"), 1);
+        assert_eq!(db.kv_delete_prefix("stale_done:"), 1);
+        assert!(db.kv_get("aired:1:5").is_none());
+        assert_eq!(
+            db.kv_get("blur_adult").as_deref(),
+            Some("1"),
+            "a setting is not an account's business"
+        );
+    }
+
+    /// `json_extract` raises on malformed JSON rather than returning null, and
+    /// a migration that throws leaves an app that will not start. Both
+    /// attributing steps guard with `json_valid`.
+    #[test]
+    fn a_malformed_viewer_blob_does_not_block_the_upgrade() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(MIGRATIONS).unwrap();
+        conn.execute_batch(MIGRATION_V2).unwrap();
+        conn.execute_batch(MIGRATION_V3).unwrap();
+        conn.execute_batch(MIGRATION_V4).unwrap();
+        conn.execute_batch(MIGRATION_V5).unwrap();
+        conn.execute(
+            "INSERT INTO kv (key, value) VALUES ('anilist_viewer', 'not json')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO offline_queue (kind, payload, created_at) VALUES ('save', '{}', 1)",
+            [],
+        )
+        .unwrap();
+        conn.execute("INSERT INTO notifications (kind, title, body, created_ms) VALUES ('airing','t','b',1)", [])
+            .unwrap();
+
+        conn.execute_batch(MIGRATION_V16)
+            .expect("v16 must survive a malformed viewer blob");
+        conn.execute_batch(MIGRATION_V18)
+            .expect("v18 must survive a malformed viewer blob");
+    }
+
     #[test]
     fn a_notification_remembers_the_media_it_is_about() {
         let db = mem_db();
-        db.notif_insert("airing", "New episode", "Ep 5 is out", 1_000, Some(16498))
+        db.notif_insert("airing", "New episode", "Ep 5 is out", 1_000, Some(16498), None)
             .unwrap();
-        db.notif_insert("update", "Update ready", "0.24.0", 2_000, None)
+        db.notif_insert("update", "Update ready", "0.24.0", 2_000, None, None)
             .unwrap();
 
         // Newest first.
-        let all = db.notif_all(50);
+        let all = db.notif_all(50, None);
         assert_eq!(all[0].media_id, None, "an app update is not about a title");
         assert_eq!(all[1].media_id, Some(16498));
     }

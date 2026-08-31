@@ -1004,6 +1004,15 @@ async fn confirm_pending_impl(
             emit_session(&app, Some(session));
             return Ok(());
         }
+        // Nothing left to confirm. The tray item is always enabled and carries
+        // no `expect`, so without this a press after a successful scrobble ran
+        // the update again, tripped `would_regress`, and turned a finished
+        // session's `Updated` into a `Blocked(Failed)` on the card.
+        match &session.phase {
+            Phase::Updated => return Err("That episode is already updated".into()),
+            Phase::Updating => return Err("That update is already running".into()),
+            _ => {}
+        }
         // A block the user is not allowed to override stays blocked, whatever
         // asked. The card hides the button for these, so reaching here means
         // a stale event or a caller that never saw it — either way the answer

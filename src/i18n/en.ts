@@ -1417,6 +1417,7 @@ export const en = {
     jfErrNoToken: "The server's reply contained no access token.",
     jfErrNoUserId: "The server's reply contained no user id.",
     jfErrBadCredentials: "Wrong username or password.",
+    jfErrBadUrl: "That is not a usable server address — it needs to start with http:// or https://.",
     airingNotify: "New-episode notifications",
     airingNotifyHint:
       "Desktop notification when a new episode of a show you are watching airs — the one thing the website cannot do while Karasu sits in the tray.",

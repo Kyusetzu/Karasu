@@ -1416,6 +1416,7 @@ export const de: typeof en = {
     jfErrNoToken: "Die Antwort des Servers enthielt kein Zugriffstoken.",
     jfErrNoUserId: "Die Antwort des Servers enthielt keine Benutzer-ID.",
     jfErrBadCredentials: "Falscher Benutzername oder falsches Passwort.",
+    jfErrBadUrl: "Das ist keine nutzbare Serveradresse — sie muss mit http:// oder https:// beginnen.",
     airingNotify: "Benachrichtigung bei neuer Folge",
     airingNotifyHint:
       "Desktop-Benachrichtigung, wenn eine neue Folge einer laufenden Serie erscheint — das Einzige, was die Website nicht kann, während Karasu im Tray liegt.",

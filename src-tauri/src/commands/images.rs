@@ -36,39 +36,12 @@ const ALLOWED_TYPES: [&str; 5] = [
 /// The URL comes from a bio written by somebody else, so without this a crafted
 /// profile could make the app probe the machine it is running on or the LAN
 /// behind it — the classic SSRF shape. Checked on the original URL *and* on
-/// every redirect hop, since a public host can redirect to `127.0.0.1`.
-///
-/// **The limit, stated plainly:** this matches on the literal host, so a
-/// hostname that *resolves* to a private address still gets through. Closing
-/// that needs a custom DNS resolver, which is a much larger change; what is here
-/// stops the direct attempt, and the payoff for the remaining case is only ever
-/// an image rendered in a profile — there is no path back out to the attacker.
-fn host_is_local(host: &str) -> bool {
-    let h = host.trim_start_matches('[').trim_end_matches(']').to_ascii_lowercase();
-    if h == "localhost" || h.ends_with(".localhost") || h.ends_with(".local") {
-        return true;
-    }
-    if let Ok(ip) = h.parse::<std::net::IpAddr>() {
-        return match ip {
-            std::net::IpAddr::V4(v4) => {
-                v4.is_loopback() || v4.is_private() || v4.is_link_local() || v4.is_unspecified()
-            }
-            std::net::IpAddr::V6(v6) => {
-                v6.is_loopback()
-                    || v6.is_unspecified()
-                    // Unique-local (fc00::/7) and link-local (fe80::/10).
-                    || (v6.segments()[0] & 0xfe00) == 0xfc00
-                    || (v6.segments()[0] & 0xffc0) == 0xfe80
-            }
-        };
-    }
-    false
-}
-
-/// Whether this is a URL worth even attempting.
-fn url_is_fetchable(url: &reqwest::Url) -> bool {
-    matches!(url.scheme(), "http" | "https") && url.host_str().is_some_and(|h| !host_is_local(h))
-}
+/// The SSRF guard and the scheme check both live in `net`, beside the client
+/// seam every outbound request is built from — they are questions about the
+/// URLs those clients are handed, and keeping them here meant they were
+/// answered by string comparison that three spellings of loopback walked
+/// through.
+use crate::net::is_public_http_url as url_is_fetchable;
 
 /// Fetches a remote image and hands it back as a `data:` URI.
 ///
@@ -135,11 +108,18 @@ pub async fn fetch_bio_image(url: String) -> Result<String, String> {
     if resp.content_length().is_some_and(|n| n > MAX_BYTES) {
         return Err("too large".into());
     }
-    let bytes = resp.bytes().await.map_err(|_| "read".to_string())?;
-    // And again after, because `Content-Length` is a claim, not a guarantee —
-    // a chunked response has none at all.
-    if bytes.len() as u64 > MAX_BYTES {
-        return Err("too large".into());
+    // Then enforced *while* reading, because `Content-Length` is a claim rather
+    // than a guarantee and a chunked response makes none at all. Buffering the
+    // whole body first and measuring afterwards meant a hostile host — any host
+    // an arbitrary bio can name — could make the app allocate as much memory as
+    // it cared to send before the cap was ever consulted.
+    let mut bytes: Vec<u8> = Vec::new();
+    let mut resp = resp;
+    while let Some(chunk) = resp.chunk().await.map_err(|_| "read".to_string())? {
+        if bytes.len() as u64 + chunk.len() as u64 > MAX_BYTES {
+            return Err("too large".into());
+        }
+        bytes.extend_from_slice(&chunk);
     }
 
     Ok(format!(

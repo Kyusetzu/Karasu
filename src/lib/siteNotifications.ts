@@ -77,6 +77,11 @@ export interface RawSiteNotification {
   media?: {
     id?: number | null;
     title?: { romaji?: string | null; english?: string | null; native?: string | null } | null;
+    /** Carried so the content filter can be applied here at all — the query
+        used to ask for neither, which left the bell the one surface where a
+        hidden title could still be named. */
+    isAdult?: boolean | null;
+    genres?: string[] | null;
   } | null;
   thread?: { id?: number | null; title?: string | null } | null;
   staff?: { id?: number | null; name?: { full?: string | null } | null } | null;
@@ -104,6 +109,16 @@ export interface SiteNotifRow {
   userId: number | null;
   mediaId: number | null;
   activityId: number | null;
+  /**
+   * The subject's content-filter fields, when the row is about a title.
+   *
+   * Carried rather than decided here: this function knows nothing about the
+   * reader's filter level, and should not. The bell applies `isBlocked` with
+   * these — before them the query asked for neither field, so a hidden title
+   * could still be named in an aired-episode line, which is a title on screen
+   * exactly as much as a cover is.
+   */
+  media: { isAdult?: boolean | null; genres?: string[] | null } | null;
 }
 
 /** One notification, or null for anything the bell does not render. */
@@ -172,6 +187,9 @@ export function normalizeSiteNotification(raw: RawSiteNotification | null): Site
     target,
     userId: raw.user?.id ?? null,
     mediaId: raw.media?.id ?? null,
+    media: raw.media
+      ? { isAdult: raw.media.isAdult ?? null, genres: raw.media.genres ?? null }
+      : null,
     activityId: raw.activityId ?? null,
   };
 }

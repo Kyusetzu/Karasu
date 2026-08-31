@@ -28,6 +28,7 @@ const site = (over: Partial<SiteNotifRow> = {}): SiteNotifRow => ({
   userId: 7,
   mediaId: null,
   activityId: 100,
+  media: null,
   ...over,
 });
 

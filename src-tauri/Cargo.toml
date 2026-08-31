@@ -1,6 +1,6 @@
 [package]
 name = "karasu"
-version = "0.190.19"
+version = "0.190.20"
 description = "A modern anime and manga tracker built exclusively for AniList"
 authors = ["Kyu"]
 license = "MIT"

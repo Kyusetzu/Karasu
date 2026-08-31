@@ -853,6 +853,7 @@ export const de: typeof en = {
     queued: "{{title}} gespeichert — wird synchronisiert",
     failedDetail: "In der Warteschlange — Karasu versucht es erneut.",
     syncBusy: "Eine Synchronisierung läuft bereits. Bitte gleich erneut versuchen.",
+    rateLimited: "AniList drosselt gerade die Anfragen. Karasu versucht es in Kürze erneut.",
     bulkSaved: "{{count}} aktualisiert",
     bulkFailed: "Massenänderung fehlgeschlagen",
     bulkPartial:

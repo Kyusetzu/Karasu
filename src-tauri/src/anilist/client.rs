@@ -160,7 +160,23 @@ fn is_auth_failure(code: u16, msg: &str) -> bool {
 /// check, and used to sign the message "token rejected" to a user who never
 /// had a token. Tokenless auth-shaped failures are retryable network weather
 /// instead.
+/// The stable code a rate-limited request answers with.
+///
+/// A code rather than the server's sentence, for the reason `TOKEN_REJECTED`
+/// is one: the frontend has to *recognise* this class to stop retrying it, and
+/// matching on prose would mean re-implementing `message_is_retryable` in
+/// TypeScript — the same rule in two languages, free to drift.
+/// `lib/backendError.ts` turns it into a sentence.
+pub const RATE_LIMITED: &str = "anilist.rateLimited";
+
 fn classify(code: u16, msg: String, sent_token: bool) -> ApiError {
+    // 429 is the one retryable class worth naming: it is the only one the
+    // frontend must not spend a second round trip on, because the answer is
+    // guaranteed to be the same until the window rolls.
+    if code == 429 {
+        crate::logging::debug("anilist", format!("rate limited: {msg}"));
+        return ApiError::Retryable(RATE_LIMITED.into());
+    }
     if is_auth_failure(code, &msg) {
         if sent_token {
             ApiError::Auth(msg)
@@ -305,6 +321,16 @@ struct RateState {
     /// a guess as a fresh measurement, which is the one thing the headroom
     /// display must not do.
     reset_at: Option<Instant>,
+}
+
+/// Why the pre-flight loop is not sending yet.
+enum Wait {
+    /// Nothing in the way; the request is claimed and goes out.
+    Go,
+    /// Our own pacing, bounded by `MAX_PACE`.
+    Local(Duration),
+    /// A deadline AniList set. Not bounded by `MAX_PACE`.
+    Server(Duration),
 }
 
 impl RateState {
@@ -496,23 +522,40 @@ impl AniList {
         // over from a window that has since rolled.
         let started = Instant::now();
         loop {
-            let nap = {
+            // Two different reasons to wait, and only one of them is ours.
+            let wait = {
                 let mut rate = self.rate.lock().await;
                 let now = Instant::now();
-                if rate.headroom(now) > RESERVE {
+                if let Some(left) = rate.throttled_for(now) {
+                    // A deadline the *server* set, from a `Retry-After` we were
+                    // given. It used to be recorded and never read here, so
+                    // every other caller on this shared client kept sending
+                    // into a window AniList had already closed — earning more
+                    // 429s, each with a longer deadline than the last.
+                    Wait::Server(left.min(SLICE))
+                } else if rate.headroom(now) > RESERVE {
                     rate.claim();
-                    None
+                    Wait::Go
                 } else {
                     rate.park(SLICE, "preflight");
-                    Some(SLICE)
+                    Wait::Local(SLICE)
                 }
             };
-            let Some(d) = nap else { break };
-            if started.elapsed() >= MAX_PACE {
-                // Bounded, and the request goes out anyway. See `MAX_PACE`.
-                self.rate.lock().await.claim();
-                break;
-            }
+            let d = match wait {
+                Wait::Go => break,
+                // `MAX_PACE` bounds our *own* pacing: stalling a screen for
+                // longer than that costs more than the 429 it avoids. It does
+                // not apply to a server deadline, which is not ours to shorten
+                // and where sending early is a guaranteed rejection.
+                Wait::Local(d) => {
+                    if started.elapsed() >= MAX_PACE {
+                        self.rate.lock().await.claim();
+                        break;
+                    }
+                    d
+                }
+                Wait::Server(d) => d,
+            };
             tokio::time::sleep(d).await;
         }
         // Recorded per request so the panel can separate our own pacing from
@@ -702,6 +745,44 @@ mod tests {
 
     /// A deadline in the past is not a throttle. This is what makes "nothing
     /// ever clears it" safe — there is no cleanup path to get wrong.
+    /// The deadline was recorded and never consulted, so every other caller on
+    /// this shared client kept sending into a window AniList had closed —
+    /// earning further 429s, each with a longer deadline than the last.
+    #[test]
+    fn a_server_deadline_outranks_a_healthy_local_budget() {
+        let mut rate = fresh();
+        let now = Instant::now();
+        // Plenty of budget by the local count.
+        rate.remaining = SEED;
+        rate.observed = Some(now);
+        assert!(rate.headroom(now) > RESERVE);
+        // But the server said wait.
+        rate.park(Duration::from_secs(90), "retryAfter");
+        assert!(
+            rate.throttled_for(now).is_some(),
+            "the pre-flight loop checks this before the budget"
+        );
+    }
+
+    /// 429 answers with a stable code rather than the server's prose, so the
+    /// frontend can recognise the class without re-implementing
+    /// `message_is_retryable` in TypeScript.
+    #[test]
+    fn a_rate_limit_is_named_not_described() {
+        let e = classify(429, "Too Many Requests".into(), true);
+        assert!(matches!(e, ApiError::Retryable(ref m) if m == RATE_LIMITED));
+        assert!(e.is_retryable(), "and it still keeps a queued edit");
+    }
+
+    /// A tokenless 429 is the same class: the code says what happened, and
+    /// `sent_token` only ever decides auth-shaped failures.
+    #[test]
+    fn a_rate_limit_is_named_with_or_without_a_token() {
+        assert!(
+            matches!(classify(429, "x".into(), false), ApiError::Retryable(ref m) if m == RATE_LIMITED)
+        );
+    }
+
     #[test]
     fn an_expired_deadline_is_not_a_throttle() {
         let now = Instant::now();

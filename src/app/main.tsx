@@ -6,7 +6,7 @@ import App from "./App";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { reportError } from "@/api/diagnostics";
 import { isTokenRejected, setIdentityChangedHandler } from "@/api/anilist";
-import { isNotFound } from "@/lib/apiError";
+import { isNotFound, isRateLimited } from "@/lib/apiError";
 import { useTheme } from "@/stores/theme";
 import { initLanguage } from "@/i18n";
 // The @font-face rules live in index.css — see the note there for why the
@@ -27,9 +27,15 @@ const queryClient = new QueryClient({
       // token answers the same way every time, so a bare `retry: 1` spent two
       // round-trips out of a ~30/min budget to reach the identical error — on
       // every query of every screen, since one dead token fails them all at
-      // once. Same for a media id that does not exist.
+      // once. Same for a media id that does not exist, and same for a rate
+      // limit: the Rust client has already waited out the server's
+      // `Retry-After` before giving up, so retrying here stacks a second round
+      // trip onto a window that is still closed.
       retry: (count, error) =>
-        count < 1 && !isTokenRejected(error) && !isNotFound(error),
+        count < 1 &&
+        !isTokenRejected(error) &&
+        !isNotFound(error) &&
+        !isRateLimited(error),
     },
   },
 });

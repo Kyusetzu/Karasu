@@ -856,6 +856,7 @@ export const en = {
     queued: "{{title}} saved — will sync",
     failedDetail: "Queued — Karasu will retry.",
     syncBusy: "A sync is already running. Try again in a moment.",
+    rateLimited: "AniList is rate-limiting requests. Karasu will retry shortly.",
     bulkSaved: "{{count}} updated",
     bulkFailed: "Bulk update failed",
     bulkPartial: "Stopped after {{done}} of {{count}} — the rest is unchanged",

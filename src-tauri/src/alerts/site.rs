@@ -99,6 +99,12 @@ query {
   }
 }";
 
+/// How long a failed check waits before the next attempt.
+///
+/// Long enough that an unreachable server is not polled at the tick rate,
+/// short enough that a blip does not cost the whole configured interval.
+const RETRY_AFTER_FAILURE_MS: i64 = 5 * 60_000;
+
 pub fn spawn(app: AppHandle) {
     crate::logging::supervise("site", move || {
         let app = app.clone();
@@ -135,6 +141,20 @@ async fn check(app: &AppHandle) {
         Err(e) => {
             // Once per transition, not per tick — the debug_changed lesson.
             crate::logging::debug_changed("site", "check", format!("check failed: {e:?}"));
+            // Not stamped as a success — that would silence the next interval,
+            // which is the whole point of stamping late. But not left unstamped
+            // either: this loop ticks every 60 s and only this stamp holds it
+            // back, so a server that stays unreachable turned a 15-to-720
+            // minute pass into one request a minute, out of a shared budget,
+            // exactly when the API is least able to answer. The next attempt is
+            // pushed out by the shorter of the configured interval and
+            // `RETRY_AFTER_FAILURE`.
+            let interval_ms = interval * 60_000;
+            let retry_in = interval_ms.min(RETRY_AFTER_FAILURE_MS);
+            let _ = db.kv_set(
+                LAST_CHECK_KEY,
+                &(crate::alerts::notify::now_ms() - interval_ms + retry_in).to_string(),
+            );
             return;
         }
     };

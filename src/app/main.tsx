@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import App from "./App";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { reportError } from "@/api/diagnostics";
-import { isTokenRejected } from "@/api/anilist";
+import { isTokenRejected, setIdentityChangedHandler } from "@/api/anilist";
 import { isNotFound } from "@/lib/apiError";
 import { useTheme } from "@/stores/theme";
 import { initLanguage } from "@/i18n";
@@ -33,6 +33,13 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+// Nothing cached under one account may be served under the next one. Most keys
+// carry no viewer (`["mediaDetail", id]`, `["search", …]`) while their payload
+// does, so this is a `clear()` rather than an invalidation: an invalidated
+// entry stays renderable while it refetches, which is the window the previous
+// account's progress, score and private notes were visible in.
+setIdentityChangedHandler(() => queryClient.clear());
 
 // Everything React's boundaries cannot see: a throw in an event handler, a
 // rejected promise nobody awaited, a failed dynamic import. None of these

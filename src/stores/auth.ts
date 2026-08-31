@@ -125,13 +125,15 @@ export const useAuth = create<AuthState>((set, get) => ({
     api.setTokenRejectedHandler(() => get().reportSessionExpired());
     // The one-click login completes in the backend (callback server) and
     // announces the fresh viewer through this event.
-    listen<Viewer>("anilist-auth", (e) =>
+    listen<Viewer>("anilist-auth", (e) => {
+      // Same reason as `connect` below: this is a different account arriving.
+      api.identityChanged();
       set({
         viewer: applyViewer(e.payload),
         mode: applyMode("anilist"),
         sessionExpired: false,
-      }),
-    );
+      });
+    });
     try {
       const viewer = await api.session();
       if (viewer) {
@@ -148,6 +150,11 @@ export const useAuth = create<AuthState>((set, get) => ({
 
   connect: async (token: string) => {
     const viewer = await api.connect(token);
+    // Drop every cached response before the new viewer is visible. The keys
+    // that matter here carry no viewer of their own while their payload does,
+    // so without this the previous account's entry — progress, score, private
+    // notes — keeps rendering under this one, and one Save writes it here.
+    api.identityChanged();
     // Cleared here and on the `anilist-auth` event above, which are the only
     // two ways a working token arrives. Leaving it set would strand the banner
     // over a session that has just been fixed.
@@ -160,12 +167,16 @@ export const useAuth = create<AuthState>((set, get) => ({
 
   enableLocal: async () => {
     await api.enableLocalMode();
+    api.identityChanged();
     applyViewer(null);
     set({ mode: applyMode("local") });
   },
 
   logout: async () => {
     await api.logout();
+    // The account's responses must not outlive the account: signing back in as
+    // someone else would otherwise meet a cache still holding these answers.
+    api.identityChanged();
     // Signed out is not "expired": there is no session left to be stale, and
     // the sign-in screen is already the thing the banner would ask for.
     set({ viewer: applyViewer(null), mode: applyMode("none"), sessionExpired: false });

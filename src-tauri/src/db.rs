@@ -809,6 +809,129 @@ impl Db {
 
     /// Patches an entry's progress/status directly in the list cache so
     /// that detection sees the new state right after a scrobble.
+    /// Reads, edits and writes the cached list back **under one lock**.
+    ///
+    /// The shape this replaces took the mutex three times — once to read, once
+    /// to write, with the parse and re-serialise of the whole payload in
+    /// between — so a `fetch_media_list` storing a freshly fetched list in that
+    /// gap was silently overwritten by the stale copy plus one patched entry.
+    /// On a list of any size the gap is milliseconds, not microseconds.
+    ///
+    /// `edit` reports whether it changed anything, so an entry that is not
+    /// cached costs no write at all.
+    fn edit_cached_list<F>(&self, user_id: i64, media_type: &str, edit: F) -> bool
+    where
+        F: FnOnce(&mut serde_json::Value) -> bool,
+    {
+        let conn = self.0.guard();
+        let payload: String = match conn.query_row(
+            "SELECT payload FROM list_cache WHERE user_id = ?1 AND media_type = ?2",
+            rusqlite::params![user_id, media_type],
+            |r| r.get(0),
+        ) {
+            Ok(p) => p,
+            Err(_) => return false,
+        };
+        let Ok(mut lists) = serde_json::from_str::<serde_json::Value>(&payload) else {
+            return false;
+        };
+        if !edit(&mut lists) {
+            return false;
+        }
+        conn.execute(
+            "INSERT INTO list_cache (user_id, media_type, payload, fetched_at)
+             VALUES (?1, ?2, ?3, strftime('%s','now'))
+             ON CONFLICT(user_id, media_type) DO UPDATE
+                SET payload = excluded.payload, fetched_at = excluded.fetched_at",
+            rusqlite::params![user_id, media_type, lists.to_string()],
+        )
+        .is_ok()
+    }
+
+    /// Applies a field patch to one cached entry, for every writer that changes
+    /// an entry.
+    ///
+    /// **Why this must be called from every write path.** The scrobbler's two
+    /// anti-regression guards — `block_reason` and `would_regress` — read their
+    /// idea of current progress from this table. It used to be written by a
+    /// full list fetch and patched by the scrobbler itself, and by nothing
+    /// else: a manual save, a bulk edit and a queue drain all left it stale.
+    /// The guard was therefore fed the value the user had just replaced, so a
+    /// scrobble of an episode *below* a freshly set progress passed both checks
+    /// and wrote an absolute value that moved the list backwards.
+    ///
+    /// `patch` is an object of the fields to set, so one function serves
+    /// progress, status, score, volumes and dates alike.
+    pub fn cache_patch_entry(
+        &self,
+        user_id: i64,
+        media_type: &str,
+        media_id: i64,
+        patch: &serde_json::Value,
+    ) -> bool {
+        let Some(fields) = patch.as_object() else {
+            return false;
+        };
+        if fields.is_empty() {
+            return false;
+        }
+        self.edit_cached_list(user_id, media_type, |lists| {
+            let mut touched = false;
+            for group in lists.as_array_mut().into_iter().flatten() {
+                for entry in group
+                    .get_mut("entries")
+                    .and_then(|v| v.as_array_mut())
+                    .into_iter()
+                    .flatten()
+                {
+                    if entry.get("mediaId").and_then(|v| v.as_i64()) == Some(media_id) {
+                        for (k, v) in fields {
+                            entry[k.as_str()] = v.clone();
+                        }
+                        touched = true;
+                    }
+                }
+            }
+            touched
+        })
+    }
+
+    /// Drops one entry from every group of the cached list.
+    ///
+    /// A deleted entry that stays here is not merely stale: it remains a
+    /// scrobble candidate, and playing that title writes
+    /// `SaveMediaListEntry(mediaId:)`, which *creates* an entry — so the row
+    /// the user just removed came back on the next episode.
+    pub fn cache_forget_entry(&self, user_id: i64, media_type: &str, media_id: i64) -> bool {
+        self.forget_where(user_id, media_type, "mediaId", media_id)
+    }
+
+    /// The same removal keyed on the *entry* id, across both media types.
+    ///
+    /// `delete_list_entry` is given only `id` — the list entry's own id, not
+    /// the media's — and nothing tells it whether that entry is an anime or a
+    /// manga, so both caches are asked and the one holding it answers.
+    pub fn cache_forget_entry_id(&self, user_id: i64, entry_id: i64) -> bool {
+        let anime = self.forget_where(user_id, "ANIME", "id", entry_id);
+        let manga = self.forget_where(user_id, "MANGA", "id", entry_id);
+        anime || manga
+    }
+
+    fn forget_where(&self, user_id: i64, media_type: &str, field: &str, value: i64) -> bool {
+        self.edit_cached_list(user_id, media_type, |lists| {
+            let mut removed = false;
+            for group in lists.as_array_mut().into_iter().flatten() {
+                if let Some(entries) = group.get_mut("entries").and_then(|v| v.as_array_mut()) {
+                    let before = entries.len();
+                    entries.retain(|e| e.get(field).and_then(|v| v.as_i64()) != Some(value));
+                    removed |= entries.len() != before;
+                }
+            }
+            removed
+        })
+    }
+
+    /// Progress and status, the scrobbler's own patch.
     pub fn update_cached_progress(
         &self,
         user_id: i64,
@@ -817,28 +940,11 @@ impl Db {
         progress: u32,
         status: Option<&str>,
     ) {
-        let Some(payload) = self.cached_list(user_id, media_type) else {
-            return;
-        };
-        let Ok(mut lists) = serde_json::from_str::<serde_json::Value>(&payload) else {
-            return;
-        };
-        for group in lists.as_array_mut().into_iter().flatten() {
-            for entry in group
-                .get_mut("entries")
-                .and_then(|v| v.as_array_mut())
-                .into_iter()
-                .flatten()
-            {
-                if entry.get("mediaId").and_then(|v| v.as_i64()) == Some(media_id) {
-                    entry["progress"] = progress.into();
-                    if let Some(s) = status {
-                        entry["status"] = s.into();
-                    }
-                }
-            }
+        let mut patch = serde_json::json!({ "progress": progress });
+        if let Some(s) = status {
+            patch["status"] = s.into();
         }
-        let _ = self.cache_list(user_id, media_type, &lists.to_string());
+        self.cache_patch_entry(user_id, media_type, media_id, &patch);
     }
 
     // --- Offline queue ------------------------------------------------------
@@ -2518,6 +2624,91 @@ mod tests {
     /// and the AniList rows in the same panel have opened theirs all along.
     /// The v18 rule, and the reason it exists: bell rows had no owner at all,
     /// so signing out of A and into B showed B a list of A's aired episodes.
+    fn seed_list(db: &Db) {
+        db.cache_list(
+            1,
+            "ANIME",
+            &serde_json::json!([{
+                "name": "Watching",
+                "entries": [
+                    { "id": 10, "mediaId": 100, "progress": 4, "status": "CURRENT" },
+                    { "id": 11, "mediaId": 200, "progress": 1, "status": "CURRENT" }
+                ]
+            }])
+            .to_string(),
+        )
+        .unwrap();
+    }
+
+    fn cached_entry(db: &Db, media_id: i64) -> Option<serde_json::Value> {
+        let payload = db.cached_list(1, "ANIME")?;
+        let lists: serde_json::Value = serde_json::from_str(&payload).ok()?;
+        lists
+            .as_array()?
+            .iter()
+            .flat_map(|g| g.get("entries").and_then(|e| e.as_array()).cloned().unwrap_or_default())
+            .find(|e| e.get("mediaId").and_then(|v| v.as_i64()) == Some(media_id))
+    }
+
+    /// The guard the scrobbler reads must see what the user just saved.
+    ///
+    /// Before this the cache was written by a full fetch and patched by the
+    /// scrobbler alone, so a manual "24 / COMPLETED" left it holding the old
+    /// number — and a scrobble of episode 5 then passed both anti-regression
+    /// checks and wrote the list backwards.
+    #[test]
+    fn a_saved_entry_reaches_the_cache_the_guards_read() {
+        let db = mem_db();
+        seed_list(&db);
+        db.cache_patch_entry(
+            1,
+            "ANIME",
+            100,
+            &serde_json::json!({ "progress": 24, "status": "COMPLETED" }),
+        );
+        let entry = cached_entry(&db, 100).expect("still cached");
+        assert_eq!(entry["progress"], 24);
+        assert_eq!(entry["status"], "COMPLETED");
+        // The neighbour is untouched.
+        assert_eq!(cached_entry(&db, 200).unwrap()["progress"], 1);
+    }
+
+    /// A patch names only the fields it carries; everything else keeps its
+    /// value, the same absent-means-unchanged rule the mutation follows.
+    #[test]
+    fn a_patch_leaves_the_fields_it_does_not_name() {
+        let db = mem_db();
+        seed_list(&db);
+        db.cache_patch_entry(1, "ANIME", 100, &serde_json::json!({ "score": 9 }));
+        let entry = cached_entry(&db, 100).unwrap();
+        assert_eq!(entry["score"], 9);
+        assert_eq!(entry["progress"], 4, "not blanked by a patch about score");
+        assert_eq!(entry["status"], "CURRENT");
+    }
+
+    /// A deleted entry that stays cached is still a scrobble candidate, and
+    /// `SaveMediaListEntry(mediaId:)` creates an entry — so playing that title
+    /// brought the row the user just removed straight back.
+    #[test]
+    fn a_deleted_entry_stops_being_a_scrobble_candidate() {
+        let db = mem_db();
+        seed_list(&db);
+        assert!(db.cache_forget_entry_id(1, 10), "the entry id is what delete has");
+        assert!(cached_entry(&db, 100).is_none(), "gone from the cache");
+        assert!(cached_entry(&db, 200).is_some(), "and only that one");
+    }
+
+    /// Nothing to patch costs no write, so an entry that was never cached
+    /// cannot resurrect a list that has since been replaced.
+    #[test]
+    fn patching_an_uncached_entry_changes_nothing() {
+        let db = mem_db();
+        seed_list(&db);
+        assert!(!db.cache_patch_entry(1, "ANIME", 999, &serde_json::json!({ "progress": 3 })));
+        assert!(!db.cache_forget_entry(1, "ANIME", 999));
+        assert_eq!(cached_entry(&db, 100).unwrap()["progress"], 4);
+    }
+
     #[test]
     fn a_bell_row_is_invisible_to_another_account() {
         let db = mem_db();

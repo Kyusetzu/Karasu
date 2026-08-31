@@ -180,10 +180,19 @@ pub enum Phase {
 /// the account did not have, and `scrobble-done` fired. If the queued row was
 /// later refused for good, the cache kept a number that had never landed — and
 /// `would_regress`, which reads that cache, then refused the correct rewrite.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Outcome {
     Landed,
     Queued,
+    /// The write was refused here, before it was sent.
+    ///
+    /// Carries a real block reason rather than a message. `would_regress` used
+    /// to answer with English prose, which became `BlockReason::Failed` — the
+    /// one blocked phase that is *forceable* and whose text
+    /// `backendErrorText` cannot translate. So a German card showed an English
+    /// sentence beside an "Update now" button that reproduced the identical
+    /// refusal, for as long as the user kept pressing it.
+    Refused(BlockReason),
 }
 
 #[derive(Debug, Clone)]
@@ -813,10 +822,15 @@ async fn perform_update(
             .map(|c| c.progress)
     };
     if would_regress(episode, cached_progress, list_status) {
-        return Err(format!(
-            "Refusing to set progress back to {episode} from {}",
-            cached_progress.unwrap_or(0)
-        ));
+        // The same fact `block_reason` states before a session ever arms —
+        // discovered later, because this reads the cache immediately before
+        // writing. Said in the same vocabulary, it renders in the reader's
+        // language and is not forceable, so the card stops offering a retry
+        // that cannot succeed.
+        return Ok(Outcome::Refused(BlockReason::AlreadyWatched {
+            episode,
+            progress: cached_progress.unwrap_or(0),
+        }));
     }
 
     let done = total == Some(episode);
@@ -1084,6 +1098,7 @@ async fn confirm_pending_impl(
             session.phase = match &result {
                 Ok(Outcome::Landed) => Phase::Updated,
                 Ok(Outcome::Queued) => Phase::Queued,
+                Ok(Outcome::Refused(reason)) => Phase::Blocked(reason.clone()),
                 Err(e) => Phase::Blocked(BlockReason::Failed { message: e.clone() }),
             };
             emit_session(&app, Some(session));
@@ -1376,6 +1391,7 @@ async fn drive_session(app: &AppHandle) {
                     session.phase = match result {
                         Ok(Outcome::Landed) => Phase::Updated,
                         Ok(Outcome::Queued) => Phase::Queued,
+                        Ok(Outcome::Refused(reason)) => Phase::Blocked(reason),
                         Err(e) => Phase::Blocked(BlockReason::Failed { message: e }),
                     };
                     emit_session(&app, Some(session));
@@ -1661,6 +1677,18 @@ mod tests {
             !armed_now(true, false, &watching, false),
             "nothing to disarm without a deadline"
         );
+    }
+
+    /// A refusal is not a failure, and the difference is visible: `Failed` is
+    /// the one blocked phase that is forceable and whose message no dictionary
+    /// covers, so answering a regress refusal with it put an untranslated
+    /// sentence beside a retry button that could only ever reproduce it.
+    #[test]
+    fn a_refused_write_is_not_offered_a_retry() {
+        let refused = BlockReason::AlreadyWatched { episode: 5, progress: 24 };
+        assert!(!refused.forceable(), "there is nothing a retry could change");
+        let failed = BlockReason::Failed { message: "AniList said no".into() };
+        assert!(failed.forceable(), "a server refusal is worth retrying");
     }
 
     /// The write is spawned rather than awaited, so the 5 s poll keeps running

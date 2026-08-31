@@ -113,6 +113,12 @@ pub fn redirect(rules: &[Rule], media_id: i64, episode: u32) -> Option<(i64, u32
 
 /// Loads rules from the file cache and refreshes them from the GitHub
 /// repo in the background when they are stale.
+/// How many times the one-shot fetch is attempted before giving up.
+const RETRIES: u32 = 4;
+/// Multiplied by the attempt number, so 5s, 10s, 15s — long enough for a
+/// laptop's wifi to associate after a cold start.
+const RETRY_BACKOFF: std::time::Duration = std::time::Duration::from_secs(5);
+
 pub fn spawn_loader(app: tauri::AppHandle) {
     use tauri::Manager;
     tauri::async_runtime::spawn(async move {
@@ -156,26 +162,57 @@ pub fn spawn_loader(app: tauri::AppHandle) {
         // re-fired forever and the redirect rules never loaded there at all.
         // Exactly the "fix applied to three of four builders" failure the
         // seam's own header warns about.
-        let client = match crate::net::client_builder().build() {
+        // A timeout, because this is the one outbound client in the tree that
+        // had none at any level: `update.rs` sets one, the AniList client sets
+        // one, the bio-image proxy sets one. A stalled connection here leaks
+        // the task and its socket for the life of the process, and the redirect
+        // rules — which decide *which entry* an episode is written to — never
+        // arrive at all, silently.
+        let client = match crate::net::client_builder()
+            .timeout(std::time::Duration::from_secs(20))
+            .build()
+        {
             Ok(c) => c,
             Err(e) => {
                 crate::logging::warn("relations", format!("cannot build the client: {e}"));
                 return;
             }
         };
-        let resp = match client.get(SOURCE_URL).send().await {
-            Ok(r) => r,
-            Err(e) => {
-                crate::logging::warn("relations", format!("cannot fetch the rules: {e}"));
-                return;
+        // Retried, because one bad moment used to cost the whole session. This
+        // is a one-shot on a cold start — a laptop opened before the wifi
+        // associates is the ordinary case — and giving up on the first refusal
+        // left `Relations` empty until the app was restarted. That is not a
+        // missing nicety: `redirect` with no rules passes the episode straight
+        // through, so a franchise whose seasons are separate AniList entries
+        // gets season 2's numbers written onto season 1, silently.
+        let mut text = None;
+        for attempt in 0..RETRIES {
+            if attempt > 0 {
+                tokio::time::sleep(RETRY_BACKOFF * attempt).await;
             }
-        };
-        let text = match resp.text().await {
-            Ok(t) => t,
-            Err(e) => {
-                crate::logging::warn("relations", format!("cannot read the rules: {e}"));
-                return;
+            match client.get(SOURCE_URL).send().await {
+                Ok(r) => match r.text().await {
+                    Ok(t) => {
+                        text = Some(t);
+                        break;
+                    }
+                    Err(e) => crate::logging::warn(
+                        "relations",
+                        format!("cannot read the rules (attempt {}): {e}", attempt + 1),
+                    ),
+                },
+                Err(e) => crate::logging::warn(
+                    "relations",
+                    format!("cannot fetch the rules (attempt {}): {e}", attempt + 1),
+                ),
             }
+        }
+        let Some(text) = text else {
+            crate::logging::error(
+                "relations",
+                "gave up fetching the episode-redirect rules;                  detection will not redirect this session",
+            );
+            return;
         };
         let rules = parse_rules(&text);
         if rules.is_empty() {

@@ -205,6 +205,11 @@ export function PortableSection() {
     setError(null);
     const { invoke } = await import("@tauri-apps/api/core");
     try {
+      // Neither call returns on success: the backend relaunches the app onto
+      // the mode it just switched to. It has to — `Db` is opened once at
+      // startup and never reopened, so anything written between the switch and
+      // the next launch would go to the database the app is abandoning. What
+      // follows is therefore the failure path plus the belt-and-braces refresh.
       if (status.portable) await invoke("disable_portable");
       else await invoke("enable_portable", { replace: replace ?? null });
       setRestart(true);

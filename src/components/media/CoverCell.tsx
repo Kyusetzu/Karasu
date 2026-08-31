@@ -2,6 +2,8 @@ import { useState, type HTMLAttributes, type ReactNode } from "react";
 import { Link } from "react-router";
 import { Star } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { shouldBlur, type Filterable } from "@/lib/contentFilter";
+import { useContentFilter } from "@/stores/contentFilter";
 import { HERO_ATTR } from "@/hooks/useViewTransitions";
 import { useTranslation } from "react-i18next";
 
@@ -19,6 +21,7 @@ export function CoverCell({
   cover,
   score,
   adult,
+  media,
   blurred,
   revealLabel,
   progress,
@@ -50,10 +53,21 @@ export function CoverCell({
       announce thirty identical "Show"s. */
   revealLabel?: string;
   /**
+   * The title this cover belongs to, so the cell can decide the blur itself.
+   *
+   * Prefer this over `blurred`. The rule lived at every call site, which meant
+   * remembering it at every call site — and eight surfaces remembered while
+   * five did not, so the same title arrived blurred in the list and bare in the
+   * bell, a command-palette result or a picker. A guard that must be recalled
+   * twenty-one times is a guard that will be missed at some of them.
+   */
+  media?: Filterable | null;
+  /**
    * Blur the artwork until it is clicked — the softer half of the content
    * filter, for someone who wants explicit titles *present* but not on display.
-   * See `shouldBlur`; the badge above still shows through, so the cell is never
-   * an unexplained grey rectangle.
+   *
+   * An explicit override, and it wins: `AnimeDetail` uses it to un-blur a cover
+   * the reader has chosen to reveal. Leave it out and pass `media` instead.
    */
   blurred?: boolean;
   /** Draws the bar flush to the bottom edge. Omit when there is no total. */
@@ -96,7 +110,12 @@ export function CoverCell({
   const [revealed, setRevealed] = useState(false);
   // `cover != null` because a missing cover has nothing to veil: it used to
   // put a 45% wash and a "Show" pill over an empty `bg-surface-800` box.
-  const veiled = blurred && !revealed && cover != null;
+  // Decided here rather than at each call site. `blurred` still wins when a
+  // caller states it, which is how a reader-revealed detail page stays bare.
+  const level = useContentFilter((s) => s.level);
+  const blurAdult = useContentFilter((s) => s.blurAdult);
+  const wanted = blurred ?? shouldBlur(media, level, blurAdult);
+  const veiled = wanted && !revealed && cover != null;
 
   const art = cover && (
     <img

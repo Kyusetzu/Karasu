@@ -1,8 +1,22 @@
 import { useRef } from "react";
 import { render } from "@testing-library/react";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import * as api from "@/api/anilist";
 import { useAdvancedCategories, useAuth } from "./auth";
 import type { Viewer } from "@/api/types";
+
+// Only the three IPC calls are replaced. `setIdentityChangedHandler` and
+// `identityChanged` stay the real ones so the test drives the actual seam.
+vi.mock("@/api/anilist", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/api/anilist")>();
+  return {
+    ...actual,
+    isTauri: true,
+    connect: vi.fn(async () => null),
+    logout: vi.fn(async () => {}),
+    enableLocalMode: vi.fn(async () => {}),
+  };
+});
 
 /**
  * The selector-stability test, and it exists because the first version of
@@ -96,5 +110,45 @@ describe("useAdvancedCategories", () => {
     const { getByTestId } = render(<Probe renders={renders} />);
     expect(getByTestId("out").textContent).toBe("|true");
     expect(renders.current).toBe(1);
+  });
+});
+
+/**
+ * Every way the app changes which account it is acting as must drop the query
+ * cache, and this test exists because none of them did.
+ *
+ * Most cache keys carry no viewer — `["mediaDetail", id]`, `["search", …]` —
+ * while the payload behind them does: `MEDIA_FIELDS` spreads `mediaListEntry`,
+ * which is *this* account's progress, score and private notes. Within
+ * `gcTime` the previous account's entry therefore kept rendering under the
+ * next one and seeded the entry editor, one Save away from being written to
+ * the wrong list.
+ *
+ * The assertion is on the callback firing rather than on a `QueryClient`,
+ * because the store cannot reach the client: `main.tsx` owns it and registers
+ * the handler, exactly as it does for a rejected token.
+ */
+describe("identity changes drop the query cache", () => {
+  const fired: string[] = [];
+
+  beforeEach(() => {
+    fired.length = 0;
+    api.setIdentityChangedHandler(() => fired.push("cleared"));
+    useAuth.setState({ viewer: null, mode: "none", sessionExpired: false });
+  });
+
+  it("fires on sign-in", async () => {
+    await useAuth.getState().connect("token");
+    expect(fired).toEqual(["cleared"]);
+  });
+
+  it("fires on sign-out", async () => {
+    await useAuth.getState().logout();
+    expect(fired).toEqual(["cleared"]);
+  });
+
+  it("fires when the account-free list is chosen", async () => {
+    await useAuth.getState().enableLocal();
+    expect(fired).toEqual(["cleared"]);
   });
 });

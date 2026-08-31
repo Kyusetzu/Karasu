@@ -108,6 +108,39 @@ under it.
 
 The backlog, each item with its recorded reason — none of it blocks the tag:
 
+### Carried over from the release audit
+
+The audit's own reports are gone (they were a list of unfixed weaknesses in a
+repository about to be public, which is a finding it raised against itself).
+Everything it found at P1 and P2 is fixed, as is every P3 with a behavioural
+consequence. What is left is recorded here rather than in a deleted folder:
+
+- **Updater ergonomics.** A declined update re-downloads ~100 MB every 24 h
+  because `download_pending_update` never consults the stash before fetching;
+  the daily bell row for it is not deduped; and the check throttle has no lower
+  bound, so a backwards clock jump (a dead CMOS battery, a restored VM
+  snapshot) disables automatic checks until real time passes the bad stamp.
+- **Android `versionCode` does not move on a commit-only bump.** It is derived
+  from the semver core, so two release APKs differing only in `COMMIT_NUMBER`
+  are the same version to Android. Karasu has no Android updater by design, so
+  the cost is that `adb install -r` cannot tell them apart.
+- **`hydrate` re-parses every indexed path during `setup`**, before the window
+  exists, and `backups::run_once` blocks a tokio worker rather than going
+  through `spawn_blocking`. Both are startup-cost items, not correctness ones.
+- **`LocalLibrary` is not virtualized** while its sibling list is, so a large
+  library renders every row.
+- **The window-title detection rung cannot see play state**, so a paused or
+  minimized player keeps the wall clock running. Unlike the media-session rung
+  (fixed) there is no play state to consult; closing it needs a different
+  signal, not a smaller change.
+- **Comment and documentation drift** the audit catalogued: a handful of
+  comments describing behaviour that has since moved, and the bundled Android
+  copy of THIRD-PARTY-NOTICES.md which has to be edited alongside the root one.
+- **An attribution row for the anime-relations dataset** in
+  THIRD-PARTY-NOTICES.md. Its licence is CC0, so nothing is owed; the file's
+  two reproduction commands (`npm ls`, `cargo metadata`) structurally cannot
+  see a runtime-fetched dataset, which is the more interesting half.
+
 - **Measure the residual sign-in delay on a device.** `connect_with_token`
   has logged its three phases since the handoff fix; nobody has read them
   off hardware yet. Act only if it is still slow.

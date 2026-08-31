@@ -117,26 +117,57 @@ fn delete_portable_key() {}
 /// `get_password().ok()` does — reported a successful migration for a user
 /// whose keyring was merely locked, and the sign-in was then unreachable
 /// through a portable folder that had never received it.
+///
+/// Split into copy and clear on purpose, and the caller runs them either side
+/// of the marker. Doing both before the marker meant a failed marker write
+/// left the token deleted from the credential store while `is_portable()` was
+/// still false — the app came back signed out, from a switch that had
+/// reported failure. Copying first and clearing last leaves the token
+/// readable through whichever side wins.
 #[cfg(any(windows, target_os = "linux"))]
-pub fn migrate_to_portable_file() -> Result<(), String> {
+pub fn copy_token_to_portable_file() -> Result<(), String> {
     let entry = entry()?;
     let token = match entry.get_password() {
         Ok(token) => token,
         Err(keyring::Error::NoEntry) => return Ok(()),
         Err(e) => return Err(format!("Could not read the stored sign-in: {e}")),
     };
-    save_token_file(&token)?;
-    // Only once the token is safely in the portable file. Leaving it behind
-    // would keep a live bearer token in the credential store that sign-out
-    // (which follows `is_portable()`) would never reach — so a failure here is
-    // worth recording even though the migration itself succeeded.
+    save_token_file(&token)
+}
+
+/// Drops the credential-store copy once portable mode is actually in effect.
+///
+/// A failure is recorded rather than raised: the switch has succeeded, and the
+/// cost is a stale bearer token in a store that sign-out (which follows
+/// `is_portable()`) will no longer reach.
+#[cfg(any(windows, target_os = "linux"))]
+pub fn clear_credential_store_token() {
+    let Ok(entry) = entry() else { return };
     if let Err(e) = entry.delete_credential() {
-        crate::logging::warn(
-            "auth",
-            format!("migrated to portable mode but could not clear the old credential: {e}"),
-        );
+        if !matches!(e, keyring::Error::NoEntry) {
+            crate::logging::warn(
+                "auth",
+                format!("switched to portable mode but could not clear the old credential: {e}"),
+            );
+        }
     }
-    Ok(())
+}
+
+/// The way back out: portable file → credential store.
+///
+/// Without this, enable → disable → restart signed the user out silently. The
+/// token had been moved into the portable folder and `load_token` follows
+/// `is_portable()`, so once the marker was gone it read an empty credential
+/// store and found nothing. The portable file is left in place — it is the
+/// user's data and `disable_portable` is a switch, not a delete.
+#[cfg(any(windows, target_os = "linux"))]
+pub fn copy_token_from_portable_file() -> Result<(), String> {
+    let Some(token) = load_token_file() else {
+        return Ok(());
+    };
+    entry()?
+        .set_password(&token)
+        .map_err(|e| format!("Could not restore the stored sign-in: {e}"))
 }
 
 // --- Mobile ------------------------------------------------------------------
@@ -288,9 +319,18 @@ pub fn delete_token() {
 }
 
 /// Portable mode is an exe-relative concept and phones have no exe dir, so
-/// there is never anything to migrate.
+/// there is never anything to migrate. A cfg'd trio rather than a cfg on the
+/// call site, per the house rule.
 #[cfg(mobile)]
-pub fn migrate_to_portable_file() -> Result<(), String> {
+pub fn copy_token_to_portable_file() -> Result<(), String> {
+    Ok(())
+}
+
+#[cfg(mobile)]
+pub fn clear_credential_store_token() {}
+
+#[cfg(mobile)]
+pub fn copy_token_from_portable_file() -> Result<(), String> {
     Ok(())
 }
 

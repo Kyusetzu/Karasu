@@ -668,8 +668,10 @@ fn persist(db: &Db, data: &LibraryData) -> Result<(), String> {
         .collect();
     let score_rows: Vec<(i64, f64)> =
         data.summary.iter().map(|e| (e.media_id, e.score)).collect();
-    db.library_replace_all(&rows, &score_rows)?;
-    db.library_replace_unmatched(&data.unmatched_rows())
+    // One transaction for both tables: they are one answer. Written as two,
+    // a failure in between left an index describing this scan beside an
+    // unmatched list describing the previous one.
+    db.library_publish(&rows, &score_rows, &data.unmatched_rows())
 }
 
 /// Maps every video file that parses to an episode onto the entry it belongs
@@ -929,7 +931,7 @@ pub fn get_library_unmatched(state: State<'_, LibraryIndex>) -> Vec<UnmatchedGro
 /// files are already known and re-walking the disk to reach a conclusion the
 /// user just handed us would make a one-click correction cost a full scan.
 /// The override row is what makes the next scan agree.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn set_library_match(
     app: AppHandle,
     title: String,
@@ -1093,7 +1095,7 @@ pub fn plan_redirect(
 /// Like `set_library_match`, the answer is applied to the in-memory index
 /// immediately; the v11 rows `plan_redirect` produces are what make the next
 /// scan and the next restart agree.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn set_library_redirect(
     app: AppHandle,
     media_id: i64,
@@ -1138,7 +1140,7 @@ pub fn set_library_redirect(
 /// know their media id, and a freed episode 13 belongs with them rather than
 /// in "unplaced". When no sibling knows (the whole key was split), the range
 /// honestly lands unplaced until the next scan, like `clear_library_match`.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn clear_library_redirect(
     app: AppHandle,
     title: String,
@@ -1203,7 +1205,7 @@ pub fn clear_library_redirect(
 /// files land in "unplaced" until then. That is honest: without the override
 /// there is no answer on record, and inventing the old guess back would be
 /// claiming knowledge this function does not have.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn clear_library_match(
     app: AppHandle,
     title: String,

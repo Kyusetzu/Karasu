@@ -689,8 +689,14 @@ mod tests {
         }
         let all = entries(RING_CAPACITY * 2);
         assert!(all.len() <= RING_CAPACITY, "ring grew past its cap");
-        // Newest first.
-        let newest = &all[0];
+        // Newest first — of *our* entries. The ring is process-global and the
+        // panic hook writes to it from any thread, so `all[0]` is not
+        // necessarily ours even under `serialize()`, which only orders the
+        // tests that take it.
+        let newest = all
+            .iter()
+            .find(|e| e.target == "ringtest")
+            .expect("no entry with the ringtest target");
         assert!(
             newest.message.contains(&format!("entry {}", RING_CAPACITY + 49)),
             "{}",
@@ -743,6 +749,7 @@ mod tests {
     /// captures one rather than trusting that `set_hook` was called.
     #[test]
     fn the_panic_hook_records_the_panic() {
+        const PANIC_MARKER: &str = "a deliberate test panic";
         // The CI flake this lock exists for: the ring-flood test evicting
         // this entry between the panic and the read. (A `len > before`
         // assertion also used to live here — wrong for a different reason:
@@ -751,19 +758,17 @@ mod tests {
         install_panic_hook();
 
         // Caught so the test itself survives; the hook still runs first.
-        let _ = std::panic::catch_unwind(|| panic!("a deliberate test panic"));
+        let _ = std::panic::catch_unwind(|| panic!("{PANIC_MARKER}"));
 
         let recorded = entries(RING_CAPACITY);
+        // Matched on our own message, not on the target alone: `sync.rs`'s
+        // poisoned-lock test panics deliberately too, and the hook records it
+        // into this same global ring without taking `serialize()`.
         let entry = recorded
             .iter()
-            .find(|e| e.target == "panic")
-            .expect("no entry with the panic target");
+            .find(|e| e.target == "panic" && e.message.contains(PANIC_MARKER))
+            .expect("the hook recorded no entry for our panic");
         assert_eq!(entry.level, Level::Error);
-        assert!(
-            entry.message.contains("a deliberate test panic"),
-            "{}",
-            entry.message
-        );
         // The location is what makes it actionable, given `strip = true` leaves
         // backtraces near-symbol-free.
         assert!(entry.message.contains("logging.rs"), "{}", entry.message);

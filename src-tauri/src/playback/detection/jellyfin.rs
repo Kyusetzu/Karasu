@@ -580,6 +580,18 @@ pub async fn list_sessions(cfg: &JellyfinConfig) -> Result<Vec<SessionSummary>, 
 ///
 /// Split out from the HTTP call so the mapping — which is the part with real
 /// decisions in it — is unit-testable without a server.
+/// Whether the server says this session is paused.
+///
+/// Absent or unreadable means "not paused": the field is advisory here, used
+/// only to prefer one candidate over another, and a missing `PlayState` must
+/// not make live playback look stale.
+fn is_paused(session: &serde_json::Value) -> bool {
+    get_ci(session, "PlayState")
+        .and_then(|p| get_ci(p, "IsPaused"))
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
+}
+
 pub fn playback_from_session(session: &serde_json::Value) -> Option<Playback> {
     // Every read here goes through `get_ci`, for the reason that function was
     // written: a casing mismatch fails as a silent "nothing is playing", and
@@ -663,8 +675,16 @@ pub fn playback_from_session(session: &serde_json::Value) -> Option<Playback> {
             // An API field, not a parse: as explicit as a spelling gets.
             episode_marked: episode.is_some(),
             // Season 1 carries no information for matching and would only
-            // confuse the "S2" title variants the matcher generates.
-            season: season.filter(|s| *s > 1),
+            // confuse the "S2" title variants the matcher generates, so it is
+            // dropped. Season **0** is not the same thing: that is Jellyfin's
+            // Specials folder, and collapsing it into "no season" made a
+            // special arrive as episode N of the main series — scrobbled onto
+            // it, and sharing the `season = -1` correction key with the real
+            // episodes, so correcting one moved the other. Passed through, it
+            // reaches `season_informed`, which cannot place it against a bare
+            // title and blocks with `UnknownSeason` until the user says which
+            // entry it is.
+            season: season.filter(|s| *s != 1),
             release_group: None,
         }),
         position_sec,
@@ -704,11 +724,22 @@ pub async fn detect(cfg: &JellyfinConfig) -> Option<Playback> {
         return None;
     };
     let mut matched = 0usize;
-    let found = list
+    let candidates: Vec<&serde_json::Value> = list
         .iter()
         .filter(|s| session_matches(s, &cfg.user_id, &cfg.device))
         .inspect(|_| matched += 1)
-        .find_map(playback_from_session);
+        .collect();
+    // Playing sessions first, paused ones only as a fallback — the same
+    // ordering `media_session::watchable` uses, and for the same reason. The
+    // server returns sessions in no promised order, so a paused one left open
+    // on another device could win over live playback; its position never
+    // moves, and `position_due` reads a frozen position as "not far enough
+    // yet" for as long as it is held.
+    let found = candidates
+        .iter()
+        .filter(|s| !is_paused(s))
+        .find_map(|s| playback_from_session(s))
+        .or_else(|| candidates.iter().find_map(|s| playback_from_session(s)));
     if found.is_none() {
         // The two numbers separate "the filter rejects everything" from
         // "nothing is playing" — the exact question the Test-connection
@@ -738,6 +769,16 @@ const HOLD_TICKS: u8 = 3;
 /// The last answer the server actually gave, and how many failures have been
 /// covered with it since.
 static LAST_GOOD: Mutex<Option<(Playback, u8)>> = Mutex::new(None);
+
+/// Drops the held session.
+///
+/// The hold exists so one failed poll does not blank the card, but it is the
+/// *previous* user's playback: after a Jellyfin sign-out, or when the app
+/// changes which AniList account it acts as, replaying it would hand the next
+/// session someone else's episode for up to `HOLD_TICKS`.
+pub fn forget_last_good() {
+    *LAST_GOOD.guard() = None;
+}
 
 /// Records a successful poll and hands the answer straight back.
 fn remember(found: Option<Playback>) -> Option<Playback> {
@@ -977,6 +1018,59 @@ mod tests {
 
     fn session(user: &str, device: &str) -> serde_json::Value {
         json!({ "UserId": user, "DeviceName": device, "UserName": "whoever" })
+    }
+
+    /// A paused session left open on another device must not win over live
+    /// playback: its position never moves, and a frozen position reads as
+    /// "not far enough yet" for as long as the session is held.
+    #[test]
+    fn a_paused_session_does_not_outrank_a_playing_one() {
+        let paused = json!({
+            "PlayState": { "IsPaused": true },
+            "NowPlayingItem": { "Type": "Episode", "SeriesName": "Test Show", "IndexNumber": 3 }
+        });
+        let playing = json!({
+            "PlayState": { "IsPaused": false },
+            "NowPlayingItem": { "Type": "Episode", "SeriesName": "Test Show", "IndexNumber": 7 }
+        });
+        assert!(is_paused(&paused));
+        assert!(!is_paused(&playing));
+
+        let candidates = [&paused, &playing];
+        let picked = candidates
+            .iter()
+            .filter(|s| !is_paused(s))
+            .find_map(|s| playback_from_session(s))
+            .or_else(|| candidates.iter().find_map(|s| playback_from_session(s)))
+            .expect("one of them plays");
+        assert_eq!(picked.parsed.as_ref().and_then(|p| p.episode), Some(7));
+    }
+
+    /// Absent or unreadable `PlayState` means "not paused": the field only
+    /// ranks candidates here, and a missing one must not make live playback
+    /// look stale.
+    #[test]
+    fn a_missing_play_state_is_not_a_pause() {
+        assert!(!is_paused(&json!({})));
+        assert!(!is_paused(&json!({ "PlayState": {} })));
+        assert!(!is_paused(&json!({ "PlayState": { "IsPaused": "yes" } })));
+    }
+
+    /// With nothing playing, a paused session is still what the user is
+    /// watching — the fallback arm, and the reason it exists.
+    #[test]
+    fn a_paused_session_is_still_used_when_it_is_all_there_is() {
+        let paused = json!({
+            "PlayState": { "IsPaused": true },
+            "NowPlayingItem": { "Type": "Episode", "SeriesName": "Test Show", "IndexNumber": 3 }
+        });
+        let candidates = [&paused];
+        let picked = candidates
+            .iter()
+            .filter(|s| !is_paused(s))
+            .find_map(|s| playback_from_session(s))
+            .or_else(|| candidates.iter().find_map(|s| playback_from_session(s)));
+        assert!(picked.is_some(), "a pause must not blank the card");
     }
 
     #[test]

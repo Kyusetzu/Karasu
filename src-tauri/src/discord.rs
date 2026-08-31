@@ -138,9 +138,15 @@ pub fn sync(app: &AppHandle, now: Option<&NowPlaying>) {
     // to the idle presence rather than going silent.
     let level = crate::commands::read_content_filter(&db);
     let now = now.filter(|np| {
-        np.media_id
-            .map(|id| !crate::commands::media_id_blocked(&db, id, &level))
-            .unwrap_or(true)
+        match np.media_id {
+            Some(id) => !crate::commands::media_id_blocked(&db, id, &level),
+            // An *unmatched* detection is precisely where adult or private
+            // content lands — nothing on the list to check it against — and
+            // `unwrap_or(true)` published its raw parsed title to everyone who
+            // can see the profile. With the filter on, an unplaceable title is
+            // not broadcast at all; with it off, nothing here applies anyway.
+            None => level == "off",
+        }
     });
 
     // Build the two presence strings and the timestamps. The start second

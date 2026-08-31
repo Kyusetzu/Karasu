@@ -210,9 +210,16 @@ export function useListMutations(userId: number, mediaType: MediaType) {
       // A save that changed nothing gets no receipt. Undoing a no-op is noise,
       // and so is announcing one.
       if (!undo) return;
+      // `queued` means the write never reached AniList — it is sitting in
+      // SQLite waiting for a drain. It came back as a success because the edit
+      // is not lost, but saying so in the same green receipt as a landed write
+      // is the one assurance a tracker must not get wrong. The undo still
+      // works: it queues too.
       showToast({
-        kind: "success",
-        text: receiptText(input, ctx.before, ctx.title),
+        kind: res?.queued ? "info" : "success",
+        text: res?.queued
+          ? t("receipt.queued", { title: ctx.title })
+          : receiptText(input, ctx.before, ctx.title),
         action: {
           label: t("receipt.undo"),
           run: () => save.mutate(undo),

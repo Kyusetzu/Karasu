@@ -1467,7 +1467,7 @@ query ($page: Int, $reset: Boolean) {
       STAFF_SUBMISSION_UPDATE, CHARACTER_SUBMISSION_UPDATE
     ]) {
       __typename
-      ... on AiringNotification { id createdAt episode media { id title { romaji english native } } }
+      ... on AiringNotification { id createdAt episode media { id title { romaji english native } isAdult genres } }
       ... on FollowingNotification { id createdAt user { id name } }
       ... on ActivityMentionNotification { id createdAt activityId user { id name } }
       ... on ActivityReplyNotification { id createdAt activityId user { id name } }
@@ -1479,11 +1479,11 @@ query ($page: Int, $reset: Boolean) {
       ... on ThreadCommentSubscribedNotification { id createdAt commentId user { id name } thread { id title } }
       ... on ThreadCommentLikeNotification { id createdAt commentId user { id name } thread { id title } }
       ... on ThreadLikeNotification { id createdAt user { id name } thread { id title } }
-      ... on RelatedMediaAdditionNotification { id createdAt media { id title { romaji english native } } }
-      ... on MediaDataChangeNotification { id createdAt reason media { id title { romaji english native } } }
-      ... on MediaMergeNotification { id createdAt reason deletedMediaTitles media { id title { romaji english native } } }
+      ... on RelatedMediaAdditionNotification { id createdAt media { id title { romaji english native } isAdult genres } }
+      ... on MediaDataChangeNotification { id createdAt reason media { id title { romaji english native } isAdult genres } }
+      ... on MediaMergeNotification { id createdAt reason deletedMediaTitles media { id title { romaji english native } isAdult genres } }
       ... on MediaDeletionNotification { id createdAt reason deletedMediaTitle }
-      ... on MediaSubmissionUpdateNotification { id createdAt status submittedTitle media { id title { romaji english native } } }
+      ... on MediaSubmissionUpdateNotification { id createdAt status submittedTitle media { id title { romaji english native } isAdult genres } }
       ... on StaffSubmissionUpdateNotification { id createdAt status staff { id name { full } } }
       ... on CharacterSubmissionUpdateNotification { id createdAt status character { id name { full } } }
     }

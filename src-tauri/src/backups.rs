@@ -11,7 +11,7 @@
 //! a laptop that sleeps through the appointed hour still get its backup.
 
 use crate::db::Db;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Manager};
 
 const BACKUP_ENABLED_KEY: &str = "backup_enabled";
@@ -87,6 +87,59 @@ fn is_readable_database(path: &Path) -> bool {
     .and_then(|c| c.query_row("PRAGMA quick_check", [], |r| r.get::<_, String>(0)))
     .map(|answer| answer == "ok")
     .unwrap_or(false)
+}
+
+/// Puts the newest readable backup in place of a database that will not open.
+///
+/// Called from `setup` when `Db::open` fails. Without it, a corrupt or
+/// truncated `karasu.db` meant the app never started at all — while up to a
+/// week of good snapshots sat in a folder beside it, reachable only through
+/// the app that would not launch. The user's own copy is kept as
+/// `karasu.db.unreadable` rather than deleted: it is still their data, and a
+/// support request is easier to answer with it than without.
+///
+/// Returns the path it restored from, or `None` when there was nothing
+/// usable — in which case the caller fails as it did before.
+pub fn restore_newest(data_dir: &Path) -> Option<PathBuf> {
+    let dir = data_dir.join("backups");
+    let mut names: Vec<String> = std::fs::read_dir(&dir)
+        .ok()?
+        .filter_map(|e| e.ok())
+        .map(|e| e.file_name().to_string_lossy().to_string())
+        .filter(|n| is_backup_name(n))
+        .collect();
+    // Newest first: the names carry a sortable date, which is why they are
+    // shaped the way `backup_name` shapes them.
+    names.sort_unstable_by(|a, b| b.cmp(a));
+
+    let target = data_dir.join("karasu.db");
+    for name in names {
+        let candidate = dir.join(&name);
+        if !is_readable_database(&candidate) {
+            crate::logging::warn("backups", format!("{name} is not readable either; trying older"));
+            continue;
+        }
+        // Move the unreadable file aside rather than overwrite it.
+        if target.exists() {
+            let aside = data_dir.join("karasu.db.unreadable");
+            let _ = std::fs::remove_file(&aside);
+            if let Err(e) = std::fs::rename(&target, &aside) {
+                crate::logging::error("backups", format!("cannot set the broken database aside: {e}"));
+                return None;
+            }
+        }
+        match std::fs::copy(&candidate, &target) {
+            Ok(_) => {
+                crate::logging::info("backups", format!("restored the database from {name}"));
+                return Some(candidate);
+            }
+            Err(e) => {
+                crate::logging::error("backups", format!("cannot restore {name}: {e}"));
+                return None;
+            }
+        }
+    }
+    None
 }
 
 /// One pass: today's snapshot if absent, then the prune. Also called
@@ -195,5 +248,55 @@ mod tests {
         assert!(!is_backup_name("karasu-2026081411.db"));
         assert!(!is_backup_name("karasu-abcdefgh.db"));
         assert!(!is_backup_name("karasu-20260814.db.bak"));
+    }
+
+    /// The failure this exists for: a database that will not open, with good
+    /// snapshots sitting beside it that only the app could reach.
+    #[test]
+    fn a_broken_database_is_replaced_by_the_newest_readable_backup() {
+        let dir = std::env::temp_dir().join(format!("karasu-restore-{}", std::process::id()));
+        let backups = dir.join("backups");
+        std::fs::create_dir_all(&backups).unwrap();
+
+        // Two real databases, and a newer one that is not.
+        for (name, good) in [("karasu-20260829.db", true), ("karasu-20260830.db", true)] {
+            let path = backups.join(name);
+            let conn = rusqlite::Connection::open(&path).unwrap();
+            conn.execute_batch("CREATE TABLE marker (which TEXT);").unwrap();
+            conn.execute("INSERT INTO marker (which) VALUES (?1)", [name]).unwrap();
+            drop(conn);
+            assert_eq!(is_readable_database(&path), good);
+        }
+        std::fs::write(backups.join("karasu-20260831.db"), b"not a database").unwrap();
+        std::fs::write(dir.join("karasu.db"), b"also not a database").unwrap();
+
+        let from = restore_newest(&dir).expect("a readable backup exists");
+        assert!(
+            from.ends_with("karasu-20260830.db"),
+            "the newest *readable* one, skipping the corrupt newer file: {from:?}"
+        );
+
+        // The restored file is the one that was chosen, and the broken
+        // original is kept rather than thrown away.
+        let conn = rusqlite::Connection::open(dir.join("karasu.db")).unwrap();
+        let which: String = conn
+            .query_row("SELECT which FROM marker", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(which, "karasu-20260830.db");
+        drop(conn);
+        assert!(dir.join("karasu.db.unreadable").exists(), "the user's own file is kept");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Nothing usable means the caller fails exactly as it did before, rather
+    /// than starting on an empty database and looking like data loss.
+    #[test]
+    fn no_usable_backup_restores_nothing() {
+        let dir = std::env::temp_dir().join(format!("karasu-restore-none-{}", std::process::id()));
+        std::fs::create_dir_all(dir.join("backups")).unwrap();
+        std::fs::write(dir.join("backups").join("karasu-20260830.db"), b"junk").unwrap();
+        assert!(restore_newest(&dir).is_none());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

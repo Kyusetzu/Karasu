@@ -5,9 +5,9 @@
 //! `lib.rs` resolve exactly as they did — a command's name is a string on the
 //! frontend, and renaming one is a runtime break the compiler cannot see.
 
-mod auth;
+pub(crate) mod auth;
 mod images;
-mod list;
+pub(crate) mod list;
 mod playback;
 mod prefs;
 mod system;

@@ -352,6 +352,8 @@ export const en = {
   },
   stats: {
     title: "Statistics",
+    listUnavailable:
+      "Your list could not be loaded, so the panels counted from it are missing rather than empty.",
     signInText: "Connect your AniList account to see your statistics.",
     localSubtitle: "Counted from your local list — no account, no requests.",
     localMissing:
@@ -853,8 +855,10 @@ export const en = {
     score: "{{title}} scored {{n}}",
     undo: "Undo",
     failed: "Couldn't save {{title}}",
+    queued: "{{title}} saved — will sync",
     failedDetail: "Queued — Karasu will retry.",
     syncBusy: "A sync is already running. Try again in a moment.",
+    rateLimited: "AniList is rate-limiting requests. Karasu will retry shortly.",
     bulkSaved: "{{count}} updated",
     bulkFailed: "Bulk update failed",
     bulkPartial: "Stopped after {{done}} of {{count}} — the rest is unchanged",
@@ -1136,6 +1140,7 @@ export const en = {
     confirmPromptManga: "Mark chapter {{n}} as read?",
     updating: "Updating …",
     updated: "Progress updated ({{n}})",
+    queued: "Saved ({{n}}) — will sync when AniList is reachable",
     blocked: "Auto-update not possible",
     blockedAlreadyWatched:
       "Episode {{n}} is already watched — your list is at {{progress}}.",
@@ -1414,6 +1419,7 @@ export const en = {
     jfErrNoToken: "The server's reply contained no access token.",
     jfErrNoUserId: "The server's reply contained no user id.",
     jfErrBadCredentials: "Wrong username or password.",
+    jfErrBadUrl: "That is not a usable server address — it needs to start with http:// or https://.",
     airingNotify: "New-episode notifications",
     airingNotifyHint:
       "Desktop notification when a new episode of a show you are watching airs — the one thing the website cannot do while Karasu sits in the tray.",

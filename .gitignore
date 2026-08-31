@@ -39,3 +39,11 @@ design/*.svg
 # six-second production build would become an unbounded one. Naming it here too
 # means the guard does not depend on a single line in a nested file.
 src-tauri/target/
+
+# Audit reports. Written by a review pass, kept out of the tree on purpose: a
+# list of a codebase's unfixed weaknesses — its SSRF guard, its OAuth listener,
+# its IPC surface, its token stores — is a map for anyone who reads the repo,
+# and this one is public. What such a pass concludes belongs in CLAUDE.md (the
+# invariants) and ROADMAP.md (what is left), which is where the last one's
+# findings went.
+/audit/

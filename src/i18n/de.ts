@@ -351,6 +351,8 @@ export const de: typeof en = {
   },
   stats: {
     title: "Statistik",
+    listUnavailable:
+      "Deine Liste konnte nicht geladen werden — die daraus berechneten Auswertungen fehlen daher, statt leer zu wirken.",
     signInText: "Verbinde deinen AniList-Account, um deine Statistik zu sehen.",
     localSubtitle: "Aus deiner lokalen Liste gezählt — kein Konto, keine Anfragen.",
     localMissing:
@@ -850,8 +852,10 @@ export const de: typeof en = {
     score: "{{title}} mit {{n}} bewertet",
     undo: "Rückgängig",
     failed: "{{title}} konnte nicht gespeichert werden",
+    queued: "{{title}} gespeichert — wird synchronisiert",
     failedDetail: "In der Warteschlange — Karasu versucht es erneut.",
     syncBusy: "Eine Synchronisierung läuft bereits. Bitte gleich erneut versuchen.",
+    rateLimited: "AniList drosselt gerade die Anfragen. Karasu versucht es in Kürze erneut.",
     bulkSaved: "{{count}} aktualisiert",
     bulkFailed: "Massenänderung fehlgeschlagen",
     bulkPartial:
@@ -1139,6 +1143,7 @@ export const de: typeof en = {
     confirmPromptManga: "Kapitel {{n}} als gelesen markieren?",
     updating: "Aktualisiere …",
     updated: "Fortschritt aktualisiert ({{n}})",
+    queued: "Gespeichert ({{n}}) — wird synchronisiert, sobald AniList erreichbar ist",
     blocked: "Auto-Update nicht möglich",
     blockedAlreadyWatched:
       "Folge {{n}} ist bereits gesehen — deine Liste steht bei {{progress}}.",
@@ -1413,6 +1418,7 @@ export const de: typeof en = {
     jfErrNoToken: "Die Antwort des Servers enthielt kein Zugriffstoken.",
     jfErrNoUserId: "Die Antwort des Servers enthielt keine Benutzer-ID.",
     jfErrBadCredentials: "Falscher Benutzername oder falsches Passwort.",
+    jfErrBadUrl: "Das ist keine nutzbare Serveradresse — sie muss mit http:// oder https:// beginnen.",
     airingNotify: "Benachrichtigung bei neuer Folge",
     airingNotifyHint:
       "Desktop-Benachrichtigung, wenn eine neue Folge einer laufenden Serie erscheint — das Einzige, was die Website nicht kann, während Karasu im Tray liegt.",

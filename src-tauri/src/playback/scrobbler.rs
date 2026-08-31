@@ -45,7 +45,13 @@ pub struct NowPlaying {
     /// Kept because `requeue_match` re-resolves from this object rather than
     /// from a fresh detection: without the untouched number it would shift an
     /// already-shifted one and drift a little further on every correction.
-    #[serde(skip)]
+    ///
+    /// Serialised for the same reason the correction dialog needs it: an
+    /// offset is `chosen - detected`, and `episode` below is already shifted
+    /// and already redirected. Measuring against that number stored a wrong
+    /// offset the moment a correction was edited a second time, and confirming
+    /// the pre-filled figure stored `0` — destroying a working correction.
+    #[serde(rename = "sourceEpisode")]
     pub source_episode: Option<u32>,
     /// AniList media ID on a successful match against the list
     #[serde(rename = "mediaId")]
@@ -155,8 +161,38 @@ pub enum Phase {
     Pending,
     Updating,
     Updated,
+    /// Written locally, not yet accepted by AniList.
+    ///
+    /// A distinct phase because `Updated` is a claim about the server. The
+    /// write went to the offline queue — offline, throttled, or behind a drain
+    /// that was already running — and saying "Updated ✓" for it is the one
+    /// assurance a tracker cannot get wrong.
+    Queued,
     Blocked(BlockReason),
     Cancelled,
+}
+
+/// What a write actually did.
+///
+/// `save_entry_core` answers `queued` for anything that could still work
+/// later, and that answer used to be discarded by every caller in this file:
+/// the session went to `Updated`, the local cache was patched with progress
+/// the account did not have, and `scrobble-done` fired. If the queued row was
+/// later refused for good, the cache kept a number that had never landed — and
+/// `would_regress`, which reads that cache, then refused the correct rewrite.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Outcome {
+    Landed,
+    Queued,
+    /// The write was refused here, before it was sent.
+    ///
+    /// Carries a real block reason rather than a message. `would_regress` used
+    /// to answer with English prose, which became `BlockReason::Failed` — the
+    /// one blocked phase that is *forceable* and whose text
+    /// `backendErrorText` cannot translate. So a German card showed an English
+    /// sentence beside an "Update now" button that reproduced the identical
+    /// refusal, for as long as the user kept pressing it.
+    Refused(BlockReason),
 }
 
 #[derive(Debug, Clone)]
@@ -176,6 +212,16 @@ pub struct Session {
     pub update_at: Option<Instant>,
     pub update_at_epoch_ms: Option<u64>,
     pub phase: Phase,
+    /// Consecutive polls that detected nothing at all.
+    ///
+    /// A pause is indistinguishable from a stop on any source that reports
+    /// only playing sessions — which is every media-session player, and on
+    /// Linux that is the whole of local detection. Dropping the session on the
+    /// first empty tick therefore threw away the accumulated watch time and
+    /// restarted the threshold from zero on resume, so a twice-paused episode
+    /// could never scrobble. Counted rather than acted on immediately, and
+    /// reset the moment the same content is seen again.
+    pub missed_ticks: u32,
 }
 
 /// Running scrobble session (shared between the loop and commands).
@@ -223,6 +269,7 @@ fn emit_session(app: &AppHandle, session: Option<&Session>) {
                 Phase::Pending => "pending",
                 Phase::Updating => "updating",
                 Phase::Updated => "updated",
+                Phase::Queued => "queued",
                 Phase::Blocked(_) => "blocked",
                 Phase::Cancelled => "cancelled",
             }
@@ -569,6 +616,41 @@ fn build_now_playing(
 /// simply continuing to watch.
 const GAP_GRACE: Duration = Duration::from_secs(5 * 60);
 
+/// How many consecutive empty polls a session survives before it is dropped.
+///
+/// Five minutes at the 5 s poll: long enough for an ordinary pause — a door, a
+/// kettle — and short enough that a player closed for good does not hold the
+/// card for the rest of the evening. The card keeps showing the last state
+/// while this runs down, which is the accepted trade: a stale card for a few
+/// minutes is cheaper than an episode that never scrobbles.
+const EMPTY_TICK_GRACE: u32 = 60;
+
+/// Whether an armed session is still armed *this* tick.
+///
+/// Separate from [`auto_arm`], which answers the question once when the
+/// session starts. The settings can change while an episode plays, and two of
+/// them must be honoured at the moment the update comes due rather than at the
+/// moment it was scheduled: switching automatic tracking off has to stop a
+/// write that is already waiting, and the gap grace is opt-in the same way.
+fn armed_now(enabled: bool, gap_auto: bool, phase: &Phase, has_deadline: bool) -> bool {
+    enabled
+        && has_deadline
+        && match phase {
+            Phase::Watching => true,
+            Phase::Blocked(BlockReason::EpisodeGap { .. }) => gap_auto,
+            _ => false,
+        }
+}
+
+/// Whether an empty poll ends the session, given how many came before it.
+///
+/// The session survives [`EMPTY_TICK_GRACE`] of them: on any source that
+/// reports only playing sessions a pause looks exactly like a stop, and
+/// ending the session there restarts the threshold from zero on resume.
+fn grace_spent(missed_ticks: u32) -> bool {
+    missed_ticks > EMPTY_TICK_GRACE
+}
+
 /// How long until this session's automatic update arms, or `None` for never.
 ///
 /// Watching arms at the normal threshold. An episode-gap block arms only
@@ -626,7 +708,11 @@ fn block_reason(now: &NowPlaying, episode: u32, progress: u32) -> Option<BlockRe
 /// this is. The last is what makes a correction stick: once made, this
 /// returns `None` and the session proceeds normally.
 fn unplaceable_season(now: &NowPlaying) -> Option<u32> {
-    let season = now.season.filter(|s| *s > 1)?;
+    // `!= 1` rather than `> 1`: season 0 is a Specials folder, and a special
+    // matched against the bare series title is the same mistake as a season-2
+    // episode — it lands on the main entry and moves its progress. Season 1 is
+    // the only one that genuinely carries no information.
+    let season = now.season.filter(|s| *s != 1)?;
     if now.overridden {
         return None;
     }
@@ -721,7 +807,7 @@ async fn perform_update(
     episode: u32,
     total: Option<u32>,
     list_status: &str,
-) -> Result<(), String> {
+) -> Result<Outcome, String> {
     let token =
         crate::anilist::auth::load_token().ok_or("Not connected to AniList")?;
 
@@ -736,10 +822,15 @@ async fn perform_update(
             .map(|c| c.progress)
     };
     if would_regress(episode, cached_progress, list_status) {
-        return Err(format!(
-            "Refusing to set progress back to {episode} from {}",
-            cached_progress.unwrap_or(0)
-        ));
+        // The same fact `block_reason` states before a session ever arms —
+        // discovered later, because this reads the cache immediately before
+        // writing. Said in the same vocabulary, it renders in the reader's
+        // language and is not forceable, so the card stops offering a retry
+        // that cannot succeed.
+        return Ok(Outcome::Refused(BlockReason::AlreadyWatched {
+            episode,
+            progress: cached_progress.unwrap_or(0),
+        }));
     }
 
     let done = total == Some(episode);
@@ -752,7 +843,17 @@ async fn perform_update(
 
     let db = app.state::<Db>();
     let api = app.state::<crate::anilist::client::AniList>();
-    crate::commands::save_entry_core(app, &db, &api, &token, input).await?;
+    let result = crate::commands::save_entry_core(app, &db, &api, &token, input).await?;
+    if result.queued {
+        // Nothing reached AniList, so nothing here may claim it did: no cache
+        // patch, no widget refresh, no `scrobble-done`. The queue owns it now
+        // and the card says so.
+        crate::logging::debug(
+            "scrobble",
+            format!("#{media_id} ep {episode} queued — not claiming it landed"),
+        );
+        return Ok(Outcome::Queued);
+    }
 
     // Patch the local cache so the next detection sees the new state
     if let Some(user_id) = cached_user_id(&db) {
@@ -779,7 +880,7 @@ async fn perform_update(
         "scrobble-done",
         json!({ "mediaId": media_id, "episode": episode }),
     );
-    Ok(())
+    Ok(Outcome::Landed)
 }
 
 /// Re-resolves what is playing against the corrections table, right now.
@@ -959,6 +1060,15 @@ async fn confirm_pending_impl(
             emit_session(&app, Some(session));
             return Ok(());
         }
+        // Nothing left to confirm. The tray item is always enabled and carries
+        // no `expect`, so without this a press after a successful scrobble ran
+        // the update again, tripped `would_regress`, and turned a finished
+        // session's `Updated` into a `Blocked(Failed)` on the card.
+        match &session.phase {
+            Phase::Updated => return Err("That episode is already updated".into()),
+            Phase::Updating => return Err("That update is already running".into()),
+            _ => {}
+        }
         // A block the user is not allowed to override stays blocked, whatever
         // asked. The card hides the button for these, so reaching here means
         // a stale event or a caller that never saw it — either way the answer
@@ -986,13 +1096,17 @@ async fn confirm_pending_impl(
     if let Some(session) = guard.as_mut() {
         if applies_to(session, data.0, data.2) {
             session.phase = match &result {
-                Ok(()) => Phase::Updated,
+                Ok(Outcome::Landed) => Phase::Updated,
+                Ok(Outcome::Queued) => Phase::Queued,
+                Ok(Outcome::Refused(reason)) => Phase::Blocked(reason.clone()),
                 Err(e) => Phase::Blocked(BlockReason::Failed { message: e.clone() }),
             };
             emit_session(&app, Some(session));
         }
     }
-    result
+    // The caller only needs to know it did not fail; which of the two ways it
+    // succeeded is already on the card.
+    result.map(|_| ())
 }
 
 /// Starts the detection and scrobble loop (runs for the app's lifetime).
@@ -1070,6 +1184,15 @@ pub fn spawn(app: AppHandle) {
             }
 
             drive_session(&app).await;
+            // Every tick, not only when the title changes. `sync` skips an
+            // identical payload by fingerprint and re-sends it once
+            // `RESEND_SECS` has passed — which is how a Discord that was
+            // restarted, or started after Karasu, gets a presence at all. That
+            // mechanism could never fire, because the only caller sat inside
+            // the "playback changed" branch: a whole episode is
+            // fingerprint-identical by construction, so nothing called it for
+            // twenty minutes at a time. Cheap: a lock and a string compare.
+            crate::discord::sync_current(&app);
             tokio::time::sleep(POLL_INTERVAL).await;
         }
         }
@@ -1115,6 +1238,7 @@ async fn drive_session(app: &AppHandle) {
                         update_at: armed_in.map(|d| Instant::now() + d),
                         update_at_epoch_ms: armed_in.map(epoch_ms_in),
                         phase,
+                        missed_ticks: 0,
                     };
                     // The two `Blocked` reasons are the most-asked "why didn't it
                     // scrobble", and until now they existed only as a transient
@@ -1140,22 +1264,40 @@ async fn drive_session(app: &AppHandle) {
                     // disarms a waiting gap immediately, while `update_at`
                     // was only ever set if it was on when the session began.
                     let session = guard.as_mut().unwrap();
-                    let armed = session.update_at.is_some()
-                        && match &session.phase {
-                            Phase::Watching => true,
-                            Phase::Blocked(BlockReason::EpisodeGap { .. }) => settings.gap_auto,
-                            _ => false,
-                        };
+                    // Playing again (or still), so the pause grace starts over.
+                    session.missed_ticks = 0;
+                    // `enabled` is re-read here, not just at `auto_arm`: turning
+                    // automatic tracking off mid-episode used to leave an
+                    // already-armed session to fire anyway, up to a full
+                    // threshold later, which is precisely what the switch is
+                    // asked to prevent.
+                    let armed = armed_now(
+                        settings.enabled,
+                        settings.gap_auto,
+                        &session.phase,
+                        session.update_at.is_some(),
+                    );
+                    // A gap block waits out `GAP_GRACE` on the wall clock and
+                    // nothing else. A source-reported position must not
+                    // short-circuit it: resuming a part-watched episode already
+                    // sits past two thirds, so believing the position here
+                    // would lift the block within one 5 s tick and hand the
+                    // grace no time to mean anything.
+                    let gap_armed =
+                        matches!(session.phase, Phase::Blocked(BlockReason::EpisodeGap { .. }));
+                    let wall_due = session.update_at.is_some_and(|at| Instant::now() >= at);
                     let due = armed
-                        && position_due(
-                            np.position_sec,
-                            np.duration_sec,
-                            np.duration_min,
-                            settings.delay_min,
-                        )
-                        .unwrap_or_else(|| {
-                            session.update_at.is_some_and(|at| Instant::now() >= at)
-                        });
+                        && if gap_armed {
+                            wall_due
+                        } else {
+                            position_due(
+                                np.position_sec,
+                                np.duration_sec,
+                                np.duration_min,
+                                settings.delay_min,
+                            )
+                            .unwrap_or(wall_due)
+                        };
                     if !due {
                         None
                     } else if settings.confirm {
@@ -1211,9 +1353,16 @@ async fn drive_session(app: &AppHandle) {
                 }
             }
             _ => {
-                if guard.is_some() {
-                    *guard = None;
-                    emit_session(app, None);
+                // Nothing detected this tick. That is a pause as often as it is
+                // a stop, and the two are indistinguishable from here, so the
+                // session is held — with its `update_at` intact — until the
+                // grace runs out.
+                if let Some(session) = guard.as_mut() {
+                    session.missed_ticks = session.missed_ticks.saturating_add(1);
+                    if grace_spent(session.missed_ticks) {
+                        *guard = None;
+                        emit_session(app, None);
+                    }
                 }
                 None
             }
@@ -1221,27 +1370,43 @@ async fn drive_session(app: &AppHandle) {
     };
 
     if let Some((mid, mtype, ep, total, status)) = update_data {
-        let result = perform_update(app, mid, &mtype, ep, total, &status).await;
-        let state = app.state::<ScrobbleSession>();
-        let mut guard = state.0.guard();
-        if let Some(session) = guard.as_mut() {
-            if applies_to(session, mid, ep) {
-                session.phase = match result {
-                    Ok(()) => Phase::Updated,
-                    Err(e) => Phase::Blocked(BlockReason::Failed { message: e }),
-                };
-                emit_session(app, Some(session));
+        // Spawned, not awaited. This runs inside the 5 s detection poll and the
+        // write can take minutes: `save_entry_core` drains the offline queue
+        // first, and the shared limiter may hold the request behind a server
+        // deadline. Awaited, that froze detection outright — the log went
+        // quiet, the card stopped moving, and any session that began and ended
+        // inside the freeze was never seen at all.
+        //
+        // Letting the loop carry on is safe because the session is already in
+        // `Phase::Updating`, which `armed_now` never arms, so the next tick
+        // cannot start a second write for it. `applies_to` then decides whether
+        // the result still describes what is playing by the time it lands.
+        let app = app.clone();
+        tauri::async_runtime::spawn(async move {
+            let result = perform_update(&app, mid, &mtype, ep, total, &status).await;
+            let state = app.state::<ScrobbleSession>();
+            let mut guard = state.0.guard();
+            if let Some(session) = guard.as_mut() {
+                if applies_to(session, mid, ep) {
+                    session.phase = match result {
+                        Ok(Outcome::Landed) => Phase::Updated,
+                        Ok(Outcome::Queued) => Phase::Queued,
+                        Ok(Outcome::Refused(reason)) => Phase::Blocked(reason),
+                        Err(e) => Phase::Blocked(BlockReason::Failed { message: e }),
+                    };
+                    emit_session(&app, Some(session));
+                }
             }
-        }
+        });
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        applies_to, auto_arm, block_reason, position_due, shift_episode, threshold,
-        would_regress, BlockReason, NowPlaying, Phase, Session, DEFAULT_THRESHOLD,
-        GAP_GRACE, MANGA_THRESHOLD,
+        applies_to, armed_now, auto_arm, block_reason, grace_spent, position_due, shift_episode,
+        threshold, would_regress, BlockReason, NowPlaying, Phase, Session, DEFAULT_THRESHOLD,
+        EMPTY_TICK_GRACE, GAP_GRACE, MANGA_THRESHOLD, POLL_INTERVAL,
     };
     use std::time::Duration;
 
@@ -1467,7 +1632,90 @@ mod tests {
             update_at: None,
             update_at_epoch_ms: None,
             phase: Phase::Watching,
+            missed_ticks: 0,
         }
+    }
+
+    /// The P1 this grace exists for: on a media-session-only player a pause
+    /// makes `is_playing` false, detection returns nothing, and the session
+    /// used to be destroyed on that single tick — taking the accumulated watch
+    /// time with it and restarting the threshold from zero on resume. On Linux
+    /// there is no window-title rung to fall back to, so this is every player.
+    #[test]
+    fn a_pause_does_not_end_the_session() {
+        assert!(!grace_spent(0), "the tick that just happened");
+        assert!(!grace_spent(1));
+        assert!(
+            !grace_spent(EMPTY_TICK_GRACE),
+            "still inside the grace at the boundary"
+        );
+        assert!(
+            grace_spent(EMPTY_TICK_GRACE + 1),
+            "a player closed for good does eventually let go"
+        );
+    }
+
+    /// Five minutes at the 5 s poll. Written down because the constant is a
+    /// tick count and the promise is a duration.
+    #[test]
+    fn the_grace_is_five_minutes_of_polls() {
+        assert_eq!(EMPTY_TICK_GRACE * POLL_INTERVAL.as_secs() as u32, 300);
+    }
+
+    /// Turning automatic tracking off must stop a write that is already
+    /// waiting. `auto_arm` answers only at session start, so before this the
+    /// switch had no effect until the next episode.
+    #[test]
+    fn switching_automatic_updates_off_disarms_a_waiting_session() {
+        let watching = Phase::Watching;
+        assert!(armed_now(true, false, &watching, true));
+        assert!(
+            !armed_now(false, false, &watching, true),
+            "off means off, mid-episode included"
+        );
+        assert!(
+            !armed_now(true, false, &watching, false),
+            "nothing to disarm without a deadline"
+        );
+    }
+
+    /// A refusal is not a failure, and the difference is visible: `Failed` is
+    /// the one blocked phase that is forceable and whose message no dictionary
+    /// covers, so answering a regress refusal with it put an untranslated
+    /// sentence beside a retry button that could only ever reproduce it.
+    #[test]
+    fn a_refused_write_is_not_offered_a_retry() {
+        let refused = BlockReason::AlreadyWatched { episode: 5, progress: 24 };
+        assert!(!refused.forceable(), "there is nothing a retry could change");
+        let failed = BlockReason::Failed { message: "AniList said no".into() };
+        assert!(failed.forceable(), "a server refusal is worth retrying");
+    }
+
+    /// The write is spawned rather than awaited, so the 5 s poll keeps running
+    /// while it is in flight. This is what stops the next tick starting a
+    /// second write for the same session — and therefore what makes spawning
+    /// safe. Any phase that means "a write is under way or done" must never
+    /// arm; extending `armed_now` without keeping that true would reintroduce
+    /// double scrobbles.
+    #[test]
+    fn no_phase_with_a_write_in_flight_can_arm() {
+        for phase in [Phase::Updating, Phase::Pending, Phase::Updated, Phase::Queued] {
+            assert!(
+                !armed_now(true, true, &phase, true),
+                "{phase:?} must not arm while or after a write"
+            );
+        }
+    }
+
+    /// The gap grace is opt-in at the due point too, and no other blocked
+    /// phase ever arms.
+    #[test]
+    fn only_a_gap_block_arms_and_only_when_opted_in() {
+        let gap = Phase::Blocked(BlockReason::EpisodeGap { episode: 9, progress: 5 });
+        assert!(armed_now(true, true, &gap, true));
+        assert!(!armed_now(true, false, &gap, true));
+        let watched = Phase::Blocked(BlockReason::AlreadyWatched { episode: 3, progress: 12 });
+        assert!(!armed_now(true, true, &watched, true));
     }
 
     #[test]

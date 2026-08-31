@@ -517,7 +517,7 @@ const FENCE = /^\s*```/;
 const CENTER_CLOSE = /^([\s\S]*?)~~~\s*$/;
 /**
  * Opens one. The trailing group is content written on the *same line* as the
- * fence, which real bios do constantly — `~~~ tam | she/her | arg` was the form
+ * fence, which real bios do constantly — `~~~ ren | they/them | de` was the form
  * that exposed this. Requiring a bare `~~~` line left the tildes on screen.
  */
 const CENTER_OPEN = /^\s*~~~(.*)$/;

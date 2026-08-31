@@ -202,6 +202,7 @@ jobs:
           else {
             $out = @("tag=latest", "name=Latest build", "prerelease=true", "rolling=true", "version=", "suffix=")
           }
+
           # `Out-File -Append -Encoding utf8`, the same idiom rename-installer.ps1
           # already uses, rather than `>>` — the redirect's default encoding is
           # a shell-version detail and this file is parsed by the runner.
@@ -225,6 +226,20 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      # Before anything is built or published, and for both arms: a rolling
+      # build ships to the prerelease channel and is installed by real users,
+      # so it needs this as much as a tag does.
+      #
+      # The four-part version lives in five files and only bump-version.mjs
+      # writes all of them at once, so a hand-edit or a bad merge can leave them
+      # disagreeing. The consequence is not cosmetic: `latest.json` is generated
+      # from package.json plus COMMIT_NUMBER, while the running app compares
+      # against the COMMIT_NUMBER compiled into it. Let those describe two
+      # different builds and every install re-downloads its own update forever,
+      # with only a new release to stop it.
+      - name: Check the version files agree
+        run: node scripts/bump-version.mjs --check
 
       # Flattened into linux-artifacts/. continue-on-error so a missing or
       # failed Linux build degrades to a Windows-only release rather than

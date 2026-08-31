@@ -93,29 +93,50 @@ pub fn season_informed(parsed: &Parsed) -> bool {
     without_season_marker(parsed).is_some()
 }
 
+/// One spelling to look for, and whether it may win outright.
+///
+/// `exact_ok` is false for exactly one needle: the title with its season
+/// marker removed, past season 1. That spelling exists to *score* — it is what
+/// finds a continuously numbered entry whose title carries no season at all —
+/// but as an exact hit it is a claim about the wrong entry. "Show S2" strips
+/// to "show", which matches the season-1 entry's title character for
+/// character, and the exact-match path returns on the first candidate that
+/// hits: with the season-1 entry earlier in the list, a season-2 detection
+/// bound to it and wrote season 2's episode numbers onto season 1.
+struct Needle {
+    text: String,
+    exact_ok: bool,
+}
+
 /// Title variants of the detected name to cover season spellings:
 /// "Title S2" ↔ "Title 2nd Season" ↔ "Title Season 2".
-fn variants(parsed: &Parsed) -> Vec<String> {
+fn variants(parsed: &Parsed) -> Vec<Needle> {
     let base = normalize(&parsed.title);
-    let mut out = vec![base.clone()];
+    let mut out = vec![Needle { text: base.clone(), exact_ok: true }];
 
     if let Some(season) = parsed.season {
         if let Some(stripped) = without_season_marker(parsed) {
-            out.push(format!("{stripped} season {season}"));
             let suffix = match season {
                 1 => "st",
                 2 => "nd",
                 3 => "rd",
                 _ => "th",
             };
-            out.push(format!("{stripped} {season}{suffix} season"));
-            if season > 1 {
-                out.push(format!("{stripped} {season}"));
+            for text in [
+                format!("{stripped} season {season}"),
+                format!("{stripped} {season}{suffix} season"),
+            ] {
+                out.push(Needle { text, exact_ok: true });
             }
-            out.push(stripped);
+            if season > 1 {
+                out.push(Needle { text: format!("{stripped} {season}"), exact_ok: true });
+            }
+            // Season 1 is the case where the stripped title *is* the answer:
+            // "Show S1" and "Show" name the same entry.
+            out.push(Needle { text: stripped, exact_ok: season <= 1 });
         }
     }
-    out.dedup();
+    out.dedup_by(|a, b| a.text == b.text);
     out
 }
 
@@ -171,10 +192,10 @@ pub fn best_match_prepared(
     parsed: &Parsed,
     candidates: &[PreparedCandidate],
 ) -> Option<Match> {
-    let needles: Vec<(String, HashSet<[u8; 3]>)> = variants(parsed)
+    let needles: Vec<(Needle, HashSet<[u8; 3]>)> = variants(parsed)
         .into_iter()
         .map(|needle| {
-            let grams = trigrams(&needle);
+            let grams = trigrams(&needle.text);
             (needle, grams)
         })
         .collect();
@@ -184,8 +205,11 @@ pub fn best_match_prepared(
         for (hay, hay_grams) in &candidate.titles {
             for (needle, needle_grams) in &needles {
                 // Stays a plain string comparison: an exact hit must win
-                // outright, before any scoring.
-                if hay == needle {
+                // outright, before any scoring — but only for a spelling
+                // entitled to. Scoring still sees every needle, so a stripped
+                // title remains the way a continuously numbered entry is
+                // found; it just cannot end the search on the wrong season.
+                if needle.exact_ok && *hay == needle.text {
                     return Some(Match {
                         media_id: candidate.media_id,
                         score: 1.0,
@@ -208,6 +232,20 @@ pub fn best_match_prepared(
 mod tests {
     use super::*;
     use crate::playback::recognition::parser::parse;
+
+    /// A candidate that is nothing but an id and its titles — the only two
+    /// fields title matching looks at.
+    fn titled(media_id: i64, titles: &[&str]) -> Candidate {
+        Candidate {
+            media_id,
+            titles: titles.iter().map(|t| (*t).into()).collect(),
+            episodes: None,
+            duration_min: None,
+            cover_url: None,
+            progress: 0,
+            status: "CURRENT".into(),
+        }
+    }
 
     fn candidates() -> Vec<Candidate> {
         vec![
@@ -270,6 +308,44 @@ mod tests {
         assert_eq!(m.media_id, 166531);
     }
 
+    /// The season-1 entry deliberately sorts *first*, which is what made this a
+    /// bug rather than a coin toss: "Show S2" strips to "show", the stripped
+    /// spelling matched that entry character for character, and the
+    /// exact-match path returned on the first candidate that hit. Season 2's
+    /// episode numbers then went onto season 1's list entry.
+    #[test]
+    fn a_second_season_does_not_bind_to_season_one_that_sorts_first() {
+        let ordered = vec![
+            titled(1, &["Test Show"]),
+            titled(2, &["Test Show Season 2"]),
+        ];
+        let parsed = parse("[Group] Test Show S2 - 05 [1080p].mkv");
+        let m = best_match(&parsed, &ordered).expect("season 2 is on the list");
+        assert_eq!(m.media_id, 2, "the season the title actually names");
+    }
+
+    /// The stripped spelling still earns its keep: a continuously numbered
+    /// entry carries no season marker at all, and dropping the needle would
+    /// lose it. It scores — it just cannot end the search.
+    #[test]
+    fn a_continuously_numbered_entry_is_still_found() {
+        let only_base = vec![titled(7, &["Test Show"])];
+        let parsed = parse("[Group] Test Show S2 - 05 [1080p].mkv");
+        let m = best_match(&parsed, &only_base).expect("nothing else to match");
+        assert_eq!(m.media_id, 7);
+    }
+
+    /// Season 1 is the case where the stripped title *is* the answer, so it
+    /// keeps its exact match.
+    #[test]
+    fn season_one_still_matches_the_bare_title_exactly() {
+        let base = vec![titled(3, &["Test Show"])];
+        let parsed = parse("[Group] Test Show S1 - 05 [1080p].mkv");
+        let m = best_match(&parsed, &base).unwrap();
+        assert_eq!(m.media_id, 3);
+        assert_eq!(m.score, 1.0, "an exact hit, not a fuzzy one");
+    }
+
     #[test]
     fn fuzzy_tolerates_small_differences() {
         let parsed = parse("Sousou no Frieren (2023) - 28.mkv");
@@ -298,13 +374,13 @@ mod tests {
             for title in &candidate.titles {
                 let hay = normalize(title);
                 for needle in &needles {
-                    if hay == *needle {
+                    if needle.exact_ok && hay == needle.text {
                         return Some(Match {
                             media_id: candidate.media_id,
                             score: 1.0,
                         });
                     }
-                    let score = similarity(needle, &hay);
+                    let score = similarity(&needle.text, &hay);
                     if best.as_ref().is_none_or(|b| score > b.score) {
                         best = Some(Match {
                             media_id: candidate.media_id,

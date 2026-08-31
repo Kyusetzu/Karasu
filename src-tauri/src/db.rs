@@ -324,7 +324,8 @@ PRAGMA user_version = 15;
 const MIGRATION_V16: &str = "
 ALTER TABLE offline_queue ADD COLUMN user_id INTEGER;
 UPDATE offline_queue
-   SET user_id = (SELECT json_extract(value, '$.id') FROM kv WHERE key = 'anilist_viewer');
+   SET user_id = (SELECT json_extract(value, '$.id') FROM kv
+                   WHERE key = 'anilist_viewer' AND json_valid(value));
 DELETE FROM offline_queue WHERE user_id IS NULL;
 PRAGMA user_version = 16;
 ";
@@ -356,6 +357,36 @@ INSERT INTO kv (key, value)
 SELECT 'blur_adult', CASE WHEN EXISTS (SELECT 1 FROM kv) THEN '0' ELSE '1' END
 WHERE NOT EXISTS (SELECT 1 FROM kv WHERE key = 'blur_adult');
 PRAGMA user_version = 17;
+";
+
+/// v18 gives `notifications` an owner, for the reason v16 gave one to
+/// `offline_queue`: the table had no account column at all, so every bell row
+/// the app wrote for one account was read back for the next one. Signing out
+/// of A and into B showed B a list of A's aired episodes and sequel
+/// announcements.
+///
+/// `user_id` is **nullable, and the null is a real answer**: an app-update
+/// notice belongs to the install rather than to an account, and must stay
+/// readable while signed out and in local mode. Account-scoped rows carry an
+/// id; app-wide rows carry null; the readers ask for `user_id IS NULL OR
+/// user_id = ?`.
+///
+/// The backfill attributes existing rows to the cached viewer, skipping the
+/// `update` kind so the one app-wide row that predates this keeps its meaning.
+/// A row that cannot be attributed (nobody signed in) simply stays null, which
+/// is the harmless direction here — unlike v16, where an unattributable queue
+/// row could be *written* to the wrong account and was therefore deleted.
+///
+/// `json_valid(value)` guards the extract because `json_extract` raises on
+/// malformed JSON rather than returning null, and a migration that throws
+/// leaves an app that will not start.
+const MIGRATION_V18: &str = "
+ALTER TABLE notifications ADD COLUMN user_id INTEGER;
+UPDATE notifications
+   SET user_id = (SELECT json_extract(value, '$.id') FROM kv
+                   WHERE key = 'anilist_viewer' AND json_valid(value))
+ WHERE kind <> 'update';
+PRAGMA user_version = 18;
 ";
 
 /// One detection correction: what was detected, and what it really is.
@@ -616,6 +647,15 @@ impl Db {
             // INSERT guarded on the key it inserts.
             apply(&conn, 17, MIGRATION_V17)?;
         }
+        if version < 18 {
+            // The sixth `ALTER TABLE ADD COLUMN`, so v7's guard once more: the
+            // column and its backfill land together or not at all.
+            if has_column(&conn, "notifications", "user_id") {
+                apply(&conn, 18, "PRAGMA user_version = 18;")?;
+            } else {
+                apply(&conn, 18, MIGRATION_V18)?;
+            }
+        }
         Ok(Db(Mutex::new(conn)))
     }
 
@@ -673,6 +713,22 @@ impl Db {
              WHERE substr(key, 1, length(?1)) = ?1
                AND CAST(value AS INTEGER) < ?2",
             rusqlite::params![prefix, cutoff],
+        )
+        .unwrap_or(0)
+    }
+
+    /// Deletes every key under a prefix, whatever its value.
+    ///
+    /// The sibling of `kv_prune_older` for the case where age is not the
+    /// question: on an account change the alert passes' dedupe keys
+    /// (`aired:`, `sequel_seen:`, `stale_done:`) are about what the *previous*
+    /// account had already been told, and holding them would silently deny the
+    /// next account notifications it has never seen.
+    pub fn kv_delete_prefix(&self, prefix: &str) -> usize {
+        let conn = self.0.guard();
+        conn.execute(
+            "DELETE FROM kv WHERE substr(key, 1, length(?1)) = ?1",
+            rusqlite::params![prefix],
         )
         .unwrap_or(0)
     }
@@ -753,6 +809,129 @@ impl Db {
 
     /// Patches an entry's progress/status directly in the list cache so
     /// that detection sees the new state right after a scrobble.
+    /// Reads, edits and writes the cached list back **under one lock**.
+    ///
+    /// The shape this replaces took the mutex three times — once to read, once
+    /// to write, with the parse and re-serialise of the whole payload in
+    /// between — so a `fetch_media_list` storing a freshly fetched list in that
+    /// gap was silently overwritten by the stale copy plus one patched entry.
+    /// On a list of any size the gap is milliseconds, not microseconds.
+    ///
+    /// `edit` reports whether it changed anything, so an entry that is not
+    /// cached costs no write at all.
+    fn edit_cached_list<F>(&self, user_id: i64, media_type: &str, edit: F) -> bool
+    where
+        F: FnOnce(&mut serde_json::Value) -> bool,
+    {
+        let conn = self.0.guard();
+        let payload: String = match conn.query_row(
+            "SELECT payload FROM list_cache WHERE user_id = ?1 AND media_type = ?2",
+            rusqlite::params![user_id, media_type],
+            |r| r.get(0),
+        ) {
+            Ok(p) => p,
+            Err(_) => return false,
+        };
+        let Ok(mut lists) = serde_json::from_str::<serde_json::Value>(&payload) else {
+            return false;
+        };
+        if !edit(&mut lists) {
+            return false;
+        }
+        conn.execute(
+            "INSERT INTO list_cache (user_id, media_type, payload, fetched_at)
+             VALUES (?1, ?2, ?3, strftime('%s','now'))
+             ON CONFLICT(user_id, media_type) DO UPDATE
+                SET payload = excluded.payload, fetched_at = excluded.fetched_at",
+            rusqlite::params![user_id, media_type, lists.to_string()],
+        )
+        .is_ok()
+    }
+
+    /// Applies a field patch to one cached entry, for every writer that changes
+    /// an entry.
+    ///
+    /// **Why this must be called from every write path.** The scrobbler's two
+    /// anti-regression guards — `block_reason` and `would_regress` — read their
+    /// idea of current progress from this table. It used to be written by a
+    /// full list fetch and patched by the scrobbler itself, and by nothing
+    /// else: a manual save, a bulk edit and a queue drain all left it stale.
+    /// The guard was therefore fed the value the user had just replaced, so a
+    /// scrobble of an episode *below* a freshly set progress passed both checks
+    /// and wrote an absolute value that moved the list backwards.
+    ///
+    /// `patch` is an object of the fields to set, so one function serves
+    /// progress, status, score, volumes and dates alike.
+    pub fn cache_patch_entry(
+        &self,
+        user_id: i64,
+        media_type: &str,
+        media_id: i64,
+        patch: &serde_json::Value,
+    ) -> bool {
+        let Some(fields) = patch.as_object() else {
+            return false;
+        };
+        if fields.is_empty() {
+            return false;
+        }
+        self.edit_cached_list(user_id, media_type, |lists| {
+            let mut touched = false;
+            for group in lists.as_array_mut().into_iter().flatten() {
+                for entry in group
+                    .get_mut("entries")
+                    .and_then(|v| v.as_array_mut())
+                    .into_iter()
+                    .flatten()
+                {
+                    if entry.get("mediaId").and_then(|v| v.as_i64()) == Some(media_id) {
+                        for (k, v) in fields {
+                            entry[k.as_str()] = v.clone();
+                        }
+                        touched = true;
+                    }
+                }
+            }
+            touched
+        })
+    }
+
+    /// Drops one entry from every group of the cached list.
+    ///
+    /// A deleted entry that stays here is not merely stale: it remains a
+    /// scrobble candidate, and playing that title writes
+    /// `SaveMediaListEntry(mediaId:)`, which *creates* an entry — so the row
+    /// the user just removed came back on the next episode.
+    pub fn cache_forget_entry(&self, user_id: i64, media_type: &str, media_id: i64) -> bool {
+        self.forget_where(user_id, media_type, "mediaId", media_id)
+    }
+
+    /// The same removal keyed on the *entry* id, across both media types.
+    ///
+    /// `delete_list_entry` is given only `id` — the list entry's own id, not
+    /// the media's — and nothing tells it whether that entry is an anime or a
+    /// manga, so both caches are asked and the one holding it answers.
+    pub fn cache_forget_entry_id(&self, user_id: i64, entry_id: i64) -> bool {
+        let anime = self.forget_where(user_id, "ANIME", "id", entry_id);
+        let manga = self.forget_where(user_id, "MANGA", "id", entry_id);
+        anime || manga
+    }
+
+    fn forget_where(&self, user_id: i64, media_type: &str, field: &str, value: i64) -> bool {
+        self.edit_cached_list(user_id, media_type, |lists| {
+            let mut removed = false;
+            for group in lists.as_array_mut().into_iter().flatten() {
+                if let Some(entries) = group.get_mut("entries").and_then(|v| v.as_array_mut()) {
+                    let before = entries.len();
+                    entries.retain(|e| e.get(field).and_then(|v| v.as_i64()) != Some(value));
+                    removed |= entries.len() != before;
+                }
+            }
+            removed
+        })
+    }
+
+    /// Progress and status, the scrobbler's own patch.
     pub fn update_cached_progress(
         &self,
         user_id: i64,
@@ -761,28 +940,11 @@ impl Db {
         progress: u32,
         status: Option<&str>,
     ) {
-        let Some(payload) = self.cached_list(user_id, media_type) else {
-            return;
-        };
-        let Ok(mut lists) = serde_json::from_str::<serde_json::Value>(&payload) else {
-            return;
-        };
-        for group in lists.as_array_mut().into_iter().flatten() {
-            for entry in group
-                .get_mut("entries")
-                .and_then(|v| v.as_array_mut())
-                .into_iter()
-                .flatten()
-            {
-                if entry.get("mediaId").and_then(|v| v.as_i64()) == Some(media_id) {
-                    entry["progress"] = progress.into();
-                    if let Some(s) = status {
-                        entry["status"] = s.into();
-                    }
-                }
-            }
+        let mut patch = serde_json::json!({ "progress": progress });
+        if let Some(s) = status {
+            patch["status"] = s.into();
         }
-        let _ = self.cache_list(user_id, media_type, &lists.to_string());
+        self.cache_patch_entry(user_id, media_type, media_id, &patch);
     }
 
     // --- Offline queue ------------------------------------------------------
@@ -1087,12 +1249,13 @@ impl Db {
         body: &str,
         created_ms: i64,
         media_id: Option<i64>,
+        user_id: Option<i64>,
     ) -> Result<(), String> {
         let conn = self.0.guard();
         conn.execute(
-            "INSERT INTO notifications (kind, title, body, created_ms, media_id)
-             VALUES (?1, ?2, ?3, ?4, ?5)",
-            rusqlite::params![kind, title, body, created_ms, media_id],
+            "INSERT INTO notifications (kind, title, body, created_ms, media_id, user_id)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            rusqlite::params![kind, title, body, created_ms, media_id, user_id],
         )
         .map_err(|e| format!("Notification write failed: {e}"))?;
 
@@ -1109,17 +1272,25 @@ impl Db {
         Ok(())
     }
 
-    /// Most recent notifications first, capped at `limit`.
-    pub fn notif_all(&self, limit: i64) -> Vec<NotificationRow> {
+    /// Most recent notifications first, capped at `limit`, for one account.
+    ///
+    /// `viewer` is who is asking. A row with a null `user_id` belongs to the
+    /// install rather than to an account — the app-update notice — and is
+    /// returned to everyone, including a signed-out or local-mode caller.
+    /// Everything else answers only to its owner, which is what stops one
+    /// account's aired-episode rows appearing in the next account's bell.
+    pub fn notif_all(&self, limit: i64, viewer: Option<i64>) -> Vec<NotificationRow> {
         let conn = self.0.guard();
         let mut stmt = match conn.prepare(
             "SELECT id, kind, title, body, created_ms, media_id, read
-             FROM notifications ORDER BY id DESC LIMIT ?1",
+             FROM notifications
+             WHERE user_id IS NULL OR user_id = ?2
+             ORDER BY id DESC LIMIT ?1",
         ) {
             Ok(s) => s,
             Err(_) => return Vec::new(),
         };
-        stmt.query_map([limit], |r| {
+        stmt.query_map(rusqlite::params![limit, viewer], |r| {
             Ok(NotificationRow {
                 id: r.get(0)?,
                 kind: r.get(1)?,
@@ -1159,14 +1330,28 @@ impl Db {
             .map_err(|e| format!("Notification delete failed: {e}"))
     }
 
-    pub fn notif_unread_count(&self) -> i64 {
+    /// Unread rows this account may see — same scoping rule as `notif_all`.
+    pub fn notif_unread_count(&self, viewer: Option<i64>) -> i64 {
         let conn = self.0.guard();
         conn.query_row(
-            "SELECT COUNT(*) FROM notifications WHERE read = 0",
-            [],
+            "SELECT COUNT(*) FROM notifications
+              WHERE read = 0 AND (user_id IS NULL OR user_id = ?1)",
+            rusqlite::params![viewer],
             |r| r.get(0),
         )
         .unwrap_or(0)
+    }
+
+    /// Forgets every account-scoped bell row, keeping the install's own.
+    ///
+    /// Called when the app changes which account it acts as. The app-update
+    /// notice survives because it is not about an account and the user has not
+    /// acted on it yet.
+    pub fn notif_clear_owned(&self) -> Result<(), String> {
+        let conn = self.0.guard();
+        conn.execute("DELETE FROM notifications WHERE user_id IS NOT NULL", [])
+            .map(|_| ())
+            .map_err(|e| format!("Notification clear failed: {e}"))
     }
 
     // --- Local library ------------------------------------------------------
@@ -1186,6 +1371,17 @@ impl Db {
         let tx = conn
             .transaction()
             .map_err(|e| format!("Library write failed: {e}"))?;
+        Self::write_index(&tx, rows, scores)?;
+        tx.commit()
+            .map_err(|e| format!("Library write failed: {e}"))
+    }
+
+    /// The index half of a scan result, inside a caller's transaction.
+    fn write_index(
+        tx: &rusqlite::Transaction<'_>,
+        rows: &[(i64, u32, String)],
+        scores: &[(i64, f64)],
+    ) -> Result<(), String> {
         tx.execute("DELETE FROM library_files", [])
             .map_err(|e| format!("Library write failed: {e}"))?;
         {
@@ -1208,8 +1404,7 @@ impl Db {
                     .map_err(|e| format!("Library write failed: {e}"))?;
             }
         }
-        tx.commit()
-            .map_err(|e| format!("Library write failed: {e}"))
+                Ok(())
     }
 
     /// Match confidence per media, for the rows the library screen draws.
@@ -1474,6 +1669,30 @@ impl Db {
     /// `library_override` is deliberately untouched: it is the user's, not the
     /// scan's, and wiping it here would undo every correction on the next scan
     /// — which is precisely the failure the whole design exists to avoid.
+    /// Publishes a whole scan result — index, scores and unmatched list — in
+    /// **one** transaction.
+    ///
+    /// `library_replace_all` and `library_replace_unmatched` are each atomic on
+    /// their own, and calling them in sequence is not: a failure between them
+    /// left an index describing this scan beside an unmatched list describing
+    /// the previous one, which is the state the "N files could not be placed"
+    /// screen reads. The tables are one answer and are written as one.
+    pub fn library_publish(
+        &self,
+        rows: &[(i64, u32, String)],
+        scores: &[(i64, f64)],
+        unmatched: &[(String, i32, u32, String)],
+    ) -> Result<(), String> {
+        let mut conn = self.0.guard();
+        let tx = conn
+            .transaction()
+            .map_err(|e| format!("Library write failed: {e}"))?;
+        Self::write_index(&tx, rows, scores)?;
+        Self::write_unmatched(&tx, unmatched)?;
+        tx.commit()
+            .map_err(|e| format!("Library write failed: {e}"))
+    }
+
     pub fn library_replace_unmatched(
         &self,
         unmatched: &[(String, i32, u32, String)],
@@ -1482,6 +1701,16 @@ impl Db {
         let tx = conn
             .transaction()
             .map_err(|e| format!("Library write failed: {e}"))?;
+        Self::write_unmatched(&tx, unmatched)?;
+        tx.commit()
+            .map_err(|e| format!("Library write failed: {e}"))
+    }
+
+    /// The unmatched half of a scan result, inside a caller's transaction.
+    fn write_unmatched(
+        tx: &rusqlite::Transaction<'_>,
+        unmatched: &[(String, i32, u32, String)],
+    ) -> Result<(), String> {
         tx.execute("DELETE FROM library_unmatched", [])
             .map_err(|e| format!("Library write failed: {e}"))?;
         {
@@ -1496,8 +1725,7 @@ impl Db {
                     .map_err(|e| format!("Library write failed: {e}"))?;
             }
         }
-        tx.commit()
-            .map_err(|e| format!("Library write failed: {e}"))
+        Ok(())
     }
 }
 
@@ -1525,6 +1753,7 @@ mod tests {
         conn.execute_batch(MIGRATION_V15).unwrap();
         conn.execute_batch(MIGRATION_V16).unwrap();
         conn.execute_batch(MIGRATION_V17).unwrap();
+        conn.execute_batch(MIGRATION_V18).unwrap();
         Db(Mutex::new(conn))
     }
 
@@ -1749,7 +1978,7 @@ mod tests {
     fn notifications_stop_at_the_retention_limit() {
         let db = mem_db();
         for i in 0..(NOTIF_KEEP + 25) {
-            db.notif_insert("airing", "New episode", "body", i, None)
+            db.notif_insert("airing", "New episode", "body", i, None, None)
                 .unwrap();
         }
         let count: i64 = db
@@ -1760,7 +1989,7 @@ mod tests {
             .unwrap();
         assert_eq!(count, NOTIF_KEEP);
         // And it is the newest that survive.
-        assert_eq!(db.notif_all(1)[0].created_ms, NOTIF_KEEP + 24);
+        assert_eq!(db.notif_all(1, None)[0].created_ms, NOTIF_KEEP + 24);
     }
 
     /// v7 adds a column, and `ALTER TABLE ADD COLUMN` cannot be re-run. A
@@ -1788,18 +2017,19 @@ mod tests {
         let version: i64 = conn
             .query_row("PRAGMA user_version", [], |r| r.get(0))
             .unwrap();
-        assert_eq!(version, 17, "and must end up fully migrated");
+        assert_eq!(version, 18, "and must end up fully migrated");
         drop(conn);
 
-        // v13, v14 and v15 are the other `ALTER TABLE ADD COLUMN` steps, so
-        // each needs the same guard and the same proof: the column present, the
-        // version behind. v14 adds three columns in one transaction, which is
-        // why checking the first one is enough to decide for all three.
+        // v13, v14, v15 and v18 are the other `ALTER TABLE ADD COLUMN` steps,
+        // so each needs the same guard and the same proof: the column present,
+        // the version behind. v14 adds three columns in one transaction, which
+        // is why checking the first one is enough to decide for all three.
         for (version_behind, table, column) in [
             (12, "detection_override", "episode_offset"),
             (13, "local_list", "started_at"),
             (14, "notifications", "media_id"),
             (15, "offline_queue", "user_id"),
+            (17, "notifications", "user_id"),
         ] {
             let conn = Connection::open(dir.join("karasu.db")).unwrap();
             assert!(has_column(&conn, table, column));
@@ -1814,7 +2044,7 @@ mod tests {
             let version: i64 = conn
                 .query_row("PRAGMA user_version", [], |r| r.get(0))
                 .unwrap();
-            assert_eq!(version, 17);
+            assert_eq!(version, 18);
         }
 
         let _ = std::fs::remove_dir_all(&dir);
@@ -2294,36 +2524,36 @@ mod tests {
     #[test]
     fn notifications_insert_list_and_read() {
         let db = mem_db();
-        db.notif_insert("airing", "New episode", "Ep 5 is out", 1_000, None)
+        db.notif_insert("airing", "New episode", "Ep 5 is out", 1_000, None, None)
             .unwrap();
-        db.notif_insert("sequel", "Sequel announced", "A sequel", 2_000, None)
+        db.notif_insert("sequel", "Sequel announced", "A sequel", 2_000, None, None)
             .unwrap();
 
-        let all = db.notif_all(50);
+        let all = db.notif_all(50, None);
         assert_eq!(all.len(), 2);
         // Newest first.
         assert_eq!(all[0].kind, "sequel");
-        assert_eq!(db.notif_unread_count(), 2);
+        assert_eq!(db.notif_unread_count(None), 2);
 
         db.notif_mark_read(all[0].id).unwrap();
-        assert_eq!(db.notif_unread_count(), 1);
+        assert_eq!(db.notif_unread_count(None), 1);
 
         db.notif_mark_all_read().unwrap();
-        assert_eq!(db.notif_unread_count(), 0);
-        assert!(db.notif_all(50).iter().all(|n| n.read));
+        assert_eq!(db.notif_unread_count(None), 0);
+        assert!(db.notif_all(50, None).iter().all(|n| n.read));
     }
 
     #[test]
     fn clearing_one_kind_spares_the_rest() {
         let db = mem_db();
-        db.notif_insert("update", "Update ready", "1.0 is out", 1_000, None)
+        db.notif_insert("update", "Update ready", "1.0 is out", 1_000, None, None)
             .unwrap();
-        db.notif_insert("airing", "New episode", "Ep 5 is out", 2_000, None)
+        db.notif_insert("airing", "New episode", "Ep 5 is out", 2_000, None, None)
             .unwrap();
 
         db.notif_clear_kind("update").unwrap();
 
-        let all = db.notif_all(50);
+        let all = db.notif_all(50, None);
         assert_eq!(all.len(), 1);
         assert_eq!(all[0].kind, "airing");
     }
@@ -2332,9 +2562,9 @@ mod tests {
     fn notif_all_respects_limit() {
         let db = mem_db();
         for i in 0..5 {
-            db.notif_insert("airing", "t", "b", i, None).unwrap();
+            db.notif_insert("airing", "t", "b", i, None, None).unwrap();
         }
-        assert_eq!(db.notif_all(3).len(), 3);
+        assert_eq!(db.notif_all(3, None).len(), 3);
     }
 
     /// v16. A queued edit belongs to the account that made it.
@@ -2435,16 +2665,213 @@ mod tests {
 
     /// v15. A bell row that cannot say which title it is about is a sentence,
     /// and the AniList rows in the same panel have opened theirs all along.
+    /// The v18 rule, and the reason it exists: bell rows had no owner at all,
+    /// so signing out of A and into B showed B a list of A's aired episodes.
+    fn seed_list(db: &Db) {
+        db.cache_list(
+            1,
+            "ANIME",
+            &serde_json::json!([{
+                "name": "Watching",
+                "entries": [
+                    { "id": 10, "mediaId": 100, "progress": 4, "status": "CURRENT" },
+                    { "id": 11, "mediaId": 200, "progress": 1, "status": "CURRENT" }
+                ]
+            }])
+            .to_string(),
+        )
+        .unwrap();
+    }
+
+    fn cached_entry(db: &Db, media_id: i64) -> Option<serde_json::Value> {
+        let payload = db.cached_list(1, "ANIME")?;
+        let lists: serde_json::Value = serde_json::from_str(&payload).ok()?;
+        lists
+            .as_array()?
+            .iter()
+            .flat_map(|g| g.get("entries").and_then(|e| e.as_array()).cloned().unwrap_or_default())
+            .find(|e| e.get("mediaId").and_then(|v| v.as_i64()) == Some(media_id))
+    }
+
+    /// The guard the scrobbler reads must see what the user just saved.
+    ///
+    /// Before this the cache was written by a full fetch and patched by the
+    /// scrobbler alone, so a manual "24 / COMPLETED" left it holding the old
+    /// number — and a scrobble of episode 5 then passed both anti-regression
+    /// checks and wrote the list backwards.
+    /// The index and the unmatched list are one answer, so they land together
+    /// or not at all. Written as two transactions, a failure in between left an
+    /// index from this scan beside an unmatched list from the previous one —
+    /// and the "could not be placed" screen reads the second.
+    #[test]
+    fn a_scan_publishes_both_tables_at_once() {
+        let db = mem_db();
+        db.library_publish(
+            &[(100, 1, "/a/ep1.mkv".into())],
+            &[(100, 0.95)],
+            &[("Unplaceable".into(), -1, 3, "/a/x.mkv".into())],
+        )
+        .unwrap();
+        assert_eq!(db.library_all().len(), 1);
+        assert_eq!(db.library_unmatched().len(), 1);
+
+        // A second publish replaces both, rather than merging into either.
+        db.library_publish(&[], &[], &[]).unwrap();
+        assert!(db.library_all().is_empty());
+        assert!(db.library_unmatched().is_empty(), "no stale leftovers");
+    }
+
+    #[test]
+    fn a_saved_entry_reaches_the_cache_the_guards_read() {
+        let db = mem_db();
+        seed_list(&db);
+        db.cache_patch_entry(
+            1,
+            "ANIME",
+            100,
+            &serde_json::json!({ "progress": 24, "status": "COMPLETED" }),
+        );
+        let entry = cached_entry(&db, 100).expect("still cached");
+        assert_eq!(entry["progress"], 24);
+        assert_eq!(entry["status"], "COMPLETED");
+        // The neighbour is untouched.
+        assert_eq!(cached_entry(&db, 200).unwrap()["progress"], 1);
+    }
+
+    /// A patch names only the fields it carries; everything else keeps its
+    /// value, the same absent-means-unchanged rule the mutation follows.
+    #[test]
+    fn a_patch_leaves_the_fields_it_does_not_name() {
+        let db = mem_db();
+        seed_list(&db);
+        db.cache_patch_entry(1, "ANIME", 100, &serde_json::json!({ "score": 9 }));
+        let entry = cached_entry(&db, 100).unwrap();
+        assert_eq!(entry["score"], 9);
+        assert_eq!(entry["progress"], 4, "not blanked by a patch about score");
+        assert_eq!(entry["status"], "CURRENT");
+    }
+
+    /// A deleted entry that stays cached is still a scrobble candidate, and
+    /// `SaveMediaListEntry(mediaId:)` creates an entry — so playing that title
+    /// brought the row the user just removed straight back.
+    #[test]
+    fn a_deleted_entry_stops_being_a_scrobble_candidate() {
+        let db = mem_db();
+        seed_list(&db);
+        assert!(db.cache_forget_entry_id(1, 10), "the entry id is what delete has");
+        assert!(cached_entry(&db, 100).is_none(), "gone from the cache");
+        assert!(cached_entry(&db, 200).is_some(), "and only that one");
+    }
+
+    /// Nothing to patch costs no write, so an entry that was never cached
+    /// cannot resurrect a list that has since been replaced.
+    #[test]
+    fn patching_an_uncached_entry_changes_nothing() {
+        let db = mem_db();
+        seed_list(&db);
+        assert!(!db.cache_patch_entry(1, "ANIME", 999, &serde_json::json!({ "progress": 3 })));
+        assert!(!db.cache_forget_entry(1, "ANIME", 999));
+        assert_eq!(cached_entry(&db, 100).unwrap()["progress"], 4);
+    }
+
+    #[test]
+    fn a_bell_row_is_invisible_to_another_account() {
+        let db = mem_db();
+        db.notif_insert("airing", "Ep 5", "is out", 1_000, Some(16498), Some(1))
+            .unwrap();
+        db.notif_insert("sequel", "A sequel", "announced", 2_000, None, Some(2))
+            .unwrap();
+
+        let mine = db.notif_all(50, Some(1));
+        assert_eq!(mine.len(), 1, "only this account's row");
+        assert_eq!(mine[0].title, "Ep 5");
+        assert_eq!(db.notif_unread_count(Some(1)), 1);
+        assert_eq!(db.notif_unread_count(Some(2)), 1);
+    }
+
+    /// The null is a real answer: the app-update notice belongs to the install,
+    /// not to an account, so it must survive a sign-out and stay readable in
+    /// local mode — where there is no viewer to match against at all.
+    #[test]
+    fn the_update_notice_belongs_to_the_install() {
+        let db = mem_db();
+        db.notif_insert("update", "Update ready", "1.0 is out", 1_000, None, None)
+            .unwrap();
+        db.notif_insert("airing", "Ep 5", "is out", 2_000, None, Some(1))
+            .unwrap();
+
+        assert_eq!(db.notif_all(50, Some(1)).len(), 2);
+        assert_eq!(db.notif_all(50, Some(2)).len(), 1, "the update notice only");
+        assert_eq!(db.notif_all(50, None).len(), 1, "signed out, same answer");
+
+        db.notif_clear_owned().unwrap();
+        let left = db.notif_all(50, None);
+        assert_eq!(left.len(), 1, "the account's row goes, the install's stays");
+        assert_eq!(left[0].kind, "update");
+    }
+
+    /// The dedupe keys record what the *previous* account was already told.
+    /// Keeping them would silently deny the next account notifications it has
+    /// never seen.
+    #[test]
+    fn the_alert_dedupe_keys_do_not_outlive_an_account() {
+        let db = mem_db();
+        db.kv_set("aired:1:5", "9000").unwrap();
+        db.kv_set("sequel_seen:42", "1").unwrap();
+        db.kv_set("stale_done:7", "1").unwrap();
+        db.kv_set("blur_adult", "1").unwrap();
+
+        assert_eq!(db.kv_delete_prefix("aired:"), 1);
+        assert_eq!(db.kv_delete_prefix("sequel_seen:"), 1);
+        assert_eq!(db.kv_delete_prefix("stale_done:"), 1);
+        assert!(db.kv_get("aired:1:5").is_none());
+        assert_eq!(
+            db.kv_get("blur_adult").as_deref(),
+            Some("1"),
+            "a setting is not an account's business"
+        );
+    }
+
+    /// `json_extract` raises on malformed JSON rather than returning null, and
+    /// a migration that throws leaves an app that will not start. Both
+    /// attributing steps guard with `json_valid`.
+    #[test]
+    fn a_malformed_viewer_blob_does_not_block_the_upgrade() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(MIGRATIONS).unwrap();
+        conn.execute_batch(MIGRATION_V2).unwrap();
+        conn.execute_batch(MIGRATION_V3).unwrap();
+        conn.execute_batch(MIGRATION_V4).unwrap();
+        conn.execute_batch(MIGRATION_V5).unwrap();
+        conn.execute(
+            "INSERT INTO kv (key, value) VALUES ('anilist_viewer', 'not json')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO offline_queue (kind, payload, created_at) VALUES ('save', '{}', 1)",
+            [],
+        )
+        .unwrap();
+        conn.execute("INSERT INTO notifications (kind, title, body, created_ms) VALUES ('airing','t','b',1)", [])
+            .unwrap();
+
+        conn.execute_batch(MIGRATION_V16)
+            .expect("v16 must survive a malformed viewer blob");
+        conn.execute_batch(MIGRATION_V18)
+            .expect("v18 must survive a malformed viewer blob");
+    }
+
     #[test]
     fn a_notification_remembers_the_media_it_is_about() {
         let db = mem_db();
-        db.notif_insert("airing", "New episode", "Ep 5 is out", 1_000, Some(16498))
+        db.notif_insert("airing", "New episode", "Ep 5 is out", 1_000, Some(16498), None)
             .unwrap();
-        db.notif_insert("update", "Update ready", "0.24.0", 2_000, None)
+        db.notif_insert("update", "Update ready", "0.24.0", 2_000, None, None)
             .unwrap();
 
         // Newest first.
-        let all = db.notif_all(50);
+        let all = db.notif_all(50, None);
         assert_eq!(all[0].media_id, None, "an app update is not about a title");
         assert_eq!(all[1].media_id, Some(16498));
     }

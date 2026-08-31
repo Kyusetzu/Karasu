@@ -39,6 +39,8 @@ import {
   installPendingUpdate,
 } from "@/api/anilist";
 import { showToast } from "@/stores/toast";
+import { isBlocked } from "@/lib/contentFilter";
+import { useContentFilter } from "@/stores/contentFilter";
 import { siteNotifications, siteNotifCount, type SiteNotifPage } from "@/api/social";
 import type { SiteNotifKind, SiteNotifRow } from "@/lib/siteNotifications";
 import {
@@ -347,9 +349,19 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
   // adds an observer rather than a second request.
   const badge = useNotifBadge();
 
+  // Filtered here, once, before grouping: the bell was the one surface where a
+  // hidden title could still be named, because the query asked for neither
+  // `isAdult` nor `genres` and `isBlocked` therefore had nothing to judge. Both
+  // are on the query now, and a row about a blocked title is dropped rather
+  // than shown with its name — an aired-episode line is a title on screen just
+  // as much as a cover is.
+  const level = useContentFilter((s) => s.level);
   const siteRows = useMemo(
-    () => (site.data?.pages ?? []).flatMap((p) => p.rows),
-    [site.data],
+    () =>
+      (site.data?.pages ?? [])
+        .flatMap((p) => p.rows)
+        .filter((r) => !isBlocked(r.media, level)),
+    [site.data, level],
   );
 
   // One stream, grouped. Recomputed over the whole loaded set on every page —

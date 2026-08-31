@@ -353,10 +353,18 @@ pub fn set_jellyfin_settings(
     url: String,
     device: String,
 ) -> Result<(), String> {
-    db.kv_set(
-        "jellyfin_url",
-        &crate::playback::detection::jellyfin::normalize_base_url(&url),
-    )?;
+    let base = crate::playback::detection::jellyfin::normalize_base_url(&url);
+    // The detection poll sends the stored Jellyfin access token to whatever
+    // this holds, as an `Authorization` header, every few seconds and with no
+    // further user action. `normalize_base_url` only trims whitespace and a
+    // trailing slash, so anything at all could be stored here — including a
+    // scheme that is not HTTP, which is not a server the user mistyped but a
+    // place a secret must never go. A private or LAN address stays perfectly
+    // valid: that is where a Jellyfin server normally lives.
+    if !base.is_empty() && !crate::net::is_usable_base_url(&base) {
+        return Err("jellyfin.badUrl".into());
+    }
+    db.kv_set("jellyfin_url", &base)?;
     db.kv_set("jellyfin_device", device.trim())?;
     Ok(())
 }

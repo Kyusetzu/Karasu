@@ -32,3 +32,21 @@ export function isNotFound(error: unknown): boolean {
   const normalized = text.trim().toLowerCase().replace(/\.$/, "");
   return normalized === NOT_FOUND.toLowerCase() || normalized.endsWith("not found");
 }
+
+/** The stable code `client.rs` returns for a rate-limited request. */
+export const RATE_LIMITED = "anilist.rateLimited";
+
+/**
+ * Whether a rejection is AniList throttling us.
+ *
+ * Retrying it is guaranteed to fail until the window rolls, and the Rust
+ * client has already waited out the server's `Retry-After` before giving up —
+ * so a second attempt from here spends another request out of a ~30/min budget
+ * to reach the identical answer, and does it for every query on the screen at
+ * once.
+ */
+export function isRateLimited(error: unknown): boolean {
+  if (!error) return false;
+  const text = error instanceof Error ? error.message : String(error);
+  return text.trim() === RATE_LIMITED;
+}

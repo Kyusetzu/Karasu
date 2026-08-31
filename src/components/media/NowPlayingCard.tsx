@@ -266,6 +266,22 @@ function ScrobbleStatus({ countdown }: { countdown: string | null }) {
           })}
         </p>
       );
+    case "queued":
+      return (
+        // Deliberately not the success green with its checkmark: the write is
+        // real but it is in SQLite, not on AniList, and the card is the one
+        // place that difference is visible while it lasts.
+        <p className="text-xs text-ink-500">
+          {t("nowPlaying.queued", {
+            n: t(
+              current?.mediaType === "MANGA"
+                ? "common.chapter"
+                : "common.episode",
+              { n: scrobble.episode },
+            ),
+          })}
+        </p>
+      );
     case "blocked":
       return (
         <p className="text-xs text-gold">
@@ -455,9 +471,17 @@ function ScrobbleActions({ playing }: { playing: NowPlaying }) {
                   // The offset, not the episode: the correction has to hold
                   // for *every* episode of this season, not only the one on
                   // screen when it was made.
+                  //
+                  // Measured against `sourceEpisode` — what the player
+                  // reported — and never against `episode`, which already
+                  // carries this correction's own offset and any relations
+                  // redirect. Against the shifted number, re-picking the same
+                  // entry with its pre-filled episode stored `0` and destroyed
+                  // the correction, and editing a redirected title replaced the
+                  // redirect with the raw source number.
                   episodeOffset:
-                    realEpisode != null && np.episode != null
-                      ? realEpisode - np.episode
+                    realEpisode != null && np.sourceEpisode != null
+                      ? realEpisode - np.sourceEpisode
                       : 0,
                 }),
               )

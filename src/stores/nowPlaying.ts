@@ -11,7 +11,20 @@ export interface NowPlaying {
   parsedTitle: string;
   /** The season the parse carried — half the key a correction is stored under. */
   season: number | null;
+  /**
+   * The episode as resolved — after a correction's offset and after any
+   * relations redirect. This is what the card shows and what gets written.
+   */
   episode: number | null;
+  /**
+   * The episode as the source reported it, before either of those.
+   *
+   * An offset is `chosen - detected`, and `detected` is this one. Measuring
+   * against `episode` stored a wrong offset as soon as a correction was edited
+   * a second time — and confirming the pre-filled number stored `0`, wiping a
+   * correction that was working.
+   */
+  sourceEpisode: number | null;
   mediaId: number | null;
   matchedTitle: string | null;
   /** True when this match is the user's own correction, not the matcher's. */
@@ -26,6 +39,8 @@ export type ScrobblePhase =
   | "pending"
   | "updating"
   | "updated"
+  /** Written locally, waiting for the queue to reach AniList. */
+  | "queued"
   | "blocked"
   | "cancelled";
 

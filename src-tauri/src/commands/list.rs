@@ -288,10 +288,17 @@ pub async fn fetch_media_list(
                 lists,
             })
         }
-        Err(ApiError::Network(_)) => {
-            let cached = db
-                .cached_list(user_id, media_type)
-                .ok_or("Offline and no local list cache available yet")?;
+        // Offline *or* throttled: a complete list sits in SQLite and the one
+        // moment it is genuinely useful — a 429, a 5xx, a timeout — was the one
+        // moment nothing consulted it, so every list screen showed an error
+        // page instead. Deliberately not extended to `Auth`: a rejected token
+        // must reach the frontend, which is what raises the one sign-in banner
+        // instead of each screen inventing its own failure.
+        Err(e @ (ApiError::Network(_) | ApiError::Retryable(_))) => {
+            let cached = db.cached_list(user_id, media_type).ok_or_else(|| {
+                let _ = &e;
+                "Offline and no local list cache available yet".to_string()
+            })?;
             // The cache did not move, but the projection file can still be
             // missing (an update shipped the widgets after the cache was
             // written) — refreshing here is idempotent and closes that gap
@@ -361,12 +368,60 @@ pub(crate) async fn save_entry_core(
             queue_push_deduped(db, "save", &input.to_string())?;
             Ok(MutationResult { queued: true, entry: None })
         }
-        Ok(data) => Ok(MutationResult {
-            queued: false,
-            entry: data.get("SaveMediaListEntry").cloned(),
-        }),
+        Ok(data) => {
+            let entry = data.get("SaveMediaListEntry").cloned();
+            // The local cache is what the scrobbler's anti-regression guards
+            // read. Leaving it on the pre-edit value is how a hand-set
+            // "24 / COMPLETED" could be overwritten by a scrobble of episode 5:
+            // both guards compared against a number the user had already
+            // replaced. Patched from the server's echo, so the cache holds what
+            // AniList accepted rather than what was asked for.
+            if let Some(echo) = entry.as_ref() {
+                cache_entry_echo(db, echo);
+            }
+            Ok(MutationResult { queued: false, entry })
+        }
         Err(e) => Err(e.into()),
     }
+}
+
+/// Mirrors a saved entry into the SQLite list cache.
+///
+/// Takes the fields the cache actually carries and the guards actually read;
+/// anything absent from the echo is left alone rather than blanked, which is
+/// the same absent-means-unchanged rule the mutation itself follows.
+pub(crate) fn cache_entry_echo(db: &Db, echo: &Value) {
+    let Some(user_id) = viewer_id(db) else { return };
+    let Some(media_id) = echo
+        .get("mediaId")
+        .and_then(|v| v.as_i64())
+        .or_else(|| echo.pointer("/media/id").and_then(|v| v.as_i64()))
+    else {
+        return;
+    };
+    let media_type = echo
+        .pointer("/media/type")
+        .and_then(|v| v.as_str())
+        .unwrap_or("ANIME");
+    let mut patch = serde_json::Map::new();
+    for field in [
+        "progress",
+        "progressVolumes",
+        "status",
+        "score",
+        "repeat",
+        "notes",
+        "private",
+        "startedAt",
+        "completedAt",
+    ] {
+        if let Some(v) = echo.get(field) {
+            if !v.is_null() {
+                patch.insert(field.into(), v.clone());
+            }
+        }
+    }
+    db.cache_patch_entry(user_id, media_type, media_id, &Value::Object(patch));
 }
 
 /// Saves a list entry (status/progress/score). Offline, the change is
@@ -497,11 +552,22 @@ pub async fn bulk_save_list_entries(
         // new ones.
         match api.query(Some(&token), UPDATE_ENTRIES_MUTATION, vars).await {
             Ok(data) => {
-                updated += data
+                let echoed = data
                     .pointer("/UpdateMediaListEntries")
                     .and_then(|v| v.as_array())
-                    .map(|a| a.len())
-                    .unwrap_or(0);
+                    .cloned()
+                    .unwrap_or_default();
+                updated += echoed.len();
+                // Each accepted chunk is mirrored as it lands, so a run that
+                // dies halfway leaves the cache agreeing with AniList about the
+                // entries that did change. Without this an offline refetch
+                // after a partial failure served every row at its pre-edit
+                // value — including the ones the server had already accepted,
+                // which is the outcome the caller's invalidate-don't-restore
+                // choice exists to avoid.
+                for entry in &echoed {
+                    cache_entry_echo(&db, entry);
+                }
             }
             Err(e) => {
                 failure = Some(String::from(e));
@@ -522,10 +588,17 @@ pub async fn delete_list_entry(
     let token = auth::load_token().ok_or("Not connected to AniList")?;
     let input = json!({ "id": id });
 
+    // A drain that *skipped* leaves the queue standing, so it takes the same
+    // exit as one that failed — the exit `save_entry_core` has always taken and
+    // this path did not. Deleting live while a concurrent drain still holds an
+    // older `save` for the same entry meant the drain replayed it afterwards,
+    // and `SaveMediaListEntry(mediaId:)` creates an entry: the row the user had
+    // just confirmed deleting came back, carrying only the fields that save
+    // knew about.
     if pending(&db) > 0 {
         match process_queue(&db, &api, Some(&token)).await {
-            Ok(drained) => report_dropped(&app, &drained.dropped),
-            Err(_) => {
+            Ok(drained) if !drained.skipped => report_dropped(&app, &drained.dropped),
+            _ => {
                 queue_push_deduped(&db, "delete", &input.to_string())?;
                 return Ok(MutationResult { queued: true, entry: None });
             }
@@ -533,7 +606,15 @@ pub async fn delete_list_entry(
     }
 
     match api.query(Some(&token), DELETE_MUTATION, input.clone()).await {
-        Ok(_) => Ok(MutationResult { queued: false, entry: None }),
+        Ok(_) => {
+            // A deleted entry left in the cache is not merely stale: it stays a
+            // scrobble candidate, and `SaveMediaListEntry(mediaId:)` *creates*
+            // an entry — so playing that title brought the row back.
+            if let Some(user_id) = viewer_id(&db) {
+                db.cache_forget_entry_id(user_id, id);
+            }
+            Ok(MutationResult { queued: false, entry: None })
+        }
         Err(e) if e.is_retryable() => {
             queue_push_deduped(&db, "delete", &input.to_string())?;
             Ok(MutationResult { queued: true, entry: None })
@@ -577,8 +658,10 @@ pub fn get_profile_mode(db: State<'_, Db>) -> String {
 /// signs in again, which is the flow's shape anyway.
 #[tauri::command]
 pub fn enable_local_mode(db: State<'_, Db>) -> Result<(), String> {
-    crate::anilist::auth::delete_token();
-    db.kv_set("profile_mode", "local")
+    // Through the one switch, so the outgoing account's bell rows, dedupe keys
+    // and widget projection do not sit behind the account-free list — and so
+    // the stale viewer blob cannot keep scoping a queue nothing can drain.
+    crate::commands::auth::switch_identity(&db, crate::commands::auth::Identity::Local)
 }
 
 /// Loads the local list for a media type, shaped exactly like the online
@@ -937,7 +1020,13 @@ async fn process_queue(
         }
         let mutation = if kind == "delete" { DELETE_MUTATION } else { SAVE_MUTATION };
         match api.query(token, mutation, variables).await {
-            Ok(_) => {
+            Ok(data) => {
+                // Same reason the live save path does it: the scrobbler's
+                // guards read this cache, and a drained edit is a write like
+                // any other.
+                if let Some(echo) = data.get("SaveMediaListEntry") {
+                    cache_entry_echo(db, echo);
+                }
                 db.queue_remove(id);
                 flushed += 1;
             }

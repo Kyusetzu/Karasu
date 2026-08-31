@@ -65,6 +65,29 @@ export const setTokenRejectedHandler = (fn: () => void) => {
 };
 
 /**
+ * Told when the app changes which account it is acting as, so the query cache
+ * can be dropped whole.
+ *
+ * A registered callback for the same reason as `setTokenRejectedHandler`
+ * above: the `QueryClient` lives in `main.tsx` and `stores/auth` already
+ * imports this module, so reaching for either from here would be a cycle.
+ *
+ * Why the cache must be *cleared* and not invalidated: most keys carry no
+ * viewer — `["mediaDetail", id]`, `["search", …]`, `["seasonal", …]` — while
+ * the payload behind them does (`MEDIA_FIELDS` spreads `mediaListEntry`, which
+ * is this account's progress, score and private notes). Invalidation marks
+ * those entries stale but keeps them renderable during the refetch, which is
+ * exactly the window in which the previous account's entry seeds the editor.
+ */
+let onIdentityChanged: () => void = () => {};
+export const setIdentityChangedHandler = (fn: () => void) => {
+  onIdentityChanged = fn;
+};
+
+/** Raised by the auth store on every sign-in, sign-out and mode switch. */
+export const identityChanged = () => onIdentityChanged();
+
+/**
  * Every read goes through here, which is why the rejection is caught here.
  *
  * `anilist_query` attaches the bearer to *every* query — including the public

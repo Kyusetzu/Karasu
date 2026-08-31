@@ -11,7 +11,12 @@ describe("normalizeSiteNotification", () => {
       id: 1,
       createdAt: 1700000000,
       episode: 12,
-      media: { id: 42, title: { romaji: "Sousou no Frieren", english: "Frieren", native: null } },
+      media: {
+        id: 42,
+        title: { romaji: "Sousou no Frieren", english: "Frieren", native: null },
+        isAdult: false,
+        genres: ["Adventure"],
+      },
     });
     expect(row).toEqual({
       id: 1,
@@ -25,6 +30,9 @@ describe("normalizeSiteNotification", () => {
       userId: null,
       mediaId: 42,
       activityId: null,
+      // Carried through so the bell can apply the content filter: an
+      // aired-episode line names a title just as a cover shows one.
+      media: { isAdult: false, genres: ["Adventure"] },
     });
   });
 
@@ -164,5 +172,30 @@ describe("normalizeSiteNotification", () => {
         character: { id: 66, name: { full: "Ichigo" } },
       }),
     ).toMatchObject({ title: "Ichigo", target: "/character/66" });
+  });
+
+  // A row about a hidden title must be droppable by the caller, which needs
+  // the fields to judge with. The query asked for neither before this, so the
+  // bell was the one surface where a filtered title could still be named.
+  it("carries the filter fields for a title it is about", () => {
+    const row = normalizeSiteNotification({
+      __typename: "AiringNotification",
+      id: 9,
+      createdAt: 1,
+      episode: 3,
+      media: { id: 7, title: { romaji: "X", english: null, native: null }, isAdult: true, genres: ["Hentai"] },
+    });
+    expect(row?.media).toEqual({ isAdult: true, genres: ["Hentai"] });
+  });
+
+  it("has no media to judge for a row that is not about a title", () => {
+    const row = normalizeSiteNotification({
+      __typename: "ThreadLikeNotification",
+      id: 10,
+      createdAt: 1,
+      user: { id: 2, name: "Bob" },
+      thread: { id: 5, title: "A thread" },
+    });
+    expect(row?.media).toBeNull();
   });
 });

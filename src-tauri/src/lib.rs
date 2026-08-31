@@ -353,10 +353,31 @@ pub fn run() {
             // Before the database, so a failure to open *that* is the first
             // thing the log records rather than something it misses.
             logging::init(data_dir.clone());
-            app.manage(db::Db::open(data_dir).map_err(|e| {
-                logging::error("db", format!("cannot open the database: {e}"));
-                std::io::Error::other(e)
-            })?);
+            // A database that will not open used to end the launch here, while
+            // up to a week of good snapshots sat in a folder beside it —
+            // reachable only through the app that would not start. One attempt
+            // to restore the newest readable one first; if that fails too, the
+            // launch ends as before, with both failures in the log.
+            let db = match db::Db::open(data_dir.clone()) {
+                Ok(db) => db,
+                Err(first) => {
+                    logging::error("db", format!("cannot open the database: {first}"));
+                    match backups::restore_newest(&data_dir) {
+                        Some(_) => db::Db::open(data_dir.clone()).map_err(|e| {
+                            logging::error(
+                                "db",
+                                format!("the restored database will not open either: {e}"),
+                            );
+                            std::io::Error::other(e)
+                        })?,
+                        None => {
+                            logging::error("db", "no usable backup to restore from");
+                            return Err(std::io::Error::other(first).into());
+                        }
+                    }
+                }
+            };
+            app.manage(db);
             // The verbose switch survives a restart, so a "turn it on and
             // reproduce it" request does not have to be re-armed each launch.
             logging::set_debug(

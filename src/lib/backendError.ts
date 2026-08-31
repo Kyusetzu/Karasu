@@ -29,8 +29,12 @@ export function backendErrorText(
       return t("settings.jfErrNoUserId");
     case "jellyfin.badCredentials":
       return t("settings.jfErrBadCredentials");
+    case "jellyfin.badUrl":
+      return t("settings.jfErrBadUrl");
     case "queue.busy":
       return t("receipt.syncBusy");
+    case "anilist.rateLimited":
+      return t("receipt.rateLimited");
     // The banner in `shell/SessionExpired` is the real answer to this one, but
     // the code still reaches a toast or an inline error on paths the banner
     // does not cover — and rendering the raw code would be worse than the

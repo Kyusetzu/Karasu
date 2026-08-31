@@ -675,8 +675,16 @@ pub fn playback_from_session(session: &serde_json::Value) -> Option<Playback> {
             // An API field, not a parse: as explicit as a spelling gets.
             episode_marked: episode.is_some(),
             // Season 1 carries no information for matching and would only
-            // confuse the "S2" title variants the matcher generates.
-            season: season.filter(|s| *s > 1),
+            // confuse the "S2" title variants the matcher generates, so it is
+            // dropped. Season **0** is not the same thing: that is Jellyfin's
+            // Specials folder, and collapsing it into "no season" made a
+            // special arrive as episode N of the main series — scrobbled onto
+            // it, and sharing the `season = -1` correction key with the real
+            // episodes, so correcting one moved the other. Passed through, it
+            // reaches `season_informed`, which cannot place it against a bare
+            // title and blocks with `UnknownSeason` until the user says which
+            // entry it is.
+            season: season.filter(|s| *s != 1),
             release_group: None,
         }),
         position_sec,

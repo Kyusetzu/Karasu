@@ -699,7 +699,11 @@ fn block_reason(now: &NowPlaying, episode: u32, progress: u32) -> Option<BlockRe
 /// this is. The last is what makes a correction stick: once made, this
 /// returns `None` and the session proceeds normally.
 fn unplaceable_season(now: &NowPlaying) -> Option<u32> {
-    let season = now.season.filter(|s| *s > 1)?;
+    // `!= 1` rather than `> 1`: season 0 is a Specials folder, and a special
+    // matched against the bare series title is the same mistake as a season-2
+    // episode — it lands on the main entry and moves its progress. Season 1 is
+    // the only one that genuinely carries no information.
+    let season = now.season.filter(|s| *s != 1)?;
     if now.overridden {
         return None;
     }
@@ -1165,6 +1169,15 @@ pub fn spawn(app: AppHandle) {
             }
 
             drive_session(&app).await;
+            // Every tick, not only when the title changes. `sync` skips an
+            // identical payload by fingerprint and re-sends it once
+            // `RESEND_SECS` has passed — which is how a Discord that was
+            // restarted, or started after Karasu, gets a presence at all. That
+            // mechanism could never fire, because the only caller sat inside
+            // the "playback changed" branch: a whole episode is
+            // fingerprint-identical by construction, so nothing called it for
+            // twenty minutes at a time. Cheap: a lock and a string compare.
+            crate::discord::sync_current(&app);
             tokio::time::sleep(POLL_INTERVAL).await;
         }
         }

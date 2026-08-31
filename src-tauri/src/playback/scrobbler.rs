@@ -1342,19 +1342,33 @@ async fn drive_session(app: &AppHandle) {
     };
 
     if let Some((mid, mtype, ep, total, status)) = update_data {
-        let result = perform_update(app, mid, &mtype, ep, total, &status).await;
-        let state = app.state::<ScrobbleSession>();
-        let mut guard = state.0.guard();
-        if let Some(session) = guard.as_mut() {
-            if applies_to(session, mid, ep) {
-                session.phase = match result {
-                    Ok(Outcome::Landed) => Phase::Updated,
-                    Ok(Outcome::Queued) => Phase::Queued,
-                    Err(e) => Phase::Blocked(BlockReason::Failed { message: e }),
-                };
-                emit_session(app, Some(session));
+        // Spawned, not awaited. This runs inside the 5 s detection poll and the
+        // write can take minutes: `save_entry_core` drains the offline queue
+        // first, and the shared limiter may hold the request behind a server
+        // deadline. Awaited, that froze detection outright — the log went
+        // quiet, the card stopped moving, and any session that began and ended
+        // inside the freeze was never seen at all.
+        //
+        // Letting the loop carry on is safe because the session is already in
+        // `Phase::Updating`, which `armed_now` never arms, so the next tick
+        // cannot start a second write for it. `applies_to` then decides whether
+        // the result still describes what is playing by the time it lands.
+        let app = app.clone();
+        tauri::async_runtime::spawn(async move {
+            let result = perform_update(&app, mid, &mtype, ep, total, &status).await;
+            let state = app.state::<ScrobbleSession>();
+            let mut guard = state.0.guard();
+            if let Some(session) = guard.as_mut() {
+                if applies_to(session, mid, ep) {
+                    session.phase = match result {
+                        Ok(Outcome::Landed) => Phase::Updated,
+                        Ok(Outcome::Queued) => Phase::Queued,
+                        Err(e) => Phase::Blocked(BlockReason::Failed { message: e }),
+                    };
+                    emit_session(&app, Some(session));
+                }
             }
-        }
+        });
     }
 }
 
@@ -1634,6 +1648,22 @@ mod tests {
             !armed_now(true, false, &watching, false),
             "nothing to disarm without a deadline"
         );
+    }
+
+    /// The write is spawned rather than awaited, so the 5 s poll keeps running
+    /// while it is in flight. This is what stops the next tick starting a
+    /// second write for the same session — and therefore what makes spawning
+    /// safe. Any phase that means "a write is under way or done" must never
+    /// arm; extending `armed_now` without keeping that true would reintroduce
+    /// double scrobbles.
+    #[test]
+    fn no_phase_with_a_write_in_flight_can_arm() {
+        for phase in [Phase::Updating, Phase::Pending, Phase::Updated, Phase::Queued] {
+            assert!(
+                !armed_now(true, true, &phase, true),
+                "{phase:?} must not arm while or after a write"
+            );
+        }
     }
 
     /// The gap grace is opt-in at the due point too, and no other blocked

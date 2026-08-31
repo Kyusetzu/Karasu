@@ -59,6 +59,23 @@ control back to the app through the `karasu://` custom scheme. A Jellyfin
 server you configure yourself is contacted too; that is your machine, not
 ours, and the "no hosted backend" guarantee is unaffected.
 
+Two contacts that are neither AniList nor yours, and are worth naming because
+neither is obvious from the screen you are on:
+
+- **Image hosts, when you open a profile.** AniList bios embed images from
+  wherever their author chose — imgur, tumblr, catbox and a long tail of
+  others. Karasu fetches those in Rust rather than from the page, so the
+  WebView never talks to them and the CSP is not widened: one request, with a
+  size cap, a content-type allowlist, a timeout, no cookies and no `Referer`,
+  and local or private addresses refused on the URL and on every redirect hop.
+  What that cannot hide is your IP address from the host, which is unavoidable
+  in any design that displays the image at all. Anything that fails falls back
+  to a plain chip.
+- **`raw.githubusercontent.com`, for episode-redirect rules.** The
+  anime-relations dataset (CC0) is fetched at most once a week and cached
+  beside the database. It is what lets a detected "season 2, episode 1" reach
+  the right entry.
+
 Things worth reporting: the app mishandling or leaking either secret, a way to
 execute arbitrary code via a malicious media title/filename/response, or a
 flaw in the desktop update mechanism (Karasu verifies every downloaded update

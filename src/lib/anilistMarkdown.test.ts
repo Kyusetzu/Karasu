@@ -461,11 +461,11 @@ describe("block structure", () => {
     expect(types([oneLine])).toContain("chip");
 
     // Content on the opening fence's own line. This is the form that shipped a
-    // literal `~~~` to screen — a real bio opens with `~~~ tam | she/her | arg`
+    // literal `~~~` to screen — a real bio opens with `~~~ ren | they/them | de`
     // and the old rule demanded a bare `~~~` line.
-    const trailing = parse(`~~~ tam | she/her\n\n[insta](https://instagram.com/x)\n\n~~~`);
+    const trailing = parse(`~~~ ren | they/them\n\n[insta](https://instagram.com/x)\n\n~~~`);
     expect(trailing[0].type).toBe("center");
-    expect(textOf(trailing)).toContain("she/her");
+    expect(textOf(trailing)).toContain("they/them");
     expect(textOf(trailing)).not.toContain("~~~");
     expect(types(trailing)).toContain("link");
   });
@@ -587,13 +587,13 @@ describe("bounds", () => {
     // Trimmed from a live profile: nested centre blocks, sized images, links.
     const real =
       `~~~img28(https://gifcity.carrd.co/a.gif) img(https://gifcity.carrd.co/b.gif)~~~\n\n` +
-      `~~~ tam | she/her | arg\n\n[instagram ](https://www.instagram.com/x/) + ` +
+      `~~~ ren | they/them | de\n\n[instagram ](https://www.instagram.com/x/) + ` +
       `[spotify](https://open.spotify.com/user/y?si=z&utm_source=copy-link)\n\n~~~`;
     const r = parseAniListMarkdown(real);
     expect(r.truncated).toBe(false);
     expect(types(r.nodes)).toContain("center");
     expect(types(r.nodes)).toContain("chip");
-    expect(textOf(r.nodes)).toContain("she/her");
+    expect(textOf(r.nodes)).toContain("they/them");
   });
 
   it("survives input that is not a string", () => {
@@ -825,7 +825,7 @@ describe("block HTML kept as structure", () => {
   });
 
   it("renders the fixture profile's shape — the bug that started this", () => {
-    // Distilled from a real bio (User "cheesxcxke"): entity spacers, centred
+    // Distilled from a real bio: entity spacers, centred
     // divs, an h5 with bare-<a> decoration, a linked favicon image.
     const real =
       `&nbsp;\n` +

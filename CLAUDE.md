@@ -635,6 +635,55 @@ import it.
   It is not bundled, so this is target-dir disk and nothing else. Looked at
   once; don't spend the afternoon on it again.
 
+## Invariants the release audit established
+
+Each of these closed a group of real defects, and each is the kind of rule that
+comes back the moment it is only remembered rather than enforced. They are
+written as rules because that is what the audit found: the same mistake in
+four or five places, made by careful code, because nothing said it once.
+
+- **`list_cache` has one owner.** `db::edit_cached_list` does read, edit and
+  write under a single lock, and `cache_patch_entry` / `cache_forget_entry`
+  are the only ways an entry changes. *Every* write path calls them — the live
+  save, the bulk chunks, the delete, the queue drain — because the scrobbler's
+  two anti-regression guards read this table as truth. Fed a stale copy, they
+  let a scrobble overwrite the user's own newer edit, and a deleted entry stayed
+  a scrobble candidate that `SaveMediaListEntry(mediaId:)` then recreated.
+- **`Queued` is not success.** `save_entry_core` answers `queued` for anything
+  that could still work later, and no caller may treat that as landed: no
+  `Phase::Updated`, no cache patch, no `scrobble-done`, no green receipt.
+  `Outcome::{Landed, Queued, Refused}` exists so the compiler asks. A
+  *skipped* drain takes the same exit as a failed one, in all three mutating
+  commands.
+- **Identity changes only through `commands::auth::switch_identity`.** It
+  forgets the outgoing account first and writes the identity *before* the
+  credential. The order is the point: a failure then leaves "this account, no
+  credential", where the drain finds nothing, rather than "new credential, old
+  identity", which sends one account's queued edits under another's bearer.
+  `refresh_viewer` is deliberately outside it — same account, fresher data.
+- **The tick re-reads what the tick decides on.** `settings.enabled`, the gap
+  grace and play state are read at the due point, not at session creation. A
+  session survives `EMPTY_TICK_GRACE` empty polls, because on any source that
+  reports only playing sessions a pause is indistinguishable from a stop. No
+  phase carrying a write in flight may arm — that invariant is what makes
+  spawning the write safe, and it has a test of its own.
+- **Validate by parsing, never by spelling.** `net::host_is_local` canonicalises
+  to an `IpAddr` before any range test. Three spellings of loopback walked
+  through the string-matching version it replaced. `to_ipv4` is not the tool:
+  it converts IPv4-compatible addresses too, turning `::1` into `0.0.0.1`.
+- **The limiter reads its own deadline.** A `Retry-After` outranks the local
+  budget, and `MAX_PACE` bounds only our own pacing. One retry layer, not two:
+  429 answers with the stable code `RATE_LIMITED` so the frontend can refuse it
+  without re-implementing the classification in TypeScript.
+- **A partial result is a value, not an absence.** A failed list query is not an
+  empty list, and a query in the error state has `isLoading === false` with no
+  data — so destructure `isError` wherever `data` is used, or the screen states
+  the opposite of the truth as settled fact.
+- **The five version files must agree.** `node scripts/bump-version.mjs --check`
+  proves it and the release workflow runs it before building. A mismatch between
+  `package.json` and `COMMIT_NUMBER` makes every install re-download its own
+  update forever.
+
 ## Conventions
 
 - **One commit per feature.** The maintainer commits per feature; keep changes

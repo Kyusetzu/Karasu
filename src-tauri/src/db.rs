@@ -896,21 +896,18 @@ impl Db {
         })
     }
 
-    /// Drops one entry from every group of the cached list.
+    /// Drops one entry from every group of the cached list, keyed on the
+    /// *entry* id, across both media types.
     ///
     /// A deleted entry that stays here is not merely stale: it remains a
     /// scrobble candidate, and playing that title writes
     /// `SaveMediaListEntry(mediaId:)`, which *creates* an entry — so the row
     /// the user just removed came back on the next episode.
-    pub fn cache_forget_entry(&self, user_id: i64, media_type: &str, media_id: i64) -> bool {
-        self.forget_where(user_id, media_type, "mediaId", media_id)
-    }
-
-    /// The same removal keyed on the *entry* id, across both media types.
     ///
-    /// `delete_list_entry` is given only `id` — the list entry's own id, not
-    /// the media's — and nothing tells it whether that entry is an anime or a
-    /// manga, so both caches are asked and the one holding it answers.
+    /// Keyed on the entry id because `delete_list_entry` is given only `id` —
+    /// the list entry's own id, not the media's — and nothing tells it whether
+    /// that entry is an anime or a manga, so both caches are asked and the one
+    /// holding it answers.
     pub fn cache_forget_entry_id(&self, user_id: i64, entry_id: i64) -> bool {
         let anime = self.forget_where(user_id, "ANIME", "id", entry_id);
         let manga = self.forget_where(user_id, "MANGA", "id", entry_id);
@@ -1362,20 +1359,6 @@ impl Db {
     /// `scores` goes in the same transaction for the same reason: an index that
     /// survived a crash without its confidences would show every title as an
     /// exact match, which is the one thing the column exists to deny.
-    pub fn library_replace_all(
-        &self,
-        rows: &[(i64, u32, String)],
-        scores: &[(i64, f64)],
-    ) -> Result<(), String> {
-        let mut conn = self.0.guard();
-        let tx = conn
-            .transaction()
-            .map_err(|e| format!("Library write failed: {e}"))?;
-        Self::write_index(&tx, rows, scores)?;
-        tx.commit()
-            .map_err(|e| format!("Library write failed: {e}"))
-    }
-
     /// The index half of a scan result, inside a caller's transaction.
     fn write_index(
         tx: &rusqlite::Transaction<'_>,
@@ -1404,7 +1387,7 @@ impl Db {
                     .map_err(|e| format!("Library write failed: {e}"))?;
             }
         }
-                Ok(())
+        Ok(())
     }
 
     /// Match confidence per media, for the rows the library screen draws.
@@ -1672,7 +1655,7 @@ impl Db {
     /// Publishes a whole scan result — index, scores and unmatched list — in
     /// **one** transaction.
     ///
-    /// `library_replace_all` and `library_replace_unmatched` are each atomic on
+    /// `write_index` and `write_unmatched` are each atomic on
     /// their own, and calling them in sequence is not: a failure between them
     /// left an index describing this scan beside an unmatched list describing
     /// the previous one, which is the state the "N files could not be placed"
@@ -1688,19 +1671,6 @@ impl Db {
             .transaction()
             .map_err(|e| format!("Library write failed: {e}"))?;
         Self::write_index(&tx, rows, scores)?;
-        Self::write_unmatched(&tx, unmatched)?;
-        tx.commit()
-            .map_err(|e| format!("Library write failed: {e}"))
-    }
-
-    pub fn library_replace_unmatched(
-        &self,
-        unmatched: &[(String, i32, u32, String)],
-    ) -> Result<(), String> {
-        let mut conn = self.0.guard();
-        let tx = conn
-            .transaction()
-            .map_err(|e| format!("Library write failed: {e}"))?;
         Self::write_unmatched(&tx, unmatched)?;
         tx.commit()
             .map_err(|e| format!("Library write failed: {e}"))
@@ -1922,10 +1892,10 @@ mod tests {
     fn a_rescan_keeps_corrections_and_replaces_everything_else() {
         let db = mem_db();
         db.library_override_set("shingeki no kyojin", -1, 16498).unwrap();
-        db.library_replace_unmatched(&[("mystery show".into(), 2, 3, "C:/a/E03.mkv".into())])
+        db.library_publish(&[], &[], &[("mystery show".into(), 2, 3, "C:/a/E03.mkv".into())])
             .unwrap();
 
-        db.library_replace_unmatched(&[("mystery show".into(), 2, 4, "C:/a/E04.mkv".into())])
+        db.library_publish(&[], &[], &[("mystery show".into(), 2, 4, "C:/a/E04.mkv".into())])
             .unwrap();
 
         assert_eq!(db.library_overrides(), vec![("shingeki no kyojin".into(), -1, 16498)]);
@@ -2314,12 +2284,13 @@ mod tests {
         let db = mem_db();
         assert!(db.library_all().is_empty());
 
-        db.library_replace_all(
+        db.library_publish(
             &[
                 (154587, 13, "C:/anime/frieren-13.mkv".into()),
                 (154587, 14, "C:/anime/frieren-14.mkv".into()),
             ],
             &[(154587, 1.0)],
+            &[],
         )
         .unwrap();
         let mut rows = db.library_all();
@@ -2327,7 +2298,7 @@ mod tests {
         assert_eq!(rows.len(), 2);
         assert_eq!(rows[0], (154587, 13, "C:/anime/frieren-13.mkv".into()));
 
-        db.library_replace_all(&[(1, 1, "C:/anime/other-01.mkv".into())], &[(1, 0.82)])
+        db.library_publish(&[(1, 1, "C:/anime/other-01.mkv".into())], &[(1, 0.82)], &[])
             .unwrap();
         let rows = db.library_all();
         assert_eq!(rows, vec![(1, 1, "C:/anime/other-01.mkv".to_string())]);
@@ -2341,12 +2312,13 @@ mod tests {
         let db = mem_db();
         assert!(db.library_scores().is_empty());
 
-        db.library_replace_all(
+        db.library_publish(
             &[
                 (154587, 13, "C:/anime/frieren-13.mkv".into()),
                 (1, 1, "C:/anime/other-01.mkv".into()),
             ],
             &[(154587, 1.0), (1, 0.74)],
+            &[],
         )
         .unwrap();
         let mut scores = db.library_scores();
@@ -2355,7 +2327,7 @@ mod tests {
 
         // A rescan is the whole picture, so the previous confidences go with
         // the previous paths rather than lingering beside them.
-        db.library_replace_all(&[(1, 1, "C:/anime/other-01.mkv".into())], &[(1, 0.91)])
+        db.library_publish(&[(1, 1, "C:/anime/other-01.mkv".into())], &[(1, 0.91)], &[])
             .unwrap();
         assert_eq!(db.library_scores(), vec![(1, 0.91)]);
     }
@@ -2816,7 +2788,7 @@ mod tests {
         let db = mem_db();
         seed_list(&db);
         assert!(!db.cache_patch_entry(1, "ANIME", 999, &serde_json::json!({ "progress": 3 })));
-        assert!(!db.cache_forget_entry(1, "ANIME", 999));
+        assert!(!db.cache_forget_entry_id(1, 999));
         assert_eq!(cached_entry(&db, 100).unwrap()["progress"], 4);
     }
 

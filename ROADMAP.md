@@ -115,21 +115,38 @@ repository about to be public, which is a finding it raised against itself).
 Everything it found at P1 and P2 is fixed, as is every P3 with a behavioural
 consequence. What is left is recorded here rather than in a deleted folder:
 
-- **`hydrate`'s startup cost was measured and is not one.** The audit filed it
-  without a number; in a release build the re-parse is 49 ms for 20,000 files
-  and the cached-list read 76 ms for 8,000 entries, so a pathological install
-  pays about an eighth of a second and a normal one under twenty milliseconds.
-  Moving it off `setup` would buy that back at the price of a window where the
-  Library screen renders empty and the correction commands need a "not ready"
-  state. Both measurements are kept as `#[ignore]`d tests
-  (`library::hydrate_cost`, `db::tests::measure_the_cache_read`) so the finding
-  cannot be re-filed from reasoning alone.
-- **Measure the residual sign-in delay on a device.** `connect_with_token`
-  has logged its three phases since the handoff fix; nobody has read them
-  off hardware yet. Act only if it is still slow.
+Everything still listed here is blocked on something no amount of work in the
+repository supplies — a device, a live API, or a decision that is the
+maintainer's. Each says which, so none of them reads as unstarted work.
+
+**Needs hardware:**
+
+- **Read the sign-in timings off a device.** `connect_with_token` logs its
+  three phases at debug level. Two of the labels were swapped until now, and
+  they were swapped in the way that mattered: the line credited the Keystore
+  token write — the expensive candidate on Android, where its first use also
+  generates the hardware key — to the cheap kv step. So the instrument was
+  ready but would have sent whoever read it after the wrong suspect. Turn on
+  verbose logging, sign in on a phone, read `connect timings` out of
+  `karasu.log`. Act only if it is still slow.
+
+**Needs network access to `graphql.anilist.co`:**
+
+- **Does AniList's rate window roll or step?** `anilist/client.rs` asserted
+  both for a while; the stepped model is what ships, and its cost is that one
+  response reporting `remaining: 0` makes every request in the following
+  minute pay the full 5 s self-pace and go out anyway. Healing proportionally
+  is the fix *if* the window rolls and is actively harmful if it does not —
+  it would hand out budget that does not exist. `scripts/ratelimit-probe.mjs`
+  is the experiment; run it where AniList is reachable and record the answer
+  in CLAUDE.md.
 - **The `Page.threadComments` off-by-one.** AniList returns `perPage + 1`
-  rows with one out of sequence; cause unknown, recorded in CLAUDE.md.
-  Re-measure someday or report upstream — the app degrades gracefully.
+  rows with one out of sequence; cause unknown, recorded in CLAUDE.md. Needs
+  a live re-measurement before it can be reported upstream or defended
+  against — the app degrades gracefully meanwhile.
+
+**Needs a user, or a decision already made:**
+
 - **User-installed CAs on Android** — the webpki-roots trade documented in
   `net.rs`. Revisit only if a user with such a setup actually asks.
 - **`MediaSessionManager` detection on Android** — moot while the app is
@@ -137,7 +154,3 @@ consequence. What is left is recorded here rather than in a deleted folder:
   question, and Play distribution is itself not planned (maintainer,
   August 2026; sideload is the model, `adb install -r` is the update path,
   and Android must never gain an updater by accident).
-- **The limiter's zero-headroom minute** — a header reporting
-  `remaining: 0` un-heals headroom for 60 s, during which every request
-  pays the full 5 s self-pace before being sent anyway. Measured and
-  recorded during round 10; harmless in practice so far.

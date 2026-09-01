@@ -649,6 +649,27 @@ import it.
   and no `/PDB` — and the file is still produced and hardlinked into `deps/`.
   It is not bundled, so this is target-dir disk and nothing else. Looked at
   once; don't spend the afternoon on it again.
+- **`hydrate` is not a startup cost, and the numbers are in the tree.** It was
+  filed as one without a measurement. In a release build the re-parse of every
+  indexed path is 49 ms for 20,000 files, and the other half nobody had looked
+  at — deserializing the cached list to recompute the overflow chips — is 76 ms
+  for 8,000 entries on a 2 MB blob. A pathological install pays about an eighth
+  of a second before the window appears; a normal one pays under twenty
+  milliseconds. Moving it off `setup` would buy that back and cost a window
+  where the Library screen renders empty and every correction command needs a
+  "not ready" state it does not have. `library::hydrate_cost` and
+  `db::tests::measure_the_cache_read` are the measurements, `#[ignore]`d — run
+  them with `cargo test --release --lib <name> -- --ignored --nocapture`.
+- **Whether AniList's rate window rolls or steps is genuinely unknown.**
+  `anilist/client.rs` asserted both for a while: `SLICE`'s comment said it
+  rolls, `headroom` implements a step. The step is what ships, and the cost is
+  that one response reporting `remaining: 0` makes every request in the next
+  minute pay the full `MAX_PACE` and go out anyway. Do **not** "fix" that by
+  healing proportionally — right for a rolling window, and for a stepped one it
+  hands out budget that does not exist and earns the 429s the limiter exists to
+  avoid. `scripts/ratelimit-probe.mjs` is the one experiment that settles it;
+  its header says what each outcome implies. Record the answer here when
+  someone with network access to `graphql.anilist.co` runs it.
 
 ## Invariants the release audit established
 

@@ -269,8 +269,15 @@ const RESERVE: u32 = 2;
 /// was the whole of the "everything is slow" bug.
 const WINDOW: Duration = Duration::from_secs(60);
 
-/// One pacing slice. Short on purpose: the point is to re-check, not to sleep.
-/// The window rolls continuously, so the budget can return at any moment.
+/// One pacing slice. Short on purpose: the point is to re-check, not to sleep,
+/// and a concurrent response landing mid-wait can raise the budget at any
+/// moment.
+///
+/// This comment used to add "the window rolls continuously" as if it were
+/// known. It is not: `headroom` below implements the opposite — a stepped
+/// window — and nobody has measured which AniList actually uses. The
+/// disagreement is spelled out there and settled by
+/// `scripts/ratelimit-probe.mjs`.
 const SLICE: Duration = Duration::from_millis(400);
 
 /// The longest one caller paces before sending regardless.
@@ -366,6 +373,22 @@ impl RateState {
     /// `&mut` because it repairs rather than merely reports: a stale count is
     /// not evidence of a low budget, it is the absence of evidence, and the old
     /// code treated the two as the same thing.
+    ///
+    /// **This models a stepped window, and whether that is right is an open
+    /// question.** A count holds exactly as measured until a whole `WINDOW` has
+    /// passed and then jumps to the full limit — so one response reporting
+    /// `remaining: 0` costs every request in the following minute the full
+    /// `MAX_PACE` before being sent anyway. Five seconds of latency each, for
+    /// nothing, if the real window rolls and the budget was quietly returning
+    /// the whole time.
+    ///
+    /// It is left alone deliberately rather than "improved". Healing
+    /// proportionally is right for a rolling window and actively harmful for a
+    /// stepped one — it would hand out budget that does not exist and earn the
+    /// 429s this whole type exists to avoid, in exchange for latency that has
+    /// not hurt anyone yet. One measurement decides it, and this environment
+    /// cannot take it: `scripts/ratelimit-probe.mjs` is that measurement, and
+    /// its header says what each answer implies.
     fn headroom(&mut self, now: Instant) -> u32 {
         if self.counted_at().is_none_or(|t| now.duration_since(t) >= WINDOW) {
             self.remaining = self.limit.unwrap_or(SEED);
@@ -836,6 +859,11 @@ mod tests {
     /// while the only way to learn a better number was to send a request, which
     /// napped first. A count belonging to a window that has since rolled is the
     /// absence of evidence, not evidence of a low budget.
+    ///
+    /// Pins the *stepped* reading, which is what the code does today. If
+    /// `scripts/ratelimit-probe.mjs` ever shows the window rolling, this test
+    /// is the one that has to change with `headroom` — deliberately, and not
+    /// by accident.
     #[test]
     fn a_count_from_a_rolled_window_stops_counting() {
         let now = Instant::now();

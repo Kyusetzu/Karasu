@@ -169,10 +169,17 @@ pub async fn connect_with_token(db: &Db, api: &AniList, input: &str) -> Result<V
         // Do not leave a viewer nobody can act as.
         let _ = switch_identity(&db, Identity::None);
     })?;
+    // The order of these two was swapped, which mattered more than a swapped
+    // label usually does: this line exists to say *which* of three suspects is
+    // slow on a device, and it named the wrong one. `t2 - t1` spans
+    // `switch_identity` -- the kv writes -- and everything after `t2` is
+    // `save_token`, whose first use on Android also generates the hardware
+    // Keystore key. That is the expensive candidate the comment above names,
+    // and the log was crediting it to the cheap one.
     crate::logging::debug(
         "auth",
         format!(
-            "connect timings: viewer {}ms, token save {}ms, kv {}ms",
+            "connect timings: viewer {}ms, kv {}ms, token save {}ms",
             (t1 - t0).as_millis(),
             (t2 - t1).as_millis(),
             t2.elapsed().as_millis()

@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
+import { VirtualRows } from "@/components/list/VirtualRows";
 import { Link } from "react-router";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -305,6 +313,25 @@ function LibraryView({ userId }: { userId: number }) {
     [unmatched, blocked],
   );
 
+  // The scroll container every section virtualizes against, and which rows
+  // are expanded.
+  //
+  // The expand state used to be a `useState` inside `LibraryRow`. Virtualizing
+  // unmounts a row that scrolls out of view, which would have taken that state
+  // with it: expand a row, scroll past it, come back, and it had quietly
+  // closed. Held here it survives, because the page outlives the row.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [expandedRows, setExpandedRows] = useState<ReadonlySet<number>>(
+    () => new Set(),
+  );
+  const toggleRow = useCallback((mediaId: number) => {
+    setExpandedRows((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(mediaId)) next.add(mediaId);
+      return next;
+    });
+  }, []);
+
   // What the picker is currently open on: either a row being corrected or an
   // unplaced group being assigned. One piece of state, because only one of
   // them can be open at a time and two would let both be.
@@ -532,7 +559,7 @@ function LibraryView({ userId }: { userId: number }) {
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-10">
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-8 pb-10">
         <FilteredNotice adult={hiddenAdult} suggestive={hiddenSuggestive} className="mb-2" />
         {rows.length === 0 && !unmatched?.length ? (
           <EmptyState
@@ -550,6 +577,9 @@ function LibraryView({ userId }: { userId: number }) {
             <Group
               label={t("library.readyToPlay")}
               rows={ready}
+              scrollRef={scrollRef}
+              expanded={expandedRows}
+              onToggle={toggleRow}
               onCorrect={setEditing}
               onAdd={addToList}
               onSplit={setSplitting}
@@ -558,6 +588,9 @@ function LibraryView({ userId }: { userId: number }) {
               label={t("library.upToDate")}
               rows={done}
               muted
+              scrollRef={scrollRef}
+              expanded={expandedRows}
+              onToggle={toggleRow}
               onCorrect={setEditing}
               onAdd={addToList}
               onSplit={setSplitting}
@@ -566,6 +599,9 @@ function LibraryView({ userId }: { userId: number }) {
               rows={offListRows}
               suggestions={visibleSuggestions}
               media={suggestedById}
+              scrollRef={scrollRef}
+              expanded={expandedRows}
+              onToggle={toggleRow}
               onCorrect={setEditing}
               onAdd={addToList}
               onConfirm={confirmSuggestion}
@@ -574,6 +610,7 @@ function LibraryView({ userId }: { userId: number }) {
             />
             <Unplaced
               groups={failed}
+              scrollRef={scrollRef}
               onAssign={(key) => setEditing({ key, hasOverride: false })}
             />
           </>
@@ -631,6 +668,9 @@ function DetectedOffList({
   rows,
   suggestions,
   media,
+  scrollRef,
+  expanded,
+  onToggle,
   onCorrect,
   onAdd,
   onConfirm,
@@ -640,6 +680,9 @@ function DetectedOffList({
   rows: Row[];
   suggestions: UnmatchedGroup[];
   media: Map<number, Media>;
+  scrollRef: RefObject<HTMLDivElement | null>;
+  expanded: ReadonlySet<number>;
+  onToggle: (mediaId: number) => void;
   onCorrect: (c: Correction) => void;
   onAdd: (media: Media) => void;
   onConfirm: (key: TitleKey, mediaId: number) => void;
@@ -647,6 +690,16 @@ function DetectedOffList({
   onSplit: (t: SplitTarget) => void;
 }) {
   const { t } = useTranslation();
+  // Two row shapes in one card, so they go through one virtualizer as a
+  // tagged union rather than two — two would each measure their own start and
+  // the second would sit on top of the first.
+  const items = useMemo(
+    () => [
+      ...rows.map((row) => ({ kind: "row" as const, row })),
+      ...suggestions.map((group) => ({ kind: "suggestion" as const, group })),
+    ],
+    [rows, suggestions],
+  );
   if (rows.length === 0 && suggestions.length === 0) return null;
 
   return (
@@ -657,27 +710,39 @@ function DetectedOffList({
       <p className="mb-3 text-2xs text-ink-600">
         {t("library.detectedOffListHint")}
       </p>
-      <div className="overflow-hidden rounded-xl border border-hair">
-        {rows.map((row) => (
-          <LibraryRow
-            key={row.lib.mediaId}
-            row={row}
-            muted={false}
-            onCorrect={onCorrect}
-            onAdd={onAdd}
-            onSplit={onSplit}
-          />
-        ))}
-        {suggestions.map((group) => (
-          <SuggestionRow
-            key={`${group.title}:${group.season}`}
-            group={group}
-            media={media.get(group.suggestion!.mediaId)}
-            onConfirm={onConfirm}
-            onReject={onReject}
-          />
-        ))}
-      </div>
+      <VirtualRows
+        items={items}
+        scrollRef={scrollRef}
+        estimateRowHeight={ROW_HEIGHT}
+        getKey={(item) =>
+          item.kind === "row"
+            ? `r:${item.row.lib.mediaId}`
+            : `s:${item.group.title}:${item.group.season}`
+        }
+        className="overflow-hidden rounded-xl border border-hair"
+        renderItem={(item, _i, isLast) =>
+          item.kind === "row" ? (
+            <LibraryRow
+              row={item.row}
+              muted={false}
+              last={isLast}
+              open={expanded.has(item.row.lib.mediaId)}
+              onToggle={onToggle}
+              onCorrect={onCorrect}
+              onAdd={onAdd}
+              onSplit={onSplit}
+            />
+          ) : (
+            <SuggestionRow
+              group={item.group}
+              media={media.get(item.group.suggestion!.mediaId)}
+              last={isLast}
+              onConfirm={onConfirm}
+              onReject={onReject}
+            />
+          )
+        }
+      />
     </section>
   );
 }
@@ -686,11 +751,13 @@ function DetectedOffList({
 function SuggestionRow({
   group,
   media,
+  last,
   onConfirm,
   onReject,
 }: {
   group: UnmatchedGroup;
   media: Media | undefined;
+  last: boolean;
   onConfirm: (key: TitleKey, mediaId: number) => void;
   onReject: (key: TitleKey) => void;
 }) {
@@ -700,7 +767,12 @@ function SuggestionRow({
   const exact = guess.score >= EXACT;
 
   return (
-    <div className="skip-offscreen flex items-center gap-3.5 border-b border-surface-950 bg-surface-900/60 px-3.5 py-2 transition-surface last:border-b-0 hover:bg-surface-850">
+    <div
+      className={cn(
+        "flex items-center gap-3.5 bg-surface-900/60 px-3.5 py-2 transition-surface hover:bg-surface-850",
+        !last && "border-b border-surface-950",
+      )}
+    >
       <div className="h-13 w-8.75 shrink-0 overflow-hidden rounded-md bg-surface-800 opacity-60">
         {media?.coverImage.large && (
           <img
@@ -768,9 +840,11 @@ function SuggestionRow({
  */
 function Unplaced({
   groups,
+  scrollRef,
   onAssign,
 }: {
   groups: { title: string; season: number; files: LibraryFile[] }[];
+  scrollRef: RefObject<HTMLDivElement | null>;
   onAssign: (key: TitleKey) => void;
 }) {
   const { t } = useTranslation();
@@ -843,11 +917,18 @@ function Unplaced({
           {t("library.noUnplacedMatch")}
         </p>
       )}
-      <div className="overflow-hidden rounded-xl border border-hair">
-        {shown.map((group) => (
+      <VirtualRows
+        items={shown}
+        scrollRef={scrollRef}
+        estimateRowHeight={ROW_HEIGHT}
+        getKey={(group) => `${group.title}:${group.season}`}
+        className="overflow-hidden rounded-xl border border-hair"
+        renderItem={(group, _i, isLast) => (
           <div
-            key={`${group.title}:${group.season}`}
-            className="skip-offscreen flex items-center gap-3.5 border-b border-surface-950 bg-surface-900 px-3.5 py-2 transition-surface last:border-b-0 hover:bg-surface-850"
+            className={cn(
+              "flex items-center gap-3.5 bg-surface-900 px-3.5 py-2 transition-surface hover:bg-surface-850",
+              !isLast && "border-b border-surface-950",
+            )}
           >
             <span className="grid h-13 w-8.75 shrink-0 place-items-center rounded-md bg-surface-800 text-ink-600">
               <HelpCircle className="size-4" />
@@ -878,8 +959,8 @@ function Unplaced({
               {t("library.assign")}
             </Button>
           </div>
-        ))}
-      </div>
+        )}
+      />
       {!filter && (hidden > 0 || expanded) && (
         <button
           type="button"
@@ -904,6 +985,9 @@ function Group({
   label,
   rows,
   muted = false,
+  scrollRef,
+  expanded,
+  onToggle,
   onCorrect,
   onAdd,
   onSplit,
@@ -911,6 +995,9 @@ function Group({
   label: string;
   rows: Row[];
   muted?: boolean;
+  scrollRef: RefObject<HTMLDivElement | null>;
+  expanded: ReadonlySet<number>;
+  onToggle: (mediaId: number) => void;
   onCorrect: (c: Correction) => void;
   onAdd: (media: Media) => void;
   onSplit: (t: SplitTarget) => void;
@@ -921,40 +1008,66 @@ function Group({
       <p className="mb-3 text-[.6875rem] font-medium uppercase tracking-[.12em] text-ink-600">
         {label}
       </p>
-      <div className="overflow-hidden rounded-xl border border-hair">
-        {rows.map((row) => (
+      <VirtualRows
+        items={rows}
+        scrollRef={scrollRef}
+        estimateRowHeight={ROW_HEIGHT}
+        getKey={(row) => row.lib.mediaId}
+        className="overflow-hidden rounded-xl border border-hair"
+        renderItem={(row, _i, isLast) => (
           <LibraryRow
-            key={row.lib.mediaId}
             row={row}
             muted={muted}
+            last={isLast}
+            open={expanded.has(row.lib.mediaId)}
+            onToggle={onToggle}
             onCorrect={onCorrect}
             onAdd={onAdd}
             onSplit={onSplit}
           />
-        ))}
-      </div>
+        )}
+      />
     </section>
   );
 }
+
+/**
+ * Collapsed height of a row, for the virtualizer's first guess.
+ *
+ * `h-13` for the cover plus `py-2` above and below: 3.25rem + 1rem at the
+ * 16px root the app pins. Only ever an estimate — every mounted row is
+ * measured, which is what an expanded row's file list needs — but a wrong one
+ * makes the scrollbar jump as you scroll into unmeasured territory.
+ */
+const ROW_HEIGHT = 68;
 
 const fileName = (path: string) => path.split(/[\\/]/).pop() ?? path;
 
 function LibraryRow({
   row,
   muted,
+  last,
+  open,
+  onToggle,
   onCorrect,
   onAdd,
   onSplit,
 }: {
   row: Row;
   muted: boolean;
+  /** Virtualized rows are absolutely positioned, so `last:` cannot see which
+      one closes the card. */
+  last: boolean;
+  /** Owned by the page: a row scrolled out of view is unmounted, and state
+      held here would go with it. */
+  open: boolean;
+  onToggle: (mediaId: number) => void;
   onCorrect: (c: Correction) => void;
   onAdd: (media: Media) => void;
   onSplit: (t: SplitTarget) => void;
 }) {
   const { t } = useTranslation();
   const playEpisode = useLibrary((s) => s.playEpisode);
-  const [open, setOpen] = useState(false);
   const { lib, media, entry, next } = row;
   const title = displayTitle(media.title);
   // A zero is not a bad match — it is *no* match on record. Only a scan writes
@@ -972,7 +1085,12 @@ function LibraryRow({
   const source = lib.sources?.find((s) => s.manual) ?? lib.sources?.[0];
 
   return (
-    <div className="skip-offscreen border-b border-surface-950 bg-surface-900 transition-surface last:border-b-0 hover:bg-surface-850">
+    <div
+      className={cn(
+        "bg-surface-900 transition-surface hover:bg-surface-850",
+        !last && "border-b border-surface-950",
+      )}
+    >
       <div className="flex items-center gap-3.5 px-3.5 py-2">
         <Link to={`/media/${lib.mediaId}`} className="shrink-0">
           <div className="h-13 w-8.75 overflow-hidden rounded-md bg-surface-800">
@@ -1023,7 +1141,7 @@ function LibraryRow({
 
         <button
           type="button"
-          onClick={() => setOpen((v) => !v)}
+          onClick={() => onToggle(lib.mediaId)}
           aria-expanded={open}
           className="flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-2xs tabular-nums text-ink-600 transition-surface hover:bg-surface-800 hover:text-ink-300"
         >

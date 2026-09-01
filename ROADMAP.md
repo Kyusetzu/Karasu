@@ -124,19 +124,6 @@ consequence. What is left is recorded here rather than in a deleted folder:
   state. Both measurements are kept as `#[ignore]`d tests
   (`library::hydrate_cost`, `db::tests::measure_the_cache_read`) so the finding
   cannot be re-filed from reasoning alone.
-- **`LocalLibrary` skips off-screen rows rather than virtualizing them.**
-  `content-visibility: auto` lets the browser drop the layout and paint work
-  for rows out of view while keeping them in the DOM, which is what its
-  sibling `MediaList` cannot do — a virtualized row is unmounted, and here the
-  expand state lives inside the row, so an expanded row scrolled past would
-  collapse and find-in-page would stop seeing the titles. The mount cost of
-  the rows themselves is untouched. Virtualizing properly means flattening the
-  four labelled groups into one list of header-or-row items and lifting the
-  expand state out; worth doing if a real library is measured to be slow on
-  this page, and not before — the change is unverifiable without running it.
-  Note WebKitGTK is behind WebView2 on the property, where it degrades to the
-  old behaviour rather than breaking.
-
 - **Measure the residual sign-in delay on a device.** `connect_with_token`
   has logged its three phases since the handoff fix; nobody has read them
   off hardware yet. Act only if it is still slow.

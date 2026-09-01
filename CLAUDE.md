@@ -151,7 +151,11 @@ src-tauri/src/
 scripts/             bump-version.mjs (every commit), anilist-query.mjs
                      (validate a query live), android-check.ps1 (the fast
                      cfg(mobile) gate — cargo check for aarch64 with the NDK
-                     env exported); release/ holds the five PowerShell scripts
+                     env exported), windows-check.sh (the same idea for
+                     cfg(windows) from a Linux box — a whole-crate cross-check
+                     is impossible because aws-lc-sys needs the MSVC headers,
+                     so it copies the module into a throwaway crate and checks
+                     that); release/ holds the five PowerShell scripts
                      the release workflow runs (installer, AppImage and APK
                      renamers are deliberate near-twins, release-notes, and
                      generate-update-manifest — desktop-only on purpose)

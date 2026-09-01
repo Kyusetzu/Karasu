@@ -136,10 +136,6 @@ consequence. What is left is recorded here rather than in a deleted folder:
   this page, and not before — the change is unverifiable without running it.
   Note WebKitGTK is behind WebView2 on the property, where it degrades to the
   old behaviour rather than breaking.
-- **The window-title detection rung cannot see play state**, so a paused or
-  minimized player keeps the wall clock running. Unlike the media-session rung
-  (fixed) there is no play state to consult; closing it needs a different
-  signal, not a smaller change.
 
 - **Measure the residual sign-in delay on a device.** `connect_with_token`
   has logged its three phases since the handoff fix; nobody has read them

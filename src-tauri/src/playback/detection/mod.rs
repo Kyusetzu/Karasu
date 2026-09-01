@@ -1,6 +1,7 @@
 //! Detection of running media playback via visible windows
 //! (Karasu's counterpart to Taiga's Anisthesia).
 
+pub mod audio;
 pub mod jellyfin;
 pub mod media_session;
 pub mod mpv_ipc;
@@ -103,7 +104,7 @@ unsafe extern "system" fn enum_callback(hwnd: HWND, lparam: LPARAM) -> BOOL {
 }
 
 #[cfg(windows)]
-fn process_name(pid: u32) -> Option<String> {
+pub(super) fn process_name(pid: u32) -> Option<String> {
     unsafe {
         let handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).ok()?;
         let mut buf = [0u16; 1024];
@@ -141,8 +142,18 @@ mod live_tests {
 /// after this one. See `detect_playback` in the scrobbler loop.
 pub fn detect_windows() -> Option<Playback> {
     let windows = enumerate_windows();
+    // What the audio stack says about each of those processes. Read once for
+    // the whole sweep rather than per candidate: it is a COM round trip, this
+    // runs every 5 s, and every rung below asks the same question.
+    //
+    // An empty map is the normal answer everywhere except Windows, and it
+    // suppresses nothing — see `audio`.
+    let playing = audio::play_states();
     // Local players take precedence over browser detection
     for w in &windows {
+        if audio::is_paused(&playing, &w.process) {
+            continue;
+        }
         if let Some(media) = profiles::match_player(&w.process, &w.title) {
             return Some(Playback {
                 process: w.process.clone(),
@@ -156,6 +167,9 @@ pub fn detect_windows() -> Option<Playback> {
         }
     }
     for w in &windows {
+        if audio::is_paused(&playing, &w.process) {
+            continue;
+        }
         if let Some(media) = profiles::match_streaming(&w.process, &w.title) {
             return Some(Playback {
                 process: w.process.clone(),
@@ -168,6 +182,10 @@ pub fn detect_windows() -> Option<Playback> {
             });
         }
     }
+    // No pause check on the manga rung, and it would be wrong to add one: a
+    // reader is a browser tab that makes no sound, so its process reads as
+    // Inactive whenever no *other* tab is playing. Reading is not audible, and
+    // the wall clock is the only progress signal it ever had.
     for w in &windows {
         if let Some(media) = profiles::match_manga(&w.process, &w.title) {
             return Some(Playback {

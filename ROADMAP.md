@@ -120,9 +120,15 @@ consequence. What is left is recorded here rather than in a deleted folder:
   the daily bell row for it is not deduped; and the check throttle has no lower
   bound, so a backwards clock jump (a dead CMOS battery, a restored VM
   snapshot) disables automatic checks until real time passes the bad stamp.
-- **`hydrate` re-parses every indexed path during `setup`**, before the window
-  exists, and `backups::run_once` blocks a tokio worker rather than going
-  through `spawn_blocking`. Both are startup-cost items, not correctness ones.
+- **`hydrate`'s startup cost was measured and is not one.** The audit filed it
+  without a number; in a release build the re-parse is 49 ms for 20,000 files
+  and the cached-list read 76 ms for 8,000 entries, so a pathological install
+  pays about an eighth of a second and a normal one under twenty milliseconds.
+  Moving it off `setup` would buy that back at the price of a window where the
+  Library screen renders empty and the correction commands need a "not ready"
+  state. Both measurements are kept as `#[ignore]`d tests
+  (`library::hydrate_cost`, `db::tests::measure_the_cache_read`) so the finding
+  cannot be re-filed from reasoning alone.
 - **`LocalLibrary` is not virtualized** while its sibling list is, so a large
   library renders every row.
 - **The window-title detection rung cannot see play state**, so a paused or

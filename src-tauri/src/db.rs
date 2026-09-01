@@ -1757,6 +1757,52 @@ mod tests {
         Db(Mutex::new(conn))
     }
 
+    /// The other half of `hydrate`'s startup cost, measured for the same
+    /// reason as `library::hydrate_cost`: the audit filed it as a startup
+    /// item without a number, and the number is what decides whether moving
+    /// it off the setup thread is worth the empty-index window that costs.
+    ///
+    /// Ignored by default — a measurement, not an assertion. Run with
+    /// `cargo test --release --lib measure_the_cache_read -- --ignored --nocapture`.
+    #[test]
+    #[ignore]
+    fn measure_the_cache_read() {
+        for entries in [500usize, 2_000, 8_000] {
+            let rows: Vec<Value> = (1..=entries)
+                .map(|i| {
+                    serde_json::json!({
+                        "mediaId": i,
+                        "progress": i % 24,
+                        "status": "CURRENT",
+                        "media": {
+                            "id": i,
+                            "episodes": 24,
+                            "title": {
+                                "romaji": format!("Some Long Show Title Number {i}"),
+                                "english": format!("Some Long Show Title Number {i}"),
+                                "native": "\u{3042}\u{306e}\u{4f5c}\u{54c1}",
+                            },
+                            "synonyms": [format!("Alt Title {i}"), format!("Second Alt {i}")],
+                        }
+                    })
+                })
+                .collect();
+            let blob = serde_json::json!([{ "isCustomList": false, "entries": rows }]).to_string();
+            let db = mem_db();
+            db.kv_set("anilist_viewer", "{\"id\":1}").unwrap();
+            db.cache_list(1, "ANIME", &blob).unwrap();
+
+            let start = std::time::Instant::now();
+            let candidates = crate::playback::scrobbler::candidates_from_cache(&db, "ANIME");
+            println!(
+                "cache {entries} entries ({} KiB): {:?}, {} candidates",
+                blob.len() / 1024,
+                start.elapsed(),
+                candidates.len()
+            );
+        }
+    }
+
     /// v17 has to tell two populations apart that the key itself cannot.
     #[test]
     fn v17_blurs_by_default_only_where_nothing_was_ever_stored() {

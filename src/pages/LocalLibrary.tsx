@@ -700,7 +700,7 @@ function SuggestionRow({
   const exact = guess.score >= EXACT;
 
   return (
-    <div className="flex items-center gap-3.5 border-b border-surface-950 bg-surface-900/60 px-3.5 py-2 transition-surface last:border-b-0 hover:bg-surface-850">
+    <div className="skip-offscreen flex items-center gap-3.5 border-b border-surface-950 bg-surface-900/60 px-3.5 py-2 transition-surface last:border-b-0 hover:bg-surface-850">
       <div className="h-13 w-8.75 shrink-0 overflow-hidden rounded-md bg-surface-800 opacity-60">
         {media?.coverImage.large && (
           <img
@@ -847,7 +847,7 @@ function Unplaced({
         {shown.map((group) => (
           <div
             key={`${group.title}:${group.season}`}
-            className="flex items-center gap-3.5 border-b border-surface-950 bg-surface-900 px-3.5 py-2 transition-surface last:border-b-0 hover:bg-surface-850"
+            className="skip-offscreen flex items-center gap-3.5 border-b border-surface-950 bg-surface-900 px-3.5 py-2 transition-surface last:border-b-0 hover:bg-surface-850"
           >
             <span className="grid h-13 w-8.75 shrink-0 place-items-center rounded-md bg-surface-800 text-ink-600">
               <HelpCircle className="size-4" />
@@ -972,7 +972,7 @@ function LibraryRow({
   const source = lib.sources?.find((s) => s.manual) ?? lib.sources?.[0];
 
   return (
-    <div className="border-b border-surface-950 bg-surface-900 transition-surface last:border-b-0 hover:bg-surface-850">
+    <div className="skip-offscreen border-b border-surface-950 bg-surface-900 transition-surface last:border-b-0 hover:bg-surface-850">
       <div className="flex items-center gap-3.5 px-3.5 py-2">
         <Link to={`/media/${lib.mediaId}`} className="shrink-0">
           <div className="h-13 w-8.75 overflow-hidden rounded-md bg-surface-800">

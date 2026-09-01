@@ -23,6 +23,39 @@ val keyProperties = Properties().apply {
     }
 }
 
+// Hand-written (init regenerates this file): the fourth version segment.
+//
+// Karasu versions as MAJOR.MINOR.PATCH.COMMIT#, and only the first three reach
+// `tauri.properties` -- the Tauri CLI writes it from `tauri.conf.json`, which
+// carries the semver core and nothing else. Its versionCode formula is
+// `major * 1000000 + minor * 1000 + patch`, so two release APKs that differ
+// only in COMMIT_NUMBER were the same version to Android: `adb install -r`
+// could not tell them apart, and neither could the settings screen.
+//
+// COMMIT_NUMBER is the one counter in this project that is monotonic by
+// definition (+1 on every commit, never reset), which is exactly what a
+// versionCode wants to be, so it is used directly. The base is what keeps the
+// switch installable: the old formula's last shipped value was 190020, and
+// Android refuses to install a lower versionCode over a higher one. A million
+// clears every code that formula ever produced, leaving ~2.1 billion of
+// headroom -- about four million more commits than this project will see.
+//
+// Read from the Rust const rather than a copy, because `scripts/bump-version.mjs`
+// already owns that line and a sixth place to update is a sixth place to
+// forget. There is deliberately no fallback: a silent one would reinstate the
+// bug it is here to fix, and do it quietly.
+val VERSION_CODE_BASE = 1_000_000
+
+val commitNumber = run {
+    val src = file("../../../src/commands/update.rs")
+    if (!src.exists()) {
+        throw GradleException("Cannot read the commit number: ${src.absolutePath} does not exist")
+    }
+    val match = Regex("""COMMIT_NUMBER: u32 = (\d+);""").find(src.readText())
+        ?: throw GradleException("No `COMMIT_NUMBER: u32 = <n>;` in ${src.absolutePath}")
+    match.groupValues[1].toInt()
+}
+
 android {
     compileSdk = 36
     namespace = "dev.kyu.karasu"
@@ -31,8 +64,9 @@ android {
         applicationId = "dev.kyu.karasu"
         minSdk = 24
         targetSdk = 36
-        versionCode = tauriProperties.getProperty("tauri.android.versionCode", "1").toInt()
-        versionName = tauriProperties.getProperty("tauri.android.versionName", "1.0")
+        versionCode = commitNumber + VERSION_CODE_BASE
+        versionName =
+            tauriProperties.getProperty("tauri.android.versionName", "1.0") + ".$commitNumber"
     }
     signingConfigs {
         create("release") {

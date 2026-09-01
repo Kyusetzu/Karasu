@@ -715,7 +715,7 @@ pub async fn detect(cfg: &JellyfinConfig) -> Option<Playback> {
             // what made a single slow response visible: detection dropped to
             // the media session, which composes an episode-name title, and
             // the card flipped to it for that tick. Hold the last good answer
-            // for a few ticks instead. See `last_good`.
+            // for a few ticks instead. See `hold_last_good` and `LAST_GOOD`.
             return hold_last_good();
         }
     };

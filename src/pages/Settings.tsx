@@ -59,8 +59,8 @@ import { Button } from "@/components/ui/button";
  * it, the way the empty local library points at Library.
  *
  * Ids are kept wherever a pane survived a reshuffle. Renaming `detection` for
- * cosmetics would break every deep link at no gain; `ALIASES` below covers the
- * two that genuinely went away.
+ * cosmetics would break every deep link at no gain; `PANE_ALIASES` in
+ * `lib/settingsPanes` covers the two that genuinely went away.
  */
 const PANES = [
   { id: "account", icon: User, sections: [AccountSection, DefaultsSection] },

@@ -148,7 +148,7 @@ async fn check(app: &AppHandle) {
             // minute pass into one request a minute, out of a shared budget,
             // exactly when the API is least able to answer. The next attempt is
             // pushed out by the shorter of the configured interval and
-            // `RETRY_AFTER_FAILURE`.
+            // `RETRY_AFTER_FAILURE_MS`.
             let interval_ms = interval * 60_000;
             let retry_in = interval_ms.min(RETRY_AFTER_FAILURE_MS);
             let _ = db.kv_set(

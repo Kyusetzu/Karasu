@@ -122,7 +122,11 @@ src-tauri/src/
                      MainActivity.kt (native edge-to-edge insets; the WebView
                      cannot see the status bar), app/build.gradle.kts (release
                      signing from gitignored key.properties, falling back to
-                     debug signing so CI without secrets still builds), and
+                     debug signing so CI without secrets still builds, plus
+                     the versionCode/versionName read out of `COMMIT_NUMBER`
+                     — `tauri.properties` carries only the semver core, so
+                     without it a commit-only bump is the same version to
+                     Android), and
                      TokenCipher.kt (the Keystore seal `keystore.rs` calls
                      over JNI — init won't overwrite it, but a wiped tree
                      won't recreate it: restore from git), and NotifJob.kt
@@ -138,9 +142,11 @@ src-tauri/src/
                      projection file, with WidgetRefresher's proguard keep
                      load-bearing the same way NotifScheduler's is.
                      Re-apply all of it after any re-init. Also committed here: the bundled copy
-                     of THIRD-PARTY-NOTICES.md under app assets — it drifts
-                     silently when the root file is edited without an
-                     Android build, so edit both together
+                     of THIRD-PARTY-NOTICES.md under app assets — the APK
+                     cannot read the repository root, so it carries its own
+                     copy, and `src/lib/notices.test.ts` fails the gate when
+                     the two differ. Edit both together; the test is what
+                     says so when you don't
   discord.rs · library.rs · portable.rs
 scripts/             bump-version.mjs (every commit), anilist-query.mjs
                      (validate a query live), android-check.ps1 (the fast

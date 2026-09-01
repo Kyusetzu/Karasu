@@ -621,8 +621,8 @@ pub fn open_backup_dir(app: tauri::AppHandle, db: State<'_, Db>) -> Result<(), S
         .map_err(|e| format!("Could not open {dir}: {e}"))
 }
 
-#[tauri::command(async)]
-pub fn set_backup_settings(
+#[tauri::command]
+pub async fn set_backup_settings(
     app: tauri::AppHandle,
     db: State<'_, Db>,
     enabled: bool,
@@ -631,7 +631,16 @@ pub fn set_backup_settings(
     crate::backups::write_settings(&db, enabled, keep as usize)?;
     if enabled {
         // Switching it on should produce a backup now, not within the hour.
-        crate::backups::run_once(&app);
+        //
+        // On a blocking thread for the same reason the hourly pass uses one:
+        // the work is a `VACUUM INTO` over the whole database, and
+        // `#[tauri::command(async)]` on a synchronous body only moves it to an
+        // async worker — where it parks that worker instead of the UI thread.
+        // The `.await` is what keeps the toast honest: the command still does
+        // not answer until the backup is on disk.
+        tokio::task::spawn_blocking(move || crate::backups::run_once(&app))
+            .await
+            .map_err(|e| format!("Could not write the backup: {e}"))?;
     }
     Ok(())
 }

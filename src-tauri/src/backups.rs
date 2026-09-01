@@ -206,7 +206,21 @@ pub fn spawn(app: AppHandle) {
         let app = app.clone();
         async move {
             loop {
-                run_once(&app);
+                // `spawn_blocking`, not a bare call. `run_once` is all
+                // synchronous filesystem work, and its expensive step is
+                // `VACUUM INTO` over the whole database — bounded by the file's
+                // size and the disk's speed, neither of which this code gets to
+                // choose. On the async runtime that parks a worker thread for
+                // the duration, and the workers are shared with every other
+                // background pass and with the AniList client.
+                //
+                // A join error means the blocking task itself panicked;
+                // `supervise` restarts the loop, so it is logged and the sleep
+                // still happens rather than spinning.
+                let handle = app.clone();
+                if let Err(e) = tokio::task::spawn_blocking(move || run_once(&handle)).await {
+                    crate::logging::warn("backup", format!("the backup pass failed: {e}"));
+                }
                 tokio::time::sleep(std::time::Duration::from_secs(60 * 60)).await;
             }
         }

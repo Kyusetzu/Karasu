@@ -115,31 +115,31 @@ repository about to be public, which is a finding it raised against itself).
 Everything it found at P1 and P2 is fixed, as is every P3 with a behavioural
 consequence. What is left is recorded here rather than in a deleted folder:
 
-- **Updater ergonomics.** A declined update re-downloads ~100 MB every 24 h
-  because `download_pending_update` never consults the stash before fetching;
-  the daily bell row for it is not deduped; and the check throttle has no lower
-  bound, so a backwards clock jump (a dead CMOS battery, a restored VM
-  snapshot) disables automatic checks until real time passes the bad stamp.
-- **Android `versionCode` does not move on a commit-only bump.** It is derived
-  from the semver core, so two release APKs differing only in `COMMIT_NUMBER`
-  are the same version to Android. Karasu has no Android updater by design, so
-  the cost is that `adb install -r` cannot tell them apart.
-- **`hydrate` re-parses every indexed path during `setup`**, before the window
-  exists, and `backups::run_once` blocks a tokio worker rather than going
-  through `spawn_blocking`. Both are startup-cost items, not correctness ones.
-- **`LocalLibrary` is not virtualized** while its sibling list is, so a large
-  library renders every row.
+- **`hydrate`'s startup cost was measured and is not one.** The audit filed it
+  without a number; in a release build the re-parse is 49 ms for 20,000 files
+  and the cached-list read 76 ms for 8,000 entries, so a pathological install
+  pays about an eighth of a second and a normal one under twenty milliseconds.
+  Moving it off `setup` would buy that back at the price of a window where the
+  Library screen renders empty and the correction commands need a "not ready"
+  state. Both measurements are kept as `#[ignore]`d tests
+  (`library::hydrate_cost`, `db::tests::measure_the_cache_read`) so the finding
+  cannot be re-filed from reasoning alone.
+- **`LocalLibrary` skips off-screen rows rather than virtualizing them.**
+  `content-visibility: auto` lets the browser drop the layout and paint work
+  for rows out of view while keeping them in the DOM, which is what its
+  sibling `MediaList` cannot do — a virtualized row is unmounted, and here the
+  expand state lives inside the row, so an expanded row scrolled past would
+  collapse and find-in-page would stop seeing the titles. The mount cost of
+  the rows themselves is untouched. Virtualizing properly means flattening the
+  four labelled groups into one list of header-or-row items and lifting the
+  expand state out; worth doing if a real library is measured to be slow on
+  this page, and not before — the change is unverifiable without running it.
+  Note WebKitGTK is behind WebView2 on the property, where it degrades to the
+  old behaviour rather than breaking.
 - **The window-title detection rung cannot see play state**, so a paused or
   minimized player keeps the wall clock running. Unlike the media-session rung
   (fixed) there is no play state to consult; closing it needs a different
   signal, not a smaller change.
-- **Comment and documentation drift** the audit catalogued: a handful of
-  comments describing behaviour that has since moved, and the bundled Android
-  copy of THIRD-PARTY-NOTICES.md which has to be edited alongside the root one.
-- **An attribution row for the anime-relations dataset** in
-  THIRD-PARTY-NOTICES.md. Its licence is CC0, so nothing is owed; the file's
-  two reproduction commands (`npm ls`, `cargo metadata`) structurally cannot
-  see a runtime-fetched dataset, which is the more interesting half.
 
 - **Measure the residual sign-in delay on a device.** `connect_with_token`
   has logged its three phases since the handoff fix; nobody has read them

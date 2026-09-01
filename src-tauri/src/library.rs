@@ -444,8 +444,8 @@ pub async fn scan_library(app: AppHandle) -> Result<ScanSummary, String> {
         (root, candidates, override_map(&db), redirect_rules(&db), stored, cursor)
     };
 
-    // Everything below ends in `library_replace_all` and its two siblings, each
-    // of which DELETEs its whole table before inserting what this scan found.
+    // Everything below ends in `library_publish`, which DELETEs each of its
+    // three tables before inserting what this scan found.
     // So an unreachable folder — an offline NAS, an unplugged drive, a renamed
     // directory — must not reach that point: it yields zero files, and zero
     // files used to be written down as the truth and then survive a restart
@@ -1901,5 +1901,35 @@ mod tests {
         assert_eq!(out.len(), 1);
 
         let _ = std::fs::remove_dir_all(&empty);
+    }
+}
+
+#[cfg(test)]
+mod hydrate_cost {
+    /// How long the re-parse in `hydrate` actually takes, since the audit
+    /// filed it as a startup cost without ever putting a number on it.
+    ///
+    /// Ignored by default — it is a measurement, not an assertion. Run with
+    /// `cargo test --lib hydrate_cost -- --ignored --nocapture`.
+    #[test]
+    #[ignore]
+    fn measure_the_reparse() {
+        let names: Vec<String> = (1..=20_000)
+            .map(|i| {
+                format!(
+                    "[SubsPlease] Some Long Show Title S{}  - {:02} (1080p) [A1B2C3D4].mkv",
+                    (i % 4) + 1,
+                    i % 24 + 1
+                )
+            })
+            .collect();
+        for n in [1_000usize, 5_000, 20_000] {
+            let start = std::time::Instant::now();
+            let mut sink = 0usize;
+            for name in &names[..n] {
+                sink += super::reparse(name).0.len();
+            }
+            println!("reparse {n} files: {:?} (sink {sink})", start.elapsed());
+        }
     }
 }

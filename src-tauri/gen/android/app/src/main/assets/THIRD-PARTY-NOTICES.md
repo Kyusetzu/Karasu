@@ -19,6 +19,10 @@ npm ls --all --json
 cargo metadata --manifest-path src-tauri/Cargo.toml --format-version 1 --all-features
 ```
 
+Neither command can see the section on data fetched at runtime, which is why
+that section exists: a dataset the app downloads on first run is in no
+manifest, so nothing here would have caught its absence.
+
 ---
 
 ## Fonts
@@ -51,6 +55,24 @@ The local database is SQLite, compiled into the binary through `rusqlite`'s
 > notice, here is a blessing: May you do good and not evil.
 
 <https://www.sqlite.org/copyright.html>
+
+## Data fetched at runtime
+
+Not shipped in any build — downloaded on first use and cached beside the
+database — but incorporated into what the app does, and so listed here for the
+same reason the bundled components are. It is also the one entry the two
+commands above structurally cannot report: it appears in no manifest.
+
+| Data | Used for | Licence |
+| --- | --- | --- |
+| **anime-relations** — [erengy/anime-relations](https://github.com/erengy/anime-relations), `anime-relations.txt` | redirecting an episode number to the AniList entry it really belongs to — a continuously numbered release of a split-cour show, and specials | [CC0-1.0](https://github.com/erengy/anime-relations/blob/master/LICENSE) |
+
+CC0 waives copyright rather than imposing conditions, so nothing is owed. The
+row is a courtesy: it is the same dataset Taiga uses, it is what makes episode
+25 of a combined release land on the sequel's episode 1, and a user reading
+this file should be able to find out where that behaviour comes from. The
+fetch itself is in `src-tauri/src/playback/relations.rs`, cached for seven
+days.
 
 ## Rust crates
 

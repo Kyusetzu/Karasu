@@ -1,6 +1,6 @@
 [package]
 name = "karasu"
-version = "0.190.28"
+version = "0.192.1"
 description = "A modern anime and manga tracker built exclusively for AniList"
 authors = ["Kyu"]
 license = "MIT"
@@ -132,6 +132,12 @@ windows = { version = "0.62", features = [
     "Foundation",
     "Foundation_Collections",
     "Win32_System_Com",
+    # WASAPI audio sessions: the only per-process play state a *window* has.
+    # `IMMDevice::Activate` is gated behind the other two, which carry the
+    # PROPVARIANT it takes and never uses.
+    "Win32_Media_Audio",
+    "Win32_System_Com_StructuredStorage",
+    "Win32_System_Variant",
 ] }
 # The blocking `join()` on WinRT async operations lives here, not in `windows`.
 windows-future = "0.3"

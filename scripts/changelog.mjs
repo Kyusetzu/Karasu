@@ -201,6 +201,23 @@ if (!since) {
   process.exit(1);
 }
 
+// A marker naming a commit that no longer exists is routine rather than
+// exotic: an amend or a rebase rewrites the sha the previous run recorded.
+// Without this the next run died on a raw `git log` usage dump, which says
+// nothing about what to do.
+try {
+  execFileSync("git", ["cat-file", "-e", `${since}^{commit}`], { cwd: ROOT, stdio: "ignore" });
+} catch {
+  console.error(
+    `changelog: the marker names ${since}, which is not a commit in this repository.\n` +
+      "  An amend or a rebase rewrote it. Point the marker at a commit that still\n" +
+      "  exists and whose changes are already described — usually the one before\n" +
+      "  your current work:\n" +
+      "    <!-- generated-through: $(git rev-parse --short HEAD~1) -->",
+  );
+  process.exit(1);
+}
+
 const head = git("rev-parse", "HEAD").trim().slice(0, 7);
 const entries = collect(since);
 

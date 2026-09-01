@@ -70,7 +70,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: e8b8fe3 -->
+<!-- generated-through: 189d4e2 -->
 
 ### Fixed
 
@@ -244,6 +244,7 @@ tag time is then optional rather than load-bearing.
   clock pushed backwards no longer disables update checks either.
 - The local library only renders the rows on screen, so a large collection
   opens without the pause.
+- The background notification check reports it when Android refuses to register the job, instead of showing a schedule that does not exist.
 
 ### Added
 

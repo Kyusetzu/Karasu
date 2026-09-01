@@ -50,3 +50,22 @@ export function isRateLimited(error: unknown): boolean {
   const text = error instanceof Error ? error.message : String(error);
   return text.trim() === RATE_LIMITED;
 }
+
+/**
+ * Whether a rejection is the connection rather than the answer.
+ *
+ * `client.rs` renders `ApiError::Network` as `Network error: <reqwest's own
+ * text>`, and that prefix is the whole contract — the text after it is a
+ * library's wording and is not something to match on. Every other `ApiError`
+ * variant renders with a different prefix or a stable code.
+ *
+ * Worth telling apart because it is the one rejection with a useful fallback:
+ * a screen that cannot reach AniList may still have the answer cached, and
+ * saying "you are offline" is help where dumping the transport's sentence is
+ * not.
+ */
+export function isOffline(error: unknown): boolean {
+  if (!error) return false;
+  const text = error instanceof Error ? error.message : String(error);
+  return text.trim().startsWith("Network error:");
+}

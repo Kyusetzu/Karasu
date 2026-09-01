@@ -664,6 +664,13 @@ export const de: typeof en = {
     hintClose: "Ctrl K schließen",
   },
   detail: {
+    offlineTitle: "Du bist offline",
+    offlineHint:
+      "Dieser Titel steht nicht auf deiner Liste, also ist nichts gespeichert, was sich zeigen ließe. Er lädt, sobald du wieder online bist.",
+    offlineCached: "Offline — gezeigt wird, was deine Liste schon hatte.",
+    offlineProgress: "Fortschritt {{progress}} / {{total}}",
+    offlineRest:
+      "Der Rest dieser Seite — Banner, Studios, Beziehungen, Charaktere, Reviews — wird nur live geladen. Ein +1 hier wird eingereiht und gesendet, sobald du wieder online bist.",
     notOnList: "Nicht auf deiner Liste",
     favourite: "Favorit",
     favourited: "Favorisiert",

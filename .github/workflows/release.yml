@@ -30,6 +30,100 @@ permissions:
   contents: read
 
 jobs:
+  # Everything that can reject a tag without compiling anything, run first and
+  # alone. It is seconds of work and it gates the rest.
+  #
+  # This lived inside `build-and-publish`, whose comment claimed it ran
+  # "deliberately before the ~15-minute build". It did not: that job carries
+  # `needs: [build-linux, android-build]`, so on a real run the check fired
+  # eleven minutes in — measured, not guessed. The failure mode it exists to
+  # prevent is the expensive one: the tag is already pushed by then, and a tag
+  # that disagrees with the commit it points at, or one whose CHANGELOG section
+  # is missing, cost a quarter of an hour before saying so.
+  #
+  # Ubuntu rather than Windows: pwsh is preinstalled there too, the scripts are
+  # cross-platform PowerShell already, and a Linux runner starts in seconds.
+  precheck:
+    runs-on: ubuntu-22.04
+    outputs:
+      tag: ${{ steps.target.outputs.tag }}
+      name: ${{ steps.target.outputs.name }}
+      prerelease: ${{ steps.target.outputs.prerelease }}
+      rolling: ${{ steps.target.outputs.rolling }}
+      version: ${{ steps.target.outputs.version }}
+      suffix: ${{ steps.target.outputs.suffix }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+
+      # The four-part version lives in five files and only bump-version.mjs
+      # writes all of them at once, so a hand-edit or a bad merge can leave them
+      # disagreeing. The consequence is not cosmetic: `latest.json` is generated
+      # from package.json plus COMMIT_NUMBER, while the running app compares
+      # against the COMMIT_NUMBER compiled into it. Let those describe two
+      # different builds and every install re-downloads its own update forever,
+      # with only a new release to stop it.
+      #
+      # No `npm ci` in front of it: this reads files and compares strings, and
+      # installing the tree would put a minute back into the thing being made
+      # fast.
+      - name: Check the version files agree
+        run: node scripts/bump-version.mjs --check
+
+      # Which release this run is, decided once. Everything downstream reads
+      # these outputs, so the three literals that used to be `latest` / `Latest
+      # build` / `prerelease: true` live in exactly one place.
+      - name: Resolve release target
+        id: target
+        shell: pwsh
+        run: |
+          $ref = "${env:GITHUB_REF}"
+          if ($ref -like "refs/tags/*") {
+            $tag = $ref -replace "^refs/tags/", ""
+            $core = $tag -replace "^v", ""
+            $pkg = (Get-Content package.json -Raw | ConvertFrom-Json).version
+            # A prerelease tag (v1.0.0-rc1) keeps its suffix in the name but
+            # must still agree on the semver core with what is committed.
+            $tagCore = ($core -split "-")[0]
+            if ($tagCore -ne $pkg) {
+              throw "Tag $tag says $tagCore but package.json says $pkg -- bump the version on the tagged commit, or tag the right commit."
+            }
+            # `-` in the tag is semver's prerelease marker; GitHub should mark
+            # those as prereleases and a bare v1.0.0 as a real one.
+            $pre = if ($core -match "-") { "true" } else { "false" }
+            # Everything after the first dash, for the artifact filenames. The
+            # bundler names them from package.json's semver core alone, so
+            # v1.0.0-rc1 and v1.0.0 produced identically-named installers --
+            # indistinguishable once downloaded, and the rolling prune keeps
+            # assets by name. Filenames only: latest.json's `version` stays
+            # clean semver + build metadata.
+            $suffix = if ($core -match "-") { ($core -split "-", 2)[1] } else { "" }
+            $out = @("tag=$tag", "name=Karasu $core", "prerelease=$pre", "rolling=false", "version=$core", "suffix=$suffix")
+            # The notes are composed after the build, from CHANGELOG.md, and
+            # the slicer throws when the section is missing. Checked here too,
+            # so a tag with no changelog entry costs seconds rather than
+            # failing at the end of a fifteen-minute build with the tag
+            # already pushed and no release to show for it. Note this means a
+            # prerelease tag needs its own `## 1.0.0-rc1` section.
+            ./scripts/release/release-notes.ps1 -Version $core -OutFile notes-precheck.md | Out-Null
+            Remove-Item notes-precheck.md -ErrorAction SilentlyContinue
+          }
+          else {
+            $out = @("tag=latest", "name=Latest build", "prerelease=true", "rolling=true", "version=", "suffix=")
+          }
+
+          # `Out-File -Append -Encoding utf8`, the same idiom rename-installer.ps1
+          # already uses, rather than `>>` -- the redirect's default encoding is
+          # a shell-version detail and this file is parsed by the runner.
+          $out | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          $summary = ($out | ForEach-Object { $_ -replace "^[^=]+=", "" })
+          Write-Host "Publishing to tag '$($summary[0])' as '$($summary[1])' (prerelease=$($summary[2]), rolling=$($summary[3]))"
+
   # Builds the Linux artifact and hands it to the publisher below as an
   # artifact. A matrix was the obvious shape and the wrong one: every
   # post-build step here is PowerShell against `bundle/nsis`, `latest.json` has
@@ -40,6 +134,9 @@ jobs:
   # ubuntu-22.04 for glibc reach — see ci.yml for the reasoning.
   build-linux:
     runs-on: ubuntu-22.04
+    # Hard, unlike the publisher's soft dependency below: there is no point
+    # spending fifteen minutes of runner time on a tag that will be refused.
+    needs: precheck
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -149,66 +246,16 @@ jobs:
     # android-build joins the same soft dependency: when the signing secrets
     # exist it hands signed APKs over as an artifact, and a red Android leg
     # costs the APKs, never the desktop release.
-    needs: [build-linux, android-build]
-    if: ${{ !cancelled() }}
+    #
+    # `precheck` joins as a *hard* dependency: a run whose tag was rejected has
+    # nothing to publish, and `!cancelled()` would otherwise let this job go
+    # ahead on a failed precheck exactly as it goes ahead on a failed Linux leg.
+    # The two build jobs stay soft.
+    needs: [precheck, build-linux, android-build]
+    if: ${{ !cancelled() && needs.precheck.result == 'success' }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      # Which release this run is, decided once. Everything downstream reads
-      # these outputs, so the three literals that used to be `latest` / `Latest
-      # build` / `prerelease: true` live in exactly one place.
-      #
-      # First, and deliberately before the ~15-minute build: a tag that
-      # disagrees with the commit it points at fails in seconds rather than
-      # producing a release called 1.0.0 whose installer says 0.132.0. The
-      # scripts read the version off disk at the tagged commit, so nothing else
-      # would ever catch that.
-      - name: Resolve release target
-        id: target
-        shell: pwsh
-        run: |
-          $ref = "${env:GITHUB_REF}"
-          if ($ref -like "refs/tags/*") {
-            $tag = $ref -replace "^refs/tags/", ""
-            $core = $tag -replace "^v", ""
-            $pkg = (Get-Content package.json -Raw | ConvertFrom-Json).version
-            # A prerelease tag (v1.0.0-rc1) keeps its suffix in the name but
-            # must still agree on the semver core with what is committed.
-            $tagCore = ($core -split "-")[0]
-            if ($tagCore -ne $pkg) {
-              throw "Tag $tag says $tagCore but package.json says $pkg -- bump the version on the tagged commit, or tag the right commit."
-            }
-            # `-` in the tag is semver's prerelease marker; GitHub should mark
-            # those as prereleases and a bare v1.0.0 as a real one.
-            $pre = if ($core -match "-") { "true" } else { "false" }
-            # Everything after the first dash, for the artifact filenames. The
-            # bundler names them from package.json's semver core alone, so
-            # v1.0.0-rc1 and v1.0.0 produced identically-named installers —
-            # indistinguishable once downloaded, and the rolling prune keeps
-            # assets by name. Filenames only: latest.json's `version` stays
-            # clean semver + build metadata.
-            $suffix = if ($core -match "-") { ($core -split "-", 2)[1] } else { "" }
-            $out = @("tag=$tag", "name=Karasu $core", "prerelease=$pre", "rolling=false", "version=$core", "suffix=$suffix")
-            # The notes are composed after the build, from CHANGELOG.md, and
-            # the slicer throws when the section is missing. Checked here too,
-            # so a tag with no changelog entry costs seconds rather than
-            # failing at the end of a fifteen-minute build with the tag
-            # already pushed and no release to show for it. Note this means a
-            # prerelease tag needs its own `## 1.0.0-rc1` section.
-            ./scripts/release/release-notes.ps1 -Version $core -OutFile notes-precheck.md | Out-Null
-            Remove-Item notes-precheck.md -ErrorAction SilentlyContinue
-          }
-          else {
-            $out = @("tag=latest", "name=Latest build", "prerelease=true", "rolling=true", "version=", "suffix=")
-          }
-
-          # `Out-File -Append -Encoding utf8`, the same idiom rename-installer.ps1
-          # already uses, rather than `>>` — the redirect's default encoding is
-          # a shell-version detail and this file is parsed by the runner.
-          $out | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-          $summary = ($out | ForEach-Object { $_ -replace "^[^=]+=", "" })
-          Write-Host "Publishing to tag '$($summary[0])' as '$($summary[1])' (prerelease=$($summary[2]), rolling=$($summary[3]))"
 
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -231,16 +278,6 @@ jobs:
       # build ships to the prerelease channel and is installed by real users,
       # so it needs this as much as a tag does.
       #
-      # The four-part version lives in five files and only bump-version.mjs
-      # writes all of them at once, so a hand-edit or a bad merge can leave them
-      # disagreeing. The consequence is not cosmetic: `latest.json` is generated
-      # from package.json plus COMMIT_NUMBER, while the running app compares
-      # against the COMMIT_NUMBER compiled into it. Let those describe two
-      # different builds and every install re-downloads its own update forever,
-      # with only a new release to stop it.
-      - name: Check the version files agree
-        run: node scripts/bump-version.mjs --check
-
       # Flattened into linux-artifacts/. continue-on-error so a missing or
       # failed Linux build degrades to a Windows-only release rather than
       # taking the whole thing down.
@@ -278,7 +315,7 @@ jobs:
         id: installer
         shell: pwsh
         env:
-          RELEASE_SUFFIX: ${{ steps.target.outputs.suffix }}
+          RELEASE_SUFFIX: ${{ needs.precheck.outputs.suffix }}
         run: ./scripts/release/rename-installer.ps1 -Suffix $env:RELEASE_SUFFIX
 
       # The tag matters here more than anywhere else: the manifest's download
@@ -292,8 +329,8 @@ jobs:
       - name: Generate update manifest (latest.json)
         shell: pwsh
         env:
-          RELEASE_TAG: ${{ steps.target.outputs.tag }}
-          RELEASE_NAME: ${{ steps.target.outputs.name }}
+          RELEASE_TAG: ${{ needs.precheck.outputs.tag }}
+          RELEASE_NAME: ${{ needs.precheck.outputs.name }}
         run: >
           ./scripts/release/generate-update-manifest.ps1
           -Tag $env:RELEASE_TAG
@@ -349,7 +386,7 @@ jobs:
       - name: Compose release notes
         shell: pwsh
         env:
-          NOTES_VERSION: ${{ steps.target.outputs.version }}
+          NOTES_VERSION: ${{ needs.precheck.outputs.version }}
           NOTES_SHA: ${{ github.sha }}
           NOTES_VT: ${{ steps.virustotal.outputs.analysis || 'unavailable for this release' }}
         run: |
@@ -379,7 +416,7 @@ jobs:
       # Rolling only: a version tag must never move, which is the entire point
       # of having one.
       - name: Move the rolling tag to this commit
-        if: ${{ steps.target.outputs.rolling == 'true' }}
+        if: ${{ needs.precheck.outputs.rolling == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
@@ -393,9 +430,9 @@ jobs:
       - name: Publish release
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3
         with:
-          tag_name: ${{ steps.target.outputs.tag }}
-          name: ${{ steps.target.outputs.name }}
-          prerelease: ${{ steps.target.outputs.prerelease }}
+          tag_name: ${{ needs.precheck.outputs.tag }}
+          name: ${{ needs.precheck.outputs.name }}
+          prerelease: ${{ needs.precheck.outputs.prerelease }}
           body_path: notes.md
           files: |
             src-tauri/target/release/bundle/nsis/*.exe
@@ -417,7 +454,7 @@ jobs:
       # list, seconds after an unrelated push published it. Guarded by `if:`,
       # never by emptying `$keep`.
       - name: Prune stale release assets
-        if: ${{ steps.target.outputs.rolling == 'true' }}
+        if: ${{ needs.precheck.outputs.rolling == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
           # Through the environment, not `${{ }}` inside the script body. A
@@ -476,6 +513,8 @@ jobs:
   # signature, and vice versa.
   android-build:
     runs-on: ubuntu-22.04
+    # Same reason as build-linux.
+    needs: precheck
     env:
       # Job-level `if:` cannot read secrets; steps key off this instead.
       HAS_ANDROID_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_B64 != '' }}

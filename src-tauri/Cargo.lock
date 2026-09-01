@@ -2325,7 +2325,7 @@ dependencies = [
 
 [[package]]
 name = "karasu"
-version = "0.192.2"
+version = "0.193.1"
 dependencies = [
  "base64 0.22.1",
  "chacha20poly1305",

@@ -621,6 +621,32 @@ nav a {
    variable unset is an invalid declaration — `grid-template-columns` then
    computes to `none` and the grid silently collapses. It only shows for the
    frames before the store's `init()` runs. */
+/* Rows the browser may skip laying out and painting while they are off
+   screen. The local library is a flat list of one row per matched title, and
+   a large collection makes that a long one — each row carries a cover, two
+   links, up to four buttons and a collapsible file list.
+
+   Deliberately *not* virtualization, which is what its sibling `MediaList`
+   uses. Virtualizing would unmount the off-screen rows, and the expand state
+   lives inside each row, so an expanded row scrolled past would silently
+   collapse; find-in-page would stop seeing the titles too. `content-visibility`
+   keeps every row in the DOM and skips only the work, which is the half that
+   was expensive.
+
+   `auto` on `contain-intrinsic-size` means "use the last size actually
+   rendered", which is what makes an expanded row keep its real height in the
+   scrollbar instead of snapping back to the collapsed estimate. The 4.25rem is
+   the collapsed height — `h-13` (3.25rem) for the cover plus `py-2` above and
+   below — and only ever applies to a row that has not been on screen yet, so
+   it is the number the scrollbar is built from before you reach the bottom.
+
+   Where the property is unsupported — WebKitGTK is behind WebView2 here — it
+   is ignored, and the page renders exactly as it did before. */
+@utility skip-offscreen {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 4.25rem;
+}
+
 @utility media-grid {
   display: grid;
   grid-template-columns: repeat(var(--cover-cols, 8), minmax(0, 1fr));

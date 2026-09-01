@@ -10,6 +10,7 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Shimmer } from "@/components/Skeleton";
+import { showToast } from "@/stores/toast";
 import { ExternalNote, NeedsAccount, Row, SELECT, Toggle } from "./shared";
 import {
   LIST_ACTIVITY_STATUSES,
@@ -646,7 +647,13 @@ export function NotificationScheduleSection() {
 
   const commit = (m: number) => {
     setMinutes(m);
-    setNotifSchedule(m).catch(() => {});
+    // The rejection carries a real sentence now, and swallowing it was how a
+    // JobScheduler that refused the job left this pane reading "every 15
+    // minutes" with nothing registered. The stored setting is still correct
+    // either way, so the select keeps the new value.
+    setNotifSchedule(m).catch((e) =>
+      showToast({ kind: "error", text: String(e) }),
+    );
   };
 
   return (

@@ -132,23 +132,35 @@ pub fn set_notif_schedule(db: State<'_, Db>, minutes: i64) -> Result<(), String>
             crate::alerts::site::INTERVAL_MAX,
         )
     };
+    // The setting is stored first and unconditionally: a scheduling failure is
+    // recoverable — `spawn_schedule_assert` retries it at every start — so the
+    // user's choice must survive it.
     db.kv_set(crate::alerts::site::INTERVAL_KEY, &clamped.to_string())?;
-    reassert_notif_job(clamped);
-    Ok(())
+    // ...but it is not swallowed. This used to log and return `Ok`, so a
+    // JobScheduler that refused the job left the pane reading "every 15
+    // minutes" with no job registered — `cmd jobscheduler run` answers
+    // "Could not find job 46231", and nothing on screen ever said why. The
+    // stored value is still correct, which is what the message promises.
+    reassert_notif_job(clamped)
 }
 
 /// Cfg'd pair: Android mirrors the setting into its JobScheduler so the
 /// dead-app half fires on the same cadence; everywhere else the in-app pass
 /// reads the kv on its next tick and nothing more is needed.
 #[cfg(target_os = "android")]
-fn reassert_notif_job(minutes: i64) {
-    if let Err(e) = crate::background::assert_schedule(minutes) {
+fn reassert_notif_job(minutes: i64) -> Result<(), String> {
+    crate::background::assert_schedule(minutes).map_err(|e| {
         crate::logging::warn("prefs", format!("job reschedule failed: {e}"));
-    }
+        format!(
+            "The setting is saved, but Android refused the background job ({e}).              It will be retried the next time Karasu starts."
+        )
+    })
 }
 
 #[cfg(not(target_os = "android"))]
-fn reassert_notif_job(_minutes: i64) {}
+fn reassert_notif_job(_minutes: i64) -> Result<(), String> {
+    Ok(())
+}
 
 /// Whether sequel-announcement notifications are enabled (default off).
 #[tauri::command]

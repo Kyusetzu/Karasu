@@ -10,7 +10,7 @@ use super::*;
 
 /// Monotonic commit counter — the 4th version segment
 /// (`MAJOR.MINOR.PATCH.COMMIT#`). Bumped by one on every commit.
-pub const COMMIT_NUMBER: u32 = 518;
+pub const COMMIT_NUMBER: u32 = 519;
 
 /// Full four-part display version, e.g. `0.1.1.38`. The `MAJOR.MINOR.PATCH`
 /// core comes from the crate version (kept in sync across the manifests).
@@ -105,6 +105,24 @@ fn update_channel_manifest_url(channel: &str) -> &'static str {
 
 const UPDATE_CHECK_THROTTLE_MS: i64 = 24 * 60 * 60 * 1000;
 
+/// Whether a background check may run, given the stamp of the last one.
+///
+/// The obvious form — `now - last < throttle` — has no lower bound, and the
+/// stamp is wall-clock rather than monotonic. A clock that jumps *backwards*
+/// (a dead CMOS battery, a restored VM snapshot, a timezone-confused first
+/// boot) leaves a stamp in the future, `now - last` goes negative, and
+/// negative is smaller than the throttle: automatic checks stay off until
+/// real time crawls past the bad stamp, which can be years. A stamp ahead of
+/// now describes no elapsed interval at all, so it is treated as no stamp —
+/// the check runs, and the write after the request replaces it with a sane
+/// one.
+fn check_due(last: Option<i64>, now: i64, throttle: i64) -> bool {
+    match last {
+        None => true,
+        Some(last) => !(0..throttle).contains(&(now - last)),
+    }
+}
+
 /// Compares the running version against the latest release on the selected
 /// channel. Background/automatic callers should pass `force: false` (respects
 /// a 24h throttle so startup checks don't hit the API every launch); the
@@ -129,16 +147,14 @@ pub async fn check_for_updates(
         let last_check = db
             .kv_get("last_update_check_ms")
             .and_then(|s| s.parse::<i64>().ok());
-        if let Some(last) = last_check {
-            if now_ms() - last < UPDATE_CHECK_THROTTLE_MS {
-                return Ok(UpdateInfo {
-                    current,
-                    latest: None,
-                    url: None,
-                    is_newer: false,
-                    channel_empty: false,
-                });
-            }
+        if !check_due(last_check, now_ms(), UPDATE_CHECK_THROTTLE_MS) {
+            return Ok(UpdateInfo {
+                current,
+                latest: None,
+                url: None,
+                is_newer: false,
+                channel_empty: false,
+            });
         }
     }
 
@@ -330,12 +346,40 @@ pub fn clear_stale_update_notice(db: &crate::db::Db) {
 
 #[cfg(test)]
 mod tests {
-    use super::{can_install, display_version, version_gt, version_parts};
+    use super::{can_install, check_due, display_version, version_gt, version_parts};
 
     /// Windows first, and deliberately: `running_from_appimage()` is false
     /// there, so the obvious one-line form of this gate —
     /// `if !running_from_appimage() { return }` — disables the updater for
     /// every actual user of the app. This assertion is the one that catches it.
+    const DAY: i64 = 24 * 60 * 60 * 1000;
+
+    #[test]
+    fn a_check_is_due_when_nothing_was_ever_stamped() {
+        assert!(check_due(None, 1_700_000_000_000, DAY));
+    }
+
+    #[test]
+    fn the_throttle_holds_within_the_window_and_lifts_after_it() {
+        let now = 1_700_000_000_000;
+        assert!(!check_due(Some(now), now, DAY), "stamped this instant");
+        assert!(!check_due(Some(now - DAY + 1), now, DAY), "one ms short");
+        assert!(check_due(Some(now - DAY), now, DAY), "exactly a day");
+        assert!(check_due(Some(now - 2 * DAY), now, DAY), "long overdue");
+    }
+
+    /// The one this function exists for. `now - last < throttle` is true for
+    /// every negative difference, so a stamp in the future — a clock pushed
+    /// backwards by a dead CMOS battery or a restored snapshot — disabled
+    /// automatic checks until real time caught up with it. A year ahead is a
+    /// year of no update checks.
+    #[test]
+    fn a_stamp_in_the_future_does_not_disable_checking() {
+        let now = 1_700_000_000_000;
+        assert!(check_due(Some(now + 1), now, DAY), "one ms ahead");
+        assert!(check_due(Some(now + 365 * DAY), now, DAY), "a year ahead");
+    }
+
     #[test]
     fn only_a_linux_build_outside_an_appimage_refuses_to_install() {
         assert!(can_install(false, false), "Windows, where the users are");
@@ -578,6 +622,31 @@ pub async fn download_pending_update(
         return Ok(None);
     };
 
+    // Already downloaded. The stash is the whole installer — ~100 MB held in
+    // process memory — and this pass runs once a day, so without this check a
+    // user who is offered an update and simply does not restart pays for it
+    // again every 24 h, forever, on their own bandwidth. Downloading the same
+    // bytes on top of the bytes we already hold buys nothing: `install` reads
+    // the stash, and the version is the only thing that decides whether the
+    // stash is still the right answer.
+    //
+    // Compared on `update.version`, the manifest spelling, because that is what
+    // both sides carry; `display_version` is for the UI and would compare two
+    // renderings rather than two versions.
+    if let Some((held, _)) = pending.0.guard().as_ref() {
+        if held.version == update.version {
+            crate::logging::debug_changed(
+                "update",
+                "download",
+                "the stash already holds this version; not downloading it again",
+            );
+            return Ok(Some(DownloadedUpdate {
+                version: display_version(&held.version),
+                notes: held.body.clone(),
+            }));
+        }
+    }
+
     let version = display_version(&update.version);
     // Manifest form, not display form: it is what `clear_stale_update_notice`
     // compares against the running build at the next startup, so the "new
@@ -591,20 +660,36 @@ pub async fn download_pending_update(
         .map_err(|e| e.to_string())?;
 
     *pending.0.guard() = Some((update, bytes));
+
+    // One row per version, not one per download. The stash lives in process
+    // memory, so a restart empties it and the next background pass downloads
+    // the same version again — legitimately, the bytes are gone — but the bell
+    // row it posted the first time is in SQLite and is still there. Posting
+    // another announces the same release twice. `clear_stale_update_notice`
+    // removes the marker and the rows together once the running build catches
+    // up, so the next genuinely new version still gets its row.
+    //
+    // This is the guard the Android arm of `check_for_updates` has always had;
+    // the desktop path notified unconditionally.
+    let already_announced =
+        db.kv_get("last_notified_update_version").as_deref() == Some(raw_version.as_str());
     let _ = db.kv_set("last_notified_update_version", &raw_version);
-    crate::alerts::notify::notify(
-        &app,
-        "update",
-        crate::i18n::Msg::UpdateTitle,
-        // Emphatically *not* "restart to install it", which is what this said.
-        // The download lives in process memory, so restarting is precisely the
-        // action that throws it away — the instruction undid the thing it was
-        // announcing, and the next check downloaded the whole installer again.
-        // The wording is in `i18n.rs` now, with that note beside it.
-        crate::i18n::Msg::UpdateBody { version: &version },
-        // An app update is not about a title, so there is nothing to open.
-        None,
-    );
+    if !already_announced {
+        crate::alerts::notify::notify(
+            &app,
+            "update",
+            crate::i18n::Msg::UpdateTitle,
+            // Emphatically *not* "restart to install it", which is what this
+            // said. The download lives in process memory, so restarting is
+            // precisely the action that throws it away — the instruction undid
+            // the thing it was announcing, and the next check downloaded the
+            // whole installer again. The wording is in `i18n.rs` now, with
+            // that note beside it.
+            crate::i18n::Msg::UpdateBody { version: &version },
+            // An app update is not about a title, so there is nothing to open.
+            None,
+        );
+    }
 
     Ok(Some(DownloadedUpdate { version, notes }))
 }

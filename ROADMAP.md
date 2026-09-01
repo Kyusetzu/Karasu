@@ -68,12 +68,15 @@ been publishing rolling builds, so this is a confirmation, not a setup task.
 The CHANGELOG header documents the file's own half; the whole sequence, in
 order:
 
-1. Rewrite `CHANGELOG.md`: rename `## Unreleased` to `## 1.0.0` (a trailing
-   ` — 2026-…` date is fine; brackets or a fourth segment break the slicer's
-   match and the tag build throws), curate the section from `git log` — it
-   is deliberately well behind the tree, so this is a real writing pass —
-   open a fresh empty `## Unreleased` above it, and delete the "there has
-   been no tagged release yet" paragraph, which stops being true.
+1. `node scripts/changelog.mjs`, then rewrite `CHANGELOG.md`'s headings:
+   rename `## Unreleased` to `## 1.0.0` (a trailing ` — 2026-…` date is fine;
+   brackets or a fourth segment break the slicer's match and the tag build
+   throws), open a fresh empty `## Unreleased` above it carrying a
+   `<!-- generated-through: <sha> -->` marker, and delete the "there has been
+   no tagged release yet" paragraph, which stops being true. The section's
+   contents are generated, so this is heading surgery rather than a writing
+   pass; read it once and reach for a `Changelog:` trailer on anything whose
+   line reads badly.
 2. `node scripts/bump-version.mjs major`, in the same dirty tree — the
    CHANGELOG edit is what lets the bump run without `--force`. It lands on
    `1.0.0.<commit#>` and prints it for the commit subject.
@@ -88,8 +91,11 @@ order:
    workflow runs start and cannot cancel each other (the concurrency group
    is keyed on the ref). The rolling `latest` prerelease survives as the
    prerelease channel and is rebuilt at the same content.
-7. Watch **Resolve release target** on the tag run: the version-agreement
-   check and the release-notes precheck fail in seconds, before the build.
+7. Watch the **precheck** job on the tag run: it is its own job with no
+   dependencies, so the version-agreement check and the release-notes
+   precheck really do fail in seconds. (They used to live inside
+   `build-and-publish`, which waits on the two build jobs — measured at
+   eleven minutes before it said a word.)
    Then confirm the published release — not marked prerelease, installer +
    AppImage (+ the two APKs if the secrets exist), `SHA256SUMS.txt`, and a
    `latest.json` whose version reads `1.0.0+<commit#>`. The `+` is

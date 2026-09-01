@@ -160,7 +160,10 @@ scripts/             bump-version.mjs (every commit), anilist-query.mjs
                      so it copies the module into a throwaway crate and checks
                      that), virtual-rows-check.mjs (VirtualRows in a real
                      Chromium — jsdom has no layout, so it mounts zero rows
-                     and a unit test there passes vacuously); release/ holds the five PowerShell scripts
+                     and a unit test there passes vacuously), changelog.mjs
+                     (appends the Unreleased section from the commits since
+                     its `generated-through` marker; a `Changelog:` trailer
+                     overrules the subject); release/ holds the five PowerShell scripts
                      the release workflow runs (installer, AppImage and APK
                      renamers are deliberate near-twins, release-notes, and
                      generate-update-manifest — desktop-only on purpose)
@@ -392,6 +395,7 @@ Three commands, in this order. Don't do any of it by hand.
 node scripts/bump-version.mjs patch   # minor for features, major for breaks
 npm run verify                        # typecheck + vitest + cargo test
 git commit                            # message ends with the Co-Authored-By trailer
+node scripts/changelog.mjs            # after the commit — it reads the commit
 ```
 
 **`scripts/bump-version.mjs`** moves the version in all five places at once —
@@ -403,6 +407,15 @@ that, `--print` just reports the current version.
 
 **`npm run verify`** is the whole gate and is what CI runs, so the two cannot
 drift. It short-circuits, so a type error stops it before the tests.
+
+**`scripts/changelog.mjs`** runs *after* the commit, because it reads it. It
+appends to `CHANGELOG.md`'s `## Unreleased` section from every commit since the
+`generated-through` marker, so nobody writes that file by hand — the maintainer
+declined to, and a changelog kept by hand is one that silently goes stale. The
+commit subject is the changelog line; add a `Changelog: Fixed: …` trailer when
+the subject describes the change and the reader needs the effect, or
+`Changelog: skip` to leave a commit out. Version-only, docs-only, CI-only and
+scripts-only commits drop out without a trailer.
 
 For build-affecting changes — dependencies, `tauri.conf.json`, anything in the
 bundle — also run `npm run tauri build` as a smoke check. On Windows only the

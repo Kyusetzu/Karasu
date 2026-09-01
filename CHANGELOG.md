@@ -19,7 +19,9 @@ GitHub complains about, so the script does. So before pushing `v1.0.0`:
 
 1. rename `## Unreleased` to `## 1.0.0` (a trailing ` — 2026-08-15` is fine,
    the match only needs the version to come first),
-2. open a fresh empty `## Unreleased` above it,
+2. open a fresh empty `## Unreleased` above it, carrying a
+   `<!-- generated-through: <sha> -->` marker so the generator knows where to
+   resume,
 3. delete the paragraph above this one, which stops being true at that point,
 4. and make sure `package.json` already says `1.0.0` — the workflow refuses a
    tag whose version disagrees with the commit it points at.
@@ -27,13 +29,27 @@ GitHub complains about, so the script does. So before pushing `v1.0.0`:
 Commit subjects are the real record and are written to be read; this file is the
 short version, grouped by what it means for someone using the app.
 
-**How this file is maintained, decided after it drifted.** It is *not* updated
-per commit any more, and the `Unreleased` section below is deliberately behind —
-well behind the tree (this sentence used to say by how much; the number
-decayed, the policy did not). Keeping two records of
-the same work in step by hand is the kind of chore that gets skipped under
-pressure, and skipping it silently is worse than not doing it: a half-updated
-changelog reads as complete.
+**How this file is maintained: by `scripts/changelog.mjs`, not by hand.**
+Keeping two records of the same work in step by hand is the kind of chore that
+gets skipped under pressure, and skipping it silently is worse than not doing
+it — a half-updated changelog reads as complete. So the `Unreleased` section is
+generated from the commits.
+
+    node scripts/changelog.mjs           # bring it up to HEAD
+    node scripts/changelog.mjs --check   # is anything undescribed?
+
+The `<!-- generated-through: <sha> -->` marker in that section records how far
+it has read; the script only ever appends past that point, so anything already
+written by hand survives and a second run is a no-op. What makes the output
+readable is that commit subjects here are prose, written to be read — a
+conventional-commits parser would have had nothing to work with. A commit that
+deserves a better line than its subject says so in a trailer:
+
+    Changelog: Fixed: A declined update no longer re-downloads every day.
+    Changelog: skip
+
+Version-only commits and changes confined to docs, CI or scripts are left out
+without needing the trailer.
 
 It is kept rather than deleted for two concrete reasons:
 
@@ -47,12 +63,14 @@ It is kept rather than deleted for two concrete reasons:
    deciding whether to update wants to read. This is grouped by what changed for
    *them*.
 
-So the policy is: write the section **at tag time**, from `git log`, and curate
-it then. The subjects are written to be read precisely so that pass is quick,
-and doing it once with the whole release in view produces better grouping than
-183 lines accreted a commit at a time ever did.
+So the policy is: the section is generated, and the writing that matters
+happens in the commit subject — or in a `Changelog:` trailer when the subject
+is about the change and the reader needs to hear about the effect. Curating at
+tag time is then optional rather than load-bearing.
 
 ## Unreleased
+
+<!-- generated-through: e8b8fe3 -->
 
 ### Fixed
 
@@ -203,6 +221,29 @@ and doing it once with the whole release in view produces better grouping than
 - A paused mpv no longer outranks the thing actually playing.
 - Scores got their colour back in the list, and a bio's centred lines render as
   lines.
+- **Signing out of one account and into another no longer carries the first
+  account's data across.** Queued offline edits, bell rows and the alert dedupe
+  keys belong to the account that made them; the queue could drain one
+  account's unsent edits onto another's list.
+- **A scrobble can no longer overwrite an edit you just made.** Every write
+  path keeps the cached list in step, which is what the scrobbler reads to
+  decide whether progress moved backwards.
+- **A queued edit is no longer reported as a saved one.** An edit that can only
+  be sent later says so, instead of showing a green receipt and a progress bar
+  that had not moved on AniList.
+- **A deleted entry stays deleted.** It used to remain a scrobble candidate,
+  and playing that title recreated the row.
+- **A paused player stops the clock.** Detection reads the audio session, so an
+  episode left paused mid-watch is no longer eventually written as watched.
+  Windows only — the other detection sources already reported their own play
+  state.
+- **A database that will not open falls back to the newest daily backup**
+  rather than blocking the app whose only recovery path runs through it.
+- **A declined update stops re-downloading itself.** It fetched the whole
+  installer again every 24 hours and announced the same release each time. A
+  clock pushed backwards no longer disables update checks either.
+- The local library only renders the rows on screen, so a large collection
+  opens without the pause.
 
 ### Added
 

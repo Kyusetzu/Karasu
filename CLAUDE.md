@@ -142,9 +142,11 @@ src-tauri/src/
                      projection file, with WidgetRefresher's proguard keep
                      load-bearing the same way NotifScheduler's is.
                      Re-apply all of it after any re-init. Also committed here: the bundled copy
-                     of THIRD-PARTY-NOTICES.md under app assets — it drifts
-                     silently when the root file is edited without an
-                     Android build, so edit both together
+                     of THIRD-PARTY-NOTICES.md under app assets — the APK
+                     cannot read the repository root, so it carries its own
+                     copy, and `src/lib/notices.test.ts` fails the gate when
+                     the two differ. Edit both together; the test is what
+                     says so when you don't
   discord.rs · library.rs · portable.rs
 scripts/             bump-version.mjs (every commit), anilist-query.mjs
                      (validate a query live), android-check.ps1 (the fast

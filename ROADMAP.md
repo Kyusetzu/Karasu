@@ -145,13 +145,10 @@ consequence. What is left is recorded here rather than in a deleted folder:
   minimized player keeps the wall clock running. Unlike the media-session rung
   (fixed) there is no play state to consult; closing it needs a different
   signal, not a smaller change.
-- **Comment and documentation drift** the audit catalogued: a handful of
-  comments describing behaviour that has since moved, and the bundled Android
-  copy of THIRD-PARTY-NOTICES.md which has to be edited alongside the root one.
-- **An attribution row for the anime-relations dataset** in
-  THIRD-PARTY-NOTICES.md. Its licence is CC0, so nothing is owed; the file's
-  two reproduction commands (`npm ls`, `cargo metadata`) structurally cannot
-  see a runtime-fetched dataset, which is the more interesting half.
+- **Comment drift** the audit catalogued: a handful of comments describing
+  behaviour that has since moved. The bundled Android copy of
+  THIRD-PARTY-NOTICES.md is no longer one of them — `src/lib/notices.test.ts`
+  fails the gate when it diverges from the root file.
 
 - **Measure the residual sign-in delay on a device.** `connect_with_token`
   has logged its three phases since the handoff fix; nobody has read them

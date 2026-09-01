@@ -130,11 +130,6 @@ consequence. What is left is recorded here rather than in a deleted folder:
 - **The `Page.threadComments` off-by-one.** AniList returns `perPage + 1`
   rows with one out of sequence; cause unknown, recorded in CLAUDE.md.
   Re-measure someday or report upstream — the app degrades gracefully.
-- **A hint about Android's "open by default" setting.** anilist.co App
-  Links can never auto-verify (assetlinks.json needs domain ownership), so
-  opening AniList links by default stays a manual Android setting; the
-  share target exists precisely because it needs no domain. A first-run or
-  README hint is a nicety, not a gap.
 - **User-installed CAs on Android** — the webpki-roots trade documented in
   `net.rs`. Revisit only if a user with such a setup actually asks.
 - **`MediaSessionManager` detection on Android** — moot while the app is

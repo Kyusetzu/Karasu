@@ -290,7 +290,13 @@ with no UAC prompt and nothing written outside your own profile.
 > permission before the first one is sent. Four home-screen widgets —
 > Airing Today, Continue Watching, Continue Reading and a weekly airing
 > calendar — render straight from the cached list, no network needed; and
-> sharing an anilist.co link from any browser opens it in Karasu.
+> sharing an anilist.co link from any browser opens it in Karasu. Sharing is
+> the supported route on purpose: making Karasu open anilist.co links
+> *directly* would need Android to verify the domain against a file hosted on
+> anilist.co, which is not ours to put there. If you want tapping a link to
+> land in Karasu anyway, Android will let you say so by hand — **Settings →
+> Apps → Karasu → Open by default → Add link** — and the share sheet needs
+> none of that.
 >
 > Detection differs. Window titles are read on Windows only: there is no
 > X11/Wayland enumerator, and under Wayland one application cannot read

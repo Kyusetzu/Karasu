@@ -120,10 +120,6 @@ consequence. What is left is recorded here rather than in a deleted folder:
   the daily bell row for it is not deduped; and the check throttle has no lower
   bound, so a backwards clock jump (a dead CMOS battery, a restored VM
   snapshot) disables automatic checks until real time passes the bad stamp.
-- **Android `versionCode` does not move on a commit-only bump.** It is derived
-  from the semver core, so two release APKs differing only in `COMMIT_NUMBER`
-  are the same version to Android. Karasu has no Android updater by design, so
-  the cost is that `adb install -r` cannot tell them apart.
 - **`hydrate` re-parses every indexed path during `setup`**, before the window
   exists, and `backups::run_once` blocks a tokio worker rather than going
   through `spawn_blocking`. Both are startup-cost items, not correctness ones.

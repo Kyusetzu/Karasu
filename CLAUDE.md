@@ -122,7 +122,11 @@ src-tauri/src/
                      MainActivity.kt (native edge-to-edge insets; the WebView
                      cannot see the status bar), app/build.gradle.kts (release
                      signing from gitignored key.properties, falling back to
-                     debug signing so CI without secrets still builds), and
+                     debug signing so CI without secrets still builds, plus
+                     the versionCode/versionName read out of `COMMIT_NUMBER`
+                     — `tauri.properties` carries only the semver core, so
+                     without it a commit-only bump is the same version to
+                     Android), and
                      TokenCipher.kt (the Keystore seal `keystore.rs` calls
                      over JNI — init won't overwrite it, but a wiped tree
                      won't recreate it: restore from git), and NotifJob.kt

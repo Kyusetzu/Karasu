@@ -70,7 +70,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 189d4e2 -->
+<!-- generated-through: cf10a67 -->
 
 ### Fixed
 
@@ -245,6 +245,7 @@ tag time is then optional rather than load-bearing.
 - The local library only renders the rows on screen, so a large collection
   opens without the pause.
 - The background notification check reports it when Android refuses to register the job, instead of showing a schedule that does not exist.
+- A title's page now shows what your list already knows when you are offline, with a working +1, instead of a raw network error.
 
 ### Added
 

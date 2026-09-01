@@ -8,6 +8,8 @@ import {
   type InfiniteData,
 } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { isOffline } from "@/lib/apiError";
+import { OfflineDetail } from "@/components/media/OfflineDetail";
 import {
   ChevronRight,
   Clock,
@@ -107,7 +109,7 @@ export default function AnimeDetail() {
   const [coverOpen, setCoverOpen] = useState(false);
   const coverViewer = usePresence(coverOpen);
 
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["mediaDetail", mediaId],
     queryFn: () => animeDetail(mediaId),
     enabled: isTauri && Number.isFinite(mediaId),
@@ -144,6 +146,15 @@ export default function AnimeDetail() {
   // the text sat at the top-left and then the whole page arrived underneath
   // it, which moves everything twice. Same reasoning as MediaList's.
   if (isLoading) return <DetailSkeleton />;
+  // Offline gets its own answer. This page has no cache of its own —
+  // `DETAIL_QUERY` is a live passthrough — so a dropped connection used to
+  // paint the transport's own English sentence across the whole screen, in
+  // any UI language, with no retry. `OfflineDetail` serves what the *list*
+  // cache already holds instead, which is enough to see the title and to
+  // press +1 (the save queues). A real device pass could not test the offline
+  // queue at all because of this: the page died before the button existed.
+  if (error && isOffline(error))
+    return <OfflineDetail mediaId={mediaId} onRetry={() => void refetch()} />;
   if (error)
     return (
       <p className="p-8 text-danger">

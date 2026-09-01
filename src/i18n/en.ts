@@ -668,6 +668,13 @@ export const en = {
     hintClose: "Ctrl K close",
   },
   detail: {
+    offlineTitle: "You are offline",
+    offlineHint:
+      "This title is not on your list, so there is nothing saved to show. It will load once you are back.",
+    offlineCached: "Offline — showing what your list already had.",
+    offlineProgress: "Progress {{progress}} / {{total}}",
+    offlineRest:
+      "The rest of this page — banner, studios, relations, characters, reviews — is only fetched live. A +1 here is queued and sent when you are back.",
     notOnList: "Not on your list",
     favourite: "Favourite",
     favourited: "Favourited",

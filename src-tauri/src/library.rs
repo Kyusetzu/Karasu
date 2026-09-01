@@ -444,8 +444,8 @@ pub async fn scan_library(app: AppHandle) -> Result<ScanSummary, String> {
         (root, candidates, override_map(&db), redirect_rules(&db), stored, cursor)
     };
 
-    // Everything below ends in `library_replace_all` and its two siblings, each
-    // of which DELETEs its whole table before inserting what this scan found.
+    // Everything below ends in `library_publish`, which DELETEs each of its
+    // three tables before inserting what this scan found.
     // So an unreachable folder — an offline NAS, an unplugged drive, a renamed
     // directory — must not reach that point: it yields zero files, and zero
     // files used to be written down as the truth and then survive a restart

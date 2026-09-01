@@ -826,7 +826,7 @@ export interface StatEntry {
   minutesWatched: number;
   /** Chapters read (manga); 0 for anime. */
   chaptersRead: number;
-  /** Display name resolved per category by `statEntryLabel`. */
+  /** Display name resolved per category by `entryLabel` in `RankedList`. */
   genre?: string;
   tag?: { id: number; name: string };
   voiceActor?: NamedPerson;

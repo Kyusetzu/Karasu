@@ -30,6 +30,7 @@
  *   node scripts/changelog.mjs           # bring the section up to HEAD
  *   node scripts/changelog.mjs --check   # exit 1 if it would change anything
  *   node scripts/changelog.mjs --dry-run # print what it would add
+ *   node scripts/changelog.mjs --marker-head # after folding it in with --amend
  */
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
@@ -181,6 +182,34 @@ function insert(section, entries, through) {
 
 const args = new Set(process.argv.slice(2));
 const file = readFileSync(FILE, "utf8");
+
+/**
+ * `--marker-head`: move the marker to HEAD without generating anything.
+ *
+ * For the amend. This script runs after a commit, so folding its own edit back
+ * into that commit with `--amend` rewrites the sha it just recorded — and the
+ * next run then offers the entry a second time, because the marker names a
+ * commit that is no longer an ancestor of HEAD. One line beats explaining the
+ * hazard and hoping.
+ */
+if (args.has("--marker-head")) {
+  const head = execFileSync("git", ["rev-parse", "--short", "HEAD"], {
+    cwd: ROOT,
+    encoding: "utf8",
+  }).trim();
+  const current = file.match(MARKER)?.[1];
+  if (!current) {
+    console.error("changelog: no marker to move — is the Unreleased section missing one?");
+    process.exit(1);
+  }
+  if (current === head) {
+    console.log(`changelog: marker already at ${head}`);
+    process.exit(0);
+  }
+  writeFileSync(FILE, file.replace(MARKER, `<!-- generated-through: ${head} -->`));
+  console.log(`changelog: marker moved from ${current} to ${head}`);
+  process.exit(0);
+}
 
 const start = file.indexOf(`${UNRELEASED}\n`);
 if (start === -1) {

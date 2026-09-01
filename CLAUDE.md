@@ -396,6 +396,8 @@ node scripts/bump-version.mjs patch   # minor for features, major for breaks
 npm run verify                        # typecheck + vitest + cargo test
 git commit                            # message ends with the Co-Authored-By trailer
 node scripts/changelog.mjs            # after the commit — it reads the commit
+git commit --amend --no-edit          # fold the changelog in, then re-run:
+node scripts/changelog.mjs --marker-head
 ```
 
 **`scripts/bump-version.mjs`** moves the version in all five places at once —
@@ -408,7 +410,12 @@ that, `--print` just reports the current version.
 **`npm run verify`** is the whole gate and is what CI runs, so the two cannot
 drift. It short-circuits, so a type error stops it before the tests.
 
-**`scripts/changelog.mjs`** runs *after* the commit, because it reads it. It
+**`scripts/changelog.mjs`** runs *after* the commit, because it reads it —
+which is also why the loop above ends the way it does. Folding the generated
+entry back in with `--amend` rewrites the sha the marker just recorded, so the
+next run would offer the same entry a second time; `--marker-head` re-points it
+at the amended commit and is the one-line answer. Skip the amend and commit the
+changelog separately if you prefer — the marker stays correct either way. It
 appends to `CHANGELOG.md`'s `## Unreleased` section from every commit since the
 `generated-through` marker, so nobody writes that file by hand — the maintainer
 declined to, and a changelog kept by hand is one that silently goes stale. The

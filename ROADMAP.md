@@ -115,11 +115,6 @@ repository about to be public, which is a finding it raised against itself).
 Everything it found at P1 and P2 is fixed, as is every P3 with a behavioural
 consequence. What is left is recorded here rather than in a deleted folder:
 
-- **Updater ergonomics.** A declined update re-downloads ~100 MB every 24 h
-  because `download_pending_update` never consults the stash before fetching;
-  the daily bell row for it is not deduped; and the check throttle has no lower
-  bound, so a backwards clock jump (a dead CMOS battery, a restored VM
-  snapshot) disables automatic checks until real time passes the bad stamp.
 - **`hydrate`'s startup cost was measured and is not one.** The audit filed it
   without a number; in a release build the re-parse is 49 ms for 20,000 files
   and the cached-list read 76 ms for 8,000 entries, so a pathological install

@@ -26,42 +26,27 @@ not before. What remains:
 
 ### The device pass
 
-Verified so far: all four widgets render real data (2026-08-30). Still to
-exercise on hardware:
+Verified on hardware so far (2026-08-30 and 2026-09-03): the four widgets,
+HTTP/2 on both platforms, the share target bare and buried, the deep link
+warm and cold, the offline detail page and a queued +1 drained to AniList,
+the update notice clearing itself over a real update, Windows pause
+detection, the local library at its real size, database recovery from a
+daily backup, the background job registering once `ACCESS_NETWORK_STATE`
+was declared, running with the app dead, and surviving a reboot without the
+app being opened. Still to exercise:
 
-- **HTTP/2 negotiated** — enable debug logging, open any AniList screen,
-  and `karasu.log` should say `negotiated HTTP/2` (the round-10 ALPN fix;
-  general loading speed should be visibly better).
-- **The dead-app notification check** — enable the interval in Settings →
-  AniList, force-stop Karasu, then
-  `adb shell cmd jobscheduler run -f dev.kyu.karasu 46231`.
-- **The share target** — share an anilist.co link out of the browser, once
-  bare and once buried in a sentence.
-- **The boot-persisted reschedule** — reboot with the interval on, force a
-  run without opening the app first.
+- **A background notification actually posted** — the forced runs so far
+  were arming passes (no seen-id baseline yet, or the app used within the
+  interval). Needs: the interval on, the phone untouched for longer than the
+  interval, something unread on AniList, then
+  `adb shell cmd jobscheduler run -f dev.kyu.karasu 46231` — and never a
+  force-stop first, which cancels the package's jobs.
 - **Sign-out wipes `widgets.json`** — the widgets fall back to their empty
   state on the next render.
-- **The sync surface** — More → Sync, a queued offline edit drained.
-- **The update notice clears itself** — needs one real update cycle: let
-  the app announce a release, install it, relaunch, and the bell row is
-  gone. (Testable early by hand-setting a low `last_notified_update_version`.)
 - **The round-10 surface fixes at a glance** — Wrapped loads with a moving
   loader and draws promptly, its pill rows each hold one line, the covers
   show edit + +1 whole, the hero has working arrows and a fast first
   banner, the More sheet reads as a list.
-
-### The build smoke
-
-`npm run tauri build` and `tauri android build`, warnings read — `verify`
-cannot see everything a bundle build can.
-
-### The secrets confirmation
-
-Repo settings, not the tree: the four `ANDROID_*` secrets must exist at tag
-time or the release ships desktop-only (debug APK stays a workflow
-artifact); `TAURI_SIGNING_PRIVATE_KEY` (+ password) must exist or the tag
-build dies at the manifest step, *after* the 15-minute build. Both have
-been publishing rolling builds, so this is a confirmation, not a setup task.
 
 ### Cutting the release, mechanically
 
@@ -135,13 +120,6 @@ maintainer's. Each says which, so none of them reads as unstarted work.
   ready but would have sent whoever read it after the wrong suspect. Turn on
   verbose logging, sign in on a phone, read `connect timings` out of
   `karasu.log`. Act only if it is still slow.
-
-**Needs network access to `graphql.anilist.co`:**
-
-- **The `Page.threadComments` off-by-one.** AniList returns `perPage + 1`
-  rows with one out of sequence; cause unknown, recorded in CLAUDE.md. Needs
-  a live re-measurement before it can be reported upstream or defended
-  against — the app degrades gracefully meanwhile.
 
 **Needs a user, or a decision already made:**
 

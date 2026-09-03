@@ -23,6 +23,8 @@
  * not a schema problem — judge validity by the absence of `errors`.
  *
  * Public ids that work for smoke tests: user 153164, media 16498, staff 95269.
+ * User 153164 is a stranger's public account, chosen for that; the
+ * maintainer's own is 6421433 — do not read one expecting the other.
  */
 
 import { readFileSync, readdirSync } from "node:fs";

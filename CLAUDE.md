@@ -265,7 +265,7 @@ of AniList's own list fields, it costs nothing to carry, and the local list has
 stored it since schema v7. The rejected idea is tracking **purchases**, which
 would need price data the app has no source for.
 
-The schema is at **v17** (v17 seeds `blur_adult` on for new installs only —
+The schema is at **v18** (v17 seeds `blur_adult` on for new installs only —
 an existing install's explicit choice, or absence of one, is left alone). `library_match` (v8) holds the scanner's per-title
 match confidence, which is what the local library's `exact` / `close` column
 reads. v9 adds `library_override` — the user's corrections, keyed on the parsed
@@ -326,6 +326,11 @@ the queue, and a queued row carried only a `mediaId` — so signing out of A and
 into B drained A's unsynced edits onto B's list, silently, on B's first list
 fetch. It backfills from the cached viewer and drops rows it cannot attribute,
 because clearing the queue on logout would defeat the point of having one.
+
+v18 adds a nullable `user_id` to `notifications`, backfilled from the cached
+viewer, and leaves `kind = 'update'` rows unowned on purpose: the update
+notice is the app's, not an account's, so it survives a sign-out while every
+row an account was told goes with that account (`notif_clear_owned`).
 
 **AniList has two name spaces for a custom list, and only one is writable.**
 `MediaListCollection.lists[].name` is a *display* value: it upper-cases the
@@ -612,13 +617,18 @@ import it.
   reversed against the unsorted call). "sort is inert" is a fact about the
   `threadId` shape only; `USER_FORUM_COMMENTS_QUERY` is the one place the app
   passes `sort` to this field, and why.
-- **`Page.threadComments` returns `perPage + 1` rows, and the extra one is out
-  of sequence.** At `perPage: 10`, page 1 of thread 1 came back as
-  `17,18,19,23,30,`**`2088149`**`,32,40,43,44,53` and page 2 carried `1618189`
-  between `163` and `165` — eleven rows both times, while `pageInfo` kept
-  reporting `perPage: 10`. **Cause unknown**; it is recorded because each "Load
-  more" therefore draws one chronologically wrong row, not because it is
-  understood.
+- **`Page.threadComments` returns `perPage + 1` rows, and the extra one is a
+  nested reply served as a root.** At `perPage: 10`, page 1 of thread 1 came
+  back as `17,18,19,23,30,`**`2088149`**`,32,40,43,44,53` and page 2 carried
+  `1618189` between `163` and `165` — eleven rows both times, while
+  `pageInfo` kept reporting `perPage: 10`. Re-measured identically on
+  2026-09-03 (page 3 was a clean ten), and the cause narrowed by one more
+  request: `ThreadComment(id: 2088149)` resolves to the tree of root comment
+  **30**, the root just before it on the page — so the extra row is a reply
+  buried inside the preceding root (posted years later), which AniList hands
+  out as if it were a root of its own. Each "Load more" therefore draws one
+  row that belongs inside another; `lib/comments` degrades gracefully, and
+  this is the datum an upstream report needs.
 - **Never round-trip source text through `encode("utf-8").decode("unicode_escape")`.**
   A script inserting i18n keys did, over text Python had already decoded, and
   every em-dash, arrow and umlaut came back a byte at a time as latin-1 —
@@ -694,6 +704,63 @@ import it.
   hands out budget that does not exist and earns the 429s the limiter exists
   to avoid. (Whether the bucket is per IP or per token is still unmeasured;
   the probe's header says how to find out.)
+- **An agent shell launched from the Claude desktop app sees a virtualized
+  AppData.** That app is an MSIX package (`Claude_pzs8sxrjxfjjc`), and every
+  child process inherits its file-system virtualization: any path under
+  `%APPDATA%` / `%LOCALAPPDATA%` that has a shadow under
+  `…\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\{Roaming,Local}\`
+  is served *from* the shadow and written *into* it. The real install's
+  `karasu.db` was shadowed by a stale copy a Claude-launched run left on
+  8 Aug, so the "truncate the database" recovery test wrote to the shadow and
+  changed nothing — "boots fine, file unchanged, nothing logged" was that,
+  not a wrong path. The Android SDK, NDK and licences exist *only* in that
+  shadow (the real `%LOCALAPPDATA%\Android\Sdk` is empty), so `tauri android
+  build`, `android-check.ps1` and `apksigner` run only from such a shell.
+  Read the real data dir via `\\localhost\C$\Users\…` (the loopback share
+  bypasses the filter), never launch the installed app from that shell, and
+  keep every test instance's data under `src-tauri\target\`.
+- **The desktop test rig.** A release exe with a `karasu.portable` marker
+  beside it keeps db, log, backups and a DPAPI `token.dat` under
+  `target\release\data\` and starts signed out; launched with
+  `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9222`, its
+  WebView is scriptable through Playwright's `connectOverCDP` (the app is a
+  `HashRouter`, so navigate by `location.hash`). Three traps: the marker does
+  not isolate the single-instance mutex, so the installed app must be quit
+  first (the tell is its window popping up); `Abmelden` in the rig calls
+  `delete_token`, which clears the *shared* Windows Credential Manager entry
+  the installed app uses; and the Jellyfin token has no portable branch, so a
+  seed copied from a real backup polls the real server unless its
+  `jellyfin*` kv rows are deleted first.
+- **A 0-byte `karasu.db` is a valid empty database**, so truncating it does
+  not exercise the backup fallback — the app starts empty with no error line,
+  which reads as the failure it is not. Clobber the 16-byte header instead;
+  the transcript is then `ERROR db: cannot open the database: Migration
+  failed: file is not a database`, `INFO  backups: restored the database from
+  karasu-YYYYMMDD.db`, and the broken file kept as `karasu.db.unreadable`
+  (measured 2026-09-03).
+- **`am force-stop` cancels the package's JobScheduler jobs**, so a "force-stop,
+  then `cmd jobscheduler run`" procedure answers "Could not find job 46231"
+  whatever the code did. The dead-app state is Home, then `am kill` (leaves
+  `stopped=false`). The job's registration itself was refused for the whole
+  life of the feature until 0.193.9: a job with a connectivity constraint
+  needs `ACCESS_NETWORK_STATE` in the manifest, or `schedule()` throws a
+  `SecurityException` that the old code caught and logged to logcat only.
+  The job's Rust log lines never reach `karasu.log` (no `logging::init` in
+  that process); logcat tag `KarasuNotifJob` is the only channel. A forced run
+  posts nothing unless the interval is on, the last check is older than it,
+  and a seen-id baseline already exists — the first run only arms.
+- **A pause defers a scrobble, it does not cancel it.** The window rung drops
+  a paused player's window (WASAPI reads the session Inactive within a few
+  seconds), the card unmounts, and the session's absolute deadline keeps
+  running; resume inside the five-minute grace after the deadline and the
+  very next tick is due. Observed on 2026-09-03 with mpv: paused at +60 s
+  of a 120 s threshold, no write while paused, `due, waiting for
+  confirmation` on the first tick after resume. A silent file in a fresh
+  process is detected normally.
+- **User id 153164 in `scripts/anilist-query.mjs`'s examples is a stranger's
+  public account, not the maintainer's.** Kyusetzu is **6421433**. A plan
+  built on the wrong one reads someone else's list and then "finds" bugs in
+  the offline page for titles that were never on the list.
 
 ## Invariants the release audit established
 

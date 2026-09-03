@@ -70,7 +70,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 957dc9d -->
+<!-- generated-through: 7a5910b -->
 
 ### Fixed
 
@@ -251,6 +251,7 @@ tag time is then optional rather than load-bearing.
 - AniList activity permalinks open in Karasu on Android.
 - The Android background notification check now actually registers with the system; before, Android had been refusing it silently since the feature existed.
 - An anilist.co link that launches Karasu on Android now opens the page it names instead of the dashboard.
+- The local library's scrollbar no longer creeps while scrolling into rows it has not drawn yet.
 
 ### Added
 

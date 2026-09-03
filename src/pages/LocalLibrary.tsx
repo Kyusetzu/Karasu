@@ -1035,11 +1035,16 @@ function Group({
  * Collapsed height of a row, for the virtualizer's first guess.
  *
  * `h-13` for the cover plus `py-2` above and below: 3.25rem + 1rem at the
- * 16px root the app pins. Only ever an estimate — every mounted row is
- * measured, which is what an expanded row's file list needs — but a wrong one
- * makes the scrollbar jump as you scroll into unmeasured territory.
+ * 16px root the app pins, plus the 1px `border-b` every row but the last
+ * carries. Only ever an estimate — every mounted row is measured, which is
+ * what an expanded row's file list needs — but a wrong one makes the
+ * scrollbar creep as you scroll into unmeasured territory: at 68 the divider
+ * was left out, every newly mounted row measured 69, and a real WebView2
+ * pass on 2026-09-03 watched `scrollHeight` grow by one pixel per row from
+ * 9102 to 9194 across a single scroll to the bottom. The last row of a list
+ * is one pixel over-estimated instead, which shrinks rather than jumps.
  */
-const ROW_HEIGHT = 68;
+const ROW_HEIGHT = 69;
 
 const fileName = (path: string) => path.split(/[\\/]/).pop() ?? path;
 

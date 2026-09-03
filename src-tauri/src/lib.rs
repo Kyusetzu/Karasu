@@ -344,6 +344,10 @@ pub fn run() {
         // mapping in-app links already use.
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_notification::init())
+        // Not exposed to the WebView (no capability names it): the fs plugin
+        // is here so `commands::system` can write into what a save dialog
+        // answered with — on Android a content:// URI, not a path.
+        .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init());
 
     attach_desktop(builder)

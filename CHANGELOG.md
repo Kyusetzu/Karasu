@@ -70,7 +70,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: ac67dcd -->
+<!-- generated-through: 429019d -->
 
 ### Fixed
 
@@ -252,6 +252,7 @@ tag time is then optional rather than load-bearing.
 - The Android background notification check now actually registers with the system; before, Android had been refusing it silently since the feature existed.
 - An anilist.co link that launches Karasu on Android now opens the page it names instead of the dashboard.
 - The local library's scrollbar no longer creeps while scrolling into rows it has not drawn yet.
+- On Android, "Save report", the poster export and the calendar export write a file instead of leaving an empty one behind.
 
 ### Added
 

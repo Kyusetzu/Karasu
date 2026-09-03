@@ -1,6 +1,6 @@
 [package]
 name = "karasu"
-version = "0.193.13"
+version = "0.193.14"
 description = "A modern anime and manga tracker built exclusively for AniList"
 authors = ["Kyu"]
 license = "MIT"
@@ -58,6 +58,10 @@ tauri-plugin-single-instance = "2"
 tauri-plugin-autostart = "2"
 tauri-plugin-notification = "2"
 tauri-plugin-dialog = "2"
+# Rust-side only — no capability grants it to the WebView. It exists because a
+# save dialog on Android answers with a content:// URI that `std::fs` cannot
+# open; `Fs::open` goes through the platform's own descriptor for either.
+tauri-plugin-fs = "2"
 tauri-plugin-updater = "2"
 tauri-plugin-global-shortcut = "2"
 serde = { version = "1", features = ["derive"] }

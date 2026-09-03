@@ -9,6 +9,79 @@ use super::*;
 
 /// Where the last Wrapped poster was saved, so the next one opens there.
 const EXPORT_DIR_KEY: &str = "export_dir";
+
+/// Writes what a save dialog answered with, wherever that is.
+///
+/// Desktop dialogs answer with a path. Android's answer with a `content://`
+/// URI from the Storage Access Framework, which `FilePath::into_path` refuses
+/// — so every export here used to let the picker create the document and
+/// then write nothing into it: a 0-byte file in Downloads and `Ok(false)`
+/// with no error, measured on the phone on 2026-09-03. The fs plugin opens
+/// either through the platform's own descriptor. Returns the folder worth
+/// remembering for the next dialog, which a content URI does not have.
+fn write_picked(
+    app: &tauri::AppHandle,
+    picked: tauri_plugin_fs::FilePath,
+    bytes: &[u8],
+) -> Result<Option<std::path::PathBuf>, String> {
+    use std::io::Write;
+    use tauri_plugin_fs::{FsExt, OpenOptions};
+
+    let dir = parent_of(&picked);
+    let mut opts = OpenOptions::new();
+    opts.write(true).create(true).truncate(true);
+    let mut file = app.fs().open(picked, opts).map_err(|e| e.to_string())?;
+    file.write_all(bytes).map_err(|e| e.to_string())?;
+    Ok(dir)
+}
+
+/// `write_picked`'s opposite, bounded because the only caller is the list
+/// import and a list export is kilobytes: a mistaken pick of something huge
+/// should fail, not OOM.
+fn read_picked(
+    app: &tauri::AppHandle,
+    picked: tauri_plugin_fs::FilePath,
+    max_bytes: u64,
+) -> Result<(String, Option<std::path::PathBuf>), String> {
+    use std::io::Read;
+    use tauri_plugin_fs::{FsExt, OpenOptions};
+
+    const TOO_LARGE: &str = "That file is too large to be a list export";
+    let dir = parent_of(&picked);
+    let mut opts = OpenOptions::new();
+    opts.read(true);
+    let file = app
+        .fs()
+        .open(picked, opts)
+        .map_err(|e| format!("Could not read the file: {e}"))?;
+    if file.metadata().map(|m| m.len()).unwrap_or(0) > max_bytes {
+        return Err(TOO_LARGE.into());
+    }
+    let mut contents = String::new();
+    // The metadata of a content URI can be silent about the size, so the
+    // read itself is capped too.
+    file.take(max_bytes + 1)
+        .read_to_string(&mut contents)
+        .map_err(|e| format!("Could not read the file: {e}"))?;
+    if contents.len() as u64 > max_bytes {
+        return Err(TOO_LARGE.into());
+    }
+    Ok((contents, dir))
+}
+
+fn parent_of(picked: &tauri_plugin_fs::FilePath) -> Option<std::path::PathBuf> {
+    match picked {
+        tauri_plugin_fs::FilePath::Path(p) => p.parent().map(|d| d.to_path_buf()),
+        tauri_plugin_fs::FilePath::Url(_) => None,
+    }
+}
+
+/// The folder the next dialog opens in — only a real folder qualifies.
+fn remember_dir(db: &Db, dir: Option<std::path::PathBuf>) {
+    if let Some(dir) = dir {
+        let _ = db.kv_set(EXPORT_DIR_KEY, &dir.to_string_lossy());
+    }
+}
 /// Verbose logging. Off by default — the errors that matter are recorded either
 /// way, and this is the switch for reproducing something on request.
 pub(crate) const LOG_DEBUG_KEY: &str = "log_debug";
@@ -352,18 +425,11 @@ pub fn save_image(
         }
     }
 
-    let path = builder
-        .add_filter(label, &[ext])
-        .blocking_save_file()
-        .and_then(|p| p.into_path().ok());
-
-    match path {
-        Some(p) => {
-            std::fs::write(&p, &data)
+    match builder.add_filter(label, &[ext]).blocking_save_file() {
+        Some(picked) => {
+            let dir = write_picked(&app, picked, &data)
                 .map_err(|e| format!("Could not save image: {e}"))?;
-            if let Some(dir) = p.parent() {
-                let _ = db.kv_set(EXPORT_DIR_KEY, &dir.to_string_lossy());
-            }
+            remember_dir(&db, dir);
             Ok(true)
         }
         None => Ok(false),
@@ -469,18 +535,11 @@ pub fn export_diagnostics(
             builder = builder.set_directory(dir);
         }
     }
-    let path = builder
-        .add_filter("Markdown", &["md"])
-        .blocking_save_file()
-        .and_then(|p| p.into_path().ok());
-
-    match path {
-        Some(p) => {
-            std::fs::write(&p, out.as_bytes())
+    match builder.add_filter("Markdown", &["md"]).blocking_save_file() {
+        Some(picked) => {
+            let dir = write_picked(&app, picked, out.as_bytes())
                 .map_err(|e| format!("Could not save the report: {e}"))?;
-            if let Some(dir) = p.parent() {
-                let _ = db.kv_set(EXPORT_DIR_KEY, &dir.to_string_lossy());
-            }
+            remember_dir(&db, dir);
             Ok(true)
         }
         None => Ok(false),
@@ -509,18 +568,14 @@ pub fn save_text(
             builder = builder.set_directory(dir);
         }
     }
-    let path = builder
+    match builder
         .add_filter(filter_label, &[extension.as_str()])
         .blocking_save_file()
-        .and_then(|p| p.into_path().ok());
-
-    match path {
-        Some(p) => {
-            std::fs::write(&p, contents.as_bytes())
+    {
+        Some(picked) => {
+            let dir = write_picked(&app, picked, contents.as_bytes())
                 .map_err(|e| format!("Could not save the file: {e}"))?;
-            if let Some(dir) = p.parent() {
-                let _ = db.kv_set(EXPORT_DIR_KEY, &dir.to_string_lossy());
-            }
+            remember_dir(&db, dir);
             Ok(true)
         }
         None => Ok(false),
@@ -548,23 +603,14 @@ pub fn open_text(
             builder = builder.set_directory(dir);
         }
     }
-    let path = builder
+    match builder
         .add_filter(filter_label, &[extension.as_str()])
         .blocking_pick_file()
-        .and_then(|p| p.into_path().ok());
-
-    match path {
-        Some(p) => {
+    {
+        Some(picked) => {
             const MAX_BYTES: u64 = 16 * 1024 * 1024;
-            let size = std::fs::metadata(&p).map(|m| m.len()).unwrap_or(0);
-            if size > MAX_BYTES {
-                return Err("That file is too large to be a list export".into());
-            }
-            let contents = std::fs::read_to_string(&p)
-                .map_err(|e| format!("Could not read the file: {e}"))?;
-            if let Some(dir) = p.parent() {
-                let _ = db.kv_set(EXPORT_DIR_KEY, &dir.to_string_lossy());
-            }
+            let (contents, dir) = read_picked(&app, picked, MAX_BYTES)?;
+            remember_dir(&db, dir);
             Ok(Some(contents))
         }
         None => Ok(None),

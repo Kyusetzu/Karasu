@@ -83,14 +83,23 @@ if (first === null) {
 for (let i = 0; i < 8; i++) await sample(`burn ${i + 1}`);
 
 console.log("");
-for (const at of [5, 15, 30, 45, 70]) {
-  await wait(at === 5 ? 5 : at === 15 ? 10 : 15);
+// Anchored to the wall clock rather than to summed waits: each sample costs a
+// round trip, and the verdict turns on whether the count comes back at the
+// 60 s boundary or before it. The first version summed its waits and put the
+// sample it labelled +70s at +60 s exactly -- on the boundary it was meant to
+// be safely past.
+const t0 = Date.now();
+for (const at of [5, 15, 30, 45, 60, 90]) {
+  await wait(Math.max(0, at - (Date.now() - t0) / 1000));
   await sample(`+${at}s`);
 }
 
 console.log(
-  "\nRead the recovery samples: climbing steadily across +5/+15/+30/+45 is a" +
-    "\nrolling window, and `headroom` should heal proportionally. Flat until" +
-    "\n+70s and then full is a stepped window, and `headroom` is already correct" +
-    "\n-- fix SLICE's comment instead. Record whichever it is in CLAUDE.md.",
+  "\nRead the recovery samples. Climbing steadily across +5/+15/+30/+45 is a" +
+    "\nrolling window, and `headroom` should heal proportionally -- but each" +
+    "\nsample spends one request in the window it watches, so a count that only" +
+    "\ndrops by one per sample is the samples' own cost, not a heal. Flat through" +
+    "\n+45 and back to full at +60 or +90 is a stepped window, and `headroom` is" +
+    "\nalready correct -- fix SLICE's comment instead. Record whichever it is in" +
+    "\nCLAUDE.md.",
 );

@@ -138,14 +138,6 @@ maintainer's. Each says which, so none of them reads as unstarted work.
 
 **Needs network access to `graphql.anilist.co`:**
 
-- **Does AniList's rate window roll or step?** `anilist/client.rs` asserted
-  both for a while; the stepped model is what ships, and its cost is that one
-  response reporting `remaining: 0` makes every request in the following
-  minute pay the full 5 s self-pace and go out anyway. Healing proportionally
-  is the fix *if* the window rolls and is actively harmful if it does not —
-  it would hand out budget that does not exist. `scripts/ratelimit-probe.mjs`
-  is the experiment; run it where AniList is reachable and record the answer
-  in CLAUDE.md.
 - **The `Page.threadComments` off-by-one.** AniList returns `perPage + 1`
   rows with one out of sequence; cause unknown, recorded in CLAUDE.md. Needs
   a live re-measurement before it can be reported upstream or defended

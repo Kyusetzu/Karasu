@@ -273,11 +273,12 @@ const WINDOW: Duration = Duration::from_secs(60);
 /// and a concurrent response landing mid-wait can raise the budget at any
 /// moment.
 ///
-/// This comment used to add "the window rolls continuously" as if it were
-/// known. It is not: `headroom` below implements the opposite — a stepped
-/// window — and nobody has measured which AniList actually uses. The
-/// disagreement is spelled out there and settled by
-/// `scripts/ratelimit-probe.mjs`.
+/// That is the only way budget comes back early. AniList's window **steps**:
+/// measured twice on 2026-09-03 with `scripts/ratelimit-probe.mjs`, the count
+/// sat exactly where a burn left it for 45 s (each sample costing one) and was
+/// back at the full limit at +60 s. So a slice never finds budget that quietly
+/// returned mid-window — it finds a response that landed, or the step itself.
+/// This comment once said the window rolls continuously; it does not.
 const SLICE: Duration = Duration::from_millis(400);
 
 /// The longest one caller paces before sending regardless.
@@ -374,21 +375,18 @@ impl RateState {
     /// not evidence of a low budget, it is the absence of evidence, and the old
     /// code treated the two as the same thing.
     ///
-    /// **This models a stepped window, and whether that is right is an open
-    /// question.** A count holds exactly as measured until a whole `WINDOW` has
-    /// passed and then jumps to the full limit — so one response reporting
-    /// `remaining: 0` costs every request in the following minute the full
-    /// `MAX_PACE` before being sent anyway. Five seconds of latency each, for
-    /// nothing, if the real window rolls and the budget was quietly returning
-    /// the whole time.
+    /// **This models a stepped window, which is what AniList runs.** Measured
+    /// twice on 2026-09-03 with `scripts/ratelimit-probe.mjs`: after a burn
+    /// the count held exactly as left (17 at +45 s, each sample costing one)
+    /// and read 29 of 30 at +60 s — flat, then the whole budget at once. A
+    /// count therefore holds until a full `WINDOW` has passed and then jumps
+    /// to the limit, and the cost of that is bounded and known: one response
+    /// reporting `remaining: 0` makes every request in the following minute
+    /// pay the full `MAX_PACE` before going out anyway.
     ///
-    /// It is left alone deliberately rather than "improved". Healing
-    /// proportionally is right for a rolling window and actively harmful for a
-    /// stepped one — it would hand out budget that does not exist and earn the
-    /// 429s this whole type exists to avoid, in exchange for latency that has
-    /// not hurt anyone yet. One measurement decides it, and this environment
-    /// cannot take it: `scripts/ratelimit-probe.mjs` is that measurement, and
-    /// its header says what each answer implies.
+    /// Do not heal proportionally. That is right for a rolling window and
+    /// actively harmful for this one — it would hand out budget that does not
+    /// exist and earn the 429s this whole type exists to avoid.
     fn headroom(&mut self, now: Instant) -> u32 {
         if self.counted_at().is_none_or(|t| now.duration_since(t) >= WINDOW) {
             self.remaining = self.limit.unwrap_or(SEED);
@@ -860,10 +858,10 @@ mod tests {
     /// napped first. A count belonging to a window that has since rolled is the
     /// absence of evidence, not evidence of a low budget.
     ///
-    /// Pins the *stepped* reading, which is what the code does today. If
-    /// `scripts/ratelimit-probe.mjs` ever shows the window rolling, this test
-    /// is the one that has to change with `headroom` — deliberately, and not
-    /// by accident.
+    /// Pins the *stepped* reading, measured against the live API on 2026-09-03
+    /// (`scripts/ratelimit-probe.mjs`, twice: flat through +45 s, full again
+    /// at +60 s). If that ever changes, this test is the one that has to
+    /// change with `headroom` — deliberately, and not by accident.
     #[test]
     fn a_count_from_a_rolled_window_stops_counting() {
         let now = Instant::now();

@@ -680,16 +680,20 @@ import it.
   "not ready" state it does not have. `library::hydrate_cost` and
   `db::tests::measure_the_cache_read` are the measurements, `#[ignore]`d — run
   them with `cargo test --release --lib <name> -- --ignored --nocapture`.
-- **Whether AniList's rate window rolls or steps is genuinely unknown.**
-  `anilist/client.rs` asserted both for a while: `SLICE`'s comment said it
-  rolls, `headroom` implements a step. The step is what ships, and the cost is
-  that one response reporting `remaining: 0` makes every request in the next
-  minute pay the full `MAX_PACE` and go out anyway. Do **not** "fix" that by
-  healing proportionally — right for a rolling window, and for a stepped one it
-  hands out budget that does not exist and earns the 429s the limiter exists to
-  avoid. `scripts/ratelimit-probe.mjs` is the one experiment that settles it;
-  its header says what each outcome implies. Record the answer here when
-  someone with network access to `graphql.anilist.co` runs it.
+- **AniList's rate window steps; it does not roll.** Measured twice on
+  2026-09-03 with `scripts/ratelimit-probe.mjs` (unauthenticated, the phone in
+  airplane mode, two minutes apart, identical both times): a cold client reads
+  `remaining: 29` of 30; a burn to 21 then reads 20, 19, 18, 17 at
+  +5/+15/+30/+45 s — each sample costing exactly one and nothing returning —
+  and 29 at +60 s, 28 at +90 s. Flat, then the whole budget at once, about
+  60 s after the first request of the window. `headroom` in
+  `anilist/client.rs` models exactly that step and stays as it is; the cost —
+  one response reporting `remaining: 0` makes every request in the next
+  minute pay the full `MAX_PACE` and go out anyway — is bounded and known. Do
+  **not** heal proportionally: right for a rolling window, and for this one it
+  hands out budget that does not exist and earns the 429s the limiter exists
+  to avoid. (Whether the bucket is per IP or per token is still unmeasured;
+  the probe's header says how to find out.)
 
 ## Invariants the release audit established
 

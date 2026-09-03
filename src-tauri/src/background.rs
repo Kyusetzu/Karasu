@@ -200,9 +200,9 @@ pub fn assert_schedule(minutes: i64) -> Result<(), String> {
         .map_err(|e| format!("background attach: {e}"))?;
     let activity = unsafe { JObject::from_raw(ctx.context_jobject.cast()) };
 
-    // `schedule` answers with JobScheduler's own result code; `cancel` has
-    // nothing to refuse, so it reports success outright.
-    let result = (|| -> jni::errors::Result<i32> {
+    // `schedule` answers with the reason it could not register the job, in
+    // Android's own words, or an empty string; `cancel` has nothing to refuse.
+    let result = (|| -> jni::errors::Result<String> {
         let loader = env
             .call_method(&activity, "getClassLoader", "()Ljava/lang/ClassLoader;", &[])?
             .l()?;
@@ -217,16 +217,22 @@ pub fn assert_schedule(minutes: i64) -> Result<(), String> {
             .l()?;
         let class = JClass::from(class);
         if minutes > 0 {
-            env.call_static_method(
-                &class,
-                "schedule",
-                "(Landroid/content/Context;I)I",
-                &[
-                    jni::objects::JValue::Object(&activity),
-                    jni::objects::JValue::Int(minutes as i32),
-                ],
-            )?
-            .i()
+            let answer = env
+                .call_static_method(
+                    &class,
+                    "schedule",
+                    "(Landroid/content/Context;I)Ljava/lang/String;",
+                    &[
+                        jni::objects::JValue::Object(&activity),
+                        jni::objects::JValue::Int(minutes as i32),
+                    ],
+                )?
+                .l()?;
+            let answer = JString::from(answer);
+            // Bound to a local first: the `JavaStr` borrows `answer`, and a
+            // temporary in the tail expression would outlive it.
+            let text: String = env.get_string(&answer)?.into();
+            Ok(text)
         } else {
             env.call_static_method(
                 &class,
@@ -234,35 +240,28 @@ pub fn assert_schedule(minutes: i64) -> Result<(), String> {
                 "(Landroid/content/Context;)V",
                 &[jni::objects::JValue::Object(&activity)],
             )?;
-            Ok(RESULT_SUCCESS)
+            Ok(String::new())
         }
     })();
 
-    let code = result.map_err(|e| {
+    let reason = result.map_err(|e| {
         if env.exception_check().unwrap_or(false) {
             let _ = env.exception_clear();
         }
         format!("background schedule: {e}")
     })?;
     // The JNI call succeeding only means Kotlin ran. Whether JobScheduler
-    // accepted the job is the return value, which used to be dropped — so a
-    // RESULT_FAILURE left the pane reading "every 15 minutes" with nothing
-    // registered, and this function reporting Ok.
-    match code {
-        RESULT_SUCCESS => Ok(()),
-        RESULT_FAILURE => Err(
-            "JobScheduler refused the job (RESULT_FAILURE): nothing is registered".to_string(),
-        ),
-        other => Err(format!(
-            "NotifScheduler.schedule threw (code {other}); logcat tag KarasuNotifJob has the trace"
-        )),
+    // accepted the job is the answer, which used to be dropped — so a refusal
+    // left the pane reading "every 15 minutes" with nothing registered, and
+    // this function reporting Ok. The first reason ever surfaced was
+    // `SecurityException: ACCESS_NETWORK_STATE required for jobs with a
+    // connectivity constraint`, which is why the text is carried verbatim.
+    if reason.is_empty() {
+        Ok(())
+    } else {
+        Err(reason)
     }
 }
-
-/// `JobScheduler.RESULT_SUCCESS` / `RESULT_FAILURE`, as `NotifScheduler.schedule`
-/// returns them; anything else is its own "threw" marker.
-const RESULT_SUCCESS: i32 = 1;
-const RESULT_FAILURE: i32 = 0;
 
 /// Startup re-assertion, retried briefly: `main_android_context` races the
 /// spawned setup (tao populates it in `onActivityCreate`), so a bare call

@@ -45,14 +45,14 @@ object KarasuNative {
 object NotifScheduler {
   private const val JOB_ID = 46231 // the callback port's digits, reused as an id
 
-  /** Returns JobScheduler's own answer — RESULT_SUCCESS (1) or RESULT_FAILURE
-   *  (0) — or -1 when scheduling threw. The return value is the only channel
-   *  the framework has for a refusal; dropping it left a refused job invisible
-   *  behind a pane that read "every 15 minutes", and `cmd jobscheduler run`
-   *  answering "Could not find job 46231" with nothing on screen saying why.
-   *  Rust reads it and turns anything but 1 into the error the pane shows. */
+  /** Returns "" when the job is registered, otherwise the reason it is not:
+   *  JobScheduler's own RESULT_FAILURE, or the exception schedule() threw,
+   *  in its own words. That text is what the Settings pane shows — dropping
+   *  it left a refused job invisible behind a pane that read "every 15
+   *  minutes", and the first reason ever seen was a SecurityException that
+   *  only the trace in logcat named. */
   @JvmStatic
-  fun schedule(context: Context, minutes: Int): Int {
+  fun schedule(context: Context, minutes: Int): String {
     return try {
       val js = context.getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
       val job = JobInfo.Builder(JOB_ID, ComponentName(context, NotifJobService::class.java))
@@ -62,12 +62,14 @@ object NotifScheduler {
         // Survives a reboot. RECEIVE_BOOT_COMPLETED is declared in the
         // manifest (setPersisted throws without it).
         .setPersisted(true)
+        // A connectivity constraint needs ACCESS_NETWORK_STATE in the
+        // manifest, or schedule() throws — see the manifest comment.
         .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
         .build()
-      js.schedule(job)
+      if (js.schedule(job) == JobScheduler.RESULT_SUCCESS) "" else "JobScheduler answered RESULT_FAILURE"
     } catch (t: Throwable) {
       Log.w("KarasuNotifJob", "schedule failed", t)
-      -1
+      t.toString()
     }
   }
 

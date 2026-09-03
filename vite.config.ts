@@ -61,6 +61,12 @@ export default defineConfig(async () => ({
           include: ["src/**/*.dom.test.tsx"],
           environment: "jsdom",
           setupFiles: ["./vitest.setup.ts"],
+          // A jsdom test on a cold CI runner can spend most of vitest's 5 s
+          // default just rendering: run 33788735270 saw a plain `waitFor` in
+          // SyncPanel.dom.test.tsx time out on a runner that reported 47 s of
+          // transforms, on a branch that changed only a workflow file. Twenty
+          // seconds still fails a real hang; it stops failing a slow machine.
+          testTimeout: 20_000,
         },
       },
     ],

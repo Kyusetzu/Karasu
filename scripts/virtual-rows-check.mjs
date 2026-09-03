@@ -11,15 +11,26 @@
 // reason android-check.ps1 and windows-check.sh sit outside the gate.
 //
 // Usage: node scripts/virtual-rows-check.mjs
-// Requires: playwright (npm i --no-save playwright) and a Chromium at
-// $PLAYWRIGHT_BROWSERS_PATH or /opt/pw-browsers/chromium.
+// Requires: playwright (npm i --no-save --no-audit --no-fund playwright, then
+// `git checkout -- package-lock.json` to undo npm's rewrite of the root
+// version, which bump-version.mjs does not maintain) and a Chromium-family
+// browser: $CHROMIUM_PATH, else Edge on Windows, else /opt/pw-browsers/chromium.
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const CHROMIUM = process.env.CHROMIUM_PATH ?? "/opt/pw-browsers/chromium";
-const URL = "http://localhost:5199/";
+const CHROMIUM =
+  process.env.CHROMIUM_PATH ??
+  (process.platform === "win32"
+    ? "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe"
+    : "/opt/pw-browsers/chromium");
+if (!existsSync(CHROMIUM)) {
+  console.error(`virtual-rows-check: no browser at ${CHROMIUM} — set CHROMIUM_PATH`);
+  process.exit(1);
+}
+const HARNESS_URL = "http://localhost:5199/";
 
 const failures = [];
 const check = (name, ok, detail = "") => {
@@ -27,19 +38,43 @@ const check = (name, ok, detail = "") => {
   if (!ok) failures.push(name);
 };
 
+// Node's own binary and Vite's entry script, not `npx`: on Windows the shim is
+// `npx.cmd`, which `spawn` cannot find without a shell (ENOENT, and with no
+// error listener that was an uncaught exception), and a shell would make the
+// `vite.kill()` below stop the shell and orphan the server on 5199.
+let stopping = false;
 const vite = spawn(
-  "npx",
-  ["vite", "--config", path.join(here, "virtual-rows-check", "vite.config.ts")],
+  process.execPath,
+  [
+    path.join(here, "..", "node_modules", "vite", "bin", "vite.js"),
+    "--config",
+    path.join(here, "virtual-rows-check", "vite.config.ts"),
+  ],
   { cwd: path.join(here, ".."), stdio: "ignore" },
 );
-process.on("exit", () => vite.kill());
+vite.on("error", (e) => {
+  console.error(`virtual-rows-check: could not start vite: ${e.message}`);
+  process.exit(1);
+});
+// `stdio: "ignore"` hides a Vite that started and then died (port taken, bad
+// config), so its exit has to be watched too.
+vite.on("exit", (code) => {
+  if (!stopping && code) {
+    console.error(`virtual-rows-check: vite exited with ${code}`);
+    process.exit(1);
+  }
+});
+process.on("exit", () => {
+  stopping = true;
+  vite.kill();
+});
 
 const { chromium } = await import("playwright");
 
 // Wait for the dev server rather than sleeping a fixed time.
 for (let i = 0; i < 60; i++) {
   try {
-    if ((await fetch(URL)).ok) break;
+    if ((await fetch(HARNESS_URL)).ok) break;
   } catch {
     /* not up yet */
   }
@@ -50,7 +85,7 @@ const browser = await chromium.launch({ executablePath: CHROMIUM });
 const page = await browser.newPage({ viewport: { width: 1200, height: 700 } });
 const pageErrors = [];
 page.on("pageerror", (e) => pageErrors.push(String(e)));
-await page.goto(URL, { waitUntil: "networkidle" });
+await page.goto(HARNESS_URL, { waitUntil: "networkidle" });
 await page.waitForSelector('[data-testid="a0"]');
 
 const scrollTo = async (y) => {
@@ -131,6 +166,7 @@ check("a section growing above moves the rows below it", after - before === 360,
 check("no page errors", pageErrors.length === 0, pageErrors.join(" | "));
 
 await browser.close();
+stopping = true;
 vite.kill();
 
 if (failures.length) {

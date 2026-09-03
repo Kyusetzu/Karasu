@@ -70,7 +70,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 118b040 -->
+<!-- generated-through: 1bd279d -->
 
 ### Fixed
 
@@ -248,6 +248,7 @@ tag time is then optional rather than load-bearing.
 - A title's page now shows what your list already knows when you are offline, with a working +1, instead of a raw network error.
 - On Android, a background-notification job the system refuses is now reported in Settings instead of silently missing.
 - Switching AniList accounts no longer carries the previous account's notification cursor along.
+- AniList activity permalinks open in Karasu on Android.
 
 ### Added
 

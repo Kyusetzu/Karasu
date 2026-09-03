@@ -37,8 +37,14 @@ const TICK: Duration = Duration::from_secs(60);
 const STARTUP_DELAY: Duration = Duration::from_secs(45);
 
 pub const INTERVAL_KEY: &str = "notif_bg_interval_min";
-const SEEN_KEY: &str = "site_notif_seen_id";
-const LAST_CHECK_KEY: &str = "site_notif_last_check_ms";
+/// The cursor, per account: the newest notification id already announced and
+/// when it was last checked. `background.rs` shares both, and
+/// `commands::auth::switch_identity` clears both — `kv_advance_max` only ever
+/// moves the id forward, so one account's cursor left behind would either
+/// starve the next account (its ids are lower, nothing is ever "newer") or
+/// fire on its first pass.
+pub(crate) const SEEN_KEY: &str = "site_notif_seen_id";
+pub(crate) const LAST_CHECK_KEY: &str = "site_notif_last_check_ms";
 
 /// Android's JobScheduler floor — one vocabulary on both platforms, so the
 /// desktop cannot promise a cadence the phone quietly rounds up.

@@ -1700,11 +1700,13 @@ impl Db {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use serde_json::Value;
 
-    fn mem_db() -> Db {
+    /// A migrated in-memory database. `pub(crate)` so tests elsewhere can
+    /// exercise code that takes a `Db` without opening a file.
+    pub(crate) fn mem_db() -> Db {
         let conn = Connection::open_in_memory().unwrap();
         conn.execute_batch(MIGRATIONS).unwrap();
         conn.execute_batch(MIGRATION_V2).unwrap();

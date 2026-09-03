@@ -27,11 +27,10 @@ use jni::sys::jstring;
 use jni::JNIEnv;
 use std::path::PathBuf;
 
-use crate::alerts::site::{INTERVAL_KEY, INTERVAL_MAX, INTERVAL_MIN, SITE_QUERY};
+use crate::alerts::site::{
+    INTERVAL_KEY, INTERVAL_MAX, INTERVAL_MIN, LAST_CHECK_KEY, SEEN_KEY, SITE_QUERY,
+};
 use crate::db::Db;
-
-const SEEN_KEY: &str = "site_notif_seen_id";
-const LAST_CHECK_KEY: &str = "site_notif_last_check_ms";
 
 fn now_ms() -> i64 {
     std::time::SystemTime::now()

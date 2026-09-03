@@ -255,6 +255,13 @@ pub fn switch_identity(db: &Db, next: Identity) -> Result<(), String> {
     db.kv_delete_prefix("aired:");
     db.kv_delete_prefix("sequel_seen:");
     db.kv_delete_prefix("stale_done:");
+    // The site-notification cursor is per account too, and it only ever moves
+    // forward: left behind, it either starves the next account (lower ids are
+    // never "newer") or fires on its first pass. It leaked here until the
+    // device pass looked for why a phone that had held two accounts never
+    // notified.
+    db.kv_delete(crate::alerts::site::SEEN_KEY);
+    db.kv_delete(crate::alerts::site::LAST_CHECK_KEY);
     // The widget projection holds this account's titles and must not outlive
     // it, exactly like the token beside it.
     crate::widgets::clear();
@@ -340,3 +347,27 @@ pub async fn anilist_query(
 }
 
 // --- Media list: loading with cache, mutations with offline queue -----------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The site-notification cursor belongs to the account that advanced it.
+    /// Deliberately the `AniList` arm: `Local` and `None` reach
+    /// `auth::delete_token`, which clears this machine's real credential
+    /// store — a test must never take that path.
+    #[test]
+    fn switching_accounts_forgets_the_site_notification_cursor() {
+        let db = crate::db::tests::mem_db();
+        db.kv_set(crate::alerts::site::SEEN_KEY, "123456").unwrap();
+        db.kv_set(crate::alerts::site::LAST_CHECK_KEY, "1788000000000").unwrap();
+        db.kv_set("aired:1:1", "1").unwrap();
+
+        switch_identity(&db, Identity::AniList(json!({ "id": 2, "name": "b" }))).unwrap();
+
+        assert_eq!(db.kv_get(crate::alerts::site::SEEN_KEY), None);
+        assert_eq!(db.kv_get(crate::alerts::site::LAST_CHECK_KEY), None);
+        assert_eq!(db.kv_get("aired:1:1"), None, "the older dedupe keys still go too");
+        assert_eq!(db.kv_get("profile_mode").as_deref(), Some("anilist"));
+    }
+}

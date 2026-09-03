@@ -6,6 +6,13 @@
          permission through the manifest merge, but a persisted job must not
          depend on a dependency's manifest — the merger dedupes. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Hand-added: the notification job asks for a network constraint
+         (setRequiredNetworkType), and JobScheduler refuses to register any
+         job with a connectivity constraint unless the app holds this
+         permission — measured on Android 16 as a SecurityException out of
+         schedule(), which was the whole of "Could not find job 46231". A
+         normal permission, granted at install, never prompted. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <!-- AndroidTV support -->
     <uses-feature android:name="android.software.leanback" android:required="false" />

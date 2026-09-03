@@ -70,7 +70,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 66fbfdd -->
+<!-- generated-through: e0fc6a6 -->
 
 ### Fixed
 
@@ -246,6 +246,7 @@ tag time is then optional rather than load-bearing.
   opens without the pause.
 - The background notification check reports it when Android refuses to register the job, instead of showing a schedule that does not exist.
 - A title's page now shows what your list already knows when you are offline, with a working +1, instead of a raw network error.
+- On Android, a background-notification job the system refuses is now reported in Settings instead of silently missing.
 
 ### Added
 

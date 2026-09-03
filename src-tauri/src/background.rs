@@ -201,7 +201,9 @@ pub fn assert_schedule(minutes: i64) -> Result<(), String> {
         .map_err(|e| format!("background attach: {e}"))?;
     let activity = unsafe { JObject::from_raw(ctx.context_jobject.cast()) };
 
-    let result = (|| -> jni::errors::Result<()> {
+    // `schedule` answers with JobScheduler's own result code; `cancel` has
+    // nothing to refuse, so it reports success outright.
+    let result = (|| -> jni::errors::Result<i32> {
         let loader = env
             .call_method(&activity, "getClassLoader", "()Ljava/lang/ClassLoader;", &[])?
             .l()?;
@@ -219,12 +221,13 @@ pub fn assert_schedule(minutes: i64) -> Result<(), String> {
             env.call_static_method(
                 &class,
                 "schedule",
-                "(Landroid/content/Context;I)V",
+                "(Landroid/content/Context;I)I",
                 &[
                     jni::objects::JValue::Object(&activity),
                     jni::objects::JValue::Int(minutes as i32),
                 ],
-            )?;
+            )?
+            .i()
         } else {
             env.call_static_method(
                 &class,
@@ -232,17 +235,35 @@ pub fn assert_schedule(minutes: i64) -> Result<(), String> {
                 "(Landroid/content/Context;)V",
                 &[jni::objects::JValue::Object(&activity)],
             )?;
+            Ok(RESULT_SUCCESS)
         }
-        Ok(())
     })();
 
-    result.map_err(|e| {
+    let code = result.map_err(|e| {
         if env.exception_check().unwrap_or(false) {
             let _ = env.exception_clear();
         }
         format!("background schedule: {e}")
-    })
+    })?;
+    // The JNI call succeeding only means Kotlin ran. Whether JobScheduler
+    // accepted the job is the return value, which used to be dropped — so a
+    // RESULT_FAILURE left the pane reading "every 15 minutes" with nothing
+    // registered, and this function reporting Ok.
+    match code {
+        RESULT_SUCCESS => Ok(()),
+        RESULT_FAILURE => Err(
+            "JobScheduler refused the job (RESULT_FAILURE): nothing is registered".to_string(),
+        ),
+        other => Err(format!(
+            "NotifScheduler.schedule threw (code {other}); logcat tag KarasuNotifJob has the trace"
+        )),
+    }
 }
+
+/// `JobScheduler.RESULT_SUCCESS` / `RESULT_FAILURE`, as `NotifScheduler.schedule`
+/// returns them; anything else is its own "threw" marker.
+const RESULT_SUCCESS: i32 = 1;
+const RESULT_FAILURE: i32 = 0;
 
 /// Startup re-assertion, retried briefly: `main_android_context` races the
 /// spawned setup (tao populates it in `onActivityCreate`), so a bare call
@@ -252,15 +273,21 @@ pub fn spawn_schedule_assert(app: tauri::AppHandle) {
     use tauri::Manager;
     tauri::async_runtime::spawn(async move {
         let minutes = crate::alerts::site::interval_min(&app.state::<Db>());
+        let mut last = String::new();
         for _ in 0..20 {
             match assert_schedule(minutes) {
                 Ok(()) => return,
-                Err(_) => tokio::time::sleep(std::time::Duration::from_millis(500)).await,
+                Err(e) => {
+                    last = e;
+                    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                }
             }
         }
+        // The last reason, not just the fact: "not ready yet" twenty times is a
+        // different bug from a JobScheduler refusal.
         crate::logging::warn(
             "background",
-            "could not re-assert the notification job schedule at startup",
+            format!("could not re-assert the notification job schedule at startup: {last}"),
         );
     });
 }

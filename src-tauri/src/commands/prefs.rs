@@ -152,7 +152,7 @@ fn reassert_notif_job(minutes: i64) -> Result<(), String> {
     crate::background::assert_schedule(minutes).map_err(|e| {
         crate::logging::warn("prefs", format!("job reschedule failed: {e}"));
         format!(
-            "The setting is saved, but Android refused the background job ({e}).              It will be retried the next time Karasu starts."
+            "The setting is saved, but Android refused the background job ({e}). It will be retried the next time Karasu starts."
         )
     })
 }

@@ -45,9 +45,15 @@ object KarasuNative {
 object NotifScheduler {
   private const val JOB_ID = 46231 // the callback port's digits, reused as an id
 
+  /** Returns JobScheduler's own answer — RESULT_SUCCESS (1) or RESULT_FAILURE
+   *  (0) — or -1 when scheduling threw. The return value is the only channel
+   *  the framework has for a refusal; dropping it left a refused job invisible
+   *  behind a pane that read "every 15 minutes", and `cmd jobscheduler run`
+   *  answering "Could not find job 46231" with nothing on screen saying why.
+   *  Rust reads it and turns anything but 1 into the error the pane shows. */
   @JvmStatic
-  fun schedule(context: Context, minutes: Int) {
-    try {
+  fun schedule(context: Context, minutes: Int): Int {
+    return try {
       val js = context.getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
       val job = JobInfo.Builder(JOB_ID, ComponentName(context, NotifJobService::class.java))
         // Android floors periodic jobs at 15 minutes and clamps silently;
@@ -61,6 +67,7 @@ object NotifScheduler {
       js.schedule(job)
     } catch (t: Throwable) {
       Log.w("KarasuNotifJob", "schedule failed", t)
+      -1
     }
   }
 

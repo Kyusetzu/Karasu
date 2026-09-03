@@ -70,7 +70,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: f615a45 -->
+<!-- generated-through: 1574963 -->
 
 ### Fixed
 
@@ -250,6 +250,7 @@ tag time is then optional rather than load-bearing.
 - Switching AniList accounts no longer carries the previous account's notification cursor along.
 - AniList activity permalinks open in Karasu on Android.
 - The Android background notification check now actually registers with the system; before, Android had been refusing it silently since the feature existed.
+- An anilist.co link that launches Karasu on Android now opens the page it names instead of the dashboard.
 
 ### Added
 

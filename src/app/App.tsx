@@ -20,7 +20,7 @@ import Titlebar from "@/components/shell/Titlebar";
 import Sidebar from "@/components/shell/Sidebar";
 import BottomBar from "@/components/shell/BottomBar";
 import { usePhoneShell } from "@/hooks/usePhoneShell";
-import { onOpenUrl } from "@tauri-apps/plugin-deep-link";
+import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
 import { internalRoute } from "@/lib/anilistUrl";
 import SessionExpired from "@/components/shell/SessionExpired";
 import Toast from "@/components/shell/Toast";
@@ -93,12 +93,30 @@ export default function App() {
   // route mapping in-app links use. Anything `internalRoute` refuses is
   // dropped — the app never claims a page it cannot draw. Outside Tauri the
   // listener would throw reaching for internals, hence the guard.
+  //
+  // Two deliveries, because the plugin has two. `onOpenUrl` is a plain event
+  // listener and only hears links that arrive while the app is running; the
+  // link that *starts* the app is recorded before any listener exists and is
+  // never emitted, so a cold start landed on the dashboard — measured on the
+  // phone, for a shared link and a tapped one alike. `getCurrent` hands that
+  // first link back, once. The same URL reaching both within a moment routes
+  // once; the same link tapped again later still routes, on purpose.
   useEffect(() => {
     if (!isTauri) return;
-    const un = onOpenUrl((urls) => {
+    let last: { url: string; at: number } | null = null;
+    const route = (urls: string[]) => {
+      const url = urls[0] ?? "";
+      if (last && last.url === url && Date.now() - last.at < 2000) return;
+      last = { url, at: Date.now() };
       const to = urls.map(internalRoute).find((r) => r !== null);
       if (to) navigate(to);
-    });
+    };
+    const un = onOpenUrl(route);
+    getCurrent()
+      .then((urls) => {
+        if (urls && urls.length > 0) route(urls);
+      })
+      .catch(() => {});
     return () => {
       void un.then((f) => f());
     };

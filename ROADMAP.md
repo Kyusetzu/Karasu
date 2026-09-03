@@ -32,15 +32,11 @@ warm and cold, the offline detail page and a queued +1 drained to AniList,
 the update notice clearing itself over a real update, Windows pause
 detection, the local library at its real size, database recovery from a
 daily backup, the background job registering once `ACCESS_NETWORK_STATE`
-was declared, running with the app dead, and surviving a reboot without the
-app being opened. Still to exercise:
+was declared, running with the app dead, surviving a reboot without the app
+being opened, and posting a real system notification from that dead-app run
+("1 ungelesene Benachrichtigung wartet", channel `karasu.site`). Still to
+exercise:
 
-- **A background notification actually posted** — the forced runs so far
-  were arming passes (no seen-id baseline yet, or the app used within the
-  interval). Needs: the interval on, the phone untouched for longer than the
-  interval, something unread on AniList, then
-  `adb shell cmd jobscheduler run -f dev.kyu.karasu 46231` — and never a
-  force-stop first, which cancels the package's jobs.
 - **Sign-out wipes `widgets.json`** — the widgets fall back to their empty
   state on the next render.
 - **The round-10 surface fixes at a glance** — Wrapped loads with a moving

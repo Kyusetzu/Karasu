@@ -6,12 +6,6 @@ Format loosely after [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versions are `MAJOR.MINOR.PATCH.COMMIT#`, where the fourth segment is a commit
 counter that moves on every commit (see `CONTRIBUTING.md`).
 
-**There has been no tagged release yet.** Everything published so far went to
-the rolling `latest` prerelease, which is force-moved on every push to `main`.
-The workflow publishes tagged `v*` releases too — none has been cut yet, which
-is why there is nothing under a version heading below to compare against. The
-first will close the `Unreleased` section rather than adding to it.
-
 **Cutting a release reads this file.** `scripts/release/release-notes.ps1`
 slices the section between `## <version>` and the next `## `, and *throws* if
 there isn't one — a release published with an empty body is not something
@@ -70,7 +64,27 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 30b2d99 -->
+<!-- generated-through: 04badb1 -->
+
+## 1.0.0 — 2026-09-05
+
+Karasu 1.0.0 is the first tagged release: a desktop and Android tracker built
+exclusively for AniList, in the spirit of Taiga. It watches what you play or
+read — the system's media sessions on Windows and Linux, player and browser
+windows on Windows, and a Jellyfin server anywhere — parses the release name,
+matches it against your list and scrobbles the progress, asking first when it
+is not sure. Around that sit the list itself with offline editing and a sync
+queue, a local library scanner that knows which episode you have on disk,
+statistics and a year-in-review poster, AniList's forum and activity feed,
+and on Android four home-screen widgets and background notifications that
+run with the app closed.
+
+This release also opens the **Stable** update channel: new installs follow it
+by default, and the per-commit build lives on as **Nightly** for anyone who
+wants to stay on the edge. Everything below is what changed on the way here,
+grouped by what it means for you rather than by commit; the full record is
+the commit log.
+
 
 ### Fixed
 

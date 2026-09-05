@@ -403,6 +403,11 @@ PRAGMA user_version = 18;
 /// on its own, because by the time v19 runs on a fresh install v17 has
 /// already put a row in `kv`, so v17's "is kv empty" test would call every
 /// new install an old one.
+///
+/// The one gap, accepted: a first launch that dies between step 2 and this
+/// one leaves a fresh file already labelled with a version, and the next open
+/// seeds it as an old install — a few milliseconds of first-launch window,
+/// and the consequence is the old default rather than a lost choice.
 const MIGRATION_V19: &str = "
 INSERT INTO kv (key, value)
 SELECT 'update_channel', 'prerelease'

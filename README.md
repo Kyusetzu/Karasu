@@ -234,6 +234,11 @@ carries one build per platform, always the newest: the Windows installer
 APKs (`Karasu_<version>_arm64.apk`, plus a `_universal` fallback) — alongside
 `SHA256SUMS.txt` and `latest.json`, the manifest the desktop updater reads.
 
+Two releases sit on that page. **Karasu <version>** is the Stable channel and
+the one to take; **Nightly build** is the rolling per-commit build for anyone
+who wants to stay on the edge. The built-in updater follows Stable on a fresh
+install; the channel is chosen under **Settings → Advanced → Updates**.
+
 On first start, open **Settings → Log in with AniList** — your browser opens
 AniList, you approve access, and Karasu logs you in automatically. (A manual
 token paste is available as a fallback.) On Android the way back is one tap:

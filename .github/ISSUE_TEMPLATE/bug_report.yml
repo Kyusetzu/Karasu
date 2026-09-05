@@ -118,8 +118,8 @@ body:
       label: Before you post
       options:
         - label: >-
-            I am on the current `latest` release (Karasu publishes one rolling
-            build; About → Check for updates says).
+            I am on the newest tagged release, or on the current `latest` build
+            if I use the Nightly channel (About → Check for updates says which).
           required: false
         - label: I searched the existing issues.
           required: false

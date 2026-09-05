@@ -80,7 +80,7 @@ version is installed the same way, over the top.
 }
 
 if ([string]::IsNullOrWhiteSpace($Version)) {
-    $head = "Automated build from the latest commit on ``main`` ($Sha)."
+    $head = "The Nightly channel: an automated build from the latest commit on ``main`` ($Sha), rebuilt on every push. The Stable channel is the newest tagged release."
 }
 else {
     $changelog = Join-Path $repoRoot "CHANGELOG.md"

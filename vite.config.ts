@@ -34,7 +34,7 @@ export default defineConfig(async () => ({
    * Two test projects, split by an explicit `.dom.` in the filename.
    *
    * Everything is **node** by default, which is what keeps the suite fast —
-   * thirty-odd files and four hundred assertions in about two seconds. Only
+   * seventy-odd files and eight hundred-odd cases in a couple of seconds. Only
    * `*.dom.test.tsx` boots jsdom and Testing Library.
    *
    * The marker is in the name rather than inferred from the extension, because

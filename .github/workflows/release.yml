@@ -114,7 +114,7 @@ jobs:
             Remove-Item notes-precheck.md -ErrorAction SilentlyContinue
           }
           else {
-            $out = @("tag=latest", "name=Latest build", "prerelease=true", "rolling=true", "version=", "suffix=")
+            $out = @("tag=latest", "name=Nightly build", "prerelease=true", "rolling=true", "version=", "suffix=")
           }
 
           # `Out-File -Append -Encoding utf8`, the same idiom rename-installer.ps1

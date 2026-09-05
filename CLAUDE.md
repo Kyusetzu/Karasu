@@ -367,7 +367,8 @@ nobody on the rolling build was moved without choosing. Which population a
 file belongs to is decided in `open` by the pre-migration `user_version` (0
 means created just now), **not** by whether `kv` is empty — v17 has already
 written a row by the time v19 runs on a fresh install, so v17's own test would
-call every new install an old one.
+call every new install an old one. The accepted gap: a first launch that dies
+mid-chain leaves a fresh file with a version, and the next open seeds it.
 
 **AniList has two name spaces for a custom list, and only one is writable.**
 `MediaListCollection.lists[].name` is a *display* value: it upper-cases the

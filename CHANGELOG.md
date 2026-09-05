@@ -70,7 +70,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: b36bc2b -->
+<!-- generated-through: 33e95c5 -->
 
 ### Fixed
 
@@ -253,6 +253,7 @@ tag time is then optional rather than load-bearing.
 - The local library's scrollbar no longer creeps while scrolling into rows it has not drawn yet.
 - On Android, "Save report", the poster export and the calendar export write a file instead of leaving an empty one behind.
 - Switching update channel no longer leaves the other channel's "ready to install" notice in the bell.
+- Sharing a link to Karasu on Android works from apps that share styled text.
 
 ### Added
 

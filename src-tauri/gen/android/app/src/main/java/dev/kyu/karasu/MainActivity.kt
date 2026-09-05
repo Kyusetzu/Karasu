@@ -22,7 +22,10 @@ class MainActivity : TauriActivity() {
   // and rewrites both the parameter and setIntent on the warm path.
   private fun asView(intent: Intent?): Intent? {
     if (intent?.action != Intent.ACTION_SEND || intent.type != "text/plain") return null
-    val text = intent.getStringExtra(Intent.EXTRA_TEXT) ?: return null
+    // EXTRA_TEXT is documented as a CharSequence. A share from an app that
+    // styles its text arrives as a Spanned, and getStringExtra answers null
+    // for anything that is not a String — the link was then silently dropped.
+    val text = intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString() ?: return null
     val url = Regex("https?://\\S+").find(text)?.value?.trimEnd(')', '"', '\'', '.', ',', ';')
       ?: return null
     return Intent(Intent.ACTION_VIEW, Uri.parse(url)).setPackage(packageName)

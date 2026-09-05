@@ -15,8 +15,21 @@
 
    The one real risk the investigation did find is handled in `.gitignore`
    rather than here: the walk honours .gitignore, and `src-tauri/target` was
-   excluded by a single line in a *nested* ignore file. */
+   excluded by a single line in a *nested* ignore file.
+
+   One exclusion exists, and it was measured the way the paragraph above
+   demands (2026-09-05, Tailwind 4.3.3): the website in `site/` is a second
+   Tailwind project in the same repository, and without the line below the
+   app's walk reads its markup too — a probe file carrying `rotate-[7deg]
+   bg-[#123456]` under `site/src/` grew this file's output from 82,783 to
+   82,854 bytes and put both classes in it. With `@source not "../../site"`
+   the output was byte-identical to the baseline (same 82,783 bytes, same
+   hash), with the probe present and with `site/` absent alike. So a
+   *negated* `@source` is safe where the positive lists were not; keep the
+   path relative to this file, and re-run the same diff if the line, the
+   import, or Tailwind moves. */
 @import "tailwindcss";
+@source not "../../site";
 
 /* Declared by hand instead of importing @fontsource's stylesheets, which list a
    woff fallback after the woff2. WebView2 is Chromium and has supported woff2

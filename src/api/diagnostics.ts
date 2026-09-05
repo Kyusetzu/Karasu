@@ -32,6 +32,7 @@ export interface Diagnostics {
   dataDir: string;
   tray: boolean;
   schema: number;
+  updateChannel: string;
   queued: number;
   signedIn: boolean;
   profileMode: string;

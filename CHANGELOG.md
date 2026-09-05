@@ -70,7 +70,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: c44a17a -->
+<!-- generated-through: c736eb2 -->
 
 ### Fixed
 
@@ -252,6 +252,7 @@ tag time is then optional rather than load-bearing.
 - An anilist.co link that launches Karasu on Android now opens the page it names instead of the dashboard.
 - The local library's scrollbar no longer creeps while scrolling into rows it has not drawn yet.
 - On Android, "Save report", the poster export and the calendar export write a file instead of leaving an empty one behind.
+- Switching update channel no longer leaves the other channel's "ready to install" notice in the bell.
 
 ### Added
 

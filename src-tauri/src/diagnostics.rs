@@ -47,6 +47,12 @@ pub struct Diagnostics {
     pub data_dir: String,
     pub tray: bool,
     pub schema: u32,
+    /// Which manifest the updater polls. After v1.0.0 the same four-part
+    /// version can run on either channel — the tag build and the rolling
+    /// build off the same commit are identical — so a report that could not
+    /// say which was missing the first thing to check for any "it says I am
+    /// up to date" or "it keeps offering the same build".
+    pub update_channel: String,
     pub queued: usize,
     /// Whether a token exists. Never the token.
     pub signed_in: bool,
@@ -167,6 +173,7 @@ pub fn collect(app: &tauri::AppHandle) -> Diagnostics {
         data_dir,
         tray: app.state::<crate::TrayPresent>().0,
         schema: db.schema_version(),
+        update_channel: crate::commands::stored_channel(&db),
         // This account's, matching what the pending badge shows. Another
         // account's rows exist but are neither drained nor counted here.
         queued: crate::commands::pending(&db),
@@ -251,6 +258,7 @@ pub fn render(d: &Diagnostics, redact: bool) -> String {
         },
     );
     row("Schema", format!("v{}", d.schema));
+    row("Update channel", d.update_channel.clone());
     row("Queued edits", d.queued.to_string());
     row("Debug logging", yn(d.log_debug).into());
     out
@@ -302,6 +310,7 @@ mod tests {
             data_dir: "/home/kyu/.local/share/dev.kyu.karasu".into(),
             tray: false,
             schema: 10,
+            update_channel: "stable".into(),
             queued: 2,
             signed_in: true,
             profile_mode: "anilist".into(),

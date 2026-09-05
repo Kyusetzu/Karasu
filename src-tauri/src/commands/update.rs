@@ -10,7 +10,7 @@ use super::*;
 
 /// Monotonic commit counter — the 4th version segment
 /// (`MAJOR.MINOR.PATCH.COMMIT#`). Bumped by one on every commit.
-pub const COMMIT_NUMBER: u32 = 557;
+pub const COMMIT_NUMBER: u32 = 558;
 
 /// Full four-part display version, e.g. `0.1.1.38`. The `MAJOR.MINOR.PATCH`
 /// core comes from the crate version (kept in sync across the manifests).
@@ -52,7 +52,7 @@ pub struct UpdateInfo {
 /// `main`). The default applies to new installs only: schema v19 seeded every
 /// database that predates the flip with `"prerelease"`, the channel it was
 /// living with, so nobody was moved without choosing.
-fn stored_channel(db: &Db) -> String {
+pub(crate) fn stored_channel(db: &Db) -> String {
     db.kv_get("update_channel")
         .unwrap_or_else(|| "stable".to_string())
 }
@@ -71,13 +71,19 @@ pub fn set_update_channel(
     if channel != "prerelease" && channel != "stable" {
         return Err("Unknown update channel".into());
     }
-    // Both stashes belong to the channel that produced them. A download held in
-    // memory for the rolling build is not an update on `stable`, and the daily
-    // throttle would otherwise keep the new channel unchecked for up to 24
-    // hours — so About kept offering to install a build the selected channel
-    // does not have.
+    // Everything an update check produced belongs to the channel that produced
+    // it. A download held in memory for the rolling build is not an update on
+    // `stable`, and the daily throttle would otherwise keep the new channel
+    // unchecked for up to 24 hours — so About kept offering to install a build
+    // the selected channel does not have. The announcement is the third piece
+    // and was left behind for a while: the bell row saying "1.0.0.600
+    // downloaded and ready to install" survived a switch to Stable, where
+    // that build does not exist, so pressing it re-downloaded nothing and
+    // failed every time. Same pair `clear_stale_update_notice` uses.
     *pending.0.guard() = None;
     db.kv_delete("last_update_check_ms");
+    db.kv_delete("last_notified_update_version");
+    let _ = db.notif_clear_kind("update");
     db.kv_set("update_channel", &channel)
 }
 

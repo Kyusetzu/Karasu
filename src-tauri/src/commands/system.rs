@@ -57,15 +57,19 @@ fn read_picked(
     if file.metadata().map(|m| m.len()).unwrap_or(0) > max_bytes {
         return Err(TOO_LARGE.into());
     }
-    let mut contents = String::new();
     // The metadata of a content URI can be silent about the size, so the
-    // read itself is capped too.
+    // read itself is capped too — as bytes first, so an oversize file is
+    // reported as oversize even when the byte after the cap splits a
+    // multi-byte character, which `read_to_string` would call invalid UTF-8.
+    let mut bytes = Vec::new();
     file.take(max_bytes + 1)
-        .read_to_string(&mut contents)
+        .read_to_end(&mut bytes)
         .map_err(|e| format!("Could not read the file: {e}"))?;
-    if contents.len() as u64 > max_bytes {
+    if bytes.len() as u64 > max_bytes {
         return Err(TOO_LARGE.into());
     }
+    let contents =
+        String::from_utf8(bytes).map_err(|e| format!("Could not read the file: {e}"))?;
     Ok((contents, dir))
 }
 

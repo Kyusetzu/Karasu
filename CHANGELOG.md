@@ -15,16 +15,16 @@ first will close the `Unreleased` section rather than adding to it.
 **Cutting a release reads this file.** `scripts/release/release-notes.ps1`
 slices the section between `## <version>` and the next `## `, and *throws* if
 there isn't one — a release published with an empty body is not something
-GitHub complains about, so the script does. So before pushing `v1.0.0`:
+GitHub complains about, so the script does. So before pushing a `v*` tag:
 
-1. rename `## Unreleased` to `## 1.0.0` (a trailing ` — 2026-08-15` is fine,
-   the match only needs the version to come first),
+1. rename `## Unreleased` to `## <version>` (a trailing ` — <date>` is fine,
+   the match only needs the version to come first; brackets around it or a
+   fourth dotted segment break the match and the tag build throws),
 2. open a fresh empty `## Unreleased` above it, carrying a
    `<!-- generated-through: <sha> -->` marker so the generator knows where to
    resume,
-3. delete the paragraph above this one, which stops being true at that point,
-4. and make sure `package.json` already says `1.0.0` — the workflow refuses a
-   tag whose version disagrees with the commit it points at.
+3. and make sure `package.json` already says the same version — the workflow
+   refuses a tag whose version disagrees with the commit it points at.
 
 Commit subjects are the real record and are written to be read; this file is the
 short version, grouped by what it means for someone using the app.
@@ -70,7 +70,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: cd32891 -->
+<!-- generated-through: e5f21b6 -->
 
 ### Fixed
 
@@ -246,7 +246,6 @@ tag time is then optional rather than load-bearing.
   opens without the pause.
 - The background notification check reports it when Android refuses to register the job, instead of showing a schedule that does not exist.
 - A title's page now shows what your list already knows when you are offline, with a working +1, instead of a raw network error.
-- On Android, a background-notification job the system refuses is now reported in Settings instead of silently missing.
 - Switching AniList accounts no longer carries the previous account's notification cursor along.
 - AniList activity permalinks open in Karasu on Android.
 - The Android background notification check now actually registers with the system; before, Android had been refusing it silently since the feature existed.

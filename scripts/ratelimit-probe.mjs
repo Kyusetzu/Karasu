@@ -1,25 +1,27 @@
 #!/usr/bin/env node
 /**
- * Settles one open question about AniList's rate limiter: does its window
- * *roll*, or does it reset in a step?
+ * Re-measures the shape of AniList's rate window: does it *roll*, or does it
+ * reset in a step?
  *
- * Why it matters. `anilist/client.rs` currently asserts both. `SLICE`'s comment
- * says "the window rolls continuously, so the budget can return at any moment",
- * which is why the pre-flight re-checks every 400 ms instead of sleeping. But
- * `headroom` implements the opposite: a count stays exactly as measured until a
- * whole `WINDOW` has passed since it was taken, and then jumps to the full
- * limit. Both cannot be right.
+ * The answer is known. Measured twice on 2026-09-03 (unauthenticated, two
+ * minutes apart, identical both times): a burn to 21 read 20, 19, 18, 17 at
+ * +5/+15/+30/+45 s -- each sample costing exactly one and nothing returning --
+ * and 29 at +60 s. Flat, then the whole budget at once, about 60 s after the
+ * first request of the window. **Stepped.** `headroom` in `anilist/client.rs`
+ * models exactly that, and CLAUDE.md's notes carry the numbers.
  *
- * What follows from the answer:
+ * Why the script stays: the limiter's model is a claim about a server nobody
+ * here runs, and the day AniList changes it, this is the ten-minute way to
+ * find out. Run it before touching `headroom`, `SLICE` or `MAX_PACE`. Healing
+ * proportionally would be right for a rolling window, and for this one it
+ * hands out budget that does not exist and earns the 429s the limiter exists
+ * to avoid -- which is why this is a measurement and not an argument.
  *
- * - **Rolling.** `headroom` should heal in proportion to elapsed time. Today a
- *   response reporting `remaining: 0` pins the budget at 0 for 60 s, and every
- *   request in that minute pays the full `MAX_PACE` of 5 s and is then sent
- *   anyway -- five seconds of latency per request that buys nothing.
- * - **Stepped.** `headroom` is already right and `SLICE`'s comment is the thing
- *   to fix. Healing proportionally would then hand out budget that does not
- *   exist and earn 429s, which is worse than the latency it removes -- which is
- *   why this is not a change anyone should make from reasoning alone.
+ * The one question it does *not* settle is whether the bucket is per IP or
+ * per token. To find out: run it twice at once from two machines on different
+ * networks, one of them sending `Authorization: Bearer <token>` on every
+ * request (add the header to `sample`). If the tokened machine's count falls
+ * with the other's, the bucket is per IP; if each keeps its own 30, per token.
  *
  * The experiment: spend the budget down, then watch `x-ratelimit-remaining`
  * recover while sending nothing. A rolling window climbs back gradually; a
@@ -95,11 +97,10 @@ for (const at of [5, 15, 30, 45, 60, 90]) {
 }
 
 console.log(
-  "\nRead the recovery samples. Climbing steadily across +5/+15/+30/+45 is a" +
-    "\nrolling window, and `headroom` should heal proportionally -- but each" +
-    "\nsample spends one request in the window it watches, so a count that only" +
-    "\ndrops by one per sample is the samples' own cost, not a heal. Flat through" +
-    "\n+45 and back to full at +60 or +90 is a stepped window, and `headroom` is" +
-    "\nalready correct -- fix SLICE's comment instead. Record whichever it is in" +
-    "\nCLAUDE.md.",
+  "\nRead the recovery samples against the known shape: flat through +45 (each" +
+    "\nsample costs one, so a count that only drops by one per sample is the" +
+    "\nsamples' own cost, not a heal) and back to full at +60 or +90 is the" +
+    "\nstepped window `headroom` models. A count that climbs across +5/+15/+30/+45" +
+    "\nmeans AniList changed its limiter -- then `headroom` should heal" +
+    "\nproportionally, and CLAUDE.md's rate-window note needs rewriting first.",
 );

@@ -34,8 +34,12 @@
                 <!-- AndroidTV support -->
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
-            <!-- Hand-added, OUTSIDE the markers above (that block is
-                 rewritten on every build): the share target. MainActivity
+            <!-- Hand-added: the share target. It sits here, ABOVE the
+                 deep-link markers below, because that is where the
+                 generator leaves it — placed after the closing marker it
+                 was moved back up here on every build, and the tree was
+                 dirty after each one. The block between the markers is
+                 rewritten on every build; this one is not. MainActivity
                  rewrites a SEND into a synthetic VIEW so the deep-link
                  plugin's own validation and routing carry it — see the
                  comment there. -->

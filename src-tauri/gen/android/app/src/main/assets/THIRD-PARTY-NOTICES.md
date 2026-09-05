@@ -110,7 +110,7 @@ production dependencies:
 | tailwindcss, @tailwindcss/vite, tailwind-merge, clsx | MIT |
 | class-variance-authority | Apache-2.0 |
 | d3-array, d3-scale, d3-shape, lucide-react | ISC |
-| @tauri-apps/api, @tauri-apps/plugin-opener | MIT or Apache-2.0 |
+| @tauri-apps/api, @tauri-apps/plugin-opener, @tauri-apps/plugin-deep-link | MIT or Apache-2.0 |
 | @fontsource/sn-pro | OFL-1.1 |
 | @fontsource/kosugi-maru | Apache-2.0 |
 

@@ -136,8 +136,14 @@ src-tauri/src/
                      (the JobScheduler half of background notifications —
                      same restore-from-git rule; its NotifScheduler proguard
                      keep is load-bearing, and the manifest's hand-added
-                     service + RECEIVE_BOOT_COMPLETED sit OUTSIDE the
-                     deep-link markers, which are rewritten on every build),
+                     entries — the NotifJobService `<service>`,
+                     RECEIVE_BOOT_COMPLETED, ACCESS_NETWORK_STATE (a job
+                     with a connectivity constraint needs it, or
+                     `schedule()` throws and the feature is silently dead),
+                     and the SEND share-target filter, which sits ABOVE the
+                     deep-link markers because that is where the generator
+                     leaves it — all sit OUTSIDE those markers, which are
+                     rewritten on every build),
                      and Widgets.kt plus its res/ family (karasu_widget
                      layout, widget_bg drawable, styles_widgets,
                      strings_widgets en+de, four xml/widget_* metadata) —
@@ -150,6 +156,24 @@ src-tauri/src/
                      copy, and `src/lib/notices.test.ts` fails the gate when
                      the two differ. Edit both together; the test is what
                      says so when you don't
+  background.rs      the dead-app notification check, Android's half: the one
+                     symbol NotifJob.kt calls over JNI, in a process where
+                     Tauri may never have started — no AppHandle, every
+                     dependency taken by hand; shares the site-notification
+                     kv vocabulary with alerts/site.rs
+  backups.rs         daily local snapshots of karasu.db (`VACUUM INTO`, one
+                     per UTC day, newest N kept) — what db.rs falls back to
+                     when the file will not open
+  i18n.rs            the strings Rust composes (notifications, the bell rows,
+                     the tray menu) in the language the user chose
+  keystore.rs        Android-Keystore sealing for the two mobile token files —
+                     the Rust side of TokenCipher.kt
+  sync.rs            lock-taking that survives a poisoned mutex, so a
+                     supervised background loop's panic does not take every
+                     later lock with it
+  widgets.rs         the home-screen widgets' projection file (widgets.json),
+                     rewritten whenever the list cache moves; Widgets.kt
+                     renders it with no network and no schema knowledge
   discord.rs · library.rs · portable.rs
 scripts/             bump-version.mjs (every commit), anilist-query.mjs
                      (validate a query live), android-check.ps1 (the fast
@@ -163,7 +187,10 @@ scripts/             bump-version.mjs (every commit), anilist-query.mjs
                      and a unit test there passes vacuously), changelog.mjs
                      (appends the Unreleased section from the commits since
                      its `generated-through` marker; a `Changelog:` trailer
-                     overrules the subject); release/ holds the five PowerShell scripts
+                     overrules the subject), ratelimit-probe.mjs (re-measures
+                     the shape of AniList's rate window — stepped, see the
+                     notes — one unauthenticated request per sample, needs
+                     real egress to graphql.anilist.co); release/ holds the five PowerShell scripts
                      the release workflow runs (installer, AppImage and APK
                      renamers are deliberate near-twins, release-notes, and
                      generate-update-manifest — desktop-only on purpose)
@@ -265,8 +292,7 @@ of AniList's own list fields, it costs nothing to carry, and the local list has
 stored it since schema v7. The rejected idea is tracking **purchases**, which
 would need price data the app has no source for.
 
-The schema is at **v18** (v17 seeds `blur_adult` on for new installs only —
-an existing install's explicit choice, or absence of one, is left alone). `library_match` (v8) holds the scanner's per-title
+The schema is at **v18**. `library_match` (v8) holds the scanner's per-title
 match confidence, which is what the local library's `exact` / `close` column
 reads. v9 adds `library_override` — the user's corrections, keyed on the parsed
 `(title, season)` with `season = -1` for a release name that carried none, and
@@ -326,6 +352,9 @@ the queue, and a queued row carried only a `mediaId` — so signing out of A and
 into B drained A's unsynced edits onto B's list, silently, on B's first list
 fetch. It backfills from the cached viewer and drops rows it cannot attribute,
 because clearing the queue on logout would defeat the point of having one.
+
+v17 seeds `blur_adult` on for new installs only — an existing install's
+explicit choice, or absence of one, is left alone.
 
 v18 adds a nullable `user_id` to `notifications`, backfilled from the cached
 viewer, and leaves `kind = 'update'` rows unowned on purpose: the update
@@ -394,7 +423,7 @@ the app would download and reinstall itself on a loop. The comparator supplies
 
 ## The commit loop
 
-Three commands, in this order. Don't do any of it by hand.
+Six commands, in this order. Don't do any of it by hand.
 
 ```sh
 node scripts/bump-version.mjs patch   # minor for features, major for breaks
@@ -757,6 +786,13 @@ import it.
   of a 120 s threshold, no write while paused, `due, waiting for
   confirmation` on the first tick after resume. A silent file in a fresh
   process is detected normally.
+- **The Android sign-in is slow at the network, not at the Keystore.**
+  Measured on the phone on 2026-09-05 with verbose logging:
+  `connect timings: viewer 5237ms, kv 6ms, token save 27ms` — and the
+  viewer figure included AniList answering the first fetch with HTTP 502
+  and `connect_with_token`'s one bounded retry (1.5 s sleep) covering it.
+  The hardware-key generation everyone suspected costs 27 ms. Do not move
+  `save_token` off the sign-in path on the strength of the old guess.
 - **User id 153164 in `scripts/anilist-query.mjs`'s examples is a stranger's
   public account, not the maintainer's.** Kyusetzu is **6421433**. A plan
   built on the wrong one reads someone else's list and then "finds" bugs in

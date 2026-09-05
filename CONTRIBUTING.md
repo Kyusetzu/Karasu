@@ -43,7 +43,7 @@ Two hard limits shape almost everything else:
 
 ## The commit loop
 
-Three commands, in this order, for **every** commit. Not by hand.
+Four steps, in this order, for **every** commit. Not by hand.
 
 ```bash
 node scripts/bump-version.mjs patch
@@ -75,6 +75,19 @@ was wrong before; the log here is meant to be read. End the message with:
 ```
 Co-Authored-By: <your name> <your email>
 ```
+
+```bash
+node scripts/changelog.mjs
+```
+
+After the commit, because it reads it: appends the commit's line to
+`CHANGELOG.md`'s `## Unreleased` section. Nobody writes that file by hand.
+Fold the result in with `git commit --amend --no-edit`, then run
+`node scripts/changelog.mjs --marker-head` so the marker names the amended
+commit. The subject is the changelog line; a `Changelog: Fixed: …` trailer
+replaces it when the reader needs the effect rather than the change, and
+`Changelog: skip` leaves a commit out. Docs-, CI- and scripts-only commits
+drop out by themselves.
 
 One commit per feature. For anything touching dependencies,
 `tauri.conf.json`, or the bundle, also run `npm run tauri build` as a smoke

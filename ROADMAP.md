@@ -26,23 +26,17 @@ not before. What remains:
 
 ### The device pass
 
-Verified on hardware so far (2026-08-30 and 2026-09-03): the four widgets,
-HTTP/2 on both platforms, the share target bare and buried, the deep link
-warm and cold, the offline detail page and a queued +1 drained to AniList,
-the update notice clearing itself over a real update, Windows pause
-detection, the local library at its real size, database recovery from a
-daily backup, the background job registering once `ACCESS_NETWORK_STATE`
-was declared, running with the app dead, surviving a reboot without the app
-being opened, and posting a real system notification from that dead-app run
-("1 ungelesene Benachrichtigung wartet", channel `karasu.site`). Still to
-exercise:
-
-- **Sign-out wipes `widgets.json`** — the widgets fall back to their empty
-  state on the next render.
-- **The round-10 surface fixes at a glance** — Wrapped loads with a moving
-  loader and draws promptly, its pill rows each hold one line, the covers
-  show edit + +1 whole, the hero has working arrows and a fast first
-  banner, the More sheet reads as a list.
+Done. Verified on hardware between 2026-08-30 and 2026-09-05: the four
+widgets and their emptying on sign-out, HTTP/2 on both platforms, the share
+target bare and buried, the deep link warm and cold, the offline detail page
+and a queued +1 drained to AniList, the update notice clearing itself over
+two real updates, Windows pause detection, the local library at its real
+size, database recovery from a daily backup, the background job registering
+once `ACCESS_NETWORK_STATE` was declared, running with the app dead,
+surviving a reboot without the app being opened and posting a real system
+notification from that run, the Android sign-in timed (the Keystore write is
+27 ms; the viewer fetch is the cost), and the round-10 surfaces judged by the
+maintainer.
 
 ### Cutting the release, mechanically
 
@@ -106,16 +100,22 @@ Everything still listed here is blocked on something no amount of work in the
 repository supplies — a device, a live API, or a decision that is the
 maintainer's. Each says which, so none of them reads as unstarted work.
 
-**Needs hardware:**
+**Found by the pre-tag sweep of 2026-09-05, deferred on purpose:**
 
-- **Read the sign-in timings off a device.** `connect_with_token` logs its
-  three phases at debug level. Two of the labels were swapped until now, and
-  they were swapped in the way that mattered: the line credited the Keystore
-  token write — the expensive candidate on Android, where its first use also
-  generates the hardware key — to the cheap kv step. So the instrument was
-  ready but would have sent whoever read it after the wrong suspect. Turn on
-  verbose logging, sign in on a phone, read `connect timings` out of
-  `karasu.log`. Act only if it is still slow.
+- **The widgets' empty state is English on a German phone.** `Widgets.kt`
+  falls back to a hard-coded "Open Karasu" / "Karasu" when `widgets.json` is
+  absent — which is exactly what sign-out leaves behind. Read the two labels
+  from `strings_widgets.xml` (both locales already exist) instead. Deferred
+  because seeing it costs a sign-out, and the maintainer had just signed back
+  in.
+- **Dependabot #15 (rustls) and #16 (the npm group).** #15 touches the one
+  path nothing on this machine can check — Android TLS through the named
+  aws-lc-rs provider in `net.rs`; #16 moves the JS halves of two Tauri
+  plugins while their Rust halves stay pinned. Both after a device pass
+  re-verifies Android TLS and the deep link. #13 and #14 (the two actions)
+  are proven by any rolling run and can go first. A Dependabot squash does
+  not bump the version: `node scripts/bump-version.mjs patch --force` after
+  each merge keeps `COMMIT_NUMBER` monotonic.
 
 **Needs a user, or a decision already made:**
 

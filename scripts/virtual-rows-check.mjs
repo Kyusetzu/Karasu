@@ -117,10 +117,19 @@ const [a0, a1, a2] = [await rect("a0"), await rect("a1"), await rect("a2")];
 check("rows tile without gap or overlap", a1.top === a0.bottom && a2.top === a1.bottom,
   `${a0.bottom}/${a1.top}/${a1.bottom}/${a2.top}`);
 
+// The estimate has to match the rows' real height, or every row scrolled into
+// view replaces the estimate with a measurement one pixel larger and the
+// scrollbar creeps — the local library shipped exactly that (68 against rows
+// that measure 69). No last row is mounted at either point, so the only thing
+// that can move the height between them is the estimate being wrong.
+const heightAtRest = await page.$eval("#scroller", (s) => s.scrollHeight);
 await scrollTo(20000);
 const scrolled = await mounted();
 check("scrolling recycles rather than accumulates",
   scrolled.length < 60 && !scrolled.includes("a0"), `${scrolled.length} mounted`);
+const heightScrolled = await page.$eval("#scroller", (s) => s.scrollHeight);
+check("the scroll height does not creep as rows are measured",
+  heightScrolled === heightAtRest, `${heightAtRest} -> ${heightScrolled}`);
 
 // The reason each instance measures its own `scrollMargin`: two lists share
 // one scroller, and the second must start below the first, not on top of it.

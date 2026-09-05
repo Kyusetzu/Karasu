@@ -6,7 +6,12 @@ import { createRoot } from "react-dom/client";
 import { useRef, useState } from "react";
 import { VirtualRows } from "@/components/list/VirtualRows";
 
+// The rendered height. Each row but the last also carries a 1px border, so
+// the virtualizer's estimate is ROW + 1 — the same off-by-one the local
+// library shipped with (68 against rows that measure 69), which crept the
+// scroll height by a pixel per row scrolled into view; the check asserts it.
 const ROW = 68;
+const ESTIMATE = ROW + 1;
 const make = (n: number, prefix: string) =>
   Array.from({ length: n }, (_, i) => ({ id: `${prefix}${i}`, i }));
 
@@ -44,10 +49,10 @@ function App() {
       <p id="notice" style={{ height: tall ? 400 : 40, margin: 0 }}>notice</p>
       <button id="grow" onClick={() => setTall((v) => !v)}>grow</button>
       <p>SECTION A</p>
-      <VirtualRows items={make(500, "a")} scrollRef={scrollRef} estimateRowHeight={ROW}
+      <VirtualRows items={make(500, "a")} scrollRef={scrollRef} estimateRowHeight={ESTIMATE}
         getKey={(x) => x.id} renderItem={row("A")} />
       <p>SECTION B</p>
-      <VirtualRows items={make(500, "b")} scrollRef={scrollRef} estimateRowHeight={ROW}
+      <VirtualRows items={make(500, "b")} scrollRef={scrollRef} estimateRowHeight={ESTIMATE}
         getKey={(x) => x.id} renderItem={row("B")} />
     </div>
   );

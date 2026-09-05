@@ -19,75 +19,10 @@ needing a hosted backend.
 
 ---
 
-## Milestone: v1.0.0
-
-Feature work is done; the tag is cut on the maintainer's explicit word and
-not before. What remains:
-
-### The device pass
-
-Done. Verified on hardware between 2026-08-30 and 2026-09-05: the four
-widgets and their emptying on sign-out, HTTP/2 on both platforms, the share
-target bare and buried, the deep link warm and cold, the offline detail page
-and a queued +1 drained to AniList, the update notice clearing itself over
-two real updates, Windows pause detection, the local library at its real
-size, database recovery from a daily backup, the background job registering
-once `ACCESS_NETWORK_STATE` was declared, running with the app dead,
-surviving a reboot without the app being opened and posting a real system
-notification from that run, the Android sign-in timed (the Keystore write is
-27 ms; the viewer fetch is the cost), and the round-10 surfaces judged by the
-maintainer.
-
-### Cutting the release, mechanically
-
-The CHANGELOG header documents the file's own half; the whole sequence, in
-order:
-
-1. `node scripts/changelog.mjs`, then rewrite `CHANGELOG.md`'s headings:
-   rename `## Unreleased` to `## 1.0.0` (a trailing ` — 2026-…` date is fine;
-   brackets or a fourth segment break the slicer's match and the tag build
-   throws), open a fresh empty `## Unreleased` above it carrying a
-   `<!-- generated-through: <sha> -->` marker, and delete the "there has been
-   no tagged release yet" paragraph, which stops being true. The section's
-   contents are generated, so this is heading surgery rather than a writing
-   pass; read it once and reach for a `Changelog:` trailer on anything whose
-   line reads badly.
-2. `node scripts/bump-version.mjs major`, in the same dirty tree — the
-   CHANGELOG edit is what lets the bump run without `--force`. It lands on
-   `1.0.0.<commit#>` and prints it for the commit subject.
-3. `npm run verify`, bare, never piped. Then the build smoke above if
-   anything moved since it last ran.
-4. One commit carrying the CHANGELOG rewrite and all five version files —
-   the workflow reads both off the tagged commit.
-5. `git tag -a v1.0.0` — annotated, because `git push --follow-tags`
-   silently skips lightweight tags, and the only symptom would be a rolling
-   rebuild and no release.
-6. Push branch and tag — the maintainer's own action, every time. Two
-   workflow runs start and cannot cancel each other (the concurrency group
-   is keyed on the ref). The rolling `latest` prerelease survives as the
-   Nightly channel and is rebuilt at the same content.
-7. Watch the **precheck** job on the tag run: it is its own job with no
-   dependencies, so the version-agreement check and the release-notes
-   precheck really do fail in seconds. (They used to live inside
-   `build-and-publish`, which waits on the two build jobs — measured at
-   eleven minutes before it said a word.)
-   Then confirm the published release — not marked prerelease, installer +
-   AppImage (+ the two APKs if the secrets exist), `SHA256SUMS.txt`, and a
-   `latest.json` whose version reads `1.0.0+<commit#>`. The `+` is
-   load-bearing; CLAUDE.md's versioning section says why.
-
-Two consequences worth knowing on tag day. v1.0.0 is the first
-non-prerelease, so GitHub's `releases/latest` alias starts resolving and
-the **Stable update channel goes live** the moment it publishes — its
-manifest has 404'd since the channel existed. And once the release is
-published the tag is immutable: a run that fails *after* the precheck can
-be re-run against the same tag, but a broken tagged commit means
-delete-tag, fix, re-tag — acceptable only while no release was published
-under it.
-
 ## After v1.0.0
 
-The backlog, each item with its recorded reason — none of it blocks the tag:
+v1.0.0 was tagged on 2026-09-05. The backlog, each item with its recorded
+reason:
 
 ### Carried over from the release audit
 

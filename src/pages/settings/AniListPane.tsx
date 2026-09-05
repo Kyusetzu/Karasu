@@ -652,16 +652,20 @@ export function NotificationScheduleSection() {
     // left this pane reading "every 15 minutes" with nothing registered. The
     // stored setting is still correct in that case, so the select keeps the
     // new value; `notifScheduleFailure` says which of the two sentences is
-    // the true one.
+    // the true one. The toast truncates both of its lines to one row, and
+    // a phone shows about thirty characters of each — so the headline is the
+    // short fact, the reassurance leads the detail line, and the platform's
+    // own reason follows it for the wide screens and the bug reports.
     setNotifSchedule(m).catch((e) => {
       const failure = notifScheduleFailure(String(e));
+      const refused = failure.kind === "refused";
+      const detail = refused
+        ? [t("settings.notifJobRefusedHint"), failure.detail].filter(Boolean).join(" · ")
+        : failure.detail;
       showToast({
         kind: "error",
-        text:
-          failure.kind === "refused"
-            ? t("settings.notifJobRefused")
-            : t("settings.notifScheduleFailed"),
-        detail: failure.detail || undefined,
+        text: refused ? t("settings.notifJobRefused") : t("settings.notifScheduleFailed"),
+        detail: detail || undefined,
       });
     });
   };

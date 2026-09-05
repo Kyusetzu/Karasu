@@ -1002,7 +1002,7 @@ export const de: typeof en = {
     unfollowedToast: "{{name}} entfolgt",
     followFailed: "Konnte {{name}} nicht folgen",
     followFailedDetail:
-      "Es wurde nichts gesendet. Soziale Änderungen werden offline nicht zwischengespeichert.",
+      "Es wurde nichts gesendet. Folgen und Likes werden offline nicht zwischengespeichert.",
     // Tabs und Listen
     tabOverview: "Übersicht",
     editProfile: "Profil bearbeiten",
@@ -1044,7 +1044,7 @@ export const de: typeof en = {
     unlike: "Gefällt mir nicht mehr",
     likeFailed: "Konnte das Like nicht ändern",
     likeFailedDetail:
-      "Es wurde nichts gesendet. Soziale Änderungen werden offline nicht zwischengespeichert.",
+      "Es wurde nichts gesendet. Folgen und Likes werden offline nicht zwischengespeichert.",
     noReplies: "Noch keine Antworten.",
     repliesFailed: "Antworten konnten nicht geladen werden.",
     replyPlaceholder: "Antworten …",
@@ -1461,8 +1461,8 @@ export const de: typeof en = {
     notifSchedule60: "Stunde",
     notifScheduleCustom: "Eigener Wert …",
     notifScheduleCustomLabel: "Minuten (15–720)",
-    notifJobRefused:
-      "Die Einstellung ist gespeichert, aber Android hat den Hintergrundjob abgelehnt. Karasu versucht es beim nächsten Start erneut.",
+    notifJobRefused: "Der Hintergrundjob konnte nicht eingeplant werden",
+    notifJobRefusedHint: "Die Einstellung ist gespeichert; Karasu versucht es beim nächsten Start erneut",
     notifScheduleFailed: "Der Rhythmus der Benachrichtigungen konnte nicht gespeichert werden",
     queueTitle: "Nicht synchronisierte Änderungen",
     queueHint:
@@ -1564,7 +1564,8 @@ export const de: typeof en = {
     updateAutoHint:
       "Prüft einmal täglich beim Start und benachrichtigt dich bei Funden.",
     updateChannel: "Update-Kanal",
-    updateChannelHint: "Gegen welche Releases Karasu prüft.",
+    updateChannelHint:
+      "Gegen welche Releases Karasu prüft. Nightly wird bei jedem Push auf main neu gebaut.",
     updateChannelPrerelease: "Nightly",
     updateChannelStable: "Stabil",
     language: "Sprache",

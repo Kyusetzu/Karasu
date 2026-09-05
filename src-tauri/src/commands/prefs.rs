@@ -144,16 +144,20 @@ pub fn set_notif_schedule(db: State<'_, Db>, minutes: i64) -> Result<(), String>
     reassert_notif_job(clamped)
 }
 
-/// Cfg'd pair: Android mirrors the setting into its JobScheduler so the
-/// dead-app half fires on the same cadence; everywhere else the in-app pass
-/// reads the kv on its next tick and nothing more is needed.
-/// The stable code the refusal is reported under — `src/lib/notifSchedule.ts`
-/// is the other half, which turns it into the translated toast and keeps the
-/// platform's own reason as the detail line. A sentence here would be shown
-/// verbatim, in English, on a German phone.
+/// The stable code a failed reschedule is reported under —
+/// `src/lib/notifSchedule.ts` is the other half, which turns it into the
+/// translated toast and keeps the platform's own reason as the detail line. A
+/// sentence here would be shown verbatim, in English, on a German phone. It
+/// covers every arm of `assert_schedule`, JobScheduler's refusal and the JNI
+/// plumbing alike: the reason line tells them apart, the headline says only
+/// what is true of all of them — not scheduled, setting kept, retried at the
+/// next start.
 #[cfg(target_os = "android")]
 const NOTIF_JOB_REFUSED: &str = "settings.notifJobRefused";
 
+/// Cfg'd pair: Android mirrors the setting into its JobScheduler so the
+/// dead-app half fires on the same cadence; everywhere else the in-app pass
+/// reads the kv on its next tick and nothing more is needed.
 #[cfg(target_os = "android")]
 fn reassert_notif_job(minutes: i64) -> Result<(), String> {
     crate::background::assert_schedule(minutes).map_err(|e| {

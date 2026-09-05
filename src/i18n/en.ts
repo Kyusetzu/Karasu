@@ -999,7 +999,7 @@ export const en = {
     followedToast: "Following {{name}}",
     unfollowedToast: "Unfollowed {{name}}",
     followFailed: "Couldn't follow {{name}}",
-    followFailedDetail: "Nothing was sent. Social changes are not queued offline.",
+    followFailedDetail: "Nothing was sent. Follows and likes are not queued offline.",
     // Tabs and lists
     tabOverview: "Overview",
     editProfile: "Edit profile",
@@ -1040,7 +1040,7 @@ export const en = {
     like: "Like",
     unlike: "Remove like",
     likeFailed: "Couldn't change that like",
-    likeFailedDetail: "Nothing was sent. Social changes are not queued offline.",
+    likeFailedDetail: "Nothing was sent. Follows and likes are not queued offline.",
     noReplies: "No replies yet.",
     repliesFailed: "Replies could not be loaded.",
     replyPlaceholder: "Reply …",
@@ -1462,8 +1462,8 @@ export const en = {
     notifSchedule60: "Hour",
     notifScheduleCustom: "Custom …",
     notifScheduleCustomLabel: "Minutes (15–720)",
-    notifJobRefused:
-      "The setting is saved, but Android refused the background job. Karasu will retry the next time it starts.",
+    notifJobRefused: "The background job could not be scheduled",
+    notifJobRefusedHint: "The setting is saved; Karasu retries at the next start",
     notifScheduleFailed: "The notification schedule could not be saved",
     queueTitle: "Unsynced edits",
     queueHint:
@@ -1564,7 +1564,8 @@ export const en = {
     updateAuto: "Automatically check for updates",
     updateAutoHint: "Checks once a day on startup and notifies you if found.",
     updateChannel: "Update channel",
-    updateChannelHint: "Which releases Karasu checks against.",
+    updateChannelHint:
+      "Which releases Karasu checks against. Nightly is rebuilt on every push to main.",
     updateChannelPrerelease: "Nightly",
     updateChannelStable: "Stable",
     language: "Language",

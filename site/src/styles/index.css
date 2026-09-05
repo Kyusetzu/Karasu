@@ -1,0 +1,53 @@
+/* The site's stylesheet. Everything that makes it look like Karasu comes from
+   `tokens.generated.css`, which `scripts/sync-tokens.mjs` writes from the
+   app's `src/app/index.css` — the palette, the motion tokens, the keyframes,
+   the panel washes, the reduced-motion and forced-colours rules. Do not edit
+   that file; re-run the sync. What lives here is only what a scrolling web
+   page needs that a desktop window does not.
+
+   Tailwind's source scan is rooted at this project (site/), because the dev
+   server and the build both run from here; the app's own scan excludes
+   `site/` in the other direction. */
+@import "tailwindcss";
+@import "./tokens.generated.css";
+@import "./fonts.css";
+
+@theme {
+  /* The app's body face is the Windows system stack; a website is read on
+     everything, so the stack is widened. SN Pro stays the brand face. */
+  --font-sans:
+    "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Helvetica Neue",
+    Arial, sans-serif;
+  --font-brand: "SN Pro", var(--font-sans);
+  /* Kosugi Maru is not shipped; the katakana in the wordmark is drawn as
+     paths, and any other Japanese falls back to the brand face. */
+  --font-brand-jp: var(--font-brand);
+}
+
+html {
+  /* The sticky nav's height, so an anchor jump lands below it. */
+  scroll-padding-top: 4.5rem;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+body {
+  @apply bg-surface-950 text-ink-100 font-sans antialiased;
+}
+
+/* Text selection follows the accent, as in the app. */
+::selection {
+  background: rgba(var(--accent-rgb), 0.35);
+}
+
+/* Skip link: visible only when focused. */
+.skip-link {
+  @apply sr-only;
+}
+.skip-link:focus-visible {
+  @apply not-sr-only fixed left-4 top-4 z-50 rounded-lg bg-accent-500 px-3 py-2 text-sm font-medium text-accent-ink outline-none;
+}

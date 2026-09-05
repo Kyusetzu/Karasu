@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://kyusetzu.github.io/Karasu/sitemap.xml

@@ -1,0 +1,782 @@
+/* GENERATED from src/app/index.css (sha256 8c5cb5e97c70) by site/scripts/sync-tokens.mjs
+   — do not edit. Re-run `npm run sync` after changing the source; `npm run check`
+   fails while this file is stale. CLAUDE.md, "The website". */
+/* `static` because Tailwind v4 tree-shakes theme variables that no utility
+   references, and the light-theme block below overrides these unconditionally.
+   Without it a token used only via `var()` — or not yet used at all, like the
+   graph outlines — exists in light and is *undefined in dark*, where it
+   silently falls back to the inherited colour. Symmetry between the two blocks
+   matters more here than the few hundred bytes. */
+@theme static {
+  /* 125rem = 2000px, the third-column tier. The second-column tier is the
+     built-in `2xl` (1536px); together they are how a wide screen gets filled,
+     since nothing here is allowed to grow instead.
+
+     Must be rem, not px: Tailwind sorts breakpoints to decide cascade order,
+     and a px value can't be ordered against the built-in rem ones — it lands
+     *before* `sm`, so `sm:grid-cols-4` quietly beat `3xl:grid-cols-6`. Media
+     queries resolve rem against 16px regardless of the root font size, so this
+     stays pinned to 2000px even under an Accessibility text scale. */
+  --breakpoint-3xl: 125rem;
+
+  /* Smaller than text-xs, for notification badges and tag chips. Exists so
+     those stop reaching for arbitrary px values, which don't scale. */
+  --text-2xs: 0.625rem;
+  --text-2xs--line-height: 1.4;
+
+  --color-surface-950: #0b0d12;
+  --color-surface-900: #11141b;
+  --color-surface-850: #161a23;
+  --color-surface-800: #1c212c;
+  --color-surface-700: #262c3a;
+  --color-surface-600: #333b4d;
+
+  /* The bottom two steps were raised to clear 4.5:1 on the *darkest surface
+     they ever sit on*, and the ramp re-spaced upward to keep four distinct
+     steps. The old ink-600 (#5b6474) managed only 3.26:1 on the page and
+     2.92:1 on an elevated panel, and it was spent almost entirely on the 10px
+     and 11px labels — the text that could least afford it. Verified:
+     ink-600 is 5.45:1 on surface-950 and 4.88:1 on surface-850. */
+  --color-ink-100: #eef1f6;
+  --color-ink-300: #c3cbd9;
+  --color-ink-500: #98a1b2;
+  --color-ink-600: #7f8899;
+
+  /* Score stars only. */
+  --color-gold: #fcd34d;
+  /* Destructive actions, failure states. */
+  --color-danger: #f0787f;
+  /* "Mark complete" — only ever a glyph on the scrim over cover art. */
+  --color-success: #6ee7b7;
+  /* Franchise-graph node outlines that aren't status- or accent-driven. */
+  --color-graph-completed: #5ec98a;
+  --color-graph-none: #3a3f4d;
+
+  /* List-status colours. Overwritten at runtime by `stores/theme` from the
+     user's palette — these are the same defaults `lib/statusColors` ships, and
+     they exist here so a cover ring paints correctly on the very first frame,
+     before the store's `init()` has written anything. */
+  --color-status-current: #3fb950;
+  --color-status-repeating: #1a7f37;
+  --color-status-completed: #4b8dd6;
+  --color-status-paused: #d9a13b;
+  --color-status-dropped: #d1495b;
+  --color-status-planning: #6b7280;
+
+  --color-accent-400: #8b9dff;
+  --color-accent-500: #6c7fff;
+  --color-accent-600: #5563e8;
+  /* Readable text on accent-filled controls; recomputed at runtime per accent. */
+  --color-accent-ink: #ffffff;
+
+  /* Corvids are quick and precise, and that still governs *surface* motion:
+     hover, focus, background and border changes get one short duration and one
+     sharp curve. Overriding Tailwind's defaults means every plain
+     `transition-*` utility already lands on it, and that is the default a new
+     component should reach for.
+
+     What changed: this used to forbid springs and overshoot outright, which
+     left the app with no vocabulary for the handful of moments that are worth
+     noticing — a dialog arriving, a progress counter ticking up, a scrobble
+     landing. Those are *feature* motion, they are rare, and a little weight
+     there reads as craft rather than noise. The expressive tokens below exist
+     for exactly those; everything else stays on `--ease-karasu`.
+
+     Rule of thumb: if it happens on hover or on every keystroke, it is a
+     surface. If it happens because something in the user's library changed, it
+     may be a feature. */
+  --default-transition-duration: 140ms;
+  --default-transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+  --ease-karasu: cubic-bezier(0.2, 0, 0, 1);
+
+  /* Overshoots slightly past its target and settles back — the wingbeat, not a
+     bounce. Only for things that *arrive*: never for anything leaving, which
+     should read as decisive. */
+  --ease-spring: cubic-bezier(0.34, 1.42, 0.64, 1);
+  /* Long decelerating tail, no overshoot: for motion the eye follows rather
+     than merely notices — a hero settling, a chart drawing itself. */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  /* Leaving is the mirror of arriving and should be quicker than it: a dialog
+     that lingers on the way out feels unresponsive. */
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+
+  /* Two expressive durations, so feature motion does not each pick its own. */
+  --duration-expressive: 280ms;
+  --duration-exit: 120ms;
+
+  /* A bird landing on a branch — down from above, no bounce. On every screen
+     root, and on the palette, the bell and the graph rail.
+     These consume the ease tokens above rather than retyping the curves, so
+     retuning a token retunes every animation built on it. */
+  --animate-settle: settle 150ms var(--ease-karasu);
+  /* Things that arrive from the bottom edge: toasts, the bulk bar. */
+  --animate-rise-in: riseIn 160ms var(--ease-karasu);
+  --animate-pop-in: popIn 120ms var(--ease-karasu);
+  --animate-fade-in: fadeIn 120ms linear;
+  /* The progress counter acknowledging a +1. */
+  --animate-tick: tick 180ms var(--ease-karasu);
+  /* The titlebar detection dot: the app quietly proving it is watching. */
+  --animate-blip: blip 2.4s ease-in-out infinite;
+  /* `steps(1)` so a caret blinks rather than fades. Deliberately unused: it was
+     written for the command palette, which turned out to use a real `<input>`
+     and therefore has the platform's own caret already. Kept because the shape
+     is right for any custom text affordance that does need one — but don't wire
+     it to something merely to give it a consumer. */
+  --animate-breathe: breathe 1.2s steps(1) infinite;
+  --animate-shimmer: shimmer 1.5s linear infinite;
+
+  /* --- Feature motion ----------------------------------------------------
+     Entries that are meant to be noticed, and the exits that match them.
+     Every overlay in the app now leaves through one of these rather than
+     vanishing mid-frame; `usePresence` is what keeps the node alive long
+     enough for that to be visible. */
+  --animate-settle-out: settleOut var(--duration-exit) var(--ease-exit) forwards;
+  --animate-rise-out: riseOut var(--duration-exit) var(--ease-exit) forwards;
+  --animate-pop-out: popOut var(--duration-exit) var(--ease-exit) forwards;
+  --animate-fade-out: fadeOut var(--duration-exit) linear forwards;
+  /* The dialog arrival: scales up past 1 and settles. */
+  --animate-spring-in: springIn var(--duration-expressive) var(--ease-spring);
+  /* A success landing — the scrobble confirmation. */
+  --animate-land: land 420ms var(--ease-out-expo);
+
+  /* --- Idle motion -------------------------------------------------------
+     Ambient rather than attention-seeking: long periods, small amplitudes,
+     and only on surfaces where the app is genuinely doing or holding
+     something. The test for one of these is that it should be invisible
+     while you are reading the screen and only apparent when you look at it
+     directly — anything you can notice out of the corner of your eye while
+     working is a distraction, not atmosphere. Three consumers is the budget;
+     a screen where several things breathe at once reads as unstable. */
+
+  /* A live surface: the accent breathing around Now Playing while an episode
+     is actually running. Paired with the titlebar dot's `blip`, which is the
+     same idea at the other end of the window. */
+  --animate-idle-glow: idleGlow 4.5s ease-in-out infinite;
+  /* The perched bird settling — two pixels, six seconds. */
+  --animate-idle-float: idleFloat 6s ease-in-out infinite;
+  /* Something waiting to be read. */
+  --animate-idle-pulse: idlePulse 2.8s ease-in-out infinite;
+
+  --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  /* Brand wordmark typography, matching the logo (design/Logo - Karasu Full Art.svg) */
+  --font-brand: "SN Pro", var(--font-sans);
+  --font-brand-jp: "Kosugi Maru", var(--font-brand);
+}
+
+/* Declared at the top level rather than inside `@theme`, so they are emitted
+   whether or not a utility referencing them has been written yet. */
+@keyframes settle {
+  from {
+    opacity: 0;
+    transform: translateY(-0.5rem);
+  }
+}
+
+@keyframes riseIn {
+  from {
+    opacity: 0;
+    transform: translateY(0.75rem);
+  }
+}
+
+@keyframes popIn {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes tick {
+  50% {
+    transform: scale(1.14);
+  }
+}
+
+@keyframes blip {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@keyframes breathe {
+  50% {
+    opacity: 0;
+  }
+}
+
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/* The chevron wipe — see `@utility loader-sweep` below. The overshoot inset
+   is exactly one 1em cell, matching the original's -30px over 30px cells, so
+   `steps(7)` lands each step on a cell boundary. */
+@keyframes loaderSweep {
+  100% {
+    clip-path: inset(0 -1em 0 0);
+  }
+}
+
+/* Exits. `forwards` on each animation above holds the end state, so the node
+   stays invisible for the frame between the animation finishing and React
+   unmounting it — without that it flashes back to full opacity. */
+@keyframes settleOut {
+  to {
+    opacity: 0;
+    transform: translateY(-0.375rem);
+  }
+}
+
+@keyframes riseOut {
+  to {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+}
+
+@keyframes popOut {
+  to {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+@keyframes fadeOut {
+  to {
+    opacity: 0;
+  }
+}
+
+/* Arrives past its size and settles — paired with `--ease-spring`, which is
+   what supplies the overshoot; the keyframes only say where it starts. */
+@keyframes springIn {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateY(0.5rem);
+  }
+}
+
+/* Something completing: a short drop onto its mark. */
+@keyframes land {
+  0% {
+    opacity: 0;
+    transform: translateY(-0.5rem) scale(0.9);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(0) scale(1.06);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Idle loops. Every one of these is a `box-shadow`/`opacity`/`transform`
+   animation and therefore already collapses under the reduce-motion rules at
+   the bottom of this file — none of them needs a JS guard. */
+/* Inset, not an outer glow. Its one consumer is an overlay inside Now
+   Playing, which is `overflow-hidden` — an outward shadow would be clipped at
+   the card edge and never seen. Inset also suits the surface it sits on: the
+   card is cut *into* the page, so what warms is the inside of the well. */
+@keyframes idleGlow {
+  0%,
+  100% {
+    box-shadow:
+      inset 0 0 0 1px rgba(var(--accent-rgb), 0.07),
+      inset 0 0 1.5rem -0.75rem rgba(var(--accent-rgb), 0.2);
+  }
+  50% {
+    box-shadow:
+      inset 0 0 0 1px rgba(var(--accent-rgb), 0.17),
+      inset 0 0 2rem -0.5rem rgba(var(--accent-rgb), 0.4);
+  }
+}
+
+@keyframes idleFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-0.125rem);
+  }
+}
+
+@keyframes idlePulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.75;
+    transform: scale(1.09);
+  }
+}
+
+/* A line drawing itself. The length differs per series, so it arrives as
+   `--draw-length` on the element rather than being baked in here. */
+@keyframes drawLine {
+  from {
+    stroke-dashoffset: var(--draw-length);
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Chart shapes arriving: grows from its own centre, which for a treemap tile
+   or a radar dot is the honest direction. `transform-box: fill-box` is what
+   makes `transform-origin: center` mean the shape's own box rather than the
+   SVG's origin — without it every tile flies in from the top-left corner. */
+@keyframes chartIn {
+  from {
+    opacity: 0;
+    transform: scale(0.86);
+  }
+}
+
+@utility chart-in {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: chartIn 320ms var(--ease-out-expo) backwards;
+}
+
+/* The one skeleton fill: a light sweep travelling across the placeholder
+   rather than the whole block pulsing. A pulse says "this is busy"; a sweep
+   says "this is a shape that will be filled", which is what a skeleton is for.
+   The 100deg angle keeps the highlight off the vertical, so a column of cells
+   reads as one surface being lit rather than each blinking on its own. */
+@utility shimmer-fill {
+  background-image: linear-gradient(
+    100deg,
+    var(--color-surface-800) 8%,
+    var(--color-surface-700) 20%,
+    var(--color-surface-800) 34%
+  );
+  background-size: 200% 100%;
+  animation: var(--animate-shimmer);
+}
+
+/* The chevron loader (`ui/loader.tsx`): one currentColor chevron, the
+   drop-shadow chain stamping it across a row, and a stepped clip-path wipe
+   revealing them left to right. Everything is in em so one class scales from
+   a popover to a page — the caller's font-size is the cell size, and the
+   caller's text colour is the ink (set *on* the element, deliberately:
+   WebKitGTK has resolved inherited currentColor inside filter lists stalely).
+
+   `forwards` is load-bearing under reduced motion: the global collapse below
+   forces one 0.01ms iteration, and without a fill the element would snap
+   back to its fully-clipped base — an invisible loading state. With it the
+   forced single iteration holds the final, fully revealed frame. While the
+   animation is `infinite` the fill never applies, so normal playback is
+   untouched. */
+@utility loader-sweep {
+  width: 6em;
+  height: 1.667em;
+  display: flex;
+  filter: drop-shadow(1em 0.833em 0 currentColor) drop-shadow(2em 0 0 currentColor)
+    drop-shadow(4em 0 0 currentColor);
+  clip-path: inset(0 100% 0 0);
+  animation: loaderSweep 2s infinite steps(7) forwards;
+  /* Layer promotion, so Chromium can composite the clip-path steps and the
+     loader keeps sweeping while the main thread is busy — a loader is
+     exactly the element on screen during long tasks, and a frozen one
+     reads as a static image. Where unsupported this is a harmless extra
+     layer; the reduced-motion collapse above is untouched by it. */
+  will-change: clip-path;
+
+  &::before {
+    content: "";
+    width: 1em;
+    height: 0.833em;
+    background: currentColor;
+    clip-path: polygon(
+      0 50%,
+      30% 40%,
+      100% 0,
+      60% 40%,
+      100% 50%,
+      60% 60%,
+      100% 100%,
+      30% 60%
+    );
+  }
+}
+
+/* RGB triplets, for `rgba(var(--scrim), α)` in banner and cover gradients.
+   A triplet rather than a colour because the alpha varies per stop, and it has
+   to invert: hardcoded dark rgba stops left a dark smear across the light
+   theme. Not in `@theme` — Tailwind's colour utilities can't consume a bare
+   triplet, and nothing should try. */
+:root {
+  --scrim: 11, 13, 18;
+
+  /* Derived from the accent by `stores/theme.ts` and written to this element's
+     inline style, which wins over these. They exist so the wash is still valid
+     CSS on the frame before that runs — `rgba(var(--w1), .07)` with `--w1`
+     undefined is an invalid declaration, and the gradient silently disappears.
+     Values are the default accent's (#4b3fc7). */
+  --accent-rgb: 75, 63, 199;
+  --w1: 63, 114, 199;
+  --w2: 179, 63, 199;
+  --hair: rgba(63, 114, 199, 0.11);
+
+  /* The 1px edge along the top of a raised panel. A white catch-light is how a
+     dark surface reads as lit from above — on a white panel it is invisible,
+     so light theme inverts it to a faint shadow line instead. */
+  --catch-light: rgba(255, 255, 255, 0.09);
+
+  /* The shadow cast *into* an inset well. Black at .55 is right against a
+     near-black page and is a bruise on a white one, so it is a token. */
+  --well-shadow: rgba(0, 0, 0, 0.55);
+}
+
+/* Light theme: override the surface/ink tokens; accent is set at runtime. */
+:root[data-theme="light"] {
+  --color-surface-950: #f4f6f9;
+  --color-surface-900: #ffffff;
+  --color-surface-850: #eef1f5;
+  --color-surface-800: #e4e8ee;
+  --color-surface-700: #d2d8e2;
+  --color-surface-600: #b6bece;
+
+  --color-ink-100: #1a1e27;
+  --color-ink-300: #333b48;
+  --color-ink-500: #464e5d;
+  --color-ink-600: #5f6879;
+
+  /* Gold, danger and success all need a light counterpart for the same reason
+     the inks do — they are used as *text*, and the dark values are tuned for a
+     near-black page. The handoff supplies one for gold but not for the other
+     two, which measure 2.73:1 (danger) and 1.52:1 (success) on white. These
+     are the same hues pulled down to 6.58:1 and 5.34:1. `#b3232c` is already
+     in the design language as the close-button hover. */
+  --color-gold: #8a6207;
+  --color-danger: #b3232c;
+  --color-success: #0d7a54;
+
+  /* The graph outlines invert for the same reason. `#5ec98a` is a 2px line at
+     1.9:1 on the light panel — indistinguishable from the muted grey it is
+     supposed to contrast with — and `#3a3f4d` stops reading as "muted" and
+     becomes the heaviest line on the screen. "Completed" lands on the audited
+     light green; "not on list" sits a step under `s600`, which is where the
+     handoff puts muted graph nodes. */
+  --color-graph-completed: #0d7a54;
+  --color-graph-none: #aab2c2;
+
+  --scrim: 244, 246, 249;
+  --catch-light: rgba(11, 13, 18, 0.07);
+  --well-shadow: rgba(11, 13, 18, 0.14);
+
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+/* The cover grid shared by the list, search and seasonal pages. One
+   definition rather than three copies that could drift apart.
+
+   `--cover-cols` is the covers-per-row setting, written to the root by the
+   theme store; equal flexible tracks mean the covers scale to share the
+   width exactly — no dead strip, and the third device round's finding that
+   fixed-size tracks could not tell "medium" from "large" on a phone cannot
+   recur, because the setting *is* the column count now. This replaced two
+   earlier shapes: fixed `--cover-track` tracks (auto-fill), and an unlayered
+   phone override of them whose cascade trap is documented above the selects
+   rule — one rule again, no override, nothing to outrank.
+
+   The fallback is load-bearing. `repeat(var(--cover-cols))` with the
+   variable unset is an invalid declaration — `grid-template-columns` then
+   computes to `none` and the grid silently collapses. It only shows for the
+   frames before the store's `init()` runs. */
+@utility media-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--cover-cols, 8), minmax(0, 1fr));
+}
+
+/* The iridescent wash. Two companion sheens rotated off the accent's own hue,
+   so overlapping panels read like feathers rather than stacked grey cards —
+   and so an indigo accent throws violet while a straw one throws warm amber.
+   Composes over a background colour: `class="bg-surface-900 panel-wash"`. */
+@utility panel-wash {
+  background-image: linear-gradient(
+    140deg,
+    rgba(var(--w1), 0.07),
+    rgba(var(--w2), 0.03) 60%,
+    transparent
+  );
+}
+
+/* The sidebar's own wash: one hue, shallower and steeper than `panel-wash`.
+   A tall narrow column crossed by that two-hue 140deg gradient reads as a
+   diagonal stripe; at 160deg over the top 42% it reads as light falling in. */
+@utility rail-wash {
+  background-image: linear-gradient(
+    160deg,
+    rgba(var(--w1), 0.05),
+    transparent 42%
+  );
+}
+
+/* The gradient at the foot of every cover. Cover art is arbitrary — it can be
+   white, busy, or bright — so anything sitting over the bottom of one needs a
+   deterministic backdrop rather than a hopeful `bg-black/40`. Near-opaque at
+   the base, gone by the top of its own 3.5rem. */
+@utility cover-scrim {
+  background-image: linear-gradient(to top, rgba(4, 5, 8, 0.92), transparent);
+}
+
+/* The rule trailing a section heading. Fading it out rather than running it
+   edge to edge is what keeps seven stacked sections from reading as a form. */
+@utility section-rule {
+  flex: 1;
+  height: 1px;
+  background-image: linear-gradient(
+    90deg,
+    var(--color-surface-800),
+    transparent
+  );
+}
+
+/* The account avatar, when there is no picture to show. Strong enough that a
+   bare initial still reads as a deliberate object rather than a grey blob. */
+@utility avatar-wash {
+  background-image: linear-gradient(
+    140deg,
+    rgba(var(--w1), 0.35),
+    transparent 65%
+  );
+}
+
+/* The 1px catch-light along the top of a raised card. A pseudo-element rather
+   than a second gradient layer, so it can sit on a panel that already has the
+   wash without either fighting for `background-image`. */
+@utility panel-top {
+  position: relative;
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset-inline: 0;
+    top: 0;
+    height: 1px;
+    pointer-events: none;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      var(--catch-light),
+      transparent
+    );
+  }
+}
+
+/* Hairline borders, tinted with the cooler sheen rather than a flat grey. */
+@utility border-hair {
+  border-color: var(--hair);
+}
+
+/* The opposite of a raised panel: cut *into* the page rather than sitting on
+   it. Used by the now-playing card and the bulk bar, both of which appear
+   unprompted over content that is already there — reading as a different
+   substance is how they announce themselves without shouting. */
+@utility inset-well {
+  background-color: var(--color-surface-950);
+  box-shadow:
+    inset 0 0.125rem 0.375rem var(--well-shadow),
+    inset 0 0 0 1px var(--catch-light);
+}
+
+/* The vertical accent stripe down the left edge of an inset well. It marks the
+   slab as *this app's* rather than a generic panel, and fading at both ends
+   keeps it from reading as a border. */
+@utility well-edge {
+  &::before {
+    content: "";
+    position: absolute;
+    inset-block: 0;
+    left: 0;
+    width: 0.125rem;
+    pointer-events: none;
+    background: linear-gradient(
+      180deg,
+      transparent,
+      var(--color-accent-500),
+      transparent
+    );
+  }
+}
+
+/* Transitions only what the theme actually swaps. Prefer this over
+   `transition-colors`, which also animates `color` — see above. */
+@utility transition-surface {
+  transition-property: background-color, border-color, box-shadow, opacity;
+  transition-duration: var(--default-transition-duration);
+  transition-timing-function: var(--default-transition-timing-function);
+}
+
+/* Honour the OS setting, and the Settings toggle that mirrors it. Durations go
+   to a hair above zero rather than to `none`, so anything waiting on a
+   `transitionend` still gets one.
+
+   The *delays* have to go too, and used to be left alone. A staggered reveal
+   sets `animation-delay` per element (up to a few hundred ms); zeroing only the
+   duration turns that into a staggered *wait* — the content appears one piece
+   at a time exactly as before, just instantly each time, which is a worse
+   experience than the animation for the person who asked for less motion.
+   Same for `transition-delay`.
+
+   This covers CSS only. Anything driven from JS — a view transition, a
+   scroll-linked effect, a WAAPI call — is invisible to these rules and has to
+   read `useTheme(s => s.reduceMotion)` itself. `prefersReducedMotion()` in
+   `lib/motion.ts` is the shared answer. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+html[data-reduce-motion] *,
+html[data-reduce-motion] *::before,
+html[data-reduce-motion] *::after {
+  animation-duration: 0.01ms !important;
+  animation-delay: 0ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  transition-delay: 0ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* Windows High Contrast, which is the accessibility mode this app is most
+   likely to meet: WebView2 honours it, and it replaces every colour the theme
+   picked with the user's own palette. That is the point of it — the trouble is
+   that Karasu draws a lot of meaning in colour *alone*.
+
+   Three things break without this. The focus ring is a coloured outline, and a
+   forced palette flattens it into the border beside it. Every accent-filled
+   control loses the accent, so a primary button and a secondary one become the
+   same shape. And the charts are SVG fills, which are left as they are on
+   purpose: a bar chart repainted in system colours is unreadable, and
+   `forced-color-adjust: none` is the standard way to say "this element's
+   colours carry information".
+
+   `Highlight`/`ButtonText` are system colour keywords — the user's, whatever
+   they chose — not our tokens. */
+@media (forced-colors: active) {
+  /* The ring, in a colour the mode guarantees is distinct from everything
+     else, and thick enough to survive a border it might land on. */
+  *:focus-visible {
+    outline: 3px solid Highlight;
+    outline-offset: 2px;
+  }
+  /* A filled control keeps its edge when its fill is taken away. */
+  button,
+  [role="button"],
+  a {
+    forced-color-adjust: auto;
+  }
+  /* Anything whose colour *is* the data keeps ours. The charts are drawn by
+     hand in SVG, so they are addressable as a group.
+
+     `forced-color-adjust` INHERITS, which is the trap here: putting it on a
+     panel would freeze that panel's *text* at the dark theme's ink as well, and
+     a forced light palette then renders near-white labels on white. So the
+     opt-out goes on the painted elements themselves — the swatches, the bars,
+     the heatmap cells — and never on a container that also holds words. The
+     SVG charts are the exception that proves it: they contain no text. */
+  svg[data-chart],
+  [data-keep-colors] {
+    forced-color-adjust: none;
+  }
+  /* A dialog floats over a page it no longer visually separates from, because
+     the scrim stops being a colour. Addressed by role rather than by
+     `[data-overlay] > *`: that attribute also sits on the bell panel, the
+     context menu and the filter popovers, which put it on the panel itself —
+     so the child selector drew a box around every row inside them. */
+  [role="dialog"],
+  [role="alertdialog"] {
+    border: 1px solid ButtonText;
+  }
+}
+
+/* `prefers-contrast: more` is the softer request, and it gets the softer
+   answer: keep the palette, sharpen the edges the design deliberately keeps
+   quiet. `--hair` is the line every panel and row is separated by, at 11%
+   opacity — legible on a good monitor, invisible on a bad one. */
+@media (prefers-contrast: more) {
+  :root {
+    --hair: rgba(63, 114, 199, 0.34);
+  }
+  *:focus-visible {
+    outline-width: 3px;
+  }
+}
+
+/* Scrollbars */
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--color-surface-700);
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--color-surface-600);
+  background-clip: content-box;
+  border: 2px solid transparent;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* The default accent (#4b3fc7, src/stores/theme.ts) as the theme store
+   writes it at runtime — computed through src/lib/contrast.ts at sync time,
+   never typed by hand. The @theme fallbacks above are not these colours. */
+:root {
+  --color-accent-400: #8077d7;
+  --color-accent-500: #4b3fc7;
+  --color-accent-600: #3f35a7;
+  --color-accent-ink: #eef1f6;
+  --accent-rgb: 75, 63, 199;
+  --w1: 63, 114, 199;
+  --w2: 179, 63, 199;
+  --hair: rgba(63, 114, 199, 0.11);
+}
+
+:root[data-theme="light"] {
+  --color-accent-400: #3c329f;
+  --color-accent-500: #4b3fc7;
+  --color-accent-600: #3f35a7;
+  --color-accent-ink: #eef1f6;
+  --accent-rgb: 75, 63, 199;
+  --w1: 63, 114, 199;
+  --w2: 179, 63, 199;
+  --hair: rgba(63, 114, 199, 0.16);
+}

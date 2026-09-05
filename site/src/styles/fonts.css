@@ -1,0 +1,28 @@
+/* SN Pro, the brand face — the only web font the site ships. Three weights
+   from @fontsource/sn-pro (SIL Open Font License 1.1, text in
+   public/fonts/OFL.txt), latin subset only, ~19 kB each. The app's Japanese
+   face (Kosugi Maru, 1.44 MB) stays out on purpose: the only Japanese here is
+   the katakana in the wordmark, which is drawn as paths. */
+@font-face {
+  font-family: "SN Pro";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/sn-pro-latin-400-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "SN Pro";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/sn-pro-latin-600-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "SN Pro";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/sn-pro-latin-700-normal.woff2") format("woff2");
+}

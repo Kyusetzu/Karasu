@@ -1,0 +1,40 @@
+{
+  "name": "karasu-site",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "The official Karasu website, served from GitHub Pages at kyusetzu.github.io/Karasu",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite",
+    "check": "tsc --noEmit && node scripts/sync-tokens.mjs --check",
+    "sync": "node scripts/sync-tokens.mjs",
+    "build": "vite build --outDir dist/client && vite build --ssr src/entry-server.tsx --outDir dist/server && node scripts/prerender.mjs && node scripts/verify-dist.mjs",
+    "preview": "vite preview --outDir dist/client",
+    "release-info": "node scripts/release-info.mjs",
+    "lighthouse": "node scripts/lighthouse.mjs"
+  },
+  "dependencies": {
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.41.0",
+    "motion": "^13.2.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "tailwind-merge": "^3.6.0"
+  },
+  "devDependencies": {
+    "@fontsource/sn-pro": "^5.3.0",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "@vitejs/plugin-react": "^6.1.1",
+    "lighthouse": "^13.4.1",
+    "opentype.js": "^2.0.0",
+    "playwright-core": "^1.63.0",
+    "sharp": "^0.35.4",
+    "tailwindcss": "^4.3.3",
+    "typescript": "~7.0.2",
+    "vite": "^8.2.2"
+  }
+}

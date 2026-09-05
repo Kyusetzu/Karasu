@@ -1,0 +1,14 @@
+{
+  "tag": "v1.0.0",
+  "version": "1.0.0",
+  "commit": 563,
+  "publishedAt": "2026-09-05",
+  "url": "https://github.com/Kyusetzu/Karasu/releases/tag/v1.0.0",
+  "assets": {
+    "windows": "https://github.com/Kyusetzu/Karasu/releases/download/v1.0.0/Karasu_1.0.0.563_x64-setup.exe",
+    "linux": "https://github.com/Kyusetzu/Karasu/releases/download/v1.0.0/Karasu_1.0.0.563_amd64.AppImage",
+    "androidArm64": "https://github.com/Kyusetzu/Karasu/releases/download/v1.0.0/Karasu_1.0.0.563_arm64.apk",
+    "androidUniversal": "https://github.com/Kyusetzu/Karasu/releases/download/v1.0.0/Karasu_1.0.0.563_universal.apk",
+    "sums": "https://github.com/Kyusetzu/Karasu/releases/download/v1.0.0/SHA256SUMS.txt"
+  }
+}

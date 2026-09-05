@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense, useEffect, useRef } from "react";
 import { Link, Routes, Route, useLocation, useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
@@ -101,6 +101,17 @@ export default function App() {
   // phone, for a shared link and a tapped one alike. `getCurrent` hands that
   // first link back, once. The same URL reaching both within a moment routes
   // once; the same link tapped again later still routes, on purpose.
+  //
+  // Once per mount, and `navigate` through a ref rather than a dependency.
+  // `App` sits outside any `<Route>`, so react-router hands it a fresh
+  // `navigate` on every pathname change; keyed on it, this effect re-ran on
+  // each in-app navigation and asked `getCurrent` again — and the plugin
+  // keeps the launch URL for the life of the process, so every tap on the
+  // bottom bar was answered by a jump back to the deep-linked page. Measured
+  // on the phone on 2026-09-05: the Anime tab opened the list before a link
+  // had arrived and did nothing after one.
+  const navigateRef = useRef(navigate);
+  navigateRef.current = navigate;
   useEffect(() => {
     if (!isTauri) return;
     let last: { url: string; at: number } | null = null;
@@ -109,7 +120,7 @@ export default function App() {
       if (last && last.url === url && Date.now() - last.at < 2000) return;
       last = { url, at: Date.now() };
       const to = urls.map(internalRoute).find((r) => r !== null);
-      if (to) navigate(to);
+      if (to) navigateRef.current(to);
     };
     const un = onOpenUrl(route);
     getCurrent()
@@ -120,7 +131,7 @@ export default function App() {
     return () => {
       void un.then((f) => f());
     };
-  }, [navigate]);
+  }, []);
 
   // Paint the list from SQLite as soon as the viewer is known, rather than
   // waiting out a full AniList round trip on every launch.

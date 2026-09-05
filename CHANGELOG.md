@@ -70,7 +70,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 9791c55 -->
+<!-- generated-through: cd32891 -->
 
 ### Fixed
 
@@ -292,3 +292,4 @@ tag time is then optional rather than load-bearing.
   thing the website cannot do while Karasu sits in the tray — and leaves the bell
   row to the AniList tab, where it opens the entry. Turn AniList's off and Karasu
   writes that row itself, as before. Both settings say so, on both screens.
+- The Social tab is now called Activities.

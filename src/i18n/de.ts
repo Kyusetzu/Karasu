@@ -18,7 +18,7 @@ export const de: typeof en = {
     search: "Suche",
     seasonal: "Saison",
     calendar: "Kalender",
-    social: "Sozial",
+    social: "Aktivitäten",
     forum: "Forum",
     stats: "Statistik",
     wrapped: "Wrapped",

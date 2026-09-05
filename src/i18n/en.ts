@@ -20,7 +20,7 @@ export const en = {
     search: "Search",
     seasonal: "Seasonal",
     calendar: "Calendar",
-    social: "Social",
+    social: "Activities",
     forum: "Forum",
     stats: "Statistics",
     wrapped: "Wrapped",

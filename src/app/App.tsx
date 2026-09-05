@@ -345,7 +345,7 @@ const PAGE_LABELS: Record<string, string> = {
   "/search": "Search",
   "/seasonal": "Seasonal",
   "/calendar": "Calendar",
-  "/social": "Social",
+  "/social": "Activities",
   "/forum": "Forum",
   "/stats": "Statistics",
   "/library": "Local library",

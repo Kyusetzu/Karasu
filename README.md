@@ -144,7 +144,7 @@ Because a local app can do things anilist.co simply can't:
   stories, cross-medium sources/adaptations), each node coloured by your status,
   pan and zoom, any branch foldable, double-click to open a title
 
-**Social**
+**Activities**
 - **Profiles** — yours and anyone's: bio, banner, favourites, statistics and
   their lists, with follow/unfollow, a follower browser, and a forum tab that
   opens on their comment history

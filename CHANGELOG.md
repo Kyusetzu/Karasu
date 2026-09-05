@@ -70,7 +70,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: bfc21da -->
+<!-- generated-through: c44a17a -->
 
 ### Fixed
 
@@ -292,3 +292,4 @@ tag time is then optional rather than load-bearing.
   row to the AniList tab, where it opens the entry. Turn AniList's off and Karasu
   writes that row itself, as before. Both settings say so, on both screens.
 - The Social tab is now called Activities.
+- New installs follow the Stable update channel; the per-commit build is the Nightly channel, and every install that was on it stays there.

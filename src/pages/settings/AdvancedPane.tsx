@@ -864,10 +864,10 @@ export function UpdatesSection() {
               }}
               className={SELECT}
             >
+              <option value="stable">{t("settings.updateChannelStable")}</option>
               <option value="prerelease">
                 {t("settings.updateChannelPrerelease")}
               </option>
-              <option value="stable">{t("settings.updateChannelStable")}</option>
             </select>
           </Row>
         )}

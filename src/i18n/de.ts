@@ -1565,7 +1565,7 @@ export const de: typeof en = {
       "Prüft einmal täglich beim Start und benachrichtigt dich bei Funden.",
     updateChannel: "Update-Kanal",
     updateChannelHint: "Gegen welche Releases Karasu prüft.",
-    updateChannelPrerelease: "Rolling (neuester Build)",
+    updateChannelPrerelease: "Nightly",
     updateChannelStable: "Stabil",
     language: "Sprache",
     languageHint: "„System“ folgt der Anzeigesprache deines Systems.",

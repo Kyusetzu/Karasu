@@ -292,7 +292,7 @@ of AniList's own list fields, it costs nothing to carry, and the local list has
 stored it since schema v7. The rejected idea is tracking **purchases**, which
 would need price data the app has no source for.
 
-The schema is at **v18**. `library_match` (v8) holds the scanner's per-title
+The schema is at **v19**. `library_match` (v8) holds the scanner's per-title
 match confidence, which is what the local library's `exact` / `close` column
 reads. v9 adds `library_override` — the user's corrections, keyed on the parsed
 `(title, season)` with `season = -1` for a release name that carried none, and
@@ -360,6 +360,14 @@ v18 adds a nullable `user_id` to `notifications`, backfilled from the cached
 viewer, and leaves `kind = 'update'` rows unowned on purpose: the update
 notice is the app's, not an account's, so it survives a sign-out while every
 row an account was told goes with that account (`notif_clear_owned`).
+
+v19 seeds `update_channel = prerelease` for a database that predates it, so
+the Stable default that came with v1.0.0 applies to new installs only and
+nobody on the rolling build was moved without choosing. Which population a
+file belongs to is decided in `open` by the pre-migration `user_version` (0
+means created just now), **not** by whether `kv` is empty — v17 has already
+written a row by the time v19 runs on a fresh install, so v17's own test would
+call every new install an old one.
 
 **AniList has two name spaces for a custom list, and only one is writable.**
 `MediaListCollection.lists[].name` is a *display* value: it upper-cases the

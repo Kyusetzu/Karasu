@@ -1565,7 +1565,7 @@ export const en = {
     updateAutoHint: "Checks once a day on startup and notifies you if found.",
     updateChannel: "Update channel",
     updateChannelHint: "Which releases Karasu checks against.",
-    updateChannelPrerelease: "Rolling (latest build)",
+    updateChannelPrerelease: "Nightly",
     updateChannelStable: "Stable",
     language: "Language",
     languageHint: "“System” follows your system display language.",

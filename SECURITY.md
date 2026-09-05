@@ -129,11 +129,11 @@ key will not verify against yours and vice versa.
 
 ## Supported versions
 
-Karasu ships as a single rolling `latest` prerelease — there's no separate
-LTS/stable branch to track yet. The release workflow can also publish tagged
-`v*` releases, but that is machinery rather than a channel until the first tag
-lands; rolling `latest` remains the only published channel. Please report
-issues against the current `latest` release.
+Karasu publishes two channels: tagged `v*` releases (the **Stable** channel,
+which the updater follows by default) and the rolling `latest` prerelease
+(the **Nightly** channel), rebuilt on every push to `main`. Only the newest
+tagged release is supported; please report issues against it, or against the
+current `latest` build if you are on Nightly. There is no LTS branch.
 
 ## Dependency advisories
 

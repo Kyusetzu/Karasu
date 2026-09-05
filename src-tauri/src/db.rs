@@ -389,6 +389,30 @@ UPDATE notifications
 PRAGMA user_version = 18;
 ";
 
+/// Schema v19: an install that predates the Stable channel stays on Nightly.
+///
+/// v1.0.0 is the first tagged release, and with it the default update channel
+/// flips from the per-commit `latest` prerelease to `stable` — someone who
+/// downloads "Karasu 1.0.0" should not be offered a nightly the next morning.
+/// Every install that exists *before* that flip was on the rolling build,
+/// most by default rather than by choice, and moving them to Stable would
+/// silently stall them on 1.0.0. So this seeds their absent choice as the one
+/// they were living with — and only theirs. Which population a database
+/// belongs to is decided in `open`, by the version the file arrived with: a
+/// fresh database reads 0 there and takes only the stamp. The SQL cannot tell
+/// on its own, because by the time v19 runs on a fresh install v17 has
+/// already put a row in `kv`, so v17's "is kv empty" test would call every
+/// new install an old one.
+const MIGRATION_V19: &str = "
+INSERT INTO kv (key, value)
+SELECT 'update_channel', 'prerelease'
+WHERE NOT EXISTS (SELECT 1 FROM kv WHERE key = 'update_channel');
+PRAGMA user_version = 19;
+";
+
+/// v19 for a database that did not exist before it: nothing to preserve.
+const MIGRATION_V19_FRESH: &str = "PRAGMA user_version = 19;";
+
 /// One detection correction: what was detected, and what it really is.
 ///
 /// A struct rather than the tuple this started as, because the row grew a
@@ -654,6 +678,15 @@ impl Db {
                 apply(&conn, 18, "PRAGMA user_version = 18;")?;
             } else {
                 apply(&conn, 18, MIGRATION_V18)?;
+            }
+        }
+        if version < 19 {
+            // `version` is what the file said before any step ran: 0 means it
+            // was created just now, so there is no earlier channel to keep.
+            if version == 0 {
+                apply(&conn, 19, MIGRATION_V19_FRESH)?;
+            } else {
+                apply(&conn, 19, MIGRATION_V19)?;
             }
         }
         Ok(Db(Mutex::new(conn)))
@@ -1726,6 +1759,8 @@ pub(crate) mod tests {
         conn.execute_batch(MIGRATION_V16).unwrap();
         conn.execute_batch(MIGRATION_V17).unwrap();
         conn.execute_batch(MIGRATION_V18).unwrap();
+        // The fresh-database arm, which is what an in-memory database is.
+        conn.execute_batch(MIGRATION_V19_FRESH).unwrap();
         Db(Mutex::new(conn))
     }
 
@@ -1805,6 +1840,83 @@ pub(crate) mod tests {
         conn.execute_batch(MIGRATION_V17).unwrap();
         let db = Db(Mutex::new(conn));
         assert_eq!(db.kv_get("blur_adult").as_deref(), Some("0"));
+    }
+
+    /// v19 tells its two populations apart by the version the file arrived
+    /// with, not by what `kv` holds — v17 has already written a row by then.
+    #[test]
+    fn v19_keeps_an_existing_install_on_nightly_and_a_fresh_one_on_stable() {
+        // Fresh: no row, so the reader's default — Stable — applies.
+        let fresh = mem_db();
+        assert_eq!(fresh.kv_get("update_channel"), None);
+
+        // Existing: the seed writes the channel the install was living with.
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(MIGRATIONS).unwrap();
+        conn.execute_batch("INSERT INTO kv (key, value) VALUES ('theme', 'karasu');")
+            .unwrap();
+        conn.execute_batch(MIGRATION_V19).unwrap();
+        let existing = Db(Mutex::new(conn));
+        assert_eq!(
+            existing.kv_get("update_channel").as_deref(),
+            Some("prerelease")
+        );
+    }
+
+    /// The decision itself lives in `open`, so it is exercised through `open`:
+    /// a file at v18 is seeded, a file that did not exist is not.
+    #[test]
+    fn v19_decides_by_the_version_the_file_arrived_with() {
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis())
+            .unwrap_or(0);
+        let dir = std::env::temp_dir().join(format!(
+            "karasu-v19-{}-{stamp}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+
+        // A database written by a v18 build, then opened by this one.
+        {
+            let conn = Connection::open(dir.join("karasu.db")).unwrap();
+            conn.execute_batch(MIGRATIONS).unwrap();
+            for step in [
+                MIGRATION_V2, MIGRATION_V3, MIGRATION_V4, MIGRATION_V5, MIGRATION_V6,
+                MIGRATION_V7, MIGRATION_V8, MIGRATION_V9, MIGRATION_V10, MIGRATION_V11,
+                MIGRATION_V12, MIGRATION_V13, MIGRATION_V14, MIGRATION_V15, MIGRATION_V16,
+                MIGRATION_V17, MIGRATION_V18,
+            ] {
+                conn.execute_batch(step).unwrap();
+            }
+        }
+        let upgraded = Db::open(dir.clone()).unwrap();
+        assert_eq!(
+            upgraded.kv_get("update_channel").as_deref(),
+            Some("prerelease")
+        );
+        drop(upgraded);
+
+        // A database that did not exist until this open.
+        let fresh_dir = dir.join("fresh");
+        let fresh = Db::open(fresh_dir).unwrap();
+        assert_eq!(fresh.kv_get("update_channel"), None);
+        drop(fresh);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Re-runnable, and it never argues with a choice.
+    #[test]
+    fn v19_leaves_an_explicit_choice_alone() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(MIGRATIONS).unwrap();
+        conn.execute_batch("INSERT INTO kv (key, value) VALUES ('update_channel', 'stable');")
+            .unwrap();
+        conn.execute_batch(MIGRATION_V19).unwrap();
+        conn.execute_batch(MIGRATION_V19).unwrap();
+        let db = Db(Mutex::new(conn));
+        assert_eq!(db.kv_get("update_channel").as_deref(), Some("stable"));
     }
 
     /// The offset is what makes a correction able to say *which episode*, not
@@ -2035,7 +2147,7 @@ pub(crate) mod tests {
         let version: i64 = conn
             .query_row("PRAGMA user_version", [], |r| r.get(0))
             .unwrap();
-        assert_eq!(version, 18, "and must end up fully migrated");
+        assert_eq!(version, 19, "and must end up fully migrated");
         drop(conn);
 
         // v13, v14, v15 and v18 are the other `ALTER TABLE ADD COLUMN` steps,
@@ -2062,7 +2174,7 @@ pub(crate) mod tests {
             let version: i64 = conn
                 .query_row("PRAGMA user_version", [], |r| r.get(0))
                 .unwrap();
-            assert_eq!(version, 18);
+            assert_eq!(version, 19);
         }
 
         let _ = std::fs::remove_dir_all(&dir);

@@ -65,7 +65,7 @@ order:
 6. Push branch and tag — the maintainer's own action, every time. Two
    workflow runs start and cannot cancel each other (the concurrency group
    is keyed on the ref). The rolling `latest` prerelease survives as the
-   prerelease channel and is rebuilt at the same content.
+   Nightly channel and is rebuilt at the same content.
 7. Watch the **precheck** job on the tag run: it is its own job with no
    dependencies, so the version-agreement check and the release-notes
    precheck really do fail in seconds. (They used to live inside

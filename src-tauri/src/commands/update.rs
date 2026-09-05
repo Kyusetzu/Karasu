@@ -10,7 +10,7 @@ use super::*;
 
 /// Monotonic commit counter — the 4th version segment
 /// (`MAJOR.MINOR.PATCH.COMMIT#`). Bumped by one on every commit.
-pub const COMMIT_NUMBER: u32 = 556;
+pub const COMMIT_NUMBER: u32 = 557;
 
 /// Full four-part display version, e.g. `0.1.1.38`. The `MAJOR.MINOR.PATCH`
 /// core comes from the crate version (kept in sync across the manifests).
@@ -46,14 +46,20 @@ pub struct UpdateInfo {
     pub channel_empty: bool,
 }
 
-/// Update channel: `"prerelease"` (the rolling `latest` tag, default — the
-/// only channel with real releases today) or `"stable"` (GitHub's
-/// latest-non-prerelease alias, for whenever stable tags start being
-/// published).
+/// Update channel: `"stable"` (GitHub's latest-non-prerelease alias — the
+/// default since v1.0.0 gave it a release to point at) or `"prerelease"` (the
+/// rolling `latest` tag, "Nightly" in the UI, rebuilt on every push to
+/// `main`). The default applies to new installs only: schema v19 seeded every
+/// database that predates the flip with `"prerelease"`, the channel it was
+/// living with, so nobody was moved without choosing.
+fn stored_channel(db: &Db) -> String {
+    db.kv_get("update_channel")
+        .unwrap_or_else(|| "stable".to_string())
+}
+
 #[tauri::command]
 pub fn get_update_channel(db: State<'_, Db>) -> String {
-    db.kv_get("update_channel")
-        .unwrap_or_else(|| "prerelease".to_string())
+    stored_channel(&db)
 }
 
 #[tauri::command]
@@ -139,9 +145,7 @@ pub async fn check_for_updates(
     // Compare the full four-part version so a release tagged with the commit
     // number lines up with what's running.
     let current = app_version_string();
-    let channel = db
-        .kv_get("update_channel")
-        .unwrap_or_else(|| "prerelease".to_string());
+    let channel = stored_channel(&db);
 
     if !force {
         let last_check = db
@@ -583,9 +587,7 @@ pub async fn download_pending_update(
         return Ok(None);
     }
 
-    let channel = db
-        .kv_get("update_channel")
-        .unwrap_or_else(|| "prerelease".to_string());
+    let channel = stored_channel(&db);
     let endpoint = reqwest::Url::parse(update_channel_manifest_url(&channel))
         .map_err(|e| e.to_string())?;
 

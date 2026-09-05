@@ -1462,6 +1462,9 @@ export const en = {
     notifSchedule60: "Hour",
     notifScheduleCustom: "Custom …",
     notifScheduleCustomLabel: "Minutes (15–720)",
+    notifJobRefused:
+      "The setting is saved, but Android refused the background job. Karasu will retry the next time it starts.",
+    notifScheduleFailed: "The notification schedule could not be saved",
     queueTitle: "Unsynced edits",
     queueHint:
       "Writes that have not reached AniList yet — they retry on their own whenever a list loads. Each row is the only copy of that edit.",

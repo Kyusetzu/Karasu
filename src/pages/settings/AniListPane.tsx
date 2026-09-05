@@ -25,6 +25,7 @@ import {
 import { useUpdateUser } from "@/hooks/useUpdateUser";
 import { useAuth } from "@/stores/auth";
 import { cn } from "@/lib/utils";
+import { notifScheduleFailure } from "@/lib/notifSchedule";
 
 /**
  * The eighth pane: AniList's own account settings.
@@ -647,13 +648,22 @@ export function NotificationScheduleSection() {
 
   const commit = (m: number) => {
     setMinutes(m);
-    // The rejection carries a real sentence now, and swallowing it was how a
-    // JobScheduler that refused the job left this pane reading "every 15
-    // minutes" with nothing registered. The stored setting is still correct
-    // either way, so the select keeps the new value.
-    setNotifSchedule(m).catch((e) =>
-      showToast({ kind: "error", text: String(e) }),
-    );
+    // Swallowing the rejection was how a JobScheduler that refused the job
+    // left this pane reading "every 15 minutes" with nothing registered. The
+    // stored setting is still correct in that case, so the select keeps the
+    // new value; `notifScheduleFailure` says which of the two sentences is
+    // the true one.
+    setNotifSchedule(m).catch((e) => {
+      const failure = notifScheduleFailure(String(e));
+      showToast({
+        kind: "error",
+        text:
+          failure.kind === "refused"
+            ? t("settings.notifJobRefused")
+            : t("settings.notifScheduleFailed"),
+        detail: failure.detail || undefined,
+      });
+    });
   };
 
   return (

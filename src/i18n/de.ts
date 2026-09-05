@@ -1461,6 +1461,9 @@ export const de: typeof en = {
     notifSchedule60: "Stunde",
     notifScheduleCustom: "Eigener Wert …",
     notifScheduleCustomLabel: "Minuten (15–720)",
+    notifJobRefused:
+      "Die Einstellung ist gespeichert, aber Android hat den Hintergrundjob abgelehnt. Karasu versucht es beim nächsten Start erneut.",
+    notifScheduleFailed: "Der Rhythmus der Benachrichtigungen konnte nicht gespeichert werden",
     queueTitle: "Nicht synchronisierte Änderungen",
     queueHint:
       "Schreibvorgänge, die AniList noch nicht erreicht haben — sie versuchen es von selbst wieder, sobald eine Liste lädt. Jede Zeile ist die einzige Kopie dieser Änderung.",

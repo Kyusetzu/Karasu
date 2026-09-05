@@ -8,6 +8,11 @@ name: CI
 # is the workflow that actually gates what ships.
 on:
   pull_request:
+    # The website has its own gate in pages.yml; a site-only PR need not build
+    # the app twice.
+    paths-ignore:
+      - "site/**"
+      - ".github/workflows/pages.yml"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

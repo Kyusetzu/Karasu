@@ -42,8 +42,8 @@ Because a local app can do things anilist.co simply can't:
   unwatched episode with one click, straight from your list.
 - **It keeps you in the loop.** Desktop notifications and a bundled notification
   centre for new episodes, announced sequels, and titles you've left on hold.
-- **It shows up on Discord.** Rich Presence that reflects what you're doing,
-  always on.
+- **It shows up on Discord.** Optional Rich Presence that reflects what you're
+  doing — and still says so when nothing is playing.
 - **It works without an account, too.** A fully local list on your device —
   editing, statistics, export and import all work offline — with a one-time
   merge into AniList whenever you decide to connect. Two things do need an
@@ -194,7 +194,8 @@ Because a local app can do things anilist.co simply can't:
   persist, chain, and can be corrected
 - Titles the matcher can't place get **AniList's best guess** to confirm with
   one click, or a search to answer by hand
-- **Discord Rich Presence**, always on, with a link back to the project
+- **Discord Rich Presence**, optional, with an idle state and a link back to
+  the project
 - **Local-only mode** (no account needed) with a later sign-in merge
 - **Portable mode** — keep everything in a folder next to the executable
 

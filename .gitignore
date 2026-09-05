@@ -32,6 +32,10 @@ design/*.svg
 /latest.json
 /SHA256SUMS.txt
 
+# The website's raw screenshot captures — 2x PNGs, tens of megabytes. The
+# processed derivatives under site/src/assets/screenshots/ are what ships.
+site/captures/
+
 # Belt and braces: `src-tauri/.gitignore` already ignores `/target/`, and that
 # nested file is the *only* thing keeping Tailwind's source scan out of it.
 # Tailwind's walk honours .gitignore, and `src-tauri/target` here is ~100 GB

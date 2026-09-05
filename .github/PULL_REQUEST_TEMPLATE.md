@@ -30,6 +30,8 @@ Fixes #
 - [ ] `scripts/android-check.ps1` was run if this touches Rust that compiles
       on Android (`cfg(mobile)` / `cfg(target_os = "android")`) — or the
       description says why that does not apply
+- [ ] A change that touches only `site/**` skips the bump and passes
+      `npm --prefix site run check` instead
 - [ ] Commit message is prose and ends with a `Co-Authored-By:` trailer
 - [ ] Nothing here is on CONTRIBUTING.md's rejected list
 

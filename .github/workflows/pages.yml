@@ -1,0 +1,87 @@
+name: Website
+
+# The public site under site/ — its own npm project, deployed to
+# https://kyusetzu.github.io/Karasu/ through GitHub Pages. Three triggers: a
+# push to main that touches the site (or the app stylesheet the site generates
+# its tokens from — a stale token file must fail here, in the open, rather than
+# drift), a published release, so the download version on the page follows the
+# newest tag without a site commit, and the button in the Actions tab.
+#
+# Not release.yml's business: that workflow ignores site/**, because a site
+# commit must never build a Nightly. See CLAUDE.md, "The website".
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "site/**"
+      - ".github/workflows/pages.yml"
+      - "src/app/index.css"
+  release:
+    types: [published]
+  workflow_dispatch:
+
+# One deployment at a time, and never cancelled mid-flight: a half-deployed
+# site is worse than a late one.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    # A prerelease is the Nightly build; the page follows Stable only.
+    if: ${{ github.event_name != 'release' || !github.event.release.prerelease }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: site
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check (typecheck + token freshness)
+        run: npm run check
+
+      # The version on the download buttons comes from the newest non-prerelease
+      # release, fetched here rather than read from package.json — main's
+      # version is ahead of the release the moment the tag commit lands, and the
+      # page must advertise what a visitor can actually download. Without a
+      # token (a fork, a local build) the committed fallback stays in place.
+      - name: Read the newest release
+        run: node scripts/release-info.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Build
+        run: npm run build
+
+      - name: Upload the site
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: site/dist/client
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

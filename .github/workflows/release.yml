@@ -7,6 +7,13 @@ on:
     # `latest` prerelease; `v*` publishes a release under its own tag, whose
     # assets the prune step at the bottom of this file cannot reach.
     tags: ["v*"]
+    # The website is its own project with its own workflow (pages.yml), and a
+    # site commit must never build a Nightly: fifteen minutes of runners and a
+    # spurious update for every Nightly install. Path filters are not
+    # evaluated for tag pushes, so a release is never held back by this.
+    paths-ignore:
+      - "site/**"
+      - ".github/workflows/pages.yml"
 
 # Keyed on the ref, not one global slot. `git push --follow-tags` delivers two
 # separate push events — the branch, then the tag — and under a shared group

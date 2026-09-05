@@ -807,6 +807,49 @@ import it.
   built on the wrong one reads someone else's list and then "finds" bugs in
   the offline page for titles that were never on the list.
 
+## The website
+
+The public site lives in `site/` and deploys to
+https://kyusetzu.github.io/Karasu/ through `.github/workflows/pages.yml` — on
+a push to `main` that touches `site/**` or `src/app/index.css`, on a published
+(non-prerelease) release, or by hand. It is its own npm project with its own
+lockfile and `node_modules`; nothing under `site/` is imported by the app, and
+the app's vitest projects cannot see it (`src/**` only). Layout, stack and the
+review checkpoints are in `site/README.md`.
+
+- **Site-only commits do not bump the version and do not run the app loop.**
+  The gate is `npm --prefix site run check` (typecheck plus the token
+  freshness check), then a prose commit with the `Co-Authored-By` trailer.
+  `scripts/changelog.mjs` drops `site/` paths by itself, so no
+  `Changelog: skip` is needed. A commit that touches both the app and the
+  site goes through the normal six commands, and its changelog line describes
+  the app half.
+- **A site commit must not build a Nightly.** `release.yml` and `ci.yml`
+  carry `paths-ignore: ["site/**", ".github/workflows/pages.yml"]`; keep it
+  that way. Push `pages.yml` and the `site/` folder together — the workflow
+  runs `npm ci` in `site/` and fails on a tree without it.
+- **The app's Tailwind build must not see the site.** `src/app/index.css`
+  carries `@source not "../../site";` under the import, measured on
+  2026-09-05: with a probe class under `site/src/` the emitted
+  `dist/assets/index-*.css` was byte-identical to the baseline with the line
+  and 71 bytes larger without it. Re-run that diff whenever the line, the
+  import or Tailwind moves; the header of `index.css` carries the numbers.
+- **Tokens are generated, never copied.** `site/src/styles/tokens.generated.css`
+  is written by `node site/scripts/sync-tokens.mjs` from the `@theme`,
+  `@keyframes`, `@utility`, `:root` and `[data-theme]` blocks of
+  `src/app/index.css`, plus the default accent evaluated through
+  `src/lib/contrast.ts` — the `@theme` fallbacks are not the colours a user
+  sees. Changing any of those blocks means re-running the sync in the same
+  commit; the site's `check` fails when the file is stale, and `pages.yml`
+  watches `index.css` so drift fails in the open.
+- **The UI primitives under `site/src/components/ui` are copies, on purpose.**
+  The site's Tailwind scan cannot see `src/`, and an app refactor must not
+  break the deploy. `sync-tokens.mjs --report-copies` shows the drift and
+  enforces nothing.
+- **Every claim on the site has a row in `site/CONTENT-AUDIT.md`** naming the
+  file or test that makes it true. No row, no sentence — the site advertises
+  the app that exists, not the one that is planned.
+
 ## Invariants the release audit established
 
 Each of these closed a group of real defects, and each is the kind of rule that

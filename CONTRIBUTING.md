@@ -97,6 +97,14 @@ equivalents: `scripts/android-check.ps1` for anything touching `cfg`-gated
 Rust, and a real `npx tauri android build` for anything touching
 `src-tauri/gen/android/` or the plugin set.
 
+## The website
+
+`site/` is the public site (https://kyusetzu.github.io/Karasu/), an npm project
+of its own. A change that touches only `site/` skips the loop above: no version
+bump, and the gate is `npm --prefix site run check`. CLAUDE.md's "The website"
+section has the rest — the generated tokens, the copied primitives, and why a
+site commit never builds a Nightly.
+
 ## Where code goes
 
 - `src/lib/` — pure logic, with its `*.test.ts` beside it. **Prefer extracting

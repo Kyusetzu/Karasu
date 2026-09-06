@@ -11,7 +11,7 @@ import {
 /** Every node type the renderer knows how to draw. Hardcoded on purpose: adding
  *  a member to the union without adding it here fails the walk below, which is
  *  the pressure we want — a new node type must be reviewed, not absorbed. */
-const BLOCK_TYPES = new Set(["p", "h", "quote", "list", "codeBlock", "hr", "center"]);
+const BLOCK_TYPES = new Set(["p", "h", "quote", "list", "codeBlock", "hr", "center", "spoiler"]);
 const INLINE_TYPES = new Set([
   "text", "strong", "em", "strike", "code", "link", "mention", "spoiler", "chip", "br",
   "accent",
@@ -291,6 +291,85 @@ describe("inline forms", () => {
     expect(types([n])).toContain("strong");
     expect(types(parse(`~!never closed`))).not.toContain("spoiler");
     expect(textOf(parse(`~!never closed`))).toBe("~!never closed");
+  });
+
+  it("reads `~!!~` as an empty spoiler, as anilist.co does", () => {
+    const n = first(`a ~!!~ b`)[1];
+    expect(n).toMatchObject({ type: "spoiler", children: [] });
+  });
+});
+
+// --- Spoilers that span lines ---------------------------------------------
+
+describe("block spoilers", () => {
+  /** The block-level spoiler nodes of a document, in order. */
+  const spoilers = (src: string) =>
+    parse(src).filter((n): n is Extract<MdNode, { type: "spoiler" }> => n.type === "spoiler");
+
+  it("hides two paragraphs behind one spoiler", () => {
+    // The forum's usual shape: the opener on its own line, blank lines inside.
+    const nodes = parse(`~!\nfirst paragraph\n\nsecond paragraph\n!~`);
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0].type).toBe("spoiler");
+    const inner = (nodes[0] as { children: MdNode[] }).children;
+    expect(inner.map((n) => n.type)).toEqual(["p", "p"]);
+    expect(textOf(inner)).toBe("first paragraphsecond paragraph");
+  });
+
+  it("takes a list and an image line with it", () => {
+    const [s] = spoilers(`~!what happens:\n- she leaves\n- he stays\nimg(https://i.imgur.com/a.png)!~`);
+    expect(s.children.map((n) => n.type)).toEqual(["p", "list", "p"]);
+    expect(chipsOf(`~!x\nimg(https://i.imgur.com/a.png)\n!~`)).toHaveLength(1);
+  });
+
+  it("keeps the text before the opener and after the closer outside", () => {
+    const nodes = parse(`Thoughts: ~!the butler\n\ndid it!~ and that's all`);
+    expect(nodes.map((n) => n.type)).toEqual(["p", "spoiler", "p"]);
+    // Trailing whitespace goes with the paragraph's own trim; leading stays.
+    expect(textOf([nodes[0]])).toBe("Thoughts:");
+    expect(textOf([nodes[2]])).toBe(" and that's all");
+    expect(textOf((nodes[1] as { children: MdNode[] }).children)).toBe("the butlerdid it");
+  });
+
+  it("leaves an opener with no closer anywhere below literal", () => {
+    const nodes = parse(`~!never\n\nclosed`);
+    expect(types(nodes)).not.toContain("spoiler");
+    expect(textOf(nodes)).toBe("~!neverclosed");
+  });
+
+  it("opens on a paragraph's later line, not only its first", () => {
+    // `before` and `~!` share a paragraph; the spoiler must still be found.
+    const nodes = parse(`before\n~!\nsecret\n\nlines\n!~\nafter`);
+    expect(nodes.map((n) => n.type)).toEqual(["p", "spoiler", "p"]);
+    expect(textOf([nodes[0]])).toBe("before");
+    expect(textOf([nodes[2]])).toBe("after");
+  });
+
+  it("does not open a block for a spoiler closed on its own line", () => {
+    const nodes = parse(`~!inline!~ text\n\nmore`);
+    expect(nodes.map((n) => n.type)).toEqual(["p", "p"]);
+    expect(types([nodes[0]])).toContain("spoiler");
+  });
+
+  it("nests with centring in either order", () => {
+    const [s] = spoilers(`~!\n~~~centred~~~\n!~`);
+    expect(s.children.map((n) => n.type)).toEqual(["center"]);
+    const [c] = parse(`~~~\n~!hidden\n\nlines!~\n~~~`);
+    expect(c.type).toBe("center");
+    expect((c as { children: MdNode[] }).children.map((n) => n.type)).toEqual(["spoiler"]);
+  });
+
+  it("wins over a fence that opens inside it, as anilist.co converts spoilers in code too", () => {
+    const [s] = spoilers("~!\n```\ncode\n```\n!~");
+    expect(s.children.map((n) => n.type)).toEqual(["codeBlock"]);
+    // But a fence that opens first keeps its sample literal.
+    expect(types(parse("```\n~!not a spoiler\n\nstill not!~\n```"))).not.toContain("spoiler");
+  });
+
+  it("counts the images inside it towards the cap", () => {
+    const line = "img(https://i.imgur.com/a.png)";
+    const src = `~!\n${Array.from({ length: 26 }, () => line).join("\n\n")}\n!~`;
+    expect(chipsOf(src).filter((c) => c.capped)).toHaveLength(2);
   });
 });
 
@@ -631,11 +710,14 @@ describe("renderPlain", () => {
     expect(out.endsWith("…")).toBe(true);
   });
 
-  it("reveals no spoiler text unintentionally — it flattens like everything else", () => {
-    // Documenting the behaviour rather than asserting a security property: a
-    // preview is not a place to put a spoiler, so callers must not use this for
-    // one. The renderer, not this, is what hides them.
-    expect(renderPlain(`~!secret!~`)).toBe("secret");
+  it("never puts a spoiler's text in a preview", () => {
+    // A preview is exactly where a spoiler leaks: the profile's comment list
+    // shows the first lines of every comment, and this used to flatten the
+    // hidden part into plain view there.
+    expect(renderPlain(`~!secret!~ did it`)).toBe("[…] did it");
+    expect(renderPlain(`before\n~!\nsecret\n\nlines\n!~\nafter`)).toBe("before […] after");
+    expect(renderPlain(`~!secret!~`, 200, "Spoiler")).toBe("Spoiler");
+    expect(renderPlain(`~!secret!~`)).not.toContain("secret");
   });
 
   it("flattens accent decoration into its text", () => {

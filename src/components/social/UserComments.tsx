@@ -136,10 +136,12 @@ export function UserComments({
           </div>
           {/* The comment itself, flattened to one plain line — markdown markup
               in a snippet reads as noise, and `renderPlain` shares the parser
-              so the two can never disagree about what counts as content. */}
+              so the two can never disagree about what counts as content. A
+              spoiler stays the word "Spoiler" here: a preview is the one place
+              it must not leak. */}
           {c.comment && (
             <p className="mt-1.5 line-clamp-2 pl-5.5 text-xs leading-relaxed text-ink-500">
-              {renderPlain(c.comment)}
+              {renderPlain(c.comment, 200, t("social.mdSpoiler"))}
             </p>
           )}
         </Link>

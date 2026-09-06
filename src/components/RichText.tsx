@@ -211,11 +211,21 @@ function Chip({ kind, host, href }: { kind: "image" | "video"; host: string; hre
  * Hidden until clicked, and hidden by *absence* rather than by CSS — text that
  * is merely invisible is still selectable and still in the accessibility tree,
  * which is not what anyone means by a spoiler.
+ *
+ * `block` is the form `Markdown` draws for a spoiler that spans paragraphs:
+ * a full-width bar in place of the whole run, and the blocks in a bordered
+ * well once revealed. Same absence rule.
  */
-function Spoiler({ children }: { children: ReactNode }) {
+export function Spoiler({ children, block = false }: { children: ReactNode; block?: boolean }) {
   const { t } = useTranslation();
   const [shown, setShown] = useState(false);
-  if (shown) return <span className="rounded bg-surface-800 px-1">{children}</span>;
+  if (shown) {
+    return block ? (
+      <div className="space-y-2 rounded-lg border border-surface-800 bg-surface-900/60 p-2">{children}</div>
+    ) : (
+      <span className="rounded bg-surface-800 px-1">{children}</span>
+    );
+  }
   return (
     <button
       type="button"
@@ -225,7 +235,11 @@ function Spoiler({ children }: { children: ReactNode }) {
         e.stopPropagation();
         setShown(true);
       }}
-      className="rounded bg-surface-700 px-1.5 text-xs text-ink-500 transition-surface hover:text-ink-300"
+      className={
+        block
+          ? "flex w-full items-center gap-1.5 rounded-lg border border-surface-700 bg-surface-800 px-2.5 py-1.5 text-left text-xs text-ink-500 transition-surface hover:text-ink-300"
+          : "rounded bg-surface-700 px-1.5 text-xs text-ink-500 transition-surface hover:text-ink-300"
+      }
     >
       {t("social.mdSpoiler")}
     </button>

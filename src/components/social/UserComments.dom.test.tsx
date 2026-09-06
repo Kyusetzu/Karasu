@@ -64,6 +64,20 @@ describe("UserComments paging states", () => {
     expect(screen.queryByText(/__ello__/)).toBeNull();
   });
 
+  it("keeps a spoiler hidden in the preview", async () => {
+    fetchPage.mockReset();
+    fetchPage.mockResolvedValue(
+      page([comment(1, "Who did it?", "~!the butler!~ did it, obviously")], false),
+    );
+
+    renderWithProviders(<UserComments userId={3} emptyTitle="empty" />);
+
+    expect(await screen.findByText("Who did it?")).toBeTruthy();
+    // The word "Spoiler" (its key, under the stubbed `t`) stands in for the text.
+    expect(screen.getByText(/social\.mdSpoiler did it, obviously/)).toBeTruthy();
+    expect(screen.queryByText(/butler/)).toBeNull();
+  });
+
   it("still offers the next page when the first one came back empty", async () => {
     fetchPage.mockReset();
     fetchPage.mockResolvedValue(page([], true));

@@ -128,7 +128,7 @@ export function parseImageWidth(token: string | undefined): ChipWidth | undefine
     : { value: Math.min(value, MAX_IMAGE_PX), unit: "px" };
 }
 
-/** Block content. `center` is the only nesting container. */
+/** Block content. `center` and `spoiler` are the two nesting containers. */
 export type MdNode =
   | { type: "p"; children: MdInline[] }
   | { type: "h"; level: 1 | 2 | 3 | 4 | 5 | 6; children: MdInline[] }
@@ -136,7 +136,10 @@ export type MdNode =
   | { type: "list"; ordered: boolean; items: MdInline[][] }
   | { type: "codeBlock"; text: string }
   | { type: "hr" }
-  | { type: "center"; children: MdNode[] };
+  | { type: "center"; children: MdNode[] }
+  /** A `~!…!~` whose opener and closer sit on different lines — the forum's
+   *  usual shape, wrapping paragraphs, lists and images. See `parseBlocks`. */
+  | { type: "spoiler"; children: MdNode[] };
 
 export interface ParsedMarkdown {
   nodes: MdNode[];
@@ -181,7 +184,9 @@ function hostOf(href: string): string {
 // position instead would make the scan itself quadratic before any backtracking.
 
 const RE = {
-  spoiler: /~!([\s\S]+?)!~/y,
+  // `*?`, not `+?`: `~!!~` is an empty spoiler on anilist.co, not four
+  // characters of text.
+  spoiler: /~!([\s\S]*?)!~/y,
   strongStar: /\*\*(?!\s)([\s\S]+?)\*\*/y,
   strongScore: /__(?!\s)([\s\S]+?)__/y,
   strike: /~~(?!~)(?!\s)([\s\S]+?)~~/y,
@@ -595,7 +600,71 @@ const TABLE_RULE = /^[\s|:-]+$/;
  * Groups lines into blocks. Every branch consumes at least one line, so the
  * loop terminates on any input.
  */
-function parseBlocks(lines: string[]): MdNode[] {
+/**
+ * Where a `~!` that no `!~` on the same line closes begins, or null.
+ *
+ * Both scanners walk the line left to right two characters at a time, so the
+ * `!~` inside `~!~` is the tail of the opener rather than a closer of its own
+ * — the same reading the inline rule takes.
+ */
+function spoilerOpenAt(line: string): number | null {
+  const open: number[] = [];
+  let i = 0;
+  while (i < line.length - 1) {
+    if (line[i] === "~" && line[i + 1] === "!") {
+      open.push(i);
+      i += 2;
+    } else if (line[i] === "!" && line[i + 1] === "~") {
+      open.pop();
+      i += 2;
+    } else {
+      i += 1;
+    }
+  }
+  return open.length ? open[0] : null;
+}
+
+/** Where the first `!~` that no earlier `~!` on the same line opened sits, or null. */
+function spoilerCloseAt(line: string): number | null {
+  let depth = 0;
+  let i = 0;
+  while (i < line.length - 1) {
+    if (line[i] === "~" && line[i + 1] === "!") {
+      depth += 1;
+      i += 2;
+    } else if (line[i] === "!" && line[i + 1] === "~") {
+      if (depth === 0) return i;
+      depth -= 1;
+      i += 2;
+    } else {
+      i += 1;
+    }
+  }
+  return null;
+}
+
+/**
+ * The block spoiler starting on line `i`, if one does: where its opener sits,
+ * and the line and column of the first closer below. Null when the line has no
+ * unmatched opener or nothing below ever closes it.
+ */
+function blockSpoilerAt(
+  lines: string[],
+  i: number,
+): { open: number; j: number; close: number } | null {
+  const open = spoilerOpenAt(lines[i]);
+  if (open === null) return null;
+  for (let j = i + 1; j < lines.length; j += 1) {
+    const close = spoilerCloseAt(lines[j]);
+    if (close !== null) return { open, j, close };
+  }
+  return null;
+}
+
+function parseBlocks(input: string[]): MdNode[] {
+  // A copy, because the closing line of a block spoiler is split and its tail
+  // written back as the next line to read.
+  const lines = input.slice();
   const out: MdNode[] = [];
   let i = 0;
 
@@ -604,6 +673,34 @@ function parseBlocks(lines: string[]): MdNode[] {
 
     if (!line.trim()) {
       i += 1;
+      continue;
+    }
+
+    // A spoiler that spans lines. The inline rule handles `~!x!~` within one
+    // block; but blocks are split at blank lines, lists and quotes *before*
+    // inline parsing, so a `~!` on one line and its `!~` three paragraphs
+    // later — the forum's usual shape, hiding a whole reply — used to stay
+    // literal on both ends with everything between them in plain view. Here
+    // the opener claims every line up to the closer as one nested block.
+    //
+    // Before the fence branch on purpose: anilist.co converts spoilers even
+    // inside code blocks (kiniro.uk's reference, and its own complaint about
+    // it), so a spoiler that opens above a fence takes the fence with it. A
+    // fence that opens first still wins, which keeps a code sample *about*
+    // the syntax literal.
+    //
+    // No closer anywhere below: the inline rule leaves the `~!` literal,
+    // exactly as it does for an unclosed one on a single line.
+    const spoiler = blockSpoilerAt(lines, i);
+    if (spoiler) {
+      const { open, j, close } = spoiler;
+      const before = line.slice(0, open);
+      if (before.trim()) out.push(...parseBlocks([before]));
+      const body = [line.slice(open + 2), ...lines.slice(i + 1, j), lines[j].slice(0, close)];
+      out.push({ type: "spoiler", children: parseBlocks(body) });
+      const after = lines[j].slice(close + 2);
+      lines[j] = after;
+      i = after.trim() ? j : j + 1;
       continue;
     }
 
@@ -729,9 +826,16 @@ function parseBlocks(lines: string[]): MdNode[] {
       continue;
     }
 
-    // Paragraph: every line up to a blank one or the start of another block.
+    // Paragraph: every line up to a blank one or the start of another block —
+    // a block spoiler included, or a `~!` on a paragraph's second line would
+    // be swallowed as text before the branch above ever saw it.
     const body: string[] = [];
-    while (i < lines.length && lines[i].trim() && !startsBlock(lines[i])) {
+    while (
+      i < lines.length &&
+      lines[i].trim() &&
+      !startsBlock(lines[i]) &&
+      (body.length === 0 || blockSpoilerAt(lines, i) === null)
+    ) {
       body.push(lines[i].replace(/\s+$/, ""));
       i += 1;
     }
@@ -815,6 +919,7 @@ function capExcessImages(nodes: MdNode[]): void {
           for (const item of n.items) inline(item);
           break;
         case "center":
+        case "spoiler":
           block(n.children);
           break;
       }
@@ -844,8 +949,13 @@ export function parseAniListMarkdown(
  * The same source as one line of plain text — for a preview, a tooltip or a
  * length check. Shares the parser so the two can never disagree about what
  * counts as content.
+ *
+ * A spoiler becomes `spoiler` — the placeholder, not the text. A preview is
+ * exactly the place a spoiler must not leak: the comment list on a profile
+ * shows the first two lines of every comment, and a flattened `~!…!~` put the
+ * hidden part in plain view on the page that lists them.
  */
-export function renderPlain(src: string, max = 200): string {
+export function renderPlain(src: string, max = 200, spoiler = "[…]"): string {
   const { nodes } = parseAniListMarkdown(src);
   const parts: string[] = [];
 
@@ -866,11 +976,13 @@ export function renderPlain(src: string, max = 200): string {
           break;
         case "chip":
           break;
+        case "spoiler":
+          parts.push(spoiler);
+          break;
         case "strong":
         case "em":
         case "strike":
         case "link":
-        case "spoiler":
         // Without this, `18<a>&#8593;</a>` previews as "18".
         case "accent":
           inline(n.children);
@@ -899,6 +1011,9 @@ export function renderPlain(src: string, max = 200): string {
           break;
         case "center":
           block(n.children);
+          break;
+        case "spoiler":
+          parts.push(spoiler, " ");
           break;
         case "hr":
           break;

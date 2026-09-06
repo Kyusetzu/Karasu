@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 import { Markdown } from "./Markdown";
@@ -142,6 +142,19 @@ describe("Markdown renders the real structures", () => {
     // leave it selectable and readable in the accessibility tree.
     expect(screen.queryByText(/butler/)).toBeNull();
     expect(screen.getByRole("button").textContent).toContain("social.mdSpoiler");
+  });
+
+  it("hides a spoiler spanning paragraphs behind one button and reveals all of it", () => {
+    draw(`Verdict: ~!\nthe butler did it\n\n- with the candlestick\n!~`);
+    expect(screen.getByText(/Verdict/)).toBeTruthy();
+    expect(screen.queryByText(/butler/)).toBeNull();
+    expect(screen.queryByText(/candlestick/)).toBeNull();
+    const buttons = screen.getAllByRole("button");
+    expect(buttons).toHaveLength(1);
+    fireEvent.click(buttons[0]);
+    expect(screen.getByText(/butler/)).toBeTruthy();
+    expect(screen.getByText(/candlestick/)).toBeTruthy();
+    expect(screen.queryByRole("button")).toBeNull();
   });
 
   it("turns a single newline into a break, as bios rely on", () => {

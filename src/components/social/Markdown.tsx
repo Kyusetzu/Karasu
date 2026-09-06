@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { parseAniListMarkdown, type MdNode } from "@/lib/anilistMarkdown";
-import { ExternalAnchor, RichText } from "@/components/RichText";
+import { ExternalAnchor, RichText, Spoiler } from "@/components/RichText";
 
 /**
  * Block-level AniList markdown: paragraphs, headings, quotes, lists, fences and
@@ -89,6 +89,14 @@ function Blocks({ nodes }: { nodes: MdNode[] }) {
               <div key={i} className="space-y-2 text-center leading-loose">
                 <Blocks nodes={n.children} />
               </div>
+            );
+          case "spoiler":
+            // One button for the whole run, and nothing of it in the DOM until
+            // pressed — the inline `Spoiler`'s rule, at block width.
+            return (
+              <Spoiler key={i} block>
+                <Blocks nodes={n.children} />
+              </Spoiler>
             );
         }
       })}

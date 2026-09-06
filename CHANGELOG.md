@@ -64,11 +64,12 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 0a8f5cc -->
+<!-- generated-through: 9aead7d -->
 
 ### Fixed
 
 - Pinning an activity no longer signs you out; a refusal shows AniList's reason, and the pin control is only offered on accounts that can pin.
+- Spoilers that wrap several paragraphs, lists or images now hide as one block, and comment previews no longer reveal spoiler text.
 ## 1.0.0 — 2026-09-05
 
 Karasu 1.0.0 is the first tagged release: a desktop and Android tracker built

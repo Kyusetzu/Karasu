@@ -57,6 +57,17 @@ export default function KeyboardSheet() {
         { label: t("keys.extend"), keys: ["Shift", "↑↓"] },
       ],
     },
+    {
+      // The markdown composers' own bindings — `MarkdownTextarea` wires them.
+      title: t("keys.inComposer"),
+      rows: [
+        { label: t("keys.bold"), keys: ["Ctrl", "B"] },
+        { label: t("keys.italic"), keys: ["Ctrl", "I"] },
+        { label: t("keys.strike"), keys: ["Ctrl", "Shift", "X"] },
+        { label: t("keys.spoiler"), keys: ["Ctrl", "Shift", "S"] },
+        { label: t("keys.send"), keys: ["Ctrl", "↵"] },
+      ],
+    },
   ];
 
   return (

@@ -2,13 +2,12 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
-import { Eye, EyeOff } from "lucide-react";
 import { saveThread, THREAD_CATEGORIES } from "@/api/social";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Pill } from "@/components/ui/pill";
-import { Markdown } from "@/components/social/Markdown";
+import { MarkdownTextarea } from "@/components/social/MarkdownTextarea";
 import { charsLeft, POST_MAX, TITLE_MAX, validateThread } from "@/lib/composer";
 import { showToast } from "@/stores/toast";
 import { cn } from "@/lib/utils";
@@ -38,7 +37,6 @@ export function NewThreadModal({
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [categories, setCategories] = useState<Set<number>>(new Set());
-  const [preview, setPreview] = useState(false);
 
   const check = validateThread(title, body, [...categories]);
   const left = charsLeft(body);
@@ -107,51 +105,27 @@ export function NewThreadModal({
           <label className="block text-xs font-medium text-ink-300" htmlFor="thread-body">
             {t("forum.bodyLabel")}
           </label>
-          {preview ? (
-            <div className="mt-1.5 min-h-36 overflow-y-auto rounded-lg border border-surface-800 bg-surface-950 p-3">
-              {body.trim() ? (
-                <Markdown source={check.body} />
-              ) : (
-                <p className="text-xs text-ink-600">{t("social.previewEmpty")}</p>
-              )}
-            </div>
-          ) : (
-            <textarea
-              id="thread-body"
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              onKeyDown={(e) => {
-                // Ctrl/Cmd+Enter sends; plain Enter is a newline, exactly as
-                // in the activity composer.
-                if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-                  e.preventDefault();
-                  submit();
-                }
-              }}
-              placeholder={t("forum.bodyPlaceholder")}
-              rows={8}
-              className="mt-1.5 min-h-36 w-full resize-y rounded-lg border border-surface-700 bg-surface-950 px-3 py-2 text-sm focus:border-accent-500 focus:outline-none"
-            />
-          )}
-          <div className="mt-1 flex items-center justify-between">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => setPreview((v) => !v)}
-              disabled={!body.trim()}
-            >
-              {preview ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
-              {preview ? t("social.previewOff") : t("social.previewOn")}
-            </Button>
-            {(left < POST_MAX * 0.15 || left < 0) && (
-              <span
-                className={cn("text-2xs tabular-nums", left < 0 ? "text-danger" : "text-ink-600")}
-              >
-                {left}
-              </span>
-            )}
-          </div>
+          <MarkdownTextarea
+            id="thread-body"
+            className="mt-1.5"
+            value={body}
+            onChange={setBody}
+            onSubmit={submit}
+            placeholder={t("forum.bodyPlaceholder")}
+            rows={8}
+            preview="toggle"
+            previewSource={body.trim() ? check.body : ""}
+            textareaClassName="min-h-36"
+            footer={
+              (left < POST_MAX * 0.15 || left < 0) && (
+                <span
+                  className={cn("text-2xs tabular-nums", left < 0 ? "text-danger" : "text-ink-600")}
+                >
+                  {left}
+                </span>
+              )
+            }
+          />
         </div>
 
         <div className="flex items-center justify-end gap-2 border-t border-surface-800 pt-3">

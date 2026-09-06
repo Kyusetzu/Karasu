@@ -31,6 +31,7 @@ import { EmptyState, PerchRule, StruckQuery } from "@/components/EmptyState";
 import { isNotFound } from "@/lib/apiError";
 import { Shimmer } from "@/components/Skeleton";
 import { Markdown } from "@/components/social/Markdown";
+import { MarkdownTextarea } from "@/components/social/MarkdownTextarea";
 import { CommentTree } from "@/components/social/CommentTree";
 import { flattenComments, visibleAnchor, type FlatComment } from "@/lib/comments";
 import { nextPageParam } from "@/lib/paging";
@@ -504,24 +505,30 @@ export default function Thread() {
         if (!check.ok || replyRoot == null || replyMutation.isPending) return;
         replyMutation.mutate({ text: check.text, parentId: replyRoot });
       }}
-      className="mt-2 space-y-1.5"
+      className="mt-2"
     >
-      <textarea
+      <MarkdownTextarea
         value={replyDraft}
-        onChange={(e) => setReplyDraft(e.target.value)}
+        onChange={setReplyDraft}
+        onSubmit={() => {
+          const check = validatePost(replyDraft);
+          if (!check.ok || replyRoot == null || replyMutation.isPending) return;
+          replyMutation.mutate({ text: check.text, parentId: replyRoot });
+        }}
         rows={3}
         autoFocus
         placeholder={t("social.replyPlaceholder")}
-        className="w-full resize-y rounded-lg border border-surface-700 bg-surface-950 p-2 text-sm text-ink-100 placeholder:text-ink-600 focus:border-accent-500 focus:outline-none"
+        footer={
+          <>
+            <Button size="sm" type="submit" disabled={!validatePost(replyDraft).ok || replyMutation.isPending}>
+              {replyMutation.isPending ? t("social.posting") : t("social.postReply")}
+            </Button>
+            <Button size="sm" variant="ghost" type="button" onClick={() => setReplyTo(null)}>
+              {t("common.cancel")}
+            </Button>
+          </>
+        }
       />
-      <div className="flex items-center gap-2">
-        <Button size="sm" type="submit" disabled={!validatePost(replyDraft).ok || replyMutation.isPending}>
-          {replyMutation.isPending ? t("social.posting") : t("social.postReply")}
-        </Button>
-        <Button size="sm" variant="ghost" type="button" onClick={() => setReplyTo(null)}>
-          {t("common.cancel")}
-        </Button>
-      </div>
     </form>
   );
 
@@ -859,20 +866,26 @@ export default function Thread() {
             if (!check.ok || comment.isPending) return;
             comment.mutate(check.text);
           }}
-          className="mt-6 space-y-2"
+          className="mt-6"
         >
-          <textarea
+          <MarkdownTextarea
             value={draft}
-            onChange={(e) => setDraft(e.target.value)}
+            onChange={setDraft}
+            onSubmit={() => {
+              if (!check.ok || comment.isPending) return;
+              comment.mutate(check.text);
+            }}
             placeholder={t("social.commentPlaceholder")}
             rows={3}
-            className="min-h-20 w-full resize-y rounded-lg border border-surface-700 bg-surface-900 px-3 py-2 text-sm focus:border-accent-500 focus:outline-none"
+            preview="toggle"
+            previewSource={check.ok ? check.text : ""}
+            textareaClassName="min-h-20"
+            actions={
+              <Button type="submit" size="sm" disabled={!check.ok || comment.isPending}>
+                {comment.isPending ? t("social.posting") : t("social.postComment")}
+              </Button>
+            }
           />
-          <div className="flex justify-end">
-            <Button type="submit" size="sm" disabled={!check.ok || comment.isPending}>
-              {comment.isPending ? t("social.posting") : t("social.postComment")}
-            </Button>
-          </div>
         </form>
       )}
     </div>

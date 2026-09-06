@@ -18,6 +18,7 @@ import { UserLockup } from "@/components/ui/user-lockup";
 import { Button } from "@/components/ui/button";
 import { Shimmer } from "@/components/Skeleton";
 import { Markdown } from "./Markdown";
+import { MarkdownTextarea } from "./MarkdownTextarea";
 import { relTimeFromSeconds } from "@/lib/relTime";
 import { validatePost } from "@/lib/composer";
 import { canTogglePin } from "@/lib/donator";
@@ -172,6 +173,10 @@ function ActivityReplies({ activityId }: { activityId: number }) {
   });
 
   const check = validatePost(draft);
+  const submitReply = () => {
+    if (!check.ok || reply.isPending) return;
+    reply.mutate({ activityId, text: check.text }, { onSuccess: () => setDraft("") });
+  };
 
   return (
     <div className="mt-3 space-y-2 border-l-2 border-surface-800 pl-3">
@@ -219,29 +224,28 @@ function ActivityReplies({ activityId }: { activityId: number }) {
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            if (!check.ok || reply.isPending) return;
-            reply.mutate(
-              { activityId, text: check.text },
-              { onSuccess: () => setDraft("") },
-            );
+            submitReply();
           }}
-          className="flex items-start gap-2 pt-1"
+          className="pt-1"
         >
-          <textarea
+          <MarkdownTextarea
+            variant="compact"
             value={draft}
-            onChange={(e) => setDraft(e.target.value)}
+            onChange={setDraft}
+            onSubmit={submitReply}
             placeholder={t("social.replyPlaceholder")}
             rows={1}
-            className="min-h-8 flex-1 resize-y rounded-lg border border-surface-700 bg-surface-900 px-2 py-1.5 text-xs focus:border-accent-500 focus:outline-none"
+            actions={
+              <Button
+                type="submit"
+                variant="secondary"
+                size="sm"
+                disabled={!check.ok || reply.isPending}
+              >
+                {reply.isPending ? t("social.posting") : t("social.postReply")}
+              </Button>
+            }
           />
-          <Button
-            type="submit"
-            variant="secondary"
-            size="sm"
-            disabled={!check.ok || reply.isPending}
-          >
-            {reply.isPending ? t("social.posting") : t("social.postReply")}
-          </Button>
         </form>
       )}
     </div>

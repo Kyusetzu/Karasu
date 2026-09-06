@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { Eye, EyeOff } from "lucide-react";
 import { saveReview } from "@/api/social";
 import {
   REVIEW_BODY_MIN,
@@ -12,7 +11,7 @@ import {
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Markdown } from "@/components/social/Markdown";
+import { MarkdownTextarea } from "@/components/social/MarkdownTextarea";
 import { showToast } from "@/stores/toast";
 import { cn } from "@/lib/utils";
 
@@ -67,7 +66,6 @@ export function ReviewComposerModal({
   const [body, setBody] = useState(existing?.body ?? "");
   const [score, setScore] = useState(existing?.score ?? 0);
   const [priv, setPriv] = useState(existing?.private ?? false);
-  const [preview, setPreview] = useState(false);
 
   const check = validateReview(summary, body, score);
   // The floor is the surprising bound, so the counter is always visible —
@@ -136,61 +134,34 @@ export function ReviewComposerModal({
         </div>
 
         <div>
-          {/* `htmlFor` only when the textarea it names is rendered. In preview
-              mode the field is replaced by the rendered markdown, so the id
-              pointed at nothing — a label referencing a missing control is
-              worse than a plain caption, because assistive tech reports the
-              association and then cannot follow it. */}
-          <label
-            className="block text-xs font-medium text-ink-300"
-            htmlFor={preview ? undefined : "review-body"}
-          >
+          {/* The textarea stays mounted under the preview (`hidden`), so the
+              label's `htmlFor` always resolves — the earlier `htmlFor` swap
+              existed because the field used to be replaced. */}
+          <label className="block text-xs font-medium text-ink-300" htmlFor="review-body">
             {t("review.bodyLabel")}
           </label>
-          {preview ? (
-            <div className="mt-1.5 min-h-36 max-h-80 overflow-y-auto rounded-lg border border-surface-800 bg-surface-950 p-3">
-              {body.trim() ? (
-                <Markdown source={check.body} />
-              ) : (
-                <p className="text-xs text-ink-600">{t("social.previewEmpty")}</p>
-              )}
-            </div>
-          ) : (
-            <textarea
-              id="review-body"
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              onKeyDown={(e) => {
-                if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-                  e.preventDefault();
-                  submit();
-                }
-              }}
-              placeholder={t("review.bodyPlaceholder")}
-              rows={12}
-              className="mt-1.5 min-h-36 w-full resize-y rounded-lg border border-surface-700 bg-surface-950 px-3 py-2 text-sm focus:border-accent-500 focus:outline-none"
-            />
-          )}
-          <div className="mt-1 flex items-center justify-between">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => setPreview((v) => !v)}
-              disabled={!body.trim()}
-            >
-              {preview ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
-              {preview ? t("social.previewOff") : t("social.previewOn")}
-            </Button>
-            <span
-              className={cn(
-                "text-2xs tabular-nums",
-                bodyLen < REVIEW_BODY_MIN ? "text-ink-600" : "text-success",
-              )}
-            >
-              {bodyLen.toLocaleString()} / {REVIEW_BODY_MIN.toLocaleString()}
-            </span>
-          </div>
+          <MarkdownTextarea
+            id="review-body"
+            className="mt-1.5"
+            value={body}
+            onChange={setBody}
+            onSubmit={submit}
+            placeholder={t("review.bodyPlaceholder")}
+            rows={12}
+            preview="toggle"
+            previewSource={body.trim() ? check.body : ""}
+            textareaClassName="min-h-36"
+            footer={
+              <span
+                className={cn(
+                  "text-2xs tabular-nums",
+                  bodyLen < REVIEW_BODY_MIN ? "text-ink-600" : "text-success",
+                )}
+              >
+                {bodyLen.toLocaleString()} / {REVIEW_BODY_MIN.toLocaleString()}
+              </span>
+            }
+          />
         </div>
 
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2">

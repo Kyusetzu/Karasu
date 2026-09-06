@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Markdown } from "@/components/social/Markdown";
+import { MarkdownTextarea } from "@/components/social/MarkdownTextarea";
 import { useUpdateUser } from "@/hooks/useUpdateUser";
 import { charsLeft, POST_MAX } from "@/lib/composer";
 import {
@@ -84,31 +84,27 @@ export function ProfileEditModal({
           </label>
           {/* Editor and preview side by side, so the markdown is learned rather
               than guessed at. */}
-          <div className="mt-1.5 grid gap-3 sm:grid-cols-2">
-            <textarea
-              id="bio"
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              placeholder={t("social.bioPlaceholder")}
-              rows={10}
-              className="min-h-44 w-full resize-y rounded-lg border border-surface-700 bg-surface-950 px-3 py-2 text-sm focus:border-accent-500 focus:outline-none"
-            />
-            <div className="min-h-44 overflow-y-auto rounded-lg border border-surface-800 bg-surface-950 p-3">
-              {draft.trim() ? (
-                <Markdown source={draft} />
-              ) : (
-                <p className="text-xs text-ink-600">{t("social.bioPreviewEmpty")}</p>
-              )}
-            </div>
-          </div>
-          <div className="mt-1 flex items-center justify-between">
-            <p className="text-2xs text-ink-600">{t("social.bioMarkdownHint")}</p>
-            {left < POST_MAX * 0.15 && (
-              <span className={cn("text-2xs tabular-nums", tooLong ? "text-danger" : "text-ink-600")}>
-                {left}
-              </span>
-            )}
-          </div>
+          <MarkdownTextarea
+            id="bio"
+            className="mt-1.5"
+            value={draft}
+            onChange={setDraft}
+            placeholder={t("social.bioPlaceholder")}
+            rows={10}
+            preview="side"
+            previewEmpty={t("social.bioPreviewEmpty")}
+            textareaClassName="min-h-44"
+            footer={
+              <div className="flex w-full items-center justify-between">
+                <p className="text-2xs text-ink-600">{t("social.bioMarkdownHint")}</p>
+                {left < POST_MAX * 0.15 && (
+                  <span className={cn("text-2xs tabular-nums", tooLong ? "text-danger" : "text-ink-600")}>
+                    {left}
+                  </span>
+                )}
+              </div>
+            }
+          />
         </div>
 
         <div>

@@ -20,7 +20,7 @@ export function Gallery() {
       id="screenshots"
       eyebrow="Screenshots"
       title="The app, as it is."
-      lede="Every image here is a capture of the current release — nothing mocked, nothing planned. Click one to see it at full size."
+      lede="Every image here is a capture of the app as it ships — nothing mocked, nothing planned. Click one to see it at full size."
     >
       {kinds.length > 1 && (
         <div className="mt-8 flex gap-2" role="group" aria-label="Filter screenshots">

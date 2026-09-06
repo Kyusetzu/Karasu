@@ -14,7 +14,7 @@ const STEPS = [
 
 const NOTES = [
   ["Corrections stick.", "Re-point a title once; a rescan never undoes it."],
-  ["Seasons can be split.", "A folder numbered straight through becomes the AniList entries it spans."],
+  ["Seasons can be split.", "A folder numbered straight through is split into the AniList entries it spans — Karasu proposes the split, you confirm it."],
   ["Unplaced titles get a suggestion.", "Karasu asks AniList for its best guess, and applies it only when you confirm."],
 ] as const;
 

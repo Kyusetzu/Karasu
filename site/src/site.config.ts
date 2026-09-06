@@ -39,6 +39,6 @@ export const NAV = [
 export const META = {
   title: "Karasu — A modern anime & manga tracker for AniList",
   description:
-    "Karasu is a free, open-source anime and manga tracker built exclusively for AniList. It watches what you play and read on Windows, Linux and Android and keeps your AniList progress in sync.",
+    "Karasu is a free, open-source anime and manga tracker built exclusively for AniList. It notices what you play — and, on Windows, what you read — and keeps your AniList progress in sync. Windows, Linux and Android.",
   themeColor: "#0b0d12",
 } as const;

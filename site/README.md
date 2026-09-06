@@ -21,7 +21,11 @@ simply keeps the end state.
 | `npm run sync` | Regenerate `src/styles/tokens.generated.css` from `../src/app/index.css` |
 | `npm run build` | Client build, SSR build, prerender, `verify-dist` |
 | `npm run preview` | Serve `dist/client` on port 4322 |
-| `node scripts/snap.mjs <url> …` | Review screenshots at 390/768/1280/1440/2560 into `captures/review/` |
+| `npm run lighthouse` | Lighthouse, mobile and desktop, against `dist/client` in headless Edge; fails under 95 in any category |
+| `node scripts/snap.mjs <url> …` | Review screenshots at 390/768/1280/1440/2560 into `captures/review/`; `--full` stitches the whole page in tiles |
+| `node scripts/capture-desktop.mjs …` | Drives the portable release exe over CDP for the 2× desktop screenshots (`launch`, `go`, `shot`, `quit`, …) |
+| `node scripts/process-screenshots.mjs` | Turns `captures/` into the AVIF/WebP/JPEG sets under `src/assets/screenshots/` and rewrites `src/content/screenshots.ts` from `shots.config.mjs` |
+| `node scripts/og-image.mjs` | Renders `public/og.png` from the site's own tokens and font |
 | `node scripts/icons.mjs` | Regenerate the favicon set from `src-tauri/icons/app-icon.svg` |
 | `node scripts/release-info.mjs` | Refresh `src/generated/release.json` from the newest release (needs `GH_TOKEN`) |
 

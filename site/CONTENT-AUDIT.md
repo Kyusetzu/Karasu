@@ -18,7 +18,7 @@ such in the code and showing no invented data).
 | 2 | "Karasu watches what you play and read and keeps your AniList progress in sync — no buttons to press." | `src-tauri/src/playback/detection/mod.rs` `detect_playback` (four sources), `src-tauri/src/playback/scrobbler.rs` (the write), `README.md` "What is Karasu?" | confirmed |
 | 3 | "Free · open source · built for AniList"; "MIT licensed, no paid tier"; "Every commit is public" | `LICENSE` (MIT), public repository | confirmed |
 | 4 | "Windows · Linux · Android" | `.github/workflows/release.yml` (NSIS, AppImage, two APKs) | confirmed |
-| 5 | "No account needed to start"; "Start with a local list, no account" | `src/stores/auth.ts` `ProfileMode = "anilist" \| "local" \| "none"`, `setLocal`; `src/pages/FirstRun.tsx` | confirmed |
+| 5 | "No account needed to start"; "Start with a local list, no account" | `src/stores/auth.ts` `ProfileMode = "anilist" \| "local" \| "none"`, `enableLocal`; `src/components/shell/FirstRun.tsx` | confirmed |
 | 6 | "Implicit OAuth, no client secret" | `CLAUDE.md` hard constraints; `src-tauri/src/commands/auth.rs` `BUILTIN_ANILIST_CLIENT_ID`; `src-tauri/src/anilist/login.rs` | confirmed |
 | 7 | "No telemetry, no analytics, no backend, no account of ours" | exhaustive grep of `src/` and `src-tauri/src/` for sentry/posthog/plausible/mixpanel/amplitude/gtag/crashlytics/telemetry/analytics: no hits in code; `SECURITY.md` "no hosted backend"; `CLAUDE.md` hard constraint | confirmed |
 | 8 | "MIT licensed · © 2026 Kyu and Karasu contributors" | `LICENSE:3`, `src-tauri/tauri.conf.json` `copyright` | confirmed |
@@ -51,7 +51,7 @@ such in the code and showing no invented data).
 | 25 | "Up to 20,000 files, six levels deep" | `src-tauri/src/library.rs` `MAX_FILES = 20_000`, `MAX_DEPTH = 6` | confirmed |
 | 26 | Match reads exact / close / yours | `library.rs` score 1.0 exact short-circuit; `CLAUDE.md` schema v8/v9 | confirmed |
 | 27 | "The first episode past your progress"; "Plays it in your default player, or in mpv if you point Karasu at it" | `library.rs` `play_next`, `open_path` (mpv binary if configured, else the OS opener) | confirmed |
-| 28 | Corrections stick; seasons can be split; unplaced titles get a suggestion applied only when confirmed | `CLAUDE.md` schema v9 (`library_override` never cleared by a scan), v11 (`library_redirect`), v10 (`library_suggestion`); `src-tauri/src/identify.rs` | confirmed |
+| 28 | Corrections stick; seasons can be split (Karasu proposes the split through `plan_redirect`, the user confirms it — relations only hint, `library.rs`); unplaced titles get a suggestion applied only when confirmed | `CLAUDE.md` schema v9 (`library_override` never cleared by a scan), v11 (`library_redirect`), v10 (`library_suggestion`); `src-tauri/src/identify.rs` | confirmed |
 | 29 | "Karasu never downloads anything." | `CLAUDE.md` "Explicitly rejected": RSS/torrent feeds and anything piracy-adjacent | confirmed |
 
 ## Offline
@@ -71,7 +71,7 @@ such in the code and showing no invented data).
 | 35 | Charts drawn by hand in SVG: radar, sunburst, treemap, area, dot plot, gradient bars, heatmaps; no chart library | `src/components/stats/Charts.tsx`, `AreaChart.tsx`, `DotPlot.tsx`, `GradientBars.tsx`, `Heatmap.tsx`, `DayHeatmap.tsx`; `CLAUDE.md` Charts note | confirmed |
 | 36 | "Your scores against the crowd … computed from your cached list" | `Statistics.tsx` `ScoreDeltaSummary` | confirmed |
 | 37 | "A poster of your year or season in five crops, exported as PNG or JPEG at up to 3×" | `src/pages/Wrapped.tsx` `PresetKey` (five), export format and scale; `src/lib/wrapped.ts` `availableSeasons` | confirmed |
-| 38 | "costs no requests and is there offline too" | charts read the cached list (`useCachedEntry`/list cache); no query on the page beyond the cache | confirmed |
+| 38 | "Half of it is drawn from the list Karasu already holds — the sunburst, your watch time, your scores against the crowd — and the rest is AniList's own statistics, fetched once and kept for half an hour" | `src/pages/Statistics.tsx`: the sunburst, watch time and `ScoreDeltaSummary` come from the cached `mediaList`; the ratings, years, genres and people tabs come from `useQuery` → `userStatistics` (`USER_STATS_QUERY` in `src/api/queries.ts`, `staleTime` 30 min); local mode is cache-only (`LocalStatistics`). The earlier wording "costs no requests and is there offline too" was wrong and was replaced on 2026-09-06 | confirmed |
 
 ## Features
 
@@ -88,10 +88,10 @@ such in the code and showing no invented data).
 | 47 | Optional background check every 15, 30 or 60 minutes | `src/pages/settings/AniListPane.tsx` presets; `alerts/site.rs` `notif_bg_interval_min` | confirmed |
 | 48 | Android: sideloaded APK; the list, statistics, notifications, social pages; Jellyfin detection; four widgets from the cache with no network; background job with the app closed; share an anilist.co link | `release.yml` APK legs; `src-tauri/gen/android/.../Widgets.kt` + `src-tauri/src/widgets.rs`; `NotifJob.kt` + `src-tauri/src/background.rs`; `MainActivity.kt` SEND→VIEW; `AndroidManifest.xml` | confirmed |
 | 49 | Widgets: Airing Today, Continue Watching, Continue Reading, This Week | manifest receivers `Widgets$AiringToday`, `Widgets$ContinueWatching`, `Widgets$ContinueReading`, `Widgets$Week` | confirmed |
-| 50 | Seasonal page; Monday-first calendar with iCal export; franchise graph with pan and zoom; recommendations weighted by your scores; search across anime, manga, users, characters, staff, studios | `src/pages/Seasonal.tsx`; `src/lib/calendar.ts`, `src/lib/ical.ts`; `src/pages/Franchise.tsx`, `usePanZoom.ts`; `src/lib/recommend.ts`; `src/pages/Search.tsx` scopes | confirmed |
-| 51 | Activity feed, profiles with follow and affinity, forum threads and comments, text posts, likes, replies | `src/api/social.ts`; `src/pages/Social.tsx`, `UserProfile.tsx`, `Forum.tsx`, `Thread.tsx`; `src/lib/affinity.ts` | confirmed |
+| 50 | Seasonal page with a picker that reaches four years back (`src/components/ui/season-picker.tsx`, `latest - 3 … latest`, opened from the season title); Monday-first calendar with iCal export; franchise graph with pan and zoom; recommendations weighted by your scores; search across anime, manga, users, characters, staff, studios | `src/pages/Seasonal.tsx`; `src/lib/calendar.ts`, `src/lib/ical.ts`; `src/pages/Franchise.tsx`, `usePanZoom.ts`; `src/lib/recommend.ts`; `src/pages/Search.tsx` scopes | confirmed |
+| 51 | Activity feed, profiles with follow and affinity, forum threads and comments with permalinks (`src/lib/threadJump.ts`, `?comment=`), text posts, likes, replies; character, staff and studio pages (`src/app/App.tsx` routes, `src/pages/Person.tsx`) | `src/api/social.ts`; `src/pages/Social.tsx`, `UserProfile.tsx`, `Forum.tsx`, `Thread.tsx`; `src/lib/affinity.ts` | confirmed |
 | 52 | "Nothing social is kept on your machine … every further page is a button rather than a scroll" | `CLAUDE.md` "No local activity store", "Paging is a button, never a scroll" | confirmed |
-| 53 | Discord: off until switched on; title, episode/chapter, timer; button to the project; never your AniList name; filtered titles never broadcast | `src-tauri/src/discord.rs` (`discord_enabled == "1"`, nothing seeds it; payload fields; content-filter guard) | confirmed |
+| 53 | Discord: off until switched on; title, episode/chapter, timer; buttons to the project and to the title on AniList (`discord.rs` button constants); never your AniList name; filtered titles never broadcast | `src-tauri/src/discord.rs` (`discord_enabled == "1"`, nothing seeds it; payload fields; content-filter guard) | confirmed |
 | 54 | Export MAL XML and JSON in either mode; import into a local list; daily local backup on by default; portable mode | `src/pages/settings/AdvancedPane.tsx` (export both modes, import local only); `src-tauri/src/backups.rs` (`read_enabled` default on, 7 kept); `src-tauri/src/portable.rs` | confirmed |
 | 55 | "connect AniList later and Karasu merges the two" | `src/lib/mergeDecision.ts`, `src/components/overlays/SignInMerge.tsx` | confirmed |
 | 56 | The Discord card, the notifications and social panels, the "yours to keep" panel | drawn, labelled in code, neutral titles | mock |
@@ -106,7 +106,7 @@ such in the code and showing no invented data).
 | 60 | Android: detection is Jellyfin only; no in-app updater | `mpv_ipc.rs` mobile stub, no SMTC/MPRIS on mobile; `commands/update.rs` `updater_available()` false on mobile; `CLAUDE.md` | confirmed |
 | 61 | Linux: AppImage x86_64; needs webkit2gtk-4.1; MPRIS, mpv, Jellyfin; updater for a running AppImage; no window titles, no manga detection; tray needs a StatusNotifier host or closing quits | `release.yml` build-linux (ubuntu-22.04); `release-notes.ps1` boilerplate; `mpris.rs`; `detection/mod.rs`; `lib.rs` `tray_present` | confirmed |
 | 62 | "Stable … used every day by the maintainer; Experimental … built by CI, not used every day"; Linux Experimental | maintainer's statement, 2026-09-05; every Linux check in the repo is CI or a throwaway crate (`CLAUDE.md`) | confirmed (maintainer) |
-| 63 | "Version 1.0.0, released 2026-09-05"; the four asset links and the checksums | `src/generated/release.json` ← GitHub `releases/latest` via `scripts/release-info.mjs` | confirmed |
+| 63 | "Version 1.0.0, released 2026-09-05"; the four asset links and the checksums | `site/src/generated/release.json` ← GitHub `releases/latest` via `site/scripts/release-info.mjs` (run by `pages.yml` with the workflow token; the committed file is the fallback) | confirmed |
 | 64 | Updates: Stable channel by default, checked once a day; Nightly one switch away in Settings → Desktop → Updates | `commands/update.rs` `stored_channel` default `stable` (schema v19 seeds `prerelease` for existing installs), `UPDATE_CHECK_THROTTLE_MS`; `src/pages/settings/AdvancedPane.tsx` `UpdatesSection` rendered in the Desktop pane | confirmed |
 
 ## AniList, open source, FAQ
@@ -114,7 +114,7 @@ such in the code and showing no invented data).
 | # | Claim | Evidence | Status |
 |---|---|---|---|
 | 65 | Reads and writes through the public GraphQL API; a token, never a password; no client secret | `src-tauri/src/anilist/client.rs`, `login.rs` (implicit grant) | confirmed |
-| 66 | Token kept in the OS credential store; an encrypted file in portable mode; the Android Keystore; never reaches the web view | `src-tauri/src/anilist/auth.rs` (keyring; DPAPI/XChaCha20 portable files); `src-tauri/src/keystore.rs`; `CLAUDE.md` hard constraint | confirmed |
+| 66 | Token kept in the OS credential store; an encrypted file in portable mode; the Android Keystore; never handed back to the web view (the browser hand-off is `src/hooks/useAniListLogin.ts` `openUrl`; the manual fallback in `commands/auth.rs` `anilist_connect` takes a pasted token once, and nothing returns it — `anilist_session` answers the cached viewer only) | `src-tauri/src/anilist/auth.rs` (keyring; DPAPI/XChaCha20 portable files); `src-tauri/src/keystore.rs`; `CLAUDE.md` hard constraint | confirmed |
 | 67 | "AniList allows about thirty requests a minute. Karasu batches, caches and never fetches on scroll" | `CLAUDE.md` rate-limit constraint and stepped-window measurement; `anilist/client.rs` limiter; no `IntersectionObserver` fetch anywhere | confirmed |
 | 68 | "Developed with heavy AI assistance, and every change reviewed by a human maintainer" | `CLAUDE.md` preamble; `README.md` | confirmed |
 | 69 | Stack: Tauri 2, Rust, React 19 + TypeScript, Vite, Tailwind CSS v4, SQLite, TanStack Query, AniList GraphQL | `package.json`, `src-tauri/Cargo.toml`, `CLAUDE.md` Project | confirmed |
@@ -122,6 +122,25 @@ such in the code and showing no invented data).
 | 71 | FAQ "Can Karasu work offline?" | rows 30–33 | confirmed |
 | 72 | FAQ "Which platforms?" and "no macOS build" | rows 57–61; `CLAUDE.md` "macOS is deliberately not covered" | confirmed |
 | 73 | FAQ "Why does Windows warn?" | row 57 | confirmed |
+
+## Added in the copy review of 2026-09-06
+
+A second pass read every sentence against this table and the app source.
+Three sentences were wrong and were rewritten (rows 38, 72 and the meta
+description in row 80); the rest below were true but had no row.
+
+| # | Claim | Evidence | Status |
+|---|---|---|---|
+| 74 | Flow step "Your settings apply — threshold, confirmation, corrections and offsets" | `scrobbler.rs` threshold; `alerts/notify.rs` toast; `db.rs` `detection_override` (schema v12) and `episode_offset` (v13), consulted by `build_now_playing` | confirmed |
+| 75 | "Release names are parsed the same way detection parses them" | `src-tauri/src/library.rs` calls `recognition::parser::parse` | confirmed |
+| 76 | "Tailwind CSS v4 — one design-token file, the same one this site uses" | `site/scripts/sync-tokens.mjs` generates `tokens.generated.css` from `src/app/index.css`; `CLAUDE.md` "Tokens are generated, never copied" | confirmed |
+| 77 | FAQ "every release is built there from a tagged commit" | `.github/workflows/release.yml` `tags: ["v*"]` | confirmed |
+| 78 | FAQ "Signing in happens on anilist.co in your browser, which hands Karasu a token" | `src/hooks/useAniListLogin.ts` `openUrl`; the paste fallback in `commands/auth.rs` `anilist_connect` for a browser that cannot call back | confirmed |
+| 79 | The external links: Discord invite, the two issue templates, "Nightly builds" at `releases/tag/latest`, CONTRIBUTING, SECURITY, CHANGELOG, LICENSE | `site/src/site.config.ts` against `README.md` (invite), `.github/ISSUE_TEMPLATE/bug_report.yml` and `feature_request.yml`, `commands/update.rs` and `release.yml` (the `latest` tag), the four files at the repository root; every link answered 200 on 2026-09-06 | confirmed |
+| 80 | The head: title, meta description ("notices what you play — and, on Windows, what you read"), Open Graph, JSON-LD `SoftwareApplication` (`UtilitiesApplication`, price 0, author Kyu, MIT, `softwareVersion` from `release.json`) | `site/src/head.ts`, `site/src/site.config.ts`; rows 1–4, 8, 63; manga detection is window-title based and so Windows-only (`profiles.rs`), which is why the description names Windows | confirmed |
+| 81 | Screenshot captions and alt texts: "Command palette (Ctrl+K)", "Monday-first" calendar, the Seasonal switcher, "Everything" on the calendar | `src/components/shell/CommandPalette.tsx` (Ctrl+K), `src/lib/calendar.ts` (Monday first), `src/components/ui/season-picker.tsx`, the calendar's scope filter; `site/scripts/shots.config.mjs` is the source, `site/src/content/screenshots.ts` the generated copy | confirmed |
+| 82 | Gallery "a capture of the app as it ships"; Features "Each of these is in the current release" | the captures are of build 1.0.3.566, whose UI is 1.0.0's: the three commits between (`e45710f`, `ce767ef`, `2058537`) touch the roadmap, the Tailwind scan and the workflows only; every feature named is in the 1.0.0 release | confirmed |
+| 83 | FAQ "Windows has every feature. Android has the list, statistics, notifications, widgets and the social pages, but no local library, no tray and no in-app updater" | `src/pages/Settings.tsx` hides the Library and Desktop panes on Android; `commands/update.rs` `updater_available` false on mobile; `lib.rs` tray is desktop-only; rows 48, 60 | confirmed |
 
 ## Screenshots
 

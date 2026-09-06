@@ -11,7 +11,7 @@ const STEPS = [
 
 const POINTS = [
   ["Not a replacement", "The website stays the place your list lives; Karasu reads the same list and writes to it."],
-  ["The token stays in the backend", "It is kept in your OS credential store (or an encrypted file in portable mode, or the Android Keystore) and never reaches the app's web view."],
+  ["The token stays in the backend", "It is kept in your OS credential store (or an encrypted file in portable mode, or the Android Keystore) and is never handed back to the app's web view."],
   ["Within the limits", "AniList allows about thirty requests a minute. Karasu batches, caches and never fetches on scroll, so the budget is spent on what you asked for."],
 ] as const;
 

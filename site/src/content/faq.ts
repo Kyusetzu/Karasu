@@ -27,11 +27,11 @@ export const FAQ: Faq[] = [
   },
   {
     q: "Which platforms are supported?",
-    a: "Windows and Android, with every feature in the release, and Linux as an experimental AppImage. Detection differs: Windows reads media sessions, player and browser windows, mpv and Jellyfin; Linux reads media sessions, mpv and Jellyfin; Android reads Jellyfin. There is no macOS build.",
+    a: "Windows and Android are Stable, Linux is an experimental AppImage, and there is no macOS build. Windows has every feature. Android has the list, statistics, notifications, widgets and the social pages, but no local library, no tray and no in-app updater. Detection differs: Windows reads media sessions, player and browser windows, mpv and Jellyfin; Linux reads media sessions, mpv and Jellyfin, with no window titles; Android reads Jellyfin.",
   },
   {
     q: "Does Karasu store my AniList credentials?",
-    a: "It never sees your password. Signing in happens on anilist.co in your browser, which hands Karasu a token. That token is kept in your operating system's credential store on the desktop, in an encrypted file next to the app in portable mode, and in a Keystore-sealed file on Android — and it never reaches the app's web view.",
+    a: "It never sees your password. Signing in happens on anilist.co in your browser, which hands Karasu a token. That token is kept in your operating system's credential store on the desktop, in an encrypted file next to the app in portable mode, and in a Keystore-sealed file on Android — and it is never handed back to the app's web view.",
   },
   {
     q: "Can Karasu work offline?",

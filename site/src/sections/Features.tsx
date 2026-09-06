@@ -111,7 +111,7 @@ const ROWS: Row[] = [
     id: "discovery",
     eyebrow: "Discovery",
     title: "The season, the calendar, the franchise.",
-    text: "A seasonal page with a year of seasons above it, a Monday-first calendar with iCal export, a franchise graph you can pan and zoom, recommendations weighted by your own scores, and search across anime, manga, users, characters, staff and studios.",
+    text: "A seasonal page with a picker that reaches four years back, a Monday-first calendar with iCal export, a franchise graph you can pan and zoom, recommendations weighted by your own scores, and search across anime, manga, users, characters, staff and studios.",
     media: <Screenshot shot={shot("seasonal")} />,
   },
   {

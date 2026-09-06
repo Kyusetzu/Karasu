@@ -15,7 +15,7 @@ export function Statistics() {
       id="statistics"
       eyebrow="Statistics"
       title="Your list, as pictures."
-      lede="Every chart is built from the list Karasu already holds, so the page costs no requests and is there offline too."
+      lede="Half of it is drawn from the list Karasu already holds — the sunburst, your watch time, your scores against the crowd — and the rest is AniList's own statistics, fetched once and kept for half an hour."
     >
       <div className="mt-12 grid items-start gap-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-12">
         <ul className="space-y-5 lg:order-1">

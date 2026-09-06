@@ -17,7 +17,7 @@ export const DESKTOP = [
   { id: "stats-overview", file: "stats-overview.png", alt: "The Statistics page's overview tab with charts drawn from the list.", caption: "Statistics — overview" },
   { id: "stats-genres", file: "stats-genres.png", alt: "The Statistics page's genres and tags tab.", caption: "Statistics — genres and tags" },
   { id: "wrapped", file: "wrapped.png", alt: "The year-in-review poster with its preset crops beside it.", caption: "Year in review" },
-  { id: "seasonal", file: "seasonal.png", alt: "The Seasonal page shows a row of seasons above the grid of one season's titles.", caption: "Seasonal" },
+  { id: "seasonal", file: "seasonal.png", alt: "The Seasonal page shows one season's titles in a grid, with the season switcher above it.", caption: "Seasonal" },
   { id: "calendar", file: "calendar.png", alt: "The Calendar page shows the week's airing episodes on a Monday-first grid.", caption: "Calendar" },
   { id: "franchise", file: "franchise.png", alt: "The franchise graph of the Monogatari series, related titles connected by lines, with one title's card open at the side.", caption: "Franchise graph" },
   { id: "bell", file: "bell.png", alt: "The notification bell open over the Overview, listing recent notifications.", caption: "The bell — Karasu's and AniList's notifications in one stream" },

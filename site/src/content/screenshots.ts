@@ -213,7 +213,7 @@ export const SHOTS: Shot[] = [
     kind: "desktop",
     width: 2880,
     height: 1800,
-    alt: "The Seasonal page shows a row of seasons above the grid of one season's titles.",
+    alt: "The Seasonal page shows one season's titles in a grid, with the season switcher above it.",
     caption: "Seasonal",
     avif: [{ w: 2880, src: s9_avif_2880 }, { w: 1440, src: s9_avif_1440 }],
     webp: [{ w: 1440, src: s9_webp_1440 }],

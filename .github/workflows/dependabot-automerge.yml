@@ -68,6 +68,9 @@ jobs:
             exit 0
           fi
           echo "merging #$number ($title) at $SHA"
-          gh pr merge "$number" --squash --delete-branch \
+          # No checkout here, so `--repo` names the repository and the branch
+          # is left to the repository's delete-on-merge setting: `--delete-branch`
+          # wants a local clone to switch away from and fails without one.
+          gh pr merge "$number" --repo "$REPO" --squash \
             --subject "$title (#$number)" \
             --body "Merged automatically: the checks on $SHA passed ($RUN_URL)."

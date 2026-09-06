@@ -18,6 +18,12 @@
   <a href="https://discord.gg/yeHNSGyM8F"><img src="https://img.shields.io/badge/Discord-Kyu's%20Cozy%20Corner-5865F2?logo=discord&logoColor=white" alt="Discord" /></a>
 </p>
 
+<p align="center">
+  <a href="https://kyusetzu.github.io/Karasu/"><b>kyusetzu.github.io/Karasu</b></a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/Kyusetzu/Karasu/releases/latest">Download the latest release</a>
+</p>
+
 ---
 
 ## What is Karasu?
@@ -52,34 +58,52 @@ Because a local app can do things anilist.co simply can't:
 
 ## Screenshots
 
+Captures of the 1.0 release, at 2× on the desktop and straight off the phone —
+the same set the [website](https://kyusetzu.github.io/Karasu/) shows at full size.
+
 <p align="center">
-  <img src="assets/screenshots/welcome.jpg" alt="First launch" width="70%" /><br />
-  <sub>First launch — connect with AniList, or start local-only</sub>
+  <img src="assets/screenshots/now-playing.jpg" alt="Now Playing — an episode detected in mpv, the update counting down" width="80%" /><br />
+  <sub>Now Playing — an episode detected in mpv, the update counting down; confirm, dismiss, or look it up</sub>
 </p>
 
 <table>
 <tr>
-<td width="50%"><img src="assets/screenshots/overview.jpg" alt="Dashboard overview" /><br /><sub>Overview — what's airing this week, what you're in the middle of, recommendations</sub></td>
+<td width="50%"><img src="assets/screenshots/overview.jpg" alt="Dashboard overview" /><br /><sub>Overview — the season's headline title, your numbers, what airs this week and soon</sub></td>
 <td width="50%"><img src="assets/screenshots/local-library.jpg" alt="Local library" /><br /><sub>Local library — your files, matched to your list, next unwatched episode first</sub></td>
 </tr>
 <tr>
 <td width="50%"><img src="assets/screenshots/anime-list.jpg" alt="Anime list, grid view" /><br /><sub>Anime list — covers, status tabs, filters and presets</sub></td>
-<td width="50%"><img src="assets/screenshots/anime-list-columns.jpg" alt="Anime list, row view" /><br /><sub>…or as rows, with quick progress and score editing in place</sub></td>
+<td width="50%"><img src="assets/screenshots/anime-list-columns.jpg" alt="Anime list, row view" /><br /><sub>…or as rows, with status, score and progress edited in place</sub></td>
 </tr>
 <tr>
 <td width="50%"><img src="assets/screenshots/manga-list.jpg" alt="Manga list, grid view" /><br /><sub>Manga list — the same list, counting chapters and volumes</sub></td>
-<td width="50%"><img src="assets/screenshots/manga-list-columns.jpg" alt="Manga list, row view" /><br /><sub>…and its row view</sub></td>
+<td width="50%"><img src="assets/screenshots/season-overview.jpg" alt="Seasonal chart" /><br /><sub>Seasonal — one season's grid, any season of the last four years two clicks away</sub></td>
 </tr>
 <tr>
-<td width="50%"><img src="assets/screenshots/season-overview.jpg" alt="Seasonal chart" /><br /><sub>Seasonal — a year row over a season grid, so any season is two clicks away</sub></td>
-<td width="50%"><img src="assets/screenshots/statistics.jpg" alt="Statistics page" /><br /><sub>Statistics — how your list splits, the shape of your taste, the years you were active</sub></td>
+<td width="50%"><img src="assets/screenshots/statistics.jpg" alt="Statistics overview" /><br /><sub>Statistics — how your list splits by status, format and length</sub></td>
+<td width="50%"><img src="assets/screenshots/statistics-genres.jpg" alt="Statistics, genres and tags" /><br /><sub>…and the shape of your taste: genres against your average, tags by weight</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src="assets/screenshots/calendar.jpg" alt="Airing calendar" /><br /><sub>Calendar — a Monday-first week, your shows or everything, with iCal export</sub></td>
+<td width="50%"><img src="assets/screenshots/franchise.jpg" alt="Franchise graph" /><br /><sub>Franchise — the whole relation map, each node coloured by your status</sub></td>
 </tr>
 </table>
 
 <p align="center">
-  <img src="assets/screenshots/year-in-review.jpg" alt="Year in review card" width="70%" /><br />
+  <img src="assets/screenshots/year-in-review.jpg" alt="Year in review card" width="80%" /><br />
   <sub>Year in review — a shareable poster of your year, in five crops</sub>
 </p>
+
+<table>
+<tr>
+<td width="33%"><img src="assets/screenshots/android-overview.jpg" alt="Android — overview" /></td>
+<td width="33%"><img src="assets/screenshots/android-list.jpg" alt="Android — anime list" /></td>
+<td width="33%"><img src="assets/screenshots/android-detail.jpg" alt="Android — a title, with the entry editor" /></td>
+</tr>
+<tr>
+<td colspan="3" align="center"><sub>Android — the same list, statistics and social pages, with a bottom bar instead of a tray</sub></td>
+</tr>
+</table>
 
 ## Features
 
@@ -229,7 +253,9 @@ Because a local app can do things anilist.co simply can't:
 ## Installation
 
 Download from the
-[releases page](https://github.com/Kyusetzu/Karasu/releases). Each release
+[releases page](https://github.com/Kyusetzu/Karasu/releases) — or from the
+[website](https://kyusetzu.github.io/Karasu/#platforms), which carries the
+same files with each platform's notes beside its button. Each release
 carries one build per platform, always the newest: the Windows installer
 (`Karasu_<version>_x64-setup.exe`), the Linux `.AppImage`, and two Android
 APKs (`Karasu_<version>_arm64.apk`, plus a `_universal` fallback) — alongside
@@ -238,7 +264,7 @@ APKs (`Karasu_<version>_arm64.apk`, plus a `_universal` fallback) — alongside
 Two releases sit on that page. **Karasu <version>** is the Stable channel and
 the one to take; **Nightly build** is the rolling per-commit build for anyone
 who wants to stay on the edge. The built-in updater follows Stable on a fresh
-install; the channel is chosen under **Settings → Advanced → Updates**.
+install; the channel is chosen under **Settings → Desktop → Updates**.
 
 On first start, open **Settings → Log in with AniList** — your browser opens
 AniList, you approve access, and Karasu logs you in automatically. (A manual
@@ -346,6 +372,12 @@ refused on purpose so nobody builds one by accident.
 [CHANGELOG.md](CHANGELOG.md) is the short version of what has landed, and
 [ROADMAP.md](ROADMAP.md) is the honest version of what might come next — what
 each idea would actually cost, rather than a list of promises.
+
+The website is its own npm project under [`site/`](site/README.md), deployed
+to GitHub Pages by `.github/workflows/pages.yml`. Nothing in it is imported by
+the app, a site-only commit builds no Nightly, and every claim on the page has
+a row in [`site/CONTENT-AUDIT.md`](site/CONTENT-AUDIT.md) naming the code that
+makes it true.
 
 ### Architecture
 

@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 2058537 -->
+<!-- generated-through: e91e7a7 -->
 
 ## 1.0.0 — 2026-09-05
 

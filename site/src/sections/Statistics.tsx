@@ -28,9 +28,12 @@ export function Statistics() {
         </ul>
         <div className="space-y-6 lg:order-2">
           <Reveal>
-            <Screenshot shot={shot("statistics")} />
+            <Screenshot shot={shot("stats-overview")} />
           </Reveal>
           <Reveal delay={90}>
+            <Screenshot shot={shot("stats-genres")} />
+          </Reveal>
+          <Reveal delay={180}>
             <Screenshot shot={shot("wrapped")} />
           </Reveal>
         </div>

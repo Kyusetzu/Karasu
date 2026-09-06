@@ -15,7 +15,9 @@ const CLIENT = path.resolve(here, "..", "dist", "client");
 const BASE = "/Karasu/";
 const SITE_URL = "https://kyusetzu.github.io/Karasu/";
 const JS_BUDGET_GZ = 100 * 1024;
-const IMAGE_BUDGET = 250 * 1024;
+// Per format: AVIF is what every current browser downloads and carries the
+// 2x files; WebP and JPEG exist at 1x for the browsers that cannot.
+const IMAGE_BUDGET = { avif: 250 * 1024, webp: 300 * 1024, jpg: 300 * 1024, jpeg: 300 * 1024, png: 250 * 1024 };
 
 const failures = [];
 const fail = (msg) => failures.push(msg);
@@ -102,7 +104,8 @@ for (const f of files) {
     rows.push([name, size, gzipSync(readFileSync(f)).length]);
   } else if (/\.(avif|webp|jpe?g|png)$/.test(name)) {
     rows.push([name, size, null]);
-    if (size > IMAGE_BUDGET) fail(`${name} is ${(size / 1024).toFixed(0)} kB, over the ${IMAGE_BUDGET / 1024} kB image budget`);
+    const budget = IMAGE_BUDGET[name.split(".").pop()];
+    if (size > budget) fail(`${name} is ${(size / 1024).toFixed(0)} kB, over the ${budget / 1024} kB budget for its format`);
   }
 }
 for (const [name, size, gz] of rows.sort((a, b) => b[1] - a[1]).slice(0, 25)) {

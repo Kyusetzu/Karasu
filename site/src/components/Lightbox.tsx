@@ -114,13 +114,17 @@ export function Lightbox({
       >
         <figure className="min-h-0">
           <div className="panel-top overflow-hidden rounded-xl border border-surface-800 bg-surface-900 shadow-[0_1.5rem_4rem_rgba(0,0,0,.8)]">
-            <img
-              src={shot.src}
-              width={shot.width}
-              height={shot.height}
-              alt={shot.alt}
-              className="mx-auto block max-h-[78vh] w-auto max-w-full"
-            />
+            <picture>
+              <source type="image/avif" srcSet={shot.avif.map((s) => `${s.src} ${s.w}w`).join(", ")} sizes="100vw" />
+              <source type="image/webp" srcSet={shot.webp.map((s) => `${s.src} ${s.w}w`).join(", ")} sizes="100vw" />
+              <img
+                src={shot.jpg[0]?.src ?? shot.webp[0]?.src}
+                width={shot.width}
+                height={shot.height}
+                alt={shot.alt}
+                className="mx-auto block max-h-[78vh] w-auto max-w-full"
+              />
+            </picture>
           </div>
           <figcaption className="mt-3 flex items-center justify-between gap-4 text-sm text-ink-300">
             <span>{shot.caption}</span>

@@ -34,7 +34,7 @@ export function Gallery() {
       <ul className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {shots.map((s, i) => (
           <Reveal as="li" key={s.id} delay={staggerDelay(i)}>
-            <Screenshot shot={s} onClick={() => setOpen(i)} />
+            <Screenshot shot={s} onClick={() => setOpen(i)} sizes="(min-width: 1024px) 24rem, (min-width: 640px) 50vw, 100vw" />
             <p className="mt-2 text-xs text-ink-500">{s.caption}</p>
           </Reveal>
         ))}

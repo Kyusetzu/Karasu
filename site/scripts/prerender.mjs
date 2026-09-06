@@ -6,6 +6,9 @@
  * `dist/client`, which is what GitHub Pages serves. Forty lines instead of a
  * framework, because the site has two pages and no routing.
  */
+// The SSR bundle resolves react-dom/server by NODE_ENV at import time; the
+// production build is the one to render with.
+process.env.NODE_ENV = "production";
 import { readFileSync, writeFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";

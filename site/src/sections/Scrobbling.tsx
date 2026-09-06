@@ -1,5 +1,7 @@
 import { CloudUpload, Hash, Play, Radar, ScanSearch, SlidersHorizontal } from "lucide-react";
 import { FlowDiagram } from "@/components/FlowDiagram";
+import { Screenshot } from "@/components/Screenshot";
+import { shot } from "@/content/screenshots";
 import { Reveal, Section } from "@/components/Section";
 import { Card, CardTitle } from "@/components/ui/card";
 import { staggerDelay } from "@/lib/motion";
@@ -52,7 +54,11 @@ export function Scrobbling() {
         <FlowDiagram steps={STEPS} />
       </div>
 
-      <div className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <Reveal className="mt-14">
+        <Screenshot shot={shot("now-playing")} sizes="(min-width: 1152px) 72rem, 100vw" />
+      </Reveal>
+
+      <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {RULES.map((r, i) => (
           <Reveal key={r.title} delay={staggerDelay(i)}>
             <Card className="h-full">

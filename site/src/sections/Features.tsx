@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Bell, BookOpen, Calendar, LayoutGrid, MessageCircle, Smartphone, Tv } from "lucide-react";
+import { Bell, MessageCircle, Package, Tv } from "lucide-react";
 import { Screenshot } from "@/components/Screenshot";
 import { Eyebrow, Reveal, Section } from "@/components/Section";
 import { Card } from "@/components/ui/card";
@@ -15,29 +15,12 @@ interface Row {
   media: ReactNode;
 }
 
-/** A mock of the four Android widgets — names and shapes only, no data. */
-function WidgetMock() {
-  const tiles = [
-    { name: "Airing Today", rows: 3 },
-    { name: "Continue Watching", rows: 3 },
-    { name: "Continue Reading", rows: 2 },
-    { name: "This Week", rows: 4 },
-  ];
+/** Two phone screens side by side. */
+function PhonePair({ a, b }: { a: string; b: string }) {
   return (
-    <div className="grid grid-cols-2 gap-3 rounded-2xl border border-surface-800 bg-surface-950 p-4">
-      {tiles.map((t) => (
-        <div key={t.name} className="panel-wash panel-top rounded-xl border border-surface-800 bg-surface-900 p-3">
-          <p className="text-2xs font-semibold uppercase tracking-[.12em] text-ink-600">{t.name}</p>
-          <ul className="mt-2.5 space-y-1.5" aria-hidden="true">
-            {Array.from({ length: t.rows }, (_, i) => (
-              <li key={i} className="flex items-center gap-2">
-                <span className="h-5 w-3.5 rounded-[3px] bg-surface-700" />
-                <span className="h-2 flex-1 rounded-full bg-surface-800" style={{ maxWidth: `${70 - i * 12}%` }} />
-              </li>
-            ))}
-          </ul>
-        </div>
-      ))}
+    <div className="mx-auto grid max-w-md grid-cols-2 gap-4">
+      <Screenshot shot={shot(a)} sizes="(min-width: 1024px) 14rem, 45vw" />
+      <Screenshot shot={shot(b)} sizes="(min-width: 1024px) 14rem, 45vw" className="mt-8" />
     </div>
   );
 }
@@ -114,7 +97,7 @@ const ROWS: Row[] = [
       "A tray icon with Scrobble now, Sync now and the detection switch",
       "An optional background check, every 15, 30 or 60 minutes",
     ],
-    media: <Panel icon={Bell} lines={["Airing episodes, as they air", "Sequels and on-hold reminders, opt-in", "AniList notifications in the same bell", "Tray menu on the desktop"]} />,
+    media: <Screenshot shot={shot("bell")} />,
   },
   {
     id: "android",
@@ -122,7 +105,7 @@ const ROWS: Row[] = [
     title: "On your phone, with the app closed.",
     text: "The Android build is a sideloaded APK with the same list, the same statistics and Jellyfin detection. Four home-screen widgets draw straight from the cached list with no network, and a background job checks AniList's notifications even while Karasu is closed.",
     bullets: ["Share an anilist.co link into Karasu to open it there", "Widgets: Airing Today, Continue Watching, Continue Reading, This Week"],
-    media: <WidgetMock />,
+    media: <PhonePair a="phone-list" b="phone-detail" />,
   },
   {
     id: "discovery",
@@ -150,7 +133,7 @@ const ROWS: Row[] = [
     eyebrow: "Yours to keep",
     title: "No account required, nothing you cannot take with you.",
     text: "Start without an account and keep a local list; connect AniList later and Karasu merges the two. Export to MyAnimeList XML or a JSON backup in either mode; import into a local list. A daily local backup of the database is on by default, and a portable mode keeps everything beside the executable.",
-    media: <Screenshot shot={shot("welcome")} />,
+    media: <Panel icon={Package} lines={["Start with a local list, no account", "Connect AniList later; the two lists merge", "Export: MyAnimeList XML or a JSON backup", "Daily local backups; a portable mode beside the exe"]} />,
   },
 ];
 
@@ -192,10 +175,6 @@ export function Features() {
           <FeatureRow key={row.id} row={row} flip={i % 2 === 1} />
         ))}
       </div>
-      <p className="sr-only">
-        <BookOpen aria-hidden="true" /> <Calendar aria-hidden="true" /> <LayoutGrid aria-hidden="true" />{" "}
-        <Smartphone aria-hidden="true" />
-      </p>
     </Section>
   );
 }

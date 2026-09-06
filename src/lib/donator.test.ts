@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { donatorLabel } from "./donator";
+import { canTogglePin, donatorLabel, PIN_TIER, pinAbility } from "./donator";
 
 describe("donatorLabel", () => {
   it("shows nothing at tier 0, however the badge reads", () => {
@@ -31,5 +31,48 @@ describe("donatorLabel", () => {
 
   it("does not trust a negative tier", () => {
     expect(donatorLabel({ donatorTier: -1, donatorBadge: "x" })).toBeNull();
+  });
+});
+
+describe("pinAbility", () => {
+  it("is unknown for a viewer cached before the field existed", () => {
+    expect(pinAbility({})).toBe("unknown");
+    expect(pinAbility(null)).toBe("unknown");
+    expect(pinAbility(undefined)).toBe("unknown");
+  });
+
+  it("reads null as no tier", () => {
+    expect(pinAbility({ donatorTier: null })).toBe("no");
+    expect(pinAbility({ donatorTier: 0 })).toBe("no");
+  });
+
+  it("needs the tier AniList asks for", () => {
+    expect(pinAbility({ donatorTier: PIN_TIER - 1 })).toBe("no");
+    expect(pinAbility({ donatorTier: PIN_TIER })).toBe("yes");
+    expect(pinAbility({ donatorTier: 9 })).toBe("yes");
+  });
+});
+
+describe("canTogglePin", () => {
+  const unpinned = { isPinned: false };
+  const pinned = { isPinned: true };
+
+  it("is never offered on someone else's activity", () => {
+    expect(canTogglePin({ donatorTier: 5 }, unpinned, false)).toBe(false);
+    expect(canTogglePin({ donatorTier: 5 }, pinned, false)).toBe(false);
+  });
+
+  it("is hidden where AniList would refuse it", () => {
+    expect(canTogglePin({ donatorTier: 0 }, unpinned, true)).toBe(false);
+    expect(canTogglePin({ donatorTier: null }, unpinned, true)).toBe(false);
+  });
+
+  it("stays for a supporter and for an unknown tier", () => {
+    expect(canTogglePin({ donatorTier: 2 }, unpinned, true)).toBe(true);
+    expect(canTogglePin({}, unpinned, true)).toBe(true);
+  });
+
+  it("keeps the toggle on an already pinned activity whatever the tier", () => {
+    expect(canTogglePin({ donatorTier: 0 }, pinned, true)).toBe(true);
   });
 });

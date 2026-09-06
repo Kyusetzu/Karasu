@@ -3,6 +3,12 @@ export interface Viewer {
   name: string;
   siteUrl: string;
   avatar: { large: string | null } | null;
+  /** AniList's donator tier, 0 for none. Carried by `VIEWER_QUERY` because
+   *  pinning an activity is a tier-2 feature — `lib/donator` decides whether
+   *  the pin control is offered at all. Optional: a viewer blob cached before
+   *  the field existed lacks it, and reads as "unknown", which keeps the
+   *  control (a refusal then explains itself in the toast). */
+  donatorTier?: number | null;
   /** Carried by `VIEWER_QUERY` so the whole app can follow the account's
    *  score format without a profile fetch. Optional: cached viewer blobs from
    *  before the field existed lack it, and read as ten-point. */

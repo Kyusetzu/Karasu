@@ -6,6 +6,7 @@ import {
   toggleActivityPin,
   type ActivityPage,
 } from "@/api/social";
+import { backendErrorText } from "@/lib/backendError";
 import { showToast } from "@/stores/toast";
 
 /**
@@ -72,24 +73,40 @@ export function useActivityPost(viewerId: number | undefined) {
     },
   });
 
+  /**
+   * Rewrites one activity in every feed that holds it, whoever's feed it is.
+   *
+   * Prefix keys, not the viewer's two: the activity is also cached under
+   * `["social", "activity", id]` by its own page, and under other users'
+   * feeds when it was seen there. The exact-key version patched the two
+   * feeds and left the page the click was made on unchanged.
+   */
+  const patchEverywhere = (id: number, apply: (raw: object) => object | null) => {
+    for (const scope of ["feed", "activities"] as const) {
+      qc.setQueriesData<InfiniteData<ActivityPage>>({ queryKey: ["social", scope] }, (old) => {
+        if (!old) return old;
+        let touched = false;
+        const pages = old.pages.map((p) => ({
+          ...p,
+          activities: p.activities.flatMap((raw) => {
+            if ((raw as { id?: number })?.id !== id) return [raw];
+            touched = true;
+            const next = apply(raw as object);
+            return next ? [next] : [];
+          }),
+        }));
+        return touched ? { ...old, pages } : old;
+      });
+    }
+    qc.setQueryData<unknown>(["social", "activity", id], (old: unknown) =>
+      old ? apply(old as object) : old,
+    );
+  };
+
   const remove = useMutation({
     mutationFn: (id: number) => deleteActivity(id),
     onSuccess: (_ok, id) => {
-      for (const key of feedKeys()) {
-        qc.setQueryData<InfiniteData<ActivityPage>>(key, (old) =>
-          old
-            ? {
-                ...old,
-                pages: old.pages.map((p) => ({
-                  ...p,
-                  activities: p.activities.filter(
-                    (raw) => (raw as { id?: number })?.id !== id,
-                  ),
-                })),
-              }
-            : old,
-        );
-      }
+      patchEverywhere(id, () => null);
       // No undo offered, because there is none: AniList has no way to restore a
       // deleted activity, and a button implying otherwise would be a lie.
       showToast({ kind: "success", text: t("social.postDeleted") });
@@ -106,32 +123,26 @@ export function useActivityPost(viewerId: number | undefined) {
    * (pinned floats to the top of the profile feed) only changes on the next
    * refetch, which is honest: reshuffling rows under the cursor to celebrate a
    * click is worse than a badge appearing where the row already is.
+   *
+   * A refusal carries AniList's own sentence into the toast: pinning is a
+   * donator feature over there, and "Sorry, you must be at least a tier 2
+   * donator" is the whole explanation. `lib/donator` keeps the control off
+   * accounts the viewer query already knows cannot pin; this covers the
+   * viewer blob that predates the field.
    */
   const pin = useMutation({
     mutationFn: (vars: { id: number; pinned: boolean }) =>
       toggleActivityPin(vars.id, vars.pinned),
     onSuccess: (res, vars) => {
       const isPinned = res?.isPinned ?? vars.pinned;
-      for (const key of feedKeys()) {
-        qc.setQueryData<InfiniteData<ActivityPage>>(key, (old) =>
-          old
-            ? {
-                ...old,
-                pages: old.pages.map((p) => ({
-                  ...p,
-                  activities: p.activities.map((raw) =>
-                    (raw as { id?: number })?.id === vars.id
-                      ? { ...(raw as object), isPinned }
-                      : raw,
-                  ),
-                })),
-              }
-            : old,
-        );
-      }
+      patchEverywhere(vars.id, (raw) => ({ ...raw, isPinned }));
     },
-    onError: () => {
-      showToast({ kind: "error", text: t("social.pinFailed") });
+    onError: (err) => {
+      showToast({
+        kind: "error",
+        text: t("social.pinFailed"),
+        detail: backendErrorText(err, t),
+      });
     },
   });
 

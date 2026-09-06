@@ -20,6 +20,7 @@ import { Shimmer } from "@/components/Skeleton";
 import { Markdown } from "./Markdown";
 import { relTimeFromSeconds } from "@/lib/relTime";
 import { validatePost } from "@/lib/composer";
+import { canTogglePin } from "@/lib/donator";
 import { useSocialActions } from "@/hooks/useSocialActions";
 import { useActivityPost } from "@/hooks/useActivityPost";
 import { useAuth } from "@/stores/auth";
@@ -259,6 +260,9 @@ export function ActivityCard({
   const [repliesOpen, setRepliesOpen] = useState(openReplies);
   const viewer = useAuth((s) => s.viewer);
   const self = viewer !== null && viewer.id === item.user.id;
+  // Pinning is a donator feature on AniList's side; the toggle is only
+  // offered where it can succeed — see `lib/donator`.
+  const showPin = canTogglePin(viewer, item, self);
   const { pin } = useActivityPost(viewer?.id);
   const when = relTimeFromSeconds(item.createdAt, i18n.language, t("notif.now"));
 
@@ -292,9 +296,10 @@ export function ActivityCard({
             />
           </Link>
           <div className="flex shrink-0 items-center gap-2">
-            {/* Your own activity gets the toggle; someone else's pinned one
-                gets the passive marker — same glyph, different verbs. */}
-            {self ? (
+            {/* Your own activity gets the toggle, if your account may pin;
+                anyone's pinned one otherwise gets the passive marker — same
+                glyph, different verbs. */}
+            {showPin ? (
               <button
                 onClick={() => pin.mutate({ id: item.id, pinned: !item.isPinned })}
                 disabled={pin.isPending}

@@ -125,70 +125,149 @@ impl From<ApiError> for String {
 
 /// HTTP statuses that mean "not now" rather than "not ever".
 ///
-/// A 429 reaching this point has already outlived the one retry below. 401 and
-/// 403 are about the token rather than the payload, so a re-sign-in fixes them
-/// and the write is still good. 5xx is AniList being down.
+/// A 429 reaching this point has already outlived the one retry below. 401 is
+/// about the token rather than the payload, so a re-sign-in fixes it and the
+/// write is still good; 403 is AniList refusing on grounds it spells out in
+/// the message — an outage, a donator feature — and the write is still good
+/// then too. 5xx is AniList being down.
 fn status_is_retryable(code: u16) -> bool {
     matches!(code, 401 | 403 | 429) || (500..600).contains(&code)
 }
 
-/// AniList answers a bad token with HTTP 400 and the reason in the `errors`
-/// array, so the status alone cannot classify every recoverable failure.
-///
-/// The set is deliberately tiny. Everything else the server says about a
-/// payload is permanent, and guessing the other way is not free: a row wrongly
-/// called retryable stays in the queue forever and blocks every edit behind it.
-fn message_is_retryable(msg: &str) -> bool {
-    let m = msg.to_ascii_lowercase();
-    m.contains("invalid token") || m.contains("unauthorized") || m.contains("too many requests")
-}
-
-/// The token rather than the payload or the pace.
-///
-/// Checked *before* the retryable set, which also claims 401 and 403 — order is
-/// the whole distinction. "too many requests" is deliberately absent: a 429 is
-/// about how fast we asked, and calling it an auth failure would sign the user
-/// out for being busy.
-fn is_auth_failure(code: u16, msg: &str) -> bool {
-    let m = msg.to_ascii_lowercase();
-    matches!(code, 401 | 403) || m.contains("invalid token") || m.contains("unauthorized")
-}
-
-/// `sent_token` is what keeps "your session expired" honest. A request that
-/// carried no bearer cannot have had its token rejected — yet a Cloudflare or
-/// captive-portal 403 in front of graphql.anilist.co matches the same status
-/// check, and used to sign the message "token rejected" to a user who never
-/// had a token. Tokenless auth-shaped failures are retryable network weather
-/// instead.
 /// The stable code a rate-limited request answers with.
 ///
 /// A code rather than the server's sentence, for the reason `TOKEN_REJECTED`
 /// is one: the frontend has to *recognise* this class to stop retrying it, and
-/// matching on prose would mean re-implementing `message_is_retryable` in
-/// TypeScript — the same rule in two languages, free to drift.
-/// `lib/backendError.ts` turns it into a sentence.
+/// matching on prose would mean re-implementing `verdict` in TypeScript — the
+/// same rule in two languages, free to drift. `lib/backendError.ts` turns it
+/// into a sentence.
 pub const RATE_LIMITED: &str = "anilist.rateLimited";
 
-fn classify(code: u16, msg: String, sent_token: bool) -> ApiError {
-    // 429 is the one retryable class worth naming: it is the only one the
-    // frontend must not spend a second round trip on, because the answer is
-    // guaranteed to be the same until the window rolls.
+/// What one failed response means, before it becomes an `ApiError`.
+///
+/// A separate step so the one case the status and the wording cannot settle
+/// between them — `Ambiguous` — is visible to the caller, which can go and
+/// find out (see `token_alive`) instead of guessing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Verdict {
+    RateLimited,
+    /// The credential is dead. Only a 401 or an explicit "invalid token" says
+    /// so on its own.
+    Auth,
+    /// A bare `Unauthorized.` with a token sent: AniList uses the same word for
+    /// a dead token and for a resolver refusing a payload the token is not
+    /// allowed to perform. Nothing in the response tells the two apart.
+    Ambiguous,
+    Retryable,
+    Api,
+}
+
+/// The truth table, in order of precedence.
+///
+/// **A 403 is not a dead token.** AniList answers a bad token with HTTP 400 and
+/// the reason in the `errors` array; a 403 carries a *sentence* about something
+/// else — `Sorry, you must be at least a tier 2 donator to pin activities`,
+/// `The AniList API has been temporarily disabled…`, `Forbidden. (Use graphql
+/// subdomain)`. For as long as `matches!(code, 401 | 403)` made every one of
+/// those an auth failure, pinning an activity signed the user out and an
+/// outage read as an expired session. A 403 keeps its sentence and stays
+/// retryable, because the queue and the cached-list fallback branch on that
+/// and an outage must not drop a queued edit.
+///
+/// `sent_token` is what keeps "your session expired" honest. A request that
+/// carried no bearer cannot have had its token rejected — yet a Cloudflare or
+/// captive-portal 401 in front of graphql.anilist.co matches the same status
+/// check, and used to sign the message "token rejected" to a user who never
+/// had a token. Tokenless auth-shaped failures are retryable network weather.
+///
+/// "too many requests" is deliberately not auth: a 429 is about how fast we
+/// asked, and calling it an auth failure would sign the user out for being
+/// busy.
+fn verdict(code: u16, msg: &str, sent_token: bool) -> Verdict {
     if code == 429 {
-        crate::logging::debug("anilist", format!("rate limited: {msg}"));
-        return ApiError::Retryable(RATE_LIMITED.into());
+        return Verdict::RateLimited;
     }
-    if is_auth_failure(code, &msg) {
-        if sent_token {
-            ApiError::Auth(msg)
+    let m = msg.to_ascii_lowercase();
+    if code == 401 || m.contains("invalid token") {
+        return if sent_token {
+            Verdict::Auth
         } else {
-            ApiError::Retryable(msg)
-        }
-    } else if status_is_retryable(code) || message_is_retryable(&msg) {
-        ApiError::Retryable(msg)
+            Verdict::Retryable
+        };
+    }
+    // The whole message, not a substring: `Unauthorized: cannot edit this
+    // review` is a resolver explaining itself, and only the bare word is the
+    // form a dead token and a refused payload share.
+    let bare = m.trim().trim_end_matches('.').trim();
+    if bare == "unauthorized" {
+        return if sent_token {
+            Verdict::Ambiguous
+        } else {
+            Verdict::Retryable
+        };
+    }
+    if status_is_retryable(code) || m.contains("too many requests") {
+        Verdict::Retryable
     } else {
-        ApiError::Api(msg)
+        Verdict::Api
     }
 }
+
+/// `verdict`, mapped onto `ApiError` without asking anyone.
+///
+/// `Ambiguous` becomes `Auth` here — the answer this function gave for years
+/// and the right one for the probe's own request, which must not probe again.
+/// The response path resolves `Ambiguous` through `token_alive` first and only
+/// falls back to this for the rest.
+fn classify(code: u16, msg: String, sent_token: bool) -> ApiError {
+    match verdict(code, &msg, sent_token) {
+        Verdict::RateLimited => {
+            // 429 is the one retryable class worth naming: it is the only one
+            // the frontend must not spend a second round trip on, because the
+            // answer is guaranteed to be the same until the window rolls.
+            crate::logging::debug("anilist", format!("rate limited: {msg}"));
+            ApiError::Retryable(RATE_LIMITED.into())
+        }
+        Verdict::Auth | Verdict::Ambiguous => ApiError::Auth(msg),
+        Verdict::Retryable => ApiError::Retryable(msg),
+        Verdict::Api => ApiError::Api(msg),
+    }
+}
+
+/// What an `Ambiguous` refusal means once the token has been probed.
+///
+/// Alive: the payload was refused, which is a permanent answer with AniList's
+/// own sentence on it. Dead: the credential is gone. Unknown — the probe hit
+/// the network or the rate limit — is *not* a sign-out: nobody is signed out on
+/// missing evidence, and the next real request asks again.
+fn resolve_ambiguous(msg: String, alive: Option<bool>) -> ApiError {
+    match alive {
+        Some(true) => ApiError::Api(msg),
+        Some(false) => ApiError::Auth(msg),
+        None => ApiError::Retryable(msg),
+    }
+}
+
+/// Whether a request may probe the token to settle an `Ambiguous` refusal.
+/// The probe's own request may not, or a dead token would probe forever.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Probe {
+    Allowed,
+    Never,
+}
+
+/// The cheapest authenticated query there is: it answers `Unauthorized` on a
+/// dead token and a viewer id on a live one, and nothing else.
+const PROBE_QUERY: &str = "{ Viewer { id } }";
+
+/// How long one probe's answer stands. A screen fires several queries at
+/// once; without this, every ambiguous refusal among them would spend a
+/// request of its own against a 30-a-minute budget to learn the same thing.
+const PROBE_TTL: Duration = Duration::from_secs(60);
+
+/// Whether the current run of non-auth refusals has already been logged.
+/// Cleared by the next success, like `AUTH_REPORTED`.
+static REFUSED_REPORTED: AtomicBool = AtomicBool::new(false);
 
 /// GraphQL client for AniList with centralized rate limiting.
 ///
@@ -205,6 +284,9 @@ pub struct AniList {
     /// said "28 of 30" with nothing to attribute it to was the complaint this
     /// answers: the number moved and there was no way to see what moved it.
     log: Mutex<VecDeque<Recorded>>,
+    /// The last token probe's verdict and when it was reached — see
+    /// `token_alive` and `PROBE_TTL`.
+    probe: Mutex<Option<(Instant, bool)>>,
 }
 
 /// One finished request, stored with a monotonic instant so its age is computed
@@ -447,7 +529,43 @@ impl AniList {
                 reset_at: None,
             }),
             log: Mutex::new(VecDeque::with_capacity(LOG_CAP)),
+            probe: Mutex::new(None),
         }
+    }
+
+    /// Whether `token` still works, decided by one `{ Viewer { id } }` and
+    /// remembered for `PROBE_TTL`.
+    ///
+    /// Called only to settle an `Ambiguous` refusal. `Probe::Never` on the
+    /// probe's own request is what stops a dead token from probing itself in
+    /// a loop; `Box::pin` is what lets an async fn call the one it is called
+    /// from. `None` means the probe could not say — network, pace — and the
+    /// caller must not sign anyone out on that.
+    async fn token_alive(&self, token: &str) -> Option<bool> {
+        if let Some((at, alive)) = *self.probe.lock().await {
+            if at.elapsed() < PROBE_TTL {
+                return Some(alive);
+            }
+        }
+        crate::logging::info("anilist", "probing the token after an ambiguous refusal");
+        let res = Box::pin(self.query_with(Some(token), PROBE_QUERY, json!({}), Probe::Never)).await;
+        let alive = match res {
+            Ok(_) => Some(true),
+            Err(ApiError::Auth(_)) => Some(false),
+            Err(_) => None,
+        };
+        crate::logging::info(
+            "anilist",
+            match alive {
+                Some(true) => "token probe: alive — the refusal was about the payload",
+                Some(false) => "token probe: dead",
+                None => "token probe: inconclusive",
+            },
+        );
+        if let Some(a) = alive {
+            *self.probe.lock().await = Some((Instant::now(), a));
+        }
+        alive
     }
 
     /// Appends one finished request, evicting the oldest past `LOG_CAP`.
@@ -525,6 +643,16 @@ impl AniList {
         token: Option<&str>,
         query: &str,
         variables: Value,
+    ) -> Result<Value, ApiError> {
+        self.query_with(token, query, variables, Probe::Allowed).await
+    }
+
+    async fn query_with(
+        &self,
+        token: Option<&str>,
+        query: &str,
+        variables: Value,
+        probe: Probe,
     ) -> Result<Value, ApiError> {
         // Pace into the budget rather than run into the 429, then book the
         // request before sending it.
@@ -693,28 +821,50 @@ impl AniList {
                     .join("; ");
                 self.record(&operation, sent, paced, Some(status), remaining, "error")
                     .await;
-                let err = classify(
-                    status,
-                    if msg.is_empty() {
-                        format!("AniList error (HTTP {status})")
-                    } else {
-                        msg
-                    },
-                    token.is_some(),
-                );
+                let msg = if msg.is_empty() {
+                    format!("AniList error (HTTP {status})")
+                } else {
+                    msg
+                };
+                // A bare `Unauthorized.` with a token sent is the one answer
+                // the response cannot settle. Ask, once, rather than sign the
+                // user out for a payload AniList would not let them send.
+                let err = match (verdict(status, &msg, token.is_some()), token, probe) {
+                    (Verdict::Ambiguous, Some(t), Probe::Allowed) => {
+                        let alive = self.token_alive(t).await;
+                        resolve_ambiguous(msg, alive)
+                    }
+                    _ => classify(status, msg, token.is_some()),
+                };
                 // The status and AniList's own wording, once per transition.
                 // A screen fires several queries, so an unguarded warn would
                 // write the same line a dozen times and rotate the interesting
                 // part of a 1 MB log off disk — the `debug_changed` lesson.
                 // Never the header and never the body: the request carries the
                 // bearer token this whole module exists to keep in Rust.
-                if let ApiError::Auth(ref reason) = err {
-                    if !AUTH_REPORTED.swap(true, Ordering::Relaxed) {
-                        crate::logging::warn(
-                            "anilist",
-                            format!("token rejected (HTTP {status}): {reason}"),
-                        );
+                match &err {
+                    ApiError::Auth(reason) => {
+                        if !AUTH_REPORTED.swap(true, Ordering::Relaxed) {
+                            crate::logging::warn(
+                                "anilist",
+                                format!("token rejected (HTTP {status}): {reason}"),
+                            );
+                        }
                     }
+                    // A refusal that is not about the credential — the
+                    // donator sentence, an outage — is the line a bug report
+                    // needs, and the classifier used to throw it away.
+                    ApiError::Retryable(reason) | ApiError::Api(reason)
+                        if matches!(status, 401 | 403) =>
+                    {
+                        if !REFUSED_REPORTED.swap(true, Ordering::Relaxed) {
+                            crate::logging::warn(
+                                "anilist",
+                                format!("refused (HTTP {status}): {reason}"),
+                            );
+                        }
+                    }
+                    _ => {}
                 }
                 return Err(err);
             }
@@ -724,6 +874,7 @@ impl AniList {
                 // Armed again, so a *later* rejection is logged rather than
                 // swallowed as a repeat of one the user has already fixed.
                 AUTH_REPORTED.store(false, Ordering::Relaxed);
+                REFUSED_REPORTED.store(false, Ordering::Relaxed);
             }
             self.record(
                 &operation,
@@ -1021,7 +1172,10 @@ mod tests {
     #[test]
     fn an_expired_token_is_read_out_of_the_message() {
         assert!(classify(400, "Invalid token".into(), true).is_retryable());
-        assert!(classify(400, "Unauthorized".into(), true).is_retryable());
+        assert!(matches!(
+            classify(400, "Invalid token".into(), true),
+            ApiError::Auth(_)
+        ));
         // A request that carried no bearer cannot have had its token
         // rejected: a proxy or Cloudflare 403 on a tokenless request is
         // weather, not a sign-out.
@@ -1036,12 +1190,12 @@ mod tests {
         assert!(classify(400, "Too Many Requests".into(), true).is_retryable());
     }
 
-    /// The split this commit exists for. Both keep a queued edit — the write is
+    /// The split this file exists for. Both keep a queued edit — the write is
     /// good either way, it is the credential that went stale — but only one of
     /// them means "nothing will change until you sign in again".
     #[test]
     fn a_rejected_token_is_not_the_same_as_a_busy_server() {
-        for (code, msg) in [(400, "Invalid token"), (401, "nope"), (403, "nope")] {
+        for (code, msg) in [(400, "Invalid token"), (401, "nope"), (403, "invalid token")] {
             assert!(
                 matches!(classify(code, msg.into(), true), ApiError::Auth(_)),
                 "HTTP {code} / {msg:?} is an auth failure"
@@ -1063,6 +1217,84 @@ mod tests {
         ));
     }
 
+    /// The bug that made pinning an activity sign the user out. AniList's 403
+    /// carries a sentence about the *payload*; the credential is fine, the
+    /// sentence has to reach the toast, and nothing may raise the banner.
+    #[test]
+    fn a_donator_refusal_is_not_an_auth_failure() {
+        let msg = "Sorry, you must be at least a tier 2 donator to pin activities";
+        let err = classify(403, msg.into(), true);
+        assert!(matches!(err, ApiError::Retryable(_)), "{err:?}");
+        assert_eq!(String::from(err), msg);
+        assert_ne!(String::from(classify(403, msg.into(), true)), TOKEN_REJECTED);
+    }
+
+    /// The other 403 seen in the wild: AniList switching its API off. An
+    /// outage is not an expired session, and a queued edit must survive it.
+    #[test]
+    fn an_api_outage_403_keeps_a_queued_edit() {
+        let msg = "The AniList API has been temporarily disabled due to severe stability issues.";
+        let err = classify(403, msg.into(), true);
+        assert!(err.is_retryable());
+        assert!(!matches!(err, ApiError::Auth(_)));
+        assert_eq!(String::from(err), msg);
+    }
+
+    /// The one shape the response cannot settle: AniList says `Unauthorized.`
+    /// both for a dead token and for a payload the token may not send. With a
+    /// token it is a question to go and ask; without one it is weather.
+    #[test]
+    fn a_bare_unauthorized_is_ambiguous_with_a_token_and_weather_without() {
+        assert_eq!(verdict(403, "Unauthorized.", true), Verdict::Ambiguous);
+        assert_eq!(verdict(400, "Unauthorized", true), Verdict::Ambiguous);
+        assert_eq!(verdict(400, "  unauthorized. ", true), Verdict::Ambiguous);
+        assert_eq!(verdict(403, "Unauthorized.", false), Verdict::Retryable);
+        // Without a probe the old answer stands, which is what the probe's own
+        // request relies on.
+        assert!(matches!(
+            classify(403, "Unauthorized.".into(), true),
+            ApiError::Auth(_)
+        ));
+    }
+
+    /// A resolver explaining itself is not the bare word: it is a refusal of
+    /// the payload, with the explanation kept.
+    #[test]
+    fn unauthorized_inside_a_sentence_is_a_permission_error() {
+        let v = verdict(403, "Unauthorized: cannot edit this review", true);
+        assert_eq!(v, Verdict::Retryable);
+        assert_eq!(verdict(400, "Unauthorized: cannot edit this review", true), Verdict::Api);
+    }
+
+    /// The probe's three answers. `None` is the one that matters: nobody is
+    /// signed out on missing evidence.
+    #[test]
+    fn an_inconclusive_probe_does_not_sign_out() {
+        assert!(matches!(
+            resolve_ambiguous("Unauthorized.".into(), Some(true)),
+            ApiError::Api(_)
+        ));
+        assert!(matches!(
+            resolve_ambiguous("Unauthorized.".into(), Some(false)),
+            ApiError::Auth(_)
+        ));
+        let unknown = resolve_ambiguous("Unauthorized.".into(), None);
+        assert!(matches!(unknown, ApiError::Retryable(_)));
+        assert_ne!(String::from(unknown), TOKEN_REJECTED);
+    }
+
+    /// The probe's own request must never become another probe.
+    #[test]
+    fn a_probe_never_probes_itself() {
+        // `Probe::Never` is what the response path checks; with it, an
+        // ambiguous answer takes `classify`'s direct mapping.
+        assert_ne!(Probe::Never, Probe::Allowed);
+        assert!(matches!(
+            classify(400, "Unauthorized".into(), true),
+            ApiError::Auth(_)
+        ));
+    }
+
     /// Every auth failure has to keep its queued write. The queue drops `Api`.
     #[test]
     fn a_rejected_token_never_drops_an_edit() {
@@ -1081,9 +1313,10 @@ mod tests {
 
     #[test]
     fn message_matching_ignores_case() {
-        assert!(message_is_retryable("INVALID TOKEN"));
-        assert!(message_is_retryable("the server said: invalid token"));
-        assert!(!message_is_retryable("token is fine, mediaId is not"));
+        assert_eq!(verdict(400, "INVALID TOKEN", true), Verdict::Auth);
+        assert_eq!(verdict(400, "the server said: invalid token", true), Verdict::Auth);
+        assert_eq!(verdict(400, "UNAUTHORIZED.", true), Verdict::Ambiguous);
+        assert_eq!(verdict(400, "token is fine, mediaId is not", true), Verdict::Api);
     }
 
     /// `status_is_retryable` is a range check, and the ends of a range are

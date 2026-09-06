@@ -40,6 +40,7 @@ query {
     name
     siteUrl
     avatar { large }
+    donatorTier
     mediaListOptions {
       scoreFormat
       animeList { advancedScoring advancedScoringEnabled }

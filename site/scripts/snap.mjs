@@ -5,9 +5,16 @@
  * playwright-core (no browser download), the same executable the app's
  * virtual-rows check uses.
  *
- *   node scripts/snap.mjs <url> [<url> …] [--widths 390,768,1280,1440,2560] [--full] [--out name]
+ *   node scripts/snap.mjs <url> [<url> …] [options]
  *
- * `--full` captures the whole page height; otherwise the first viewport.
+ *   --widths 390,768,1280,1440,2560   viewport widths (default all five)
+ *   --full                            whole page height, not the first viewport
+ *   --out name                        file name stem (default "page")
+ *   --clip <selector>                 capture only that element
+ *   --frames 0,500,1000               one capture per delay (ms) after load, for a timeline
+ *   --reduced                         emulate prefers-reduced-motion: reduce
+ *   --scale 2                         device scale factor (default 2 below 768 px, else 1)
+ *
  * A URL's `#hash` is kept, so `#sample` reaches the dev-only sample page.
  */
 import { existsSync, mkdirSync } from "node:fs";
@@ -23,14 +30,21 @@ const EDGE =
     : "/opt/pw-browsers/chromium");
 
 const argv = process.argv.slice(2);
-const opt = (name, fallback) => {
-  const i = argv.indexOf(name);
-  return i >= 0 ? argv[i + 1] : fallback;
-};
-const urls = argv.filter((a, i) => !a.startsWith("--") && !(i > 0 && argv[i - 1].startsWith("--") && argv[i - 1] !== "--full"));
-const widths = opt("--widths", "390,768,1280,1440,2560").split(",").map(Number);
-const full = argv.includes("--full");
-const name = opt("--out", "page");
+const flagsWithValue = new Set(["--widths", "--out", "--clip", "--frames", "--scale"]);
+const opts = {};
+const urls = [];
+for (let i = 0; i < argv.length; i++) {
+  const a = argv[i];
+  if (flagsWithValue.has(a)) opts[a] = argv[++i];
+  else if (a.startsWith("--")) opts[a] = true;
+  else urls.push(a);
+}
+const widths = (opts["--widths"] ?? "390,768,1280,1440,2560").split(",").map(Number);
+const frames = opts["--frames"] ? opts["--frames"].split(",").map(Number) : [null];
+const name = opts["--out"] ?? "page";
+const full = Boolean(opts["--full"]);
+const clip = opts["--clip"];
+const reduced = Boolean(opts["--reduced"]);
 
 if (!urls.length) {
   console.error("snap: give at least one URL");
@@ -47,18 +61,33 @@ try {
   for (const url of urls) {
     for (const width of widths) {
       const height = width < 768 ? 844 : 900;
+      const scale = opts["--scale"] ? Number(opts["--scale"]) : width < 768 ? 2 : 1;
       const context = await browser.newContext({
         viewport: { width, height },
-        deviceScaleFactor: width < 768 ? 2 : 1,
+        deviceScaleFactor: scale,
         colorScheme: "dark",
+        reducedMotion: reduced ? "reduce" : "no-preference",
       });
       const page = await context.newPage();
       await page.goto(url, { waitUntil: "networkidle" });
       await page.evaluate(() => document.fonts.ready);
-      await page.waitForTimeout(600);
-      const tag = `${name}-${width}${full ? "-full" : ""}.png`;
-      await page.screenshot({ path: path.join(OUT, tag), fullPage: full });
-      console.log(`snap: ${tag}`);
+      let elapsed = 0;
+      for (const at of frames) {
+        if (at === null) await page.waitForTimeout(600);
+        else {
+          await page.waitForTimeout(Math.max(0, at - elapsed));
+          elapsed = at;
+        }
+        const tag = `${name}-${width}${reduced ? "-reduced" : ""}${at === null ? "" : `-t${at}`}${full ? "-full" : ""}.png`;
+        const file = path.join(OUT, tag);
+        if (clip) {
+          const el = page.locator(clip).first();
+          await el.screenshot({ path: file, animations: "allow" });
+        } else {
+          await page.screenshot({ path: file, fullPage: full, animations: "allow" });
+        }
+        console.log(`snap: ${tag}`);
+      }
       await context.close();
     }
   }

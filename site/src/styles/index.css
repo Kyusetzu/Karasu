@@ -13,12 +13,10 @@
 @import "./fonts.css";
 
 @theme {
-  /* The app's body face is the Windows system stack; a website is read on
-     everything, so the stack is widened. SN Pro stays the brand face. */
-  --font-sans:
-    "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Helvetica Neue",
-    Arial, sans-serif;
-  --font-brand: "SN Pro", var(--font-sans);
+  /* SN Pro everywhere (maintainer, 2026-09-05): one face on every device. The
+     app keeps the system stack for its body; the site is read on everything. */
+  --font-sans: "SN Pro", system-ui, "Segoe UI", -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --font-brand: var(--font-sans);
   /* Kosugi Maru is not shipped; the katakana in the wordmark is drawn as
      paths, and any other Japanese falls back to the brand face. */
   --font-brand-jp: var(--font-brand);
@@ -50,4 +48,117 @@ body {
 }
 .skip-link:focus-visible {
   @apply not-sr-only fixed left-4 top-4 z-50 rounded-lg bg-accent-500 px-3 py-2 text-sm font-medium text-accent-ink outline-none;
+}
+
+/* --- Hero --------------------------------------------------------------- */
+
+/* The About page's wash, so the stage sits in light rather than on a flat
+   page (src/pages/About.tsx). */
+.hero::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 28rem;
+  pointer-events: none;
+  background: radial-gradient(40rem 20rem at 50% -20%, rgba(var(--w1), 0.16), transparent 70%);
+}
+
+/* The stage: the Wrapped poster's ground and its three washes
+   (src/pages/Wrapped.tsx), with the 1px catch-light along the top. */
+.hero-stage {
+  background:
+    radial-gradient(90% 90% at 0% 0%, rgba(var(--w1), 0.16), transparent 60%),
+    radial-gradient(70% 70% at 100% 100%, rgba(var(--accent-rgb), 0.13), transparent 60%),
+    radial-gradient(60% 60% at 50% 45%, rgba(var(--w2), 0.07), transparent 65%),
+    #07090d;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 1.25rem 2.5rem rgba(0, 0, 0, 0.45);
+}
+
+.hero-dot {
+  background: var(--color-ink-600);
+}
+.hero-rail {
+  background: var(--color-accent-500);
+}
+
+/* Which line of copy each layer shows is decided by the phase alone. The
+   static render (the server's) reads as the finished scene. */
+.hero-stage .st {
+  display: none;
+}
+.hero-stage[data-phase="static"] .st-pill-live,
+.hero-stage[data-phase="detected"] .st-pill-live,
+.hero-stage[data-phase="locked"] .st-pill-live,
+.hero-stage[data-phase="filling"] .st-pill-live,
+.hero-stage[data-phase="done"] .st-pill-live,
+.hero-stage[data-phase="static"] .st-eyebrow-live,
+.hero-stage[data-phase="detected"] .st-eyebrow-live,
+.hero-stage[data-phase="locked"] .st-eyebrow-live,
+.hero-stage[data-phase="filling"] .st-eyebrow-live,
+.hero-stage[data-phase="done"] .st-eyebrow-live,
+.hero-stage[data-phase="idle"] .st-pill-idle,
+.hero-stage[data-phase="idle"] .st-eyebrow-idle,
+.hero-stage[data-phase="idle"] .st-status-idle,
+.hero-stage[data-phase="detected"] .st-status-idle,
+.hero-stage[data-phase="locked"] .st-status-locked,
+.hero-stage[data-phase="filling"] .st-status-filling,
+.hero-stage[data-phase="static"] .st-status-done,
+.hero-stage[data-phase="done"] .st-status-done {
+  display: inline-flex;
+}
+.hero-stage[data-phase="static"] .hero-dot,
+.hero-stage[data-phase="detected"] .hero-dot,
+.hero-stage[data-phase="locked"] .hero-dot,
+.hero-stage[data-phase="filling"] .hero-dot,
+.hero-stage[data-phase="done"] .hero-dot {
+  background: var(--color-accent-500);
+  animation: blip 2.4s ease-in-out infinite;
+}
+.hero-stage[data-phase="static"] .hero-rail,
+.hero-stage[data-phase="done"] .hero-rail {
+  background: var(--color-success);
+}
+/* The three idle loops, once the scene has landed — the app's cap of three. */
+.hero-stage[data-phase="done"] .hero-mark {
+  animation: idleFloat 6s ease-in-out infinite;
+}
+.hero-stage[data-phase="done"] .hero-card {
+  animation: idleGlow 4.5s ease-in-out infinite;
+}
+
+/* The start state, only where JavaScript will drive the scene forward and
+   motion is welcome. The server's markup is the finished scene; these rules
+   rewind it for the first paint so nothing flashes before the script runs.
+   `static` and `idle` look identical on purpose: the takeover is invisible. */
+@media (prefers-reduced-motion: no-preference) {
+  html[data-js] .hero-stage[data-phase="static"] .hero-mark,
+  html[data-js] .hero-stage[data-phase="static"] .hero-sight,
+  html[data-js] .hero-stage[data-phase="static"] .hero-chip,
+  html[data-js] .hero-stage[data-phase="idle"] .hero-chip {
+    opacity: 0;
+  }
+  html[data-js] .hero-stage[data-phase="static"] .hero-rail {
+    transform: scaleX(0);
+  }
+  html[data-js] .hero-stage[data-phase="static"] .hero-ring {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+  }
+  html[data-js] .hero-stage[data-phase="static"] .hero-dot {
+    background: var(--color-ink-600);
+    animation: none;
+  }
+  html[data-js] .hero-stage[data-phase="static"] .st {
+    display: none;
+  }
+  html[data-js] .hero-stage[data-phase="static"] .st-pill-idle,
+  html[data-js] .hero-stage[data-phase="static"] .st-eyebrow-idle,
+  html[data-js] .hero-stage[data-phase="static"] .st-status-idle {
+    display: inline-flex;
+  }
+  html[data-js] .hero-stage[data-phase="static"] .hero-rail {
+    background: var(--color-accent-500);
+  }
 }

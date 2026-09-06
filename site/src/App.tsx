@@ -1,6 +1,7 @@
 import KarasuMark from "@/components/KarasuMark";
 import { ButtonLink } from "@/components/ui/button";
 import { LINKS, NAV } from "@/site.config";
+import { Hero } from "@/sections/Hero";
 
 /**
  * The landing page. Sections arrive one by one; until then each id below is
@@ -48,29 +49,7 @@ export function App() {
       </header>
 
       <main id="main">
-        <section id="top" aria-labelledby="hero-title" className="mx-auto max-w-6xl px-5 py-24">
-          <p className="font-brand text-2xs font-semibold uppercase tracking-[.18em] text-accent-400">
-            Free · open source · built for AniList
-          </p>
-          <h1
-            id="hero-title"
-            className="mt-4 max-w-2xl font-brand text-[2.25rem] font-bold leading-[1.1] tracking-[-.03em] text-ink-100 md:text-[3.25rem]"
-          >
-            A modern anime &amp; manga tracker, built exclusively for AniList.
-          </h1>
-          <p className="mt-5 max-w-xl text-base leading-relaxed text-ink-300">
-            Karasu watches what you play and read and keeps your AniList progress in
-            sync — no buttons to press.
-          </p>
-          <div className="mt-8 flex flex-wrap gap-3">
-            <ButtonLink href={LINKS.latest} size="lg">
-              Download Karasu
-            </ButtonLink>
-            <ButtonLink href={LINKS.repo} variant="outline" size="lg">
-              View on GitHub
-            </ButtonLink>
-          </div>
-        </section>
+        <Hero />
 
         {NAV.map((item) => (
           <section

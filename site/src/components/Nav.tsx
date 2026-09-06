@@ -69,7 +69,8 @@ export function Nav() {
 
   // The sheet: Escape closes, Tab stays inside, focus returns to the toggle.
   useEffect(() => {
-    if (!open) return;
+    // Keyed on `mounted` too: the sheet renders one tick after `open` flips.
+    if (!open || !mounted) return;
     const root = sheet.current;
     const focusables = () =>
       Array.from(
@@ -102,7 +103,7 @@ export function Nav() {
       document.removeEventListener("keydown", onKey);
       document.documentElement.style.overflow = "";
     };
-  }, [open, close]);
+  }, [open, mounted, close]);
 
   return (
     <header className="sticky top-0 z-40 border-b border-hair bg-surface-950/95">

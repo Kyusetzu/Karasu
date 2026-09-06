@@ -20,6 +20,7 @@
 import { existsSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import { chromium } from "playwright-core";
+import sharp from "sharp";
 
 const here = path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1"));
 const OUT = path.resolve(here, "..", "captures", "review");
@@ -104,7 +105,55 @@ try {
           const el = page.locator(clip).first();
           await el.screenshot({ path: file, animations: "allow" });
         } else {
-          await page.screenshot({ path: file, fullPage: full, animations: "allow" });
+          if (full) {
+            // Not `fullPage: true`. Chromium renders a capture beyond the
+            // viewport into one surface capped at 16,384 px, and the part of
+            // a taller page past the cap wraps around: the 768 and 2560
+            // stills ended with the nav and hero painted over the footer,
+            // 21,393 and 17,018 px tall with the DOM holding one of each. A
+            // single viewport of the page's own height hits the same cap. So:
+            // scroll the page in tiles that fit, hide the sticky nav on every
+            // tile but the first (it would repeat at each seam), and
+            // composite them. Nothing on the page is sized in vh, so the
+            // shorter viewport changes no layout.
+            const docHeight = await page.evaluate(() => document.documentElement.scrollHeight);
+            const tileH = Math.min(docHeight, Math.floor(8000 / scale));
+            await page.setViewportSize({ width, height: tileH });
+            const tiles = [];
+            for (let top = 0; top < docHeight; top += tileH) {
+              const y = await page.evaluate((t) => {
+                document.documentElement.style.scrollBehavior = "auto";
+                window.scrollTo({ top: t, behavior: "instant" });
+                document.querySelector("header")?.style.setProperty("visibility", t > 0 ? "hidden" : "");
+                return window.scrollY;
+              }, top);
+              await page.waitForTimeout(150);
+              const shot = await page.screenshot({ animations: "allow" });
+              const h = Math.min(tileH, docHeight - top);
+              tiles.push({
+                left: 0,
+                top: Math.round(top * scale),
+                input: await sharp(shot)
+                  .extract({ left: 0, top: Math.round((top - y) * scale), width: Math.round(width * scale), height: Math.round(h * scale) })
+                  .png()
+                  .toBuffer(),
+              });
+            }
+            await page.evaluate(() => {
+              document.querySelector("header")?.style.removeProperty("visibility");
+              document.documentElement.style.scrollBehavior = "";
+              window.scrollTo({ top: 0, behavior: "instant" });
+            });
+            await page.setViewportSize({ width, height });
+            await sharp({
+              create: { width: Math.round(width * scale), height: Math.round(docHeight * scale), channels: 4, background: "#000" },
+            })
+              .composite(tiles)
+              .png()
+              .toFile(file);
+          } else {
+            await page.screenshot({ path: file, animations: "allow" });
+          }
         }
         console.log(`snap: ${tag}`);
       }

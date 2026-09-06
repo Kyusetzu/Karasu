@@ -38,10 +38,25 @@ export function Lightbox({
     onIndex((index + 1) % shots.length);
   }, [index, onIndex, shots.length]);
 
+  // Focus and the scroll lock, keyed on the dialog's life only. Keyed on
+  // `mounted` too: the dialog renders one tick after `open` flips, and a
+  // focus call before that finds nothing to focus. The key handler is a
+  // separate effect below because it re-binds on every index change, and
+  // returning focus to the opener on each arrow press would drag the page
+  // behind the dialog back to the thumbnail.
   useEffect(() => {
-    if (!open) return;
+    if (!open || !mounted) return;
     opener.current = document.activeElement;
     closeButton.current?.focus();
+    document.documentElement.style.overflow = "hidden";
+    return () => {
+      document.documentElement.style.overflow = "";
+      (opener.current as HTMLElement | null)?.focus?.();
+    };
+  }, [open, mounted]);
+
+  useEffect(() => {
+    if (!open || !mounted) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
@@ -67,13 +82,8 @@ export function Lightbox({
       }
     };
     document.addEventListener("keydown", onKey);
-    document.documentElement.style.overflow = "hidden";
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.documentElement.style.overflow = "";
-      (opener.current as HTMLElement | null)?.focus?.();
-    };
-  }, [open, onClose, prev, next]);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, mounted, onClose, prev, next]);
 
   if (!mounted || index === null) return null;
   const shot = shots[index];

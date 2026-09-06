@@ -22,6 +22,7 @@ export function Library() {
   return (
     <Section
       id="library"
+      wash="w1"
       eyebrow="Local library"
       title="Your files, matched to your list."
       lede="Point Karasu at the anime you keep on disk and it tells you which episode is next — one click opens it."

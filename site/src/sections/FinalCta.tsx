@@ -9,13 +9,10 @@ export function FinalCta() {
     <section id="download" aria-labelledby="download-title" className="cta relative overflow-hidden px-5 py-24 lg:py-32">
       <Reveal className="mx-auto flex max-w-2xl flex-col items-center text-center">
         <KarasuMark className="size-16 animate-idle-float" />
-        <h2
-          id="download-title"
-          className="mt-6 font-brand text-[2rem] font-bold leading-[1.1] tracking-[-.03em] text-ink-100 md:text-[2.75rem]"
-        >
+        <h2 id="download-title" className="mt-6 font-brand text-cta font-bold text-ink-100">
           Ready to track smarter?
         </h2>
-        <p className="mt-4 max-w-md text-base leading-relaxed text-ink-300">
+        <p className="mt-4 max-w-md text-lede text-ink-300">
           Install Karasu, sign in on AniList once, and let the bird keep the list.
         </p>
         <div className="mt-8 flex flex-wrap justify-center gap-3">

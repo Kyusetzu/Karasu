@@ -18,6 +18,7 @@ export function Gallery() {
   return (
     <Section
       id="screenshots"
+      wash="w2"
       eyebrow="Screenshots"
       title="The app, as it is."
       lede="Every image here is a capture of the app as it ships — nothing mocked, nothing planned. Click one to see it at full size."

@@ -20,6 +20,35 @@
   /* Kosugi Maru is not shipped; the katakana in the wordmark is drawn as
      paths, and any other Japanese falls back to the brand face. */
   --font-brand-jp: var(--font-brand);
+
+  /* Fluid display sizes. The app's type is fixed because a window is; a page
+     is read at 390 px and at 2560, and a heading that is right at one is
+     wrong at the other. Each grows with the viewport between two bounds:
+     the display reads 2.375rem on a phone, 3.6rem at 1440, 3.75rem past
+     1530; the section heading 1.75 → 2.34 → 2.5rem. */
+  --text-display: clamp(2.375rem, 1.55rem + 2.3vw, 3.75rem);
+  --text-display--line-height: 1.06;
+  --text-display--letter-spacing: -0.03em;
+  --text-h2: clamp(1.75rem, 1.3rem + 1.15vw, 2.5rem);
+  --text-h2--line-height: 1.12;
+  --text-h2--letter-spacing: -0.025em;
+  --text-cta: clamp(2rem, 1.4rem + 1.6vw, 3rem);
+  --text-cta--line-height: 1.1;
+  --text-cta--letter-spacing: -0.03em;
+  --text-lede: clamp(1rem, 0.94rem + 0.2vw, 1.125rem);
+  --text-lede--line-height: 1.6;
+}
+
+/* The page's column: 72rem, and 80rem on a screen wide enough that 72 reads
+   as a strip down the middle. One utility so the nav, the hero, the strip,
+   every section and the footer agree. */
+@utility container-site {
+  margin-inline: auto;
+  width: 100%;
+  max-width: 72rem;
+  @media (width >= 96rem) {
+    max-width: 80rem;
+  }
 }
 
 html {
@@ -48,6 +77,100 @@ body {
 }
 .skip-link:focus-visible {
   @apply not-sr-only fixed left-4 top-4 z-50 rounded-lg bg-accent-500 px-3 py-2 text-sm font-medium text-accent-ink outline-none;
+}
+
+/* --- Nav ---------------------------------------------------------------- */
+
+/* At the top of the page the bar is part of the page — no surface, no rule —
+   and it takes both the moment the page scrolls under it. */
+.site-nav {
+  transition:
+    background-color 140ms var(--ease-karasu),
+    border-color 140ms var(--ease-karasu);
+}
+.site-nav[data-scrolled="false"] {
+  background-color: transparent;
+  border-color: transparent;
+}
+
+/* --- Section washes ----------------------------------------------------- */
+
+/* A few sections sit in a little light, the About page's recipe: one radial
+   wash centred on the heading, faint enough to read as depth rather than as
+   a band. Centred 10rem down rather than on the top edge, and gone by 60% of
+   its radius, so it has faded to nothing before the section's own edge —
+   anchored at the edge it was brightest exactly there, and the boundary
+   between two sections drew itself as a line. Painted under the content
+   (`z-index: -1` inside the section's own stacking context), so nothing is
+   tinted. */
+.wash {
+  position: relative;
+  isolation: isolate;
+}
+.wash::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(
+    64rem 18rem at var(--wash-x, 8%) 10rem,
+    rgba(var(--wash-rgb, var(--w1)), var(--wash-a, 0.11)),
+    transparent 60%
+  );
+}
+.wash-w1 {
+  --wash-rgb: var(--w1);
+}
+.wash-w2 {
+  --wash-rgb: var(--w2);
+}
+.wash-accent {
+  --wash-rgb: var(--accent-rgb);
+}
+.wash-center {
+  --wash-x: 50%;
+}
+
+/* --- Screenshots -------------------------------------------------------- */
+
+/* A thumbnail that opens lifts a hair under the pointer — surface motion,
+   on the surface curve. */
+.shot-button {
+  transition:
+    transform 140ms var(--ease-karasu),
+    box-shadow 140ms var(--ease-karasu),
+    border-color 140ms var(--ease-karasu);
+}
+.shot-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 1.5rem 3rem rgba(0, 0, 0, 0.55);
+}
+
+/* --- FAQ ---------------------------------------------------------------- */
+
+/* An answer opens by growing, not by appearing: a grid track from 0fr to
+   1fr, which is the one way CSS animates to an unknown height. Closed, it is
+   also hidden from the accessibility tree — visibility flips after the
+   track has collapsed, and before it grows. */
+.faq-a {
+  display: grid;
+  grid-template-rows: 0fr;
+  visibility: hidden;
+  transition:
+    grid-template-rows var(--duration-expressive) var(--ease-out-expo),
+    visibility 0s linear var(--duration-expressive);
+}
+.faq-a[data-open] {
+  grid-template-rows: 1fr;
+  visibility: visible;
+  transition:
+    grid-template-rows var(--duration-expressive) var(--ease-out-expo),
+    visibility 0s;
+}
+.faq-a > div {
+  min-height: 0;
+  overflow: hidden;
 }
 
 /* --- Hero --------------------------------------------------------------- */
@@ -212,6 +335,15 @@ body {
   html[data-js] .flow[data-revealed] .flow-step::after {
     transform: none;
     transition: transform 520ms var(--ease-out-expo) calc(var(--i, 0) * 110ms + 200ms);
+  }
+  /* The steps themselves arrive one after another, each just before the
+     connector that leaves it starts to draw — the row builds left to right. */
+  html[data-js] .flow:not([data-revealed]) .flow-step > * {
+    opacity: 0;
+  }
+  html[data-js] .flow[data-revealed] .flow-step > * {
+    animation: riseIn 320ms var(--ease-out-expo) both;
+    animation-delay: calc(var(--i, 0) * 110ms);
   }
   @media (min-width: 48rem) {
     html[data-js] .flow:not([data-revealed]) .flow-step::after {

@@ -13,6 +13,7 @@ export function Statistics() {
   return (
     <Section
       id="statistics"
+      wash="accent"
       eyebrow="Statistics"
       title="Your list, as pictures."
       lede="Half of it is drawn from the list Karasu already holds — the sunburst, your watch time, your scores against the crowd — and the rest is AniList's own statistics, fetched once and kept for half an hour."
@@ -26,16 +27,19 @@ export function Statistics() {
             </li>
           ))}
         </ul>
-        <div className="space-y-6 lg:order-2">
+        {/* One wide capture, two beneath it: a composition rather than a pile. */}
+        <div className="space-y-5 lg:order-2">
           <Reveal>
-            <Screenshot shot={shot("stats-overview")} />
+            <Screenshot shot={shot("stats-overview")} sizes="(min-width: 1024px) 42rem, 100vw" />
           </Reveal>
-          <Reveal delay={90}>
-            <Screenshot shot={shot("stats-genres")} />
-          </Reveal>
-          <Reveal delay={180}>
-            <Screenshot shot={shot("wrapped")} />
-          </Reveal>
+          <div className="grid gap-5 sm:grid-cols-2">
+            <Reveal delay={90}>
+              <Screenshot shot={shot("stats-genres")} sizes="(min-width: 1024px) 21rem, (min-width: 640px) 50vw, 100vw" />
+            </Reveal>
+            <Reveal delay={180}>
+              <Screenshot shot={shot("wrapped")} sizes="(min-width: 1024px) 21rem, (min-width: 640px) 50vw, 100vw" />
+            </Reveal>
+          </div>
         </div>
       </div>
     </Section>

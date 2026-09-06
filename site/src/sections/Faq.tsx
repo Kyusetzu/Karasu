@@ -27,12 +27,10 @@ function Item({ q, a, index }: { q: string; a: string; index: number }) {
           />
         </button>
       </h3>
-      <div
-        id={`${id}-a`}
-        hidden={!open}
-        className={cn("pb-5 pr-8 text-sm leading-relaxed text-ink-300", open && "animate-settle")}
-      >
-        {a}
+      <div id={`${id}-a`} data-open={open || undefined} className="faq-a">
+        <div>
+          <p className="pb-5 pr-8 text-sm leading-relaxed text-ink-300">{a}</p>
+        </div>
       </div>
     </li>
   );

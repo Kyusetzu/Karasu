@@ -19,6 +19,7 @@ export function AniList() {
   return (
     <Section
       id="anilist"
+      wash="accent"
       eyebrow="AniList"
       title="Built for AniList, not instead of it."
       lede="Karasu is an independent, open-source project that talks to AniList's public API on your behalf. It is not made by AniList and not endorsed by it."

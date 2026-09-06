@@ -34,7 +34,7 @@ const COLUMNS = [
 export function Footer() {
   return (
     <footer className="border-t border-hair">
-      <div className="mx-auto max-w-6xl px-5 py-14">
+      <div className="container-site px-5 py-14">
         <div className="grid gap-10 md:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))]">
           <div>
             <a href="#top" className="inline-flex items-center gap-2.5 rounded-lg focus-visible:outline-2 focus-visible:outline-accent-500">

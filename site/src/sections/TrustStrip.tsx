@@ -13,10 +13,12 @@ const FACTS = [
 export function TrustStrip() {
   return (
     <div className="border-y border-hair bg-surface-900/40">
-      <ul className="mx-auto grid max-w-6xl grid-cols-2 gap-px px-5 py-6 md:grid-cols-4 md:py-7">
+      <ul className="container-site grid grid-cols-2 gap-px px-5 py-6 md:grid-cols-4 md:py-7">
         {FACTS.map(({ icon: Icon, title, text }, i) => (
           <Reveal as="li" key={title} delay={staggerDelay(i)} className="flex items-start gap-3 px-1 py-2 md:px-4">
-            <Icon className="mt-0.5 size-4.5 shrink-0 text-accent-400" aria-hidden="true" />
+            <span className="grid size-9 shrink-0 place-items-center rounded-full border border-surface-700 bg-surface-900 text-accent-400">
+              <Icon className="size-4" aria-hidden="true" />
+            </span>
             <div>
               <p className="font-brand text-sm font-semibold text-ink-100">{title}</p>
               <p className="mt-0.5 text-xs leading-relaxed text-ink-500">{text}</p>

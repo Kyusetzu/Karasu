@@ -29,6 +29,7 @@ export function Section({
   className,
   align = "left",
   width = "6xl",
+  wash,
 }: {
   id: string;
   eyebrow?: string;
@@ -38,29 +39,33 @@ export function Section({
   className?: string;
   align?: "left" | "center";
   width?: "6xl" | "5xl" | "4xl";
+  /** A faint radial wash behind the heading; see `.wash` in the stylesheet. */
+  wash?: "w1" | "w2" | "accent";
 }) {
   const head = useReveal<HTMLDivElement>();
-  const max = width === "6xl" ? "max-w-6xl" : width === "5xl" ? "max-w-5xl" : "max-w-4xl";
+  const max = width === "6xl" ? "container-site" : width === "5xl" ? "mx-auto max-w-5xl" : "mx-auto max-w-4xl";
   return (
     <section
       id={id}
       aria-labelledby={`${id}-title`}
-      className={cn("scroll-mt-16 px-5 py-20 lg:py-28", className)}
+      className={cn(
+        "scroll-mt-16 px-5 py-20 lg:py-28 2xl:py-32",
+        wash && `wash wash-${wash}`,
+        wash && align === "center" && "wash-center",
+        className,
+      )}
     >
-      <div className={cn("mx-auto", max)}>
+      <div className={max}>
         <div
           ref={head}
           data-reveal
           className={cn("max-w-2xl", align === "center" && "mx-auto text-center")}
         >
           {eyebrow && <Eyebrow>{eyebrow}</Eyebrow>}
-          <h2
-            id={`${id}-title`}
-            className="mt-3 font-brand text-[1.75rem] font-bold leading-[1.12] tracking-[-.025em] text-ink-100 md:text-[2.25rem]"
-          >
+          <h2 id={`${id}-title`} className="mt-3 font-brand text-h2 font-bold text-ink-100">
             {title}
           </h2>
-          {lede && <p className="mt-4 text-base leading-relaxed text-ink-300 md:text-[1.0625rem]">{lede}</p>}
+          {lede && <p className="mt-4 text-lede text-ink-300">{lede}</p>}
         </div>
         {children}
       </div>

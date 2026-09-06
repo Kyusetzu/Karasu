@@ -67,6 +67,16 @@ export function Nav() {
 
   const close = useCallback(() => setOpen(false), []);
 
+  // The bar is transparent at the top of the page and solid once anything has
+  // scrolled under it. Server and first client render both say "top".
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const read = () => setScrolled(window.scrollY > 8);
+    read();
+    window.addEventListener("scroll", read, { passive: true });
+    return () => window.removeEventListener("scroll", read);
+  }, []);
+
   // The sheet: Escape closes, Tab stays inside, focus returns to the toggle.
   useEffect(() => {
     // Keyed on `mounted` too: the sheet renders one tick after `open` flips.
@@ -106,8 +116,8 @@ export function Nav() {
   }, [open, mounted, close]);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-hair bg-surface-950/95">
-      <nav aria-label="Primary" className="mx-auto flex h-14 max-w-6xl items-center justify-between px-5">
+    <header data-scrolled={scrolled || open} className="site-nav sticky top-0 z-40 border-b border-hair bg-surface-950/95">
+      <nav aria-label="Primary" className="container-site flex h-14 items-center justify-between px-5">
         <a href="#top" className="flex items-center gap-2.5 rounded-lg focus-visible:outline-2 focus-visible:outline-accent-500" aria-label="Karasu — back to top">
           <KarasuMark className="size-6" />
           <span className="font-brand text-xs font-semibold tracking-[.2em] text-ink-300">KARASU</span>

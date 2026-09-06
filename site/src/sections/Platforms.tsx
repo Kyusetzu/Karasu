@@ -12,6 +12,7 @@ export function Platforms() {
   return (
     <Section
       id="platforms"
+      wash="w1"
       eyebrow="Platforms"
       title="Windows, Linux and Android. No macOS."
       lede={

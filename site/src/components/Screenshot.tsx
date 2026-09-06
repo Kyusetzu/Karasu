@@ -52,7 +52,7 @@ export function Screenshot({
       <button
         type="button"
         onClick={onClick}
-        className={cn(frame, "group block w-full text-left transition-surface hover:border-surface-700 focus-visible:outline-2 focus-visible:outline-accent-500")}
+        className={cn(frame, "shot-button group block w-full text-left hover:border-surface-700 focus-visible:outline-2 focus-visible:outline-accent-500")}
         aria-label={`Open: ${shot.caption}`}
       >
         {picture}

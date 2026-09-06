@@ -182,6 +182,28 @@ export function HeroScene({ className }: { className?: string }) {
       aria-label="Karasu recognises an episode playing in mpv and updates the list"
       role="img"
     >
+      {/* The sight line, first in the stage so it paints under the mark and the
+          card: it leaves the raven's silhouette and slips under the card's edge,
+          and only the stretch between them shows. Same coordinates as the
+          reticle's layer below. */}
+      <svg
+        className="pointer-events-none absolute inset-0 h-full w-full overflow-visible"
+        viewBox={`0 0 ${box.w} ${box.h}`}
+        aria-hidden="true"
+      >
+        <path
+          ref={sight}
+          className="hero-sight"
+          d={line}
+          fill="none"
+          stroke="var(--color-accent-400)"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          pathLength={1}
+          opacity={0.35}
+        />
+      </svg>
+
       {/* Row one: the detection pill, the titlebar's capsule. */}
       <div className="flex justify-center @max-md:justify-start">
         <div className="flex h-6 max-w-[80%] items-center gap-2 rounded-full border border-hair bg-surface-900 px-2.5 @max-md:max-w-[72%]">
@@ -200,23 +222,13 @@ export function HeroScene({ className }: { className?: string }) {
         </div>
       </div>
 
-      {/* The sight line and the reticle, in the stage's own pixels. */}
+      {/* The reticle, above everything: it is the one part of the overlay that
+          belongs on top of the card, ringing the badge. */}
       <svg
         className="pointer-events-none absolute inset-0 z-10 h-full w-full overflow-visible"
         viewBox={`0 0 ${box.w} ${box.h}`}
         aria-hidden="true"
       >
-        <path
-          ref={sight}
-          className="hero-sight"
-          d={line}
-          fill="none"
-          stroke="var(--color-accent-400)"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          pathLength={1}
-          opacity={0.35}
-        />
         {/* Positioned by the outer group's attribute; animated on the inner one, because motion
             writes a CSS transform, which would override the attribute on the same element. */}
         <g transform={`translate(${target.x} ${target.y})`}>

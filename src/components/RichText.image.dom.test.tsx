@@ -5,11 +5,14 @@ import { render, waitFor } from "@testing-library/react";
  * The inlined bio image, which only exists under Tauri — everywhere else it
  * falls back to the chip, which is why the other RichText suites never see it.
  */
+const fetches = vi.hoisted(() => ({ count: 0 }));
 vi.mock("@/api/anilist", async (orig) => ({
   ...(await orig<typeof import("@/api/anilist")>()),
   isTauri: true,
-  fetchBioImage: (url: string) =>
-    Promise.resolve(`data:image/png;base64,AAAA#${encodeURIComponent(url)}`),
+  fetchBioImage: (url: string) => {
+    fetches.count += 1;
+    return Promise.resolve(`data:image/png;base64,AAAA#${encodeURIComponent(url)}`);
+  },
 }));
 
 import { Markdown } from "./social/Markdown";
@@ -37,6 +40,19 @@ describe("an inlined bio image", () => {
     draw("img(https://i.imgur.com/a.png)");
     await waitFor(() => expect(document.querySelector("img")).not.toBeNull());
     expect(document.querySelector("img")!.getAttribute("src")).toMatch(/^data:/);
+  });
+
+  it("fetches one URL once across mounts, and a second URL once more", async () => {
+    const before = fetches.count;
+    const first = draw("img(https://i.imgur.com/once.png)");
+    await waitFor(() => expect(document.querySelector("img")).not.toBeNull());
+    first.unmount();
+    draw("img(https://i.imgur.com/once.png) img(https://i.imgur.com/once.png)");
+    await waitFor(() => expect(document.querySelectorAll("img")).toHaveLength(2));
+    expect(fetches.count - before).toBe(1);
+    draw("img(https://i.imgur.com/twice.png)");
+    await waitFor(() => expect(document.querySelectorAll("img")).toHaveLength(3));
+    expect(fetches.count - before).toBe(2);
   });
 
   /**

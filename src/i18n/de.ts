@@ -1010,7 +1010,7 @@ export const de: typeof en = {
     bioPlaceholder: "Sag etwas über dich …",
     bioPreviewEmpty: "Die Vorschau erscheint hier, während du schreibst.",
     bioMarkdownHint:
-      "Markdown funktioniert. Bilder und Embeds erscheinen als Links — die Vorschau zeigt genau, wie dein Profil in Karasu aussieht.",
+      "Markdown funktioniert, Bilder eingeschlossen; Videos erscheinen als Links. Die Vorschau zeigt genau, wie dein Profil in Karasu aussieht.",
     profileColor: "Profilfarbe",
     profileColorHint:
       "AniList färbt dein Profil damit ein. Ein eigener Hex-Wert ist dort eine Unterstützer-Funktion.",

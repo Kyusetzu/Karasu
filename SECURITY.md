@@ -66,8 +66,10 @@ neither is obvious from the screen you are on:
   wherever their author chose — imgur, tumblr, catbox and a long tail of
   others. Karasu fetches those in Rust rather than from the page, so the
   WebView never talks to them and the CSP is not widened: one request, with a
-  size cap, a content-type allowlist, a timeout, no cookies and no `Referer`,
-  and local or private addresses refused on the URL and on every redirect hop.
+  size cap, the format decided by the bytes themselves (PNG, JPEG, GIF, WebP
+  or AVIF — never SVG, whatever the host declares), a timeout, no cookies and
+  no `Referer` on any hop, and local or private addresses refused on the URL
+  and on every redirect hop. Each image is fetched once per session.
   What that cannot hide is your IP address from the host, which is unavoidable
   in any design that displays the image at all. Anything that fails falls back
   to a plain chip.

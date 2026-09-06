@@ -17,19 +17,65 @@ const MAX_BYTES: u64 = 4 * 1024 * 1024;
 /// user is looking at a profile, not waiting on a download.
 const TIMEOUT: Duration = Duration::from_secs(8);
 
-/// What may come back. An allowlist, not a denylist: the response is about to
-/// become a `data:` URI, and `data:image/svg+xml` is a scripting context.
+/// How many bytes the format is decided on. Every signature below sits well
+/// inside 64; the AVIF brand list is the one that reaches furthest.
+const SNIFF_BYTES: usize = 64;
+
+/// What the bytes say the image is — and nothing else is asked.
+///
+/// The declared `Content-Type` is not consulted at all. Hosts answer with
+/// `application/octet-stream`, with no header, and with `image/png` for a
+/// JPEG, and an allowlist over the header refused the first two and trusted
+/// the third; the bytes cannot be wrong about themselves. The result is an
+/// allowlist all the same, and `None` is the answer for everything not on it:
+/// the response is about to become a `data:` URI, and `data:image/svg+xml`
+/// is a scripting context.
 ///
 /// **SVG is deliberately absent.** It can carry `<script>`, and while the CSP
 /// blocks script in an `<img>`, relying on that for something this easy to
 /// exclude is a worse trade than losing the handful of SVG bios that exist.
-const ALLOWED_TYPES: [&str; 5] = [
-    "image/png",
-    "image/jpeg",
-    "image/gif",
-    "image/webp",
-    "image/avif",
-];
+/// An SVG or an HTML error page sniffs as nothing, and nothing is what the
+/// caller gets.
+fn sniff_image(head: &[u8]) -> Option<&'static str> {
+    if head.starts_with(&[0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A]) {
+        return Some("image/png");
+    }
+    if head.starts_with(&[0xFF, 0xD8, 0xFF]) {
+        return Some("image/jpeg");
+    }
+    if head.starts_with(b"GIF87a") || head.starts_with(b"GIF89a") {
+        return Some("image/gif");
+    }
+    if head.len() >= 12 && head.starts_with(b"RIFF") && &head[8..12] == b"WEBP" {
+        return Some("image/webp");
+    }
+    // ISO-BMFF: a size, `ftyp`, the major brand, a minor version, then the
+    // compatible brands. AVIF may carry `mif1` as its major brand and `avif`
+    // only among the compatibles, so the whole list is read.
+    if head.len() >= 12 && &head[4..8] == b"ftyp" {
+        let avif = head[8..]
+            .chunks_exact(4)
+            .take((SNIFF_BYTES - 8) / 4)
+            .any(|brand| brand == b"avif" || brand == b"avis");
+        if avif {
+            return Some("image/avif");
+        }
+    }
+    None
+}
+
+/// Appends `chunk` to `buf` unless the result would pass `cap`.
+///
+/// Refuses *before* growing: a hostile host — any host an arbitrary bio can
+/// name — must not get the app to allocate a chunk past the cap and only then
+/// notice.
+fn push_capped(buf: &mut Vec<u8>, chunk: &[u8], cap: u64) -> Result<(), &'static str> {
+    if buf.len() as u64 + chunk.len() as u64 > cap {
+        return Err("too large");
+    }
+    buf.extend_from_slice(chunk);
+    Ok(())
+}
 
 /// Hosts that must never be fetched on a stranger's say-so.
 ///
@@ -71,8 +117,23 @@ pub async fn fetch_bio_image(url: String) -> Result<String, String> {
     }
 
     // Every hop re-checked, because a public URL may redirect anywhere.
+    //
+    // `Accept` names the formats the sniff below will take, which is what a
+    // host that negotiates (imgur, the CDNs) needs to hand over an image
+    // rather than a page about one. `referer(false)` is what makes "no
+    // Referer" true on *every* hop: reqwest's default sets one on redirects,
+    // so the promise in SECURITY.md only held for the first request.
+    let mut headers = reqwest::header::HeaderMap::new();
+    headers.insert(
+        reqwest::header::ACCEPT,
+        reqwest::header::HeaderValue::from_static(
+            "image/avif,image/webp,image/png,image/jpeg,image/gif,*/*;q=0.1",
+        ),
+    );
     let client = crate::net::client_builder()
         .user_agent(concat!("Karasu/", env!("CARGO_PKG_VERSION")))
+        .default_headers(headers)
+        .referer(false)
         .timeout(TIMEOUT)
         .redirect(reqwest::redirect::Policy::custom(|attempt| {
             if attempt.previous().len() >= 3 {
@@ -93,16 +154,6 @@ pub async fn fetch_bio_image(url: String) -> Result<String, String> {
         return Err("status".into());
     }
 
-    let mime = resp
-        .headers()
-        .get(reqwest::header::CONTENT_TYPE)
-        .and_then(|v| v.to_str().ok())
-        .map(|v| v.split(';').next().unwrap_or("").trim().to_ascii_lowercase())
-        .unwrap_or_default();
-    if !ALLOWED_TYPES.contains(&mime.as_str()) {
-        return Err("type".into());
-    }
-
     // Checked before reading where the server declares it, so an oversized
     // image costs one round trip rather than a download.
     if resp.content_length().is_some_and(|n| n > MAX_BYTES) {
@@ -113,14 +164,25 @@ pub async fn fetch_bio_image(url: String) -> Result<String, String> {
     // whole body first and measuring afterwards meant a hostile host — any host
     // an arbitrary bio can name — could make the app allocate as much memory as
     // it cared to send before the cap was ever consulted.
+    //
+    // The format is decided from the first bytes as soon as there are enough
+    // of them, so an HTML page four megabytes long is refused after one
+    // chunk rather than after the download. See `sniff_image` for why the
+    // declared type is never read.
     let mut bytes: Vec<u8> = Vec::new();
     let mut resp = resp;
+    let mut mime: Option<&'static str> = None;
     while let Some(chunk) = resp.chunk().await.map_err(|_| "read".to_string())? {
-        if bytes.len() as u64 + chunk.len() as u64 > MAX_BYTES {
-            return Err("too large".into());
+        push_capped(&mut bytes, &chunk, MAX_BYTES).map_err(str::to_string)?;
+        if mime.is_none() && bytes.len() >= SNIFF_BYTES {
+            mime = Some(sniff_image(&bytes).ok_or_else(|| "type".to_string())?);
         }
-        bytes.extend_from_slice(&chunk);
     }
+    let mime = match mime {
+        Some(m) => m,
+        // Shorter than the sniff window, which a tiny icon can be.
+        None => sniff_image(&bytes).ok_or_else(|| "type".to_string())?,
+    };
 
     Ok(format!(
         "data:{mime};base64,{}",
@@ -188,11 +250,70 @@ mod tests {
         }
     }
 
+    /// Each format by its signature — the declared type is never consulted,
+    /// so this is the whole of the allowlist.
+    #[test]
+    fn every_allowed_format_is_recognised_by_its_bytes() {
+        let png = [0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A, 0, 0];
+        assert_eq!(sniff_image(&png), Some("image/png"));
+        assert_eq!(sniff_image(&[0xFF, 0xD8, 0xFF, 0xE0, 0, 0x10]), Some("image/jpeg"));
+        assert_eq!(sniff_image(b"GIF89a\x01\x00"), Some("image/gif"));
+        assert_eq!(sniff_image(b"GIF87a\x01\x00"), Some("image/gif"));
+        assert_eq!(sniff_image(b"RIFF\x24\x00\x00\x00WEBPVP8 "), Some("image/webp"));
+        // Major brand `avif`.
+        assert_eq!(sniff_image(b"\x00\x00\x00\x1cftypavif\x00\x00\x00\x00mif1"), Some("image/avif"));
+        // Major brand `mif1`, `avif` only among the compatible brands.
+        assert_eq!(
+            sniff_image(b"\x00\x00\x00\x20ftypmif1\x00\x00\x00\x00mif1avifmiaf"),
+            Some("image/avif")
+        );
+        assert_eq!(sniff_image(b"\x00\x00\x00\x1cftypavis\x00\x00\x00\x00"), Some("image/avif"));
+    }
+
     /// SVG is the one image type deliberately missing: it is a scripting
     /// context, and losing the few SVG bios is the cheaper side of the trade.
+    /// An HTML page — the usual body behind a hotlink refusal — is nothing
+    /// either, whatever its header said.
     #[test]
-    fn svg_is_not_an_allowed_type() {
-        assert!(!ALLOWED_TYPES.contains(&"image/svg+xml"));
-        assert!(ALLOWED_TYPES.contains(&"image/png"));
+    fn svg_html_and_near_misses_sniff_as_nothing() {
+        for body in [
+            &b""[..],
+            b"\xFF\xD8",
+            b"<svg xmlns=\"http://www.w3.org/2000/svg\"><script>1</script></svg>",
+            b"<?xml version=\"1.0\"?><svg/>",
+            b"<!DOCTYPE html><html><body>403</body></html>",
+            // RIFF without the WEBP form type is a WAV or an AVI.
+            b"RIFF\x24\x00\x00\x00WAVEfmt ",
+            // An ISO-BMFF that is not an AVIF: HEIC, or plain mif1.
+            b"\x00\x00\x00\x18ftypheic\x00\x00\x00\x00mif1heic",
+            b"\x00\x00\x00\x14ftypmif1\x00\x00\x00\x00mif1",
+        ] {
+            assert_eq!(sniff_image(body), None, "{:?}", String::from_utf8_lossy(body));
+        }
+    }
+
+    /// The cap refuses before it grows the buffer, and exactly-at-cap is fine.
+    #[test]
+    fn the_size_cap_refuses_before_allocating() {
+        let mut buf = vec![0u8; 3];
+        assert!(push_capped(&mut buf, &[1, 2, 3], 8).is_ok());
+        assert_eq!(buf.len(), 6);
+        assert!(push_capped(&mut buf, &[4, 5], 8).is_ok(), "exactly at the cap is allowed");
+        assert_eq!(buf.len(), 8);
+        assert_eq!(push_capped(&mut buf, &[6], 8), Err("too large"));
+        assert_eq!(buf.len(), 8, "a refused chunk must not have been appended");
+    }
+
+    /// The reason the declared type is ignored: a body that is not what its
+    /// header claims is judged by the body.
+    #[test]
+    fn a_body_that_is_not_an_image_is_refused_whatever_it_was_declared_as() {
+        // "image/png" on the wire, HTML in the body — sniffed, refused.
+        assert_eq!(sniff_image(b"<html><body>hotlink denied</body></html>"), None);
+        // "application/octet-stream" on the wire, a real PNG in the body — accepted.
+        assert_eq!(
+            sniff_image(&[0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A]),
+            Some("image/png")
+        );
     }
 }

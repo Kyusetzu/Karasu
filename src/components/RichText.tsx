@@ -7,6 +7,16 @@ import { fetchBioImage, isTauri } from "@/api/anilist";
 import { cn } from "@/lib/utils";
 import type { ChipWidth, MdInline } from "@/lib/anilistMarkdown";
 import { internalRoute } from "@/lib/anilistUrl";
+import { createPromiseCache } from "@/lib/promiseCache";
+
+/**
+ * One fetch per URL per session. Every `InlineImage` used to ask Rust the
+ * moment it mounted, so a profile opened twice fetched its images twice and
+ * a re-rendered feed row fetched again; the cache dedupes the calls in
+ * flight and keeps every answer, refusals included — a host that said no a
+ * second ago will say no again, and the chip is right both times.
+ */
+const bioImages = createPromiseCache((href: string) => fetchBioImage(href));
 
 /**
  * Whether the nodes being rendered are already inside a link.
@@ -102,7 +112,8 @@ function InlineImage({
   useEffect(() => {
     if (!isTauri) return setFailed(true);
     let live = true;
-    fetchBioImage(href)
+    bioImages
+      .get(href)
       .then((uri) => live && setSrc(uri))
       .catch(() => live && setFailed(true));
     return () => {

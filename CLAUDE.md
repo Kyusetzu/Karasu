@@ -704,9 +704,13 @@ import it.
   the user's IP and which profile they opened, *from the page, on every render*.
   `commands::fetch_bio_image` makes one bounded request in Rust instead and
   returns a `data:` URI, which the existing `img-src 'self' data:` already
-  permits: size cap, content-type allowlist (no SVG — it is a scripting
-  context), timeout, no cookies, no `Referer`, and local/private hosts refused on
+  permits: size cap, the format sniffed from the bytes (png/jpeg/gif/webp/avif
+  — never SVG, it is a scripting context — and the declared `Content-Type` is
+  not consulted, because hosts send `octet-stream`, nothing, or the wrong
+  one), timeout, no cookies, no `Referer` on any hop (`referer(false)`;
+  reqwest's default sets one on redirects), and local/private hosts refused on
   the URL *and every redirect hop* so a crafted bio cannot probe the LAN. The
+  frontend fetches each URL once per session (`lib/promiseCache`). The
   host still learns the user's IP; that is unavoidable in any design that shows
   the image, and it is the residue rather than the part that was solved. Anything
   that fails falls back to the chip. **Do not "simplify" this into a CSP

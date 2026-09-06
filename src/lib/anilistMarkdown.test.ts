@@ -87,6 +87,10 @@ describe("the tree cannot carry executable content", () => {
     `<a href="javascript:alert(1)">x</a>`,
     `<a href=javascript:alert(1)>y</a>`,
     `<a href='DATA:text/html,x'>z</a>`,
+    // Entity-smuggled schemes: decoded before the whitelist, so they fail it.
+    `[click](java&#115;cript:alert(1))`,
+    `<a href="&#106;avascript:alert(1)">x</a>`,
+    `<img src="j&#97;vascript:alert(1)">`,
     `~!<script>alert(1)</script>!~`,
     `**<script>alert(1)</script>**`,
     `<div\nunclosed`,
@@ -187,6 +191,42 @@ describe("raw HTML drops the tag and keeps the words", () => {
 
   it("yields nothing at all for a void tag with no text", () => {
     expect(textOf(parse(`<img src=x onerror=alert(1)>`))).toBe("");
+    // `x` is not a URL, so not even a chip — and the handler is never read.
+    expect(types(parse(`<img src=x onerror=alert(1)>`))).not.toContain("chip");
+  });
+
+  it("reads a URL with balanced parentheses whole, and drops a title", () => {
+    expect(chipsOf(`img(https://upload.wikimedia.org/x_(1).png)`)[0]).toMatchObject({
+      href: "https://upload.wikimedia.org/x_(1).png",
+    });
+    expect(chipsOf(`![alt](https://i.imgur.com/a.png "the title")`)[0]).toMatchObject({
+      href: "https://i.imgur.com/a.png",
+    });
+    const n = parse(`[Wiki](https://en.wikipedia.org/wiki/Foo_(bar) 'title')`)[0] as { children: MdInline[] };
+    expect(n.children[0]).toMatchObject({ type: "link", href: "https://en.wikipedia.org/wiki/Foo_(bar)" });
+    // An unclosed target is not a markdown link: the bracket stays as text,
+    // and only the bare URL after it autolinks.
+    const open = parse(`[x](https://a.co`)[0] as { children: MdInline[] };
+    expect(textOf([open.children[0]])).toBe("[x](");
+    expect(open.children[1]).toMatchObject({ type: "link", href: "https://a.co" });
+  });
+
+  it("reads an <img> tag as the image it is, size included", () => {
+    const [c] = chipsOf(`<img src="https://i.imgur.com/a.png" width="220" alt="badge">`);
+    expect(c).toMatchObject({ kind: "image", href: "https://i.imgur.com/a.png", width: { value: 220, unit: "px" } });
+    expect(chipsOf(`<img width='50%' src='https://i.imgur.com/b.png'>`)[0]).toMatchObject({
+      width: { value: 50, unit: "%" },
+    });
+    expect(chipsOf(`<img alt="no source">`)).toHaveLength(0);
+  });
+
+  it("keeps a linked <img> inside its <a>", () => {
+    const n = parse(`<a href="https://steamcommunity.com/id/x"><img src="https://i.imgur.com/steam.png"></a>`)[0] as {
+      children: MdInline[];
+    };
+    const link = n.children[0];
+    expect(link).toMatchObject({ type: "link", href: "https://steamcommunity.com/id/x" });
+    expect((link as { children: MdInline[] }).children[0]).toMatchObject({ type: "chip", kind: "image" });
   });
 
   it("turns an HTML-art bio into its prose", () => {
@@ -463,6 +503,17 @@ describe("images and embeds become chips, never pictures", () => {
   it("handles an image nested inside a link, as real bios write it", () => {
     // `[img33(url) ](target)` — a linked image. Both survive, in that order.
     const nodes = parse(`[img33(https://i.imgur.com/a.png) ](https://myanimelist.net/x)`);
+    // The markdown spelling of the same idiom: a bracketed label holding an
+    // image. The label's own `]` used to end the link's label early, and the
+    // whole thing came out as a link with the image lost.
+    const md = parse(`[![badge](https://i.imgur.com/b.png)](https://example.com/me)`);
+    const link = (md[0] as { children: MdInline[] }).children[0];
+    expect(link).toMatchObject({ type: "link", href: "https://example.com/me" });
+    expect((link as { children: MdInline[] }).children[0]).toMatchObject({
+      type: "chip",
+      kind: "image",
+      href: "https://i.imgur.com/b.png",
+    });
     const kinds = types(nodes);
     expect(kinds).toContain("link");
     expect(kinds).toContain("chip");
@@ -774,11 +825,16 @@ describe("entities", () => {
     expect(textOf(parse("`a &amp; b`"))).toBe("a &amp; b");
   });
 
-  it("never decodes inside a URL — the href keeps its bytes", () => {
-    const n = (parse(`[x](https://a.co/?a=1&amp;b=2)`)[0] as { children: MdInline[] })
-      .children[0];
-    expect(n).toMatchObject({ type: "link", href: "https://a.co/?a=1&amp;b=2" });
+  it("decodes an entity inside a URL before judging it", () => {
+    // CommonMark decodes link destinations and `href` is attribute-encoded,
+    // so `&amp;` in a query string is one ampersand on the wire — and the
+    // whitelist runs on the decoded bytes, which is what keeps a smuggled
+    // scheme out (see HOSTILE).
+    const n = parse(`[x](https://a.co/?a=1&amp;b=2)`)[0] as { children: MdInline[] };
+    expect(n.children[0]).toMatchObject({ type: "link", href: "https://a.co/?a=1&b=2" });
+    expect(types(parse(`[x](java&#115;cript:alert(1))`))).not.toContain("link");
   });
+
 });
 
 // --- The inline HTML subset ------------------------------------------------

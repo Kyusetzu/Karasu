@@ -1007,7 +1007,7 @@ export const en = {
     bioPlaceholder: "Say something about yourself …",
     bioPreviewEmpty: "The preview appears here as you type.",
     bioMarkdownHint:
-      "Markdown works. Images and embeds show as links — the preview is exactly what your profile will look like in Karasu.",
+      "Markdown works, images included; videos show as links. The preview is exactly what your profile will look like in Karasu.",
     profileColor: "Profile colour",
     profileColorHint:
       "AniList uses this to tint your profile. A custom hex value is a supporter feature on their side.",

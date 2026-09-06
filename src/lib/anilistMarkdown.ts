@@ -168,10 +168,63 @@ const LIMIT = 8000;
  *  router. The HashRouter happens to defang it today by prefixing `#`; the
  *  parser does not get to rely on which router the renderer mounts. */
 function safeHref(raw: string): string | null {
-  const href = raw.trim();
+  // Entities are decoded *before* the whitelist runs, never after: CommonMark
+  // decodes a link destination, an `href="…&amp;…"` is attribute-encoded by
+  // definition, and a bio's `?a=1&amp;b=2` used to reach the host as the
+  // literal five characters and 404. Decoding first is also what keeps
+  // `java&#115;cript:` from walking past a check that only saw the encoded
+  // form — the whitelist judges the bytes the browser would use.
+  const href = raw.trim().replace(ENTITY_GLOBAL, (whole, name: string) => decodeEntity(name) ?? whole);
   if (/^https?:\/\/\S+$/i.test(href)) return href;
   if (/^\/(?!\/)[^\s]*$/.test(href)) return href;
   return null;
+}
+
+/** `ENTITY_RE`'s pattern with the global flag, for `replace` over a whole URL. */
+const ENTITY_GLOBAL = new RegExp(ENTITY_RE.source, "g");
+
+/**
+ * Reads the `(target)` of a link, image or embed, starting at the `(`.
+ *
+ * A URL with balanced parentheses inside — `x_(1).png`, Wikipedia — is read
+ * whole; the old rules stopped at the first `)` and sent the host half a
+ * path. An optional CommonMark title (`"…"` or `'…'`) after the URL is
+ * accepted and dropped, so `![alt](url "title")` is an image rather than a
+ * paragraph with a bare link in it. Null when the target is malformed, in
+ * which case the caller leaves the opener as text.
+ */
+function readParenTarget(src: string, i: number): { url: string; end: number } | null {
+  let j = i + 1;
+  while (j < src.length && /\s/.test(src[j])) j += 1;
+  const start = j;
+  let depth = 0;
+  while (j < src.length) {
+    const ch = src[j];
+    if (ch === "(") depth += 1;
+    else if (ch === ")") {
+      if (depth === 0) break;
+      depth -= 1;
+    } else if (/\s/.test(ch)) break;
+    j += 1;
+  }
+  const url = src.slice(start, j);
+  if (!url) return null;
+  let k = j;
+  while (k < src.length && /[ \t]/.test(src[k])) k += 1;
+  if (k < src.length && (src[k] === '"' || src[k] === "'")) {
+    const close = src.indexOf(src[k], k + 1);
+    if (close === -1) return null;
+    k = close + 1;
+    while (k < src.length && /[ \t]/.test(src[k])) k += 1;
+  }
+  if (src[k] !== ")") return null;
+  return { url, end: k + 1 };
+}
+
+/** One attribute's value out of a tag's attribute string, quoted or bare. */
+function attrOf(attrs: string, name: string): string | null {
+  const m = new RegExp(`\\b${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, "i").exec(attrs);
+  return m ? (m[1] ?? m[2] ?? m[3] ?? "") : null;
 }
 
 /** The host, for a chip's label. Regex rather than `new URL`, which throws. */
@@ -193,11 +246,21 @@ const RE = {
   emStar: /\*(?!\s)([^*\n]+?)\*/y,
   emScore: /_(?!\s)([^_\n]+?)_/y,
   code: /`([^`\n]+)`/y,
-  // AniList's own image form, with an optional size: img(u) img33(u) img200%(u)
-  image: /img(\d+%?)?\(\s*([^)\s]+)\s*\)/iy,
-  mdImage: /!\[[^\]]*\]\(\s*([^)\s]+)\s*\)/y,
-  video: /(?:youtube|webm)\(\s*([^)\s]+)\s*\)/iy,
-  link: /\[([^\]]*)\]\(\s*([^)\s]+)\s*\)/y,
+  // The openers only; `readParenTarget` reads the `(url)` that follows, so a
+  // URL may hold balanced parentheses and a markdown image or link may carry
+  // a title. AniList's own image form has an optional size: img(u) img33(u)
+  // img200%(u).
+  image: /img(\d+%?)?\(/iy,
+  // One nested bracket level in the label, so `[![alt](img)](target)` — a
+  // linked image, the way anilist.co bios link a badge — is a link holding
+  // an image rather than a link whose label stops at the first `]`.
+  mdImage: /!\[((?:[^\[\]]|\[[^\]]*\])*)\]\(/y,
+  video: /(?:youtube|webm)\(/iy,
+  link: /\[((?:[^\[\]]|\[[^\]]*\])*)\]\(/y,
+  // `<img>` is an image, not a tag to drop: HTML-art bios and forum posts
+  // written on the site's own editor use it, and dropping it left a linked
+  // badge as an empty link.
+  htmlImg: /<img\b([^>]*)>/iy,
   autolink: /https?:\/\/[^\s<>()[\]]+/y,
   mention: /@([A-Za-z0-9_]{2,20})\b/y,
   // `script` and `style` lose their *contents* too, not just their tags. Every
@@ -304,6 +367,19 @@ function parseInline(src: string): MdInline[] {
         i += br[0].length;
         continue;
       }
+      const htmlImg = at(RE.htmlImg, src, i);
+      if (htmlImg) {
+        flush();
+        i += htmlImg[0].length;
+        const srcAttr = attrOf(htmlImg[1], "src");
+        // `width="220"` and `width="50%"` are the same sizes the `img220(u)`
+        // form declares; anything else on the tag — `onerror`, `style` — is
+        // never read, and a missing or refused `src` leaves nothing behind.
+        if (srcAttr) {
+          pushChip(out, "image", srcAttr, parseImageWidth(attrOf(htmlImg[1], "width") ?? undefined));
+        }
+        continue;
+      }
       const pair = at(RE.htmlPair, src, i);
       if (pair) {
         flush();
@@ -392,39 +468,44 @@ function parseInline(src: string): MdInline[] {
 
     if (c === "i" || c === "I" || c === "y" || c === "Y" || c === "w" || c === "W") {
       const img = at(RE.image, src, i);
-      if (img) {
+      // Each opener ends on its `(`, which is where the target reader starts.
+      const imgTarget = img && readParenTarget(src, i + img[0].length - 1);
+      if (img && imgTarget) {
         flush();
-        // Group 1 is the declared size, group 2 the URL — the size group used
-        // to be non-capturing, which is why the URL was `img[1]`.
-        pushChip(out, "image", img[2], parseImageWidth(img[1]));
-        i += img[0].length;
+        // Group 1 is the declared size — it used to be non-capturing, which is
+        // why the URL was once `img[1]`.
+        pushChip(out, "image", imgTarget.url, parseImageWidth(img[1]));
+        i = imgTarget.end;
         continue;
       }
       const vid = at(RE.video, src, i);
-      if (vid) {
+      const vidTarget = vid && readParenTarget(src, i + vid[0].length - 1);
+      if (vid && vidTarget) {
         flush();
-        pushChip(out, "video", vid[1]);
-        i += vid[0].length;
+        pushChip(out, "video", vidTarget.url);
+        i = vidTarget.end;
         continue;
       }
     }
 
     if (c === "!") {
       const img = at(RE.mdImage, src, i);
-      if (img) {
+      const target = img && readParenTarget(src, i + img[0].length - 1);
+      if (img && target) {
         flush();
-        pushChip(out, "image", img[1]);
-        i += img[0].length;
+        pushChip(out, "image", target.url);
+        i = target.end;
         continue;
       }
     }
 
     if (c === "[") {
       const link = at(RE.link, src, i);
-      if (link) {
-        const href = safeHref(link[2]);
+      const target = link && readParenTarget(src, i + link[0].length - 1);
+      if (link && target) {
+        const href = safeHref(target.url);
         flush();
-        i += link[0].length;
+        i = target.end;
         const children = parseInline(link[1]);
         // A rejected href is not a link. Its label still is content — which is
         // how AniList's `[](json…)` layout blob vanishes: empty label, no node.

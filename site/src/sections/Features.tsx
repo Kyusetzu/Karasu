@@ -18,7 +18,10 @@ interface Row {
 /** Two phone screens side by side. */
 function PhonePair({ a, b }: { a: string; b: string }) {
   return (
-    <div className="mx-auto grid max-w-md grid-cols-2 gap-4">
+    // `items-start`: the grid would otherwise stretch the first frame to the
+    // row's height, which the second frame's top margin makes 2rem taller —
+    // an empty band under the first screenshot.
+    <div className="mx-auto grid max-w-md grid-cols-2 items-start gap-4">
       <Screenshot shot={shot(a)} sizes="(min-width: 1024px) 14rem, 45vw" />
       <Screenshot shot={shot(b)} sizes="(min-width: 1024px) 14rem, 45vw" className="mt-8" />
     </div>

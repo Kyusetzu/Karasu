@@ -44,11 +44,15 @@ for (const set of SETS) {
       continue;
     }
     const meta = await sharp(src).metadata();
-    const ratio = meta.height / meta.width;
+    // `crop: { top, bottom }` in the config cuts rows off the raw capture
+    // first — the phone's status bar, which is the phone's, not the app's.
+    const crop = { top: shot.crop?.top ?? 0, bottom: shot.crop?.bottom ?? 0 };
+    const region = { left: 0, top: crop.top, width: meta.width, height: meta.height - crop.top - crop.bottom };
+    const ratio = region.height / region.width;
     const variants = { avif: [], webp: [], jpg: [] };
     for (const w of set.widths) {
       const h = Math.round(w * ratio);
-      const base = sharp(src).resize(w, h, { kernel: "lanczos3" });
+      const base = sharp(src).extract(region).resize(w, h, { kernel: "lanczos3" });
       const avif = path.join(OUT, set.kind, `${shot.id}-${w}.avif`);
       const webp = path.join(OUT, set.kind, `${shot.id}-${w}.webp`);
       // The 2x file is viewed at half its pixels, so it can afford a lower quality.

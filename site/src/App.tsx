@@ -1,3 +1,4 @@
+import { Feathers } from "@/components/Feathers";
 import { Footer } from "@/components/Footer";
 import { Nav } from "@/components/Nav";
 import { AniList } from "@/sections/AniList";
@@ -22,6 +23,7 @@ export function App() {
       <a href="#main" className="skip-link">
         Skip to content
       </a>
+      <Feathers />
       <Nav />
       <main id="main">
         <Hero />

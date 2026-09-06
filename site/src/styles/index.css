@@ -79,6 +79,18 @@ body {
   @apply not-sr-only fixed left-4 top-4 z-50 rounded-lg bg-accent-500 px-3 py-2 text-sm font-medium text-accent-ink outline-none;
 }
 
+/* --- Feathers ----------------------------------------------------------- */
+
+/* The particle canvas: the whole viewport, fixed, under everything in flow.
+   A negative z-index in the root stacking context paints above the body's
+   background and below every section; the washes and panels sit on top. */
+.feathers {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+
 /* --- Nav ---------------------------------------------------------------- */
 
 /* At the top of the page the bar is part of the page — no surface, no rule —

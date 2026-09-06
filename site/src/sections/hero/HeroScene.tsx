@@ -167,25 +167,37 @@ export function HeroScene({ className }: { className?: string }) {
   const done = phase === "done" || phase === "static";
 
   return (
+    // Three rows — the pill, the mark's room, the card — so nothing can sit
+    // on anything else at any size: the mark takes whatever height is left
+    // between the other two. Percentages placed the layers before, and at
+    // some widths the mark's tail met the card's top edge.
+    // The `@container` is the wrapper, not the stage: an element cannot query
+    // its own size, so the stage's taller aspect on a narrow column has to
+    // read the column's width from one level up.
+    <div className={cn("@container", className)}>
     <div
       ref={stage}
       data-phase={phase}
-      className={cn("hero-stage @container relative aspect-[16/10] w-full overflow-hidden rounded-2xl", className)}
+      className="hero-stage relative grid aspect-[16/10] w-full grid-rows-[auto_minmax(0,1fr)_auto] gap-3 overflow-hidden rounded-2xl p-[5%] @max-md:aspect-[6/5] @max-md:gap-2.5"
       aria-label="Karasu recognises an episode playing in mpv and updates the list"
       role="img"
     >
-      {/* The detection pill, the titlebar's capsule. */}
-      <div className="absolute left-1/2 top-[6%] flex h-6 max-w-[80%] -translate-x-1/2 items-center gap-2 rounded-full border border-hair bg-surface-900 px-2.5 @max-md:left-[5%] @max-md:max-w-[70%] @max-md:translate-x-0">
-        <span className="hero-dot size-1.5 shrink-0 rounded-full" />
-        <span className="truncate text-2xs font-medium tracking-[.03em] text-ink-500">
-          <span className="st st-pill-idle">{COPY.pill.idle}</span>
-          <span className="st st-pill-live">{COPY.pill.live}</span>
-        </span>
+      {/* Row one: the detection pill, the titlebar's capsule. */}
+      <div className="flex justify-center @max-md:justify-start">
+        <div className="flex h-6 max-w-[80%] items-center gap-2 rounded-full border border-hair bg-surface-900 px-2.5 @max-md:max-w-[72%]">
+          <span className="hero-dot size-1.5 shrink-0 rounded-full" />
+          <span className="truncate text-2xs font-medium tracking-[.03em] text-ink-500">
+            <span className="st st-pill-idle">{COPY.pill.idle}</span>
+            <span className="st st-pill-live">{COPY.pill.live}</span>
+          </span>
+        </div>
       </div>
 
-      {/* The mark. Brand art, never re-tinted. */}
-      <div ref={mark} className="hero-mark absolute left-[7%] top-[14%] h-[40%] @max-md:top-[17%] @max-md:h-[34%]">
-        <KarasuMark className="h-full w-auto" />
+      {/* Row two: the mark, top-left of the room that is left. Brand art, never re-tinted. */}
+      <div className="relative min-h-0">
+        <div ref={mark} className="hero-mark absolute left-[2%] top-0 h-full max-h-44 @max-md:max-h-28">
+          <KarasuMark className="h-full w-auto" />
+        </div>
       </div>
 
       {/* The sight line and the reticle, in the stage's own pixels. */}
@@ -214,52 +226,61 @@ export function HeroScene({ className }: { className?: string }) {
         </g>
       </svg>
 
-      {/* The Now Playing card, the app's recipe. */}
-      <div className="hero-card absolute bottom-[9%] right-[6%] w-[58%] min-w-[15rem] max-w-[24rem] rounded-[.875rem] px-4.5 py-4 inset-well well-edge @max-md:left-[5%] @max-md:right-[5%] @max-md:w-auto @max-md:min-w-0 @max-md:max-w-none @max-md:px-3.5 @max-md:py-3">
-        <div className="flex items-start gap-3">
-          <div ref={disc} className="relative grid size-11 shrink-0 place-items-center rounded-full bg-accent-600/25 text-accent-400">
-            <MonitorPlay className="size-5" aria-hidden="true" />
-            <svg className="absolute inset-0 size-11 -rotate-90" viewBox="0 0 44 44" aria-hidden="true">
-              <circle cx="22" cy="22" r="20.5" fill="none" stroke="currentColor" strokeOpacity="0.18" strokeWidth="2" />
-              <circle ref={ring} className="hero-ring" cx="22" cy="22" r="20.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" pathLength={1} />
-            </svg>
+      {/* Row three: the Now Playing card, the app's recipe, against the right edge. */}
+      <div className="flex justify-end">
+        {/* 17.5rem at the least: the eyebrow, the chip and the title all have to fit
+            beside the disc, and at 15rem the stage of a 1024px window cut both. */}
+        <div className="hero-card relative w-[58%] min-w-70 max-w-96 rounded-[.875rem] px-4.5 py-4 inset-well well-edge @max-md:w-full @max-md:min-w-0 @max-md:max-w-none @max-md:px-3.5 @max-md:py-3">
+          <div className="flex items-start gap-3">
+            <div ref={disc} className="relative grid size-11 shrink-0 place-items-center rounded-full bg-accent-600/25 text-accent-400">
+              <MonitorPlay className="size-5" aria-hidden="true" />
+              <svg className="absolute inset-0 size-11 -rotate-90" viewBox="0 0 44 44" aria-hidden="true">
+                <circle cx="22" cy="22" r="20.5" fill="none" stroke="currentColor" strokeOpacity="0.18" strokeWidth="2" />
+                <circle ref={ring} className="hero-ring" cx="22" cy="22" r="20.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" pathLength={1} />
+              </svg>
+            </div>
+            <div className="min-w-0 flex-1">
+              {/* The chip shares the eyebrow's line, so the title keeps the card's whole width. */}
+              <div className="flex items-center justify-between gap-2">
+                <p className="truncate text-2xs uppercase tracking-[.09em] text-ink-600">
+                  <span className="st st-eyebrow-idle">{COPY.eyebrow.idle}</span>
+                  <span className="st st-eyebrow-live">{COPY.eyebrow.live}</span>
+                </p>
+                <span
+                  ref={chip}
+                  className="hero-chip shrink-0 rounded-[.625rem] border border-success/40 bg-success/10 px-2 py-0.5 font-brand text-2xs font-semibold uppercase tracking-[.16em] text-success"
+                >
+                  {COPY.chip}
+                </span>
+              </div>
+              <p className="truncate text-[1.0625rem] font-semibold text-ink-100 @max-xl:text-[.9375rem]">
+                {COPY.title} <span className="text-ink-500">— {COPY.episode}</span>
+              </p>
+              <p className="mt-0.5 flex items-center gap-1.5 whitespace-nowrap text-xs text-ink-500">
+                <span className="st st-status-idle">{COPY.status.idle}</span>
+                <span className="st st-status-locked">{COPY.status.locked}</span>
+                <span className="st st-status-filling">{COPY.status.filling}</span>
+                <span className="st st-status-done inline-flex items-center gap-1.5 text-success">
+                  <Check className={cn("size-3.5", done && phase !== "static" && "animate-land")} aria-hidden="true" />
+                  {COPY.status.done}
+                </span>
+              </p>
+            </div>
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-2xs uppercase tracking-[.09em] text-ink-600">
-              <span className="st st-eyebrow-idle">{COPY.eyebrow.idle}</span>
-              <span className="st st-eyebrow-live">{COPY.eyebrow.live}</span>
-            </p>
-            <p className="truncate text-[1.0625rem] font-semibold text-ink-100 @max-md:text-[.9375rem]">
-              {COPY.title} <span className="text-ink-500 @max-md:hidden">— {COPY.episode}</span>
-            </p>
-            <p className="mt-0.5 flex items-center gap-1.5 whitespace-nowrap text-xs text-ink-500">
-              <span className="st st-status-idle">{COPY.status.idle}</span>
-              <span className="st st-status-locked">{COPY.status.locked}</span>
-              <span className="st st-status-filling">{COPY.status.filling}</span>
-              <span className="st st-status-done inline-flex items-center gap-1.5 text-success">
-                <Check className={cn("size-3.5", done && phase !== "static" && "animate-land")} aria-hidden="true" />
-                {COPY.status.done}
-              </span>
-            </p>
+          <div className="mt-3 h-1 overflow-hidden rounded-full bg-surface-800">
+            <div ref={rail} className="hero-rail h-1 w-full origin-left rounded-full" />
           </div>
-          <span
-            ref={chip}
-            className="hero-chip rounded-[.625rem] border border-success/40 bg-success/10 px-2 py-0.5 font-brand text-2xs font-semibold uppercase tracking-[.16em] text-success"
-          >
-            {COPY.chip}
-          </span>
-        </div>
-        <div className="mt-3 h-1 overflow-hidden rounded-full bg-surface-800">
-          <div ref={rail} className="hero-rail h-1 w-full origin-left rounded-full" />
         </div>
       </div>
 
-      {/* Replay, once the scene has run. Hidden for the static and reduced-motion renders. */}
+      {/* Replay, once the scene has run: bottom-left beside the card, top-right on a
+          narrow stage where the card is the whole width. Hidden for the static and
+          reduced-motion renders. */}
       <button
         type="button"
         onClick={play}
         className={cn(
-          "absolute bottom-[9%] left-[7%] z-20 inline-flex h-7.5 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-ink-500 transition-surface hover:bg-surface-850 hover:text-ink-100 focus-visible:outline-2 focus-visible:outline-accent-500 @max-md:bottom-auto @max-md:left-auto @max-md:right-[4%] @max-md:top-[5%]",
+          "absolute bottom-[5%] left-[5%] z-20 inline-flex h-7.5 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-ink-500 transition-surface hover:bg-surface-850 hover:text-ink-100 focus-visible:outline-2 focus-visible:outline-accent-500 @max-md:bottom-auto @max-md:left-auto @max-md:right-[5%] @max-md:top-[5%]",
           phase === "done" ? "opacity-100" : "pointer-events-none opacity-0",
         )}
         aria-hidden={phase !== "done"}
@@ -268,6 +289,7 @@ export function HeroScene({ className }: { className?: string }) {
         <RotateCcw className="size-3.5" aria-hidden="true" />
         <span className="@max-md:sr-only">{COPY.replay}</span>
       </button>
+    </div>
     </div>
   );
 }

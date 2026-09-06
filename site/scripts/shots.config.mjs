@@ -28,9 +28,9 @@ export const DESKTOP = [
 ];
 
 export const PHONE = [
-  { id: "phone-overview", file: "overview.png", alt: "The phone's Overview with the bottom bar.", caption: "Android — overview" },
-  { id: "phone-list", file: "list.png", alt: "The anime list on the phone as a four-column cover grid with the status tabs above.", caption: "Android — anime list" },
-  { id: "phone-detail", file: "detail.png", alt: "A title's detail page on the phone with the entry editor.", caption: "Android — a title, with the entry editor" },
-  { id: "phone-search", file: "search.png", alt: "The search page on the phone.", caption: "Android — search" },
-  { id: "phone-more", file: "more.png", alt: "The More sheet on the phone listing the remaining screens.", caption: "Android — the More sheet" },
+  { id: "phone-overview", file: "overview.png", alt: "The phone's Overview with the bottom bar.", crop: { top: 107 }, caption: "Android —overview" },
+  { id: "phone-list", file: "list.png", alt: "The anime list on the phone as a four-column cover grid with the status tabs above.", crop: { top: 107 }, caption: "Android —anime list" },
+  { id: "phone-detail", file: "detail.png", alt: "A title's detail page on the phone with the entry editor.", crop: { top: 107 }, caption: "Android —a title, with the entry editor" },
+  { id: "phone-search", file: "search.png", alt: "The search page on the phone.", crop: { top: 107 }, caption: "Android —search" },
+  { id: "phone-more", file: "more.png", alt: "The More sheet on the phone listing the remaining screens.", crop: { top: 107 }, caption: "Android —the More sheet" },
 ];

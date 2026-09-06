@@ -1,0 +1,73 @@
+name: Dependabot auto-merge
+
+# Merges a Dependabot pull request once the checks on its newest commit are
+# green. It listens to the check workflows *finishing* rather than to the PR
+# itself, so it cannot run before a build has spoken, and it needs no branch
+# protection to make it wait — which leaves the maintainer's direct pushes to
+# main exactly as they are. An app PR is heard through CI, a site PR through
+# Site; a PR neither of them runs for (nothing under either's paths) is never
+# merged here and waits for a person.
+#
+# Three refusals, checked against the PR the run belongs to: not opened by
+# dependabot[bot], not from this repository, or a head that moved after the
+# commit the run tested. Dependabot itself never opens a semver-major PR for
+# npm or cargo (dependabot.yml), so nothing here has to grade updates.
+#
+# What a merge does not do: build a Nightly or bump the version. The merge is
+# made with GITHUB_TOKEN, and a push made with that token starts no workflow
+# by design, so the dependency lands on main and the next real commit — which
+# is also the one that gives it a version number, since a Dependabot merge
+# bumps nothing (CLAUDE.md, "The commit loop") — is the one that ships it.
+on:
+  workflow_run:
+    workflows: ["CI", "Site"]
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  merge:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.actor.login == 'dependabot[bot]' &&
+      startsWith(github.event.workflow_run.head_branch, 'dependabot/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Merge the pull request the run belongs to
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.event.workflow_run.head_branch }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+        run: |
+          set -euo pipefail
+          pr=$(gh api "repos/$REPO/pulls?head=${REPO%%/*}:$BRANCH&state=open" --jq '.[0] // empty')
+          if [ -z "$pr" ]; then
+            echo "no open pull request for $BRANCH — nothing to merge"
+            exit 0
+          fi
+          number=$(jq -r .number <<<"$pr")
+          author=$(jq -r .user.login <<<"$pr")
+          head=$(jq -r .head.sha <<<"$pr")
+          headrepo=$(jq -r .head.repo.full_name <<<"$pr")
+          title=$(jq -r .title <<<"$pr")
+          if [ "$author" != "dependabot[bot]" ]; then
+            echo "#$number was opened by $author, not Dependabot — leaving it"
+            exit 0
+          fi
+          if [ "$headrepo" != "$REPO" ]; then
+            echo "#$number comes from $headrepo — leaving it"
+            exit 0
+          fi
+          if [ "$head" != "$SHA" ]; then
+            echo "#$number moved on: the run tested $SHA, the head is now $head — the next run decides"
+            exit 0
+          fi
+          echo "merging #$number ($title) at $SHA"
+          gh pr merge "$number" --squash --delete-branch \
+            --subject "$title (#$number)" \
+            --body "Merged automatically: the checks on $SHA passed ($RUN_URL)."

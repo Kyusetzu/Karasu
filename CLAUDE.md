@@ -849,6 +849,34 @@ review checkpoints are in `site/README.md`.
 - **Every claim on the site has a row in `site/CONTENT-AUDIT.md`** naming the
   file or test that makes it true. No row, no sentence — the site advertises
   the app that exists, not the one that is planned.
+- **A site pull request is checked by `site-ci.yml`, not `ci.yml`.** CI ignores
+  `site/**`; the Site workflow runs the site's `check` and `build` on a PR that
+  touches `site/**` or `src/app/index.css`, and is what the auto-merge below
+  listens to for a site dependency bump.
+
+## Dependabot merges itself
+
+`.github/workflows/dependabot-automerge.yml` merges a Dependabot PR when the
+check workflow for it — CI for the app, Site for the website — finishes green
+on the PR's current head. It runs on `workflow_run`, so it cannot fire before a
+build has spoken and needs no branch protection to wait, which is what keeps
+direct pushes to `main` as they are. It refuses a PR not opened by
+`dependabot[bot]`, one from another repository, or one whose head moved after
+the tested commit. Three consequences to know:
+
+- **The merge builds no Nightly and bumps no version.** It is made with
+  `GITHUB_TOKEN`, and a push made with that token starts no workflow by
+  design. The dependency sits on `main` until the next real commit, which
+  carries the version bump and the Nightly for both — the same way a
+  hand-merged Dependabot PR always worked here (they never bumped either).
+- **A PR neither workflow runs for is never merged automatically** — a change
+  outside both path lists waits for a person. Dependabot never opens a
+  semver-major PR for npm or cargo (`dependabot.yml`), so the workflow grades
+  nothing; if that ignore list ever loosens, this is the place to add a
+  `fetch-metadata` gate.
+- **Re-running a PR's CI is the way to merge it by hand through the
+  automation** (`gh run rerun <id>`); the re-run keeps Dependabot as the
+  run's actor, the merge follows.
 
 ## Invariants the release audit established
 

@@ -1,0 +1,48 @@
+name: Site
+
+# The website's gate on a pull request. ci.yml ignores site/** on purpose — a
+# site-only PR need not build the app twice — so until this existed a
+# site-only PR had no check at all, and nothing could merge one on the
+# strength of a green run. Same three commands as pages.yml, minus the deploy:
+# typecheck plus token freshness, then the production build, which ends in
+# verify-dist's budgets. The app stylesheet is watched too, because the
+# site's tokens are generated from it and a stale token file must fail here.
+on:
+  pull_request:
+    paths:
+      - "site/**"
+      - "src/app/index.css"
+      - ".github/workflows/site-ci.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  site-check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: site
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check (typecheck + token freshness)
+        run: npm run check
+
+      - name: Build (prerender + verify-dist)
+        run: npm run build

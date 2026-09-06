@@ -78,16 +78,26 @@ for (const page of ["index.html", "404.html"]) {
   }
 }
 
-// Budgets.
+// Budgets. The JavaScript budget is for what the page loads before it can
+// run: the entry and every chunk it preloads. Chunks fetched on demand (the
+// hero's `motion`) are listed but not counted.
+const indexHtml = readFileSync(path.join(CLIENT, "index.html"), "utf8");
+const initial = new Set(
+  [...indexHtml.matchAll(/<(?:script[^>]+src|link[^>]+rel="modulepreload"[^>]+href)="([^"]+)"/g)].map((m) =>
+    m[1].replace(BASE, ""),
+  ),
+);
 let jsGz = 0;
+let lazyGz = 0;
 const rows = [];
 for (const f of files) {
   const size = statSync(f).size;
   const name = rel(f);
   if (name.endsWith(".js")) {
     const gz = gzipSync(readFileSync(f)).length;
-    jsGz += gz;
-    rows.push([name, size, gz]);
+    if (initial.has(name)) jsGz += gz;
+    else lazyGz += gz;
+    rows.push([name + (initial.has(name) ? "" : "  (lazy)"), size, gz]);
   } else if (/\.(css)$/.test(name)) {
     rows.push([name, size, gzipSync(readFileSync(f)).length]);
   } else if (/\.(avif|webp|jpe?g|png)$/.test(name)) {
@@ -98,7 +108,7 @@ for (const f of files) {
 for (const [name, size, gz] of rows.sort((a, b) => b[1] - a[1]).slice(0, 25)) {
   console.log(`${String(size).padStart(9)} B${gz === null ? "" : `  ${String(gz).padStart(7)} gz`}  ${name}`);
 }
-console.log(`JavaScript, gzipped: ${(jsGz / 1024).toFixed(1)} kB (budget ${JS_BUDGET_GZ / 1024} kB)`);
+console.log(`JavaScript, gzipped: ${(jsGz / 1024).toFixed(1)} kB initial (budget ${JS_BUDGET_GZ / 1024} kB) + ${(lazyGz / 1024).toFixed(1)} kB on demand`);
 if (jsGz > JS_BUDGET_GZ) fail(`JavaScript over budget: ${(jsGz / 1024).toFixed(1)} kB gzipped`);
 
 for (const required of ["robots.txt", "sitemap.xml", ".nojekyll", "404.html"]) {

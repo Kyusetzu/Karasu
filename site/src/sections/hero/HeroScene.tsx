@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { animate, type AnimationPlaybackControls, type AnimationSequence } from "motion";
+import type { AnimationPlaybackControls, AnimationSequence } from "motion";
 import { Check, MonitorPlay, RotateCcw } from "lucide-react";
 import KarasuMark from "@/components/KarasuMark";
 import { cn } from "@/lib/cn";
@@ -94,7 +94,11 @@ export function HeroScene({ className }: { className?: string }) {
     timers.current = [];
   };
 
-  const play = useCallback(() => {
+  const play = useCallback(async () => {
+    // `motion` arrives only when the scene is about to run: it is the one
+    // dependency the first paint does not need, and it stays out of the
+    // budget the page loads with.
+    const { animate } = await import("motion");
     if (!mark.current || !sight.current || !reticle.current || !ring.current || !rail.current || !chip.current) return;
     controls.current?.stop();
     clearTimers();

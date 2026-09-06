@@ -1,11 +1,11 @@
-import { FileCheck2, MonitorSmartphone, UserRoundX } from "lucide-react";
+import { ScrollText, MonitorSmartphone, UserRoundX } from "lucide-react";
 import { ButtonLink } from "@/components/ui/button";
 import { LINKS } from "@/site.config";
 import { HeroScene } from "./hero/HeroScene";
 
 const FACTS = [
   { icon: MonitorSmartphone, text: "Windows · Linux · Android" },
-  { icon: FileCheck2, text: "MIT licensed" },
+  { icon: ScrollText, text: "MIT licensed" },
   { icon: UserRoundX, text: "No account needed to start" },
 ] as const;
 

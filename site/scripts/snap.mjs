@@ -71,6 +71,26 @@ try {
       const page = await context.newPage();
       await page.goto(url, { waitUntil: "networkidle" });
       await page.evaluate(() => document.fonts.ready);
+      // A full-page capture does not scroll, and the page reveals on scroll:
+      // sweep it once so every block has been in view, then return to the top.
+      if (full) {
+        await page.evaluate(async () => {
+          // Instant, not smooth: the page asks for smooth scrolling, and a smooth
+          // sweep glides past the observers between frames.
+          document.documentElement.style.scrollBehavior = "auto";
+          const step = Math.max(200, Math.floor(window.innerHeight * 0.6));
+          for (let y = 0; y < document.documentElement.scrollHeight; y += step) {
+            window.scrollTo({ top: y, behavior: "instant" });
+            await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 90)));
+          }
+          window.scrollTo({ top: 0, behavior: "instant" });
+          // Whatever the sweep missed is revealed by hand: this is a review
+          // still, and a block that is invisible in it tells the reviewer nothing.
+          for (const el of document.querySelectorAll("[data-reveal]")) el.setAttribute("data-revealed", "");
+          document.documentElement.style.scrollBehavior = "";
+        });
+        await page.waitForTimeout(500);
+      }
       let elapsed = 0;
       for (const at of frames) {
         if (at === null) await page.waitForTimeout(600);

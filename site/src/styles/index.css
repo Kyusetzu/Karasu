@@ -162,3 +162,70 @@ body {
     background: var(--color-accent-500);
   }
 }
+
+/* --- Reveal ------------------------------------------------------------- */
+
+/* Blocks rise into view once, on the app's `riseIn` — only where a script
+   will mark them and motion is welcome. Without either they are simply there. */
+@media (prefers-reduced-motion: no-preference) {
+  html[data-js] [data-reveal]:not([data-revealed]) {
+    opacity: 0;
+  }
+  html[data-js] [data-reveal][data-revealed] {
+    animation: riseIn 260ms var(--ease-out-expo) both;
+  }
+}
+
+/* --- Flow diagram -------------------------------------------------------- */
+
+/* The connector after each step but the last: a hairline that draws in
+   after the row is revealed, one step after another. Vertical spine below
+   `md`, horizontal rule from it. */
+.flow-step:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  background: linear-gradient(90deg, var(--color-surface-600), var(--color-surface-800));
+  left: 1.375rem;
+  top: 2.75rem;
+  bottom: -1.5rem;
+  width: 1px;
+  transform-origin: top;
+}
+@media (min-width: 48rem) {
+  .flow-step:not(:last-child)::after {
+    top: 1.375rem;
+    left: 2.75rem;
+    right: -1rem;
+    bottom: auto;
+    width: auto;
+    height: 1px;
+    transform-origin: left;
+  }
+}
+.flow-success .flow-step > span {
+  color: var(--color-success);
+}
+@media (prefers-reduced-motion: no-preference) {
+  html[data-js] .flow:not([data-revealed]) .flow-step::after {
+    transform: scaleY(0);
+  }
+  html[data-js] .flow[data-revealed] .flow-step::after {
+    transform: none;
+    transition: transform 520ms var(--ease-out-expo) calc(var(--i, 0) * 110ms + 200ms);
+  }
+  @media (min-width: 48rem) {
+    html[data-js] .flow:not([data-revealed]) .flow-step::after {
+      transform: scaleX(0);
+    }
+  }
+}
+
+/* --- Final call to action ------------------------------------------------ */
+.cta::before {
+  content: "";
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 26rem;
+  pointer-events: none;
+  background: radial-gradient(40rem 20rem at 50% 120%, rgba(var(--accent-rgb), 0.14), transparent 70%);
+}

@@ -25,7 +25,7 @@
  * describe. Never signs out and never opens the Jellyfin pane.
  */
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { chromium } from "playwright-core";
 
@@ -34,6 +34,7 @@ const REPO = path.resolve(here, "..", "..");
 const RELEASE = path.join(REPO, "src-tauri", "target", "release");
 const EXE = path.join(RELEASE, "karasu.exe");
 const MARKER = path.join(RELEASE, "karasu.portable");
+const PID_FILE = path.join(RELEASE, "karasu.rig-pid");
 const OUT = path.resolve(here, "..", "captures", "desktop");
 const CDP = "http://127.0.0.1:9222";
 const VIEWPORT = { width: 1440, height: 900, deviceScaleFactor: 2 };
@@ -67,6 +68,10 @@ switch (cmd) {
       stdio: "ignore",
     });
     child.unref();
+    // `quit` needs the pid: the app has no quit command — the tray's Quit is
+    // `app.exit(0)` on a menu event — so ending the rig means ending the
+    // process. Beside the marker, inside the ignored target dir.
+    writeFileSync(PID_FILE, String(child.pid));
     console.log(`capture: rig launched (pid ${child.pid}); data under ${path.join(RELEASE, "data")}`);
     break;
   }
@@ -159,10 +164,19 @@ switch (cmd) {
     break;
   }
   case "quit": {
-    const { browser, page } = await connect();
-    await page.evaluate(() => window.__TAURI_INTERNALS__.invoke("quit_app").catch(() => {}));
-    await browser.close().catch(() => {});
-    console.log("capture: quit requested");
+    // Ends the process `launch` started. It used to invoke a `quit_app`
+    // command that does not exist, swallow the rejection and report
+    // success — the rig stayed up, and a release build then failed to
+    // replace the running exe.
+    if (!existsSync(PID_FILE)) throw new Error("capture: no rig pid on record; was it launched by this script?");
+    const pid = Number(readFileSync(PID_FILE, "utf8"));
+    try {
+      process.kill(pid);
+      console.log(`capture: rig stopped (pid ${pid})`);
+    } catch (e) {
+      console.log(`capture: pid ${pid} was already gone (${e.code ?? e.message})`);
+    }
+    rmSync(PID_FILE, { force: true });
     break;
   }
   default:

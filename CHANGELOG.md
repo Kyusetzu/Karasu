@@ -64,13 +64,14 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: a7ada66 -->
+<!-- generated-through: 5a23524 -->
 
 ### Fixed
 
 - Pinning an activity no longer signs you out; a refusal shows AniList's reason, and the pin control is only offered on accounts that can pin.
 - Spoilers that wrap several paragraphs, lists or images now hide as one block, and comment previews no longer reveal spoiler text.
 - Images in bios and forum posts that showed as a link now render — linked badges, <img> tags, URLs with parentheses, and hosts that mislabel the file — and each is fetched once.
+- Bios and posts render as anilist.co does where they did not — a favicon-style ICO image loads inline, every HTML entity a browser knows is decoded, a heading written as #Title without the space is a heading, ~~~centred~~~ text inside a heading keeps its spoiler, <hr> draws a rule, and a one-line centred row starting with a dash is no longer a bulleted list.
 
 ### Added
 

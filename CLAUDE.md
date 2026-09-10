@@ -622,6 +622,21 @@ import it.
   query keeps it, pays for it with `perPage: 10`, and `lib/comments` flattens to
   two levels while reporting what it hides. Being untyped, "unexpected shape" is
   a normal outcome there rather than a defensive hypothetical.
+- **`text(asHtml: true)` is the API's renderer, not the website's.** The
+  site renders markdown in the browser with its own pipeline, and the two
+  disagree inside HTML blocks: markdown inside a multi-line `<center>` is
+  literal to the API and rendered by the site (`#__[t](u)__` is an `<h1>`
+  holding a bold link there, a bare anime URL a media card), and the site's
+  heading rule needs no space after the `#` (marked's, not CommonMark's).
+  Spoilers and images agreed in every sample measured on 2026-09-10; that is
+  why `anilistMarkdown.fixtures.test.ts` grades those two everywhere and
+  headings/links only where `scripts/sample-markdown.mjs` says the API can be
+  trusted. The oracle is the site's `.markdown` element in a browser, and a
+  one-line `<div align="center">- x -</div>` is *not* a list there while a
+  multi-line `<center>` block does get its markdown — measured, not derived.
+  The sampler's `--rig` transport exists because an outage that refuses
+  unauthenticated requests (HTTP 403 "temporarily disabled") still answers
+  signed-in ones.
 - **The website reaches a forum page Karasu cannot, and that is deliberate.**
   anilist.co renders page 470 of thread 1 because its **Web Worker** posts to
   **`anilist.co/graphql`** — a different endpoint from `graphql.anilist.co` —
@@ -704,7 +719,7 @@ import it.
   the user's IP and which profile they opened, *from the page, on every render*.
   `commands::fetch_bio_image` makes one bounded request in Rust instead and
   returns a `data:` URI, which the existing `img-src 'self' data:` already
-  permits: size cap, the format sniffed from the bytes (png/jpeg/gif/webp/avif
+  permits: size cap, the format sniffed from the bytes (png/jpeg/gif/webp/avif/ico
   — never SVG, it is a scripting context — and the declared `Content-Type` is
   not consulted, because hosts send `octet-stream`, nothing, or the wrong
   one), timeout, no cookies, no `Referer` on any hop (`referer(false)`;

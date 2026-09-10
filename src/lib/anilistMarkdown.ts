@@ -70,6 +70,16 @@ export type MdInline =
    * styling.
    */
   | { type: "accent"; children: MdInline[] }
+  /**
+   * `~~~x~~~` *inside* a line. anilist.co converts the tildes to `<center>`
+   * tags before markdown runs, so a heading written as `# ~~~Title~~~` — the
+   * 100-day-challenge template, all over text activities — is a centred
+   * heading, and `~~~~!img(u)!~ ~~~` centres a spoiler. Read as `~~`+`~`
+   * by the strike rule instead, the spoiler after it was lost (activity
+   * 1154078329, measured on the site 2026-09-10). Block-level `~~~` rows are
+   * the `center` block; this is the inline remainder.
+   */
+  | { type: "centered"; children: MdInline[] }
   | {
       type: "chip";
       kind: "image" | "video";
@@ -240,6 +250,9 @@ const RE = {
   // `*?`, not `+?`: `~!!~` is an empty spoiler on anilist.co, not four
   // characters of text.
   spoiler: /~!([\s\S]*?)!~/y,
+  // Tried before `strike`, which would otherwise read the first two of three
+  // tildes and leave the third to break whatever follows. See `centered`.
+  centerInline: /~~~([\s\S]*?)~~~/y,
   strongStar: /\*\*(?!\s)([\s\S]+?)\*\*/y,
   strongScore: /__(?!\s)([\s\S]+?)__/y,
   strike: /~~(?!~)(?!\s)([\s\S]+?)~~/y,
@@ -430,6 +443,13 @@ function parseInline(src: string): MdInline[] {
         out.push({ type: "spoiler", children: parseInline(sp[1]) });
         continue;
       }
+      const centre = at(RE.centerInline, src, i);
+      if (centre) {
+        flush();
+        i += centre[0].length;
+        out.push({ type: "centered", children: parseInline(centre[1]) });
+        continue;
+      }
       const st = at(RE.strike, src, i);
       if (st) {
         flush();
@@ -609,10 +629,22 @@ const CENTER_CLOSE = /^([\s\S]*?)~~~\s*$/;
 const CENTER_OPEN = /^\s*~~~(.*)$/;
 /** The whole block on one line — the other common form, `~~~img28(url)~~~`. */
 const CENTER_ONE_LINE = /^\s*~~~([\s\S]*?)~~~\s*$/;
-const HEADING = /^(#{1,6})\s+(.*)$/;
+/**
+ * The space after the hashes is optional, as it is on anilist.co: the site
+ * runs a marked-era heading rule, so `#__Day 235__` at the start of a line is
+ * an `<h1>` there (activity 1154093188, measured in the browser 2026-09-10 —
+ * the API's `asHtml` disagrees, and the site is what a user compares
+ * against). CommonMark's "a hashtag is not a heading" was the rule here
+ * before, and it rendered the 365-day-challenge posts as a `#` and bold text.
+ * A seventh `#` still fails the rule, and a bare `#` is not a heading.
+ */
+const HEADING = /^(#{1,6})(?!#)[ \t]*(\S.*)$/;
 /** A heading written as HTML, alone on its line — the form centred bios use
  *  (`<div align="center"><h5>…</h5></div>` recurses into exactly this). */
 const HTML_HEADING = /^\s*<h([1-6])\b[^>]*>([\s\S]*?)<\/h\1\s*>\s*$/i;
+/** `<hr>` alone on its line, which the site draws as the rule it is; the
+ *  inline scanner would otherwise drop it as one more unknown tag. */
+const HTML_HR = /^\s*<hr\b[^>]*\/?>\s*$/i;
 /**
  * The HTML spelling of a centred block: `<center>`, or a `<div>`/`<p>`
  * carrying `align=center` in any quoting and case. The whole open tag is
@@ -635,7 +667,7 @@ const CENTER_TAG_OPEN =
 function tryHtmlCenter(
   lines: string[],
   start: number,
-): { body: string[]; next: number } | null {
+): { body: string[]; next: number; oneLine: boolean } | null {
   const m = CENTER_TAG_OPEN.exec(lines[start]);
   if (!m) return null;
   const tag = /^[a-z]+/i.exec(m[1])![0].toLowerCase();
@@ -662,13 +694,54 @@ function tryHtmlCenter(
       const cut = content.toLowerCase().lastIndexOf(`</${tag}`);
       const inner = cut === -1 ? content : content.slice(0, cut);
       if (inner.trim()) body.push(inner);
-      return { body, next: j + 1 };
+      return { body, next: j + 1, oneLine: j === start };
     }
     if (content.trim()) body.push(content);
     j += 1;
-    if (j >= lines.length) return { body, next: j };
+    if (j >= lines.length) return { body, next: j, oneLine: false };
     content = lines[j];
   }
+}
+
+/**
+ * The content of a centred HTML row that opens and closes on one line.
+ *
+ * Markdown *block* rules do not run inside it: anilist.co keeps
+ * `<div align="center">- <a>✧</a> -</div>` as the three characters (user
+ * 6975140's bio, sampled 2026-09-10 through `about(asHtml: true)`; the row
+ * is in `fixtures/anilistMarkdown.fixtures.json`), where the list rule read a
+ * bullet and hung a dot off the left edge of a centred line. The HTML block
+ * forms still apply, because they are what these rows are made of — a
+ * heading, or another centred row — and everything else is one paragraph.
+ *
+ * Only the one-line form, on purpose: no sample has yet said what the site
+ * does with a `- a` line *inside* a `<center>` block that spans lines, and
+ * that form keeps its markdown reading until one does.
+ */
+function parseHtmlInner(body: string[]): MdNode[] {
+  const out: MdNode[] = [];
+  for (const line of body) {
+    const hh = HTML_HEADING.exec(line);
+    if (hh) {
+      out.push({
+        type: "h",
+        level: Number(hh[1]) as 1 | 2 | 3 | 4 | 5 | 6,
+        children: parseInline(hh[2]),
+      });
+      continue;
+    }
+    if (HTML_HR.test(line)) {
+      out.push({ type: "hr" });
+      continue;
+    }
+    const nested = tryHtmlCenter([line], 0);
+    if (nested) {
+      out.push({ type: "center", children: parseHtmlInner(nested.body) });
+      continue;
+    }
+    out.push({ type: "p", children: parseInline(line) });
+  }
+  return out;
 }
 const QUOTE = /^\s*>\s?(.*)$/;
 const HR = /^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/;
@@ -809,7 +882,12 @@ function parseBlocks(input: string[]): MdNode[] {
     // one-line `<div align="center">…</div>` rows.
     const htmlCenter = tryHtmlCenter(lines, i);
     if (htmlCenter) {
-      out.push({ type: "center", children: parseBlocks(htmlCenter.body) });
+      out.push({
+        type: "center",
+        children: htmlCenter.oneLine
+          ? parseHtmlInner(htmlCenter.body)
+          : parseBlocks(htmlCenter.body),
+      });
       i = htmlCenter.next;
       continue;
     }
@@ -834,7 +912,7 @@ function parseBlocks(input: string[]): MdNode[] {
       continue;
     }
 
-    if (HR.test(line)) {
+    if (HR.test(line) || HTML_HR.test(line)) {
       out.push({ type: "hr" });
       i += 1;
       continue;
@@ -938,6 +1016,7 @@ function startsBlock(line: string): boolean {
     CENTER_OPEN.test(line) ||
     CENTER_TAG_OPEN.test(line) ||
     HR.test(line) ||
+    HTML_HR.test(line) ||
     HEADING.test(line) ||
     HTML_HEADING.test(line) ||
     QUOTE.test(line) ||
@@ -983,6 +1062,7 @@ function capExcessImages(nodes: MdNode[]): void {
         // `accent` too, or an image inside a bare `<a>` would escape the
         // fan-out cap this walk exists to enforce.
         case "accent":
+        case "centered":
           inline(n.children);
           break;
       }
@@ -1066,6 +1146,7 @@ export function renderPlain(src: string, max = 200, spoiler = "[…]"): string {
         case "link":
         // Without this, `18<a>&#8593;</a>` previews as "18".
         case "accent":
+        case "centered":
           inline(n.children);
           break;
       }

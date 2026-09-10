@@ -329,6 +329,15 @@ export function RichText({ nodes }: { nodes: MdInline[] }) {
                 <RichText nodes={n.children} />
               </Spoiler>
             );
+          case "centered":
+            // `~~~x~~~` inside a line — the site's `<center>` inside an
+            // `<h1>`. A block-level span, so it takes its own line and
+            // centres it, and the heading or paragraph around it is intact.
+            return (
+              <span key={i} className="block text-center">
+                <RichText nodes={n.children} />
+              </span>
+            );
           case "accent":
             // A bare `<a>` — anilist.co colours it like a link, and profile
             // decoration relies on exactly that. Colour only: it goes

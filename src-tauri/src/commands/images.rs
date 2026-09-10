@@ -36,6 +36,13 @@ const SNIFF_BYTES: usize = 64;
 /// exclude is a worse trade than losing the handful of SVG bios that exist.
 /// An SVG or an HTML error page sniffs as nothing, and nothing is what the
 /// caller gets.
+///
+/// ICO is on the list because favicon services are how a bio links its
+/// author's other accounts — `img16(https://a.favicon.im/steamcommunity.com)`
+/// inside an `<a>`, sampled 2026-09-10, answered `image/x-icon` with bytes
+/// that agreed, while the same service gave PNG for discord.com. A raster
+/// container the WebView decodes like any other, with no scripting surface;
+/// a cursor (type 2) is not an image and stays out.
 fn sniff_image(head: &[u8]) -> Option<&'static str> {
     if head.starts_with(&[0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A]) {
         return Some("image/png");
@@ -60,6 +67,11 @@ fn sniff_image(head: &[u8]) -> Option<&'static str> {
         if avif {
             return Some("image/avif");
         }
+    }
+    // ICO: a zero reserved word, type 1 (2 is a cursor), then a non-zero
+    // image count.
+    if head.len() >= 6 && head[..4] == [0, 0, 1, 0] && head[4..6] != [0, 0] {
+        return Some("image/x-icon");
     }
     None
 }
@@ -127,7 +139,7 @@ pub async fn fetch_bio_image(url: String) -> Result<String, String> {
     headers.insert(
         reqwest::header::ACCEPT,
         reqwest::header::HeaderValue::from_static(
-            "image/avif,image/webp,image/png,image/jpeg,image/gif,*/*;q=0.1",
+            "image/avif,image/webp,image/png,image/jpeg,image/gif,image/x-icon,*/*;q=0.1",
         ),
     );
     let client = crate::net::client_builder()
@@ -268,6 +280,11 @@ mod tests {
             Some("image/avif")
         );
         assert_eq!(sniff_image(b"\x00\x00\x00\x1cftypavis\x00\x00\x00\x00"), Some("image/avif"));
+        // ICO as a favicon service answers it: reserved 0, type 1, one entry.
+        assert_eq!(
+            sniff_image(b"\x00\x00\x01\x00\x01\x00\x10\x10\x00\x00\x01\x00\x20\x00"),
+            Some("image/x-icon")
+        );
     }
 
     /// SVG is the one image type deliberately missing: it is a scripting
@@ -284,6 +301,10 @@ mod tests {
             b"<!DOCTYPE html><html><body>403</body></html>",
             // RIFF without the WEBP form type is a WAV or an AVI.
             b"RIFF\x24\x00\x00\x00WAVEfmt ",
+            // A cursor shares ICO's header with type 2; an ICO with no
+            // entries is a header and nothing to draw.
+            b"\x00\x00\x02\x00\x01\x00\x10\x10",
+            b"\x00\x00\x01\x00\x00\x00\x10\x10",
             // An ISO-BMFF that is not an AVIF: HEIC, or plain mif1.
             b"\x00\x00\x00\x18ftypheic\x00\x00\x00\x00mif1heic",
             b"\x00\x00\x00\x14ftypmif1\x00\x00\x00\x00mif1",

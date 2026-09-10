@@ -198,3 +198,18 @@ describe("Markdown renders the real structures", () => {
     expect(container.firstChild).toBeNull();
   });
 });
+
+describe("Markdown renders the site's inline centring", () => {
+  it("centres the ~~~part~~~ of a heading without breaking the heading or the spoiler after it", () => {
+    // The 100-day-challenge template: `<h1><center>…</center> <center><spoiler/></center></h1>`
+    // on anilist.co (activity 1154078329, measured 2026-09-10).
+    const { container } = draw("# ~~~Title~~~ ~~~~!hidden words!~ ~~~");
+    const h1 = container.querySelector("h1");
+    expect(h1).not.toBeNull();
+    const centred = h1?.querySelectorAll(".text-center") ?? [];
+    expect(centred).toHaveLength(2);
+    expect(centred[0]?.textContent).toBe("Title");
+    expect(screen.getByRole("button", { name: /social\.mdSpoiler/ })).toBeTruthy();
+    expect(container.textContent).not.toContain("hidden words");
+  });
+});

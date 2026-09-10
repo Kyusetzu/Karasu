@@ -1,0 +1,63 @@
+{
+  "sampledAt": "2026-09-10",
+  "samples": [
+    {
+      "kind": "about",
+      "id": 6975140,
+      "note": "one-line centred rows, bare <a> art, &plus;, two favicons inside links (one an ICO)",
+      "raw": "&nbsp;\n<div align=\"center\"><h5>˗ˏˋ <a>&#x2605;</a> ˎˊ˗</h5></div>\n&nbsp;\n<div align=\"center\">18 <a>&plus;</a></div>\n<div align=\"center\">likes back <a>&sol;</a> follows back</div>\n<div align=\"center\">taken <a>&#9825;</a></div>\n&nbsp;\n<div align=\"center\">- <a>&#x2727;</a> -</div>\n&nbsp;\n<div align=\"center\">img89(https://static2.klipy.com/ii/a8ada81afc59159ea5c8927feffa2e31/df/97/0kaM5oxuQD75UtkGihMY.gif)</div>\n<div align=\"center\"><h5>click to <a>add</a> me</h5></div>\n<div align=\"center\">&#x22B9;&#x208A; &#x2DA;<a>&#x2027;</a>&nbsp;&nbsp;&nbsp;&nbsp;<a href=\"https://discord.dog/1318293217254445106\">img16(https://a.favicon.im/discord.com)</a>&nbsp;&nbsp;&nbsp;&nbsp;<a href=\"https://steamcommunity.com/id/cheesxcxke\">img16(https://a.favicon.im/steamcommunity.com)</a>&nbsp;&nbsp;&nbsp;&nbsp;<a>&#x2027;</a>&#x2DA; &#x208A;&#x22B9;</div>\n&nbsp;",
+      "html": "<p>&nbsp;</p>\n<div align=\"center\"><h5>˗ˏˋ <a>&#x2605;</a> ˎˊ˗</h5></div>\n<p>&nbsp;</p>\n<div align=\"center\">18 <a>&plus;</a></div>\n<div align=\"center\">likes back <a>&sol;</a> follows back</div>\n<div align=\"center\">taken <a>&#9825;</a></div>\n<p>&nbsp;</p>\n<div align=\"center\">- <a>&#x2727;</a> -</div>\n<p>&nbsp;</p>\n<div align=\"center\"><img width='89' src='https://static2.klipy.com/ii/a8ada81afc59159ea5c8927feffa2e31/df/97/0kaM5oxuQD75UtkGihMY.gif'></div>\n<div align=\"center\"><h5>click to <a>add</a> me</h5></div>\n<div align=\"center\">&#x22B9;&#x208A; &#x2DA;<a>&#x2027;</a>&nbsp;&nbsp;&nbsp;&nbsp;<a href=\"https://discord.dog/1318293217254445106\"><img width='16' src='https://a.favicon.im/discord.com'></a>&nbsp;&nbsp;&nbsp;&nbsp;<a href=\"https://steamcommunity.com/id/cheesxcxke\"><img width='16' src='https://a.favicon.im/steamcommunity.com'></a>&nbsp;&nbsp;&nbsp;&nbsp;<a>&#x2027;</a>&#x2DA; &#x208A;&#x22B9;</div>\n<p>&nbsp;</p>"
+    },
+    {
+      "kind": "comment",
+      "id": 3151776,
+      "note": "a mention, then img220(…) on a line of its own",
+      "raw": "@Nawe 9/10 Love\n\nimg220(https://d28hgpri8am2if.cloudfront.net/book_images/cvr9781421517742_9781421517742_hr.jpg)",
+      "html": "<p><a target='_blank' href='https://anilist.co/user/Nawe'>@Nawe</a> 9/10 Love</p>\n<img width='220' src='https://d28hgpri8am2if.cloudfront.net/book_images/cvr9781421517742_9781421517742_hr.jpg'>"
+    },
+    {
+      "kind": "comment",
+      "id": 3242081,
+      "note": "a mention, a score line, img300(…)",
+      "raw": "@akuma15\n\n8.5/10 \n\nimg300(https://static.mfcdn.nl/6ba6/i/1/7a/d088edcb6df7738da33affa71bf56ea5.jpg)",
+      "html": "<p><a target='_blank' href='https://anilist.co/user/akuma15'>@akuma15</a></p>\n<p>8.5/10 </p>\n<img width='300' src='https://static.mfcdn.nl/6ba6/i/1/7a/d088edcb6df7738da33affa71bf56ea5.jpg'>"
+    },
+    {
+      "kind": "text",
+      "id": 1154088020,
+      "note": "a #heading with no space inside <center>, then a spoiler spanning paragraphs with four images inside",
+      "compare": [
+        "spoilers",
+        "images",
+        "links"
+      ],
+      "raw": "<center>\n#[__ANILIST ANIME TOURNUMENT #16__](javascript:;)  __(16)__\n\n~~~img500(https://cdn.imgchest.com/files/7460bca011ed.png)~~~\n\n__Please write only the name of the anime, \nresponses within the first 24 hours are valid\nPlease dont making \"larp\" comments __\n\n\n~!\n\nimg500(https://cdn.imgchest.com/files/f2f28e3e03cd.png)\n\nimg350(https://cdn.imgchest.com/files/5fa7978865ba.png)\n\nimg350(https://cdn.imgchest.com/files/8b3acedff561.png) \n\n\n__I might not be able to do this every day, I might take a break some days, \nand I chose the animes with a friend, I hope you like it__\n!~",
+      "html": "<center>\n#[__ANILIST ANIME TOURNUMENT #16__](javascript:;)  __(16)__\n\n<center><img width='500' src='https://cdn.imgchest.com/files/7460bca011ed.png'></center>\n\n__Please write only the name of the anime, \nresponses within the first 24 hours are valid\nPlease dont making \"larp\" comments __\n\n<span class='markdown_spoiler'><span>\n\n<img width='500' src='https://cdn.imgchest.com/files/f2f28e3e03cd.png'>\n\n<img width='350' src='https://cdn.imgchest.com/files/5fa7978865ba.png'>\n\n<img width='350' src='https://cdn.imgchest.com/files/8b3acedff561.png'> \n\n__I might not be able to do this every day, I might take a break some days, \nand I chose the animes with a friend, I hope you like it__\n</span></span>"
+    },
+    {
+      "kind": "text",
+      "id": 1154093188,
+      "note": "a <center> block spanning the whole post: #__heading__ rows, <hr>, a bare anime URL, a spoiler holding an image",
+      "compare": [
+        "spoilers",
+        "images"
+      ],
+      "raw": "<center>\n#__[365 Days Anime Challenge](https://anilist.co/forum/thread/85412)__\nWill be curious to compare this to my 100 day anime and manga challenge answers\n<hr>\n#__Day 235: Series that would make for a good video game__\nOkay so I've literally only ever watched a single episode of it, but I did think that it would work much better as a video game than an anime, just based on that first episode. The plot and everything felt very much like some JRPG thing.\nhttps://anilist.co/anime/20800\n\nAside from that hmmmmm, the action of the Fate series is perfect for RPGs, but there's already some of those (Samurai Remnant, Extra)\n\nAn action-rhythm game of FLCL could potentially be alright too, but I don't actually think that would work too well.........\n\nSo final answer is, Yuki Yuna but only based on one episode i watched years ago\n<hr>\nTemplate:  \n~!img(https://i.ibb.co/Zz9hsZWn/animangachallengewithbg-0000-Layer-Comp-1.png)!~",
+      "html": "<center>\n#__[365 Days Anime Challenge](https://anilist.co/forum/thread/85412)__\nWill be curious to compare this to my 100 day anime and manga challenge answers\n<hr>\n#__Day 235: Series that would make for a good video game__\nOkay so I've literally only ever watched a single episode of it, but I did think that it would work much better as a video game than an anime, just based on that first episode. The plot and everything felt very much like some JRPG thing.\nhttps://anilist.co/anime/20800\n\nAside from that hmmmmm, the action of the Fate series is perfect for RPGs, but there's already some of those (Samurai Remnant, Extra)\n\nAn action-rhythm game of FLCL could potentially be alright too, but I don't actually think that would work too well.........\n\nSo final answer is, Yuki Yuna but only based on one episode i watched years ago\n<hr>\nTemplate:  \n<span class='markdown_spoiler'><span><img width='' src='https://i.ibb.co/Zz9hsZWn/animangachallengewithbg-0000-Layer-Comp-1.png'></span></span>"
+    },
+    {
+      "kind": "text",
+      "id": 1154078329,
+      "note": "~~~ inside a # heading, a spoiler in the centre, img350 rows",
+      "raw": "# ~~~4. Favorite Male Character~~~ ~~~~!img450(https://i.imgur.com/SN9Ca9P.png)!~ ~~~\n~~~I limited myself to just 2 this time XD~~~\n\n~~~img350(https://i.imgur.com/tgfTX78.gif)\nhttps://anilist.co/anime/1575/Code-Geass-Lelouch-of-the-Rebellion/~~~\n\n\n\nimg350(https://i.imgur.com/lywjPQn.gif)\nhttps://anilist.co/anime/14813/My-Teen-Romantic-Comedy-SNAFU/",
+      "html": "<h1><center>4. Favorite Male Character</center> ~~~<span class='markdown_spoiler'><span><img width='450' src='https://i.imgur.com/SN9Ca9P.png'></span></span> <center></h1>\n<p></center>I limited myself to just 2 this time XD<center></p>\n<p></center><img width='350' src='https://i.imgur.com/tgfTX78.gif'><br />\n<a href=\"https://anilist.co/anime/1575/Code-Geass-Lelouch-of-the-Rebellion/\">https://anilist.co/anime/1575/Code-Geass-Lelouch-of-the-Rebellion/</a>~~~</p>\n<img width='350' src='https://i.imgur.com/lywjPQn.gif'>\n<p><a href=\"https://anilist.co/anime/14813/My-Teen-Romantic-Comedy-SNAFU/\">https://anilist.co/anime/14813/My-Teen-Romantic-Comedy-SNAFU/</a></p>"
+    },
+    {
+      "kind": "text",
+      "id": 1154078012,
+      "note": "an inline spoiler after a quote joined with <br />",
+      "raw": "\"People are all imitations of monkeys. Gods are all imitations of people.\"\n—Lord Aizen ~!damn this Saturday the Internets gonna get broken!~",
+      "html": "<p>&quot;People are all imitations of monkeys. Gods are all imitations of people.&quot;<br />\n—Lord Aizen <span class='markdown_spoiler'><span>damn this Saturday the Internets gonna get broken</span></span></p>"
+    }
+  ]
+}

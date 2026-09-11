@@ -93,7 +93,9 @@ object NotifScheduler {
 /**
  * Runs the check with the app possibly dead. `onStartJob` is on the main
  * thread, so the work moves to its own thread and `jobFinished` reports
- * back; a reschedule is never requested — the period itself is the retry.
+ * back. A run that finished never asks for a reschedule — the period itself
+ * is the retry; a run the system interrupts does (`onStopJob` answers
+ * true), so a check cut short by Doze is not lost until the next period.
  */
 class NotifJobService : JobService() {
   private val channelId = "karasu.site"

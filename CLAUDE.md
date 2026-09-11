@@ -206,7 +206,16 @@ scripts/             bump-version.mjs (every commit), anilist-query.mjs
                      overrules the subject), ratelimit-probe.mjs (re-measures
                      the shape of AniList's rate window — stepped, see the
                      notes — one unauthenticated request per sample, needs
-                     real egress to graphql.anilist.co); release/ holds the five PowerShell scripts
+                     real egress to graphql.anilist.co), phone-measure.ps1
+                     (the adb side of the Android tracking-service
+                     measurement: service state, standby bucket, Doze, the
+                     notification job, the Kotlin logcat tags, and polls per
+                     hour from an exported diagnostics file — the Rust log
+                     never reaches logcat, and a release APK is not
+                     debuggable, so the export is the only way at it),
+                     sample-markdown.mjs and gen-entities.mjs (the markdown
+                     fixtures and the entity table, see the notes);
+                     release/ holds the five PowerShell scripts
                      the release workflow runs (installer, AppImage and APK
                      renamers are deliberate near-twins, release-notes, and
                      generate-update-manifest — desktop-only on purpose)

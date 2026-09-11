@@ -62,6 +62,10 @@ pub struct Diagnostics {
     pub library_matched: usize,
     pub media_sessions: bool,
     pub jellyfin: bool,
+    /// Which Jellyfin address the last successful request went to — `local`
+    /// or `external` — and `None` without a sign-in. The first thing to check
+    /// for "it works at home and not away", and it names no host.
+    pub jellyfin_base: Option<String>,
     /// The mpv IPC pipe. It outranks every other source, so a bug report that
     /// could not say whether it was on was missing the first thing to check.
     pub mpv: bool,
@@ -190,6 +194,13 @@ pub fn collect(app: &tauri::AppHandle) -> Diagnostics {
         library_matched: library.matched,
         media_sessions: crate::commands::read_media_detection(&db),
         jellyfin: crate::commands::jellyfin_config(&db).is_some(),
+        jellyfin_base: crate::commands::jellyfin_config(&db).map(|_| {
+            use crate::playback::detection::jellyfin::{active_base, Base};
+            match active_base() {
+                Base::Local => "local".to_string(),
+                Base::External => "external".to_string(),
+            }
+        }),
         mpv: crate::commands::mpv_ipc_config(&db).is_some(),
         log_debug: crate::logging::debug_enabled(),
         linux: linux_info(),
@@ -249,6 +260,9 @@ pub fn render(d: &Diagnostics, redact: bool) -> String {
             sources.join(", ")
         }
     });
+    if let Some(base) = &d.jellyfin_base {
+        row("Jellyfin address in use", base.clone());
+    }
     row(
         "Library",
         if d.library_configured {
@@ -319,6 +333,7 @@ mod tests {
             library_matched: 980,
             media_sessions: true,
             jellyfin: false,
+            jellyfin_base: None,
             mpv: false,
             log_debug: false,
             linux: Some(LinuxInfo {

@@ -46,6 +46,9 @@ const HIDDEN_POLL_INTERVAL: Duration = Duration::from_secs(15);
 /// the next attempt — once a minute, not once a tick.
 #[cfg_attr(not(target_os = "android"), allow(dead_code))]
 const SERVICE_RETRY: Duration = Duration::from_secs(60);
+/// How often the loop reports its own tick count. Five minutes: 288 lines a
+/// day at most, and only while verbose logging is on.
+const POLL_REPORT: Duration = Duration::from_secs(5 * 60);
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct NowPlaying {
@@ -1311,7 +1314,25 @@ pub fn spawn(app: AppHandle) {
         let app = app.clone();
         async move {
         let mut last_raw: Option<(String, String)> = None;
+        let mut polls = 0u32;
+        let mut polls_since = Instant::now();
         loop {
+            // The poll cadence as it actually happened, for the phone
+            // measurement in the plan: five seconds on screen, fifteen with
+            // it off, and no ticks at all while Android holds the process
+            // frozen. A plain `debug`, not `debug_changed`: the number *is*
+            // the measurement, and deduping a steady count would hide the
+            // very steady state being measured. `scripts/phone-measure.ps1`
+            // reads these lines out of an exported diagnostics file.
+            polls += 1;
+            if polls_since.elapsed() >= POLL_REPORT {
+                crate::logging::debug(
+                    "detect",
+                    format!("{polls} polls in the last {} min", POLL_REPORT.as_secs() / 60),
+                );
+                polls = 0;
+                polls_since = Instant::now();
+            }
             let (media_detection, jellyfin, mpv, tracking_on, background_wanted) = {
                 let db = app.state::<Db>();
                 (

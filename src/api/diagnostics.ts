@@ -41,6 +41,8 @@ export interface Diagnostics {
   libraryMatched: number;
   mediaSessions: boolean;
   jellyfin: boolean;
+  /** Which Jellyfin address answered last — "local" or "external"; null without a sign-in. */
+  jellyfinBase: string | null;
   /** The mpv IPC pipe — the source that outranks every other one. */
   mpv: boolean;
   logDebug: boolean;

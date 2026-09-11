@@ -1469,10 +1469,23 @@ export const en = {
     jellyfinFoundNone: "No server answered. Type the address by hand.",
     jellyfinFindFailed: "Search failed ({{message}})",
     jellyfinSignedInOn: "Signed in as {{name}} on {{server}}",
+    jellyfinExternalUrl: "External address (optional)",
+    jellyfinExternalPlaceholder: "https://jellyfin.example.org",
+    jellyfinExternalHint:
+      "Used when the server is not reachable at the address above — away from home, on mobile data. Karasu checks it is the same server before it sends anything.",
+    jellyfinExternalPlainHttp:
+      "This address is http: your access token would cross the internet unencrypted. Use https if you can.",
+    jellyfinExternalVerified: "Verified as the same server.",
+    jellyfinExternalUnverified: "Not reachable from here yet — checked when it is needed.",
+    jellyfinViaExternal: "Answered via the external address ({{url}}).",
     notifScheduleAndroidHint:
       "If Android delays these checks, exclude Karasu from battery optimisation under Detection → Jellyfin.",
     jfErrBadUrl: "That is not a usable server address — it needs to start with http:// or https://.",
     jfErrNotJellyfin: "That address answers, but not like a Jellyfin server.",
+    jfErrExternalOtherServer:
+      "That address answers as a different Jellyfin server, so it was not saved.",
+    jfErrExternalUnknownServer:
+      "Karasu does not know this server's identity yet. Sign in again, or save while on the home network, then add the external address.",
     airingNotify: "New-episode notifications",
     airingNotifyHint:
       "Desktop notification when a new episode of a show you are watching airs — the one thing the website cannot do while Karasu sits in the tray.",

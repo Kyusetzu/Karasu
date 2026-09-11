@@ -59,6 +59,21 @@ control back to the app through the `karasu://` custom scheme. A Jellyfin
 server you configure yourself is contacted too; that is your machine, not
 ours, and the "no hosted backend" guarantee is unaffected.
 
+The Jellyfin settings take an optional **external address** for when the
+first one is out of reach. Before the access token ever travels to it, Karasu
+asks that address (anonymously, `/System/Info/Public`) for the server's id
+and uses it only if the id is the one learned at sign-in — an address that
+answers as some other server is refused outright. Plain `http` is accepted
+there by the maintainer's choice; the settings pane says in so many words
+that the token would then cross the internet unencrypted, and the answer is
+`https`. Signing in also runs that probe first, so the password only ever goes
+to something that answered like a Jellyfin server. Two Karasus signed in as
+the same Jellyfin user announce themselves to the server (an empty
+`POST /Sessions/Capabilities` every fifteen seconds while tracking) so that
+they can see each other in `/Sessions` and only one of them writes an
+episode; that request carries nothing but the same token and device id every
+other request does.
+
 Two contacts that are neither AniList nor yours, and are worth naming because
 neither is obvious from the screen you are on:
 

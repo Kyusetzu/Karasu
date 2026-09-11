@@ -58,6 +58,13 @@ pub const ERR_BAD_URL: &str = "jellyfin.badUrl";
 /// The address answered, but not with `/System/Info/Public` — a web page, a
 /// proxy's error, some other service on that port.
 pub const ERR_NOT_JELLYFIN: &str = "jellyfin.notJellyfin";
+/// The external address answers, but as a different Jellyfin server — not
+/// stored, because the token would go to it.
+pub const ERR_EXTERNAL_OTHER_SERVER: &str = "jellyfin.externalOtherServer";
+/// The server's own id is not known yet (a sign-in older than the probe,
+/// and the first address out of reach right now), so "the same server"
+/// cannot be checked and the external address is not stored.
+pub const ERR_EXTERNAL_UNKNOWN_SERVER: &str = "jellyfin.externalUnknownServer";
 
 /// What this build calls itself in the `MediaBrowser` header.
 ///
@@ -92,6 +99,13 @@ pub struct JellyfinConfig {
     pub device: String,
     pub device_name: String,
     pub device_id: String,
+    /// A second base to try when `url` is out of reach — away from the LAN.
+    /// Empty when there is none. See `send_on`.
+    pub external_url: String,
+    /// The server's id from sign-in. The external address must answer with
+    /// the same one before the token travels to it; empty for a sign-in
+    /// older than the probe, which keeps the external address unused.
+    pub server_id: String,
 }
 
 #[cfg(any(windows, target_os = "linux"))]
@@ -462,21 +476,18 @@ async fn get_json(
     cfg: &JellyfinConfig,
     path: &str,
 ) -> Result<serde_json::Value, String> {
-    let base = normalize_base_url(&cfg.url);
-    if base.is_empty() || cfg.token.is_empty() {
+    if normalize_base_url(&cfg.url).is_empty() || cfg.token.is_empty() {
         return Err(ERR_SIGNED_OUT.into());
     }
-    let resp = http()
-        .get(format!("{base}{path}"))
-        .header(
-            "Authorization",
-            auth_header(&cfg.device_name, &cfg.device_id, Some(&cfg.token)),
-        )
-        .header("Accept", "application/json")
-        .timeout(std::time::Duration::from_secs(4))
-        .send()
-        .await
-        .map_err(|e| format!("Could not reach the server: {e}"))?;
+    let auth = auth_header(&cfg.device_name, &cfg.device_id, Some(&cfg.token));
+    let resp = send_on(cfg, |base| {
+        http()
+            .get(format!("{base}{path}"))
+            .header("Authorization", auth.as_str())
+            .header("Accept", "application/json")
+            .timeout(Duration::from_secs(4))
+    })
+    .await?;
     if resp.status() == reqwest::StatusCode::UNAUTHORIZED {
         // Jellyfin's "sign out all devices" revokes tokens, and a silent
         // failure here would look exactly like "nothing is playing" forever.
@@ -851,21 +862,18 @@ pub async fn heartbeat(cfg: &JellyfinConfig) {
 
 /// POST with no body, as the signed-in user. The same checks as `get_json`.
 async fn post_empty(cfg: &JellyfinConfig, path: &str) -> Result<(), String> {
-    let base = normalize_base_url(&cfg.url);
-    if base.is_empty() || cfg.token.is_empty() {
+    if normalize_base_url(&cfg.url).is_empty() || cfg.token.is_empty() {
         return Err(ERR_SIGNED_OUT.into());
     }
-    let resp = http()
-        .post(format!("{base}{path}"))
-        .header(
-            "Authorization",
-            auth_header(&cfg.device_name, &cfg.device_id, Some(&cfg.token)),
-        )
-        .header("Content-Length", "0")
-        .timeout(Duration::from_secs(4))
-        .send()
-        .await
-        .map_err(|e| format!("Could not reach the server: {e}"))?;
+    let auth = auth_header(&cfg.device_name, &cfg.device_id, Some(&cfg.token));
+    let resp = send_on(cfg, |base| {
+        http()
+            .post(format!("{base}{path}"))
+            .header("Authorization", auth.as_str())
+            .header("Content-Length", "0")
+            .timeout(Duration::from_secs(4))
+    })
+    .await?;
     if resp.status() == reqwest::StatusCode::UNAUTHORIZED {
         return Err("Jellyfin rejected the saved sign-in — sign in again".into());
     }
@@ -873,6 +881,258 @@ async fn post_empty(cfg: &JellyfinConfig, path: &str) -> Result<(), String> {
         return Err(format!("Server responded with HTTP {}", resp.status()));
     }
     Ok(())
+}
+
+// --- The external address ----------------------------------------------------
+
+/// Trims and validates the optional second address. Empty is "none"; anything
+/// that is not an HTTP base is refused with the same code as the first.
+///
+/// Plain http is *allowed* — the maintainer's call (2026-09-11): a server
+/// exposed without TLS is his own to expose. The pane says what it means for
+/// the token, through `external_is_plain_http`, rather than refusing.
+pub fn validate_external_url(raw: &str) -> Result<String, &'static str> {
+    let base = normalize_base_url(raw);
+    if base.is_empty() {
+        return Ok(base);
+    }
+    if !crate::net::is_usable_base_url(&base) {
+        return Err(ERR_BAD_URL);
+    }
+    Ok(base)
+}
+
+/// Whether the token would cross the public internet unencrypted on this
+/// address: http, and a host that is not local. The pane's warning line.
+pub fn external_is_plain_http(base: &str) -> bool {
+    reqwest::Url::parse(base).is_ok_and(|u| {
+        u.scheme() == "http" && u.host_str().is_some_and(|h| !crate::net::host_is_local(h))
+    })
+}
+
+/// Whether an external address's probe names the server this account signed
+/// in to. An empty stored id refuses: "the same server" cannot be claimed of
+/// an unknown one.
+pub fn external_accepted(info: &super::discovery::ServerInfo, server_id: &str) -> bool {
+    let id = server_id.trim();
+    !id.is_empty() && info.id.trim() == id
+}
+
+/// Which of the two addresses a request went to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Base {
+    Local,
+    External,
+}
+
+/// How long the external address stays in use after the local one failed
+/// before the local one is tried again. Five minutes: a phone away from home
+/// pays one four-second probe of the LAN address per five minutes, and one
+/// that came home is back on the LAN within five.
+pub const STICKY: Duration = Duration::from_secs(5 * 60);
+
+/// Which address to try first, and where to fall back to when it fails.
+/// Pure — `BASE` below holds the one instance per process.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BaseState {
+    active: Base,
+    since: Option<Instant>,
+}
+
+impl BaseState {
+    pub const fn new() -> Self {
+        BaseState { active: Base::Local, since: None }
+    }
+
+    /// The base to try first, now.
+    pub fn first(&self, now: Instant) -> Base {
+        match (self.active, self.since) {
+            (Base::External, Some(since)) if now.duration_since(since) < STICKY => Base::External,
+            _ => Base::Local,
+        }
+    }
+
+    /// The base a request went to, and how it went; answers the base to fall
+    /// back to right now, if any.
+    ///
+    /// A local failure with an external address configured hands over to it
+    /// and starts the sticky clock. An external failure hands straight back
+    /// to local, no clock: the LAN address is home, and if both are down
+    /// nothing helps. A success on either is remembered as the active one;
+    /// a successful external keeps its clock, so the local probe still comes
+    /// round.
+    pub fn record(&mut self, tried: Base, ok: bool, has_external: bool, now: Instant) -> Option<Base> {
+        match (tried, ok) {
+            (Base::Local, true) => {
+                *self = BaseState::new();
+                None
+            }
+            (Base::Local, false) if has_external => {
+                *self = BaseState { active: Base::External, since: Some(now) };
+                Some(Base::External)
+            }
+            (Base::Local, false) => None,
+            (Base::External, true) => {
+                if self.active != Base::External {
+                    *self = BaseState { active: Base::External, since: Some(now) };
+                }
+                None
+            }
+            (Base::External, false) => {
+                *self = BaseState::new();
+                Some(Base::Local)
+            }
+        }
+    }
+}
+
+static BASE: Mutex<BaseState> = Mutex::new(BaseState::new());
+/// The external address whose probe named the same server, verified once
+/// per address per process — lazily, the first time it is needed, or by
+/// Settings when the address was saved while it was reachable. Compared
+/// against the configured address, so a changed setting re-verifies.
+static VERIFIED_EXTERNAL: Mutex<Option<String>> = Mutex::new(None);
+/// When the last verification attempt failed, so an unreachable external
+/// address is probed once per `STICKY` rather than once per tick while the
+/// local one is down too.
+static EXTERNAL_PROBE_FAILED_AT: Mutex<Option<Instant>> = Mutex::new(None);
+
+/// The base the last successful request went to — what Test connection
+/// reports.
+pub fn active_base() -> Base {
+    BASE.guard().active
+}
+
+/// Forgets which base was in use and which external address was verified —
+/// called when the settings change under the poll.
+pub fn reset_base() {
+    *BASE.guard() = BaseState::new();
+    *VERIFIED_EXTERNAL.guard() = None;
+    *EXTERNAL_PROBE_FAILED_AT.guard() = None;
+}
+
+/// Records that `url` answered the probe as the same server.
+pub fn mark_external_verified(url: &str) {
+    *VERIFIED_EXTERNAL.guard() = Some(normalize_base_url(url));
+}
+
+pub fn external_verified(url: &str) -> bool {
+    let url = normalize_base_url(url);
+    !url.is_empty() && VERIFIED_EXTERNAL.guard().as_deref() == Some(url.as_str())
+}
+
+/// The external base, once its probe has named the same server; `None` when
+/// there is no external address, it does not answer from here, its id is a
+/// different server's, or the server's own id is not known yet. The token
+/// never travels on a `None`.
+async fn verified_external(cfg: &JellyfinConfig) -> Option<String> {
+    let external = normalize_base_url(&cfg.external_url);
+    if external.is_empty() {
+        return None;
+    }
+    if external_verified(&external) {
+        return Some(external);
+    }
+    if cfg.server_id.trim().is_empty() {
+        crate::logging::debug_changed(
+            "jellyfin",
+            "external",
+            "external address unused: the server's id is unknown (sign in again to learn it)",
+        );
+        return None;
+    }
+    if EXTERNAL_PROBE_FAILED_AT
+        .guard()
+        .is_some_and(|t| t.elapsed() < STICKY)
+    {
+        return None;
+    }
+    match super::discovery::probe(&external).await {
+        Ok(info) if external_accepted(&info, &cfg.server_id) => {
+            mark_external_verified(&external);
+            *EXTERNAL_PROBE_FAILED_AT.guard() = None;
+            crate::logging::info("jellyfin", format!("external address verified as {}", info.name));
+            Some(external)
+        }
+        Ok(info) => {
+            *EXTERNAL_PROBE_FAILED_AT.guard() = Some(Instant::now());
+            crate::logging::debug_changed(
+                "jellyfin",
+                "external",
+                format!("external address answers as a different server ({}); not used", info.name),
+            );
+            None
+        }
+        Err(e) => {
+            *EXTERNAL_PROBE_FAILED_AT.guard() = Some(Instant::now());
+            crate::logging::debug_changed(
+                "jellyfin",
+                "external",
+                format!("external address not verified: {e}"),
+            );
+            None
+        }
+    }
+}
+
+/// Sends a request built for a base, trying the other base once on a
+/// transport failure — a connection that could not be made or timed out, not
+/// an HTTP status, which is an answer. `build` receives the base URL and
+/// returns the request for it. The external base is used only once verified;
+/// until then every attempt is local whatever `BASE` says. Worst case is two
+/// timeouts in one call, which the sequential poll merely delays.
+async fn send_on(
+    cfg: &JellyfinConfig,
+    build: impl Fn(&str) -> reqwest::RequestBuilder,
+) -> Result<reqwest::Response, String> {
+    let local = normalize_base_url(&cfg.url);
+    let has_external = !normalize_base_url(&cfg.external_url).is_empty();
+    let mut base = BASE.guard().first(Instant::now());
+    let url = match base {
+        Base::External => match verified_external(cfg).await {
+            Some(u) => u,
+            None => {
+                base = Base::Local;
+                local.clone()
+            }
+        },
+        Base::Local => local.clone(),
+    };
+
+    let err = match build(&url).send().await {
+        Ok(resp) => {
+            BASE.guard().record(base, true, has_external, Instant::now());
+            return Ok(resp);
+        }
+        Err(e) => e,
+    };
+    let fallback = BASE.guard().record(base, false, has_external, Instant::now());
+    let Some(next) = fallback else {
+        return Err(format!("Could not reach the server: {err}"));
+    };
+    let next_url = match next {
+        Base::External => match verified_external(cfg).await {
+            Some(u) => u,
+            None => return Err(format!("Could not reach the server: {err}")),
+        },
+        Base::Local => local,
+    };
+    crate::logging::debug_changed(
+        "jellyfin",
+        "base",
+        format!("{base:?} address unreachable, trying the {next:?} one"),
+    );
+    match build(&next_url).send().await {
+        Ok(resp) => {
+            BASE.guard().record(next, true, has_external, Instant::now());
+            Ok(resp)
+        }
+        Err(e) => {
+            BASE.guard().record(next, false, has_external, Instant::now());
+            Err(format!("Could not reach the server: {e}"))
+        }
+    }
 }
 
 /// Turns one `/Sessions` entry into a detection result.
@@ -1137,6 +1397,8 @@ mod tests {
         assert_eq!(ERR_BAD_CREDENTIALS, "jellyfin.badCredentials");
         assert_eq!(ERR_BAD_URL, "jellyfin.badUrl");
         assert_eq!(ERR_NOT_JELLYFIN, "jellyfin.notJellyfin");
+        assert_eq!(ERR_EXTERNAL_OTHER_SERVER, "jellyfin.externalOtherServer");
+        assert_eq!(ERR_EXTERNAL_UNKNOWN_SERVER, "jellyfin.externalUnknownServer");
     }
 
     use serde_json::json;
@@ -1718,5 +1980,94 @@ mod tests {
     #[test]
     fn the_freshness_window_covers_a_missed_heartbeat() {
         assert!(FRESH >= 2 * HEARTBEAT);
+    }
+
+    // --- The external address --------------------------------------------
+
+    #[test]
+    fn an_external_url_is_any_http_base_and_plain_http_is_flagged() {
+        assert_eq!(validate_external_url("  "), Ok(String::new()));
+        assert_eq!(
+            validate_external_url(" https://jf.example.org/ "),
+            Ok("https://jf.example.org".to_string())
+        );
+        assert_eq!(validate_external_url("ftp://jf.example.org"), Err(ERR_BAD_URL));
+        assert_eq!(validate_external_url("jf.example.org"), Err(ERR_BAD_URL));
+        // The maintainer's call: plain http is stored, and said out loud.
+        assert_eq!(
+            validate_external_url("http://jf.example.org:8096"),
+            Ok("http://jf.example.org:8096".to_string())
+        );
+        assert!(external_is_plain_http("http://jf.example.org:8096"));
+        assert!(external_is_plain_http("http://203.0.113.7:8096"));
+        assert!(!external_is_plain_http("https://jf.example.org"));
+        // Local hosts keep http without a warning: that is the LAN case.
+        assert!(!external_is_plain_http("http://192.168.1.10:8096"));
+        assert!(!external_is_plain_http("http://nas.local:8096"));
+        assert!(!external_is_plain_http("http://100.64.0.5:8096"), "a Tailscale-style range is local");
+    }
+
+    #[test]
+    fn the_server_id_must_match_before_the_token_travels() {
+        let info = |id: &str| super::super::discovery::ServerInfo {
+            name: "NAS".into(),
+            id: id.into(),
+            version: "10.10".into(),
+        };
+        assert!(external_accepted(&info("abc"), "abc"));
+        assert!(external_accepted(&info(" abc "), "abc"));
+        assert!(!external_accepted(&info("other"), "abc"));
+        assert!(!external_accepted(&info("abc"), ""), "an unknown server is not the same server");
+        assert!(!external_accepted(&info(""), ""));
+    }
+
+    #[test]
+    fn the_local_base_is_tried_first() {
+        let now = Instant::now();
+        let state = BaseState::new();
+        assert_eq!(state.first(now), Base::Local);
+        assert_eq!(state.first(now + STICKY * 3), Base::Local);
+    }
+
+    #[test]
+    fn a_local_transport_failure_falls_back_only_when_an_external_exists() {
+        let now = Instant::now();
+        let mut without = BaseState::new();
+        assert_eq!(without.record(Base::Local, false, false, now), None);
+        assert_eq!(without.first(now), Base::Local);
+        let mut with = BaseState::new();
+        assert_eq!(with.record(Base::Local, false, true, now), Some(Base::External));
+        assert_eq!(with.first(now), Base::External);
+    }
+
+    #[test]
+    fn the_external_base_is_sticky_for_five_minutes_then_local_is_probed_again() {
+        let now = Instant::now();
+        let mut state = BaseState::new();
+        state.record(Base::Local, false, true, now);
+        assert_eq!(state.first(now + STICKY - Duration::from_secs(1)), Base::External);
+        assert_eq!(state.first(now + STICKY), Base::Local, "the LAN gets its probe");
+        // Still away: the probe fails and the clock restarts.
+        let later = now + STICKY;
+        assert_eq!(state.record(Base::Local, false, true, later), Some(Base::External));
+        assert_eq!(state.first(later + STICKY - Duration::from_secs(1)), Base::External);
+        // Home again: the probe succeeds and local is active at once.
+        assert_eq!(state.record(Base::Local, true, true, later + STICKY), None);
+        assert_eq!(state.first(later + STICKY), Base::Local);
+        // A success on the external base while sticky keeps the clock, so
+        // the local probe still comes round.
+        let mut away = BaseState::new();
+        away.record(Base::Local, false, true, now);
+        assert_eq!(away.record(Base::External, true, true, now + Duration::from_secs(60)), None);
+        assert_eq!(away.first(now + STICKY), Base::Local);
+    }
+
+    #[test]
+    fn an_external_failure_returns_to_local_at_once() {
+        let now = Instant::now();
+        let mut state = BaseState::new();
+        state.record(Base::Local, false, true, now);
+        assert_eq!(state.record(Base::External, false, true, now), Some(Base::Local));
+        assert_eq!(state.first(now), Base::Local);
     }
 }

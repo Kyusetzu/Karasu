@@ -1468,10 +1468,23 @@ export const de: typeof en = {
     jellyfinFoundNone: "Kein Server hat geantwortet. Gib die Adresse von Hand ein.",
     jellyfinFindFailed: "Suche fehlgeschlagen ({{message}})",
     jellyfinSignedInOn: "Angemeldet als {{name}} auf {{server}}",
+    jellyfinExternalUrl: "Externe Adresse (optional)",
+    jellyfinExternalPlaceholder: "https://jellyfin.example.org",
+    jellyfinExternalHint:
+      "Wird genutzt, wenn der Server unter der Adresse oben nicht erreichbar ist — unterwegs, im Mobilfunknetz. Karasu prüft vorher, dass es derselbe Server ist.",
+    jellyfinExternalPlainHttp:
+      "Diese Adresse ist http: dein Zugriffstoken ginge unverschlüsselt durchs Internet. Nimm https, wenn es geht.",
+    jellyfinExternalVerified: "Geprüft, derselbe Server.",
+    jellyfinExternalUnverified: "Von hier noch nicht erreichbar — wird geprüft, sobald sie gebraucht wird.",
+    jellyfinViaExternal: "Antwort über die externe Adresse ({{url}}).",
     notifScheduleAndroidHint:
       "Wenn Android diese Prüfungen verzögert, nimm Karasu unter Erkennung → Jellyfin von der Akku-Optimierung aus.",
     jfErrBadUrl: "Das ist keine nutzbare Serveradresse — sie muss mit http:// oder https:// beginnen.",
     jfErrNotJellyfin: "Diese Adresse antwortet, aber nicht wie ein Jellyfin-Server.",
+    jfErrExternalOtherServer:
+      "Unter dieser Adresse antwortet ein anderer Jellyfin-Server, daher wurde sie nicht gespeichert.",
+    jfErrExternalUnknownServer:
+      "Karasu kennt die Identität dieses Servers noch nicht. Melde dich neu an oder speichere im Heimnetz, dann füge die externe Adresse hinzu.",
     airingNotify: "Benachrichtigung bei neuer Folge",
     airingNotifyHint:
       "Desktop-Benachrichtigung, wenn eine neue Folge einer laufenden Serie erscheint — das Einzige, was die Website nicht kann, während Karasu im Tray liegt.",

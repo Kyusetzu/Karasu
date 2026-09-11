@@ -30,6 +30,7 @@ import {
   type JellyfinBackground,
   type JellyfinSession,
   type JellyfinSettings,
+  type JellyfinTest,
   type ScrobbleSettings,
   type MediaSession,
 } from "@/stores/nowPlaying";
@@ -564,9 +565,10 @@ export function JellyfinSection() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [device, setDevice] = useState("");
+  const [externalUrl, setExternalUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [signingIn, setSigningIn] = useState(false);
-  const [sessions, setSessions] = useState<JellyfinSession[] | null>(null);
+  const [sessions, setSessions] = useState<JellyfinTest | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [finding, setFinding] = useState(false);
   const [found, setFound] = useState<DiscoveredServer[] | null>(null);
@@ -577,6 +579,7 @@ export function JellyfinSection() {
       setSettings(s);
       setUrl(s.url);
       setDevice(s.device);
+      setExternalUrl(s.externalUrl);
     });
   }, []);
 
@@ -605,9 +608,10 @@ export function JellyfinSection() {
       setPassword("");
       setUsername("");
       setSettings(next);
-      // The device field is saved separately; persist whatever is in it now so
-      // signing in doesn't quietly discard an edit.
-      await setJellyfinSettings(url, device);
+      // The device and external fields are saved separately; persist whatever
+      // is in them now so signing in doesn't quietly discard an edit.
+      await setJellyfinSettings(url, device, externalUrl);
+      setSettings(await getJellyfinSettings());
     } catch (e) {
       setError(backendErrorText(e, t));
     } finally {
@@ -629,7 +633,7 @@ export function JellyfinSection() {
     setError(null);
     setSessions(null);
     try {
-      await setJellyfinSettings(url, device);
+      await setJellyfinSettings(url, device, externalUrl);
       setSettings(await getJellyfinSettings());
     } catch (e) {
       setError(backendErrorText(e, t));
@@ -739,6 +743,41 @@ export function JellyfinSection() {
           placeholder={t("settings.jellyfinDeviceAny")}
         />
 
+        {/* The second address, for when the first is out of reach. Editable
+            while signed in — it is not part of the sign-in — and saved by
+            the same Save. The status line under it is the backend's word:
+            verified against the server's id, or not yet reachable from
+            here; and the warning when http would carry the token across the
+            internet, which the maintainer chose to allow rather than refuse. */}
+        <div>
+          <label className="block text-xs font-medium text-ink-300" htmlFor="jellyfin-external">
+            {t("settings.jellyfinExternalUrl")}
+          </label>
+          <Input
+            id="jellyfin-external"
+            value={externalUrl}
+            onChange={(e) => setExternalUrl(e.target.value)}
+            placeholder={t("settings.jellyfinExternalPlaceholder")}
+            className="mt-1"
+          />
+          <p className="mt-1 text-xs text-ink-600">{t("settings.jellyfinExternalHint")}</p>
+          {settings.externalUrl && settings.externalUrl === externalUrl.trim() && (
+            <p
+              className={cn(
+                "mt-1 text-xs",
+                settings.externalVerified ? "text-success" : "text-ink-500",
+              )}
+            >
+              {settings.externalVerified
+                ? t("settings.jellyfinExternalVerified")
+                : t("settings.jellyfinExternalUnverified")}
+            </p>
+          )}
+          {settings.externalPlainHttp && settings.externalUrl === externalUrl.trim() && (
+            <p className="mt-1 text-xs text-gold">{t("settings.jellyfinExternalPlainHttp")}</p>
+          )}
+        </div>
+
         <div className="flex flex-wrap gap-2">
           {settings.connected ? (
             <>
@@ -769,7 +808,12 @@ export function JellyfinSection() {
         {t("settings.jellyfinDeviceHelp")}
       </p>
       {settings.connected && <JellyfinBackgroundRows />}
-      {sessions && <SessionList sessions={sessions} />}
+      {sessions && (
+        <SessionList
+          sessions={sessions.sessions}
+          via={sessions.base === "external" ? sessions.url : null}
+        />
+      )}
       {error && <p className="mt-2 text-sm text-danger">{error}</p>}
     </Card>
   );
@@ -845,19 +889,32 @@ function JellyfinBackgroundRows() {
 }
 
 /** The Test-connection result: what the server sees, and what we accept. */
-function SessionList({ sessions }: { sessions: JellyfinSession[] }) {
+function SessionList({
+  sessions,
+  via,
+}: {
+  sessions: JellyfinSession[];
+  /** The external address, when that is what answered — worth saying, since
+      it means the first address was out of reach just now. */
+  via: string | null;
+}) {
   const { t } = useTranslation();
+  const viaLine = via && (
+    <p className="text-xs text-ink-500">{t("settings.jellyfinViaExternal", { url: via })}</p>
+  );
 
   if (sessions.length === 0) {
     return (
-      <p className="mt-3 text-sm text-ink-500">
-        {t("settings.jellyfinNoSessions")}
-      </p>
+      <div className="mt-3 space-y-1">
+        {viaLine}
+        <p className="text-sm text-ink-500">{t("settings.jellyfinNoSessions")}</p>
+      </div>
     );
   }
 
   return (
     <div className="mt-3 space-y-1.5">
+      {viaLine}
       {sessions.map((s, i) => (
         <div
           key={`${s.device}-${s.user}-${i}`}

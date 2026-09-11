@@ -16,6 +16,14 @@ describe("backendErrorText", () => {
     // The address answered, but with a web page or another service — the
     // probe on sign-in and on the external address is what says so.
     expect(backendErrorText("jellyfin.notJellyfin", t)).toBe("T:settings.jfErrNotJellyfin");
+    // The external address: a different server behind it, or a server whose
+    // identity the app has not learned yet.
+    expect(backendErrorText("jellyfin.externalOtherServer", t)).toBe(
+      "T:settings.jfErrExternalOtherServer",
+    );
+    expect(backendErrorText("jellyfin.externalUnknownServer", t)).toBe(
+      "T:settings.jfErrExternalUnknownServer",
+    );
     // A bulk edit refused because a drain already holds the queue lock. It
     // cannot be queued itself, so the refusal has to say why.
     expect(backendErrorText("queue.busy", t)).toBe("T:receipt.syncBusy");

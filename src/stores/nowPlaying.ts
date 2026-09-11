@@ -204,6 +204,19 @@ export interface JellyfinSettings {
   device: string;
   /** This machine's name, offered as the default device. */
   localDevice: string;
+  /** The optional second address, tried when the first is out of reach. */
+  externalUrl: string;
+  /** Whether it has answered as the same server from here; null for none. */
+  externalVerified: boolean | null;
+  /** Whether it would carry the token over plain http across the internet. */
+  externalPlainHttp: boolean;
+}
+
+/** The Test-connection answer: the sessions, and which address answered. */
+export interface JellyfinTest {
+  sessions: JellyfinSession[];
+  base: "local" | "external";
+  url: string;
 }
 
 export interface JellyfinSession {
@@ -271,9 +284,10 @@ export const setJellyfinBackground = (enabled: boolean) =>
 export const requestBatteryExemption = () =>
   invoke<void>("request_battery_exemption");
 
-/** Saves the settings that aren't part of signing in. */
-export const setJellyfinSettings = (url: string, device: string) =>
-  invoke<void>("set_jellyfin_settings", { url, device });
+/** Saves the settings that aren't part of signing in. The external address
+    is checked against the server's identity when it can be reached. */
+export const setJellyfinSettings = (url: string, device: string, externalUrl: string) =>
+  invoke<void>("set_jellyfin_settings", { url, device, externalUrl });
 
 /**
  * Exchanges a username and password for an access token. Any Jellyfin account
@@ -294,4 +308,4 @@ export const jellyfinSignOut = () =>
  * accepts each one. Showing the non-matching ones is the point: it's the only
  * way to find out what Jellyfin calls your device.
  */
-export const testJellyfin = () => invoke<JellyfinSession[]>("test_jellyfin");
+export const testJellyfin = () => invoke<JellyfinTest>("test_jellyfin");

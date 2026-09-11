@@ -108,6 +108,8 @@ pub(crate) fn jellyfin_config(
         device: db.kv_get("jellyfin_device").unwrap_or_default(),
         device_name: local_device_name(),
         device_id: jellyfin_device_id(db),
+        external_url: db.kv_get("jellyfin_external_url").unwrap_or_default(),
+        server_id: db.kv_get("jellyfin_server_id").unwrap_or_default(),
     })
 }
 
@@ -325,10 +327,19 @@ pub struct JellyfinSettings {
     pub device: String,
     /// This machine's name, so the UI can offer it as the default.
     pub local_device: String,
+    /// The optional second address; empty for none.
+    pub external_url: String,
+    /// Whether the external address has answered as the same server from
+    /// here; `None` when there is none.
+    pub external_verified: Option<bool>,
+    /// Whether the external address would carry the token over plain http
+    /// across the internet — the pane's warning line.
+    pub external_plain_http: bool,
 }
 
 #[tauri::command]
 pub fn get_jellyfin_settings(db: State<'_, Db>) -> JellyfinSettings {
+    let external = db.kv_get("jellyfin_external_url").unwrap_or_default();
     JellyfinSettings {
         url: db.kv_get("jellyfin_url").unwrap_or_default(),
         connected: crate::playback::detection::jellyfin::load_token().is_some()
@@ -347,6 +358,13 @@ pub fn get_jellyfin_settings(db: State<'_, Db>) -> JellyfinSettings {
         // suggestion cannot become a setting by itself.
         device: db.kv_get("jellyfin_device").unwrap_or_default(),
         local_device: local_device_name(),
+        external_url: external.clone(),
+        external_verified: if external.is_empty() {
+            None
+        } else {
+            Some(crate::playback::detection::jellyfin::external_verified(&external))
+        },
+        external_plain_http: crate::playback::detection::jellyfin::external_is_plain_http(&external),
     }
 }
 
@@ -422,13 +440,23 @@ fn request_battery_exemption_impl() -> Result<(), String> {
 }
 
 /// Saves the settings that aren't part of signing in.
+///
+/// The external address is checked now if it can be: one that answers as a
+/// different server is refused rather than stored, since the token would go
+/// to it; one that does not answer from here — hairpin NAT, at home on the
+/// LAN — is stored and verified the first time it is needed. If the server's
+/// own id is not known yet (a sign-in older than the probe), the first address
+/// is asked for it now; if that fails too, the external address is refused
+/// with a code that says why.
 #[tauri::command]
-pub fn set_jellyfin_settings(
+pub async fn set_jellyfin_settings(
     db: State<'_, Db>,
     url: String,
     device: String,
+    external_url: String,
 ) -> Result<(), String> {
-    let base = crate::playback::detection::jellyfin::normalize_base_url(&url);
+    use crate::playback::detection::{discovery, jellyfin};
+    let base = jellyfin::normalize_base_url(&url);
     // The detection poll sends the stored Jellyfin access token to whatever
     // this holds, as an `Authorization` header, every few seconds and with no
     // further user action. `normalize_base_url` only trims whitespace and a
@@ -437,10 +465,37 @@ pub fn set_jellyfin_settings(
     // place a secret must never go. A private or LAN address stays perfectly
     // valid: that is where a Jellyfin server normally lives.
     if !base.is_empty() && !crate::net::is_usable_base_url(&base) {
-        return Err(crate::playback::detection::jellyfin::ERR_BAD_URL.into());
+        return Err(jellyfin::ERR_BAD_URL.into());
+    }
+    let external = jellyfin::validate_external_url(&external_url).map_err(String::from)?;
+    // Whatever was known about the addresses is stale the moment they change.
+    jellyfin::reset_base();
+    if !external.is_empty() {
+        let server_id = match db.kv_get("jellyfin_server_id").filter(|s| !s.trim().is_empty()) {
+            Some(id) => id,
+            None => match discovery::probe(&base).await {
+                Ok(info) => {
+                    db.kv_set("jellyfin_server_id", &info.id)?;
+                    db.kv_set("jellyfin_server_name", &info.name)?;
+                    info.id
+                }
+                Err(_) => return Err(jellyfin::ERR_EXTERNAL_UNKNOWN_SERVER.into()),
+            },
+        };
+        match discovery::probe(&external).await {
+            Ok(info) if jellyfin::external_accepted(&info, &server_id) => {
+                jellyfin::mark_external_verified(&external);
+            }
+            Ok(_) => return Err(jellyfin::ERR_EXTERNAL_OTHER_SERVER.into()),
+            Err(e) => crate::logging::debug(
+                "jellyfin",
+                format!("external address not reachable from here yet ({e}); verified when needed"),
+            ),
+        }
     }
     db.kv_set("jellyfin_url", &base)?;
     db.kv_set("jellyfin_device", device.trim())?;
+    db.kv_set("jellyfin_external_url", &external)?;
     Ok(())
 }
 
@@ -531,11 +586,24 @@ pub async fn probe_jellyfin_server(
 /// character off looks identical to "nothing is playing", and this is the only
 /// way to discover what Jellyfin calls a machine.
 #[tauri::command]
-pub async fn test_jellyfin(
-    db: State<'_, Db>,
-) -> Result<Vec<crate::playback::detection::jellyfin::SessionSummary>, String> {
+pub async fn test_jellyfin(db: State<'_, Db>) -> Result<JellyfinTest, String> {
+    use crate::playback::detection::jellyfin;
     let cfg = jellyfin_config(&db).ok_or("Sign in to your Jellyfin server first")?;
-    crate::playback::detection::jellyfin::list_sessions(&cfg).await
+    let sessions = jellyfin::list_sessions(&cfg).await?;
+    let base = jellyfin::active_base();
+    let url = match base {
+        jellyfin::Base::External => jellyfin::normalize_base_url(&cfg.external_url),
+        jellyfin::Base::Local => jellyfin::normalize_base_url(&cfg.url),
+    };
+    Ok(JellyfinTest { sessions, base, url })
+}
+
+/// The Test-connection answer: the sessions, and which address answered.
+#[derive(serde::Serialize)]
+pub struct JellyfinTest {
+    pub sessions: Vec<crate::playback::detection::jellyfin::SessionSummary>,
+    pub base: crate::playback::detection::jellyfin::Base,
+    pub url: String,
 }
 
 /// Every media session the desktop currently knows about, for the Settings

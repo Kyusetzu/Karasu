@@ -33,6 +33,10 @@ export function backendErrorText(
       return t("settings.jfErrBadUrl");
     case "jellyfin.notJellyfin":
       return t("settings.jfErrNotJellyfin");
+    case "jellyfin.externalOtherServer":
+      return t("settings.jfErrExternalOtherServer");
+    case "jellyfin.externalUnknownServer":
+      return t("settings.jfErrExternalUnknownServer");
     case "queue.busy":
       return t("receipt.syncBusy");
     case "anilist.rateLimited":

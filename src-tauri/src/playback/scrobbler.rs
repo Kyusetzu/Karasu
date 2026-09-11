@@ -44,6 +44,7 @@ pub const YIELD_GRACE: Duration = Duration::from_secs(3 * 60);
 const HIDDEN_POLL_INTERVAL: Duration = Duration::from_secs(15);
 /// How long a refused start of the tracking service is left alone before
 /// the next attempt — once a minute, not once a tick.
+#[cfg_attr(not(target_os = "android"), allow(dead_code))]
 const SERVICE_RETRY: Duration = Duration::from_secs(60);
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
@@ -709,6 +710,9 @@ fn grace_spent(missed_ticks: u32) -> bool {
 /// start from the background — and, after a refusal, `SERVICE_RETRY` of
 /// patience, so a phone that keeps saying no is asked once a minute rather
 /// than once a tick. A stop needs nothing.
+///
+/// Pure and tested everywhere; only Android has a caller outside the tests.
+#[cfg_attr(not(target_os = "android"), allow(dead_code))]
 fn service_transition(
     running: bool,
     want: bool,

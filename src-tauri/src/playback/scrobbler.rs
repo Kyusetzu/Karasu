@@ -22,6 +22,15 @@ pub const POLL_INTERVAL: Duration = Duration::from_secs(5);
 const DEFAULT_THRESHOLD: Duration = Duration::from_secs(15 * 60);
 /// Threshold for manga chapters (reading is faster than watching).
 const MANGA_THRESHOLD: Duration = Duration::from_secs(5 * 60);
+/// How long a due session defers to a higher-ranked Karasu before writing
+/// anyway.
+///
+/// Longer than `jellyfin::FRESH` on purpose: the peer was heard from within
+/// the last thirty seconds and runs the same threshold, so its write is due
+/// about now; three minutes is time enough for it to land and for the live
+/// check in `perform_update` to see it. A peer that is present but will not
+/// write — confirm mode with nobody at the desk — costs this much delay, once.
+pub const YIELD_GRACE: Duration = Duration::from_secs(3 * 60);
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct NowPlaying {
@@ -155,9 +164,23 @@ impl BlockReason {
     }
 }
 
+/// Who a `Yielding` session is waiting for, for the card.
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct YieldTarget {
+    pub platform: detection::jellyfin::Platform,
+    pub device: String,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Phase {
     Watching,
+    /// Due, but another Karasu signed in as the same Jellyfin user outranks
+    /// this one and was heard from moments ago, so it gets the first write.
+    /// The session waits `YIELD_GRACE` and then proceeds as if newly due; the
+    /// live check in `perform_update` is what then stops a second write.
+    /// Deliberately not a `Blocked`: "Now" forces straight through it.
+    Yielding(YieldTarget),
     Pending,
     Updating,
     Updated,
@@ -251,6 +274,9 @@ struct ScrobbleEvent {
     episode: Option<u32>,
     #[serde(rename = "updateAtMs")]
     update_at_ms: Option<u64>,
+    /// The Karasu a `yielding` session waits for; `None` in every other phase.
+    #[serde(rename = "yieldingTo")]
+    yielding_to: Option<YieldTarget>,
 }
 
 fn emit_session(app: &AppHandle, session: Option<&Session>) {
@@ -262,10 +288,12 @@ fn emit_session(app: &AppHandle, session: Option<&Session>) {
             media_id: None,
             episode: None,
             update_at_ms: None,
+            yielding_to: None,
         },
         Some(s) => ScrobbleEvent {
             phase: match &s.phase {
                 Phase::Watching => "watching",
+                Phase::Yielding(_) => "yielding",
                 Phase::Pending => "pending",
                 Phase::Updating => "updating",
                 Phase::Updated => "updated",
@@ -292,6 +320,12 @@ fn emit_session(app: &AppHandle, session: Option<&Session>) {
                 // say *when* rather than only *that* — unarmed blocks have
                 // no epoch to leak, since `auto_arm` never set one.
                 Phase::Blocked(BlockReason::EpisodeGap { .. }) => s.update_at_epoch_ms,
+                // The end of the grace, so the card can count down the wait.
+                Phase::Yielding(_) => s.update_at_epoch_ms,
+                _ => None,
+            },
+            yielding_to: match &s.phase {
+                Phase::Yielding(target) => Some(target.clone()),
                 _ => None,
             },
         },
@@ -637,6 +671,9 @@ fn armed_now(enabled: bool, gap_auto: bool, phase: &Phase, has_deadline: bool) -
         && has_deadline
         && match phase {
             Phase::Watching => true,
+            // A yield is a wait, not a write: the deadline it carries is the
+            // end of the grace, and it has to fire.
+            Phase::Yielding(_) => true,
             Phase::Blocked(BlockReason::EpisodeGap { .. }) => gap_auto,
             _ => false,
         }
@@ -649,6 +686,28 @@ fn armed_now(enabled: bool, gap_auto: bool, phase: &Phase, has_deadline: bool) -
 /// ending the session there restarts the threshold from zero on resume.
 fn grace_spent(missed_ticks: u32) -> bool {
     missed_ticks > EMPTY_TICK_GRACE
+}
+
+/// Whether a due session should wait for another Karasu first, and for which.
+///
+/// Once per session: a `Yielding` session that comes due again has waited
+/// its grace and writes whatever the peer list says now — the live check in
+/// `perform_update` is what stops a duplicate then, not a second wait. No
+/// snapshot, or no own row in it, is no verdict.
+fn defer_for_peer(
+    phase: &Phase,
+    snapshot: Option<detection::jellyfin::PeerSnapshot>,
+) -> Option<YieldTarget> {
+    if matches!(phase, Phase::Yielding(_)) {
+        return None;
+    }
+    let snapshot = snapshot?;
+    let own = snapshot.own.as_ref()?;
+    let peer = detection::jellyfin::yield_to(&snapshot.peers, own, detection::jellyfin::FRESH)?;
+    Some(YieldTarget {
+        platform: peer.platform,
+        device: peer.device_name.clone(),
+    })
 }
 
 /// How long until this session's automatic update arms, or `None` for never.
@@ -810,17 +869,17 @@ async fn perform_update(
 ) -> Result<Outcome, String> {
     let token =
         crate::anilist::auth::load_token().ok_or("Not connected to AniList")?;
+    let db = app.state::<Db>();
+    let api = app.state::<crate::anilist::client::AniList>();
+    let user_id = cached_user_id(&db);
 
     // Read the progress the list actually holds, not what the session was
     // built with: the session may be minutes old, and this is the last point
     // before a write that cannot be taken back.
-    let cached_progress = {
-        let db = app.state::<Db>();
-        candidates_from_cache(&db, media_type)
-            .into_iter()
-            .find(|c| c.media_id == media_id)
-            .map(|c| c.progress)
-    };
+    let cached_progress = candidates_from_cache(&db, media_type)
+        .into_iter()
+        .find(|c| c.media_id == media_id)
+        .map(|c| c.progress);
     if would_regress(episode, cached_progress, list_status) {
         // The same fact `block_reason` states before a session ever arms —
         // discovered later, because this reads the cache immediately before
@@ -833,16 +892,47 @@ async fn perform_update(
         }));
     }
 
+    // Then AniList itself, once, whatever the cache says. The cache is this
+    // instance's memory, and the write it is about to guard against may have
+    // come from another Karasu on the same account — the desktop, while this
+    // is the phone — or from the website. Whatever comes back is patched in
+    // through the cache's one owner, so the next guard reads it too. No
+    // answer (offline, throttled) means the cache's word stands and the
+    // write goes on to be queued as before.
+    let (progress_now, status_now) = match user_id {
+        Some(uid) => match crate::commands::live_entry(&api, &token, uid, media_id).await {
+            Some(Some((progress, status))) => {
+                db.update_cached_progress(uid, media_type, media_id, progress, Some(&status));
+                (Some(progress), status)
+            }
+            // Not on the list: the save below creates the entry.
+            Some(None) => (None, list_status.to_string()),
+            None => (cached_progress, list_status.to_string()),
+        },
+        None => (cached_progress, list_status.to_string()),
+    };
+    if would_regress(episode, progress_now, &status_now) {
+        crate::logging::debug(
+            "scrobble",
+            format!(
+                "#{media_id} ep {episode} already at {} on AniList — not writing",
+                progress_now.unwrap_or(0)
+            ),
+        );
+        return Ok(Outcome::Refused(BlockReason::AlreadyWatched {
+            episode,
+            progress: progress_now.unwrap_or(0),
+        }));
+    }
+
     let done = total == Some(episode);
-    let status = match (done, list_status) {
+    let status = match (done, status_now.as_str()) {
         (true, _) => "COMPLETED",
         (false, "REPEATING") => "REPEATING",
         _ => "CURRENT",
     };
     let input = json!({ "mediaId": media_id, "progress": episode, "status": status });
 
-    let db = app.state::<Db>();
-    let api = app.state::<crate::anilist::client::AniList>();
     let result = crate::commands::save_entry_core(app, &db, &api, &token, input).await?;
     if result.queued {
         // Nothing reached AniList, so nothing here may claim it did: no cache
@@ -856,7 +946,7 @@ async fn perform_update(
     }
 
     // Patch the local cache so the next detection sees the new state
-    if let Some(user_id) = cached_user_id(&db) {
+    if let Some(user_id) = user_id {
         db.update_cached_progress(user_id, media_type, media_id, episode, Some(status));
         // A scrobble is the other writer of that cache; the widgets follow.
         crate::widgets::refresh(app);
@@ -1120,15 +1210,26 @@ pub fn spawn(app: AppHandle) {
         async move {
         let mut last_raw: Option<(String, String)> = None;
         loop {
-            let (media_detection, jellyfin, mpv) = {
+            let (media_detection, jellyfin, mpv, tracking_on) = {
                 let db = app.state::<Db>();
                 (
                     crate::commands::read_media_detection(&db),
                     crate::commands::jellyfin_config(&db),
                     crate::commands::mpv_ipc_config(&db),
+                    crate::commands::read_scrobble_settings(&db).enabled,
                 )
             };
+            let heartbeat_cfg = jellyfin.clone();
             let playback = detection::detect_playback(media_detection, jellyfin, mpv).await;
+            // Announce this instance to the other Karasus on the account —
+            // but only while it is tracking a Jellyfin playback *and* would
+            // write: an instance with automatic updates off is not one to
+            // wait for, and it must not look like one. See `jellyfin::heartbeat`.
+            if let (Some(cfg), Some(p)) = (heartbeat_cfg.as_ref(), playback.as_ref()) {
+                if tracking_on && p.process.starts_with("jellyfin (") {
+                    detection::jellyfin::heartbeat(cfg).await;
+                }
+            }
             let raw = playback
                 .as_ref()
                 .map(|p| (p.process.clone(), p.media_title.clone()));
@@ -1283,11 +1384,18 @@ async fn drive_session(app: &AppHandle) {
                     // sits past two thirds, so believing the position here
                     // would lift the block within one 5 s tick and hand the
                     // grace no time to mean anything.
-                    let gap_armed =
-                        matches!(session.phase, Phase::Blocked(BlockReason::EpisodeGap { .. }));
+                    //
+                    // A yield waits out `YIELD_GRACE` the same way: the
+                    // position is already past two thirds — that is what made
+                    // it due — and believing it again would end the wait on
+                    // the very next tick.
+                    let wall_only = matches!(
+                        session.phase,
+                        Phase::Blocked(BlockReason::EpisodeGap { .. }) | Phase::Yielding(_)
+                    );
                     let wall_due = session.update_at.is_some_and(|at| Instant::now() >= at);
                     let due = armed
-                        && if gap_armed {
+                        && if wall_only {
                             wall_due
                         } else {
                             position_due(
@@ -1299,6 +1407,28 @@ async fn drive_session(app: &AppHandle) {
                             .unwrap_or(wall_due)
                         };
                     if !due {
+                        None
+                    } else if let Some(target) = defer_for_peer(
+                        &session.phase,
+                        detection::jellyfin::peer_snapshot(detection::jellyfin::FRESH),
+                    ) {
+                        // Another Karasu — the desktop, seen from the phone —
+                        // goes first. Wait, then come back here as newly due;
+                        // `perform_update`'s live check finds its write.
+                        session.update_at = Some(Instant::now() + YIELD_GRACE);
+                        session.update_at_epoch_ms = Some(epoch_ms_in(YIELD_GRACE));
+                        crate::logging::debug(
+                            "scrobble",
+                            format!(
+                                "#{} ep {} due, yielding to Karasu on {} for {} s",
+                                session.media_id,
+                                session.episode,
+                                target.device,
+                                YIELD_GRACE.as_secs()
+                            ),
+                        );
+                        session.phase = Phase::Yielding(target);
+                        emit_session(app, Some(session));
                         None
                     } else if settings.confirm {
                         session.phase = Phase::Pending;
@@ -1404,11 +1534,13 @@ async fn drive_session(app: &AppHandle) {
 #[cfg(test)]
 mod tests {
     use super::{
-        applies_to, armed_now, auto_arm, block_reason, grace_spent, position_due, shift_episode,
-        threshold, would_regress, BlockReason, NowPlaying, Phase, Session, DEFAULT_THRESHOLD,
-        EMPTY_TICK_GRACE, GAP_GRACE, MANGA_THRESHOLD, POLL_INTERVAL,
+        applies_to, armed_now, auto_arm, block_reason, defer_for_peer, grace_spent, position_due,
+        shift_episode, threshold, would_regress, BlockReason, NowPlaying, Phase, Session,
+        YieldTarget, DEFAULT_THRESHOLD, EMPTY_TICK_GRACE, GAP_GRACE, MANGA_THRESHOLD,
+        POLL_INTERVAL, YIELD_GRACE,
     };
-    use std::time::Duration;
+    use crate::playback::detection::jellyfin::{Peer, PeerSnapshot, Platform, FRESH};
+    use std::time::{Duration, Instant};
 
     fn now_playing(media_type: &str, duration_min: Option<u32>) -> NowPlaying {
         NowPlaying {
@@ -1696,7 +1828,8 @@ mod tests {
     /// second write for the same session — and therefore what makes spawning
     /// safe. Any phase that means "a write is under way or done" must never
     /// arm; extending `armed_now` without keeping that true would reintroduce
-    /// double scrobbles.
+    /// double scrobbles. `Yielding` is deliberately absent from the list: it
+    /// is a wait *before* the write, and its deadline has to fire.
     #[test]
     fn no_phase_with_a_write_in_flight_can_arm() {
         for phase in [Phase::Updating, Phase::Pending, Phase::Updated, Phase::Queued] {
@@ -1736,5 +1869,70 @@ mod tests {
     #[test]
     fn a_different_media_does_not_take_the_result() {
         assert!(!applies_to(&session(2, 5), 1, 5));
+    }
+
+    // --- Yielding to another Karasu ------------------------------------------
+
+    fn peer(id: &str, name: &str, platform: Platform, last_activity: Option<i64>) -> Peer {
+        Peer {
+            device_id: id.into(),
+            device_name: name.into(),
+            platform,
+            last_activity,
+        }
+    }
+
+    /// The phone's view: its own row stamped now, the desktop's a few seconds
+    /// earlier.
+    fn phone_sees_desktop() -> PeerSnapshot {
+        PeerSnapshot {
+            own: Some(peer("phone", "Pixel", Platform::Mobile, Some(1_000))),
+            peers: vec![peer("pc", "KYU-PC", Platform::Desktop, Some(996))],
+            taken: Instant::now(),
+        }
+    }
+
+    fn target() -> YieldTarget {
+        YieldTarget { platform: Platform::Desktop, device: "KYU-PC".into() }
+    }
+
+    /// A yield is a wait with a deadline, so it must stay armed — and on the
+    /// wall clock alone, which `drive_session` enforces by treating it like an
+    /// armed gap block.
+    #[test]
+    fn a_yielding_session_stays_armed_and_waits_on_the_wall_clock() {
+        assert!(armed_now(true, false, &Phase::Yielding(target()), true));
+        assert!(!armed_now(false, false, &Phase::Yielding(target()), true), "off means off");
+        assert!(!armed_now(true, false, &Phase::Yielding(target()), false));
+    }
+
+    /// The phone yields once to the desktop, then writes: a second look at the
+    /// same peer list must not restart the grace, or a desktop that is present
+    /// but will not write (confirm mode, nobody there) would hold the phone
+    /// forever.
+    #[test]
+    fn a_session_yields_once_and_then_writes() {
+        let first = defer_for_peer(&Phase::Watching, Some(phone_sees_desktop()));
+        assert_eq!(first, Some(target()));
+        assert_eq!(defer_for_peer(&Phase::Yielding(target()), Some(phone_sees_desktop())), None);
+        // No snapshot, or no own row to judge freshness by: no yield.
+        assert_eq!(defer_for_peer(&Phase::Watching, None), None);
+        let mut blind = phone_sees_desktop();
+        blind.own = None;
+        assert_eq!(defer_for_peer(&Phase::Watching, Some(blind)), None);
+        // The desktop never waits for the phone.
+        let desktop_sees_phone = PeerSnapshot {
+            own: Some(peer("pc", "KYU-PC", Platform::Desktop, Some(1_000))),
+            peers: vec![peer("phone", "Pixel", Platform::Mobile, Some(1_000))],
+            taken: Instant::now(),
+        };
+        assert_eq!(defer_for_peer(&Phase::Watching, Some(desktop_sees_phone)), None);
+    }
+
+    /// The grace has to outlast the freshness window, or a session could
+    /// yield, wait, and find the same still-fresh peer to yield to again.
+    #[test]
+    fn the_yield_grace_outlives_the_freshness_window() {
+        assert!(YIELD_GRACE > FRESH);
     }
 }

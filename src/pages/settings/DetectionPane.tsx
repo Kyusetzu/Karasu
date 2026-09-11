@@ -744,6 +744,18 @@ function SessionList({ sessions }: { sessions: JellyfinSession[] }) {
             {s.client && (
               <span className="text-xs text-ink-600">({s.client})</span>
             )}
+            {/* The other Karasus on this account, and how long ago each was
+                heard from — the numbers the write-order rule judges by. */}
+            {s.karasu === "desktop" && (
+              <span className="rounded-full bg-accent-500/15 px-2 py-0.5 text-xs text-accent-400">
+                {t("settings.jellyfinKarasuDesktop")}
+              </span>
+            )}
+            {s.karasu === "mobile" && (
+              <span className="rounded-full bg-accent-500/15 px-2 py-0.5 text-xs text-accent-400">
+                {t("settings.jellyfinKarasuMobile")}
+              </span>
+            )}
             {s.matched && (
               <span className="rounded-full bg-success/20 px-2 py-0.5 text-xs text-success">
                 {t("settings.jellyfinMatched")}
@@ -752,6 +764,12 @@ function SessionList({ sessions }: { sessions: JellyfinSession[] }) {
           </p>
           <p className="mt-0.5 text-xs text-ink-500">
             {s.playing ?? t("settings.jellyfinIdle")}
+            {s.activeAgoSec !== null && (
+              <span className="text-ink-600">
+                {" "}
+                · {t("settings.jellyfinActiveAgo", { s: s.activeAgoSec })}
+              </span>
+            )}
           </p>
         </div>
       ))}

@@ -1187,6 +1187,8 @@ export const en = {
     correctTitle: "Wrong title? Pick the right one",
     skipTitle: "Don't update this one",
     soon: "soon",
+    yielding:
+      "Karasu on {{device}} is tracking this too and goes first — updating here in {{time}} if it hasn't.",
     idle: "Watching for players — nothing playing",
   },
   settings: {
@@ -1448,6 +1450,9 @@ export const en = {
     jfErrNoToken: "The server's reply contained no access token.",
     jfErrNoUserId: "The server's reply contained no user id.",
     jfErrBadCredentials: "Wrong username or password.",
+    jellyfinKarasuDesktop: "Karasu · desktop",
+    jellyfinKarasuMobile: "Karasu · phone",
+    jellyfinActiveAgo: "active {{s}} s ago",
     jfErrBadUrl: "That is not a usable server address — it needs to start with http:// or https://.",
     airingNotify: "New-episode notifications",
     airingNotifyHint:

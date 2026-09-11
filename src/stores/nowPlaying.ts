@@ -36,6 +36,9 @@ export interface NowPlaying {
 export type ScrobblePhase =
   | "idle"
   | "watching"
+  /** Due, but another Karasu on the same Jellyfin account outranks this one
+      and goes first; this one writes after a grace unless it already has. */
+  | "yielding"
   | "pending"
   | "updating"
   | "updated"
@@ -67,6 +70,8 @@ export interface ScrobbleState {
   mediaId: number | null;
   episode: number | null;
   updateAtMs: number | null;
+  /** The Karasu a `yielding` session waits for; null in every other phase. */
+  yieldingTo: { platform: "desktop" | "mobile"; device: string } | null;
 }
 
 interface NowPlayingStore {
@@ -82,6 +87,7 @@ const IDLE: ScrobbleState = {
   mediaId: null,
   episode: null,
   updateAtMs: null,
+  yieldingTo: null,
 };
 
 let initialized = false;
@@ -202,10 +208,16 @@ export interface JellyfinSession {
   user: string;
   device: string;
   client: string;
+  deviceId: string;
   /** What that session is playing, or null when idle. */
   playing: string | null;
   /** Whether the device filter accepts this session. */
   matched: boolean;
+  /** Set when the row is a Karasu — this one included — with its platform. */
+  karasu: "desktop" | "mobile" | null;
+  /** Seconds since that row was last heard from, measured on the server's
+      clock against this instance's own row. */
+  activeAgoSec: number | null;
 }
 
 export const getJellyfinSettings = () =>

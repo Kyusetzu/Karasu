@@ -134,6 +134,59 @@ pub(crate) fn viewer_id(db: &Db) -> Option<i64> {
         .and_then(|v| v.get("id").and_then(|i| i.as_i64()))
 }
 
+/// One entry's live progress and status, the scrobbler's last look before it
+/// writes.
+///
+/// A `Page` around `mediaList`, not a `MediaList` root: the root answers a
+/// missing entry with HTTP 404 and nulls every sibling with it (CLAUDE.md),
+/// while an empty page is an ordinary answer meaning "not on the list".
+/// Validated 2026-09-11 through the rig's `anilist_query`:
+/// `{"Page":{"mediaList":[{"progress":25,"status":"COMPLETED"}]}}`.
+pub(crate) const ENTRY_PROGRESS_QUERY: &str = "query ($userId: Int, $mediaId: Int) { Page(perPage: 1) { mediaList(userId: $userId, mediaId: $mediaId) { progress status } } }";
+
+/// Reads the page shape above. `None` is the empty page — not on the list.
+pub(crate) fn parse_live_entry(data: &Value) -> Option<(u32, String)> {
+    let row = data.pointer("/Page/mediaList/0")?;
+    let progress = row.get("progress").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+    let status = row
+        .get("status")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    Some((progress, status))
+}
+
+/// Asks AniList what the entry holds right now.
+///
+/// The outer `None` is "could not ask" — offline, throttled, refused — and the
+/// caller decides on the cache's word instead; the inner `None` is the empty
+/// page. One request per scrobble, inside the shared limiter like any other.
+pub(crate) async fn live_entry(
+    api: &AniList,
+    token: &str,
+    user_id: i64,
+    media_id: i64,
+) -> Option<Option<(u32, String)>> {
+    match api
+        .query(
+            Some(token),
+            ENTRY_PROGRESS_QUERY,
+            json!({ "userId": user_id, "mediaId": media_id }),
+        )
+        .await
+    {
+        Ok(data) => Some(parse_live_entry(&data)),
+        Err(e) => {
+            crate::logging::debug_changed(
+                "scrobble",
+                "live",
+                format!("live check unavailable: {}", String::from(e)),
+            );
+            None
+        }
+    }
+}
+
 /// How many edits the signed-in account is waiting to sync. Zero when signed
 /// out — another account's rows are not this account's business.
 pub(crate) fn pending(db: &Db) -> usize {
@@ -1301,5 +1354,26 @@ mod tests {
     #[test]
     fn an_empty_selection_sends_nothing() {
         assert!(bulk_chunks(&[]).is_empty());
+    }
+
+    /// The exact shape the rig returned on 2026-09-11 for a completed entry.
+    #[test]
+    fn a_live_entry_is_read_from_the_page_shape() {
+        let data = serde_json::json!({
+            "Page": { "mediaList": [ { "progress": 25, "status": "COMPLETED" } ] }
+        });
+        assert_eq!(super::parse_live_entry(&data), Some((25, "COMPLETED".to_string())));
+        // A null progress on a planning entry is zero, not a refusal.
+        let planning = serde_json::json!({
+            "Page": { "mediaList": [ { "progress": null, "status": "PLANNING" } ] }
+        });
+        assert_eq!(super::parse_live_entry(&planning), Some((0, "PLANNING".to_string())));
+    }
+
+    #[test]
+    fn an_empty_page_means_not_on_the_list() {
+        let data = serde_json::json!({ "Page": { "mediaList": [] } });
+        assert_eq!(super::parse_live_entry(&data), None);
+        assert_eq!(super::parse_live_entry(&serde_json::json!({})), None);
     }
 }

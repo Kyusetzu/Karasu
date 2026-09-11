@@ -34,6 +34,7 @@ use super::Playback;
 use crate::sync::LockExt;
 use crate::playback::recognition::parser::Parsed;
 use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 /// Stable codes for the failures a user actually sees, rather than sentences.
 ///
@@ -54,6 +55,19 @@ pub const ERR_NO_TOKEN: &str = "jellyfin.noToken";
 pub const ERR_NO_USER_ID: &str = "jellyfin.noUserId";
 pub const ERR_BAD_CREDENTIALS: &str = "jellyfin.badCredentials";
 
+/// What this build calls itself in the `MediaBrowser` header.
+///
+/// Per platform on purpose: a `/Sessions` answer lists every Karasu signed in
+/// as the same user, and a phone has to tell a desktop from another phone by
+/// that row alone — the coordination in `yield_to` rests on it. Jellyfin keys
+/// sessions on `(Client, DeviceId)`, so the rename on Android leaves one stale
+/// "Karasu" row beside the new one until the server prunes it; the device id
+/// and the stored token are untouched by it.
+#[cfg(not(target_os = "android"))]
+pub const CLIENT_NAME: &str = "Karasu";
+#[cfg(target_os = "android")]
+pub const CLIENT_NAME: &str = "Karasu Android";
+
 #[cfg(any(windows, target_os = "linux"))]
 const SERVICE: &str = "dev.kyu.karasu";
 /// Credential-store entry for the Jellyfin access token.
@@ -65,6 +79,7 @@ const TOKEN_USER: &str = "jellyfin_token";
 const LEGACY_KEY_USER: &str = "jellyfin";
 
 /// Everything the source needs to poll one user's playback on one device.
+#[derive(Clone)]
 pub struct JellyfinConfig {
     pub url: String,
     pub token: String,
@@ -378,7 +393,7 @@ fn auth_header(device: &str, device_id: &str, token: Option<&str>) -> String {
         d => d,
     };
     let mut header = format!(
-        "MediaBrowser Client=\"Karasu\", Device=\"{device}\", DeviceId=\"{}\", Version=\"{version}\"",
+        "MediaBrowser Client=\"{CLIENT_NAME}\", Device=\"{device}\", DeviceId=\"{}\", Version=\"{version}\"",
         escape(device_id),
     );
     if let Some(t) = token {
@@ -542,14 +557,22 @@ pub async fn authenticate(
 
 /// One row of the Test-connection diagnostic.
 #[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SessionSummary {
     pub user: String,
     pub device: String,
     pub client: String,
+    pub device_id: String,
     /// What that session is playing, or `None` when it is idle.
     pub playing: Option<String>,
     /// Whether the configured user/device filter accepts this session.
     pub matched: bool,
+    /// Set when the row is a Karasu — this one included — with its platform.
+    pub karasu: Option<Platform>,
+    /// Seconds between this row's last activity and this instance's own row,
+    /// server clock on both sides; the number `yield_to` judges by. `None`
+    /// when either stamp is missing.
+    pub active_ago_sec: Option<i64>,
 }
 
 /// Every session the server reports, annotated with whether the filter accepts
@@ -558,22 +581,293 @@ pub struct SessionSummary {
 /// This is the only way a user can find out what their device is actually
 /// called: Jellyfin Media Player usually reports the machine hostname, but it
 /// is configurable and a browser session reports the browser name instead.
+/// It is also the measuring instrument for the coordination: the other
+/// Karasu's row, and how long ago it was heard from.
 pub async fn list_sessions(cfg: &JellyfinConfig) -> Result<Vec<SessionSummary>, String> {
     let sessions = get_json(cfg, "/Sessions").await?;
-    Ok(sessions
-        .as_array()
-        .map(|arr| {
-            arr.iter()
-                .map(|s| SessionSummary {
-                    user: str_field(s, "UserName"),
-                    device: str_field(s, "DeviceName"),
-                    client: str_field(s, "Client"),
-                    playing: playback_from_session(s).map(|p| p.media_title),
-                    matched: session_matches(s, &cfg.user_id, &cfg.device),
-                })
-                .collect()
+    let Some(arr) = sessions.as_array() else {
+        return Ok(Vec::new());
+    };
+    let (own, _) = peers_from_sessions(arr, &cfg.device_id);
+    let reference = own.and_then(|p| p.last_activity);
+    Ok(arr
+        .iter()
+        .map(|s| SessionSummary {
+            user: str_field(s, "UserName"),
+            device: str_field(s, "DeviceName"),
+            client: str_field(s, "Client"),
+            device_id: str_field(s, "DeviceId"),
+            playing: playback_from_session(s).map(|p| p.media_title),
+            matched: session_matches(s, &cfg.user_id, &cfg.device),
+            karasu: platform_of(&str_field(s, "Client")),
+            active_ago_sec: match (reference, last_activity(s)) {
+                (Some(now), Some(then)) => Some(now - then),
+                _ => None,
+            },
         })
-        .unwrap_or_default())
+        .collect())
+}
+
+// --- Peers: the other Karasus on the same account ----------------------------
+
+/// Which kind of Karasu a `/Sessions` row is, read off its `Client`.
+///
+/// Ordered, because the order *is* the coordination rule: a desktop outranks
+/// a phone — the always-on machine writes, the phone waits (`yield_to`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Platform {
+    Mobile,
+    Desktop,
+}
+
+/// The platform this build announces — see `CLIENT_NAME`.
+#[cfg(not(target_os = "android"))]
+pub const OWN_PLATFORM: Platform = Platform::Desktop;
+#[cfg(target_os = "android")]
+pub const OWN_PLATFORM: Platform = Platform::Mobile;
+
+/// Another Karasu signed in as the same Jellyfin user, as `/Sessions` lists it.
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Peer {
+    pub device_id: String,
+    pub device_name: String,
+    pub platform: Platform,
+    /// `LastActivityDate` as Unix seconds; `None` when absent or unreadable.
+    pub last_activity: Option<i64>,
+}
+
+/// How recently a peer must have been heard from to count as present.
+///
+/// Twice the heartbeat plus slack: a peer that is still polling refreshes its
+/// row every `HEARTBEAT`; one quiet for this long has been quit, suspended or
+/// cut off, and waiting on it would only lose the scrobble.
+pub const FRESH: Duration = Duration::from_secs(30);
+/// How often a tracking instance refreshes its own row. See `heartbeat`.
+pub const HEARTBEAT: Duration = Duration::from_secs(15);
+
+/// Reads a Karasu `Client` name into a platform; anything else is not a peer.
+///
+/// The bare name is the desktop. Every suffixed flavour — "Karasu Android",
+/// and whatever comes next — ranks below it, which is the conservative reading
+/// for a flavour this build has never heard of: it waits rather than races.
+pub fn platform_of(client: &str) -> Option<Platform> {
+    let client = client.trim();
+    if client == "Karasu" {
+        Some(Platform::Desktop)
+    } else if client.starts_with("Karasu") {
+        Some(Platform::Mobile)
+    } else {
+        None
+    }
+}
+
+/// `2026-09-11T10:12:13.1234567Z` — Jellyfin's spelling, seven fractional
+/// digits — as Unix seconds. `+02:00` and `-0500` offsets are honoured too,
+/// since a reverse proxy or an older server may hand out local time. There is
+/// no date crate in the tree, and this is the one field that needs one.
+pub fn parse_utc_seconds(s: &str) -> Option<i64> {
+    let s = s.trim();
+    let b = s.as_bytes();
+    if b.len() < 19
+        || b[4] != b'-'
+        || b[7] != b'-'
+        || (b[10] != b'T' && b[10] != b' ')
+        || b[13] != b':'
+        || b[16] != b':'
+    {
+        return None;
+    }
+    let num = |from: usize, to: usize| -> Option<i64> { s.get(from..to)?.parse::<i64>().ok() };
+    let (year, month, day) = (num(0, 4)?, num(5, 7)?, num(8, 10)?);
+    let (hour, minute, second) = (num(11, 13)?, num(14, 16)?, num(17, 19)?);
+    if !(1..=12).contains(&month) || !(1..=31).contains(&day) || hour > 23 || minute > 59 || second > 60
+    {
+        return None;
+    }
+    // A fraction, if any, then the zone.
+    let mut rest = &s[19..];
+    if let Some(after) = rest.strip_prefix('.') {
+        let digits = after.bytes().take_while(|c| c.is_ascii_digit()).count();
+        rest = &after[digits..];
+    }
+    let offset = match rest {
+        "" | "Z" | "z" => 0,
+        _ => {
+            let sign = match rest.as_bytes()[0] {
+                b'+' => 1,
+                b'-' => -1,
+                _ => return None,
+            };
+            let tz = rest[1..].replace(':', "");
+            if tz.len() != 4 {
+                return None;
+            }
+            let h = tz[0..2].parse::<i64>().ok()?;
+            let m = tz[2..4].parse::<i64>().ok()?;
+            sign * (h * 3600 + m * 60)
+        }
+    };
+    // Days since 1970-01-01, Howard Hinnant's days-from-civil.
+    let (y, m) = if month <= 2 { (year - 1, month + 9) } else { (year, month - 3) };
+    let era = y.div_euclid(400);
+    let yoe = y - era * 400;
+    let doy = (153 * m + 2) / 5 + day - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    let days = era * 146_097 + doe - 719_468;
+    Some(days * 86_400 + hour * 3600 + minute * 60 + second - offset)
+}
+
+fn last_activity(session: &serde_json::Value) -> Option<i64> {
+    get_ci(session, "LastActivityDate")
+        .and_then(|v| v.as_str())
+        .and_then(parse_utc_seconds)
+}
+
+/// One `/Sessions` row as a peer, or `None` for anything that is not a Karasu.
+pub fn peer_from_session(session: &serde_json::Value) -> Option<Peer> {
+    let platform = platform_of(&str_field(session, "Client"))?;
+    let device_id = str_field(session, "DeviceId");
+    if device_id.is_empty() {
+        return None;
+    }
+    Some(Peer {
+        device_id,
+        device_name: str_field(session, "DeviceName"),
+        platform,
+        last_activity: last_activity(session),
+    })
+}
+
+/// This instance's own row and every other Karasu, from one `/Sessions` answer.
+///
+/// Own is matched on the device id, preferring the row that carries this
+/// build's platform: after the Android rename the phone's old "Karasu" row
+/// lingers beside the new one with the same device id, and it must be neither
+/// the reference clock nor a peer to wait for.
+pub fn peers_from_sessions(
+    list: &[serde_json::Value],
+    own_device_id: &str,
+) -> (Option<Peer>, Vec<Peer>) {
+    let mut own: Option<Peer> = None;
+    let mut peers = Vec::new();
+    for peer in list.iter().filter_map(peer_from_session) {
+        if peer.device_id == own_device_id {
+            if !own.as_ref().is_some_and(|o| o.platform == OWN_PLATFORM) {
+                own = Some(peer);
+            }
+        } else {
+            peers.push(peer);
+        }
+    }
+    (own, peers)
+}
+
+/// Whether `a` goes before `b`: a desktop before a phone, and between equals
+/// the lower device id — arbitrary but stable, so two desktops can never both
+/// defer to each other.
+pub fn outranks(a: &Peer, b: &Peer) -> bool {
+    a.platform > b.platform || (a.platform == b.platform && a.device_id < b.device_id)
+}
+
+/// The peer this instance should wait for before writing, if any.
+///
+/// Freshness is measured against this instance's *own* row in the same
+/// answer, so the server's clock is on both sides and nothing depends on the
+/// phone's. Without an own stamp there is no verdict: better to write than to
+/// wait on a guess.
+pub fn yield_to<'a>(peers: &'a [Peer], own: &Peer, fresh: Duration) -> Option<&'a Peer> {
+    let now = own.last_activity?;
+    let fresh = fresh.as_secs() as i64;
+    peers
+        .iter()
+        .filter(|p| p.last_activity.is_some_and(|t| now - t <= fresh))
+        .filter(|p| outranks(p, own))
+        .fold(None, |best: Option<&Peer>, p| match best {
+            Some(b) if outranks(b, p) => Some(b),
+            _ => Some(p),
+        })
+}
+
+/// What the last `/Sessions` answer said about the other Karasus.
+#[derive(Debug, Clone)]
+pub struct PeerSnapshot {
+    pub own: Option<Peer>,
+    pub peers: Vec<Peer>,
+    pub taken: Instant,
+}
+
+/// Side channel to the scrobbler, like `LAST_GOOD`: `Playback` is shared by
+/// every source, and the peer list is a fact about this one alone.
+static PEERS: Mutex<Option<PeerSnapshot>> = Mutex::new(None);
+
+fn record_peers(list: &[serde_json::Value], own_device_id: &str) {
+    let (own, peers) = peers_from_sessions(list, own_device_id);
+    *PEERS.guard() = Some(PeerSnapshot { own, peers, taken: Instant::now() });
+}
+
+/// The snapshot, unless it is older than `max_age` — a server that stopped
+/// answering must not leave a ghost desktop to defer to.
+pub fn peer_snapshot(max_age: Duration) -> Option<PeerSnapshot> {
+    PEERS.guard().clone().filter(|s| s.taken.elapsed() <= max_age)
+}
+
+/// Refreshes this instance's own `/Sessions` row.
+///
+/// Jellyfin stamps `LastActivityDate` only on the endpoints that go through
+/// its session helper — capabilities, play-state reports, the websocket — and
+/// not on a plain `GET /Sessions`; and it prunes rows quiet past the
+/// dashboard's inactive threshold, ten minutes by default. A merely polling
+/// Karasu would therefore vanish from the answer the other one reads. This is
+/// the cheapest of those endpoints: an empty `POST /Sessions/Capabilities`,
+/// answered 204, sent at most once per `HEARTBEAT` — and, by the caller's
+/// rule, only while this instance is tracking a Jellyfin playback with
+/// automatic updates on. An instance that will not write must not look like
+/// one that will.
+pub async fn heartbeat(cfg: &JellyfinConfig) {
+    static LAST_BEAT: Mutex<Option<Instant>> = Mutex::new(None);
+    {
+        let mut last = LAST_BEAT.guard();
+        if last.is_some_and(|t| t.elapsed() < HEARTBEAT) {
+            return;
+        }
+        *last = Some(Instant::now());
+    }
+    match post_empty(cfg, "/Sessions/Capabilities").await {
+        Ok(()) => crate::logging::debug_changed("jellyfin", "heartbeat", "heartbeat accepted"),
+        Err(e) => crate::logging::debug_changed(
+            "jellyfin",
+            "heartbeat",
+            format!("heartbeat failed: {e}"),
+        ),
+    }
+}
+
+/// POST with no body, as the signed-in user. The same checks as `get_json`.
+async fn post_empty(cfg: &JellyfinConfig, path: &str) -> Result<(), String> {
+    let base = normalize_base_url(&cfg.url);
+    if base.is_empty() || cfg.token.is_empty() {
+        return Err(ERR_SIGNED_OUT.into());
+    }
+    let resp = http()
+        .post(format!("{base}{path}"))
+        .header(
+            "Authorization",
+            auth_header(&cfg.device_name, &cfg.device_id, Some(&cfg.token)),
+        )
+        .header("Content-Length", "0")
+        .timeout(Duration::from_secs(4))
+        .send()
+        .await
+        .map_err(|e| format!("Could not reach the server: {e}"))?;
+    if resp.status() == reqwest::StatusCode::UNAUTHORIZED {
+        return Err("Jellyfin rejected the saved sign-in — sign in again".into());
+    }
+    if !resp.status().is_success() {
+        return Err(format!("Server responded with HTTP {}", resp.status()));
+    }
+    Ok(())
 }
 
 /// Turns one `/Sessions` entry into a detection result.
@@ -723,6 +1017,10 @@ pub async fn detect(cfg: &JellyfinConfig) -> Option<Playback> {
         crate::logging::debug_changed("jellyfin", "detect", "/Sessions was not a list");
         return None;
     };
+    // The same answer says which other Karasus are here; the scrobbler asks
+    // for it at the due point. Recorded before the filter below, which keeps
+    // only playing sessions — a peer's row is an idle one by construction.
+    record_peers(list, &cfg.device_id);
     let mut matched = 0usize;
     let candidates: Vec<&serde_json::Value> = list
         .iter()
@@ -778,6 +1076,8 @@ static LAST_GOOD: Mutex<Option<(Playback, u8)>> = Mutex::new(None);
 /// session someone else's episode for up to `HOLD_TICKS`.
 pub fn forget_last_good() {
     *LAST_GOOD.guard() = None;
+    // The peer list is the previous account's too.
+    *PEERS.guard() = None;
 }
 
 /// Records a successful poll and hands the answer straight back.
@@ -1169,9 +1469,13 @@ mod tests {
     fn the_auth_header_carries_what_jellyfin_requires() {
         let h = auth_header("KYU-PC", "dev-1", None);
         assert!(h.starts_with("MediaBrowser "));
-        for part in ["Client=\"Karasu\"", "Device=\"KYU-PC\"", "DeviceId=\"dev-1\""] {
+        let client = format!("Client=\"{CLIENT_NAME}\"");
+        for part in [client.as_str(), "Device=\"KYU-PC\"", "DeviceId=\"dev-1\""] {
             assert!(h.contains(part), "{h} is missing {part}");
         }
+        // The name is what `platform_of` reads on the other side, so the two
+        // must agree about what this build is.
+        assert_eq!(platform_of(CLIENT_NAME), Some(OWN_PLATFORM));
         assert!(h.contains("Version=\""));
         assert!(!h.contains("Token="), "no token before signing in");
         assert!(auth_header("d", "i", Some("tok")).contains("Token=\"tok\""));
@@ -1271,5 +1575,141 @@ mod tests {
             cached_or(&cache, || panic!("must not read the credential store")),
             None,
         );
+    }
+
+    // --- Peers -------------------------------------------------------------
+
+    fn peer(id: &str, name: &str, platform: Platform, last_activity: Option<i64>) -> Peer {
+        Peer {
+            device_id: id.into(),
+            device_name: name.into(),
+            platform,
+            last_activity,
+        }
+    }
+
+    #[test]
+    fn the_client_name_says_which_platform_this_is() {
+        assert_eq!(platform_of("Karasu"), Some(Platform::Desktop));
+        assert_eq!(platform_of("Karasu Android"), Some(Platform::Mobile));
+        // A flavour this build has never met waits rather than races.
+        assert_eq!(platform_of("Karasu Toaster"), Some(Platform::Mobile));
+        assert_eq!(platform_of("Jellyfin Media Player"), None);
+        assert_eq!(platform_of("Karasuma"), Some(Platform::Mobile), "prefix, not word");
+        assert_eq!(platform_of(""), None);
+    }
+
+    /// Jellyfin writes seven fractional digits and a `Z`; a proxy may hand out
+    /// an offset instead. Both must land on the same second.
+    #[test]
+    fn last_activity_parses_zulu_fraction_and_an_offset() {
+        assert_eq!(parse_utc_seconds("1970-01-01T00:00:00Z"), Some(0));
+        assert_eq!(parse_utc_seconds("2000-03-01T00:00:00Z"), Some(951_868_800));
+        let plain = parse_utc_seconds("2026-09-11T10:12:13Z").unwrap();
+        assert_eq!(parse_utc_seconds("2026-09-11T10:12:13.1234567Z"), Some(plain));
+        assert_eq!(parse_utc_seconds("2026-09-11T12:12:13+02:00"), Some(plain));
+        assert_eq!(parse_utc_seconds("2026-09-11T05:12:13-0500"), Some(plain));
+        assert_eq!(parse_utc_seconds("2026-09-11T10:12:03Z"), Some(plain - 10));
+        for junk in ["", "yesterday", "2026-13-01T00:00:00Z", "2026-09-11", "2026-09-11T10:12:13+2"] {
+            assert_eq!(parse_utc_seconds(junk), None, "{junk:?}");
+        }
+    }
+
+    #[test]
+    fn a_peer_is_read_from_a_session_and_the_own_device_is_set_aside() {
+        let list = vec![
+            json!({ "Client": "Karasu", "DeviceId": "pc-1", "DeviceName": "KYU-PC",
+                    "LastActivityDate": "2026-09-11T10:12:13.0000000Z" }),
+            json!({ "Client": CLIENT_NAME, "DeviceId": "me", "DeviceName": "mine",
+                    "LastActivityDate": "2026-09-11T10:12:20.0000000Z" }),
+            json!({ "Client": "Jellyfin Web", "DeviceId": "browser", "DeviceName": "Chrome" }),
+        ];
+        let (own, peers) = peers_from_sessions(&list, "me");
+        let own = own.expect("the own row");
+        assert_eq!(own.device_id, "me");
+        assert_eq!(own.last_activity, parse_utc_seconds("2026-09-11T10:12:20Z"));
+        assert_eq!(peers.len(), 1, "the browser is not a peer");
+        assert_eq!(peers[0].device_name, "KYU-PC");
+        assert_eq!(peers[0].platform, Platform::Desktop);
+    }
+
+    /// After the Android rename the phone's old "Karasu" row lingers beside
+    /// the new one with the same device id. It is neither the clock nor a peer.
+    #[test]
+    fn a_stale_row_with_the_own_device_id_is_not_a_peer() {
+        let other = if OWN_PLATFORM == Platform::Desktop { "Karasu Android" } else { "Karasu" };
+        let list = vec![
+            json!({ "Client": other, "DeviceId": "me", "DeviceName": "old",
+                    "LastActivityDate": "2026-09-11T09:00:00Z" }),
+            json!({ "Client": CLIENT_NAME, "DeviceId": "me", "DeviceName": "new",
+                    "LastActivityDate": "2026-09-11T10:00:00Z" }),
+        ];
+        let (own, peers) = peers_from_sessions(&list, "me");
+        assert_eq!(own.unwrap().device_name, "new");
+        assert!(peers.is_empty());
+    }
+
+    #[test]
+    fn a_client_that_is_not_karasu_is_never_a_peer() {
+        assert!(peer_from_session(&json!({ "Client": "Jellyfin Web", "DeviceId": "x" })).is_none());
+        assert!(peer_from_session(&json!({ "Client": "Karasu" })).is_none(), "no device id");
+        let p = peer_from_session(&json!({ "client": "Karasu Android", "deviceId": "p" })).unwrap();
+        assert_eq!(p.platform, Platform::Mobile);
+        assert_eq!(p.last_activity, None);
+    }
+
+    #[test]
+    fn a_desktop_outranks_a_phone_and_the_lower_device_id_breaks_a_tie() {
+        let pc = peer("zzz", "pc", Platform::Desktop, None);
+        let phone = peer("aaa", "phone", Platform::Mobile, None);
+        assert!(outranks(&pc, &phone));
+        assert!(!outranks(&phone, &pc));
+        let pc2 = peer("aaa", "pc2", Platform::Desktop, None);
+        assert!(outranks(&pc2, &pc));
+        assert!(!outranks(&pc, &pc2));
+        assert!(!outranks(&pc, &pc), "nothing outranks itself");
+    }
+
+    #[test]
+    fn a_fresh_higher_ranked_peer_is_waited_for() {
+        let own = peer("phone", "phone", Platform::Mobile, Some(1_000));
+        let peers = vec![
+            peer("pc-b", "second", Platform::Desktop, Some(990)),
+            peer("pc-a", "first", Platform::Desktop, Some(995)),
+            peer("phone-2", "other phone", Platform::Mobile, Some(1_000)),
+        ];
+        let target = yield_to(&peers, &own, FRESH).expect("a desktop is present");
+        assert_eq!(target.device_name, "first", "the highest-ranked fresh peer");
+        // A desktop never waits for a phone, however fresh.
+        let pc = peer("pc-a", "first", Platform::Desktop, Some(1_000));
+        assert!(yield_to(&[own.clone()], &pc, FRESH).is_none());
+    }
+
+    #[test]
+    fn a_peer_older_than_fresh_does_not_block() {
+        let own = peer("phone", "phone", Platform::Mobile, Some(1_000));
+        let stale = vec![peer("pc", "pc", Platform::Desktop, Some(1_000 - FRESH.as_secs() as i64 - 1))];
+        assert!(yield_to(&stale, &own, FRESH).is_none());
+        let edge = vec![peer("pc", "pc", Platform::Desktop, Some(1_000 - FRESH.as_secs() as i64))];
+        assert!(yield_to(&edge, &own, FRESH).is_some(), "exactly FRESH old still counts");
+        // A peer stamped *after* us (it beat between our two requests) is fresh.
+        let ahead = vec![peer("pc", "pc", Platform::Desktop, Some(1_004))];
+        assert!(yield_to(&ahead, &own, FRESH).is_some());
+        let unstamped = vec![peer("pc", "pc", Platform::Desktop, None)];
+        assert!(yield_to(&unstamped, &own, FRESH).is_none());
+    }
+
+    #[test]
+    fn without_an_own_timestamp_there_is_no_verdict() {
+        let own = peer("phone", "phone", Platform::Mobile, None);
+        let peers = vec![peer("pc", "pc", Platform::Desktop, Some(1_000))];
+        assert!(yield_to(&peers, &own, FRESH).is_none());
+    }
+
+    /// The freshness window has to cover two missed heartbeats, or a busy
+    /// desktop that skipped one beat would hand the write to the phone.
+    #[test]
+    fn the_freshness_window_covers_a_missed_heartbeat() {
+        assert!(FRESH >= 2 * HEARTBEAT);
     }
 }

@@ -76,8 +76,11 @@ export default function NowPlayingCard() {
   const scrobble = useNowPlaying((s) => s.scrobble);
   const countdown = useCountdown(
     // Blocked carries a time only for an armed episode gap — the backend
-    // emits none otherwise — so the same hook serves both phases.
-    scrobble.phase === "watching" || scrobble.phase === "blocked"
+    // emits none otherwise — so the same hook serves all three phases; for a
+    // yield the time is the end of the wait.
+    scrobble.phase === "watching" ||
+      scrobble.phase === "blocked" ||
+      scrobble.phase === "yielding"
       ? scrobble.updateAtMs
       : null,
   );
@@ -237,6 +240,17 @@ function ScrobbleStatus({ countdown }: { countdown: string | null }) {
               )}
         </p>
       );
+    case "yielding":
+      // Another Karasu on the same Jellyfin account — the desktop, seen from
+      // the phone — goes first. Quiet, not gold: nothing is wrong.
+      return (
+        <p className="text-xs text-ink-500">
+          {t("nowPlaying.yielding", {
+            device: scrobble.yieldingTo?.device ?? "",
+            time: countdown ?? t("nowPlaying.soon"),
+          })}
+        </p>
+      );
     case "pending":
       return (
         <p className="text-xs font-medium text-gold">
@@ -394,6 +408,9 @@ function ScrobbleActions({ playing }: { playing: NowPlaying }) {
   const canScrobble =
     (scrobble.phase === "pending" ||
       scrobble.phase === "watching" ||
+      // "Now" forces straight through a yield: the wait is a courtesy to
+      // the other device, not a rule.
+      scrobble.phase === "yielding" ||
       scrobble.phase === "cancelled" ||
       scrobble.phase === "blocked") &&
     // A block Rust will refuse anyway must not be offered. Forcing forward

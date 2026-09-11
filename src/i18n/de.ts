@@ -1190,6 +1190,8 @@ export const de: typeof en = {
     correctTitle: "Falscher Titel? Den richtigen auswählen",
     skipTitle: "Nicht aktualisieren",
     soon: "gleich",
+    yielding:
+      "Karasu auf {{device}} erfasst das ebenfalls und hat Vorrang – hier wird in {{time}} aktualisiert, falls es dort nicht passiert.",
     idle: "Warte auf Player – nichts läuft",
   },
   settings: {
@@ -1447,6 +1449,9 @@ export const de: typeof en = {
     jfErrNoToken: "Die Antwort des Servers enthielt kein Zugriffstoken.",
     jfErrNoUserId: "Die Antwort des Servers enthielt keine Benutzer-ID.",
     jfErrBadCredentials: "Falscher Benutzername oder falsches Passwort.",
+    jellyfinKarasuDesktop: "Karasu · Desktop",
+    jellyfinKarasuMobile: "Karasu · Handy",
+    jellyfinActiveAgo: "vor {{s}} s aktiv",
     jfErrBadUrl: "Das ist keine nutzbare Serveradresse — sie muss mit http:// oder https:// beginnen.",
     airingNotify: "Benachrichtigung bei neuer Folge",
     airingNotifyHint:

@@ -902,17 +902,25 @@ describe("inline HTML kept as structure", () => {
     expect(textOf([n])).toBe("★");
   });
 
-  it("degrades a rejected href to plain children, never accent", () => {
+  /// anilist.co strips a refused target to an `<a>` without href and colours
+  /// it like any bare anchor (activity 1154088020's `[__…__](javascript:;)`
+  /// heading is blue there, measured 2026-09-11). Colour, never a link: the
+  /// HOSTILE walk above still finds no `link`, no `chip` and no href.
+  it("renders a rejected href as accent decoration, never as a link", () => {
     for (const src of [
       `<a href="javascript:alert(1)">x</a>`,
       `<a href="">x</a>`,
       `<a href="jsonN4IgDg">x</a>`,
+      `[x](javascript:;)`,
+      `[x](data:text/html,y)`,
     ]) {
       const kinds = types(parse(src));
       expect(kinds, src).not.toContain("link");
-      expect(kinds, src).not.toContain("accent");
+      expect(kinds, src).toContain("accent");
       expect(textOf(parse(src)), src).toBe("x");
     }
+    // The layout blob: an empty label leaves an empty accent, nothing to see.
+    expect(textOf(parse(`[](jsonN4IgDglgdlCmAmIBcAWA7ADgMwFY0EYMAmAXyA==)`))).toBe("");
   });
 });
 
@@ -1042,7 +1050,12 @@ describe("one-line centred HTML rows", () => {
 
   it("keeps the markdown reading for a block that spans lines", () => {
     // No sample has contradicted this form; the one-line rule is the measured
-    // one and the only one changed.
+    // one and the only one changed. Looked for on 2026-09-11: 200 recent text
+    // activities and the bios of the maintainer's following and followers
+    // hold not one multi-line `<div align>` block with a list or heading
+    // inside, so there was nothing to measure on the site — the multi-line
+    // `<center>` case (activity 1154093188, markdown rendered) is the nearest
+    // evidence, and it points this way.
     const src = `<center>
 - a
 - b

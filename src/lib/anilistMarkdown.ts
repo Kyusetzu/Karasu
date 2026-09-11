@@ -62,12 +62,16 @@ export type MdInline =
   | { type: "mention"; name: string }
   | { type: "spoiler"; children: MdInline[] }
   /**
-   * `<a>` with no href attribute at all. anilist.co styles a bare anchor in
-   * the accent colour, and profile art leans on it — half the fixture bio is
-   * stars and arrows between `<a>` tags. Only the no-href form lands here: an
-   * `<a>` whose href is *rejected* (a `javascript:` scheme, the layout blob)
-   * degrades to plain children instead, so hostile input never earns accent
-   * styling.
+   * An anchor that goes nowhere: `<a>` with no href at all, or a link — HTML
+   * or markdown — whose target `safeHref` rejected (a `javascript:` scheme,
+   * the layout blob). anilist.co styles both in the accent colour: a bare
+   * anchor is its decoration idiom (half the fixture bio is stars and arrows
+   * between `<a>` tags), and a refused target is stripped to an `<a>` without
+   * href and coloured the same — measured 2026-09-11 on activity 1154088020,
+   * whose `[__…__](javascript:;)` heading is blue on the site. The refused
+   * form used to degrade to plain children here so that hostile input never
+   * earned a node; it earns colour now, and still no target, no handler and
+   * no `href` of any kind — the security tests below say so.
    */
   | { type: "accent"; children: MdInline[] }
   /**
@@ -527,10 +531,11 @@ function parseInline(src: string): MdInline[] {
         flush();
         i = target.end;
         const children = parseInline(link[1]);
-        // A rejected href is not a link. Its label still is content — which is
-        // how AniList's `[](json…)` layout blob vanishes: empty label, no node.
+        // A rejected href is not a link; its label is accent-coloured content,
+        // as on the site. AniList's `[](json…)` layout blob still vanishes:
+        // an empty label is an accent node with nothing in it.
         if (href) out.push({ type: "link", href, children });
-        else out.push(...children);
+        else out.push({ type: "accent", children });
         continue;
       }
     }
@@ -568,26 +573,21 @@ function parseInline(src: string): MdInline[] {
 }
 
 /**
- * `<a>` in a bio is three different things.
+ * `<a>` in a bio is two different things.
  *
  * With a usable href it is a link, and its children go *inside* the link
  * node — the same shape `[img33(pic)](target)` produces, which is what lets
  * `RichText`'s `InLink` context keep a linked image to one click target.
- * With no href attribute at all it is AniList's decoration idiom, kept as an
- * `accent` node. And with a href `safeHref` rejects — `javascript:`, `data:`,
- * the layout blob — it is neither: the children are spliced in as plain
- * content, exactly like the markdown-link branch above, so hostile input
- * never earns a node.
+ * Otherwise — no href attribute at all, or one `safeHref` rejects
+ * (`javascript:`, `data:`, the layout blob) — it is an `accent` node: the
+ * site's decoration colour, no target, exactly like the markdown-link branch
+ * above. The rejected href itself is dropped here and never stored.
  */
 function pushHtmlAnchor(out: MdInline[], attrs: string, children: MdInline[]) {
   const raw = /\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(attrs);
-  if (!raw) {
-    out.push({ type: "accent", children });
-    return;
-  }
-  const href = safeHref(raw[1] ?? raw[2] ?? raw[3] ?? "");
+  const href = raw ? safeHref(raw[1] ?? raw[2] ?? raw[3] ?? "") : null;
   if (href) out.push({ type: "link", href, children });
-  else out.push(...children);
+  else out.push({ type: "accent", children });
 }
 
 function pushChip(

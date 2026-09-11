@@ -111,23 +111,78 @@ pub fn merge_replies(replies: Vec<DiscoveredServer>) -> Vec<DiscoveredServer> {
     out
 }
 
+/// The address of the interface the default route leaves through.
+///
+/// A UDP "connect" picks it from the routing table without sending a
+/// packet; TEST-NET-1 is the destination because nothing real answers to
+/// it. `None` with no route at all — a phone in airplane mode.
+fn primary_local_ip() -> Option<std::net::IpAddr> {
+    let socket = std::net::UdpSocket::bind(("0.0.0.0", 0)).ok()?;
+    socket.connect(("192.0.2.1", DISCOVERY_PORT)).ok()?;
+    socket.local_addr().ok().map(|a| a.ip())
+}
+
 /// Sends the discovery message to `target` and collects every reply that
 /// arrives within `listen_for`. Parameterised so a test can point it at a
 /// responder on the loopback; `discover` points it at the limited broadcast.
+///
+/// Sent from two sockets: one bound to the wildcard address and one bound to
+/// the interface the default route uses. Windows sends a limited broadcast
+/// from a wildcard socket out of *one* interface of its own choosing, and on
+/// a PC with a Hyper-V or VirtualBox switch that is the virtual one —
+/// measured 2026-09-11 on the maintainer's machine, where the wildcard
+/// socket heard nothing and the Ethernet-bound one heard the server twice.
+/// Both are kept: the wildcard one is what reaches a LAN that is not the
+/// default route, when the OS happens to pick it.
 pub async fn broadcast(
     target: SocketAddr,
     listen_for: Duration,
 ) -> Result<Vec<DiscoveredServer>, String> {
-    let socket = tokio::net::UdpSocket::bind(("0.0.0.0", 0))
+    let mut binds: Vec<std::net::IpAddr> = vec![std::net::Ipv4Addr::UNSPECIFIED.into()];
+    if let Some(ip) = primary_local_ip().filter(|ip| ip.is_ipv4() && !ip.is_unspecified()) {
+        binds.insert(0, ip);
+    }
+    let tasks: Vec<_> = binds
+        .into_iter()
+        .map(|bind| tokio::spawn(collect_from(bind, target, listen_for)))
+        .collect();
+    let mut found = Vec::new();
+    let mut sent = 0usize;
+    let mut last_error = String::new();
+    for task in tasks {
+        match task.await {
+            Ok(Ok(list)) => {
+                sent += 1;
+                found.extend(list);
+            }
+            Ok(Err(e)) => last_error = e,
+            Err(e) => last_error = format!("discovery task failed: {e}"),
+        }
+    }
+    // One socket that could send is enough; only when none could is the
+    // search a failure rather than an empty answer.
+    if sent == 0 {
+        return Err(last_error);
+    }
+    Ok(found)
+}
+
+/// One socket's share of `broadcast`.
+async fn collect_from(
+    bind: std::net::IpAddr,
+    target: SocketAddr,
+    listen_for: Duration,
+) -> Result<Vec<DiscoveredServer>, String> {
+    let socket = tokio::net::UdpSocket::bind((bind, 0))
         .await
-        .map_err(|e| format!("Could not open a socket: {e}"))?;
+        .map_err(|e| format!("Could not open a socket on {bind}: {e}"))?;
     socket
         .set_broadcast(true)
         .map_err(|e| format!("Could not enable broadcast: {e}"))?;
     socket
         .send_to(DISCOVERY_MESSAGE, target)
         .await
-        .map_err(|e| format!("Could not send the discovery message: {e}"))?;
+        .map_err(|e| format!("Could not send the discovery message from {bind}: {e}"))?;
 
     let deadline = tokio::time::Instant::now() + listen_for;
     let mut buf = [0u8; 4096];

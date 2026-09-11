@@ -1453,6 +1453,17 @@ export const en = {
     jellyfinKarasuDesktop: "Karasu · desktop",
     jellyfinKarasuMobile: "Karasu · phone",
     jellyfinActiveAgo: "active {{s}} s ago",
+    jellyfinBackground: "Keep tracking in the background",
+    jellyfinBackgroundHint:
+      "Shows a quiet, permanent notification while Karasu is open. It is what stops Android from freezing the app when the screen is off; without it, tracking pauses a few minutes after you leave.",
+    jellyfinBattery: "Battery optimisation",
+    jellyfinBatteryHint:
+      "Android may still pause the app and delay the notification check unless Karasu is excluded here. Some phones ignore even that.",
+    jellyfinBatteryAllow: "Exclude Karasu",
+    jellyfinBatteryAllowed: "Excluded",
+    jellyfinBatteryFailed: "Could not open the battery settings ({{message}})",
+    notifScheduleAndroidHint:
+      "If Android delays these checks, exclude Karasu from battery optimisation under Detection → Jellyfin.",
     jfErrBadUrl: "That is not a usable server address — it needs to start with http:// or https://.",
     airingNotify: "New-episode notifications",
     airingNotifyHint:

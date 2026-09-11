@@ -59,6 +59,18 @@ class MainActivity : TauriActivity() {
     WindowInsetsControllerCompat(window, root).isAppearanceLightStatusBars = false
   }
 
+  override fun onResume() {
+    super.onResume()
+    // Hand-edited: tell Rust the screen is ours again — the poll speeds back
+    // up, and a wanted tracking service that could not start from the
+    // background gets its chance (see TrackingService.kt).
+    try {
+      KarasuNative.setForeground(true)
+    } catch (t: Throwable) {
+      // A missing symbol must never take the activity lifecycle down.
+    }
+  }
+
   override fun onPause() {
     super.onPause()
     // Hand-edited: leaving the app is the moment the home screen becomes
@@ -67,6 +79,11 @@ class MainActivity : TauriActivity() {
       WidgetRefresher.refresh(applicationContext)
     } catch (t: Throwable) {
       // A widget refresh must never take the activity lifecycle down.
+    }
+    try {
+      KarasuNative.setForeground(false)
+    } catch (t: Throwable) {
+      // Same rule.
     }
   }
 

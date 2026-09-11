@@ -149,7 +149,18 @@ src-tauri/src/
                      strings_widgets en+de, four xml/widget_* metadata) —
                      the four home-screen widgets, fed by widgets.rs's
                      projection file, with WidgetRefresher's proguard keep
-                     load-bearing the same way NotifScheduler's is.
+                     load-bearing the same way NotifScheduler's is;
+                     and TrackingService.kt (the opt-in foreground service
+                     that keeps Jellyfin tracking alive with the screen off,
+                     plus the battery-exemption calls — TrackingControl is
+                     JNI-by-name like NotifScheduler, so its proguard keep
+                     is load-bearing too; the manifest's hand-added
+                     FOREGROUND_SERVICE, FOREGROUND_SERVICE_SPECIAL_USE,
+                     REQUEST_IGNORE_BATTERY_OPTIMIZATIONS and
+                     POST_NOTIFICATIONS, and the `<service>` with its
+                     `specialUse` `<property>`, sit outside the markers like
+                     the rest; MainActivity's onResume/onPause report the
+                     foreground flag through `KarasuNative.setForeground`).
                      Re-apply all of it after any re-init. Also committed here: the bundled copy
                      of THIRD-PARTY-NOTICES.md under app assets — the APK
                      cannot read the repository root, so it carries its own
@@ -160,7 +171,12 @@ src-tauri/src/
                      symbol NotifJob.kt calls over JNI, in a process where
                      Tauri may never have started — no AppHandle, every
                      dependency taken by hand; shares the site-notification
-                     kv vocabulary with alerts/site.rs
+                     kv vocabulary with alerts/site.rs. Also the live app's
+                     Android-only glue the other way round — Rust calling
+                     Kotlin statics through the activity's class loader
+                     (`with_app_class`): the notification job's schedule,
+                     the tracking service, the battery exemption, and the
+                     foreground flag the scrobbler's poll cadence reads
   backups.rs         daily local snapshots of karasu.db (`VACUUM INTO`, one
                      per UTC day, newest N kept) — what db.rs falls back to
                      when the file will not open

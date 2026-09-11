@@ -346,6 +346,77 @@ pub fn get_jellyfin_settings(db: State<'_, Db>) -> JellyfinSettings {
     }
 }
 
+/// Whether the phone keeps a foreground service up so Jellyfin tracking
+/// survives the screen going off. Off by default: it is a persistent
+/// notification, and the user opts into that. Read by the scrobbler's tick.
+pub(crate) fn read_jellyfin_background(db: &Db) -> bool {
+    db.kv_get("jellyfin_background").as_deref() == Some("1")
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct JellyfinBackground {
+    pub enabled: bool,
+    /// Whether this platform has the service at all — Android only, so the
+    /// pane can leave the rows out everywhere else.
+    pub supported: bool,
+    /// Whether Android has exempted Karasu from battery optimisation; `None`
+    /// where the question does not exist, or where it could not be asked.
+    pub battery_exempt: Option<bool>,
+}
+
+#[tauri::command]
+pub fn get_jellyfin_background(db: State<'_, Db>) -> JellyfinBackground {
+    JellyfinBackground {
+        enabled: read_jellyfin_background(&db),
+        supported: background_supported(),
+        battery_exempt: battery_exempt_state(),
+    }
+}
+
+/// Stores the choice; the scrobbler's next tick starts or stops the service.
+#[tauri::command]
+pub fn set_jellyfin_background(db: State<'_, Db>, enabled: bool) -> Result<(), String> {
+    db.kv_set("jellyfin_background", if enabled { "1" } else { "0" })
+}
+
+/// Opens Android's exemption dialog. The desktop arm refuses the way
+/// `autostart_apply`'s mobile arm does: the pane never shows the button there.
+#[tauri::command]
+pub fn request_battery_exemption() -> Result<(), String> {
+    request_battery_exemption_impl()
+}
+
+#[cfg(target_os = "android")]
+fn background_supported() -> bool {
+    true
+}
+
+#[cfg(not(target_os = "android"))]
+fn background_supported() -> bool {
+    false
+}
+
+#[cfg(target_os = "android")]
+fn battery_exempt_state() -> Option<bool> {
+    crate::background::battery_exempt().ok()
+}
+
+#[cfg(not(target_os = "android"))]
+fn battery_exempt_state() -> Option<bool> {
+    None
+}
+
+#[cfg(target_os = "android")]
+fn request_battery_exemption_impl() -> Result<(), String> {
+    crate::background::request_battery_exemption()
+}
+
+#[cfg(not(target_os = "android"))]
+fn request_battery_exemption_impl() -> Result<(), String> {
+    Err("Battery settings are not a thing on this platform".into())
+}
+
 /// Saves the settings that aren't part of signing in.
 #[tauri::command]
 pub fn set_jellyfin_settings(

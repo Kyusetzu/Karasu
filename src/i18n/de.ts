@@ -1452,6 +1452,17 @@ export const de: typeof en = {
     jellyfinKarasuDesktop: "Karasu · Desktop",
     jellyfinKarasuMobile: "Karasu · Handy",
     jellyfinActiveAgo: "vor {{s}} s aktiv",
+    jellyfinBackground: "Im Hintergrund weiter erfassen",
+    jellyfinBackgroundHint:
+      "Zeigt eine stille, dauerhafte Benachrichtigung, solange Karasu offen ist. Sie hält Android davon ab, die App bei ausgeschaltetem Bildschirm einzufrieren; ohne sie pausiert die Erfassung wenige Minuten, nachdem du die App verlässt.",
+    jellyfinBattery: "Akku-Optimierung",
+    jellyfinBatteryHint:
+      "Android kann die App trotzdem pausieren und die Benachrichtigungsprüfung verzögern, solange Karasu hier nicht ausgenommen ist. Manche Handys ignorieren selbst das.",
+    jellyfinBatteryAllow: "Karasu ausnehmen",
+    jellyfinBatteryAllowed: "Ausgenommen",
+    jellyfinBatteryFailed: "Akku-Einstellungen konnten nicht geöffnet werden ({{message}})",
+    notifScheduleAndroidHint:
+      "Wenn Android diese Prüfungen verzögert, nimm Karasu unter Erkennung → Jellyfin von der Akku-Optimierung aus.",
     jfErrBadUrl: "Das ist keine nutzbare Serveradresse — sie muss mit http:// oder https:// beginnen.",
     airingNotify: "Benachrichtigung bei neuer Folge",
     airingNotifyHint:

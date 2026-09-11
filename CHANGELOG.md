@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 0948815 -->
+<!-- generated-through: a5e2391 -->
 
 ### Fixed
 
@@ -77,6 +77,7 @@ tag time is then optional rather than load-bearing.
 ### Added
 
 - A formatting toolbar in every place you write on AniList — activities, replies, threads, comments, reviews and your bio — with shortcuts for bold, italic, strikethrough and spoiler.
+- On Android, Jellyfin tracking can keep running with the screen off — a switch under Detection → Jellyfin starts a quiet permanent notification that stops Android from freezing the app, a button excludes Karasu from battery optimisation (which also keeps the notification check on schedule), and the tracking settings are no longer greyed out there.
 ## 1.0.0 — 2026-09-05
 
 Karasu 1.0.0 is the first tagged release: a desktop and Android tracker built

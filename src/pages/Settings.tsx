@@ -160,9 +160,15 @@ const ANDROID_HIDDEN_SECTIONS: ReadonlySet<unknown> = new Set([PortableSection])
  * the user's call: seeing what the desktop can do explains what the phone
  * deliberately does not, where silent absence reads as a missing feature.
  * Jellyfin and the corrections come first there, being the parts that work.
+ *
+ * `ScrobbleSection` is deliberately *not* here. The scrobbler loop runs on
+ * Android (Jellyfin is its source there) and reads these very switches —
+ * tracking on/off, confirm, the threshold, the notification toggles — every
+ * tick, so greying them left a phone writing to AniList on defaults it could
+ * not change. The one row in it that is desktop machinery, the media-session
+ * toggle, hides itself there.
  */
 const ANDROID_DESKTOP_ONLY: ReadonlySet<unknown> = new Set([
-  ScrobbleSection,
   MediaSessionSection,
   MpvSection,
 ]);

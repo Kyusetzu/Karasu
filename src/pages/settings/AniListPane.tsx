@@ -24,6 +24,7 @@ import {
 } from "@/lib/anilistUserFields";
 import { useUpdateUser } from "@/hooks/useUpdateUser";
 import { useAuth } from "@/stores/auth";
+import { isAndroid, usePlatform } from "@/stores/platform";
 import { cn } from "@/lib/utils";
 import { notifScheduleFailure } from "@/lib/notifSchedule";
 
@@ -630,6 +631,7 @@ function notificationLabel(
 export function NotificationScheduleSection() {
   const { t } = useTranslation();
   const viewer = useAuth((s) => s.viewer);
+  const android = isAndroid(usePlatform((s) => s.info));
   const [minutes, setMinutes] = useState<number | null>(null);
   const [custom, setCustom] = useState(false);
   // The field's text while editing - the covers-per-row lesson: binding a
@@ -674,6 +676,18 @@ export function NotificationScheduleSection() {
     <Card>
       <CardTitle>{t("settings.notifSchedule")}</CardTitle>
       <p className="mt-2 text-sm text-ink-500">{t("settings.notifScheduleHint")}</p>
+      {/* The job runs on the cadence chosen here only while Android lets it:
+          a rarely-opened app's periodic job is stretched to once a day by the
+          standby buckets, and the exemption under Detection → Jellyfin is the
+          lever. Said here, where the cadence is chosen. */}
+      {android && (
+        <p className="mt-1 text-xs text-ink-600">
+          {t("settings.notifScheduleAndroidHint")}{" "}
+          <Link to="/settings?pane=detection" className="text-accent-400 hover:underline">
+            {t("settings.pane_detection")}
+          </Link>
+        </p>
+      )}
       <div className="mt-3">
         <Row label={t("settings.notifScheduleLabel")}>
           <select

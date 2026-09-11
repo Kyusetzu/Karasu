@@ -31,6 +31,20 @@ const MANGA_THRESHOLD: Duration = Duration::from_secs(5 * 60);
 /// check in `perform_update` to see it. A peer that is present but will not
 /// write — confirm mode with nobody at the desk — costs this much delay, once.
 pub const YIELD_GRACE: Duration = Duration::from_secs(3 * 60);
+/// The poll cadence with the screen off, on the platform that has one.
+///
+/// Fifteen seconds instead of five: the scrobble deadline is wall clock or
+/// position, never a tick count, so nothing lands later — and a phone in a
+/// pocket wakes its radio a third as often. `EMPTY_TICK_GRACE` and
+/// `jellyfin::HOLD_TICKS` *are* tick counts, so a hidden phone holds a paused
+/// session for fifteen minutes and a lost server for forty-five seconds;
+/// both are the more lenient direction. Inside `jellyfin::FRESH`, so a
+/// hidden phone's own row is still fresh when the desktop looks.
+#[cfg_attr(not(target_os = "android"), allow(dead_code))]
+const HIDDEN_POLL_INTERVAL: Duration = Duration::from_secs(15);
+/// How long a refused start of the tracking service is left alone before
+/// the next attempt — once a minute, not once a tick.
+const SERVICE_RETRY: Duration = Duration::from_secs(60);
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct NowPlaying {
@@ -688,6 +702,90 @@ fn grace_spent(missed_ticks: u32) -> bool {
     missed_ticks > EMPTY_TICK_GRACE
 }
 
+/// Whether to start (`Some(true)`), stop (`Some(false)`) or leave the
+/// tracking service, given what is wanted and what is running.
+///
+/// A start needs the activity on screen — Android 12+ refuses a foreground
+/// start from the background — and, after a refusal, `SERVICE_RETRY` of
+/// patience, so a phone that keeps saying no is asked once a minute rather
+/// than once a tick. A stop needs nothing.
+fn service_transition(
+    running: bool,
+    want: bool,
+    foreground: bool,
+    last_attempt: Option<Instant>,
+    now: Instant,
+) -> Option<bool> {
+    match (running, want) {
+        (true, false) => Some(false),
+        (false, true)
+            if foreground
+                && last_attempt.is_none_or(|t| now.duration_since(t) >= SERVICE_RETRY) =>
+        {
+            Some(true)
+        }
+        _ => None,
+    }
+}
+
+/// Cfg'd pair: Android keeps the foreground service in step with the tick's
+/// own reading of the setting — one call site, re-evaluated every tick, so a
+/// sign-out, a switched-off setting or a refused start all heal themselves
+/// without a second code path. Everywhere else there is no service.
+#[cfg(target_os = "android")]
+fn assert_tracking_service(app: &AppHandle, want: bool) {
+    static STATE: Mutex<(bool, Option<Instant>)> = Mutex::new((false, None));
+    let now = Instant::now();
+    let decision = {
+        let state = STATE.guard();
+        service_transition(state.0, want, crate::background::is_foreground(), state.1, now)
+    };
+    let Some(on) = decision else { return };
+    let (title, body) = {
+        let lang = crate::i18n::lang(&app.state::<Db>());
+        (
+            crate::i18n::text(lang, crate::i18n::Msg::TrackingServiceTitle),
+            crate::i18n::text(lang, crate::i18n::Msg::TrackingServiceBody),
+        )
+    };
+    let mut state = STATE.guard();
+    match crate::background::tracking_service(on, &title, &body) {
+        Ok(()) => {
+            *state = (on, None);
+            crate::logging::info(
+                "scrobble",
+                if on { "background tracking service started" } else { "background tracking service stopped" },
+            );
+        }
+        Err(e) => {
+            state.1 = Some(now);
+            crate::logging::warn(
+                "scrobble",
+                format!("tracking service {}: {e}", if on { "start refused" } else { "stop failed" }),
+            );
+        }
+    }
+}
+
+#[cfg(not(target_os = "android"))]
+fn assert_tracking_service(_app: &AppHandle, _want: bool) {}
+
+/// The tick's sleep: five seconds on screen, `HIDDEN_POLL_INTERVAL` with the
+/// activity paused. Only Android reports the difference.
+#[cfg(target_os = "android")]
+fn poll_interval() -> Duration {
+    if crate::background::is_foreground() {
+        POLL_INTERVAL
+    } else {
+        HIDDEN_POLL_INTERVAL
+    }
+}
+
+#[cfg(not(target_os = "android"))]
+fn poll_interval() -> Duration {
+    POLL_INTERVAL
+}
+
 /// Whether a due session should wait for another Karasu first, and for which.
 ///
 /// Once per session: a `Yielding` session that comes due again has waited
@@ -1210,15 +1308,21 @@ pub fn spawn(app: AppHandle) {
         async move {
         let mut last_raw: Option<(String, String)> = None;
         loop {
-            let (media_detection, jellyfin, mpv, tracking_on) = {
+            let (media_detection, jellyfin, mpv, tracking_on, background_wanted) = {
                 let db = app.state::<Db>();
                 (
                     crate::commands::read_media_detection(&db),
                     crate::commands::jellyfin_config(&db),
                     crate::commands::mpv_ipc_config(&db),
                     crate::commands::read_scrobble_settings(&db).enabled,
+                    crate::commands::read_jellyfin_background(&db),
                 )
             };
+            // The tick re-reads what the tick decides on: the service is
+            // wanted exactly while there is a Jellyfin sign-in to poll, the
+            // updates it would make are on, and the user opted into the
+            // persistent notification.
+            assert_tracking_service(&app, tracking_on && jellyfin.is_some() && background_wanted);
             let heartbeat_cfg = jellyfin.clone();
             let playback = detection::detect_playback(media_detection, jellyfin, mpv).await;
             // Announce this instance to the other Karasus on the account —
@@ -1294,7 +1398,7 @@ pub fn spawn(app: AppHandle) {
             // fingerprint-identical by construction, so nothing called it for
             // twenty minutes at a time. Cheap: a lock and a string compare.
             crate::discord::sync_current(&app);
-            tokio::time::sleep(POLL_INTERVAL).await;
+            tokio::time::sleep(poll_interval()).await;
         }
         }
     });
@@ -1535,9 +1639,9 @@ async fn drive_session(app: &AppHandle) {
 mod tests {
     use super::{
         applies_to, armed_now, auto_arm, block_reason, defer_for_peer, grace_spent, position_due,
-        shift_episode, threshold, would_regress, BlockReason, NowPlaying, Phase, Session,
-        YieldTarget, DEFAULT_THRESHOLD, EMPTY_TICK_GRACE, GAP_GRACE, MANGA_THRESHOLD,
-        POLL_INTERVAL, YIELD_GRACE,
+        service_transition, shift_episode, threshold, would_regress, BlockReason, NowPlaying,
+        Phase, Session, YieldTarget, DEFAULT_THRESHOLD, EMPTY_TICK_GRACE, GAP_GRACE,
+        HIDDEN_POLL_INTERVAL, MANGA_THRESHOLD, POLL_INTERVAL, SERVICE_RETRY, YIELD_GRACE,
     };
     use crate::playback::detection::jellyfin::{Peer, PeerSnapshot, Platform, FRESH};
     use std::time::{Duration, Instant};
@@ -1934,5 +2038,38 @@ mod tests {
     #[test]
     fn the_yield_grace_outlives_the_freshness_window() {
         assert!(YIELD_GRACE > FRESH);
+    }
+
+    // --- The Android tracking service ----------------------------------------
+
+    /// Android 12+ refuses a foreground start from the background, so the
+    /// only start worth asking for is one made on screen — and a phone that
+    /// refuses anyway is asked again once a minute, not every five seconds.
+    #[test]
+    fn a_start_waits_for_the_foreground_and_backs_off_after_a_refusal() {
+        let base = Instant::now();
+        let now = base + 2 * SERVICE_RETRY;
+        assert_eq!(service_transition(false, true, true, None, now), Some(true));
+        assert_eq!(service_transition(false, true, false, None, now), None, "not from the background");
+        let just_refused = Some(now - Duration::from_secs(10));
+        assert_eq!(service_transition(false, true, true, just_refused, now), None);
+        let long_ago = Some(now - SERVICE_RETRY);
+        assert_eq!(service_transition(false, true, true, long_ago, now), Some(true));
+        assert_eq!(service_transition(true, true, true, None, now), None, "already running");
+    }
+
+    #[test]
+    fn a_stop_needs_nothing() {
+        let now = Instant::now();
+        assert_eq!(service_transition(true, false, false, Some(now), now), Some(false));
+        assert_eq!(service_transition(false, false, true, None, now), None, "nothing to stop");
+    }
+
+    /// Slower than on screen, but still inside the window in which the
+    /// desktop must see the phone's row as fresh.
+    #[test]
+    fn the_hidden_poll_is_slower_than_the_visible_one_and_still_inside_fresh() {
+        assert!(HIDDEN_POLL_INTERVAL > POLL_INTERVAL);
+        assert!(HIDDEN_POLL_INTERVAL < FRESH);
     }
 }

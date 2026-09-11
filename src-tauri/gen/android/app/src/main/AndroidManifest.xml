@@ -13,6 +13,23 @@
          schedule(), which was the whole of "Could not find job 46231". A
          normal permission, granted at install, never prompted. -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Hand-added: the tracking service (TrackingService.kt). A foreground
+         service needs the base permission on 28+ and, on 34+, one for its
+         type; `specialUse` is the type without a daily cap (Android 15
+         limits dataSync to six hours) and, for a sideloaded APK, without a
+         store review — the service's <property> below still says what it
+         is for. Normal permissions, granted at install, never prompted. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <!-- Hand-added: lets Settings open the system dialog that exempts Karasu
+         from battery optimisation — the lever that un-defers the notification
+         job of a rarely-opened app (App Standby buckets stretch a periodic
+         job to once a day). A normal permission; the dialog is the consent. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- Hand-added: the notification plugin's AAR donates it through the
+         manifest merge, but the tracking service's persistent notification
+         must not depend on a dependency's manifest — the merger dedupes. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- AndroidTV support -->
     <uses-feature android:name="android.software.leanback" android:required="false" />
@@ -124,6 +141,19 @@
           android:name=".NotifJobService"
           android:permission="android.permission.BIND_JOB_SERVICE"
           android:exported="false" />
+
+        <!-- Hand-added, same rule: the foreground service that keeps Jellyfin
+             tracking alive with the screen off. See TrackingService.kt. The
+             subtype note is a <property>, not <meta-data>: that is what
+             Android 14 reads for specialUse. -->
+        <service
+          android:name=".TrackingService"
+          android:exported="false"
+          android:foregroundServiceType="specialUse">
+          <property
+            android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+            android:value="Keeps the Jellyfin playback poll running while an episode plays elsewhere, so watch progress reaches AniList; opt-in, sideloaded, no store listing." />
+        </service>
 
         <!-- Hand-added: the four home-screen widgets. See Widgets.kt. -->
         <receiver

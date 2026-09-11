@@ -82,6 +82,13 @@ pub enum Msg<'a> {
     TrayDetection,
     TrayOpen,
     TrayQuit,
+    /// The Android tracking service's persistent notification — composed
+    /// here so Kotlin renders text it never chose. Constructed only on
+    /// Android; dead on the desktop compile without being wrong.
+    #[cfg_attr(not(target_os = "android"), allow(dead_code))]
+    TrackingServiceTitle,
+    #[cfg_attr(not(target_os = "android"), allow(dead_code))]
+    TrackingServiceBody,
 }
 
 pub fn text(lang: Lang, msg: Msg<'_>) -> String {
@@ -184,6 +191,15 @@ pub fn text(lang: Lang, msg: Msg<'_>) -> String {
         (De, TrayOpen) => "Karasu öffnen".into(),
         (En, TrayQuit) => "Quit".into(),
         (De, TrayQuit) => "Beenden".into(),
+        (En, TrackingServiceTitle) => "Watching Jellyfin".into(),
+        (De, TrackingServiceTitle) => "Jellyfin wird beobachtet".into(),
+        (En, TrackingServiceBody) => {
+            "Karasu keeps checking what is playing so your AniList progress updates.".into()
+        }
+        (De, TrackingServiceBody) => {
+            "Karasu prüft weiter, was läuft, damit dein AniList-Fortschritt aktualisiert wird."
+                .into()
+        }
     }
 }
 

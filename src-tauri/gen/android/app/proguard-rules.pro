@@ -35,6 +35,12 @@
 -keep class dev.kyu.karasu.KarasuNative { *; }
 -keep class dev.kyu.karasu.NotifJobService { *; }
 
+# The tracking service. TrackingControl shares NotifScheduler's failure mode
+# (JNI-by-name, nothing else keeps it); the service is manifest-kept but
+# pinned anyway, for the same reason as the JobService above.
+-keep class dev.kyu.karasu.TrackingControl { *; }
+-keep class dev.kyu.karasu.TrackingService { *; }
+
 # The widgets. WidgetRefresher shares NotifScheduler's failure mode
 # (JNI-by-name, nothing else keeps it); the receivers are manifest-kept by
 # aapt but pinned anyway so a default-rule change cannot break them silently.

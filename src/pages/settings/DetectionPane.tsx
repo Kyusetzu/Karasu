@@ -10,24 +10,28 @@ import { cn } from "@/lib/utils";
 import * as api from "@/api/anilist";
 import {
   clearDetectionOverride,
+  getJellyfinBackground,
   getJellyfinSettings,
   getScrobbleSettings,
   getMediaDetection,
   jellyfinSignIn,
   jellyfinSignOut,
   listDetectionOverrides,
+  requestBatteryExemption,
+  setJellyfinBackground,
   setJellyfinSettings,
   setScrobbleSettings,
   setMediaDetection,
   mediaSessions,
   testJellyfin,
   type DetectionOverride,
+  type JellyfinBackground,
   type JellyfinSession,
   type JellyfinSettings,
   type ScrobbleSettings,
   type MediaSession,
 } from "@/stores/nowPlaying";
-import { isLinux, usePlatform } from "@/stores/platform";
+import { isAndroid, isLinux, usePlatform } from "@/stores/platform";
 import { useAuth } from "@/stores/auth";
 import { ExternalNote, Row, Toggle } from "./shared";
 import { anilistCoversAiring } from "@/lib/airingCoverage";
@@ -131,7 +135,10 @@ export function ScrobbleSection() {
           label={t("settings.trackingGapAuto")}
           hint={t("settings.trackingGapAutoHint")}
         />
-        {mediaOn !== null && (
+        {/* The one desktop-only row in a card the phone otherwise owns: a
+            phone has no SMTC to switch, so the row hides itself there rather
+            than greying the whole card (see `ANDROID_DESKTOP_ONLY`). */}
+        {mediaOn !== null && !isAndroid(platform) && (
           <Toggle
             checked={mediaOn}
             onChange={(v) => {
@@ -703,9 +710,79 @@ export function JellyfinSection() {
       <p className="mt-1 text-xs text-ink-600">
         {t("settings.jellyfinDeviceHelp")}
       </p>
+      {settings.connected && <JellyfinBackgroundRows />}
       {sessions && <SessionList sessions={sessions} />}
       {error && <p className="mt-2 text-sm text-danger">{error}</p>}
     </Card>
+  );
+}
+
+/**
+ * Android only: the foreground service that keeps tracking alive with the
+ * screen off, and the battery-optimisation exemption. Both are the user's
+ * call — one is a permanent notification, the other a system dialog — so
+ * neither is on by default, and the backend says whether the platform has
+ * them at all rather than the pane guessing from the OS name.
+ */
+function JellyfinBackgroundRows() {
+  const { t } = useTranslation();
+  const [state, setState] = useState<JellyfinBackground | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!api.isTauri) return;
+    const load = () => {
+      getJellyfinBackground()
+        .then(setState)
+        .catch(() => {});
+    };
+    load();
+    // The exemption dialog answers nothing; the state is re-read when the
+    // window comes back from it.
+    window.addEventListener("focus", load);
+    return () => window.removeEventListener("focus", load);
+  }, []);
+
+  if (!state?.supported) return null;
+
+  const toggle = (v: boolean) => {
+    const previous = state;
+    setState({ ...state, enabled: v });
+    setError(null);
+    setJellyfinBackground(v).catch((e) => {
+      setState(previous);
+      setError(String(e));
+    });
+  };
+
+  const ask = async () => {
+    setError(null);
+    try {
+      await requestBatteryExemption();
+    } catch (e) {
+      setError(t("settings.jellyfinBatteryFailed", { message: String(e) }));
+    }
+  };
+
+  return (
+    <div className="mt-3 space-y-3 border-t border-surface-800 pt-3">
+      <Toggle
+        checked={state.enabled}
+        onChange={toggle}
+        label={t("settings.jellyfinBackground")}
+        hint={t("settings.jellyfinBackgroundHint")}
+      />
+      <Row label={t("settings.jellyfinBattery")} hint={t("settings.jellyfinBatteryHint")}>
+        {state.batteryExempt ? (
+          <span className="text-sm text-success">{t("settings.jellyfinBatteryAllowed")}</span>
+        ) : (
+          <Button variant="secondary" size="sm" onClick={ask}>
+            {t("settings.jellyfinBatteryAllow")}
+          </Button>
+        )}
+      </Row>
+      {error && <p className="text-sm text-danger">{error}</p>}
+    </div>
   );
 }
 

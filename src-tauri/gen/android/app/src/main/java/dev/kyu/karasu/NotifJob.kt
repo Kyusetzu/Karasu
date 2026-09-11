@@ -38,6 +38,12 @@ object KarasuNative {
 
   @JvmStatic
   external fun backgroundNotifCheck(context: Context): String
+
+  /** Whether the activity is on screen — MainActivity reports resume and
+   *  pause. Rust reads it for the poll cadence and for the one moment a
+   *  foreground service may be started (`background.rs`). */
+  @JvmStatic
+  external fun setForeground(foreground: Boolean)
 }
 
 /** Registers/cancels the periodic job — called from Rust over JNI whenever

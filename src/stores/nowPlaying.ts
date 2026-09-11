@@ -223,6 +223,26 @@ export interface JellyfinSession {
 export const getJellyfinSettings = () =>
   invoke<JellyfinSettings>("get_jellyfin_settings");
 
+/** The phone's background arrangements; `supported` is false everywhere else. */
+export interface JellyfinBackground {
+  enabled: boolean;
+  supported: boolean;
+  /** Whether Android has exempted Karasu from battery optimisation. */
+  batteryExempt: boolean | null;
+}
+
+export const getJellyfinBackground = () =>
+  invoke<JellyfinBackground>("get_jellyfin_background");
+
+/** Whether to keep a foreground service up so tracking survives the screen
+    going off — a persistent notification, hence opt-in. */
+export const setJellyfinBackground = (enabled: boolean) =>
+  invoke<void>("set_jellyfin_background", { enabled });
+
+/** Opens Android's dialog for the battery-optimisation exemption. */
+export const requestBatteryExemption = () =>
+  invoke<void>("request_battery_exemption");
+
 /** Saves the settings that aren't part of signing in. */
 export const setJellyfinSettings = (url: string, device: string) =>
   invoke<void>("set_jellyfin_settings", { url, device });

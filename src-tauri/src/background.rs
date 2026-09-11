@@ -19,13 +19,20 @@
 //! compare-and-set, and reads the same interval key. The request bypasses
 //! the managed client's limiter by construction — there is no managed
 //! client — which the freshness stamp bounds to one request per interval.
+//!
+//! The other half of the file is the glue for the *live* app's Android-only
+//! machinery — the tracking service, the battery exemption and the
+//! foreground flag (`TrackingService.kt`, `MainActivity.kt`) — which goes
+//! the other way: Rust calling Kotlin statics through the activity's class
+//! loader, the dance `assert_schedule` established.
 
 #![cfg(target_os = "android")]
 
-use jni::objects::{JClass, JObject, JString};
-use jni::sys::jstring;
+use jni::objects::{JClass, JObject, JString, JValue};
+use jni::sys::{jboolean, jstring};
 use jni::JNIEnv;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::alerts::site::{
     INTERVAL_KEY, INTERVAL_MAX, INTERVAL_MIN, LAST_CHECK_KEY, SEEN_KEY, SITE_QUERY,
@@ -187,10 +194,17 @@ pub extern "system" fn Java_dev_kyu_karasu_KarasuNative_backgroundNotifCheck(
         .unwrap_or(std::ptr::null_mut())
 }
 
-/// (Re-)asserts the JobScheduler registration to match the setting — called
-/// on every settings change and once at startup. Goes through the running
-/// app's tao context, exactly like the keystore's own `call`.
-pub fn assert_schedule(minutes: i64) -> Result<(), String> {
+/// Runs `f` with an attached env, the activity, and an app class loaded
+/// through the activity's own class loader — the dance every Kotlin static
+/// here shares. Goes through the running app's tao context, exactly like the
+/// keystore's own `call`; `main_android_context` is `None` before tao's
+/// `onActivityCreate`, which callers treat as "not ready yet" rather than as
+/// a failure. A pending Java exception is cleared on the way out, so a
+/// failed call cannot poison the next one.
+fn with_app_class<T>(
+    name: &str,
+    f: impl FnOnce(&mut JNIEnv<'_>, &JObject<'_>, &JClass<'_>) -> jni::errors::Result<T>,
+) -> Result<T, String> {
     let ctx = tao::platform::android::prelude::main_android_context()
         .ok_or("background: the android context is not ready yet")?;
     let vm = unsafe { jni::JavaVM::from_raw(ctx.java_vm.cast()) }
@@ -200,55 +214,66 @@ pub fn assert_schedule(minutes: i64) -> Result<(), String> {
         .map_err(|e| format!("background attach: {e}"))?;
     let activity = unsafe { JObject::from_raw(ctx.context_jobject.cast()) };
 
-    // `schedule` answers with the reason it could not register the job, in
-    // Android's own words, or an empty string; `cancel` has nothing to refuse.
-    let result = (|| -> jni::errors::Result<String> {
+    let result = (|| -> jni::errors::Result<T> {
         let loader = env
             .call_method(&activity, "getClassLoader", "()Ljava/lang/ClassLoader;", &[])?
             .l()?;
-        let name = env.new_string("dev.kyu.karasu.NotifScheduler")?;
+        let jname = env.new_string(name)?;
         let class = env
             .call_method(
                 &loader,
                 "loadClass",
                 "(Ljava/lang/String;)Ljava/lang/Class;",
-                &[jni::objects::JValue::Object(&name)],
+                &[JValue::Object(&jname)],
             )?
             .l()?;
         let class = JClass::from(class);
-        if minutes > 0 {
-            let answer = env
-                .call_static_method(
-                    &class,
-                    "schedule",
-                    "(Landroid/content/Context;I)Ljava/lang/String;",
-                    &[
-                        jni::objects::JValue::Object(&activity),
-                        jni::objects::JValue::Int(minutes as i32),
-                    ],
-                )?
-                .l()?;
-            let answer = JString::from(answer);
-            // Bound to a local first: the `JavaStr` borrows `answer`, and a
-            // temporary in the tail expression would outlive it.
-            let text: String = env.get_string(&answer)?.into();
-            Ok(text)
-        } else {
-            env.call_static_method(
-                &class,
-                "cancel",
-                "(Landroid/content/Context;)V",
-                &[jni::objects::JValue::Object(&activity)],
-            )?;
-            Ok(String::new())
-        }
+        f(&mut env, &activity, &class)
     })();
 
-    let reason = result.map_err(|e| {
+    result.map_err(|e| {
         if env.exception_check().unwrap_or(false) {
             let _ = env.exception_clear();
         }
-        format!("background schedule: {e}")
+        format!("background {name}: {e}")
+    })
+}
+
+/// A Kotlin static's `String` answer as Rust text.
+///
+/// Bound to a local first: the `JavaStr` borrows `answer`, and a temporary
+/// in the tail expression would outlive it.
+fn answer_text(env: &mut JNIEnv<'_>, answer: JObject<'_>) -> jni::errors::Result<String> {
+    let answer = JString::from(answer);
+    let text: String = env.get_string(&answer)?.into();
+    Ok(text)
+}
+
+/// (Re-)asserts the JobScheduler registration to match the setting — called
+/// on every settings change and once at startup.
+pub fn assert_schedule(minutes: i64) -> Result<(), String> {
+    // `schedule` answers with the reason it could not register the job, in
+    // Android's own words, or an empty string; `cancel` has nothing to refuse.
+    let reason = with_app_class("dev.kyu.karasu.NotifScheduler", |env, activity, class| {
+        if minutes > 0 {
+            let answer = env
+                .call_static_method(
+                    class,
+                    "schedule",
+                    "(Landroid/content/Context;I)Ljava/lang/String;",
+                    &[JValue::Object(activity), JValue::Int(minutes as i32)],
+                )?
+                .l()?;
+            answer_text(env, answer)
+        } else {
+            env.call_static_method(
+                class,
+                "cancel",
+                "(Landroid/content/Context;)V",
+                &[JValue::Object(activity)],
+            )?;
+            Ok(String::new())
+        }
     })?;
     // The JNI call succeeding only means Kotlin ran. Whether JobScheduler
     // accepted the job is the answer, which used to be dropped — so a refusal
@@ -256,6 +281,104 @@ pub fn assert_schedule(minutes: i64) -> Result<(), String> {
     // this function reporting Ok. The first reason ever surfaced was
     // `SecurityException: ACCESS_NETWORK_STATE required for jobs with a
     // connectivity constraint`, which is why the text is carried verbatim.
+    if reason.is_empty() {
+        Ok(())
+    } else {
+        Err(reason)
+    }
+}
+
+// --- The live app's Android-only machinery -----------------------------------
+
+/// Whether the activity is on screen. `MainActivity` reports resume and pause
+/// over `setForeground`; the scrobbler reads it for its poll cadence and for
+/// the one moment a foreground service may be started — Android 12+ refuses
+/// a foreground start from the background. Starts true: the process begins
+/// with its activity showing.
+static FOREGROUND: AtomicBool = AtomicBool::new(true);
+
+/// `dev.kyu.karasu.KarasuNative.setForeground`.
+#[no_mangle]
+pub extern "system" fn Java_dev_kyu_karasu_KarasuNative_setForeground(
+    _env: JNIEnv,
+    _class: JClass,
+    foreground: jboolean,
+) {
+    FOREGROUND.store(foreground != 0, Ordering::Relaxed);
+}
+
+pub fn is_foreground() -> bool {
+    FOREGROUND.load(Ordering::Relaxed)
+}
+
+/// Starts (`on`) or stops the tracking service. `title` and `body` are the
+/// persistent notification's text, rendered in Rust in the user's language —
+/// Kotlin composes nothing. `Err` carries Android's own reason for a refused
+/// start, most often `ForegroundServiceStartNotAllowedException` when asked
+/// from the background; the scrobbler gates on `is_foreground` so that one
+/// is rare, and backs off when it happens anyway.
+pub fn tracking_service(on: bool, title: &str, body: &str) -> Result<(), String> {
+    let reason = with_app_class("dev.kyu.karasu.TrackingControl", |env, activity, class| {
+        if on {
+            let title = env.new_string(title)?;
+            let body = env.new_string(body)?;
+            let answer = env
+                .call_static_method(
+                    class,
+                    "start",
+                    "(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
+                    &[
+                        JValue::Object(activity),
+                        JValue::Object(&title),
+                        JValue::Object(&body),
+                    ],
+                )?
+                .l()?;
+            answer_text(env, answer)
+        } else {
+            env.call_static_method(
+                class,
+                "stop",
+                "(Landroid/content/Context;)V",
+                &[JValue::Object(activity)],
+            )?;
+            Ok(String::new())
+        }
+    })?;
+    if reason.is_empty() {
+        Ok(())
+    } else {
+        Err(reason)
+    }
+}
+
+/// Whether Android has exempted Karasu from battery optimisation.
+pub fn battery_exempt() -> Result<bool, String> {
+    with_app_class("dev.kyu.karasu.TrackingControl", |env, activity, class| {
+        env.call_static_method(
+            class,
+            "isBatteryExempt",
+            "(Landroid/content/Context;)Z",
+            &[JValue::Object(activity)],
+        )?
+        .z()
+    })
+}
+
+/// Opens the system dialog that asks for the exemption. The dialog answers
+/// nothing back; the pane re-reads `battery_exempt` when it regains focus.
+pub fn request_battery_exemption() -> Result<(), String> {
+    let reason = with_app_class("dev.kyu.karasu.TrackingControl", |env, activity, class| {
+        let answer = env
+            .call_static_method(
+                class,
+                "requestBatteryExemption",
+                "(Landroid/content/Context;)Ljava/lang/String;",
+                &[JValue::Object(activity)],
+            )?
+            .l()?;
+        answer_text(env, answer)
+    })?;
     if reason.is_empty() {
         Ok(())
     } else {

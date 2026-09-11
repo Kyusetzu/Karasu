@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: a4af9aa -->
+<!-- generated-through: b1a1f6c -->
 
 ### Fixed
 
@@ -75,6 +75,7 @@ tag time is then optional rather than load-bearing.
 - With Karasu on both the PC and the phone watching the same Jellyfin account, an episode reaches AniList once — the desktop goes first, the phone waits three minutes and checks, and every instance asks AniList for the current progress before it writes.
 - Find servers now reaches the Jellyfin server on a PC with a virtual network switch (Hyper-V, VirtualBox), which the first version missed.
 - New-episode and sequel checks keep working through an AniList outage that refuses anonymous requests, by signing them with your account while you are signed in.
+- A link with a target Karasu refuses (javascript:, data:, AniList's layout blob) now shows in the accent colour like on anilist.co, instead of as plain text.
 
 ### Added
 

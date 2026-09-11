@@ -169,11 +169,15 @@ async fn check(app: &AppHandle) {
             .unwrap_or(0)
             % chunks.len();
         let mut done = 0usize;
+        // The token when there is one, for the same reason `airing.rs` sends
+        // it: public data, same budget, and an outage that refuses only
+        // unauthenticated requests no longer stalls the pass.
+        let token = crate::anilist::auth::load_token();
 
         for at in window(start, chunks.len(), MAX_BATCHES) {
             let chunk = chunks[at];
             let vars = json!({ "ids": chunk, "type": media_type });
-            let Ok(data) = api.query(None, RELATIONS_QUERY, vars).await else {
+            let Ok(data) = api.query(token.as_deref(), RELATIONS_QUERY, vars).await else {
                 // Keep the ground this run did cover before giving up, or a
                 // flaky connection would make the window stand still.
                 if done > 0 {

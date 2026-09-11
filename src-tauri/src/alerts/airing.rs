@@ -181,7 +181,13 @@ async fn check(app: &AppHandle) {
     // Keep last_check and retry next round either way, but say which it was:
     // a network blip and a schema break took the same silent branch, so "airing
     // notifications stopped" had no cause anyone could report.
-    let data = match api.query(None, AIRING_QUERY, vars).await {
+    // With the account's token when there is one. The data is public and the
+    // budget window is the same either way, but an outage that refuses
+    // unauthenticated requests — 2026-09-10/11: HTTP 403 "temporarily
+    // disabled" for those, normal answers for signed-in ones — used to fail
+    // this check every round for as long as it lasted.
+    let token = crate::anilist::auth::load_token();
+    let data = match api.query(token.as_deref(), AIRING_QUERY, vars).await {
         Ok(data) => data,
         Err(e) => {
             // `From<ApiError> for String` is what distinguishes a network error

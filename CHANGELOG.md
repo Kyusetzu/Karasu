@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 382ca24 -->
+<!-- generated-through: a68f18a -->
 
 ### Fixed
 
@@ -74,6 +74,7 @@ tag time is then optional rather than load-bearing.
 - Bios and posts render as anilist.co does where they did not — a favicon-style ICO image loads inline, every HTML entity a browser knows is decoded, a heading written as #Title without the space is a heading, ~~~centred~~~ text inside a heading keeps its spoiler, <hr> draws a rule, and a one-line centred row starting with a dash is no longer a bulleted list.
 - With Karasu on both the PC and the phone watching the same Jellyfin account, an episode reaches AniList once — the desktop goes first, the phone waits three minutes and checks, and every instance asks AniList for the current progress before it writes.
 - Find servers now reaches the Jellyfin server on a PC with a virtual network switch (Hyper-V, VirtualBox), which the first version missed.
+- New-episode and sequel checks keep working through an AniList outage that refuses anonymous requests, by signing them with your account while you are signed in.
 
 ### Added
 

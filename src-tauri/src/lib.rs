@@ -518,6 +518,8 @@ pub fn run() {
             commands::get_jellyfin_background,
             commands::set_jellyfin_background,
             commands::request_battery_exemption,
+            commands::discover_jellyfin_servers,
+            commands::probe_jellyfin_server,
             commands::platform_info,
             commands::get_close_to_tray,
             commands::set_close_to_tray,

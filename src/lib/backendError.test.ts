@@ -12,6 +12,10 @@ describe("backendErrorText", () => {
     expect(backendErrorText(new Error("jellyfin.badCredentials"), t)).toBe(
       "T:settings.jfErrBadCredentials",
     );
+    expect(backendErrorText("jellyfin.badUrl", t)).toBe("T:settings.jfErrBadUrl");
+    // The address answered, but with a web page or another service — the
+    // probe on sign-in and on the external address is what says so.
+    expect(backendErrorText("jellyfin.notJellyfin", t)).toBe("T:settings.jfErrNotJellyfin");
     // A bulk edit refused because a drain already holds the queue lock. It
     // cannot be queued itself, so the refusal has to say why.
     expect(backendErrorText("queue.busy", t)).toBe("T:receipt.syncBusy");

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
-import { ChevronRight, RefreshCw, X } from "lucide-react";
+import { ChevronRight, RefreshCw, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import * as api from "@/api/anilist";
 import {
   clearDetectionOverride,
+  discoverJellyfinServers,
   getJellyfinBackground,
   getJellyfinSettings,
   getScrobbleSettings,
@@ -25,6 +26,7 @@ import {
   mediaSessions,
   testJellyfin,
   type DetectionOverride,
+  type DiscoveredServer,
   type JellyfinBackground,
   type JellyfinSession,
   type JellyfinSettings,
@@ -566,6 +568,8 @@ export function JellyfinSection() {
   const [signingIn, setSigningIn] = useState(false);
   const [sessions, setSessions] = useState<JellyfinSession[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [finding, setFinding] = useState(false);
+  const [found, setFound] = useState<DiscoveredServer[] | null>(null);
 
   useEffect(() => {
     if (!api.isTauri) return;
@@ -577,6 +581,19 @@ export function JellyfinSection() {
   }, []);
 
   if (!settings) return null;
+
+  const find = async () => {
+    setFinding(true);
+    setError(null);
+    setFound(null);
+    try {
+      setFound(await discoverJellyfinServers());
+    } catch (e) {
+      setError(t("settings.jellyfinFindFailed", { message: backendErrorText(e, t) }));
+    } finally {
+      setFinding(false);
+    }
+  };
 
   const signIn = async () => {
     setSigningIn(true);
@@ -637,6 +654,42 @@ export function JellyfinSection() {
       <CardTitle>{t("settings.jellyfin")}</CardTitle>
       <p className="mt-2 text-sm text-ink-500">{t("settings.jellyfinHint")}</p>
       <div className="mt-3 space-y-2">
+        {/* Jellyfin's own discovery, so the address need not be typed at
+            all: the servers on this network, by name, one click each. */}
+        {!settings.connected && (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <Button variant="secondary" size="sm" onClick={find} disabled={finding}>
+              <Search className={cn("size-4", finding && "animate-pulse")} />{" "}
+              {finding ? t("settings.jellyfinFinding") : t("settings.jellyfinFind")}
+            </Button>
+            <span className="text-xs text-ink-600">{t("settings.jellyfinFindHint")}</span>
+          </div>
+        )}
+        {!settings.connected &&
+          found &&
+          (found.length === 0 ? (
+            <p className="text-sm text-ink-500">{t("settings.jellyfinFoundNone")}</p>
+          ) : (
+            <div className="space-y-1.5">
+              {found.map((s) => (
+                <button
+                  key={s.address}
+                  type="button"
+                  onClick={() => {
+                    setUrl(s.address);
+                    setFound(null);
+                  }}
+                  className="flex w-full flex-wrap items-center justify-between gap-x-3 rounded-lg border border-surface-800 bg-surface-900 px-3 py-2 text-left text-sm transition-surface hover:border-surface-600"
+                >
+                  <span className="font-medium text-ink-300">{s.name || s.address}</span>
+                  <span className="text-xs text-ink-500">
+                    {s.address}
+                    {s.version ? ` · v${s.version}` : ""}
+                  </span>
+                </button>
+              ))}
+            </div>
+          ))}
         <Input
           value={url}
           onChange={(e) => setUrl(e.target.value)}
@@ -646,9 +699,14 @@ export function JellyfinSection() {
 
         {settings.connected ? (
           <p className="text-sm text-success">
-            {t("settings.jellyfinSignedIn", {
-              name: settings.userName || "?",
-            })}
+            {settings.serverName
+              ? t("settings.jellyfinSignedInOn", {
+                  name: settings.userName || "?",
+                  server: settings.serverName,
+                })
+              : t("settings.jellyfinSignedIn", {
+                  name: settings.userName || "?",
+                })}
           </p>
         ) : (
           <>

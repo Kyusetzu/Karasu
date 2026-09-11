@@ -2,6 +2,7 @@
 //! (Karasu's counterpart to Taiga's Anisthesia).
 
 pub mod audio;
+pub mod discovery;
 pub mod jellyfin;
 pub mod media_session;
 pub mod mpv_ipc;

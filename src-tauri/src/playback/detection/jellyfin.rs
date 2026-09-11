@@ -54,6 +54,10 @@ pub const ERR_SIGNED_OUT: &str = "jellyfin.signedOut";
 pub const ERR_NO_TOKEN: &str = "jellyfin.noToken";
 pub const ERR_NO_USER_ID: &str = "jellyfin.noUserId";
 pub const ERR_BAD_CREDENTIALS: &str = "jellyfin.badCredentials";
+pub const ERR_BAD_URL: &str = "jellyfin.badUrl";
+/// The address answered, but not with `/System/Info/Public` — a web page, a
+/// proxy's error, some other service on that port.
+pub const ERR_NOT_JELLYFIN: &str = "jellyfin.notJellyfin";
 
 /// What this build calls itself in the `MediaBrowser` header.
 ///
@@ -414,7 +418,7 @@ fn escape(value: &str) -> String {
 /// server from the machine this was written on, and a casing mismatch would
 /// fail as a silent "nothing is playing" rather than an error. Accepting both
 /// costs one lookup and removes the whole failure mode.
-fn get_ci<'a>(v: &'a serde_json::Value, name: &str) -> Option<&'a serde_json::Value> {
+pub(super) fn get_ci<'a>(v: &'a serde_json::Value, name: &str) -> Option<&'a serde_json::Value> {
     v.get(name).or_else(|| {
         let mut chars = name.chars();
         let lower: String = chars
@@ -427,7 +431,7 @@ fn get_ci<'a>(v: &'a serde_json::Value, name: &str) -> Option<&'a serde_json::Va
     })
 }
 
-fn str_field(v: &serde_json::Value, name: &str) -> String {
+pub(super) fn str_field(v: &serde_json::Value, name: &str) -> String {
     get_ci(v, name)
         .and_then(|x| x.as_str())
         .unwrap_or("")
@@ -441,8 +445,9 @@ fn str_field(v: &serde_json::Value, name: &str) -> String {
 /// That is a fresh TCP handshake ~17k times a day, plus a rebuilt rustls config
 /// and root store on an https server, for a request that should be riding a
 /// kept-alive connection. Per-request timeouts still work on a shared client,
-/// which matters because the two callers want different ones.
-fn http() -> &'static reqwest::Client {
+/// which matters because the two callers want different ones. `discovery`
+/// shares it for the same reason.
+pub(super) fn http() -> &'static reqwest::Client {
     static HTTP: std::sync::OnceLock<reqwest::Client> = std::sync::OnceLock::new();
     HTTP.get_or_init(|| {
         crate::net::client_builder()
@@ -1130,6 +1135,8 @@ mod tests {
         assert_eq!(ERR_NO_TOKEN, "jellyfin.noToken");
         assert_eq!(ERR_NO_USER_ID, "jellyfin.noUserId");
         assert_eq!(ERR_BAD_CREDENTIALS, "jellyfin.badCredentials");
+        assert_eq!(ERR_BAD_URL, "jellyfin.badUrl");
+        assert_eq!(ERR_NOT_JELLYFIN, "jellyfin.notJellyfin");
     }
 
     use serde_json::json;

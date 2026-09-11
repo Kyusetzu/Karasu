@@ -198,6 +198,8 @@ export interface JellyfinSettings {
   connected: boolean;
   /** The signed-in account, for display only. */
   userName: string;
+  /** The server's own name, learned at sign-in; empty for an older sign-in. */
+  serverName: string;
   /** Empty means "any device of this account". */
   device: string;
   /** This machine's name, offered as the default device. */
@@ -222,6 +224,32 @@ export interface JellyfinSession {
 
 export const getJellyfinSettings = () =>
   invoke<JellyfinSettings>("get_jellyfin_settings");
+
+/** A server that answered the LAN broadcast and confirmed itself. */
+export interface DiscoveredServer {
+  name: string;
+  address: string;
+  id: string;
+  version: string | null;
+}
+
+/** What `/System/Info/Public` says a server is. */
+export interface JellyfinServerInfo {
+  name: string;
+  id: string;
+  version: string;
+}
+
+/**
+ * Jellyfin's own discovery: a UDP broadcast on the local network, answered
+ * by every server on it. Two seconds of listening plus a confirmation per
+ * answer — a button, never something a screen does on its own.
+ */
+export const discoverJellyfinServers = () =>
+  invoke<DiscoveredServer[]>("discover_jellyfin_servers");
+
+export const probeJellyfinServer = (url: string) =>
+  invoke<JellyfinServerInfo>("probe_jellyfin_server", { url });
 
 /** The phone's background arrangements; `supported` is false everywhere else. */
 export interface JellyfinBackground {

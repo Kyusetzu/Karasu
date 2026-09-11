@@ -319,6 +319,9 @@ pub struct JellyfinSettings {
     pub connected: bool,
     /// The signed-in account, so Settings can show who that is.
     pub user_name: String,
+    /// The server's own name, learned from `/System/Info/Public` at sign-in;
+    /// empty for a sign-in older than that probe.
+    pub server_name: String,
     pub device: String,
     /// This machine's name, so the UI can offer it as the default.
     pub local_device: String,
@@ -333,6 +336,7 @@ pub fn get_jellyfin_settings(db: State<'_, Db>) -> JellyfinSettings {
                 .kv_get("jellyfin_user_id")
                 .is_some_and(|u| !u.trim().is_empty()),
         user_name: db.kv_get("jellyfin_user_name").unwrap_or_default(),
+        server_name: db.kv_get("jellyfin_server_name").unwrap_or_default(),
         // The *stored* value, empty included. This used to prefill the
         // machine name, which the screen puts in the field's `value` and
         // writes back on any Save or sign-in — so opening the card and
@@ -433,7 +437,7 @@ pub fn set_jellyfin_settings(
     // place a secret must never go. A private or LAN address stays perfectly
     // valid: that is where a Jellyfin server normally lives.
     if !base.is_empty() && !crate::net::is_usable_base_url(&base) {
-        return Err("jellyfin.badUrl".into());
+        return Err(crate::playback::detection::jellyfin::ERR_BAD_URL.into());
     }
     db.kv_set("jellyfin_url", &base)?;
     db.kv_set("jellyfin_device", device.trim())?;
@@ -454,6 +458,16 @@ pub async fn jellyfin_sign_in(
     password: String,
 ) -> Result<JellyfinSettings, String> {
     let base = crate::playback::detection::jellyfin::normalize_base_url(&url);
+    // The address is validated and probed *before* the password goes
+    // anywhere: this path used to send the credentials to whatever was
+    // typed, and a typo answered "Sign-in failed: HTTP 404" where "that is
+    // not a Jellyfin server" was the truth. The probe's answer is also the
+    // server's identity — the name for the status line, and the id the
+    // external address will have to match.
+    if !crate::net::is_usable_base_url(&base) {
+        return Err(crate::playback::detection::jellyfin::ERR_BAD_URL.into());
+    }
+    let info = crate::playback::detection::discovery::probe(&base).await?;
     let (device_name, device_id) = {
         (local_device_name(), jellyfin_device_id(&db))
     };
@@ -470,6 +484,8 @@ pub async fn jellyfin_sign_in(
     db.kv_set("jellyfin_url", &base)?;
     db.kv_set("jellyfin_user_id", &session.user_id)?;
     db.kv_set("jellyfin_user_name", &session.user_name)?;
+    db.kv_set("jellyfin_server_id", &info.id)?;
+    db.kv_set("jellyfin_server_name", &info.name)?;
     crate::playback::detection::jellyfin::save_token(&session.token)?;
     // The old admin API key is useless now and grants far more on the server
     // than Karasu needs; don't leave it sitting in the credential store.
@@ -484,7 +500,26 @@ pub fn jellyfin_sign_out(db: State<'_, Db>) -> Result<JellyfinSettings, String> 
     crate::playback::detection::jellyfin::delete_legacy_api_key();
     db.kv_delete("jellyfin_user_id");
     db.kv_delete("jellyfin_user_name");
+    db.kv_delete("jellyfin_server_id");
+    db.kv_delete("jellyfin_server_name");
     Ok(get_jellyfin_settings(db))
+}
+
+/// Every Jellyfin server that answers the LAN broadcast and confirms itself.
+/// See `detection::discovery`. Two seconds of listening plus a probe per
+/// answer; a button press, never a poll.
+#[tauri::command]
+pub async fn discover_jellyfin_servers(
+) -> Result<Vec<crate::playback::detection::discovery::DiscoveredServer>, String> {
+    crate::playback::detection::discovery::discover().await
+}
+
+/// What the server at `url` says it is — name, version, id — anonymously.
+#[tauri::command]
+pub async fn probe_jellyfin_server(
+    url: String,
+) -> Result<crate::playback::detection::discovery::ServerInfo, String> {
+    crate::playback::detection::discovery::probe(&url).await
 }
 
 /// Lists the sessions the server reports, flagging which ones the device

@@ -1462,9 +1462,17 @@ export const en = {
     jellyfinBatteryAllow: "Exclude Karasu",
     jellyfinBatteryAllowed: "Excluded",
     jellyfinBatteryFailed: "Could not open the battery settings ({{message}})",
+    jellyfinFind: "Find servers",
+    jellyfinFinding: "Searching…",
+    jellyfinFindHint:
+      "Asks the local network which Jellyfin servers answer. On a VPN or away from home, none will.",
+    jellyfinFoundNone: "No server answered. Type the address by hand.",
+    jellyfinFindFailed: "Search failed ({{message}})",
+    jellyfinSignedInOn: "Signed in as {{name}} on {{server}}",
     notifScheduleAndroidHint:
       "If Android delays these checks, exclude Karasu from battery optimisation under Detection → Jellyfin.",
     jfErrBadUrl: "That is not a usable server address — it needs to start with http:// or https://.",
+    jfErrNotJellyfin: "That address answers, but not like a Jellyfin server.",
     airingNotify: "New-episode notifications",
     airingNotifyHint:
       "Desktop notification when a new episode of a show you are watching airs — the one thing the website cannot do while Karasu sits in the tray.",

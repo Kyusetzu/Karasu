@@ -1461,9 +1461,17 @@ export const de: typeof en = {
     jellyfinBatteryAllow: "Karasu ausnehmen",
     jellyfinBatteryAllowed: "Ausgenommen",
     jellyfinBatteryFailed: "Akku-Einstellungen konnten nicht geöffnet werden ({{message}})",
+    jellyfinFind: "Server suchen",
+    jellyfinFinding: "Suche…",
+    jellyfinFindHint:
+      "Fragt im lokalen Netz, welche Jellyfin-Server antworten. Über VPN oder von unterwegs antwortet keiner.",
+    jellyfinFoundNone: "Kein Server hat geantwortet. Gib die Adresse von Hand ein.",
+    jellyfinFindFailed: "Suche fehlgeschlagen ({{message}})",
+    jellyfinSignedInOn: "Angemeldet als {{name}} auf {{server}}",
     notifScheduleAndroidHint:
       "Wenn Android diese Prüfungen verzögert, nimm Karasu unter Erkennung → Jellyfin von der Akku-Optimierung aus.",
     jfErrBadUrl: "Das ist keine nutzbare Serveradresse — sie muss mit http:// oder https:// beginnen.",
+    jfErrNotJellyfin: "Diese Adresse antwortet, aber nicht wie ein Jellyfin-Server.",
     airingNotify: "Benachrichtigung bei neuer Folge",
     airingNotifyHint:
       "Desktop-Benachrichtigung, wenn eine neue Folge einer laufenden Serie erscheint — das Einzige, was die Website nicht kann, während Karasu im Tray liegt.",

@@ -31,6 +31,8 @@ export function backendErrorText(
       return t("settings.jfErrBadCredentials");
     case "jellyfin.badUrl":
       return t("settings.jfErrBadUrl");
+    case "jellyfin.notJellyfin":
+      return t("settings.jfErrNotJellyfin");
     case "queue.busy":
       return t("receipt.syncBusy");
     case "anilist.rateLimited":

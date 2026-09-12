@@ -59,7 +59,10 @@ adb shell dumpsys deviceidle get deep
 adb shell dumpsys deviceidle get light
 
 Section "notification job (46231)"
-adb shell dumpsys jobscheduler | Select-String -Pattern $Package -Context 0,25 | Select-Object -First 1
+# The job's own entry, not the package's first mention: the dump opens with
+# a scheduling history that names every package long before the JOB lines.
+$job = adb shell dumpsys jobscheduler | Select-String -Pattern "JOB #.*$Package/\.NotifJobService" -Context 0,25 | Select-Object -First 1
+if ($job) { $job } else { "not registered - the check interval is off (Settings -> AniList -> Notifications), or the app has not started since it was set" }
 
 Section "logcat, the Kotlin side (last 50 lines)"
 adb logcat -d -s KarasuTracking:V KarasuNotifJob:V | Select-Object -Last 50

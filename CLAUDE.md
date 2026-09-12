@@ -662,6 +662,26 @@ import it.
   The sampler's `--rig` transport exists because an outage that refuses
   unauthenticated requests (HTTP 403 "temporarily disabled") still answers
   signed-in ones.
+- **Jellyfin sessions need a heartbeat, and the Android tracking service
+  was measured, not assumed.** `GET /Sessions` does not refresh a session's
+  `LastActivityDate`; an empty `POST /Sessions/Capabilities` does, on
+  Jellyfin 10.11.11 (2026-09-11: the rig's own row read `activeAgoSec: 0`
+  on every look while it tracked a playback, and the phone's read 6 s from
+  the desktop). That row is how two Karasus on one account see each other
+  (`jellyfin::yield_to`), so a "the phone never yields" report starts with
+  Test connection: is the desktop's row there, and how old is it. The
+  same day, on the maintainer's NX809J with the release APK: `dumpsys
+  activity services` showed `TrackingService … isForeground=true
+  types=0x40000000` (that is `specialUse`) for the whole of a 30-minute
+  screen-off run, `am get-standby-bucket` answered 5 (exempted) once the
+  battery dialog was accepted, and the notification job is simply absent
+  from `dumpsys jobscheduler` while the interval setting is 0 — not a
+  failure. `scripts/phone-measure.ps1` is the whole of that procedure. And
+  Windows sends a limited broadcast from a wildcard UDP socket out of one
+  interface of its own choosing — with a Hyper-V switch present, that one —
+  which is why `discovery::broadcast` also binds to the default route's
+  address (measured on the maintainer's PC: the wildcard socket heard
+  nothing, the Ethernet-bound one heard the server twice).
 - **The website reaches a forum page Karasu cannot, and that is deliberate.**
   anilist.co renders page 470 of thread 1 because its **Web Worker** posts to
   **`anilist.co/graphql`** — a different endpoint from `graphql.anilist.co` —

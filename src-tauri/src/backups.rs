@@ -1,14 +1,4 @@
-//! Daily local snapshots of `karasu.db` — the no-cloud answer to backup.
-//!
-//! One file per civil UTC day in `<data>/backups/`, written through
-//! `Db::snapshot_to` (`VACUUM INTO`, which also requires the target not to
-//! exist — the skip-if-present check below is load-bearing, not an
-//! optimisation). Retention keeps the newest N and touches only names this
-//! module writes; a stray file in the folder is someone else's business.
-//!
-//! The loop wakes hourly rather than sleeping a day: after today's file
-//! exists a pass is one metadata check, and the short interval is what makes
-//! a laptop that sleeps through the appointed hour still get its backup.
+//! Daily local snapshots of `karasu.db`, one per civil UTC day, keeping the newest N and touching only names it wrote.
 
 use crate::db::Db;
 use std::path::{Path, PathBuf};
@@ -31,9 +21,7 @@ pub(crate) fn read_keep(db: &Db) -> usize {
         .unwrap_or(DEFAULT_KEEP)
 }
 
-/// `karasu-YYYYMMDD.db` for the given instant. Civil UTC on purpose — the
-/// name is an identity, and a timezone-dependent one would write two files
-/// for one day across a travel day.
+/// `karasu-YYYYMMDD.db` for the instant, in civil UTC so a travel day cannot write two files for one day.
 fn backup_name(epoch_secs: i64) -> String {
     let (y, m, d) = crate::logging::civil_date(epoch_secs);
     format!("karasu-{y:04}{m:02}{d:02}.db")
@@ -49,9 +37,7 @@ fn is_backup_name(name: &str) -> bool {
             .all(|b| b.is_ascii_digit())
 }
 
-/// Which files to delete, given a listing and how many to keep. `YYYYMMDD`
-/// sorts chronologically as text, so the oldest are simply the front of the
-/// sorted list.
+/// Which files to delete given a listing and how many to keep; `YYYYMMDD` sorts chronologically as text.
 fn prune_candidates(names: &[String], keep: usize) -> Vec<String> {
     let mut ours: Vec<&String> = names.iter().filter(|n| is_backup_name(n)).collect();
     ours.sort();
@@ -72,13 +58,7 @@ fn now_secs() -> i64 {
         .unwrap_or(0)
 }
 
-/// Whether a file on disk is a database that would actually open.
-///
-/// `quick_check` rather than `integrity_check`: it reads the pages it needs
-/// instead of the whole file, which is what catches the failures that matter
-/// here — a truncated or half-written snapshot — without spending seconds on a
-/// large database once an hour. A file SQLite refuses to open at all fails at
-/// the first step, which is the most common shape of the problem.
+/// Whether a file is a database that would open; `quick_check` catches a truncated snapshot without reading the whole file.
 fn is_readable_database(path: &Path) -> bool {
     rusqlite::Connection::open_with_flags(
         path,
@@ -89,17 +69,7 @@ fn is_readable_database(path: &Path) -> bool {
     .unwrap_or(false)
 }
 
-/// Puts the newest readable backup in place of a database that will not open.
-///
-/// Called from `setup` when `Db::open` fails. Without it, a corrupt or
-/// truncated `karasu.db` meant the app never started at all — while up to a
-/// week of good snapshots sat in a folder beside it, reachable only through
-/// the app that would not launch. The user's own copy is kept as
-/// `karasu.db.unreadable` rather than deleted: it is still their data, and a
-/// support request is easier to answer with it than without.
-///
-/// Returns the path it restored from, or `None` when there was nothing
-/// usable — in which case the caller fails as it did before.
+/// Puts the newest readable backup in place of a database that will not open, keeping the broken file aside.
 pub fn restore_newest(data_dir: &Path) -> Option<PathBuf> {
     let dir = data_dir.join("backups");
     let mut names: Vec<String> = std::fs::read_dir(&dir)
@@ -108,8 +78,7 @@ pub fn restore_newest(data_dir: &Path) -> Option<PathBuf> {
         .map(|e| e.file_name().to_string_lossy().to_string())
         .filter(|n| is_backup_name(n))
         .collect();
-    // Newest first: the names carry a sortable date, which is why they are
-    // shaped the way `backup_name` shapes them.
+    // Newest first: the names carry a sortable date, which is why `backup_name` shapes them as it does.
     names.sort_unstable_by(|a, b| b.cmp(a));
 
     let target = data_dir.join("karasu.db");
@@ -142,9 +111,7 @@ pub fn restore_newest(data_dir: &Path) -> Option<PathBuf> {
     None
 }
 
-/// One pass: today's snapshot if absent, then the prune. Also called
-/// directly when the setting is switched on, so enabling produces a backup
-/// now rather than within the hour.
+/// One pass: today's snapshot if absent, then the prune; also called directly when the setting is switched on.
 pub(crate) fn run_once(app: &AppHandle) {
     let db = app.state::<Db>();
     if !read_enabled(&db) {
@@ -161,11 +128,7 @@ pub(crate) fn run_once(app: &AppHandle) {
 
     let name = backup_name(now_secs());
     let today = dir.join(&name);
-    // Presence used to be the whole test, so a file truncated by a full disk or
-    // a process killed mid-`VACUUM` was never rewritten and still occupied one
-    // of the retained slots — a backup that cannot be restored, held in the
-    // place of one that could. Rewriting an unreadable one is cheap; finding
-    // out at restore time is not.
+    // Keep the readability check; a truncated snapshot would otherwise hold a retained slot until restore time.
     if !today.exists() || !is_readable_database(&today) {
         if today.exists() {
             crate::logging::warn(
@@ -173,8 +136,7 @@ pub(crate) fn run_once(app: &AppHandle) {
                 format!("{name} is not a readable database; writing it again"),
             );
             if let Err(e) = std::fs::remove_file(&today) {
-                // `VACUUM INTO` refuses an existing destination, so a file that
-                // cannot be removed cannot be replaced either.
+                // `VACUUM INTO` refuses an existing destination, so a file that cannot be removed cannot be replaced.
                 crate::logging::warn("backup", format!("could not remove {name}: {e}"));
                 return;
             }
@@ -206,17 +168,7 @@ pub fn spawn(app: AppHandle) {
         let app = app.clone();
         async move {
             loop {
-                // `spawn_blocking`, not a bare call. `run_once` is all
-                // synchronous filesystem work, and its expensive step is
-                // `VACUUM INTO` over the whole database — bounded by the file's
-                // size and the disk's speed, neither of which this code gets to
-                // choose. On the async runtime that parks a worker thread for
-                // the duration, and the workers are shared with every other
-                // background pass and with the AniList client.
-                //
-                // A join error means the blocking task itself panicked;
-                // `supervise` restarts the loop, so it is logged and the sleep
-                // still happens rather than spinning.
+                // `spawn_blocking`, not a bare call: `VACUUM INTO` would park a runtime worker shared with the AniList client.
                 let handle = app.clone();
                 if let Err(e) = tokio::task::spawn_blocking(move || run_once(&handle)).await {
                     crate::logging::warn("backup", format!("the backup pass failed: {e}"));
@@ -264,8 +216,7 @@ mod tests {
         assert!(!is_backup_name("karasu-20260814.db.bak"));
     }
 
-    /// The failure this exists for: a database that will not open, with good
-    /// snapshots sitting beside it that only the app could reach.
+    /// Proves a database that will not open is replaced by the newest readable snapshot, skipping a corrupt newer one.
     #[test]
     fn a_broken_database_is_replaced_by_the_newest_readable_backup() {
         let dir = std::env::temp_dir().join(format!("karasu-restore-{}", std::process::id()));
@@ -290,8 +241,7 @@ mod tests {
             "the newest *readable* one, skipping the corrupt newer file: {from:?}"
         );
 
-        // The restored file is the one that was chosen, and the broken
-        // original is kept rather than thrown away.
+        // The restored file is the one that was chosen, and the broken original is kept rather than thrown away.
         let conn = rusqlite::Connection::open(dir.join("karasu.db")).unwrap();
         let which: String = conn
             .query_row("SELECT which FROM marker", [], |r| r.get(0))
@@ -303,8 +253,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
-    /// Nothing usable means the caller fails exactly as it did before, rather
-    /// than starting on an empty database and looking like data loss.
+    /// Proves nothing usable restores nothing, so the caller fails rather than starting empty and looking like data loss.
     #[test]
     fn no_usable_backup_restores_nothing() {
         let dir = std::env::temp_dir().join(format!("karasu-restore-none-{}", std::process::id()));

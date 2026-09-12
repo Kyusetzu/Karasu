@@ -1,7 +1,4 @@
-//! Portable mode: when a `karasu.portable` marker file sits next to the
-//! executable, Karasu keeps its database and token in a `data` folder
-//! beside the exe instead of in the user's AppData. The token is encrypted
-//! either way — DPAPI on Windows, XChaCha20-Poly1305 on Linux (see auth).
+//! Portable mode: a `karasu.portable` marker beside the exe keeps the database and token in a `data` folder there.
 
 use std::path::{Path, PathBuf};
 
@@ -10,33 +7,14 @@ const DATA_DIR: &str = "data";
 #[cfg(any(windows, target_os = "linux"))]
 const TOKEN_FILE: &str = "token.dat";
 
-/// Whether `$APPIMAGE` names something we should believe.
-///
-/// The AppImage runtime exports `APPIMAGE`, `ARGV0` and `OWD`, and **every
-/// child process inherits them** — so a Karasu installed from a package and
-/// launched from a terminal that an AppImage'd app spawned would otherwise read
-/// a completely unrelated `.AppImage` as its own location, and put its data
-/// folder next to that. A bare name is the other trap: `Path::parent()` of
-/// `"Karasu.AppImage"` is `Some("")`, which makes the data directory relative
-/// to whatever the working directory happens to be.
-///
-/// Requiring an absolute path that exists rules out both.
-///
-/// Lives outside the `#[cfg]` so its tests run on both platforms rather than
-/// only in the Linux CI job, which is why Windows needs telling it is unused.
+/// Whether `$APPIMAGE` is worth believing: every child of an AppImage'd process inherits it, so it must exist.
+// Ungated so its tests run on both platforms, which is why Windows needs telling it is unused.
 #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 pub(crate) fn plausible_appimage(path: &Path) -> bool {
     path.is_absolute() && path.exists()
 }
 
-/// The folder portable mode works out of, from the two inputs that decide it.
-///
-/// Split from `exe_dir` so the AppImage case can be tested without one.
-/// `$APPIMAGE` wins because inside an AppImage `current_exe()` resolves into
-/// the throwaway `/tmp/.mount_XXXX` squashfs: the marker written there would
-/// never be found again, and the data folder would cease to exist the moment
-/// the process ends. `$APPIMAGE` is the real path of the `.AppImage` file, and
-/// its folder is the one the user can actually see.
+/// The folder portable mode works out of; `$APPIMAGE` wins because inside an AppImage `current_exe()` is a throwaway mount.
 fn base_dir(appimage: Option<&Path>, current_exe: Option<&Path>) -> Option<PathBuf> {
     appimage
         .or(current_exe)
@@ -44,9 +22,7 @@ fn base_dir(appimage: Option<&Path>, current_exe: Option<&Path>) -> Option<PathB
         .map(|p| p.to_path_buf())
 }
 
-/// `$APPIMAGE`, but only when it is worth believing. The gate lives here, at
-/// the boundary where the environment is read, so `base_dir` stays pure and
-/// testable against paths that need not exist.
+/// `$APPIMAGE` when it is worth believing; the gate sits where the environment is read so `base_dir` stays pure.
 fn appimage_path() -> Option<PathBuf> {
     #[cfg(target_os = "linux")]
     {
@@ -65,8 +41,7 @@ pub fn exe_dir() -> Option<PathBuf> {
     base_dir(appimage.as_deref(), current.as_deref())
 }
 
-/// Whether this process is running from an AppImage, as the UI understands it:
-/// autostart cannot work and the updater can only replace the bundle.
+/// Whether this process runs from an AppImage, where autostart cannot work and the updater can only replace the bundle.
 pub fn running_from_appimage() -> bool {
     appimage_path().is_some()
 }
@@ -85,19 +60,13 @@ pub fn portable_data_dir() -> Option<PathBuf> {
     Some(exe_dir()?.join(DATA_DIR))
 }
 
-/// Path to the encrypted token file (portable mode only). Gated with its only
-/// callers, the desktop token store — portable mode is an exe-relative idea.
+/// Path to the encrypted token file in portable mode, gated with its only callers in the desktop token store.
 #[cfg(any(windows, target_os = "linux"))]
 pub fn token_file() -> Option<PathBuf> {
     Some(portable_data_dir()?.join(TOKEN_FILE))
 }
 
-/// The resolved data directory, remembered at startup.
-///
-/// Desktop token storage never needs it — the credential store is ambient and
-/// the portable file is exe-relative — but on mobile the app-private data dir
-/// is the only sane root and nothing exe-relative exists, so `lib.rs`'s setup
-/// records the answer it already computed for the database.
+/// The data directory setup resolved for the database, because on mobile nothing exe-relative exists to derive it from.
 #[cfg(mobile)]
 static RESOLVED_DATA_DIR: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
 
@@ -106,22 +75,17 @@ pub fn remember_data_dir(dir: &std::path::Path) {
     let _ = RESOLVED_DATA_DIR.set(dir.to_path_buf());
 }
 
-/// A cfg'd pair, per the house rule — the call site in setup compiles
-/// everywhere and the desktop half has nothing to remember.
+/// The desktop half of the cfg'd pair, so the call site in setup compiles everywhere; it has nothing to remember.
 #[cfg(desktop)]
 pub fn remember_data_dir(_dir: &std::path::Path) {}
 
-/// Where a secret lives on mobile: a plain file in the app-private data dir,
-/// which Android sandboxes per app. Weaker than a desktop credential store —
-/// Keystore-backed encryption is the named follow-up — but the invariant that
-/// matters holds: the token stays in Rust and never reaches the WebView.
+/// Where a secret lives on mobile: a file in the app-private data dir, so the token never reaches the WebView.
 #[cfg(mobile)]
 pub fn mobile_secret_file(name: &str) -> Option<PathBuf> {
     Some(RESOLVED_DATA_DIR.get()?.join(name))
 }
 
-/// Where the DB/settings live: exe-relative in portable mode, else the
-/// provided AppData fallback.
+/// Where the DB and settings live: exe-relative in portable mode, else the provided AppData fallback.
 pub fn data_dir(app_data_fallback: PathBuf) -> PathBuf {
     if is_portable() {
         if let Some(dir) = portable_data_dir() {
@@ -161,9 +125,7 @@ mod tests {
         assert_eq!(data_dir(fallback.clone()), fallback);
     }
 
-    /// Inside an AppImage `current_exe()` points into a temporary mount that
-    /// is gone as soon as the process ends, so `$APPIMAGE` has to win — the
-    /// whole point of portable mode is a folder that is still there next time.
+    /// Proves `$APPIMAGE` beats `current_exe()`, which inside an AppImage points into a mount gone when the process ends.
     #[test]
     fn an_appimage_path_beats_the_mounted_executable() {
         let appimage = PathBuf::from("/home/kyu/Apps/Karasu.AppImage");
@@ -181,13 +143,10 @@ mod tests {
         assert_eq!(base_dir(None, None), None);
     }
 
-    /// `$APPIMAGE` is inherited by every child of an AppImage'd process, so a
-    /// package-installed Karasu launched from an AppImage'd terminal would
-    /// otherwise adopt that unrelated bundle's folder as its own.
+    /// Proves an inherited `$APPIMAGE` from an unrelated bundle is refused unless it is absolute and exists.
     #[test]
     fn only_an_absolute_existing_appimage_is_believed() {
-        // A bare name is the dangerous one: its parent is "", which would make
-        // the data folder relative to the working directory.
+        // A bare name is the dangerous one: its parent is "", which makes the data folder relative to the cwd.
         assert!(!plausible_appimage(Path::new("Karasu.AppImage")));
         assert!(!plausible_appimage(Path::new(
             "/home/kyu/Apps/DoesNotExist.AppImage"

@@ -3,8 +3,7 @@ use rusqlite::Connection;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
-/// SQLite database in the app data directory: key-value settings, the
-/// list cache and the offline update queue.
+/// SQLite database in the app data directory: key-value settings, the list cache and the offline update queue.
 pub struct Db(pub Mutex<Connection>);
 
 const MIGRATIONS: &str = "
@@ -20,8 +19,7 @@ CREATE TABLE IF NOT EXISTS offline_queue (
 );
 ";
 
-/// Schema v2: list_cache per media type (ANIME/MANGA). Older caches are
-/// dropped and repopulated on the next load.
+/// Schema v2: list_cache per media type; older caches are dropped and repopulated on the next load.
 const MIGRATION_V2: &str = "
 DROP TABLE IF EXISTS list_cache;
 CREATE TABLE list_cache (
@@ -34,9 +32,7 @@ CREATE TABLE list_cache (
 PRAGMA user_version = 2;
 ";
 
-/// Schema v3: created a `history` table for a playback-history feature that
-/// has since been removed. The table is kept (empty, unused) so databases
-/// already migrated to v3 remain valid; do not rely on it.
+/// Schema v3: a `history` table for a removed feature, kept empty so migrated databases stay valid; do not rely on it.
 const MIGRATION_V3: &str = "
 CREATE TABLE IF NOT EXISTS history (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -51,10 +47,7 @@ CREATE TABLE IF NOT EXISTS history (
 PRAGMA user_version = 3;
 ";
 
-/// Schema v4: a fully local media list for account-free ("local-only") use.
-/// `media_json` caches the AniList media metadata so the list renders
-/// offline; `tags` is reserved (tags currently ride inside `notes`, matching
-/// the AniList path, so the UI stays mode-agnostic).
+/// Schema v4: the account-free local list; `media_json` caches the media so it renders offline, `tags` is reserved.
 const MIGRATION_V4: &str = "
 CREATE TABLE IF NOT EXISTS local_list (
     media_id   INTEGER NOT NULL,
@@ -72,9 +65,7 @@ CREATE TABLE IF NOT EXISTS local_list (
 PRAGMA user_version = 4;
 ";
 
-/// Schema v5: an in-app notification centre. Every desktop toast (airing,
-/// on-hold, sequel) is also recorded here so the user has one bundled place
-/// to review them, with a read/unread state.
+/// Schema v5: the in-app notification centre, recording every desktop toast with a read/unread state.
 const MIGRATION_V5: &str = "
 CREATE TABLE IF NOT EXISTS notifications (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -87,10 +78,7 @@ CREATE TABLE IF NOT EXISTS notifications (
 PRAGMA user_version = 5;
 ";
 
-/// Schema v6: the local library index. The scan used to live only in memory,
-/// so every restart dropped it and the play buttons vanished until the user
-/// rescanned by hand. Persisting it means the index survives a restart; stale
-/// paths are caught at play time instead.
+/// Schema v6: the local library index, persisted so it survives a restart; stale paths are caught at play time.
 const MIGRATION_V6: &str = "
 CREATE TABLE IF NOT EXISTS library_files (
     media_id INTEGER NOT NULL,
@@ -101,22 +89,13 @@ CREATE TABLE IF NOT EXISTS library_files (
 PRAGMA user_version = 6;
 ";
 
-/// Schema v7: volumes read, for the local list.
-///
-/// AniList tracks manga on two axes and always has (`progressVolumes`); the
-/// local list only ever stored chapters, so a volume edit made without an
-/// account was silently dropped. Added rather than backfilled — there is no
-/// way to infer volumes from chapters, and guessing would be worse than zero.
+/// Schema v7: volumes read on the local list, defaulted rather than backfilled because chapters cannot infer them.
 const MIGRATION_V7: &str = "
 ALTER TABLE local_list ADD COLUMN progress_volumes INTEGER NOT NULL DEFAULT 0;
 PRAGMA user_version = 7;
 ";
 
-/// How confident the scanner was about each matched title.
-///
-/// Its own table rather than a column on `library_files`: the score belongs to
-/// the *title*, and a column there would repeat it down every episode row and
-/// invite the two copies to disagree.
+/// Schema v8: the scanner's per-title match confidence, its own table so the score is not repeated down every episode row.
 const MIGRATION_V8: &str = "
 CREATE TABLE IF NOT EXISTS library_match (
   media_id INTEGER PRIMARY KEY,
@@ -125,26 +104,7 @@ CREATE TABLE IF NOT EXISTS library_match (
 PRAGMA user_version = 8;
 ";
 
-/// Manual match corrections, and the two things they need to be possible.
-///
-/// All three key on the `(title, season)` pair the parser extracts from a
-/// release name — the same pair `index_files` already memoises its matcher
-/// lookups on. Keying on anything else (a path, a media id) would not survive
-/// the next scan, and surviving the next scan is the entire point: the user is
-/// correcting the *parse*, not this one row.
-///
-/// `season` is `-1` rather than NULL where the release name carried none.
-/// SQLite permits NULLs in a PRIMARY KEY and treats each one as distinct, so a
-/// nullable column here would let the same seasonless title be overridden
-/// twice and neither row would win.
-///
-/// - `library_override` is user data. A scan must never clear it.
-/// - `library_unmatched` is what the scan could *not* place, kept so the
-///   \"unplaced\" list is still there after a restart rather than only until one.
-///
-/// There is deliberately no table recording which parsed title produced each
-/// matched row. `hydrate` recovers that by re-parsing the stored filenames, and
-/// a stored copy could only ever drift away from what the parser says today.
+/// Schema v9: match corrections and the unplaced list, keyed on the parsed `(title, season)` so they survive the next scan.
 const MIGRATION_V9: &str = "
 CREATE TABLE IF NOT EXISTS library_override (
   title TEXT NOT NULL,
@@ -162,15 +122,7 @@ CREATE TABLE IF NOT EXISTS library_unmatched (
 PRAGMA user_version = 9;
 ";
 
-/// What AniList thinks an unplaceable title is, pending the user's agreement.
-///
-/// The local matcher can only ever search the cached list, so a show that was
-/// never added is outside its universe entirely — no filename is clean enough
-/// to be found. A scan now asks AniList about the leftovers, but a search hit
-/// is a weaker thing than a match against a known list: searching "Pokemon"
-/// returns *something* whether or not it is the right something. So these are
-/// stored as suggestions and applied only when confirmed, at which point they
-/// become an ordinary `library_override` row and this table stops mattering.
+/// Schema v10: AniList's guess for an unplaceable title, applied only once confirmed because a search hit is not a match.
 const MIGRATION_V10: &str = "
 CREATE TABLE IF NOT EXISTS library_suggestion (
   title TEXT NOT NULL,
@@ -182,18 +134,7 @@ CREATE TABLE IF NOT EXISTS library_suggestion (
 PRAGMA user_version = 10;
 ";
 
-/// A user-confirmed season split: \"episodes `ep_from..=ep_to` of this parse
-/// belong to `media_id`, renumbered from `dst_start`\".
-///
-/// The record shape is exactly `relations::Rule` — a source range and a
-/// destination start — but keyed on the parsed `(title, season)` like
-/// `library_override`, because the user is correcting the *parse* and the
-/// correction must survive the next scan. Unlike an override it also carries an
-/// episode range: a 24-file folder for a 12-episode show holds two shows under
-/// one parse key, which is precisely what `library_override` cannot express.
-///
-/// `season` is `-1` where the release name carried none, matching v9's
-/// convention and for the same reason. User data: a scan must never clear it.
+/// Schema v11: confirmed season splits, keyed on the parse plus a disk episode range; a scan never clears them.
 const MIGRATION_V11: &str = "
 CREATE TABLE IF NOT EXISTS library_redirect (
   title TEXT NOT NULL,
@@ -207,33 +148,7 @@ CREATE TABLE IF NOT EXISTS library_redirect (
 PRAGMA user_version = 11;
 ";
 
-/// What the user says a *detected* title really is.
-///
-/// The same `(title, season)` idea as v9's `library_override`, and for the same
-/// reason — the correction must outlive the thing that produced it — but a
-/// deliberately separate table, because the two key spaces are different
-/// populations that happen to share a shape:
-///
-/// - The producers differ. `index_files` parses a *filename*; `build_now_playing`
-///   parses a cleaned window or media-session title, or takes Jellyfin's own
-///   `SeriesName`. They coincide for a local file in mpv and diverge everywhere
-///   else, so one table would let a correction typed against a browser tab
-///   silently re-point files on disk at the next scan.
-/// - Detection covers manga; the library scanner does not. Hence `media_type` in
-///   the key: a chapter title and an episode title may normalise to the same
-///   string and mean different entries.
-/// - `clear_library_match` deletes an override *and every redirect on its key*,
-///   and `set_library_match` refuses while a scan is running. Sharing would make
-///   "undo" on one screen quietly undo the other, and make a now-playing button
-///   fail for a reason the user cannot connect to what they clicked.
-///
-/// `display_title` is the chosen entry's title, stored because the picker has it
-/// in hand at correction time. It costs one column and buys two things with no
-/// request at all: the Settings list can name what each row points at, and a
-/// forced entry that is not on the cached list still reads as itself on screen.
-///
-/// `season = -1` where the parse carried none, per v9. User data: nothing on a
-/// scan or a poll may clear it.
+/// Schema v12: detection corrections, apart from `library_override` because titles and filenames are different key spaces.
 const MIGRATION_V12: &str = "
 CREATE TABLE IF NOT EXISTS detection_override (
   title TEXT NOT NULL,
@@ -246,35 +161,13 @@ CREATE TABLE IF NOT EXISTS detection_override (
 PRAGMA user_version = 12;
 ";
 
-/// How far the source's episode numbering sits from the entry's.
-///
-/// v12 could say *which entry* a detected title is, and nothing about *which
-/// episode*. That covers a franchise whose seasons are separate AniList
-/// entries — Jellyfin's S2E1 is episode 1 of the sequel — but not the other
-/// layout, where a server splits one continuously-numbered entry into cours
-/// and its S2E1 is episode 13. Only the viewer knows which they are looking
-/// at, so it is stored beside the entry they picked.
-///
-/// Signed, and applied as `reported + offset`: a source can number *ahead* of
-/// AniList as easily as behind. Zero for every existing row, which is exactly
-/// what those corrections meant.
+/// Schema v13: a signed episode offset on a detection correction, for a server that splits one numbered entry into cours.
 const MIGRATION_V13: &str = "
 ALTER TABLE detection_override ADD COLUMN episode_offset INTEGER NOT NULL DEFAULT 0;
 PRAGMA user_version = 13;
 ";
 
-/// Schema v14: start date, finish date and privacy on the local list.
-///
-/// The account-free list had none of them, so `local_list_json` emitted a
-/// hard-coded `false` and two nulls and the editor hid the controls — three
-/// fields the app understands everywhere else, missing for the one user who
-/// chose not to sign in. Nothing about them needs an account: a date is a date,
-/// and "private" locally means the same thing it means in an export.
-///
-/// The dates are stored as the JSON text of AniList's own `FuzzyDate`
-/// (`{"year":2024,"month":3,"day":null}`) rather than as an ISO string, because
-/// every part is independently nullable and the frontend already speaks that
-/// shape end to end. A partial date is a real answer here, not a broken one.
+/// Schema v14: dates and privacy on the local list; the dates are `FuzzyDate` JSON because every part is nullable.
 const MIGRATION_V14: &str = "
 ALTER TABLE local_list ADD COLUMN started_at TEXT;
 ALTER TABLE local_list ADD COLUMN completed_at TEXT;
@@ -282,45 +175,13 @@ ALTER TABLE local_list ADD COLUMN private INTEGER NOT NULL DEFAULT 0;
 PRAGMA user_version = 14;
 ";
 
-/// Schema v15: which media a notification is about.
-///
-/// The table stored rendered sentences and nothing else, so the one thing
-/// anyone wants from a "new episode aired" row — the show it is about — was a
-/// search away. AniList's own rows in the same panel have opened the title
-/// since they landed, which left Karasu's half of the bell looking inert beside
-/// them. Every writer already had the id in hand and dropped it on the floor.
-///
-/// Nullable rather than defaulted, because two of the five callers genuinely
-/// have nothing to point at: the app-update notice is not about a title, and a
-/// dropped-queue report with `n > 1` covers several. NULL therefore reads as
-/// "nothing to open" rather than "not migrated" — which is also the truth about
-/// every row written before this step, so they need no backfill and could not
-/// have one: their rendered title is the only handle, and matching that back to
-/// an id would be a guess.
+/// Schema v15: which media a notification is about, nullable because the update notice has none.
 const MIGRATION_V15: &str = "
 ALTER TABLE notifications ADD COLUMN media_id INTEGER;
 PRAGMA user_version = 15;
 ";
 
-/// Schema v16: which account a queued edit belongs to.
-///
-/// `anilist_logout` deletes the token and the cached viewer and left the queue
-/// alone, and a queued row carried only a `mediaId` — so edits made under one
-/// account were drained under whatever token signed in next. Signing out of A
-/// and into B wrote A's unsynced progress onto B's list, silently, on B's first
-/// list fetch.
-///
-/// Clearing the queue on logout would have closed it without a migration, but
-/// an offline queue exists precisely so unsynced edits survive; discarding them
-/// because someone signed out to fix a token is the same class of loss one step
-/// removed. Stamping the row is what lets both hold.
-///
-/// Rows that predate the column are attributed to the cached viewer, which is
-/// the only account that could have written them. With no cached viewer there
-/// is nobody to attribute them to, and an unattributable queued write is the
-/// exact hazard this closes — so those are dropped rather than guessed at.
-/// `json_extract` is built into SQLite itself since 3.38, well below what
-/// rusqlite bundles.
+/// Schema v16: the account a queued edit belongs to, so one account's queue never drains under the next one's token.
 const MIGRATION_V16: &str = "
 ALTER TABLE offline_queue ADD COLUMN user_id INTEGER;
 UPDATE offline_queue
@@ -330,28 +191,7 @@ DELETE FROM offline_queue WHERE user_id IS NULL;
 PRAGMA user_version = 16;
 ";
 
-/// Schema v17: `blur_adult` defaults on for new installs only.
-///
-/// The setting arrived defaulting to on for everyone, and `get_blur_adult`
-/// reads absence as on — so an existing user who had never opened the setting
-/// would have their covers blurred by an update they did not ask for. Turning
-/// it on for people choosing their settings for the first time is the wanted
-/// behaviour; changing it under people who already had a working screen is not.
-///
-/// Absence of the key cannot tell those two populations apart, so the answer is
-/// written down once, here, while the difference is still observable: **an
-/// empty `kv` table means nothing has ever been stored, which only happens on a
-/// database being created right now.** Every migration below runs before any
-/// setting is written, so on a fresh install this sees an empty table.
-///
-/// The imprecision, stated rather than hidden: a long-standing install that
-/// never signed in and never changed a single setting also has an empty `kv`,
-/// and is read as new. That user gets the blur on — the same answer a new
-/// install gets, for someone who has expressed no preference either way.
-///
-/// `WHERE NOT EXISTS` on the key itself keeps the step re-runnable, which the
-/// `ALTER TABLE` steps above cannot be, and means an explicit choice already
-/// made is never overwritten.
+/// Schema v17: `blur_adult` seeded on for new installs only, decided by whether `kv` is still empty when this runs.
 const MIGRATION_V17: &str = "
 INSERT INTO kv (key, value)
 SELECT 'blur_adult', CASE WHEN EXISTS (SELECT 1 FROM kv) THEN '0' ELSE '1' END
@@ -359,27 +199,7 @@ WHERE NOT EXISTS (SELECT 1 FROM kv WHERE key = 'blur_adult');
 PRAGMA user_version = 17;
 ";
 
-/// v18 gives `notifications` an owner, for the reason v16 gave one to
-/// `offline_queue`: the table had no account column at all, so every bell row
-/// the app wrote for one account was read back for the next one. Signing out
-/// of A and into B showed B a list of A's aired episodes and sequel
-/// announcements.
-///
-/// `user_id` is **nullable, and the null is a real answer**: an app-update
-/// notice belongs to the install rather than to an account, and must stay
-/// readable while signed out and in local mode. Account-scoped rows carry an
-/// id; app-wide rows carry null; the readers ask for `user_id IS NULL OR
-/// user_id = ?`.
-///
-/// The backfill attributes existing rows to the cached viewer, skipping the
-/// `update` kind so the one app-wide row that predates this keeps its meaning.
-/// A row that cannot be attributed (nobody signed in) simply stays null, which
-/// is the harmless direction here — unlike v16, where an unattributable queue
-/// row could be *written* to the wrong account and was therefore deleted.
-///
-/// `json_valid(value)` guards the extract because `json_extract` raises on
-/// malformed JSON rather than returning null, and a migration that throws
-/// leaves an app that will not start.
+/// Schema v18: a nullable owner on `notifications`, null being the app's own row, so one account never sees another's bell.
 const MIGRATION_V18: &str = "
 ALTER TABLE notifications ADD COLUMN user_id INTEGER;
 UPDATE notifications
@@ -389,25 +209,7 @@ UPDATE notifications
 PRAGMA user_version = 18;
 ";
 
-/// Schema v19: an install that predates the Stable channel stays on Nightly.
-///
-/// v1.0.0 is the first tagged release, and with it the default update channel
-/// flips from the per-commit `latest` prerelease to `stable` — someone who
-/// downloads "Karasu 1.0.0" should not be offered a nightly the next morning.
-/// Every install that exists *before* that flip was on the rolling build,
-/// most by default rather than by choice, and moving them to Stable would
-/// silently stall them on 1.0.0. So this seeds their absent choice as the one
-/// they were living with — and only theirs. Which population a database
-/// belongs to is decided in `open`, by the version the file arrived with: a
-/// fresh database reads 0 there and takes only the stamp. The SQL cannot tell
-/// on its own, because by the time v19 runs on a fresh install v17 has
-/// already put a row in `kv`, so v17's "is kv empty" test would call every
-/// new install an old one.
-///
-/// The one gap, accepted: a first launch that dies between step 2 and this
-/// one leaves a fresh file already labelled with a version, and the next open
-/// seeds it as an old install — a few milliseconds of first-launch window,
-/// and the consequence is the old default rather than a lost choice.
+/// Schema v19: an install predating the Stable channel stays on Nightly; `open` decides by the file's version, not `kv`.
 const MIGRATION_V19: &str = "
 INSERT INTO kv (key, value)
 SELECT 'update_channel', 'prerelease'
@@ -419,10 +221,6 @@ PRAGMA user_version = 19;
 const MIGRATION_V19_FRESH: &str = "PRAGMA user_version = 19;";
 
 /// One detection correction: what was detected, and what it really is.
-///
-/// A struct rather than the tuple this started as, because the row grew a
-/// sixth field and `(String, i32, String, i64, String, i32)` at three call
-/// sites is a puzzle rather than a signature.
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DetectionOverride {
@@ -432,11 +230,9 @@ pub struct DetectionOverride {
     pub season: i32,
     pub media_type: String,
     pub media_id: i64,
-    /// The chosen entry's title, stored so the Settings list and an off-list
-    /// entry read correctly without a request.
+    /// The chosen entry's title, stored so the Settings list and an off-list entry read correctly without a request.
     pub display_title: String,
-    /// Added to the detected episode. Signed: a source may number ahead of
-    /// AniList as easily as behind.
+    /// Added to the detected episode; signed because a source may number ahead of AniList as easily as behind.
     pub episode_offset: i32,
 }
 
@@ -449,23 +245,13 @@ pub struct NotificationRow {
     pub body: String,
     #[serde(rename = "createdMs")]
     pub created_ms: i64,
-    /// What the bell row opens, when there is something to open. `None` for the
-    /// app-update notice, for a dropped-queue report, and for every row written
-    /// before schema v15. Renamed individually because this struct carries no
-    /// `rename_all` — `created_ms` above is the precedent.
+    /// What the bell row opens; `None` for the update notice, a dropped-queue report and every row older than v15.
     #[serde(rename = "mediaId")]
     pub media_id: Option<i64>,
     pub read: bool,
 }
 
-/// One row of the offline queue.
-///
-/// `created_at` has been written since the table existed and was never read
-/// back — the drain does not care how old a write is, it just sends it. The
-/// sync panel does care: "queued 20 minutes ago" is the difference between a
-/// backlog that is moving and one that is stuck, and it is the only thing in a
-/// queued row that a user can sanity-check against their own memory. No
-/// migration; the column was always there.
+/// One row of the offline queue, with `created_at` because the sync panel needs to tell a moving backlog from a stuck one.
 #[derive(Debug, Clone)]
 pub struct QueuedRow {
     pub id: i64,
@@ -475,9 +261,7 @@ pub struct QueuedRow {
     pub created_at: i64,
 }
 
-/// Statuses emitted as list groups in local mode. Emitting all of them
-/// (even when empty) mirrors the AniList response shape so the shared
-/// optimistic-cache logic finds a target group on every status change.
+/// Statuses emitted as list groups in local mode, even when empty, so the optimistic cache always finds a target group.
 const LOCAL_STATUSES: [&str; 6] = [
     "CURRENT",
     "PLANNING",
@@ -506,21 +290,7 @@ pub struct LocalRow {
     pub media_json: Option<String>,
 }
 
-/// One write to the local list.
-///
-/// A struct rather than the thirteen positional arguments this would otherwise
-/// be — the same reason `DetectionOverride` stopped being a tuple.
-///
-/// **Every field but the key and the timestamp is `Option`, and `None` means
-/// "leave it alone" rather than "set it to nothing"** — the same contract
-/// AniList gives an absent GraphQL variable. That has to hold for all of them,
-/// because almost nothing in the UI sends a whole entry: `+1` on a list row
-/// sends `progress` alone, the status dropdown sends `status` alone, the bulk
-/// bar sends one field across a whole selection, and the detail editor omits
-/// `progressVolumes` entirely. v14 gave the contract to `private` and the two
-/// dates and left the other six defaulting to `PLANNING`/`0`/`""`, so a `+1`
-/// reset the status, score, repeat, volume count and notes of the row it was
-/// incrementing — and the tags with the notes, since they share the column.
+/// One write to the local list; every `None` means "leave it alone", because a `+1` sends `progress` alone.
 pub struct LocalWrite<'a> {
     pub media_id: i64,
     pub media_type: &'a str,
@@ -537,19 +307,10 @@ pub struct LocalWrite<'a> {
     pub updated_ms: i64,
 }
 
-/// Notifications retained. The bell reads the newest 100, so this is scrollback
-/// headroom rather than a display limit — it exists only so the table cannot
-/// grow without bound.
+/// Notifications retained: scrollback headroom rather than a display limit, so the table cannot grow without bound.
 const NOTIF_KEEP: i64 = 500;
 
-/// Applies one migration step atomically.
-///
-/// The wrapping transaction is the whole point. `execute_batch` otherwise runs
-/// in autocommit, so each statement lands on its own and a crash between a
-/// schema change and the `PRAGMA user_version` that records it left a database
-/// that had been migrated but was still labelled with the old version — and the
-/// next launch would try to migrate it again. SQLite's DDL and `user_version`
-/// are both transactional, so either the whole step lands or none of it does.
+/// Applies one migration step inside a transaction, so the schema change and the `user_version` bump land together.
 fn apply(conn: &Connection, version: u32, sql: &str) -> Result<(), String> {
     conn.execute_batch(&format!("BEGIN;\n{sql}\nCOMMIT;"))
         .map_err(|e| format!("Migration v{version} failed: {e}"))
@@ -572,12 +333,7 @@ impl Db {
             .map_err(|e| format!("Could not create app data folder: {e}"))?;
         let conn = Connection::open(data_dir.join("karasu.db"))
             .map_err(|e| format!("Could not open database: {e}"))?;
-        // Before the migrations, which run DDL on *every* open: SQLite's
-        // default is an immediate SQLITE_BUSY, and on Android a background
-        // job (JobScheduler) can hold a second connection on this file while
-        // the app cold-starts — whose open failing aborts startup outright.
-        // Five seconds of retry protects both directions. Deliberately not
-        // WAL: `snapshot_to` encodes rollback-journal assumptions.
+        // Before the migrations: Android's background job can hold a second connection while the app cold-starts.
         conn.busy_timeout(std::time::Duration::from_secs(5))
             .map_err(|e| format!("Could not set the lock timeout: {e}"))?;
         conn.execute_batch(MIGRATIONS)
@@ -601,13 +357,7 @@ impl Db {
             apply(&conn, 6, MIGRATION_V6)?;
         }
         if version < 7 {
-            // The one migration that cannot simply be re-run: every other step
-            // is `CREATE TABLE IF NOT EXISTS`, but `ALTER TABLE ADD COLUMN`
-            // fails outright if the column is there. A database interrupted
-            // between that ALTER and its version bump — possible on any build
-            // before `apply` made the pair atomic — would otherwise fail to
-            // open on every launch from then on, with no way back short of
-            // deleting it. Recovering costs one query.
+            // `ALTER TABLE ADD COLUMN` fails if the column is there, so a database interrupted mid-step must still open.
             if has_column(&conn, "local_list", "progress_volumes") {
                 apply(&conn, 7, "PRAGMA user_version = 7;")?;
             } else {
@@ -630,10 +380,7 @@ impl Db {
             apply(&conn, 12, MIGRATION_V12)?;
         }
         if version < 13 {
-            // `ALTER TABLE ADD COLUMN` again, so the same guard v7 needed: it
-            // fails outright when the column is already there, and a database
-            // interrupted between the ALTER and its version bump would then
-            // refuse to open on every launch from then on.
+            // `ALTER TABLE ADD COLUMN` again, so v7's guard again.
             if has_column(&conn, "detection_override", "episode_offset") {
                 apply(&conn, 13, "PRAGMA user_version = 13;")?;
             } else {
@@ -641,9 +388,7 @@ impl Db {
             }
         }
         if version < 14 {
-            // Three `ALTER TABLE ADD COLUMN`s, so the guard v7 and v13 carry.
-            // `apply` wraps the step in a transaction, so all three land or
-            // none do and the first column decides the answer for all of them.
+            // Three `ALTER TABLE ADD COLUMN`s in one transaction, so v7's guard and the first column decides for all three.
             if has_column(&conn, "local_list", "started_at") {
                 apply(&conn, 14, "PRAGMA user_version = 14;")?;
             } else {
@@ -651,8 +396,7 @@ impl Db {
             }
         }
         if version < 15 {
-            // The fourth `ALTER TABLE ADD COLUMN` in the schema, so v7's guard
-            // for the fourth time and for the same reason.
+            // `ALTER TABLE ADD COLUMN` again, so v7's guard again.
             if has_column(&conn, "notifications", "media_id") {
                 apply(&conn, 15, "PRAGMA user_version = 15;")?;
             } else {
@@ -660,11 +404,7 @@ impl Db {
             }
         }
         if version < 16 {
-            // The fifth `ALTER TABLE ADD COLUMN`, so v7's guard again. The
-            // attribution and the delete ride in the same step, and `apply`
-            // wraps the whole thing in a transaction — a database that gained
-            // the column but not the attribution would be one where every
-            // pre-existing row is unowned and therefore invisible.
+            // v7's guard again; `apply` keeps the column and its attribution in one transaction, or every old row is unowned.
             if has_column(&conn, "offline_queue", "user_id") {
                 apply(&conn, 16, "PRAGMA user_version = 16;")?;
             } else {
@@ -672,13 +412,11 @@ impl Db {
             }
         }
         if version < 17 {
-            // Re-runnable on its own terms, so no `has_column` guard: it is an
-            // INSERT guarded on the key it inserts.
+            // No `has_column` guard: an INSERT guarded on the key it inserts is re-runnable on its own.
             apply(&conn, 17, MIGRATION_V17)?;
         }
         if version < 18 {
-            // The sixth `ALTER TABLE ADD COLUMN`, so v7's guard once more: the
-            // column and its backfill land together or not at all.
+            // An `ALTER TABLE ADD COLUMN` is not re-runnable, so v7's guard: the column and its backfill land together.
             if has_column(&conn, "notifications", "user_id") {
                 apply(&conn, 18, "PRAGMA user_version = 18;")?;
             } else {
@@ -686,8 +424,7 @@ impl Db {
             }
         }
         if version < 19 {
-            // `version` is what the file said before any step ran: 0 means it
-            // was created just now, so there is no earlier channel to keep.
+            // `version` is what the file said before any step ran; 0 means created just now, with no channel to keep.
             if version == 0 {
                 apply(&conn, 19, MIGRATION_V19_FRESH)?;
             } else {
@@ -703,10 +440,7 @@ impl Db {
             .ok()
     }
 
-    /// Sets `key` to `value` only when it grows — a compare-and-set in the
-    /// UPDATE itself, so two connections racing the same cursor (the app's
-    /// pass and Android's background job) cannot both believe they advanced
-    /// it. Returns whether this call was the one that moved it.
+    /// Sets `key` to `value` only when it grows, as one compare-and-set so two racing connections cannot both claim the move.
     pub fn kv_advance_max(&self, key: &str, value: i64) -> bool {
         let conn = self.0.guard();
         conn.execute(
@@ -735,15 +469,7 @@ impl Db {
         let _ = conn.execute("DELETE FROM kv WHERE key = ?1", [key]);
     }
 
-    /// Drops `prefix`-keyed rows whose value is an epoch-seconds stamp older
-    /// than `cutoff`. Returns how many went.
-    ///
-    /// `substr` rather than `LIKE prefix || '%'` because `_` is a LIKE
-    /// wildcard, and several of these prefixes contain one.
-    ///
-    /// Rows written before the value carried a stamp hold `"1"`, which casts to
-    /// 1 and is therefore always older than the cutoff. That is correct: they
-    /// are by definition from an earlier run.
+    /// Drops `prefix`-keyed rows stamped older than `cutoff`; `substr` rather than `LIKE` because `_` is a LIKE wildcard.
     pub fn kv_prune_older(&self, prefix: &str, cutoff: i64) -> usize {
         let conn = self.0.guard();
         conn.execute(
@@ -755,13 +481,7 @@ impl Db {
         .unwrap_or(0)
     }
 
-    /// Deletes every key under a prefix, whatever its value.
-    ///
-    /// The sibling of `kv_prune_older` for the case where age is not the
-    /// question: on an account change the alert passes' dedupe keys
-    /// (`aired:`, `sequel_seen:`, `stale_done:`) are about what the *previous*
-    /// account had already been told, and holding them would silently deny the
-    /// next account notifications it has never seen.
+    /// Deletes every key under a prefix, so an account change drops the alert dedupe keys the previous account earned.
     pub fn kv_delete_prefix(&self, prefix: &str) -> usize {
         let conn = self.0.guard();
         conn.execute(
@@ -791,17 +511,7 @@ impl Db {
         .map_err(|e| format!("Cache write failed: {e}"))
     }
 
-    /// Writes a consistent copy of the database to `dest`, which must not
-    /// exist yet.
-    ///
-    /// `std::fs::copy` is not a substitute. The connection runs in SQLite's
-    /// default rollback-journal mode, where a database mid-transaction is only
-    /// consistent read together with its `-journal` sidecar — and the alert
-    /// passes, the scrobbler and a library scan all write from background
-    /// threads at any moment. Copying the main file alone can capture pages
-    /// whose originals still live in a journal that was never copied.
-    /// `VACUUM INTO` asks SQLite for the snapshot instead, and taking the same
-    /// mutex every other writer takes keeps it from racing them.
+    /// Writes a consistent copy to `dest`, which must not exist; `std::fs::copy` cannot see the rollback journal.
     pub fn snapshot_to(&self, dest: &std::path::Path) -> Result<(), String> {
         let conn = self.0.guard();
         conn.execute("VACUUM INTO ?1", rusqlite::params![dest.to_string_lossy()])
@@ -809,19 +519,7 @@ impl Db {
             .map_err(|e| format!("Could not copy the database: {e}"))
     }
 
-    /// `snapshot_to`, but over a file that may already be there.
-    ///
-    /// `VACUUM INTO` refuses an existing destination — there is a test in this
-    /// file asserting exactly that — so portable mode's "replace the database
-    /// beside the executable" branch could never succeed: it printed a raw
-    /// SQLite error, and the only route to a portable copy was deleting the old
-    /// file by hand.
-    ///
-    /// Written beside the destination and renamed over it, rather than deleting
-    /// first: a rename within one directory is atomic, so an interrupted copy
-    /// leaves the old database intact instead of neither. The temp file is
-    /// cleaned up on the failure path, since a half-written `.tmp` next to a
-    /// user's database is its own small alarm.
+    /// `snapshot_to` over a file that may exist, written beside it and renamed so an interrupted copy keeps the old one.
     pub fn snapshot_over(&self, dest: &std::path::Path) -> Result<(), String> {
         if !dest.exists() {
             return self.snapshot_to(dest);
@@ -845,18 +543,7 @@ impl Db {
         .ok()
     }
 
-    /// Patches an entry's progress/status directly in the list cache so
-    /// that detection sees the new state right after a scrobble.
-    /// Reads, edits and writes the cached list back **under one lock**.
-    ///
-    /// The shape this replaces took the mutex three times — once to read, once
-    /// to write, with the parse and re-serialise of the whole payload in
-    /// between — so a `fetch_media_list` storing a freshly fetched list in that
-    /// gap was silently overwritten by the stale copy plus one patched entry.
-    /// On a list of any size the gap is milliseconds, not microseconds.
-    ///
-    /// `edit` reports whether it changed anything, so an entry that is not
-    /// cached costs no write at all.
+    /// Reads, edits and writes the cached list under one lock, or a fetch landing in the gap is overwritten by a stale copy.
     fn edit_cached_list<F>(&self, user_id: i64, media_type: &str, edit: F) -> bool
     where
         F: FnOnce(&mut serde_json::Value) -> bool,
@@ -886,20 +573,7 @@ impl Db {
         .is_ok()
     }
 
-    /// Applies a field patch to one cached entry, for every writer that changes
-    /// an entry.
-    ///
-    /// **Why this must be called from every write path.** The scrobbler's two
-    /// anti-regression guards — `block_reason` and `would_regress` — read their
-    /// idea of current progress from this table. It used to be written by a
-    /// full list fetch and patched by the scrobbler itself, and by nothing
-    /// else: a manual save, a bulk edit and a queue drain all left it stale.
-    /// The guard was therefore fed the value the user had just replaced, so a
-    /// scrobble of an episode *below* a freshly set progress passed both checks
-    /// and wrote an absolute value that moved the list backwards.
-    ///
-    /// `patch` is an object of the fields to set, so one function serves
-    /// progress, status, score, volumes and dates alike.
+    /// Patches one cached entry; every write path must call it, because the scrobbler's regression guards read this table.
     pub fn cache_patch_entry(
         &self,
         user_id: i64,
@@ -934,18 +608,7 @@ impl Db {
         })
     }
 
-    /// Drops one entry from every group of the cached list, keyed on the
-    /// *entry* id, across both media types.
-    ///
-    /// A deleted entry that stays here is not merely stale: it remains a
-    /// scrobble candidate, and playing that title writes
-    /// `SaveMediaListEntry(mediaId:)`, which *creates* an entry — so the row
-    /// the user just removed came back on the next episode.
-    ///
-    /// Keyed on the entry id because `delete_list_entry` is given only `id` —
-    /// the list entry's own id, not the media's — and nothing tells it whether
-    /// that entry is an anime or a manga, so both caches are asked and the one
-    /// holding it answers.
+    /// Drops an entry from both cached lists by entry id, or a deleted entry stays a scrobble candidate and gets recreated.
     pub fn cache_forget_entry_id(&self, user_id: i64, entry_id: i64) -> bool {
         let anime = self.forget_where(user_id, "ANIME", "id", entry_id);
         let manga = self.forget_where(user_id, "MANGA", "id", entry_id);
@@ -984,11 +647,7 @@ impl Db {
 
     // --- Offline queue ------------------------------------------------------
 
-    /// Queues an edit against the account that made it.
-    ///
-    /// `user_id` is not optional and the drain filters on it: a queued row is a
-    /// write waiting to happen, and the one thing it must never do is happen to
-    /// somebody else's list. See `MIGRATION_V16`.
+    /// Queues an edit against the account that made it, so the drain can never write it to somebody else's list.
     pub fn queue_push(&self, user_id: i64, kind: &str, payload: &str) -> Result<(), String> {
         let conn = self.0.guard();
         conn.execute(
@@ -1000,8 +659,7 @@ impl Db {
         .map_err(|e| format!("Queue write failed: {e}"))
     }
 
-    /// Everything queued by `user_id`, oldest first. Another account's rows are
-    /// not returned — not as an empty-list fallback, not at all.
+    /// Everything queued by `user_id`, oldest first; another account's rows are never returned.
     pub fn queue_all(&self, user_id: i64) -> Vec<QueuedRow> {
         let conn = self.0.guard();
         let mut stmt = match conn.prepare(
@@ -1027,11 +685,7 @@ impl Db {
         let _ = conn.execute("DELETE FROM offline_queue WHERE id = ?1", [id]);
     }
 
-    /// `queue_remove` with the owner in the WHERE clause. The unscoped one is
-    /// fine for the drain, which only ever holds ids it read via `queue_all`;
-    /// a user-triggered discard resolves its id from a UI snapshot that can be
-    /// stale across a sign-out, and v16 exists precisely because rows crossing
-    /// accounts was a real data-loss bug. Returns whether a row went.
+    /// `queue_remove` scoped to the owner, for a user-triggered discard whose id came from a snapshot stale across a sign-out.
     pub fn queue_remove_for(&self, user_id: i64, id: i64) -> bool {
         let conn = self.0.guard();
         conn.execute(
@@ -1042,12 +696,7 @@ impl Db {
         .unwrap_or(false)
     }
 
-    /// The schema version the database is actually on.
-    ///
-    /// A diagnostics fact worth having because several readers here return an
-    /// empty list rather than an error when the shape does not match what they
-    /// expect — so "my library is empty" and "the migration did not run" look
-    /// identical from the outside.
+    /// The schema version the database is on, for diagnostics, since readers here answer a shape mismatch with an empty list.
     pub fn schema_version(&self) -> u32 {
         let conn = self.0.guard();
         conn.query_row("PRAGMA user_version", [], |r| r.get::<_, i64>(0))
@@ -1055,8 +704,7 @@ impl Db {
             .unwrap_or(0)
     }
 
-    /// The pending badge. Scoped like the drain, so it counts what *this*
-    /// account is waiting on rather than what is in the table.
+    /// The pending badge, scoped like the drain so it counts what this account is waiting on.
     pub fn queue_len(&self, user_id: i64) -> usize {
         let conn = self.0.guard();
         conn.query_row(
@@ -1070,21 +718,11 @@ impl Db {
 
     // --- Local-only list ----------------------------------------------------
 
-    /// Insert or update a local entry. `media_json` is kept from the existing
-    /// row when `None`, so field-only edits (progress/status) don't need to
-    /// re-supply the media metadata.
+    /// Inserts or updates a local entry, keeping every column an absent field does not mention.
     pub fn local_upsert(&self, w: LocalWrite<'_>) -> Result<(), String> {
         let conn = self.0.guard();
         conn.execute(
-            // Absent means "unchanged" for every column here — the same contract
-            // AniList gives an absent GraphQL variable, and what the whole UI
-            // relies on, since almost nothing sends a complete entry. A first
-            // insert has no previous value to keep, so the `VALUES` list carries
-            // the neutral defaults; the `DO UPDATE` clause keeps what is there.
-            //
-            // Clearing a date is spelled the way AniList spells it, as an object
-            // with every part null, which is a present value here rather than an
-            // absent one.
+            // Absent means unchanged, as for an absent GraphQL variable; a cleared date is an object with every part null.
             "INSERT INTO local_list
                 (media_id, media_type, status, progress, progress_volumes, score, repeat,
                  notes, tags, private, started_at, completed_at, updated_ms, media_json)
@@ -1123,8 +761,7 @@ impl Db {
         .map_err(|e| format!("Local save failed: {e}"))
     }
 
-    /// Media type of an existing local row (media ids are globally unique on
-    /// AniList, so the id alone identifies the row).
+    /// Media type of an existing local row; AniList media ids are globally unique, so the id alone identifies it.
     pub fn local_find_type(&self, media_id: i64) -> Option<String> {
         let conn = self.0.guard();
         conn.query_row(
@@ -1147,9 +784,7 @@ impl Db {
 
     fn local_rows(&self, media_type: Option<&str>) -> Vec<LocalRow> {
         let conn = self.0.guard();
-        // Column order here is load-bearing: `map` reads by index, and
-        // `collect` below drops rows whose mapping errors. A mismatch does not
-        // fail loudly — it silently returns an empty list.
+        // Column order is load-bearing: `map` reads by index, and a mismatch silently returns an empty list.
         let sql = "SELECT media_id, media_type, status, progress, progress_volumes, \
                    score, repeat, notes, updated_ms, media_json, private, \
                    started_at, completed_at FROM local_list";
@@ -1198,20 +833,14 @@ impl Db {
         self.local_rows(None)
     }
 
-    /// A stored `FuzzyDate` back as JSON, or null.
-    ///
-    /// Unparseable text becomes null rather than an error: the column is
-    /// written by exactly one place, so a row that does not parse is a row from
-    /// a Karasu that no longer exists, and the entry is worth more than the
-    /// date is.
+    /// A stored `FuzzyDate` back as JSON, or null; unparseable text is null because the entry is worth more than the date.
     pub(crate) fn fuzzy_date(stored: Option<&str>) -> serde_json::Value {
         stored
             .and_then(|s| serde_json::from_str(s).ok())
             .unwrap_or(serde_json::Value::Null)
     }
 
-    /// The local list for one media type as an AniList-shaped `lists` array
-    /// (JSON string), so the frontend `ListResult` is identical to online.
+    /// The local list for one media type as an AniList-shaped `lists` JSON array, so the frontend sees one shape.
     pub fn local_list_json(&self, media_type: &str) -> String {
         use serde_json::{json, Value};
         let mut buckets: std::collections::HashMap<&str, Vec<Value>> =
@@ -1232,19 +861,7 @@ impl Db {
                 "repeat": row.repeat,
                 "notes": row.notes,
                 "updatedAt": row.updated_ms / 1000,
-                // Real values since v14. They were a hard-coded `false` and two
-                // nulls for as long as the local list existed, which made the
-                // shape match the API's while quietly saying "no" to three
-                // questions nobody had asked the database. Still emitted
-                // explicitly rather than left absent: `MediaListEntry` declares
-                // them, so omitting them would make the type a lie and
-                // `entry.startedAt` would be `undefined` where the compiler
-                // promised an object or null.
-                //
-                // "Private" locally cannot mean hidden from anyone — there is no
-                // account and no feed. It means left out of the MAL export, the
-                // one export that hands the list to someone else; the JSON
-                // backup keeps the entry and carries the flag with it.
+                // Emitted explicitly because `MediaListEntry` declares them; "private" locally means left out of the MAL export.
                 "private": row.private,
                 "startedAt": Self::fuzzy_date(row.started_at.as_deref()),
                 "completedAt": Self::fuzzy_date(row.completed_at.as_deref()),
@@ -1294,11 +911,7 @@ impl Db {
         )
         .map_err(|e| format!("Notification write failed: {e}"))?;
 
-        // The table was insert-only, so a long-lived install accumulated every
-        // notification it had ever shown — thousands a year, of which nothing
-        // can read past the newest hundred. Trimming on write keeps the bound
-        // without a separate pass to forget to run. Well above the read limit,
-        // so scrolling back is unaffected.
+        // Trimming on write keeps the table bounded without a separate pass to forget to run.
         let _ = conn.execute(
             "DELETE FROM notifications WHERE id NOT IN
                  (SELECT id FROM notifications ORDER BY created_ms DESC, id DESC LIMIT ?1)",
@@ -1307,13 +920,7 @@ impl Db {
         Ok(())
     }
 
-    /// Most recent notifications first, capped at `limit`, for one account.
-    ///
-    /// `viewer` is who is asking. A row with a null `user_id` belongs to the
-    /// install rather than to an account — the app-update notice — and is
-    /// returned to everyone, including a signed-out or local-mode caller.
-    /// Everything else answers only to its owner, which is what stops one
-    /// account's aired-episode rows appearing in the next account's bell.
+    /// Newest notifications first for one account, plus the install's own null-owner rows, which everyone sees.
     pub fn notif_all(&self, limit: i64, viewer: Option<i64>) -> Vec<NotificationRow> {
         let conn = self.0.guard();
         let mut stmt = match conn.prepare(
@@ -1354,10 +961,7 @@ impl Db {
             .map_err(|e| format!("Notification update failed: {e}"))
     }
 
-    /// Removes every row of one kind — the update notice's exit. A "new
-    /// release" row must not outlive the install it announces, and the
-    /// retention trim above (newest 500) never reaches it on a quiet
-    /// account, so without this the row was effectively permanent.
+    /// Removes every row of one kind, the update notice's exit, since the retention trim never reaches it on a quiet account.
     pub fn notif_clear_kind(&self, kind: &str) -> Result<(), String> {
         let conn = self.0.guard();
         conn.execute("DELETE FROM notifications WHERE kind = ?1", [kind])
@@ -1377,11 +981,7 @@ impl Db {
         .unwrap_or(0)
     }
 
-    /// Forgets every account-scoped bell row, keeping the install's own.
-    ///
-    /// Called when the app changes which account it acts as. The app-update
-    /// notice survives because it is not about an account and the user has not
-    /// acted on it yet.
+    /// Forgets every account-scoped bell row on an account change, keeping the install's own update notice.
     pub fn notif_clear_owned(&self) -> Result<(), String> {
         let conn = self.0.guard();
         conn.execute("DELETE FROM notifications WHERE user_id IS NOT NULL", [])
@@ -1391,13 +991,7 @@ impl Db {
 
     // --- Local library ------------------------------------------------------
 
-    /// Replaces the whole library index in one transaction — a scan always
-    /// produces the complete picture, so a diff would only add failure modes.
-    ///
-    /// `scores` goes in the same transaction for the same reason: an index that
-    /// survived a crash without its confidences would show every title as an
-    /// exact match, which is the one thing the column exists to deny.
-    /// The index half of a scan result, inside a caller's transaction.
+    /// The index half of a scan result, with its scores, inside a caller's transaction so neither survives without the other.
     fn write_index(
         tx: &rusqlite::Transaction<'_>,
         rows: &[(i64, u32, String)],
@@ -1462,9 +1056,7 @@ impl Db {
             .unwrap_or_default()
     }
 
-    /// Records a correction. Upsert rather than insert: pointing the same
-    /// release name somewhere new is a correction of the correction, not a
-    /// second opinion to be kept alongside the first.
+    /// Records a correction as an upsert, because re-pointing the same release name corrects the correction.
     pub fn library_override_set(
         &self,
         title: &str,
@@ -1481,11 +1073,7 @@ impl Db {
         .map_err(|e| format!("Could not save the correction: {e}"))
     }
 
-    /// Forgets a correction, letting the matcher have its guess back.
-    ///
-    /// Returns how many rows that was. Discarding the count made "there was no
-    /// correction here" indistinguishable from "removed it", and the caller
-    /// needs to tell those apart to avoid reporting success for a no-op.
+    /// Forgets a correction and returns the row count, so the caller can tell a removal from a no-op.
     pub fn library_override_clear(&self, title: &str, season: i32) -> Result<usize, String> {
         let conn = self.0.guard();
         conn.execute(
@@ -1497,9 +1085,7 @@ impl Db {
 
     // --- Detection corrections ------------------------------------------------
 
-    /// Every correction the user has made on the now-playing card. Small by
-    /// nature — one row per title the matcher gets wrong — so it is read whole
-    /// and matched in memory.
+    /// Every correction made on the now-playing card, read whole and matched in memory because the table stays small.
     pub fn detection_overrides(&self) -> Vec<DetectionOverride> {
         let conn = self.0.guard();
         conn.prepare(
@@ -1522,9 +1108,7 @@ impl Db {
         .unwrap_or_default()
     }
 
-    /// Records a detection correction. Upsert for `library_override_set`'s
-    /// reason: pointing the same detected title somewhere new corrects the
-    /// correction rather than adding a second opinion.
+    /// Records a detection correction as an upsert, for `library_override_set`'s reason.
     pub fn detection_override_set(
         &self,
         title: &str,
@@ -1556,8 +1140,7 @@ impl Db {
         .map_err(|e| format!("Could not save the correction: {e}"))
     }
 
-    /// Forgets one, giving the matcher its guess back. Returns the row count so
-    /// a no-op is distinguishable from a removal, exactly as v9's clear does.
+    /// Forgets one detection correction and returns the row count, so a no-op is distinguishable from a removal.
     pub fn detection_override_clear(
         &self,
         title: &str,
@@ -1575,8 +1158,7 @@ impl Db {
 
     // --- Season splits --------------------------------------------------------
 
-    /// Every user-confirmed episode-range redirect:
-    /// `(title, season, ep_from, ep_to, media_id, dst_start)`.
+    /// Every user-confirmed episode-range redirect as `(title, season, ep_from, ep_to, media_id, dst_start)`.
     pub fn library_redirects(&self) -> Vec<(String, i32, u32, u32, i64, u32)> {
         let conn = self.0.guard();
         conn.prepare(
@@ -1591,8 +1173,7 @@ impl Db {
         .unwrap_or_default()
     }
 
-    /// Records a season split. Upsert on the range start, like the overrides:
-    /// re-pointing the same range is a correction of the correction.
+    /// Records a season split as an upsert on the range start, because re-pointing the same range corrects the correction.
     pub fn library_redirect_set(
         &self,
         title: &str,
@@ -1616,8 +1197,7 @@ impl Db {
         .map_err(|e| format!("Could not save the season split: {e}"))
     }
 
-    /// Removes a season split. Returns the row count, for the same reason
-    /// `library_override_clear` does.
+    /// Removes a season split and returns the row count, for the same reason `library_override_clear` does.
     pub fn library_redirect_clear(
         &self,
         title: &str,
@@ -1656,9 +1236,7 @@ impl Db {
             .unwrap_or_default()
     }
 
-    /// Replaces the suggestions in one transaction. Scan output, like the
-    /// unplaced files — and like them, `library_override` is left alone: a
-    /// confirmed correction outranks anything a later search comes up with.
+    /// Replaces the suggestions in one transaction, leaving `library_override` alone: a correction outranks a search.
     pub fn library_replace_suggestions(
         &self,
         rows: &[(String, i32, i64, f64)],
@@ -1685,19 +1263,7 @@ impl Db {
             .map_err(|e| format!("Library write failed: {e}"))
     }
 
-    /// Replaces the unplaced files in one transaction.
-    ///
-    /// `library_override` is deliberately untouched: it is the user's, not the
-    /// scan's, and wiping it here would undo every correction on the next scan
-    /// — which is precisely the failure the whole design exists to avoid.
-    /// Publishes a whole scan result — index, scores and unmatched list — in
-    /// **one** transaction.
-    ///
-    /// `write_index` and `write_unmatched` are each atomic on
-    /// their own, and calling them in sequence is not: a failure between them
-    /// left an index describing this scan beside an unmatched list describing
-    /// the previous one, which is the state the "N files could not be placed"
-    /// screen reads. The tables are one answer and are written as one.
+    /// Publishes a whole scan result in one transaction, never touching `library_override`, which is the user's.
     pub fn library_publish(
         &self,
         rows: &[(i64, u32, String)],
@@ -1742,8 +1308,7 @@ pub(crate) mod tests {
     use super::*;
     use serde_json::Value;
 
-    /// A migrated in-memory database. `pub(crate)` so tests elsewhere can
-    /// exercise code that takes a `Db` without opening a file.
+    /// A migrated in-memory database, `pub(crate)` so tests elsewhere can take a `Db` without opening a file.
     pub(crate) fn mem_db() -> Db {
         let conn = Connection::open_in_memory().unwrap();
         conn.execute_batch(MIGRATIONS).unwrap();
@@ -1769,13 +1334,7 @@ pub(crate) mod tests {
         Db(Mutex::new(conn))
     }
 
-    /// The other half of `hydrate`'s startup cost, measured for the same
-    /// reason as `library::hydrate_cost`: the audit filed it as a startup
-    /// item without a number, and the number is what decides whether moving
-    /// it off the setup thread is worth the empty-index window that costs.
-    ///
-    /// Ignored by default — a measurement, not an assertion. Run with
-    /// `cargo test --release --lib measure_the_cache_read -- --ignored --nocapture`.
+    /// Measures the cached-list read that is the other half of `hydrate`'s startup cost; a measurement, not an assertion.
     #[test]
     #[ignore]
     fn measure_the_cache_read() {
@@ -1818,13 +1377,11 @@ pub(crate) mod tests {
     /// v17 has to tell two populations apart that the key itself cannot.
     #[test]
     fn v17_blurs_by_default_only_where_nothing_was_ever_stored() {
-        // A database being created right now: kv is empty when v17 runs, so
-        // the person choosing settings for the first time gets the blur on.
+        // A database being created right now: kv is empty when v17 runs, so the blur comes on.
         let fresh = mem_db();
         assert_eq!(fresh.kv_get("blur_adult").as_deref(), Some("1"));
 
-        // A database that has been in use: something is already stored, so the
-        // screen the user already had does not change under them on an update.
+        // A database in use: something is already stored, so the screen the user had does not change under them.
         let conn = Connection::open_in_memory().unwrap();
         conn.execute_batch(MIGRATIONS).unwrap();
         conn.execute_batch("INSERT INTO kv (key, value) VALUES ('theme', 'karasu');")
@@ -1847,8 +1404,7 @@ pub(crate) mod tests {
         assert_eq!(db.kv_get("blur_adult").as_deref(), Some("0"));
     }
 
-    /// v19 tells its two populations apart by the version the file arrived
-    /// with, not by what `kv` holds — v17 has already written a row by then.
+    /// Proves v19 seeds Nightly for an existing install and leaves a fresh one on the Stable default.
     #[test]
     fn v19_keeps_an_existing_install_on_nightly_and_a_fresh_one_on_stable() {
         // Fresh: no row, so the reader's default — Stable — applies.
@@ -1868,8 +1424,7 @@ pub(crate) mod tests {
         );
     }
 
-    /// The decision itself lives in `open`, so it is exercised through `open`:
-    /// a file at v18 is seeded, a file that did not exist is not.
+    /// Proves `open` seeds a file that arrived at v18 and not one that did not exist, since `kv` cannot tell them apart.
     #[test]
     fn v19_decides_by_the_version_the_file_arrived_with() {
         let stamp = std::time::SystemTime::now()
@@ -1924,9 +1479,7 @@ pub(crate) mod tests {
         assert_eq!(db.kv_get("update_channel").as_deref(), Some("stable"));
     }
 
-    /// The offset is what makes a correction able to say *which episode*, not
-    /// only which entry — and it defaults to the "same numbering" every
-    /// pre-v13 row meant.
+    /// Proves a correction carries an episode offset, defaulting to the same numbering every pre-v13 row meant.
     #[test]
     fn a_correction_can_carry_an_episode_offset() {
         let db = mem_db();
@@ -1949,9 +1502,7 @@ pub(crate) mod tests {
         assert_eq!(rows.len(), 2, "and does not add a row");
     }
 
-    /// The detection correction is its own key space, and the two tables must
-    /// not be able to reach into each other — the whole reason v12 exists
-    /// rather than a `media_type` column bolted onto v9.
+    /// Proves a detection correction is keyed by medium and cannot reach into the library's table, which is why v12 exists.
     #[test]
     fn a_detection_correction_is_keyed_by_medium_and_leaves_the_library_alone() {
         let db = mem_db();
@@ -1988,8 +1539,7 @@ pub(crate) mod tests {
         assert_eq!(db.library_overrides().len(), 1);
     }
 
-    /// A suggestion is the scan's opinion and a correction is the user's, so a
-    /// rescan may replace all of the former and none of the latter.
+    /// Proves a rescan replaces every suggestion and no correction, since only the former is the scan's opinion.
     #[test]
     fn a_rescan_replaces_suggestions_but_never_corrections() {
         let db = mem_db();
@@ -2004,9 +1554,7 @@ pub(crate) mod tests {
         assert_eq!(db.library_overrides(), vec![("hunter x hunter".into(), -1, 136)]);
     }
 
-    /// A correction is the user's answer and has to outlive the scan that
-    /// disagreed with it — so a rescan replaces sources and unmatched files
-    /// while leaving every override exactly where it was.
+    /// Proves a rescan replaces the index and unmatched files while leaving every override where it was.
     #[test]
     fn a_rescan_keeps_corrections_and_replaces_everything_else() {
         let db = mem_db();
@@ -2024,9 +1572,7 @@ pub(crate) mod tests {
         );
     }
 
-    /// Re-pointing the same release name replaces the earlier answer instead of
-    /// leaving two rows for one key, and clearing gives the matcher its guess
-    /// back rather than pinning the title to nothing.
+    /// Proves re-pointing a release name replaces the earlier answer and clearing gives the matcher its guess back.
     #[test]
     fn an_override_is_replaced_then_cleared() {
         let db = mem_db();
@@ -2034,24 +1580,19 @@ pub(crate) mod tests {
         db.library_override_set("bleach", 2, 200).unwrap();
         assert_eq!(db.library_overrides(), vec![("bleach".into(), 2, 200)]);
 
-        // A different season of the same show is a different key, not the same
-        // correction seen twice.
+        // A different season of the same show is a different key, not the same correction seen twice.
         db.library_override_set("bleach", -1, 300).unwrap();
         assert_eq!(db.library_overrides().len(), 2);
 
         assert_eq!(db.library_override_clear("bleach", 2).unwrap(), 1);
         assert_eq!(db.library_overrides(), vec![("bleach".into(), -1, 300)]);
 
-        // Clearing a key that holds no correction is not an error, but it must
-        // not read as a removal either — the caller reports success on the
-        // strength of this number, and 0 is the whole no-op case.
+        // Clearing a key with no correction is not an error, but it must not read as a removal either.
         assert_eq!(db.library_override_clear("bleach", 2).unwrap(), 0);
         assert_eq!(db.library_override_clear("never-corrected", 1).unwrap(), 0);
     }
 
-    /// A season split keys on its range start, so re-pointing the same range
-    /// replaces the earlier answer, a second range on the same parse is its own
-    /// row, and clearing returns the honest count.
+    /// Proves a season split keys on its range start, so a second range is its own row and clearing counts honestly.
     #[test]
     fn a_season_split_is_replaced_then_cleared() {
         let db = mem_db();
@@ -2062,8 +1603,7 @@ pub(crate) mod tests {
             vec![("frieren".into(), -1, 13, 28, 556, 1)]
         );
 
-        // A second overflow of the same parse — a three-cour folder — is a
-        // second range, not a correction of the first.
+        // A second overflow of the same parse is a second range, not a correction of the first.
         db.library_redirect_set("frieren", -1, 29, 40, 557, 1).unwrap();
         assert_eq!(db.library_redirects().len(), 2);
 
@@ -2075,12 +1615,7 @@ pub(crate) mod tests {
         assert_eq!(db.library_redirect_clear("frieren", -1, 13).unwrap(), 0);
     }
 
-    /// The index must survive a write/read round-trip, and a rescan must
-    /// replace the previous contents rather than accumulate them.
-    /// The list cache is what `cached_media_list` serves on a cold start, so a
-    /// The airing watcher writes one of these per episode, forever. Pruning
-    /// has to take the old unstamped rows too, or the ones already on disk
-    /// would never go.
+    /// Proves pruning takes the old unstamped rows too, or the ones already on disk would never go.
     #[test]
     fn pruning_takes_stale_and_legacy_keys_and_leaves_the_rest() {
         let db = mem_db();
@@ -2127,11 +1662,7 @@ pub(crate) mod tests {
         assert_eq!(db.notif_all(1, None)[0].created_ms, NOTIF_KEEP + 24);
     }
 
-    /// v7 adds a column, and `ALTER TABLE ADD COLUMN` cannot be re-run. A
-    /// database that had the column but was still labelled v6 — what an
-    /// interrupted upgrade used to leave behind — failed to open on every
-    /// launch from then on, permanently, with the whole list and library
-    /// unreachable behind it.
+    /// Proves a database with a column already added but the version still behind opens instead of failing every launch.
     #[test]
     fn a_database_left_mid_upgrade_still_opens() {
         let dir = std::env::temp_dir().join(format!("karasu-mig-{}", std::process::id()));
@@ -2139,8 +1670,7 @@ pub(crate) mod tests {
 
         drop(Db::open(dir.clone()).unwrap());
 
-        // Exactly the interrupted state: the ALTER committed, the version bump
-        // did not.
+        // Exactly the interrupted state: the ALTER committed, the version bump did not.
         let conn = Connection::open(dir.join("karasu.db")).unwrap();
         assert!(has_column(&conn, "local_list", "progress_volumes"));
         conn.execute_batch("PRAGMA user_version = 6;").unwrap();
@@ -2155,10 +1685,7 @@ pub(crate) mod tests {
         assert_eq!(version, 19, "and must end up fully migrated");
         drop(conn);
 
-        // v13, v14, v15 and v18 are the other `ALTER TABLE ADD COLUMN` steps,
-        // so each needs the same guard and the same proof: the column present,
-        // the version behind. v14 adds three columns in one transaction, which
-        // is why checking the first one is enough to decide for all three.
+        // Every other `ALTER TABLE ADD COLUMN` step needs the same proof: the column present, the version behind.
         for (version_behind, table, column) in [
             (12, "detection_override", "episode_offset"),
             (13, "local_list", "started_at"),
@@ -2185,8 +1712,7 @@ pub(crate) mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
-    /// v14. Three fields the app understands everywhere else, which the local
-    /// list answered with a hard-coded `false` and two nulls.
+    /// Proves a local entry carries dates and privacy, and that an absent field leaves them alone.
     #[test]
     fn a_local_entry_carries_dates_and_privacy() {
         let db = mem_db();
@@ -2216,9 +1742,7 @@ pub(crate) mod tests {
         assert_eq!(e["startedAt"]["day"], Value::Null);
         assert_eq!(e["completedAt"], Value::Null);
 
-        // The editor sends a date only once it has been touched, and a `+1
-        // progress` from a list row sends none of the three. Absent has to mean
-        // "leave it alone" or an unrelated save would quietly wipe all of them.
+        // A `+1` sends none of the three, so absent has to mean "leave it alone" or an unrelated save wipes them.
         db.local_upsert(LocalWrite {
             progress: Some(5),
             updated_ms: 2_000,
@@ -2230,8 +1754,7 @@ pub(crate) mod tests {
         assert_eq!(e["private"], true);
         assert_eq!(e["startedAt"]["year"], 2024);
 
-        // Clearing is AniList's own spelling — the object with every part null
-        // — which is a value rather than an absence and therefore lands.
+        // Clearing is AniList's own spelling, an object with every part null, which is a value and therefore lands.
         db.local_upsert(LocalWrite {
             private: Some(false),
             started_at: Some(r#"{"year":null,"month":null,"day":null}"#),
@@ -2244,17 +1767,7 @@ pub(crate) mod tests {
         assert_eq!(e["startedAt"]["year"], Value::Null);
     }
 
-    /// The contract above, for the other six columns.
-    ///
-    /// v14 gave "absent means unchanged" to `private` and the two dates and left
-    /// status, progress, volumes, score, repeat and notes writing `excluded.*`
-    /// unconditionally — so a `+1` from a list row, which sends `progress` and
-    /// nothing else, reset the status to PLANNING and the rest to zero, taking
-    /// the tags with the notes they share a column with. Every quick control in
-    /// the app sends exactly one field, so this was the common case, not an edge.
-    ///
-    /// Built from `patch()` rather than `write()` on purpose: the older helper
-    /// always supplies a status, which is what kept the test above blind to this.
+    /// Proves a one-field save leaves the other six columns alone; built from `patch()`, since `write()` always sends a status.
     #[test]
     fn a_partial_local_save_leaves_every_untouched_field_alone() {
         let db = mem_db();
@@ -2285,8 +1798,7 @@ pub(crate) mod tests {
         assert_eq!(row.progress_volumes, 12);
         assert_eq!(row.notes, "a note", "and so the tags sharing the column");
 
-        // The status dropdown is the same shape and used to zero `progress`
-        // too — an entry at episode 137 came back at 0 for being paused.
+        // The status dropdown is the same shape and must not zero `progress`.
         db.local_upsert(LocalWrite {
             status: Some("PAUSED"),
             ..patch(4, "ANIME")
@@ -2298,9 +1810,7 @@ pub(crate) mod tests {
         assert_eq!(row.score, 8.0);
     }
 
-    /// A row that does not exist yet has no previous value to keep, so the
-    /// neutral defaults still apply — they just moved to the `VALUES` list.
-    /// `LocalLibrary`'s "add to list" sends `{mediaId, status}` and relies on it.
+    /// Proves a first write still gets the neutral defaults, which "add to list" relies on when it sends only a status.
     #[test]
     fn a_first_local_write_still_gets_the_neutral_defaults() {
         let db = mem_db();
@@ -2321,10 +1831,7 @@ pub(crate) mod tests {
         assert!(!row.private);
     }
 
-    /// Portable mode's copy step. Also pins that SQLite accepts a bound
-    /// parameter as the `VACUUM INTO` destination — building that path by
-    /// string concatenation would break on any apostrophe in a user's folder
-    /// name.
+    /// Proves a snapshot is a readable copy and that `VACUUM INTO` takes a bound parameter, so an apostrophe in a path is safe.
     #[test]
     fn a_snapshot_is_a_readable_database_with_the_same_rows() {
         let db = mem_db();
@@ -2339,18 +1846,14 @@ pub(crate) mod tests {
         let copy = Db(Mutex::new(Connection::open(&dest).unwrap()));
         assert_eq!(copy.kv_get("anilist_viewer").as_deref(), Some(r#"{"id":7}"#));
 
-        // VACUUM INTO refuses to overwrite, which is what makes the caller's
-        // "only when the destination is absent" guard load-bearing.
+        // VACUUM INTO refuses to overwrite, which is what makes the caller's absent-destination guard load-bearing.
         assert!(db.snapshot_to(&dest).is_err());
 
         drop(copy);
         let _ = std::fs::remove_dir_all(&dir);
     }
 
-    /// The other half of the line above: portable mode's "replace what is
-    /// there" branch called `snapshot_to` on a path that by definition exists,
-    /// so it could never succeed — it printed a raw SQLite error and the only
-    /// way to a portable copy was deleting the file by hand.
+    /// Proves `snapshot_over` replaces a database already there, which portable mode's copy branch needs.
     #[test]
     fn a_snapshot_can_replace_the_database_already_there() {
         let db = mem_db();
@@ -2375,8 +1878,7 @@ pub(crate) mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
-    /// miss has to be distinguishable from a cached empty list — the caller
-    /// falls back to a loading state on `None` and paints on `Some`.
+    /// Proves a cache miss is distinguishable from a cached empty list, since the caller shows a loading state on `None`.
     #[test]
     fn list_cache_round_trip_and_miss() {
         let db = mem_db();
@@ -2388,8 +1890,7 @@ pub(crate) mod tests {
             Some("[{\"entries\":[]}]")
         );
 
-        // Scoped per user *and* per media type: priming one must not serve the
-        // other, or the manga list would render the anime one.
+        // Scoped per user and per media type, or the manga list would render the anime one.
         assert!(db.cached_list(7, "MANGA").is_none());
         assert!(db.cached_list(8, "ANIME").is_none());
 
@@ -2423,9 +1924,7 @@ pub(crate) mod tests {
         assert_eq!(rows, vec![(1, 1, "C:/anime/other-01.mkv".to_string())]);
     }
 
-    /// Schema v8. The scanner's confidence is the difference between "this is
-    /// the show" and "this is my best guess", and the screen says so — but only
-    /// if the number survives the restart the index already survives.
+    /// Proves the scanner's confidence survives a restart with the index and is replaced by a rescan.
     #[test]
     fn library_scores_round_trip_and_replace() {
         let db = mem_db();
@@ -2444,23 +1943,13 @@ pub(crate) mod tests {
         scores.sort_by_key(|(id, _)| *id);
         assert_eq!(scores, vec![(1, 0.74), (154587, 1.0)]);
 
-        // A rescan is the whole picture, so the previous confidences go with
-        // the previous paths rather than lingering beside them.
+        // A rescan is the whole picture, so the previous confidences go with the previous paths.
         db.library_publish(&[(1, 1, "C:/anime/other-01.mkv".into())], &[(1, 0.91)], &[])
             .unwrap();
         assert_eq!(db.library_scores(), vec![(1, 0.91)]);
     }
 
-    /// Schema v7. Volumes are a second axis, not a derived one: a manga read
-    /// by volume and a manga read by chapter are different states, and the
-    /// local list dropped the volume half entirely before this.
-    /// Every field a test does not care about, so the ones it does care about
-    /// are the only ones written out at the call site.
-    ///
-    /// `status` is `Some("CURRENT")` because most tests here read the row back
-    /// out of `local_list_json`, which groups by status. That makes this helper
-    /// blind to the partial-save bug by construction — a `LocalWrite` built
-    /// from it always *sends* a status — so the test for that uses `patch()`.
+    /// A `LocalWrite` with every field a test does not care about filled in; it always sends a status, so `patch()` exists.
     fn write(media_id: i64, media_type: &'static str) -> LocalWrite<'static> {
         LocalWrite {
             media_id,
@@ -2479,10 +1968,7 @@ pub(crate) mod tests {
         }
     }
 
-    /// What the UI actually sends: a key, a timestamp, and nothing else.
-    ///
-    /// The shape `local_save_entry` produces for `{mediaId, progress}` — a `+1`
-    /// from a list row. Every absent field must survive the write.
+    /// What the UI actually sends for a `+1`: a key, a timestamp, and nothing else.
     fn patch(media_id: i64, media_type: &'static str) -> LocalWrite<'static> {
         LocalWrite {
             media_id,
@@ -2537,9 +2023,7 @@ pub(crate) mod tests {
         assert_eq!(row.progress_volumes, 12);
     }
 
-    /// The migration runs on a database that already has rows. `ALTER TABLE
-    /// ... DEFAULT 0` has to leave them readable rather than erroring or
-    /// yielding NULL, which `local_rows` would drop on the floor.
+    /// Proves v7 leaves existing rows readable with a zero, which `local_rows` would otherwise drop as NULL.
     #[test]
     fn migration_v7_backfills_existing_rows_with_zero() {
         let conn = Connection::open_in_memory().unwrap();
@@ -2563,11 +2047,7 @@ pub(crate) mod tests {
             .unwrap();
         assert_eq!(version, 7);
 
-        // The rest of the ladder, because `local_rows` reads every column the
-        // *current* schema has. Stopping at v7 here made this test fail the
-        // moment v14 added three more — silently, as an empty list rather than
-        // an error, which is the failure mode that function's comment warns
-        // about and is worth having a test walk into.
+        // The rest of the ladder, because `local_rows` reads every column the current schema has.
         conn.execute_batch(MIGRATION_V8).unwrap();
         conn.execute_batch(MIGRATION_V9).unwrap();
         conn.execute_batch(MIGRATION_V10).unwrap();
@@ -2582,8 +2062,7 @@ pub(crate) mod tests {
         let row = db.local_all().into_iter().find(|r| r.media_id == 3).unwrap();
         assert_eq!(row.progress, 40);
         assert_eq!(row.progress_volumes, 0);
-        // v14's three columns backfill the same way: a row written before them
-        // reads as not private, with no dates.
+        // v14's three columns backfill the same way: not private, no dates.
         assert!(!row.private);
         assert_eq!(row.started_at, None);
         assert_eq!(row.completed_at, None);
@@ -2704,13 +2183,7 @@ pub(crate) mod tests {
         assert_eq!(db.notif_all(3, None).len(), 3);
     }
 
-    /// v16. A queued edit belongs to the account that made it.
-    ///
-    /// `anilist_logout` clears the token and the cached viewer and leaves the
-    /// queue standing, and the drain runs on every list fetch with whatever
-    /// token is loaded *now* — so before this, signing out of one account and
-    /// into another replayed the first account's unsynced edits onto the
-    /// second's list.
+    /// Proves a queued edit is served only to the account that made it, never to whoever signs in next.
     #[test]
     fn a_queued_edit_is_invisible_to_another_account() {
         let db = mem_db();
@@ -2720,14 +2193,11 @@ pub(crate) mod tests {
 
         assert_eq!(db.queue_all(111).len(), 2);
         assert_eq!(db.queue_len(111), 2);
-        // The account that signed in next sees its own row and nothing else —
-        // not the other two, and not an empty-list fallback that would hide the
-        // distinction.
+        // The account that signed in next sees its own row and nothing else, not even an empty-list fallback.
         let theirs = db.queue_all(222);
         assert_eq!(theirs.len(), 1);
         assert!(theirs[0].payload.contains("\"mediaId\":3"));
-        // `created_at` is read back rather than merely written. It is stamped by
-        // SQLite, so any positive value proves the column reached the struct.
+        // `created_at` is stamped by SQLite, so any positive value proves the column reached the struct.
         assert!(theirs[0].created_at > 0);
         assert_eq!(db.queue_len(222), 1);
         // A third account with nothing queued drains nothing.
@@ -2735,9 +2205,7 @@ pub(crate) mod tests {
         assert_eq!(db.queue_len(333), 0);
     }
 
-    /// The scoped discard: another account's id must not delete, and the
-    /// answer says whether anything went — the UI reports "already gone"
-    /// honestly instead of pretending a stale row was removed.
+    /// Proves a discard under another account deletes nothing and the answer says whether anything went.
     #[test]
     fn a_discard_only_removes_the_owners_row() {
         let db = mem_db();
@@ -2753,9 +2221,7 @@ pub(crate) mod tests {
         assert!(!db.queue_remove_for(111, id));
     }
 
-    /// The v16 backfill. Rows written before the column existed belong to
-    /// whoever was cached at upgrade time — the only account that could have
-    /// written them.
+    /// Proves v16 attributes pre-existing rows to the cached viewer, the only account that could have written them.
     #[test]
     fn the_queue_migration_attributes_rows_to_the_cached_viewer() {
         let conn = Connection::open_in_memory().unwrap();
@@ -2779,9 +2245,7 @@ pub(crate) mod tests {
         assert_eq!(owner, 6421433);
     }
 
-    /// And with nobody cached there is nobody to attribute them to. An
-    /// unattributable queued write is the exact hazard v16 closes, so those
-    /// rows are dropped rather than left for the next account to inherit.
+    /// Proves v16 drops rows it cannot attribute rather than leaving them for the next account to inherit.
     #[test]
     fn the_queue_migration_drops_rows_it_cannot_attribute() {
         let conn = Connection::open_in_memory().unwrap();
@@ -2800,10 +2264,7 @@ pub(crate) mod tests {
         assert_eq!(n, 0);
     }
 
-    /// v15. A bell row that cannot say which title it is about is a sentence,
-    /// and the AniList rows in the same panel have opened theirs all along.
-    /// The v18 rule, and the reason it exists: bell rows had no owner at all,
-    /// so signing out of A and into B showed B a list of A's aired episodes.
+    /// A cached anime list with two entries, for the cache-patch tests.
     fn seed_list(db: &Db) {
         db.cache_list(
             1,
@@ -2830,16 +2291,7 @@ pub(crate) mod tests {
             .find(|e| e.get("mediaId").and_then(|v| v.as_i64()) == Some(media_id))
     }
 
-    /// The guard the scrobbler reads must see what the user just saved.
-    ///
-    /// Before this the cache was written by a full fetch and patched by the
-    /// scrobbler alone, so a manual "24 / COMPLETED" left it holding the old
-    /// number — and a scrobble of episode 5 then passed both anti-regression
-    /// checks and wrote the list backwards.
-    /// The index and the unmatched list are one answer, so they land together
-    /// or not at all. Written as two transactions, a failure in between left an
-    /// index from this scan beside an unmatched list from the previous one —
-    /// and the "could not be placed" screen reads the second.
+    /// Proves the index and the unmatched list land together and a second publish replaces both.
     #[test]
     fn a_scan_publishes_both_tables_at_once() {
         let db = mem_db();
@@ -2875,8 +2327,7 @@ pub(crate) mod tests {
         assert_eq!(cached_entry(&db, 200).unwrap()["progress"], 1);
     }
 
-    /// A patch names only the fields it carries; everything else keeps its
-    /// value, the same absent-means-unchanged rule the mutation follows.
+    /// Proves a patch changes only the fields it names, the same absent-means-unchanged rule the mutation follows.
     #[test]
     fn a_patch_leaves_the_fields_it_does_not_name() {
         let db = mem_db();
@@ -2888,9 +2339,7 @@ pub(crate) mod tests {
         assert_eq!(entry["status"], "CURRENT");
     }
 
-    /// A deleted entry that stays cached is still a scrobble candidate, and
-    /// `SaveMediaListEntry(mediaId:)` creates an entry — so playing that title
-    /// brought the row the user just removed straight back.
+    /// Proves a deleted entry leaves the cache, or it stays a scrobble candidate and gets recreated on the next episode.
     #[test]
     fn a_deleted_entry_stops_being_a_scrobble_candidate() {
         let db = mem_db();
@@ -2900,8 +2349,7 @@ pub(crate) mod tests {
         assert!(cached_entry(&db, 200).is_some(), "and only that one");
     }
 
-    /// Nothing to patch costs no write, so an entry that was never cached
-    /// cannot resurrect a list that has since been replaced.
+    /// Proves patching an uncached entry writes nothing, so it cannot resurrect a list since replaced.
     #[test]
     fn patching_an_uncached_entry_changes_nothing() {
         let db = mem_db();
@@ -2926,9 +2374,7 @@ pub(crate) mod tests {
         assert_eq!(db.notif_unread_count(Some(2)), 1);
     }
 
-    /// The null is a real answer: the app-update notice belongs to the install,
-    /// not to an account, so it must survive a sign-out and stay readable in
-    /// local mode — where there is no viewer to match against at all.
+    /// Proves the update notice belongs to the install, surviving a sign-out and readable with no viewer at all.
     #[test]
     fn the_update_notice_belongs_to_the_install() {
         let db = mem_db();
@@ -2947,9 +2393,7 @@ pub(crate) mod tests {
         assert_eq!(left[0].kind, "update");
     }
 
-    /// The dedupe keys record what the *previous* account was already told.
-    /// Keeping them would silently deny the next account notifications it has
-    /// never seen.
+    /// Proves the alert dedupe keys go with the account, or the next one is silently denied what it has never seen.
     #[test]
     fn the_alert_dedupe_keys_do_not_outlive_an_account() {
         let db = mem_db();
@@ -2969,9 +2413,7 @@ pub(crate) mod tests {
         );
     }
 
-    /// `json_extract` raises on malformed JSON rather than returning null, and
-    /// a migration that throws leaves an app that will not start. Both
-    /// attributing steps guard with `json_valid`.
+    /// Proves a malformed viewer blob does not throw in v16 or v18, since `json_extract` raises without `json_valid`.
     #[test]
     fn a_malformed_viewer_blob_does_not_block_the_upgrade() {
         let conn = Connection::open_in_memory().unwrap();

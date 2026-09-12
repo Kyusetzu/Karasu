@@ -90,7 +90,9 @@ function main() {
       else offenders.push({ path: r.path, line: b.line, length: b.length, kind: b.kind });
     }
   }
-  const stale = allowlist.filter((e) => !used.has(e));
+  // An entry counts as stale only when its file was scanned; a --files run must not blame the rest of the list.
+  const scanned = new Set(files);
+  const stale = allowlist.filter((e) => !used.has(e) && scanned.has(e.file));
 
   if (has("--stats")) {
     const areas = new Map();

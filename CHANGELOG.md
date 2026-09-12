@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 6a96539 -->
+<!-- generated-through: 57506fd -->
 
 ### Fixed
 
@@ -84,6 +84,7 @@ tag time is then optional rather than load-bearing.
 - Settings → Detection → Jellyfin can find the servers on your network by name, and signing in checks the address is a Jellyfin server before your password is sent.
 - Jellyfin settings take an optional external address for when the server is not reachable at the first one — Karasu switches over by itself, checks it is the same server before sending anything, and Test connection says which address answered.
 - An "Interface size" setting under Appearance zooms the whole window (75–200 %), for 4K displays and TVs across the room.
+- Ctrl+plus, Ctrl+minus and Ctrl+0 change the interface size, like in a browser, and the size sticks.
 
 ### Changed
 

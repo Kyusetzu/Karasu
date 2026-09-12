@@ -1,12 +1,6 @@
 name: Site
 
-# The website's gate on a pull request. ci.yml ignores site/** on purpose — a
-# site-only PR need not build the app twice — so until this existed a
-# site-only PR had no check at all, and nothing could merge one on the
-# strength of a green run. Same three commands as pages.yml, minus the deploy:
-# typecheck plus token freshness, then the production build, which ends in
-# verify-dist's budgets. The app stylesheet is watched too, because the
-# site's tokens are generated from it and a stale token file must fail here.
+# The website's PR gate, since ci.yml ignores site/**: the same check and build as pages.yml, minus the deploy.
 on:
   pull_request:
     paths:

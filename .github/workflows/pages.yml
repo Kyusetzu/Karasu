@@ -1,14 +1,6 @@
 name: Website
 
-# The public site under site/ — its own npm project, deployed to
-# https://kyusetzu.github.io/Karasu/ through GitHub Pages. Three triggers: a
-# push to main that touches the site (or the app stylesheet the site generates
-# its tokens from — a stale token file must fail here, in the open, rather than
-# drift), a published release, so the download version on the page follows the
-# newest tag without a site commit, and the button in the Actions tab.
-#
-# Not release.yml's business: that workflow ignores site/**, because a site
-# commit must never build a Nightly. See CLAUDE.md, "The website".
+# Deploys site/ to GitHub Pages on a site push, a published release (the page follows the newest tag) or by hand.
 on:
   push:
     branches: ["main"]
@@ -20,8 +12,7 @@ on:
     types: [published]
   workflow_dispatch:
 
-# One deployment at a time, and never cancelled mid-flight: a half-deployed
-# site is worse than a late one.
+# One deployment at a time and never cancelled mid-flight: a half-deployed site is worse than a late one.
 concurrency:
   group: pages
   cancel-in-progress: false
@@ -54,11 +45,7 @@ jobs:
       - name: Check (typecheck + token freshness)
         run: npm run check
 
-      # The version on the download buttons comes from the newest non-prerelease
-      # release, fetched here rather than read from package.json — main's
-      # version is ahead of the release the moment the tag commit lands, and the
-      # page must advertise what a visitor can actually download. Without a
-      # token (a fork, a local build) the committed fallback stays in place.
+      # The download version comes from the newest stable release; main's package.json is already past it.
       - name: Read the newest release
         run: node scripts/release-info.mjs
         env:

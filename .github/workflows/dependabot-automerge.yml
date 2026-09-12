@@ -1,23 +1,6 @@
 name: Dependabot auto-merge
 
-# Merges a Dependabot pull request once the checks on its newest commit are
-# green. It listens to the check workflows *finishing* rather than to the PR
-# itself, so it cannot run before a build has spoken, and it needs no branch
-# protection to make it wait — which leaves the maintainer's direct pushes to
-# main exactly as they are. An app PR is heard through CI, a site PR through
-# Site; a PR neither of them runs for (nothing under either's paths) is never
-# merged here and waits for a person.
-#
-# Three refusals, checked against the PR the run belongs to: not opened by
-# dependabot[bot], not from this repository, or a head that moved after the
-# commit the run tested. Dependabot itself never opens a semver-major PR for
-# npm or cargo (dependabot.yml), so nothing here has to grade updates.
-#
-# What a merge does not do: build a Nightly or bump the version. The merge is
-# made with GITHUB_TOKEN, and a push made with that token starts no workflow
-# by design, so the dependency lands on main and the next real commit — which
-# is also the one that gives it a version number, since a Dependabot merge
-# bumps nothing (CLAUDE.md, "The commit loop") — is the one that ships it.
+# Merges a Dependabot PR once CI or Site is green on its head; workflow_run needs no branch protection to wait.
 on:
   workflow_run:
     workflows: ["CI", "Site"]
@@ -68,9 +51,7 @@ jobs:
             exit 0
           fi
           echo "merging #$number ($title) at $SHA"
-          # No checkout here, so `--repo` names the repository and the branch
-          # is left to the repository's delete-on-merge setting: `--delete-branch`
-          # wants a local clone to switch away from and fails without one.
+          # No checkout here: --repo names the repository, and --delete-branch would need a local clone to switch away from.
           gh pr merge "$number" --repo "$REPO" --squash \
             --subject "$title (#$number)" \
             --body "Merged automatically: the checks on $SHA passed ($RUN_URL)."

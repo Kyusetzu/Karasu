@@ -1,28 +1,4 @@
-//! The home-screen widgets' data projection.
-//!
-//! Android's four widgets (Airing Today, Continue Watching, Continue
-//! Reading, Weekly Calendar) are classic RemoteViews with no network and no
-//! schema knowledge: they render `<dataDir>/widgets.json` (tauri's app_data_dir = the package root), which this
-//! module writes whenever the list cache moves. A new pattern for this
-//! repo — nothing else writes a file for an outside consumer — named as
-//! such on purpose: Rust owns the format the way `keystore.rs` owns
-//! `TokenCipher`'s, so a `MIGRATION_V*` can never break a widget that
-//! parses SQLite on its own.
-//!
-//! Display strings are pre-rendered here (one i18n home, per `i18n.rs`'s
-//! own header — Android res strings would fork the system and track the
-//! device locale, not the app language). Timestamps ship raw
-//! (`airingAtMs`): Kotlin buckets "today" and the weekday at *render*
-//! time, so a days-stale file still renders correctly dated — its airing
-//! rows honestly age out rather than showing yesterday as today. Weekly
-//! Calendar is "the next episode per show, this week": the cache only
-//! knows `nextAiringEpisode`, and the projection says so rather than
-//! promising a full schedule.
-//!
-//! The content filter is applied at projection time, and `blur_adult`
-//! *hides* here rather than blurring — a widget cannot blur, and the home
-//! screen is the one surface where erring toward absence is obviously
-//! right.
+//! The Android home-screen widgets' projection file; Rust owns the format so a `MIGRATION_V*` cannot break a widget.
 
 use serde_json::{json, Value};
 
@@ -33,9 +9,7 @@ const MAX_ROWS: usize = 8;
 /// The airing window, and the calendar's whole span.
 const WEEK_MS: i64 = 7 * 24 * 60 * 60 * 1000;
 
-/// The widget vocabulary, local rather than `Msg` variants: these are
-/// captions, not notifications, and the exhaustive `(Lang, Msg)` match
-/// would grow eight arms that no toast ever renders.
+/// The widget captions, local rather than `Msg` variants, because no toast ever renders them.
 fn labels(lang: Lang) -> Value {
     match lang {
         Lang::En => json!({
@@ -83,8 +57,7 @@ fn title_of(media: &Value) -> String {
         .unwrap_or_else(|| "—".to_string())
 }
 
-/// Every visible CURRENT/REPEATING entry across the payload's groups,
-/// content-filtered, custom lists skipped (they duplicate the status lists).
+/// Every visible CURRENT/REPEATING entry, content-filtered, with custom lists skipped as duplicates.
 fn watching_rows<'a>(
     payload: &'a Value,
     level: &str,
@@ -161,11 +134,7 @@ fn airing_rows(entries: &[&Value], now_ms: i64) -> Value {
     )
 }
 
-/// The whole projection, pure and tested: payloads in, widget document out.
-/// On the desktop compile only the tests call this — the sole non-Android
-/// consumer is `write_projection` above the `cfg`. The allow roots the whole
-/// pure chain (the helpers and both consts) as live for the lint, which is
-/// what keeps the media_session pattern warning-free here.
+/// The whole projection, pure and tested; the allow keeps the chain live on desktop, where only tests call it.
 #[cfg_attr(not(target_os = "android"), allow(dead_code))]
 pub fn project(
     anime_payload: Option<&Value>,
@@ -189,10 +158,7 @@ pub fn project(
     })
 }
 
-/// Re-projects and rewrites the file from whatever the database holds.
-/// Cheap enough to run on every hook (two cached blobs, one small write),
-/// and a no-op off Android — the projection logic still compiles and tests
-/// everywhere, per the media_session pattern.
+/// Re-projects and rewrites the file from the database; cheap enough for every hook, and a no-op off Android.
 pub fn refresh(app: &tauri::AppHandle) {
     #[cfg(target_os = "android")]
     write_projection(app);
@@ -218,8 +184,7 @@ fn write_projection(app: &tauri::AppHandle) {
     let anime = parse("ANIME");
     let manga = parse("MANGA");
     let level = crate::commands::read_content_filter(&db);
-    // Absent means ON, matching `get_blur_adult` (v17 seeds it for new
-    // installs) — reading `== "1"` here would invert the default.
+    // Absent means ON, matching `get_blur_adult`; reading `== "1"` here would invert the default.
     let hide_adult = db.kv_get("blur_adult").as_deref() != Some("0");
     let lang = crate::i18n::lang(&db);
     let doc = project(
@@ -241,10 +206,7 @@ fn write_projection(app: &tauri::AppHandle) {
     poke_refresher();
 }
 
-/// Broadcasts the standard widget update through Kotlin's `WidgetRefresher`
-/// so placed widgets re-render the fresh file — the same tao-context JNI
-/// route the keystore and the job scheduler ride. Failures are per-write
-/// noise, logged only on transition.
+/// Broadcasts the widget update through Kotlin's `WidgetRefresher` so placed widgets re-render the fresh file.
 #[cfg(target_os = "android")]
 fn poke_refresher() {
     let go = || -> Result<(), String> {
@@ -290,9 +252,7 @@ fn poke_refresher() {
     }
 }
 
-/// Sign-out: the projection holds list titles, and the file must not
-/// outlive the account it describes. The widgets fall back to their empty
-/// state on the next render.
+/// Sign-out: the projection holds list titles, so the file must not outlive the account it describes.
 pub fn clear() {
     #[cfg(target_os = "android")]
     if let Some(path) = crate::portable::mobile_secret_file("widgets.json") {

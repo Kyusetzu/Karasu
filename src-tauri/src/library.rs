@@ -1,7 +1,4 @@
-//! Local library: scan a folder for video files, match them to the user's
-//! AniList entries with the existing parser/matcher, and let the user play
-//! the next unwatched episode straight from Karasu — Taiga's killer feature
-//! and a reason to use the app over the website.
+//! The local library: scans a folder, matches files to AniList entries, and plays the next unwatched episode.
 
 use crate::db::Db;
 use crate::sync::LockExt;
@@ -19,15 +16,7 @@ use tauri::{AppHandle, Manager, State};
 const MAX_DEPTH: usize = 6;
 const MAX_FILES: usize = 20_000;
 
-/// One video file, as the scan understood it.
-///
-/// The index is this list and nothing else; `by_media`, the summary and the
-/// unplaced groups are all derived from it. That matters because of what a
-/// correction has to do: re-point exactly the files whose release name parsed
-/// to a given title, and no others. A map keyed by media id cannot express
-/// that — when two folders match one title, their files are already merged and
-/// no longer separable — so the flat list is what makes "this one is wrong"
-/// answerable without a rescan.
+/// One video file as the scan read it; every view derives from this list, so a correction can re-point one parse only.
 #[derive(Clone)]
 pub struct ScannedFile {
     pub title: String,
@@ -42,10 +31,7 @@ pub struct ScannedFile {
     pub manual: bool,
 }
 
-/// A user-confirmed season split, in the shape `index_files` applies it:
-/// "episodes `ep_from..=ep_to` of this parse are `media_id`, renumbered from
-/// `dst_start`". The persisted form is `library_redirect` (schema v11), and the
-/// record shape deliberately mirrors `relations::Rule`.
+/// A confirmed season split as `index_files` applies it; persisted as `library_redirect`, mirroring `relations::Rule`.
 #[derive(Clone, Debug)]
 pub struct SplitRule {
     pub title: String,
@@ -72,29 +58,19 @@ impl SplitRule {
 pub struct LibraryData {
     files: Vec<ScannedFile>,
     by_media: HashMap<i64, HashMap<u32, String>>,
-    /// The confidences live on the summary rows themselves — the only thing
-    /// that reads them is the screen, and it reads the summary.
+    /// The confidences live on the summary rows, since the screen is the only reader and it reads the summary.
     summary: Vec<LibraryEntry>,
     unmatched: Vec<UnmatchedGroup>,
-    /// AniList's guesses, keyed the same way everything else here is. Held
-    /// separately from the groups because `reindex` rebuilds those from
-    /// scratch on every correction and would otherwise drop the lot.
+    /// AniList's guesses, held apart from the groups because `reindex` rebuilds those and would drop the lot.
     suggestions: HashMap<(String, i32), Suggested>,
-    /// AniList's episode count per matched id, lifted from the same candidates
-    /// the matcher used — the number a folder can overflow. Only ids whose
-    /// count is known appear; an airing show with `episodes: null` cannot
-    /// honestly overflow anything.
+    /// AniList's episode count per matched id; only known counts appear, since an airing show cannot overflow.
     episode_counts: HashMap<i64, u32>,
-    /// A snapshot of the community anime-relations rules, taken where the app
-    /// state is available (scan, hydrate) so `reindex` can hint without it.
-    /// Empty on a cold start before the file downloads — an overflow then
-    /// simply carries no hint.
+    /// A snapshot of the anime-relations rules so `reindex` can hint without app state; empty before the download.
     rules: Vec<relations::Rule>,
 }
 
 impl LibraryData {
-    /// Rebuilds every derived view from `files`. Called after a scan and after
-    /// each correction, so the two can never disagree.
+    /// Rebuilds every derived view from `files`, after a scan and after each correction, so they never disagree.
     fn reindex(&mut self) {
         let mut by_media: HashMap<i64, HashMap<u32, String>> = HashMap::new();
         let mut scores: HashMap<i64, f64> = HashMap::new();
@@ -110,20 +86,13 @@ impl LibraryData {
                         .or_default()
                         .entry(f.episode)
                         .or_insert_with(|| f.path.clone());
-                    // Two folders can land on one title — a season and its
-                    // batch re-encode, say. The best of them is what the row
-                    // should claim.
+                    // Two folders can land on one title; the best score is what the row should claim.
                     let best = scores.entry(id).or_insert(f.score);
                     if f.score > *best {
                         *best = f.score;
                     }
                     *manual.entry(id).or_insert(false) |= f.manual;
-                    // Per source, not only per row. One title can be the merge
-                    // of several parses — a specials folder assigned onto the
-                    // main show, say — and only one of them carries the
-                    // override. A row-level flag says "something here was
-                    // corrected" but not *which*, which is the one thing
-                    // "remove correction" needs to know.
+                    // Per source, not only per row: "remove correction" needs to know which parse carries the override.
                     let seen = sources.entry(id).or_default();
                     match seen
                         .iter_mut()
@@ -155,8 +124,7 @@ impl LibraryData {
                 UnmatchedGroup { title, season, files, suggestion }
             })
             .collect();
-        // Most files first: the folder with a season in it is the one worth
-        // placing, and a stray extra that parsed to its own title is not.
+        // Most files first: the folder with a season in it is worth placing, a stray extra is not.
         self.unmatched
             .sort_by(|a, b| b.files.len().cmp(&a.files.len()).then(a.title.cmp(&b.title)));
     }
@@ -178,13 +146,7 @@ impl LibraryData {
 pub struct TitleKey {
     pub title: String,
     pub season: i32,
-    /// Whether *this* parse is the one carrying a correction.
-    ///
-    /// `#[serde(default)]` only keeps the pre-existing `Deserialize` derive
-    /// total; nothing actually deserializes a `TitleKey`. The index on disk is
-    /// SQLite rows with no `sources` array, and `hydrate` rebuilds the whole
-    /// thing through `reindex`, so this flag is always computed by the running
-    /// binary.
+    /// Whether this parse carries a correction; always computed by `reindex`, since nothing deserializes a `TitleKey`.
     #[serde(default)]
     pub manual: bool,
 }
@@ -195,9 +157,7 @@ pub struct UnmatchedGroup {
     pub title: String,
     pub season: i32,
     pub files: Vec<LibraryFile>,
-    /// What AniList thinks this is, if it was asked and answered convincingly.
-    /// Unconfirmed: the screen shows it greyed and the user decides. A search
-    /// hit is a weaker claim than a match against a list the user curated.
+    /// What AniList thinks this is, unconfirmed: the screen shows it greyed and the user decides.
     pub suggestion: Option<Suggested>,
 }
 
@@ -208,13 +168,7 @@ pub struct Suggested {
     pub score: f64,
 }
 
-/// The index, and whether a scan is currently rebuilding it.
-///
-/// The flag is not a lock on the data — it is a lock on the *conclusion*. A
-/// scan reads the corrections once at the start and ends by replacing the whole
-/// index and both of its tables, so a correction saved in between is written,
-/// then silently overwritten minutes later. Refusing it is the honest answer;
-/// the screen already shows a rejected command's reason.
+/// The index, and whether a scan is rebuilding it; a correction saved mid-scan would be overwritten, so it is refused.
 pub struct LibraryIndex(pub Mutex<LibraryData>, pub AtomicBool);
 
 impl Default for LibraryIndex {
@@ -230,27 +184,20 @@ pub struct LibraryFile {
     pub path: String,
 }
 
-/// Which episodes of a matched entry are present on disk. `episodes` is kept
-/// as a bare sorted list so existing callers stay unchanged; `files` carries
-/// the paths for the library page.
+/// Which episodes of a matched entry are on disk; `episodes` stays a bare sorted list for existing callers.
 #[derive(Clone, serde::Serialize)]
 pub struct LibraryEntry {
     #[serde(rename = "mediaId")]
     pub media_id: i64,
     pub episodes: Vec<u32>,
     pub files: Vec<LibraryFile>,
-    /// Matcher confidence, 0–1. `1.0` is the exact-title short circuit; the
-    /// screen says "exact" there and "close" below it, because a fuzzy match
-    /// is a guess and the user is the only one who can check it.
+    /// Matcher confidence; `1.0` is the exact-title short circuit and anything below reads as "close" on screen.
     pub score: f64,
     /// The release names that led here — what a correction has to be keyed on.
     pub sources: Vec<TitleKey>,
-    /// Placed by the user rather than by the matcher, so the screen can say so
-    /// instead of reporting a confidence nothing measured.
+    /// Placed by the user rather than the matcher, so the screen can say so instead of showing a confidence.
     pub manual: bool,
-    /// More files than the matched entry has episodes — a 24-file folder on a
-    /// 12-episode show, almost always a next season under one folder name.
-    /// Detection only; nothing is re-pointed until the user confirms a split.
+    /// More files than the entry has episodes, usually a next season in one folder; detection only, nothing re-pointed.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub overflow: Option<Overflow>,
 }
@@ -267,9 +214,7 @@ pub struct Overflow {
     /// The first overflowing episode number, as the files spell it.
     #[serde(rename = "firstExtra")]
     pub first_extra: u32,
-    /// What the community anime-relations rules say the overflow is, when they
-    /// say anything. A *suggestion* for the card to pre-select — never applied
-    /// on its own; the user always confirms (maintainer's decision).
+    /// What the community rules say the overflow is: a pre-selection for the card, never applied without confirmation.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hint: Option<SplitHint>,
 }
@@ -301,11 +246,7 @@ pub struct LibraryStatus {
     pub matched: usize,
 }
 
-/// The folder, and what the last scan made of it.
-///
-/// `ScanSummary` carries the same two counts but only as the return value of a
-/// scan, so a restart forgot them and the row had nothing to show until the
-/// user rescanned.
+/// The folder and what the last scan made of it, so the row has something to show after a restart.
 #[tauri::command]
 pub fn get_library_status(db: State<'_, Db>, state: State<'_, LibraryIndex>) -> LibraryStatus {
     LibraryStatus {
@@ -344,33 +285,19 @@ fn pick_folder(app: &AppHandle) -> Option<String> {
         .map(|p| p.to_string_lossy().to_string())
 }
 
-/// The scanner is desktop-only — scoped storage does not hand out folder
-/// walks — so on mobile there is nothing a picked folder could feed. The
-/// command answers "no choice made" rather than erroring, which is also what
-/// dismissing the picker answers.
+/// The scanner is desktop-only, so on mobile the picker answers "no choice made" rather than erroring.
 #[cfg(mobile)]
 fn pick_folder(_app: &AppHandle) -> Option<String> {
     None
 }
 
-/// The most recent scan's index (empty before the first scan).
-///
-/// Everything: absolute paths, per-title match scores, the release names each
-/// match came from. Only the Library screen needs any of that, and it is
-/// lazily routed — see `get_library_episodes` for what everyone else reads.
+/// The most recent scan's full index; only the Library screen needs it, everyone else reads `get_library_episodes`.
 #[tauri::command]
 pub fn get_library_index(state: State<'_, LibraryIndex>) -> Vec<LibraryEntry> {
     state.0.guard().summary.clone()
 }
 
-/// Just which episodes exist per media id.
-///
-/// This is the whole of what the app asks the library outside its own screen:
-/// a "next episode" affordance on a list row and on the detail page. Serving
-/// the full index for that meant cloning every absolute file path under the
-/// index mutex and shipping them all through the IPC bridge on **every
-/// launch** — hundreds of kilobytes of JSON, for a map of numbers, whether or
-/// not the Library screen was ever opened.
+/// Just which episodes exist per media id, so the launch-time read does not ship every absolute path over IPC.
 #[tauri::command]
 pub fn get_library_episodes(
     state: State<'_, LibraryIndex>,
@@ -384,21 +311,11 @@ pub fn get_library_episodes(
         .collect()
 }
 
-/// Scans the configured folder and rebuilds the index.
-///
-/// `async` is load-bearing rather than decorative: `tauri-macros` defaults a
-/// plain `#[tauri::command]` to `ExecutionContext::Blocking`, which runs the
-/// body inline on the WebView2 UI thread. A recursive walk of up to
-/// `MAX_FILES` plus a fuzzy match per file froze the whole window — the
-/// "scanning" spinner could not even animate, because the thread that would
-/// have animated it was doing the scan.
+/// Scans the configured folder and rebuilds the index; `async` is load-bearing, a blocking command froze the window.
 #[tauri::command(async)]
 pub async fn scan_library(app: AppHandle) -> Result<ScanSummary, String> {
     let index = app.state::<LibraryIndex>();
-    // A scan ends by replacing the whole index and both of its tables, so
-    // anything that writes one meanwhile is thrown away when it lands. Claim
-    // the flag before the first early return, and drop-guard it so every exit —
-    // including the two `?`s below and a panic — clears it.
+    // Claim the flag before the first early return and drop-guard it, so every exit clears it.
     if index
         .1
         .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
@@ -416,10 +333,7 @@ pub async fn scan_library(app: AppHandle) -> Result<ScanSummary, String> {
             .ok_or("No library folder set")?;
         let candidates = candidates_from_cache(&db, "ANIME");
         if candidates.is_empty() {
-            // `candidates_from_cache` reads the cached *AniList* list, so in
-            // the account-free profile this is not "load your list first" — it
-            // is always empty and always will be. Saying so beats sending
-            // someone to look for a button that would not help.
+            // In the account-free profile the cached list is always empty, so say so rather than send someone to load it.
             return Err(if db.kv_get("anilist_viewer").is_some() {
                 "Load your anime list first, then scan"
             } else {
@@ -428,10 +342,7 @@ pub async fn scan_library(app: AppHandle) -> Result<ScanSummary, String> {
             }
             .into());
         }
-        // What AniList has already been asked. Re-asking costs a request per 25
-        // titles and returns the same answer, so a rescan of a folder that
-        // never changed would spend the whole identification budget learning
-        // nothing.
+        // What AniList has already been asked; re-asking would spend the identification budget learning nothing.
         let stored: HashMap<(String, i32), (i64, f64)> = db
             .library_suggestions()
             .into_iter()
@@ -444,13 +355,7 @@ pub async fn scan_library(app: AppHandle) -> Result<ScanSummary, String> {
         (root, candidates, override_map(&db), redirect_rules(&db), stored, cursor)
     };
 
-    // Everything below ends in `library_publish`, which DELETEs each of its
-    // three tables before inserting what this scan found.
-    // So an unreachable folder — an offline NAS, an unplugged drive, a renamed
-    // directory — must not reach that point: it yields zero files, and zero
-    // files used to be written down as the truth and then survive a restart
-    // through `hydrate`, while the command returned Ok and the pane rendered
-    // the result in success styling.
+    // Everything below ends in `library_publish`, so an unreachable folder must not reach it as zero files.
     let previously_indexed = {
         let db = app.state::<Db>();
         db.library_all().len()
@@ -465,12 +370,7 @@ pub async fn scan_library(app: AppHandle) -> Result<ScanSummary, String> {
     let mut files = Vec::new();
     let unreadable = collect_videos(Path::new(&root), 0, &mut files);
     let total = files.len();
-    // A mount point that is still mounted but no longer carries its contents
-    // reads as an empty directory rather than an error, which is exactly what a
-    // disconnected NAS looks like. Finding nothing where there was something is
-    // therefore treated as a failure to look, not as an emptied library. A
-    // genuinely emptied folder reports the same thing once and is resolved by
-    // pointing the setting somewhere else.
+    // A disconnected mount reads as an empty directory, so nothing where there was something is a failure to look.
     if total == 0 && (unreadable > 0 || previously_indexed > 0) {
         return Err(format!(
             "Found no video files in the library folder, but {previously_indexed} \
@@ -482,35 +382,20 @@ pub async fn scan_library(app: AppHandle) -> Result<ScanSummary, String> {
     let mut data = LibraryData {
         files: index_files(&files, &candidates, &overrides, &redirects),
         episode_counts: episode_counts(&candidates),
-        // Snapshotted before the identify await below — the guard on a
-        // `std::sync::RwLock` must not live across one, same as the index lock.
+        // Snapshotted before the identify await; an `RwLock` guard must not live across one.
         rules: app.state::<relations::Relations>().0.read().unwrap().clone(),
         ..Default::default()
     };
     data.reindex();
 
-    // Whatever the list could not place, AniList is asked about directly.
-    // (See below for why this sits between indexing and publishing.) This
-    // is the only way an off-list show is ever identified: the matcher above
-    // searches the cached list and nothing else, so a title that was never
-    // added cannot be found there however clean its filename is.
-    //
-    // Deliberately between indexing and publishing, and deliberately holding no
-    // lock: `LibraryIndex` is a `std::sync::Mutex` and its guard must not be
-    // alive across an `.await`.
+    // The only way an off-list show is identified; sits between indexing and publishing so no lock lives across the await.
     let mut unknown: Vec<identify::Unidentified> = data
         .unmatched
         .iter()
         .filter(|g| !stored.contains_key(&(g.title.clone(), g.season)))
         .map(|g| identify::Unidentified { title: g.title.clone(), season: g.season })
         .collect();
-    // Rotate before the cap, so successive scans work through the whole
-    // unplaced set instead of re-asking the same head of it. `reindex` sorts
-    // the groups most-files-first and a title that gets no answer is stored
-    // nowhere, so without this a folder of 200 unanswerable extras would sit at
-    // the front of the queue forever and everything behind it would never be
-    // asked once. A fresh library still starts at 0, so the biggest folders are
-    // still asked about first.
+    // Rotate before the cap so successive scans work through the whole unplaced set instead of re-asking its head.
     let pending = unknown.len();
     let asked = if pending == 0 {
         0
@@ -526,11 +411,7 @@ pub async fn scan_library(app: AppHandle) -> Result<ScanSummary, String> {
         identify::identify(&api, token.as_deref(), &unknown).await
     };
 
-    // The union, not just what this scan learned: `library_replace_suggestions`
-    // empties the table first, so writing only `fresh` would delete every
-    // answer the filter above just decided not to re-ask for. Carried-forward
-    // rows are kept only while their group is still unplaced — a title the
-    // scan has since matched, or whose files are gone, drops out here.
+    // The union, not just `fresh`: `library_replace_suggestions` empties the table, and placed groups drop out here.
     let suggestions: Vec<(String, i32, i64, f64)> = fresh
         .iter()
         .map(|s| (s.title.clone(), s.season, s.media_id, s.score))
@@ -543,16 +424,13 @@ pub async fn scan_library(app: AppHandle) -> Result<ScanSummary, String> {
 
     {
         let db = app.state::<Db>();
-        // Persist so the index survives a restart — without this every relaunch
-        // drops the library and the play buttons disappear until a manual rescan.
+        // Persist so the index survives a restart, or every relaunch drops the library until a rescan.
         persist(&db, &data)?;
         db.library_replace_suggestions(&suggestions)?;
-        // Where the next scan picks up. Modulo the set it was taken against, so
-        // a shrinking unplaced set cannot park the cursor past the end.
+        // Where the next scan picks up, modulo the set it was taken against so a shrinking set cannot strand it.
         let next = if pending == 0 { 0 } else { (cursor + asked) % pending };
         db.kv_set("identify_cursor", &next.to_string())?;
-        // The count of files *walked* is not derivable from the index — most of
-        // them matched nothing — so it is stored rather than recomputed.
+        // The count of files walked is not derivable from the index, so it is stored rather than recomputed.
         db.kv_set("library_files_seen", &total.to_string())?;
     }
 
@@ -565,8 +443,7 @@ pub async fn scan_library(app: AppHandle) -> Result<ScanSummary, String> {
             )
         })
         .collect();
-    // Cheap second pass: only the unplaced groups change, and it keeps the
-    // suggestion in one place rather than patched onto the groups afterwards.
+    // Cheap second pass: only the unplaced groups change, and the suggestion stays in one place.
     data.reindex();
 
     let summary = data.summary.clone();
@@ -576,12 +453,7 @@ pub async fn scan_library(app: AppHandle) -> Result<ScanSummary, String> {
     Ok(ScanSummary { entries: summary, files: total, matched })
 }
 
-/// Clears the scanning flag however `scan_library` leaves.
-///
-/// A plain `store(false)` before each `return` would be four call sites and one
-/// of them would eventually be forgotten — which is how the two early errors,
-/// the ones that fire before a single file is walked, would have left the app
-/// refusing corrections until it was restarted.
+/// Clears the scanning flag however `scan_library` leaves, so no early return can leave corrections refused.
 struct ScanGuard<'a>(&'a AtomicBool);
 
 impl Drop for ScanGuard<'_> {
@@ -613,11 +485,7 @@ fn redirect_rules(db: &Db) -> Vec<SplitRule> {
         .collect()
 }
 
-/// One confirmed season split, in display order for the Settings list.
-///
-/// Keyed on the *parse* — the title and season as the release names on disk
-/// spell them — because that is the key `clear_library_redirect` deletes by.
-/// The destination `media_id` is what the UI joins a display title onto.
+/// One confirmed split for the Settings list, keyed on the parse, which is what `clear_library_redirect` deletes by.
 #[derive(serde::Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct LibraryRedirectRow {
@@ -629,9 +497,7 @@ pub struct LibraryRedirectRow {
     pub dst_start: u32,
 }
 
-/// The confirmed splits, for the Settings list — until this existed the rows
-/// were written and applied but never shown, so the only undo was
-/// `clear_library_match` taking the whole key with it.
+/// The confirmed splits for the Settings list, so a split can be undone on its own rather than with the whole key.
 #[tauri::command]
 pub fn list_library_redirects(app: AppHandle) -> Vec<LibraryRedirectRow> {
     let db = app.state::<Db>();
@@ -658,8 +524,7 @@ fn episode_counts(candidates: &[matcher::Candidate]) -> HashMap<i64, u32> {
         .collect()
 }
 
-/// Writes the whole index — files, confidences, sources and the unplaced —
-/// so a restart and a correction see the same picture a scan just built.
+/// Writes the whole index so a restart and a correction see the same picture a scan just built.
 fn persist(db: &Db, data: &LibraryData) -> Result<(), String> {
     let rows: Vec<(i64, u32, String)> = data
         .by_media
@@ -668,38 +533,11 @@ fn persist(db: &Db, data: &LibraryData) -> Result<(), String> {
         .collect();
     let score_rows: Vec<(i64, f64)> =
         data.summary.iter().map(|e| (e.media_id, e.score)).collect();
-    // One transaction for both tables: they are one answer. Written as two,
-    // a failure in between left an index describing this scan beside an
-    // unmatched list describing the previous one.
+    // One transaction for both tables: written as two, a failure in between left them describing different scans.
     db.library_publish(&rows, &score_rows, &data.unmatched_rows())
 }
 
-/// Maps every video file that parses to an episode onto the entry it belongs
-/// to. The first path wins for a given (media, episode) pair.
-///
-/// A library is organised per series, so the same (title, season) recurs once
-/// per episode file. `best_match` is pure in that pair plus `candidates`, so it
-/// only has to run once per distinct series rather than once per file — which
-/// collapses its input from the file count (up to `MAX_FILES`) to the
-/// distinct-title count, typically a few hundred.
-///
-/// Negative results are cached too, deliberately: an unmatched file (an OP, an
-/// ED, an extra) never hits the exact-match short circuit inside `best_match`
-/// and so costs a full fuzzy sweep over every candidate — the most expensive
-/// case there is, and the one most likely to repeat across a season folder.
-///
-/// The candidate list is normalized and trigrammed once up front rather than
-/// per lookup, which is the other half of the same idea.
-/// An override is consulted *before* the matcher rather than applied after it.
-/// Running the matcher first and then overwriting its answer would waste the
-/// expensive fuzzy sweep on precisely the titles the user has already told us
-/// the matcher gets wrong.
-///
-/// A season split is consulted before *both*: it names an episode range of the
-/// same parse, which is strictly more specific than the whole-key override —
-/// files 13–24 go where the split says while 1–12 still follow the override or
-/// the matcher. A split file's episode is stored **renumbered** (disk 13 →
-/// sequel's 1), which is what `play_next`'s progress comparison needs.
+/// Maps files to entries: split, then override, then the matcher memoized per parse; split episodes are stored renumbered.
 fn index_files(
     files: &[String],
     candidates: &[matcher::Candidate],
@@ -758,8 +596,7 @@ fn index_files(
     scanned
 }
 
-/// `Option<u32>` seasons become `-1`, so the in-memory key and the database key
-/// are the same value and neither has to translate for the other.
+/// `Option<u32>` seasons become `-1`, so the in-memory key and the database key are the same value.
 fn season_key(season: Option<u32>) -> i32 {
     season.map(|s| s as i32).unwrap_or(-1)
 }
@@ -798,13 +635,7 @@ fn build_summary(
     summary
 }
 
-/// Whether a folder holds more than the matched entry can — and, when the
-/// community rules already know where the rest goes, where that is.
-///
-/// Only fires when AniList states an episode count: an airing show with an
-/// unknown total cannot honestly overflow anything. Files already re-pointed by
-/// a confirmed split have left this entry, so the check settles itself once the
-/// user answers.
+/// Whether a folder holds more than the entry can, with the community rules' hint; only fires on a known episode count.
 fn detect_overflow(
     media_id: i64,
     episodes: &[u32],
@@ -824,13 +655,7 @@ fn detect_overflow(
     })
 }
 
-/// Restores the index from the database at startup (no disk walk).
-///
-/// The stored rows carry no title, so each one's is recovered by re-parsing its
-/// filename. That is not a shortcut around a missing column: `parser::parse` is
-/// pure and the filename has not changed, so it returns exactly what the scan
-/// saw — and a title derived this way cannot drift out of step with the parser
-/// the way a copy written months ago could.
+/// Restores the index at startup with no disk walk; each title is re-parsed, so it cannot drift from the parser.
 pub fn hydrate(app: &AppHandle) {
     let db = app.state::<Db>();
     let rows = db.library_all();
@@ -846,11 +671,7 @@ pub fn hydrate(app: &AppHandle) {
         .into_iter()
         .map(|(media_id, episode, path)| {
             let (title, season, disk_episode) = reparse(&path);
-            // A split row's stored episode is the *renumbered* one, which the
-            // filename cannot confirm — so the split is re-derived from its
-            // rule and the filename's own number, the two sources that cannot
-            // drift. A rule cleared since last run simply stops matching here
-            // and the row falls back to what is stored.
+            // A split row stores the renumbered episode, so the split is re-derived from its rule and the filename's number.
             if let Some((rule, renumbered)) = disk_episode.and_then(|ep| {
                 redirects
                     .iter()
@@ -884,8 +705,7 @@ pub fn hydrate(app: &AppHandle) {
 
     let mut data = LibraryData {
         files,
-        // Restored rather than re-fetched: identification costs AniList
-        // requests and a restart is not new information.
+        // Restored rather than re-fetched: identification costs requests and a restart is not new information.
         suggestions: db
             .library_suggestions()
             .into_iter()
@@ -893,8 +713,7 @@ pub fn hydrate(app: &AppHandle) {
                 ((title, season), Suggested { media_id, score })
             })
             .collect(),
-        // The counts come from the same cached list a scan reads, so the
-        // overflow chips survive a restart without one.
+        // The counts come from the same cached list a scan reads, so the overflow chips survive a restart.
         episode_counts: episode_counts(&candidates_from_cache(&db, "ANIME")),
         rules: app
             .state::<relations::Relations>()
@@ -925,12 +744,7 @@ pub fn get_library_unmatched(state: State<'_, LibraryIndex>) -> Vec<UnmatchedGro
     state.0.guard().unmatched.clone()
 }
 
-/// Points every file that parses to `title`/`season` at `media_id`.
-///
-/// Applied to the in-memory index immediately rather than by rescanning: the
-/// files are already known and re-walking the disk to reach a conclusion the
-/// user just handed us would make a one-click correction cost a full scan.
-/// The override row is what makes the next scan agree.
+/// Points every file of this parse at `media_id` in memory at once; the override row makes the next scan agree.
 #[tauri::command(async)]
 pub fn set_library_match(
     app: AppHandle,
@@ -959,36 +773,18 @@ pub fn set_library_match(
     Ok(guard.summary.clone())
 }
 
-/// Everything a confirmed split changes, computed before anything is written.
-///
-/// Split from the command so it is testable without Tauri state — the three
-/// bugs this shape replaced (a chained split shifting the wrong files, an
-/// upsert on `(title, season, ep_from)` silently swallowing an earlier rule,
-/// and a zero-match confirm returning `Ok` with nothing to show) were all
-/// invisible precisely because the old command mixed the decision with the
-/// writes.
+/// Everything a confirmed split changes, computed before anything is written so it is testable without Tauri state.
 #[derive(Debug)]
 pub struct RedirectPlan {
-    /// Primary keys of existing rules to delete — every rule the new range
-    /// touches, including ones that come back trimmed.
+    /// Primary keys of existing rules to delete: every rule the new range touches, including ones that come back trimmed.
     pub delete: Vec<(String, i32, u32)>,
-    /// Rules to insert: one per parse group in the range, plus the trimmed
-    /// remnants of any overlapped rule.
+    /// Rules to insert: one per parse group in the range, plus the trimmed remnants of any overlapped rule.
     pub insert: Vec<SplitRule>,
     /// `(index into files, renumbered episode)` for every affected file.
     pub files: Vec<(usize, u32)>,
 }
 
-/// Plans a split of the *current-frame* episodes `from..=to` of `media_id` —
-/// exactly the numbers the row and the chip display — onto `dst_media_id`,
-/// renumbered from `dst_start`.
-///
-/// The persisted rules stay keyed on `(title, season, disk range)`, because
-/// that is the frame a scan parses; the translation happens here, per file,
-/// by re-reading each filename's own number. Keying the *command* on what the
-/// user can see is the fix for the chained-split bug: after one split the
-/// row's numbers are renumbered, and a second command still keyed on disk
-/// numbers targeted files the user was not looking at.
+/// Plans a split keyed on the current-frame range the row displays; re-keying on disk numbers was the chained-split bug.
 pub fn plan_redirect(
     files: &[ScannedFile],
     existing: &[SplitRule],
@@ -998,10 +794,7 @@ pub fn plan_redirect(
     dst_media_id: i64,
     dst_start: u32,
 ) -> Result<RedirectPlan, String> {
-    // The affected files, grouped by the parse key their rule will carry.
-    // `title`/`season` are already the parse key on every ScannedFile; only
-    // the disk number needs the filename re-read, since `episode` may be the
-    // renumbered value of an earlier split.
+    // Group by parse key; only the disk number needs the filename re-read, since `episode` may already be renumbered.
     let mut groups: HashMap<(String, i32), Vec<(usize, u32, u32)>> = HashMap::new();
     for (i, f) in files.iter().enumerate() {
         if f.media_id != Some(media_id) || f.episode < from || f.episode > to {
@@ -1016,18 +809,14 @@ pub fn plan_redirect(
         };
         groups.entry((f.title.clone(), f.season)).or_default().push((i, d, f.episode));
     }
-    // The silent no-op this replaces: confirming against a range that matches
-    // nothing must say so, not close the dialog with an unchanged screen.
+    // Confirming against a range that matches nothing must say so, not close the dialog over an unchanged screen.
     if groups.is_empty() {
         return Err(format!("No files land in episodes {from}–{to} of that title — nothing to split"));
     }
 
     let mut plan = RedirectPlan { delete: Vec::new(), insert: Vec::new(), files: Vec::new() };
     for ((title, season), members) in groups {
-        // Within one parse, disk and current numbering may only differ by a
-        // constant shift (an earlier split's renumbering). A mixed offset
-        // means the range spans files this plan cannot describe with one
-        // rule — refuse rather than guess.
+        // Disk and current numbers may only differ by a constant shift; a mixed offset cannot be one rule, so refuse.
         let offset = members[0].1 as i64 - members[0].2 as i64;
         if members.iter().any(|(_, d, e)| *d as i64 - *e as i64 != offset) {
             return Err(
@@ -1037,9 +826,7 @@ pub fn plan_redirect(
         }
         let d_min = members.iter().map(|(_, d, _)| *d).min().unwrap();
         let d_max = members.iter().map(|(_, d, _)| *d).max().unwrap();
-        // A rule covers a disk range wholesale, so a same-parse file inside
-        // it that the user did *not* select would be silently dragged along
-        // on the next scan.
+        // A rule covers a disk range wholesale, so an unselected same-parse file inside it would be dragged along.
         let selected: std::collections::HashSet<usize> =
             members.iter().map(|(i, _, _)| *i).collect();
         for (i, f) in files.iter().enumerate() {
@@ -1055,9 +842,7 @@ pub fn plan_redirect(
             }
         }
 
-        // A chained split supersedes exactly the disk range it covers: every
-        // overlapped rule is deleted, and whatever part of it lies outside
-        // the new range comes back trimmed, its own mapping intact.
+        // A chained split supersedes exactly its disk range: overlapped rules are deleted and come back trimmed.
         for r in existing.iter().filter(|r| {
             r.title == title && r.season == season && r.ep_from <= d_max && r.ep_to >= d_min
         }) {
@@ -1089,12 +874,7 @@ pub fn plan_redirect(
     Ok(plan)
 }
 
-/// Confirms a season split: current-frame episodes `from..=to` of `media_id`
-/// belong to `dst_media_id`, renumbered from `dst_start`.
-///
-/// Like `set_library_match`, the answer is applied to the in-memory index
-/// immediately; the v11 rows `plan_redirect` produces are what make the next
-/// scan and the next restart agree.
+/// Confirms a season split in memory at once; the rows `plan_redirect` produces make the next scan and restart agree.
 #[tauri::command(async)]
 pub fn set_library_redirect(
     app: AppHandle,
@@ -1135,11 +915,7 @@ pub fn set_library_redirect(
     Ok(guard.summary.clone())
 }
 
-/// Removes a season split, giving the range back to whatever the rest of the
-/// parse still answers to — the sibling files outside every remaining split
-/// know their media id, and a freed episode 13 belongs with them rather than
-/// in "unplaced". When no sibling knows (the whole key was split), the range
-/// honestly lands unplaced until the next scan, like `clear_library_match`.
+/// Removes a season split, giving the range back to a sibling of the same parse, or to "unplaced" when none remains.
 #[tauri::command(async)]
 pub fn clear_library_redirect(
     app: AppHandle,
@@ -1153,8 +929,7 @@ pub fn clear_library_redirect(
     }
 
     let db = app.state::<Db>();
-    // The rule itself is needed to know which files it governed, so it is read
-    // before it is deleted.
+    // The rule is needed to know which files it governed, so it is read before it is deleted.
     let rule = redirect_rules(&db)
         .into_iter()
         .find(|r| r.title == title && r.season == season && r.ep_from == ep_from)
@@ -1163,8 +938,7 @@ pub fn clear_library_redirect(
     let remaining = redirect_rules(&db);
 
     let mut guard = state.0.guard();
-    // The answer the freed files fall back to: any sibling of the same parse
-    // that no remaining split claims.
+    // The answer the freed files fall back to: a sibling of the same parse that no remaining split claims.
     let fallback = guard.files.iter().find_map(|f| {
         if f.title != title || f.season != season || f.media_id.is_none() {
             return None;
@@ -1198,13 +972,7 @@ pub fn clear_library_redirect(
 }
 
 
-/// Drops a correction and gives the file back to the matcher's own answer.
-///
-/// The matcher is not re-run here — its candidates are the cached list and
-/// re-preparing them for one title is work the next scan does anyway — so the
-/// files land in "unplaced" until then. That is honest: without the override
-/// there is no answer on record, and inventing the old guess back would be
-/// claiming knowledge this function does not have.
+/// Drops a correction; the matcher is not re-run, so the files land in "unplaced" until the next scan.
 #[tauri::command(async)]
 pub fn clear_library_match(
     app: AppHandle,
@@ -1218,9 +986,7 @@ pub fn clear_library_match(
 
     let db = app.state::<Db>();
     let dropped = db.library_override_clear(&title, season)?;
-    // A season split is a correction on the same parse, so the same gesture
-    // removes it too. Resetting its files while leaving the v11 rows would
-    // quietly bring them back on the next restart or scan.
+    // A season split is a correction on the same parse, so it goes too, or its rows would bring it back on restart.
     let rules: Vec<SplitRule> = redirect_rules(&db)
         .into_iter()
         .filter(|r| r.title == title && r.season == season)
@@ -1233,9 +999,7 @@ pub fn clear_library_match(
     let mut reset = 0usize;
     for f in &mut guard.files {
         if f.title == title && f.season == season && f.manual {
-            // A split file's stored episode is the renumbered one; the
-            // filename still says the disk number, which is what an unplaced
-            // row is keyed by.
+            // A split file stores the renumbered episode; the unplaced row is keyed by the disk number the filename says.
             if let (_, _, Some(ep)) = reparse(&f.path) {
                 f.episode = ep;
             }
@@ -1245,10 +1009,7 @@ pub fn clear_library_match(
             reset += 1;
         }
     }
-    // Deleting no rows and resetting no files is not a correction removed, and
-    // reporting Ok for it closes the dialog and refetches as though something
-    // happened. The reachable case is a row whose sources were picked in walk
-    // order, so the button was offered against a parse that was never corrected.
+    // Deleting no rows and resetting no files is not a correction removed, and `Ok` would close the dialog as if it were.
     if dropped == 0 && rules.is_empty() && reset == 0 {
         return Err("There is no correction on that title to remove".into());
     }
@@ -1257,8 +1018,7 @@ pub fn clear_library_match(
     Ok(guard.summary.clone())
 }
 
-/// Opens the next unwatched episode of `media_id` in the default player.
-/// The existing detection then picks it up and scrobbles it as usual.
+/// Opens the next unwatched episode of `media_id` in the default player, for detection to pick up as usual.
 #[tauri::command]
 pub fn play_next(app: AppHandle, media_id: i64) -> Result<(), String> {
     let db = app.state::<Db>();
@@ -1290,8 +1050,7 @@ pub fn play_next(app: AppHandle, media_id: i64) -> Result<(), String> {
     open_path(&app, &path)
 }
 
-/// Opens one specific episode — the library page lets the user pick, which
-/// `play_next` cannot express.
+/// Opens one specific episode, which the library page lets the user pick and `play_next` cannot express.
 #[tauri::command]
 pub fn play_episode(app: AppHandle, media_id: i64, episode: u32) -> Result<(), String> {
     let path = {
@@ -1308,15 +1067,7 @@ pub fn play_episode(app: AppHandle, media_id: i64, episode: u32) -> Result<(), S
     open_path(&app, &path)
 }
 
-/// Opens `path`, reporting a stale index clearly — the index is persisted
-/// now, so a file can legitimately have moved since the last scan.
-///
-/// Two doors, and the default-player contract stays the default: only a
-/// configured mpv binary takes the first one, launched with
-/// `--input-ipc-server=<pipe>` so the IPC source sees the playback Karasu
-/// itself started — knowing the pipe name up front beats discovering a
-/// running instance. A failed launch (moved binary, typo) logs and falls
-/// through to the opener, so the play button never goes dead over a setting.
+/// Opens `path`: a configured mpv with an IPC pipe first, else the default opener, so a bad setting never kills the button.
 fn open_path(app: &AppHandle, path: &str) -> Result<(), String> {
     if !Path::new(path).exists() {
         return Err("That file is no longer on disk — rescan your library".into());
@@ -1324,16 +1075,12 @@ fn open_path(app: &AppHandle, path: &str) -> Result<(), String> {
     if let Some((player, pipe)) = crate::commands::mpv_launch_config(&app.state::<Db>()) {
         match std::process::Command::new(&player)
             .arg(format!("--input-ipc-server={pipe}"))
-            // `--` first: a file whose name begins with a dash is a filename,
-            // not an option, and mpv cannot tell without being told.
+            // `--` first: a filename beginning with a dash is not an option, and mpv cannot tell without being told.
             .arg("--")
             .arg(path)
             .spawn()
         {
-            // The child is deliberately not held: Karasu does not manage the
-            // player's lifetime. `wait` in a detached thread only so a Linux
-            // exit is reaped instead of lingering as a zombie until Karasu
-            // quits — on Windows the handle simply closes.
+            // The child is not managed; the detached `wait` only reaps a Linux exit instead of leaving a zombie.
             Ok(mut child) => {
                 std::thread::spawn(move || {
                     let _ = child.wait();
@@ -1354,13 +1101,7 @@ fn open_path(app: &AppHandle, path: &str) -> Result<(), String> {
         .map_err(|e| format!("Could not open the file: {e}"))
 }
 
-/// Recursively collects video files up to the depth/size caps.
-///
-/// Returns how many directories could not be read. A scan ends by replacing
-/// all three library tables, so "found nothing" and "could not look" must not
-/// arrive here as the same answer: an unreadable directory used to `return`
-/// silently at every level, root included, and the empty result was then
-/// persisted as the truth.
+/// Collects video files up to the caps; the unreadable-directory count keeps "found nothing" apart from "could not look".
 #[must_use]
 fn collect_videos(dir: &Path, depth: usize, out: &mut Vec<String>) -> usize {
     if depth > MAX_DEPTH || out.len() >= MAX_FILES {
@@ -1434,15 +1175,12 @@ mod tests {
         assert!(matcher::best_match(&parsed, &frieren()).is_none());
     }
 
-    // Forward slashes on purpose: Windows' `Path` accepts both separators,
-    // Linux only `/` — a backslash fixture parses its whole self as the
-    // filename there, and these tests also run in the linux-build CI job.
+    // Forward slashes on purpose: Linux `Path` only splits on `/`, and these tests run in the linux-build CI job too.
     fn paths(names: &[&str]) -> Vec<String> {
         names.iter().map(|n| format!("/anime/{n}")).collect()
     }
 
-    /// Scans without any correction on record, then derives every view — the
-    /// same two steps `scan_library` takes.
+    /// Scans with no correction on record, then derives every view, the same two steps `scan_library` takes.
     fn indexed(files: &[String], candidates: &[Candidate]) -> LibraryData {
         indexed_with(files, candidates, &HashMap::new())
     }
@@ -1455,8 +1193,7 @@ mod tests {
         indexed_full(files, candidates, overrides, &[], &[])
     }
 
-    /// The full pipeline as `scan_library` runs it: splits and overrides at
-    /// index time, episode counts and relations rules at reindex time.
+    /// The full pipeline as `scan_library` runs it: splits and overrides at index time, counts and rules at reindex.
     fn indexed_full(
         files: &[String],
         candidates: &[Candidate],
@@ -1474,8 +1211,7 @@ mod tests {
         data
     }
 
-    /// The memoized index must agree with calling `best_match` per file — the
-    /// cache key is exactly that function's input, so results are identical.
+    /// Proves the memoized index agrees with calling `best_match` per file.
     #[test]
     fn indexes_a_season_folder_by_episode() {
         let files = paths(&[
@@ -1493,8 +1229,7 @@ mod tests {
         }
     }
 
-    /// Repeated titles are what the cache exists for, and unmatched files are
-    /// the expensive case it must also cover — neither may change the result.
+    /// Proves repeated and unmatched titles, the cases the cache exists for, do not change the result.
     #[test]
     fn repeated_and_unmatched_titles_are_handled_once() {
         let mut files = paths(&["Totally Unrelated Show - 01.mkv", "Totally Unrelated Show - 02.mkv"]);
@@ -1506,8 +1241,7 @@ mod tests {
         // …and the matched one is unaffected by sharing the scan with it.
         assert_eq!(data.by_media[&154587].len(), 1);
         assert!(data.by_media[&154587].contains_key(&13));
-        // It is not discarded either: it is exactly what "unplaced" is for,
-        // and both its episodes belong to the one group.
+        // Not discarded either: this is what "unplaced" is for, and both episodes belong to the one group.
         assert_eq!(data.unmatched.len(), 1);
         assert_eq!(data.unmatched[0].files.len(), 2);
     }
@@ -1530,8 +1264,7 @@ mod tests {
             .collect()
     }
 
-    /// 24 files on a 12-episode show is flagged, with the facts the split card
-    /// needs — and nothing is re-pointed, because detection is not a decision.
+    /// Proves a folder larger than the show is flagged with the split card's facts and nothing is re-pointed.
     #[test]
     fn a_folder_larger_than_the_show_is_flagged_not_repointed() {
         let data = indexed_full(
@@ -1552,8 +1285,7 @@ mod tests {
         assert!(overflow.hint.is_none());
     }
 
-    /// When the community anime-relations rules know the overflow, the flag
-    /// carries their answer as a pre-selection — still never applied alone.
+    /// Proves the community rules supply the hint as a pre-selection only, never applied alone.
     #[test]
     fn the_community_rules_supply_the_hint_only() {
         let rules = vec![relations::Rule {
@@ -1593,8 +1325,7 @@ mod tests {
         assert!(entry.overflow.is_none());
     }
 
-    /// A confirmed split re-points its range, renumbered to the sequel's own
-    /// count — disk 13 becomes the sequel's episode 1 — and the flag settles.
+    /// Proves a confirmed split re-points its range renumbered to the sequel's count and settles the flag.
     #[test]
     fn a_confirmed_split_repoints_and_renumbers() {
         let parsed = parser::parse("Bocchi the Rock - 13.mkv");
@@ -1617,17 +1348,14 @@ mod tests {
         let first = data.summary.iter().find(|e| e.media_id == 1).expect("season 1");
         assert_eq!(first.episodes, vec![11, 12]);
         assert!(first.overflow.is_none());
-        // …and the range lands on the sequel, renumbered and marked as the
-        // user's own placement.
+        // …and the range lands on the sequel, renumbered and marked as the user's own placement.
         let second = data.summary.iter().find(|e| e.media_id == 2).expect("season 2");
         assert_eq!(second.episodes, vec![1, 2]);
         assert!(second.manual);
         assert!(data.by_media[&2][&1].contains("- 13"));
     }
 
-    /// A split names an episode range, which is strictly more specific than a
-    /// whole-key override — inside the range the split wins, outside it the
-    /// override still does.
+    /// Proves a split beats a whole-key override inside its range and the override still wins outside it.
     #[test]
     fn a_split_beats_a_whole_key_override_inside_its_range() {
         let parsed = parser::parse("Bocchi the Rock - 13.mkv");
@@ -1652,10 +1380,7 @@ mod tests {
         assert!(data.by_media[&2].contains_key(&1), "split takes its range");
     }
 
-    /// Two successive splits on one folder: the second is keyed on the
-    /// numbers the row *shows* (current frame), and both rules end up in
-    /// disk numbering. The old command's `(title, season, ep_from)` upsert
-    /// silently overwrote the first rule here.
+    /// Proves a second split keys on the numbers the row shows, and both rules end up in disk numbering.
     #[test]
     fn a_second_split_keys_on_what_the_row_shows() {
         let eps: Vec<u32> = (1..=36).collect();
@@ -1677,9 +1402,7 @@ mod tests {
             &[first.clone()],
             &[],
         );
-        // After the first split, media 1 shows 1–12 and 25–36 — so the next
-        // overflow the user confirms reads "25–36", in current-frame numbers
-        // that happen to equal disk numbers here.
+        // After the first split media 1 shows 1–12 and 25–36, so the next confirm reads "25–36" in current-frame numbers.
         let plan = plan_redirect(&data.files, &[first.clone()], 1, 25, 36, 3, 1)
             .expect("second split plans");
         assert!(plan.delete.is_empty(), "the first rule is untouched");
@@ -1692,11 +1415,7 @@ mod tests {
         assert_eq!(renumbered.iter().max(), Some(&12));
     }
 
-    /// Splitting the *destination* of an earlier split — the row whose
-    /// current numbers no longer match its filenames. The old command
-    /// re-parsed disk numbers and shifted the wrong twelve files; the plan
-    /// resolves per file and trims the overlapped rule to what it still
-    /// covers.
+    /// Proves splitting the destination of an earlier split targets the right files and trims the overlapped rule.
     #[test]
     fn splitting_a_renumbered_row_targets_the_right_files_and_trims() {
         let eps: Vec<u32> = (1..=36).collect();
@@ -1716,13 +1435,11 @@ mod tests {
             &[whole.clone()],
             &[],
         );
-        // Media 2 now shows 1–24; its own overflow past 12 reads "13–24" in
-        // current-frame numbers, which live at disk 25–36.
+        // Media 2 now shows 1–24; its overflow past 12 reads "13–24" in current-frame numbers, which live at disk 25–36.
         let plan = plan_redirect(&data.files, &[whole.clone()], 2, 13, 24, 3, 1)
             .expect("split of a renumbered row plans");
         assert_eq!(plan.delete, vec![(whole.title.clone(), whole.season, 13)]);
-        // The overlapped rule comes back trimmed to the half it still covers,
-        // plus the new rule for the moved half — both in disk numbers.
+        // The overlapped rule comes back trimmed to the half it still covers, plus the new rule, both in disk numbers.
         let mut ranges: Vec<(u32, u32, i64, u32)> = plan
             .insert
             .iter()
@@ -1740,9 +1457,7 @@ mod tests {
         assert_eq!(moved, (25..=36).collect::<Vec<u32>>());
     }
 
-    /// Confirming a range that matches nothing is an error the dialog shows,
-    /// never an `Ok` that closes it over an unchanged screen — the exact
-    /// silence the user reported after their third split.
+    /// Proves a range that matches nothing is an error the dialog shows, never an `Ok` over an unchanged screen.
     #[test]
     fn a_split_matching_no_files_is_an_error() {
         let data = indexed_full(
@@ -1764,15 +1479,11 @@ mod tests {
         let files = paths(&["Sousou no Frieren [Movie].mkv"]);
         let data = indexed(&files, &frieren());
         assert!(data.by_media.get(&154587).is_none_or(|eps| !eps.is_empty()));
-        // Skipped means skipped: no episode number is not the same as an
-        // unplaced episode, and it must not turn up in the list to be assigned.
+        // Skipped means skipped: no episode number is not an unplaced episode, and it must not appear in the list.
         assert!(data.unmatched.is_empty());
     }
 
-    /// The match confidence rides along with the index. It is the difference
-    /// between "this is the show" and "this is my best guess", and the library
-    /// screen says which — so the scanner has to hand it over rather than
-    /// dropping it the moment it has an id.
+    /// Proves the match confidence rides along with the index, since the screen says "exact" or "best guess" from it.
     #[test]
     fn the_index_carries_its_match_confidence() {
         let files = paths(&["[SubsPlease] Sousou no Frieren - 13 (1080p) [A].mkv"]);
@@ -1785,8 +1496,7 @@ mod tests {
         assert!(!row.sources.is_empty(), "a row has to say what parse produced it");
     }
 
-    /// The first path wins for a duplicate (media, episode) — a re-encode in a
-    /// second folder must not silently replace the original.
+    /// Proves the first path wins for a duplicate (media, episode), so a re-encode does not replace the original.
     #[test]
     fn the_first_path_wins_for_a_duplicate_episode() {
         let files = vec![
@@ -1797,12 +1507,7 @@ mod tests {
         assert_eq!(index[&154587][&13], files[0]);
     }
 
-    /// The point of the whole design: a correction is consulted by the *next*
-    /// scan, so re-scanning cannot quietly undo what the user told us.
-    ///
-    /// The show here is one the matcher has no candidate for, so without the
-    /// override these files are unplaceable — which makes the assertion about
-    /// the override rather than about the matcher getting lucky.
+    /// Proves a correction is consulted by the next scan, on a show the matcher has no candidate for.
     #[test]
     fn a_correction_outlives_the_scan_that_disagreed() {
         let files = paths(&[
@@ -1813,8 +1518,7 @@ mod tests {
         assert!(plain.by_media.is_empty());
         assert_eq!(plain.unmatched.len(), 1);
 
-        // Whatever the parser made of that name is the key the user's answer
-        // gets stored under — read it back rather than assuming its spelling.
+        // Whatever the parser made of that name is the key, so read it back rather than assuming its spelling.
         let key = (plain.unmatched[0].title.clone(), plain.unmatched[0].season);
         let corrected = indexed_with(&files, &frieren(), &HashMap::from([(key, 154587)]));
 
@@ -1825,8 +1529,7 @@ mod tests {
         assert_eq!(row.score, 1.0);
     }
 
-    /// A correction moves only the files that parse to the corrected title.
-    /// Re-pointing one show in a library must not drag an unrelated one along.
+    /// Proves a correction moves only the files that parse to the corrected title.
     #[test]
     fn a_correction_moves_only_its_own_files() {
         let mut files = paths(&["[Group] Totally Unrelated Show - 01.mkv"]);
@@ -1842,13 +1545,7 @@ mod tests {
         assert!(!frieren_row.manual, "the untouched row must not become manual");
     }
 
-    /// A row can merge two parses, and only one of them may be the corrected
-    /// one. The row-level `manual` flag is the OR of them, so it cannot answer
-    /// "which parse do I remove the correction from?" — the sources have to.
-    ///
-    /// Without the per-source flag the screen offers "remove correction" keyed
-    /// on whichever parse walk order happened to put first, and picking the
-    /// auto-matched one deletes nothing while reporting success.
+    /// Proves each source says whether it is the corrected parse, which the row-level OR flag cannot answer.
     #[test]
     fn each_source_says_whether_it_is_the_corrected_one() {
         let files = paths(&[
@@ -1870,13 +1567,7 @@ mod tests {
         );
     }
 
-    /// "Found nothing" and "could not look" used to be the same answer.
-    ///
-    /// `collect_videos` swallowed a `read_dir` failure at every level including
-    /// the root, so an offline NAS or an unplugged drive produced an empty
-    /// result — which the scan then persisted through three `DELETE`-everything
-    /// writes and reported as a success. The count it returns is what
-    /// `scan_library` now refuses on.
+    /// Proves an unreadable directory is counted rather than swallowed, which is what `scan_library` refuses on.
     #[test]
     fn an_unreadable_directory_is_counted_rather_than_swallowed() {
         let missing = std::env::temp_dir().join("karasu-no-such-library-dir");
@@ -1886,8 +1577,7 @@ mod tests {
         assert_eq!(collect_videos(&missing, 0, &mut out), 1, "the root counts");
         assert!(out.is_empty());
 
-        // A real folder that is genuinely empty is a different answer, and has
-        // to stay one — it is the only way to empty a library on purpose.
+        // A genuinely empty folder is a different answer and has to stay one: it is how a library is emptied on purpose.
         let empty = std::env::temp_dir().join(format!("karasu-empty-{}", std::process::id()));
         std::fs::create_dir_all(&empty).unwrap();
         let mut out = Vec::new();
@@ -1906,11 +1596,7 @@ mod tests {
 
 #[cfg(test)]
 mod hydrate_cost {
-    /// How long the re-parse in `hydrate` actually takes, since the audit
-    /// filed it as a startup cost without ever putting a number on it.
-    ///
-    /// Ignored by default — it is a measurement, not an assertion. Run with
-    /// `cargo test --lib hydrate_cost -- --ignored --nocapture`.
+    /// Measures the re-parse in `hydrate`; run with `cargo test --release --lib hydrate_cost -- --ignored --nocapture`.
     #[test]
     #[ignore]
     fn measure_the_reparse() {

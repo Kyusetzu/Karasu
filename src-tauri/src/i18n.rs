@@ -1,21 +1,4 @@
-//! The strings Rust composes, in the language the user chose.
-//!
-//! Everything the frontend renders goes through i18next, and its two locales
-//! are kept honest by `de: typeof en` and `i18nKeys.test.ts`. None of that
-//! reaches here — every desktop notification, every row in the bell, the tray
-//! menu and the toast action label were composed in English and shown that way
-//! whatever the interface said around them.
-//!
-//! **One `match` arm per message, holding both languages.** That shape is the
-//! point: a second table with its own `en` and `de` halves would have no
-//! parity check and would drift the first time somebody added a message in a
-//! hurry. Here the translation is on the line next to the original, so
-//! forgetting it does not compile.
-//!
-//! The language is *mirrored* into the kv store by the frontend rather than
-//! read from it: the setting lives in the WebView's localStorage, which Rust
-//! has no access to. A missing mirror means English, which is what every one
-//! of these strings was before.
+//! The strings Rust composes, in the language the frontend mirrors into kv; each match arm holds both languages.
 
 use crate::db::Db;
 
@@ -29,8 +12,7 @@ pub enum Lang {
 }
 
 impl Lang {
-    /// Anything unrecognised — an unset key, a language Karasu does not ship —
-    /// is English, which is also i18next's `fallbackLng`.
+    /// Anything unrecognised is English, which is also i18next's `fallbackLng`.
     pub fn parse(code: Option<&str>) -> Self {
         match code {
             Some(c) if c.starts_with("de") => Lang::De,
@@ -44,13 +26,8 @@ pub fn lang(db: &Db) -> Lang {
     Lang::parse(db.kv_get(LANGUAGE_KEY).as_deref())
 }
 
-/// Every string Rust composes for a user to read.
-///
-/// An enum rather than string keys so the parameters are typed and the match
-/// below is exhaustive: a new message cannot be added without both languages,
-/// and a renamed field cannot silently stop being interpolated.
-// The tray and toast variants are constructed only by desktop code; on the
-// Android check that reads as "never constructed" without being wrong.
+/// Every string Rust composes for a user to read; an enum so the match is exhaustive in both languages.
+// The tray and toast variants are constructed only by desktop code, so the Android check reads them as unused.
 #[cfg_attr(mobile, allow(dead_code))]
 pub enum Msg<'a> {
     AiringTitle,
@@ -61,10 +38,7 @@ pub enum Msg<'a> {
     SequelBody { title: &'a str },
     UpdateTitle,
     UpdateBody { version: &'a str },
-    /// Android's wording: nothing downloads and nothing installs there, so
-    /// "open About to install it" would be a lie — the APK lives on GitHub.
-    /// The mirror image of the enum-level attribute: constructed only on
-    /// mobile, dead on the desktop compile without being wrong.
+    /// Android's wording: nothing downloads or installs there, so the body points at the GitHub release instead.
     #[cfg_attr(not(mobile), allow(dead_code))]
     UpdateBodyAndroid { version: &'a str },
     SiteNotifTitle,
@@ -82,9 +56,7 @@ pub enum Msg<'a> {
     TrayDetection,
     TrayOpen,
     TrayQuit,
-    /// The Android tracking service's persistent notification — composed
-    /// here so Kotlin renders text it never chose. Constructed only on
-    /// Android; dead on the desktop compile without being wrong.
+    /// The Android tracking service's persistent notification, composed here so Kotlin renders text it never chose.
     #[cfg_attr(not(target_os = "android"), allow(dead_code))]
     TrackingServiceTitle,
     #[cfg_attr(not(target_os = "android"), allow(dead_code))]
@@ -102,8 +74,7 @@ pub fn text(lang: Lang, msg: Msg<'_>) -> String {
 
         (En, StaleTitle) => "On-hold reminder".into(),
         (De, StaleTitle) => "Erinnerung: pausiert".into(),
-        // The plural is spelled out rather than papered over with "month(s)",
-        // which is a form nobody writes.
+        // The plural is spelled out rather than papered over with "month(s)", a form nobody writes.
         (En, StaleBody { title, months }) => {
             let unit = if months == 1 { "month" } else { "months" };
             format!("{title} has been paused for over {months} {unit}.")
@@ -127,8 +98,7 @@ pub fn text(lang: Lang, msg: Msg<'_>) -> String {
 
         (En, UpdateTitle) => "Update ready".into(),
         (De, UpdateTitle) => "Update bereit".into(),
-        // Deliberately not "restart to install": the download lives in process
-        // memory, so restarting is the one action that throws it away.
+        // Deliberately not "restart to install": the download lives in process memory, so restarting throws it away.
         (En, UpdateBody { version }) => {
             format!("Karasu {version} is ready. Open About to install it.")
         }
@@ -207,9 +177,7 @@ pub fn text(lang: Lang, msg: Msg<'_>) -> String {
 mod tests {
     use super::*;
 
-    /// The mirror is a best-effort copy of a setting that lives somewhere Rust
-    /// cannot read, so every way it can be missing or wrong has to mean
-    /// English rather than a panic or an empty string.
+    /// Proves every way the mirror can be missing or wrong means English rather than a panic or an empty string.
     #[test]
     fn an_unknown_or_absent_language_is_english() {
         assert_eq!(Lang::parse(None), Lang::En);
@@ -220,9 +188,7 @@ mod tests {
         assert_eq!(Lang::parse(Some("de-AT")), Lang::De);
     }
 
-    /// Every message differs between the two languages and interpolates what
-    /// it was given. A missed arm cannot compile, but an arm that forgot its
-    /// parameter compiles fine and shows a sentence with a hole in it.
+    /// Proves each message differs between languages and carries its parameters; a forgotten one still compiles.
     #[test]
     fn each_message_is_translated_and_carries_its_parameters() {
         let en = text(Lang::En, Msg::AiringBody { title: "Frieren", episode: 5 });
@@ -238,8 +204,7 @@ mod tests {
         );
     }
 
-    /// Both halves of a plural, in both languages — the case the old
-    /// "month(s)" was avoiding.
+    /// Proves both halves of the plural are spelled out, in both languages.
     #[test]
     fn the_month_count_is_spelled_out_both_ways() {
         let one = text(Lang::En, Msg::StaleBody { title: "X", months: 1 });

@@ -382,6 +382,13 @@ pub fn run() {
                 }
             };
             app.manage(db);
+            // The window from tauri.conf.json already exists here, and the
+            // page has not painted yet — so the stored zoom lands before
+            // anything is drawn rather than as a visible jump after.
+            commands::apply_ui_zoom(
+                app.handle(),
+                commands::read_ui_zoom(&app.state::<db::Db>()),
+            );
             // The verbose switch survives a restart, so a "turn it on and
             // reproduce it" request does not have to be re-armed each launch.
             logging::set_debug(
@@ -486,6 +493,8 @@ pub fn run() {
             commands::diagnostics,
             commands::diagnostics_report,
             commands::get_logs,
+            commands::get_ui_zoom,
+            commands::set_ui_zoom,
             commands::log_frontend_error,
             commands::get_log_debug,
             commands::set_log_debug,

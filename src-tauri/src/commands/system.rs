@@ -202,6 +202,65 @@ pub fn set_close_to_tray(db: State<'_, Db>, enabled: bool) -> Result<(), String>
     db.kv_set(CLOSE_TO_TRAY_KEY, if enabled { "1" } else { "0" })
 }
 
+// --- Interface size ---------------------------------------------------------
+
+/// The WebView's zoom, as a percentage, kept so a 4K display or a TV across
+/// the room does not have to be re-zoomed every launch (issue #21).
+///
+/// It is the browser's own zoom (`set_zoom`), not a CSS trick: everything in
+/// the window scales together, the way Ctrl and plus does in a browser, and
+/// the virtualized lists keep measuring what they draw. Applied in `setup`
+/// before the first paint and again on change; the zoom hotkeys in
+/// `tauri.conf.json` stay off so nothing can drift from the stored value.
+/// Android has no `set_zoom`, so the row is desktop only.
+pub const UI_ZOOM_KEY: &str = "ui_zoom";
+pub const UI_ZOOM_DEFAULT: u32 = 100;
+pub const UI_ZOOM_MIN: u32 = 50;
+pub const UI_ZOOM_MAX: u32 = 200;
+
+/// The stored value made safe to apply: the default when absent or unparsable,
+/// clamped otherwise. Pure, so the range is a test rather than a promise.
+pub fn normalize_ui_zoom(raw: Option<&str>) -> u32 {
+    raw.and_then(|s| s.trim().parse::<u32>().ok())
+        .map(|n| n.clamp(UI_ZOOM_MIN, UI_ZOOM_MAX))
+        .unwrap_or(UI_ZOOM_DEFAULT)
+}
+
+pub fn read_ui_zoom(db: &Db) -> u32 {
+    normalize_ui_zoom(db.kv_get(UI_ZOOM_KEY).as_deref())
+}
+
+/// Zooms the main window. A failure is logged and otherwise ignored — the
+/// window still works at 100 %, which beats a launch that fails over a zoom.
+#[cfg(desktop)]
+pub fn apply_ui_zoom(app: &tauri::AppHandle, percent: u32) {
+    use tauri::Manager;
+    let Some(window) = app.get_webview_window("main") else {
+        return;
+    };
+    if let Err(e) = window.set_zoom(f64::from(percent) / 100.0) {
+        crate::logging::warn("ui", format!("could not zoom the window to {percent} %: {e}"));
+    }
+}
+
+#[cfg(not(desktop))]
+pub fn apply_ui_zoom(_app: &tauri::AppHandle, _percent: u32) {}
+
+#[tauri::command]
+pub fn get_ui_zoom(db: State<'_, Db>) -> u32 {
+    read_ui_zoom(&db)
+}
+
+/// Stores and applies the zoom; answers with what was actually applied, so
+/// the pane shows the clamped number rather than the one typed.
+#[tauri::command]
+pub fn set_ui_zoom(app: tauri::AppHandle, db: State<'_, Db>, percent: u32) -> Result<u32, String> {
+    let percent = percent.clamp(UI_ZOOM_MIN, UI_ZOOM_MAX);
+    db.kv_set(UI_ZOOM_KEY, &percent.to_string())?;
+    apply_ui_zoom(&app, percent);
+    Ok(percent)
+}
+
 // --- Global hotkey -----------------------------------------------------------
 
 /// The accelerator that summons (or hides) the window from anywhere, or unset
@@ -763,7 +822,23 @@ pub fn mark_all_notifications_read(db: State<'_, Db>) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{close_hides_window, describe_database};
+    use super::{
+        close_hides_window, describe_database, normalize_ui_zoom, UI_ZOOM_DEFAULT, UI_ZOOM_MAX,
+        UI_ZOOM_MIN,
+    };
+
+    /// The zoom is applied before the first paint, so a bad stored value must
+    /// come out safe rather than as a window nobody can read.
+    #[test]
+    fn a_stored_zoom_is_clamped_and_a_missing_one_is_the_default() {
+        assert_eq!(normalize_ui_zoom(None), UI_ZOOM_DEFAULT);
+        assert_eq!(normalize_ui_zoom(Some("125")), 125);
+        assert_eq!(normalize_ui_zoom(Some(" 150 ")), 150);
+        assert_eq!(normalize_ui_zoom(Some("5")), UI_ZOOM_MIN);
+        assert_eq!(normalize_ui_zoom(Some("999")), UI_ZOOM_MAX);
+        assert_eq!(normalize_ui_zoom(Some("large")), UI_ZOOM_DEFAULT);
+        assert_eq!(normalize_ui_zoom(Some("")), UI_ZOOM_DEFAULT);
+    }
 
     /// The portable warning stands or falls on this: an existing file has to
     /// be reported, and a folder that merely exists must not be mistaken for

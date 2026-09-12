@@ -1,6 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { invoke } from "@tauri-apps/api/core";
 import { Palette } from "lucide-react";
+import * as api from "@/api/anilist";
+import { isAndroid, usePlatform } from "@/stores/platform";
 import { Card, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import {
@@ -20,6 +23,13 @@ import { ColorPicker, Row, SELECT, Toggle } from "./shared";
 import { STATUS_COLOR_ORDER, isDefaultPalette } from "@/lib/statusColors";
 import type { MediaListStatus } from "@/api/types";
 const THEME_MODES: ThemeMode[] = ["system", "light", "dark"];
+
+/**
+ * The zoom steps offered. Browser-like, and bounded by what Rust accepts
+ * (`UI_ZOOM_MIN..=UI_ZOOM_MAX` in `commands/system.rs`); a stored value off
+ * this list still displays, because the select shows whatever Rust answers.
+ */
+const UI_ZOOM_STEPS = [75, 90, 100, 110, 125, 150, 175, 200] as const;
 
 export function AppearanceSection() {
   const { t } = useTranslation();
@@ -50,6 +60,25 @@ export function AppearanceSection() {
   const changeLanguage = (setting: LanguageSetting) => {
     setLang(setting);
     setLanguageSetting(setting);
+  };
+
+  // The window zoom lives in Rust (it is applied before the first paint, so
+  // it cannot be a localStorage setting like the rest of this pane), and
+  // Android has no zoom to set — the row is simply absent there, not greyed:
+  // the phone shell has the system's own text size for that.
+  const android = isAndroid(usePlatform((s) => s.info));
+  const [zoom, setZoom] = useState<number | null>(null);
+  useEffect(() => {
+    if (!api.isTauri || android) return;
+    invoke<number>("get_ui_zoom").then(setZoom).catch(() => {});
+  }, [android]);
+  const changeZoom = async (percent: number) => {
+    setZoom(percent);
+    try {
+      setZoom(await invoke<number>("set_ui_zoom", { percent }));
+    } catch {
+      // The row keeps the chosen number; the next launch reads what stuck.
+    }
   };
 
   return (
@@ -83,6 +112,23 @@ export function AppearanceSection() {
             ))}
           </select>
         </Row>
+
+        {!android && zoom !== null && (
+          <Row label={t("settings.uiZoom")} hint={t("settings.uiZoomHint")}>
+            <select
+              value={zoom}
+              onChange={(e) => changeZoom(Number(e.target.value))}
+              className={SELECT}
+              aria-label={t("settings.uiZoom")}
+            >
+              {UI_ZOOM_STEPS.map((p) => (
+                <option key={p} value={p}>
+                  {p} %
+                </option>
+              ))}
+            </select>
+          </Row>
+        )}
 
         <Row label={t("settings.coverCols")} hint={t("settings.coverColsHint")}>
           {/* A typed number, not a slider — the third device round asked to

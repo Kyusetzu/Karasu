@@ -1605,6 +1605,9 @@ export const de: typeof en = {
     defaultAddStatusHint: "Neue Titel landen mit diesem Status auf deiner Liste.",
     coverCols: "Cover pro Reihe",
     coverColsHint: "Wie viele Cover sich eine Reihe teilen — sie skalieren passend.",
+    uiZoom: "Oberflächengröße",
+    uiZoomHint:
+      "Vergrößert das ganze Fenster, wie Strg und Plus im Browser. Für ein 4K-Display oder einen Fernseher auf Abstand.",
     reduceMotion: "Bewegung reduzieren",
     reduceMotionHint:
       "Animationen und Übergänge überspringen. Bereits aktiv, wenn dein System es verlangt.",

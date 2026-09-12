@@ -1606,6 +1606,9 @@ export const en = {
     defaultAddStatusHint: "New titles join your list with this status.",
     coverCols: "Covers per row",
     coverColsHint: "How many covers share a row — they scale to fit.",
+    uiZoom: "Interface size",
+    uiZoomHint:
+      "Zooms the whole window, like Ctrl and plus in a browser. For a 4K display, or a TV across the room.",
     reduceMotion: "Reduce motion",
     reduceMotionHint:
       "Skip animations and transitions. Already on if your system asks for it.",

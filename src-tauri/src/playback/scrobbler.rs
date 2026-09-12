@@ -1,11 +1,4 @@
-//! Detection and scrobble loop: watch windows, parse titles, match them
-//! against the list and update progress on AniList automatically once the
-//! threshold has passed.
-//!
-//! State machine per detected episode:
-//! `Watching → (Pending →) Updating → Updated`, with `Blocked` on
-//! plausibility problems (episode gap, already watched) and `Cancelled`
-//! after user abort.
+//! The detection and scrobble loop: watch, parse, match, and write progress once the threshold has passed.
 
 use crate::db::Db;
 use crate::sync::LockExt;
@@ -22,32 +15,15 @@ pub const POLL_INTERVAL: Duration = Duration::from_secs(5);
 const DEFAULT_THRESHOLD: Duration = Duration::from_secs(15 * 60);
 /// Threshold for manga chapters (reading is faster than watching).
 const MANGA_THRESHOLD: Duration = Duration::from_secs(5 * 60);
-/// How long a due session defers to a higher-ranked Karasu before writing
-/// anyway.
-///
-/// Longer than `jellyfin::FRESH` on purpose: the peer was heard from within
-/// the last thirty seconds and runs the same threshold, so its write is due
-/// about now; three minutes is time enough for it to land and for the live
-/// check in `perform_update` to see it. A peer that is present but will not
-/// write — confirm mode with nobody at the desk — costs this much delay, once.
+/// How long a due session defers to a higher-ranked Karasu; keep it longer than `jellyfin::FRESH`.
 pub const YIELD_GRACE: Duration = Duration::from_secs(3 * 60);
-/// The poll cadence with the screen off, on the platform that has one.
-///
-/// Fifteen seconds instead of five: the scrobble deadline is wall clock or
-/// position, never a tick count, so nothing lands later — and a phone in a
-/// pocket wakes its radio a third as often. `EMPTY_TICK_GRACE` and
-/// `jellyfin::HOLD_TICKS` *are* tick counts, so a hidden phone holds a paused
-/// session for fifteen minutes and a lost server for forty-five seconds;
-/// both are the more lenient direction. Inside `jellyfin::FRESH`, so a
-/// hidden phone's own row is still fresh when the desktop looks.
+/// The screen-off poll cadence, Android only; safe because the deadline is wall clock or position, not ticks.
 #[cfg_attr(not(target_os = "android"), allow(dead_code))]
 const HIDDEN_POLL_INTERVAL: Duration = Duration::from_secs(15);
-/// How long a refused start of the tracking service is left alone before
-/// the next attempt — once a minute, not once a tick.
+/// How long a refused start of the Android tracking service is left alone before the next attempt.
 #[cfg_attr(not(target_os = "android"), allow(dead_code))]
 const SERVICE_RETRY: Duration = Duration::from_secs(60);
-/// How often the loop reports its own tick count. Five minutes: 288 lines a
-/// day at most, and only while verbose logging is on.
+/// How often the loop reports its own tick count, and only while verbose logging is on.
 const POLL_REPORT: Duration = Duration::from_secs(5 * 60);
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
@@ -61,23 +37,11 @@ pub struct NowPlaying {
     pub raw_title: String,
     #[serde(rename = "parsedTitle")]
     pub parsed_title: String,
-    /// The season the parse carried, if any — half the key a correction is
-    /// stored under, so the picker has to be able to send it back.
+    /// The season the parse carried; half of a correction's key, so the picker has to send it back.
     pub season: Option<u32>,
-    /// The episode as *resolved*: the source's number plus any correction's
-    /// offset, then whatever the relations redirect made of it.
+    /// The episode as resolved: the source's number plus any correction offset, then the relations redirect.
     pub episode: Option<u32>,
-    /// The episode the source actually reported, before either of those.
-    ///
-    /// Kept because `requeue_match` re-resolves from this object rather than
-    /// from a fresh detection: without the untouched number it would shift an
-    /// already-shifted one and drift a little further on every correction.
-    ///
-    /// Serialised for the same reason the correction dialog needs it: an
-    /// offset is `chosen - detected`, and `episode` below is already shifted
-    /// and already redirected. Measuring against that number stored a wrong
-    /// offset the moment a correction was edited a second time, and confirming
-    /// the pre-filled figure stored `0` — destroying a working correction.
+    /// The episode as the source reported it; re-resolving from the shifted one would shift it again.
     #[serde(rename = "sourceEpisode")]
     pub source_episode: Option<u32>,
     /// AniList media ID on a successful match against the list
@@ -85,34 +49,22 @@ pub struct NowPlaying {
     pub media_id: Option<i64>,
     #[serde(rename = "matchedTitle")]
     pub matched_title: Option<String>,
-    /// Whether this match came from the user's own correction rather than the
-    /// matcher. Drives the "undo" affordance; nothing else reads it.
+    /// Whether this match came from the user's own correction; drives the "undo" affordance, nothing else.
     pub overridden: bool,
     /// Current list progress of the matched entry
     pub progress: Option<u32>,
     #[serde(rename = "totalEpisodes")]
     pub total_episodes: Option<u32>,
-    /// Episode length of the matched entry, in minutes.
-    ///
-    /// Carried here rather than re-derived because finding the entry means
-    /// deserializing the whole cached list. Matching already did that once and
-    /// held the answer; `threshold` and the Discord presence used to each throw
-    /// that away and parse the list again. Internal — the frontend has no use
-    /// for either of these, so they stay off the `now-playing` payload.
+    /// Episode length in minutes, kept from matching so nothing re-parses the cached list for it.
     #[serde(skip)]
     pub duration_min: Option<u32>,
-    /// `coverImage.large` of the matched entry, for the Discord presence
-    /// card. Same carriage as `duration_min`, same reason, same `skip` — the
-    /// frontend draws its covers from its own cache and has no use for this.
+    /// `coverImage.large` for the Discord presence card; the frontend draws covers from its own cache.
     #[serde(skip)]
     pub cover_url: Option<String>,
-    /// Playback position in seconds, refreshed every poll when the source
-    /// reports one (Jellyfin). Internal like `duration_min`: the deadline
-    /// check reads it, the frontend does not.
+    /// Playback position in seconds, refreshed every poll when the source reports one; the deadline check reads it.
     #[serde(skip)]
     pub position_sec: Option<u32>,
-    /// The file's own duration in seconds from the same source — beats the
-    /// entry's rounded minutes when both exist.
+    /// The file's own duration in seconds, which beats the entry's rounded minutes when both exist.
     #[serde(skip)]
     pub duration_sec: Option<u32>,
     /// List status of the matched entry when detection started.
@@ -123,31 +75,17 @@ pub struct NowPlaying {
 /// Currently detected playback, shared by commands and the scrobbler.
 pub struct PlaybackState(pub Mutex<Option<NowPlaying>>);
 
-/// Why an auto-update will not happen — a code and its numbers, never a
-/// sentence.
-///
-/// It used to be a `String` formatted in Rust and rendered verbatim on the
-/// card, so a German UI read an English sentence. This is the shape CLAUDE.md
-/// names for exactly that reason: the backend decides *what* is wrong, the
-/// component maps the code through a literal `switch` to a translated line.
-/// The log still gets prose, built on this side by `Display`.
+/// Why an auto-update will not happen, as a code the frontend translates rather than a sentence.
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 #[serde(tag = "code", rename_all = "camelCase")]
 pub enum BlockReason {
-    /// The detected episode is at or behind the list's progress. Forcing it
-    /// would *lower* progress, so the card offers no way to.
+    /// At or behind the list's progress; forcing it would lower progress, so the card offers no button.
     AlreadyWatched { episode: u32, progress: u32 },
-    /// Detected well ahead of the list. Forcing this is legitimate — it moves
-    /// progress forward — so the card keeps its button.
+    /// Detected well ahead of the list; forcing moves progress forward, so the card keeps its button.
     EpisodeGap { episode: u32, progress: u32 },
-    /// The source reported a season the matcher provably could not use, and
-    /// nobody has said which AniList entry it is. Scrobbling would write to
-    /// whatever the bare title hit — for a franchise whose seasons are
-    /// separate entries, that is season one, at season two's episode numbers.
+    /// The source reported a season the matcher could not use, and nobody has said which entry it is.
     UnknownSeason { season: u32 },
-    /// The update was attempted and the API refused it. Not a refusal of ours,
-    /// so retrying is exactly the right offer — and the message is the
-    /// server's own, which no translation could improve.
+    /// The API refused the update, so a retry is the right offer and the message is the server's own.
     Failed { message: String },
 }
 
@@ -171,9 +109,7 @@ impl std::fmt::Display for BlockReason {
 }
 
 impl BlockReason {
-    /// Whether "Update now" may override this. Forcing *forward* is a choice
-    /// worth offering and a failed request is worth retrying; moving progress
-    /// backward and guessing which entry a season is are not.
+    /// Whether "Update now" may override this; forcing forward or retrying is fine, going backward is not.
     pub fn forceable(&self) -> bool {
         matches!(
             self,
@@ -193,46 +129,23 @@ pub struct YieldTarget {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Phase {
     Watching,
-    /// Due, but another Karasu signed in as the same Jellyfin user outranks
-    /// this one and was heard from moments ago, so it gets the first write.
-    /// The session waits `YIELD_GRACE` and then proceeds as if newly due; the
-    /// live check in `perform_update` is what then stops a second write.
-    /// Deliberately not a `Blocked`: "Now" forces straight through it.
+    /// Due, but an outranking Karasu gets the first write; not a `Blocked`, so "Now" forces straight through.
     Yielding(YieldTarget),
     Pending,
     Updating,
     Updated,
-    /// Written locally, not yet accepted by AniList.
-    ///
-    /// A distinct phase because `Updated` is a claim about the server. The
-    /// write went to the offline queue — offline, throttled, or behind a drain
-    /// that was already running — and saying "Updated ✓" for it is the one
-    /// assurance a tracker cannot get wrong.
+    /// Written to the offline queue, not yet accepted by AniList; `Updated` is a claim about the server.
     Queued,
     Blocked(BlockReason),
     Cancelled,
 }
 
-/// What a write actually did.
-///
-/// `save_entry_core` answers `queued` for anything that could still work
-/// later, and that answer used to be discarded by every caller in this file:
-/// the session went to `Updated`, the local cache was patched with progress
-/// the account did not have, and `scrobble-done` fired. If the queued row was
-/// later refused for good, the cache kept a number that had never landed — and
-/// `would_regress`, which reads that cache, then refused the correct rewrite.
+/// What a write did; `Queued` is not success, so no caller may treat it as landed.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Outcome {
     Landed,
     Queued,
-    /// The write was refused here, before it was sent.
-    ///
-    /// Carries a real block reason rather than a message. `would_regress` used
-    /// to answer with English prose, which became `BlockReason::Failed` — the
-    /// one blocked phase that is *forceable* and whose text
-    /// `backendErrorText` cannot translate. So a German card showed an English
-    /// sentence beside an "Update now" button that reproduced the identical
-    /// refusal, for as long as the user kept pressing it.
+    /// Refused here before sending; a real block reason, so the card translates it and offers no futile retry.
     Refused(BlockReason),
 }
 
@@ -246,35 +159,20 @@ pub struct Session {
     pub total: Option<u32>,
     /// List status of the entry when detection started
     pub list_status: String,
-    /// Wall-clock start of this session (ms since epoch); drives the Discord
-    /// presence progress bar.
+    /// Wall-clock start of this session in ms since epoch; drives the Discord presence progress bar.
     pub started_ms: i64,
     /// When the auto-update is due (None = auto-update disabled)
     pub update_at: Option<Instant>,
     pub update_at_epoch_ms: Option<u64>,
     pub phase: Phase,
-    /// Consecutive polls that detected nothing at all.
-    ///
-    /// A pause is indistinguishable from a stop on any source that reports
-    /// only playing sessions — which is every media-session player, and on
-    /// Linux that is the whole of local detection. Dropping the session on the
-    /// first empty tick therefore threw away the accumulated watch time and
-    /// restarted the threshold from zero on resume, so a twice-paused episode
-    /// could never scrobble. Counted rather than acted on immediately, and
-    /// reset the moment the same content is seen again.
+    /// Consecutive empty polls; a pause looks like a stop, so the session is held rather than dropped.
     pub missed_ticks: u32,
 }
 
 /// Running scrobble session (shared between the loop and commands).
 pub struct ScrobbleSession(pub Mutex<Option<Session>>);
 
-/// Whether a finished update still belongs to the session now in state.
-///
-/// Both update paths drop the lock across the AniList request, and the poll
-/// loop replaces the session wholesale whenever the detected episode changes.
-/// Writing the result back unconditionally would stamp one episode's outcome
-/// onto another — and since the threshold check only fires on `Watching`, the
-/// wrongly-stamped episode could never be scrobbled at all.
+/// Whether a finished update still belongs to the session in state, which the loop may have replaced meanwhile.
 fn applies_to(session: &Session, media_id: i64, episode: u32) -> bool {
     session.media_id == media_id && session.episode == episode
 }
@@ -283,9 +181,7 @@ fn applies_to(session: &Session, media_id: i64, episode: u32) -> bool {
 struct ScrobbleEvent {
     phase: String,
     reason: Option<BlockReason>,
-    /// Whether the card may offer "Update now" against this block. Emitted
-    /// rather than re-derived on the other side, so the button and the command
-    /// that refuses it cannot drift apart.
+    /// Whether the card may offer "Update now"; emitted so the button and the refusing command cannot drift apart.
     forceable: bool,
     #[serde(rename = "mediaId")]
     media_id: Option<i64>,
@@ -324,8 +220,7 @@ fn emit_session(app: &AppHandle, session: Option<&Session>) {
                 Phase::Blocked(r) => Some(r.clone()),
                 _ => None,
             },
-            // Everything that is not a block is forceable — that is what the
-            // button has always meant outside this phase.
+            // Everything that is not a block is forceable; that is what the button has always meant outside this phase.
             forceable: match &s.phase {
                 Phase::Blocked(r) => r.forceable(),
                 _ => true,
@@ -334,9 +229,7 @@ fn emit_session(app: &AppHandle, session: Option<&Session>) {
             episode: Some(s.episode),
             update_at_ms: match &s.phase {
                 Phase::Watching => s.update_at_epoch_ms,
-                // An armed gap block carries its lift time, so the card can
-                // say *when* rather than only *that* — unarmed blocks have
-                // no epoch to leak, since `auto_arm` never set one.
+                // An armed gap block carries its lift time so the card can say when; unarmed blocks never got an epoch.
                 Phase::Blocked(BlockReason::EpisodeGap { .. }) => s.update_at_epoch_ms,
                 // The end of the grace, so the card can count down the wait.
                 Phase::Yielding(_) => s.update_at_epoch_ms,
@@ -357,8 +250,7 @@ fn cached_user_id(db: &Db) -> Option<i64> {
         .and_then(|v| v.get("id").and_then(|i| i.as_i64()))
 }
 
-/// Builds matching candidates from the SQLite list cache.
-/// For MANGA, `episodes` carries the chapter count.
+/// Builds matching candidates from the SQLite list cache; for MANGA, `episodes` carries the chapter count.
 pub fn candidates_from_cache(db: &Db, media_type: &str) -> Vec<matcher::Candidate> {
     let Some(user_id) = cached_user_id(db) else {
         return Vec::new();
@@ -444,17 +336,12 @@ pub fn candidates_from_cache(db: &Db, media_type: &str) -> Vec<matcher::Candidat
     out
 }
 
-/// `-1` for a parse that carried no season — the sentinel `library_override`
-/// established in schema v9, and the reason it is a sentinel rather than NULL
-/// is that SQLite would treat each NULL in a primary key as distinct.
+/// `-1` for a parse with no season, because SQLite treats each NULL in a primary key as distinct.
 pub(crate) fn season_key(season: Option<u32>) -> i32 {
     season.map(|s| s as i32).unwrap_or(-1)
 }
 
-/// The user's correction for this parse.
-///
-/// Read whole and matched in memory: the table holds one row per title the
-/// matcher gets wrong, which is a handful, and this runs on a 5 s poll.
+/// The user's correction for this parse; the table holds a handful of rows, so it is read whole.
 pub(crate) fn detection_override(
     db: &Db,
     title: &str,
@@ -467,27 +354,13 @@ pub(crate) fn detection_override(
         .find(|o| o.title == title && o.season == key && o.media_type == media_type)
 }
 
-/// The episode a correction says this really is.
-///
-/// Saturating, and floored at 1: an offset that would take the number to zero
-/// or below describes a mapping that cannot be true, and episode 0 is not a
-/// thing to write to a list.
+/// The episode a correction says this really is, floored at 1 because episode 0 is not a thing to write.
 pub(crate) fn shift_episode(episode: u32, offset: i32) -> u32 {
     let shifted = i64::from(episode) + i64::from(offset);
     shifted.clamp(1, u32::MAX as i64) as u32
 }
 
-/// What the cached list knows about a matched id.
-///
-/// Shared by the detection pass and the correction command so the card cannot
-/// say one thing when a title is detected and another when it is corrected.
-/// A forced id that is not on the list yet resolves to the stored display
-/// title with no progress — honest, and it self-heals on the first scrobble,
-/// since `SaveMediaListEntry` creates the entry.
-/// What `resolve_match` found. A struct rather than the 5-tuple this grew out
-/// of: at six fields, `(Option<String>, Option<u32>, Option<u32>, …)` at two
-/// call sites is a puzzle, not a signature — the same call `DetectionOverride`
-/// made in db.rs.
+/// What `resolve_match` found; a struct rather than a tuple, because six positional fields is a puzzle.
 struct Resolved {
     title: Option<String>,
     progress: Option<u32>,
@@ -497,6 +370,7 @@ struct Resolved {
     status: String,
 }
 
+/// What the cached list knows about a matched id, shared by detection and the correction command.
 fn resolve_match(
     candidates: &[matcher::Candidate],
     media_id: i64,
@@ -528,9 +402,7 @@ fn build_now_playing(
     playback: detection::Playback,
 ) -> NowPlaying {
     let media_type = if playback.manga { "MANGA" } else { "ANIME" };
-    // A source that already knows the series and episode (the Jellyfin API)
-    // supplies them directly; guessing at a formatted string would only throw
-    // away information it handed us.
+    // A source that already knows the series and episode supplies them; re-parsing its string would lose that.
     let parsed = match playback.parsed.clone() {
         Some(p) => p,
         None if playback.manga => parser::parse_manga(&playback.media_title),
@@ -538,10 +410,7 @@ fn build_now_playing(
     };
     let candidates = candidates_from_cache(db, media_type);
 
-    // The user's own answer, before the fuzzy sweep — the same precedence
-    // `index_files` documents for the library scanner. A title the matcher gets
-    // wrong (or cannot place at all) is corrected once on the card and every
-    // later detection of that parse skips the guessing entirely.
+    // The user's own answer comes before the fuzzy sweep, the same precedence `index_files` gives the scanner.
     let forced = detection_override(db, &parsed.title, parsed.season, media_type);
     if let Some(o) = &forced {
         crate::logging::debug(
@@ -552,9 +421,7 @@ fn build_now_playing(
             ),
         );
     }
-    // The corrected number, *before* the relations redirect: a correction says
-    // which episode of the entry this is, and anime-relations then decides
-    // where that episode lands — the order the v12 note in CLAUDE.md sets out.
+    // Offset before redirect: a correction says which episode this is, relations then decide where it lands.
     let source_episode = parsed.episode;
     let mut parsed = parsed;
     if let (Some(o), Some(ep)) = (&forced, parsed.episode) {
@@ -567,13 +434,7 @@ fn build_now_playing(
         None => matcher::best_match(&parsed, &candidates),
     };
 
-    // The verdict, while the score still exists. The `.map()` below rewrites
-    // `matched` into `(id, episode)` and the score is gone for good — so this is
-    // the only point where "matched the wrong show" can be told apart from
-    // "matched nothing", which is the top detection question. Logged here rather
-    // than inside the matcher on purpose: `best_match` is also the library
-    // scanner's and `identify.rs`'s, and a line in there fires once per scanned
-    // file — thousands per scan, enough to rotate this story off disk.
+    // Logged here while the score exists, not in the matcher, where a line per scanned file would rotate the log.
     crate::logging::debug(
         "recognize",
         match &matched {
@@ -589,16 +450,13 @@ fn build_now_playing(
         },
     );
 
-    // Episode redirect (anime-relations): e.g. combined release "Ep 25"
-    // → season 2, episode 1 of a different AniList entry. Anime only.
+    // The anime-relations episode redirect, anime only.
     let matched = matched.map(|m| {
         if !playback.manga {
             if let Some(ep) = parsed.episode {
                 if let Some((new_id, new_ep)) = relations::redirect(rules, m.media_id, ep)
                 {
-                    // Invisible today, and it reads as a matcher bug: a combined
-                    // release's "Ep 25" quietly becomes season 2 episode 1 of a
-                    // different AniList entry.
+                    // Otherwise invisible, and it reads as a matcher bug when an episode lands on another entry.
                     crate::logging::debug(
                         "relations",
                         format!(
@@ -618,9 +476,7 @@ fn build_now_playing(
             let r = resolve_match(
                 &candidates,
                 mid,
-                // Only when the id is the one *this* correction forced: a
-                // redirect may have moved on to another entry, whose title
-                // the stored one would misreport.
+                // Only when the id is the one this correction forced: a redirect may have moved on to another entry.
                 forced
                     .as_ref()
                     .filter(|o| o.media_id == mid)
@@ -664,57 +520,31 @@ fn build_now_playing(
     }
 }
 
-/// The grace an episode-gap block can earn its way past: five minutes of
-/// simply continuing to watch.
+/// The grace an episode-gap block can earn its way past by simply continuing to watch.
 const GAP_GRACE: Duration = Duration::from_secs(5 * 60);
 
-/// How many consecutive empty polls a session survives before it is dropped.
-///
-/// Five minutes at the 5 s poll: long enough for an ordinary pause — a door, a
-/// kettle — and short enough that a player closed for good does not hold the
-/// card for the rest of the evening. The card keeps showing the last state
-/// while this runs down, which is the accepted trade: a stale card for a few
-/// minutes is cheaper than an episode that never scrobbles.
+/// How many empty polls a session survives: long enough for a pause, short enough to let a closed player go.
 const EMPTY_TICK_GRACE: u32 = 60;
 
-/// Whether an armed session is still armed *this* tick.
-///
-/// Separate from [`auto_arm`], which answers the question once when the
-/// session starts. The settings can change while an episode plays, and two of
-/// them must be honoured at the moment the update comes due rather than at the
-/// moment it was scheduled: switching automatic tracking off has to stop a
-/// write that is already waiting, and the gap grace is opt-in the same way.
+/// Whether an armed session is still armed this tick; the tick re-reads what the tick decides on.
 fn armed_now(enabled: bool, gap_auto: bool, phase: &Phase, has_deadline: bool) -> bool {
     enabled
         && has_deadline
         && match phase {
             Phase::Watching => true,
-            // A yield is a wait, not a write: the deadline it carries is the
-            // end of the grace, and it has to fire.
+            // A yield is a wait, not a write: its deadline is the end of the grace and has to fire.
             Phase::Yielding(_) => true,
             Phase::Blocked(BlockReason::EpisodeGap { .. }) => gap_auto,
             _ => false,
         }
 }
 
-/// Whether an empty poll ends the session, given how many came before it.
-///
-/// The session survives [`EMPTY_TICK_GRACE`] of them: on any source that
-/// reports only playing sessions a pause looks exactly like a stop, and
-/// ending the session there restarts the threshold from zero on resume.
+/// Whether an empty poll ends the session; a pause looks like a stop, so it survives `EMPTY_TICK_GRACE` of them.
 fn grace_spent(missed_ticks: u32) -> bool {
     missed_ticks > EMPTY_TICK_GRACE
 }
 
-/// Whether to start (`Some(true)`), stop (`Some(false)`) or leave the
-/// tracking service, given what is wanted and what is running.
-///
-/// A start needs the activity on screen — Android 12+ refuses a foreground
-/// start from the background — and, after a refusal, `SERVICE_RETRY` of
-/// patience, so a phone that keeps saying no is asked once a minute rather
-/// than once a tick. A stop needs nothing.
-///
-/// Pure and tested everywhere; only Android has a caller outside the tests.
+/// Whether to start, stop or leave the tracking service; pure, so tested everywhere but only called on Android.
 #[cfg_attr(not(target_os = "android"), allow(dead_code))]
 fn service_transition(
     running: bool,
@@ -735,10 +565,7 @@ fn service_transition(
     }
 }
 
-/// Cfg'd pair: Android keeps the foreground service in step with the tick's
-/// own reading of the setting — one call site, re-evaluated every tick, so a
-/// sign-out, a switched-off setting or a refused start all heal themselves
-/// without a second code path. Everywhere else there is no service.
+/// Cfg'd pair: Android keeps the foreground service in step with the tick's own reading of the setting.
 #[cfg(target_os = "android")]
 fn assert_tracking_service(app: &AppHandle, want: bool) {
     static STATE: Mutex<(bool, Option<Instant>)> = Mutex::new((false, None));
@@ -777,8 +604,7 @@ fn assert_tracking_service(app: &AppHandle, want: bool) {
 #[cfg(not(target_os = "android"))]
 fn assert_tracking_service(_app: &AppHandle, _want: bool) {}
 
-/// The tick's sleep: five seconds on screen, `HIDDEN_POLL_INTERVAL` with the
-/// activity paused. Only Android reports the difference.
+/// The tick's sleep, slower with the activity paused; only Android reports the difference.
 #[cfg(target_os = "android")]
 fn poll_interval() -> Duration {
     if crate::background::is_foreground() {
@@ -793,12 +619,7 @@ fn poll_interval() -> Duration {
     POLL_INTERVAL
 }
 
-/// Whether a due session should wait for another Karasu first, and for which.
-///
-/// Once per session: a `Yielding` session that comes due again has waited
-/// its grace and writes whatever the peer list says now — the live check in
-/// `perform_update` is what stops a duplicate then, not a second wait. No
-/// snapshot, or no own row in it, is no verdict.
+/// Whether a due session yields to another Karasu, once; afterwards `perform_update`'s live check stops a duplicate.
 fn defer_for_peer(
     phase: &Phase,
     snapshot: Option<detection::jellyfin::PeerSnapshot>,
@@ -815,14 +636,7 @@ fn defer_for_peer(
     })
 }
 
-/// How long until this session's automatic update arms, or `None` for never.
-///
-/// Watching arms at the normal threshold. An episode-gap block arms only
-/// when the user opted in (`gap_auto`) — and at the *later* of the threshold
-/// and [`GAP_GRACE`], so continuing to watch is what counts as being sure
-/// and a mis-clicked episode has time to be walked away from. Every other
-/// phase stays unarmed: a backwards write and an unplaced season have no
-/// timer to earn, and a failed update is retried by hand.
+/// How long until the auto-update arms; a gap block arms only when opted in and never before `GAP_GRACE`.
 fn auto_arm(
     enabled: bool,
     gap_auto: bool,
@@ -841,16 +655,9 @@ fn auto_arm(
     }
 }
 
-/// Why this session may not auto-update, or `None` to go ahead.
-///
-/// Pure, and the single place the decision lives: `drive_session` builds a
-/// session from it, and `perform_update` refuses anything it calls
-/// unforceable, so the button on screen and the write to AniList cannot
-/// disagree about what is allowed.
+/// Why this session may not auto-update; the one place the decision lives, so the button and the write agree.
 fn block_reason(now: &NowPlaying, episode: u32, progress: u32) -> Option<BlockReason> {
-    // First, because it is the *cause* where it applies. A Jellyfin season-2
-    // episode 1 detected against the season-1 entry is also "already watched",
-    // and saying so would send the reader after the wrong thing entirely.
+    // First, because it is the cause where it applies; a wrong-season episode is also "already watched".
     if let Some(season) = unplaceable_season(now) {
         return Some(BlockReason::UnknownSeason { season });
     }
@@ -863,19 +670,9 @@ fn block_reason(now: &NowPlaying, episode: u32, progress: u32) -> Option<BlockRe
     None
 }
 
-/// The season this detection reports and cannot account for, if any.
-///
-/// Three things have to be true. The source named a season past the first;
-/// the matcher provably could not use it (`season_informed` — a title that
-/// carries no marker leaves the season inert, so the match is really a match
-/// on the bare series name); and the user has not already said which entry
-/// this is. The last is what makes a correction stick: once made, this
-/// returns `None` and the session proceeds normally.
+/// A reported season past the first that the matcher could not use and the user has not corrected.
 fn unplaceable_season(now: &NowPlaying) -> Option<u32> {
-    // `!= 1` rather than `> 1`: season 0 is a Specials folder, and a special
-    // matched against the bare series title is the same mistake as a season-2
-    // episode — it lands on the main entry and moves its progress. Season 1 is
-    // the only one that genuinely carries no information.
+    // `!= 1` rather than `> 1`: season 0 is a Specials folder, and it lands on the main entry the same way.
     let season = now.season.filter(|s| *s != 1)?;
     if now.overridden {
         return None;
@@ -890,16 +687,7 @@ fn unplaceable_season(now: &NowPlaying) -> Option<u32> {
     (!matcher::season_informed(&parsed)).then_some(season)
 }
 
-/// Whether a source-reported position has crossed the update point — `None`
-/// when there is nothing to judge by, so the caller falls back to the wall
-/// clock. Two thirds of the file's own duration when the source reports one,
-/// of the entry's rounded minutes otherwise.
-///
-/// An explicit `delay_min` keeps the wall clock on purpose: "update after N
-/// minutes" is the user's own sentence, and reinterpreting it as a fraction
-/// of the file would change what the setting means the day a source starts
-/// reporting positions. The wall clock also remains the safety net a paused
-/// player used to abuse — with a position, pausing simply stops the number.
+/// Whether the position is past two thirds, or `None` for the wall clock; an explicit delay stays on the clock.
 fn position_due(
     position_sec: Option<u32>,
     duration_sec: Option<u32>,
@@ -917,8 +705,7 @@ fn position_due(
     Some(u64::from(pos) * 3 >= u64::from(total) * 2)
 }
 
-/// Threshold until the auto-update: setting in minutes, or 2/3 of the
-/// episode length (anime), or 5 minutes (manga), otherwise 15 minutes.
+/// Threshold until the auto-update: the setting, else two thirds of the episode length, else a fallback.
 fn threshold(now: &NowPlaying, delay_min: u32) -> Duration {
     if delay_min > 0 {
         return Duration::from_secs(u64::from(delay_min) * 60);
@@ -949,16 +736,7 @@ fn now_ms() -> i64 {
 }
 
 
-/// Whether writing `episode` would move the list *backwards*.
-///
-/// A scrobble may only ever advance progress. Rewatching is the one case where
-/// a lower number is meant, and it is spelled `REPEATING` — a status the user
-/// sets deliberately, at which point the count is theirs to restart.
-///
-/// This is a data-safety rule, not a UI one, which is why it lives next to the
-/// write rather than beside the button: a Jellyfin season-2 episode 1 detected
-/// against a season-1 entry with progress 27 used to be one click away from
-/// setting that entry back to 1, on AniList and in the local cache.
+/// Whether writing `episode` moves the list backwards; a scrobble only ever advances, except when `REPEATING`.
 fn would_regress(episode: u32, progress: Option<u32>, list_status: &str) -> bool {
     list_status != "REPEATING" && progress.is_some_and(|p| episode <= p)
 }
@@ -978,32 +756,20 @@ async fn perform_update(
     let api = app.state::<crate::anilist::client::AniList>();
     let user_id = cached_user_id(&db);
 
-    // Read the progress the list actually holds, not what the session was
-    // built with: the session may be minutes old, and this is the last point
-    // before a write that cannot be taken back.
+    // Read the progress the list holds now, not the session's copy; this is the last point before a write.
     let cached_progress = candidates_from_cache(&db, media_type)
         .into_iter()
         .find(|c| c.media_id == media_id)
         .map(|c| c.progress);
     if would_regress(episode, cached_progress, list_status) {
-        // The same fact `block_reason` states before a session ever arms —
-        // discovered later, because this reads the cache immediately before
-        // writing. Said in the same vocabulary, it renders in the reader's
-        // language and is not forceable, so the card stops offering a retry
-        // that cannot succeed.
+        // The same fact `block_reason` states, in the same vocabulary, so it translates and is not forceable.
         return Ok(Outcome::Refused(BlockReason::AlreadyWatched {
             episode,
             progress: cached_progress.unwrap_or(0),
         }));
     }
 
-    // Then AniList itself, once, whatever the cache says. The cache is this
-    // instance's memory, and the write it is about to guard against may have
-    // come from another Karasu on the same account — the desktop, while this
-    // is the phone — or from the website. Whatever comes back is patched in
-    // through the cache's one owner, so the next guard reads it too. No
-    // answer (offline, throttled) means the cache's word stands and the
-    // write goes on to be queued as before.
+    // Then AniList itself, once: another Karasu or the website may have written since the cache was read.
     let (progress_now, status_now) = match user_id {
         Some(uid) => match crate::commands::live_entry(&api, &token, uid, media_id).await {
             Some(Some((progress, status))) => {
@@ -1040,9 +806,7 @@ async fn perform_update(
 
     let result = crate::commands::save_entry_core(app, &db, &api, &token, input).await?;
     if result.queued {
-        // Nothing reached AniList, so nothing here may claim it did: no cache
-        // patch, no widget refresh, no `scrobble-done`. The queue owns it now
-        // and the card says so.
+        // Nothing reached AniList, so nothing may claim it did: no cache patch, no widgets, no `scrobble-done`.
         crate::logging::debug(
             "scrobble",
             format!("#{media_id} ep {episode} queued — not claiming it landed"),
@@ -1067,9 +831,7 @@ async fn perform_update(
         }
         let _ = app.emit("now-playing", &guard.clone());
     }
-    // The presence otherwise only refreshes when detection *changes*, so the
-    // "Episode 3 / 12" text would keep showing the pre-scrobble number until
-    // the user switched files.
+    // The presence otherwise refreshes only when detection changes, so the episode text would stay stale.
     crate::discord::sync_current(app);
     let _ = app.emit(
         "scrobble-done",
@@ -1078,17 +840,7 @@ async fn perform_update(
     Ok(Outcome::Landed)
 }
 
-/// Re-resolves what is playing against the corrections table, right now.
-///
-/// The poll loop rebuilds a match only when the detected *title* changes, so a
-/// correction made mid-episode would otherwise show nothing until the next
-/// file. This patches the stored `NowPlaying` in place and re-emits everything
-/// that renders it, exactly as `perform_update` does after a scrobble — the
-/// card, the tray and the Discord presence all read from that one object.
-///
-/// `drive_session` re-reads `PlaybackState` on its next tick and starts a fresh
-/// session whenever `(media_id, episode)` differs, so the scrobbler follows the
-/// corrected entry without being told separately.
+/// Re-resolves what is playing against the corrections table now, patching `NowPlaying` and re-emitting it.
 pub fn requeue_match(app: &AppHandle) {
     let db = app.state::<Db>();
     let media_type;
@@ -1102,24 +854,21 @@ pub fn requeue_match(app: &AppHandle) {
         media_type = np.media_type.clone();
         parsed_title = np.parsed_title.clone();
         season = np.season;
-        // The number the *source* gave, never the resolved one: re-resolving
-        // from an already-shifted episode would move it again.
+        // The number the source gave, never the resolved one: re-resolving a shifted episode would move it again.
         source_episode = np.source_episode;
     }
 
     let candidates = candidates_from_cache(&db, &media_type);
     let forced = detection_override(&db, &parsed_title, season, &media_type);
 
-    // Same order as `build_now_playing`, and it has to stay that way: offset
-    // first, then the redirect decides where that number lands.
+    // Same order as `build_now_playing`, and it must stay so: offset first, then the redirect places the number.
     let episode = match (&forced, source_episode) {
         (Some(o), Some(ep)) => Some(shift_episode(ep, o.episode_offset)),
         _ => source_episode,
     };
     let picked = match &forced {
         Some(o) => Some(o.media_id),
-        // Cleared: fall back to what the matcher makes of the same parse, so
-        // "undo" really returns the guess rather than leaving a hole.
+        // Cleared: fall back to the matcher's guess, so "undo" returns the guess rather than leaving a hole.
         None => matcher::best_match(
             &parser::Parsed {
                 title: parsed_title.clone(),
@@ -1133,10 +882,7 @@ pub fn requeue_match(app: &AppHandle) {
         .map(|m| m.media_id),
     };
 
-    // The same episode redirect the detection pass applies, for the same
-    // reason: a correction settles which *series* this is, and anime-relations
-    // still decides which entry a combined release's episode number lands on.
-    // Without this the two paths would disagree until the title changed.
+    // The same redirect the detection pass applies, or the two paths would disagree until the title changed.
     let (picked, episode) = match picked {
         Some(mid) if media_type == "ANIME" => {
             let rules = app.state::<Relations>();
@@ -1163,17 +909,13 @@ pub fn requeue_match(app: &AppHandle) {
         )
     });
 
-    // Patch under the lock, then let go of it before telling anyone: the poll
-    // loop's own idiom, and `discord::sync` takes the session lock on its way
-    // through. Holding two of these at once is how a lock order becomes a
-    // deadlock the day one of them grows a caller.
+    // Patch under the lock, then release it before telling anyone; `discord::sync` takes the session lock itself.
     let patched = {
         let state = app.state::<PlaybackState>();
         let mut guard = state.0.guard();
         if let Some(np) = guard.as_mut() {
             np.overridden = forced.is_some();
-            // The resolved number, so `drive_session` starts its next session
-            // on the episode the correction actually names.
+            // The resolved number, so `drive_session` starts its next session on the episode the correction names.
             np.episode = episode;
             match resolved {
                 Some((mid, r)) => {
@@ -1208,23 +950,17 @@ pub fn requeue_match(app: &AppHandle) {
             .map(|n| n.matched_title.as_deref().unwrap_or(&n.parsed_title)),
     );
 
-    // The running session was started for the *old* id; dropping it makes the
-    // next tick build one for the corrected entry rather than scrobbling the
-    // episode onto whatever the matcher had guessed.
+    // The running session was started for the old id; dropping it makes the next tick build one for the new.
     *app.state::<ScrobbleSession>().0.guard() = None;
     emit_session(app, None);
 }
 
-/// Confirms (or discards) the pending update — invoked by the frontend
-/// through the `scrobble_now` / `scrobble_cancel` commands.
+/// Confirms or discards the pending update, for the `scrobble_now` / `scrobble_cancel` commands.
 pub async fn confirm_pending(app: AppHandle, accept: bool) -> Result<(), String> {
     confirm_pending_impl(app, accept, None).await
 }
 
-/// The toast button's path: confirm only the session the toast was raised
-/// for. The check happens under the same lock that reads the session out, so
-/// a click arriving after the next episode started fails here instead of
-/// stamping its confirmation onto whatever is pending now.
+/// The toast button's path: confirms only the session the toast was raised for, checked under the same lock.
 #[cfg(any(windows, target_os = "linux"))]
 pub async fn confirm_pending_for(
     app: AppHandle,
@@ -1255,19 +991,13 @@ async fn confirm_pending_impl(
             emit_session(&app, Some(session));
             return Ok(());
         }
-        // Nothing left to confirm. The tray item is always enabled and carries
-        // no `expect`, so without this a press after a successful scrobble ran
-        // the update again, tripped `would_regress`, and turned a finished
-        // session's `Updated` into a `Blocked(Failed)` on the card.
+        // Nothing left to confirm; the tray item carries no `expect`, so a late press would run the update again.
         match &session.phase {
             Phase::Updated => return Err("That episode is already updated".into()),
             Phase::Updating => return Err("That update is already running".into()),
             _ => {}
         }
-        // A block the user is not allowed to override stays blocked, whatever
-        // asked. The card hides the button for these, so reaching here means
-        // a stale event or a caller that never saw it — either way the answer
-        // is the same one the phase already gave.
+        // A block the user may not override stays blocked whatever asked; the card hides the button for these.
         if let Phase::Blocked(reason) = &session.phase {
             if !reason.forceable() {
                 return Err(format!("Not updating: {reason}"));
@@ -1299,16 +1029,11 @@ async fn confirm_pending_impl(
             emit_session(&app, Some(session));
         }
     }
-    // The caller only needs to know it did not fail; which of the two ways it
-    // succeeded is already on the card.
+    // The caller only needs to know it did not fail; which way it succeeded is already on the card.
     result.map(|_| ())
 }
 
-/// Starts the detection and scrobble loop (runs for the app's lifetime).
-///
-/// Supervised, because this is the loop whose silent death is most visible and
-/// least explicable: a panic here used to end detection for the session, and the
-/// only symptom was that scrobbling stopped happening.
+/// Starts the detection and scrobble loop, supervised because its silent death is the least explicable.
 pub fn spawn(app: AppHandle) {
     crate::logging::supervise("scrobbler", move || {
         let app = app.clone();
@@ -1317,13 +1042,7 @@ pub fn spawn(app: AppHandle) {
         let mut polls = 0u32;
         let mut polls_since = Instant::now();
         loop {
-            // The poll cadence as it actually happened, for the phone
-            // measurement in the plan: five seconds on screen, fifteen with
-            // it off, and no ticks at all while Android holds the process
-            // frozen. A plain `debug`, not `debug_changed`: the number *is*
-            // the measurement, and deduping a steady count would hide the
-            // very steady state being measured. `scripts/phone-measure.ps1`
-            // reads these lines out of an exported diagnostics file.
+            // The poll cadence as it happened; a plain `debug`, since deduping a steady count would hide the measurement.
             polls += 1;
             if polls_since.elapsed() >= POLL_REPORT {
                 crate::logging::debug(
@@ -1343,17 +1062,11 @@ pub fn spawn(app: AppHandle) {
                     crate::commands::read_jellyfin_background(&db),
                 )
             };
-            // The tick re-reads what the tick decides on: the service is
-            // wanted exactly while there is a Jellyfin sign-in to poll, the
-            // updates it would make are on, and the user opted into the
-            // persistent notification.
+            // The tick re-reads what it decides on: the service is wanted only while all three of these hold.
             assert_tracking_service(&app, tracking_on && jellyfin.is_some() && background_wanted);
             let heartbeat_cfg = jellyfin.clone();
             let playback = detection::detect_playback(media_detection, jellyfin, mpv).await;
-            // Announce this instance to the other Karasus on the account —
-            // but only while it is tracking a Jellyfin playback *and* would
-            // write: an instance with automatic updates off is not one to
-            // wait for, and it must not look like one. See `jellyfin::heartbeat`.
+            // Announce this instance to the other Karasus, but only while it tracks a Jellyfin playback and would write.
             if let (Some(cfg), Some(p)) = (heartbeat_cfg.as_ref(), playback.as_ref()) {
                 if tracking_on && p.process.starts_with("jellyfin (") {
                     detection::jellyfin::heartbeat(cfg).await;
@@ -1363,12 +1076,7 @@ pub fn spawn(app: AppHandle) {
                 .as_ref()
                 .map(|p| (p.process.clone(), p.media_title.clone()));
 
-            // The block below rebuilds the match only when the *title* changes,
-            // but the position moves every tick of the same title. Patch it in
-            // place first, whatever happens next: without this the deadline
-            // check judges the session-start position forever — and since a
-            // position verdict of "not yet" suppresses the wall-clock fallback,
-            // a source that reports positions would simply never scrobble.
+            // Patch the position every tick of the same title, or the deadline check judges the start position forever.
             if raw == last_raw {
                 if let Some(p) = playback.as_ref() {
                     let state = app.state::<PlaybackState>();
@@ -1381,15 +1089,7 @@ pub fn spawn(app: AppHandle) {
             }
 
             if raw != last_raw {
-                // What detection saw. Per *change*, never per tick: the poll runs
-                // every 5s, so a line here would be 17,280 a day and would rotate
-                // everything else off a 1 MB file.
-                //
-                // `debug_changed` rather than `debug`, because "changed" is not
-                // the same as "different from last time": two sources that
-                // disagree make this branch fire every single tick while
-                // alternating, which is the 17,280 lines the paragraph above
-                // is about — from the one line meant to prevent them.
+                // What detection saw, through `debug_changed`: two alternating sources would otherwise fire this every tick.
                 crate::logging::debug_changed(
                     "detect",
                     "playback",
@@ -1414,14 +1114,7 @@ pub fn spawn(app: AppHandle) {
             }
 
             drive_session(&app).await;
-            // Every tick, not only when the title changes. `sync` skips an
-            // identical payload by fingerprint and re-sends it once
-            // `RESEND_SECS` has passed — which is how a Discord that was
-            // restarted, or started after Karasu, gets a presence at all. That
-            // mechanism could never fire, because the only caller sat inside
-            // the "playback changed" branch: a whole episode is
-            // fingerprint-identical by construction, so nothing called it for
-            // twenty minutes at a time. Cheap: a lock and a string compare.
+            // Every tick, not only on change: `sync` re-sends by fingerprint, which is how a restarted Discord gets a presence.
             crate::discord::sync_current(&app);
             tokio::time::sleep(poll_interval()).await;
         }
@@ -1437,8 +1130,7 @@ async fn drive_session(app: &AppHandle) {
         crate::commands::read_scrobble_settings(&db)
     };
 
-    // Phase decision under the lock, the update itself afterwards (no
-    // await while holding the mutex).
+    // Phase decision under the lock, the update itself afterwards; no await while holding the mutex.
     let update_data = {
         let state = app.state::<ScrobbleSession>();
         let mut guard = state.0.guard();
@@ -1470,9 +1162,7 @@ async fn drive_session(app: &AppHandle) {
                         phase,
                         missed_ticks: 0,
                     };
-                    // The two `Blocked` reasons are the most-asked "why didn't it
-                    // scrobble", and until now they existed only as a transient
-                    // event to the WebView — nothing reached disk.
+                    // The `Blocked` reasons are the most-asked "why didn't it scrobble", so they reach disk.
                     crate::logging::debug(
                         "scrobble",
                         format!(
@@ -1485,39 +1175,18 @@ async fn drive_session(app: &AppHandle) {
                     *guard = Some(session);
                     None
                 } else {
-                    // Existing session: check the threshold. A position from
-                    // the source is believed over the wall clock — it is the
-                    // clock, one that pausing actually stops — but only while
-                    // the auto-update is armed at all (`update_at` present).
-                    // An armed gap block rides the same check: the settings
-                    // are re-read every tick, so switching the grace off
-                    // disarms a waiting gap immediately, while `update_at`
-                    // was only ever set if it was on when the session began.
+                    // Existing session: a source position beats the wall clock, but only while the auto-update is armed.
                     let session = guard.as_mut().unwrap();
                     // Playing again (or still), so the pause grace starts over.
                     session.missed_ticks = 0;
-                    // `enabled` is re-read here, not just at `auto_arm`: turning
-                    // automatic tracking off mid-episode used to leave an
-                    // already-armed session to fire anyway, up to a full
-                    // threshold later, which is precisely what the switch is
-                    // asked to prevent.
+                    // `enabled` is re-read here, not just at `auto_arm`, so switching tracking off disarms a waiting session.
                     let armed = armed_now(
                         settings.enabled,
                         settings.gap_auto,
                         &session.phase,
                         session.update_at.is_some(),
                     );
-                    // A gap block waits out `GAP_GRACE` on the wall clock and
-                    // nothing else. A source-reported position must not
-                    // short-circuit it: resuming a part-watched episode already
-                    // sits past two thirds, so believing the position here
-                    // would lift the block within one 5 s tick and hand the
-                    // grace no time to mean anything.
-                    //
-                    // A yield waits out `YIELD_GRACE` the same way: the
-                    // position is already past two thirds — that is what made
-                    // it due — and believing it again would end the wait on
-                    // the very next tick.
+                    // A gap block or a yield waits on the wall clock alone; the position is already past due and would end it at once.
                     let wall_only = matches!(
                         session.phase,
                         Phase::Blocked(BlockReason::EpisodeGap { .. }) | Phase::Yielding(_)
@@ -1541,9 +1210,7 @@ async fn drive_session(app: &AppHandle) {
                         &session.phase,
                         detection::jellyfin::peer_snapshot(detection::jellyfin::FRESH),
                     ) {
-                        // Another Karasu — the desktop, seen from the phone —
-                        // goes first. Wait, then come back here as newly due;
-                        // `perform_update`'s live check finds its write.
+                        // Another Karasu goes first; wait, then come back as newly due, and the live check finds its write.
                         session.update_at = Some(Instant::now() + YIELD_GRACE);
                         session.update_at_epoch_ms = Some(epoch_ms_in(YIELD_GRACE));
                         crate::logging::debug(
@@ -1569,11 +1236,7 @@ async fn drive_session(app: &AppHandle) {
                             ),
                         );
                         emit_session(app, Some(session));
-                        // The window may be hidden in the tray, so the ask
-                        // also goes to the desk — with the one button that is
-                        // the whole point. Fires once per session: reachable
-                        // only from `Watching` or an armed gap block, and both
-                        // leave those phases here.
+                        // The window may be hidden in the tray, so the ask also goes to the desk; fires once per session.
                         let lang = crate::i18n::lang(&app.state::<Db>());
                         let body = crate::i18n::text(
                             lang,
@@ -1612,10 +1275,7 @@ async fn drive_session(app: &AppHandle) {
                 }
             }
             _ => {
-                // Nothing detected this tick. That is a pause as often as it is
-                // a stop, and the two are indistinguishable from here, so the
-                // session is held — with its `update_at` intact — until the
-                // grace runs out.
+                // Nothing detected is a pause as often as a stop, so the session is held, deadline intact, until the grace runs out.
                 if let Some(session) = guard.as_mut() {
                     session.missed_ticks = session.missed_ticks.saturating_add(1);
                     if grace_spent(session.missed_ticks) {
@@ -1629,17 +1289,7 @@ async fn drive_session(app: &AppHandle) {
     };
 
     if let Some((mid, mtype, ep, total, status)) = update_data {
-        // Spawned, not awaited. This runs inside the 5 s detection poll and the
-        // write can take minutes: `save_entry_core` drains the offline queue
-        // first, and the shared limiter may hold the request behind a server
-        // deadline. Awaited, that froze detection outright — the log went
-        // quiet, the card stopped moving, and any session that began and ended
-        // inside the freeze was never seen at all.
-        //
-        // Letting the loop carry on is safe because the session is already in
-        // `Phase::Updating`, which `armed_now` never arms, so the next tick
-        // cannot start a second write for it. `applies_to` then decides whether
-        // the result still describes what is playing by the time it lands.
+        // Spawned, not awaited, because the write can take minutes; safe because no phase with a write in flight may arm.
         let app = app.clone();
         tauri::async_runtime::spawn(async move {
             let result = perform_update(&app, mid, &mtype, ep, total, &status).await;
@@ -1694,9 +1344,7 @@ mod tests {
         }
     }
 
-    /// The data-safety rule. A scrobble may advance progress and never lower
-    /// it — the Jellyfin season-2 case (episode 1 detected against a
-    /// season-1 entry sitting at 27) was one click from writing 1.
+    /// Proves a scrobble can only advance progress, never lower it.
     #[test]
     fn a_scrobble_can_only_ever_move_progress_forward() {
         assert!(would_regress(1, Some(27), "CURRENT"));
@@ -1704,15 +1352,13 @@ mod tests {
         assert!(!would_regress(28, Some(27), "CURRENT"));
         // Forcing over a gap is still allowed: it moves forward.
         assert!(!would_regress(31, Some(27), "CURRENT"));
-        // Rewatching is the one place a lower number is meant, and the user
-        // set that status themselves.
+        // Rewatching is the one place a lower number is meant, and the user set that status themselves.
         assert!(!would_regress(1, Some(27), "REPEATING"));
         // Nothing cached to compare against: not our call to refuse.
         assert!(!would_regress(1, None, "CURRENT"));
     }
 
-    /// The card's button and the command that would carry it out must agree,
-    /// which is why `forceable` is one function rather than two opinions.
+    /// Proves `forceable` is one function, so the card's button and the command cannot disagree.
     #[test]
     fn only_a_forward_force_or_a_retry_is_offered() {
         assert!(!BlockReason::AlreadyWatched { episode: 1, progress: 27 }.forceable());
@@ -1735,9 +1381,7 @@ mod tests {
         assert!(block_reason(&np, 3, 2).is_none());
     }
 
-    /// The gap grace: continuing to watch is what counts as being sure.
-    /// Opt-in, never under five minutes, never earlier than the normal
-    /// threshold — and no other block can earn a timer.
+    /// Proves the gap grace is opt-in, never under `GAP_GRACE`, never earlier than the threshold, and unique to gaps.
     #[test]
     fn a_gap_block_arms_only_when_opted_in_and_never_under_five_minutes() {
         let gap = Phase::Blocked(BlockReason::EpisodeGap { episode: 9, progress: 2 });
@@ -1771,10 +1415,7 @@ mod tests {
         );
     }
 
-    /// The Beyblade case. Jellyfin reports season 2 beside a bare series
-    /// name, so the matcher never saw the season and landed on the season-1
-    /// entry — where episode 1 is both wrong and, at progress 27, "already
-    /// watched". The season is the cause and has to be the thing reported.
+    /// Proves an unusable season is reported as the cause, ahead of the "already watched" it also looks like.
     #[test]
     fn a_season_the_matcher_could_not_use_blocks_before_anything_else() {
         let mut np = now_playing("ANIME", None);
@@ -1796,8 +1437,7 @@ mod tests {
         ));
     }
 
-    /// The offset is what lets a correction name an *episode*, for the layout
-    /// where a server splits one continuously-numbered entry into cours.
+    /// Proves the offset lets a correction name an episode, for a server that splits one entry into cours.
     #[test]
     fn an_offset_moves_the_episode_and_never_below_one() {
         // Jellyfin S2E1 of a 2-cour entry is episode 13.
@@ -1810,8 +1450,7 @@ mod tests {
         assert_eq!(shift_episode(1, 0), 1);
     }
 
-    /// A release name that carries its own season marker was matched *with*
-    /// the season, so it is not ambiguous and must not be blocked.
+    /// Proves a season spelled in the title was matched with it and is not blocked.
     #[test]
     fn a_season_spelled_in_the_title_is_left_alone() {
         let mut np = now_playing("ANIME", None);
@@ -1836,15 +1475,13 @@ mod tests {
     /// The file's own duration beats the entry's rounded minutes.
     #[test]
     fn the_sources_duration_beats_the_entrys_minutes() {
-        // The entry says 24 min (due at 960 s) but the file is 20 min
-        // (due at 800 s) — a position of 810 is due by the file's truth.
+        // The entry's minutes say not yet but the file's own duration says due, and the file's truth wins.
         assert_eq!(position_due(Some(810), Some(1200), Some(24), 0), Some(true));
         // Without the source duration the entry's minutes decide.
         assert_eq!(position_due(Some(810), None, Some(24), 0), Some(false));
     }
 
-    /// "Update after N minutes" is the user's own sentence; a position must
-    /// not reinterpret it. And with nothing to judge by, there is no verdict.
+    /// Proves an explicit delay is never reinterpreted by a position, and no data means no verdict.
     #[test]
     fn a_position_stands_down_for_an_explicit_delay_or_missing_data() {
         assert_eq!(position_due(Some(2000), Some(1440), None, 3), None);
@@ -1897,11 +1534,7 @@ mod tests {
         }
     }
 
-    /// The P1 this grace exists for: on a media-session-only player a pause
-    /// makes `is_playing` false, detection returns nothing, and the session
-    /// used to be destroyed on that single tick — taking the accumulated watch
-    /// time with it and restarting the threshold from zero on resume. On Linux
-    /// there is no window-title rung to fall back to, so this is every player.
+    /// Proves a pause does not end the session; on a media-session-only player a pause looks like a stop.
     #[test]
     fn a_pause_does_not_end_the_session() {
         assert!(!grace_spent(0), "the tick that just happened");
@@ -1916,16 +1549,13 @@ mod tests {
         );
     }
 
-    /// Five minutes at the 5 s poll. Written down because the constant is a
-    /// tick count and the promise is a duration.
+    /// Proves the tick-count constant matches the duration it promises.
     #[test]
     fn the_grace_is_five_minutes_of_polls() {
         assert_eq!(EMPTY_TICK_GRACE * POLL_INTERVAL.as_secs() as u32, 300);
     }
 
-    /// Turning automatic tracking off must stop a write that is already
-    /// waiting. `auto_arm` answers only at session start, so before this the
-    /// switch had no effect until the next episode.
+    /// Proves switching automatic tracking off stops a write that is already waiting.
     #[test]
     fn switching_automatic_updates_off_disarms_a_waiting_session() {
         let watching = Phase::Watching;
@@ -1940,10 +1570,7 @@ mod tests {
         );
     }
 
-    /// A refusal is not a failure, and the difference is visible: `Failed` is
-    /// the one blocked phase that is forceable and whose message no dictionary
-    /// covers, so answering a regress refusal with it put an untranslated
-    /// sentence beside a retry button that could only ever reproduce it.
+    /// Proves a refusal is not a `Failed`, which is forceable and untranslatable.
     #[test]
     fn a_refused_write_is_not_offered_a_retry() {
         let refused = BlockReason::AlreadyWatched { episode: 5, progress: 24 };
@@ -1952,13 +1579,7 @@ mod tests {
         assert!(failed.forceable(), "a server refusal is worth retrying");
     }
 
-    /// The write is spawned rather than awaited, so the 5 s poll keeps running
-    /// while it is in flight. This is what stops the next tick starting a
-    /// second write for the same session — and therefore what makes spawning
-    /// safe. Any phase that means "a write is under way or done" must never
-    /// arm; extending `armed_now` without keeping that true would reintroduce
-    /// double scrobbles. `Yielding` is deliberately absent from the list: it
-    /// is a wait *before* the write, and its deadline has to fire.
+    /// No phase carrying a write in flight may arm; that is what makes spawning the write safe (`Yielding` waits before it).
     #[test]
     fn no_phase_with_a_write_in_flight_can_arm() {
         for phase in [Phase::Updating, Phase::Pending, Phase::Updated, Phase::Queued] {
@@ -1969,8 +1590,7 @@ mod tests {
         }
     }
 
-    /// The gap grace is opt-in at the due point too, and no other blocked
-    /// phase ever arms.
+    /// Proves the gap grace is opt-in at the due point too, and no other blocked phase arms.
     #[test]
     fn only_a_gap_block_arms_and_only_when_opted_in() {
         let gap = Phase::Blocked(BlockReason::EpisodeGap { episode: 9, progress: 5 });
@@ -1985,10 +1605,7 @@ mod tests {
         assert!(applies_to(&session(1, 5), 1, 5));
     }
 
-    /// The case that made this a bug: the poll loop swapped in the next
-    /// episode while the AniList request was in flight. Stamping "updated"
-    /// here would both lie about episode 6 and — because the threshold only
-    /// fires on `Watching` — stop it ever being scrobbled.
+    /// Proves a newer episode swapped in mid-request does not take the result, or it could never be scrobbled.
     #[test]
     fn a_newer_episode_of_the_same_media_does_not_take_the_result() {
         assert!(!applies_to(&session(1, 6), 1, 5));
@@ -2011,8 +1628,7 @@ mod tests {
         }
     }
 
-    /// The phone's view: its own row stamped now, the desktop's a few seconds
-    /// earlier.
+    /// The phone's view: its own row stamped now, the desktop's a few seconds earlier.
     fn phone_sees_desktop() -> PeerSnapshot {
         PeerSnapshot {
             own: Some(peer("phone", "Pixel", Platform::Mobile, Some(1_000))),
@@ -2025,9 +1641,7 @@ mod tests {
         YieldTarget { platform: Platform::Desktop, device: "KYU-PC".into() }
     }
 
-    /// A yield is a wait with a deadline, so it must stay armed — and on the
-    /// wall clock alone, which `drive_session` enforces by treating it like an
-    /// armed gap block.
+    /// Proves a yield stays armed and waits on the wall clock alone, like an armed gap block.
     #[test]
     fn a_yielding_session_stays_armed_and_waits_on_the_wall_clock() {
         assert!(armed_now(true, false, &Phase::Yielding(target()), true));
@@ -2035,10 +1649,7 @@ mod tests {
         assert!(!armed_now(true, false, &Phase::Yielding(target()), false));
     }
 
-    /// The phone yields once to the desktop, then writes: a second look at the
-    /// same peer list must not restart the grace, or a desktop that is present
-    /// but will not write (confirm mode, nobody there) would hold the phone
-    /// forever.
+    /// Proves the phone yields once and then writes, or a present-but-silent desktop would hold it forever.
     #[test]
     fn a_session_yields_once_and_then_writes() {
         let first = defer_for_peer(&Phase::Watching, Some(phone_sees_desktop()));
@@ -2058,8 +1669,7 @@ mod tests {
         assert_eq!(defer_for_peer(&Phase::Watching, Some(desktop_sees_phone)), None);
     }
 
-    /// The grace has to outlast the freshness window, or a session could
-    /// yield, wait, and find the same still-fresh peer to yield to again.
+    /// Proves the grace outlasts the freshness window, or a session could yield to the same peer again.
     #[test]
     fn the_yield_grace_outlives_the_freshness_window() {
         assert!(YIELD_GRACE > FRESH);
@@ -2067,9 +1677,7 @@ mod tests {
 
     // --- The Android tracking service ----------------------------------------
 
-    /// Android 12+ refuses a foreground start from the background, so the
-    /// only start worth asking for is one made on screen — and a phone that
-    /// refuses anyway is asked again once a minute, not every five seconds.
+    /// Proves a start is only asked for on screen, and after a refusal not again until `SERVICE_RETRY`.
     #[test]
     fn a_start_waits_for_the_foreground_and_backs_off_after_a_refusal() {
         let base = Instant::now();
@@ -2090,8 +1698,7 @@ mod tests {
         assert_eq!(service_transition(false, false, true, None, now), None, "nothing to stop");
     }
 
-    /// Slower than on screen, but still inside the window in which the
-    /// desktop must see the phone's row as fresh.
+    /// Proves the hidden poll is slower than the visible one and still inside the freshness window.
     #[test]
     fn the_hidden_poll_is_slower_than_the_visible_one_and_still_inside_fresh() {
         assert!(HIDDEN_POLL_INTERVAL > POLL_INTERVAL);

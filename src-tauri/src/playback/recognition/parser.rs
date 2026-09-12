@@ -1,6 +1,4 @@
-//! Parser for anime file names and streaming titles
-//! (Karasu's counterpart to Taiga's Anitomy) — extracts series title,
-//! episode number, season and release group.
+//! Parser for anime file names and streaming titles: series title, episode, season and release group.
 
 use regex::Regex;
 use std::sync::OnceLock;
@@ -9,14 +7,7 @@ use std::sync::OnceLock;
 pub struct Parsed {
     pub title: String,
     pub episode: Option<u32>,
-    /// Whether the episode was *spelled out* (S01E05, "Episode 28", "#28")
-    /// rather than inferred from a dash or bare trailing number. "Show - 28"
-    /// is almost always episode 28 — but "Artist - Song 2" is not, which is
-    /// why the media-session pass lets an explicit marker overrule a
-    /// "music" label and an inferred number never does. Hand-built values
-    /// from structured sources (Jellyfin's own episode field) set this to
-    /// whether an episode exists at all: an API field is as explicit as a
-    /// spelling gets.
+    /// Whether the episode was spelled out rather than inferred; only a spelled-out one may overrule a "music" label.
     pub episode_marked: bool,
     pub season: Option<u32>,
     pub release_group: Option<String>,
@@ -111,8 +102,7 @@ pub fn parse(input: &str) -> Parsed {
                     continue;
                 }
                 episode = Some(ep);
-                // 0, 1 and 3 spell the episode out (S01E05, "Episode 28",
-                // "#28"); the dash and bare-trailing forms infer it.
+                // Patterns 0, 1 and 3 spell the episode out; the dash and bare-trailing forms only infer it.
                 episode_marked = matches!(i, 0 | 1 | 3);
                 title_end = m.start();
                 if i == 0 {
@@ -174,8 +164,7 @@ fn chapter_regexes() -> &'static [Regex; 3] {
     })
 }
 
-/// Parser for manga titles from browser tabs: extracts series title and
-/// chapter number (carried in the `episode` field).
+/// Parses a manga title from a browser tab; the chapter number is carried in the `episode` field.
 pub fn parse_manga(input: &str) -> Parsed {
     let mut work = input.trim().to_string();
 
@@ -199,8 +188,7 @@ pub fn parse_manga(input: &str) -> Parsed {
         if let Some(caps) = re.captures(&work) {
             if let Some(n) = caps.get(1).and_then(|g| g.as_str().parse().ok()) {
                 chapter = Some(n);
-                // Same split as the episode set: the chapter keyword and
-                // "#45" are spelled out, the dash form is inference.
+                // Same split as the episode set: the keyword and "#45" are spelled out, the dash form is inference.
                 chapter_marked = matches!(i, 0 | 2);
                 title_end = caps.get(0).unwrap().start();
                 break;
@@ -276,9 +264,7 @@ mod tests {
         assert!(r.episode_marked, "the keyword spells the episode out");
     }
 
-    /// The explicit/inferred split, pinned across all five patterns: the
-    /// media-session pass lets a spelled-out episode overrule a "music"
-    /// label, and an inferred one never may.
+    /// Pins the explicit/inferred split across all five patterns, which the media-session pass relies on.
     #[test]
     fn only_spelled_out_episodes_count_as_marked() {
         assert!(p("Frieren S01E28").episode_marked);

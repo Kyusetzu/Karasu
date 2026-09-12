@@ -1,5 +1,4 @@
-//! Matching of detected titles against the user's AniList entries.
-//! Normalization + trigram Dice similarity, season variants included.
+//! Matches detected titles against the user's list by normalization and trigram Dice similarity.
 
 use super::parser::Parsed;
 use std::collections::HashSet;
@@ -12,9 +11,7 @@ pub struct Candidate {
     pub episodes: Option<u32>,
     /// Episode length in minutes (for the scrobble threshold)
     pub duration_min: Option<u32>,
-    /// `coverImage.large`, for the Discord presence card. Carried from the
-    /// cached list the way `duration_min` is, and for the same reason:
-    /// re-finding the entry later means deserializing the whole list again.
+    /// `coverImage.large` for the Discord card, carried here so the entry need not be re-found in the cached list.
     pub cover_url: Option<String>,
     pub progress: u32,
     pub status: String,
@@ -39,11 +36,7 @@ fn trigrams(s: &str) -> HashSet<[u8; 3]> {
         .collect()
 }
 
-/// Dice coefficient over two ready-made trigram sets (0.0–1.0).
-///
-/// The empty guard is what keeps a `2.0 * 0.0 / 0.0` NaN out of the scoring
-/// loop. NaN would poison it permanently: every `score > best.score` comparison
-/// against a NaN best is false, so the first NaN pins the result forever.
+/// Dice coefficient over two trigram sets; keep the empty guard, since a NaN score pins `best` forever.
 fn dice(ta: &HashSet<[u8; 3]>, tb: &HashSet<[u8; 3]>) -> f64 {
     if ta.is_empty() || tb.is_empty() {
         return 0.0;
@@ -61,11 +54,7 @@ fn similarity(a: &str, b: &str) -> f64 {
     dice(&trigrams(a), &trigrams(b))
 }
 
-/// The title with its season marker removed, when it carried one.
-///
-/// `None` means the season number cannot be spelled out of this title —
-/// which is the case for every source that reports the season *beside* the
-/// name rather than inside it (the Jellyfin API, above all).
+/// The title with its season marker removed, or `None` when the title carried no marker to remove.
 fn without_season_marker(parsed: &Parsed) -> Option<String> {
     let season = parsed.season?;
     let base = normalize(&parsed.title);
@@ -80,36 +69,18 @@ fn without_season_marker(parsed: &Parsed) -> Option<String> {
     (!stripped.is_empty() && stripped != base).then_some(stripped)
 }
 
-/// Whether the season this parse carries could influence matching at all.
-///
-/// `variants` only ever *re-spells* a marker the title already contains; it
-/// never invents one, because "Show" plus season 2 could be "Show 2", "Show
-/// II", or a differently-named sequel entirely, and guessing writes to
-/// someone's list. So for a title that carries no marker the season is inert,
-/// and a caller that cares which entry it landed on needs to know that rather
-/// than assume the match considered it. The scrobbler asks this before
-/// trusting a season-2 detection.
+/// Whether the season could influence matching at all; `variants` never invents a marker the title lacks.
 pub fn season_informed(parsed: &Parsed) -> bool {
     without_season_marker(parsed).is_some()
 }
 
-/// One spelling to look for, and whether it may win outright.
-///
-/// `exact_ok` is false for exactly one needle: the title with its season
-/// marker removed, past season 1. That spelling exists to *score* — it is what
-/// finds a continuously numbered entry whose title carries no season at all —
-/// but as an exact hit it is a claim about the wrong entry. "Show S2" strips
-/// to "show", which matches the season-1 entry's title character for
-/// character, and the exact-match path returns on the first candidate that
-/// hits: with the season-1 entry earlier in the list, a season-2 detection
-/// bound to it and wrote season 2's episode numbers onto season 1.
+/// One spelling to look for; `exact_ok` is false only for the season-stripped title past season 1.
 struct Needle {
     text: String,
     exact_ok: bool,
 }
 
-/// Title variants of the detected name to cover season spellings:
-/// "Title S2" ↔ "Title 2nd Season" ↔ "Title Season 2".
+/// Title variants of the detected name covering the season spellings "S2", "2nd Season" and "Season 2".
 fn variants(parsed: &Parsed) -> Vec<Needle> {
     let base = normalize(&parsed.title);
     let mut out = vec![Needle { text: base.clone(), exact_ok: true }];
@@ -131,8 +102,7 @@ fn variants(parsed: &Parsed) -> Vec<Needle> {
             if season > 1 {
                 out.push(Needle { text: format!("{stripped} {season}"), exact_ok: true });
             }
-            // Season 1 is the case where the stripped title *is* the answer:
-            // "Show S1" and "Show" name the same entry.
+            // Season 1 is the case where the stripped title is the answer: "Show S1" and "Show" name the same entry.
             out.push(Needle { text: stripped, exact_ok: season <= 1 });
         }
     }
@@ -145,24 +115,14 @@ pub struct Match {
     pub score: f64,
 }
 
-/// A candidate whose titles have been normalized and trigrammed once.
-///
-/// A library scan matches many distinct titles against the *same* candidate
-/// list, and the naive loop redid `normalize` per candidate title per detected
-/// title and rebuilt both trigram sets inside every `similarity` call — the
-/// haystack's set once per needle variant, so up to five times over. Hoisting
-/// that out is the whole point of this type.
+/// A candidate normalized and trigrammed once, so a library scan does not redo that per detected title.
 pub struct PreparedCandidate {
     media_id: i64,
     /// `(normalized title, its trigrams)`, in the candidate's own title order.
     titles: Vec<(String, HashSet<[u8; 3]>)>,
 }
 
-/// Pre-normalizes a candidate list for repeated `best_match_prepared` calls.
-///
-/// Candidate order and within-candidate title order are preserved, and they
-/// matter: the scoring loop keeps the *first* maximum, so reordering here would
-/// silently change which entry wins a tie.
+/// Pre-normalizes candidates for `best_match_prepared`; order is preserved because the first maximum wins a tie.
 pub fn prepare(candidates: &[Candidate]) -> Vec<PreparedCandidate> {
     candidates
         .iter()
@@ -181,8 +141,7 @@ pub fn prepare(candidates: &[Candidate]) -> Vec<PreparedCandidate> {
         .collect()
 }
 
-/// Best candidate from the list for a detected title.
-/// Minimum score 0.7; exact matches win immediately.
+/// Best candidate for a detected title above the minimum score; an exact match wins immediately.
 pub fn best_match(parsed: &Parsed, candidates: &[Candidate]) -> Option<Match> {
     best_match_prepared(parsed, &prepare(candidates))
 }
@@ -204,11 +163,7 @@ pub fn best_match_prepared(
     for candidate in candidates {
         for (hay, hay_grams) in &candidate.titles {
             for (needle, needle_grams) in &needles {
-                // Stays a plain string comparison: an exact hit must win
-                // outright, before any scoring — but only for a spelling
-                // entitled to. Scoring still sees every needle, so a stripped
-                // title remains the way a continuously numbered entry is
-                // found; it just cannot end the search on the wrong season.
+                // Keep the exact-match short circuit, gated on `exact_ok` so it cannot end the search on the wrong season.
                 if needle.exact_ok && *hay == needle.text {
                     return Some(Match {
                         media_id: candidate.media_id,
@@ -233,8 +188,7 @@ mod tests {
     use super::*;
     use crate::playback::recognition::parser::parse;
 
-    /// A candidate that is nothing but an id and its titles — the only two
-    /// fields title matching looks at.
+    /// A candidate that is nothing but an id and its titles, the only two fields title matching looks at.
     fn titled(media_id: i64, titles: &[&str]) -> Candidate {
         Candidate {
             media_id,
@@ -308,11 +262,7 @@ mod tests {
         assert_eq!(m.media_id, 166531);
     }
 
-    /// The season-1 entry deliberately sorts *first*, which is what made this a
-    /// bug rather than a coin toss: "Show S2" strips to "show", the stripped
-    /// spelling matched that entry character for character, and the
-    /// exact-match path returned on the first candidate that hit. Season 2's
-    /// episode numbers then went onto season 1's list entry.
+    /// Proves a season-2 title cannot exact-match a season-1 entry that sorts first via its stripped spelling.
     #[test]
     fn a_second_season_does_not_bind_to_season_one_that_sorts_first() {
         let ordered = vec![
@@ -324,9 +274,7 @@ mod tests {
         assert_eq!(m.media_id, 2, "the season the title actually names");
     }
 
-    /// The stripped spelling still earns its keep: a continuously numbered
-    /// entry carries no season marker at all, and dropping the needle would
-    /// lose it. It scores — it just cannot end the search.
+    /// Proves the stripped spelling still scores, so a continuously numbered entry without a marker is found.
     #[test]
     fn a_continuously_numbered_entry_is_still_found() {
         let only_base = vec![titled(7, &["Test Show"])];
@@ -335,8 +283,7 @@ mod tests {
         assert_eq!(m.media_id, 7);
     }
 
-    /// Season 1 is the case where the stripped title *is* the answer, so it
-    /// keeps its exact match.
+    /// Proves season 1 keeps its exact match, since there the stripped title is the answer.
     #[test]
     fn season_one_still_matches_the_bare_title_exactly() {
         let base = vec![titled(3, &["Test Show"])];
@@ -359,13 +306,7 @@ mod tests {
         assert!(best_match(&parsed, &candidates()).is_none());
     }
 
-    /// The algorithm as it stood before `prepare` existed: normalize per
-    /// candidate title, rebuild both trigram sets inside every comparison.
-    /// Kept here purely so the optimized version has something independent to
-    /// be checked against — comparing `best_match` to `best_match_prepared`
-    /// would prove nothing, since the former now delegates to the latter.
-    /// `similarity` is `#[cfg(test)]` for the same reason: the scoring path
-    /// works on prepared trigram sets and no longer goes through it.
+    /// The original algorithm before `prepare` existed; keep this copy honest, it is what the fast path is checked against.
     fn best_match_reference(parsed: &Parsed, candidates: &[Candidate]) -> Option<Match> {
         let needles = variants(parsed);
         let mut best: Option<Match> = None;
@@ -420,8 +361,7 @@ mod tests {
         }
     }
 
-    /// A NaN score would pin `best` forever: every later `score > best.score`
-    /// comparison against NaN is false.
+    /// Proves `dice` never returns NaN, since a NaN score would pin `best` forever.
     #[test]
     fn dice_returns_zero_rather_than_nan_for_empty_sets() {
         let empty: HashSet<[u8; 3]> = HashSet::new();
@@ -464,8 +404,7 @@ mod tests {
         );
     }
 
-    /// An exact hit must return immediately, even when an earlier candidate
-    /// already scored well on the fuzzy path.
+    /// Proves an exact hit returns immediately even after an earlier candidate scored well on the fuzzy path.
     #[test]
     fn exact_match_short_circuits_past_a_close_fuzzy_one() {
         let list = vec![

@@ -1,11 +1,4 @@
-//! Episode redirects from erengy/anime-relations (the same data source
-//! Taiga uses): maps e.g. "episode 25" of a combined release to S2E1 of
-//! the correct AniList entry.
-//!
-//! Line format:
-//! `- MAL|Kitsu|AniList:26-51 -> MAL|Kitsu|AniList:1-26[!]`
-//! IDs may be `?` (unknown) or `~` (same as the left side); `!` means the
-//! rule also applies to the destination ID itself.
+//! Episode redirects from erengy/anime-relations, mapping a combined release's episode onto the right AniList entry.
 
 use std::sync::RwLock;
 
@@ -111,22 +104,16 @@ pub fn redirect(rules: &[Rule], media_id: i64, episode: u32) -> Option<(i64, u32
     })
 }
 
-/// Loads rules from the file cache and refreshes them from the GitHub
-/// repo in the background when they are stale.
 /// How many times the one-shot fetch is attempted before giving up.
 const RETRIES: u32 = 4;
-/// Multiplied by the attempt number, so 5s, 10s, 15s — long enough for a
-/// laptop's wifi to associate after a cold start.
+/// Multiplied by the attempt number, so a laptop's wifi has time to associate after a cold start.
 const RETRY_BACKOFF: std::time::Duration = std::time::Duration::from_secs(5);
 
+/// Loads rules from the file cache and refreshes them from GitHub in the background when they are stale.
 pub fn spawn_loader(app: tauri::AppHandle) {
     use tauri::Manager;
     tauri::async_runtime::spawn(async move {
-        // Through `portable::data_dir`, like the database and the token. This
-        // is the one persistent path that used to resolve AppData directly,
-        // which in portable mode wrote outside the folder portable mode
-        // promises to keep everything in — and on a machine where that AppData
-        // folder had never been created, failed outright.
+        // Through `portable::data_dir` like the database and the token, or portable mode writes outside its folder.
         let Ok(dir) = app.path().app_data_dir() else {
             return;
         };
@@ -155,19 +142,7 @@ pub fn spawn_loader(app: tauri::AppHandle) {
         if !stale {
             return;
         }
-        // Through `net::client_builder`, never bare `reqwest::get`: this was
-        // the one request in the tree that bypassed the seam, and on Android
-        // the default client's platform verifier panicked the task on every
-        // launch — before the cache was ever written, so the staleness check
-        // re-fired forever and the redirect rules never loaded there at all.
-        // Exactly the "fix applied to three of four builders" failure the
-        // seam's own header warns about.
-        // A timeout, because this is the one outbound client in the tree that
-        // had none at any level: `update.rs` sets one, the AniList client sets
-        // one, the bio-image proxy sets one. A stalled connection here leaks
-        // the task and its socket for the life of the process, and the redirect
-        // rules — which decide *which entry* an episode is written to — never
-        // arrive at all, silently.
+        // Through `net::client_builder`, never bare `reqwest::get`, and with a timeout so a stalled fetch cannot leak.
         let client = match crate::net::client_builder()
             .timeout(std::time::Duration::from_secs(20))
             .build()
@@ -178,13 +153,7 @@ pub fn spawn_loader(app: tauri::AppHandle) {
                 return;
             }
         };
-        // Retried, because one bad moment used to cost the whole session. This
-        // is a one-shot on a cold start — a laptop opened before the wifi
-        // associates is the ordinary case — and giving up on the first refusal
-        // left `Relations` empty until the app was restarted. That is not a
-        // missing nicety: `redirect` with no rules passes the episode straight
-        // through, so a franchise whose seasons are separate AniList entries
-        // gets season 2's numbers written onto season 1, silently.
+        // Retried: with no rules `redirect` passes episodes through, and season 2's numbers land on season 1.
         let mut text = None;
         for attempt in 0..RETRIES {
             if attempt > 0 {
@@ -218,9 +187,7 @@ pub fn spawn_loader(app: tauri::AppHandle) {
         if rules.is_empty() {
             return;
         }
-        // Not discarded: a failure here means the staleness check re-fires on
-        // every launch and the whole file is downloaded again, forever, with
-        // nothing to say why.
+        // Logged, not discarded: a silent cache failure re-downloads the file on every launch with nothing to say why.
         if let Err(e) = std::fs::write(&path, &text) {
             crate::logging::error(
                 "relations",

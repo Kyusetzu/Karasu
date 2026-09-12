@@ -8,21 +8,8 @@ import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
-/**
- * Hand-written, not generated. `tauri android init` will not overwrite this
- * file — but a wiped gen/ tree will not recreate it either: restore it from
- * git if sign-in ever dies with "TokenCipher" in the log.
- *
- * Deliberately pure platform API (java.security / javax.crypto): a Gradle
- * dependency inside this generated tree is exactly what net.rs refused for
- * TLS, and Keystore needs none. Rust calls the two statics over JNI
- * (src-tauri/src/keystore.rs) and owns the file format; this class only
- * turns bytes into iv||ciphertext under an AES-256-GCM key that never
- * leaves the Android Keystore. The proguard keep rule in
- * app/proguard-rules.pro is load-bearing — a minified release renames
- * JNI-reached classes and the calls fail only at runtime.
- */
-object TokenCipher {
+/** Hand-written; `tauri android init` will not recreate it, restore from git; the key never leaves the Keystore. */
+object TokenCipher { // reached from keystore.rs over JNI by name: the proguard keep is load-bearing
     private const val ALIAS = "karasu-secrets"
     private const val IV_LEN = 12
 
@@ -43,8 +30,7 @@ object TokenCipher {
         return gen.generateKey()
     }
 
-    /** iv(12) || ciphertext+tag. Throws on any Keystore refusal — the Rust
-     *  side reports, it does not guess. */
+    /** iv || ciphertext+tag; throws on any Keystore refusal, so the Rust side reports instead of guessing. */
     @JvmStatic
     fun seal(plain: ByteArray): ByteArray {
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")

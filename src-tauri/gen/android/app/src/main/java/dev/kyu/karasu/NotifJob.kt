@@ -1,13 +1,6 @@
 package dev.kyu.karasu
 
-// Hand-written, like TokenCipher.kt: `tauri android init` will not overwrite
-// this file, but a wiped gen/ tree will not recreate it either — restore it
-// from git after any re-init. Pure platform APIs only (JobScheduler,
-// NotificationManager, org.json) — a Gradle dependency inside this generated
-// tree is exactly what net.rs refused for TLS and TokenCipher refused for
-// crypto. The proguard keeps in proguard-rules.pro are load-bearing:
-// NotifScheduler is reached over JNI by name with no native methods and no
-// manifest entry, so neither default rule protects it.
+// Hand-written; `tauri android init` will not recreate it, restore from git; platform APIs only, no Gradle dependency.
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -24,13 +17,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import org.json.JSONObject
 
-/**
- * The one exported Rust symbol the job calls. Everything substantive —
- * reading the interval, unsealing the token, the request, the cursor —
- * happens in Rust (`background.rs`); what comes back is a rendered
- * `{"title","body"}` or an empty string for "post nothing". The token never
- * enters Kotlin.
- */
+/** The exported Rust symbols; the check itself runs in background.rs, so the token never enters Kotlin. */
 object KarasuNative {
   init {
     System.loadLibrary("karasu_lib")
@@ -39,37 +26,26 @@ object KarasuNative {
   @JvmStatic
   external fun backgroundNotifCheck(context: Context): String
 
-  /** Whether the activity is on screen — MainActivity reports resume and
-   *  pause. Rust reads it for the poll cadence and for the one moment a
-   *  foreground service may be started (`background.rs`). */
+  /** Set by MainActivity; Rust reads it for the poll cadence and the one moment a foreground service may start. */
   @JvmStatic
   external fun setForeground(foreground: Boolean)
 }
 
-/** Registers/cancels the periodic job — called from Rust over JNI whenever
- *  the setting changes, and re-asserted at every app start. */
+/** Registers or cancels the job from Rust over JNI by name, so its proguard keep is load-bearing. */
 object NotifScheduler {
   private const val JOB_ID = 46231 // the callback port's digits, reused as an id
 
-  /** Returns "" when the job is registered, otherwise the reason it is not:
-   *  JobScheduler's own RESULT_FAILURE, or the exception schedule() threw,
-   *  in its own words. That text is what the Settings pane shows — dropping
-   *  it left a refused job invisible behind a pane that read "every 15
-   *  minutes", and the first reason ever seen was a SecurityException that
-   *  only the trace in logcat named. */
+  /** Empty when the job is registered, otherwise the refusal in the platform's own words, which the Settings pane shows. */
   @JvmStatic
   fun schedule(context: Context, minutes: Int): String {
     return try {
       val js = context.getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
       val job = JobInfo.Builder(JOB_ID, ComponentName(context, NotifJobService::class.java))
-        // Android floors periodic jobs at 15 minutes and clamps silently;
-        // the Rust side already refuses smaller values, so the two agree.
+        // Android floors the period and clamps silently; the Rust side refuses smaller values, so the two agree.
         .setPeriodic(minutes.toLong() * 60_000L)
-        // Survives a reboot. RECEIVE_BOOT_COMPLETED is declared in the
-        // manifest (setPersisted throws without it).
+        // Survives a reboot; setPersisted throws without RECEIVE_BOOT_COMPLETED in the manifest.
         .setPersisted(true)
-        // A connectivity constraint needs ACCESS_NETWORK_STATE in the
-        // manifest, or schedule() throws — see the manifest comment.
+        // A connectivity constraint needs ACCESS_NETWORK_STATE in the manifest, or schedule() throws.
         .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
         .build()
       if (js.schedule(job) == JobScheduler.RESULT_SUCCESS) "" else "JobScheduler answered RESULT_FAILURE"
@@ -90,13 +66,7 @@ object NotifScheduler {
   }
 }
 
-/**
- * Runs the check with the app possibly dead. `onStartJob` is on the main
- * thread, so the work moves to its own thread and `jobFinished` reports
- * back. A run that finished never asks for a reschedule — the period itself
- * is the retry; a run the system interrupts does (`onStopJob` answers
- * true), so a check cut short by Doze is not lost until the next period.
- */
+/** Runs the check with the app possibly dead; only an interrupted run reschedules, since the period itself is the retry. */
 class NotifJobService : JobService() {
   private val channelId = "karasu.site"
 
@@ -108,8 +78,7 @@ class NotifJobService : JobService() {
       } catch (t: Throwable) {
         Log.w("KarasuNotifJob", "check failed", t)
       }
-      // Bonus tick for the widgets: their date bucketing shifts at
-      // midnight even when the data file has not moved.
+      // A bonus widget tick: their date bucketing shifts at midnight even when the data file has not moved.
       WidgetRefresher.refresh(applicationContext)
       jobFinished(params, false)
     }.start()
@@ -135,8 +104,7 @@ class NotifJobService : JobService() {
       PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
     val notification = NotificationCompat.Builder(this, channelId)
-      // The launcher mark — the same fallback the notification plugin uses;
-      // there is no dedicated status-bar glyph in the res tree.
+      // The launcher mark, as the notification plugin falls back to; the res tree has no status-bar glyph.
       .setSmallIcon(R.mipmap.ic_launcher)
       .setContentTitle(body.optString("title"))
       .setContentText(body.optString("body"))

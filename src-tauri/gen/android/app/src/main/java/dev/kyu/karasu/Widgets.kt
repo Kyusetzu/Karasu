@@ -1,17 +1,6 @@
 package dev.kyu.karasu
 
-// Hand-written, like TokenCipher.kt and NotifJob.kt: `tauri android init`
-// will not overwrite this file, but a wiped gen/ tree will not recreate it —
-// restore from git after any re-init. Pure platform APIs (AppWidgetProvider,
-// RemoteViews, org.json); no Glance, no Compose, no new Gradle dependency —
-// the net.rs/TokenCipher precedent. WidgetRefresher's proguard keep is
-// load-bearing: it is reached from Rust over JNI by name with no native
-// methods and no manifest entry.
-//
-// All data comes from <filesDir>/widgets.json, written by Rust
-// (`widgets.rs`) — pre-filtered, pre-titled, pre-localized. Kotlin's only
-// arithmetic is bucketing raw airingAtMs into "today"/weekday at *render*
-// time, which is what keeps a days-stale file honestly dated.
+// Hand-written; `tauri android init` will not recreate it, restore from git; platform APIs only, no Gradle dependency.
 
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
@@ -29,9 +18,7 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
-/** Rust pokes this after every projection write while the app runs; the
- *  NotifJobService and MainActivity.onPause poke it too. It only broadcasts
- *  the standard update to whichever widget types are actually placed. */
+/** Called from Rust over JNI by name, so its proguard keep is load-bearing; updates only the placed widget types. */
 object WidgetRefresher {
   private val TYPES = listOf(
     Widgets.AiringToday::class.java,
@@ -58,8 +45,7 @@ object WidgetRefresher {
   }
 }
 
-/** Shared machinery: read the projection, fill the shared layout, hand the
- *  per-type rendering to a subclass. */
+/** Fills the shared layout from widgets.rs's projection; bucketing dates at render time keeps a stale file honestly dated. */
 abstract class KarasuWidgetBase : AppWidgetProvider() {
   companion object {
     const val MAX_ROWS = 8
@@ -72,10 +58,7 @@ abstract class KarasuWidgetBase : AppWidgetProvider() {
     )
 
     fun doc(context: Context): JSONObject? = try {
-      // dataDir, NOT filesDir: tauri's app_data_dir resolves to
-      // Context.getDataDir() (the package root — see the PathPlugin's
-      // getDataDir), and that is where widgets.rs writes beside karasu.db.
-      // filesDir is one level below and was the four-empty-widgets bug.
+      // dataDir, not filesDir: Tauri's app_data_dir is the package root, where widgets.rs writes beside karasu.db.
       JSONObject(File(context.dataDir, "widgets.json").readText())
     } catch (t: Throwable) {
       null
@@ -118,8 +101,7 @@ abstract class KarasuWidgetBase : AppWidgetProvider() {
         views.setViewVisibility(R.id.w_footer, android.view.View.VISIBLE)
       }
 
-      // The whole widget opens the app; per-row targets would need a
-      // collection service, which fixed rows exist to avoid.
+      // The whole widget opens the app: per-row targets need a collection service, which fixed rows exist to avoid.
       views.setOnClickPendingIntent(
         R.id.w_title,
         PendingIntent.getActivity(
@@ -161,8 +143,7 @@ abstract class KarasuWidgetBase : AppWidgetProvider() {
     SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(ms))
 }
 
-/** The four launcher-facing types, as nested classes so the manifest refs
- *  stay one file: `.Widgets$AiringToday` and friends. */
+/** The four launcher-facing types, nested so the manifest's `.Widgets$AiringToday` and friends stay one file. */
 class Widgets {
   class AiringToday : KarasuWidgetBase() {
     override fun titleKey() = "airingToday"

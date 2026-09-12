@@ -13,9 +13,7 @@ val tauriProperties = Properties().apply {
     }
 }
 
-// Hand-edited (init regenerates this file): release signing from
-// key.properties (gitignored here), falling back to the debug keystore so a
-// machine without one — CI — still emits an installable APK.
+// Hand-edited; `tauri android init` regenerates this file: release signing from key.properties, debug fallback for CI.
 val keyProperties = Properties().apply {
     val propFile = file("key.properties")
     if (propFile.exists()) {
@@ -23,30 +21,10 @@ val keyProperties = Properties().apply {
     }
 }
 
-// Hand-written (init regenerates this file): the fourth version segment.
-//
-// Karasu versions as MAJOR.MINOR.PATCH.COMMIT#, and only the first three reach
-// `tauri.properties` -- the Tauri CLI writes it from `tauri.conf.json`, which
-// carries the semver core and nothing else. Its versionCode formula is
-// `major * 1000000 + minor * 1000 + patch`, so two release APKs that differ
-// only in COMMIT_NUMBER were the same version to Android: `adb install -r`
-// could not tell them apart, and neither could the settings screen.
-//
-// COMMIT_NUMBER is the one counter in this project that is monotonic by
-// definition (+1 on every commit, never reset), which is exactly what a
-// versionCode wants to be, so it is used directly. The base is what keeps the
-// switch installable: the old formula's last shipped value was 190020, and
-// Android refuses to install a lower versionCode over a higher one. A million
-// clears every code that formula ever produced, leaving ~2.1 billion of
-// headroom -- about four million more commits than this project will see.
-//
-// Read from the Rust const rather than a copy, because `scripts/bump-version.mjs`
-// already owns that line and a sixth place to update is a sixth place to
-// forget. There is deliberately no fallback: a silent one would reinstate the
-// bug it is here to fix, and do it quietly.
-val VERSION_CODE_BASE = 1_000_000
+// Hand-written; `tauri android init` regenerates this file: versionCode is COMMIT_NUMBER, which tauri.properties omits.
+val VERSION_CODE_BASE = 1_000_000 // above every code the old formula produced; Android refuses a lower versionCode
 
-val commitNumber = run {
+val commitNumber = run { // read from the Rust const, never a copy: scripts/bump-version.mjs owns that line
     val src = file("../../../src/commands/update.rs")
     if (!src.exists()) {
         throw GradleException("Cannot read the commit number: ${src.absolutePath} does not exist")
@@ -91,11 +69,7 @@ android {
             }
         }
         getByName("release") {
-            // Cleartext stays allowed in release, deliberately: Android
-            // detection is Jellyfin-only, LAN Jellyfin over plain HTTP is the
-            // documented answer to self-signed certificates (see net.rs), and
-            // a release build that silently blocks exactly that would strand
-            // the one detection source the platform has.
+            // Kept on purpose: a LAN Jellyfin over plain HTTP is a supported setup, and Android has no other detection source.
             manifestPlaceholders["usesCleartextTraffic"] = "true"
             signingConfig = if (keyProperties.containsKey("storeFile"))
                 signingConfigs.getByName("release")

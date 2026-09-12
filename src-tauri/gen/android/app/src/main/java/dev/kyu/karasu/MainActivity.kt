@@ -12,19 +12,10 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 
 class MainActivity : TauriActivity() {
-  // Hand-edited: the share target. A shared link arrives as ACTION_SEND with
-  // the URL inside EXTRA_TEXT (usually wrapped in words — "Title https://…")
-  // and a null data field, which the deep-link plugin rejects twice over. A
-  // synthetic VIEW built from the first extracted URL rides the plugin's own
-  // validation and routing instead — deliberately not tao's SEND parsing,
-  // whose Android path dead-ends and turns wordy shares into data: URLs.
-  // The rewrite runs before super in onCreate (tao reads getIntent there)
-  // and rewrites both the parameter and setIntent on the warm path.
+  // Hand-edited: the deep-link plugin rejects ACTION_SEND, so the first URL in EXTRA_TEXT is re-sent as a VIEW it routes.
   private fun asView(intent: Intent?): Intent? {
     if (intent?.action != Intent.ACTION_SEND || intent.type != "text/plain") return null
-    // EXTRA_TEXT is documented as a CharSequence. A share from an app that
-    // styles its text arrives as a Spanned, and getStringExtra answers null
-    // for anything that is not a String — the link was then silently dropped.
+    // A styled share arrives as a Spanned, and getStringExtra answers null for anything but a String.
     val text = intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString() ?: return null
     val url = Regex("https?://\\S+").find(text)?.value?.trimEnd(')', '"', '\'', '.', ',', ';')
       ?: return null
@@ -32,23 +23,14 @@ class MainActivity : TauriActivity() {
   }
 
   override fun onCreate(savedInstanceState: Bundle?) {
-    asView(intent)?.let { setIntent(it) }
-    // Hand-edited from the generated file (a bare enableEdgeToEdge()), and
-    // `tauri android init` will regenerate it back — re-apply this if the
-    // app's header ever climbs under the clock again.
-    //
-    // With targetSdk 35+ Android *enforces* edge-to-edge, so opting out via
-    // setDecorFitsSystemWindows is ignored there; the WebView cannot see the
-    // status bar either (env(safe-area-inset-top) stays 0 for it). So the
-    // insets are applied natively: the content view is padded by the real
-    // system-bar and cutout insets, and the exposed strips wear the app's
-    // own surface-950 so they read as chrome, not as a hole.
+    asView(intent)?.let { setIntent(it) } // before super: tao reads getIntent there
+    // Hand-edited; `tauri android init` regenerates this file back to a bare enableEdgeToEdge().
     enableEdgeToEdge()
     super.onCreate(savedInstanceState)
 
-    window.setBackgroundDrawable(ColorDrawable(Color.parseColor("#0b0d12")))
+    window.setBackgroundDrawable(ColorDrawable(Color.parseColor("#0b0d12"))) // surface-950: the exposed strips read as chrome, not a hole
     val root = findViewById<ViewGroup>(android.R.id.content)
-    ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
+    ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets -> // native insets: edge-to-edge is enforced, and the WebView cannot see the system bars
       val bars = insets.getInsets(
         WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
       )
@@ -61,9 +43,7 @@ class MainActivity : TauriActivity() {
 
   override fun onResume() {
     super.onResume()
-    // Hand-edited: tell Rust the screen is ours again — the poll speeds back
-    // up, and a wanted tracking service that could not start from the
-    // background gets its chance (see TrackingService.kt).
+    // Hand-edited: Rust speeds the poll back up and gets its one chance to start a wanted tracking service.
     try {
       KarasuNative.setForeground(true)
     } catch (t: Throwable) {
@@ -73,8 +53,7 @@ class MainActivity : TauriActivity() {
 
   override fun onPause() {
     super.onPause()
-    // Hand-edited: leaving the app is the moment the home screen becomes
-    // visible again, and whatever this session changed should be on it.
+    // Hand-edited: the home screen is about to show, so the widgets pick up what this session changed.
     try {
       WidgetRefresher.refresh(applicationContext)
     } catch (t: Throwable) {
@@ -83,14 +62,12 @@ class MainActivity : TauriActivity() {
     try {
       KarasuNative.setForeground(false)
     } catch (t: Throwable) {
-      // Same rule.
+      // A missing symbol must never take the activity lifecycle down.
     }
   }
 
   override fun onNewIntent(intent: Intent) {
-    // Warm path of the share target: singleTask delivers here, and the
-    // plugin reads the *parameter*, so both it and the activity's stored
-    // intent are rewritten.
+    // Share target, warm path: the plugin reads the parameter, so it and the stored intent are both rewritten.
     val rewritten = asView(intent) ?: intent
     setIntent(rewritten)
     super.onNewIntent(rewritten)

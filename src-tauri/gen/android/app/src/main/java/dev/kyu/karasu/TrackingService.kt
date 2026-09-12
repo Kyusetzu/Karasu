@@ -1,13 +1,6 @@
 package dev.kyu.karasu
 
-// Hand-written, like NotifJob.kt: `tauri android init` will not overwrite
-// this file, but a wiped gen/ tree will not recreate it either — restore it
-// from git after any re-init. Platform APIs plus androidx.core only, which
-// MainActivity already pulls in for its insets; no new Gradle dependency in
-// the generated tree, for the reason net.rs and TokenCipher give. The
-// proguard keep for TrackingControl is load-bearing: it is reached from Rust
-// over JNI by name, has no native methods and no manifest entry, so neither
-// default rule protects it.
+// Hand-written; `tauri android init` will not recreate it, restore from git; platform APIs only, no Gradle dependency.
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -27,23 +20,12 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 
-/**
- * The switches Rust flips over JNI (`background.rs`): the foreground service
- * that keeps the process alive and unfrozen while Jellyfin tracking runs
- * with the screen off, and the battery-optimisation exemption that keeps
- * Android from stretching the notification job of a rarely-opened app.
- *
- * Every answer is a string: empty for "done", otherwise the platform's own
- * reason — the NotifScheduler convention, which exists because a swallowed
- * refusal is a pane that reads "on" beside a service that is not running.
- */
+/** Flipped from Rust over JNI by name (proguard keep load-bearing); each answers "" or the platform's own reason. */
 object TrackingControl {
   const val CHANNEL = "karasu.tracking"
   const val NOTIF_ID = 46233
 
-  /** Starts the service. Android 12+ refuses a foreground start from the
-   *  background (ForegroundServiceStartNotAllowedException), which is the
-   *  expected reason here; Rust only asks while the activity is on screen. */
+  /** Android refuses a foreground start from the background, so Rust only asks while the activity is on screen. */
   @JvmStatic
   fun start(context: Context, title: String, body: String): String {
     return try {
@@ -77,8 +59,7 @@ object TrackingControl {
     }
   }
 
-  /** Opens the system dialog that asks the user to exempt Karasu. The dialog
-   *  answers nothing back; the pane re-reads `isBatteryExempt` on focus. */
+  /** Opens the system exemption dialog; it answers nothing back, so the pane re-reads isBatteryExempt on focus. */
   @JvmStatic
   fun requestBatteryExemption(context: Context): String {
     return try {
@@ -94,19 +75,7 @@ object TrackingControl {
   }
 }
 
-/**
- * Does no work of its own. The Rust loops — the 5 s detection poll, the
- * scrobbler, the alert passes — already run inside this process; what
- * Android freezes a few minutes after the screen goes off is the *process*,
- * and a foreground service with its persistent notification is the one
- * thing that stops it. `specialUse`, not `dataSync`: Android 15 caps
- * `dataSync` at six hours a day, and this APK is sideloaded, so there is
- * no store review to justify the subtype to — the manifest property says
- * what it is for anyway.
- *
- * START_NOT_STICKY on purpose: a service Android resurrects without Tauri
- * has nothing to keep alive.
- */
+/** Does no work itself; a foreground service is what keeps Android from freezing the process the Rust loops run in. */
 class TrackingService : Service() {
   override fun onBind(intent: Intent?): IBinder? = null
 
@@ -116,9 +85,7 @@ class TrackingService : Service() {
 
     val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-      // Idempotent, and re-creating updates the visible name — which is the
-      // localized title Rust rendered, so the channel reads right in the
-      // system's notification settings too.
+      // Idempotent; re-creating updates the visible name to the localized title Rust rendered.
       nm.createNotificationChannel(
         NotificationChannel(TrackingControl.CHANNEL, title, NotificationManager.IMPORTANCE_LOW)
       )
@@ -130,8 +97,7 @@ class TrackingService : Service() {
       PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
     val notification: Notification = NotificationCompat.Builder(this, TrackingControl.CHANNEL)
-      // The launcher mark — the same fallback NotifJob uses; there is no
-      // dedicated status-bar glyph in the res tree.
+      // The launcher mark, as NotifJob falls back to; the res tree has no status-bar glyph.
       .setSmallIcon(R.mipmap.ic_launcher)
       .setContentTitle(title)
       .setContentText(body)
@@ -142,16 +108,15 @@ class TrackingService : Service() {
       .build()
 
     val type =
-      if (Build.VERSION.SDK_INT >= 34) ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE else 0
+      if (Build.VERSION.SDK_INT >= 34) ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE else 0 // not dataSync: Android caps that per day
     try {
       ServiceCompat.startForeground(this, TrackingControl.NOTIF_ID, notification, type)
     } catch (t: Throwable) {
-      // A refused promotion leaves a plain background service, which is
-      // worth nothing and would be killed with the process; end it cleanly.
+      // A refused promotion leaves a plain background service, worth nothing; end it cleanly.
       Log.w("KarasuTracking", "startForeground failed", t)
       stopSelf()
     }
-    return START_NOT_STICKY
+    return START_NOT_STICKY // a service Android resurrects without Tauri has nothing to keep alive
   }
 
   companion object {

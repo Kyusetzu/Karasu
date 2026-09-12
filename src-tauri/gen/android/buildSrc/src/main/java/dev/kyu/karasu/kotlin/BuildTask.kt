@@ -16,14 +16,7 @@ open class BuildTask : DefaultTask() {
 
     @TaskAction
     fun assemble() {
-        // Hand-edited from the generated `npm` + extension-fallback dance:
-        // on Windows with nvm4w, Gradle's process launcher failed to spawn
-        // every one of npm/.exe/.cmd/.bat (cmd-script shims and Java's
-        // hardened ProcessBuilder do not mix). `node` is a real executable
-        // and spawns cleanly everywhere, so the tauri CLI is invoked through
-        // its JS entry directly. Re-running `tauri android init` will
-        // regenerate this file and undo the fix — re-apply it if the build
-        // dies with "A problem occurred starting process 'command npm'".
+        // Hand-edited; `tauri android init` regenerates this file: node runs the CLI, Gradle cannot spawn npm's cmd shims.
         runTauriCli("node")
     }
 

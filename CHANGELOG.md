@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 57506fd -->
+<!-- generated-through: 4c753ba -->
 
 ### Fixed
 
@@ -76,6 +76,7 @@ tag time is then optional rather than load-bearing.
 - Find servers now reaches the Jellyfin server on a PC with a virtual network switch (Hyper-V, VirtualBox), which the first version missed.
 - New-episode and sequel checks keep working through an AniList outage that refuses anonymous requests, by signing them with your account while you are signed in.
 - A link with a target Karasu refuses (javascript:, data:, AniList's layout blob) now shows in the accent colour like on anilist.co, instead of as plain text.
+- A pinch on Android no longer zooms the whole screen; the interface size under Appearance is the one zoom.
 
 ### Added
 

@@ -41,6 +41,9 @@ export default function KeyboardSheet() {
         { label: t("keys.anime"), keys: ["Ctrl", "2"] },
         { label: t("keys.manga"), keys: ["Ctrl", "3"] },
         { label: t("keys.sync"), keys: ["Ctrl", "R"] },
+        { label: t("keys.zoomIn"), keys: ["Ctrl", "+"] },
+        { label: t("keys.zoomOut"), keys: ["Ctrl", "−"] },
+        { label: t("keys.zoomReset"), keys: ["Ctrl", "0"] },
       ],
     },
     {

@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { invoke } from "@tauri-apps/api/core";
 import { Palette } from "lucide-react";
 import * as api from "@/api/anilist";
+import { UI_ZOOM_STEPS } from "@/lib/uiZoom";
 import { isAndroid, usePlatform } from "@/stores/platform";
 import { Card, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -23,13 +23,6 @@ import { ColorPicker, Row, SELECT, Toggle } from "./shared";
 import { STATUS_COLOR_ORDER, isDefaultPalette } from "@/lib/statusColors";
 import type { MediaListStatus } from "@/api/types";
 const THEME_MODES: ThemeMode[] = ["system", "light", "dark"];
-
-/**
- * The zoom steps offered. Browser-like, and bounded by what Rust accepts
- * (`UI_ZOOM_MIN..=UI_ZOOM_MAX` in `commands/system.rs`); a stored value off
- * this list still displays, because the select shows whatever Rust answers.
- */
-const UI_ZOOM_STEPS = [75, 90, 100, 110, 125, 150, 175, 200] as const;
 
 export function AppearanceSection() {
   const { t } = useTranslation();
@@ -70,12 +63,17 @@ export function AppearanceSection() {
   const [zoom, setZoom] = useState<number | null>(null);
   useEffect(() => {
     if (!api.isTauri || android) return;
-    invoke<number>("get_ui_zoom").then(setZoom).catch(() => {});
+    api.getUiZoom().then(setZoom).catch(() => {});
+    // Ctrl+plus while this pane is open changes the same setting; the
+    // select follows rather than showing the number from before.
+    const onZoom = (e: Event) => setZoom((e as CustomEvent<number>).detail);
+    window.addEventListener(api.UI_ZOOM_EVENT, onZoom);
+    return () => window.removeEventListener(api.UI_ZOOM_EVENT, onZoom);
   }, [android]);
   const changeZoom = async (percent: number) => {
     setZoom(percent);
     try {
-      setZoom(await invoke<number>("set_ui_zoom", { percent }));
+      setZoom(await api.setUiZoom(percent));
     } catch {
       // The row keeps the chosen number; the next launch reads what stuck.
     }
@@ -121,6 +119,11 @@ export function AppearanceSection() {
               className={SELECT}
               aria-label={t("settings.uiZoom")}
             >
+              {/* A stored value off the list (an older build, a hand-edited
+                  database) is still shown, as its own option. */}
+              {(UI_ZOOM_STEPS as readonly number[]).includes(zoom) ? null : (
+                <option value={zoom}>{zoom} %</option>
+              )}
               {UI_ZOOM_STEPS.map((p) => (
                 <option key={p} value={p}>
                   {p} %

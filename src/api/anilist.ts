@@ -461,6 +461,21 @@ export const saveText = (
 ) =>
   invoke<boolean>("save_text", { contents, defaultName, filterLabel, extension });
 
+/**
+ * The interface size, a percentage kept in Rust (it is applied before the
+ * first paint, so it cannot live in localStorage like the rest of the theme).
+ * `setUiZoom` answers with what Rust actually applied — clamped — and tells
+ * the window about it, so the Appearance select and the Ctrl+plus shortcut
+ * stay one setting rather than two views of it that drift.
+ */
+export const UI_ZOOM_EVENT = "karasu-ui-zoom";
+export const getUiZoom = () => invoke<number>("get_ui_zoom");
+export const setUiZoom = async (percent: number) => {
+  const applied = await invoke<number>("set_ui_zoom", { percent });
+  window.dispatchEvent(new CustomEvent<number>(UI_ZOOM_EVENT, { detail: applied }));
+  return applied;
+};
+
 // --- Notification centre ---------------------------------------------------
 
 export interface AppNotification {

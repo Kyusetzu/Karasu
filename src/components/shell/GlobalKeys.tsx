@@ -2,9 +2,11 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { listen } from "@tauri-apps/api/event";
-import { isTauri } from "@/api/anilist";
+import { getUiZoom, isTauri, setUiZoom } from "@/api/anilist";
 import { isTyping } from "@/components/shell/KeyboardSheet";
 import { useManualSync } from "@/hooks/useManualSync";
+import { stepZoom, UI_ZOOM_DEFAULT, zoomShortcut } from "@/lib/uiZoom";
+import { isAndroid, usePlatform } from "@/stores/platform";
 
 /**
  * The global shortcut group.
@@ -38,6 +40,24 @@ export default function GlobalKeys() {
       if (!mod && e.key === "/" && !isTyping() && !overlay) {
         e.preventDefault();
         navigate("/search");
+        return;
+      }
+
+      // The interface size, browser-style: Ctrl+plus, Ctrl+minus, Ctrl+0.
+      // Tauri's own zoom hotkeys stay off, because they would zoom the
+      // window without storing it — the next launch would come up at the
+      // Appearance select's number, not the one the keys reached. Allowed
+      // through an open dialog on purpose (it is the one shortcut that
+      // changes no data), and not on Android, which has no zoom to set.
+      const zoom = zoomShortcut(e);
+      if (zoom !== null && isTauri && !isAndroid(usePlatform.getState().info)) {
+        e.preventDefault();
+        void (async () => {
+          const current = await getUiZoom();
+          await setUiZoom(
+            zoom === "reset" ? UI_ZOOM_DEFAULT : stepZoom(current, zoom === "in" ? 1 : -1),
+          );
+        })().catch(() => {});
         return;
       }
 

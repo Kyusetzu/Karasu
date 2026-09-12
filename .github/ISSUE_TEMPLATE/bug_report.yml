@@ -50,6 +50,7 @@ body:
       options:
         - Windows installer (Karasu_..._x64-setup.exe)
         - Linux AppImage
+        - Android APK (sideloaded)
         - Built from source
     validations:
       required: true

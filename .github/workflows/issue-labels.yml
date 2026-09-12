@@ -1,0 +1,79 @@
+name: Issue labels
+
+# Labels an issue from what the form already asked. The issue forms carry a
+# type label of their own (`labels:` in the template), but a dropdown answer
+# cannot become a label without a workflow — so this reads the rendered body:
+# the feature form's platform question, and for a bug report the install
+# dropdown or the `| OS | … |` row of the pasted diagnostics. It only ever
+# *adds* labels; taking one away is a person's call in the issue view.
+#
+# The type label is re-applied too, because a form's label can go missing
+# (#21 arrived through the feature form with no label at all). Which form it
+# was is read from the headings the form rendered, not guessed from prose.
+#
+# `edited` is included so a reporter who fixes the platform answer gets the
+# label without anyone noticing the first one was wrong.
+
+on:
+  issues:
+    types: [opened, edited]
+
+permissions:
+  issues: write
+
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const body = context.payload.issue.body ?? "";
+
+            // The value under a form heading: "### <label>\n\n<value>\n\n" —
+            // the first non-empty line after the heading. Plain string
+            // search, because the labels carry question marks and a regex
+            // built from them is the kind of thing that fails silently.
+            const answer = (label) => {
+              const heading = `### ${label}`;
+              const at = body.indexOf(heading);
+              if (at === -1) return "";
+              const line = body
+                .slice(at + heading.length)
+                .split("\n")
+                .map((l) => l.trim())
+                .find((l) => l !== "");
+              return line ?? "";
+            };
+
+            const labels = new Set();
+
+            // Type, from the headings each form renders and nothing else does.
+            // Two headings per form, because a reporter can delete the first
+            // section when rewriting the top of the issue (#21 had).
+            if (/^### (What happened\?|Steps to reproduce)/m.test(body)) labels.add("bug");
+            if (/^### (What is the problem\?|What should it do instead\?)/m.test(body)) labels.add("enhancement");
+
+            // Platform. The feature form asks outright; a bug report says it
+            // through the install dropdown, or more reliably through the OS
+            // row of the diagnostics table the About page produced.
+            const platform = answer("Does this apply to a particular platform?").toLowerCase();
+            const install = answer("How did you install it?").toLowerCase();
+            const os = (body.match(/^\|\s*OS\s*\|\s*([a-z]+)\s*\|/mi)?.[1] ?? "").toLowerCase();
+            for (const name of ["windows", "linux", "android"]) {
+              if (platform === name || os === name || install.startsWith(name)) labels.add(name);
+            }
+
+            const have = new Set(context.payload.issue.labels.map((l) => l.name));
+            const add = [...labels].filter((l) => !have.has(l));
+            if (add.length === 0) {
+              core.info("nothing to add");
+              return;
+            }
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.issue.number,
+              labels: add,
+            });
+            core.info(`added: ${add.join(", ")}`);

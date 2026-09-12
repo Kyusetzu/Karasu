@@ -40,10 +40,14 @@ body:
     id: platform
     attributes:
       label: Does this apply to a particular platform?
+      description: >-
+        The answer becomes the issue's platform label (a small workflow reads
+        it), so pick the one it is really about.
       options:
-        - Both
+        - All of them
         - Windows
         - Linux
+        - Android
     validations:
       required: false
 

@@ -1457,7 +1457,7 @@ export const de: typeof en = {
       "Zeigt eine stille, dauerhafte Benachrichtigung, solange Karasu offen ist. Sie hält Android davon ab, die App bei ausgeschaltetem Bildschirm einzufrieren; ohne sie pausiert die Erfassung wenige Minuten, nachdem du die App verlässt.",
     jellyfinBattery: "Akku-Optimierung",
     jellyfinBatteryHint:
-      "Android kann die App trotzdem pausieren und die Benachrichtigungsprüfung verzögern, solange Karasu hier nicht ausgenommen ist. Manche Handys ignorieren selbst das.",
+      "Android kann die App trotzdem pausieren und die Benachrichtigungsprüfung verzögern, solange Karasu hier nicht ausgenommen ist. Manche Handys haben noch eine eigene Regel: Auf nubia und ZTE (REDMAGIC OS) in den System-App-Einstellungen von Karasu „Läuft im Hintergrund“ auf „Zugelassen“ stellen, sonst friert das Handy die App etwa eine Minute nach dem Sperren ein, Benachrichtigung hin oder her.",
     jellyfinBatteryAllow: "Karasu ausnehmen",
     jellyfinBatteryAllowed: "Ausgenommen",
     jellyfinBatteryFailed: "Akku-Einstellungen konnten nicht geöffnet werden ({{message}})",

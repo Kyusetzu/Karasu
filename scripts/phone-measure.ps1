@@ -9,11 +9,12 @@
 # Karasu's Rust log never reaches logcat on Android (logging.rs writes the
 # file and the in-memory ring, nothing else), and a release APK is not
 # debuggable, so `run-as` cannot read the file either. The poll count
-# therefore comes from Settings -> Advanced -> Export diagnostics, which
-# appends the log: save the file and pass it with -Diagnostics. The
-# "N polls in the last 5 min" lines it counts exist only with verbose
-# logging on (Settings -> Advanced), and the first one appears five minutes
-# after the app started.
+# therefore comes from the About page -> Diagnostics -> "Save report…",
+# which appends the in-memory log ring (the last 1000 lines): save it to
+# Downloads, `adb pull /sdcard/Download/karasu-diagnostics-<version>.md`,
+# and pass the file with -Diagnostics. The "N polls in the last 5 min"
+# lines it counts exist only with verbose logging on (Settings ->
+# Advanced), and the first one appears five minutes after the app started.
 #
 # What the numbers mean: the detection loop ticks every 5 s on screen and
 # every 15 s with the screen off, so 720/h is "on screen", 240/h is "screen
@@ -21,6 +22,14 @@
 # the thing the tracking service exists to prevent. The standby bucket is
 # what stretches the notification job: 10 active, 20 working set, 30
 # frequent, 40 rare, 45 restricted, 5 exempted (the battery exemption).
+#
+# The service record is not the process. A ROM can freeze a process that
+# holds a foreground service (measured on a nubia NX809J, REDMAGIC OS 11:
+# `isForeground=true` on the service, `isFrozen=true` on the process,
+# `am_freeze` 37 s after the screen lock, at OOM adj 200 where AOSP would
+# never freeze). The "frozen" line and the events section below are the
+# first thing to read; the cure on that ROM is the app's system settings ->
+# "Runs in background" -> "Allowed", not anything Karasu can request.
 param(
   [string]$Package = "dev.kyu.karasu",
   [string]$Diagnostics = "",
@@ -47,6 +56,13 @@ if ($Idle) {
 
 Section "tracking service (TrackingService with isForeground=true is the healthy line)"
 adb shell dumpsys activity services $Package | Select-String -Pattern "TrackingService|isForeground|foregroundNoti|createTime|startRequested"
+
+Section "process (isFrozen=true is the process stopped in its tracks, whatever the service says)"
+adb shell dumpsys activity processes $Package | Select-String -Pattern "ProcessRecord\{|isFrozen|curProcState|lastActivityTime"
+
+Section "freeze events (am_freeze / am_unfreeze, from the events log buffer)"
+$events = adb logcat -b events -d -v time | Select-String -Pattern "am_freeze|am_unfreeze|am_proc_died|am_kill" | Select-String -Pattern $Package | Select-Object -Last 12
+if ($events) { $events | ForEach-Object { $_.Line } } else { "none in the buffer" }
 
 Section "standby bucket"
 adb shell am get-standby-bucket $Package

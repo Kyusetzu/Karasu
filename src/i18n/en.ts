@@ -1458,7 +1458,7 @@ export const en = {
       "Shows a quiet, permanent notification while Karasu is open. It is what stops Android from freezing the app when the screen is off; without it, tracking pauses a few minutes after you leave.",
     jellyfinBattery: "Battery optimisation",
     jellyfinBatteryHint:
-      "Android may still pause the app and delay the notification check unless Karasu is excluded here. Some phones ignore even that.",
+      "Android may still pause the app and delay the notification check unless Karasu is excluded here. Some phones have a rule of their own on top: on nubia and ZTE (REDMAGIC OS), set “Runs in background” to “Allowed” in Karasu's system app settings, or the phone freezes the app about a minute after the screen locks, notification and all.",
     jellyfinBatteryAllow: "Exclude Karasu",
     jellyfinBatteryAllowed: "Excluded",
     jellyfinBatteryFailed: "Could not open the battery settings ({{message}})",

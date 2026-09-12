@@ -669,14 +669,32 @@ import it.
   on every look while it tracked a playback, and the phone's read 6 s from
   the desktop). That row is how two Karasus on one account see each other
   (`jellyfin::yield_to`), so a "the phone never yields" report starts with
-  Test connection: is the desktop's row there, and how old is it. The
-  same day, on the maintainer's NX809J with the release APK: `dumpsys
-  activity services` showed `TrackingService … isForeground=true
-  types=0x40000000` (that is `specialUse`) for the whole of a 30-minute
-  screen-off run, `am get-standby-bucket` answered 5 (exempted) once the
-  battery dialog was accepted, and the notification job is simply absent
-  from `dumpsys jobscheduler` while the interval setting is 0 — not a
-  failure. `scripts/phone-measure.ps1` is the whole of that procedure. And
+  Test connection: is the desktop's row there, and how old is it. On the
+  maintainer's NX809J (nubia, REDMAGIC OS 11, Android 16) with the release
+  APK, 2026-09-12: **the service record is not the process.** `dumpsys
+  activity services` kept showing `TrackingService … isForeground=true
+  types=0x40000000` (that is `specialUse`) while `dumpsys activity
+  processes` said `isFrozen=true` and the events log had `am_freeze` 37 s
+  after the screen lock — with the process at `prcp F/A/FGS`, adj 200,
+  far under AOSP's `freezer_cutoff_adj=900`, so it is the ROM
+  (`OomAdjusterZteHook`), not Android. The phone's own log showed the
+  five-minute poll line simply missing until the unlock, and the Jellyfin
+  row aged past `FRESH`. The battery-optimisation exemption (bucket 5,
+  Doze whitelist) did **not** prevent it; the ROM's per-app rule did:
+  system app settings → "Läuft im Hintergrund" → "Zugelassen" (and
+  "Auto-Start" → "Zugelassen" for the notification job). With that set, a
+  45-minute locked run logged `20 polls in the last 5 min` on every line
+  (the 15 s hidden cadence), no `am_freeze`, the desktop wrote at its due
+  point and the phone logged `due, yielding to Karasu on KYU-PC for
+  180 s` ten seconds later. It wrote once the grace was spent — and that
+  was right, not a duplicate: the maintainer had reset the entry to 2 by
+  hand in between, the live check in `perform_update` read that 2, and a
+  due episode 3 against a list at 2 is a scrobble. Read the live-check
+  line before calling a second write a bug. So a "the phone stops
+  tracking" report is answered by `scripts/phone-measure.ps1`'s frozen
+  line and freeze events first, and by the vendor rule second; the
+  notification job being absent from `dumpsys jobscheduler` while the
+  interval setting is 0 is not a failure. And
   Windows sends a limited broadcast from a wildcard UDP socket out of one
   interface of its own choosing — with a Hyper-V switch present, that one —
   which is why `discovery::broadcast` also binds to the default route's

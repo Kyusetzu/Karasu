@@ -1,0 +1,12 @@
+[
+  {
+    "file": "scripts/comment-audit.mjs",
+    "startsWith": "Reports every multi-line comment block",
+    "reason": "usage block: one invocation per line"
+  },
+  {
+    "file": "scripts/comment-strip-check.mjs",
+    "startsWith": "Proves a change touched only comments",
+    "reason": "usage block: one invocation per line"
+  }
+]

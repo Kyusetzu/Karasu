@@ -3,7 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/favicon.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- No user scaling: the app is a native shell, not a page, and a pinch
+         on Android otherwise zooms the whole screen and leaves it there.
+         `touch-action` on <html> in index.css is the same rule for the
+         gesture layer; the cover viewer keeps its own pinch on its element. -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
     <title>Karasu</title>
   </head>
 

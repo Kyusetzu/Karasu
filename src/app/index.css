@@ -559,6 +559,17 @@ body,
   height: 100%;
 }
 
+/* The browser's own pinch and double-tap zoom are off: a pinch on Android
+   (reported on 1.5.2.588) zoomed the whole screen and left it there, and a
+   touchscreen on Windows could do the same. Panning stays; the interface
+   size is the setting under Appearance, which zooms everything the same and
+   sticks. An element with its own gesture handling — the cover viewer — sets
+   its own `touch-action` and is not affected. The viewport meta in index.html
+   says the same thing for the layout viewport. */
+html {
+  touch-action: pan-x pan-y;
+}
+
 body {
   @apply bg-surface-950 text-ink-100 font-sans antialiased;
   overflow: hidden;

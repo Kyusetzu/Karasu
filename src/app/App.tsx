@@ -37,13 +37,7 @@ import Search from "@/pages/Search";
 import Seasonal from "@/pages/Seasonal";
 import AnimeDetail from "@/pages/AnimeDetail";
 
-// Split out of the entry chunk. These are the pages you do not land on: they
-// are reached deliberately, so a frame of nothing while the chunk loads is
-// invisible. Dashboard, MediaList, Search, Seasonal and AnimeDetail stay eager
-// — those are the launch and navigation hot path.
-//
-// Modest by itself: served over tauri:// there is no download, so this buys
-// parse and evaluate time rather than transfer.
+// Pages reached deliberately are split out of the entry chunk; the launch and navigation hot path above stays eager.
 const Statistics = lazy(() => import("@/pages/Statistics"));
 const Calendar = lazy(() => import("@/pages/Calendar"));
 const Franchise = lazy(() => import("@/pages/Franchise"));
@@ -76,9 +70,7 @@ export default function App() {
   const initContentFilter = useContentFilter((s) => s.init);
   // A primitive, so the selector is referentially stable across renders.
   const viewerId = useAuth((s) => s.viewer?.id);
-  // Route changes become a continuous transition rather than a cut followed by
-  // an arrival. Declines to intercept under reduced motion, in which case
-  // `<main key={pathname}>` below behaves exactly as it always has.
+  // Route changes become one continuous transition; under reduced motion it stands down and `<main key>` cuts as before.
   useViewTransitions();
 
   useEffect(() => {
@@ -88,30 +80,10 @@ export default function App() {
     initContentFilter();
   }, [init, initNowPlaying, refreshLibrary, initContentFilter]);
 
-  // An anilist.co link tapped anywhere on the phone can arrive here (the
-  // deep-link plugin's generated intent filter), and it lands on the same
-  // route mapping in-app links use. Anything `internalRoute` refuses is
-  // dropped — the app never claims a page it cannot draw. Outside Tauri the
-  // listener would throw reaching for internals, hence the guard.
-  //
-  // Two deliveries, because the plugin has two. `onOpenUrl` is a plain event
-  // listener and only hears links that arrive while the app is running; the
-  // link that *starts* the app is recorded before any listener exists and is
-  // never emitted, so a cold start landed on the dashboard — measured on the
-  // phone, for a shared link and a tapped one alike. `getCurrent` hands that
-  // first link back, once. The same URL reaching both within a moment routes
-  // once; the same link tapped again later still routes, on purpose.
-  //
-  // Once per mount, and `navigate` through a ref rather than a dependency.
-  // `App` sits outside any `<Route>`, so react-router hands it a fresh
-  // `navigate` on every pathname change; keyed on it, this effect re-ran on
-  // each in-app navigation and asked `getCurrent` again — and the plugin
-  // keeps the launch URL for the life of the process, so every tap on the
-  // bottom bar was answered by a jump back to the deep-linked page. Measured
-  // on the phone on 2026-09-05: the Anime tab opened the list before a link
-  // had arrived and did nothing after one.
+  // Deep links route through `internalRoute`; `getCurrent` supplies the launch link `onOpenUrl` never emits.
   const navigateRef = useRef(navigate);
   navigateRef.current = navigate;
+  // Once per mount with `navigate` behind a ref: keyed on it, every in-app navigation re-applied the kept launch URL.
   useEffect(() => {
     if (!isTauri) return;
     let last: { url: string; at: number } | null = null;
@@ -133,20 +105,16 @@ export default function App() {
     };
   }, []);
 
-  // Paint the list from SQLite as soon as the viewer is known, rather than
-  // waiting out a full AniList round trip on every launch.
+  // Paint the list from SQLite as soon as the viewer is known instead of waiting out an AniList round trip on every launch.
   usePrimedLists(viewerId);
 
-  // Karasu takes its size from Windows, not from the window width. Display
-  // scaling arrives for free through WebView2; the Accessibility text-size
-  // slider does not, so apply it here. 100% (the default) leaves the root at
-  // the stylesheet's 16px and this is a no-op.
   // Platform facts, read once — nothing here changes while the app is open.
   const loadPlatform = usePlatform((s) => s.load);
   useEffect(() => {
     loadPlatform();
   }, [loadPlatform]);
 
+  // Display scaling arrives through WebView2 for free; Windows' Accessibility text-size slider does not, so apply it here.
   useEffect(() => {
     if (!isTauri) return;
     getTextScale()
@@ -158,19 +126,14 @@ export default function App() {
       .catch(() => {});
   }, []);
 
-  // At most once/day: check for an update and, if one is found, start
-  // downloading it in the background. Installing still needs a separate,
-  // explicit confirmation from the About page (see UpdateSection there).
+  // Checks for an update and downloads it in the background; installing still needs a confirmation on the About page.
   useEffect(() => {
     if (!isTauri) return;
     getUpdateCheckAuto().then((enabled) => {
       if (!enabled) return;
       checkForUpdates(false)
         .then((info) => {
-          // Android checks and never downloads — the notice comes from the
-          // Rust check itself (a bell row), and installing is a fresh APK.
-          // Platform read at decision time: the store loaded at mount, and
-          // the network round trip above has long since resolved it.
+          // Android checks and never downloads: the Rust check posts the bell row and installing is a fresh APK.
           const android = isAndroid(usePlatform.getState().info);
           if (info.isNewer && !android) downloadPendingUpdate().catch(() => {});
         })
@@ -181,10 +144,7 @@ export default function App() {
   return (
     <div
       className="flex h-full flex-col"
-      // What bottom-anchored floaters (the toast, the playback error) must
-      // clear. Zero on desktop; the bar's height on the phone shell — a
-      // variable rather than per-component width checks, so anything else
-      // that ever anchors to the bottom inherits the answer.
+      // One variable for what bottom-anchored floaters must clear, so nothing anchoring there needs its own width check.
       style={{ "--shell-bottom": phone ? "3.5rem" : "0px" } as React.CSSProperties}
     >
       <PresenceReporter />
@@ -195,44 +155,24 @@ export default function App() {
       <SignInMerge />
       <PlaybackError />
       <Toast />
-      {/* The titlebar is desktop window furniture — drag region, window
-          controls, the pill. The phone has the system status bar above and
-          the bottom bar below; the bell rides in the bar there. */}
+      {/* The titlebar is desktop window furniture; the phone has the system status bar above and the bell in the bottom bar. */}
       {!phone && <Titlebar />}
-      {/* The first Tab stop in the window, and invisible until it is one. The
-          sidebar is fourteen links, so reaching the page by keyboard meant
-          fourteen presses on every single navigation. Not `hidden` — a hidden
-          element is not focusable, which is the whole trick: it is off-screen
-          and comes back on focus. */}
+      {/* The first Tab stop, off-screen rather than `hidden` because a hidden element is not focusable and this must be. */}
       <SkipLink />
-      {/* Above the split, so it spans the sidebar too: a rejected token is a
-          property of the session rather than of any one screen, and the
-          sidebar's account line is one of the things it makes untrue. */}
+      {/* Above the split so it spans the sidebar too: a rejected token is a property of the session, not of one screen. */}
       <SessionExpired />
       <div className="flex min-h-0 flex-1">
-        {/* The phone shell swaps the sidebar for a bottom bar — width-keyed,
-            so it can be exercised on a desktop by narrowing the window. See
-            `usePhoneShell` for why width and where the breakpoint sits. */}
+        {/* The phone shell swaps the sidebar for a bottom bar, width-keyed so a narrowed desktop window exercises it too. */}
         {!phone && <Sidebar />}
-        {/* Keyed on the route so the pane re-mounts and the animation replays.
-            One direction only — down from above, like a bird landing. No
-            slide-left/right, which would imply a history axis the app has
-            not got. */}
+        {/* Keyed on the route so the pane re-mounts and settles from above; no sideways slide, the app has no history axis. */}
         <main
           key={pathname}
           id="main"
-          // `-1` so the skip link can move focus here: `<main>` is not
-          // focusable on its own, and a link to an unfocusable target scrolls
-          // without moving the caret, which leaves the next Tab back in the
-          // sidebar.
+          // `-1` so the skip link can move focus here; a link to an unfocusable target scrolls without moving the caret.
           tabIndex={-1}
           className="min-w-0 flex-1 animate-settle overflow-y-auto outline-none"
         >
-          {/* Keyed on the route as well, so navigating away from a page that
-              threw resets the boundary — otherwise the fallback would outlive
-              the broken page and the app would look permanently crashed.
-              Inside `<main>` on purpose: the titlebar, sidebar and toast stay
-              alive, so the window is still closable and still navigable. */}
+          {/* Keyed on the route so leaving a page that threw resets the boundary; inside `<main>` so the frame stays usable. */}
           <ErrorBoundary key={pathname}>
             <Suspense fallback={null}>
               <Routes>
@@ -248,8 +188,7 @@ export default function App() {
                 <Route path="/media/:id" element={<AnimeDetail />} />
                 <Route path="/franchise/:id" element={<Franchise />} />
                 <Route path="/social" element={<Social />} />
-                {/* By name, not id: that is what AniList's own URLs, an
-                    `@mention` and a pasted link all carry. */}
+                {/* By name, not id: that is what AniList's own URLs, an `@mention` and a pasted link all carry. */}
                 <Route path="/user/:name" element={<UserProfile />} />
                 <Route path="/forum" element={<Forum />} />
                 <Route path="/thread/:id" element={<Thread />} />
@@ -261,10 +200,7 @@ export default function App() {
                 <Route path="/anime/:id" element={<AnimeDetail />} />
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/about" element={<About />} />
-                {/* A hash that matches nothing rendered an empty `<main>` with
-                    the frame still around it, which reads as the page having
-                    crashed. Reachable in practice: the window restores the
-                    last route, so a renamed one strands whoever was on it. */}
+                {/* Reachable: the window restores the last route, so a renamed one strands whoever was on it in an empty `<main>`. */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>
@@ -283,9 +219,7 @@ function SkipLink() {
     <a
       href="#main"
       onClick={(e) => {
-        // The href is what makes it a link for a screen reader; the focus call
-        // is what makes it work, since a hash change alone does not move the
-        // caret.
+        // The href makes it a link for a screen reader; the focus call makes it work, since a hash change alone moves no caret.
         e.preventDefault();
         document.getElementById("main")?.focus();
       }}
@@ -319,10 +253,7 @@ function NotFound() {
   );
 }
 
-/**
- * Playback failures ("no unwatched episode on disk", a moved file) used to be
- * swallowed at every call site. One banner reports them wherever they happen.
- */
+/** One banner for playback failures wherever they happen, so no call site swallows them. */
 function PlaybackError() {
   const { t } = useTranslation();
   const error = useLibrary((s) => s.error);
@@ -373,8 +304,7 @@ function PresenceReporter() {
       PAGE_LABELS[pathname] ??
       (pathname.startsWith("/media/") || pathname.startsWith("/anime/")
         ? "Details"
-        : // Never the name — a presence broadcast to Discord should not say
-          // whose profile is open.
+        : // Never the name — a presence broadcast to Discord should not say whose profile is open.
           pathname.startsWith("/user/")
           ? "Profile"
           : pathname.startsWith("/thread/")

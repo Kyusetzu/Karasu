@@ -9,8 +9,7 @@ import { isTokenRejected, setIdentityChangedHandler } from "@/api/anilist";
 import { isNotFound, isRateLimited } from "@/lib/apiError";
 import { useTheme } from "@/stores/theme";
 import { initLanguage } from "@/i18n";
-// The @font-face rules live in index.css — see the note there for why the
-// @fontsource stylesheets are not imported directly.
+// The @font-face rules are hand-written in index.css; the @fontsource stylesheets are deliberately not imported.
 import "./index.css";
 
 // Apply the saved theme before the first paint to avoid a flash.
@@ -23,14 +22,7 @@ const queryClient = new QueryClient({
       staleTime: 5 * 60 * 1000,
       gcTime: 30 * 60 * 1000,
       refetchOnWindowFocus: false,
-      // One retry, except where retrying cannot possibly help. A rejected
-      // token answers the same way every time, so a bare `retry: 1` spent two
-      // round-trips out of a ~30/min budget to reach the identical error — on
-      // every query of every screen, since one dead token fails them all at
-      // once. Same for a media id that does not exist, and same for a rate
-      // limit: the Rust client has already waited out the server's
-      // `Retry-After` before giving up, so retrying here stacks a second round
-      // trip onto a window that is still closed.
+      // One retry, except where it cannot help: a rejected token, a missing id or a rate limit answers the same way again.
       retry: (count, error) =>
         count < 1 &&
         !isTokenRejected(error) &&
@@ -40,17 +32,10 @@ const queryClient = new QueryClient({
   },
 });
 
-// Nothing cached under one account may be served under the next one. Most keys
-// carry no viewer (`["mediaDetail", id]`, `["search", …]`) while their payload
-// does, so this is a `clear()` rather than an invalidation: an invalidated
-// entry stays renderable while it refetches, which is the window the previous
-// account's progress, score and private notes were visible in.
+// A `clear()` rather than an invalidation: an invalidated entry stays renderable, showing the previous account's data.
 setIdentityChangedHandler(() => queryClient.clear());
 
-// Everything React's boundaries cannot see: a throw in an event handler, a
-// rejected promise nobody awaited, a failed dynamic import. None of these
-// unmount anything, so they leave no trace on screen either — which is exactly
-// why they were the hardest failures to hear about.
+// What React's boundaries cannot see — handler throws, unawaited rejections, failed imports — leaves no trace on screen.
 window.addEventListener("error", (e) => {
   reportError(e.error ?? e.message, e.filename ? `${e.filename}:${e.lineno}` : undefined);
 });
@@ -58,17 +43,14 @@ window.addEventListener("unhandledrejection", (e) => {
   reportError(e.reason);
 });
 
-// Awaited so a German start does not paint English first. English resolves in a
-// microtask, so that path is unaffected — see `initLanguage`.
+// Awaited so a German start does not paint English first; English resolves in a microtask, so that path is unaffected.
 await initLanguage();
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
       <HashRouter>
-        {/* The last resort: a throw in the shell itself, where there is no
-            frame left to keep. The one that does the real work wraps only the
-            routed pane — see App. */}
+        {/* The last resort, for a throw in the shell itself; the boundary in App wraps only the routed pane. */}
         <ErrorBoundary standalone>
           <App />
         </ErrorBoundary>

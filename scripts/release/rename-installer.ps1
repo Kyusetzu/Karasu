@@ -1,20 +1,4 @@
-<#
-.SYNOPSIS
-  Renames the freshly-built NSIS installer to include the full 4-part
-  MAJOR.MINOR.PATCH.COMMIT# version instead of just the 3-part semver core
-  Tauri's bundler uses by default.
-
-.PARAMETER Suffix
-  A tag's prerelease part, without the leading dash — "rc1" for `v1.0.0-rc1`.
-
-  The bundler names the installer from `package.json`, which carries only the
-  semver core, so a release-candidate tag and the final release produced
-  byte-identically *named* installers. Someone who downloaded the rc could not
-  tell it apart from the real thing afterwards, and the rolling prune keeps
-  assets by name. The suffix is on the filename only: `latest.json`'s `version`
-  stays clean semver plus build metadata, so nothing has to teach
-  `version_parts` about prerelease markers.
-#>
+<# Renames the NSIS installer to the four-part version; -Suffix adds a tag's prerelease part to the filename only. #>
 
 param(
     [string]$Suffix = ""
@@ -22,9 +6,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-# Two levels: scripts/release/ -> scripts/ -> repo root. Nothing here runs
-# outside CI, so a wrong root surfaces minutes into a release build; check it
-# rather than letting Get-ChildItem report a path nobody recognises.
+# Two levels up is the repo root; check it, or a wrong root surfaces minutes into a release build.
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 if (-not (Test-Path (Join-Path $repoRoot "package.json"))) {
     throw "Repo root resolved to '$repoRoot', which holds no package.json -- did this script move?"
@@ -56,16 +38,14 @@ $newPath = Join-Path $installer.DirectoryName $newName
 if ($installer.FullName -ne $newPath) {
     Rename-Item -Path $installer.FullName -NewName $newName
 
-    # createUpdaterArtifacts produces a sibling `<installer>.sig` -- keep it
-    # matched to the renamed installer if present.
+    # createUpdaterArtifacts produces a sibling `<installer>.sig`; keep it matched to the renamed installer.
     $sigPath = "$($installer.FullName).sig"
     if (Test-Path $sigPath) {
         Rename-Item -Path $sigPath -NewName "$newName.sig"
     }
 }
 
-# The release workflow needs the final name to know which asset to keep when
-# it prunes the rolling release.
+# The release workflow needs the final name to know which asset to keep when it prunes the rolling release.
 if ($env:GITHUB_OUTPUT) {
     "installer=$newName" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 }

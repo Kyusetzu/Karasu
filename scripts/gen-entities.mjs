@@ -1,20 +1,9 @@
 #!/usr/bin/env node
 /**
- * Regenerates `src/lib/htmlEntities.data.ts` from the WHATWG named character
- * reference table — the list every browser decodes, and therefore the list
- * anilist.co renders: AniList leaves entities in its HTML for the browser to
- * resolve, so a bio's `&plus;` reached the screen as `+` on the site and as
- * the seven characters in Karasu, whose hand-picked table did not know it
- * (user 6975140, sampled 2026-09-10 through `about(asHtml: true)`).
+ * Regenerates src/lib/htmlEntities.data.ts from the WHATWG entity table; only `;`-terminated names, as `ENTITY_RE` demands.
  *
  *   node scripts/gen-entities.mjs                 fetches https://html.spec.whatwg.org/entities.json
  *   node scripts/gen-entities.mjs entities.json   reads a downloaded copy
- *
- * Only the `;`-terminated names are kept. The 106 legacy names a browser also
- * accepts bare (`&amp` without the semicolon) are left out on purpose:
- * `ENTITY_RE` in lib/htmlEntities.ts requires the semicolon, so `AT&T` and
- * `a &b` stay the text they are. The table is frozen by the spec, so this is
- * a one-time generator kept for the record rather than a build step.
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -32,9 +21,7 @@ const names = Object.keys(table)
   .map((k) => k.slice(1, -1))
   .sort();
 
-// JSON escaping only where a string literal needs it (`"`, `\`, controls such
-// as `&NewLine;`), so the file shows glyphs and a diff shows what changed.
-// U+2028/2029 would be legal in a literal but invisible in a review.
+// Escape only what a literal needs, so the file shows glyphs; U+2028/2029 would be legal but invisible in a review.
 const literal = (s) =>
   JSON.stringify(s).replaceAll("\u2028", "\\u2028").replaceAll("\u2029", "\\u2029");
 

@@ -17,32 +17,12 @@ export default defineConfig(async () => ({
   },
 
   build: {
-    // Karasu only ever runs in two engines, and neither is "whatever browser
-    // matrix esbuild assumes by default" — so without this it emits downlevel
-    // transforms and polyfills for engines that cannot run the app at all.
-    //
-    // The split is Tauri's own recommendation and it is not symmetric on
-    // purpose: Windows is WebView2, i.e. evergreen Chromium, while Linux is
-    // webkit2gtk-4.1, which lags well behind it. Targeting Chromium on both
-    // would ship syntax WebKitGTK cannot parse, so Linux gets the conservative
-    // Safari target and the platform decides.
+    // Linux's webkit2gtk lags far behind Windows's evergreen WebView2, so it gets the conservative Safari target.
     // @ts-expect-error process is a nodejs global
     target: process.env.TAURI_ENV_PLATFORM === "windows" ? "chrome105" : "safari13",
   },
 
-  /**
-   * Two test projects, split by an explicit `.dom.` in the filename.
-   *
-   * Everything is **node** by default, which is what keeps the suite fast —
-   * seventy-odd files and eight hundred-odd cases in a couple of seconds. Only
-   * `*.dom.test.tsx` boots jsdom and Testing Library.
-   *
-   * The marker is in the name rather than inferred from the extension, because
-   * inferring it is wrong: `components/stats/Charts.test.tsx` renders with
-   * `renderToStaticMarkup` and its own comment says it needs no DOM and no
-   * testing library. An extension rule dragged it into jsdom for nothing. A test
-   * needing a DOM is a deliberate choice, so it says so in its filename.
-   */
+  /** Node by default; only a `.dom.` in the filename boots jsdom, because needing a DOM is a decision, not an inference. */
   test: {
     projects: [
       {
@@ -61,22 +41,16 @@ export default defineConfig(async () => ({
           include: ["src/**/*.dom.test.tsx"],
           environment: "jsdom",
           setupFiles: ["./vitest.setup.ts"],
-          // A jsdom test on a cold CI runner can spend most of vitest's 5 s
-          // default just rendering: run 33788735270 saw a plain `waitFor` in
-          // SyncPanel.dom.test.tsx time out on a runner that reported 47 s of
-          // transforms, on a branch that changed only a workflow file. Twenty
-          // seconds still fails a real hang; it stops failing a slow machine.
+          // A cold CI runner can spend the default timeout just rendering a jsdom test; this still fails a real hang.
           testTimeout: 20_000,
         },
       },
     ],
   },
 
-  // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
-  //
-  // 1. prevent Vite from obscuring rust errors
+  // Tauri dev options: never clear the screen, or Vite obscures the rust errors.
   clearScreen: false,
-  // 2. tauri expects a fixed port, fail if that port is not available
+  // tauri expects a fixed port, fail if that port is not available
   server: {
     port: 1420,
     strictPort: true,
@@ -89,7 +63,7 @@ export default defineConfig(async () => ({
         }
       : undefined,
     watch: {
-      // 3. tell Vite to ignore watching `src-tauri`
+      // tell Vite to ignore watching `src-tauri`
       ignored: ["**/src-tauri/**"],
     },
   },

@@ -1,23 +1,11 @@
 #!/usr/bin/env node
 /**
- * Bumps the version everywhere Karasu keeps one, in a single step.
+ * Bumps the version in all five places Karasu keeps one, by targeted replacement so no manifest is reformatted.
  *
  *   node scripts/bump-version.mjs patch     0.28.9.109 -> 0.28.10.110
  *   node scripts/bump-version.mjs minor     0.28.9.109 -> 0.29.0.110
  *   node scripts/bump-version.mjs major     0.28.9.109 -> 1.0.0.110
  *   node scripts/bump-version.mjs --print   report the version, change nothing
- *
- * The scheme is MAJOR.MINOR.PATCH.COMMIT# (see CLAUDE.md). The semver core
- * lives in three manifests, the commit counter in commands/update.rs, and
- * Cargo.lock
- * carries a copy of the core that cargo would otherwise only fix up on its next
- * run — five edits that used to be made by hand on every single commit.
- *
- * Files are patched by targeted replacement rather than parse-and-stringify:
- * round-tripping package.json through JSON.stringify would reformat a file
- * nobody asked to reformat. Every replacement is asserted to have matched and
- * to have changed something, because the failure that actually hurts is a
- * silent no-op that leaves the manifests disagreeing.
  */
 
 import { execFileSync } from "node:child_process";
@@ -31,8 +19,7 @@ const PACKAGE_JSON = join(ROOT, "package.json");
 const TAURI_CONF = join(ROOT, "src-tauri/tauri.conf.json");
 const CARGO_TOML = join(ROOT, "src-tauri/Cargo.toml");
 const CARGO_LOCK = join(ROOT, "src-tauri/Cargo.lock");
-// The counter sits with the updater, which is the only thing that reads it
-// at runtime — see `version_comparator` there.
+// The counter sits with the updater, whose `version_comparator` is the only runtime reader.
 const COMMANDS_RS = join(ROOT, "src-tauri/src/commands/update.rs");
 
 /** Every path this script writes, for the "did anything else change" guard. */
@@ -57,14 +44,7 @@ function fail(message) {
   process.exit(1);
 }
 
-/**
- * Computes one replacement, refusing to pass off a miss or a no-op as success.
- * Returns the write rather than performing it — see `writeAll` below.
- *
- * `replacement` is a function of the match and its groups, never a string —
- * a string would make `$1` and friends live, which is a trap when the thing
- * being substituted in is arbitrary file content.
- */
+/** Computes one replacement for `writeAll`, refusing a miss or a no-op; `replacement` is a function so `$1` stays inert. */
 function plan(path, pattern, replacement) {
   const before = readFileSync(path, "utf8");
   if (!pattern.test(before)) {
@@ -77,20 +57,7 @@ function plan(path, pattern, replacement) {
   return { path, before, after };
 }
 
-/**
- * Writes every planned change, or none of them.
- *
- * The version lives in five places and they have to agree. Writing each one as
- * soon as it was computed meant a miss in the fourth — Cargo.lock mid-merge, so
- * the anchored `name = "karasu"\nversion =` pattern does not match — left the
- * first three bumped and `COMMIT_NUMBER` behind. Nothing in `npm run verify`
- * compares the five, so that mismatch commits silently, and the release ships a
- * manifest whose commit number repeats the previous one: the exact thing the
- * four-part scheme exists to keep monotonic.
- *
- * Every check now runs before any write, and a write that fails mid-sequence
- * restores what has already been written.
- */
+/** Writes every planned change or none, restoring on a mid-sequence failure so the five files never disagree. */
 function writeAll(writes) {
   const done = [];
   try {
@@ -103,8 +70,7 @@ function writeAll(writes) {
       try {
         writeFileSync(w.path, w.before);
       } catch {
-        // Restoring failed too — say which file is left inconsistent rather
-        // than reporting only the original error.
+        // Restoring failed too: name the file left inconsistent rather than reporting only the original error.
         console.error(`bump-version: could not restore ${relative(ROOT, w.path)}`);
       }
     }
@@ -122,13 +88,7 @@ function readCurrent() {
   return { core: core[1], commit: Number(commit[1]) };
 }
 
-/**
- * Refuses a bump that would stand on its own.
- *
- * A version bump describes an accompanying change; on its own it is always
- * either a mistake or a double-run. Bumping before editing is legitimate but
- * unusual, hence --force rather than a prompt.
- */
+/** Refuses a bump with nothing to describe, since that is a mistake or a double-run; --force covers bumping ahead. */
 function requireAccompanyingChange() {
   let status;
   try {
@@ -162,20 +122,7 @@ if (args.includes("--print")) {
   process.exit(0);
 }
 
-/**
- * Checks that every place the version lives already agrees, and changes
- * nothing.
- *
- * The four-part scheme is spread over five files and only this script ever
- * writes all of them at once — so a hand-edit, a bad merge or an interrupted
- * bump can leave them disagreeing, and nothing said so. That is not cosmetic:
- * `latest.json` is built from `package.json` plus `COMMIT_NUMBER`, while the
- * running app compares against the `COMMIT_NUMBER` compiled into it. If the
- * two ever describe different builds, every install downloads and reinstalls
- * an update it already has, on a loop, and only a new release stops it.
- *
- * Run in CI before a release is published, and cheap enough to run by hand.
- */
+/** Checks that the five version files agree, because a mismatch makes every install reinstall its own update on a loop. */
 if (args.includes("--check")) {
   const problems = [];
   const cargo = readFileSync(CARGO_TOML, "utf8").match(
@@ -227,8 +174,7 @@ const core =
       : `${major}.${minor}.${patchNum + 1}`;
 const commit = current.commit + 1;
 
-// Every replacement is computed and checked first; `writeAll` then writes them
-// all, so a pattern that misses cannot leave the five files disagreeing.
+// Every replacement is checked before `writeAll` writes any, so a missed pattern cannot leave the five files disagreeing.
 writeAll([
   plan(PACKAGE_JSON, JSON_VERSION, () => `"version": "${core}"`),
   plan(TAURI_CONF, JSON_VERSION, () => `"version": "${core}"`),

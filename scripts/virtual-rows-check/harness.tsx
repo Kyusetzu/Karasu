@@ -1,15 +1,9 @@
-// The page `virtual-rows-check.mjs` drives. Two `VirtualRows` in one scroller,
-// which is the arrangement the local library uses and the one nothing else can
-// check: jsdom has no layout, so a unit test there mounts zero rows and every
-// assertion passes vacuously.
+// The page `virtual-rows-check.mjs` drives: two `VirtualRows` in one scroller, the arrangement jsdom cannot lay out.
 import { createRoot } from "react-dom/client";
 import { useRef, useState } from "react";
 import { VirtualRows } from "@/components/list/VirtualRows";
 
-// The rendered height. Each row but the last also carries a 1px border, so
-// the virtualizer's estimate is ROW + 1 — the same off-by-one the local
-// library shipped with (68 against rows that measure 69), which crept the
-// scroll height by a pixel per row scrolled into view; the check asserts it.
+// Every row but the last carries a 1px border, so the estimate is ROW + 1 or the scroll height creeps a pixel per row.
 const ROW = 68;
 const ESTIMATE = ROW + 1;
 const make = (n: number, prefix: string) =>
@@ -17,8 +11,7 @@ const make = (n: number, prefix: string) =>
 
 function App() {
   const scrollRef = useRef<HTMLDivElement>(null);
-  // Held above the rows on purpose: this mirrors the page, where a row that
-  // scrolls out of view is unmounted and would lose state kept inside it.
+  // Held above the rows on purpose: a row that scrolls out of view is unmounted and would lose state kept inside it.
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
   const [tall, setTall] = useState(false);
 

@@ -1,23 +1,4 @@
-<#
-.SYNOPSIS
-  Renames the freshly-built AppImage to include the full 4-part
-  MAJOR.MINOR.PATCH.COMMIT# version instead of just the 3-part semver core
-  Tauri's bundler uses by default.
-
-.DESCRIPTION
-  The Linux counterpart to rename-installer.ps1, and deliberately its near
-  twin: same repo-root guard, same COMMIT_NUMBER source, same substitution. The
-  two producing differently-shaped names is exactly the kind of drift that only
-  shows up when a release is half-published.
-
-  PowerShell on a Linux runner is not a mistake — pwsh is preinstalled on
-  GitHub's Ubuntu images, and keeping scripts/release/ one toolchain is worth
-  more than avoiding it.
-
-.PARAMETER Suffix
-  A tag's prerelease part, without the leading dash. See rename-installer.ps1,
-  whose reasoning this shares.
-#>
+<# Renames the AppImage to the four-part version; a near twin of rename-installer.ps1 so the two names cannot drift. #>
 
 param(
     [string]$Suffix = ""
@@ -54,28 +35,17 @@ if ($Suffix) { $fullVersion = "$fullVersion-$Suffix" }
 $newName = $appimage.Name -replace [regex]::Escape($packageVersion), $fullVersion
 
 if ($appimage.Name -ne $newName) {
-    # Every sibling that starts with the original name, not just "<name>.sig":
-    # the updater artifact's exact shape depends on createUpdaterArtifacts, and
-    # a prefix match catches `.sig` and a `.tar.gz` pair alike rather than
-    # silently leaving one behind under the old version.
+    # Every sibling with the original name as prefix, so `.sig` and a `.tar.gz` pair alike follow the rename.
     $siblings = Get-ChildItem -Path $bundleDir -Filter "$($appimage.Name)*" |
         Where-Object { $_.Name -ne $appimage.Name }
 
     Rename-Item -Path $appimage.FullName -NewName $newName
     foreach ($s in $siblings) {
-        # `$tail`, not `$suffix`: PowerShell variable names are case-insensitive,
-        # so a local `$suffix` here *is* the `$Suffix` parameter and the first
-        # sibling would overwrite it for every rename after it.
+        # `$tail`, not `$suffix`: names are case-insensitive, so a local `$suffix` would clobber the `$Suffix` parameter.
         $tail = $s.Name.Substring($appimage.Name.Length)
         Rename-Item -Path $s.FullName -NewName "$newName$tail"
     }
 }
 
-# Deliberately no GITHUB_OUTPUT here, unlike rename-installer.ps1. This used to
-# write one under a comment claiming the workflow needed it, but the step that
-# runs this script has no `id:`, so no `steps.<id>.outputs.appimage` could ever
-# have referenced it — and the prune step reads the name out of the downloaded
-# folder instead, precisely to avoid plumbing an output across jobs. A dead
-# output is bad enough; one with a comment asserting it is load-bearing invites
-# someone to wire it up to an expression that silently resolves to "".
+# No GITHUB_OUTPUT on purpose: the prune step reads the name from the downloaded folder, not from an output across jobs.
 Write-Output (Join-Path $bundleDir $newName)

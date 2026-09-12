@@ -1,20 +1,7 @@
 #!/usr/bin/env node
-// Checks `VirtualRows` in a real browser, because nothing else can.
+// Checks `VirtualRows` in a real Chromium, since jsdom has no layout and a unit test there passes vacuously.
 //
-// jsdom has no layout: every rect is zero, so the virtualizer's window is
-// degenerate and it mounts *no* rows at all. Measured, not assumed — a unit
-// test there passes every assertion vacuously, which reads as coverage and
-// is worse than having none. Everything this component does is geometry, so
-// the check is a real Chromium with a real scroll container.
-//
-// Not part of `npm run verify`: it needs a browser and a dev server, the same
-// reason android-check.ps1 and windows-check.sh sit outside the gate.
-//
-// Usage: node scripts/virtual-rows-check.mjs
-// Requires: playwright (npm i --no-save --no-audit --no-fund playwright, then
-// `git checkout -- package-lock.json` to undo npm's rewrite of the root
-// version, which bump-version.mjs does not maintain) and a Chromium-family
-// browser: $CHROMIUM_PATH, else Edge on Windows, else /opt/pw-browsers/chromium.
+//   node scripts/virtual-rows-check.mjs    needs playwright (npm i --no-save playwright, then restore package-lock.json)
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -38,10 +25,7 @@ const check = (name, ok, detail = "") => {
   if (!ok) failures.push(name);
 };
 
-// Node's own binary and Vite's entry script, not `npx`: on Windows the shim is
-// `npx.cmd`, which `spawn` cannot find without a shell (ENOENT, and with no
-// error listener that was an uncaught exception), and a shell would make the
-// `vite.kill()` below stop the shell and orphan the server on 5199.
+// Not `npx`: spawn cannot find `npx.cmd` without a shell, and a shell would make `vite.kill()` orphan the server.
 let stopping = false;
 const vite = spawn(
   process.execPath,
@@ -56,8 +40,7 @@ vite.on("error", (e) => {
   console.error(`virtual-rows-check: could not start vite: ${e.message}`);
   process.exit(1);
 });
-// `stdio: "ignore"` hides a Vite that started and then died (port taken, bad
-// config), so its exit has to be watched too.
+// `stdio: "ignore"` hides a Vite that started and then died, so its exit has to be watched too.
 vite.on("exit", (code) => {
   if (!stopping && code) {
     console.error(`virtual-rows-check: vite exited with ${code}`);
@@ -117,11 +100,7 @@ const [a0, a1, a2] = [await rect("a0"), await rect("a1"), await rect("a2")];
 check("rows tile without gap or overlap", a1.top === a0.bottom && a2.top === a1.bottom,
   `${a0.bottom}/${a1.top}/${a1.bottom}/${a2.top}`);
 
-// The estimate has to match the rows' real height, or every row scrolled into
-// view replaces the estimate with a measurement one pixel larger and the
-// scrollbar creeps — the local library shipped exactly that (68 against rows
-// that measure 69). No last row is mounted at either point, so the only thing
-// that can move the height between them is the estimate being wrong.
+// The estimate has to match the real row height, or every row scrolled into view creeps the scroll height by a pixel.
 const heightAtRest = await page.$eval("#scroller", (s) => s.scrollHeight);
 await scrollTo(20000);
 const scrolled = await mounted();
@@ -131,8 +110,7 @@ const heightScrolled = await page.$eval("#scroller", (s) => s.scrollHeight);
 check("the scroll height does not creep as rows are measured",
   heightScrolled === heightAtRest, `${heightAtRest} -> ${heightScrolled}`);
 
-// The reason each instance measures its own `scrollMargin`: two lists share
-// one scroller, and the second must start below the first, not on top of it.
+// Each instance measures its own `scrollMargin` so the second list starts below the first, not on top of it.
 await scrollTo(33900);
 const [endOfA, startOfB] = [await offset("a499"), await offset("b0")];
 check("the second list starts after the first",
@@ -162,9 +140,7 @@ check("an expanded row is unmounted when scrolled away", !away);
 check("and is still expanded when it comes back", returned.h === expanded.h,
   `${returned.h} vs ${expanded.h}`);
 
-// Nothing re-renders VirtualRows when a *sibling* above changes height, so
-// only the ResizeObserver can catch it. This is the case that silently
-// desyncs without one.
+// Nothing re-renders VirtualRows when a sibling above changes height, so only the ResizeObserver can catch it.
 const before = await offset("a0");
 await page.click("#grow");
 await page.waitForTimeout(400);

@@ -1,29 +1,4 @@
-<#
-.SYNOPSIS
-  Renames a freshly-built release APK to carry the full 4-part
-  MAJOR.MINOR.PATCH.COMMIT# version and its flavor.
-
-.DESCRIPTION
-  The Android counterpart to rename-installer.ps1 and rename-appimage.ps1,
-  and deliberately their near twin: same repo-root guard, same COMMIT_NUMBER
-  source. The Gradle output is `app-<flavor>-release.apk` with no version at
-  all, so unlike the other two this is a wholesale rename rather than a
-  substitution: `Karasu_<version>_<flavor>.apk`.
-
-  Deliberately no `.sig` handling and no GITHUB_OUTPUT: Android has no
-  updater (updater_available() answers false on mobile, and the manifest
-  generator never learns about Android), and the workflow reads names out of
-  the collected folder rather than plumbing outputs across jobs — the same
-  reasoning rename-appimage.ps1 records.
-
-.PARAMETER Flavor
-  Which Gradle flavor's release output to rename: "universal" (every ABI in
-  one APK) or "arm64" (the one almost every phone needs).
-
-.PARAMETER Suffix
-  A tag's prerelease part, without the leading dash. See rename-installer.ps1,
-  whose reasoning this shares.
-#>
+<# Renames the Gradle APK to `Karasu_<version>_<flavor>.apk`; no .sig and no GITHUB_OUTPUT, as Android has no updater. #>
 
 param(
     [ValidateSet("universal", "arm64", "arm", "x86", "x86_64")]

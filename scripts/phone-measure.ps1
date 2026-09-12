@@ -1,35 +1,9 @@
-# Reads the phone's side of the Jellyfin background-tracking story over adb —
-# the measurement the plan for the foreground service asks for.
+# Reads the phone's side of Jellyfin background tracking over adb; the Rust log never reaches logcat, hence -Diagnostics.
 #
 #   scripts\phone-measure.ps1                       service, standby bucket, Doze state, the job, Kotlin logcat
 #   scripts\phone-measure.ps1 -Diagnostics x.md     ...plus polls per hour, from an exported diagnostics file
 #   scripts\phone-measure.ps1 -Idle                 "unplug" the charger and force Doze (the negative run)
 #   scripts\phone-measure.ps1 -Reset                undo -Idle
-#
-# Karasu's Rust log never reaches logcat on Android (logging.rs writes the
-# file and the in-memory ring, nothing else), and a release APK is not
-# debuggable, so `run-as` cannot read the file either. The poll count
-# therefore comes from the About page -> Diagnostics -> "Save report…",
-# which appends the in-memory log ring (the last 1000 lines): save it to
-# Downloads, `adb pull /sdcard/Download/karasu-diagnostics-<version>.md`,
-# and pass the file with -Diagnostics. The "N polls in the last 5 min"
-# lines it counts exist only with verbose logging on (Settings ->
-# Advanced), and the first one appears five minutes after the app started.
-#
-# What the numbers mean: the detection loop ticks every 5 s on screen and
-# every 15 s with the screen off, so 720/h is "on screen", 240/h is "screen
-# off but alive", and a stretch with no lines at all is the process frozen —
-# the thing the tracking service exists to prevent. The standby bucket is
-# what stretches the notification job: 10 active, 20 working set, 30
-# frequent, 40 rare, 45 restricted, 5 exempted (the battery exemption).
-#
-# The service record is not the process. A ROM can freeze a process that
-# holds a foreground service (measured on a nubia NX809J, REDMAGIC OS 11:
-# `isForeground=true` on the service, `isFrozen=true` on the process,
-# `am_freeze` 37 s after the screen lock, at OOM adj 200 where AOSP would
-# never freeze). The "frozen" line and the events section below are the
-# first thing to read; the cure on that ROM is the app's system settings ->
-# "Runs in background" -> "Allowed", not anything Karasu can request.
 param(
   [string]$Package = "dev.kyu.karasu",
   [string]$Diagnostics = "",
@@ -75,8 +49,7 @@ adb shell dumpsys deviceidle get deep
 adb shell dumpsys deviceidle get light
 
 Section "notification job (46231)"
-# The job's own entry, not the package's first mention: the dump opens with
-# a scheduling history that names every package long before the JOB lines.
+# The job's own entry, not the package's first mention: the dump opens with a scheduling history naming every package.
 $job = adb shell dumpsys jobscheduler | Select-String -Pattern "JOB #.*$Package/\.NotifJobService" -Context 0,25 | Select-Object -First 1
 if ($job) { $job } else { "not registered - the check interval is off (Settings -> AniList -> Notifications), or the app has not started since it was set" }
 

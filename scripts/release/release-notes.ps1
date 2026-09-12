@@ -1,41 +1,11 @@
-<#
-.SYNOPSIS
-  Writes the body of a GitHub release to a file, for `body_path:`.
-
-  Two shapes. A rolling build gets the same paragraph it has always had. A
-  tagged release gets its own section sliced out of CHANGELOG.md, followed by
-  the same download-and-verify boilerplate — the part that tells Windows users
-  why SmartScreen warns and Linux users which library the AppImage does not
-  bundle, which is true of every release regardless of what changed in it.
-
-  A FILE, not a workflow expression. `${{ }}` inside a YAML block scalar is
-  textual substitution before anything parses it, and CHANGELOG markdown is
-  full of backticks, dollars and quotes — in a job that holds the signing key.
-  release.yml's prune step already documents that class of bug for a single
-  filename; this is strictly worse input.
-
-.PARAMETER Version
-  The semver core the CHANGELOG heading is expected to carry ("1.0.0"). Empty
-  for a rolling build.
-
-.PARAMETER Sha
-  The commit, quoted in the rolling body.
-
-.PARAMETER VirusTotal
-  The scan link, or empty.
-
-.PARAMETER OutFile
-  Where to write. Defaults to notes.md in the working directory.
-#>
+<# Writes the release body to a file for `body_path:`; CHANGELOG markdown must never pass through a `${{ }}` expression. #>
 
 param(
     [string]$Version = "",
     [string]$Sha = "",
     [string]$VirusTotal = "",
     [string]$OutFile = "notes.md",
-    # Set when this release actually carries APKs -- the workflow passes it
-    # after looking in the downloaded artifact folder. A static paragraph
-    # would describe assets that are absent until the signing secrets exist.
+    # Set only when this release actually carries APKs, so the body never describes assets that are absent.
     [switch]$Android
 )
 
@@ -72,8 +42,7 @@ Both are signed with the project key, so installing over a previous release
 keeps your data. The built-in updater covers desktop only -- on Android a new
 version is installed the same way, over the top.
 "@
-    # Before the updater paragraph, so the desktop-only caveat lands right
-    # above the sentence describing the updater.
+    # Before the updater paragraph, so the desktop-only caveat lands right above the sentence describing the updater.
     $marker = "Karasu's built-in updater"
     $idx = $boilerplate.IndexOf($marker)
     $boilerplate = $boilerplate.Substring(0, $idx) + $androidPara + "`n`n" + $boilerplate.Substring($idx)
@@ -87,8 +56,7 @@ else {
     if (-not (Test-Path $changelog)) {
         throw "No CHANGELOG.md at $changelog"
     }
-    # Slice `## <version>` up to the next `## `. The heading may carry a trailing
-    # ` - <date>' or similar; anything after the version is ignored.
+    # Slice `## <version>` up to the next `## `; anything after the version on the heading is ignored.
     $lines = Get-Content $changelog
     $start = -1
     for ($i = 0; $i -lt $lines.Count; $i++) {
@@ -104,12 +72,7 @@ else {
     for ($i = $start; $i -lt $lines.Count; $i++) {
         if ($lines[$i] -match "^##\s") { $end = $i; break }
     }
-    # The bounds check comes BEFORE the slice, because PowerShell's `..` range
-    # silently *reverses* when the end is below the start: for an empty section
-    # (`## 1.0.0` immediately followed by the next heading) `$start` equals
-    # `$end`, and `$lines[5..4]` returns lines 5 and 4 in reverse rather than
-    # nothing. The emptiness guard below could then never fire, and the release
-    # body would have been the two headings backwards.
+    # The bounds check comes BEFORE the slice: PowerShell's `..` range silently reverses when the end is below the start.
     if ($start -ge $end) {
         throw "The '## $Version' section in CHANGELOG.md is empty."
     }
@@ -126,9 +89,7 @@ if (-not [string]::IsNullOrWhiteSpace($VirusTotal)) {
 }
 $body = "$body`n`n---`n`n$boilerplate`n"
 
-# LF and no BOM, for the same reason SHA256SUMS.txt is written this way: this
-# runs on windows-latest and the output is read by something that is not
-# Windows.
+# LF and no BOM: this runs on windows-latest and the output is read by something that is not Windows.
 [IO.File]::WriteAllText(
     (Join-Path $PWD $OutFile),
     ($body -replace "`r`n", "`n"),

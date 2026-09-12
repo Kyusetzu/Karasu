@@ -1,14 +1,7 @@
 <!doctype html>
 <html>
   <head>
-    <!--
-      Only the utilities VirtualRows itself relies on. The harness deliberately
-      does not load the app's Tailwind build, and these have to be here rather
-      than assumed: without `.absolute` the rows sit in normal flow *and* take
-      their transform, which spaces them at exactly twice their height and
-      reads as a virtualizer bug. That is the one failure this harness has
-      actually produced, and it was the harness's fault.
-    -->
+    <!-- Only what VirtualRows needs: without `.absolute` the rows double-space and look like a virtualizer bug. -->
     <style>
       .relative { position: relative }
       .absolute { position: absolute }

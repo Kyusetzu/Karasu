@@ -1,20 +1,7 @@
 #!/usr/bin/env bash
-# Type-check the Windows-only detection code from a machine that is not Windows.
+# Type-checks the Windows-only audio module from Linux in a throwaway crate; aws-lc-sys rules out a whole-crate check.
 #
-# The counterpart to scripts/android-check.ps1, and the same reason: `npm run
-# verify` compiles for the host, so every `#[cfg(windows)]` block in the tree
-# is invisible to it. CI has a Windows job, but finding a typo there costs a
-# round trip of ten minutes.
-#
-# A whole-crate `cargo check --target x86_64-pc-windows-msvc` is not available
-# here and will not become available: rustls pulls `aws-lc-sys`, whose build
-# script compiles C against the MSVC headers, and those are not redistributable
-# to a Linux box. So this uses the throwaway-crate technique CLAUDE.md already
-# documents for the mirror-image problem (Linux-only code on a Windows dev
-# machine): copy the module, stub what it reaches for, check that.
-#
-# Usage: scripts/windows-check.sh
-# Requires: rustup target add x86_64-pc-windows-msvc
+#   scripts/windows-check.sh                    first: rustup target add x86_64-pc-windows-msvc
 set -euo pipefail
 
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -26,10 +13,7 @@ if ! rustup target list --installed | grep -qx x86_64-pc-windows-msvc; then
     exit 1
 fi
 
-# The `windows` feature list is duplicated from src-tauri/Cargo.toml rather
-# than parsed out of it. A drift here shows up as a missing-method error naming
-# the feature, which is a clearer failure than anything a fragile TOML scrape
-# would produce.
+# The feature list is copied from src-tauri/Cargo.toml; a drift shows as a missing-method error naming the feature.
 mkdir -p "$work/src/detection"
 cat > "$work/Cargo.toml" <<'EOF'
 [package]

@@ -1,30 +1,11 @@
 #!/usr/bin/env node
 /**
- * Runs one of the app's own GraphQL queries against the live AniList API.
+ * Runs one of the app's own GraphQL queries against the live AniList API, read off disk so it checks the query the app ships.
  *
  *   node scripts/anilist-query.mjs DETAIL_QUERY '{"id":16498}'
  *   node scripts/anilist-query.mjs LIST_QUERY '{"userId":153164,"type":"ANIME"}'
  *   node scripts/anilist-query.mjs USER_STATS_QUERY '{"id":153164}' --show-query
  *   node scripts/anilist-query.mjs DETAIL_QUERY '{"id":16498}' --raw | jq .
- *
- * CLAUDE.md requires validating queries against the live schema before wiring
- * new fields, because the schema is the source of truth. That used to mean
- * hand-rolling an extract-interpolate-POST script each time, which is both slow
- * and wrong in an interesting way: a retyped query proves nothing about the one
- * the app ships. This reads the constant off disk instead.
- *
- * Handles the three literal forms in the tree — TS template literals, TS
- * double-quoted strings and Rust `const NAME: &str` — and resolves `${OTHER}`
- * interpolations from the same file (USER_STATS_QUERY pulls in STAT_ROW,
- * DETAIL_QUERY pulls in MEDIA_FIELDS).
- *
- * Unauthenticated, so it cannot see private data: a user's `voiceActors` and
- * `staff` statistics come back as empty arrays. That is a permissions artefact,
- * not a schema problem — judge validity by the absence of `errors`.
- *
- * Public ids that work for smoke tests: user 153164, media 16498, staff 95269.
- * User 153164 is a stranger's public account, chosen for that; the
- * maintainer's own is 6421433 — do not read one expecting the other.
  */
 
 import { readFileSync, readdirSync } from "node:fs";
@@ -40,8 +21,7 @@ function sourceFiles() {
   const api = readdirSync(apiDir)
     .filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts"))
     .map((f) => join(apiDir, f));
-  // The Rust queries used to share one commands.rs; read the whole module so
-  // LIST_QUERY and friends stay reachable wherever they end up living.
+  // Read the whole commands module so LIST_QUERY and friends stay reachable wherever they end up living.
   const cmdDir = join(ROOT, "src-tauri/src/commands");
   const rust = readdirSync(cmdDir)
     .filter((f) => f.endsWith(".rs"))
@@ -49,13 +29,7 @@ function sourceFiles() {
   return [...api, ...rust];
 }
 
-/**
- * Finds `const NAME = <literal>` in one source, for TS and Rust alike.
- *
- * The optional `: &str` covers Rust; the literal is either backtick-delimited
- * (TS template) or double-quoted (TS string and Rust). Escaped quotes are
- * allowed for so a `\"` inside a Rust literal cannot end the match early.
- */
+/** Finds `const NAME = <literal>` in one source, TS template, TS string or Rust `&str` alike, honouring escaped quotes. */
 function findConstant(source, name) {
   const backtick = new RegExp(`const ${name}\\s*(?::[^=]+)?=\\s*\`([^\`]*)\``);
   const quoted = new RegExp(
@@ -162,11 +136,7 @@ if (parsed.errors) {
 }
 
 if (!flags.has("--raw")) {
-  // The byte count is the point: it is what makes a field's cost, or a
-  // compression change, an observation rather than an assumption.
-  // `relative`, not a hard-coded backslash: paths here are built with `join`,
-  // so on Linux they use `/` and the old strip silently did nothing — printing
-  // the absolute checkout path into output that gets pasted into issues.
+  // The byte count makes a field's cost an observation; `relative` keeps the absolute checkout path out of pasted output.
   console.log(`${name} from ${relative(ROOT, found.file)}`);
   console.log(`  HTTP ${response.status}, ${body.length} bytes`);
   console.log(`  data: ${Object.keys(parsed.data ?? {}).join(", ") || "none"}`);

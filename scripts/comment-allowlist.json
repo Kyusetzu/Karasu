@@ -8,5 +8,50 @@
     "file": "scripts/comment-strip-check.mjs",
     "startsWith": "Proves a change touched only comments",
     "reason": "usage block: one invocation per line"
+  },
+  {
+    "file": "scripts/anilist-query.mjs",
+    "startsWith": "Runs one of the app's own GraphQL queries",
+    "reason": "usage block: one invocation per line"
+  },
+  {
+    "file": "scripts/bump-version.mjs",
+    "startsWith": "Bumps the version in all five places",
+    "reason": "usage block: one invocation per line"
+  },
+  {
+    "file": "scripts/windows-check.sh",
+    "startsWith": "Type-checks the Windows-only audio module",
+    "reason": "usage block: one invocation per line"
+  },
+  {
+    "file": "scripts/changelog.mjs",
+    "startsWith": "Appends the commits since the marker",
+    "reason": "usage block: one invocation per line"
+  },
+  {
+    "file": "scripts/gen-entities.mjs",
+    "startsWith": "Regenerates src/lib/htmlEntities.data.ts",
+    "reason": "usage block: one invocation per line"
+  },
+  {
+    "file": "scripts/ratelimit-probe.mjs",
+    "startsWith": "Re-measures whether AniList's rate window",
+    "reason": "usage block: one invocation per line"
+  },
+  {
+    "file": "scripts/sample-markdown.mjs",
+    "startsWith": "Samples real AniList markdown beside",
+    "reason": "usage block: one invocation per line"
+  },
+  {
+    "file": "scripts/virtual-rows-check.mjs",
+    "startsWith": "Checks `VirtualRows` in a real Chromium",
+    "reason": "usage block: one invocation per line"
+  },
+  {
+    "file": "scripts/phone-measure.ps1",
+    "startsWith": "Reads the phone's side of Jellyfin",
+    "reason": "usage block: one invocation per line"
   }
 ]

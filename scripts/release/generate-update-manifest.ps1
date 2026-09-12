@@ -1,25 +1,4 @@
-<#
-.SYNOPSIS
-  Builds latest.json, the manifest the in-app updater (tauri-plugin-updater)
-  fetches to learn about new releases. Must run after rename-installer.ps1,
-  since it needs the installer's final (4-part-versioned) filename.
-
-.PARAMETER Tag
-  The release tag the assets will live under. Defaults to the rolling `latest`,
-  which reproduces this script's original output byte for byte.
-
-  This is the single most important parameter here, and it exists because of a
-  failure that would have been invisible until it bit. The download URL used to
-  be hardcoded to `releases/download/latest/`. Publish a stable release with
-  that and its manifest points at an installer on the *rolling* tag — which the
-  prune step at the end of release.yml deletes on the very next push to main.
-  The release page still looks perfect; only the updater breaks, and only after
-  an unrelated commit.
-
-.PARAMETER Notes
-  The `notes` field. Carried through to `DownloadedUpdate.notes` and currently
-  rendered nowhere, so this is for the manifest's own readability.
-#>
+<# Builds latest.json for the updater; -Tag must name the release the assets live under, or the rolling prune orphans it. #>
 
 param(
     [string]$Tag = "latest",
@@ -28,9 +7,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-# Two levels: scripts/release/ -> scripts/ -> repo root. Nothing here runs
-# outside CI, so a wrong root surfaces minutes into a release build; check it
-# rather than letting Get-ChildItem report a path nobody recognises.
+# Two levels up is the repo root; check it, or a wrong root surfaces minutes into a release build.
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 if (-not (Test-Path (Join-Path $repoRoot "package.json"))) {
     throw "Repo root resolved to '$repoRoot', which holds no package.json -- did this script move?"
@@ -58,18 +35,10 @@ if (-not $commitMatch) {
 }
 $commitNumber = $commitMatch.Matches[0].Groups[1].Value
 $packageVersion = (Get-Content $packageJson -Raw | ConvertFrom-Json).version
-# The commit number is attached as semver *build metadata* ("0.23.2+90"), not as
-# a fourth dotted segment. tauri-plugin-updater parses this field with
-# semver::Version::from_str, which rejects "0.23.2.90" outright -- the manifest
-# then fails to deserialize and every install dies with
-# "unexpected character '.' after patch version number".
-# Build metadata is ignored by semver precedence, so update.rs pairs this with
-# an explicit version_comparator to keep commit-only bumps detectable.
+# Semver build metadata, never a fourth dotted segment: the updater's semver parser rejects that and every install dies.
 $fullVersion = "$packageVersion+$commitNumber"
 
-# The tag the assets are published under -- release.yml passes whichever it is
-# about to publish to, so a stable release's manifest points at the stable
-# release's own assets and never into the rolling tag the prune step empties.
+# The tag the assets are published under, so a stable manifest never points into the rolling tag the prune step empties.
 $downloadUrl = "https://github.com/Kyusetzu/Karasu/releases/download/$Tag/$($installer.Name)"
 $pubDate = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
 
@@ -80,13 +49,7 @@ $platforms = [ordered]@{
     }
 }
 
-# The Linux leg is optional on purpose. Its build job is a soft dependency, so
-# a broken AppImage must not hold back a working Windows release — the manifest
-# simply describes what actually exists. `linux-x86_64` is
-# tauri-plugin-updater's own target key ({os}-{arch}); a client looks up only
-# its own key and errors only when *that* one is missing, so adding this cannot
-# affect Windows. The `version` field is shared, which is correct: same commit,
-# same version, two artifacts.
+# The Linux leg is optional: a broken AppImage must not hold back a Windows release, and a client reads only its own key.
 $linuxDir = Join-Path $repoRoot "linux-artifacts"
 $appimage = Get-ChildItem -Path $linuxDir -Filter "*.AppImage" -ErrorAction SilentlyContinue |
     Sort-Object LastWriteTime -Descending |
@@ -100,14 +63,7 @@ if ($appimage) {
         }
     }
     else {
-        # A warning, not a `throw`. Throwing here ran under
-        # $ErrorActionPreference = "Stop" inside the *Windows* publish job, so an
-        # unsigned AppImage failed the step and skipped everything after it:
-        # no checksums, no latest.json, and no installer published at all. That
-        # is precisely the coupling the soft dependency exists to prevent — a
-        # Linux packaging hiccup would have stalled auto-updates for every
-        # Windows user. Omitting the key leaves the manifest describing what
-        # actually exists, which is what it is for.
+        # A warning, not a throw: throwing here failed the Windows publish step and stalled auto-updates for every Windows user.
         Write-Host "::warning::AppImage $($appimage.Name) has no signature; publishing without a Linux updater entry."
     }
 }

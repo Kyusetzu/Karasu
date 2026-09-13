@@ -1,7 +1,7 @@
 {
   "name": "karasu",
   "private": true,
-  "version": "1.5.23",
+  "version": "1.5.24",
   "type": "module",
   "author": "Kyu",
   "license": "MIT",
@@ -9,7 +9,7 @@
     "dev": "vite",
     "build": "vite build",
     "typecheck": "tsc --noEmit",
-    "verify": "npm run typecheck && npm test && cargo test --manifest-path src-tauri/Cargo.toml",
+    "verify": "npm run typecheck && node scripts/comment-audit.mjs --check && npm test && cargo test --manifest-path src-tauri/Cargo.toml",
     "bump": "node scripts/bump-version.mjs",
     "preview": "vite preview",
     "test": "vitest run",

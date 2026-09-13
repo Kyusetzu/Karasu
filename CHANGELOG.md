@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 81af314 -->
+<!-- generated-through: 3fd36b6 -->
 
 ### Fixed
 
@@ -78,6 +78,7 @@ tag time is then optional rather than load-bearing.
 - A link with a target Karasu refuses (javascript:, data:, AniList's layout blob) now shows in the accent colour like on anilist.co, instead of as plain text.
 - A pinch on Android no longer zooms the whole screen; the interface size under Appearance is the one zoom.
 - The sidebar collapses to icons on a short window instead of pushing its lower entries out of view.
+- Restarting Karasu right after it spent its AniList budget no longer fires a burst of requests into the limit.
 
 ### Added
 
@@ -88,10 +89,13 @@ tag time is then optional rather than load-bearing.
 - An "Interface size" setting under Appearance zooms the whole window (75–200 %), for 4K displays and TVs across the room.
 - Ctrl+plus, Ctrl+minus and Ctrl+0 change the interface size, like in a browser, and the size sticks.
 - The calendar has three views (week grid, tiles, agenda) and never scrolls sideways; "My shows" keeps the episodes that already aired, dimmed; a Density setting under Appearance sizes the calendar, the local library and the digests.
+- The sync panel and the diagnostics report show AniList requests per source since the app started.
+- Detail, seasonal, franchise and similar pages are cached on disk with a per-page lifetime, so reopening one after a restart usually costs no request.
 
 ### Changed
 
 - The Android battery hint says which vendor setting keeps tracking alive with the screen off (nubia/ZTE: "Runs in background" → "Allowed").
+- Your list is read from the local copy for fifteen minutes after a fetch and refreshed quietly in the background after that; "Sync now" still fetches at once.
 ## 1.0.0 — 2026-09-05
 
 Karasu 1.0.0 is the first tagged release: a desktop and Android tracker built

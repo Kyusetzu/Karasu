@@ -1,25 +1,4 @@
-/**
- * Which AniList URLs this app can answer itself.
- *
- * A link in a bio or a comment that points at `anilist.co/user/hori` used to
- * open the browser, sign-in state and all, for a page Karasu draws natively.
- * `internalRoute` is the one mapping from AniList's URL space onto the app's
- * routes; `RichText`'s link case consults it, which covers bios, comments,
- * thread bodies, activities and autolinks in a single place.
- *
- * What deliberately maps to `null`, and therefore stays external:
- *
- * - **Forum category and search pages** (`/forum/overview`,
- *   `/forum/recent?category=…`) — Karasu's forum index is deliberately not a
- *   browsable mirror of the website's.
- * - **Settings, reviews, everything else** — a link should never land
- *   somewhere less capable than the page it named.
- * - **Every other host.** This is a router, not an opener; the caller keeps
- *   its external path for whatever this refuses.
- *
- * The user route is by *name* on purpose — that is what AniList's own URLs
- * carry (`App.tsx` documents the same decision for `@mention`s).
- */
+/** The one mapping from AniList's URL space onto app routes; anything Karasu draws less capably stays external. */
 
 /** `anilist.co` and `www.anilist.co`, http or https, nothing else. */
 const HOST = /^https?:\/\/(?:www\.)?anilist\.co\//i;
@@ -27,9 +6,7 @@ const HOST = /^https?:\/\/(?:www\.)?anilist\.co\//i;
 const RULES: [RegExp, (m: RegExpExecArray) => string][] = [
   // The slug after the id is decorative and optional, on every media URL.
   [/^(?:anime|manga)\/(\d+)(?:\/|$)/i, (m) => `/media/${m[1]}`],
-  // A comment permalink carries its comment: the thread page resolves the id
-  // through the uncapped tree field and highlights the row. Before the plain
-  // thread rule, or the shorter pattern would eat it.
+  // A comment permalink carries its comment; keep it before the plain thread rule, or the shorter pattern eats it.
   [
     /^forum\/thread\/(\d+)\/comment\/(\d+)(?:\/|$)/i,
     (m) => `/thread/${m[1]}?comment=${m[2]}`,
@@ -43,13 +20,7 @@ const RULES: [RegExp, (m: RegExpExecArray) => string][] = [
   [/^studio\/(\d+)(?:\/|$)/i, (m) => `/studio/${m[1]}`],
 ];
 
-/**
- * The internal route for an AniList URL, or `null` for "open it externally".
- *
- * Query strings and fragments are stripped before matching: AniList tacks
- * `?ref=` style parameters onto shared links, and none of the mapped pages
- * read them.
- */
+/** The internal route for an AniList URL, or `null` to open it externally; query and fragment are stripped first. */
 export function internalRoute(href: string): string | null {
   if (!HOST.test(href)) return null;
   const path = href.replace(HOST, "").replace(/[?#].*$/, "");

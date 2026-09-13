@@ -2,20 +2,9 @@ import type { FuzzyDate, MediaListEntry, MediaType } from "@/api/types";
 import { displayTitle } from "@/api/types";
 import { toRaw, type ScoreFormat } from "@/lib/scoreFormat";
 
-/**
- * The MyAnimeList XML export — the lingua franca of tracker migration.
- *
- * Pure on purpose: the shape of the file is all decisions (status names,
- * date spelling, score scale, what to do with a title MAL has never heard
- * of), and every one of them is testable without a click. The section is
- * keyed on `idMal`, so an AniList-only title cannot appear in the file at
- * all — it is *counted* instead, because a silently shorter export reads
- * as a complete one.
- */
+/** The MyAnimeList XML export; a title with no `idMal` cannot appear, so it is counted rather than silently dropped. */
 
-/** MAL's status vocabulary. REPEATING maps to the active status — MAL keeps
-    rewatching as a flag, not a state, and an importer that sees an unknown
-    status drops the entry entirely. */
+/** MAL's status vocabulary; REPEATING maps to the active status, since an unknown status drops the entry on import. */
 function malStatus(status: string, type: MediaType): string {
   switch (status) {
     case "CURRENT":
@@ -34,8 +23,7 @@ function malStatus(status: string, type: MediaType): string {
   }
 }
 
-/** MAL has no partial dates: anything short of year+month+day exports as
-    the format's own null, `0000-00-00`, rather than a guessed day. */
+/** MAL has no partial dates, so anything short of a full date exports as its own null rather than a guessed day. */
 export function malDate(date: FuzzyDate | null | undefined): string {
   if (!date || date.year == null || date.month == null || date.day == null) {
     return "0000-00-00";
@@ -45,8 +33,7 @@ export function malDate(date: FuzzyDate | null | undefined): string {
   return `${date.year}-${mm}-${dd}`;
 }
 
-/** CDATA can hold anything except its own terminator; a title containing
-    `]]>` is split across two sections at the offending spot. */
+/** CDATA can hold anything except its own terminator, so a title containing `]]>` is split across two sections. */
 export function cdata(text: string): string {
   return `<![CDATA[${text.split("]]>").join("]]]]><![CDATA[>")}]]>`;
 }
@@ -71,10 +58,7 @@ export function buildMalXml(
   let omitted = 0;
 
   for (const e of entries) {
-    // This file is the one export that hands the list to someone else, so it
-    // is the one where "private" has to mean something. The JSON export
-    // deliberately keeps private entries and carries the flag with them — it is
-    // a backup, and a backup that silently drops rows is not one.
+    // This export hands the list to someone else, so "private" means left out here; the JSON backup keeps the row.
     if (e.private) {
       omitted += 1;
       continue;
@@ -84,9 +68,7 @@ export function buildMalXml(
       skipped += 1;
       continue;
     }
-    // MAL scores are whole numbers out of ten; the raw 0–100 scale is the
-    // one place every AniList format converges, so the division is exact
-    // for ten-point accounts and honest rounding for the rest.
+    // MAL scores are whole numbers out of ten, and the raw scale is where every AniList format converges.
     const score = Math.round(toRaw(format, e.score) / 10);
     const start = malDate(e.startedAt);
     const finish = malDate(e.completedAt);
@@ -151,21 +133,7 @@ export function buildMalXml(
   return { xml, count: rows.length, skipped, omitted };
 }
 
-/**
- * The JSON export: Karasu's own shape, for the reader that is a program.
- *
- * Scores are exported as `scoreRaw` — the format-independent 0–100 integer —
- * beside the account's format, so a re-import (or anyone else's script) never
- * has to guess what "4" meant. Media is trimmed to identity: the list data is
- * the export, not the cover art.
- *
- * **Every list field the app can read is here.** It dropped `advancedScores`,
- * `customLists` and `hiddenFromStatusLists` for a while — all three already
- * fetched, and all three whole-value writes on AniList with no undo, so they
- * are the fields a backup is *most* needed for. A file named "backup" is either
- * complete or it says what it omits, and the only honest omission here is the
- * cover art.
- */
+/** The JSON export in Karasu's own shape; keep every list field the app reads here, since a backup that omits is not one. */
 export function buildJsonExport(
   anime: MediaListEntry[],
   manga: MediaListEntry[],
@@ -192,10 +160,7 @@ export function buildJsonExport(
     completedAt: e.completedAt,
     private: e.private,
     hiddenFromStatusLists: e.hiddenFromStatusLists ?? null,
-    // Read as a name→value map; a re-import has to turn both back into the
-    // array shapes AniList writes. Carried as read rather than pre-converted,
-    // because the positional order `advancedScores` writes in comes from the
-    // account's own category list, which a backup file cannot pin.
+    // Carried as read, not pre-converted: the order `advancedScores` writes in is the account's, which a file cannot pin.
     customLists: e.customLists ?? null,
     advancedScores: e.advancedScores ?? null,
   });

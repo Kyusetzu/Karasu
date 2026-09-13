@@ -1,17 +1,4 @@
-/**
- * Which settings pane a `?pane=` value names.
- *
- * The ids are a deep link the rest of the app hands out — an empty local
- * library points at Library, an overridden AniList row points at the Karasu
- * pane that wins — and one a user may well have bookmarked. So they outlive a
- * reshuffle: a pane that survives keeps its id even when its label changes, and
- * a pane that genuinely goes away leaves an alias behind rather than letting the
- * link fall through to Account, which looks like the link was wrong rather than
- * moved.
- *
- * Separate from `pages/Settings.tsx` because that file's pane table holds React
- * components; this is the part worth testing on its own.
- */
+/** Which settings pane a `?pane=` value names; ids are deep links, so a removed pane leaves an alias behind. */
 
 /** In nav order. `pages/Settings.tsx` renders one entry per id, in this order. */
 export const PANE_IDS = [
@@ -27,12 +14,7 @@ export const PANE_IDS = [
 
 export type PaneId = (typeof PANE_IDS)[number];
 
-/**
- * Panes that no longer exist, and where their contents went.
- *
- * `content` was one slider and joined Appearance; `integrations` was one toggle
- * and joined Desktop.
- */
+/** Panes that no longer exist, and where their contents went. */
 export const PANE_ALIASES: Record<string, PaneId> = {
   content: "appearance",
   integrations: "desktop",

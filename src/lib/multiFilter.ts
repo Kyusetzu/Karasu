@@ -1,18 +1,4 @@
-/**
- * Include / exclude / off, for a filter that takes more than one answer.
- *
- * AniList's own browse page lets you say "Action **and** Drama, but **not**
- * Ecchi" — `Page.media` takes `genre_in`/`genre_not_in` and `tag_in`/`tag_not_in`
- * for exactly that. Karasu offered one genre and one tag, both include-only,
- * which is the difference between a filter and a lens.
- *
- * Pure and here rather than in the component, because two of these functions
- * are load-bearing in ways a component cannot express: `cycle` is the whole
- * interaction, and `encode` is what the query cache is keyed on. An unsorted
- * key would mint a new cache entry every time the user re-picked the same two
- * genres in a different order — the same trap `RecommendedSection` documents
- * for its seed ids.
- */
+/** Include / exclude / off for the genre and tag filters; `cycle` is the interaction and `encode` is the query cache key. */
 
 export type Tri = "off" | "include" | "exclude";
 
@@ -33,14 +19,7 @@ export function triOf(value: MultiValue, option: string): Tri {
   return "off";
 }
 
-/**
- * One click advances a value: off → include → exclude → off.
- *
- * Three states on one control rather than two controls per option. A pair of
- * lists side by side doubles the vertical space for six hundred tags and still
- * has to stop the same tag appearing in both; cycling makes that impossible by
- * construction.
- */
+/** One click advances a value off → include → exclude → off, so an option can never sit on both sides. */
 export function cycle(value: MultiValue, option: string): MultiValue {
   const without = {
     include: value.include.filter((o) => o !== option),
@@ -56,13 +35,7 @@ export function cycle(value: MultiValue, option: string): MultiValue {
   }
 }
 
-/**
- * A stable string for the query cache, and only for that.
- *
- * Sorted on both sides so picking Action-then-Drama and Drama-then-Action are
- * one cache entry rather than two. The `-` prefix is unambiguous because
- * AniList's genres and tags never begin with one.
- */
+/** A stable query-cache key: keep both sides sorted, or re-picking the same options in another order mints a new entry. */
 export function encode(value: MultiValue): string {
   return [
     ...[...value.include].sort(),
@@ -84,13 +57,7 @@ export function summarize(value: MultiValue): Summary | null {
   return { first, extra: value.include.length + value.exclude.length - 1 };
 }
 
-/**
- * The arguments AniList takes, or `undefined` where it takes none.
- *
- * `undefined` rather than an empty array on purpose: `gql`'s JSON body drops
- * undefined keys, and an absent argument is no filter — where `genre_in: []`
- * is a filter matching nothing.
- */
+/** The arguments AniList takes, `undefined` rather than `[]` where none apply because an empty `genre_in` matches nothing. */
 export function toQueryArgs(value: MultiValue): {
   in?: string[];
   notIn?: string[];

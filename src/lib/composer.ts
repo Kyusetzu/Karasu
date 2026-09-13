@@ -1,14 +1,4 @@
-/**
- * What counts as a postable message.
- *
- * Shared by the activity composer, the reply box and the thread comment box, so
- * the three cannot disagree about whether a wall of spaces is a post.
- *
- * The reason it returns a *key* rather than a sentence: `i18nKeys.test.ts` only
- * sees literal `t("…")` calls, so a pure function that returned prose would put
- * its strings outside the suite's reach. The component maps the key through a
- * literal switch, the same shape `receiptText` uses in `useListMutations`.
- */
+/** Why a post is refused, as a key rather than a sentence so `i18nKeys.test.ts` can see the string. */
 export type PostRejection = "empty" | "tooLong";
 
 export interface PostValidation {
@@ -18,46 +8,24 @@ export interface PostValidation {
   text: string;
 }
 
-/**
- * Karasu's own bound: AniList's schema documents no maximum for activity text.
- *
- * Generous rather than tight — a status update is not a tweet and people do
- * write paragraphs — but still a number, because a field with no limit is one
- * that eventually receives a pasted novel and fails at the API instead of in
- * the box where it could be explained.
- */
+/** Karasu's own bound, AniList documents none; without one a pasted novel fails at the API, not in the box. */
 export const POST_MAX = 4000;
 
 export function validatePost(raw: string): PostValidation {
-  // Three or more newlines become two: AniList renders single newlines as
-  // breaks, so a stray run of blank lines is a wall of nothing in the feed.
+  // Three or more newlines become two, since AniList renders every newline as a break in the feed.
   const text = raw.trim().replace(/\n{3,}/g, "\n\n");
   if (!text) return { ok: false, reason: "empty", text };
-  // Counted on the trimmed text, so trailing whitespace cannot push a valid
-  // post over the edge.
+  // Counted on the trimmed text, so trailing whitespace cannot push a valid post over the edge.
   if (text.length > POST_MAX) return { ok: false, reason: "tooLong", text };
   return { ok: true, text };
 }
 
-/**
- * Characters left, for a counter that only appears when it matters.
- *
- * Negative once over, so the caller can style it without repeating the
- * comparison.
- */
+/** Characters left for the counter, negative once over so the caller need not repeat the comparison. */
 export function charsLeft(raw: string): number {
   return POST_MAX - raw.trim().length;
 }
 
-/**
- * What counts as a postable thread — a title, a body, and at least one
- * category.
- *
- * AniList's own composer enforces the category; a threadless category is fine
- * but a categoryless thread lands nowhere anyone browses. The title bound is
- * Karasu's, like `POST_MAX`: AniList documents none, and the forum renders
- * titles on one line.
- */
+/** Why a thread is refused; a categoryless one lands nowhere anyone browses, and the title bound is Karasu's. */
 export type ThreadRejection = "titleEmpty" | "titleTooLong" | PostRejection | "noCategory";
 
 export const TITLE_MAX = 120;
@@ -84,12 +52,7 @@ export function validateThread(
   return { ok: true, ...out };
 }
 
-/**
- * What counts as a publishable review. Unlike the two above, every bound
- * here is **AniList's own**, enforced server-side — validating locally just
- * moves the rejection from a failed request into the box where it can be
- * explained while typing.
- */
+/** Why a review is refused; every bound is AniList's own, checked here so the box can explain it. */
 export type ReviewRejection =
   | "summaryTooShort"
   | "summaryTooLong"
@@ -125,12 +88,7 @@ export function validateReview(
   return { ok: true, ...out };
 }
 
-// --- Editing ---------------------------------------------------------------
-//
-// The formatting toolbar's arithmetic, as pure functions over (text, start,
-// end): each returns the new text and where the selection should land. Pure
-// so it is testable in node and shared by every composer; the component's
-// only job is to read the textarea's selection and write the result back.
+// --- Editing: the toolbar's arithmetic as pure functions over (text, start, end), shared and node-tested.
 
 /** The text after an edit, and the selection to leave in it. */
 export interface TextEdit {
@@ -139,9 +97,7 @@ export interface TextEdit {
   end: number;
 }
 
-/** The inline marks, as the pair of markers each wraps in. Italic is `*x*`
- *  and never `_x_`: `_` is inert inside a word and AniList's own parser has
- *  a bug below three characters with it. */
+/** The inline marks as marker pairs; italic is `*x*`, never `_x_`, since `_` is inert inside a word. */
 export const INLINE_MARKS = {
   bold: ["**", "**"],
   italic: ["*", "*"],
@@ -153,9 +109,7 @@ export const INLINE_MARKS = {
 const order = (start: number, end: number): [number, number] =>
   start <= end ? [start, end] : [end, start];
 
-/** The selection with its leading and trailing whitespace given back to the
- *  outside — the parser refuses `** x**`, so a wrapped selection must not
- *  start or end on a space. */
+/** The selection minus its outer whitespace, because the parser refuses `** x**`. */
 function trimmed(text: string, start: number, end: number): [number, number] {
   let s = start;
   let e = end;
@@ -164,11 +118,7 @@ function trimmed(text: string, start: number, end: number): [number, number] {
   return [s, e];
 }
 
-/**
- * Wraps the selection in `before`/`after`, or unwraps it when it already is —
- * whether the markers sit just outside the selection or just inside it. With
- * nothing selected the markers are inserted with the caret between them.
- */
+/** Wraps the selection in the markers, or unwraps it when they already sit just outside or inside it. */
 export function wrapSelection(
   text: string,
   start: number,
@@ -179,13 +129,7 @@ export function wrapSelection(
   const [s0, e0] = order(start, end);
   const [s, e] = trimmed(text, s0, e0);
   const sel = text.slice(s, e);
-  // Markers just outside: `**|sel|**` → toggle off.
-  //
-  // For a marker that is one character repeated — `*`, `**`, `~~`, `~~~` —
-  // the *run* either side decides, not the exact slice: the `*` either side
-  // of `word` in `**word**` is bold's second star, not italic to switch off.
-  // Bold is on from a run of two; italic is on at an odd run (`*` or `***`),
-  // and so italic inside bold wraps to `***word***` and unwraps back.
+  // Repeated-character markers are judged by the run either side, so `**word**` is not italic to switch off.
   const run = before.length > 0 && after === before && [...before].every((ch) => ch === before[0])
     ? before[0]
     : null;
@@ -247,12 +191,7 @@ const QUOTE_MARK = /^>\s?/;
 const BULLET_MARK = /^[-*+]\s+/;
 const NUMBER_MARK = /^\d+\.\s+/;
 
-/**
- * Puts a block prefix in front of every line the selection touches, or takes
- * it off when every line already carries it. A numbered list is renumbered
- * from 1; a heading replaces whatever heading level was there. The whole
- * block is selected afterwards, so a second press toggles it back.
- */
+/** Prefixes every line the selection touches, or strips the prefix when every line already carries it. */
 export function prefixLines(text: string, start: number, end: number, prefix: LinePrefix): TextEdit {
   const [ls, le] = lineSpan(text, start, end);
   const lines = text.slice(ls, le).split("\n");
@@ -279,11 +218,7 @@ export function prefixLines(text: string, start: number, end: number, prefix: Li
   return { text: text.slice(0, ls) + block + text.slice(le), start: ls, end: ls + block.length };
 }
 
-/**
- * Steps the heading level of the selected lines: none → `##` → `###` →
- * `####` → none. One button rather than six, and it starts at `##` because
- * a post's `#` is the size of the page title around it.
- */
+/** Cycles `##` → `###` → `####` → none, from `##` because a post's `#` is the size of the page title. */
 export function cycleHeading(text: string, start: number, end: number): TextEdit {
   const [ls] = lineSpan(text, start, end);
   const first = text.slice(ls, text.indexOf("\n", ls) === -1 ? text.length : text.indexOf("\n", ls));
@@ -298,12 +233,7 @@ export function cycleHeading(text: string, start: number, end: number): TextEdit
   return prefixLines(text, start, end, { heading: next as 2 | 3 | 4 });
 }
 
-/**
- * A link out of the selection. A selected URL becomes the target with the
- * caret in the empty label; selected text becomes the label with the word
- * `url` selected so typing replaces it; nothing selected gives `[]()` with
- * the caret in the label. No dialog — the text is the form.
- */
+/** A link out of the selection, no dialog: a URL becomes the target, text the label with `url` left selected. */
 export function insertLink(text: string, start: number, end: number): TextEdit {
   const [s0, e0] = order(start, end);
   const [s, e] = trimmed(text, s0, e0);
@@ -362,12 +292,7 @@ export function fenceCode(text: string, start: number, end: number): TextEdit {
   return { text: text.slice(0, s) + out + text.slice(e), start: s, end: s + out.length };
 }
 
-/**
- * The smallest replacement that turns `before` into `after`: the common
- * prefix and suffix are left alone. This is what lets the component hand an
- * edit to the browser as one `insertText` — a single undo step with the
- * caret where the user expects — instead of replacing the whole value.
- */
+/** The smallest replacement turning `before` into `after`, so one `insertText` makes one undo step. */
 export function editSpan(before: string, after: string): { start: number; end: number; insert: string } {
   let p = 0;
   const max = Math.min(before.length, after.length);

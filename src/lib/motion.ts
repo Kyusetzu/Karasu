@@ -1,29 +1,11 @@
-/**
- * The one answer to "should this move?", for motion CSS cannot see.
- *
- * `index.css` collapses every animation and transition under
- * `prefers-reduced-motion` and under the app's own `data-reduce-motion`
- * attribute. That covers declarative motion completely and JS-driven motion not
- * at all: a View Transition, a scroll-linked parallax, a `requestAnimationFrame`
- * loop or an `element.animate()` call is invisible to those rules and would ship
- * as unconditional movement. Anything of that kind must ask here first.
- *
- * The decision is split from the DOM read so it can be tested without a browser
- * environment, and so the reading half stays one line with nothing to get wrong.
- */
+/** The one reduce-motion answer for what CSS cannot see: View Transitions, WAAPI, scroll handlers and timeouts ask here. */
 
 /** Either source is enough; the toggle only ever adds to the OS setting. */
 export function reducedMotion(toggleOn: boolean, osPrefers: boolean): boolean {
   return toggleOn || osPrefers;
 }
 
-/**
- * Reads the live setting.
- *
- * The DOM rather than the store, so it can be called outside React — a
- * navigation wrapper runs before any component does. `stores/theme.ts` writes
- * the attribute before first paint.
- */
+/** Reads the live setting from the DOM rather than the store, so it works outside React before any component runs. */
 export function prefersReducedMotion(): boolean {
   if (typeof document === "undefined") return false;
   return reducedMotion(
@@ -33,14 +15,7 @@ export function prefersReducedMotion(): boolean {
   );
 }
 
-/**
- * `ms`, or 0 when the user asked for less motion.
- *
- * For durations held in JS — how long to keep an exiting node mounted, how long
- * to wait before a follow-up step. Returning 0 rather than skipping the call
- * keeps the same code path in both cases, so the "reduced" branch cannot drift
- * out of sync with the animated one.
- */
+/** `ms`, or 0 under reduced motion, so JS-held durations keep one code path instead of a branch that can drift. */
 export function motionDuration(
   ms: number,
   reduced = prefersReducedMotion(),
@@ -48,38 +23,18 @@ export function motionDuration(
   return reduced ? 0 : ms;
 }
 
-/**
- * One rhythm for every staggered *entrance*. The skeleton shimmer below
- * shares the cycle but not the step — an entrance lands twice as tight as a
- * loop phase, and this file used to claim they mirrored each other when only
- * the cycle did.
- */
+/** One rhythm for every staggered entrance; the skeleton shimmer shares the cycle but not the step. */
 export const STAGGER_STEP_MS = 45;
 export const STAGGER_CYCLE = 6;
 
-/**
- * The shimmer's phase offset for cell `index`, in ms.
- *
- * Not an entrance stagger: the shimmer loops, so this only decides where in
- * the loop a cell starts — six offsets make the sweep travel across a grid
- * instead of pulsing the whole page at once. Deliberately no reduced-motion
- * branch: the delay rides an animation the CSS collapse already zeroes,
- * inline style included, so a JS guard here would be a second answer to a
- * question CSS has settled.
- */
+/** The shimmer's phase step; looser than an entrance step because a loop phase is not an arrival. */
 const SKELETON_STEP_MS = 90;
+/** The shimmer's phase offset for cell `index`; no reduced-motion branch, since the CSS collapse already zeroes it. */
 export function skeletonDelay(index: number): number {
   return (index % STAGGER_CYCLE) * SKELETON_STEP_MS;
 }
 
-/**
- * The stagger delay for item `index`, in ms.
- *
- * Cycled rather than unbounded: without the wrap, a hundredth cell would wait
- * four seconds for its turn. Zero under reduced motion — a stagger whose
- * duration is collapsed but whose delay is not becomes a staggered *wait*,
- * which is worse than the animation for the person who asked for less of it.
- */
+/** The cycled stagger delay for item `index`; zero under reduced motion, or a collapsed stagger becomes a staggered wait. */
 export function staggerDelay(
   index: number,
   reduced = prefersReducedMotion(),
@@ -90,20 +45,7 @@ export function staggerDelay(
 /** How long a whole chart series has to finish arriving. */
 export const SERIES_WINDOW_MS = 260;
 
-/**
- * The delay for item `index` of a known `count`-item series, in ms.
- *
- * `staggerDelay` wraps every sixth item, which is right for a grid or a list —
- * they are unbounded, and the wrap is what stops the hundredth cell waiting
- * four seconds. It is wrong for a chart: a chart is read as *one shape*
- * arriving, so a delay that returns to zero partway through looks like the
- * animation stalled and started again. That is what a fourteen-tile treemap
- * was doing.
- *
- * Bounded instead by compressing the step as the series grows, so the whole
- * series still lands inside `SERIES_WINDOW_MS` however many members it has,
- * while a short one keeps the same rhythm as everything else in the app.
- */
+/** The delay for item `index` of a `count`-item series, compressed to fit the window; a chart must never wrap to zero. */
 export function seriesDelay(
   index: number,
   count: number,

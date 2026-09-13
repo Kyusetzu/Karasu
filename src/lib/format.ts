@@ -1,10 +1,6 @@
 import type { TFunction } from "i18next";
 
-/**
- * The format vocabulary per medium — the closed enum the list and search
- * filters validate against. One definition, or the two filter surfaces
- * drift.
- */
+/** The closed format enum per medium; one definition, or the list and search filters drift. */
 export const MEDIA_FORMATS = {
   ANIME: ["TV", "TV_SHORT", "MOVIE", "SPECIAL", "OVA", "ONA", "MUSIC"],
   MANGA: ["MANGA", "NOVEL", "ONE_SHOT"],
@@ -13,11 +9,7 @@ export const MEDIA_FORMATS = {
 /** AniList media-format enum values we have explicit labels for. */
 const KNOWN = new Set<string>([...MEDIA_FORMATS.ANIME, ...MEDIA_FORMATS.MANGA]);
 
-/**
- * Human-readable label for an AniList media format (e.g. `TV_SHORT` →
- * "TV Short"). Unknown/new enum values are title-cased as a safe fallback so a
- * raw `SOME_NEW_FORMAT` never leaks into the UI.
- */
+/** Human-readable label for a media format; an unknown enum value is title-cased so it never leaks raw into the UI. */
 export function formatLabel(
   format: string | null | undefined,
   t: TFunction,
@@ -44,10 +36,7 @@ const KNOWN_STATUS = new Set([
   "HIATUS",
 ]);
 
-/**
- * Airing/publishing status of the *work* (`RELEASING`, …) — distinct from the
- * user's own list status (Watching/Completed), which lives under `status.*`.
- */
+/** Airing/publishing status of the work, distinct from the user's list status under `status.*`. */
 export function mediaStatusLabel(
   status: string | null | undefined,
   t: TFunction,
@@ -85,13 +74,7 @@ export function sourceLabel(
   return titleCase(source);
 }
 
-/**
- * Manhwa/Manhua are not formats on AniList — they are `countryOfOrigin`.
- *
- * Here rather than in `MediaList`, which had them to itself, because Search
- * needs the same four and the same labels: two copies of this list is how
- * "Manhua (China)" ends up spelled two ways.
- */
+/** Manhwa/Manhua are `countryOfOrigin`, not formats; one list here so MediaList and Search spell them alike. */
 export const ORIGINS = ["JP", "KR", "CN", "TW"] as const;
 
 /** Literal switch, so `i18nKeys.test.ts` sees every key. */
@@ -127,11 +110,7 @@ export function fuzzyDate(
   });
 }
 
-/**
- * Coarse countdown to the next episode ("2d 4h", "35m"). Deliberately drops
- * to at most two units — the detail page wants a glanceable value, not a
- * ticking clock.
- */
+/** Coarse countdown to the next episode, at most two units: a glanceable value, not a ticking clock. */
 export function countdown(secondsUntil: number, t: TFunction): string {
   if (secondsUntil <= 0) return "";
   const days = Math.floor(secondsUntil / 86400);

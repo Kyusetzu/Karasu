@@ -1,9 +1,4 @@
-/**
- * The arithmetic under `usePanZoom`, for a `translate3d(tx,ty,0) scale(zoom)`
- * surface with `transform-origin: 0 0`. Pure so the anchor invariants live
- * under unit tests: the content under the anchor point (the cursor, or the
- * pinch midpoint) must stay under it through the gesture.
- */
+/** The arithmetic under `usePanZoom`, assuming `transform-origin: 0 0`; pure so the anchor invariant is unit-tested. */
 
 export interface ZoomView {
   tx: number;
@@ -34,12 +29,7 @@ export function zoomAboutPoint(
   return { zoom, tx: px - (px - v.tx) * scale, ty: py - (py - v.ty) * scale };
 }
 
-/**
- * One pinch step: the previous and current positions of both pointers, in
- * viewport coordinates. Scale follows the distance ratio; the content that
- * was under the old midpoint lands under the new one, so the image tracks
- * the fingers while it grows.
- */
+/** One pinch step: scale follows the distance ratio and the old midpoint's content lands under the new one. */
 export function pinchUpdate(
   v: ZoomView,
   prev: [Point, Point],

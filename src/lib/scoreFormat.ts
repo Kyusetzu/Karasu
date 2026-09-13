@@ -1,21 +1,4 @@
-/**
- * AniList's five score formats, as one vocabulary.
- *
- * The account's `scoreFormat` decides two things at once: how `score: Float`
- * is *interpreted* when written, and what `score(format:)` returns when read.
- * Karasu historically pinned ten-point on the read side while writing the
- * bare float — which corrupted scores on any non-ten-point account (an ★8
- * sent to a 100-point account stores 8/100). The cure has two halves:
- *
- * - **Writes go through `scoreRaw`** (0–100 int, format-independent) built by
- *   `toRaw` — correct whatever the account is set to, and safe to replay from
- *   the offline queue even if the format changed in between.
- * - **Reads and controls follow the format**, using `scoreScale` for ranges
- *   and `formatScore` for rendering.
- *
- * POINT_3 is AniList's smiley scale; its raw mapping (35/60/85) is the one
- * the site itself uses.
- */
+/** Score formats as one vocabulary: writes go through `scoreRaw`, reads and controls follow the account's format. */
 
 export type ScoreFormat =
   | "POINT_100"
@@ -65,10 +48,7 @@ export function scoreScale(f: ScoreFormat): ScoreScale {
 /** The smiley scale's raw values, as anilist.co itself writes them. */
 const POINT_3_RAW = [0, 35, 60, 85] as const;
 
-/**
- * A display-format value as the 0–100 integer `scoreRaw` takes.
- * Zero stays zero — it means "unscored", not "scored the minimum".
- */
+/** A display-format value as the integer `scoreRaw` takes; zero stays zero, since it means "unscored". */
 export function toRaw(f: ScoreFormat, value: number): number {
   if (!Number.isFinite(value) || value <= 0) return 0;
   const { max } = scoreScale(f);
@@ -91,11 +71,7 @@ export function fromRaw(f: ScoreFormat, raw: number): number {
 /** The smiley glyphs, index = score. Emoji, so no i18n key is needed. */
 const SMILEYS = ["", "☹️", "😐", "🙂"] as const;
 
-/**
- * A score as the user's format displays it. Zero renders as an en dash —
- * every call site treats zero as "unscored", and printing "0" would claim a
- * score nobody gave.
- */
+/** A score as the user's format displays it; zero renders as an en dash, since "0" would claim a score nobody gave. */
 export function formatScore(f: ScoreFormat, value: number): string {
   if (!Number.isFinite(value) || value <= 0) return "–";
   if (f === "POINT_3") return SMILEYS[Math.min(3, Math.round(value))] || "–";
@@ -103,21 +79,13 @@ export function formatScore(f: ScoreFormat, value: number): string {
   return Math.min(max, value).toFixed(decimals);
 }
 
-/**
- * An *aggregate* (mean, delta) on the display scale. Always one decimal —
- * a mean of integers is not an integer — and numeric even for the smiley
- * scale, where "😐, roughly" has no glyph and a number is at least honest.
- */
+/** An aggregate on the display scale, always one decimal and numeric even for the smiley scale, which has no glyph for it. */
 export function formatMeanScore(f: ScoreFormat, value: number): string {
   if (!Number.isFinite(value) || value <= 0) return "–";
   return Math.min(scoreScale(f).max, value).toFixed(1);
 }
 
-/**
- * The selectable values for a discrete format, or `null` for the two
- * continuous ones (POINT_100 and POINT_10_DECIMAL take a number input — a
- * select of a hundred options is not a control).
- */
+/** The selectable values for a discrete format, or `null` for the continuous ones, which take a number input. */
 export function scoreOptions(f: ScoreFormat): number[] | null {
   switch (f) {
     case "POINT_10":

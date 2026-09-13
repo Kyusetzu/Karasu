@@ -1,11 +1,4 @@
-/**
- * Content filter. AniList flags genuinely explicit works with `isAdult`
- * (the "Hentai" genre); "Ecchi" is an ordinary genre and is *not* isAdult,
- * so hiding suggestive material needs the genre check on top.
- *
- * Everything filter-related lives here so no render site reimplements the
- * rules — a site that gets them subtly wrong is exactly how content leaks.
- */
+/** Every content-filter rule lives here so no render site reimplements one; "Ecchi" is a genre, not `isAdult`. */
 export type ContentFilterLevel = "off" | "moderate" | "strict";
 
 export const CONTENT_FILTER_LEVELS: ContentFilterLevel[] = [
@@ -25,11 +18,7 @@ export interface Filterable {
 
 export type BlockReason = "adult" | "suggestive";
 
-/**
- * Why `media` is hidden at `level`, or null when it is not. Adult wins when a
- * title is both — an adult+Ecchi title is counted once, as adult, which is
- * also the order the disclosure banners report the split in.
- */
+/** Why `media` is hidden at `level`, or null; adult wins over suggestive so a title is never counted twice. */
 export function blockReason(
   media: Filterable | null | undefined,
   level: ContentFilterLevel,
@@ -53,12 +42,7 @@ export function isBlocked(
   return blockReason(media, level) !== null;
 }
 
-/**
- * Whether a bare genre/tag *name* should be hidden. Aggregate views
- * (statistics, the year-in-review card) only have names to work with — no
- * media object to test — and "Hentai" appearing on a shareable image is the
- * most visible way this filter can fail.
- */
+/** Whether a bare genre/tag name is hidden, for aggregate views that have no media object to test. */
 export function isBlockedGenre(
   name: string,
   level: ContentFilterLevel,
@@ -74,15 +58,7 @@ export function adultQueryArg(level: ContentFilterLevel): boolean | undefined {
   return level === "off" ? undefined : false;
 }
 
-/**
- * Turns that into the GraphQL variables fragment — an *empty object* when
- * unfiltered, so `$isAdult` is left unset and the argument is absent.
- *
- * It has to be absent rather than null. AniList matches `isAdult: null`
- * against media whose `isAdult` is null, and the field is never null, so a
- * null argument returns **zero results** instead of meaning "no constraint" —
- * which silently emptied Seasonal and Search whenever the filter was Off.
- */
+/** The variables fragment; keep `$isAdult` absent rather than null when unfiltered, or AniList returns zero results. */
 export function adultVars(isAdult?: boolean): { isAdult?: boolean } {
   return isAdult === undefined ? {} : { isAdult };
 }
@@ -94,26 +70,13 @@ export function toLevel(value: string | null | undefined): ContentFilterLevel {
     : "strict";
 }
 
-/**
- * Whether explicit artwork should arrive blurred rather than bare.
- *
- * Deliberately *not* folded into `isBlocked`. The level decides what reaches
- * the screen at all; this decides how what does reach it looks — and the two
- * cannot both apply, because a title the level blocks is never rendered. In
- * practice that means this only ever matters with the filter Off, which is
- * exactly when someone is most likely to want the softer option: see the work
- * rather than hide it, but not have it appear unannounced.
- *
- * `isAdult` only. Ecchi is an ordinary genre and blurring every ecchi cover
- * would blur a large slice of an ordinary list.
- */
+/** Whether explicit artwork arrives blurred; kept apart from `isBlocked` and `isAdult`-only, since Ecchi is a genre. */
 export function shouldBlur(
   media: Filterable | null | undefined,
   level: ContentFilterLevel,
   blurAdult: boolean,
 ): boolean {
   if (!blurAdult || !media?.isAdult) return false;
-  // Belt and braces: a blocked title is not rendered, so this is unreachable
-  // for it — but a render site that forgot `isBlocked` should still blur.
+  // A blocked title is never rendered, but a render site that forgot `isBlocked` should still blur.
   return !isBlocked(media, level) || level !== "off";
 }

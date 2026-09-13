@@ -1,12 +1,4 @@
-/**
- * Score affinity between two lists, on the raw hundred-point scale.
- *
- * Raw, because the two sides speak different dialects — the viewer's list
- * arrives in their format, the profile owner's in *theirs* — and `toRaw`
- * already exists to make exactly this comparison sound (the sign-in merge
- * uses it the same way). Pearson correlation over the shared scored titles:
- * +1 is "same taste", 0 is "unrelated", negative is "opposites".
- */
+/** Pearson score affinity between two lists on the raw hundred-point scale, since each side arrives in its own format. */
 
 export interface AffinityEntry {
   mediaId: number;
@@ -27,9 +19,7 @@ export interface AffinityResult {
   shared: number;
   /** Titles both sides scored — the affinity's honest denominator. */
   scoredShared: number;
-  /** Pearson over the scored shared titles; null below the floor or when a
-      side's scores have no variance (a constant scorer correlates with
-      nothing, which is a fact about the maths, not the people). */
+  /** Pearson over the scored shared titles; null below the floor or when a side's scores have no variance. */
   pearson: number | null;
   /** Largest absolute score gaps, biggest first. */
   disagreements: Disagreement[];

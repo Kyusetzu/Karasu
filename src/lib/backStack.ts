@@ -1,26 +1,4 @@
-/**
- * The Android back gesture, taught to close overlays.
- *
- * Every overlay closes on Escape — a key phones do not have. On Android the
- * system back gesture walks the WebView's history instead, which with a
- * HashRouter means "leave the page" while a dialog is still covering it. So
- * an opening overlay pushes one history entry at the *current* URL (the hash
- * is unchanged: no navigation fires, `<main key={pathname}>` keeps its key),
- * and the back gesture pops that entry — the popstate closes the topmost
- * overlay and goes no further.
- *
- * Closing by any other means (Escape, backdrop, an action) has to unwind the
- * entry it pushed, or every opened-and-closed dialog would cost one extra
- * back press later. `release()` calls `history.back()` and arms a one-shot
- * swallow so our own listener ignores the resulting popstate. If a navigation
- * buried the entry first (`history.state` no longer carries the token), the
- * entry is left where it lies: popping would eat a real history step. The one
- * inert same-URL entry that remains costs a single extra back press that the
- * router treats as a no-op — the documented, accepted edge.
- *
- * Everything here is pure against an injected history so the races live under
- * unit tests instead of on the phone. `hooks/useBackClose` is the React glue.
- */
+/** The back gesture closes overlays: one same-URL history entry per overlay, unwound on any close so it is net zero. */
 
 export interface HistoryLike {
   pushState(data: unknown, unused: string): void;
@@ -44,11 +22,7 @@ export function createBackStack(h: HistoryLike) {
   let swallow = 0;
 
   return {
-    /**
-     * Called when an overlay opens. Returns the release for when it closes by
-     * any means other than the back gesture; releasing after a back-close is
-     * a no-op, so callers may do it unconditionally from cleanup.
-     */
+    /** Called when an overlay opens; the returned release is a no-op after a back-close, so cleanup may call it anyway. */
     register(close: () => void): () => void {
       const entry: Entry = { token: nextToken++, close };
       h.pushState({ karasuBack: entry.token }, "");

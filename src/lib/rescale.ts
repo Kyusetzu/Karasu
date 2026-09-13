@@ -1,15 +1,6 @@
 import { scoreScale, toRaw, type ScoreFormat } from "./scoreFormat";
 
-/**
- * The plan behind the bulk score rescale.
- *
- * AniList's bulk mutation writes *one* value to every id it is given, so a
- * rescale cannot be one request — it is one request per distinct target
- * score (chunked at 50 ids), which for a ten-point account is at most ten.
- * Planning is separated from writing so the tool can say exactly what a
- * click will do — how many entries move and how many requests it costs —
- * before anything is sent.
- */
+/** The bulk score rescale planned apart from the write, one request per distinct target score, so a click can be priced. */
 
 export interface RescaleGroup {
   /** The snapped target score, in display units. */
@@ -27,12 +18,7 @@ export interface RescalePlan {
   requests: number;
 }
 
-/**
- * Maps every scored entry inside `[from.min, from.max]` linearly onto
- * `[to.min, to.max]`, snapped to the format's step and clamped to its
- * scale. Unscored entries (0) are never touched — zero means "no opinion",
- * and a rescale must not invent one.
- */
+/** Maps scored entries in the source range linearly onto the target, snapped and clamped; unscored entries stay unscored. */
 export function planRescale(
   entries: { id: number; mediaId: number; score: number }[],
   from: { min: number; max: number },
@@ -53,8 +39,7 @@ export function planRescale(
       from.max === from.min
         ? to.min
         : to.min + ((e.score - from.min) * (to.max - to.min)) / (from.max - from.min);
-    // Snap to the format's step; the floor is one step, not zero — a rescale
-    // may make a score small, but only clearing may make it disappear.
+    // Snap to the format's step with a floor of one step, since only clearing may make a score disappear.
     const snapped = Number(
       Math.min(scaleMax, Math.max(step, Math.round(mapped / step) * step)).toFixed(2),
     );

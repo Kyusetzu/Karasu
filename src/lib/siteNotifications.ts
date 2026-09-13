@@ -1,19 +1,6 @@
 import { displayTitle } from "@/api/types";
 
-/**
- * AniList's notification feed, flattened for the bell.
- *
- * The API returns a nineteen-member union where every member carries a
- * different set of nullable objects. The bell wants rows: a name to lead
- * with, a verb to explain, a place to go. This module is the boundary where
- * the union becomes that — pure, so the mapping is testable without a bell.
- *
- * `ActivityMessageNotification` is deliberately not here. It is private mail
- * between two users, and it is excluded the same three ways `MessageActivity`
- * is on the feeds: absent from the query's `type_in`, given no inline
- * fragment, and normalised to null by the fall-through below — with a test
- * that says so.
- */
+/** AniList's notification union flattened for the bell; ActivityMessageNotification is private mail and stays excluded. */
 
 export type SiteNotifKind =
   | "AIRING"
@@ -59,8 +46,7 @@ const KIND_BY_TYPENAME: Record<string, SiteNotifKind> = {
   CharacterSubmissionUpdateNotification: "CHARACTER_SUBMISSION_UPDATE",
 };
 
-/** The loose shape a union member arrives in. Everything nullable, because
-    on an untyped boundary "unexpected shape" is a normal outcome. */
+/** The loose shape a union member arrives in, everything nullable, since an unexpected shape is a normal outcome here. */
 export interface RawSiteNotification {
   __typename?: string;
   id?: number | null;
@@ -77,9 +63,7 @@ export interface RawSiteNotification {
   media?: {
     id?: number | null;
     title?: { romaji?: string | null; english?: string | null; native?: string | null } | null;
-    /** Carried so the content filter can be applied here at all — the query
-        used to ask for neither, which left the bell the one surface where a
-        hidden title could still be named. */
+    /** Keep these in the query; without them the bell is the one surface that can still name a hidden title. */
     isAdult?: boolean | null;
     genres?: string[] | null;
   } | null;
@@ -102,22 +86,11 @@ export interface SiteNotifRow {
   detail: string | null;
   /** Route to open on click, or null when the subject no longer exists. */
   target: string | null;
-  /** Grouping identity — `notifGroups` collapses runs on these. The route
-      string cannot serve: reverse-parsing it re-derives what the API already
-      said, and the ids were thrown away here for exactly as long as nothing
-      needed them. */
+  /** Grouping identity for `notifGroups`; keep the ids, since reverse-parsing the route re-derives what the API said. */
   userId: number | null;
   mediaId: number | null;
   activityId: number | null;
-  /**
-   * The subject's content-filter fields, when the row is about a title.
-   *
-   * Carried rather than decided here: this function knows nothing about the
-   * reader's filter level, and should not. The bell applies `isBlocked` with
-   * these — before them the query asked for neither field, so a hidden title
-   * could still be named in an aired-episode line, which is a title on screen
-   * exactly as much as a cover is.
-   */
+  /** The subject's content-filter fields, carried for the bell's `isBlocked` rather than decided here. */
   media: { isAdult?: boolean | null; genres?: string[] | null } | null;
 }
 
@@ -142,8 +115,7 @@ export function normalizeSiteNotification(raw: RawSiteNotification | null): Site
       ? [raw.deletedMediaTitles]
       : [];
 
-  // The lead line, in the order the kinds care about: a thread row leads with
-  // the thread, a media row with the title, a person row with the person.
+  // The lead line: a thread row leads with the thread, a media row with the title, a person row with the person.
   const title =
     threadTitle ??
     mediaTitle ??
@@ -153,12 +125,7 @@ export function normalizeSiteNotification(raw: RawSiteNotification | null): Site
     raw.submittedTitle ??
     "—";
 
-  // Where a click goes. The activity itself first: only the five Activity*
-  // kinds carry `activityId`, and for them the activity is the news — the
-  // actor's profile is the *name's* target, which the bell renders as its own
-  // link. Threads before users for the same reason: thread rows carry both,
-  // and the thread is the news. Null is honest for a deletion — there is
-  // nowhere left.
+  // Where a click goes: the activity or thread before the actor, whose name is its own link; null for a deletion.
   const target =
     raw.activityId != null
       ? `/activity/${raw.activityId}`

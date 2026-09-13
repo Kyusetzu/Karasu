@@ -1,25 +1,4 @@
-/**
- * AniList's own account settings: which ones Karasu overrides, and how to send
- * a change without destroying anything.
- *
- * Two hazards live in this API and both are quiet. They are the reason this file
- * is pure logic with tests rather than a form handler.
- *
- * **1. `animeListOptions` / `mangaListOptions` can delete custom lists, with no
- * undo on AniList's side.** `MediaListOptionsInput.customLists` is a full
- * replacement, so sending the object with a stale or absent list removes lists
- * the user built by hand. `formToUpdateUserVars` therefore never emits either
- * field, and a test asserts that — confirmed unnecessary by introspection:
- * `scoreFormat` and `rowOrder` are **top-level `UpdateUser` arguments**, while
- * `MediaListOptionsInput` contains only `sectionOrder`,
- * `splitCompletedSectionByFormat`, `customLists`, `advancedScoring`,
- * `advancedScoringEnabled` and `theme` — nothing this pane needs and everything
- * it could break.
- *
- * **2. `notificationOptions` is a whole-array write.** A partial send silently
- * disables every type left out, and the user discovers it weeks later by not
- * being notified. `mergeNotificationOptions` always emits all twenty.
- */
+/** AniList account settings; the list-options inputs replace custom lists wholesale, so they are never sent. */
 
 /** Every `NotificationType` AniList has, in the order its own settings list them. */
 export const NOTIFICATION_TYPES = [
@@ -52,13 +31,7 @@ export interface NotificationOption {
   enabled: boolean | null;
 }
 
-/**
- * The full twenty-entry array to send, given what the account currently has and
- * what the user just toggled.
- *
- * Always all twenty, never a patch. Anything the server did not report defaults
- * to enabled, matching AniList's own default for a type it has not stored.
- */
+/** The whole `notificationOptions` array to send, never a patch: a partial write disables every type left out. */
 export function mergeNotificationOptions(
   current: NotificationOption[] | null | undefined,
   changes: Partial<Record<NotificationTypeName, boolean>>,
@@ -73,13 +46,7 @@ export function mergeNotificationOptions(
   }));
 }
 
-/**
- * `disabledListActivity` is the same whole-array shape as the notification
- * grid, one entry per `MediaListStatus`: `disabled: true` means "don't post an
- * activity when I set this status". A partial send would reset whatever was
- * left out, so the merge always emits all six, defaulting to `false` (posting,
- * AniList's own default) for a status the server has not stored.
- */
+/** Every `MediaListStatus`, one `disabledListActivity` entry each. */
 export const LIST_ACTIVITY_STATUSES = [
   "CURRENT",
   "PLANNING",
@@ -96,6 +63,7 @@ export interface ListActivityOption {
   type: string | null;
 }
 
+/** The whole `disabledListActivity` array to send, never a patch: a partial write resets every status left out. */
 export function mergeListActivity(
   current: ListActivityOption[] | null | undefined,
   changes: Partial<Record<ListActivityStatus, boolean>>,
@@ -110,27 +78,7 @@ export function mergeListActivity(
   }));
 }
 
-/**
- * The three AniList settings whose effect lands somewhere else in Karasu.
- *
- * Editing them is still legitimate — they are the user's settings and other
- * clients honour them — but a row that appears to do nothing is a bug report
- * waiting to happen, so each carries a note naming *where* its effect lands.
- * The hint keys are literals so `i18nKeys.test.ts` can see them.
- *
- * Two are overrides outright: Karasu picks titles and filters adult content
- * with its own setting and ignores AniList's. `airingNotifications` is the odd
- * one and is kept here for the opposite reason — Karasu *reads* it. While it is
- * on, the airing watcher shows the desktop notification and leaves the bell row
- * to AniList's own, so the two toggles are coupled, and the cross-reference to
- * the Detection pane is more load-bearing than when it was a plain override:
- * nobody would guess the coupling from either screen alone.
- *
- * `scoreFormat` used to be the fourth: Karasu pinned ten-point everywhere,
- * so the row truthfully said its own display would not move. Since the
- * scoreRaw change the whole app reads and writes in the account's format,
- * so the setting simply *works* and needs no note.
- */
+/** AniList settings whose effect lands elsewhere in Karasu, each with a literal hint key naming where. */
 export const LOCAL_OVERRIDES = {
   titleLanguage: {
     hintKey: "settings.alOverrideTitleLanguage",
@@ -139,12 +87,12 @@ export const LOCAL_OVERRIDES = {
   },
   displayAdultContent: {
     hintKey: "settings.alOverrideAdult",
-    // The content filter moved in with Appearance — it was one slider, and it
-    // answers the same question the rest of that pane does.
+    // The content filter lives in Appearance because it answers the same question the rest of that pane does.
     pane: "appearance",
   },
   airingNotifications: {
     hintKey: "settings.alOverrideAiring",
+    // Read rather than overridden: while it is on, the airing watcher leaves the bell row to AniList's own.
     pane: "detection",
   },
 } as const;
@@ -169,17 +117,7 @@ export interface UserSettingsForm {
   disabledListActivity?: { disabled: boolean; type: ListActivityStatus }[];
 }
 
-/**
- * The variables to send for exactly what changed.
- *
- * Absent means "don't change", which is the same convention
- * `bulkSaveEntries` already documents for list writes. Sending every field on
- * every save would make an unrelated stale value overwrite a change made
- * elsewhere.
- *
- * **Never emits `animeListOptions` or `mangaListOptions`.** See the file header;
- * there is a test for it.
- */
+/** Only what changed; absent means "don't change", and `animeListOptions`/`mangaListOptions` are never emitted. */
 export function formToUpdateUserVars(
   form: UserSettingsForm,
 ): Record<string, unknown> {

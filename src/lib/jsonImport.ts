@@ -1,34 +1,12 @@
 import type { FuzzyDate, Media, MediaListStatus, MediaType } from "@/api/types";
 
-/**
- * Reading Karasu's own JSON export back in — the half that was missing.
- *
- * The app could write this file and not read it, which makes it an export
- * rather than a backup: the only way back in was a MyAnimeList XML, which
- * carries neither AniList ids nor private flags nor the two axes manga is
- * tracked on. This closes that.
- *
- * It is a *parser*, not a fetch: everything it needs is in the file, including
- * the AniList media id, so an import costs no requests at all. That is the
- * whole reason the export carries `media.id` and `scoreRaw` — a
- * format-independent integer nobody has to guess the meaning of.
- *
- * Everything unusable is counted rather than dropped, on the same principle as
- * `malImport`: an import that silently loses rows is how two copies of a list
- * drift apart without anyone noticing.
- */
+/** Reads Karasu's own JSON export back in without a request, and counts every unusable row rather than dropping it. */
 
 export interface JsonImportRow {
   mediaId: number;
   mediaType: MediaType;
   title: string;
-  /**
-   * The export's trimmed media block, rebuilt as a `Media`.
-   *
-   * Local mode stores this beside the row so the list renders offline — without
-   * it an imported entry is a title-less card waiting on a fetch that local
-   * mode never makes. AniList mode ignores it, as it does for the MAL path.
-   */
+  /** The export's trimmed media block rebuilt as a `Media`, stored by local mode so the list renders offline. */
   media: Media;
   status: MediaListStatus;
   /** The 0–100 raw score, exactly as exported. */
@@ -63,13 +41,7 @@ function count(value: unknown): number {
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
 }
 
-/**
- * A fuzzy date only if it looks like one.
- *
- * Every part is independently nullable on AniList, so `{year: 2019}` is a real
- * answer rather than a broken one — but an object with no year at all is not a
- * date, and passing it on would put an empty `{}` where the app expects null.
- */
+/** A fuzzy date only if it has a year; every other part is independently nullable, as on AniList. */
 function fuzzy(value: unknown): FuzzyDate | null {
   if (!value || typeof value !== "object") return null;
   const d = value as Record<string, unknown>;
@@ -93,9 +65,7 @@ function rowsFrom(list: unknown, mediaType: MediaType, out: JsonImportResult) {
     const media = (e.media ?? {}) as Record<string, unknown>;
     const mediaId = Number(media.id);
     const status = e.status as MediaListStatus;
-    // The id is what makes this importable without a single request, and the
-    // status is what decides which list it lands on. Without either, the row
-    // is not one.
+    // The id makes the row importable without a request and the status decides its list; without either it is no row.
     if (!Number.isInteger(mediaId) || mediaId <= 0 || !STATUSES.includes(status)) {
       out.skipped += 1;
       continue;
@@ -122,8 +92,7 @@ function rowsFrom(list: unknown, mediaType: MediaType, out: JsonImportResult) {
         volumes: Number.isInteger(media.volumes) ? (media.volumes as number) : null,
       } as Media,
       status,
-      // Clamped rather than trusted: this file may have been edited by hand,
-      // and a score above the scale would be written to a list.
+      // Clamped rather than trusted: a hand-edited score above the scale would be written to a list.
       scoreRaw: Math.min(100, count(e.scoreRaw)),
       progress: count(e.progress),
       progressVolumes: count(e.progressVolumes),
@@ -136,14 +105,7 @@ function rowsFrom(list: unknown, mediaType: MediaType, out: JsonImportResult) {
   }
 }
 
-/**
- * Parses an export produced by `buildJsonExport`.
- *
- * Throws only on text that is not JSON at all — a file of the wrong *shape*
- * comes back as zero rows, which the caller reports the same way it reports an
- * empty MAL import. The `source` marker is checked because a JSON file that
- * parses is not evidence of anything: someone will drop the wrong export in.
- */
+/** Parses a `buildJsonExport` file; throws only on non-JSON, and the wrong shape or `source` yields zero rows. */
 export function parseJsonExport(text: string): JsonImportResult {
   const data = JSON.parse(text) as Record<string, unknown>;
   const out: JsonImportResult = { rows: [], skipped: 0 };

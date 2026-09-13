@@ -1,27 +1,6 @@
 import type { SocialUser } from "@/api/social";
 
-/**
- * AniList's thread comments, flattened to something renderable.
- *
- * `ThreadComment.childComments` is a raw `Json` scalar, not a typed connection:
- * there is no way to select its shape, no way to limit its depth, and no
- * guarantee about what arrives. That is the entire reason this is pure logic
- * with tests rather than a `.map()` in a component.
- *
- * Two measurements that shaped the decisions here, both taken against thread
- * 12753 (a 4,500-comment forum game):
- *
- * - **Asking for `childComments` costs 13×.** Twelve comments came to 52,801
- *   bytes with it and 3,964 bytes without. It is all-or-nothing, so the page
- *   size is capped low to compensate rather than the field being dropped —
- *   replies are most of what a thread *is*, and it is one request either way.
- * - **The nesting reaches 48 levels.** A reply chain that deep cannot be
- *   rendered as a tree in a tracker's side panel and would not be readable if it
- *   were, so it is flattened to two levels and the rest is a link to AniList.
- *   Most of that 52 kB is therefore discarded on purpose; the alternative is a
- *   per-comment expander that cannot know whether it will find anything, since
- *   the child count is only inside the blob.
- */
+/** Thread comments flattened to two levels, the rest reported as hidden; `childComments` is an untyped blob. */
 
 export interface FlatComment {
   id: number;
@@ -31,18 +10,9 @@ export interface FlatComment {
   isLiked: boolean;
   siteUrl: string;
   user: SocialUser | null;
-  /** 0 for a top-level comment, 1 for a reply. Never deeper — see above. */
+  /** 0 for a top-level comment, 1 for a reply; never deeper. */
   depth: 0 | 1;
-  /**
-   * The top-level comment this row belongs to — itself, when `depth` is 0.
-   *
-   * **This is what a reply must be parented to.** AniList nests arbitrarily
-   * deep, but only two levels are rendered: a comment parented to a *reply*
-   * lands at depth 2, which `flattenComments` folds into `hiddenReplies` and
-   * never draws. Posting one therefore succeeds and then vanishes, with the
-   * only trace being a "N more on AniList" counter ticking up. Measured chains
-   * run 48 deep, so that is the ordinary case rather than an edge.
-   */
+  /** The top-level row this belongs to, itself at depth 0; parent replies here or they land past the cap and vanish. */
   rootId: number;
   /** Replies that exist but sit below the depth cap. */
   hiddenReplies: number;
@@ -104,21 +74,13 @@ function normalize(raw: unknown, depth: 0 | 1): FlatComment | null {
     siteUrl: typeof c.siteUrl === "string" ? c.siteUrl : "",
     user: asUser(c.user),
     depth,
-    // Overwritten by the caller, which is the only place that knows the row
-    // this one hangs off. Seeded to itself so a normalized row is never
-    // parentless, whatever path reaches it.
+    // Seeded to itself so a normalized row is never parentless; the caller overwrites it with the real root.
     rootId: c.id,
     hiddenReplies: 0,
   };
 }
 
-/**
- * Flattens a page of comments to at most two levels, in reading order.
- *
- * Never throws. A malformed or unexpected `childComments` yields no replies
- * rather than taking the whole thread down — the field is untyped, so "unexpected"
- * is a normal outcome rather than a defensive hypothetical.
- */
+/** Flattens a page to two levels in reading order; a malformed `childComments` yields no replies rather than a throw. */
 export function flattenComments(rows: unknown): FlatComment[] {
   if (!Array.isArray(rows)) return [];
   const out: FlatComment[] = [];
@@ -136,9 +98,7 @@ export function flattenComments(rows: unknown): FlatComment[] {
     for (const kid of kids) {
       const reply = normalize(kid, 1);
       if (!reply) continue;
-      // Everything below this reply is beyond the cap; count it so the row can
-      // say so instead of silently losing a conversation.
-      // Parented to the top-level row, not to `reply.id` — see `rootId`.
+      // Parented to the top-level row, not to `reply.id`; the subtree past the cap is counted so the row can say so.
       reply.rootId = top.id;
       reply.hiddenReplies = countDescendants((kid as RawComment)?.childComments);
       hidden += reply.hiddenReplies;
@@ -154,16 +114,7 @@ export function flattenComments(rows: unknown): FlatComment[] {
 }
 
 
-/**
- * The row `flattenComments` will actually draw for `targetId`.
- *
- * The tree query resolves a comment id to the root of its conversation, but
- * the flatten renders two levels — so a deeply nested target may not be a row
- * at all. This answers with the target itself when it is visible (`exact`),
- * its depth-1 ancestor when it is folded below the cap (`exact: false`), the
- * top-level root when a malformed child hides it, and null when the id is
- * nowhere in the rows. Same untyped-blob rules as the flatten: never throws.
- */
+/** The row `flattenComments` will draw for `targetId`: itself (`exact`), its nearest drawable ancestor, or null. */
 export function visibleAnchor(
   rows: unknown,
   targetId: number,

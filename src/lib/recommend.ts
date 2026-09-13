@@ -1,16 +1,4 @@
-/**
- * Recommendations built from what you've already finished.
- *
- * AniList's `Media.recommendations` is community-voted "if you liked X, try
- * Y". One title's recommendations are a shallow list; the useful signal comes
- * from asking many of your completed entries at once and seeing which titles
- * keep coming back — weighted by how much *you* liked the thing that
- * suggested them.
- *
- * All of this is pure so it can be tested without a network or a renderer;
- * the query lives in `api/queries.ts` and the rendering in
- * `components/RecommendedSection.tsx`.
- */
+/** Recommendations from many completed entries at once, weighted by how much you liked the title that suggested each. */
 import type { MediaListEntry, MediaType } from "@/api/types";
 import type { MediaWithListStatus } from "@/api/queries";
 
@@ -18,7 +6,7 @@ import type { MediaWithListStatus } from "@/api/queries";
 export interface RawRecommendation {
   /** The completed entry whose recommendations this came from. */
   seedId: number;
-  /** AniList's community vote count. Can be negative — see below. */
+  /** AniList's community vote count; negative means voted down. */
   rating: number;
   /** RATE_UP | RATE_DOWN | NO_RATING — the viewer's own vote, if fetched. */
   userRating?: string | null;
@@ -37,33 +25,18 @@ export interface ScoredRecommendation {
   weight: number;
   /** The seed that contributed most, for "because you finished …". */
   topSeedId: number;
-  /** The viewer's vote on the *top* pairing — the one the caption names
-      and the one a vote button acts on. */
+  /** The viewer's vote on the top pairing, the one the caption names and a vote button acts on. */
   userRating: string | null;
   /** How many distinct completed entries pointed here. */
   seedCount: number;
 }
 
-/**
- * How much a completed entry's opinion counts, as a 0–1 fraction of the
- * score scale's `max` (scores arrive in the account's display format now).
- *
- * An unscored entry counts as a 7/10: you finished it, which is a mild
- * endorsement, but you never said you liked it. The point of weighting at all
- * is the other end — a 3/10 you slogged through shouldn't drag its
- * recommendations to the top of the page just because you saw it through.
- */
+/** How much a completed entry's opinion counts, a fraction of the scale's `max`; unscored is a mild endorsement. */
 export function seedWeight(score: number, max = 10): number {
   return score > 0 ? score / max : 0.7;
 }
 
-/**
- * The completed entries worth asking about, best-liked first.
- *
- * Capped because every seed is a sub-selection in one batched query — 25 keeps
- * it to a single request well inside AniList's rate limit. Sorting by score
- * means the cap drops the entries whose opinion we'd weight least anyway.
- */
+/** The completed entries worth asking about, best-liked first and capped so every seed fits one batched request. */
 export function pickSeeds(
   entries: MediaListEntry[],
   limit = 25,
@@ -93,19 +66,7 @@ export interface RankOptions {
   scoreMax?: number;
 }
 
-/**
- * Aggregates raw recommendation nodes into a ranked list.
- *
- * Notable exclusions:
- * - `rating <= 0`. AniList lets users vote a recommendation *down*, so a node
- *   can arrive with a negative rating meaning "these are nothing alike".
- *   Summing those unfiltered would let a widely-rejected pairing count as
- *   support.
- * - Anything already on the user's list. The exclude set is built from the
- *   fetched list rather than from `mediaListEntry`, which is null in
- *   local-only mode where the AniList query runs unauthenticated.
- * - The wrong media type — an anime's recommendations can include manga.
- */
+/** Ranks raw nodes, skipping down-voted pairings, the wrong media type and anything already on the fetched list. */
 export function rankRecommendations(
   recs: RawRecommendation[],
   { seeds, exclude, type, limit = 12, isHidden, scoreMax = 10 }: RankOptions,

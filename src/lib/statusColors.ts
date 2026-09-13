@@ -1,19 +1,4 @@
-/**
- * One colour per list status, for the whole app.
- *
- * Karasu had exactly one status→colour map before this, page-local to
- * `Franchise`, where Watching rode the accent and Completed was a fixed green.
- * A cover ring needed the same idea, and two maps would have meant a colour
- * meaning one thing on a card and another in the graph — so this is the single
- * vocabulary and Franchise reads it too.
- *
- * The defaults are deliberately *not* the accent. A user picks the accent for
- * how it looks; these have to be told apart from each other at ring width, and
- * one of them changing every time the accent does would break that. Watching is
- * green because it is the healthy state, Dropped red, Paused amber, Planning
- * grey because it is the absence of activity, and Rewatching a deeper green so
- * it reads as a variant of Watching rather than a seventh unrelated hue.
- */
+/** The one status-to-colour vocabulary for the whole app; the defaults are not the accent so they stay distinguishable. */
 
 import type { MediaListStatus } from "@/api/types";
 
@@ -46,14 +31,7 @@ const HEX = /^#[0-9a-f]{6}$/i;
 export const isStatusHex = (v: unknown): v is string =>
   typeof v === "string" && HEX.test(v);
 
-/**
- * A stored palette, with anything unusable replaced by its default.
- *
- * Per key rather than all-or-nothing: a single corrupted entry should cost that
- * one colour, not the five beside it that are still fine. Extra keys are
- * dropped — a status AniList retires must not linger in a `Record` the rest of
- * the app indexes by a live union.
- */
+/** A stored palette with each unusable entry replaced by its own default and unknown keys dropped. */
 export function normalizeStatusColors(stored: unknown): StatusPalette {
   const src = (stored ?? {}) as Partial<Record<string, unknown>>;
   const out = {} as StatusPalette;
@@ -75,14 +53,6 @@ export function isDefaultPalette(p: StatusPalette): boolean {
 export const statusVar = (status: MediaListStatus): string =>
   `--color-status-${status.toLowerCase()}`;
 
-/**
- * What to paint for a status, as a `var()` so a live palette change repaints
- * without re-rendering anything.
- *
- * `null` is "not on your list", which is a real answer on a search result and
- * must stay distinguishable from Planning — see `Franchise`, where the two are
- * three RGB points apart by default and the *line style* carries the
- * difference. A user picking two similar hues cannot break that.
- */
+/** What to paint for a status as a `var()`, so a palette change repaints live; `null` is "not on your list", not Planning. */
 export const statusColorVar = (status: MediaListStatus | null): string =>
   status ? `var(${statusVar(status)})` : NO_STATUS_COLOR;

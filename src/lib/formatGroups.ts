@@ -1,17 +1,4 @@
-/**
- * Splitting a season into format sections, and moving around one with arrows.
- *
- * A season is fifty titles in one wall, and a TV series, a five-minute short
- * and a music video are not comparable things to scan past each other. Grouping
- * them is cheap here because Seasonal is unvirtualized — fifty items, a plain
- * CSS grid — so a section is just another grid, and none of `VirtualGrid`'s
- * row-chunking applies.
- *
- * What is *not* free is the keyboard. `nextFocus` treats the results as one
- * uniform rectangle, so with ragged section ends "down" from the last row of
- * one group lands at the wrong offset in the next. `nextFocusGrouped` below is
- * that arithmetic done properly.
- */
+/** Splitting a season into format sections, and the arrow-key arithmetic `nextFocus` gets wrong over ragged sections. */
 
 import type { Move } from "./roving";
 
@@ -34,16 +21,7 @@ export interface FormatGroup<T> {
   offset: number;
 }
 
-/**
- * Groups by `format`, in `FORMAT_ORDER`, with everything else last.
- *
- * `Media.format` is typed `string | null`, not a union — so a value AniList
- * adds later must land somewhere rather than vanishing. It joins the trailing
- * group, which is why that group is keyed `null` and labelled generically: an
- * unknown format is not "no format", but on screen they are the same shrug.
- *
- * Empty groups are dropped: a heading over nothing is worse than no heading.
- */
+/** Groups by `format` in `FORMAT_ORDER`, with unknown and null formats in a trailing group and empty groups dropped. */
 export function groupByFormat<T extends { format?: string | null }>(
   items: readonly T[],
 ): FormatGroup<T>[] {
@@ -77,20 +55,7 @@ export function flattenGroups<T>(groups: readonly FormatGroup<T>[]): T[] {
   return groups.flatMap((g) => g.items);
 }
 
-/**
- * Arrow movement over sections of unequal length.
- *
- * Left and right run through the whole list, so the end of one section leads
- * into the next — which is what a reader expects from a flat sequence.
- *
- * Up and down move by a row *within* the section the focus is in, and step into
- * the neighbouring section only when there is no row to move to. Crossing keeps
- * the column where it can: dropping out of column 3 should arrive at column 3,
- * or at the nearest thing the next section's first row has.
- *
- * Falling out of the bottom of the last section, or the top of the first, is a
- * no-op rather than a wrap — the same rule `nextFocus` documents.
- */
+/** Arrow movement over sections of unequal length: left/right run flat, up/down cross sections keeping the column, no wrap. */
 export function nextFocusGrouped(
   current: number | null,
   move: Move,
@@ -120,8 +85,7 @@ export function nextFocusGrouped(
   if (move === "down") {
     const next = local + cols;
     if (next < sizes[s]) return start + next;
-    // Past the end of this section: the *last* row is often ragged, so land on
-    // its final item before leaving — otherwise a press can skip a whole row.
+    // The last row is often ragged, so land on its final item before leaving or a press can skip a whole row.
     const lastRowStart = Math.floor((sizes[s] - 1) / cols) * cols;
     if (local < lastRowStart) return start + sizes[s] - 1;
     if (s + 1 >= sizes.length) return at;

@@ -1,19 +1,7 @@
 import type { FuzzyDate, MediaListEntry } from "@/api/types";
 import { displayTitle } from "@/api/types";
 
-/**
- * Statistics AniList cannot answer, computed from the cached list.
- *
- * `LIST_QUERY` already carries per-entry scores, the community's
- * `averageScore`, fuzzy start/completion dates and season facts — enough for
- * whole tabs that cost **zero requests** and work offline. Everything here is
- * pure over the entries the caller already holds; the content filter runs at
- * the call site, on the same filtered pool every other panel reads.
- *
- * Scores: the user's arrive in the account's display format, the community's
- * is hundred-point (`averageScore`) — brought onto the display scale here, at
- * the boundary, like `normalizeStatsBlock` does for the statistics endpoint.
- */
+/** Statistics AniList cannot answer, computed from the cached list; community scores are put on the display scale. */
 
 export interface DeltaRow {
   mediaId: number;
@@ -39,12 +27,7 @@ export interface ScoreDeltaSummary {
   kindest: DeltaRow[];
 }
 
-/**
- * How the user's scores sit against the community's, for the titles where
- * both exist. Unscored entries and titles AniList has no mean for are
- * excluded rather than counted as zero — a zero *is* the absence here, and
- * averaging it in would drag the mean toward an opinion nobody holds.
- */
+/** The user's scores against the community's where both exist; a missing score is skipped, never counted as zero. */
 export function scoreDelta(
   entries: MediaListEntry[],
   top = 5,
@@ -102,17 +85,7 @@ export interface ActivityHeatmap {
   total: number;
 }
 
-/**
- * When the list was actually worked on: every start and every completion with
- * a known year *and* month becomes one event in its cell.
- *
- * Fuzzy-date honesty is the whole trick here — AniList dates are legitimately
- * partial ("2019", "March 2024"), and a year-only date is **skipped**, never
- * pinned to January: a fabricated cell reads exactly like a real one and
- * poisons the picture. Both dates count, deliberately — starting and
- * finishing are both activity, and a show begun in March and finished in May
- * was worked on in both months.
- */
+/** Each start and completion with a known month is one event; a year-only date is skipped, never pinned to January. */
 export function activityHeatmap(
   entries: MediaListEntry[],
   maxYears = 8,
@@ -155,20 +128,7 @@ export interface LocalTotals {
   releaseYears: { year: number; count: number }[];
 }
 
-/**
- * The figures AniList's statistics endpoint would return, counted from the
- * list instead.
- *
- * Every one of these is derivable from entries the app already holds, which is
- * the whole reason the account-free profile can have a statistics screen at
- * all. What is *not* here is what AniList precomputes and Karasu cannot:
- * minutes watched (no duration on a list entry), and the genre, tag, studio,
- * voice-actor and staff rankings, which need a join across every media the user
- * has ever touched.
- *
- * Deliberately not filtered: the caller has already applied the content filter,
- * the same way every other panel on that screen reads its pool.
- */
+/** The figures AniList's statistics endpoint would return, counted from the list the caller has already filtered. */
 export function localTotals(entries: MediaListEntry[]): LocalTotals {
   const byStatus = new Map<string, number>();
   const scores = new Map<number, number>();
@@ -185,9 +145,7 @@ export function localTotals(entries: MediaListEntry[]): LocalTotals {
       scoreSum += e.score;
       scores.set(e.score, (scores.get(e.score) ?? 0) + 1);
     }
-    // `seasonYear` rather than `startDate`: the list query carries it, and it
-    // is the year the *title* is from — which is what a release-year chart is
-    // asking. A missing one is left out rather than bucketed as 0.
+    // seasonYear is the year the title is from, which is what a release-year chart asks; a missing one is left out.
     const year = e.media.seasonYear;
     if (year) years.set(year, (years.get(year) ?? 0) + 1);
   }
@@ -219,11 +177,7 @@ export interface SeasonCount {
   meanScore: number;
 }
 
-/**
- * Which broadcast seasons the list is drawn from, with how the user scored
- * each — "am I a fall person". Seasonless media (most manga, some films) are
- * simply outside the question rather than a fifth bucket.
- */
+/** Which broadcast seasons the list draws from and how the user scored each; seasonless media are not a fifth bucket. */
 export function seasonalHistory(entries: MediaListEntry[]): SeasonCount[] {
   const seen = new Set<number>();
   const counts = new Map<SeasonName, { count: number; scoreSum: number; scored: number }>();
@@ -251,32 +205,10 @@ export function seasonalHistory(entries: MediaListEntry[]): SeasonCount[] {
 
 // --- AniList's own activity history, at day resolution -------------------
 
-/**
- * AniList's five intensity buckets, as it actually reports them.
- *
- * `level` on `activityHistory` came back as **1, 3, 5, 7, 9** across the
- * accounts measured — five odd steps, which is why `Heatmap`'s five opacities
- * map onto it one-for-one. Taking AniList's bucket rather than re-deriving
- * thresholds from `amount` is the same decision `normalizeStatsBlock` makes:
- * when the API has already answered a question, answering it again locally is
- * how the two come to disagree.
- */
+/** AniList's own intensity buckets; use its level rather than re-deriving thresholds from amount locally. */
 export const HISTORY_LEVELS = [1, 3, 5, 7, 9] as const;
 
-/**
- * Which day a history bucket belongs to, as a UTC midnight.
- *
- * **The dates are not UTC days.** Measured across two accounts, every `date`
- * sits either exactly on UTC midnight or exactly 82,800s (23:00) before one —
- * and an account whose range crosses late March carries both. That is the
- * signature of midnight in **Europe/London**: UTC in winter, UTC+1 in summer.
- *
- * So a bucket stamped 23:00Z on 16 July is London's 17 July, and reading it
- * with `getUTCDate` would put it on the 16th while reading it in the viewer's
- * local time would put it wherever the viewer happens to be — off by one for
- * anyone west of London. Rounding to the nearest UTC day recovers the London
- * date from both spellings and depends on no timezone at all.
- */
+/** The bucket's day as a UTC midnight; AniList stamps London midnights, so round to the nearest UTC day, never floor. */
 export function historyDay(dateSeconds: number): number {
   return Math.round(dateSeconds / 86400) * 86400;
 }
@@ -301,21 +233,7 @@ export interface DayHeatmap {
   to: number;
 }
 
-/**
- * AniList's activity history as a week × weekday grid — the shape its own
- * profile draws.
- *
- * Returns `null` when there is nothing to draw, which is also what local mode
- * always gets: `activityHistory` belongs to an account, so there is no local
- * equivalent and `activityHeatmap`'s month grid stays the fallback rather than
- * being replaced by an empty one.
- *
- * Note what the range is *not*: a fixed year. Two accounts measured spanned 34
- * and 186 days, both ending at the same date, so whether AniList caps the
- * window or those accounts are simply that old could not be established. The
- * grid therefore draws exactly the range it was given rather than padding out
- * to a year that may be a fiction.
- */
+/** AniList's activity history as a week-by-weekday grid, drawn over exactly the range given rather than a padded year. */
 export function dayHeatmapFromHistory(
   history: { date: number; amount: number; level?: number | null }[] | null | undefined,
 ): DayHeatmap | null {
@@ -341,17 +259,13 @@ export function dayHeatmapFromHistory(
   const from = days[0];
   const to = days[days.length - 1];
 
-  // Monday-first, because that is what a week is in every locale this app
-  // ships. `getUTCDay` is Sunday-first, hence the rotation.
+  // Monday-first, as every locale this app ships expects; getUTCDay is Sunday-first, hence the rotation.
   const weekdayOf = (day: number) => (new Date(day * 1000).getUTCDay() + 6) % 7;
   const start = from - weekdayOf(from) * 86400;
 
   const weeks: (HeatmapDay | null)[][] = [];
   const months: { column: number; month: number }[] = [];
-  // Keyed by year and month, so January twice over is two labels; and a month
-  // stays *unlabelled* until a column is free for it. Advancing a "last month
-  // seen" cursor instead loses any month that begins in a column another month
-  // already claimed — February starting on a Sunday vanished entirely.
+  // Keyed by year and month, and a month waits for a free column; a "last month seen" cursor loses whole months.
   const labelled = new Set<number>();
   for (let day = start, column = 0; day <= to; column += 1) {
     const week: (HeatmapDay | null)[] = [];

@@ -1,10 +1,4 @@
-/**
- * Minimal RFC 5545 assembly for the airing-week export.
- *
- * Only what a VEVENT needs: UTC timestamps, text escaping, and the 75-octet
- * line fold. `now` is a parameter rather than `Date.now()` so the output is
- * a pure function of its inputs and the tests can pin exact bytes.
- */
+/** Minimal RFC 5545 assembly for the airing-week export; `now` is a parameter so the tests can pin exact bytes. */
 
 export interface IcsEvent {
   /** Stable per airing, so re-imports update instead of duplicating. */
@@ -35,12 +29,7 @@ export function escapeIcsText(value: string): string {
     .replace(/\r?\n/g, "\\n");
 }
 
-/**
- * RFC 5545 §3.1: content lines fold at 75 octets, continuation lines start
- * with one space. Folded at characters rather than octets — a multi-byte
- * title folds a little early, which the spec permits; folding late would
- * not be.
- */
+/** RFC 5545 line folding, done at characters rather than octets because folding early is permitted and late is not. */
 export function foldIcsLine(line: string): string {
   if (line.length <= 74) return line;
   const parts: string[] = [line.slice(0, 74)];

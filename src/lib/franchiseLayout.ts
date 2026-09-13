@@ -1,12 +1,6 @@
 import type { FranchiseEdge, FranchiseNode } from "@/api/franchise";
 
-/**
- * Node box and grid pitch for the franchise canvas, in **em**.
- *
- * The canvas is sized in rem against the root scale rather than in px, so a
- * 125% Windows text bump grows the whole graph coherently instead of inflating
- * the labels inside fixed boxes.
- */
+/** Node box and grid pitch for the franchise canvas in em, so a text-scale bump grows the whole graph coherently. */
 export const NODE_W = 5.25;
 /** 2:3 cover + the two label lines beneath it. */
 export const COVER_H = NODE_W * 1.5;
@@ -37,20 +31,7 @@ export interface FranchiseLayout {
   height: number;
 }
 
-/**
- * Lay the franchise out as a tree rooted at `rootId`.
- *
- * Positions are derived, never authored: a breadth-first walk over the
- * undirected relation graph gives every node a parent (the edge it was first
- * reached through), depth follows from that parent, and a column holds every
- * node at one depth, vertically centred. Collapsing therefore needs no special
- * case — the hidden nodes simply drop out of their columns and the rest close
- * ranks.
- *
- * Pure (no DOM) so it can be unit-tested. Cycles terminate because each node is
- * parented once, and nodes unreachable from the root become roots of their own
- * at depth 0 rather than vanishing.
- */
+/** Lays the franchise out as a BFS tree rooted at `rootId`, one centred column per depth; unreachable nodes become roots. */
 export function layoutFranchise(
   nodes: FranchiseNode[],
   edges: FranchiseEdge[],
@@ -98,8 +79,7 @@ export function layoutFranchise(
     }
   };
 
-  // The root first so it owns depth 0, then anything the walk never reached —
-  // an isolated node is still a node, and hiding it would misreport the graph.
+  // The root first so it owns depth 0, then anything the walk never reached, because hiding it would misreport the graph.
   if (nodes.some((n) => n.id === rootId)) walk(rootId);
   for (const n of nodes) walk(n.id);
 
@@ -111,8 +91,7 @@ export function layoutFranchise(
     parent.descendants += node.descendants + 1;
   }
 
-  // Pre-order keeps a subtree contiguous within its column, so a branch reads
-  // as one block instead of interleaving with its siblings' children.
+  // Pre-order keeps a subtree contiguous within its column, so a branch reads as one block.
   const order: number[] = [];
   const visible = new Set<number>();
   const descend = (id: number) => {

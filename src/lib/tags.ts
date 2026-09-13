@@ -1,16 +1,4 @@
-/**
- * Custom tags piggy-backed inside AniList's per-entry `notes` string.
- *
- * AniList has no user-defined tags on list entries, so Karasu stores them in
- * a single delimited block appended to the notes:
- *
- *   <user notes>\n\n[[karasu:tags]]tag1, tag2[[/karasu:tags]]
- *
- * Parsing is deliberately defensive: a notes string edited on the AniList
- * website (or mangled by anything else) must never crash us and must never
- * lose the user's prose. When in doubt we treat the entry as having no tags
- * and show the notes verbatim.
- */
+/** Custom tags in a `[[karasu:tags]]` block appended to the notes; when in doubt, no tags and the notes verbatim. */
 
 const TAG_BLOCK_RE = /\[\[karasu:tags\]\]([\s\S]*?)\[\[\/karasu:tags\]\]/;
 
@@ -41,13 +29,7 @@ export function normalizeTags(parts: readonly string[]): string[] {
   return out;
 }
 
-/**
- * Split a raw notes string into user-facing notes + tags. Only the first
- * well-formed block is honoured; anything before it stays as notes, anything
- * after it is left in notes untouched. A block that yields no usable tags is
- * treated as "no tags" and the raw string is returned unchanged (never strip
- * something we couldn't confidently interpret).
- */
+/** Splits notes into prose and tags from the first well-formed block, returning the raw string when it yields none. */
 export function parseNotes(raw: string | null | undefined): ParsedNotes {
   const source = raw ?? "";
   const match = TAG_BLOCK_RE.exec(source);
@@ -72,11 +54,7 @@ function stripTagBlock(s: string): string {
   return s.replace(TAG_BLOCK_RE, "");
 }
 
-/**
- * Re-assemble a notes string from user-facing notes + tags. Any pre-existing
- * block in `userNotes` is stripped first so round-trips can never accumulate
- * blocks. With no tags, the notes are returned block-free and trimmed.
- */
+/** Re-assembles notes plus tags, stripping any existing block first so round-trips can never accumulate blocks. */
 export function serializeNotes(userNotes: string, tags: readonly string[]): string {
   const base = stripTagBlock(userNotes).replace(/\s+$/, "");
   const clean = normalizeTags(tags);

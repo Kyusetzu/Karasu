@@ -1,35 +1,8 @@
-/**
- * AniList's activity feed, normalised into something renderable.
- *
- * `Page.activities` returns an `ActivityUnion` of three members —
- * `ListActivity`, `TextActivity` and `MessageActivity` — and the third is
- * **private mail between two users**. It is excluded three separate ways: it is
- * absent from the query's `type_in`, it is given no inline fragment, and
- * `normalizeActivity` returns null for it with a test that says so. One
- * argument someone widens later is all it would take, so none of the three is
- * redundant.
- */
+/** AniList's activity feed normalised for rendering; MessageActivity is private mail and is excluded three separate ways. */
 
 import type { SocialMedia, SocialUser } from "@/api/social";
 
-/**
- * The verbs AniList composes, as a closed set of keys.
- *
- * The catch this exists for: **AniList ships the sentence, in English only.**
- * `ListActivity.status` is a pre-composed string like `"watched episode"`, so a
- * German user would otherwise read a German feed with English verbs in it.
- * Mapping to a key first is what makes translation possible at all.
- *
- * Measured across 150 live activities, by frequency: "watched episode" (57),
- * "read chapter" (39), "completed" (14), "plans to watch" (10),
- * "plans to read" (3), "dropped" (1). The rest are AniList's other list
- * statuses, included because they exist even though the sample missed them.
- *
- * A *closed union*, not a template — `i18nKeys.test.ts` only sees literal
- * `t("…")` calls, so a key built by interpolation is invisible to the suite.
- * The component maps this through a literal switch, exactly as `receiptText`
- * in `useListMutations` already does.
- */
+/** AniList's verbs as a closed set of keys, since it ships the sentence in English only; never a template key. */
 export type ActivityVerb =
   | "watchedEpisode"
   | "rewatchedEpisode"
@@ -54,13 +27,7 @@ const VERBS: Record<string, ActivityVerb> = {
   paused: "paused",
 };
 
-/**
- * The key for a status string, or null when AniList sends something new.
- *
- * Null means "fall back to AniList's own words" rather than "show nothing" — an
- * unrecognised verb should read slightly untranslated, not leave a row with a
- * blank where the sentence goes.
- */
+/** The key for a status string, or null so the row falls back to AniList's own words rather than a blank. */
 export function listActivityVerb(status: string | null | undefined): ActivityVerb | null {
   if (!status) return null;
   return VERBS[status.trim().toLowerCase()] ?? null;
@@ -83,18 +50,12 @@ export function parseProgress(progress: string | null | undefined): ProgressRang
   return to !== undefined && to > from ? { from, to } : { from };
 }
 
-/**
- * `"5"` or `"162–170"` — an en dash, because AniList's `"162 - 170"` is a batch
- * of chapters read in one sitting, not "162 of a 170 total". The German
- * templates were deliberately kept free of "von 170" for the same reason.
- */
+/** A single number or an en-dash range; the range is a batch read in one sitting, not "x of a total". */
 export function formatProgress(p: ProgressRange): string {
   return p.to !== undefined ? `${p.from}–${p.to}` : String(p.from);
 }
 
-/** The verbs whose sentence template carries a `{{n}}` progress slot. An
- *  activity with one of these but no parseable progress falls back to
- *  AniList's own words rather than rendering a hole where the number goes. */
+/** The verbs whose template carries a `{{n}}` slot; without parseable progress they fall back to AniList's words. */
 export const PROGRESS_VERBS: ReadonlySet<ActivityVerb> = new Set([
   "watchedEpisode",
   "rewatchedEpisode",
@@ -102,16 +63,7 @@ export const PROGRESS_VERBS: ReadonlySet<ActivityVerb> = new Set([
   "rereadChapter",
 ]);
 
-/**
- * Splits a sentence template at the `%t%` token, where the media title link is
- * rendered. Each language owns its whole sentence — German puts the participle
- * *after* the title ("hat Kapitel 162–170 von … gelesen"), which no fixed
- * verb-then-title order can express — and the component drops a React element
- * into the gap, so the title can stay a link without `Trans` or interpolation.
- *
- * A template missing the token degrades to `{before: s, after: ""}` — the old
- * verb-first order — instead of eating the title.
- */
+/** Splits a sentence template at the `%t%` title slot, so each language owns its word order and the title stays a link. */
 export function splitSentence(s: string): { before: string; after: string } {
   const i = s.indexOf("%t%");
   if (i === -1) return { before: s, after: "" };
@@ -158,14 +110,7 @@ export interface RawActivity {
   text?: string | null;
 }
 
-/**
- * One activity, or null when it is not something to render.
- *
- * Null covers three cases, all of which do occur: a `MessageActivity` (private
- * mail), an activity whose author is missing, and a member type this build does
- * not know. Returning null rather than throwing means one unexpected row cannot
- * take a whole feed page down with it.
- */
+/** One activity, or null for private mail, a missing author or an unknown member, so one row cannot sink the page. */
 export function normalizeActivity(raw: RawActivity | null | undefined): FeedItem | null {
   if (!raw || typeof raw.id !== "number" || !raw.user) return null;
 
@@ -184,8 +129,7 @@ export function normalizeActivity(raw: RawActivity | null | undefined): FeedItem
     return {
       ...base,
       kind: "list",
-      // A deleted title still leaves its activity behind, so the media is
-      // genuinely optional rather than defensively so.
+      // A deleted title still leaves its activity behind, so the media is genuinely optional.
       media: raw.media ?? null,
       verb: listActivityVerb(raw.status),
       rawStatus: raw.status?.trim() ?? "",
@@ -203,13 +147,7 @@ export function normalizeActivity(raw: RawActivity | null | undefined): FeedItem
   return null;
 }
 
-/**
- * The item after a like is toggled, for the optimistic patch.
- *
- * Clamped at zero: AniList's count and the local guess can disagree after a
- * race, and a feed row reading "-1 likes" is worse than one that is briefly one
- * behind.
- */
+/** The item after a like is toggled, for the optimistic patch; clamped at zero so a race never reads "-1 likes". */
 export function toggleLike<T extends { likeCount: number; isLiked: boolean }>(item: T): T {
   const isLiked = !item.isLiked;
   return {

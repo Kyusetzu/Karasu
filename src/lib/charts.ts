@@ -1,11 +1,4 @@
-/**
- * Chart geometry — the maths behind the statistics panels, kept out of the
- * components so it can be tested without a DOM.
- *
- * Everything here works in SVG user units with y running down, and angles in
- * degrees measured clockwise from twelve o'clock, which is how a reader
- * describes a pie slice.
- */
+/** Chart geometry for the statistics panels, in SVG user units with angles in degrees clockwise from twelve o'clock. */
 
 export interface Point {
   x: number;
@@ -24,13 +17,7 @@ export function polar(cx: number, cy: number, r: number, deg: number): Point {
   return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
 }
 
-/**
- * One ring segment — the building block of both a donut and a sunburst.
- *
- * A full circle is drawn as two half arcs: a single arc whose start and end
- * points coincide is a no-op in SVG, so a category holding everything would
- * otherwise vanish rather than fill the ring.
- */
+/** One ring segment; a full circle is drawn as two half arcs, since an SVG arc whose ends coincide draws nothing. */
 export function arcPath(
   cx: number,
   cy: number,
@@ -83,12 +70,7 @@ export function slices(values: number[]): { start: number; end: number }[] {
   });
 }
 
-/**
- * The corners of a radar polygon, one axis per value, starting at the top.
- *
- * `max` is passed in rather than derived so several series can share a scale;
- * a zero max collapses to the centre instead of dividing by it.
- */
+/** The corners of a radar polygon from the top; `max` is passed in so several series can share a scale. */
 export function radarPoints(
   values: number[],
   max: number,
@@ -105,24 +87,11 @@ export function radarPoints(
 export const pointsAttr = (points: Point[]): string =>
   points.map((p) => `${round(p.x)},${round(p.y)}`).join(" ");
 
-// `linePoints` and `polylineLength` lived here for the hand-rolled LineChart;
-// the Years tab's AreaChart gets both from d3-shape (`curveMonotoneX` and
-// `pathLength` normalization), so they left with their consumer.
+// Line-path helpers belong to the Years tab's AreaChart, which takes them from d3-shape.
 
 const round = (n: number) => Math.round(n * 100) / 100;
 
-/**
- * Squarified treemap.
- *
- * Rows are grown while adding the next value improves the worst aspect ratio
- * in the row, then laid along the shorter side — the standard Bruls/Huizing/
- * van Wijk construction. Naive slice-and-dice is a third of the code and
- * produces slivers, which is the one thing a treemap must not do: a shape
- * that thin carries no area impression at all.
- *
- * Values are assumed sorted descending; zero and negative values are dropped
- * by the caller, since a rectangle with no area is not a fact worth drawing.
- */
+/** Squarified treemap over values sorted descending, since slice-and-dice produces slivers that carry no area impression. */
 export function squarify(values: number[], w: number, h: number): Rect[] {
   const out: Rect[] = [];
   const total = values.reduce((sum, v) => sum + v, 0);

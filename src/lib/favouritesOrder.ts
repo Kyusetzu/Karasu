@@ -1,14 +1,6 @@
 import type { FavouriteKind } from "@/api/social";
 
-/**
- * The reorder modal's pure half.
- *
- * `UpdateFavouriteOrder` replaces a kind's whole set, so the one invariant
- * that matters is: the variables always carry **every** id, in the new order,
- * with a 1-based position for each. Dropping an id from the arrays is
- * indistinguishable from unfavouriting it, which is why `toOrderVars` is the
- * only place the variables are built and why its tests count the set.
- */
+/** The reorder modal's pure half; the variables must carry every id, since a dropped id reads as an unfavourite. */
 
 /** The `(idsArg, orderArg)` pair per kind, matching the mutation's argument names. */
 export const FAV_ORDER_ARGS: Record<FavouriteKind, [string, string]> = {
@@ -19,11 +11,7 @@ export const FAV_ORDER_ARGS: Record<FavouriteKind, [string, string]> = {
   studio: ["studioIds", "studioOrder"],
 };
 
-/**
- * The list with one item moved, or the same array when the move is a no-op —
- * out-of-range targets clamp rather than throw, so holding an arrow at the top
- * of the list is harmless.
- */
+/** The list with one item moved, or the same array for a no-op; out-of-range targets clamp rather than throw. */
 export function moveItem<T>(list: T[], from: number, to: number): T[] {
   if (from < 0 || from >= list.length) return list;
   const clamped = Math.max(0, Math.min(list.length - 1, to));

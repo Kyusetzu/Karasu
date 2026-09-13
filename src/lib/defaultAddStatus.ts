@@ -1,15 +1,6 @@
 import { STATUS_ORDER, type MediaListStatus } from "@/api/types";
 
-/**
- * Which status a title joins the list with, when the user has not said.
- *
- * Every add flow — the discovery grids' plus circle, the local library's
- * "add to list", the entry editor's seed for a title not yet on the list —
- * hard-coded Planning; this makes that one configurable value instead of
- * four agreeing literals. localStorage following `viewMode.ts` — per
- * machine, no sync, nothing to migrate. One value for both media types:
- * the statuses are the same six, only their display names differ.
- */
+/** The one status every add flow uses when the user has not said, kept per machine in localStorage. */
 
 const KEY = "karasu-default-add-status";
 

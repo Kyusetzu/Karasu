@@ -1,7 +1,4 @@
-/**
- * Small colour-contrast helpers so accent-coloured surfaces always carry
- * readable text, no matter how light or dark the user's accent is.
- */
+/** Colour-contrast helpers so accent-coloured surfaces always carry readable text, whatever accent the user picks. */
 
 /** Parse an `#rgb`/`#rrggbb` string to [r,g,b] in 0…255 (fallback: black). */
 export function parseHex(hex: string): [number, number, number] {
@@ -41,42 +38,17 @@ export interface InkPair {
 /** Maximum contrast, but harsh — use where nothing softer will do. */
 export const PURE_INK: InkPair = { dark: "#000000", light: "#ffffff" };
 
-/**
- * The two ends of the app's own ink scale — the light theme's `ink-100` and
- * the dark theme's. Text on an accent fill picks one of these rather than pure
- * black or white, so a button matches the ink everywhere else instead of
- * jumping to an absolute the rest of the UI never uses.
- *
- * Deliberately *not* theme-dependent. Which one is readable is decided by the
- * accent fill's own luminance, and that does not change when the page around
- * it does.
- */
+/** The two ends of the app's own ink scale, not theme-dependent: the accent fill's luminance decides, not the page. */
 export const UI_INK: InkPair = { dark: "#1a1e27", light: "#eef1f6" };
 
-/**
- * Whichever of the two inks genuinely has more contrast on the background.
- *
- * The rule used to be `luminance > 0.45`, which is a much higher bar than the
- * arithmetic supports: the two ratios actually cross at luminance ≈ 0.179, so
- * everything between there and 0.45 was being given the light ink when the
- * dark one was more readable. On the app's own accent presets that was not a
- * near-miss — white on `#46a5b3` measures 2.88:1 and on `#3b93e6` 3.23:1, both
- * below the 4.5:1 floor, where black would have given 7.29:1 and 6.50:1.
- */
+/** Whichever ink has more contrast on the background; compare the two ratios, never a luminance threshold. */
 export function readableInk(hexBg: string, ink: InkPair = PURE_INK): string {
   return contrastRatio(hexBg, ink.dark) >= contrastRatio(hexBg, ink.light)
     ? ink.dark
     : ink.light;
 }
 
-/**
- * Rotates a colour's hue, holding saturation above a floor.
- *
- * The floor is what makes the companion sheens work for *any* accent: a
- * near-grey base has almost no saturation to rotate, so without it the wash
- * would be a second grey and the panels would go flat. `saturationFloor` is a
- * 0…1 fraction, unlike `Hsv.s` which is 0…100.
- */
+/** Rotates a hue holding saturation above a 0..1 floor, so a near-grey accent still yields a coloured sheen. */
 export function hueRotate(
   hex: string,
   degrees: number,
@@ -141,15 +113,7 @@ export interface AccentContext {
   ink?: InkPair;
 }
 
-/**
- * Derives every accent-dependent value from the one colour the user picked.
- *
- * All of it must stay computed: the point is that any colour on the wheel is
- * safe. The companion sheens (`w1`/`w2`) are the accent's own hue rotated, so
- * an indigo accent throws violet, a straw one throws warm amber and a teal one
- * throws green-blue. Hardcoding any of it reintroduces the failure where a pale
- * accent produced unreadable text while the panel wash stayed violet.
- */
+/** Derives every accent-dependent value from the one colour picked; keep all of it computed so any hue is safe. */
 export function accentShades(
   base: string,
   { light = false, surface950, surface900, ink = UI_INK }: AccentContext = {},
@@ -158,16 +122,13 @@ export function accentShades(
   const page = surface950 ?? (light ? "#f4f6f9" : "#0b0d12");
   const panel = surface900 ?? (light ? "#ffffff" : "#11141b");
 
-  // Accent-as-text: step away from the page until it clears 4.5:1. The bound
-  // matters — a base that can never reach it (a mid grey on a mid page) would
-  // otherwise spin here.
+  // Accent-as-text: step away from the page until it is readable; keep the bound, or an unreachable base spins here.
   let a400 = mix(base, toward, 0.2);
   for (let i = 0; i < 20 && contrastRatio(a400, page) < 4.5; i++) {
     a400 = mix(a400, toward, 0.12);
   }
 
-  // Accent-as-fill: only light theme needs help, where a very pale accent
-  // would otherwise be a white square on a white panel.
+  // Accent-as-fill: only light theme needs help, where a pale accent would be a white square on a white panel.
   const a500 =
     light && contrastRatio(base, panel) < 3 ? mix(base, "#000000", 0.22) : base;
 

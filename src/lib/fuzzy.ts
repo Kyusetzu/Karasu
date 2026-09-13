@@ -1,28 +1,4 @@
-/**
- * Fuzzy text matching for the local search surfaces — the library filter, the
- * command palette, the local library's unplaced list and the tag picker.
- *
- * A TypeScript port of the scrobbler's matcher
- * (`src-tauri/src/playback/recognition/matcher.rs`): the same normalize →
- * trigram machinery, adapted for the one way a search box differs from a
- * filename matcher — the query is a *fragment* of a title, not a whole one.
- * Symmetric Dice at the matcher's 0.7 floor rejects "frieren" against
- * "Sousou no Frieren" (≈0.42), so the fuzzy tier here is trigram
- * *containment*: how much of what was typed is found in the title. Dice
- * itself stays below, exact and tested, as the primitive.
- *
- * Scoring is tiered so that everything the old substring filter matched still
- * matches, and ranks above anything merely fuzzy:
- *
- *   1.0        exact title
- *   0.8..1.0   substring — the tighter title ranks higher
- *   0.6..0.8   every query word prefixes a distinct title word, any order
- *   0.3..0.6   trigram containment ≥ 0.5, queries of 3+ characters only
- *
- * Titles are scored one at a time: a per-title document is what makes a query
- * structurally unable to match across two adjacent names — the straddle bug
- * the old NUL-joined haystack existed to prevent.
- */
+/** Fuzzy search: exact > substring > word-prefix > trigram containment, scored per title, never a joined haystack. */
 
 export interface FuzzyTitle {
   norm: string;
@@ -37,14 +13,7 @@ export interface FuzzyDoc {
 
 export type PreparedQuery = FuzzyTitle;
 
-/**
- * Lowercase, fold diacritics, keep only letters and digits.
- *
- * The diacritic fold is a deliberate extension over the Rust normalize (which
- * compares release names to titles, both effectively ASCII): a search box
- * compares *typing* to titles, and nobody types "Pokémon". NFD is inert for
- * kana and kanji, so native titles pass through unharmed.
- */
+/** Lowercase, fold diacritics (nobody types "Pokémon"; NFD is inert for kana and kanji), keep letters and digits. */
 export function normalize(s: string): string {
   return s
     .normalize("NFD")
@@ -54,11 +23,7 @@ export function normalize(s: string): string {
     .trim();
 }
 
-/**
- * Codepoint trigrams over the padded string — the matcher's byte windows,
- * identical for ASCII and sharper for CJK, where byte windows straddle
- * characters. Two leading spaces and one trailing, same as the Rust.
- */
+/** Codepoint trigrams over the padded string (two leading spaces, one trailing), the same windows as the Rust matcher. */
 export function trigrams(s: string): Set<string> {
   const out = new Set<string>();
   if (!s) return out;
@@ -97,11 +62,7 @@ export function prepareQuery(q: string): PreparedQuery {
   return prepare(q);
 }
 
-/**
- * Below this share of the query's trigrams, a title is noise rather than a
- * typo. One wrong letter in a ten-character query still clears it (~0.73);
- * "half the words happen to appear somewhere" does not.
- */
+/** Below this share of the query's trigrams a title is noise rather than a typo. */
 const CONTAINMENT_FLOOR = 0.5;
 
 function scoreTitle(t: FuzzyTitle, q: PreparedQuery): number {
@@ -109,9 +70,7 @@ function scoreTitle(t: FuzzyTitle, q: PreparedQuery): number {
   if (t.norm.includes(q.norm)) {
     return 0.8 + 0.2 * (q.norm.length / t.norm.length);
   }
-  // Every query word a prefix of its own title word, any order — what lets
-  // "kimetsu yaiba" find "Kimetsu no Yaiba". Longest query words claim their
-  // title word first, so a stray "k" cannot steal the word "kimetsu" needs.
+  // Every query word prefixes its own title word in any order; longest first, so a stray "k" cannot steal "kimetsu".
   if (q.tokens.length > 0 && q.tokens.length <= t.tokens.length) {
     const used = new Array<boolean>(t.tokens.length).fill(false);
     const byLength = [...q.tokens].sort((a, b) => b.length - a.length);
@@ -128,8 +87,7 @@ function scoreTitle(t: FuzzyTitle, q: PreparedQuery): number {
       return 0.6 + 0.2 * Math.min(1, qLen / tLen);
     }
   }
-  // Typos. Skipped for one- and two-character queries, where a
-  // three-character window means nothing.
+  // Typos; skipped for queries shorter than one trigram window, where it means nothing.
   if (Array.from(q.norm).length >= 3 && t.grams.size > 0) {
     let common = 0;
     for (const g of q.grams) if (t.grams.has(g)) common++;

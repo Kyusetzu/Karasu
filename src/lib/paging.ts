@@ -1,18 +1,4 @@
-/**
- * The arithmetic behind a "Load more" button.
- *
- * Karasu had no pagination anywhere before the social screens: `pageInfo` was
- * queried in two places and never read, and the only "show more" was
- * `RankedList`'s fixed expand (since retired — the endpoint clamps at 30 rows,
- * so 30 is "all of it"). So this is the whole contract, in one tested place,
- * rather than a condition repeated per tab.
- *
- * Paging is button-driven on purpose, never scroll-driven. The rate limiter in
- * `anilist/client.rs` is a ~30/min brake shared with the scrobbler and the
- * three background alert passes, and it cannot see a burst it has not sent yet
- * — so a feed that fetches because the user scrolled spends that budget with
- * nobody asking it to.
- */
+/** The arithmetic behind "Load more"; paging is a button, never a scroll, because the limiter cannot see a burst. */
 
 export interface PageInfoLike {
   total?: number | null;
@@ -20,14 +6,7 @@ export interface PageInfoLike {
   hasNextPage?: boolean | null;
 }
 
-/**
- * The next page number, or `undefined` to stop — the shape `useInfiniteQuery`'s
- * `getNextPageParam` wants.
- *
- * Derived from the response's own `currentPage` rather than a counter kept
- * alongside it: a counter drifts the first time a fetch fails and is retried,
- * and the symptom is a silently skipped page rather than an error.
- */
+/** The next page for `getNextPageParam`, from the response's own `currentPage` because a local counter drifts on retry. */
 export function nextPageParam(info: PageInfoLike | null | undefined): number | undefined {
   if (!info || info.hasNextPage !== true) return undefined;
   const current = info.currentPage;
@@ -37,19 +16,7 @@ export function nextPageParam(info: PageInfoLike | null | undefined): number | u
   return current + 1;
 }
 
-/**
- * How many rows are still unfetched, for the button's label.
- *
- * **Counts what was fetched, not what is shown.** The content filter runs
- * client-side on other people's content — `Page.activities` and `favourites`
- * take no `isAdult` argument — so a strict-filter user can fetch twenty-five
- * rows and see four. Subtracting the *visible* count would then claim there are
- * twenty-one more to load when the next request will bring nothing new, which
- * is a lie about the rate limit being spent.
- *
- * Clamped at zero: `total` can legitimately fall below what is already loaded
- * when someone unfollows mid-session, and a negative remainder would render.
- */
+/** Rows still unfetched, counted against fetched rather than shown, because the content filter hides rows client-side. */
 export function remainingCount(
   info: PageInfoLike | null | undefined,
   fetched: number,

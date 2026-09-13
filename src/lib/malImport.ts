@@ -1,15 +1,6 @@
 import type { FuzzyDate } from "@/api/types";
 
-/**
- * Reading a MyAnimeList XML export back in — the mirror of `lib/malExport`.
- *
- * A hand extractor rather than `DOMParser`, for two load-bearing reasons: the
- * node test project has no DOM, and the format is flat by construction — one
- * level of known tags inside `<anime>`/`<manga>` blocks, no attributes worth
- * reading. Everything unrecognisable degrades to a *counted* skip, because an
- * import that silently drops rows is how two trackers drift apart without
- * anyone noticing.
- */
+/** Reading a MyAnimeList XML export back in by hand, because the node test project has no DOM and the format is flat. */
 
 export interface MalImportRow {
   idMal: number;
@@ -52,8 +43,7 @@ function num(block: string, name: string): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-/** `2024-03-09` → fuzzy date; MAL's `0000-00-00` (and any malformed spelling)
-    is null. Partial forms with a zero day keep what they do have. */
+/** `YYYY-MM-DD` to a fuzzy date; a zero year or malformed text is null, and a zero month or day keeps the rest. */
 export function parseMalDate(text: string | null): FuzzyDate | null {
   const m = text?.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!m) return null;
@@ -87,8 +77,7 @@ export function parseMalStatus(text: string | null): MalImportRow["status"] | nu
 }
 
 export function parseMalXml(xml: string): MalImportResult {
-  // The element name is the truth about the medium; user_export_type is only
-  // a header and real-world files have carried the wrong one.
+  // The element name is the truth about the medium; the user_export_type header has been wrong in real files.
   const animeBlocks = [...xml.matchAll(/<anime>([\s\S]*?)<\/anime>/g)].map((m) => m[1]);
   const mangaBlocks = [...xml.matchAll(/<manga>([\s\S]*?)<\/manga>/g)].map((m) => m[1]);
   const type: MalImportResult["type"] = mangaBlocks.length > animeBlocks.length ? "MANGA" : "ANIME";
@@ -105,9 +94,7 @@ export function parseMalXml(xml: string): MalImportResult {
     }
     const title =
       (type === "ANIME" ? tag(block, "series_title") : tag(block, "manga_title")) ?? "";
-    // A rewatch count with the "Watching" status is MAL's spelling of
-    // REPEATING-in-progress only when the show was already completed once;
-    // without that context the safe read is the literal status.
+    // A rewatch count under "Watching" is REPEATING only with context MAL does not give, so read the literal status.
     const status = parseMalStatus(tag(block, "my_status")) ?? "PLANNING";
     const score = Math.min(10, Math.max(0, num(block, "my_score")));
     rows.push({

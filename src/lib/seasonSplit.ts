@@ -1,11 +1,4 @@
-/**
- * The season-split card's arithmetic, pure and previewable.
- *
- * A split says "disk episodes `from..=to` are another show, renumbered from
- * `dstStart`" — the same record shape as a community anime-relations rule. The
- * preview exists so the user confirms the *mapping*, not just the idea: seeing
- * "episode 13 → episode 1" is what catches an off-by-one before it is saved.
- */
+/** The season-split card's arithmetic; the preview shows the mapping so an off-by-one is caught before saving. */
 
 export interface SplitPair {
   disk: number;
@@ -22,10 +15,7 @@ export function splitMapping(from: number, to: number, dstStart: number): SplitP
   return pairs;
 }
 
-/**
- * The preview's shape: the first few pairs, an ellipsis count, and the last
- * pair — a 200-episode split must not render 200 lines to say one thing.
- */
+/** The preview's shape: the first few pairs, an ellipsis count and the last pair, so a long split stays short. */
 export function previewMapping(
   from: number,
   to: number,

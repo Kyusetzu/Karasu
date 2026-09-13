@@ -1,14 +1,7 @@
 import type { Season, WrappedEntry } from "@/api/queries";
 import { displayTitle } from "@/api/types";
 
-/**
- * What one card covers. Two different questions, named so neither is guessed:
- * a year is bucketed by *completion* (`completedAt.year` — "what I finished
- * in 2026"), a season by *broadcast* (`media.season`/`seasonYear` — "the
- * Winter 2026 shows I finished, whenever I finished them"). Broadcast is
- * what `/seasonal` and `SeasonPicker` mean by season, so the picker can be
- * reused without the word quietly changing meaning.
- */
+/** What one card covers: a year is bucketed by completion, a season by broadcast, as `SeasonPicker` means it. */
 export type WrappedPeriod =
   | { kind: "year"; year: number }
   | { kind: "season"; season: Season; year: number };
@@ -73,11 +66,7 @@ function statsFor(
   };
 }
 
-/**
- * Aggregate a year across both media types. `hideGenre` suppresses individual
- * genre *names* from the top-genres bars — the card is exported and shared, so
- * a filtered genre label must not survive even when its entries are gone.
- */
+/** Aggregates a period across both media; `hideGenre` keeps a filtered genre label off the exported, shareable card. */
 export function aggregate(
   anime: WrappedEntry[],
   manga: WrappedEntry[],
@@ -103,12 +92,7 @@ export function availableYears(
 /** In-year display order, newest last — the broadcast calendar's own. */
 const SEASON_ORDER: Season[] = ["WINTER", "SPRING", "SUMMER", "FALL"];
 
-/**
- * Distinct broadcast seasons with at least one completed title, newest first
- * (year descending, Fall before Winter within one). Data-driven where the
- * seasonal page's picker is a rolling window — a completion list reaches
- * back a decade, and an empty season is not worth offering.
- */
+/** Distinct broadcast seasons with at least one completed title, newest first, since an empty season is not worth offering. */
 export function availableSeasons(
   anime: WrappedEntry[],
   manga: WrappedEntry[],

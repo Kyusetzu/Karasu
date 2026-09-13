@@ -1,21 +1,12 @@
 import type { MediaListEntry, MediaListStatus } from "@/api/types";
 
-/**
- * The calendar's date arithmetic, pure and local.
- *
- * Everything here works in the user's local timezone through the `Date`
- * object, never by adding 86 400s to an epoch: "which weekday does this
- * episode land on" is a local question, and a DST transition makes one day of
- * the week 23 or 25 hours long. `setDate`/`setHours` absorb that; arithmetic
- * on seconds does not.
- */
+/** The calendar's date arithmetic, done through local `Date` methods because epoch arithmetic breaks across DST. */
 
 /** Unix seconds of the local Monday 00:00 of the week containing `nowMs`. */
 export function weekStartOf(nowMs: number): number {
   const d = new Date(nowMs);
   d.setHours(0, 0, 0, 0);
-  // getDay is Sunday-first; the calendar is Monday-first, as a week of airing
-  // anime is (the weekend is the destination, not the start).
+  // getDay is Sunday-first; the calendar is Monday-first, as a week of airing anime is.
   d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
   return Math.floor(d.getTime() / 1000);
 }
@@ -40,13 +31,7 @@ export function localMidnight(sec: number): number {
   return Math.floor(d.getTime() / 1000);
 }
 
-/**
- * Distributes items into one bucket per day, each bucket sorted by time.
- *
- * An item outside every given day is dropped rather than clamped — the weekly
- * query windows are half-open at midnight, and an episode airing one second
- * past the week belongs to the next page, not to a stretched Sunday.
- */
+/** Distributes items into one sorted bucket per day, dropping rather than clamping anything outside the given days. */
 export function bucketByLocalDay<T extends { airingAt: number }>(
   items: T[],
   days: number[],
@@ -68,16 +53,7 @@ export interface ListAiring {
   entry: MediaListEntry;
 }
 
-/**
- * The list's own airing data projected into a window: entries in the given
- * statuses whose `nextAiringEpisode` lands in `(gt, lt]`, soonest first.
- *
- * One episode per show is this source's honest limit — the cached list
- * carries only the *next* episode, which is also why the window is a week and
- * not a month. The default statuses match the Dashboard digest; the calendar
- * passes PLANNING too, because a planned premiere is exactly what a calendar
- * is for.
- */
+/** The list's own `nextAiringEpisode` data projected into `(gt, lt]`, soonest first — one episode per show. */
 export function fromList(
   entries: MediaListEntry[],
   gt: number,

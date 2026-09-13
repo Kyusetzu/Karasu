@@ -1,15 +1,10 @@
-/**
- * Saved list filter/sort presets, persisted per media type in localStorage
- * (same lightweight per-machine approach as the language override).
- */
+/** Saved list filter/sort presets, persisted per media type in localStorage. */
 export interface Preset {
   name: string;
   tab: string;
   filter: string;
   sort: string;
-  /** Optional: presets stored before these filters existed lack them, and
-      applying such a preset must *clear* the filters, not keep stale ones —
-      the apply site guards with `?? ""`. */
+  /** Absent on older presets, and applying one must clear the filter rather than keep a stale one. */
   tagFilter?: string;
   format?: string;
   country?: string;

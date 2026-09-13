@@ -1,53 +1,4 @@
-/**
- * AniList-flavoured markdown, parsed to a tree of plain data.
- *
- * Bios, thread bodies, comments and text activities are all written in this
- * dialect: markdown-it plus AniList's own additions, authored by strangers, and
- * rendered inside a WebView whose `csp` is `null`.
- *
- * **Why a tree and not sanitized HTML.** `lib/description.ts` takes the other
- * road for media descriptions, and its own comment records that its previous
- * version was a live path from a description to script execution here. It
- * survives by allowing five tags with no attributes, which is far less
- * structure than a bio needs. The deciding argument is testability: this repo
- * has no jsdom and no `@testing-library`, so a sanitizer's contract — "this
- * HTML string is safe" — cannot be asserted without a DOM, while a tree's — "no
- * node can carry executable content" — is a walk over plain objects. The union
- * below has no `html` or `raw` member, so there is nothing for a renderer to
- * pass through even by mistake.
- *
- * **What it deliberately gets wrong.** A visible minority of AniList profiles
- * are HTML art: absolutely-positioned `div`s, inline CSS, background images. In
- * a sample of 44 real bios, 24 contained raw tags. A *structural* subset now
- * survives as tree nodes — entities, paired styling tags, `<a>` (see
- * `pushHtmlAnchor`), centred `<div>`/`<p>`/`<center>` blocks and `<h1>`–`<h6>`
- * — because that subset is most of what real bios are made of. Everything
- * else keeps the old rule: tags *dropped and their text kept*, so an art bio
- * degrades to its prose. Escaping the tags into visible `<div style=…>` was
- * the alternative and it is worse: a wall of markup reads as a bug in Karasu,
- * where a plain bio does not. Inline CSS in particular stays dropped on
- * purpose — colour and geometry are where a bio starts scripting the page.
- *
- * **Images and embeds are parsed into `chip` nodes either way** — what the
- * renderer does with one is its business, not the parser's. `RichText` now
- * fetches an image through Rust and inlines it as a `data:` URI, falling back to
- * a chip when that fails; a video is always a chip.
- *
- * The measurement behind that split is worth keeping here: across 89 bios
- * holding 350 images, **6 were on `*.anilist.co`** and the rest were imgur,
- * tumblr, pinimg, catbox and discord. That is why `img-src` was never widened —
- * an allowlist over that tail hands an unbounded set of third parties the user's
- * IP — and why the images arrive through a proxy instead. See
- * `components/RichText.tsx` and `commands/images.rs`.
- *
- * Grounded in real data rather than the docs. Of those 44 bios: 36 relied on
- * single newlines (hence `br`, see `LIMIT`), 25 used `~~~centered~~~`, 24 used
- * AniList's `img120(url)` form — including percentages like `img200%(url)` —
- * and exactly one used markdown's `![](…)`. One carried
- * `[](jsonN4IgDglg…)`, which is AniList's own hidden profile-layout blob; the
- * href allowlist drops it, which is the whole reason the allowlist is a
- * whitelist and not a `javascript:` blacklist.
- */
+/** AniList-flavoured markdown parsed to a tree of plain data whose node types cannot carry markup. */
 
 import { ENTITY_RE, decodeEntity } from "./htmlEntities";
 
@@ -61,28 +12,9 @@ export type MdInline =
   | { type: "link"; href: string; children: MdInline[] }
   | { type: "mention"; name: string }
   | { type: "spoiler"; children: MdInline[] }
-  /**
-   * An anchor that goes nowhere: `<a>` with no href at all, or a link — HTML
-   * or markdown — whose target `safeHref` rejected (a `javascript:` scheme,
-   * the layout blob). anilist.co styles both in the accent colour: a bare
-   * anchor is its decoration idiom (half the fixture bio is stars and arrows
-   * between `<a>` tags), and a refused target is stripped to an `<a>` without
-   * href and coloured the same — measured 2026-09-11 on activity 1154088020,
-   * whose `[__…__](javascript:;)` heading is blue on the site. The refused
-   * form used to degrade to plain children here so that hostile input never
-   * earned a node; it earns colour now, and still no target, no handler and
-   * no `href` of any kind — the security tests below say so.
-   */
+  /** A bare `<a>` or a link `safeHref` refused: accent-coloured as on the site, never a target or href. */
   | { type: "accent"; children: MdInline[] }
-  /**
-   * `~~~x~~~` *inside* a line. anilist.co converts the tildes to `<center>`
-   * tags before markdown runs, so a heading written as `# ~~~Title~~~` — the
-   * 100-day-challenge template, all over text activities — is a centred
-   * heading, and `~~~~!img(u)!~ ~~~` centres a spoiler. Read as `~~`+`~`
-   * by the strike rule instead, the spoiler after it was lost (activity
-   * 1154078329, measured on the site 2026-09-10). Block-level `~~~` rows are
-   * the `center` block; this is the inline remainder.
-   */
+  /** `~~~x~~~` inside a line, centred as on anilist.co rather than read as `~~`+`~` by the strike rule. */
   | { type: "centered"; children: MdInline[] }
   | {
       type: "chip";
@@ -91,33 +23,12 @@ export type MdInline =
       href: string;
       /** The author's declared width, if they gave one. See `ChipWidth`. */
       width?: ChipWidth;
-      /**
-       * Render as a chip and make no request. See `capExcessImages`.
-       *
-       * Only ever set on `kind: "image"`; a video is never fetched anyway.
-       */
+      /** Render as a chip and make no request; only ever set on an image, see `capExcessImages`. */
       capped?: true;
     }
   | { type: "br" };
 
-/**
- * The width an author asked for, parsed and clamped.
- *
- * AniList documents `img###(url)` as "the width in **pixels**, such as `420`"
- * (thread 6125, "Anilist-Flavored Markdown"), which settles a reading that
- * could otherwise only be guessed at: `img33(u)` is a 33px icon, not a third of
- * the column. The `%` spelling is not in that documentation but is accepted by
- * the same syntax and appears in real bios, so it is carried through as a
- * percentage rather than silently read as pixels.
- *
- * This was being **discarded**: the size group was non-capturing, so `img33(u)`
- * and `img200%(u)` rendered identically to `img(u)`. This module's own header
- * records that 24 of 44 sampled bios use this form, so it was the common case
- * that was being ignored, not an edge.
- *
- * Clamped here rather than at the render site so that no consumer can be handed
- * a number it has to re-validate — a width is either absent or usable.
- */
+/** The declared `img###(url)` width, in pixels or a percentage, clamped so no consumer re-validates it. */
 export interface ChipWidth {
   value: number;
   unit: "px" | "%";
@@ -126,12 +37,7 @@ export interface ChipWidth {
 /** Beyond this a declared pixel width is a mistake or an attack, not a layout. */
 const MAX_IMAGE_PX = 2000;
 
-/**
- * `undefined` for no declared size, and for any size that is not a width.
- *
- * A percentage above 100 is clamped rather than dropped: the author did mean
- * "as wide as possible", and `max-w-full` would bound it anyway.
- */
+/** `undefined` for no usable size; a percentage over 100 is clamped, the author meant as wide as possible. */
 export function parseImageWidth(token: string | undefined): ChipWidth | undefined {
   if (!token) return undefined;
   const percent = token.endsWith("%");
@@ -151,8 +57,7 @@ export type MdNode =
   | { type: "codeBlock"; text: string }
   | { type: "hr" }
   | { type: "center"; children: MdNode[] }
-  /** A `~!…!~` whose opener and closer sit on different lines — the forum's
-   *  usual shape, wrapping paragraphs, lists and images. See `parseBlocks`. */
+  /** A `~!…!~` whose opener and closer sit on different lines, the forum's usual shape. */
   | { type: "spoiler"; children: MdNode[] };
 
 export interface ParsedMarkdown {
@@ -161,33 +66,12 @@ export interface ParsedMarkdown {
   truncated: boolean;
 }
 
-/**
- * The parse-time bound, not a cosmetic cap.
- *
- * Inline scanning tries a handful of lazy patterns at each position, so an
- * unclosed delimiter in a very long single line is quadratic. Truncating first
- * turns that worst case into a fixed ceiling, which is why the limit is applied
- * before any other work. The longest bio in the sample was 4,487 characters, so
- * this is an outlier bound rather than something a normal profile meets.
- */
+/** The parse-time bound, applied first so an unclosed delimiter in a long line cannot go quadratic. */
 const LIMIT = 8000;
 
-/** `http`/`https` for the world, a leading `/` for our own routes. Anything else
- *  — `javascript:`, `data:`, `vbscript:`, and AniList's `json…` layout blob —
- *  is not a link, and the node is never created.
- *
- *  `//` is excluded from the "our own routes" arm on purpose: a
- *  protocol-relative URL like `//evil.example/x` starts with a slash but names
- *  another *host*, and the internal branch hands its href straight to the
- *  router. The HashRouter happens to defang it today by prefixing `#`; the
- *  parser does not get to rely on which router the renderer mounts. */
+/** `http(s)` or one leading `/`, a whitelist; keep `//host` refused, it names another host. */
 function safeHref(raw: string): string | null {
-  // Entities are decoded *before* the whitelist runs, never after: CommonMark
-  // decodes a link destination, an `href="…&amp;…"` is attribute-encoded by
-  // definition, and a bio's `?a=1&amp;b=2` used to reach the host as the
-  // literal five characters and 404. Decoding first is also what keeps
-  // `java&#115;cript:` from walking past a check that only saw the encoded
-  // form — the whitelist judges the bytes the browser would use.
+  // Entities decode before the whitelist, so the check judges the bytes the browser would use.
   const href = raw.trim().replace(ENTITY_GLOBAL, (whole, name: string) => decodeEntity(name) ?? whole);
   if (/^https?:\/\/\S+$/i.test(href)) return href;
   if (/^\/(?!\/)[^\s]*$/.test(href)) return href;
@@ -197,16 +81,7 @@ function safeHref(raw: string): string | null {
 /** `ENTITY_RE`'s pattern with the global flag, for `replace` over a whole URL. */
 const ENTITY_GLOBAL = new RegExp(ENTITY_RE.source, "g");
 
-/**
- * Reads the `(target)` of a link, image or embed, starting at the `(`.
- *
- * A URL with balanced parentheses inside — `x_(1).png`, Wikipedia — is read
- * whole; the old rules stopped at the first `)` and sent the host half a
- * path. An optional CommonMark title (`"…"` or `'…'`) after the URL is
- * accepted and dropped, so `![alt](url "title")` is an image rather than a
- * paragraph with a bare link in it. Null when the target is malformed, in
- * which case the caller leaves the opener as text.
- */
+/** Reads the `(target)` at `i`, balanced parentheses and a title allowed; null when malformed. */
 function readParenTarget(src: string, i: number): { url: string; end: number } | null {
   let j = i + 1;
   while (j < src.length && /\s/.test(src[j])) j += 1;
@@ -246,16 +121,12 @@ function hostOf(href: string): string {
   return /^https?:\/\/([^/?#]+)/i.exec(href)?.[1] ?? "";
 }
 
-// --- Inline ---------------------------------------------------------------
-// Sticky patterns, matched at an explicit index. Slicing the remainder at each
-// position instead would make the scan itself quadratic before any backtracking.
+// --- Inline: sticky patterns matched at an index; slicing the remainder each time is quadratic.
 
 const RE = {
-  // `*?`, not `+?`: `~!!~` is an empty spoiler on anilist.co, not four
-  // characters of text.
+  // `*?`, not `+?`: `~!!~` is an empty spoiler on anilist.co, not four characters of text.
   spoiler: /~!([\s\S]*?)!~/y,
-  // Tried before `strike`, which would otherwise read the first two of three
-  // tildes and leave the third to break whatever follows. See `centered`.
+  // Before `strike`, which would read two of the three tildes and leave the third to break what follows.
   centerInline: /~~~([\s\S]*?)~~~/y,
   strongStar: /\*\*(?!\s)([\s\S]+?)\*\*/y,
   strongScore: /__(?!\s)([\s\S]+?)__/y,
@@ -263,39 +134,25 @@ const RE = {
   emStar: /\*(?!\s)([^*\n]+?)\*/y,
   emScore: /_(?!\s)([^_\n]+?)_/y,
   code: /`([^`\n]+)`/y,
-  // The openers only; `readParenTarget` reads the `(url)` that follows, so a
-  // URL may hold balanced parentheses and a markdown image or link may carry
-  // a title. AniList's own image form has an optional size: img(u) img33(u)
-  // img200%(u).
+  // Openers only, `readParenTarget` reads the `(url)`; the optional size is img33(u) or img200%(u).
   image: /img(\d+%?)?\(/iy,
-  // One nested bracket level in the label, so `[![alt](img)](target)` — a
-  // linked image, the way anilist.co bios link a badge — is a link holding
-  // an image rather than a link whose label stops at the first `]`.
+  // One nested bracket level in the label, so `[![alt](img)](target)` is a link holding an image.
   mdImage: /!\[((?:[^\[\]]|\[[^\]]*\])*)\]\(/y,
   video: /(?:youtube|webm)\(/iy,
   link: /\[((?:[^\[\]]|\[[^\]]*\])*)\]\(/y,
-  // `<img>` is an image, not a tag to drop: HTML-art bios and forum posts
-  // written on the site's own editor use it, and dropping it left a linked
-  // badge as an empty link.
+  // `<img>` is an image, not a tag to drop; dropping it left a linked badge as an empty link.
   htmlImg: /<img\b([^>]*)>/iy,
   autolink: /https?:\/\/[^\s<>()[\]]+/y,
   mention: /@([A-Za-z0-9_]{2,20})\b/y,
-  // `script` and `style` lose their *contents* too, not just their tags. Every
-  // other element's text is prose worth keeping; theirs is code that was never
-  // meant to be read, and showing it produced `bold bitalert(1)` on a real bio.
+  // `script` and `style` lose their contents too: theirs is code never meant to be read, not prose.
   dropWhole: /<\s*(script|style)\b[^>]*>[\s\S]*?<\/\s*\1\s*>/iy,
   dropDangling: /<\s*(?:script|style)\b[\s\S]*$/iy,
-  // Paired styling tags kept as structure rather than dropped: they map onto
-  // the nodes markdown already has, so `<b>x</b>` and `**x**` are the same
-  // tree. Lazy body, so a nested same-name tag flattens instead of matching
-  // across two elements; an unclosed one falls through to `htmlTag` below and
-  // degrades to today's tag-dropped text.
+  // Paired styling tags become the nodes they already mean; lazy, so a nested same-name tag flattens.
   htmlPair: /<(b|strong|i|em|s|del|strike)\b[^>]*>([\s\S]*?)<\/\1\s*>/iy,
-  // `<a>` is three different things — see `pushHtmlAnchor`.
+  // `<a>` is a link or an accent node, decided in `pushHtmlAnchor`.
   htmlA: /<a\b([^>]*)>([\s\S]*?)<\/a\s*>/iy,
   htmlTag: /<\/?[a-zA-Z][^>]*>|<!--[\s\S]*?-->|<![^>]*>/y,
-  // An unclosed `<div` at the very end still has to be consumed, or the scanner
-  // emits it as literal text and the art bio shows a stray fragment.
+  // An unclosed `<div` at the very end still has to be consumed, or it shows as a stray fragment.
   htmlDangling: /<\/?[a-zA-Z][^>]*$/y,
   brTag: /<br\s*\/?>/iy,
 };
@@ -311,16 +168,7 @@ const TAG_NODE: Record<string, "strong" | "em" | "strike"> = {
   strike: "strike",
 };
 
-/**
- * Matches `re` at exactly `i`.
- *
- * Callers must advance by `i + m[0].length` and **never** by `re.lastIndex`.
- * These patterns are module-level objects and `parseInline` recurses into its
- * own matches, so an inner call mutates the very `lastIndex` an outer one was
- * about to read — and a failed sticky `exec` resets it to 0. Reading it after
- * recursing sent `i` backwards on input as ordinary as `~!~!~!`, which spun
- * until the heap gave out. The match's own length cannot be corrupted.
- */
+/** Matches `re` at `i`; advance by `m[0].length`, never `re.lastIndex`, which recursion corrupts. */
 function at(re: RegExp, src: string, i: number): RegExpExecArray | null {
   re.lastIndex = i;
   return re.exec(src);
@@ -332,16 +180,7 @@ function mentionBoundary(src: string, i: number): boolean {
   return !/[A-Za-z0-9_.]/.test(src[i - 1]);
 }
 
-/**
- * True when `_` at `i` may open emphasis.
- *
- * CommonMark — which markdown-it, and therefore AniList, follows — allows
- * intraword emphasis for `*` but not for `_`, so `a*b*c` is `a<em>b</em>c`
- * while `a_b_c` is literal. That asymmetry is not pedantry here: nine of the
- * forty-four sampled bios used `__bold__`, and underscores are ordinary inside
- * usernames, file names and URLs. Without this, `snake_case_name` renders half
- * italic.
- */
+/** True when `_` at `i` may open emphasis: unlike `*`, CommonMark's `_` is inert inside a word. */
 function underscoreBoundary(src: string, i: number): boolean {
   if (i === 0) return true;
   return !/[A-Za-z0-9]/.test(src[i - 1]);
@@ -362,8 +201,7 @@ function parseInline(src: string): MdInline[] {
   while (i < src.length) {
     const c = src[i];
 
-    // Newline is a break: 36 of 44 sampled bios are line-oriented, and
-    // collapsing newlines the way CommonMark does turns each into one blob.
+    // A newline is a break: real bios are line-oriented, and collapsing newlines turns each into one blob.
     if (c === "\n") {
       flush();
       out.push({ type: "br" });
@@ -389,9 +227,7 @@ function parseInline(src: string): MdInline[] {
         flush();
         i += htmlImg[0].length;
         const srcAttr = attrOf(htmlImg[1], "src");
-        // `width="220"` and `width="50%"` are the same sizes the `img220(u)`
-        // form declares; anything else on the tag — `onerror`, `style` — is
-        // never read, and a missing or refused `src` leaves nothing behind.
+        // `width` is the size the `img220(u)` form declares; nothing else on the tag is ever read.
         if (srcAttr) {
           pushChip(out, "image", srcAttr, parseImageWidth(attrOf(htmlImg[1], "width") ?? undefined));
         }
@@ -411,8 +247,7 @@ function parseInline(src: string): MdInline[] {
         pushHtmlAnchor(out, anchor[1], parseInline(anchor[2]));
         continue;
       }
-      // Every other tag, comment and doctype: gone, contents kept. The text
-      // between tags is reached by simply continuing the scan.
+      // Every other tag, comment and doctype is dropped and its text reached by continuing the scan.
       const tag = at(RE.htmlTag, src, i) ?? at(RE.htmlDangling, src, i);
       if (tag) {
         i += tag[0].length;
@@ -421,13 +256,7 @@ function parseInline(src: string): MdInline[] {
     }
 
     if (c === "&") {
-      // Decoded *after* parsing, in text position only — never the source
-      // string, so `&lt;script&gt;` becomes visible characters rather than a
-      // tag upstream of the scanner (anilistHtml.test.ts pins the same
-      // ordering for descriptions), and never inside `safeHref`/`pushChip`,
-      // so a URL keeps its bytes. Code spans keep entities raw: the backtick
-      // branch consumes a span whole, so the scan never lands on an `&`
-      // inside one.
+      // Decoded after parsing, in text position only, so `&lt;script&gt;` is characters rather than a tag.
       const ent = at(ENTITY_RE, src, i);
       if (ent) {
         const decoded = decodeEntity(ent[1]);
@@ -496,8 +325,7 @@ function parseInline(src: string): MdInline[] {
       const imgTarget = img && readParenTarget(src, i + img[0].length - 1);
       if (img && imgTarget) {
         flush();
-        // Group 1 is the declared size — it used to be non-capturing, which is
-        // why the URL was once `img[1]`.
+        // Group 1 is the declared size.
         pushChip(out, "image", imgTarget.url, parseImageWidth(img[1]));
         i = imgTarget.end;
         continue;
@@ -531,9 +359,7 @@ function parseInline(src: string): MdInline[] {
         flush();
         i = target.end;
         const children = parseInline(link[1]);
-        // A rejected href is not a link; its label is accent-coloured content,
-        // as on the site. AniList's `[](json…)` layout blob still vanishes:
-        // an empty label is an accent node with nothing in it.
+        // A rejected href is accent content rather than a link, as on the site; an empty label shows nothing.
         if (href) out.push({ type: "link", href, children });
         else out.push({ type: "accent", children });
         continue;
@@ -572,17 +398,7 @@ function parseInline(src: string): MdInline[] {
   return out;
 }
 
-/**
- * `<a>` in a bio is two different things.
- *
- * With a usable href it is a link, and its children go *inside* the link
- * node — the same shape `[img33(pic)](target)` produces, which is what lets
- * `RichText`'s `InLink` context keep a linked image to one click target.
- * Otherwise — no href attribute at all, or one `safeHref` rejects
- * (`javascript:`, `data:`, the layout blob) — it is an `accent` node: the
- * site's decoration colour, no target, exactly like the markdown-link branch
- * above. The rejected href itself is dropped here and never stored.
- */
+/** `<a>` with a usable href is a link over its children, otherwise an `accent` node with no target. */
 function pushHtmlAnchor(out: MdInline[], attrs: string, children: MdInline[]) {
   const raw = /\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(attrs);
   const href = raw ? safeHref(raw[1] ?? raw[2] ?? raw[3] ?? "") : null;
@@ -597,13 +413,9 @@ function pushChip(
   width?: ChipWidth,
 ) {
   const href = safeHref(raw);
-  // An unusable URL leaves nothing behind — better than a chip that goes
-  // nowhere. This is also what swallows `img(data:…)`.
+  // An unusable URL leaves nothing behind, which is also what swallows `img(data:…)`.
   if (!href) return;
-  // `width` is omitted rather than set to undefined: the safety test in
-  // `anilistMarkdown.test.ts` walks `Object.keys`, and a key that is always
-  // present but usually meaningless is noise in exactly the check that exists
-  // to make an unexpected field visible.
+  // `width` is omitted rather than undefined, so the `Object.keys` safety test sees no meaningless key.
   out.push(
     width
       ? { type: "chip", kind, host: hostOf(href), href, width }
@@ -614,56 +426,23 @@ function pushChip(
 // --- Blocks ---------------------------------------------------------------
 
 const FENCE = /^\s*```/;
-/**
- * Closes a centred block: a line *ending* in three tildes, with whatever
- * precedes them being the block's last line. Real bios end this way —
- * `img220(url)~~~` with no newline before the fence — and requiring a bare
- * `~~~` line left the tildes on screen there, mirroring the opener's lesson.
- */
+/** Closes a centred block: a line ending in `~~~`, whatever precedes the tildes being its last line. */
 const CENTER_CLOSE = /^([\s\S]*?)~~~\s*$/;
-/**
- * Opens one. The trailing group is content written on the *same line* as the
- * fence, which real bios do constantly — `~~~ ren | they/them | de` was the form
- * that exposed this. Requiring a bare `~~~` line left the tildes on screen.
- */
+/** Opens one; the trailing group is content on the fence's own line, which real bios write constantly. */
 const CENTER_OPEN = /^\s*~~~(.*)$/;
 /** The whole block on one line — the other common form, `~~~img28(url)~~~`. */
 const CENTER_ONE_LINE = /^\s*~~~([\s\S]*?)~~~\s*$/;
-/**
- * The space after the hashes is optional, as it is on anilist.co: the site
- * runs a marked-era heading rule, so `#__Day 235__` at the start of a line is
- * an `<h1>` there (activity 1154093188, measured in the browser 2026-09-10 —
- * the API's `asHtml` disagrees, and the site is what a user compares
- * against). CommonMark's "a hashtag is not a heading" was the rule here
- * before, and it rendered the 365-day-challenge posts as a `#` and bold text.
- * A seventh `#` still fails the rule, and a bare `#` is not a heading.
- */
+/** The space after the hashes is optional: the site's browser renderer, not the API's `asHtml`, is the oracle. */
 const HEADING = /^(#{1,6})(?!#)[ \t]*(\S.*)$/;
-/** A heading written as HTML, alone on its line — the form centred bios use
- *  (`<div align="center"><h5>…</h5></div>` recurses into exactly this). */
+/** A heading written as HTML, alone on its line, the form centred bios use. */
 const HTML_HEADING = /^\s*<h([1-6])\b[^>]*>([\s\S]*?)<\/h\1\s*>\s*$/i;
-/** `<hr>` alone on its line, which the site draws as the rule it is; the
- *  inline scanner would otherwise drop it as one more unknown tag. */
+/** `<hr>` alone on its line, drawn as the rule it is rather than dropped as one more unknown tag. */
 const HTML_HR = /^\s*<hr\b[^>]*\/?>\s*$/i;
-/**
- * The HTML spelling of a centred block: `<center>`, or a `<div>`/`<p>`
- * carrying `align=center` in any quoting and case. The whole open tag is
- * group 1 (its first word is the tag name), the rest of the line group 2.
- * `tryHtmlCenter` below does the closing arithmetic.
- */
+/** The HTML spelling of a centred block; group 1 is the whole open tag, group 2 the rest of the line. */
 const CENTER_TAG_OPEN =
   /^\s*<(center\b[^>]*|(?:div|p)\b[^>]*\balign\s*=\s*["']?center["']?[^>]*)>([\s\S]*)$/i;
 
-/**
- * Reads one HTML-centred block starting at `lines[start]`, or answers null.
- *
- * Mirrors the `~~~` machinery: content on the opening and closing lines
- * belongs to the block, and an unclosed opener keeps the rest of the input,
- * exactly like an unclosed `~~~`. The depth count covers *every* open and
- * close of the opener's own tag, so a nested plain `<div>` inside a centred
- * one cannot close it early; the nested tags themselves are inline HTML and
- * degrade there.
- */
+/** One HTML-centred block at `lines[start]`, or null; depth-counted so a nested `<div>` cannot close it early. */
 function tryHtmlCenter(
   lines: string[],
   start: number,
@@ -688,9 +467,7 @@ function tryHtmlCenter(
   for (;;) {
     depth += count(open, content) - count(close, content);
     if (depth <= 0) {
-      // Closed on this line: everything up to the *last* close tag belongs
-      // to the block. (Prose after `</div>` on the same line would join the
-      // block rather than be lost — a shape no real bio produces.)
+      // Closed on this line: everything up to the last close tag belongs to the block.
       const cut = content.toLowerCase().lastIndexOf(`</${tag}`);
       const inner = cut === -1 ? content : content.slice(0, cut);
       if (inner.trim()) body.push(inner);
@@ -703,21 +480,7 @@ function tryHtmlCenter(
   }
 }
 
-/**
- * The content of a centred HTML row that opens and closes on one line.
- *
- * Markdown *block* rules do not run inside it: anilist.co keeps
- * `<div align="center">- <a>✧</a> -</div>` as the three characters (user
- * 6975140's bio, sampled 2026-09-10 through `about(asHtml: true)`; the row
- * is in `fixtures/anilistMarkdown.fixtures.json`), where the list rule read a
- * bullet and hung a dot off the left edge of a centred line. The HTML block
- * forms still apply, because they are what these rows are made of — a
- * heading, or another centred row — and everything else is one paragraph.
- *
- * Only the one-line form, on purpose: no sample has yet said what the site
- * does with a `- a` line *inside* a `<center>` block that spans lines, and
- * that form keeps its markdown reading until one does.
- */
+/** A one-line centred HTML row: anilist.co runs no markdown block rule inside it, only the HTML forms. */
 function parseHtmlInner(body: string[]): MdNode[] {
   const out: MdNode[] = [];
   for (const line of body) {
@@ -750,17 +513,7 @@ const OL = /^\s*\d+[.)]\s+(.*)$/;
 const TABLE_ROW = /^\s*\|(.*)\|?\s*$/;
 const TABLE_RULE = /^[\s|:-]+$/;
 
-/**
- * Groups lines into blocks. Every branch consumes at least one line, so the
- * loop terminates on any input.
- */
-/**
- * Where a `~!` that no `!~` on the same line closes begins, or null.
- *
- * Both scanners walk the line left to right two characters at a time, so the
- * `!~` inside `~!~` is the tail of the opener rather than a closer of its own
- * — the same reading the inline rule takes.
- */
+/** Where the line's first unclosed `~!` begins, or null; `~!~` is an opener, as the inline rule reads it. */
 function spoilerOpenAt(line: string): number | null {
   const open: number[] = [];
   let i = 0;
@@ -797,11 +550,7 @@ function spoilerCloseAt(line: string): number | null {
   return null;
 }
 
-/**
- * The block spoiler starting on line `i`, if one does: where its opener sits,
- * and the line and column of the first closer below. Null when the line has no
- * unmatched opener or nothing below ever closes it.
- */
+/** The block spoiler opening on line `i`: its opener's column and the first closer below, or null. */
 function blockSpoilerAt(
   lines: string[],
   i: number,
@@ -815,9 +564,9 @@ function blockSpoilerAt(
   return null;
 }
 
+/** Groups lines into blocks; every branch consumes at least one line, so the loop always terminates. */
 function parseBlocks(input: string[]): MdNode[] {
-  // A copy, because the closing line of a block spoiler is split and its tail
-  // written back as the next line to read.
+  // A copy: a block spoiler's closing line is split and its tail written back as the next line to read.
   const lines = input.slice();
   const out: MdNode[] = [];
   let i = 0;
@@ -830,21 +579,7 @@ function parseBlocks(input: string[]): MdNode[] {
       continue;
     }
 
-    // A spoiler that spans lines. The inline rule handles `~!x!~` within one
-    // block; but blocks are split at blank lines, lists and quotes *before*
-    // inline parsing, so a `~!` on one line and its `!~` three paragraphs
-    // later — the forum's usual shape, hiding a whole reply — used to stay
-    // literal on both ends with everything between them in plain view. Here
-    // the opener claims every line up to the closer as one nested block.
-    //
-    // Before the fence branch on purpose: anilist.co converts spoilers even
-    // inside code blocks (kiniro.uk's reference, and its own complaint about
-    // it), so a spoiler that opens above a fence takes the fence with it. A
-    // fence that opens first still wins, which keeps a code sample *about*
-    // the syntax literal.
-    //
-    // No closer anywhere below: the inline rule leaves the `~!` literal,
-    // exactly as it does for an unclosed one on a single line.
+    // A spoiler spanning lines, before the fence branch on purpose: on the site one opened above a fence takes it.
     const spoiler = blockSpoilerAt(lines, i);
     if (spoiler) {
       const { open, j, close } = spoiler;
@@ -858,8 +593,7 @@ function parseBlocks(input: string[]): MdNode[] {
       continue;
     }
 
-    // ``` fence — contents kept verbatim, never parsed. A `~!spoiler!~` inside
-    // a fence has to stay literal or a code sample about the syntax breaks.
+    // Fence contents are kept verbatim, so a `~!spoiler!~` inside stays a code sample about the syntax.
     if (FENCE.test(line)) {
       const body: string[] = [];
       i += 1;
@@ -869,8 +603,7 @@ function parseBlocks(input: string[]): MdNode[] {
       continue;
     }
 
-    // Centred blocks — 25 of 44 sampled bios have one. Single line first, so
-    // `~~~x~~~` is not read as an opener whose content happens to end in `~~~`.
+    // Centred blocks; single line first, or `~~~x~~~` reads as an opener whose content ends in `~~~`.
     const oneLine = CENTER_ONE_LINE.exec(line);
     if (oneLine) {
       out.push({ type: "center", children: parseBlocks([oneLine[1]]) });
@@ -878,8 +611,7 @@ function parseBlocks(input: string[]): MdNode[] {
       continue;
     }
 
-    // The HTML spelling, same node: the fixture profile is entirely
-    // one-line `<div align="center">…</div>` rows.
+    // The HTML spelling, same node: whole bios are one-line `<div align="center">` rows.
     const htmlCenter = tryHtmlCenter(lines, i);
     if (htmlCenter) {
       out.push({
@@ -901,8 +633,7 @@ function parseBlocks(input: string[]): MdNode[] {
         const close = CENTER_CLOSE.exec(lines[i]);
         i += 1;
         if (close) {
-          // Content on the closing line belongs to the block; a bare `~~~`
-          // has a whitespace-only prefix and contributes nothing.
+          // Content on the closing line belongs to the block; a bare `~~~` contributes nothing.
           if (close[1].trim()) body.push(close[1]);
           break;
         }
@@ -951,9 +682,7 @@ function parseBlocks(input: string[]): MdNode[] {
       continue;
     }
 
-    // One level only. A nested item joins the flat list rather than starting a
-    // sub-list: nesting is where a hand-written block parser gets expensive,
-    // and a bio's shopping list does not need it.
+    // One level only, a nested item joins the flat list; nesting is where a hand-written parser gets expensive.
     if (UL.test(line) || OL.test(line)) {
       const ordered = OL.test(line);
       const items: MdInline[][] = [];
@@ -967,8 +696,7 @@ function parseBlocks(input: string[]): MdNode[] {
       continue;
     }
 
-    // Tables become one paragraph per row of cell text. Rendering a real table
-    // is out of scope, and dropping the row would lose the content.
+    // Tables become one paragraph per row of cell text; dropping the row would lose the content.
     if (TABLE_ROW.test(line) && line.includes("|")) {
       while (i < lines.length && TABLE_ROW.test(lines[i]) && lines[i].includes("|")) {
         const row = lines[i];
@@ -985,9 +713,7 @@ function parseBlocks(input: string[]): MdNode[] {
       continue;
     }
 
-    // Paragraph: every line up to a blank one or the start of another block —
-    // a block spoiler included, or a `~!` on a paragraph's second line would
-    // be swallowed as text before the branch above ever saw it.
+    // Paragraph up to a blank line or another block, a block spoiler included, or a `~!` on line two is swallowed.
     const body: string[] = [];
     while (
       i < lines.length &&
@@ -998,8 +724,7 @@ function parseBlocks(input: string[]): MdNode[] {
       body.push(lines[i].replace(/\s+$/, ""));
       i += 1;
     }
-    // `startsBlock` on the very first line would spin; the branches above have
-    // already ruled that out, so `body` is never empty here.
+    // `startsBlock` on the first line would spin; the branches above rule it out, so `body` is never empty.
     if (!body.length) {
       body.push(lines[i].replace(/\s+$/, ""));
       i += 1;
@@ -1025,27 +750,10 @@ function startsBlock(line: string): boolean {
   );
 }
 
-/**
- * How many images one document may fetch.
- *
- * Every inlined image is a separate bounded request made by Rust
- * (`commands/images.rs`), issued from an effect the moment the node mounts —
- * so the count is decided by whoever wrote the bio, and they are all in flight
- * at once. Nothing stops a crafted profile reaching several hundred, and that
- * is a request fan-out a single page view should not be able to ask for.
- *
- * Past the cap the chip is still rendered, so nothing disappears — it is the
- * same fallback a refused host or an oversized file already produces.
- */
+/** How many images one document may fetch; each is a Rust request, and a bio must not set the fan-out. */
 export const MAX_INLINE_IMAGES = 24;
 
-/**
- * Marks image chips past `MAX_INLINE_IMAGES`, in document order.
- *
- * A walk over the finished tree rather than a counter threaded through the
- * parser: the cap is a property of the whole document, and the inline parser
- * runs per block with no idea what came before it.
- */
+/** Marks image chips past `MAX_INLINE_IMAGES`; a tree walk, since the inline parser runs per block. */
 function capExcessImages(nodes: MdNode[]): void {
   let seen = 0;
   const inline = (list: MdInline[]) => {
@@ -1059,8 +767,7 @@ function capExcessImages(nodes: MdNode[]): void {
         case "strike":
         case "link":
         case "spoiler":
-        // `accent` too, or an image inside a bare `<a>` would escape the
-        // fan-out cap this walk exists to enforce.
+        // `accent` too, or an image inside a bare `<a>` would escape the cap this walk exists to enforce.
         case "accent":
         case "centered":
           inline(n.children);
@@ -1089,10 +796,7 @@ function capExcessImages(nodes: MdNode[]): void {
   block(nodes);
 }
 
-/**
- * Parses AniList markdown. Never throws, and never returns a node carrying
- * markup — see the union above.
- */
+/** Parses AniList markdown; never throws, and never returns a node carrying markup. */
 export function parseAniListMarkdown(
   src: string,
   { limit = LIMIT }: { limit?: number } = {},
@@ -1106,16 +810,7 @@ export function parseAniListMarkdown(
   return { nodes, truncated };
 }
 
-/**
- * The same source as one line of plain text — for a preview, a tooltip or a
- * length check. Shares the parser so the two can never disagree about what
- * counts as content.
- *
- * A spoiler becomes `spoiler` — the placeholder, not the text. A preview is
- * exactly the place a spoiler must not leak: the comment list on a profile
- * shows the first two lines of every comment, and a flattened `~!…!~` put the
- * hidden part in plain view on the page that lists them.
- */
+/** One line of plain text through the same parser; a spoiler becomes the placeholder, never its text. */
 export function renderPlain(src: string, max = 200, spoiler = "[…]"): string {
   const { nodes } = parseAniListMarkdown(src);
   const parts: string[] = [];

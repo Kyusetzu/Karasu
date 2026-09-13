@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { WrappedEntry } from "@/api/queries";
-import { aggregate, availableSeasons, availableYears } from "./wrapped";
+import { aggregate, availableSeasons, availableYears , fromList } from "./wrapped";
 
 const entry = (p: Partial<WrappedEntry> & { year: number }): WrappedEntry => ({
   mediaId: p.mediaId ?? Math.floor(Math.abs(Math.sin(p.year)) * 1e6),
@@ -118,5 +118,35 @@ describe("availableSeasons", () => {
       { season: "WINTER", year: 2024 },
       { season: "SUMMER", year: 2015 },
     ]);
+  });
+});
+
+describe("fromList", () => {
+  const entry = (id: number, status: string, over: Record<string, unknown> = {}) => ({
+    id,
+    mediaId: id,
+    status,
+    score: 8,
+    progress: 12,
+    completedAt: { year: 2025 },
+    media: { id, duration: 24, genres: ["Action"], isAdult: false, season: "FALL", seasonYear: 2024, title: { romaji: `t${id}` } },
+    ...over,
+  });
+
+  it("keeps completed entries once, skipping custom lists and everything unfinished", () => {
+    const lists = [
+      { name: "Completed", status: "COMPLETED", isCustomList: false, entries: [entry(1, "COMPLETED"), entry(2, "COMPLETED")] },
+      { name: "Watching", status: "CURRENT", isCustomList: false, entries: [entry(3, "CURRENT")] },
+      { name: "Favourites", status: null, isCustomList: true, entries: [entry(1, "COMPLETED")] },
+    ];
+    const out = fromList(lists as never);
+    expect(out.map((e) => e.mediaId)).toEqual([1, 2]);
+    expect(out[0]).toMatchObject({ progress: 12, score: 8, year: 2025, duration: 24, season: "FALL", seasonYear: 2024 });
+  });
+
+  it("survives an entry whose media carries none of the optional fields", () => {
+    const bare = { id: 9, mediaId: 9, status: "COMPLETED", score: 0, progress: 0, completedAt: null, media: { id: 9, isAdult: false, title: { romaji: "x" } } };
+    const out = fromList([{ name: "Completed", status: "COMPLETED", isCustomList: false, entries: [bare] }] as never);
+    expect(out[0]).toMatchObject({ year: null, duration: null, genres: [], season: null, seasonYear: null });
   });
 });

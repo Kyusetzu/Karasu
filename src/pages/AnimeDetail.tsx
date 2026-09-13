@@ -1304,12 +1304,17 @@ function ListEditor({
         },
         media,
       ),
-    onSuccess: () => {
+    onSuccess: (res) => {
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
       // Scoped to this title's own collection; the other cannot have changed.
       qc.invalidateQueries({ queryKey: ["mediaList", media.type] });
-      qc.invalidateQueries({ queryKey: ["mediaDetail", mediaId] });
+      // The echo says exactly what changed, so patch the open page rather than refetch a detail we already hold.
+      if (res.entry) {
+        qc.setQueryData(["mediaDetail", mediaId], (old: MediaDetail | undefined) =>
+          old ? { ...old, mediaListEntry: res.entry as MediaDetail["mediaListEntry"] } : old,
+        );
+      }
     },
   });
 

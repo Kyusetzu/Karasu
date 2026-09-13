@@ -4,9 +4,10 @@ import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { Download, Sparkles } from "lucide-react";
-import { wrappedEntries, type Season, type WrappedEntry } from "@/api/queries";
+import type { Season, WrappedEntry } from "@/api/queries";
 import {
   currentScoreFormat,
+  fetchMediaList,
   isTauri,
   saveImage,
   type ImageFormat,
@@ -16,6 +17,7 @@ import {
   aggregate,
   availableSeasons,
   availableYears,
+  fromList,
   type MediaYearStats,
   type WrappedPeriod,
   type WrappedStats,
@@ -554,15 +556,15 @@ export default function Wrapped() {
   const [scale, setScale] = useState(2);
   const preset = PRESETS.find((p) => p.key === presetKey) ?? PRESETS[2];
 
-  // Cached because the page remounts per navigation; error keeps a dropped request from reading as an empty year.
+  // Derived from the two cached lists, which already carry every field Wrapped reads; no request of its own.
   const { data, isLoading: loading, error, refetch } = useQuery({
     queryKey: ["wrapped", viewer?.id],
     queryFn: async () => {
       const [anime, manga] = await Promise.all([
-        wrappedEntries(viewer!.id, "ANIME"),
-        wrappedEntries(viewer!.id, "MANGA"),
+        fetchMediaList(viewer!.id, "ANIME"),
+        fetchMediaList(viewer!.id, "MANGA"),
       ]);
-      return { anime, manga };
+      return { anime: fromList(anime.lists), manga: fromList(manga.lists) };
     },
     enabled: isTauri && !!viewer,
     staleTime: 30 * 60 * 1000,

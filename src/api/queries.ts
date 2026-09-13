@@ -864,29 +864,6 @@ export async function userStatistics(
 
 // --- Yearly wrap-up --------------------------------------------------------
 
-const WRAPPED_QUERY = `
-query ($userId: Int!, $type: MediaType!, $scoreFormat: ScoreFormat) {
-  MediaListCollection(userId: $userId, type: $type, status: COMPLETED) {
-    lists {
-      isCustomList
-      entries {
-        progress
-        score(format: $scoreFormat)
-        completedAt { year }
-        media {
-          id
-          duration
-          genres
-          isAdult
-          season
-          seasonYear
-          title { romaji english native }
-        }
-      }
-    }
-  }
-}`;
-
 export interface WrappedEntry {
   mediaId: number;
   progress: number;
@@ -899,57 +876,6 @@ export interface WrappedEntry {
   season: Season | null;
   seasonYear: number | null;
   title: MediaTitle;
-}
-
-/** Completed entries of one media type, de-duplicated across custom lists. */
-export async function wrappedEntries(
-  userId: number,
-  type: MediaType,
-): Promise<WrappedEntry[]> {
-  const data = await gql<{
-    MediaListCollection: {
-      lists: {
-        isCustomList: boolean;
-        entries: {
-          progress: number;
-          score: number;
-          completedAt: { year: number | null } | null;
-          media: {
-            id: number;
-            duration: number | null;
-            genres: string[];
-            isAdult: boolean;
-            season: Season | null;
-            seasonYear: number | null;
-            title: MediaTitle;
-          };
-        }[];
-      }[];
-    };
-  }>(WRAPPED_QUERY, { userId, type, ...scoreFormatVar() }, { source: "wrapped" });
-
-  const seen = new Set<number>();
-  const out: WrappedEntry[] = [];
-  for (const list of data.MediaListCollection.lists) {
-    if (list.isCustomList) continue;
-    for (const e of list.entries) {
-      if (seen.has(e.media.id)) continue;
-      seen.add(e.media.id);
-      out.push({
-        mediaId: e.media.id,
-        progress: e.progress,
-        score: e.score,
-        year: e.completedAt?.year ?? null,
-        duration: e.media.duration,
-        genres: e.media.genres,
-        isAdult: e.media.isAdult,
-        season: e.media.season,
-        seasonYear: e.media.seasonYear,
-        title: e.media.title,
-      });
-    }
-  }
-  return out;
 }
 
 // --- MAL import resolution -------------------------------------------------

@@ -1,5 +1,32 @@
 import type { Season, WrappedEntry } from "@/api/queries";
-import { displayTitle } from "@/api/types";
+import { displayTitle, type MediaListGroup } from "@/api/types";
+
+/** The completed entries of a cached list, as Wrapped wants them; the list already holds every field, so no request. */
+export function fromList(lists: MediaListGroup[]): WrappedEntry[] {
+  const seen = new Set<number>();
+  const out: WrappedEntry[] = [];
+  for (const group of lists) {
+    // Custom lists repeat entries that the status lists already carry.
+    if (group.isCustomList) continue;
+    for (const e of group.entries) {
+      if (e.status !== "COMPLETED" || seen.has(e.media.id)) continue;
+      seen.add(e.media.id);
+      out.push({
+        mediaId: e.media.id,
+        progress: e.progress,
+        score: e.score,
+        year: e.completedAt?.year ?? null,
+        duration: e.media.duration ?? null,
+        genres: e.media.genres ?? [],
+        isAdult: e.media.isAdult ?? false,
+        season: (e.media.season as Season | null) ?? null,
+        seasonYear: e.media.seasonYear ?? null,
+        title: e.media.title,
+      });
+    }
+  }
+  return out;
+}
 
 /** What one card covers: a year is bucketed by completion, a season by broadcast, as `SeasonPicker` means it. */
 export type WrappedPeriod =

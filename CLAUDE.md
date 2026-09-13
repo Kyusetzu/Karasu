@@ -974,6 +974,21 @@ import it.
   that process); logcat tag `KarasuNotifJob` is the only channel. A forced run
   posts nothing unless the interval is on, the last check is older than it,
   and a seen-id baseline already exists — the first run only arms.
+- **The `cannot move state from Destroyed` panic at the end of a session is
+  Windows ending the session, not the tray's Quit.** Every one of the ten in
+  the installed app's and the rig's logs between 2026-08-14 and 2026-09-11
+  sits one to two seconds after a System-log event 1074 (shutdown, from
+  Explorer) or a Winlogon session end; the tray's Quit, driven by UI
+  automation four times on 2026-09-12 (debug and release, signed out and
+  signed in), never logged one. tao 0.35 answers `WM_ENDSESSION` with
+  `loop_destroyed()` and then keeps pumping messages with the runner already
+  `Destroyed`, which tao 0.36 fixed by exiting inside the handler
+  (tauri-apps/tao#1157); tauri-runtime-wry 2.11 still pins 0.35, so
+  `exit_now_if_unrequested` in `lib.rs` does the same from the app's `Exit`
+  hook. It reproduces on demand without a shutdown: `SendMessage(hwnd, 0x16,
+  1, 0x80000000)` to the process's `Tao Thread Event Target` window. And
+  `app.exit(0)` inside a menu callback is fine — it is a proxy message the
+  loop handles on its next turn, not a teardown in the callback.
 - **A pause defers a scrobble, it does not cancel it.** The window rung drops
   a paused player's window (WASAPI reads the session Inactive within a few
   seconds), the card unmounts, and the session's absolute deadline keeps

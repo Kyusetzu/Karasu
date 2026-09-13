@@ -21,6 +21,7 @@ use tauri::{AppHandle, Manager, Wry};
 // Used only from the desktop half of this file, so they gate with it, or Android warns of an unused import.
 #[cfg(desktop)]
 use crate::sync::LockExt;
+use std::sync::atomic::{AtomicBool, Ordering};
 #[cfg(desktop)]
 use std::sync::Mutex;
 #[cfg(desktop)]
@@ -142,6 +143,27 @@ fn hide_window_in_dev(app: &tauri::App, tray_present: bool) {
 
 #[cfg(all(desktop, not(debug_assertions)))]
 fn hide_window_in_dev(_app: &tauri::App, _tray_present: bool) {}
+
+/// Set by `RunEvent::ExitRequested`, read by `RunEvent::Exit`: the one way to tell a requested exit from an imposed one.
+static EXIT_REQUESTED: AtomicBool = AtomicBool::new(false);
+
+/// An `Exit` with no `ExitRequested` before it is the OS destroying the loop; leave before tao 0.35 pumps another message.
+#[cfg(desktop)]
+fn exit_now_if_unrequested(app: &AppHandle) {
+    if EXIT_REQUESTED.load(Ordering::SeqCst) {
+        return;
+    }
+    logging::info(
+        "shutdown",
+        "the session is ending; exiting before the event loop takes another message",
+    );
+    app.cleanup_before_exit();
+    std::process::exit(0);
+}
+
+/// Android emits the same event on the activity's destroy and the process must survive it; the notification job runs there.
+#[cfg(mobile)]
+fn exit_now_if_unrequested(_app: &AppHandle) {}
 
 /// Builds the tray, or reports why it could not; split out so `setup_platform` can wrap the whole thing in `catch_unwind`.
 #[cfg(desktop)]
@@ -467,8 +489,13 @@ pub fn run() {
             library::play_next,
             library::play_episode,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| match event {
+            tauri::RunEvent::ExitRequested { .. } => EXIT_REQUESTED.store(true, Ordering::SeqCst),
+            tauri::RunEvent::Exit => exit_now_if_unrequested(app),
+            _ => {}
+        });
 }
 
 /// The desktop-only plugins and the close-to-tray handler; a cfg'd pair, since those crates do not exist on mobile.

@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 1a97acb -->
+<!-- generated-through: 5002a49 -->
 
 ### Fixed
 
@@ -100,6 +100,7 @@ tag time is then optional rather than load-bearing.
 - Your list is read from the local copy for fifteen minutes after a fetch and refreshed quietly in the background after that; "Sync now" still fetches at once.
 - Karasu now waits for the next episode's airing time instead of polling AniList every twenty minutes for new episodes.
 - The Wrapped page is built from the list Karasu already holds, and saving from a title's page no longer reloads it.
+- Exit cleanly when Windows ends the session; the quit panic was never the tray (1.10.4.621).
 ## 1.0.0 — 2026-09-05
 
 Karasu 1.0.0 is the first tagged release: a desktop and Android tracker built

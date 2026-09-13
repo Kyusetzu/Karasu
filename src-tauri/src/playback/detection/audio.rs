@@ -1,42 +1,6 @@
-//! Whether the process behind a window is actually playing anything.
-//!
-//! The window-title rung has no play state of its own. A title is a string:
-//! mpv, VLC, MPC-HC and PotPlayer all keep showing the file name while paused,
-//! and none of the profiled players writes a pause marker into it. So a player
-//! left paused mid-episode kept the scrobbler's wall clock running, and the
-//! episode was written as watched — the one detection rung where that was
-//! still true after the media-session rung learned to read `PlayState`.
-//!
-//! The signal used instead is the audio session. WASAPI tracks one per
-//! process: `AudioSessionStateActive` while the process is submitting samples,
-//! `AudioSessionStateInactive` once it stops. Pausing a player stops the
-//! submission, so the session goes Inactive within about a second — and this
-//! is a documented, per-process, non-privileged API rather than a heuristic
-//! over a string.
-//!
-//! **Only an explicit Inactive suppresses detection.** Every other outcome —
-//! no session for that process, an Expired one, a COM failure, a machine with
-//! no audio endpoint at all, Linux — means "unknown", and unknown keeps the
-//! behaviour this module replaced. That asymmetry is the whole safety
-//! argument: a silent video, `mpv --no-audio`, an exclusive-mode device or a
-//! headless VM cannot make Karasu stop seeing playback, because none of them
-//! produces an Inactive session. The failure mode is "as before", never "blind".
-//!
-//! Expired is deliberately not Paused. It means the player released the device
-//! entirely, which some players do on pause and others only on stop, so it
-//! cannot tell the two apart. Unknown is the honest answer.
-//!
-//! The split follows `media_session/mod.rs`: the backend supplies data, this
-//! module decides, and the decision is tested on both platforms rather than
-//! only in the Linux CI job.
+//! Play state of a window's process from its WASAPI audio session; only an explicit Inactive ever suppresses.
 
-// `PlayState::Playing` and `record` are constructed only by the Windows
-// backend and the tests, so a Linux `cargo check` — which compiles neither the
-// backend nor `#[cfg(test)]` — reports them dead. They are not: they are the
-// half of this module that only one platform runs, which is the shape the
-// media-session split established. Scoped to `not(windows)` on purpose, so the
-// Windows build still gets a real dead-code warning if one of them ever
-// genuinely stops being called there.
+// Only the Windows backend and the tests call these; scoped so the Windows build keeps its real dead-code warning.
 #![cfg_attr(not(windows), allow(dead_code))]
 
 use std::collections::HashMap;
@@ -48,28 +12,15 @@ pub enum PlayState {
     Paused,
 }
 
-/// Lower-case process name (`"mpv.exe"`) to what its audio session reports.
-///
-/// A process with no entry is not in any state — it is unmeasured, which is
-/// what `is_paused` reads as "carry on".
+/// Lower-case process name to what its audio session reports; an absent entry is unmeasured, not a state.
 pub type PlayStates = HashMap<String, PlayState>;
 
-/// Whether detection should stand down for this process.
-///
-/// True *only* on a recorded `Paused`. This is the pure half, and the one the
-/// tests exercise; everything above it is a data source.
+/// Whether detection should stand down for this process: true only on a recorded `Paused`.
 pub fn is_paused(states: &PlayStates, process: &str) -> bool {
     states.get(process) == Some(&PlayState::Paused)
 }
 
-/// Folds one session's reading into the map.
-///
-/// A process can own several sessions — a browser has one per tab that has
-/// ever played, and a player may hold a second for its notification sound.
-/// Playing wins: one active stream means the process is playing, however many
-/// idle ones sit beside it. Without this rule a browser with six spent tabs
-/// and one playing video reported whichever session happened to enumerate
-/// last.
+/// Folds one session into the map; Playing wins, because one active stream beside idle ones is a playing process.
 pub fn record(states: &mut PlayStates, process: String, state: PlayState) {
     if states.get(&process) == Some(&PlayState::Playing) {
         return;
@@ -89,20 +40,11 @@ mod backend {
         CoCreateInstance, CoInitializeEx, CLSCTX_ALL, COINIT_MULTITHREADED,
     };
 
-    /// Every render session on the default endpoint, by process name.
-    ///
-    /// Every step returns the map built so far rather than propagating an
-    /// error, because a partial reading is exactly as safe as an empty one:
-    /// what is absent is unknown, and unknown does not suppress.
+    /// Every render session on the default endpoint by process name; a partial map is as safe as an empty one.
     pub fn play_states() -> PlayStates {
         let mut out = PlayStates::new();
         unsafe {
-            // The result is deliberately dropped. Detection runs on a
-            // `spawn_blocking` thread that nothing else initialises, so this
-            // is usually the call that succeeds; if the thread already has an
-            // apartment this answers RPC_E_CHANGED_MODE, which is not a
-            // failure — COM is initialised either way and the calls below work
-            // in either apartment.
+            // Dropped on purpose: RPC_E_CHANGED_MODE from a thread that already has an apartment is fine either way.
             let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
 
             let Ok(enumerator) =
@@ -110,8 +52,7 @@ mod backend {
             else {
                 return out;
             };
-            // The default endpoint only. A player sent to a second device is
-            // then unmeasured rather than wrong, which is the safe direction.
+            // The default endpoint only: a player sent to a second device is unmeasured rather than wrong.
             let Ok(device) = enumerator.GetDefaultAudioEndpoint(eRender, eMultimedia) else {
                 return out;
             };
@@ -138,7 +79,7 @@ mod backend {
                 let Ok(state) = ctrl.GetState() else {
                     continue;
                 };
-                // Expired falls through to `continue`: see the module note.
+                // Expired falls through: a player that released the device may be paused or stopped, so it stays unknown.
                 let seen = if state == AudioSessionStateActive {
                     PlayState::Playing
                 } else if state == AudioSessionStateInactive {
@@ -156,8 +97,7 @@ mod backend {
     }
 }
 
-/// No window enumeration on Linux, so nothing here to hang a play state on —
-/// and the media-session rung reads MPRIS's own `PlaybackStatus` anyway.
+/// No window enumeration on Linux, so nothing to hang a play state on; MPRIS reports its own `PlaybackStatus`.
 #[cfg(not(windows))]
 mod backend {
     pub fn play_states() -> super::PlayStates {
@@ -190,9 +130,7 @@ mod tests {
         assert!(!is_paused(&s, "vlc.exe"));
     }
 
-    /// A browser holds a session per tab that has ever played. Six spent tabs
-    /// and one playing video is a playing browser, and before `record` the
-    /// answer depended on enumeration order.
+    /// A browser holds a session per tab that has ever played, and one playing tab makes a playing browser.
     #[test]
     fn one_playing_session_outvotes_any_number_of_idle_ones() {
         let mut s = PlayStates::new();

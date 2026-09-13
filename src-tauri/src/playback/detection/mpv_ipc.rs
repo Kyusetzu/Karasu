@@ -1,47 +1,13 @@
-//! mpv's JSON IPC as a detection source — the one that knows the most.
-//!
-//! A user who adds `input-ipc-server=\\.\pipe\karasu-mpv` (or a socket path
-//! on Linux) to `mpv.conf` gets exact playback facts instead of a window
-//! title: the real file path for the release parser, and a live position the
-//! scrobble deadline can trust. Opt-in by construction — probing a pipe name
-//! nobody configured, every five seconds, would be waste dressed as a
-//! feature.
-//!
-//! The transport is the platform half (named pipe / unix socket, the cfg'd
-//! pair convention); everything with a decision in it — the request lines,
-//! reply parsing, and what counts as a usable candidate — is pure and
-//! tested on both platforms.
-//!
-//! The timeout covers the write and the reads, so a pipe that exists and
-//! never answers costs half a second. It does **not** cover the Windows
-//! connect: `ClientOptions::open` is a synchronous `CreateFileW` that runs
-//! inside the future's first poll, before the timer can arm. For a local
-//! `\\.\pipe\…` name that returns immediately, which is why the path is
-//! shape-checked before it ever gets here (`commands::mpv_ipc_config`) —
-//! a UNC or network path could otherwise stall a runtime thread past the
-//! advertised bound. Linux is genuinely async and has no such caveat.
+//! mpv's JSON IPC as an opt-in detection source: the real file path and a live position instead of a window title.
 
 use super::Playback;
 
-/// Everything the probe needs to know. Read from settings by
-/// `commands::mpv_ipc_config`, `None` while the feature is off.
+/// Everything the probe needs, read from settings by `commands::mpv_ipc_config`; `None` while the feature is off.
 pub struct MpvConfig {
     pub path: String,
 }
 
-/// The name the settings hint suggests for `mpv.conf`.
-///
-/// A named pipe on Windows lives in a per-session namespace, so a constant is
-/// right there. A unix socket is a path, and `/tmp/karasu-mpv` is one path
-/// shared by every account on the machine: on a multi-user box the first user
-/// to run mpv owns the name, and the next either collides with it or connects
-/// to a socket somebody else is holding. `$XDG_RUNTIME_DIR` exists precisely
-/// for this — per-user, mode 0700, cleared at logout — with `/tmp` kept as the
-/// fallback for a session that has none, which is what shipped before.
-///
-/// A function rather than a `const`, because the answer is only known at
-/// runtime. The settings hint reads the same one, so the path the pane tells
-/// the user to put in `mpv.conf` is always the path Karasu will connect to.
+/// The path the settings hint shows for `mpv.conf`; `$XDG_RUNTIME_DIR` is per-user, so accounts cannot collide on `/tmp`.
 #[cfg(windows)]
 pub fn default_pipe() -> String {
     r"\\.\pipe\karasu-mpv".to_string()
@@ -83,11 +49,7 @@ pub(crate) fn request_lines() -> String {
         .collect()
 }
 
-/// Feeds one reply line into the state. Returns whether it answered one of
-/// ours — events and unknown ids interleave freely on the same stream and
-/// simply do not count. An errored property ("property unavailable" during
-/// startup) still counts as answered: its slot stays `None`, which the
-/// candidate rules below treat honestly.
+/// Feeds one reply line into the state and says whether it answered one of ours; an errored property still counts.
 pub(crate) fn apply_reply(state: &mut MpvState, line: &str) -> bool {
     let Ok(v) = serde_json::from_str::<serde_json::Value>(line) else {
         return false;
@@ -107,9 +69,7 @@ pub(crate) fn apply_reply(state: &mut MpvState, line: &str) -> bool {
     true
 }
 
-/// The filename inside a local path — parser input of the same quality the
-/// MPRIS `file://` branch gets. A URL (streaming through mpv) has no useful
-/// filename, so the composed `media-title` speaks instead.
+/// The filename inside a local path; a URL has no useful filename, so the composed `media-title` speaks instead.
 fn file_name(path: &str) -> Option<String> {
     if path.contains("://") {
         return None;
@@ -118,15 +78,7 @@ fn file_name(path: &str) -> Option<String> {
     (!name.is_empty()).then(|| name.to_string())
 }
 
-/// What the probe found, as a detection candidate.
-///
-/// Paused playback stays a *candidate*, unlike the media-session pass which
-/// drops it outright — with a live position a pause simply stops the number
-/// the scrobble deadline reads, so nothing is lost by keeping it. What a
-/// paused player must not do is *outrank* a live source: `detect_playback`
-/// takes the pausedness this returns and demotes it to a last resort, which
-/// is the difference between "you paused mpv for a minute" and "an mpv window
-/// left paused an hour ago hides the episode you are streaming right now".
+/// The probe's findings as a candidate; paused stays a candidate, and `detect_playback` demotes it rather than dropping it.
 pub(crate) fn playback_from_state(state: &MpvState) -> Option<Playback> {
     let title = state
         .path
@@ -161,8 +113,7 @@ async fn connect(path: &str) -> std::io::Result<tokio::net::UnixStream> {
     tokio::net::UnixStream::connect(path).await
 }
 
-/// No mpv on mobile — there is no pipe to open, so the probe's `.ok()?` turns
-/// this into "nothing playing" the same way a desktop with mpv closed does.
+/// No mpv on mobile: the probe's `.ok()?` turns this into "nothing playing", as a desktop with mpv closed does.
 #[cfg(mobile)]
 async fn connect(_path: &str) -> std::io::Result<tokio::net::UnixStream> {
     Err(std::io::Error::from(std::io::ErrorKind::Unsupported))
@@ -178,9 +129,7 @@ async fn probe(path: &str) -> Option<MpvState> {
         let mut lines = BufReader::new(read).lines();
         let mut state = MpvState::default();
         let mut answered = 0usize;
-        // Events interleave; 32 lines is far beyond anything a healthy mpv
-        // sends between five answers, and the bound is what keeps a chatty
-        // stream from owning the loop.
+        // Events interleave, and the bound is what keeps a chatty stream from owning the loop.
         for _ in 0..32 {
             let line = lines.next_line().await.ok()??;
             if apply_reply(&mut state, &line) {
@@ -192,17 +141,14 @@ async fn probe(path: &str) -> Option<MpvState> {
         }
         None
     };
-    // One clock over connect, write and reads together: a pipe that exists
-    // but never answers (a wedged or foreign server) costs half a second,
-    // not a hung detection pass.
+    // One clock over write and reads; the Windows connect is synchronous, so `commands::mpv_ipc_config` shape-checks the path.
     tokio::time::timeout(std::time::Duration::from_millis(500), attempt)
         .await
         .ok()
         .flatten()
 }
 
-/// The candidate and whether mpv is paused — the caller needs the second half
-/// to rank it. See `playback_from_state`.
+/// The candidate and whether mpv is paused, since the caller needs the second half to rank it.
 pub async fn detect(cfg: &MpvConfig) -> Option<(Playback, bool)> {
     let state = probe(&cfg.path).await?;
     playback_from_state(&state).map(|p| (p, state.paused))
@@ -286,8 +232,7 @@ mod tests {
             paused: true,
             ..MpvState::default()
         };
-        // Still a candidate — the *ranking* is where pausedness is spent, and
-        // `detect` reports the flag so `detect_playback` can demote it.
+        // Still a candidate; pausedness is spent in the ranking, where `detect_playback` demotes it.
         assert!(playback_from_state(&paused).is_some());
         assert!(paused.paused);
 

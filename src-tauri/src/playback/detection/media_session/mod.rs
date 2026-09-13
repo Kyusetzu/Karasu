@@ -1,30 +1,4 @@
-//! The desktop's own media session as a detection source.
-//!
-//! Window-title parsing only works for players that put the file name in
-//! their title bar. Plenty don't — Jellyfin Media Player is the motivating
-//! case: its title never changes, so it was invisible to detection. But it
-//! does publish to the system's media controls (the overlay you get with the
-//! volume keys), and so do browsers playing video, Plex, and anything using
-//! the Media Session API.
-//!
-//! That gives us *structured* metadata — a separate title, artist and album —
-//! instead of one string to reverse-engineer, which is strictly better input
-//! than a release name.
-//!
-//! Every desktop has its own name for this. Windows calls it SMTC and exposes
-//! it through WinRT; Linux calls it MPRIS and exposes it over D-Bus. They
-//! agree closely enough on *what* a media session is that only the reading of
-//! it differs, so the shape and every decision made about it live here and the
-//! two backends supply nothing but a `Vec<MediaSession>`.
-//!
-//! Two caveats this module has to live with:
-//!   - Not every app fills the fields the same way. Which field carries the
-//!     series and which carries the episode varies, and jellyfin-web is known
-//!     to swap artist and title outright. `compose_title` is therefore
-//!     deliberately forgiving, and `sessions()` exists so the Settings
-//!     diagnostic can show exactly what a given player reports.
-//!   - Music players publish here too. `playback_type` is how we tell them
-//!     apart.
+//! The desktop's own media session as a detection source; the backends supply sessions and every decision lives here.
 
 use super::Playback;
 
@@ -33,11 +7,7 @@ mod mpris;
 #[cfg(windows)]
 mod smtc;
 
-// The three items below are only *called* from the MPRIS backend, so a
-// Windows build sees them as dead. They live here rather than in `mpris.rs`
-// deliberately: they are pure decisions about a session, and keeping them
-// platform-neutral is what lets their tests run on both platforms instead of
-// only in the Linux CI job.
+// Only the MPRIS backend calls these, but they are pure decisions kept platform-neutral so their tests run on both.
 #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 /// Audio-only extensions, for telling a music player from a video one.
 const AUDIO_EXTENSIONS: &[&str] = &[
@@ -45,26 +15,17 @@ const AUDIO_EXTENSIONS: &[&str] = &[
     ".m4b", ".ape", ".wv",
 ];
 
-/// Players that only ever play music, matched on the shortened app name with
-/// any `.exe` stripped — so this covers the MPRIS bus suffix ("spotify"), the
-/// Windows executable ("Spotify.exe") and the Store package family
-/// ("SpotifyAB.SpotifyMusic_…" → "spotifymusic") in one list. Used both to
-/// infer a type where MPRIS reports none and to believe a "music" label
-/// outright where the episode carve-out in `is_watchable` would otherwise
-/// second-guess it.
+/// Music-only players by shortened app name with `.exe` stripped, so one list covers MPRIS, executable and Store package.
 const MUSIC_PLAYERS: &[&str] = &[
     "spotify", "spotifyd", "spotifymusic", "ncspot", "rhythmbox", "clementine",
     "strawberry", "audacious", "elisa", "lollypop", "amberol", "mpd", "cmus",
     "moc", "quodlibet", "deadbeef", "tauon", "gnome-music", "sayonara",
 ];
 
-/// One media session as the desktop sees it. Serialized straight into the
-/// Settings diagnostic — this is the only way to find out what a player
-/// actually publishes, short of guessing.
+/// One media session as the desktop sees it, serialized straight into the Settings diagnostic.
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct MediaSession {
-    /// Source app: an executable path or package family name on Windows, a
-    /// D-Bus bus name on Linux.
+    /// Source app: an executable path or package family name on Windows, a D-Bus bus name on Linux.
     #[serde(rename = "appId")]
     pub app_id: String,
     pub title: String,
@@ -75,8 +36,7 @@ pub struct MediaSession {
     pub playback_type: String,
     /// "playing" | "paused" | "stopped" | "changing" | "opened" | "closed"
     pub status: String,
-    /// What is being played, when the source says. MPRIS publishes a
-    /// `xesam:url`; SMTC has no equivalent and leaves this empty.
+    /// What is being played, when the source says; MPRIS publishes `xesam:url`, SMTC has no equivalent.
     pub url: String,
 }
 
@@ -85,24 +45,7 @@ impl MediaSession {
         self.status == "playing"
     }
 
-    /// Music is excluded outright; anything else is allowed through, because
-    /// a player that leaves the type unset would otherwise never be
-    /// detected. Getting a false positive from an unset video player is
-    /// recoverable — the title simply won't match anything on the list.
-    ///
-    /// One carve-out, measured on a real site: a "music" label is usually
-    /// the *player's* default for anything with sound, not the site's claim
-    /// — an anime episode in a browser tab reported `type: music` and was
-    /// invisible to the whole pass. The label yields to a title that
-    /// *spells out* an episode ("Episode 2", S01E05, "#28"): the title is
-    /// evidence about the media, the type only a guess by the player — the
-    /// same primacy `infer_playback_type` gives the URL. Deliberately not
-    /// keyed on the app being a browser: Windows reports browsers under
-    /// opaque install-hash AUMIDs (`6F940AC27A98DD61` was the real one), so
-    /// an app-id test cannot recognise the very sessions this exists for.
-    /// Real music has no episode marker and stays out — and a known
-    /// music-only player is believed outright, even about a song that
-    /// happens to be called like an episode.
+    /// Music stays out, but a "music" label yields to a title spelling out an episode unless the app is a known music player.
     fn is_watchable(&self) -> bool {
         if self.playback_type != "music" {
             return true;
@@ -120,13 +63,7 @@ impl MediaSession {
     }
 }
 
-/// Builds the string handed to the release-name parser.
-///
-/// The convention across players is artist = show, title = episode, so they
-/// are joined in that order and the parser picks the episode number out of
-/// whatever numbering the title carries. The pieces are only joined when they
-/// are actually distinct: several players repeat the show name in both
-/// fields, and duplicating it would push the parser off the real title.
+/// Joins show and title for the parser only when they are distinct, since several players repeat the show in both fields.
 pub fn compose_title(artist: &str, title: &str, album: &str) -> String {
     let title = title.trim();
     let artist = artist.trim();
@@ -148,17 +85,13 @@ pub fn compose_title(artist: &str, title: &str, album: &str) -> String {
     format!("{show} - {title}")
 }
 
-/// Trims an app id down to something that reads like the other sources'
-/// `process` field ("mpv.exe", "chrome.exe"). The three shapes are an
-/// executable path, a Windows package family name, and an MPRIS bus name.
+/// Trims an app id (executable path, package family name or MPRIS bus name) down to a process-like name.
 pub fn short_app_name(app_id: &str) -> String {
     let id = app_id.trim();
     if id.is_empty() {
         return String::new();
     }
-    // An MPRIS bus name, "org.mpris.MediaPlayer2.mpv.instance1234". Checked
-    // before the package-family branch because it has no underscore to split
-    // on and would otherwise reduce to its instance suffix.
+    // An MPRIS bus name, checked first because it has no underscore and would otherwise reduce to its instance suffix.
     if let Some(rest) = id.strip_prefix("org.mpris.MediaPlayer2.") {
         return rest.split('.').next().unwrap_or(rest).to_lowercase();
     }
@@ -176,8 +109,7 @@ pub fn short_app_name(app_id: &str) -> String {
         .to_lowercase()
 }
 
-/// Every session worth reporting, best first: those declaring video, then the
-/// rest. Playing and non-music throughout.
+/// Every playing, non-music session worth reporting, those declaring video first.
 fn watchable<'a>(sessions: &'a [MediaSession]) -> impl Iterator<Item = &'a MediaSession> + 'a {
     let eligible = |s: &&MediaSession| s.is_playing() && s.is_watchable();
     sessions
@@ -190,20 +122,13 @@ fn watchable<'a>(sessions: &'a [MediaSession]) -> impl Iterator<Item = &'a Media
         )
 }
 
-/// The session to report: the best one that is playing and isn't music.
-///
-/// Only the tests take it a candidate at a time; `detect` needs the whole
-/// ordering so it can fall through past one it cannot use.
+/// The best playing non-music session; only the tests take one at a time, since `detect` needs the whole ordering.
 #[cfg(test)]
 fn pick(sessions: &[MediaSession]) -> Option<&MediaSession> {
     watchable(sessions).next()
 }
 
-/// The file name behind a `file://` URL, percent-decoded.
-///
-/// `None` for anything else — an http stream, or a URL with no last segment.
-/// Lossy decoding rather than strict: a file name that is not valid UTF-8 is
-/// still worth a guess at, and the matcher will simply fail to place it.
+/// The percent-decoded file name behind a `file://` URL, lossily since a bad name is still worth a guess; else `None`.
 pub fn local_file_name(url: &str) -> Option<String> {
     let path = url.strip_prefix("file://")?;
     // Strip the (usually empty) authority: file://host/path.
@@ -219,13 +144,7 @@ pub fn local_file_name(url: &str) -> Option<String> {
     (!decoded.is_empty()).then(|| decoded.to_string())
 }
 
-/// What kind of media this is, for sources that do not say.
-///
-/// MPRIS publishes no equivalent of SMTC's `PlaybackType`, so it is inferred.
-/// The URL is evidence about the file itself and beats any guess made from the
-/// player's name, so it is checked first. "unknown" is deliberately the
-/// fallback rather than "video": `pick` treats unknown as eligible, and a
-/// player that says nothing must not be invisible.
+/// The kind for sources that do not say: the URL beats the player's name, and the fallback is "unknown", never "video".
 #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 pub fn infer_playback_type(url: &str, app_id: &str) -> &'static str {
     // The path only — a query string must not defeat the extension check.
@@ -243,14 +162,9 @@ pub fn infer_playback_type(url: &str, app_id: &str) -> &'static str {
     "unknown"
 }
 
-/// Turns one session into a playback candidate.
-///
-/// Split out of `detect` so the mapping can be tested without a live session
-/// manager on either platform.
+/// One session as a playback candidate, split out of `detect` so the mapping is testable without a live session manager.
 pub fn playback_from(session: &MediaSession) -> Option<Playback> {
-    // A local file is the good case: MPRIS hands over the real release name,
-    // which is better parser input than any composition of artist and title,
-    // and is the same shape the Windows window-title path produces for mpv.
+    // A local file is the good case: the real release name beats any composition of artist and title as parser input.
     if let Some(name) = local_file_name(&session.url) {
         crate::logging::debug_changed(
             "session",
@@ -270,8 +184,7 @@ pub fn playback_from(session: &MediaSession) -> Option<Playback> {
 
     let media_title = compose_title(&session.artist, &session.title, &session.album);
     if media_title.trim().is_empty() {
-        // A `None` that looks exactly like "nothing is playing" from the outside,
-        // which is why it is worth a line: the session existed and was rejected.
+        // From the outside a `None` looks exactly like "nothing is playing", so the rejection is worth a line.
         crate::logging::debug_changed(
             "session",
             "skipped",
@@ -279,12 +192,7 @@ pub fn playback_from(session: &MediaSession) -> Option<Playback> {
         );
         return None;
     }
-    // A composed title whose *parse* is empty is not playback either. Some
-    // clients swap artist and title (the warning above), which puts the
-    // episode marker first — "Folge 1 - Some Show" parses to an empty title
-    // with an episode number, and an empty title matches nothing, blocks
-    // nothing useful, and would become the key of a correction that could
-    // never fire again.
+    // A composed title whose parse is empty is not playback; it matches nothing and would key a correction that never fires.
     if crate::playback::recognition::parser::parse(&media_title)
         .title
         .trim()
@@ -305,8 +213,7 @@ pub fn playback_from(session: &MediaSession) -> Option<Playback> {
     Some(Playback {
         process: short_app_name(&session.app_id),
         media_title,
-        // Not a local file, and the UI's "streaming" icon is the honest one
-        // for something we only know about through the OS.
+        // Not a local file, and the UI's "streaming" icon is the honest one for something known only through the OS.
         streaming: true,
         manga: false,
         parsed: None,
@@ -315,24 +222,10 @@ pub fn playback_from(session: &MediaSession) -> Option<Playback> {
     })
 }
 
-/// The best session that actually yields something to scrobble.
-///
-/// Not `playback_from(pick(…)?)`: `pick` returns one candidate and
-/// `playback_from` can still reject it for having no usable title, so a single
-/// unusable session ended the whole sweep. On Linux that is not hypothetical —
-/// `read_sessions` lists every `org.mpris.MediaPlayer2.*` bus name, including
-/// ones whose Metadata is absent (browsers between tracks, playerctld, a player
-/// that registered before setting metadata), and those are inferred "unknown"
-/// rather than "video", so they sit in the same tier as the real player and can
-/// be listed first. Falling through to the next candidate is the difference
-/// between scrobbling the episode and never seeing it.
+/// The best session that yields something; one `playback_from` rejects falls through instead of ending the sweep.
 pub fn detect() -> Option<Playback> {
     let sessions = sessions();
-    // What the desktop actually publishes. This is the same data the Settings
-    // diagnostic shows, and for the same reason: there is otherwise no way to
-    // tell "Karasu ignored it" from "the player never told the system". On
-    // disk it also survives the moment, which the live diagnostic does not.
-    // `debug_changed`, not `debug`: this runs on every five-second poll.
+    // What the desktop publishes, through `debug_changed` since this runs on every poll; the log outlives the diagnostic.
     crate::logging::debug_changed(
         "session",
         "sessions",
@@ -353,15 +246,7 @@ pub fn detect() -> Option<Playback> {
     found
 }
 
-/// What the platform reports, or why it could not be asked.
-///
-/// The detection pass wants a plain list and treats "nothing" as a normal
-/// answer — most polls find nothing playing. The *diagnostic* wants the
-/// difference: "no session is reporting anything" and "the session service
-/// could not be reached" were byte-identical on screen, and on Linux this pass
-/// is the whole of local detection, so the second one means the feature is
-/// down. Telling someone their player is at fault when the session bus is
-/// missing sends them to debug the wrong thing.
+/// What the platform reports, or why it could not be asked; the diagnostic must tell "no session" from "no service".
 #[cfg(windows)]
 pub fn sessions_result() -> Result<Vec<MediaSession>, String> {
     smtc::read_sessions().map_err(|e| e.to_string())
@@ -378,13 +263,7 @@ pub fn sessions_result() -> Result<Vec<MediaSession>, String> {
     Ok(Vec::new())
 }
 
-/// The list alone, for the detection pass.
-///
-/// A failure is an empty list here on purpose — the poll runs every 5 s and has
-/// nothing useful to do with an error — but it does not pass silently: the
-/// reason goes through `debug_changed`, which records a line only when it
-/// differs from the last one under the same key. A plain `warn` on this path is
-/// 17,280 lines a day and rotates the interesting part of the log off disk.
+/// The list alone for the detection pass; a failure is empty but logged through `debug_changed`, never a `warn` per poll.
 pub fn sessions() -> Vec<MediaSession> {
     match sessions_result() {
         Ok(list) => list,
@@ -457,8 +336,7 @@ mod tests {
         }
     }
 
-    /// The carve-out's fixture is the real thing: an anime episode in a tab,
-    /// reported by the browser as `type: music`, invisible to the whole pass.
+    /// The carve-out's fixture is the real thing: an anime episode in a tab that the browser reported as `type: music`.
     #[test]
     fn a_browsers_music_label_yields_to_an_episode_title() {
         let s = browser_session(
@@ -472,10 +350,7 @@ mod tests {
         assert_eq!(p.process, "chrome.exe");
     }
 
-    /// The second real report: Windows names browsers by opaque install-hash
-    /// AUMIDs, so the first fix — keyed on the app id being a browser —
-    /// never fired for the very session it was written for. The override
-    /// must work with an app id nothing can classify.
+    /// Windows names browsers by opaque AUMIDs, so the override must work with an app id nothing can classify.
     #[test]
     fn an_opaque_app_id_cannot_hide_a_spelled_out_episode() {
         let mut s = browser_session(
@@ -489,9 +364,7 @@ mod tests {
         assert!(p.streaming);
     }
 
-    /// The override needs a *spelled-out* episode: real music has none —
-    /// the Spotify web player included — and a bare trailing number in a
-    /// song name is inference, not a marker.
+    /// The override needs a spelled-out episode; a bare trailing number in a song name is inference, not a marker.
     #[test]
     fn real_music_stays_invisible_without_a_marker() {
         let sessions = vec![
@@ -501,8 +374,7 @@ mod tests {
         assert!(pick(&sessions).is_none());
     }
 
-    /// A known music-only player is believed outright, even about a song
-    /// that happens to be called like an episode.
+    /// A known music-only player is believed outright, even about a song that happens to be called like an episode.
     #[test]
     fn a_music_apps_episode_titled_song_stays_invisible() {
         let mut s = session("Yorushika", "Episode 3", "music", "playing");
@@ -546,8 +418,7 @@ mod tests {
         assert_eq!(short_app_name(""), "");
     }
 
-    /// An MPRIS bus name carries an instance suffix and no underscore, so the
-    /// package-family branch would have reduced it to "instance1234".
+    /// An MPRIS bus name has an instance suffix and no underscore, so the package-family branch would misread it.
     #[test]
     fn an_mpris_bus_name_shortens_to_the_player() {
         assert_eq!(short_app_name("org.mpris.MediaPlayer2.mpv.instance1234"), "mpv");
@@ -564,10 +435,7 @@ mod tests {
         assert!(playback_from(&session("  ", "  ", "video", "playing")).is_none());
     }
 
-    /// A playing session with no metadata used to end the sweep, because
-    /// `pick` chose it and `playback_from` then rejected it. On Linux an empty
-    /// MPRIS player sitting on the bus ahead of the real one would have hidden
-    /// the episode for as long as it stayed there.
+    /// An empty playing session must fall through, or an idle MPRIS player listed ahead of the real one hides the episode.
     #[test]
     fn an_empty_session_falls_through_to_the_next_one() {
         let sessions = vec![
@@ -580,8 +448,7 @@ mod tests {
         );
     }
 
-    /// The preference order `pick` documents still holds when iterating: video
-    /// is considered before anything untyped, whatever the bus order.
+    /// Video is considered before anything untyped, whatever the bus order.
     #[test]
     fn video_is_still_considered_before_untyped() {
         let sessions = vec![
@@ -592,9 +459,7 @@ mod tests {
         assert_eq!(order, vec!["Video", "Untyped"]);
     }
 
-    /// The URL is evidence about the file; the player's name is only a guess
-    /// about the player. So the extension wins, including for a browser, and
-    /// a query string must not defeat it.
+    /// The URL is evidence about the file, so the extension wins even for a browser, and a query string must not defeat it.
     #[test]
     fn the_media_kind_is_inferred_from_the_url_before_the_player() {
         assert_eq!(infer_playback_type("file:///a/Frieren%20-%2005.mkv", ""), "video");
@@ -603,17 +468,14 @@ mod tests {
             infer_playback_type("https://x/v.mp4?token=1", "org.mpris.MediaPlayer2.firefox"),
             "video"
         );
-        // Spotify streams, so there is no extension to read — the bus name is
-        // all there is to go on.
+        // Spotify streams, so there is no extension to read and the bus name is all there is to go on.
         assert_eq!(
             infer_playback_type("https://open.spotify.com/track/1", "org.mpris.MediaPlayer2.spotify"),
             "music"
         );
     }
 
-    /// Anything unrecognised stays eligible. `pick` lets "unknown" through on
-    /// purpose, so guessing "video" here would gain nothing and guessing
-    /// "music" would make a whole player invisible.
+    /// Anything unrecognised stays unknown: guessing "video" gains nothing and guessing "music" hides a whole player.
     #[test]
     fn an_unrecognised_source_stays_unknown() {
         assert_eq!(infer_playback_type("", ""), "unknown");
@@ -645,8 +507,7 @@ mod tests {
         assert!(local_file_name("file://").is_none());
     }
 
-    /// The whole point of reading `xesam:url`: a local file goes to the parser
-    /// as the name on disk, and is not called streaming.
+    /// A local file goes to the parser as the name on disk and is not called streaming.
     #[test]
     fn a_local_file_beats_the_composed_title() {
         let mut s = session("Some Artist", "Track 5", "video", "playing");

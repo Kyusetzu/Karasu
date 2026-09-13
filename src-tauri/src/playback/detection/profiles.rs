@@ -1,8 +1,6 @@
-//! Player and streaming profiles: which processes are interesting and how
-//! the media title is extracted from the window title.
+//! Player and streaming profiles: which processes are interesting and how the media title comes out of the window title.
 
-/// Known video players: (process names, suffixes stripped from the window
-/// title). The title must look like a video file.
+/// Known video players: process names and the suffixes stripped from a window title that looks like a video file.
 const PLAYERS: &[(&[&str], &[&str])] = &[
     (&["mpv.exe", "mpvnet.exe"], &[" - mpv", " - mpv.net"]),
     (&["vlc.exe"], &[" - VLC media player", " - VLC Media Player"]),
@@ -17,8 +15,7 @@ const PLAYERS: &[(&[&str], &[&str])] = &[
     (&["smplayer.exe"], &[" - SMPlayer"]),
 ];
 
-/// Shared with `media_session`, which uses them to tell a video URL from an
-/// audio one. One list, so the two cannot disagree about what a video is.
+/// Shared with `media_session` to tell a video URL from an audio one, so the two cannot disagree about what a video is.
 pub(crate) const VIDEO_EXTENSIONS: &[&str] = &[
     ".mkv", ".mp4", ".avi", ".m4v", ".webm", ".ts", ".m2ts", ".ogm", ".wmv", ".flv",
 ];
@@ -49,25 +46,20 @@ const BROWSER_SUFFIXES: &[&str] = &[
     " - Vivaldi",
     " — Zen Browser",
     " - LibreWolf",
-    // Firefox forks keep Firefox's em-dash habit; the hyphen twin is kept
-    // for older builds. Helium is Chromium-family and hyphenates.
+    // Firefox forks keep Firefox's em-dash, the hyphen twin covers older builds, and Helium is Chromium-family.
     " — Waterfox",
     " - Waterfox",
     " - Helium",
 ];
 
-/// Streaming sites: (marker in the title, suffixes removed to obtain the
-/// series title + episode).
-/// Crunchyroll tab: "Frieren: Beyond Journey's End Season 1 Ep 28 Watch on Crunchyroll"
-/// or "Watching Frieren Episode 28 - Crunchyroll".
+/// Streaming sites as (marker in the title, suffixes removed to obtain the series title plus episode).
 const STREAMING_MARKERS: &[(&str, &[&str])] = &[
     ("Crunchyroll", &[" Watch on Crunchyroll", " - Watch on Crunchyroll", " - Crunchyroll"]),
     ("ADN", &[" - ADN", " en streaming - ADN"]),
     ("Netflix", &[" - Netflix", " | Netflix"]),
 ];
 
-/// Manga reading sites: same mechanics as streaming, but the title carries
-/// a chapter number ("Ch. 45", "Chapter 45").
+/// Manga reading sites: same mechanics as streaming, but the title carries a chapter number.
 const MANGA_MARKERS: &[(&str, &[&str])] = &[
     ("MangaDex", &[" - MangaDex", " – MangaDex"]),
     ("MANGA Plus", &[" - MANGA Plus by SHUEISHA", " | MANGA Plus", " - MANGA Plus"]),
@@ -78,8 +70,7 @@ const MANGA_MARKERS: &[(&str, &[&str])] = &[
     ("Asura Scans", &[" - Asura Scans"]),
 ];
 
-/// Extracts the file name from a player window if the process is a known
-/// player and the title looks like a video file.
+/// Extracts the file name from a known player's window when the title looks like a video file.
 pub fn match_player(process: &str, title: &str) -> Option<String> {
     let (_, suffixes) = PLAYERS
         .iter()
@@ -97,14 +88,12 @@ pub fn match_player(process: &str, title: &str) -> Option<String> {
         return None;
     }
 
-    // Players often show menu/idle titles ("VLC media player") — only
-    // accept what looks like a video file.
+    // Players often show menu or idle titles, so only what looks like a video file is accepted.
     let lower = media.to_lowercase();
     if VIDEO_EXTENSIONS.iter().any(|ext| lower.ends_with(ext)) {
         return Some(media.to_string());
     }
-    // MPC/mpv may hide the file extension: accept heuristically when an
-    // episode number is recognizable.
+    // MPC and mpv may hide the file extension: accepted when an episode number is recognizable.
     if crate::playback::recognition::parser::parse(media).episode.is_some() {
         return Some(media.to_string());
     }
@@ -142,8 +131,7 @@ pub fn match_streaming(process: &str, title: &str) -> Option<String> {
     // Strip the "Watching " prefix (Crunchyroll)
     let media = media.strip_prefix("Watching ").unwrap_or(&media).trim();
 
-    // Only accept when an episode number is recognizable — otherwise it is
-    // just an overview page.
+    // Only accept when an episode number is recognizable; otherwise it is just an overview page.
     if crate::playback::recognition::parser::parse(media).episode.is_some() {
         Some(media.to_string())
     } else {

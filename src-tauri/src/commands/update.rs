@@ -3,17 +3,14 @@ use crate::sync::LockExt;
 use serde_json::Value;
 use tauri::State;
 
-// Siblings in the same module tree; `mod.rs` re-exports all of it, so
-// every command keeps the path it had when they shared one file.
+// Siblings in the same module tree; `mod.rs` re-exports all of it, so every command keeps its old path.
 #[allow(unused_imports)]
 use super::*;
 
-/// Monotonic commit counter — the 4th version segment
-/// (`MAJOR.MINOR.PATCH.COMMIT#`). Bumped by one on every commit.
-pub const COMMIT_NUMBER: u32 = 598;
+/// Monotonic commit counter, the fourth version segment, bumped by one on every commit.
+pub const COMMIT_NUMBER: u32 = 599;
 
-/// Full four-part display version, e.g. `0.1.1.38`. The `MAJOR.MINOR.PATCH`
-/// core comes from the crate version (kept in sync across the manifests).
+/// The full four-part display version; the semver core comes from the crate version.
 pub fn app_version_string() -> String {
     format!("{}.{}", env!("CARGO_PKG_VERSION"), COMMIT_NUMBER)
 }
@@ -36,22 +33,12 @@ pub struct UpdateInfo {
     pub url: Option<String>,
     #[serde(rename = "isNewer")]
     pub is_newer: bool,
-    /// The selected channel has no release to compare against.
-    ///
-    /// Distinct from "up to date", which is what a 404 used to report. On
-    /// `stable` that was a standing false claim — no non-prerelease release has
-    /// ever been published, so `/releases/latest/` 404s and the manual check on
-    /// the About page said, in green with a tick, that the app was current.
+    /// The selected channel has no release to compare against, which is not the same as "up to date".
     #[serde(rename = "channelEmpty")]
     pub channel_empty: bool,
 }
 
-/// Update channel: `"stable"` (GitHub's latest-non-prerelease alias — the
-/// default since v1.0.0 gave it a release to point at) or `"prerelease"` (the
-/// rolling `latest` tag, "Nightly" in the UI, rebuilt on every push to
-/// `main`). The default applies to new installs only: schema v19 seeded every
-/// database that predates the flip with `"prerelease"`, the channel it was
-/// living with, so nobody was moved without choosing.
+/// Update channel, `stable` or `prerelease`; the default reaches new installs only, older ones were seeded by migration.
 pub(crate) fn stored_channel(db: &Db) -> String {
     db.kv_get("update_channel")
         .unwrap_or_else(|| "stable".to_string())
@@ -71,15 +58,7 @@ pub fn set_update_channel(
     if channel != "prerelease" && channel != "stable" {
         return Err("Unknown update channel".into());
     }
-    // Everything an update check produced belongs to the channel that produced
-    // it. A download held in memory for the rolling build is not an update on
-    // `stable`, and the daily throttle would otherwise keep the new channel
-    // unchecked for up to 24 hours — so About kept offering to install a build
-    // the selected channel does not have. The announcement is the third piece
-    // and was left behind for a while: the bell row saying "1.0.0.600
-    // downloaded and ready to install" survived a switch to Stable, where
-    // that build does not exist, so pressing it re-downloaded nothing and
-    // failed every time. Same pair `clear_stale_update_notice` uses.
+    // The stash, the throttle and the announcement all belong to the channel that produced them, so all three go.
     *pending.0.guard() = None;
     db.kv_delete("last_update_check_ms");
     db.kv_delete("last_notified_update_version");
@@ -87,8 +66,7 @@ pub fn set_update_channel(
     db.kv_set("update_channel", &channel)
 }
 
-/// Whether Karasu checks for updates automatically (once/day on startup).
-/// Manual checks from the About page always work regardless.
+/// Whether Karasu checks for updates automatically on startup; manual checks from About always work.
 #[tauri::command]
 pub fn get_update_check_auto(db: State<'_, Db>) -> bool {
     db.kv_get("update_check_auto").as_deref() != Some("0")
@@ -117,17 +95,7 @@ fn update_channel_manifest_url(channel: &str) -> &'static str {
 
 const UPDATE_CHECK_THROTTLE_MS: i64 = 24 * 60 * 60 * 1000;
 
-/// Whether a background check may run, given the stamp of the last one.
-///
-/// The obvious form — `now - last < throttle` — has no lower bound, and the
-/// stamp is wall-clock rather than monotonic. A clock that jumps *backwards*
-/// (a dead CMOS battery, a restored VM snapshot, a timezone-confused first
-/// boot) leaves a stamp in the future, `now - last` goes negative, and
-/// negative is smaller than the throttle: automatic checks stay off until
-/// real time crawls past the bad stamp, which can be years. A stamp ahead of
-/// now describes no elapsed interval at all, so it is treated as no stamp —
-/// the check runs, and the write after the request replaces it with a sane
-/// one.
+/// Whether a background check may run; a stamp in the future counts as no stamp, or a clock jump disables checks.
 fn check_due(last: Option<i64>, now: i64, throttle: i64) -> bool {
     match last {
         None => true,
@@ -135,10 +103,7 @@ fn check_due(last: Option<i64>, now: i64, throttle: i64) -> bool {
     }
 }
 
-/// Compares the running version against the latest release on the selected
-/// channel. Background/automatic callers should pass `force: false` (respects
-/// a 24h throttle so startup checks don't hit the API every launch); the
-/// manual "Check for Updates" button always passes `force: true`.
+/// Compares the running version against the selected channel's manifest; `force: false` respects the daily throttle.
 #[tauri::command]
 pub async fn check_for_updates(
     app: tauri::AppHandle,
@@ -148,8 +113,7 @@ pub async fn check_for_updates(
     // Desktop never reads `app` on this path — the notify below is Android's.
     #[cfg(not(target_os = "android"))]
     let _ = &app;
-    // Compare the full four-part version so a release tagged with the commit
-    // number lines up with what's running.
+    // The full four-part version, so a commit-only bump still registers as an update.
     let current = app_version_string();
     let channel = stored_channel(&db);
 
@@ -168,16 +132,7 @@ pub async fn check_for_updates(
         }
     }
 
-    // Read the version from `latest.json`, not from the release's tag name.
-    // The prerelease channel publishes to a rolling tag literally called
-    // "latest", which `version_gt` parses as 0 — so a tag-based comparison can
-    // never report an update. The manifest carries the real four-part version
-    // (see scripts/release/generate-update-manifest.ps1) and is what the updater
-    // downloads from anyway.
-    // A timeout, like every other outbound client in this codebase. Without one
-    // this inherits `reqwest`'s default of *none*, so a connection that opens
-    // and then stalls parks the About page's spinner until the OS gives up —
-    // and on the startup path, holds a task open for as long as that takes.
+    // The version comes from `latest.json`, never the tag: the rolling tag is literally "latest", which parses as 0.
     let resp = crate::net::client_builder()
         .timeout(std::time::Duration::from_secs(30))
         .build()
@@ -188,22 +143,10 @@ pub async fn check_for_updates(
         .await
         .map_err(|e| format!("Update check failed: {e}"))?;
 
-    // The throttle is written here, not before the request: it used to be
-    // stamped on entry, so a check that failed — offline, DNS not up yet —
-    // burned the whole day. With autostart the startup check runs at exactly
-    // the moment the network is least likely to be ready.
+    // Stamped after the request, not before it, so a check that failed offline does not burn the whole day.
     let _ = db.kv_set("last_update_check_ms", &now_ms().to_string());
 
-    // 404 is not "up to date". On the prerelease channel the rolling tag has
-    // always existed, so it means GitHub is having a bad minute. On `stable` it
-    // means no non-prerelease release exists at all — which has been true for
-    // the whole life of the channel, and the app answered a manual check with a
-    // green tick and "you are on the latest version". That is a standing lie
-    // about a channel with nothing behind it.
-    //
-    // The background pass stays silent either way: a toast about a transient
-    // 404 is worse than saying nothing. `channel_empty` is what the About page
-    // reads to say so on a check the user asked for.
+    // 404 is not "up to date": it means the channel has nothing behind it, which About says and the background pass does not.
     if resp.status() == reqwest::StatusCode::NOT_FOUND {
         return Ok(UpdateInfo {
             current,
@@ -224,18 +167,7 @@ pub async fn check_for_updates(
         .ok_or("Update manifest has no version")?
         .trim_start_matches('v')
         .to_string();
-    // A manifest that does not describe this platform is not an update for it.
-    // `release.yml` publishes a Windows-only manifest whenever the Linux leg
-    // fails — deliberately, so a packaging hiccup cannot hold back a Windows
-    // release — and a Linux client used to be told an update was available and
-    // then fail at the download, once a day, with no way to tell why.
-    // Android is the exception to the platform gate: the APK is never in
-    // `platforms` (the manifest is desktop-only on purpose, and until this
-    // branch existed Android fell into the windows-x86_64 arm and reported
-    // "up to date" against a build that never matches). The check here is a
-    // *notice* and nothing more — per the ROADMAP, "Android has no updater
-    // and must not gain one by accident" — so the version alone decides and
-    // `url` already points at the release page where the APK lives.
+    // Desktop needs its platform in the manifest; Android, which is never in it and has no updater, gets a notice only.
     #[cfg(target_os = "android")]
     let is_newer = version_gt(&latest, &current);
     #[cfg(not(target_os = "android"))]
@@ -252,11 +184,7 @@ pub async fn check_for_updates(
         has_platform && version_gt(&latest, &current)
     };
 
-    // The desktop learns about an update from the bell row the *download*
-    // posts; Android never downloads, so the check itself is where the row
-    // comes from. Only on the background path (`!force` — a manual check has
-    // the About page open in front of it), and once per version rather than
-    // once per 24 h throttle window.
+    // Android never downloads, so the check posts the bell row itself, on the background path and once per version.
     #[cfg(target_os = "android")]
     if !force && is_newer && db.kv_get("last_notified_update_version").as_deref() != Some(&latest)
     {
@@ -280,35 +208,19 @@ pub async fn check_for_updates(
     })
 }
 
-/// Splits a version into numeric segments, treating `+` exactly like `.`.
-///
-/// `latest.json` carries the commit number as semver build metadata
-/// (`0.23.2+90`) rather than a fourth dotted segment, because the updater
-/// plugin parses that field as strict semver. Both spellings have to compare
-/// identically here, so the running `0.23.2.90` lines up with the manifest.
+/// Splits a version into numeric segments, treating `+` like `.`, so the manifest spelling matches the running one.
 fn version_parts(s: &str) -> Vec<u32> {
     s.split(['.', '+'])
         .map(|p| p.parse::<u32>().unwrap_or(0))
         .collect()
 }
 
-/// The four-part version in its display form, whatever separator it arrived
-/// with — the UI has always shown `MAJOR.MINOR.PATCH.COMMIT#`.
+/// The four-part version in its dotted display form, whatever separator it arrived with.
 fn display_version(s: &str) -> String {
     s.replace('+', ".")
 }
 
-/// Whether an in-place update can actually be installed over this build.
-///
-/// Both arguments rather than reading the world, because the shape of this
-/// predicate is the whole risk. `running_from_appimage()` is false on Windows —
-/// there are no AppImages there — so the natural-looking
-/// `if !running_from_appimage() { return }` disables the updater for **every**
-/// Windows user, which is all of them. The `is_linux` half is what keeps that
-/// from happening, and the first assertion in the test below is the one that
-/// would catch it.
-/// Whether the updater plugin exists in this build at all — the cfg'd pair
-/// for `attach_desktop` registering it only on desktop.
+/// Whether the updater plugin exists in this build at all; `attach_desktop` registers it on desktop only.
 #[cfg(desktop)]
 fn updater_available() -> bool {
     true
@@ -319,6 +231,7 @@ fn updater_available() -> bool {
     false
 }
 
+/// Whether an in-place update can be installed; the `is_linux` half is what keeps the updater on for every Windows user.
 fn can_install(is_linux: bool, from_appimage: bool) -> bool {
     !is_linux || from_appimage
 }
@@ -336,13 +249,7 @@ fn version_gt(a: &str, b: &str) -> bool {
     false
 }
 
-/// Startup: a "new release" bell row must not outlive the install it
-/// announces. Both notify paths record the announced version in this kv
-/// (manifest form — `version_parts` reads `+` and `.` alike), so once the
-/// running build has caught up the rows and the marker go together. The
-/// row's own body can't be consulted — it froze the version as display
-/// text — which is why the kv is the key. Nothing here touches a notice
-/// that is still ahead of the running build.
+/// Drops the "new release" bell row and its marker once the running build has caught up with what they announce.
 pub fn clear_stale_update_notice(db: &crate::db::Db) {
     let Some(notified) = db.kv_get("last_notified_update_version") else {
         return;
@@ -358,10 +265,7 @@ pub fn clear_stale_update_notice(db: &crate::db::Db) {
 mod tests {
     use super::{can_install, check_due, display_version, version_gt, version_parts};
 
-    /// Windows first, and deliberately: `running_from_appimage()` is false
-    /// there, so the obvious one-line form of this gate —
-    /// `if !running_from_appimage() { return }` — disables the updater for
-    /// every actual user of the app. This assertion is the one that catches it.
+    /// One day in milliseconds, the throttle the checks below exercise.
     const DAY: i64 = 24 * 60 * 60 * 1000;
 
     #[test]
@@ -378,11 +282,7 @@ mod tests {
         assert!(check_due(Some(now - 2 * DAY), now, DAY), "long overdue");
     }
 
-    /// The one this function exists for. `now - last < throttle` is true for
-    /// every negative difference, so a stamp in the future — a clock pushed
-    /// backwards by a dead CMOS battery or a restored snapshot — disabled
-    /// automatic checks until real time caught up with it. A year ahead is a
-    /// year of no update checks.
+    /// A stamp in the future does not disable checking, which the naive `now - last < throttle` would.
     #[test]
     fn a_stamp_in_the_future_does_not_disable_checking() {
         let now = 1_700_000_000_000;
@@ -390,6 +290,7 @@ mod tests {
         assert!(check_due(Some(now + 365 * DAY), now, DAY), "a year ahead");
     }
 
+    /// Windows first, because the obvious `if !running_from_appimage()` gate would disable the updater for every Windows user.
     #[test]
     fn only_a_linux_build_outside_an_appimage_refuses_to_install() {
         assert!(can_install(false, false), "Windows, where the users are");
@@ -401,15 +302,7 @@ mod tests {
         );
     }
 
-    /// The `+` in `latest.json`'s version field is load-bearing and was the one
-    /// line with no automated check.
-    ///
-    /// `tauri-plugin-updater` parses that field with `semver::Version::from_str`,
-    /// which rejects a fourth dotted segment outright — every install then dies
-    /// with "unexpected character '.' after patch version number". So the
-    /// manifest spells the commit number as build metadata, and `version_parts`
-    /// has to read both spellings identically or the comparator stops matching
-    /// the running build.
+    /// The manifest's `+` spelling compares equal to the dotted one; the updater plugin rejects a fourth dotted segment.
     #[test]
     fn the_manifest_spelling_compares_equal_to_the_dotted_one() {
         let manifest = "0.136.4+361";
@@ -417,12 +310,10 @@ mod tests {
         assert_eq!(version_parts(manifest), version_parts(running));
         assert!(!version_gt(manifest, running));
         assert!(!version_gt(running, manifest));
-        // And the commit number still decides, which is the whole reason the
-        // fourth segment exists.
+        // And the commit number still decides, which is the whole reason the fourth segment exists.
         assert!(version_gt("0.136.4+362", running));
 
-        // The shape the generator emits, pinned so a "tidy" back to a dot is a
-        // test failure rather than a broken release.
+        // The shape the generator emits, pinned so a "tidy" back to a dot fails a test rather than a release.
         let re_core: Vec<&str> = manifest.split('+').collect();
         assert_eq!(re_core.len(), 2, "exactly one '+'");
         assert_eq!(re_core[0].split('.').count(), 3, "a three-part semver core");
@@ -441,22 +332,14 @@ mod tests {
         assert!(version_gt("0.1.0.1", "0.1.0"));
     }
 
-    /// Why `check_for_updates` reads the manifest instead of the release tag.
-    /// The prerelease channel publishes to a rolling tag literally named
-    /// "latest", which parses to 0 here — so a tag-based comparison silently
-    /// reported "up to date" forever. Feeding a version string in still has to
-    /// work, so both halves are pinned.
+    /// A non-numeric tag such as the rolling "latest" never reports an update, which is why the manifest is read.
     #[test]
     fn non_numeric_tag_never_reports_an_update() {
         assert!(!version_gt("latest", "0.19.2.82"));
         assert!(version_gt("0.19.3.83", "0.19.2.82"));
     }
 
-    /// `latest.json` spells the commit number as semver build metadata
-    /// (`0.23.2+90`) because tauri-plugin-updater parses that field as strict
-    /// semver and a fourth dotted segment makes it fail to deserialize —
-    /// which is what broke installing with "unexpected character '.' after
-    /// patch version number". The two spellings must compare identically.
+    /// Semver build metadata reads as the fourth segment, so the two spellings compare identically.
     #[test]
     fn build_metadata_reads_as_the_fourth_segment() {
         assert!(version_gt("0.23.2+90", "0.23.1.89"));
@@ -467,11 +350,7 @@ mod tests {
         assert!(version_gt("0.23.1+90", "0.23.1+89"));
     }
 
-    /// The comparator handed to tauri-plugin-updater. The case that matters
-    /// most is the *equal* one: the plugin's own `current_version` comes from
-    /// Cargo.toml and has no commit number, so without this the manifest for
-    /// the running build would sort above it and the app would reinstall
-    /// itself on a loop.
+    /// The comparator uses the running commit number, so the manifest for the running build does not sort above it.
     #[test]
     fn remote_is_newer_uses_the_running_commit_number() {
         use super::{remote_is_newer, COMMIT_NUMBER};
@@ -486,16 +365,14 @@ mod tests {
         assert!(!remote_is_newer((0, 22, 9, n + 5), running), "older minor");
     }
 
-    /// The About page has always shown MAJOR.MINOR.PATCH.COMMIT#; the manifest
-    /// separator is an implementation detail and must not leak into the UI.
+    /// Versions display with dots; the manifest separator must not leak into the UI.
     #[test]
     fn versions_display_with_dots() {
         assert_eq!(display_version("0.23.2+90"), "0.23.2.90");
         assert_eq!(display_version("0.23.2.90"), "0.23.2.90");
     }
 
-    /// Must stay in lockstep with `isBlocked` in src/lib/contentFilter.ts —
-    /// the background passes would otherwise notify about titles the UI hides.
+    /// The content filter levels stay in lockstep with `isBlocked` in `src/lib/contentFilter.ts`.
     #[test]
     fn content_filter_levels() {
         use super::media_blocked;
@@ -525,20 +402,13 @@ mod tests {
 
 // --- In-app updater ------------------------------------------------------------
 
-/// Whether a manifest's `(major, minor, patch, commit)` is newer than the
-/// running build, whose commit number is `COMMIT_NUMBER` rather than anything
-/// the plugin can see (see the comparator in `download_pending_update`).
-///
-/// Split out from the closure so the comparison is testable without
-/// constructing a `semver::Version`.
+/// Whether a manifest version is newer than the running build, whose commit number is `COMMIT_NUMBER`; pure, for the test.
 fn remote_is_newer(remote: (u64, u64, u64, u64), current_core: (u64, u64, u64)) -> bool {
     let (major, minor, patch) = current_core;
     remote > (major, minor, patch, COMMIT_NUMBER as u64)
 }
 
-/// Downloaded-but-not-yet-installed update, held between
-/// `download_pending_update` and `install_pending_update` so applying it is a
-/// separate, explicit user action (installing closes and restarts the app).
+/// A downloaded update held until `install_pending_update`, so installing stays a separate, explicit user action.
 #[derive(Default)]
 pub struct PendingUpdate(pub std::sync::Mutex<Option<(tauri_plugin_updater::Update, Vec<u8>)>>);
 
@@ -548,9 +418,7 @@ pub struct DownloadedUpdate {
     pub notes: Option<String>,
 }
 
-/// Checks the selected channel's manifest and, if a newer version is
-/// available, downloads it and stashes it for `install_pending_update`.
-/// Notifies the user (kind: "update") once the download finishes.
+/// Checks the selected channel's manifest, downloads a newer build into the stash and notifies once it is there.
 #[tauri::command]
 pub async fn download_pending_update(
     app: tauri::AppHandle,
@@ -559,13 +427,7 @@ pub async fn download_pending_update(
 ) -> Result<Option<DownloadedUpdate>, String> {
     use tauri_plugin_updater::UpdaterExt;
 
-    // The updater plugin is registered only on desktop (`attach_desktop`), and
-    // `updater_builder()` reaches for its managed state — which *panics* when
-    // the plugin never ran. The guard below cannot catch this: it asks "is
-    // this Linux?", and Android answers no, which reads as Windows. Same
-    // quiet-refusal shape as the AppImage case, so the auto check stays
-    // silent and the About button reports "nothing downloaded" — mobile
-    // distribution is the store or a sideloaded APK, never this plugin.
+    // `updater_builder()` panics where the plugin never ran, and the Linux guard below reads Android as Windows.
     if !updater_available() {
         crate::logging::debug_changed(
             "update",
@@ -575,15 +437,7 @@ pub async fn download_pending_update(
         return Ok(None);
     }
 
-    // Nothing to install into. `tauri-plugin-updater` replaces
-    // `current_exe()` — it has no notion of `$APPIMAGE` — so on a Linux build
-    // that is not a mounted AppImage the best outcome of "Install" is
-    // overwriting the binary the user compiled, in place, with a different
-    // build. Karasu ships exactly one Linux artifact, so today that means every
-    // Linux user who did not download the AppImage.
-    //
-    // Downloading is the expensive half (~100 MB held in memory) and the
-    // notification is the misleading half, so this refuses before either.
+    // A Linux build outside an AppImage has nothing to install into, so this refuses before downloading or notifying.
     if !can_install(cfg!(target_os = "linux"), crate::portable::running_from_appimage()) {
         crate::logging::debug_changed(
             "update",
@@ -601,17 +455,7 @@ pub async fn download_pending_update(
         .updater_builder()
         .endpoints(vec![endpoint])
         .map_err(|e| e.to_string())?
-        // Without this the app would re-offer the build it is already running,
-        // forever. The plugin's default is `remote > current` using semver's
-        // *derived* Ord, which does compare build metadata — but its
-        // `current_version` comes from `package_info()`, i.e. Cargo.toml, which
-        // carries only `MAJOR.MINOR.PATCH` and no commit number at all. So the
-        // running 0.23.2.90 arrives here as a bare `0.23.2`, and any manifest
-        // with build metadata (`0.23.2+90` — the very same build) sorts above
-        // it: download, restart, repeat.
-        //
-        // COMMIT_NUMBER is a compile-time const in this file, so supplying the
-        // running commit number here is exact rather than reconstructed.
+        // Keep this comparator: the plugin's own current version has no commit number, so every install re-downloads itself.
         .version_comparator(|current, release| {
             remote_is_newer(
                 (
@@ -630,17 +474,7 @@ pub async fn download_pending_update(
         return Ok(None);
     };
 
-    // Already downloaded. The stash is the whole installer — ~100 MB held in
-    // process memory — and this pass runs once a day, so without this check a
-    // user who is offered an update and simply does not restart pays for it
-    // again every 24 h, forever, on their own bandwidth. Downloading the same
-    // bytes on top of the bytes we already hold buys nothing: `install` reads
-    // the stash, and the version is the only thing that decides whether the
-    // stash is still the right answer.
-    //
-    // Compared on `update.version`, the manifest spelling, because that is what
-    // both sides carry; `display_version` is for the UI and would compare two
-    // renderings rather than two versions.
+    // Already downloaded: compared on the manifest spelling both sides carry, so the same bytes are not fetched daily.
     if let Some((held, _)) = pending.0.guard().as_ref() {
         if held.version == update.version {
             crate::logging::debug_changed(
@@ -656,10 +490,7 @@ pub async fn download_pending_update(
     }
 
     let version = display_version(&update.version);
-    // Manifest form, not display form: it is what `clear_stale_update_notice`
-    // compares against the running build at the next startup, so the "new
-    // release" row cannot outlive its own install. The same marker the
-    // Android arm writes.
+    // Manifest form, not display form: `clear_stale_update_notice` compares it against the running build at startup.
     let raw_version = update.version.clone();
     let notes = update.body.clone();
     let bytes = update
@@ -669,16 +500,7 @@ pub async fn download_pending_update(
 
     *pending.0.guard() = Some((update, bytes));
 
-    // One row per version, not one per download. The stash lives in process
-    // memory, so a restart empties it and the next background pass downloads
-    // the same version again — legitimately, the bytes are gone — but the bell
-    // row it posted the first time is in SQLite and is still there. Posting
-    // another announces the same release twice. `clear_stale_update_notice`
-    // removes the marker and the rows together once the running build catches
-    // up, so the next genuinely new version still gets its row.
-    //
-    // This is the guard the Android arm of `check_for_updates` has always had;
-    // the desktop path notified unconditionally.
+    // One bell row per version, not per download: a restart empties the stash but the row it posted is still in SQLite.
     let already_announced =
         db.kv_get("last_notified_update_version").as_deref() == Some(raw_version.as_str());
     let _ = db.kv_set("last_notified_update_version", &raw_version);
@@ -687,12 +509,7 @@ pub async fn download_pending_update(
             &app,
             "update",
             crate::i18n::Msg::UpdateTitle,
-            // Emphatically *not* "restart to install it", which is what this
-            // said. The download lives in process memory, so restarting is
-            // precisely the action that throws it away — the instruction undid
-            // the thing it was announcing, and the next check downloaded the
-            // whole installer again. The wording is in `i18n.rs` now, with
-            // that note beside it.
+            // Never "restart to install it": the download lives in process memory, and a restart throws it away.
             crate::i18n::Msg::UpdateBody { version: &version },
             // An app update is not about a title, so there is nothing to open.
             None,
@@ -702,12 +519,7 @@ pub async fn download_pending_update(
     Ok(Some(DownloadedUpdate { version, notes }))
 }
 
-/// What is sitting in the stash, if anything.
-///
-/// Without this the frontend could not tell. `About` only ever learned about a
-/// download from its own call, so an update fetched automatically at startup
-/// was invisible there: no Restart button, and the only way forward was to
-/// check again and download the identical installer a second time.
+/// What is sitting in the stash, so About can show a download the startup check made.
 #[tauri::command]
 pub fn pending_update(pending: State<'_, PendingUpdate>) -> Option<DownloadedUpdate> {
     let guard = pending.0.guard();
@@ -718,20 +530,13 @@ pub fn pending_update(pending: State<'_, PendingUpdate>) -> Option<DownloadedUpd
     })
 }
 
-/// Installs the update stashed by `download_pending_update` and restarts the
-/// app. On Windows the NSIS installer requires the running process to exit,
-/// so this call does not return on success.
+/// Installs the stashed update and restarts the app; on success this call does not return.
 #[tauri::command]
 pub fn install_pending_update(
     app: tauri::AppHandle,
     pending: State<'_, PendingUpdate>,
 ) -> Result<(), String> {
-    // Held, not taken. `install` borrows the bytes, and taking them first meant
-    // a failure — an AV agent blocking the extracted installer, an unwritable
-    // %TEMP%, a refused UAC prompt — dropped the download on the floor. The
-    // second click then answered "No update has been downloaded yet" directly
-    // underneath a line saying it had been, and the only recovery was to
-    // download the whole thing again.
+    // Held, not taken: `install` borrows the bytes, and taking them first dropped the download on any failure.
     let guard = pending.0.guard();
     let Some((update, bytes)) = guard.as_ref() else {
         return Err("No update has been downloaded yet".into());

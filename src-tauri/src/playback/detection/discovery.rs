@@ -1,22 +1,4 @@
-//! Finding a Jellyfin server on the local network, and asking one what it is.
-//!
-//! Jellyfin's own clients discover servers with a UDP broadcast: the text
-//! `who is JellyfinServer?` to port 7359, answered by every server on the
-//! segment with a small JSON body — `Address`, `Id`, `Name`. The reply is
-//! unicast back to the socket that asked, so nothing here listens for
-//! broadcasts and Android needs neither `CHANGE_WIFI_MULTICAST_STATE` nor a
-//! multicast lock. Only the *limited* broadcast (255.255.255.255) is sent: a
-//! per-interface subnet broadcast needs an interface enumeration the tree
-//! has no crate for, and the limited one reaches the primary LAN, which is
-//! where a home server lives. Client isolation on an access point and an
-//! active VPN both come out as "nobody answered", which the pane's hint
-//! says in so many words.
-//!
-//! `/System/Info/Public` is the anonymous endpoint every Jellyfin answers
-//! with its name, version and id. It confirms a discovered address, gives a
-//! hand-typed URL a name for the status line, and — for the external
-//! address — is how the app checks it is the *same* server before the token
-//! ever travels to it.
+//! Finds a Jellyfin server on the LAN by UDP broadcast and confirms it through `/System/Info/Public`.
 
 use std::net::SocketAddr;
 use std::time::Duration;
@@ -25,16 +7,11 @@ use super::jellyfin::{http, normalize_base_url, str_field, ERR_BAD_URL, ERR_NOT_
 
 pub const DISCOVERY_PORT: u16 = 7359;
 pub const DISCOVERY_MESSAGE: &[u8] = b"who is JellyfinServer?";
-/// How long replies are collected for. Two seconds is what the official
-/// clients wait; a server on the segment answers within milliseconds.
+/// How long replies are collected for; a server on the segment answers within milliseconds.
 pub const LISTEN_FOR: Duration = Duration::from_secs(2);
-/// How many discovered addresses are confirmed with a probe. A LAN has one
-/// or two servers; a reply storm is not worth chasing.
+/// How many discovered addresses are confirmed with a probe; a reply storm is not worth chasing.
 const MAX_PROBES: usize = 8;
-/// Receive errors tolerated before the collection gives up early. Windows
-/// reports an ICMP "port unreachable" from any host on the segment as a
-/// `recv_from` error on the socket that broadcast, which must not end the
-/// search before the real server has answered.
+/// Receive errors tolerated early: Windows surfaces any host's ICMP port-unreachable as a `recv_from` error here.
 const MAX_RECV_ERRORS: u8 = 8;
 
 /// A server that answered the broadcast, confirmed by its own info endpoint.
@@ -57,9 +34,7 @@ pub struct ServerInfo {
     pub version: String,
 }
 
-/// One UDP reply, or `None` for anything that is not one — a stray datagram
-/// on the ephemeral port, a reply without an address, an address the app
-/// would refuse to talk to anyway (`net::is_usable_base_url`).
+/// One UDP reply, or `None` for a stray datagram, a reply without an address, or one the app would refuse anyway.
 pub fn parse_discovery_reply(bytes: &[u8]) -> Option<DiscoveredServer> {
     let body: serde_json::Value = serde_json::from_slice(bytes).ok()?;
     let address = normalize_base_url(&str_field(&body, "Address"));
@@ -74,9 +49,7 @@ pub fn parse_discovery_reply(bytes: &[u8]) -> Option<DiscoveredServer> {
     })
 }
 
-/// Reads `/System/Info/Public`. The `Id` is what makes the answer usable —
-/// it is the identity the external-address check compares — so a body
-/// without one is not a Jellyfin answer; a missing name is cosmetic.
+/// Reads `/System/Info/Public`; without an `Id` the body is not a Jellyfin answer, while a missing name is cosmetic.
 pub fn parse_public_info(body: &serde_json::Value) -> Option<ServerInfo> {
     let id = str_field(body, "Id");
     if id.is_empty() {
@@ -89,9 +62,7 @@ pub fn parse_public_info(body: &serde_json::Value) -> Option<ServerInfo> {
     })
 }
 
-/// One row per server: a server with several addresses, or a reply that
-/// arrived twice, is one entry with the first address kept; sorted by name
-/// so the list is stable between two presses of the button.
+/// One row per server with the first address kept, sorted by name so the list is stable between two presses.
 pub fn merge_replies(replies: Vec<DiscoveredServer>) -> Vec<DiscoveredServer> {
     let mut out: Vec<DiscoveredServer> = Vec::new();
     for reply in replies {
@@ -111,29 +82,14 @@ pub fn merge_replies(replies: Vec<DiscoveredServer>) -> Vec<DiscoveredServer> {
     out
 }
 
-/// The address of the interface the default route leaves through.
-///
-/// A UDP "connect" picks it from the routing table without sending a
-/// packet; TEST-NET-1 is the destination because nothing real answers to
-/// it. `None` with no route at all — a phone in airplane mode.
+/// The address the default route leaves through, read off a UDP connect that sends nothing; `None` with no route.
 fn primary_local_ip() -> Option<std::net::IpAddr> {
     let socket = std::net::UdpSocket::bind(("0.0.0.0", 0)).ok()?;
     socket.connect(("192.0.2.1", DISCOVERY_PORT)).ok()?;
     socket.local_addr().ok().map(|a| a.ip())
 }
 
-/// Sends the discovery message to `target` and collects every reply that
-/// arrives within `listen_for`. Parameterised so a test can point it at a
-/// responder on the loopback; `discover` points it at the limited broadcast.
-///
-/// Sent from two sockets: one bound to the wildcard address and one bound to
-/// the interface the default route uses. Windows sends a limited broadcast
-/// from a wildcard socket out of *one* interface of its own choosing, and on
-/// a PC with a Hyper-V or VirtualBox switch that is the virtual one —
-/// measured 2026-09-11 on the maintainer's machine, where the wildcard
-/// socket heard nothing and the Ethernet-bound one heard the server twice.
-/// Both are kept: the wildcard one is what reaches a LAN that is not the
-/// default route, when the OS happens to pick it.
+/// Broadcasts from the default route's address too; a wildcard socket picks one interface and may pick the virtual switch.
 pub async fn broadcast(
     target: SocketAddr,
     listen_for: Duration,
@@ -159,8 +115,7 @@ pub async fn broadcast(
             Err(e) => last_error = format!("discovery task failed: {e}"),
         }
     }
-    // One socket that could send is enough; only when none could is the
-    // search a failure rather than an empty answer.
+    // One socket that could send is enough; only when none could is the search a failure rather than empty.
     if sent == 0 {
         return Err(last_error);
     }
@@ -212,8 +167,7 @@ async fn collect_from(
     Ok(found)
 }
 
-/// Asks a server what it is, anonymously. Five seconds: this runs on a
-/// button press and on sign-in, never inside the poll loop.
+/// Asks a server what it is, anonymously; runs on a button press and on sign-in, never inside the poll loop.
 pub async fn probe(base: &str) -> Result<ServerInfo, String> {
     let base = normalize_base_url(base);
     if !crate::net::is_usable_base_url(&base) {
@@ -236,12 +190,7 @@ pub async fn probe(base: &str) -> Result<ServerInfo, String> {
     parse_public_info(&body).ok_or_else(|| ERR_NOT_JELLYFIN.to_string())
 }
 
-/// The whole search: broadcast, merge, confirm.
-///
-/// A reply whose address does not answer the info endpoint is dropped — it
-/// is not a server the app could sign in to from here — and the probe's
-/// name and version replace the reply's: the same fields from the same
-/// server, but the probe is the one that proves the address works.
+/// Broadcast, merge, confirm: a reply whose address fails the probe is dropped, and the probe's name and version win.
 pub async fn discover() -> Result<Vec<DiscoveredServer>, String> {
     let target = SocketAddr::from(([255, 255, 255, 255], DISCOVERY_PORT));
     let replies = merge_replies(broadcast(target, LISTEN_FOR).await?);
@@ -277,8 +226,7 @@ mod tests {
         assert_eq!(s.id, "abc123");
         assert_eq!(s.name, "NAS");
         assert_eq!(s.version, None);
-        // A trailing slash is trimmed like a typed URL, and camelCase is
-        // accepted like every other Jellyfin field.
+        // A trailing slash is trimmed like a typed URL, and camelCase is accepted like every other Jellyfin field.
         assert_eq!(
             parse_discovery_reply(br#"{"address":"http://nas:8096/","id":"x","name":"n"}"#)
                 .unwrap()
@@ -294,8 +242,7 @@ mod tests {
         }
     }
 
-    /// The address is about to be typed into the URL field for the user;
-    /// anything the app would refuse there is refused here.
+    /// Anything the URL field would refuse is refused here, since the address is about to be typed into it.
     #[test]
     fn a_reply_with_an_unusable_address_is_dropped() {
         for address in ["ftp://nas", "", "javascript:alert(1)", "nas:8096"] {
@@ -351,9 +298,7 @@ mod tests {
         assert_eq!(merged.len(), 2);
     }
 
-    /// A responder on the loopback stands in for a server: it answers the
-    /// magic string with a reply, and `broadcast` collects it inside the
-    /// budget without waiting the budget out.
+    /// A loopback responder stands in for a server, and `broadcast` collects its reply without waiting the budget out.
     #[tokio::test]
     async fn a_loopback_responder_is_discovered() {
         let responder = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();

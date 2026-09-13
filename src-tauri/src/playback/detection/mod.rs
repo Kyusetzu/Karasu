@@ -1,5 +1,4 @@
-//! Detection of running media playback via visible windows
-//! (Karasu's counterpart to Taiga's Anisthesia).
+//! Detection of running media playback via visible windows, Karasu's counterpart to Taiga's Anisthesia.
 
 pub mod audio;
 pub mod discovery;
@@ -40,16 +39,11 @@ pub struct Playback {
     pub streaming: bool,
     /// true if this is manga reading (chapters instead of episodes)
     pub manga: bool,
-    /// Set when the source already knows the series and episode exactly, so
-    /// the release-name parser is skipped. Only the Jellyfin API can do this;
-    /// every window-title source leaves it `None`.
+    /// Set when the source knows series and episode exactly, so the parser is skipped; only the Jellyfin API does.
     pub parsed: Option<crate::playback::recognition::parser::Parsed>,
-    /// Playback position in seconds, when the source reports one (Jellyfin's
-    /// `PlayState` today). A window title never knows it, so those sources
-    /// leave it `None` and the scrobbler falls back to the wall clock.
+    /// Playback position in seconds when the source reports one; a window title never does, so the wall clock steps in.
     pub position_sec: Option<u32>,
-    /// The *file's* duration in seconds from the same source. More exact than
-    /// the entry's rounded minutes when present.
+    /// The file's duration in seconds from the same source, more exact than the entry's rounded minutes.
     pub duration_sec: Option<u32>,
 }
 
@@ -66,9 +60,7 @@ pub fn enumerate_windows() -> Vec<WindowInfo> {
     result
 }
 
-/// Windows-only by design, not groundwork: Wayland forbids reading another
-/// application's windows and an X11-only backend was declined, so on Linux
-/// the media-session pass and Jellyfin are the whole of detection.
+/// Windows-only by design: Wayland forbids reading another application's windows, so Linux has no window rung.
 #[cfg(not(windows))]
 pub fn enumerate_windows() -> Vec<WindowInfo> {
     Vec::new()
@@ -123,8 +115,7 @@ pub(super) fn process_name(pid: u32) -> Option<String> {
     }
 }
 
-/// Manual live test: `cargo test live_detect -- --ignored --nocapture`
-/// with a player running prints all windows and the detection result.
+/// Manual live test: run `live_detect` with `--ignored --nocapture` and a player open to print the windows and the result.
 #[cfg(test)]
 mod live_tests {
     #[test]
@@ -137,18 +128,10 @@ mod live_tests {
     }
 }
 
-/// Scans visible windows for running anime playback or manga reading.
-///
-/// The SMTC pass is deliberately *not* here: it is async, and it must run
-/// after this one. See `detect_playback` in the scrobbler loop.
+/// Scans visible windows for anime playback or manga reading; the media-session pass is async and runs after this.
 pub fn detect_windows() -> Option<Playback> {
     let windows = enumerate_windows();
-    // What the audio stack says about each of those processes. Read once for
-    // the whole sweep rather than per candidate: it is a COM round trip, this
-    // runs every 5 s, and every rung below asks the same question.
-    //
-    // An empty map is the normal answer everywhere except Windows, and it
-    // suppresses nothing — see `audio`.
+    // Read once per sweep rather than per candidate, since it is a COM round trip; an empty map suppresses nothing.
     let playing = audio::play_states();
     // Local players take precedence over browser detection
     for w in &windows {
@@ -183,10 +166,7 @@ pub fn detect_windows() -> Option<Playback> {
             });
         }
     }
-    // No pause check on the manga rung, and it would be wrong to add one: a
-    // reader is a browser tab that makes no sound, so its process reads as
-    // Inactive whenever no *other* tab is playing. Reading is not audible, and
-    // the wall clock is the only progress signal it ever had.
+    // No pause check on the manga rung: a reader tab makes no sound, so its process reads Inactive whenever nothing plays.
     for w in &windows {
         if let Some(media) = profiles::match_manga(&w.process, &w.title) {
             return Some(Playback {
@@ -203,30 +183,7 @@ pub fn detect_windows() -> Option<Playback> {
     None
 }
 
-/// Full sweep, in order of how much each source actually knows.
-///
-/// A *playing* mpv IPC pipe comes first when the user has configured one: it
-/// reports the real file path **and** a live position, and a pipe the user
-/// wrote into `mpv.conf` is the most explicit signal in the whole pipeline.
-/// The Jellyfin API is next (server URL, API key *and* a user — see
-/// `jellyfin`): series and episode as separate fields plus a position,
-/// beating anything derived from a string. Window titles come next. The
-/// desktop's media sessions come last — a browser playing Crunchyroll appears
-/// in both, and the site-marker path produces a cleaner title, so the session
-/// pass only gets a look in when nothing recognised a window. That is exactly
-/// the Jellyfin Media Player case, where the title bar never changes.
-///
-/// A **paused** mpv is the exception to its own rung, and the reason is a real
-/// bug this fixed: Karasu now launches mpv itself, so an mpv window left
-/// paused an hour ago sat at the top of this order forever and hid a Jellyfin
-/// episode that was actually playing. A paused pipe is therefore held aside
-/// and used only when every other source came up empty — still the honest
-/// answer when it is the only thing on the machine, never an answer that
-/// outranks something live.
-///
-/// The order holds on Linux too, but the window rung is empty there: window
-/// enumeration has no X11/Wayland backend, so after mpv and Jellyfin the
-/// media-session pass is the only generic source.
+/// Full sweep, most-knowing source first: playing mpv IPC, Jellyfin, window titles, media sessions, then a paused mpv.
 pub async fn detect_playback(
     media_detection: bool,
     jellyfin: Option<jellyfin::JellyfinConfig>,
@@ -248,15 +205,9 @@ pub async fn detect_playback(
             return Some(p);
         }
     }
-    // Blocking Win32/WinRT and D-Bus work; keep it off the runtime's worker
-    // thread.
+    // Blocking Win32/WinRT and D-Bus work; keep it off the runtime's worker thread.
     let found = tokio::task::spawn_blocking(move || {
-        // Which rung won, said at each rung rather than once afterwards:
-        // `Playback` carries no source field, so a single line after the fact
-        // could not tell a window title from a media session — and the
-        // precedence documented above is the most confusing part of the
-        // pipeline. `or_else` also collapses the branch, so there is no later
-        // point that still knows.
+        // Said at each rung rather than once afterwards: `Playback` carries no source field, so nothing later knows which won.
         if let Some(p) = detect_windows() {
             crate::logging::debug_changed("detect", "source", format!("window title: {:?}", p.media_title));
             return Some(p);

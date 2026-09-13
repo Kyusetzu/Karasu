@@ -36,6 +36,7 @@ import { useAuth } from "@/stores/auth";
 import { useAniListLogin } from "@/hooks/useAniListLogin";
 import { useListSummary } from "@/hooks/useListSummary";
 import { useManualSync } from "@/hooks/useManualSync";
+import { useShortViewport } from "@/hooks/useShortViewport";
 import { Avatar, UserLockup } from "@/components/ui/user-lockup";
 import SyncPanel from "./SyncPanel";
 
@@ -315,11 +316,20 @@ export default function Sidebar() {
   // `?? 0`, matching every list screen; keying on `undefined` in local mode reads a cache entry nothing writes.
   const { counts, pending, syncedAt } = useListSummary(viewer?.id ?? 0);
   const android = isAndroid(usePlatform((s) => s.info));
-  const [collapsed, setCollapsed] = useState(loadCollapsed);
+  const [stored, setStored] = useState(loadCollapsed);
+  // A short viewport collapses the rail by itself; a toggle while short is an override that lasts until the height changes.
+  const short = useShortViewport();
+  const [override, setOverride] = useState<boolean | null>(null);
+  useEffect(() => setOverride(null), [short]);
+  const collapsed = override ?? (stored || short);
 
   const toggleCollapsed = () => {
     const next = !collapsed;
-    setCollapsed(next);
+    if (short) {
+      setOverride(next);
+      return;
+    }
+    setStored(next);
     saveCollapsed(next);
   };
   const { pathname } = useLocation();
@@ -349,7 +359,8 @@ export default function Sidebar() {
           style={{ top }}
         />
       )}
-      <div className="flex flex-1 flex-col gap-px px-2.5">
+      {/* Scrolls as the last resort, so no item is ever unreachable on a viewport shorter than the rail. */}
+      <div className="flex min-h-0 flex-1 flex-col gap-px overflow-y-auto px-2.5">
         {visibleGroups(android).map((group, i) => (
           <div key={group.label} className="contents">
             {/* Collapsed, a rule keeps the grouping the headings carried; the first group needs none since nothing precedes it. */}

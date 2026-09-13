@@ -13,17 +13,7 @@ import { nextPageParam } from "@/lib/paging";
 import { relTimeFromSeconds } from "@/lib/relTime";
 import { staggerDelay } from "@/lib/motion";
 
-/**
- * One user's forum comments, across every thread, newest first — the surface
- * anilist.co calls "Forum Comments" on a profile.
- *
- * A separate list from `ThreadList` because the rows are a different shape (a
- * comment under its thread's title, not a thread), but the paging discipline
- * is the same one, defects and all: a button and never a scroll, the footer
- * shared by the empty and populated returns so an empty page with more behind
- * it still offers the way forward, and an error that never discards the pages
- * already on screen.
- */
+/** One user's forum comments across every thread, newest first, paged by a button and never a scroll. */
 export function UserComments({
   userId,
   emptyTitle,
@@ -54,10 +44,7 @@ export function UserComments({
     );
   }
 
-  // First occurrence wins: ID_DESC pages shift when comments are posted
-  // between fetches, so the last row of one page can reappear on the next —
-  // and CLAUDE.md records this field returning perPage+1 rows besides. Either
-  // way a repeat would be a duplicate React key.
+  // First occurrence wins: ID_DESC pages shift between fetches, and a repeated row would be a duplicate React key.
   const seen = new Set<number>();
   const rows = (q.data?.pages ?? [])
     .flatMap((p) => p.comments)
@@ -112,10 +99,7 @@ export function UserComments({
       {rows.map((c, i) => (
         <Link
           key={c.id}
-          // The comment's own anchor: the thread page resolves it through
-          // the uncapped tree field and highlights it. A comment whose
-          // thread failed to resolve still renders; the forum index is the
-          // least-wrong place for that click to land.
+          // The comment's own anchor, resolved by the thread page; a comment with no thread lands on the forum index.
           to={c.thread ? `/thread/${c.thread.id}?comment=${c.id}` : "/forum"}
           className="block animate-rise-in rounded-xl border border-surface-800 p-3 transition-surface hover:border-surface-700 hover:bg-surface-900"
           style={{ animationDelay: `${staggerDelay(i)}ms` }}
@@ -134,11 +118,7 @@ export function UserComments({
               {c.createdAt != null && relTimeFromSeconds(c.createdAt, i18n.language, t("notif.now"))}
             </span>
           </div>
-          {/* The comment itself, flattened to one plain line — markdown markup
-              in a snippet reads as noise, and `renderPlain` shares the parser
-              so the two can never disagree about what counts as content. A
-              spoiler stays the word "Spoiler" here: a preview is the one place
-              it must not leak. */}
+          {/* The comment flattened to plain text through the shared parser; a spoiler stays the word "Spoiler" here. */}
           {c.comment && (
             <p className="mt-1.5 line-clamp-2 pl-5.5 text-xs leading-relaxed text-ink-500">
               {renderPlain(c.comment, 200, t("social.mdSpoiler"))}

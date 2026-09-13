@@ -2,20 +2,7 @@ import { area, curveMonotoneX, line } from "d3-shape";
 import { scaleLinear, scalePoint } from "d3-scale";
 import { seriesDelay } from "@/lib/motion";
 
-/**
- * A smoothed area over time — `LineChart`'s successor for year series.
- *
- * `curveMonotoneX` rather than a spline: it interpolates smoothly but never
- * overshoots, so a year of zero cannot dip the curve below the floor and a
- * spike cannot ring past its own value. The geometry comes from d3-shape and
- * d3-scale; the rendering, the palette and the motion stay the house's.
- *
- * The draw-on uses `pathLength={1}`: a curve's true length is not knowable
- * without measuring the DOM, and normalizing the path to length 1 lets the
- * same dash trick work in pure markup. (The old warning about
- * `non-scaling-stroke` does not apply — nothing here moves the stroke into
- * screen space.)
- */
+/** A smoothed area over years; `curveMonotoneX` never overshoots, and `pathLength={1}` keeps the draw-on pure markup. */
 export function AreaChart({
   data,
   height = 150,

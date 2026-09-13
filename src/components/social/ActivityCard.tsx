@@ -27,20 +27,7 @@ import { useActivityPost } from "@/hooks/useActivityPost";
 import { useAuth } from "@/stores/auth";
 import { cn } from "@/lib/utils";
 
-/**
- * One row of the feed.
- *
- * The sentence is translated whole, not assembled from a verb. AniList composes
- * it itself — `"watched episode"` — in English word order and English only, so a
- * German feed read "las Kapitel 162 - 170 Titel" where German wants the
- * participle *after* the title. Each verb owns a full template with a `{{n}}`
- * progress slot and a `%t%` token where the title link goes; `splitSentence`
- * opens the gap and the component drops the `<Link>` in.
- *
- * Still a literal switch over a closed union — `i18nKeys.test.ts` only sees
- * literal `t("…")` calls, and a key built by interpolation would be invisible
- * to it.
- */
+/** A verb's sentence, translated whole; keep the literal switch, `i18nKeys.test.ts` sees only literal `t("…")`. */
 function sentenceFor(
   verb: ActivityVerb,
   t: (k: string, o?: { n?: string }) => string,
@@ -78,10 +65,7 @@ function ListSentence({ item }: { item: Extract<FeedItem, { kind: "list" }> }) {
     </Link>
   ) : null;
 
-  // The template path needs a verb this build knows, a title for the slot,
-  // and — for the four progress verbs — a parsed progress. Anything else falls
-  // back to AniList's own words: slightly untranslated beats a sentence with a
-  // hole where the number or title goes.
+  // Missing a verb, title or needed progress, AniList's own words beat a sentence with a hole in it.
   if (
     item.verb === null ||
     item.media === null ||
@@ -109,11 +93,7 @@ function ListSentence({ item }: { item: Extract<FeedItem, { kind: "list" }> }) {
   );
 }
 
-/**
- * The heart is its own receipt and its own undo, which is why a like gets no
- * toast — see `useSocialActions`. A *failed* one does, because that is the case
- * the interface has already claimed succeeded.
- */
+/** The heart is its own receipt and undo, so only a failed like gets a toast; see `useSocialActions`. */
 function LikeButton({
   id,
   type,
@@ -131,8 +111,7 @@ function LikeButton({
   const mode = useAuth((s) => s.mode);
   const { like } = useSocialActions();
 
-  // Nothing to like *as* without an account, and a disabled heart is an
-  // invitation with no explanation.
+  // Nothing to like as without an account, and a disabled heart is an invitation with no explanation.
   if (mode !== "anilist") {
     return (
       <span className="flex items-center gap-1 px-1.5 py-0.5 text-2xs text-ink-600">
@@ -181,8 +160,7 @@ function ActivityReplies({ activityId }: { activityId: number }) {
   return (
     <div className="mt-3 space-y-2 border-l-2 border-surface-800 pl-3">
       {q.isLoading && <Shimmer className="h-3 w-32 rounded" />}
-      {/* Before this, a failed fetch fell through to "no replies yet" below —
-          which is a claim about the thread, not about the request. */}
+      {/* A failed fetch says nothing about the thread, so it must not fall through to "no replies yet". */}
       {q.error && (
         <p className="text-2xs text-danger">{t("social.repliesFailed")}</p>
       )}
@@ -264,8 +242,7 @@ export function ActivityCard({
   const [repliesOpen, setRepliesOpen] = useState(openReplies);
   const viewer = useAuth((s) => s.viewer);
   const self = viewer !== null && viewer.id === item.user.id;
-  // Pinning is a donator feature on AniList's side; the toggle is only
-  // offered where it can succeed — see `lib/donator`.
+  // Pinning is a donator feature, so the toggle is offered only where it can succeed; see `lib/donator`.
   const showPin = canTogglePin(viewer, item, self);
   const { pin } = useActivityPost(viewer?.id);
   const when = relTimeFromSeconds(item.createdAt, i18n.language, t("notif.now"));
@@ -300,9 +277,7 @@ export function ActivityCard({
             />
           </Link>
           <div className="flex shrink-0 items-center gap-2">
-            {/* Your own activity gets the toggle, if your account may pin;
-                anyone's pinned one otherwise gets the passive marker — same
-                glyph, different verbs. */}
+            {/* Your own activity gets the toggle if you may pin; anyone's pinned one gets the passive marker. */}
             {showPin ? (
               <button
                 onClick={() => pin.mutate({ id: item.id, pinned: !item.isPinned })}
@@ -339,8 +314,7 @@ export function ActivityCard({
           {item.kind === "list" ? (
             <ListSentence item={item} />
           ) : (
-            // Text activities are markdown, same dialect as a bio — so the same
-            // renderer, which means no innerHTML and no remote images.
+            // Text activities are bio markdown, so the same renderer: no innerHTML and no remote images.
             <Markdown source={item.text} siteUrl={item.siteUrl} />
           )}
         </div>
@@ -365,9 +339,7 @@ export function ActivityCard({
           </button>
         </div>
 
-        {/* One request per expansion, never eagerly — a page of twenty-five
-            activities carrying every reply would multiply the payload for rows
-            nobody opened. */}
+        {/* One request per expansion, never eagerly, or every row pays for replies nobody opened. */}
         {repliesOpen && <ActivityReplies activityId={item.id} />}
       </div>
     </article>

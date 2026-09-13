@@ -1,13 +1,6 @@
 import { useTranslation } from "react-i18next";
 
-/**
- * The vocabulary the statistics screen and its panels share.
- *
- * `Category` is the sub-tab; `RankedCategory` is which ranked array a row
- * comes from. They used to be the same union — one tab per array — until the
- * overhaul folded the five ranked lists into two themed tabs, at which point
- * "which screen" and "which data" became different questions.
- */
+/** The statistics sub-tab, a different question from `RankedCategory`, which names the ranked array a row comes from. */
 export type Category = "overview" | "ratings" | "years" | "genresTags" | "people";
 
 export type RankedCategory = "genres" | "tags" | "voiceActors" | "studios" | "staff";

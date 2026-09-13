@@ -22,26 +22,14 @@ import { Pill } from "@/components/ui/pill";
 import { Shimmer } from "@/components/Skeleton";
 import { EmptyState, PerchRule } from "@/components/EmptyState";
 
-/**
- * Another user's list, read-only — rendered with the mutation-free cover
- * pieces (`CoverCell`), never the viewer's own list machinery: `GridCard`
- * wants five mutation callbacks and the *viewer's* score format, both wrong
- * here. Scores render in the owner's format, because their ★4 on a
- * five-star account is what they actually said.
- *
- * One request per medium, spent when the tab (a user-initiated moment)
- * mounts this component. The affinity strip costs nothing extra: the
- * viewer's own list is read from the cache it already lives in, compared on
- * the raw scale where the two formats meet.
- */
+/** Another user's list, read-only through `CoverCell` rather than `GridCard`, with scores in the owner's format. */
 export function UserLists({ user }: { user: UserProfile }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const viewer = useAuth((s) => s.viewer);
   const viewerFormat = useScoreFormat();
   const level = useContentFilter((s) => s.level);
-  // Someone else's list is still rendered under *this* user's filter, so the
-  // veil applies here exactly as it does to their own grid.
+  // Someone else's list still renders under *this* user's filter, so the veil applies as it does to their own grid.
   const blurAdult = useContentFilter((s) => s.blurAdult);
   const [type, setType] = useState<MediaType>("ANIME");
   const [status, setStatus] = useState<MediaListStatus>("CURRENT");
@@ -55,8 +43,7 @@ export function UserLists({ user }: { user: UserProfile }) {
 
   const theirFormat = asScoreFormat(user.mediaListOptions?.scoreFormat);
 
-  // De-duped by media id: a custom list echoes entries the status lists
-  // already carry (the Wrapped query documents the same trap).
+  // De-duped by media id: a custom list echoes entries the status lists already carry.
   const entries = useMemo(() => {
     const seen = new Set<number>();
     const out: ForeignListEntry[] = [];

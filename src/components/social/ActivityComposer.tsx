@@ -8,17 +8,7 @@ import { useActivityPost } from "@/hooks/useActivityPost";
 import { useAuth } from "@/stores/auth";
 import { cn } from "@/lib/utils";
 
-/**
- * Post a status update to AniList.
- *
- * The feature CLAUDE.md's second carve-out is about — the paragraph explains
- * what was decided and, more importantly, what is still refused.
- *
- * The preview toggle is not decoration. It renders through the same `Markdown`
- * component the feed uses, which is the only way anyone discovers *which*
- * markdown Karasu supports: images become chips here exactly as they will in the
- * post, so the surprise happens before sending rather than after.
- */
+/** Post a status update to AniList (CLAUDE.md's social carve-out); the preview renders through the feed's `Markdown`. */
 export function ActivityComposer() {
   const { t } = useTranslation();
   const viewer = useAuth((s) => s.viewer);

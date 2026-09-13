@@ -30,11 +30,7 @@ const page = (comments: UserForumComment[], hasNextPage: boolean): UserCommentPa
   comments,
 });
 
-/**
- * The same three paging states `ThreadList.dom.test.tsx` pins, on the same
- * grounds: the list uses the shared footer discipline, and each of these
- * fails against a naive implementation.
- */
+/** The same paging states `ThreadList.dom.test.tsx` pins, since the list shares the footer discipline. */
 describe("UserComments paging states", () => {
   it("renders a comment repeated across pages once — ID_DESC pages shift", async () => {
     fetchPage.mockReset();

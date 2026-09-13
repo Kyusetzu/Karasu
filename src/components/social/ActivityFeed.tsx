@@ -12,18 +12,7 @@ import { useContentFilter } from "@/stores/contentFilter";
 import { staggerDelay } from "@/lib/motion";
 import { ActivityCard } from "./ActivityCard";
 
-/**
- * A paginated activity feed — a profile's own, or everyone the viewer follows.
- *
- * Never shows a remaining count. AniList reports `total: 5000` with
- * `lastPage: 500` for any feed with real content, exactly as it does for user
- * search, so a number on the button would be invented. `UserList` carries the
- * same caveat as a flag; here it is simply never shown.
- *
- * Button-driven, like every other paged list in the app: the limiter shared with
- * the scrobbler and the alert passes cannot see a burst it has not sent, so
- * spending a request is always something the user did.
- */
+/** Activity feed paged by a button, never a scroll; no remaining count, because `pageInfo.total` is a capped sentinel. */
 export function ActivityFeed({
   queryKey,
   source,
@@ -71,9 +60,7 @@ export function ActivityFeed({
     );
   }
 
-  // `normalizeActivity` drops private messages and anything unrecognised; the
-  // content filter then runs on other people's media, which `Page.activities`
-  // gives no server-side argument for.
+  // `normalizeActivity` drops private messages; the content filter runs here because `Page.activities` cannot.
   const items: FeedItem[] = (q.data?.pages ?? [])
     .flatMap((p) => p.activities)
     .map((raw) => normalizeActivity(raw as Parameters<typeof normalizeActivity>[0]))

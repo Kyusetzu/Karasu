@@ -3,14 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { FollowButton } from "./FollowButton";
 import { renderWithProviders, signIn, signOut, useLocalProfile } from "@/test/render";
 
-/**
- * The four relation states, and the three cases where the button must not exist.
- *
- * `lib/follows.test.ts` proves the *relation* maths. This proves the button
- * agrees with it — including the accessible name, which is the one thing a
- * screen-reader user hears and which says the opposite of the visible label on
- * purpose.
- */
+/** The button agrees with `lib/follows.test.ts` on every relation state, and is absent where there is nobody to follow as. */
 
 afterEach(signOut);
 
@@ -24,8 +17,7 @@ describe("FollowButton renders nothing when there is nobody to follow as", () =>
   });
 
   it("is absent in the account-free local mode", () => {
-    // The social graph belongs to an AniList account; a disabled button here
-    // would be an invitation with no explanation.
+    // The social graph belongs to an AniList account; a disabled button here would be an invitation with no explanation.
     useLocalProfile();
     const { container } = renderWithProviders(<FollowButton {...OTHER} flags={{}} />);
     expect(container.firstChild).toBeNull();
@@ -72,9 +64,7 @@ describe("FollowButton states", () => {
   });
 
   it("names the action, not the state, for a screen reader", () => {
-    // The visible label reads "Following" — the current state — while the
-    // accessible name has to read "Unfollow", because a button announced as
-    // "Following" implies that pressing it would start following.
+    // The label reads the state, the accessible name the action: "Following" read aloud implies pressing would follow.
     signIn();
     renderWithProviders(<FollowButton {...OTHER} flags={{ isFollowing: true }} />);
     const button = screen.getByRole("button");

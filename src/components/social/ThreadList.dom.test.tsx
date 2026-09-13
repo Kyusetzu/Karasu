@@ -33,18 +33,7 @@ const page = (threads: ThreadSummary[], hasNextPage: boolean): ThreadPage => ({
   threads,
 });
 
-/**
- * The dead end this suite exists for.
- *
- * An empty page with more behind it used to render the empty state *only* — so
- * the "Load more" button never appeared and page 2 was unreachable, forever, by
- * any interaction. AniList really does answer that way, which makes this a
- * second and purely client-side way to produce the "my subscribed threads are
- * empty" report.
- *
- * jsdom computes no layout, so nothing here asserts anything visual — these are
- * about which elements exist.
- */
+/** An empty page with more behind it still offers the next page; AniList really answers that way. */
 describe("ThreadList paging states", () => {
   it("still offers the next page when the first one came back empty", async () => {
     const fetchPage = vi.fn(async () => page([], true));
@@ -92,10 +81,7 @@ describe("ThreadList paging states", () => {
     expect(await screen.findByText("Browse the forum")).toBeTruthy();
   });
 
-  /**
-   * A failure on a later page must not take the pages already on screen with
-   * it. The reader is looking at those.
-   */
+  /** A failure on a later page must not take the pages already on screen with it. */
   it("keeps the loaded pages when a later one fails", async () => {
     let call = 0;
     const fetchPage = vi.fn(async () => {

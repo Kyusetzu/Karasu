@@ -6,18 +6,7 @@ import { useFollow } from "@/hooks/useFollow";
 import { followRelation, isFollowing, isSelf, type FollowFlags } from "@/lib/follows";
 import { useState } from "react";
 
-/**
- * Follow / unfollow, wherever a user appears.
- *
- * Renders nothing at all rather than a disabled control when there is nobody to
- * follow *as* — signed out, in the account-free local mode, or looking at
- * yourself. A greyed-out button in those cases would be an invitation with no
- * explanation.
- *
- * The label swaps to "Unfollow" only on hover or focus, so a row of followed
- * users reads as a list of states rather than a wall of identical buttons, and
- * the destructive reading is only there when the pointer is on it.
- */
+/** Follow / unfollow wherever a user appears; renders nothing, not a disabled control, when there is nobody to follow as. */
 export function FollowButton({
   userId,
   name,
@@ -51,8 +40,7 @@ export function FollowButton({
       onMouseLeave={() => setHot(false)}
       onFocus={() => setHot(true)}
       onBlur={() => setHot(false)}
-      // The accessible name must be the action, not the state — a screen reader
-      // reading "Following" on a button implies pressing it would follow.
+      // The accessible name must be the action, not the state: "Following" read aloud implies pressing would follow.
       aria-label={
         following
           ? t("social.unfollowAria", { name })

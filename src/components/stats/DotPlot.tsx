@@ -2,16 +2,7 @@ import { scaleLinear } from "d3-scale";
 import { Card, CardTitle } from "@/components/ui/card";
 import { seriesDelay } from "@/lib/motion";
 
-/**
- * A dumbbell plot: two scores per row on one 0–max axis, joined by a line
- * whose length *is* the disagreement. `max` is the score scale's top —
- * ten by default, whatever the account's format renders otherwise.
- *
- * Built for "my score against the community's" — the one figure AniList's
- * own statistics cannot draw, since it never sees both numbers side by side.
- * The mine-dot carries the accent; the community sits in the neutral graph
- * tone, the same "not yours" colour the sunburst uses for its remainder.
- */
+/** A dumbbell plot: two scores per row on one 0-`max` axis, where `max` is the account's score scale top. */
 export interface DotPlotRow {
   label: string;
   mine: number;

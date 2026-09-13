@@ -10,31 +10,7 @@ import { nextPageParam } from "@/lib/paging";
 import { staggerDelay } from "@/lib/motion";
 import { ThreadRow } from "./ThreadRow";
 
-/**
- * The one owner of "a paginated list of threads".
- *
- * Same shape as `UserList` and for the same reason: a profile's Forum tab and the
- * forum index would otherwise be two paging implementations that drift. Whoever
- * calls it supplies the key and the fetcher.
- *
- * Never a remaining count. `pageInfo.total` on threads is the capped 5000
- * sentinel this API returns for anything with real content, so the button says
- * "Load more" rather than inventing a number.
- */
-/**
- * The three states a paginated list gets wrong if it renders them naively.
- *
- * 1. **An empty first page with `hasNextPage: true` was a dead end.** Returning
- *    only the empty state means the "Load more" button never renders, so page 2
- *    is unreachable forever — and AniList does serve empty pages with more
- *    behind them. A second, client-side mechanism producing exactly the "my
- *    subscribed threads are empty" symptom.
- * 2. **An error threw away every loaded page.** A failure on page 4 replaced
- *    pages 1–3 — on screen, correct, and being read — with one line of red
- *    text. The bare error is now only for having nothing at all to show.
- * 3. **`EmptyState` takes `actions` and neither list forwarded it**, so an empty
- *    list could not offer the one thing that would fix it.
- */
+/** The one paged thread list; an empty page with more behind it keeps the button, which never carries a count. */
 export function ThreadList({
   queryKey,
   fetchPage,
@@ -75,7 +51,7 @@ export function ThreadList({
   }
 
   const list = (q.data?.pages ?? []).flatMap((p) => p.threads);
-  // Only when there is nothing on screen to lose. See the note above.
+  // Only when there is nothing on screen to lose: a failed later page keeps the loaded ones.
   if (q.error && !list.length && !q.hasNextPage) {
     return (
       <p className="text-sm text-danger">
@@ -84,8 +60,7 @@ export function ThreadList({
     );
   }
 
-  // Shared by the empty and populated returns: both need the button, and the
-  // empty one needing it is the whole of point 1 above.
+  // Shared by the empty and populated returns: an empty page with more behind it needs the button too.
   const footer = (
     <>
       {q.error && (

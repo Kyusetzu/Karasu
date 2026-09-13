@@ -5,14 +5,7 @@ import { UserLockup } from "@/components/ui/user-lockup";
 import { FollowButton } from "./FollowButton";
 import { followRelation, relationBadgeKey } from "@/lib/follows";
 
-/**
- * One person in a list.
- *
- * No bio line, deliberately — see `FOLLOWERS_QUERY`. A bio runs to several
- * kilobytes and fifty of them would be a half-megabyte payload for a row that
- * shows a name and a button, so the query does not ask for one and this cannot
- * render one.
- */
+/** One person in a list; no bio line, because `FOLLOWERS_QUERY` does not ask for one and a page of bios is a heavy payload. */
 export function UserRow({ user }: { user: SocialUser }) {
   const { t } = useTranslation();
   const relation = followRelation(user);

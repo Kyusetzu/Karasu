@@ -4,19 +4,7 @@ import { max } from "d3-array";
 import { Card, CardTitle } from "@/components/ui/card";
 import { seriesDelay } from "@/lib/motion";
 
-/**
- * Horizontal bars with the Wrapped poster's accent gradient, one row per
- * labelled value.
- *
- * The gradient is a real SVG `<linearGradient>` referencing the theme's
- * custom properties, so it follows the accent like everything else. One
- * `<defs>` per card (`useId` keeps the reference unique when two cards
- * mount), shared by every row's fill.
- *
- * `domain` pins the axis — a mean-score bar wants 0–10 whatever the data's
- * top is, or a 7.1 next to a 7.4 would read as a landslide. Without it the
- * longest row takes the full width, the count-chart behaviour.
- */
+/** Accent-gradient bars, one row per labelled value; `domain` pins the axis so a score bar is not scaled to its top row. */
 export function GradientBars({
   title,
   hint,

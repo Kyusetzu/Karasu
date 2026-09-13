@@ -41,10 +41,7 @@ function Badge({
   );
 }
 
-/** `meanScore` arrives hundred-point — the normalisation trap CLAUDE.md
- *  records for the statistics screen. Shown ten-point deliberately: this is
- *  *someone else's* mean, and their scoring format is theirs, so the neutral
- *  scale beats translating their opinion into the viewer's format. */
+/** `meanScore` arrives hundred-point and is shown ten-point on purpose: someone else's mean, on the neutral scale. */
 function meanText(score: number | undefined | null): string | null {
   if (!score) return null; // 0 means "no scores", not "scored zero"
   return `★ ${toDisplayScale("POINT_10", score).toFixed(1)}`;
@@ -63,9 +60,7 @@ export function ProfileHeader({ user }: { user: UserProfile }) {
 
   return (
     <header className="relative">
-      {/* The banner is the only place a user's own image is loaded, and it is
-          their own doing on their own profile. Chips cover the rest — see
-          `Markdown`. */}
+      {/* The banner is the only user image loaded directly; `Markdown` covers the rest with chips. */}
       {user.bannerImage && (
         <div className="absolute inset-x-0 top-0 h-32 overflow-hidden">
           <img
@@ -90,8 +85,7 @@ export function ProfileHeader({ user }: { user: UserProfile }) {
                     : t("social.badgeFollowsYou")}
                 </Badge>
               )}
-              {/* `donatorLabel`, not `donatorBadge` — the badge string is the
-                  label and AniList returns it for everyone. See lib/donator.ts. */}
+              {/* `donatorLabel`, not `donatorBadge`: AniList returns the badge string for everyone (lib/donator.ts). */}
               {donator && (
                 <Badge tone="gold" icon={<Heart className="size-2.5" />}>
                   {donator}
@@ -123,8 +117,7 @@ export function ProfileHeader({ user }: { user: UserProfile }) {
               </button>
             </div>
 
-            {/* Renaming is a real AniList feature, and a profile reached by an
-                old link should say so rather than look like a different person. */}
+            {/* A profile reached by an old link should say it was renamed rather than look like a different person. */}
             {user.previousNames.length > 0 && (
               <p className="mt-1 flex items-center gap-1 text-2xs text-ink-600">
                 <Sparkles className="size-2.5" />
@@ -161,8 +154,7 @@ export function ProfileHeader({ user }: { user: UserProfile }) {
         )}
       </div>
 
-      {/* Through `PresenceIf` so the dialog can animate out — React unmounts
-          before CSS can, so `{open && <Modal/>}` only ever has an entrance. */}
+      {/* Through `PresenceIf` so the dialog can animate out; `{open && <Modal/>}` only ever has an entrance. */}
       <PresenceIf when={editing}>
         {(leaving) => (
           <ProfileEditModal

@@ -3,14 +3,7 @@ import { cn } from "@/lib/utils";
 import { parseAniListMarkdown, type MdNode } from "@/lib/anilistMarkdown";
 import { ExternalAnchor, RichText, Spoiler } from "@/components/RichText";
 
-/**
- * Block-level AniList markdown: paragraphs, headings, quotes, lists, fences and
- * centred blocks. Inline content is `RichText`, which media descriptions share.
- *
- * There is no `dangerouslySetInnerHTML` here or there, and there must never be
- * one: the parser produces a tree instead of an HTML string precisely so this
- * file cannot inject markup even by accident.
- */
+/** Block AniList markdown from the parser's tree, never `dangerouslySetInnerHTML`; the site's renderer is the oracle. */
 
 const HEADING_SIZE = [
   "text-lg font-semibold",
@@ -79,20 +72,14 @@ function Blocks({ nodes }: { nodes: MdNode[] }) {
           case "hr":
             return <hr key={i} className="border-surface-800" />;
           case "center":
-            // `text-align`, not flex: a centred paragraph is still *lines*,
-            // and a flex row swallows `<br>` — a break is not a flex item, so
-            // image chips ended up glued onto the text line above them. Chips
-            // are inline-flex, which is inline-level, so plain text-align
-            // centres a row of them exactly as it centres words; the small
-            // leading keeps a chip line from touching the text line above.
+            // `text-align`, not flex; a flex row swallows `<br>` and glues image chips onto the text line above.
             return (
               <div key={i} className="space-y-2 text-center leading-loose">
                 <Blocks nodes={n.children} />
               </div>
             );
           case "spoiler":
-            // One button for the whole run, and nothing of it in the DOM until
-            // pressed — the inline `Spoiler`'s rule, at block width.
+            // One button for the whole run and nothing of it in the DOM until pressed, as the inline `Spoiler` does.
             return (
               <Spoiler key={i} block>
                 <Blocks nodes={n.children} />
@@ -104,11 +91,7 @@ function Blocks({ nodes }: { nodes: MdNode[] }) {
   );
 }
 
-/**
- * `source` is raw AniList markdown. `limit` is passed through to the parser,
- * which truncates *before* parsing — that is what bounds the work, not just the
- * output.
- */
+/** Raw AniList markdown; `limit` truncates before parsing, bounding the work and not just the output. */
 export function Markdown({
   source,
   className,

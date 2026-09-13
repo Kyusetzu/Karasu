@@ -3,14 +3,7 @@ import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 import { Markdown } from "./Markdown";
 
-/**
- * The renderer's half of the parser's guarantee.
- *
- * `lib/anilistMarkdown.test.ts` proves the *tree* cannot carry executable
- * content. This proves the *component* does not reintroduce it — the tree being
- * safe is worth nothing if the thing drawing it reaches for innerHTML, and those
- * are two separate claims that need two separate tests.
- */
+/** `lib/anilistMarkdown.test.ts` proves the tree safe; this proves the component never reaches for innerHTML. */
 
 function draw(source: string) {
   return render(
@@ -35,22 +28,7 @@ const HOSTILE = [
 ];
 
 describe("Markdown renders no executable content", () => {
-  /**
-   * This used to assert **zero** `<img>` for any input, with a note saying that
-   * if it ever failed, the no-CSP reasoning had to be revisited first. It has
-   * been revisited, deliberately: bio images are fetched by Rust and handed back
-   * as a `data:` URI, so the CSP is unchanged and the WebView still never talks
-   * to imgur. See `commands/images.rs` and `components/RichText.tsx`.
-   *
-   * So the property that actually matters is now the one pinned here: **no
-   * `<img>` may ever carry a remote `src`.** A `data:` URI is the proxy's own
-   * output; anything with a scheme and a host would mean the page is fetching
-   * for itself, which is exactly what was rejected.
-   *
-   * Under jsdom `isTauri` is false, so the proxy is never attempted and every
-   * image falls back to the chip — which is also the shipped behaviour whenever
-   * a fetch fails, and is what makes the loop below meaningful for HOSTILE.
-   */
+  /** No `<img>` may carry a remote `src`; a `data:` URI is the Rust proxy's output, a host means the page fetched it. */
   it("never emits an img with a remote src, for any input", () => {
     for (const src of [...HOSTILE, `img(https://i.imgur.com/a.png)`, `![alt](https://i.imgur.com/a.png)`]) {
       const { container, unmount } = draw(src);
@@ -78,8 +56,7 @@ describe("Markdown renders no executable content", () => {
         for (const attr of el.getAttributeNames()) {
           expect(attr.toLowerCase().startsWith("on"), `${attr} on <${el.tagName}> from ${src}`).toBe(false);
         }
-        // The parser drops every HTML attribute, so nothing should carry a style
-        // it did not get from a Tailwind class.
+        // The parser drops every HTML attribute, so no style survives that a Tailwind class did not give.
         expect(el.getAttribute("style"), src).toBeNull();
       }
       unmount();
@@ -138,8 +115,7 @@ describe("Markdown renders the real structures", () => {
 
   it("hides a spoiler behind a button until it is pressed", () => {
     draw(`~!the butler did it!~`);
-    // The text must not be in the DOM at all — visually hiding it would still
-    // leave it selectable and readable in the accessibility tree.
+    // Not in the DOM at all; visually hidden text is still selectable and read by a screen reader.
     expect(screen.queryByText(/butler/)).toBeNull();
     expect(screen.getByRole("button").textContent).toContain("social.mdSpoiler");
   });
@@ -164,9 +140,7 @@ describe("Markdown renders the real structures", () => {
   });
 
   it("renders a real bio's HTML shape — entities, centring, decoration", () => {
-    // Distilled from a live profile: the star arrives as `&#x2605;` inside a
-    // bare `<a>` inside an `<h5>` inside `<div align="center">`, and every
-    // layer used to be lost — literal entity text, no centring, no accent.
+    // From a live profile: an entity inside a bare `<a>` inside an `<h5>` inside a centred div.
     const { container } = draw(
       `<div align="center"><h5>˗ˏˋ <a>&#x2605;</a> ˎˊ˗</h5></div>\n` +
         `<div align="center">likes back <a>&sol;</a> follows back</div>`,
@@ -187,8 +161,7 @@ describe("Markdown renders the real structures", () => {
     const anchors = container.querySelectorAll("a");
     expect(anchors).toHaveLength(1);
     expect(anchors[0].getAttribute("href")).toBe("https://steamcommunity.com/id/x");
-    // Under jsdom the proxy never runs, so the image is its chip — inside the
-    // anchor, as a span rather than a nested button (the InLink rule).
+    // Under jsdom the image is its chip, which inside an anchor is a span rather than a nested button.
     expect(anchors[0].querySelectorAll("button")).toHaveLength(0);
     expect(anchors[0].textContent).toContain("social.mdImage");
   });
@@ -201,8 +174,7 @@ describe("Markdown renders the real structures", () => {
 
 describe("Markdown renders the site's inline centring", () => {
   it("centres the ~~~part~~~ of a heading without breaking the heading or the spoiler after it", () => {
-    // The 100-day-challenge template: `<h1><center>…</center> <center><spoiler/></center></h1>`
-    // on anilist.co (activity 1154078329, measured 2026-09-10).
+    // The 100-day-challenge template on anilist.co, an h1 holding a centred title and a centred spoiler.
     const { container } = draw("# ~~~Title~~~ ~~~~!hidden words!~ ~~~");
     const h1 = container.querySelector("h1");
     expect(h1).not.toBeNull();

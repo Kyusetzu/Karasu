@@ -8,17 +8,7 @@ import { Heatmap } from "./Heatmap";
 import { DayHeatmap } from "./DayHeatmap";
 import { dayHeatmapFromHistory } from "@/lib/localStats";
 
-/**
- * These charts kept their numbers in `<title>` elements, which is to say behind
- * a hover — invisible on a screenshot, unreachable on a touchscreen and absent
- * from the page for anyone reading it rather than pointing at it.
- *
- * Rendering to static markup is enough to check that: it needs no DOM and no
- * testing library, and the question is only whether the figure is in the output
- * at all. Where a value is deliberately dropped — a slice too thin to write in
- * — the test says so, so that thinning stays a decision rather than a
- * regression nobody notices.
- */
+/** Static markup needs no DOM, so the filename stays without `.dom`; the tests ask only what the output holds. */
 const html = (node: React.ReactElement) => renderToStaticMarkup(node);
 
 /** Text content only, so a value cannot be "found" inside a path's geometry. */
@@ -123,8 +113,7 @@ describe("GradientBars", () => {
   });
 
   it("a pinned domain keeps a 7.4 from reading as a landslide over a 7.1", () => {
-    // With domain 10, a 7.4 bar is 74 units wide — not the full 100 the
-    // data-relative scale would give the longest row.
+    // The bar is its share of the pinned domain, not the full width a data-relative scale would give it.
     const markup = html(
       <GradientBars title="t" domain={10} rows={[{ label: "TV", value: 7.4, text: "7.4" }]} />,
     );
@@ -177,8 +166,7 @@ describe("Treemap", () => {
 
   it("fills the width it is given rather than sitting in the middle of it", () => {
     const markup = html(<Treemap data={data} />);
-    // The bug: viewBox 320x180 drawn into a ~1000px card meant `xMidYMid meet`
-    // scaled it 1:1 and centred it, leaving two thirds of the card empty.
+    // A pinned height under `xMidYMid meet` would centre the map and leave most of the card empty.
     expect(markup).toMatch(/viewBox="0 0 1000 300"/);
     expect(markup).not.toMatch(/style="[^"]*height/);
   });
@@ -203,9 +191,7 @@ describe("Treemap", () => {
 });
 
 describe("RadarChart", () => {
-  // No axis is worth half the maximum. With one — the old fixture had 60
-  // against a 120 maximum — the half-ring label is indistinguishable from that
-  // axis's own count, and the ring test below passed with the rings deleted.
+  // No axis may equal half the maximum, or the half-ring label doubles as that axis's own count.
   const axes = [
     { label: "Action", value: 120 },
     { label: "Fantasy", value: 90 },
@@ -223,8 +209,7 @@ describe("RadarChart", () => {
 
   it("labels the rings, so the polygon is a measurement and not just a shape", () => {
     const out = texts(html(<RadarChart axes={axes} />));
-    // The outer ring is the largest axis by definition, so no fixture makes it
-    // a unique string — count it instead of asking whether it is present.
+    // The outer ring always equals the largest axis, so its string is counted rather than merely found.
     expect(out.filter((v) => v === "120")).toHaveLength(2); // ring + axis
     expect(out).toContain("60"); // the half ring, which is nobody's count
   });
@@ -250,14 +235,7 @@ describe("Sunburst", () => {
     expect(out).toContain("300");
   });
 
-  /**
-   * `accent-ink` is derived to be readable *on the accent colour*. Only the
-   * first two wedges are accent-filled; the rest are surface greys, where the
-   * derivation is answering a different question and lands at 1.0–1.9:1 for
-   * eleven of the eighteen accent/theme combinations. A value that renders
-   * invisibly is still in the markup, so no `texts()` assertion can catch
-   * this — the class is the only evidence.
-   */
+  /** An invisible value is still in the markup, so the ink class is the only evidence. */
   it("writes each ring's count in an ink that its own fill can carry", () => {
     const markup = html(
       <Sunburst
@@ -311,20 +289,12 @@ describe("DayHeatmap", () => {
     />,
   );
 
-  /**
-   * The count is the assertion: a week is seven cells whether or not anything
-   * happened in them, and a grid that silently drew only the busy days would
-   * still look plausible in a screenshot. Seven day cells plus the legend's
-   * five swatches.
-   */
+  /** The count is the assertion: a week is seven cells whether or not anything happened in them. */
   it("draws every day in the range, not only the busy ones", () => {
     expect(markup.match(/rounded-\[\.1875rem\]/g) ?? []).toHaveLength(12);
   });
 
-  /**
-   * The legend is visible, never hover-only: the range with its total, and
-   * exactly one swatch per intensity bucket — five, matching HISTORY_LEVELS.
-   */
+  /** The legend is never hover-only: the range with its total and one swatch per intensity bucket. */
   it("spells out the range and one swatch per bucket", () => {
     expect(markup).toContain("2026-01-05 – 2026-01-11 · 13 actions");
     expect(markup).toContain("Less");
@@ -334,19 +304,12 @@ describe("DayHeatmap", () => {
     }
   });
 
-  /** Alignment regression pin: no column may hold a month label inside the
-   *  day rows — the label is its own h-3 band, so every column (the weekday
-   *  axis included) starts with one. That eighth-child-in-grid-rows-7 layout
-   *  is what drifted the cells off their weekday labels. */
+  /** No column may hold a month label inside the day rows, or the cells drift off their weekday labels. */
   it("gives every column the same h-3 label band", () => {
     expect(markup).not.toContain("grid-rows-7");
   });
 
-  /**
-   * The counts live in `title`, same as the other charts here — and unlike
-   * them, a day grid has no room to write them in. The date is spelled out so
-   * the tooltip is readable on its own.
-   */
+  /** A day cell has no room for its count, so it lives in `title` with the date spelled out. */
   it("names the day and its count on each busy cell", () => {
     expect(markup).toContain("2026-01-05 · 4");
     expect(markup).toContain("2026-01-11 · 9");

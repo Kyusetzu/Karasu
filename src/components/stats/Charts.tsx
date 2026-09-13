@@ -9,14 +9,7 @@ import {
 } from "@/lib/charts";
 import { motionDuration, seriesDelay } from "@/lib/motion";
 
-/**
- * The categorical ramp: the accent leading, then the surface steps.
- *
- * Deliberately not a rainbow. Karasu has one colour of its own and the rest of
- * the interface is grey, so a chart that invents six hues reads as a different
- * application — and the hues would carry meanings (green good, red bad) that
- * "Drama" and "TV Short" do not have.
- */
+/** The categorical ramp, accent first then surface greys; a rainbow would imply meanings the data lacks. */
 export const TONES = [
   "var(--color-accent-500)",
   "var(--color-accent-400)",
@@ -26,19 +19,7 @@ export const TONES = [
   "var(--color-graph-none)",
 ];
 
-/**
- * The ink for text drawn on top of `TONES[i]`.
- *
- * Only the first two tones are the accent, and only they need `accent-ink` —
- * the derived colour that reads on whatever the user picked, which for a pale
- * accent is near-black and for a dark one near-white. On the surface greys the
- * same ink is a coin flip, so those take a fixed light ink instead.
- *
- * Deliberately `i` and not `i % TONES.length`: the treemap fades later tiles
- * with `opacity`, so tiles 6 and 7 wear the accent hue at 0.6 over surface-900
- * and are grey in practice. Judging them by their tone index would put
- * near-black text on a near-black tile.
- */
+/** Ink over `TONES[i]`; keep the bare `i`, later treemap tiles fade to grey where accent ink vanishes. */
 export const onAccent = (i: number) => (i < 2 ? "fill-accent-ink" : "fill-ink-300");
 
 export interface Slice {
@@ -47,17 +28,7 @@ export interface Slice {
   children?: { label: string; value: number }[];
 }
 
-/**
- * A sunburst: one ring of groups, one of their parts.
- *
- * The point is the second ring — a pie says how the list splits, a sunburst
- * says how each of those splits again, which is the question "what am I
- * actually watching" needs two levels to answer.
- *
- * Children inherit their parent's colour and step down in opacity rather than
- * taking a colour of their own, so the eye reads the outer ring as belonging
- * to the inner one instead of as a second, unrelated chart.
- */
+/** A sunburst of groups and their parts; children inherit the parent's hue stepped down in opacity. */
 export function Sunburst({ data, size = 260 }: { data: Slice[]; size?: number }) {
   const c = size / 2;
   const inner = size * 0.17;
@@ -76,15 +47,7 @@ export function Sunburst({ data, size = 260 }: { data: Slice[]; size?: number })
         const width = span.end - span.start;
         return (
           <Fragment key={group.label}>
-            {/* Arcs arrive in ring order. Deliberately a scale from the
-                slice's own centre rather than a sweep: a sweep would cross
-                `ArcValue`'s 26-degree label threshold on the way, popping
-                the number in partway through.
-
-                The wedge and its number arrive as one `<g>`. Animating the arc
-                alone left every figure sitting at full opacity over a ring that
-                was still coming in — half the chart moving and half of it
-                already there, which reads as the animation having stalled. */}
+            {/* Wedge and number arrive as one `<g>`, scaled not swept so the sweep cannot cross `ArcValue`'s threshold. */}
             <g
               className="chart-in"
               style={{ animationDelay: `${seriesDelay(i, data.length)}ms` }}
@@ -97,14 +60,7 @@ export function Sunburst({ data, size = 260 }: { data: Slice[]; size?: number })
               >
                 <title>{`${group.label}: ${group.value}`}</title>
               </path>
-              {/* `accent-ink` is the readable ink *for the accent colour*, and
-                  only the first two tones are accent — the rest are surface
-                  greys. `readableInk` picks whichever of near-black and
-                  near-white contrasts with the accent, which is not the same
-                  question as what reads on a grey. It happens to come out right
-                  for seven of the eighteen accent/theme combinations, the
-                  default among them; for the other eleven it lands at 1.0–1.9:1
-                  and the number is not there at all. */}
+              {/* `accent-ink` fits the accent alone, so only the first two tones take it and the greys get a fixed ink. */}
               <ArcValue
                 c={c}
                 r={(inner + mid) / 2}
@@ -114,10 +70,7 @@ export function Sunburst({ data, size = 260 }: { data: Slice[]; size?: number })
                 tone={i < 2 ? "fill-accent-ink" : "fill-ink-100"}
               />
             </g>
-            {/* The outer ring is the same hue stepped down in opacity, so it is
-                mostly card underneath and takes the light ink throughout. It
-                follows its own parent rather than the whole inner ring, so each
-                group completes before the next begins. */}
+            {/* The outer ring is the parent's hue faded over the card, so it takes the light ink throughout. */}
             {kids.map((kid, j) => {
               // The child's slice is its share of the parent's own wedge.
               const from = span.start + (kidArcs[j].start / 360) * width;
@@ -168,14 +121,7 @@ export function Sunburst({ data, size = 260 }: { data: Slice[]; size?: number })
   );
 }
 
-/**
- * A count written inside its own wedge, where the wedge can hold it.
- *
- * The threshold is in degrees rather than pixels because that is what decides
- * whether the number fits: a thin ring segment is thin at every chart size.
- * Below it the arc keeps its tooltip and the legend still carries the figure,
- * so nothing is only-on-hover — it is just not written twice.
- */
+/** A count inside its own wedge, gated in degrees because a thin segment is thin at every chart size. */
 function ArcValue({
   c,
   r,
@@ -223,14 +169,7 @@ export function ToneLegend({ items }: { items: { label: string; value: number }[
   );
 }
 
-/**
- * A radar — the shape of a taste rather than its ranking.
- *
- * Six bars sorted by count answer "which genre is biggest", which the top
- * genres list already answers. The polygon answers a different question: how
- * lopsided the taste is. A spike is a specialist, a hexagon is an omnivore,
- * and neither reads off a bar chart at a glance.
- */
+/** A radar shows the shape of a taste, not its ranking: a spike is a specialist, a hexagon an omnivore. */
 export function RadarChart({
   axes,
   size = 260,
@@ -260,9 +199,7 @@ export function RadarChart({
           strokeWidth={1}
         />
       ))}
-      {/* What the rings are worth. Without a scale the polygon says only
-          "lopsided"; with one it also says how many, which is the difference
-          between a shape and a measurement. */}
+      {/* What the rings are worth; without a scale the polygon is a shape rather than a measurement. */}
       {[0.5, 1].map((step) => (
         <text
           key={step}
@@ -287,10 +224,7 @@ export function RadarChart({
           />
         );
       })}
-      {/* The rings and axes above are the chart's frame and are simply there.
-          The polygon is the *data*, so it arrives — it used to be painted at
-          full strength on the first frame while only the dots animated, which
-          left the shape looking finished and the animation looking stuck. */}
+      {/* The rings and axes are the frame and are simply there; the polygon is the data, so it arrives. */}
       <g className="chart-in">
         <polygon
           points={pointsAttr(shape)}
@@ -307,8 +241,7 @@ export function RadarChart({
           r={2.5}
           fill="var(--color-accent-400)"
           className="chart-in"
-          // Behind the polygon it belongs to, so the vertices land on a shape
-          // that is already in place rather than racing it.
+          // After the polygon, so the vertices land on a shape already in place rather than racing it.
           style={{
             animationDelay: `${motionDuration(90) + seriesDelay(i, shape.length)}ms`,
           }}
@@ -328,8 +261,7 @@ export function RadarChart({
             >
               {axis.label.length > 12 ? `${axis.label.slice(0, 11)}…` : axis.label}
             </text>
-            {/* The count under its own axis label, so the shape and the
-                numbers are read in one place instead of one on hover. */}
+            {/* The count under its own axis label, so the numbers read beside the shape instead of on hover. */}
             <text
               x={at.x}
               y={at.y + 9}
@@ -345,18 +277,9 @@ export function RadarChart({
   );
 }
 
-// `LineChart` lived here until the Years tab's `AreaChart` superseded it —
-// same text conventions, smoothed geometry from d3-shape. Its
-// non-scaling-stroke lesson moved with it: nothing that dashes a stroke may
-// put that stroke into screen space (see AreaChart's pathLength note).
+// `LineChart` lived here until `AreaChart` superseded it; nothing that dashes a stroke may put it into screen space.
 
-/**
- * A treemap — area for count, so the long tail is visible instead of being a
- * list of rows that all look the same length.
- *
- * Labels are drawn only where the tile can hold them; a clipped word in a
- * 12px box is noise, and the tooltip has the name either way.
- */
+/** A treemap, area for count so the long tail shows; labels only where the tile can hold them. */
 export function Treemap({
   data,
   width = 1000,
@@ -373,16 +296,11 @@ export function Treemap({
     height,
   );
 
-  // No fixed pixel height and no `preserveAspectRatio` override: the viewBox's
-  // own ratio is what the SVG scales to. It used to be laid out 320 wide and
-  // then pinned to 180px tall, so in a full-width card the default
-  // `xMidYMid meet` fitted 320×180 into 1000×180 — a 1:1 scale, drawn in the
-  // middle, with two thirds of the card left empty on either side.
+  // No pixel height and no `preserveAspectRatio` override; a pinned height leaves most of a wide card empty.
   return (
     <svg data-chart viewBox={`0 0 ${width} ${height}`} className="w-full">
       {rects.map((r, i) => {
-        // Roughly 5.4 viewBox units per character at this size — enough to
-        // decide whether a name fits rather than clipping it mid-word.
+        // ViewBox units per character, enough to decide whether a name fits rather than clip it mid-word.
         const fits = Math.floor((r.w - 14) / 5.4);
         const label = items[i].label;
         const named = r.w > 44 && r.h > 30;
@@ -391,9 +309,7 @@ export function Treemap({
           <g
             key={label}
             className="chart-in"
-            // `seriesDelay`, not `staggerDelay`: the tag map draws fourteen
-            // tiles and the six-step cycle restarted twice on the way through,
-            // so the arrival visibly stalled and began again mid-chart.
+            // Keep `seriesDelay`; `staggerDelay`'s cycle restarts mid-chart and the arrival visibly stalls.
             style={{ animationDelay: `${seriesDelay(i, rects.length)}ms` }}
           >
             <rect
@@ -425,9 +341,7 @@ export function Treemap({
                 </text>
               </>
             )}
-            {/* Too narrow for a name but wide enough for a figure: the tile
-                still says how big it is rather than being a blank rectangle
-                you have to hover to identify. */}
+            {/* Too narrow for a name but wide enough for a figure, so the tile still says how big it is. */}
             {numbered && (
               <text
                 x={r.x + r.w / 2}

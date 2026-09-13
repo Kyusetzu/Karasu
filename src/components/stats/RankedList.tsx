@@ -6,13 +6,7 @@ import type { MediaType } from "@/api/types";
 import { Tabs, type TabOption } from "@/components/ui/tabs";
 import { Empty, type RankedCategory, type SortKey } from "./shared";
 
-/**
- * Everything AniList will give, shown at once. `userStatistics` category lists
- * are clamped at 30 rows server-side regardless of the `limit` argument —
- * measured live at limit 31, 50, 500 and 2000, all returning 30 — so 30 here is
- * "all of it", not a choice, and raising it buys nothing. The expand button
- * this list used to carry was a 25→30 step pretending to be one.
- */
+/** AniList clamps `userStatistics` category lists server-side whatever `limit` says, so this is all of it, not a choice. */
 export const TOP_N = 30;
 
 export function RankedList({
@@ -54,8 +48,7 @@ export function RankedList({
   return (
     <div className="space-y-3">
       <Tabs options={sortOptions} value={sort} onChange={setSort} />
-      {/* Self-contained rows, so a wide screen shows two or three at a time
-          instead of one very long bar per line. */}
+      {/* Self-contained rows, so a wide screen shows several per line instead of one very long bar. */}
       <div className="grid grid-cols-[repeat(auto-fit,minmax(22rem,1fr))] gap-1.5">
         {shown.map((e, i) => (
           <RankedRow
@@ -94,8 +87,7 @@ export function RankedRow({
   const image = entryImage(entry, category);
   const label = entryLabel(entry, category);
   const href = entryHref(entry, category);
-  // `Row` is the same markup either way; only the element changes, so a
-  // non-navigable category keeps exactly the layout it had.
+  // Only the wrapping element changes, so a non-navigable category keeps exactly the layout it had.
   const Wrapper = href
     ? ({ children }: { children: React.ReactNode }) => (
         <Link to={href} className="block">
@@ -150,14 +142,7 @@ export function entryImage(e: StatEntry, category: RankedCategory): string | nul
   return undefined; // no avatar column
 }
 
-/**
- * Where a row leads, or null for one that leads nowhere.
- *
- * Voice actors and staff have their own pages now; studios do too. Genres and
- * tags have nothing behind them, which is why this returns null rather than
- * inventing a search link — a row that looks clickable and is not is worse than
- * a row that does not.
- */
+/** Where a row leads, or null for genres and tags, which have no page behind them rather than an invented search link. */
 export function entryHref(e: StatEntry, category: RankedCategory): string | null {
   if (category === "voiceActors" && e.voiceActor?.id) return `/staff/${e.voiceActor.id}`;
   if (category === "staff" && e.staff?.id) return `/staff/${e.staff.id}`;
@@ -203,14 +188,7 @@ export function fmt(n: number, locale: string): string {
   return n.toLocaleString(locale);
 }
 
-/** AniList mean scores are on a 0–100 scale; show them rounded. */
-/**
- * Scores read to one decimal, never rounded to a whole number.
- *
- * `userStatistics` hands these over already divided by ten, so rounding here
- * would throw away the digit that division just made meaningful — a 7.1 and a
- * 7.4 are the difference between two shelves of a list.
- */
+/** Scores read to one decimal, never whole: `userStatistics` already divided by ten, and rounding drops that digit. */
 export function scoreText(score: number): string {
   return score > 0 ? score.toFixed(1) : "–";
 }

@@ -10,14 +10,7 @@ import { relTimeFromSeconds } from "@/lib/relTime";
 import { prefersReducedMotion } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
-/**
- * Comments, two levels deep, in reading order.
- *
- * `lib/comments` did the flattening and counted what sits below the cap; this
- * only draws it. The "N more on AniList" line exists because the alternative —
- * dropping a 48-deep chain silently — makes Karasu look like it lost the
- * conversation rather than declined to render it.
- */
+/** Comments two levels deep, in reading order; `lib/comments` did the flattening and this only draws it. */
 export function CommentTree({
   comments,
   onLike,
@@ -27,24 +20,11 @@ export function CommentTree({
   children,
 }: {
   comments: FlatComment[];
-  /**
-   * The row a `?comment=` landing points at — it wears a persistent accent
-   * ring and is scrolled into view once. Persistent rather than a fade:
-   * reduced motion collapses any CSS fade for exactly the users who cannot
-   * see the smooth scroll either, and the ring is the information.
-   */
+  /** The `?comment=` landing row; the ring is persistent because reduced motion would collapse a fade. */
   highlightId?: number;
   /** Omitted when there is nobody to like as — the button then does not exist. */
   onLike?: (c: FlatComment) => void;
-  /**
-   * Opens a reply box under this comment.
-   *
-   * This docstring used to claim that a reply to a reply "lands where the
-   * second level already is rather than inventing a third that nothing would
-   * draw". That was exactly backwards, and shipped: AniList accepted the
-   * depth-2 comment, `flattenComments` folded it into `hiddenReplies`, and the
-   * post vanished. The caller parents to `c.rootId`, never `c.id`.
-   */
+  /** Opens a reply box; the caller parents to `c.rootId`, never `c.id`, or a depth-two reply vanishes. */
   onReply?: (c: FlatComment) => void;
   /** Which comment currently has the box open, if any. */
   replyingTo?: number | null;
@@ -54,8 +34,7 @@ export function CommentTree({
   const { t, i18n } = useTranslation();
   const highlightRef = useRef<HTMLDivElement | null>(null);
 
-  // Once per target, never per data identity: likes and refetches replace the
-  // array every time, and re-scrolling then would hijack the reader.
+  // Once per target, not per array identity, or every like or refetch would re-scroll under the reader.
   useEffect(() => {
     if (highlightId == null) return;
     highlightRef.current?.scrollIntoView({
@@ -72,8 +51,7 @@ export function CommentTree({
           ref={c.id === highlightId ? highlightRef : undefined}
           className={cn(
             "rounded-xl border border-surface-800 bg-surface-900 p-3",
-            // A reply is indented and quieter, so the two levels read apart
-            // without needing a connector line.
+            // A reply is indented and quieter, so the two levels read apart without a connector line.
             c.depth === 1 && "ml-6 border-surface-850 bg-surface-950",
             c.id === highlightId && "border-accent-500/70 ring-1 ring-accent-500/30",
           )}

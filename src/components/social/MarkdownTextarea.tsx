@@ -43,28 +43,7 @@ import {
   type TextEdit,
 } from "@/lib/composer";
 
-/**
- * The one textarea every AniList markdown composer uses — status updates,
- * replies, threads, comments, reviews, the bio — with the formatting toolbar
- * above it and, where the caller asks, a preview and a footer row.
- *
- * It existed six times before, each hand-rolled and drifting from the others,
- * and none with a way to format short of knowing the syntax. The toolbar's
- * arithmetic lives in `lib/composer` as pure functions; this file only reads
- * the selection and writes the result back.
- *
- * Writing back goes through `execCommand("insertText")` where the engine has
- * it (WebView2 and WebKitGTK both do), as the smallest span that changes —
- * that is what makes an edit one native undo step with the caret where the
- * user expects. jsdom has no `execCommand`, so the tests exercise the plain
- * `onChange` fallback, which is also what runs if the command ever refuses.
- *
- * Keyboard: Ctrl/Cmd+B, +I, +Shift+X (strike), +Shift+S (spoiler), +Enter
- * (send). Never Ctrl+K — the command palette owns it, and the palette must
- * open from inside a composer too. Every button is `aria-label`led and
- * `preventDefault`s its mousedown, so the textarea keeps focus and, more to
- * the point, its selection.
- */
+/** The shared markdown composer textarea; `execCommand` makes an edit one undo step, and Ctrl+K stays the palette's. */
 
 type Edit = (text: string, start: number, end: number) => TextEdit;
 
@@ -78,8 +57,7 @@ export interface MarkdownTextareaProps {
   disabled?: boolean;
   /** Ctrl/Cmd+Enter. Plain Enter is a newline: AniList renders single newlines as breaks. */
   onSubmit?: () => void;
-  /** `compact` is the reply box: the toolbar shows while focused or non-empty,
-   *  no preview, and `actions` sit beside the field rather than under it. */
+  /** `compact` is the reply box: toolbar only while focused or non-empty, no preview, `actions` beside the field. */
   variant?: "full" | "compact";
   /** `toggle` swaps the field for the rendered markdown; `side` shows both. */
   preview?: "none" | "toggle" | "side";
@@ -234,8 +212,7 @@ export function MarkdownTextarea({
       rows={rows}
       autoFocus={autoFocus}
       disabled={disabled}
-      // Kept mounted under the preview rather than replaced: a label's
-      // `htmlFor` keeps resolving, and the draft keeps its undo history.
+      // Hidden, not unmounted, under the preview: `htmlFor` still resolves and the draft keeps its undo history.
       hidden={previewing}
       className={cn(
         "w-full resize-y rounded-lg border border-surface-700 bg-surface-950 text-ink-100 placeholder:text-ink-600 focus:border-accent-500 focus:outline-none",

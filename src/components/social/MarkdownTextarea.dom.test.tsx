@@ -4,13 +4,7 @@ import { MemoryRouter } from "react-router";
 import { useState } from "react";
 import { MarkdownTextarea, type MarkdownTextareaProps } from "./MarkdownTextarea";
 
-/**
- * The shared composer field. `lib/composerEdits.test.ts` proves the
- * arithmetic; this proves the component reads the selection, writes the
- * result back through `onChange` (jsdom has no `execCommand`, which is also
- * the fallback path in a browser that refuses it), keeps the field mounted
- * under a preview, and wires the shortcuts.
- */
+/** The field reads the selection, writes back through `onChange` (jsdom has no `execCommand`) and wires the shortcuts. */
 
 function Harness(props: Partial<MarkdownTextareaProps> & { initial?: string; onValue?: (v: string) => void }) {
   const { initial = "", onValue, ...rest } = props;
@@ -106,8 +100,7 @@ describe("MarkdownTextarea", () => {
 
   it("shows the empty-preview sentence when there is nothing to render", () => {
     render(<Harness initial="   " preview="toggle" previewSource="" />);
-    // The toggle is disabled on a blank draft, so this reaches the sentence
-    // through the side-by-side form instead.
+    // The toggle is disabled on a blank draft, so this reaches the sentence through the side-by-side form instead.
     render(<Harness initial="" preview="side" previewEmpty="nothing here" />);
     expect(screen.getByText("nothing here")).toBeTruthy();
   });

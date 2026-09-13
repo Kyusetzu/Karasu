@@ -3,15 +3,7 @@ import { Card, CardTitle } from "@/components/ui/card";
 import type { HeatmapYear } from "@/lib/localStats";
 import { seriesDelay } from "@/lib/motion";
 
-/**
- * A year × month activity grid — when the list was actually being worked on.
- *
- * Intensity is the accent at five quantized opacities over `--accent-rgb`, so
- * the whole grid follows the theme; an empty cell keeps the surface tone,
- * which reads as "quiet month" rather than "missing data". Every non-empty
- * cell carries its count in a `title`, and the busiest month is the scale's
- * honest top rather than a fixed guess.
- */
+/** Quantized opacities over `--accent-rgb`, so the whole grid follows the theme; an empty cell keeps the surface tone. */
 const ALPHAS = [0.14, 0.32, 0.5, 0.7, 0.92];
 
 export function Heatmap({
@@ -55,10 +47,7 @@ export function Heatmap({
             {row.months.map((count, mi) => (
               <span
                 key={mi}
-                // On the cell, not on a wrapper: `forced-color-adjust` inherits,
-                // and a wrapper would freeze the year and month labels beside
-                // these at the dark theme's ink. The cell carries nothing but
-                // its opacity, so it is the one thing that must keep ours.
+                // On the cell, not a wrapper: `forced-color-adjust` inherits and would freeze the labels beside it.
                 data-keep-colors
                 title={count > 0 ? `${monthLabels[mi]} ${row.year} · ${count}` : undefined}
                 className="aspect-square rounded-[.1875rem] bg-surface-800"

@@ -26,21 +26,7 @@ import { Heatmap } from "@/components/stats/Heatmap";
 import { Empty } from "@/components/stats/shared";
 import { fmt } from "@/components/stats/RankedList";
 
-/**
- * Statistics for the account-free profile.
- *
- * The signed-in screen is built on AniList's `userStatistics`, so without an
- * account it showed a sign-in wall — to someone who had already answered that
- * question. But most of what that endpoint returns is *counting*, and the
- * entries are sitting in SQLite: `lib/localStats` computes the delta against
- * community scores, the activity heatmap, the seasonal habits and the totals
- * here at zero request cost, because there is no request to make.
- *
- * What is genuinely missing is stated rather than hidden. Minutes watched needs
- * a duration no list entry carries, and the genre, tag, studio, voice-actor and
- * staff rankings are AniList aggregating across every media a user has ever
- * touched — neither is a thing this screen could quietly approximate.
- */
+/** Statistics for the account-free profile, counted by `lib/localStats` from SQLite with no request to make. */
 export default function LocalStatistics({
   type,
   onType,
@@ -53,10 +39,7 @@ export default function LocalStatistics({
   const scoreFormat = useScoreFormat();
   const scoreMax = scoreScale(scoreFormat).max;
 
-  // `userId: 0` because local mode ignores it — `fetchMediaList` dispatches on
-  // the profile mode and the Rust side reads the local table. The key still
-  // carries it so this shares the cache with the list screens, which use the
-  // same `viewer?.id ?? 0`.
+  // `userId: 0` is what the list screens key local mode on, so this shares their cache.
   const { data, isLoading, error } = useQuery({
     queryKey: ["mediaList", type, 0],
     queryFn: () => fetchMediaList(0, type),
@@ -170,9 +153,7 @@ export default function LocalStatistics({
               <Card className="flex h-full flex-col">
                 <CardTitle>{t("stats.breakdown")}</CardTitle>
                 <p className="mt-1 text-2xs text-ink-600">{t("stats.breakdownHint")}</p>
-                {/* Chart beside its key, the same arrangement the signed-in
-                    panel uses: the ring is square, so a full-width one would
-                    make the card as tall as the page is wide. */}
+                {/* Chart beside its key: the ring is square, so a full-width one makes the card as tall as the page is wide. */}
                 <div className="mt-3 flex flex-1 items-center gap-6">
                   <div className="w-40 shrink-0 sm:w-48">
                     <Sunburst data={breakdown} />
@@ -246,9 +227,7 @@ export default function LocalStatistics({
             )}
           </div>
 
-          {/* Said out loud rather than left as an absence. Someone comparing
-              this against the website should know which figures need an
-              account and why, not wonder whether Karasu forgot them. */}
+          {/* Said out loud rather than left as an absence: which figures need an account, and why. */}
           <p className="text-xs leading-relaxed text-ink-600">
             {t("stats.localMissing")}
           </p>

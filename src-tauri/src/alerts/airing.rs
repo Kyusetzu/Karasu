@@ -6,7 +6,12 @@ use serde_json::{json, Value};
 use std::time::Duration;
 use tauri::{AppHandle, Manager};
 
-const CHECK_INTERVAL: Duration = Duration::from_secs(20 * 60);
+/// The longest the watcher ever sleeps, so a list the app never refetched is still checked now and then.
+const SAFETY_NET: Duration = Duration::from_secs(6 * 3600);
+/// The shortest, so a burst of episodes at the same minute is one wake rather than several.
+const MIN_WAKE: Duration = Duration::from_secs(60);
+/// Waited past an episode's airing time before asking, since AniList publishes the schedule row a moment later.
+const WAKE_BUFFER: i64 = 90;
 /// Let the list cache populate before the first check.
 const STARTUP_DELAY: Duration = Duration::from_secs(30);
 /// Must equal the `perPage` in `AIRING_QUERY`; a full page is the only signal that the answer was truncated.
@@ -32,15 +37,73 @@ pub fn replan() {
     REPLAN.notify_one();
 }
 
+/// Sleeps until the earliest `(status, airingAt)` still ahead of the checkpoint, or the safety net when none is.
+fn plan_next_wake(entries: &[(&str, Option<i64>)], last_check: i64, now: i64) -> Duration {
+    let next = entries
+        .iter()
+        .filter(|(status, _)| *status == "CURRENT" || *status == "REPEATING")
+        // Past the checkpoint already means the list has not been refetched since; the safety net covers that.
+        .filter_map(|(_, at)| at.filter(|t| *t > last_check))
+        .min();
+    match next {
+        Some(at) => Duration::from_secs((at + WAKE_BUFFER - now).max(0) as u64)
+            .clamp(MIN_WAKE, SAFETY_NET),
+        None => SAFETY_NET,
+    }
+}
+
+/// The watched entries' next airing times, as `plan_next_wake` takes them.
+fn schedule_from_cache(db: &Db, viewer: Option<&Value>) -> Vec<(String, Option<i64>)> {
+    let Some(user_id) = viewer.and_then(|v| v.get("id").and_then(|i| i.as_i64())) else {
+        return Vec::new();
+    };
+    let Some(lists) = db
+        .cached_list(user_id, "ANIME")
+        .and_then(|s| serde_json::from_str::<Value>(&s).ok())
+    else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    for group in lists.as_array().into_iter().flatten() {
+        for entry in group.get("entries").and_then(|v| v.as_array()).into_iter().flatten() {
+            let status = entry.get("status").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let at = entry.pointer("/media/nextAiringEpisode/airingAt").and_then(|v| v.as_i64());
+            out.push((status, at));
+        }
+    }
+    out
+}
+
 pub fn spawn(app: AppHandle) {
     // Supervised so a panic cannot silently end the airing checks; the repeated startup delay is the first backoff.
     crate::logging::supervise("airing", move || {
         let app = app.clone();
         async move {
             tokio::time::sleep(STARTUP_DELAY).await;
+            // A replan only re-times the sleep; only a slept-through wake is a reason to ask AniList again.
+            let mut due = true;
             loop {
-                check(&app).await;
-                tokio::time::sleep(CHECK_INTERVAL).await;
+                if due {
+                    check(&app).await;
+                }
+                let wake = {
+                    let db = app.state::<Db>();
+                    let viewer = cached_viewer(&db);
+                    let last = db
+                        .kv_get("airing_last_check")
+                        .and_then(|s| s.parse::<i64>().ok())
+                        .unwrap_or(0);
+                    let schedule = schedule_from_cache(&db, viewer.as_ref());
+                    let borrowed: Vec<(&str, Option<i64>)> =
+                        schedule.iter().map(|(s, at)| (s.as_str(), *at)).collect();
+                    plan_next_wake(&borrowed, last, now_secs())
+                };
+                crate::logging::debug("airing", format!("next check in {} min", wake.as_secs() / 60));
+                // A list refresh can bring an episode closer than this sleep, so it re-times rather than waits it out.
+                due = tokio::select! {
+                    _ = tokio::time::sleep(wake) => true,
+                    _ = REPLAN.notified() => false,
+                };
             }
         }
     });
@@ -220,6 +283,35 @@ async fn check(app: &AppHandle) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Nothing to wait for sleeps the net, so an idle night costs no request at all.
+    #[test]
+    fn nothing_airing_sleeps_the_safety_net() {
+        assert_eq!(plan_next_wake(&[], 1000, 1000), SAFETY_NET);
+        assert_eq!(plan_next_wake(&[("CURRENT", None)], 1000, 1000), SAFETY_NET);
+        // A finished show's schedule is not ours to wake for.
+        assert_eq!(plan_next_wake(&[("COMPLETED", Some(1100))], 1000, 1000), SAFETY_NET);
+    }
+
+    /// The earliest episode still ahead of the checkpoint decides, with the buffer AniList needs to publish the row.
+    #[test]
+    fn the_earliest_episode_plus_the_buffer_wins() {
+        let entries = [("CURRENT", Some(5000)), ("REPEATING", Some(3000)), ("CURRENT", Some(9000))];
+        assert_eq!(plan_next_wake(&entries, 1000, 1000).as_secs(), 3000 + 90 - 1000);
+    }
+
+    /// An episode the last check already covered must not re-wake the watcher; the net covers a list gone stale.
+    #[test]
+    fn an_episode_already_checked_does_not_rewake() {
+        assert_eq!(plan_next_wake(&[("CURRENT", Some(900))], 1000, 1000), SAFETY_NET);
+    }
+
+    /// Both ends are clamped: a burst at one minute is one wake, and a far episode still gets a net check.
+    #[test]
+    fn the_wake_is_clamped_at_both_ends() {
+        assert_eq!(plan_next_wake(&[("CURRENT", Some(1001))], 1000, 5000), MIN_WAKE);
+        assert_eq!(plan_next_wake(&[("CURRENT", Some(9_000_000))], 1000, 1000), SAFETY_NET);
+    }
 
     /// Lowering `perPage` without `PAGE_SIZE` would silently make the checkpoint never full and always `now`.
     #[test]

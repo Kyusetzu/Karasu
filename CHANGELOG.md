@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 4c753ba -->
+<!-- generated-through: 81af314 -->
 
 ### Fixed
 
@@ -77,6 +77,7 @@ tag time is then optional rather than load-bearing.
 - New-episode and sequel checks keep working through an AniList outage that refuses anonymous requests, by signing them with your account while you are signed in.
 - A link with a target Karasu refuses (javascript:, data:, AniList's layout blob) now shows in the accent colour like on anilist.co, instead of as plain text.
 - A pinch on Android no longer zooms the whole screen; the interface size under Appearance is the one zoom.
+- The sidebar collapses to icons on a short window instead of pushing its lower entries out of view.
 
 ### Added
 
@@ -86,6 +87,7 @@ tag time is then optional rather than load-bearing.
 - Jellyfin settings take an optional external address for when the server is not reachable at the first one — Karasu switches over by itself, checks it is the same server before sending anything, and Test connection says which address answered.
 - An "Interface size" setting under Appearance zooms the whole window (75–200 %), for 4K displays and TVs across the room.
 - Ctrl+plus, Ctrl+minus and Ctrl+0 change the interface size, like in a browser, and the size sticks.
+- The calendar has three views (week grid, tiles, agenda) and never scrolls sideways; "My shows" keeps the episodes that already aired, dimmed; a Density setting under Appearance sizes the calendar, the local library and the digests.
 
 ### Changed
 

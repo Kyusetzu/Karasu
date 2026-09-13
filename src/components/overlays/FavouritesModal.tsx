@@ -22,19 +22,7 @@ import { showToast } from "@/stores/toast";
 import { cn } from "@/lib/utils";
 import { useContentFilter } from "@/stores/contentFilter";
 
-/**
- * Reorder and remove favourites, one kind at a time.
- *
- * `UpdateFavouriteOrder` replaces a kind's entire set, so this modal follows
- * the notification grid's discipline: a **fresh, complete** read on every
- * open (`staleTime: 0`, `gcTime: 0`), and a save that always sends every id.
- * A set too large for the bounded read (`truncated`) refuses the save rather
- * than quietly writing back a prefix — a reorder must never double as a mass
- * unfavourite.
- *
- * Arrows, not drag-and-drop: keyboard-reachable, no dependency, and a
- * favourites list is short enough that two clicks beat a grab.
- */
+/** Reorders and removes favourites per kind; a truncated read refuses the save so a reorder never mass-unfavourites. */
 
 const KINDS: FavouriteKind[] = ["anime", "manga", "character", "staff", "studio"];
 
@@ -44,11 +32,7 @@ interface Row {
   image: string | null;
   /** Cover-shaped art (media) versus a round disc (people). */
   cover: boolean;
-  /**
-   * Veil the thumbnail. Never used to *drop* a row: saving replaces the whole
-   * favourites set, so a row hidden from this list would be deleted from the
-   * account by the next reorder. Only the picture is hidden, never the entry.
-   */
+  /** Veils only the thumbnail; saving replaces the whole set, so a row dropped here would be unfavourited. */
   adult: boolean;
 }
 
@@ -96,16 +80,14 @@ export function FavouritesModal({
   const qc = useQueryClient();
   const [kind, setKind] = useState<FavouriteKind>("anime");
   const [drafts, setDrafts] = useState<Record<FavouriteKind, Row[]> | null>(null);
-  // What the server currently holds, per kind — the dirty comparison's other
-  // half. Updated on a successful save so the button disarms again.
+  // What the server holds per kind, the dirty comparison's other half; updated on save so the button disarms.
   const [baseline, setBaseline] = useState<Record<FavouriteKind, number[]> | null>(null);
 
   const q = useQuery({
     queryKey: ["social", "favouritesAll", userId],
     queryFn: () => allFavourites(userId),
     enabled: isTauri,
-    // Fresh on every open, cached never: a reorder built on a stale set is a
-    // silent unfavourite of whatever changed since.
+    // Fresh on every open and never cached: a reorder built on a stale set silently unfavourites what changed since.
     staleTime: 0,
     gcTime: 0,
     refetchOnWindowFocus: false,
@@ -129,10 +111,7 @@ export function FavouritesModal({
     );
   }, [q.data]);
 
-  // `Row` has already discarded genres, so this is `shouldBlur` spelled out
-  // rather than called: with `isAdult` the only input it looks at, the level
-  // cannot change the answer. Filtering rows out is what must not happen here
-  // — see `Row.adult`.
+  // `shouldBlur` spelled out, since `Row` kept only `isAdult`; rows are veiled, never filtered out (see `Row.adult`).
   const blurAdult = useContentFilter((s) => s.blurAdult);
   const rows = useMemo(() => drafts?.[kind] ?? [], [drafts, kind]);
   const dirty =

@@ -13,19 +13,7 @@ import { useBackClose } from "@/hooks/useBackClose";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
-/**
- * Picks the title a pile of files actually belongs to.
- *
- * Searching all of AniList rather than the local list is deliberate: the files
- * that most need correcting are the ones the matcher could not place, and the
- * matcher only ever searches the list — so anything it missed because the show
- * is not on the list yet would be unreachable from a list-only picker, which is
- * exactly the case this dialog exists for.
- *
- * The parsed title seeds the box. It is what the scanner read off disk and
- * therefore the best first guess available, and it is usually close enough that
- * the right result is already on screen when the dialog opens.
- */
+/** Picks the title a pile of files belongs to, searching all of AniList because the matcher only ever sees the list. */
 export default function MatchPicker({
   leaving = false,
   parsedTitle,
@@ -49,24 +37,11 @@ export default function MatchPicker({
   error?: string;
   /** What to search. The library scanner is anime-only; detection is not. */
   mediaType?: "ANIME" | "MANGA";
-  /** Offer this entry's sequels above the search results.
-   *
-   *  For a season the matcher could not place, the answer is nearly always
-   *  the next entry in the franchise — and a renamed sequel ("Metal Masters"
-   *  for season 2 of "Metal Fusion") is exactly the case searching the
-   *  detected title cannot find. Suggested, never applied: which season maps
-   *  to which entry is a question only the viewer can answer, and the wrong
-   *  guess writes to their list. */
+  /** Offer this entry's sequels above the results; suggested, never applied, since only the viewer knows the season. */
   suggestSequelsOf?: number | null;
-  /** The episode the source reported. Supplying it adds the "and this is
-   *  really episode N" field, for the layout where a server splits one
-   *  continuously-numbered entry into cours: its S2E1 is episode 13, and
-   *  without this the entry can be corrected but never the number. */
+  /** The episode the source reported; supplying it adds the "really episode N" field for cour-split servers. */
   detectedEpisode?: number | null;
-  /** The chosen entry's id, its display title — the second because a caller
-      storing the pick has it right here and would otherwise need a request to
-      name what it points at — and, when `detectedEpisode` was given, what
-      that episode really is. */
+  /** The chosen id, its display title (so storing the pick needs no request) and, if asked, the real episode. */
   onPick: (mediaId: number, title: string, realEpisode?: number) => void;
   /** Present only when there is a correction to undo. */
   onClear?: () => void;
@@ -75,15 +50,13 @@ export default function MatchPicker({
   const { t } = useTranslation();
   const panel = useRef<HTMLDivElement>(null);
   const titleId = useId();
-  // This one focuses its own search field, which `useDialogFocus` leaves alone
-  // — it only places focus when nothing inside has claimed it.
+  // The search field claims its own focus, which `useDialogFocus` leaves alone.
   useDialogFocus(panel, !leaving);
   useBackClose(!leaving, onCancel);
   const level = useContentFilter((s) => s.level);
   const [term, setTerm] = useState(parsedTitle);
   const [debounced, setDebounced] = useState(parsedTitle);
-  // Seeded with what was detected, so leaving it alone means "the numbering
-  // already agrees" — the common case, and the one that must cost nothing.
+  // Seeded with what was detected, so leaving it alone means the numbering already agrees.
   const [episode, setEpisode] = useState(
     detectedEpisode != null ? String(detectedEpisode) : "",
   );
@@ -102,8 +75,7 @@ export default function MatchPicker({
 
   useEffect(() => box.current?.focus(), []);
 
-  // AniList's limit is ~30 requests a minute and this box is typed into, so a
-  // request per keystroke would exhaust it inside one title.
+  // Debounced: a request per keystroke would exhaust the AniList rate limit inside one title.
   useEffect(() => {
     const id = setTimeout(() => setDebounced(term.trim()), 350);
     return () => clearTimeout(id);
@@ -121,8 +93,7 @@ export default function MatchPicker({
     [data, level],
   );
 
-  // One request, on the season the user is being asked about — the same
-  // on-demand shape `SeasonSplitModal` uses for the identical question.
+  // One request, on the season the user is being asked about, the same on-demand shape as `SeasonSplitModal`.
   const { data: sequels } = useQuery({
     queryKey: ["sequels", suggestSequelsOf],
     queryFn: () => sequelsOf(suggestSequelsOf!),
@@ -170,8 +141,7 @@ export default function MatchPicker({
           <h2 id={titleId} className="text-sm font-semibold text-ink-100">
             {t("library.pickTitle")}
           </h2>
-          {/* The parsed title is the evidence for why this row looks wrong, so
-              it belongs on screen rather than only in the search box. */}
+          {/* The parsed title is the evidence for why this row looks wrong, so it stays on screen. */}
           <p className="mt-1 truncate text-2xs text-ink-600">
             {t("library.parsedAs", {
               title: parsedTitle,
@@ -199,9 +169,7 @@ export default function MatchPicker({
               />
             )}
           </div>
-          {/* Only where an episode number is on the table. The library's own
-              corrections settle a whole title and have no single episode to
-              speak of. */}
+          {/* Only where an episode number is on the table; a library correction settles a whole title. */}
           {detectedEpisode != null && (
             <div className="mt-2 flex items-center gap-2">
               <label className="text-2xs text-ink-500" htmlFor="pick-episode">
@@ -241,10 +209,7 @@ export default function MatchPicker({
             </div>
           )}
           {results.length === 0 ? (
-            // A search that never reached AniList is not a search that found
-            // nothing. Telling someone to "try a shorter or more exact title"
-            // after a rate-limit rejection asks them to retype, which spends
-            // the request budget that caused it.
+            // A search that never reached AniList is not one that found nothing; asking for a retype spends the budget.
             <p className="px-3 py-6 text-center text-xs text-ink-600">
               {isError
                 ? t("library.searchFailed")
@@ -292,8 +257,7 @@ export default function MatchPicker({
   );
 }
 
-/** What a row needs, which is less than a `Media` — so a sequel candidate,
-    which carries `startDate` rather than `seasonYear`, can use it too. */
+/** What a row needs, less than a `Media`, so a sequel candidate carrying `startDate` can use it too. */
 export interface PickableMedia {
   id: number;
   title: MediaTitle;
@@ -338,9 +302,7 @@ function ResultRow({
         </span>
         <span className="mt-0.5 block text-2xs text-ink-600">
           {[
-            // `formatLabel`, not the raw enum. Its whole purpose is that no
-            // AniList enum reaches the screen, and this row printed `TV_SHORT`
-            // and `ONE_SHOT` verbatim — untranslated on top of unformatted.
+            // `formatLabel`, not the raw enum: no AniList enum reaches the screen.
             formatLabel(media.format, t),
             media.seasonYear,
             media.episodes ? t("library.epCount", { n: media.episodes }) : null,

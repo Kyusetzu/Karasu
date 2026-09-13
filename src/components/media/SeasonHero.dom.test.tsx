@@ -58,8 +58,7 @@ describe("SeasonHero", () => {
     await waitFor(() => expect(container.querySelector("section")).toBeNull());
   });
 
-  /** The same filter every other dashboard section runs through — the query
-   *  argument covers the server side, this covers the genre rule. */
+  /** Proves the genre rule, which the query argument cannot cover, runs on the hero too. */
   it("drops a title the content filter blocks", async () => {
     useContentFilter.setState({ level: "moderate", ready: true, error: null });
     hero.mockResolvedValue([media(1, "Blocked", { isAdult: true }), media(2, "Fine")]);
@@ -85,24 +84,19 @@ describe("SeasonHero", () => {
     expect(screen.queryAllByRole("button")).toHaveLength(0);
   });
 
-  /** Five parallel banner downloads at first paint were the hero's whole
-   *  wait, so a slide mounts only as the active one or its successor —
-   *  and stays mounted once seen, because unmounting drops the decode. */
+  /** A slide mounts only as the active one or its successor, and stays once seen, since unmounting drops the decode. */
   it("mounts a slide only once it is needed, and the arrows step and wrap", async () => {
     hero.mockResolvedValue([media(1, "A"), media(2, "B"), media(3, "C")]);
     const { container } = renderWithProviders(<SeasonHero />);
     await waitFor(() =>
       expect(screen.getByRole("heading", { level: 2 }).textContent).toBe("A"),
     );
-    // Probed by the banner img, not by role: an inactive slide is
-    // aria-hidden, which also empties its accessible name — a name query
-    // could never tell "not mounted" from "mounted and hidden".
+    // Probed by the img, not by role: an inactive slide is aria-hidden, so by name it looks unmounted.
     expect(container.querySelector('img[src*="banner/3"]')).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "dashboard.heroNext" }));
     expect(screen.getByRole("heading", { level: 2 }).textContent).toBe("B");
-    // B's successor is C, so its banner exists now — preloaded for the
-    // crossfade, still hidden until it becomes the active slide.
+    // B's successor is C, so its banner exists now, preloaded for the crossfade and still hidden.
     expect(container.querySelector('img[src*="banner/3"]')).toBeTruthy();
 
     // Backwards from the second, twice: past the first, wrapping to the last.
@@ -113,15 +107,11 @@ describe("SeasonHero", () => {
   });
 
   it("advances on its own", async () => {
-    // Installed *before* the render: the slide timer is scheduled in a mount
-    // effect, so faking the clock afterwards leaves it on the real one and the
-    // test waits seven seconds to fail. `shouldAdvanceTime` lets the query's
-    // promise still settle.
+    // Faked before the render, or the mount effect's timer stays real; `shouldAdvanceTime` lets the query settle.
     vi.useFakeTimers({ shouldAdvanceTime: true });
     hero.mockResolvedValue([media(1, "First"), media(2, "Second")]);
     renderWithProviders(<SeasonHero />);
-    // The heading is the *current* slide; both stay mounted, so it is the
-    // heading that has to change rather than the link set.
+    // The heading is the current slide; both stay mounted, so the heading has to change rather than the link set.
     await waitFor(() =>
       expect(screen.getByRole("heading", { level: 2 }).textContent).toBe("First"),
     );
@@ -131,8 +121,5 @@ describe("SeasonHero", () => {
     expect(screen.getByRole("heading", { level: 2 }).textContent).toBe("Second");
   });
 
-  // No reduced-motion hold any more, deliberately: advancing is content,
-  // not motion — the crossfade is the motion, and the global CSS overrides
-  // collapse it to a cut. The "advances on its own" test above is the whole
-  // behavior now; the component no longer consults `prefersReducedMotion`.
+  // No reduced-motion hold, deliberately: advancing is content, not motion, and the crossfade is what the CSS cuts.
 });

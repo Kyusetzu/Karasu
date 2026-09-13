@@ -7,30 +7,7 @@ import { useCachedMedia } from "@/hooks/useCachedMedia";
 import { useListMutations } from "@/hooks/useListMutations";
 
 
-/**
- * What the detail page shows when it cannot reach AniList.
- *
- * It replaced a line of raw text: `Error: Network error: error sending request
- * for url (https://graphql.anilist.co/)`, painted over the whole screen. That
- * is the transport's own sentence, in English, in a German UI, and it said
- * nothing about the one thing worth knowing — that the list you already have
- * is still there.
- *
- * Two states, and the difference is whether the title is on your list. If it
- * is, the list cache already holds the reduced `media` object LIST_QUERY
- * carries, which is enough for the cover, the title and your own progress —
- * and enough for **+1** to work, since a save offline queues and drains later.
- * That was the specific thing a device pass could not do: the page died before
- * the button existed.
- *
- * If it is not on your list there is nothing cached to show, so this says so
- * plainly and offers the retry.
- *
- * Deliberately not a reduced copy of the real page. Everything below the fold
- * there — banner, studios, relations, characters, reviews — comes from
- * `DETAIL_QUERY` and is not cached anywhere; faking a page shape around three
- * fields would promise content that does not exist offline.
- */
+/** The detail page offline: the cached list entry with a working +1, or a plain retry; never a faked page shape. */
 export function OfflineDetail({
   mediaId,
   onRetry,
@@ -67,11 +44,7 @@ export function OfflineDetail({
   );
 }
 
-/**
- * Split out because `useListMutations` needs the user id and media type, and
- * both are only known once the cache has answered — a hook cannot be called
- * conditionally in the component above.
- */
+/** Split out because `useListMutations` needs the cache's answer, and a hook cannot be called conditionally. */
 function OfflineEntry({
   mediaId,
   cached,

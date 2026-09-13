@@ -9,17 +9,7 @@ vi.mock("react-i18next", () => ({
   }),
 }));
 
-/**
- * The shape that used to ship: a caption and the editor inside one `<label>`.
- *
- * `TagEditor` renders each chip's remove `<button>` before its `<input>`, and
- * `<button>` is a labelable element — so the label's labelled control was the
- * *first chip's ×*. Every click inside the label that was not on interactive
- * content forwarded there: the caption, the box's padding, and the text of any
- * other chip. Clicking "beta" deleted "alpha", with no undo, persisted on Save.
- *
- * jsdom implements label activation forwarding, so this reproduces it.
- */
+/** The editor inside one `<label>`, whose labelled control becomes the first chip's remove button. */
 function Wrapped({ onChange }: { onChange: (t: string[]) => void }) {
   return (
     <label>

@@ -15,8 +15,7 @@ import { MarkdownTextarea } from "@/components/social/MarkdownTextarea";
 import { showToast } from "@/stores/toast";
 import { cn } from "@/lib/utils";
 
-/** Literal `t()` call per case — the guard's regex only sees those, so a
-    switch returning bare key strings would sit outside the suite's reach. */
+/** One literal `t()` call per case, because `i18nKeys.test.ts` only sees literal calls. */
 function reasonText(
   reason: ReviewRejection,
   t: (k: string, o?: Record<string, unknown>) => string,
@@ -34,15 +33,7 @@ function reasonText(
   }
 }
 
-/**
- * Writing (or editing) a review — `NewThreadModal`'s shape, with the bounds
- * AniList itself enforces surfaced while typing: the 2,200-character body
- * floor especially, which would otherwise only ever appear as a failed
- * request. Not optimistic, like every composer: it is the user's own words.
- *
- * Editing repopulates from the row the reviews query already fetched;
- * `SaveReview` with an `id` is the upsert (introspection in `api/social`).
- */
+/** Writes or edits a review, surfacing AniList's own bounds while typing; `SaveReview` with an `id` is the upsert. */
 export function ReviewComposerModal({
   mediaId,
   existing,
@@ -68,10 +59,7 @@ export function ReviewComposerModal({
   const [priv, setPriv] = useState(existing?.private ?? false);
 
   const check = validateReview(summary, body, score);
-  // The floor is the surprising bound, so the counter is always visible —
-  // unlike the activity composer's, which only appears near the ceiling.
-  // Counted on `check.body` — the newline-collapsed form actually sent —
-  // so the number can never disagree with the gate it explains.
+  // Counted on `check.body`, the newline-collapsed form actually sent, so the number never disagrees with the gate.
   const bodyLen = check.body.length;
 
   const save = useMutation({
@@ -85,10 +73,7 @@ export function ReviewComposerModal({
         private: priv,
       }),
     onSuccess: () => {
-      // Trim to the first page before invalidating: the fold's infinite query
-      // is active right behind this modal, and invalidating an active infinite
-      // query refetches *every* retained page — the trap `Thread`'s comment
-      // box documents. One page retained means one request spent.
+      // Trim to the first page before invalidating: an active infinite query refetches every retained page.
       qc.setQueryData<{ pages: unknown[]; pageParams: unknown[] }>(
         ["social", "reviews", mediaId],
         (old) =>
@@ -134,9 +119,7 @@ export function ReviewComposerModal({
         </div>
 
         <div>
-          {/* The textarea stays mounted under the preview (`hidden`), so the
-              label's `htmlFor` always resolves — the earlier `htmlFor` swap
-              existed because the field used to be replaced. */}
+          {/* The textarea stays mounted under the preview, so the label's `htmlFor` always resolves. */}
           <label className="block text-xs font-medium text-ink-300" htmlFor="review-body">
             {t("review.bodyLabel")}
           </label>

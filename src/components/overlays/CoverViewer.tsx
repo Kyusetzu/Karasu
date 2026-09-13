@@ -6,17 +6,7 @@ import { useDialogFocus } from "@/hooks/useDialogFocus";
 import { useBackClose } from "@/hooks/useBackClose";
 import { usePanZoom } from "@/hooks/usePanZoom";
 
-/**
- * The cover, full screen. Built on the modal *primitives* rather than
- * `<Modal>` — a titled panel is the wrong chrome for a picture. Closes on
- * Escape, the system back gesture, the ✕, or a tap anywhere that is not the
- * image; pinch (or the wheel, or a double tap) zooms about the gesture
- * point, one finger pans.
- *
- * The image src is whatever the caller already has — on the detail page that
- * is `extraLarge`, the same URL the hero cover just rendered, so the browser
- * cache makes opening instant and no new request is spent.
- */
+/** The cover full screen on the modal primitives, not `<Modal>`; the src is one the caller already rendered. */
 export default function CoverViewer({
   src,
   alt,
@@ -51,17 +41,14 @@ export default function CoverViewer({
       aria-modal="true"
       aria-label={alt}
       className={cn(
-        // `touch-none`, or Chromium reclaims the drag with a pointercancel
-        // mid-gesture — the franchise canvas learned this first.
+        // Keep `touch-none`; without it Chromium reclaims the drag with a pointercancel mid-gesture.
         "fixed inset-0 z-50 select-none overflow-hidden bg-[rgba(4,5,8,.92)] touch-none",
         leaving ? "animate-fade-out" : "animate-fade-in",
       )}
       {...pz.handlers}
       onClick={(e) => {
         if (leaving || pz.dragged()) return;
-        // Anywhere that is not the picture or a control closes — with the
-        // image centred in a transformed wrapper, a plain target check would
-        // never match the scrim itself.
+        // Anywhere but the picture or a control closes; a plain target check never matches the scrim through the wrapper.
         if ((e.target as HTMLElement).closest("img, button")) return;
         onClose();
       }}

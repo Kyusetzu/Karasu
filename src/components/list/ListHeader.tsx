@@ -2,19 +2,7 @@ import { useTranslation } from "react-i18next";
 import type { MediaType } from "@/api/types";
 import { shows, templateColumns, type Tier } from "./columns";
 
-/**
- * The column labels, above the virtualized rows.
- *
- * Outside `VirtualGrid` on purpose — it is one element, not a row, and putting it
- * inside would make it the first virtual item and scroll away. It shares
- * `templateColumns` with the rows, which is the only reason the labels stay over
- * their columns: two hand-maintained width lists would drift the first time one
- * of them changed.
- *
- * Sorting stays with the existing SORT control rather than becoming clickable
- * headers. The list has one sort at a time and a dropdown already says which —
- * a second way to express it would be a second source of truth.
- */
+/** Column labels outside `VirtualGrid`, so they never scroll away, sharing `templateColumns` so widths cannot drift. */
 export function ListHeader({
   tier,
   selectMode,

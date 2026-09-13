@@ -6,14 +6,7 @@ import { useDialogFocus } from "@/hooks/useDialogFocus";
 import { useBackClose } from "@/hooks/useBackClose";
 import { cn } from "@/lib/utils";
 
-/**
- * The dialog that guards a destructive action.
- *
- * It names what will be destroyed. "Are you sure?" asks the user to remember
- * what they selected thirty seconds ago on a screen the dialog is covering;
- * listing the first titles and the count answers it for them, which is the
- * only thing that makes the extra click worth asking for.
- */
+/** Guards a destructive action by naming what will be destroyed, which is what makes the extra click worth asking for. */
 export default function ConfirmDialog({
   title,
   names = [],
@@ -39,8 +32,7 @@ export default function ConfirmDialog({
   const { t } = useTranslation();
   const panel = useRef<HTMLDivElement>(null);
   const titleId = useId();
-  // Not routed through `Modal` — this one has its own layout — so it takes the
-  // same hook directly rather than going without.
+  // Not routed through `Modal` (its own layout), so it takes the same hooks directly rather than going without.
   useDialogFocus(panel, !leaving);
   useBackClose(!leaving, onCancel);
 
@@ -64,9 +56,7 @@ export default function ConfirmDialog({
     >
       <div
         ref={panel}
-        // `alertdialog` rather than `dialog`: this one guards a destructive
-        // action, and the role is what tells a screen reader to interrupt
-        // rather than wait its turn.
+        // `alertdialog` rather than `dialog`: the role tells a screen reader to interrupt rather than wait its turn.
         role="alertdialog"
         aria-modal="true"
         aria-labelledby={titleId}

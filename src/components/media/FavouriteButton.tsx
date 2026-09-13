@@ -5,17 +5,7 @@ import { useFavourite } from "@/hooks/useFavourite";
 import { useAuth } from "@/stores/auth";
 import { cn } from "@/lib/utils";
 
-/**
- * The favourite heart.
- *
- * Renders nothing without an AniList account, matching `FollowButton`: a
- * favourite lives on the account, and the local list has nowhere to put one.
- *
- * `isFavouriteBlocked` is AniList refusing the toggle for a particular entry
- * rather than a permissions problem on our side, so the control is shown
- * disabled with an explanation instead of vanishing — vanishing would read as
- * Karasu not supporting favourites for that title.
- */
+/** The favourite heart: nothing without an account, and disabled with a reason when AniList blocks the toggle. */
 export function FavouriteButton({
   kind,
   id,
@@ -41,8 +31,7 @@ export function FavouriteButton({
       onClick={() => !blocked && fav.mutate({ id })}
       disabled={fav.isPending || blocked === true}
       aria-pressed={on}
-      // The action, not the state — a control announced as "Favourited" implies
-      // pressing it would favourite.
+      // The action, not the state: a control announced as "Favourited" implies pressing it would favourite.
       aria-label={on ? t("detail.unfavouriteAria") : t("detail.favouriteAria")}
       title={blocked ? t("detail.favouriteBlocked") : undefined}
       className={cn(

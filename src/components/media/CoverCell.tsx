@@ -7,15 +7,7 @@ import { useContentFilter } from "@/stores/contentFilter";
 import { HERO_ATTR } from "@/hooks/useViewTransitions";
 import { useTranslation } from "react-i18next";
 
-/**
- * One cover in a grid: the artwork, whatever is laid over it, and the lines
- * beneath.
- *
- * Everything that sits *on* the cover gets a near-opaque backdrop rather than a
- * translucent one. Cover art is arbitrary — white, busy, bright — so a
- * `bg-black/40` badge has no contrast floor at all, and the one thing a score
- * or a progress bar must be is legible on every poster in the list.
- */
+/** One cover in a grid; everything laid on it gets a near-opaque backdrop, since arbitrary art has no contrast floor. */
 export function CoverCell({
   to,
   cover,
@@ -37,63 +29,29 @@ export function CoverCell({
 }: HTMLAttributes<HTMLDivElement> & {
   to: string;
   cover: string | null;
-  /** Whatever belongs in the gold star badge — already formatted, since the
-      user's own score and AniList's average are on different scales. */
+  /** The gold star badge's content, already formatted: the user's score and AniList's average differ in scale. */
   score?: ReactNode;
-  /**
-   * Marks the title 18+. Top-right, because the score badge has top-left and
-   * the select checkbox shares it.
-   *
-   * Only ever visible with the content filter off: at `moderate` and `strict`
-   * the adult titles are excluded *server-side* by `adultQueryArg`, so they
-   * never reach a card at all. That is correct rather than a gap.
-   */
+  /** Marks the title 18+; only visible with the filter off, since `adultQueryArg` excludes adult titles server-side. */
   adult?: boolean;
-  /** Accessible name for the reveal button — the title, so a grid does not
-      announce thirty identical "Show"s. */
+  /** Accessible name for the reveal button, the title, so a grid does not announce identical "Show"s. */
   revealLabel?: string;
-  /**
-   * The title this cover belongs to, so the cell can decide the blur itself.
-   *
-   * Prefer this over `blurred`. The rule lived at every call site, which meant
-   * remembering it at every call site — and eight surfaces remembered while
-   * five did not, so the same title arrived blurred in the list and bare in the
-   * bell, a command-palette result or a picker. A guard that must be recalled
-   * twenty-one times is a guard that will be missed at some of them.
-   */
+  /** The title this cover belongs to, so the cell decides the blur itself; prefer it over `blurred`. */
   media?: Filterable | null;
-  /**
-   * Blur the artwork until it is clicked — the softer half of the content
-   * filter, for someone who wants explicit titles *present* but not on display.
-   *
-   * An explicit override, and it wins: `AnimeDetail` uses it to un-blur a cover
-   * the reader has chosen to reveal. Leave it out and pass `media` instead.
-   */
+  /** Blur the artwork until clicked; an explicit override that wins over `media`, so leave it out unless needed. */
   blurred?: boolean;
   /** Draws the bar flush to the bottom edge. Omit when there is no total. */
   progress?: { current: number; total: number } | null;
   /** Overlaid bottom-right — the action circles. */
   actions?: ReactNode;
-  /** Anything else laid over the artwork: a hover scrim, a checkbox. Rendered
-      above the base scrim and below the badge and actions. */
+  /** Anything else laid over the artwork, rendered above the base scrim and below the badge and actions. */
   overlay?: ReactNode;
-  /** Replaces the link on the artwork itself. Bulk-edit hands this in so a
-      click selects instead of navigating — one interaction model at a time. */
+  /** Replaces the link on the artwork; bulk-edit hands this in so a click selects instead of navigating. */
   onCoverClick?: () => void;
   /** Accessible name for `onCoverClick`. */
   coverLabel?: string;
   /** Bulk-edit selection ring. */
   selected?: boolean;
-  /**
-   * A colour for the list status this title is in, drawn as a ring *inside* the
-   * frame — see `lib/statusColors`.
-   *
-   * Inset on purpose. `selected` draws an `outline` two pixels outside the
-   * frame and `MediaCard` draws a focus `ring` outside that; a third band out
-   * there would either sit on top of one of them or be mistaken for it. Inside
-   * the artwork it reads as a property of the title rather than of the
-   * interaction, which is what it is.
-   */
+  /** List-status colour drawn as a ring inside the frame, where the selection outline and focus ring cannot collide. */
   statusRing?: string | null;
   className?: string;
   /** The metadata lines below the cover. */
@@ -103,15 +61,10 @@ export function CoverCell({
     ? Math.min((progress.current / progress.total) * 100, 100)
     : 0;
 
-  // Revealed per cell and forgotten on unmount: a reveal that persisted would
-  // be a second setting nobody asked for, and scrolling back to a grid you had
-  // uncovered is exactly when you would want it covered again.
+  // Revealed per cell and forgotten on unmount: a reveal that persisted would be a second setting nobody asked for.
   const { t } = useTranslation();
   const [revealed, setRevealed] = useState(false);
-  // `cover != null` because a missing cover has nothing to veil: it used to
-  // put a 45% wash and a "Show" pill over an empty `bg-surface-800` box.
-  // Decided here rather than at each call site. `blurred` still wins when a
-  // caller states it, which is how a reader-revealed detail page stays bare.
+  // Decided here rather than at each call site; `blurred` still wins when a caller states it, and no cover means no veil.
   const level = useContentFilter((s) => s.level);
   const blurAdult = useContentFilter((s) => s.blurAdult);
   const wanted = blurred ?? shouldBlur(media, level, blurAdult);
@@ -122,16 +75,11 @@ export function CoverCell({
       src={cover}
       alt=""
       loading="lazy"
-      // The outgoing half of the cover-to-hero morph. Only an attribute here:
-      // the `view-transition-name` is applied by the click handler to the one
-      // cover actually clicked, because two elements sharing a name in the same
-      // snapshot make the browser skip the pairing altogether — and a grid
-      // holds dozens of these.
+      // Only an attribute: the click handler names the one clicked cover, since two elements sharing a name skip the morph.
       {...{ [HERO_ATTR]: "" }}
       className={cn(
         "h-full w-full object-cover transition-[filter] duration-(--duration-expressive) ease-(--ease-out-expo)",
-        // `scale-105` because a blur samples past the element's edge and would
-        // otherwise leave a soft transparent rim around the artwork.
+        // `scale-105` because a blur samples past the edge and would otherwise leave a transparent rim.
         veiled && "scale-105 blur-xl",
       )}
     />
@@ -165,8 +113,7 @@ export function CoverCell({
 
         {overlay}
 
-        {/* Over the art and under the badges, so the 18+ mark stays legible —
-            the cell has to say *why* it is covered. */}
+        {/* Over the art and under the badges, so the 18+ mark still says why the cell is covered. */}
         {veiled && (
           <button
             type="button"
@@ -177,15 +124,7 @@ export function CoverCell({
               e.stopPropagation();
               setRevealed(true);
             }}
-            // **No `z-` class.** It had `z-10`, and the status ring, both
-            // badges, the action circles and the progress bar all sit at
-            // `z-index: auto` — CSS paints a positive z-index positioned
-            // descendant after auto ones regardless of tree order, and
-            // hit-testing follows paint order. So the veil covered the edit
-            // pencil and the add/status circle: a visibly-enabled control that
-            // did nothing on click, while Tab+Enter still fired it. Plain
-            // `absolute` is enough — the veil follows the art and the scrim in
-            // tree order and precedes everything that must sit above it.
+            // No `z-` class: a positive z-index paints over the auto-indexed badges and actions and swallows their clicks.
             className="absolute inset-0 grid place-items-center bg-[rgba(4,5,8,.45)] text-2xs font-semibold text-ink-100"
           >
             <span className="rounded-full bg-[rgba(4,5,8,.85)] px-2.5 py-1">
@@ -194,8 +133,7 @@ export function CoverCell({
           </button>
         )}
 
-        {/* Above the hover scrim, below the badges: a wash that dimmed the ring
-            would make an entry look like it had left the list. */}
+        {/* Above the hover scrim, below the badges: a wash dimming the ring would make an entry look off the list. */}
         {statusRing && (
           <span
             aria-hidden
@@ -211,9 +149,7 @@ export function CoverCell({
           </span>
         )}
 
-        {/* Matched to the score badge deliberately — same radius, same padding,
-            same near-opaque fill. Cover art is arbitrary (white, busy, bright),
-            so a translucent badge has no contrast floor at all. */}
+        {/* Matched to the score badge on purpose; a translucent badge has no contrast floor on arbitrary art. */}
         {adult && (
           <span className="absolute right-2 top-2 rounded-[.625rem] bg-[rgba(4,5,8,.93)] px-1.5 py-0.5 text-2xs font-semibold text-danger">
             18+
@@ -227,13 +163,7 @@ export function CoverCell({
         )}
 
         {progress && (
-          // Borders, not bars: a straight strip inside the `rounded-lg` clip
-          // had its ends eaten by the corner circles and read as a floating
-          // stub. A bottom border on an inset-0 overlay follows the frame's
-          // own curve — full progress bends into both corners, partial
-          // progress bends at the left and cuts flat at its live edge. The
-          // fill is revealed by clip-path, so a +1 still grows the line on
-          // the house curve instead of snapping.
+          // A border revealed by clip-path, not a bar: a straight strip inside the rounded clip loses its ends to the corners.
           <div aria-hidden className="pointer-events-none absolute inset-0">
             <div className="absolute inset-0 rounded-lg border-b-[3px] border-[rgba(4,5,8,.6)]" />
             <div

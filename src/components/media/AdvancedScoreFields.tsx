@@ -1,30 +1,11 @@
 import { useTranslation } from "react-i18next";
 import { ScoreBars } from "@/components/ui/score-bars";
-// The *mean* formatter, not `formatScore`: this is an average of the
-// categories, so it keeps its decimal — and it stays numeric on the smiley
-// scale, where "😐, roughly" has no glyph.
+// The mean formatter, not `formatScore`: an average keeps its decimal and stays numeric on the smiley scale.
 import { formatMeanScore } from "@/lib/scoreFormat";
 import { useScoreFormat } from "@/stores/auth";
 import { anyScored, derivedOverall, orderedCategories } from "@/lib/advancedScores";
 
-/**
- * The per-category scores, for accounts that use advanced scoring.
- *
- * Shared rather than written twice: there are two score-editing surfaces (the
- * entry modal and the detail page's editor) and they already share `ScoreBars`
- * for exactly this reason — anything built into one of them disagrees with the
- * other about the same entry.
- *
- * The category names are the user's own free text, rendered raw. A
- * `t(\`entry.advanced.\${name}\`)` would be invisible to `i18nKeys.test.ts`
- * *and* would render the key on screen for anyone whose categories are not
- * AniList's five defaults.
- *
- * The overall score is a **preview**. AniList derives it from these on the
- * server, so the number shown here is what the mean says and the number that
- * sticks is what the mutation answers with — which is why the caller
- * reconciles from the result rather than trusting an optimistic patch.
- */
+/** Per-category scores shared by both editors; names render raw, and the overall is only a preview of the server's. */
 export function AdvancedScoreFields({
   categories,
   values,

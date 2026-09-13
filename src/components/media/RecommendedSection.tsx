@@ -25,15 +25,7 @@ import MediaCard from "@/components/media/MediaCard";
 /** Below this the suggestions are too thin to be worth a section. */
 const MIN_SEEDS = 3;
 
-/**
- * "Because you finished …" — recommendations aggregated from the user's
- * completed entries. See `lib/recommend.ts` for the ranking.
- *
- * Costs one AniList request, cached for six hours: community recommendations
- * move on the scale of weeks, and the dashboard is the most-visited page in
- * the app, so refetching on the default five-minute staleness would spend
- * rate limit on data that hadn't changed.
- */
+/** Recommendations from completed entries, ranked by `lib/recommend.ts`; cached long, since they move by the week. */
 export default function RecommendedSection({
   type,
   entries,
@@ -41,12 +33,7 @@ export default function RecommendedSection({
 }: {
   type: MediaType;
   entries: MediaListEntry[];
-  /**
-   * The list these recommendations are seeded from could not be read. Without
-   * it an empty `entries` is ambiguous — too few completed titles to suggest
-   * anything, or a dropped request — and both rendered as the section quietly
-   * not being there.
-   */
+  /** The seed list could not be read; without it an empty `entries` cannot tell too few titles from a dropped request. */
   listUnavailable?: boolean;
 }) {
   const { t } = useTranslation();
@@ -55,8 +42,7 @@ export default function RecommendedSection({
 
   const seeds = useMemo(() => pickSeeds(entries), [entries]);
 
-  // Every id on the list, whatever its status -- built from the list itself
-  // rather than from `mediaListEntry`, which is null in local-only mode.
+  // Every id on the list, built from the list itself rather than `mediaListEntry`, which is null in local-only mode.
   const exclude = useMemo(
     () => new Set(entries.map((e) => e.mediaId)),
     [entries],
@@ -67,11 +53,7 @@ export default function RecommendedSection({
     [entries],
   );
 
-  // Sorted numerically, because this array *is* the cache key. `pickSeeds`
-  // orders by score then updatedAt, so editing any completed title reshuffles
-  // ties and mints a brand-new key — a fresh AniList request for a
-  // byte-identical result, defeating the six-hour staleTime below. The
-  // unsorted `seeds` still goes to rankRecommendations, which looks up by id.
+  // Sorted, since it is the cache key: `pickSeeds` orders by score then updatedAt, so any save would mint a fresh key.
   const seedIds = useMemo(
     () => seeds.map((s) => s.mediaId).sort((a, b) => a - b),
     [seeds],
@@ -103,10 +85,7 @@ export default function RecommendedSection({
       : "dashboard.recommendedManga",
   );
 
-  // A failure keeps the heading and says so. Vanishing is the wrong answer
-  // here: this section is absent so often and so legitimately — too few
-  // completed titles, everything already on the list — that its absence reads
-  // as "nothing to suggest" rather than "the request did not come back".
+  // A failure keeps the heading and says so; the section is absent so often that vanishing reads as nothing to suggest.
   if (error || listUnavailable) {
     return (
       <section>
@@ -123,9 +102,7 @@ export default function RecommendedSection({
   return (
     <section>
       <SectionHeader icon={Sparkles} title={title} />
-      {/* Not `meta`: that slot is `shrink-0` for short phrases, and this is a
-          three-clause sentence — as unshrinkable metadata it forced the whole
-          page to scroll sideways on a phone. A paragraph wraps. */}
+      {/* Not `meta`: that slot is `shrink-0` for short phrases, and this sentence there scrolled the whole page sideways. */}
       <p className="mt-1.5 text-2xs text-ink-600">
         {t("dashboard.recommendedHint")}
       </p>
@@ -148,13 +125,7 @@ export default function RecommendedSection({
   );
 }
 
-/**
- * Up/down on the pairing the caption names — that pairing *is* the
- * recommendation on AniList's side, so the vote lands where the sentence
- * points. Votes feed the community's data; the pressed state is patched
- * into the 6-hour recommendations cache so it survives a remount without a
- * refetch, and clicking the pressed side retracts (NO_RATING).
- */
+/** Up/down on the pairing the caption names, since that pairing is the recommendation on AniList's side. */
 function RecVote({ rec }: { rec: ScoredRecommendation }) {
   const { t } = useTranslation();
   const qc = useQueryClient();

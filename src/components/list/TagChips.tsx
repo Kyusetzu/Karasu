@@ -12,8 +12,7 @@ export function TagChips({
   className?: string;
 }) {
   const tags = tagsOf(notes);
-  // Still occupies its column when empty — a row whose neighbours shift left
-  // because it happens to have no tags is harder to scan than a gap.
+  // Still occupies its column when empty; a row whose neighbours shift left is harder to scan than a gap.
   if (tags.length === 0) return className ? <div className={className} /> : null;
   return (
     <div className={cn("mt-1 flex flex-wrap gap-1", className)}>

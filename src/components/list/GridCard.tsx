@@ -12,11 +12,7 @@ import { statusColorVar } from "@/lib/statusColors";
 import { SelectBox } from "./SelectBox";
 import { TagChips } from "./TagChips";
 import { canIncrement } from "./shared";
-/**
- * Memoized: a list of a few hundred cards re-rendered on every keystroke or
- * +1 is the single biggest cost on this page. The handlers take the entry
- * rather than closing over it so the props stay referentially stable.
- */
+/** Memoized, since hundreds of cards re-render per keystroke; handlers take the entry so the props stay stable. */
 
 export const GridCard = memo(function GridCard({
   entry,
@@ -32,14 +28,7 @@ export const GridCard = memo(function GridCard({
 }: {
   entry: MediaListEntry;
   unit: string;
-  /**
-   * Computed by the page, not read from the store here.
-   *
-   * This component is memoized because a few hundred of these re-render on
-   * every keystroke, and a `useContentFilter` subscription inside it would
-   * re-render all of them whenever any part of that store moved. A boolean
-   * prop compares shallowly and costs nothing.
-   */
+  /** Computed by the page, not read from the store here: a store subscription would re-render every memoized card. */
   blurred: boolean;
   onPlusOne: (entry: MediaListEntry) => void;
   onComplete: (entry: MediaListEntry) => void;
@@ -57,24 +46,17 @@ export const GridCard = memo(function GridCard({
     <CoverCell
       to={`/media/${media.id}`}
       cover={media.coverImage.large}
-      // The badge shows through the veil, so a blurred cell reads as "18+,
-      // hidden" rather than as artwork that failed to load.
+      // The badge shows through the veil, so a blurred cell reads as hidden rather than as failed artwork.
       adult={media.isAdult === true}
       blurred={blurred}
       revealLabel={displayTitle(media.title)}
-      // Every card in this grid is on the list by definition, so the ring is
-      // never absent here — unlike a discovery grid, where its absence is the
-      // useful signal. It is what makes a status legible without reading the
-      // row, which is the point of a grid view.
+      // Every card here is on the list, so the ring is never absent; it makes the status legible without the row.
       statusRing={statusColorVar(entry.status)}
       data-media-id={media.id}
       data-media-type={media.type}
-      // The focused cell wears the same outline a selected one does. They
-      // never mean the same thing, but they never appear for different
-      // reasons either: both say "this is the one the next key acts on".
+      // The focused cell wears the selection outline: both say "this is the one the next key acts on".
       selected={focused || (selectMode && selected)}
-      // In select mode the cover *is* the checkbox target — navigating away
-      // mid-selection is never what the click meant.
+      // In select mode the cover is the checkbox target; navigating away mid-selection is never what the click meant.
       onCoverClick={
         selectMode ? () => onToggleSelect(entry.mediaId) : undefined
       }
@@ -93,22 +75,12 @@ export const GridCard = memo(function GridCard({
             className="absolute left-2 top-2 z-20"
           />
         ) : (
-          // Deepens the foot of the cover only while the actions are showing,
-          // so the three circles have a ground without dimming every poster
-          // in the grid permanently. `pointer-coarse:`: touch has no hover
-          // state to reveal from, so on a coarse pointer the scrim and the
-          // actions below are simply there — width is the wrong key for this,
-          // since a touch laptop at desktop width has the same problem.
+          // Scrim only while the actions show; `pointer-coarse:` rather than width, since touch has no hover to reveal from.
           <div className="cover-scrim pointer-events-none absolute inset-x-0 bottom-0 h-[45%] opacity-0 transition-opacity group-hover:opacity-100 pointer-coarse:opacity-100" />
         )
       }
       actions={
-        // Suppressed entirely in select mode: one interaction model at a time.
-        //
-        // `group-focus-within` alongside `group-hover`: these buttons are
-        // tabbable, so without it Tab moved focus onto controls that were fully
-        // transparent — a focus ring around nothing, and no way to tell what
-        // was about to be activated.
+        // Suppressed in select mode; keep `group-focus-within`, or Tab lands on fully transparent buttons.
         !selectMode && (
           <div className="flex gap-1.5 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100">
             <IconButton
@@ -122,13 +94,7 @@ export const GridCard = memo(function GridCard({
               <Pencil className="size-3.5" />
             </IconButton>
             {entry.status !== "COMPLETED" && (
-              // Hidden on coarse pointers, where all three buttons are
-              // permanently visible and three 30px circles need ~110px of a
-              // cover that is ~78px wide at the phone's 4-per-row default —
-              // the row overflowed leftward and the cover's overflow-hidden
-              // ate exactly the edit button. Two fit; complete is the one a
-              // touch user can spare, since +1 on the last episode completes
-              // and the editor is one tap away. A mouse keeps all three.
+              // Hidden on coarse pointers, where three always-visible circles overflow a phone cover and clip the edit button.
               <IconButton
                 variant="onCover"
                 size="sm"
@@ -167,9 +133,7 @@ export const GridCard = memo(function GridCard({
       </Link>
       <CoverMeta>
         {media.type === "MANGA" ? (
-          // Chapters lead, volumes trail, on the one line anime spends on
-          // episodes. `?` rather than a hidden total: an ongoing series
-          // genuinely has no end count, and blanking it reads as a bug.
+          // Chapters lead, volumes trail; `?` rather than a hidden total, since an ongoing series has no end count.
           <>
             {t("common.progressChapters", {
               n: entry.progress,

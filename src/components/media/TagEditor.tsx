@@ -3,17 +3,7 @@ import { useTranslation } from "react-i18next";
 import { X } from "lucide-react";
 import { MAX_TAGS, normalizeTags } from "@/lib/tags";
 
-/**
- * Chip-based tag editor. Type a tag and press Enter or comma to add it;
- * click the × on a chip to remove it. `suggestions` feed a native datalist
- * for autocomplete from the user's existing tags.
- *
- * **Never wrap this in a `<label>`.** The remove buttons come before the input
- * and `<button>` is labelable, so the label's control resolves to the first
- * chip's × and every stray click inside it — the caption, the padding, another
- * chip's text — deletes that tag. Call sites give the caption an id and pass it
- * as `labelledBy` instead.
- */
+/** Chip-based tag editor; never wrap it in a `<label>`, or a stray click deletes the first chip (use `labelledBy`). */
 export default function TagEditor({
   tags,
   onChange,
@@ -23,7 +13,7 @@ export default function TagEditor({
   tags: string[];
   onChange: (tags: string[]) => void;
   suggestions?: string[];
-  /** Id of the caption naming this editor — see the warning above. */
+  /** Id of the caption naming this editor, in place of a `<label>` wrapper `TagEditor` forbids. */
   labelledBy?: string;
 }) {
   const { t } = useTranslation();

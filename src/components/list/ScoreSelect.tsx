@@ -9,22 +9,13 @@ import {
 import { useScoreFormat } from "@/stores/auth";
 import { SCORE_SHOWS_STAR } from "./columns";
 
-/**
- * The label an option carries inside the open dropdown, where there is room
- * for decoration: a star for the two star scales, AniList's smiley for the
- * three-point one, the bare number for everything else.
- */
+/** An option's label inside the open dropdown, where a star fits; the three-point format keeps AniList's smiley. */
 function optionLabel(format: ScoreFormat, n: number): string {
   if (format === "POINT_3") return formatScore(format, n);
   return `★ ${formatScore(format, n)}`;
 }
 
-/**
- * The score options the bulk bar renders through its own `FilterSelect` — the
- * same vocabulary as the row control, so the two cannot drift. The continuous
- * formats get ten coarse steps: a bulk write over a selection is a coarse
- * gesture, and a hundred-option dropdown is not a control.
- */
+/** The bulk bar's score options, the row's vocabulary so the two cannot drift; continuous formats get coarse steps. */
 export function bulkScoreOptions(
   format: ScoreFormat,
 ): { value: string; label: string }[] {
@@ -37,24 +28,7 @@ export function bulkScoreOptions(
   return options.map((n) => ({ value: String(n), label: optionLabel(format, n) }));
 }
 
-/**
- * The row's score control, in the account's own format.
- *
- * Discrete formats (10, 5, 3) render a `<select>` whose options come from
- * `scoreOptions`, so the row and the bulk bar share one vocabulary. The two
- * continuous formats (100 and 10-decimal) get a number input instead —
- * committed on blur or Enter, because a virtualized row saving on every
- * keystroke would write `8`, then `85`, on the way to `85`.
- *
- * The closed select shows the number **without** the star — the `★ ` prefix
- * cost more width than the digit it decorated, so at `10` the label needed
- * more room than the cell had and WebView2 clips a `<select>` rather than
- * ellipsising it. The options keep the star, where there is room for it —
- * see `SCORE_SHOWS_STAR` in `columns.ts`.
- *
- * `tabular-nums` because this is the one numeric cell that changes width with
- * its value, and proportional digits made a `1` and a `7` sit differently.
- */
+/** The row's score control in the account's format; a continuous one commits a number input on blur, not per keystroke. */
 export function ScoreSelect({
   value,
   onChange,
@@ -81,8 +55,7 @@ export function ScoreSelect({
     };
     return (
       <input
-        // Remount on an external change so a recycled virtual row shows the
-        // entry it now renders rather than the last one's draft.
+        // Remount on an external change, so a recycled virtual row shows its new entry rather than the last one's draft.
         key={value}
         type="number"
         min={0}
@@ -119,10 +92,7 @@ export function ScoreSelect({
       title={t("common.score")}
     >
       <option value={0}>–</option>
-      {/* A cached entry can briefly hold a value from the *previous* format —
-          the account was just switched and the refetch has not landed. A value
-          outside the option list would render the box empty, which is
-          indistinguishable from unscored, so it gets a transitional option. */}
+      {/* A value from the previous format, cached across a switch, would render empty like unscored, so it gets an option. */}
       {value > 0 && !options.includes(value) && (
         <option value={value}>{`${star}${formatScore(format, value)}`}</option>
       )}

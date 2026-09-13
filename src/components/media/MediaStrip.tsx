@@ -6,18 +6,7 @@ import { useContentFilter } from "@/stores/contentFilter";
 import { staggerDelay } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
-/**
- * A scrolling row of covers, each with an optional role caption.
- *
- * Shared by the character, staff and studio pages, which are the same shape with
- * a different word under each cover — `characterRole`, `staffRole`, or whether the
- * studio was the main one. Three copies of this would be three chances for the
- * grid to drift.
- *
- * The content filter runs here, as it does on the profile's favourites: none of
- * these connections take an `isAdult` argument, so client-side is the only place
- * it can happen.
- */
+/** A scrolling cover row shared by the person pages; the content filter runs here since no connection takes `isAdult`. */
 export function MediaStrip({ edges }: { edges: PersonMediaEdge[] }) {
   const level = useContentFilter((s) => s.level);
   const blurAdult = useContentFilter((s) => s.blurAdult);

@@ -16,21 +16,7 @@ import {
 } from "@/lib/profileColor";
 import { cn } from "@/lib/utils";
 
-/**
- * The bio and the profile colour.
- *
- * These are the two AniList account settings that are *not* in the settings
- * pane, and the axis is not "presentation versus configuration" — it is **set
- * once versus composed**. A bio is written next to a preview of itself; a colour
- * is picked while looking at what it colours. Neither has a stable correct value
- * you set and forget, which is what everything in the pane does have.
- *
- * That also matches the app's own precedent: composition editing happens in a
- * modal here (`EntryEditModal`, the tag editor), not in Settings.
- *
- * The live preview is the only place anyone learns which markdown Karasu
- * renders — an image becomes a chip here exactly as it will on the profile.
- */
+/** The bio and profile colour, kept out of Settings because both are composed against a preview rather than set once. */
 export function ProfileEditModal({
   viewerName,
   about,

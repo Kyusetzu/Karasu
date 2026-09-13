@@ -31,21 +31,7 @@ export type RowPatch = {
 const CELL =
   "h-8 rounded-md border border-surface-800 bg-surface-900 px-2 text-xs tabular-nums text-ink-300 transition-surface focus:border-accent-500 focus:outline-none";
 
-/**
- * One entry, with everything already known about it.
- *
- * This is the detail-and-edit view of a list, so it draws on the fields the
- * payload has always carried and nothing rendered: format, airing status, season,
- * community score, volumes, repeats, the next-episode countdown and the start and
- * finish dates. None of it costs a request.
- *
- * The columns come from `columns.ts` rather than `w-*` classes here. Every row is
- * its own grid container (`VirtualGrid` slices rows), so `subgrid` is unavailable
- * and only identical fixed tracks line up down the page — and a fixed track that
- * nobody sized against its worst case is what clipped every double-digit score.
- *
- * Memoized for the same reason as GridCard — see the note there.
- */
+/** One entry in detail, memoized like `GridCard`; the tracks come from `columns.ts`, never a `w-*` class here. */
 export const ListRow = memo(function ListRow({
   entry,
   tier,
@@ -60,7 +46,7 @@ export const ListRow = memo(function ListRow({
 }: {
   entry: MediaListEntry;
   tier: Tier;
-  /** Computed by the page — see `GridCard` for why it is not read here. */
+  /** Computed by the page, not read from the store here: a store subscription would re-render every memoized row. */
   blurred: boolean;
   onQuickSave: (entry: MediaListEntry, patch: RowPatch) => void;
   onComplete: (entry: MediaListEntry) => void;
@@ -75,10 +61,7 @@ export const ListRow = memo(function ListRow({
   const manga = media.type === "MANGA";
   const max = maxProgress(media);
   const dropdown = max !== null && max <= PROGRESS_DROPDOWN_LIMIT;
-  // Subscribe to the *data*, not to `hasNext`. The selector used to return the
-  // store's `hasNext` function, whose identity never changes — so the row never
-  // re-rendered after a library scan and the play button stayed missing until
-  // something else happened to re-render the list.
+  // Subscribe to the data, not `hasNext`: its identity never changes, so the row would never re-render after a scan.
   const episodes = useLibrary((s) => s.episodes[media.id]);
   const play = useLibrary((s) => s.play);
   const canPlayNext =
@@ -86,20 +69,12 @@ export const ListRow = memo(function ListRow({
     media.type === "ANIME" &&
     !!episodes?.some((e) => e > entry.progress);
 
-  // The progress dropdown can hold up to PROGRESS_DROPDOWN_LIMIT options. Only
-  // one of them is visible before the user opens it, so mount the rest on first
-  // interaction. Hover fires well ahead of the click; focus/mousedown are the
-  // keyboard and fast-click fallbacks.
+  // Only one option shows until opened, so the rest mount on first interaction; hover fires well ahead of the click.
   const [progressOpened, setProgressOpened] = useState(false);
   const openProgress = () => setProgressOpened(true);
   const [volumesOpened, setVolumesOpened] = useState(false);
 
-  /**
-   * Everything the current tier does not give a column to, plus the descriptive
-   * fields that were never editable anyway. Prose, so it wraps and truncates
-   * instead of overflowing — which is what lets a narrow window drop columns
-   * without losing the information in them.
-   */
+  /** What the tier gives no column to, as prose that truncates, so a narrow window drops columns without losing anything. */
   const secondary = [
     media.format ? formatLabel(media.format, t) : null,
     media.seasonYear
@@ -133,9 +108,7 @@ export const ListRow = memo(function ListRow({
     entry.private ? t("list.private") : null,
   ].filter(Boolean);
 
-  // In select mode the row *is* the checkbox. Navigating away mid-selection is
-  // never what the click meant — the same substitution GridCard makes with its
-  // cover, which the list never had, so clicking a row used to leave the page.
+  // In select mode the row is the checkbox; navigating away mid-selection is never what the click meant.
   const rowClick = selectMode
     ? () => onToggleSelect(entry.mediaId)
     : undefined;
@@ -153,8 +126,7 @@ export const ListRow = memo(function ListRow({
       )}
       style={{ gridTemplateColumns: templateColumns({ tier, selectMode, manga }) }}
     >
-      {/* A zero-width track when not selecting, so no column shifts sideways on
-          entering select mode. */}
+      {/* A zero-width track when not selecting, so no column shifts sideways on entering select mode. */}
       <div className="overflow-hidden">
         {selectMode && (
           <SelectBox
@@ -164,21 +136,14 @@ export const ListRow = memo(function ListRow({
         )}
       </div>
 
-      {/* The cover carries the hero transition into the detail page, which the
-          old hand-rolled `<img>` did not. */}
+      {/* The cover carries the hero transition into the detail page. */}
       <Link
         to={`/media/${media.id}`}
         className="block"
         onClick={(e) => selectMode && e.preventDefault()}
         tabIndex={selectMode ? -1 : undefined}
       >
-        {/* No reveal control here, unlike the grid, and that is a decision
-            rather than an omission: this thumbnail is ~2rem wide, the title is
-            spelled out beside it, and the row's whole job is to be clicked
-            through to the detail page — where the same artwork has a "Show"
-            button. A reveal affordance at this size would have to sit on top of
-            the link it replaces, so the row would gain a click target that
-            means something different from the rest of the row. */}
+        {/* No reveal control, deliberately: at this size it would sit on the link it replaces, and the detail page has one. */}
         <img
           src={media.coverImage.large ?? ""}
           alt=""
@@ -204,8 +169,7 @@ export const ListRow = memo(function ListRow({
         )}
       </Link>
 
-      {/* Status — the most-changed field, so a control rather than a label
-          wherever there is room for one. */}
+      {/* Status is the most-changed field, so a control rather than a label wherever there is room for one. */}
       <div className="overflow-hidden">
         {shows(tier, "status") && (
           <select
@@ -260,9 +224,7 @@ export const ListRow = memo(function ListRow({
             )}
           </select>
         ) : (
-          // Keyed on the number so `tick` replays when it changes. The token was
-          // written for exactly this — "the progress counter acknowledging a
-          // +1" — and had no consumer; incrementing simply substituted a digit.
+          // Keyed on the number so `tick` replays on every change, the progress counter acknowledging a +1.
           <span
             key={entry.progress}
             className="block animate-tick pr-1.5 text-right text-xs tabular-nums text-ink-300"
@@ -273,9 +235,7 @@ export const ListRow = memo(function ListRow({
         )}
       </div>
 
-      {/* Volumes: manga's second axis, which the grid has always shown and the
-          list never did. Never sent for anime — AniList would accept it and
-          store a volume count on a TV series. */}
+      {/* Volumes, manga's second axis; never sent for anime, since AniList would store a volume count on a TV series. */}
       <div className="overflow-hidden" onClick={(e) => e.stopPropagation()}>
         {shows(tier, "volumes") && manga && (
           <select

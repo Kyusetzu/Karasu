@@ -25,29 +25,14 @@ import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { usePresentValue } from "@/hooks/usePresence";
 
-/**
- * When a local-only user connects AniList, offer to merge the local list into
- * their account. Local rows are cleared only after each push is confirmed, so
- * an interrupted merge never loses data. Shown once per session.
- *
- * The merge refuses to run at all unless it has read *both* live AniList lists
- * first. It is a one-way push with no undo, and every comparison it makes is
- * against what it read: an unread list looks exactly like an empty account, at
- * which point every local row is an "addition" and the whole local list lands
- * on top of real progress. Serving that comparison from the offline cache is
- * the same hazard one step removed — the cache is by definition the last state
- * Karasu could reach, not the current one.
- */
+/** Merges the local list into the account, only after reading both live lists: an unread one looks like an empty account. */
 export default function SignInMerge() {
   const { t } = useTranslation();
   const viewer = useAuth((s) => s.viewer);
   const qc = useQueryClient();
 
   const [rows, setRows] = useState<LocalEntryRow[] | null>(null);
-  // The extras ride along because the merge *deletes* the local row: a row that
-  // agrees on status/progress/score still has to be checked for what only it
-  // holds before anything is dropped. `LIST_QUERY` already returns all six, so
-  // carrying them costs no request.
+  // The extras ride along because the merge deletes the local row, and what only it holds must be checked first.
   const [online, setOnline] = useState<Map<number, MergeSide & MergeExtras>>(
     new Map(),
   );
@@ -79,10 +64,7 @@ export default function SignInMerge() {
             map.set(e.mediaId, {
               status: e.status,
               progress: e.progress,
-              // Onto the raw hundred-point scale here, at the boundary, so the
-              // decision below never has to know which format either side is
-              // in. (The connect flow seeds the format cache before this
-              // dialog mounts.)
+              // Onto the raw hundred-point scale at the boundary, so the decision never has to know which format either side is in.
               scoreRaw: toRaw(currentScoreFormat(), e.score),
               updatedAt: e.updatedAt,
               progressVolumes: e.progressVolumes,
@@ -100,9 +82,7 @@ export default function SignInMerge() {
     })();
   }, [viewer]);
 
-  // Held through the exit: `setRows(null)` used to unmount the Modal in the
-  // same commit, so this was the one dialog in the app that faded in and cut
-  // out. `held` keeps the last rows alive while `leaving` plays the exit.
+  // Held through the exit, or `setRows(null)` unmounts the Modal in the same commit and the dialog cuts out.
   const held = usePresentValue(rows);
   if (!held.value) return null;
   const shown = held.value;
@@ -127,10 +107,7 @@ export default function SignInMerge() {
       try {
         const o = online.get(r.mediaId) ?? null;
         if (localWins(asSide(r), o, strategy)) {
-          // Everything the local row holds. The merge deletes that row once
-          // the push lands, so anything left out here is gone for good —
-          // which is what happened to manga volumes, privacy and both dates
-          // until this list caught up with what the local schema stores.
+          // Every field the local row holds: the merge deletes it once the push lands, so anything left out is gone for good.
           const res = await anilistSaveEntry({
             mediaId: r.mediaId,
             status: r.status,
@@ -143,10 +120,7 @@ export default function SignInMerge() {
             ...(r.startedAt ? { startedAt: r.startedAt } : {}),
             ...(r.completedAt ? { completedAt: r.completedAt } : {}),
           });
-          // A queued write has not reached AniList yet. Clearing the local row
-          // on the strength of it would leave the entry in the offline queue
-          // and nowhere else — and the queue is the one copy the user cannot
-          // see, edit or export.
+          // A queued write has not landed; clearing the local row on it leaves the only copy in a queue the user cannot see.
           if (res.queued) {
             tally.queued += 1;
             done += 1;
@@ -154,20 +128,11 @@ export default function SignInMerge() {
             continue;
           }
         } else if (o) {
-          // AniList's side won on status/progress/score — but those are three
-          // of nine fields, and the next line deletes the local row. Anything
-          // it holds that the online row does not is about to be destroyed by
-          // a step that reports success, so push that remainder first.
-          //
-          // Additive only, and a patch: absent variables leave AniList's own
-          // values alone, so this can add a volume count or a start date
-          // without touching the status the user just chose to keep.
+          // AniList won status/progress/score, but the local row is about to go, so push what only it holds first as a patch.
           const extra = residual(r, o);
           if (hasResidual(extra)) {
             const res = await anilistSaveEntry({ mediaId: r.mediaId, ...extra });
-            // Same reasoning as above: a queued write has not landed, and
-            // clearing on the strength of it leaves the only copy in a queue
-            // the user cannot see.
+            // A queued write has not landed, so clearing on it would leave the only copy in a queue the user cannot see.
             if (res.queued) {
               tally.queued += 1;
               done += 1;

@@ -45,12 +45,7 @@ export function BulkBar({
   const disabled = count === 0;
 
   return (
-    // Same inset-well substance as the now-playing card, for the same reason:
-    // it appears unprompted over content that is already there, and reading as
-    // a different material is how it announces itself without a colour shout.
-    // `--animate-rise-in` names "the bulk bar" as a consumer and never had
-    // one: entering select mode simply pushed the list up by the height of
-    // a bar that was suddenly there.
+    // The now-playing card's inset-well substance: reading as a different material announces it without a colour shout.
     <div className="inset-well well-edge relative mx-8 mb-5 flex animate-rise-in flex-wrap items-center gap-2.5 overflow-hidden rounded-[.875rem] px-4.5 py-3">
       <span className="text-[.8125rem] font-semibold tabular-nums text-ink-100">
         {t("bulk.selected", { count })}
@@ -78,14 +73,7 @@ export function BulkBar({
         className={cn(disabled && "pointer-events-none opacity-50")}
       />
 
-      {/* Every control here sets one value across the whole selection, which is
-          what `UpdateMediaListEntries` does in one request. Progress offers only
-          0 and 1 on purpose: "set them all to episode 137" is not a thing anyone
-          wants, but "reset these to unwatched" and "mark these as started" are.
-
-          Notes and tags are deliberately absent even though the mutation accepts
-          `notes` — tags are serialized into that field, so one bulk write would
-          erase every selected entry's tags. */}
+      {/* Progress offers only reset and started on purpose; notes stay absent because a bulk write would erase every tag. */}
       <FilterSelect
         label={t("bulk.setProgress")}
         value=""

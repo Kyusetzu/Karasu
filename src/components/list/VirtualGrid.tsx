@@ -4,21 +4,7 @@ import { useTheme } from "@/stores/theme";
 import { type MediaListEntry } from "@/api/types";
 import { useColumnCount } from "@/hooks/useColumnCount";
 import { cn } from "@/lib/utils";
-/**
- * A CSS grid whose rows are virtualized: only the rows near the viewport are
- * mounted. A completed list can run to several thousand entries, and mounting
- * every cover at once is what made switching to this page stutter.
- *
- * Rows are chunked by hand, so the number of columns has to be known — see
- * `useColumnCount` for why it is measured rather than computed. The probe is a
- * zero-height copy of the grid: `auto-fill` resolves its full track list even
- * with no children, which gives a column count on the very first render and
- * keeps one source of truth for the layout in `index.css`.
- *
- * `rowGap` is applied as padding rather than `gap-y` because each row is now
- * its own grid — a gap between the rows of *different* grids does nothing. As
- * padding it lands inside the border box, so `measureElement` counts it.
- */
+/** Virtualized rows chunked by hand; `rowGap` is padding, since each row is its own grid and `gap-y` does nothing. */
 export function VirtualGrid({
   items,
   scrollRef,
@@ -40,9 +26,7 @@ export function VirtualGrid({
   onColumns?: (columns: number) => void;
 }) {
   const probeRef = useRef<HTMLDivElement>(null);
-  // The column setting re-flows the grid tracks without changing the probe's
-  // own size, so the ResizeObserver inside the hook never fires for it — see
-  // `watch` there.
+  // Keep the `coverCols` watch; it re-flows the tracks without resizing the probe, so the ResizeObserver cannot see it.
   const coverCols = useTheme((s) => s.coverCols);
   const columns = useColumnCount(probeRef, coverCols);
   const rowCount = Math.ceil(items.length / columns);
@@ -54,18 +38,15 @@ export function VirtualGrid({
     overscan: 4,
   });
 
-  // Titles wrap differently at a different column count, so the cached row
-  // measurements are worthless once it changes.
+  // Titles wrap differently at a different column count, so the cached row measurements are worthless once it changes.
   useEffect(() => {
     virtualizer.measure();
   }, [columns, virtualizer]);
 
-  // The count is measured from the resolved track, and arrow keys need it to
-  // know what "down" means — so it is reported up rather than recomputed.
+  // Arrow keys need the measured count to know what down means, so it is reported up rather than recomputed.
   useEffect(() => onColumns?.(columns), [columns, onColumns]);
 
-  // A virtualized row that is scrolled out is not mounted, so moving the focus
-  // there would otherwise land it on nothing.
+  // A scrolled-out virtual row is not mounted, so moving the focus there would otherwise land on nothing.
   useEffect(() => {
     if (focusIndex == null) return;
     virtualizer.scrollToIndex(Math.floor(focusIndex / columns), {

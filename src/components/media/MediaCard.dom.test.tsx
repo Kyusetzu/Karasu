@@ -4,20 +4,7 @@ import type { ListResult } from "@/api/types";
 import type { MediaWithListStatus } from "@/api/queries";
 import { renderWithProviders, signOut, useLocalProfile } from "@/test/render";
 
-/**
- * The data-loss guard.
- *
- * In the account-free profile `anilist_query` sends no token, so AniList
- * returns `mediaListEntry: null` for **every** title — including ones the user
- * is actively tracking in the local SQLite list. Anything that seeded an editor
- * from that null wrote `PLANNING / 0 / 0 / 0 / ""` over the real entry the
- * moment Save was pressed, because `local_save_entry` COALESCEs only *absent*
- * values and the editor sent every scalar.
- *
- * So the card must resolve its entry from the local list, and the visible proof
- * is which control it offers: a tracked title gets the status circle, never the
- * "add to Planning" plus.
- */
+/** Proves the card resolves its entry from the local list, since AniList reports null for every title without a token. */
 vi.mock("@/api/anilist", async (orig) => ({
   ...(await orig<typeof import("@/api/anilist")>()),
   isTauri: true,
@@ -76,8 +63,7 @@ describe("MediaCard in the account-free profile", () => {
     // The list screens key on user 0 — the `?? 0` convention.
     queryClient.setQueryData(["mediaList", "ANIME", 0], localList());
 
-    // The status circle, not the add-to-Planning plus: proof the card resolved
-    // the entry rather than believing AniList's null.
+    // The status circle, not the add-to-Planning plus: the card resolved the entry rather than believing the null.
     await waitFor(() =>
       expect(screen.queryByRole("button", { name: "media.addDefault" })).toBeNull(),
     );

@@ -3,14 +3,7 @@ import { describe, expect, it } from "vitest";
 import { NewThreadModal } from "./NewThreadModal";
 import { renderWithProviders } from "@/test/render";
 
-/**
- * The gate on the create button. `lib/composer.test.ts` proves `validateThread`
- * itself; this proves the modal actually asks it — a thread needs a title, a
- * body and at least one category before the button will send anything.
- *
- * The mutation is never fired here: everything below stops short of an enabled
- * click, and the one enabled state is asserted, not pressed.
- */
+/** Proves the modal asks `validateThread` before enabling create; the one enabled state is asserted, never pressed. */
 
 const createButton = () =>
   screen.getAllByRole("button").find((b) => b.textContent?.includes("forum.create") &&

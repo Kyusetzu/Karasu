@@ -1,14 +1,7 @@
 import { displayTitle, type MediaTitle } from "@/api/types";
 import { cn } from "@/lib/utils";
 
-/**
- * A title and its native form, stacked.
- *
- * The native line is dropped when it *is* the display title, which is the
- * common case for anything with no English or romaji entry — repeating it
- * would just double the row height for nothing. It is set in Kosugi Maru,
- * which is the only place the app's Japanese face appears in list content.
- */
+/** A title and its native form stacked; the native line is dropped when it is the display title itself. */
 export function TitleLockup({
   title,
   clamp = 1,
@@ -18,8 +11,7 @@ export function TitleLockup({
   title: MediaTitle;
   /** Lines the Latin title may occupy before it is clipped. */
   clamp?: 1 | 2;
-  /** `muted` steps back a shade — for captions under cover art, where the
-      artwork is already carrying the identity and the text is a label. */
+  /** `muted` steps back a shade for captions under cover art, where the artwork already carries the identity. */
   tone?: "primary" | "muted";
   className?: string;
 }) {

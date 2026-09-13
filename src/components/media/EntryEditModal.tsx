@@ -67,12 +67,7 @@ export interface EntrySaveInput {
 /** What AniList takes to *clear* a fuzzy date — all parts null. */
 const CLEARED_DATE: FuzzyDate = { year: null, month: null, day: null };
 
-/**
- * A fuzzy date behind a native date input. The picker speaks full dates
- * only; a partial value AniList already holds ("2019", "March 2024") shows
- * as a caption underneath and survives untouched until the user picks or
- * clears — at which point full-or-nothing is what gets written.
- */
+/** A fuzzy date behind a native date input; a partial value shows as a caption and survives until picked or cleared. */
 function DateField({
   label,
   value,
@@ -117,10 +112,7 @@ function DateField({
   );
 }
 
-/**
- * Shared edit dialog for list entries — usable from the list, the search
- * and the season browser. `entry === null` means "add to list".
- */
+/** Shared edit dialog for list entries; `entry === null` means "add to list". */
 export default function EntryEditModal({
   leaving,
   media,
@@ -139,9 +131,7 @@ export default function EntryEditModal({
   onSave: (input: EntrySaveInput) => void;
   onDelete?: () => void;
   tagSuggestions?: string[];
-  /** The account's custom-list names for this media type. Only callers that
-      hold the list payload can supply them; without them the section hides
-      and membership is left untouched. */
+  /** The account's custom-list names for this media type; without them the section hides and membership is untouched. */
   customListNames?: string[];
 }) {
   const { t } = useTranslation();
@@ -169,38 +159,22 @@ export default function EntryEditModal({
       ),
   );
   const [membershipsDirty, setMembershipsDirty] = useState(false);
-  // Seeded from the entry's own name→score map; the write is a positional
-  // array built from the account's category order by `lib/advancedScores`.
+  // Seeded from the entry's name-to-score map; the write is a positional array in the account's category order.
   const advancedCategories = useAdvancedCategories(media.type ?? "ANIME");
-  /**
-   * Only when this caller's entry actually carries the scores.
-   *
-   * The same rule `customListNames` follows, and for a sharper reason: three
-   * of this dialog's call sites hand over an entry that came from a query
-   * without `advancedScores` — a search result's `mediaListEntry`, the detail
-   * page's own fetch. Rendering from that shows every category at zero, and
-   * saving writes those zeros over real scores. A brand-new entry has nothing
-   * to overwrite, so it is safe and gets the section.
-   */
+  /** Only when the entry carries the scores: an entry queried without them would save zeros over real scores. */
   const advancedAvailable = entry === null || entry.advancedScores != null;
   const [advanced, setAdvanced] = useState<Record<string, number>>(
     () => ({ ...(entry?.advancedScores ?? {}) }),
   );
   const [advancedDirty, setAdvancedDirty] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  // Sent only when touched: a caller that never loaded a date must not have
-  // this dialog silently clear it on an unrelated save.
+  // Dates are sent only once touched: a caller that never loaded one must not have it silently cleared on save.
   const startedDirty = started !== (entry?.startedAt ?? null);
   const completedDirty = completed !== (entry?.completedAt ?? null);
-  // Custom lists and "hidden from status lists" are AniList's own concepts —
-  // one is a server-side list arrangement, the other is about a profile nobody
-  // else can see locally. Dates and privacy are not: schema v14 stores both, so
-  // hiding them here was a gap rather than an honest omission.
+  // Only custom lists and "hidden from status lists" are AniList-only; the local schema stores dates and privacy too.
   const anilist = mode === "anilist";
   const max = maxProgress(media) ?? 99999;
-  // Manga is tracked on two axes and always has been on AniList. A volume
-  // count is not derivable from chapters — series split them differently, and
-  // plenty of readers only track one of the two.
+  // Manga is tracked on two axes, since a volume count is not derivable from chapters.
   const isManga = media.type === "MANGA";
   const maxVolumes = media.volumes ?? 99999;
   const rewatchLabel =
@@ -209,8 +183,7 @@ export default function EntryEditModal({
   return (
     <Modal title={displayTitle(media.title)} onClose={onClose} leaving={leaving}>
       <div className="space-y-4">
-        {/* Six pills, not a dropdown. Status is the most-changed field here and
-            a dropdown hides five of its six options behind a click. */}
+        {/* Pills, not a dropdown: status is the most-changed field here and a dropdown hides its options. */}
         <div className="text-sm">
           <span className="mb-1.5 block text-ink-500">{t("common.status")}</span>
           <div className="flex flex-wrap gap-0.75">
@@ -271,11 +244,7 @@ export default function EntryEditModal({
             <ScoreBars value={score} onChange={setScore} />
           </div>
         </div>
-        {/* Only when the account has it on. The category names are seeded even
-            when it is off, so their presence is not the signal — and local mode
-            has no column for them. Sent only when touched, like the dates and
-            the memberships: an unrelated save must not write a category set the
-            user never opened. */}
+        {/* Sent only when touched, like the dates: an unrelated save must not write a category set the user never opened. */}
         {anilist && advancedCategories.length > 0 && advancedAvailable && (
           <AdvancedScoreFields
             categories={advancedCategories}
@@ -317,9 +286,7 @@ export default function EntryEditModal({
         <div className="flex flex-wrap gap-x-5 gap-y-1.5">
           <label
             className="flex cursor-pointer items-center gap-2 text-sm text-ink-300"
-            // Locally there is no account and no feed to be private from, so
-            // the checkbox has to say what it does do: keep the entry out of
-            // an export.
+            // Locally there is no feed to be private from, so the checkbox says what it does: keep the entry out of exports.
             title={anilist ? undefined : t("entry.privateLocalHint")}
           >
             <input
@@ -378,17 +345,7 @@ export default function EntryEditModal({
             )}
           </>
         )}
-        {/* A `div`, not a `label`, and the sibling at `AnimeDetail.tsx:1372`
-            already had it right. `TagEditor` renders each tag's remove button
-            before its input, and a `<button>` is a labelable element — so the
-            label's labelled control was the *first chip's ×*, and every click
-            inside the label that was not on interactive content forwarded to
-            it: the caption, the box's padding (the gesture that means "start
-            typing a tag"), and the text of any chip. Clicking "beta" deleted
-            "alpha", silently, with no undo, persisted on Save.
-
-            `htmlFor` is not the fix either — the input's id lives inside
-            `TagEditor`, so the caption names it through `aria-labelledby`. */}
+        {/* A `div`, not a `label`: a label would forward stray clicks to the first chip's remove button. */}
         <div className="block text-sm">
           <span id="entry-tags-label" className="mb-1 block text-ink-500">
             {t("tags.label")}
@@ -438,16 +395,13 @@ export default function EntryEditModal({
                   mediaId: media.id,
                   status,
                   progress,
-                  // Never sent for anime: AniList accepts it there and would
-                  // store a volume count on a TV series.
+                  // Never sent for anime: AniList accepts it there and would store a volume count on a TV series.
                   ...(isManga ? { progressVolumes: volumes } : {}),
                   score,
                   repeat,
                   notes: serializeNotes(notes, tags),
                   private: priv,
-                  // A cleared date is written as all-null parts — that is
-                  // AniList's own "remove the date" spelling, and schema v14
-                  // reads it the same way.
+                  // A cleared date is written as all-null parts, AniList's own "remove the date" spelling.
                   ...(startedDirty ? { startedAt: started ?? CLEARED_DATE } : {}),
                   ...(completedDirty
                     ? { completedAt: completed ?? CLEARED_DATE }
@@ -455,12 +409,9 @@ export default function EntryEditModal({
                   ...(anilist
                     ? {
                         hiddenFromStatusLists: hidden,
-                        // Membership only when touched: the write replaces the
-                        // whole set, so an untouched dialog must not send one.
+                        // Membership only when touched: the write replaces the whole set, so an untouched dialog sends none.
                         ...(membershipsDirty ? { customLists: [...memberships] } : {}),
-                        // Same rule, sharper edge: the array is positional, so
-                        // it is built from the account's category order and
-                        // never from the map's own key order.
+                        // The array is positional, so it is built from the account's category order, never the map's key order.
                         ...(advancedDirty && advancedCategories.length > 0
                           ? {
                               advancedScores: toAdvancedArray(

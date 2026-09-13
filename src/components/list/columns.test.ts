@@ -23,21 +23,13 @@ const shape = (over: Partial<RowShape> = {}): RowShape => ({
   ...over,
 });
 
-/**
- * The point of all of this: a fixed column width nobody checked against the
- * widest value it can hold is exactly how the old row clipped every double-digit
- * score and every long-series progress. The widths are only trustworthy while
- * something asserts they still fit.
- */
+/** The fixed widths are only trustworthy while something asserts they still fit their widest value. */
 describe("cellWidth", () => {
   it("leaves room for the text, its padding and some headroom", () => {
     expect(cellWidth(2)).toBeGreaterThan(2 * 7.2 + 16);
   });
 
-  /**
-   * The bug in one assertion: a native select spends part of its content box on
-   * the arrow, so a control needs more than the same text in a span.
-   */
+  /** A native select spends part of its box on the arrow, so a control needs more room than a span. */
   it("gives a select more room than a plain cell", () => {
     expect(cellWidth(4, true)).toBeGreaterThan(cellWidth(4, false) + 12);
   });
@@ -63,10 +55,7 @@ describe("column widths fit their worst case", () => {
     expect(COLUMN_PX.score).toBeGreaterThan(52);
   });
 
-  /**
-   * Scores render in the account's format now, so the worst case is the widest
-   * across all five: `10.0` (POINT_10_DECIMAL) — one character more than `100`.
-   */
+  /** Scores render in the account's format, so the worst case is POINT_10_DECIMAL's `10.0`. */
   it("covers the widest rendering of every score format", () => {
     expect(WORST_CASE.score.length).toBeGreaterThanOrEqual("10.0".length);
   });
@@ -88,11 +77,7 @@ describe("column widths fit their worst case", () => {
     );
   });
 
-  /**
-   * Dropping the star from the closed display is what buys the score cell its
-   * room back. If it ever returns, the worst case grows by two characters and
-   * the width above is wrong again.
-   */
+  /** Dropping the star from the closed display buys the score cell its room; if it returns, the width is wrong again. */
   it("keeps the star out of the closed score display", () => {
     expect(SCORE_SHOWS_STAR).toBe(false);
     expect(WORST_CASE.score).not.toContain("★");
@@ -102,10 +87,7 @@ describe("column widths fit their worst case", () => {
 describe("templateColumns", () => {
   const trackCount = (s: string) => s.trim().split(/\s+(?![^(]*\))/).length;
 
-  /**
-   * The track count must be constant across every shape, or the header and the
-   * rows stop describing the same columns the moment a tier changes.
-   */
+  /** The track count must be constant across every shape, or the header and the rows stop describing the same columns. */
   it("has the same number of tracks for every shape", () => {
     const counts = new Set<number>();
     for (const tier of TIERS)
@@ -115,11 +97,7 @@ describe("templateColumns", () => {
     expect([...counts]).toHaveLength(1);
   });
 
-  /**
-   * A zero-width track rather than a removed one: dropping a column on entering
-   * select mode would shift every other column sideways, which is the opposite
-   * of what you want while picking rows out of a table.
-   */
+  /** A zero-width track rather than a removed one, or entering select mode would shift every other column sideways. */
   it("keeps the selection track present but collapsed when not selecting", () => {
     expect(templateColumns(shape({ selectMode: false }))).toMatch(/^0px /);
     expect(templateColumns(shape({ selectMode: true }))).toMatch(/^24px /);
@@ -138,11 +116,7 @@ describe("templateColumns", () => {
     ).not.toContain(`${COLUMN_PX.volumes}px`);
   });
 
-  /**
-   * `minmax(0, 1fr)`, not `1fr`. A `1fr` track's minimum is its content, so a
-   * long title would push every fixed column off the right edge instead of
-   * truncating.
-   */
+  /** `minmax(0, 1fr)`, not `1fr`: a `1fr` track's minimum is its content, so a long title would push the columns out. */
   it("lets the title truncate rather than push the columns out", () => {
     expect(templateColumns(shape())).toContain("minmax(0, 1fr)");
     expect(templateColumns(shape())).not.toMatch(/(^| )1fr( |$)/);
@@ -170,11 +144,7 @@ describe("tiers", () => {
 });
 
 describe("tierForWidth", () => {
-  /**
-   * The reason tiers exist: the full set is ~1100px of fixed tracks and the
-   * window minimum leaves far less, and a fixed track overflows rather than
-   * shrinking.
-   */
+  /** Tiers exist because a fixed track overflows rather than shrinks, and the full set outgrows the window minimum. */
   it("picks a tier that actually fits", () => {
     for (const available of [560, 668, 820, 968, 1288, 1600, 2400]) {
       for (const manga of [false, true]) {
@@ -200,11 +170,7 @@ describe("tierForWidth", () => {
     }
   });
 
-  /**
-   * The app's window minimum is 940px wide with a 208px sidebar and 2rem of page
-   * padding either side — so this is the real floor a row has to survive, in
-   * select mode, on manga (the widest shape).
-   */
+  /** The floor a row has to survive: the window minimum less the sidebar and page padding, in select mode, on manga. */
   it("fits inside the smallest window the app allows", () => {
     const available = 940 - 208 - 64;
     const tier = tierForWidth(available, true);
@@ -215,12 +181,7 @@ describe("tierForWidth", () => {
 });
 
 describe("ROW_HEIGHT_PX", () => {
-  /**
-   * Feeds `estimateRowHeight`. The virtualizer measures the real height after
-   * mount, so a wrong value here is not a broken layout — it is a scrollbar that
-   * visibly resizes while you scroll, which is why it is derived from the cover
-   * rather than typed in twice.
-   */
+  /** Feeds `estimateRowHeight`; a wrong value is a scrollbar that resizes mid-scroll, so it derives from the cover. */
   it("is the cover at 2:3 plus padding, and taller than the old row", () => {
     expect(ROW_HEIGHT_PX).toBe(Math.round(COLUMN_PX.cover * 1.5) + 16);
     expect(ROW_HEIGHT_PX).toBeGreaterThan(78);

@@ -22,13 +22,7 @@ import { cn } from "@/lib/utils";
 import { countdownFraction, ringOffset, splitRemaining } from "@/lib/countdown";
 import { usePresentValue } from "@/hooks/usePresence";
 
-/**
- * The countdown, as text and as a fraction for the ring.
- *
- * The span is remembered from the largest remaining time seen for this target,
- * because the backend sends the deadline but not the length of the wait — see
- * `lib/countdown.ts`.
- */
+/** Countdown text and ring fraction; the span is remembered from the largest remaining time seen. */
 function useCountdown(targetMs: number | null): {
   label: string | null;
   fraction: number;
@@ -52,8 +46,7 @@ function useCountdown(targetMs: number | null): {
   if (span.current?.target !== targetMs) {
     span.current = { target: targetMs, ms: Math.max(diff, 1) };
   } else if (diff > span.current.ms) {
-    // A later tick reporting *more* time left means this session started before
-    // the card was mounted; widen rather than let the ring run backwards.
+    // More time left than seen before means the session predates the card; widen rather than run the ring backwards.
     span.current.ms = diff;
   }
 
@@ -75,9 +68,7 @@ export default function NowPlayingCard() {
   const current = useNowPlaying((s) => s.current);
   const scrobble = useNowPlaying((s) => s.scrobble);
   const countdown = useCountdown(
-    // Blocked carries a time only for an armed episode gap — the backend
-    // emits none otherwise — so the same hook serves all three phases; for a
-    // yield the time is the end of the wait.
+    // Blocked carries a time only for an armed episode gap, so one hook serves all three phases.
     scrobble.phase === "watching" ||
       scrobble.phase === "blocked" ||
       scrobble.phase === "yielding"
@@ -86,26 +77,10 @@ export default function NowPlayingCard() {
   );
   const qc = useQueryClient();
   const { t } = useTranslation();
-  // Retained through the exit so the card can animate away with its title
-  // rather than emptying first. Default hold: the old 160 outlived the
-  // 120ms rise-out by 40ms of frozen end-state.
+  // Retained through the exit so the card animates away with its title rather than emptying first.
   const shown = usePresentValue(current);
 
-  // Reload the list after a successful auto-update. Only the collection that
-  // actually changed: an anime scrobble cannot alter the manga list, and
-  // invalidating both refetched two full MediaListCollections.
-  //
-  // The event carries no media type, so it comes from the store — read at fire
-  // time rather than from a closure, which would pin whatever was playing when
-  // the listener was registered. The fallback is not optional: without it, an
-  // absent type would leave one list silently never refreshing.
-  //
-  // Cleanup awaits the registration promise rather than a variable it fills
-  // in. `<main key={pathname}>` remounts this on every navigation, and under
-  // StrictMode the cleanup always runs before the IPC round trip settles, so
-  // the old form found `unlisten` still undefined, did nothing, and left a
-  // handler registered for the life of the process — one more on every trip
-  // through the Dashboard, each invalidating queries on every scrobble.
+  // Only the changed type, read from the store at fire time; keep the broad-key fallback or an absent type never refreshes.
   useEffect(() => {
     if (!isTauri) return;
     const registered = listen("scrobble-done", () => {
@@ -115,6 +90,7 @@ export default function NowPlayingCard() {
       });
     });
     return () => {
+      // Await the registration itself: under StrictMode the cleanup runs before it settles and a variable is still empty.
       registered.then((un) => un());
     };
   }, [qc]);
@@ -127,20 +103,14 @@ export default function NowPlayingCard() {
   const isManga = playing.mediaType === "MANGA";
 
   return (
-    // Cut *into* the page rather than raised off it. This card arrives
-    // unprompted every evening, so reading as a different substance is how it
-    // announces itself without shouting.
+    // Cut into the page rather than raised off it: the card arrives unprompted, so it announces itself without shouting.
     <div
       className={cn(
         "inset-well well-edge relative overflow-hidden rounded-[.875rem] px-4.5 py-4",
         shown.leaving ? "animate-rise-out" : "animate-rise-in",
       )}
     >
-      {/* The one idle loop on this screen, and only while something is
-          genuinely running: the well warms and cools on a 4.5s cycle, which is
-          the same thing the titlebar dot says at the other end of the window.
-          Its own element because the card's `animation` is already spoken for
-          by the entrance/exit, and `inset-well` already owns `box-shadow`. */}
+      {/* Its own element: the card's `animation` is spoken for by the entrance/exit and `inset-well` owns `box-shadow`. */}
       {scrobble.phase === "watching" && !shown.leaving && (
         <span
           aria-hidden
@@ -149,10 +119,7 @@ export default function NowPlayingCard() {
       )}
       <div className="relative flex items-center gap-4">
         <span className="relative grid h-11 w-11 shrink-0 place-items-center rounded-full bg-accent-600/25 text-accent-400">
-          {/* The wait, drawn rather than counted. The digits below tick once a
-              second and jump; a ring closing over the same interval is the part
-              that can be read at a glance. Only while actually counting down —
-              a static full ring would suggest something is still pending. */}
+          {/* The wait drawn as a closing ring, and only while counting down: a static full ring reads as pending. */}
           {scrobble.phase === "watching" && countdown.label && (
             <svg
               className="absolute inset-0 size-11 -rotate-90"
@@ -169,8 +136,7 @@ export default function NowPlayingCard() {
                 strokeLinecap="round"
                 strokeDasharray={RING_C}
                 strokeDashoffset={ringOffset(countdown.fraction, RING_C)}
-                // A plain transition, so the reduce-motion rules already reach
-                // it — the ring still updates, it just stops sliding.
+                // A plain transition, so the reduce-motion rules reach it and the ring only stops sliding.
                 style={{ transition: "stroke-dashoffset 1s linear" }}
               />
             </svg>
@@ -207,10 +173,7 @@ export default function NowPlayingCard() {
               </span>
             )}
           </p>
-          {/* Keyed on the phase so each state fades in rather than the line
-              swapping its words in place — this row is the app reporting on
-              something it did without being asked, and a silent text change is
-              easy to miss while looking straight at it. */}
+          {/* Keyed on the phase so each state fades in; a silent text swap is easy to miss while looking at it. */}
           <div key={scrobble.phase} className="animate-fade-in">
             <ScrobbleStatus countdown={countdown.label} />
           </div>
@@ -241,8 +204,7 @@ function ScrobbleStatus({ countdown }: { countdown: string | null }) {
         </p>
       );
     case "yielding":
-      // Another Karasu on the same Jellyfin account — the desktop, seen from
-      // the phone — goes first. Quiet, not gold: nothing is wrong.
+      // Another Karasu on the same Jellyfin account goes first; quiet rather than gold, since nothing is wrong.
       return (
         <p className="text-xs text-ink-500">
           {t("nowPlaying.yielding", {
@@ -267,8 +229,7 @@ function ScrobbleStatus({ countdown }: { countdown: string | null }) {
     case "updated":
       return (
         <p className="flex items-center gap-1 text-xs font-medium text-success">
-          {/* The one genuinely good outcome in this machine, so it lands
-              rather than appearing. */}
+          {/* The one genuinely good outcome here, so it lands rather than appears. */}
           <Check className="size-3 animate-land" />{" "}
           {t("nowPlaying.updated", {
             n: t(
@@ -282,9 +243,7 @@ function ScrobbleStatus({ countdown }: { countdown: string | null }) {
       );
     case "queued":
       return (
-        // Deliberately not the success green with its checkmark: the write is
-        // real but it is in SQLite, not on AniList, and the card is the one
-        // place that difference is visible while it lasts.
+        // Not the success green: the write is in SQLite, not on AniList, and this is where that difference shows.
         <p className="text-xs text-ink-500">
           {t("nowPlaying.queued", {
             n: t(
@@ -300,8 +259,7 @@ function ScrobbleStatus({ countdown }: { countdown: string | null }) {
       return (
         <p className="text-xs text-gold">
           {scrobble.reason ? blockedText(scrobble.reason, t) : t("nowPlaying.blocked")}
-          {/* Only an armed episode gap ever has a countdown here: the grace
-              setting is on and watching on is about to count as being sure. */}
+          {/* Only an armed episode gap has a countdown here: watching on is about to count as being sure. */}
           {countdown && (
             <span className="text-ink-500">
               {" "}
@@ -324,9 +282,7 @@ function ScrobbleStatus({ countdown }: { countdown: string | null }) {
           </p>
         );
       }
-      // Without an account there is nothing to match against, so "no entry
-      // recognized" reads as a failure when it is the expected outcome. The
-      // pill would otherwise show a raw title forever with no explanation.
+      // Without an account there is nothing to match against, so "no entry recognized" would read as a failure.
       return (
         <p className="text-xs text-ink-500">
           {t(signedIn ? "nowPlaying.noMatch" : "nowPlaying.noAccount")}
@@ -335,13 +291,7 @@ function ScrobbleStatus({ countdown }: { countdown: string | null }) {
   }
 }
 
-/**
- * The block, in the reader's language.
- *
- * A literal `t()` per branch: the guard in `i18nKeys.test.ts` only sees those,
- * and this line used to be an English sentence formatted in Rust and printed
- * verbatim — which a German UI showed in English.
- */
+/** The block in the reader's language, with a literal `t()` per branch because `i18nKeys.test.ts` only sees those. */
 function blockedText(
   reason: BlockReason,
   t: (k: string, o?: Record<string, unknown>) => string,
@@ -364,19 +314,7 @@ function blockedText(
   }
 }
 
-/**
- * The card's buttons.
- *
- * The scrobble pair appears only in the phases where there is something to
- * confirm or skip — and in the blocked phase, only when Rust says forcing is
- * allowed: moving progress *backwards* is not an offer worth making, and used
- * to be one click away from setting a 27-episode entry to 1.
- *
- * The correction button is always there — a wrong match needs fixing exactly
- * as much as a missing one, and the unmatched case used to render no action at
- * all, which left "No entry recognized" as a statement with nothing to do
- * about it.
- */
+/** The card's buttons; the correction one is always there, since a wrong match needs fixing as much as a missing one. */
 function ScrobbleActions({ playing }: { playing: NowPlaying }) {
   const { t } = useTranslation();
   const scrobble = useNowPlaying((s) => s.scrobble);
@@ -393,8 +331,7 @@ function ScrobbleActions({ playing }: { playing: NowPlaying }) {
     }
   };
 
-  // Errors land in the dialog rather than a toast, the way the library's
-  // corrections do: the dialog is where the decision was made.
+  // Errors land in the dialog rather than a toast, because the dialog is where the decision was made.
   const correct = async (fn: () => Promise<void>) => {
     setError(undefined);
     try {
@@ -408,19 +345,16 @@ function ScrobbleActions({ playing }: { playing: NowPlaying }) {
   const canScrobble =
     (scrobble.phase === "pending" ||
       scrobble.phase === "watching" ||
-      // "Now" forces straight through a yield: the wait is a courtesy to
-      // the other device, not a rule.
+      // "Now" forces straight through a yield: the wait is a courtesy to the other device, not a rule.
       scrobble.phase === "yielding" ||
       scrobble.phase === "cancelled" ||
       scrobble.phase === "blocked") &&
-    // A block Rust will refuse anyway must not be offered. Forcing forward
-    // over a gap and retrying a failed request still are.
+    // A block Rust will refuse anyway must not be offered; forcing over a gap and retrying a failure still are.
     (scrobble.phase !== "blocked" || scrobble.forceable);
 
   return (
     <>
-      {/* Wrappable: two labelled buttons beside the icon outgrow a phone in
-          German, and `shrink-0` let them push the page wide instead. */}
+      {/* Wrappable: two labelled buttons outgrow a phone in German, and `shrink-0` pushed the page wide instead. */}
       <div className="flex flex-wrap justify-end gap-2">
         {canScrobble && (
           <>
@@ -459,8 +393,7 @@ function ScrobbleActions({ playing }: { playing: NowPlaying }) {
         </Button>
       </div>
 
-      {/* `Presence`, not `PresenceIf`: the picker is opened *by* a value and
-          would otherwise lose its seeded title for the length of the exit. */}
+      {/* `Presence`, not `PresenceIf`: the picker is opened by a value and would lose its seeded title during the exit. */}
       <Presence value={correcting}>
         {(np, leaving) => (
           <MatchPicker
@@ -470,9 +403,7 @@ function ScrobbleActions({ playing }: { playing: NowPlaying }) {
             current={np.matchedTitle ?? undefined}
             error={error}
             mediaType={np.mediaType}
-            // Only when a season is the open question: offering "later
-            // seasons" for an ordinary wrong match would be noise, and it
-            // costs a request.
+            // Only when a season is the open question: sequels for an ordinary wrong match are noise and cost a request.
             suggestSequelsOf={
               scrobble.reason?.code === "unknownSeason" ? np.mediaId : null
             }
@@ -485,17 +416,7 @@ function ScrobbleActions({ playing }: { playing: NowPlaying }) {
                   mediaType: np.mediaType,
                   mediaId,
                   displayTitle,
-                  // The offset, not the episode: the correction has to hold
-                  // for *every* episode of this season, not only the one on
-                  // screen when it was made.
-                  //
-                  // Measured against `sourceEpisode` — what the player
-                  // reported — and never against `episode`, which already
-                  // carries this correction's own offset and any relations
-                  // redirect. Against the shifted number, re-picking the same
-                  // entry with its pre-filled episode stored `0` and destroyed
-                  // the correction, and editing a redirected title replaced the
-                  // redirect with the raw source number.
+                  // Measured against `sourceEpisode`, never `episode`, which already carries this offset and any redirect.
                   episodeOffset:
                     realEpisode != null && np.sourceEpisode != null
                       ? realEpisode - np.sourceEpisode

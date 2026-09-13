@@ -7,10 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 
-/**
- * Picks a random entry from the Plan-to-Watch/Read pool, with an optional
- * episode-count cap. Reroll to draw again.
- */
+/** Picks a random entry from the planning pool, with an optional episode-count cap and a reroll. */
 export default function RandomPickModal({
   leaving,
   pool,

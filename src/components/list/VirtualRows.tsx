@@ -9,26 +9,7 @@ import {
 } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 
-/**
- * A flat list whose rows are virtualized inside a scroll container it does not
- * own.
- *
- * `VirtualGrid` is the sibling of this and deliberately stays separate: it
- * chunks a grid into rows and needs a measured column count, and it is the
- * only thing in its scroller. This one is a plain list, and several of them
- * share the local library's single scroller — each under its own header and
- * inside its own bordered card, which is why the sections could not simply be
- * flattened into one virtualizer.
- *
- * `scrollMargin` is what makes sharing work: the virtualizer's coordinates are
- * relative to the scroll element, so each instance has to say how far down that
- * element its own first row begins. It is measured rather than computed,
- * because everything above it — a notice line, a section that grew, a filter
- * that collapsed one — moves it.
- *
- * Row heights are measured too (`measureElement`), since a row that expands to
- * show its files is several times the height of one that has not.
- */
+/** A flat virtualized list sharing a scroller it does not own; each instance measures its own `scrollMargin`. */
 export function VirtualRows<T>({
   items,
   scrollRef,
@@ -41,9 +22,7 @@ export function VirtualRows<T>({
   /** The shared scroll container. */
   scrollRef: RefObject<HTMLDivElement | null>;
   estimateRowHeight: number;
-  /** `isLast` is passed because the last *logical* row is not the last DOM
-      child once rows are absolutely positioned, so `last:` utilities cannot
-      see it — and it is what closes the card's bottom border. */
+  /** `isLast` is passed because absolutely positioned rows hide the last logical row from `last:` utilities. */
   renderItem: (item: T, index: number, isLast: boolean) => ReactNode;
   getKey: (item: T, index: number) => string | number;
   className?: string;
@@ -55,10 +34,7 @@ export function VirtualRows<T>({
     const el = containerRef.current;
     const scroller = scrollRef.current;
     if (!el || !scroller) return;
-    // Distance between the two boxes in the scroller's own coordinates. Read
-    // from rects plus the current scroll offset rather than `offsetTop`, which
-    // is relative to the nearest positioned ancestor and silently wrong the
-    // moment one is introduced between them.
+    // Rects plus scroll offset, not `offsetTop`, which goes wrong the moment a positioned ancestor sits between them.
     const top =
       el.getBoundingClientRect().top -
       scroller.getBoundingClientRect().top +
@@ -68,9 +44,7 @@ export function VirtualRows<T>({
 
   useLayoutEffect(measureMargin);
 
-  // Anything above this list changing height moves its start. A ResizeObserver
-  // on the scroller's content catches the cases a render of *this* component
-  // cannot see — a sibling section expanding, an image finally loading.
+  // A ResizeObserver on the scroller's children catches a sibling growing, which no render of this component sees.
   useEffect(() => {
     const scroller = scrollRef.current;
     if (!scroller) return;

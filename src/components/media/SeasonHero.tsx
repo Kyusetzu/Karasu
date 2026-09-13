@@ -17,22 +17,7 @@ import { cn } from "@/lib/utils";
 /** How long each title holds before the next fades in. */
 const HOLD_MS = 7000;
 
-/**
- * The season's most popular anime, across the top of the Overview.
- *
- * One request per mount, `perPage: 10`, cached for half an hour — the
- * season's popularity ranking does not move minute to minute. It is the
- * app's third dashboard query and the only one that needs `bannerImage`,
- * which is why it has a query of its own rather than widening the 50-a-page
- * seasonal one.
- *
- * The rotation runs under reduced motion too, deliberately: advancing to
- * the next title is *content*, not motion — the crossfade is the motion,
- * and the `!important` overrides in `index.css` already collapse that
- * transition to an instant cut. Holding forever on slide one (what this
- * used to do) muted the carousel entirely for anyone whose system flips
- * the flag, battery savers included, and read as simply broken.
- */
+/** The season's top anime; keep rotating under reduced motion, since the next title is content, not motion. */
 export default function SeasonHero() {
   const { t } = useTranslation();
   const [{ season, year }] = useState(currentSeason);
@@ -47,14 +32,11 @@ export default function SeasonHero() {
     staleTime: 30 * 60 * 1000,
   });
 
-  // The same filter every other dashboard section runs through. The query
-  // argument covers the server side; this covers the genre rule, which AniList
-  // has no equivalent for.
+  // The same filter as every dashboard section: the query argument covers the server side, this covers the genre rule.
   const items = (data ?? []).filter((m) => !isBlocked(m, level));
 
   const [at, setAt] = useState(0);
-  // A ref, so the timer can be scheduled once per slide instead of being torn
-  // down and rebuilt by every unrelated re-render of the Overview.
+  // A ref, so the timer is scheduled once per slide instead of rebuilt by every unrelated re-render of the Overview.
   const count = useRef(items.length);
   count.current = items.length;
 
@@ -65,16 +47,10 @@ export default function SeasonHero() {
       HOLD_MS,
     );
     return () => window.clearTimeout(tick);
-    // `at` is the dependency on purpose: each slide schedules the next, so a
-    // tab that was hidden does not wake up owing several transitions at once.
+    // `at` is a dependency on purpose: each slide schedules the next, so a hidden tab does not wake owing several at once.
   }, [at, items.length]);
 
-  // Which slides have earned a mount. All five used to mount at once, which
-  // started five banner downloads in parallel at first paint — the whole
-  // hero waited on the slowest of them. Now the active slide and its
-  // successor (so the crossfade has something decoded to fade to) mount;
-  // once seen, a slide stays mounted, because unmounting drops the decoded
-  // image and each return visit would re-decode and flash.
+  // Mount slides as they are reached, not every banner at once, and keep a seen one: unmounting re-decodes and flashes.
   const [seen, setSeen] = useState(() => new Set([0, 1]));
   useEffect(() => {
     setSeen((prev) => {
@@ -90,9 +66,7 @@ export default function SeasonHero() {
   const step = (dir: 1 | -1) =>
     setAt((i) => (i + dir + count.current) % Math.max(1, count.current));
 
-  // Nothing is a better hero than a broken one — no skeleton once it is known
-  // there is nothing to show, so the Overview simply starts at its first
-  // section as it always did.
+  // No skeleton once there is nothing to show; the Overview simply starts at its first section.
   if (isLoading) return <Shimmer className="h-48 md:h-72 w-full rounded-2xl" />;
   if (items.length === 0) return null;
 
@@ -101,9 +75,7 @@ export default function SeasonHero() {
   return (
     <section aria-label={t("dashboard.heroLabel")} className="relative">
       <div className="relative h-48 md:h-72 overflow-hidden rounded-2xl bg-surface-900">
-        {/* Every slide is mounted and cross-faded by opacity rather than
-            swapped: swapping unmounts the decoded image, so each rotation would
-            re-decode and flash. The inactive ones are inert to the pointer. */}
+        {/* Cross-faded by opacity, not swapped: swapping unmounts the decoded image and every rotation would flash. */}
         {items.map((m, i) =>
           seen.has(i) ? (
             <Slide
@@ -115,16 +87,14 @@ export default function SeasonHero() {
           ) : null,
         )}
 
-        {/* Over the art, under the text. `from-surface-950` matches the page,
-            so the image reads as the page rather than as a card on it. */}
+        {/* `from-surface-950` matches the page, so the image reads as the page rather than as a card on it. */}
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-surface-950 via-surface-950/55 to-transparent" />
 
         <div className="pointer-events-none absolute inset-x-0 bottom-0 p-5">
           <p className="text-2xs font-semibold uppercase tracking-[.14em] text-accent-400">
             {t(`season.${season}`)} {year} · {t("dashboard.heroKicker")}
           </p>
-          {/* The link is the title, and the whole image is a second one — both
-              go to the same place, so a click anywhere on the hero works. */}
+          {/* The link is the title and the whole image is a second one, so a click anywhere on the hero works. */}
           <h2 className="mt-1 max-w-3xl">
             <Link
               to={`/media/${current.id}`}
@@ -144,11 +114,7 @@ export default function SeasonHero() {
           </p>
         </div>
 
-        {/* Prev/next as a pair in the top-right corner, over the art and
-            above the slide links. Not vertically centred: the text block is
-            bottom-anchored and reaches mid-banner on the phone's h-48, so a
-            centred arrow sat on top of the title. The top edge holds
-            nothing. */}
+        {/* Top-right, not centred: on a phone the bottom-anchored text reaches mid-banner, and a centred arrow sat on the title. */}
         {items.length > 1 && (
           <div className="absolute right-3 top-3 flex gap-1.5">
             <IconButton
@@ -194,14 +160,7 @@ export default function SeasonHero() {
   );
 }
 
-/**
- * One title's artwork.
- *
- * `bannerImage` is a 2:1 crop and the right shape here. Falling back to the
- * cover means stretching a 2:3 poster across a wide box, so it is blurred and
- * dimmed and treated as a backdrop rather than as the picture — the same trick
- * `AnimeDetail` uses when a title has no banner.
- */
+/** One title's artwork; the cover fallback is a poster stretched wide, so it is blurred and dimmed into a backdrop. */
 function Slide({
   media,
   active,
@@ -229,9 +188,7 @@ function Slide({
           src={banner ?? fallback ?? undefined}
           className={cn(
             "h-full w-full object-cover",
-            // The fallback is already a blurred backdrop, so only a real
-            // banner needs veiling — but a veiled one goes further than the
-            // backdrop blur, since here it is the picture rather than a wash.
+            // Only a real banner needs veiling, and harder than the backdrop blur, since it is the picture rather than a wash.
             !banner && "scale-110 blur-lg",
             veiled && banner && "scale-110 blur-2xl",
           )}

@@ -20,10 +20,7 @@ import { useAuth } from "@/stores/auth";
 import EntryEditModal, { type EntrySaveInput } from "@/components/media/EntryEditModal";
 import { PresenceIf } from "@/components/ui/presence";
 
-/**
- * Card for discovery grids (search, season): quick add and full editing
- * (status/progress/score) straight from the results.
- */
+/** Card for discovery grids (search, season): quick add and full editing straight from the results. */
 export default function MediaCard({
   media,
   focused = false,
@@ -43,8 +40,7 @@ export default function MediaCard({
     mutationFn: (input: Parameters<typeof saveListEntry>[0]) =>
       saveListEntry(input, media),
     onSuccess: (result, input) => {
-      // Only the collection this card belongs to — saving an anime cannot
-      // change the manga list, and the broad key refetched both.
+      // Only this card's collection: saving an anime cannot change the manga list, and the broad key refetched both.
       qc.invalidateQueries({ queryKey: ["mediaList", media.type] });
       // Patch the discovery cache locally instead of refetching (rate limit)
       media.mediaListEntry = {
@@ -58,16 +54,7 @@ export default function MediaCard({
     },
   });
 
-  /**
-   * The list entry, from AniList or — in the account-free profile — from the
-   * local list.
-   *
-   * `mediaListEntry` is null for *every* title in local mode: `anilist_query`
-   * sends no token there and AniList has never heard of the local list. Without
-   * the fallback this card offered "add to Planning" for a title already being
-   * watched, and handed `EntryEditModal` a null that it seeded PLANNING/0/0
-   * from — which `local_save_entry` then wrote over the real entry.
-   */
+  /** Keep the local fallback: `mediaListEntry` is null in local mode, and the editor would write over the real entry. */
   const cached = useCachedEntry(0, media.type, media.id);
   const entry = media.mediaListEntry ?? cached ?? null;
   const level = useContentFilter((s) => s.level);
@@ -76,16 +63,10 @@ export default function MediaCard({
   return (
     <CoverCell
       to={`/media/${media.id}`}
-      // The roving cursor is not real DOM focus — the card that has it may be
-      // any of hundreds — so the ring is drawn rather than inherited from
-      // `:focus-visible`. Same reasoning as the list view's.
+      // The roving cursor is not real DOM focus, so the ring is drawn rather than inherited from `:focus-visible`.
       className={focused ? "rounded-[.625rem] ring-2 ring-accent-500" : undefined}
       cover={media.coverImage.large}
-      // `mediaListEntry { status }` has been in `MEDIA_FIELDS` all along, so
-      // every search and seasonal card already knew this and threw it away —
-      // the only trace was a tooltip on the check circle below. Null when the
-      // title is not on the list, which is the honest answer for a discovery
-      // grid and is why not-on-list has no ring rather than a grey one.
+      // Null when the title is not on the list, so an unlisted title has no ring rather than a grey one.
       statusRing={entry ? statusColorVar(entry.status) : null}
       score={media.averageScore != null ? `${media.averageScore}%` : null}
       adult={media.isAdult === true}
@@ -107,9 +88,7 @@ export default function MediaCard({
               <Pencil className="size-3.5" />
             </IconButton>
             {entry ? (
-              // Tinted to match the ring, so the badge and the border are
-              // saying the same thing. It was `bg-success` for every status —
-              // one green check whether you had completed it or dropped it.
+              // Tinted to match the ring, so the badge and the border say the same thing.
               <span
                 className="grid size-7.5 place-items-center rounded-full text-surface-950"
                 style={{ background: statusColorVar(entry.status) }}
@@ -118,9 +97,7 @@ export default function MediaCard({
                 <Check className="size-3.75" />
               </span>
             ) : (
-              // Discovery grids get the neutral circle: adding to Planning is
-              // not the same weight of action as +1 on something you are
-              // actively watching, and the accent is reserved for that.
+              // The neutral circle: adding to Planning is not the same weight as a +1, and the accent is reserved for that.
               <IconButton
                 variant="onCover"
                 size="sm"

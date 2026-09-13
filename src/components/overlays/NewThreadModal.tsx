@@ -12,18 +12,7 @@ import { charsLeft, POST_MAX, TITLE_MAX, validateThread } from "@/lib/composer";
 import { showToast } from "@/stores/toast";
 import { cn } from "@/lib/utils";
 
-/**
- * Create a forum thread: a title, at least one category, and a markdown body.
- *
- * Create-only on purpose — editing and deleting a thread stay on anilist.co,
- * where a destructive click has the site's own confirm around it (the
- * `saveThread` comment in `api/social` records the introspection).
- *
- * Not optimistic, like the comment box: it is the user's own words, and a
- * failure that erased them would be worse than a moment of waiting. The
- * preview renders through the same `Markdown` the thread page uses, so the
- * post is learned before it is public rather than after.
- */
+/** Creates a forum thread, and only creates: editing and deleting stay on anilist.co behind the site's own confirm. */
 export function NewThreadModal({
   onClose,
   leaving,

@@ -15,19 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Shimmer } from "@/components/Skeleton";
 import { cn } from "@/lib/utils";
 
-/**
- * The season-split confirmation: a folder holds more episodes than its match
- * has, and the overflowing range needs a home.
- *
- * Candidates are the matched title's SEQUEL relations (one request, on
- * demand), with the community anime-relations hint pre-selected when it names
- * one of them — pre-selected only, never applied on its own: the maintainer
- * chose "always ask" over the scrobbler's silent renumbering. A search box
- * covers the case where the relations are wrong or missing.
- *
- * The mapping preview is the point of the dialog: "episode 13 → episode 1"
- * is what catches an off-by-one before it becomes a persisted rule.
- */
+/** The season-split confirmation; the relations hint is pre-selected but never applied on its own (always ask). */
 
 export interface SplitTarget {
   /** The row being split — the command is keyed on it, not on a parse. */
@@ -58,8 +46,7 @@ export function SeasonSplitModal({
   leaving,
 }: {
   target: SplitTarget;
-  /** The page owns the command and the refresh; this hands it the answer.
-      The label rides along so the page's success toast can name the show. */
+  /** Hands the answer to the page, which owns the command; the label lets its success toast name the show. */
   onConfirm: (mediaId: number, dstStart: number, label: string) => void;
   onClose: () => void;
   error: string | null;
@@ -82,8 +69,7 @@ export function SeasonSplitModal({
     staleTime: 60 * 60 * 1000,
   });
 
-  // The MatchPicker's own debounce, for the same reason: a search per
-  // keystroke spends the shared rate limit on half-typed words.
+  // Debounced like MatchPicker: a search per keystroke spends the shared rate limit on half-typed words.
   useEffect(() => {
     const timer = setTimeout(() => setDebounced(term.trim()), 350);
     return () => clearTimeout(timer);
@@ -99,8 +85,7 @@ export function SeasonSplitModal({
   const candidates: Choice[] = useMemo(() => {
     const toChoice = (m: SequelCandidate): Choice => ({
       mediaId: m.id,
-      // The community rules may renumber into a mid-count start (a split-cour
-      // second half); everything else begins at 1.
+      // The community rules may renumber into a mid-count start (a split-cour second half); everything else begins at 1.
       dstStart:
         overflow.hint && overflow.hint.mediaId === m.id ? overflow.hint.dstStart : 1,
       label: displayTitle(m.title),

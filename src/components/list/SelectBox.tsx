@@ -18,8 +18,7 @@ export function SelectBox({
       onClick={onToggle}
       className={cn(
         "grid size-5 shrink-0 place-items-center rounded-[.3125rem] border transition-surface",
-        // Near-opaque unchecked, because it sits on arbitrary cover art and a
-        // translucent box has no contrast floor there.
+        // Near-opaque unchecked: it sits on arbitrary cover art, where a translucent box has no contrast floor.
         checked
           ? "border-accent-500 bg-accent-500 text-accent-ink"
           : "border-[rgba(255,255,255,.35)] bg-[rgba(4,5,8,.7)] text-transparent hover:border-accent-500",

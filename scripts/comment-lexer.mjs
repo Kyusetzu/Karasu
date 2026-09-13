@@ -607,14 +607,29 @@ export function lexComments(text, lang) {
   return result;
 }
 
-/** `text` with every comment replaced by a single space; the shape the strip check compares. */
+function jsxCommentLine(lang, before, after) {
+  return (lang === "ts" || lang === "js") && before.trim() === "{" && after.trim() === "}";
+}
+
+/** `text` with every comment replaced by a single space; a JSX comment line loses its braces too, since it renders nothing. */
 export function stripComments(text, lang) {
   const { tokens } = lexComments(text, lang);
   let out = "";
   let last = 0;
   for (const t of tokens) {
-    out += text.slice(last, t.start) + " ";
-    last = t.end;
+    let start = t.start;
+    let end = t.end;
+    if (lang === "ts" || lang === "js") {
+      const lineStart = text.lastIndexOf("\n", start - 1) + 1;
+      let lineEnd = text.indexOf("\n", end);
+      if (lineEnd === -1) lineEnd = text.length;
+      if (jsxCommentLine(lang, text.slice(lineStart, start), text.slice(end, lineEnd).replace(/\r$/, ""))) {
+        start = lineStart;
+        end = lineEnd;
+      }
+    }
+    out += text.slice(last, start) + " ";
+    last = end;
   }
   return out + text.slice(last);
 }
@@ -634,7 +649,8 @@ export function blocks(text, lang) {
       // The line is comment-only when everything outside [t.start, t.end) is whitespace.
       const before = lineText.slice(0, Math.max(0, t.start - lineStart));
       const after = lineText.slice(Math.max(0, Math.min(lineText.length, t.end - lineStart)));
-      if (before.trim() === "" && after.trim() === "") {
+      // A line that is only `{/* … */}` is a JSX comment line, so stacked ones count as a block like any other.
+      if ((before.trim() === "" && after.trim() === "") || jsxCommentLine(lang, before, after)) {
         lineInfo[ln - 1] = { token: t, ln };
       } else if (lineInfo[ln - 1] === null) {
         lineInfo[ln - 1] = { token: t, ln, trailing: true };
@@ -691,6 +707,7 @@ export function selfTest() {
     ["ts", 'const re = /\\/\\/ not a comment/g; // yes\nconst s = `a ${"//"} b`; /* block */', ["yes", "block"]],
     ["ts", "const x = a / b; // div\nconst y = (a) / 2 // half", ["div", "half"]],
     ["ts", 'return <div>{/* jsx */}</div>; // after', ["jsx", "after"]],
+    ["ts", "<div>\n  {/* one */}\n  {/* two */}\n  <b/>\n</div>", ["one", "two"]],
     ["ts", "// @ts-expect-error boom\nconst z = 1;", ["@ts-expect-error boom"]],
     ["rs", 'let s = r#"/* not */ // not"#; // real\nlet c = \'\\\'\'; let l: &\'a str = "x"; /// doc', ["real", "doc"]],
     ["rs", "/* outer /* inner */ still */ let a = 1; //! mod", ["outer /* inner */ still", "mod"]],

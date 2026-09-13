@@ -18,23 +18,7 @@ const MOVE_THRESHOLD = 3;
 
 const RESTING: ZoomView = { tx: 0, ty: 0, zoom: 1 };
 
-/**
- * Pan and zoom for a `translate3d(tx, ty, 0) scale(zoom)` canvas with
- * `transform-origin: 0 0`. The arithmetic lives in `lib/zoomMath`, tested.
- *
- * Zoom is anchored to a point — the cursor for the wheel, the pinch midpoint
- * for two fingers, the viewport centre for the buttons — because zooming
- * about the origin instead walks the content out of view after two notches.
- *
- * The view is mirrored in a ref as well as in state: a pointer handler needs
- * the current offset to compute the next one, and reading it out of the state
- * closure gives whatever it was when the handler was created.
- *
- * Two pointers are a pinch: the second `pointerdown` suspends the one-finger
- * pan, each move rescales about the moving midpoint, and the last finger to
- * lift re-seeds an ordinary drag so the image does not jump. The default
- * clamp is the franchise graph's; the cover viewer widens it via `opts`.
- */
+/** Pan and zoom for a `translate3d() scale()` canvas, anchored to a point, with the arithmetic in `lib/zoomMath`. */
 export function usePanZoom(
   viewport: RefObject<HTMLElement | null>,
   opts?: { minZoom?: number; maxZoom?: number },
@@ -85,9 +69,7 @@ export function usePanZoom(
     if (e.pointerType === "mouse" && e.button !== 0) return;
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pointers.current.size === 2) {
-      // Entering a pinch: the one-finger pan stands down, and both pointers
-      // are captured — a two-finger gesture is never a click, so the
-      // capture-late discipline below does not apply to it.
+      // Entering a pinch: the one-finger pan stands down, and both pointers are captured since it is never a click.
       origin.current = null;
       moved.current = true;
       for (const id of pointers.current.keys()) {
@@ -104,11 +86,7 @@ export function usePanZoom(
     origin.current = { x: e.clientX, y: e.clientY, tx, ty };
     moved.current = false;
     setDragging(true);
-    // Deliberately NO pointer capture here. Capture retargets the derived
-    // `click`/`dblclick` at the capture element, so capturing on press made
-    // every button inside the canvas — nodes, zoom, collapse pills —
-    // unclickable for as long as the graph has existed. Capture is taken
-    // when a drag actually commits, in `onPointerMove`.
+    // Keep pointer capture out of here; it retargets the derived `click`, making every button in the canvas unclickable.
   }, []);
 
   const onPointerMove = useCallback(
@@ -140,9 +118,7 @@ export function usePanZoom(
       }
       const from = origin.current;
       if (!from) return;
-      // No capture is held before the threshold, so a press whose release
-      // lands outside the viewport never delivers its `pointerup` — without
-      // this guard the stale origin would make bare hovers pan the canvas.
+      // Keep this guard; a release outside the viewport delivers no `pointerup`, and bare hovers would then pan.
       if (e.buttons === 0) {
         origin.current = null;
         pts.delete(e.pointerId);
@@ -152,9 +128,7 @@ export function usePanZoom(
       const dx = e.clientX - from.x;
       const dy = e.clientY - from.y;
       if (!moved.current && Math.hypot(dx, dy) < MOVE_THRESHOLD) return;
-      // The drag is real from here on: take the capture now, so the pan
-      // keeps tracking past the viewport edge. A stationary click never
-      // reaches this line and its `click` stays on the button it pressed.
+      // The drag is real from here on, so capture now to keep tracking past the edge; a click never reaches this.
       if (!moved.current) e.currentTarget.setPointerCapture(e.pointerId);
       moved.current = true;
       commit({ ...current.current, tx: from.tx + dx, ty: from.ty + dy });
@@ -169,8 +143,7 @@ export function usePanZoom(
       e.currentTarget.releasePointerCapture(e.pointerId);
     }
     if (pts.size === 1) {
-      // Pinch down to one finger: re-seed an ordinary drag from the survivor
-      // so the image stays put instead of jumping to a stale origin.
+      // Pinch down to one finger: re-seed an ordinary drag from the survivor so the image does not jump.
       const [rest] = pts.values();
       const { tx, ty } = current.current;
       origin.current = { x: rest.x, y: rest.y, tx, ty };
@@ -179,9 +152,7 @@ export function usePanZoom(
     if (!origin.current) return;
     origin.current = null;
     setDragging(false);
-    // `click` fires *after* `pointerup`, so the flag has to outlive this
-    // handler and die on the next tick. Clearing it here would let every pan
-    // end in a selection; never clearing it would suppress selection forever.
+    // `click` fires after `pointerup`, so the flag must outlive this handler and die on the next tick.
     if (moved.current) setTimeout(() => (moved.current = false), 0);
   }, []);
 

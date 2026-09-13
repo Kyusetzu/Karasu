@@ -3,13 +3,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { useDialogFocus } from "./useDialogFocus";
 
-/**
- * The two things every Karasu dialog got wrong until this hook: Tab walked out
- * into the page behind the scrim, and closing dropped focus to `<body>`.
- *
- * Driven through a bare harness rather than a real overlay, so a failure points
- * at the hook rather than at whichever dialog happened to be under test.
- */
+/** Proves Tab stays inside the dialog and closing restores focus, through a bare harness so a failure blames the hook. */
 
 function Dialog({ onClose }: { onClose: () => void }) {
   const panel = useRef<HTMLDivElement>(null);
@@ -57,11 +51,7 @@ const press = (shift = false) =>
     shiftKey: shift,
   });
 
-/**
- * Focus, then click. A real browser focuses a button on mousedown, and jsdom
- * does not — without this the hook records `<body>` as the opener and the
- * restore test would be asserting jsdom's behaviour rather than the app's.
- */
+/** Focus before clicking; jsdom does not focus on mousedown, and the hook would record `<body>` as the opener. */
 function open() {
   const opener = screen.getByText("opener");
   opener.focus();

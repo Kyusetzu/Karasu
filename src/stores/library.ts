@@ -11,13 +11,7 @@ import {
 interface LibraryState {
   /** media_id → episode numbers present on disk. */
   episodes: Record<number, number[]>;
-  /**
-   * The full index — paths, scores, sources — for the library page only.
-   *
-   * Loaded on demand rather than at startup: it carries an absolute path per
-   * file, so a large library cost a few hundred kilobytes of JSON across the
-   * bridge on every launch for a screen most sessions never open.
-   */
+  /** The full index for the library page only, loaded on demand because it carries an absolute path per file. */
   entries: LibraryEntry[];
   /** Whether `entries` has ever been fetched, so `refresh` knows to keep it current. */
   entriesLoaded: boolean;
@@ -25,11 +19,7 @@ interface LibraryState {
   loadEntries: () => Promise<void>;
   /** Last library failure, surfaced globally so every call site reports it. */
   error: string | null;
-  /**
-   * Report a failure from outside the store. Playback sets `error` on its own,
-   * but a manual match is just as capable of failing and had no channel to say
-   * so — App already renders this one, so a second would only compete with it.
-   */
+  /** Reports a failure from outside the store, such as a manual match, through the one channel App already renders. */
   setError: (message: string) => void;
   refresh: () => Promise<void>;
   /** Whether an episode beyond `progress` exists locally. */
@@ -54,9 +44,7 @@ export const useLibrary = create<LibraryState>((set, get) => ({
     if (!isTauri) return;
     try {
       set({ episodes: await getLibraryEpisodes() });
-      // Once the library page has asked for the full index, keep it in step —
-      // a rescan calls this, and leaving `entries` behind would show that page
-      // the pre-scan rows. Nothing fetches it if nobody has needed it yet.
+      // Once the library page has asked for the full index, a rescan keeps it in step; nobody fetches it before then.
       if (get().entriesLoaded) set({ entries: await getLibraryIndex() });
     } catch {
       /* library not scanned yet — ignore */

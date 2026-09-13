@@ -2,16 +2,10 @@ import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 import { en } from "./en";
 
-// Not dead: `i18nKeys.test.ts` reaches it as a property of the module object,
-// which a name-level grep for `import { en }` does not see.
+// Not dead: `i18nKeys.test.ts` reaches it as a property of the module object, which a grep for the import misses.
 export { en };
 
-/**
- * Language handling: English is the primary language. On first start the
- * app follows the system language (WebView2 reports it via
- * navigator.language); the dropdown in Settings acts as an override and
- * is persisted in localStorage.
- */
+/** English is primary; the app follows the system language until the Settings dropdown overrides it in localStorage. */
 
 export type LanguageSetting = "system" | "en" | "de";
 const STORAGE_KEY = "karasu-lang";
@@ -35,16 +29,7 @@ export function resolveLanguage(setting: LanguageSetting): "en" | "de" {
   return setting === "system" ? systemLanguage() : setting;
 }
 
-/**
- * Loads a language's bundle if it is not already registered.
- *
- * Only German is ever fetched this way. English is the fallback and by far the
- * common case, so it stays in the entry chunk where `init` can use it
- * synchronously; German is ~30 kB of source that most starts never touch.
- *
- * `de.ts`'s `import { en }` is type-only (`de: typeof en`), so it erases at
- * build time and this split does not weaken the key-parity guarantee.
- */
+/** Loads German on demand; English stays in the entry chunk, and `de.ts`'s type-only import keeps key parity intact. */
 async function ensureBundle(lng: "en" | "de"): Promise<void> {
   if (lng === "en" || i18n.hasResourceBundle(lng, "translation")) return;
   const { de } = await import("./de");
@@ -63,14 +48,7 @@ export async function setLanguageSetting(setting: LanguageSetting) {
   await i18n.changeLanguage(lng);
 }
 
-/**
- * Awaited by the entry before the first render.
- *
- * Without this a German start would paint English for a frame and then swap,
- * which is a worse trade than the 30 kB it saves. Resolves in a microtask for an
- * English start, so that path pays nothing at all — and over `tauri://` the
- * German chunk is a local read rather than a download.
- */
+/** Awaited by the entry before the first render, so a German start does not paint English for a frame and swap. */
 export async function initLanguage(): Promise<void> {
   await ensureBundle(resolveLanguage(getLanguageSetting()));
 }
@@ -84,19 +62,7 @@ i18n.use(initReactI18next).init({
   interpolation: { escapeValue: false },
 });
 
-/**
- * Mirrors the language into SQLite, where Rust can read it.
- *
- * Rust composes every desktop notification, every row in the bell and the tray
- * menu, and has no access to this setting — it lives in localStorage, inside
- * the WebView. Without the mirror all of those are English whatever the
- * interface says around them.
- *
- * Fire-and-forget on purpose: it is a copy of something already stored, so a
- * failed write costs one notification in the wrong language, not a lost
- * setting. It is also the reason this is not awaited anywhere — nothing on
- * screen depends on it.
- */
+/** Mirrors the language into SQLite for Rust's notifications and tray menu; fire-and-forget, it is only a copy. */
 function mirrorToBackend(lng: string) {
   if (!("__TAURI_INTERNALS__" in window)) return;
   void import("@tauri-apps/api/core")
@@ -104,15 +70,7 @@ function mirrorToBackend(lng: string) {
     .catch(() => {});
 }
 
-/**
- * Keeps `<html lang>` on the language actually being rendered.
- *
- * `index.html` ships `lang="en"` and nothing ever moved it, so a German UI
- * claimed to be English — which is what a screen reader picks its voice and
- * pronunciation rules from, and what the WebView hyphenates and spell-checks
- * by. Registered rather than set once, because the language can change at
- * runtime from the Appearance pane.
- */
+/** Keeps `<html lang>` on the rendered language, which screen readers and the WebView's spell-check read from. */
 i18n.on("languageChanged", (lng) => {
   if (typeof document !== "undefined") document.documentElement.lang = lng;
   mirrorToBackend(lng);
@@ -120,9 +78,7 @@ i18n.on("languageChanged", (lng) => {
 if (typeof document !== "undefined") {
   const lng = resolveLanguage(getLanguageSetting());
   document.documentElement.lang = lng;
-  // On start as well as on change: `languageChanged` does not fire for the
-  // language `init` was given, and "system" can resolve differently on a
-  // machine whose locale changed since the last run.
+  // On start too: `languageChanged` does not fire for the language `init` was given, and "system" can resolve anew.
   mirrorToBackend(lng);
 }
 

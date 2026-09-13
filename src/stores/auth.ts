@@ -13,17 +13,7 @@ interface AuthState {
   mode: ProfileMode;
   /** true while the stored session is still being restored */
   loading: boolean;
-  /**
-   * AniList has rejected the stored token.
-   *
-   * One flag for the whole app, because one dead token fails everything at
-   * once: `anilist_query` attaches the bearer to every request, including the
-   * public ones behind search, the forum and detail pages. Before this, each of
-   * those screens rendered its own "Failed to load: Invalid token", which is
-   * what made an expired session read as the app randomly breaking.
-   *
-   * Never set in local mode — there is no token to reject.
-   */
+  /** AniList rejected the stored token (never set in local mode); one flag, since the bearer rides every request. */
   sessionExpired: boolean;
   /** true once a profile (AniList or local) is active */
   hasProfile: () => boolean;
@@ -43,44 +33,20 @@ function applyMode(mode: ProfileMode) {
   return mode;
 }
 
-/** Same idea for the score format: the save paths convert through the cached
- *  value, so it must move with the viewer everywhere the viewer does. */
+/** Keep the api-layer score-format cache moving with the viewer, since the save paths convert through it. */
 function applyViewer(viewer: Viewer | null): Viewer | null {
   api.setScoreFormatCache(asScoreFormat(viewer?.mediaListOptions?.scoreFormat));
   return viewer;
 }
 
-/**
- * The account's score format, for components. Ten-point when there is no
- * account to follow (local mode, signed out) — exactly the old behaviour.
- */
+/** The account's score format for components, ten-point when there is no account to follow. */
 export function useScoreFormat(): ScoreFormat {
   return useAuth((s) => asScoreFormat(s.viewer?.mediaListOptions?.scoreFormat));
 }
 
-/**
- * The account's advanced-scoring categories for one media type, or none.
- *
- * Empty whenever the feature is off, which is the only correct gate: AniList
- * seeds `advancedScoring` with five default names on accounts that have never
- * switched it on, so the presence of names says nothing. Empty in local mode
- * and signed out, where the whole idea does not apply.
- */
+/** Advanced-scoring categories for one media type; gate on the enabled flag, since AniList seeds names anyway. */
 export function useAdvancedCategories(type: MediaType): string[] {
-  // The selector returns something the store already holds **by reference**,
-  // and the deriving happens outside it. This is not a style preference.
-  //
-  // zustand 5 hands the selector straight to React's `useSyncExternalStore`,
-  // which re-invokes it in its post-commit consistency check and re-renders
-  // whenever the result is not identical to the last one. A selector that ends
-  // in `.filter()` allocates a fresh array every time, so it is *never*
-  // identical — and the component re-renders until React gives up. Measured on
-  // this repo's own React 19.2.7 and zustand 5.0.14: 55 renders, then
-  // "Maximum update depth exceeded" (minified error #185 in a shipped build).
-  //
-  // The first version of this hook derived inside the selector and stabilised
-  // only the disabled branch with the frozen constant below — which is to say,
-  // it worked for everyone except the accounts the feature exists for.
+  // Keep the selector returning a store-held reference; a fresh array per call re-renders until React gives up.
   const options = useAuth((s) =>
     type === "MANGA"
       ? s.viewer?.mediaListOptions?.mangaList
@@ -102,9 +68,7 @@ export const useAuth = create<AuthState>((set, get) => ({
   loading: true,
   sessionExpired: false,
 
-  // Idempotent on purpose: a screen fires several queries and every one of them
-  // fails, so this is called in a burst. Setting an already-set flag would
-  // re-render every subscriber for nothing.
+  // Idempotent on purpose: a screen's failing queries call this in a burst, and re-setting would re-render for nothing.
   reportSessionExpired: () => {
     if (!get().sessionExpired) set({ sessionExpired: true });
   },
@@ -119,14 +83,11 @@ export const useAuth = create<AuthState>((set, get) => ({
       set({ loading: false });
       return;
     }
-    // The api layer cannot import this store (it imports the api layer), so
-    // the rejection arrives through a registered callback — the same shape as
-    // `setProfileModeCache`.
+    // The api layer cannot import this store (it imports the api layer), so the rejection arrives by callback.
     api.setTokenRejectedHandler(() => get().reportSessionExpired());
-    // The one-click login completes in the backend (callback server) and
-    // announces the fresh viewer through this event.
+    // The one-click login completes in the backend and announces the fresh viewer through this event.
     listen<Viewer>("anilist-auth", (e) => {
-      // Same reason as `connect` below: this is a different account arriving.
+      // A different account is arriving, so drop the cached responses before its viewer is visible.
       api.identityChanged();
       set({
         viewer: applyViewer(e.payload),
@@ -150,14 +111,9 @@ export const useAuth = create<AuthState>((set, get) => ({
 
   connect: async (token: string) => {
     const viewer = await api.connect(token);
-    // Drop every cached response before the new viewer is visible. The keys
-    // that matter here carry no viewer of their own while their payload does,
-    // so without this the previous account's entry — progress, score, private
-    // notes — keeps rendering under this one, and one Save writes it here.
+    // Keep this before the set; query keys carry no viewer, so a stale entry would render and save under this account.
     api.identityChanged();
-    // Cleared here and on the `anilist-auth` event above, which are the only
-    // two ways a working token arrives. Leaving it set would strand the banner
-    // over a session that has just been fixed.
+    // Cleared wherever a working token arrives, or the banner would strand over a session just fixed.
     set({
       viewer: applyViewer(viewer),
       mode: applyMode("anilist"),
@@ -174,11 +130,9 @@ export const useAuth = create<AuthState>((set, get) => ({
 
   logout: async () => {
     await api.logout();
-    // The account's responses must not outlive the account: signing back in as
-    // someone else would otherwise meet a cache still holding these answers.
+    // The account's responses must not outlive the account, or the next sign-in meets a cache full of them.
     api.identityChanged();
-    // Signed out is not "expired": there is no session left to be stale, and
-    // the sign-in screen is already the thing the banner would ask for.
+    // Signed out is not "expired": the sign-in screen is already what the banner would ask for.
     set({ viewer: applyViewer(null), mode: applyMode("none"), sessionExpired: false });
   },
 

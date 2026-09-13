@@ -5,8 +5,7 @@ import * as api from "@/api/anilist";
 import { useAdvancedCategories, useAuth } from "./auth";
 import type { Viewer } from "@/api/types";
 
-// Only the three IPC calls are replaced. `setIdentityChangedHandler` and
-// `identityChanged` stay the real ones so the test drives the actual seam.
+// Only the three IPC calls are replaced; the identity-changed handler stays real so the test drives the actual seam.
 vi.mock("@/api/anilist", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/api/anilist")>();
   return {
@@ -18,22 +17,7 @@ vi.mock("@/api/anilist", async (importOriginal) => {
   };
 });
 
-/**
- * The selector-stability test, and it exists because the first version of
- * `useAdvancedCategories` did not have one.
- *
- * zustand 5 passes the selector to React's `useSyncExternalStore`, which
- * re-invokes it after commit and re-renders whenever the result is not
- * *identical* to the previous one. A selector ending in `.filter()` allocates
- * a new array every call, so it never is — and the component re-renders until
- * React throws "Maximum update depth exceeded" (minified #185 in a shipped
- * build). The original hook stabilised only the feature-off branch, which is
- * to say it worked for everyone except the accounts the feature is for.
- *
- * A render *count* rather than an assertion about references: the count is
- * what the user experiences, and it is the thing that cannot be satisfied by
- * accident.
- */
+/** Proves `useAdvancedCategories` returns a stable reference, or `useSyncExternalStore` re-renders until React throws. */
 
 function Probe({ renders }: { renders: { current: number } }) {
   const categories = useAdvancedCategories("ANIME");
@@ -71,7 +55,7 @@ describe("useAdvancedCategories", () => {
     const renders = { current: 0 };
     const { getByTestId } = render(<Probe renders={renders} />);
     expect(getByTestId("out").textContent).toBe("Story,Characters,Visuals|true");
-    // One render. The broken version reached 55 and then threw.
+    // One render; the count is what the user experiences and cannot be satisfied by accident.
     expect(renders.current).toBe(1);
   });
 
@@ -88,11 +72,7 @@ describe("useAdvancedCategories", () => {
     expect(renders.current).toBe(1);
   });
 
-  /**
-   * The flag is the gate, never the names. AniList seeds five defaults on
-   * accounts that have never switched the feature on, so a non-empty
-   * `advancedScoring` says nothing at all.
-   */
+  /** The flag is the gate, never the names: AniList seeds default categories on accounts that never enabled the feature. */
   it("ignores seeded category names when the feature is off", () => {
     useAuth.setState({
       viewer: viewer({
@@ -113,21 +93,7 @@ describe("useAdvancedCategories", () => {
   });
 });
 
-/**
- * Every way the app changes which account it is acting as must drop the query
- * cache, and this test exists because none of them did.
- *
- * Most cache keys carry no viewer — `["mediaDetail", id]`, `["search", …]` —
- * while the payload behind them does: `MEDIA_FIELDS` spreads `mediaListEntry`,
- * which is *this* account's progress, score and private notes. Within
- * `gcTime` the previous account's entry therefore kept rendering under the
- * next one and seeded the entry editor, one Save away from being written to
- * the wrong list.
- *
- * The assertion is on the callback firing rather than on a `QueryClient`,
- * because the store cannot reach the client: `main.tsx` owns it and registers
- * the handler, exactly as it does for a rejected token.
- */
+/** Proves every identity change fires the cache-drop handler `main.tsx` registers, or `mediaListEntry` leaks across users. */
 describe("identity changes drop the query cache", () => {
   const fired: string[] = [];
 

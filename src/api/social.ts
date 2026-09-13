@@ -6,23 +6,7 @@ import {
   type SiteNotifRow,
 } from "@/lib/siteNotifications";
 
-/**
- * AniList's social graph: profiles, followers, following, user search, and the
- * mutations that change them.
- *
- * A file of its own rather than more of `queries.ts`, which is already 555
- * lines of media queries plus the statistics block. `api/` is split by subject
- * already — `anilist`, `queries`, `types`, `franchise`, `library` — so this
- * follows the existing shape instead of inventing one.
- *
- * Everything here goes through `gql`, which is the `anilist_query` command:
- * the token is attached in Rust and never reaches this side. That is why the
- * whole social feature needs no new Tauri command.
- *
- * Every query and mutation below was checked against the live schema before it
- * was wired — mutations by introspection only, since running one would edit a
- * real account.
- */
+/** AniList's social surface, all through `gql`, so the token stays in Rust and no new Tauri command is needed. */
 
 // --- Shared shapes --------------------------------------------------------
 
@@ -35,18 +19,7 @@ export interface PageInfo {
 
 const PAGE_INFO = `pageInfo { total currentPage lastPage hasNextPage }`;
 
-/**
- * Deliberately smaller than `MEDIA_FIELDS`.
- *
- * A favourite or a feed row draws a small cover and a title, so it asks for a
- * small cover and a title. No `mediaListEntry`, no `nextAiringEpisode`, no
- * `synonyms`, no episode counts — `queries.ts` documents the opposite direction
- * for `DETAIL_QUERY`, and this is that note's mirror image.
- *
- * `isAdult` and `genres` are here for exactly one reason: `isBlocked` from
- * `lib/contentFilter` needs them, and these lists are other people's content,
- * which the local filter still has to apply. Nothing renders them directly.
- */
+/** Deliberately smaller than `MEDIA_FIELDS`; `isAdult` and `genres` exist only for lib/contentFilter. */
 const SOCIAL_MEDIA = `
   id
   type
@@ -157,21 +130,7 @@ export interface FavStudio {
   name: string | null;
 }
 
-/**
- * One user, by name or id.
- *
- * Wide because it is a single object — the "don't over-fetch" invariant in
- * CLAUDE.md is about pages of thirty to fifty, and `bannerImage` on one profile
- * is not the same decision as `bannerImage` on a list. Measured at ~7 kB.
- *
- * `options` and `mediaListOptions` are included so the AniList settings pane
- * can share this cache entry instead of spending its own request. They are
- * publicly readable for any user, which is AniList's choice, not ours — the
- * pane only ever *edits* the viewer's own.
- *
- * The ranked statistics categories are deliberately absent: those belong to
- * `USER_STATS_QUERY` in `queries.ts`, which the statistics screen already owns.
- */
+/** One user by name or id; wide because it is one object, and the settings pane shares it for its options. */
 export const USER_PROFILE_QUERY = `
 query ($name: String, $id: Int) {
   User(name: $name, id: $id) {
@@ -225,24 +184,12 @@ export async function userProfile(
   key: { name: string } | { id: number },
 ): Promise<UserProfile> {
   const data = await gql<{ User: UserProfile | null }>(USER_PROFILE_QUERY, key);
-  // AniList answers an unknown name with HTTP 404 and a `Not Found.` error, so
-  // this rarely fires — but a null `User` with no error would otherwise become
-  // a blank profile rather than the not-found state.
+  // A null `User` with no error would otherwise render a blank profile rather than the not-found state.
   if (!data.User) throw new Error("NOT_FOUND");
   return data.User;
 }
 
-/**
- * Both follower totals in one request.
- *
- * Two aliased `Page` roots, which AniList accepts (checked: 144 bytes for the
- * pair). Safe to alias precisely because `Page` cannot 404 — a missing root
- * nulls *every* sibling and returns 404, which is why `User` is never aliased
- * alongside anything else.
- *
- * It takes an id rather than a name, so a profile reached by name needs this as
- * a second request. That is the whole reason the overview costs two.
- */
+/** Aliased Page roots, safe since Page cannot 404; a not-found root nulls every sibling, so User is never aliased. */
 export const FOLLOW_COUNTS_QUERY = `
 query ($userId: Int!) {
   followers: Page(perPage: 1) { pageInfo { total } followers(userId: $userId) { id } }
@@ -267,18 +214,7 @@ export async function followCounts(userId: number): Promise<FollowCounts> {
 
 // --- Follower / following lists -------------------------------------------
 
-/**
- * `sort: USERNAME` because paging needs a total order.
- *
- * A tie-heavy or unstable sort silently duplicates and drops rows across page
- * boundaries, and nobody diagnoses that as a sort problem. AniList's own
- * follower ordering is not reproducible through `UserSort` — whose members are
- * exactly ID, USERNAME, WATCHED_TIME, CHAPTERS_READ and SEARCH_MATCH, each with
- * a `_DESC` twin — so this picks the explicable one and accepts the difference.
- *
- * No `about`. A bio runs to several kilobytes and fifty of them would be a
- * ~500 kB payload for a row that shows a name and a button.
- */
+/** `sort: USERNAME` because paging needs a total order; no `about`, since a page of bios would dwarf the rows. */
 export const FOLLOWERS_QUERY = `
 query ($userId: Int!, $page: Int) {
   Page(page: $page, perPage: 50) {
@@ -318,23 +254,7 @@ export async function following(userId: number, page = 1): Promise<UserPage> {
 
 // --- User search ----------------------------------------------------------
 
-/**
- * Search users by name.
- *
- * Two facts about this endpoint, both measured, both load-bearing for the UI:
- *
- * 1. **A short query returns junk.** Two characters come back as the exact
- *    match followed by the same fixed set of unrelated accounts
- *    (`user10151`, `Gregorymr`, …) — `"ky"` yields `["ky", "user10151", …]`.
- *    Three characters behave properly. The caller enforces a three-character
- *    minimum for this reason, where media search is happy with two.
- * 2. **`pageInfo.total` is a capped sentinel, not a count.** Anything with many
- *    matches reports `total: 5000` and `lastPage: 1000` regardless of the real
- *    number; only a tiny result set is honest (`"Kyusetzu"` → 1). So the
- *    remaining-count label is suppressed for search — see `UserList`.
- *
- * `perPage: 25` rather than 50: a search is scanned, not paged through.
- */
+/** Search users by name; below `USER_SEARCH_MIN` the answer is filler, and `total` is a capped sentinel. */
 export const USER_SEARCH_QUERY = `
 query ($search: String!, $page: Int) {
   Page(page: $page, perPage: 25) {
@@ -354,20 +274,7 @@ export async function searchUsers(search: string, page = 1): Promise<UserPage> {
 /** The shortest query this endpoint answers usefully. See `USER_SEARCH_QUERY`. */
 export const USER_SEARCH_MIN = 3;
 
-/**
- * The other three searchable entities, one lean query each — modelled on
- * `USER_SEARCH_QUERY` above and deliberately NOT on the id-based detail
- * queries below it: a result row needs a name and a face, and pulling a
- * description or a media connection per row is the half-megabyte mistake
- * `UserRow` documents for bios.
- *
- * The three-character minimum is `USER_SEARCH_MIN`, and it was re-measured
- * per entity rather than assumed: at two characters all three return an
- * exactish match followed by a fixed set of popular filler ("ky" answered
- * Levi and Gojou for characters, MADHOUSE and MAPPA for studios); at three
- * the answers become real prefix matches. Same capped `total` sentinel too,
- * so nothing here shows a remaining count.
- */
+/** Three more searchable entities, lean like `USER_SEARCH_QUERY`; `USER_SEARCH_MIN` gates them too. */
 export const CHARACTER_SEARCH_QUERY = `
 query ($search: String!, $page: Int) {
   Page(page: $page, perPage: 25) {
@@ -453,25 +360,7 @@ export async function searchStudios(
 
 // --- Activities -----------------------------------------------------------
 
-/**
- * One constant serves both a profile's activity tab and the following feed —
- * `userId` for the first, `isFollowing: true` for the second.
- *
- * `MESSAGE` is absent from `type_in` **and** `MessageActivity` gets no inline
- * fragment, so even a widened argument yields nothing renderable. Private mail
- * between two users is not something a tracker should surface, and
- * `normalizeActivity` refuses it a third time.
- *
- * `sort: ID_DESC` because paging needs a total order and ids are the only
- * strictly increasing thing here — `createdAt` ties constantly.
- *
- * No nested `replies { … }`: those load per-activity when a row is expanded,
- * one user-initiated request each, rather than multiplying every page by them.
- *
- * `pageInfo.total` is a capped sentinel here too, exactly as in user search —
- * measured at `total: 5000` with `lastPage: 500`. The feed therefore never
- * shows a remaining count.
- */
+/** Profile tab and following feed; `MessageActivity` stays out of `type_in`, the fragments and the normalizer. */
 export const ACTIVITY_QUERY = `
 query ($userId: Int, $isFollowing: Boolean, $page: Int, $sort: [ActivitySort]) {
   Page(page: $page, perPage: 25) {
@@ -496,13 +385,7 @@ query ($userId: Int, $isFollowing: Boolean, $page: Int, $sort: [ActivitySort]) {
   }
 }`;
 
-/**
- * One activity by id — where a notification row lands. The same two fragments
- * as the feed, so `normalizeActivity` and `ActivityCard` serve unchanged;
- * `MessageActivity` gets no fragment here either, and the normalizer refuses
- * it besides. A deleted id answers 404/"Not Found.", which reaches the page
- * as an ordinary query error.
- */
+/** One activity by id, where a notification lands; the feed's two fragments, and no `MessageActivity` either. */
 export const SINGLE_ACTIVITY_QUERY = `
 query ($id: Int!) {
   Activity(id: $id) {
@@ -539,8 +422,7 @@ export async function activities(
     {
       ...vars,
       page,
-      // A pin floats on the profile it belongs to; a following feed is a
-      // timeline and stays one. Both are still total orders, which paging needs.
+      // A pin floats on its own profile while a feed stays a timeline; both are total orders, as paging needs.
       sort: "userId" in vars ? ["PINNED", "ID_DESC"] : ["ID_DESC"],
     },
   );
@@ -549,27 +431,13 @@ export async function activities(
 
 // --- Mutations ------------------------------------------------------------
 
-/**
- * Returns the fields the cache patch needs and nothing else, so a follow never
- * costs a refetch.
- */
+/** Returns only the fields the cache patch needs, so a follow never costs a refetch. */
 export const TOGGLE_FOLLOW_MUTATION = `
 mutation ($userId: Int!) {
   ToggleFollow(userId: $userId) { id name isFollowing isFollower }
 }`;
 
-/**
- * Likes, for anything AniList calls likeable.
- *
- * `LikeableType` has exactly four members — `THREAD`, `THREAD_COMMENT`,
- * `ACTIVITY`, `ACTIVITY_REPLY` — but the *return* is a `LikeableUnion` of six,
- * which additionally includes `MessageActivity`. Every member we can actually
- * reach gets a fragment; `MessageActivity` deliberately does not, so a like on
- * private mail could not round-trip even if something asked for it.
- *
- * Returns only the two fields the optimistic patch has to reconcile, so a like
- * never costs a refetch.
- */
+/** Likes for anything likeable; `MessageActivity` gets no fragment, so private mail cannot round-trip. */
 export const TOGGLE_LIKE_MUTATION = `
 mutation ($id: Int!, $type: LikeableType!) {
   ToggleLikeV2(id: $id, type: $type) {
@@ -595,16 +463,7 @@ export async function toggleLike(id: number, type: LikeableType): Promise<LikeRe
   return data.ToggleLikeV2;
 }
 
-/**
- * Replies to one activity, loaded on demand.
- *
- * Not nested inside `ACTIVITY_QUERY`: a page of twenty-five activities carrying
- * every reply would multiply the payload for rows nobody expanded. One request
- * per expansion, user-initiated.
- *
- * `ActivityReply` has no `replyCount` and no children — replies are flat, one
- * level, which is a fact about AniList rather than a simplification here.
- */
+/** Replies to one activity, loaded per expansion rather than nested in `ACTIVITY_QUERY`; they are flat. */
 export const ACTIVITY_REPLIES_QUERY = `
 query ($activityId: Int!) {
   Page(perPage: 50) {
@@ -667,16 +526,7 @@ export async function toggleFollow(userId: number): Promise<ToggleFollowResult> 
   return data.ToggleFollow;
 }
 
-/**
- * Post a status update.
- *
- * This mutation is the reason CLAUDE.md's rejected-features section carries a
- * second carve-out — read it before removing anything here.
- *
- * Returns the created activity in the same shape `ACTIVITY_QUERY` produces, so
- * the new post can be pushed straight onto the front of the cached feed rather
- * than triggering a refetch of a page that has just changed underneath.
- */
+/** Post a status update, a carve-out CLAUDE.md records; answers in the `ACTIVITY_QUERY` shape for the feed. */
 export const SAVE_TEXT_ACTIVITY_MUTATION = `
 mutation ($text: String!) {
   SaveTextActivity(text: $text) {
@@ -716,11 +566,7 @@ export async function deleteActivity(id: number): Promise<boolean> {
   return data.DeleteActivity?.deleted === true;
 }
 
-/**
- * Pin (or unpin) one of the viewer's own activities to their profile.
- * `isPinned` exists on both renderable members (verified by introspection),
- * and the profile feed sorts `[PINNED, ID_DESC]` so a pin floats on refetch.
- */
+/** Pin or unpin one of the viewer's activities; the profile feed sorts pinned first, so a pin floats. */
 export const TOGGLE_ACTIVITY_PIN_MUTATION = `
 mutation ($id: Int!, $pinned: Boolean) {
   ToggleActivityPin(id: $id, pinned: $pinned) {
@@ -741,13 +587,7 @@ export async function toggleActivityPin(
 
 // --- Forum ----------------------------------------------------------------
 
-/**
- * A list of threads. **No `body`** — a list renders titles.
- *
- * `sort: REPLIED_AT_DESC` puts the live conversations first and is a total
- * order, which paging needs. `pageInfo.total` is the same capped 5000 sentinel
- * as everywhere else in this file, so thread lists show no remaining count.
- */
+/** A list of threads with no `body`; sorted `REPLIED_AT_DESC`, a total order, which paging needs. */
 export const THREADS_QUERY = `
 query ($userId: Int, $page: Int) {
   Page(page: $page, perPage: 25) {
@@ -784,13 +624,7 @@ export interface ThreadPage {
   threads: ThreadSummary[];
 }
 
-/**
- * Threads one user started. This used to also take `{ replyUserId }`, and the
- * variant was dropped with the "Replied to" lens it fed: that argument lists
- * threads where the user is the *most recent* replier, so anyone whose reply
- * was answered vanished from their own tab. `userForumComments` answers the
- * question that lens was pretending to.
- */
+/** Threads one user started; do not add `replyUserId`, it lists only threads where the user replied last. */
 export async function threads(
   vars: { userId: number },
   page = 1,
@@ -802,26 +636,7 @@ export async function threads(
   return { pageInfo: data.Page.pageInfo, threads: data.Page.threads ?? [] };
 }
 
-/**
- * `replyUser` and `replyCommentId` are what make "jump to the newest reply"
- * possible on a thread too big to page to the end of.
- *
- * Two scalars on a request already being made. AniList caps paging at 5,000
- * entries, so on thread 1 (7,045 root comments) the last *reachable* page ends
- * in 2021 while the thread was replied to today. `replyCommentId` is the way
- * out: `THREAD_COMMENT_TREE_QUERY` resolves it through a root LIST field that
- * the cap does not apply to, and answers with the whole conversation it sits
- * in. One request, and it does not care how big the thread is.
- *
- * `replyUser` is no longer load-bearing for the jump — it names the last
- * replier on screen. The route it used to drive (`threadComments(threadId,
- * userId:)`, paged to that author's own last page) did work and was verified:
- * Kento46 has 144 comments in thread 1 and the final page of them does hold
- * `replyCommentId`. It was replaced because it arrives without the conversation
- * around it, which is the thing a reader opened the thread for.
- *
- * See `lib/threadJump`.
- */
+/** `replyCommentId` is the newest-reply jump's key; `lib/threadJump` resolves it past the paging cap. */
 export const THREAD_QUERY = `
 query ($id: Int!) {
   Thread(id: $id) {
@@ -849,26 +664,7 @@ export async function thread(id: number): Promise<ThreadDetail> {
   return data.Thread;
 }
 
-/**
- * A page of comments, with their reply chains.
- *
- * `perPage: 10` rather than 25, and that is because of `childComments`: it is a
- * raw `Json` scalar with no depth control, and asking for it cost 52,801 bytes
- * for twelve comments against 3,964 without — 13×, with nesting measured 48
- * levels deep. It is fetched anyway because replies are most of what a thread is
- * and it is one request either way; the page size is what pays for it.
- * `lib/comments` flattens the result to two levels and reports the rest.
- *
- * **`sort` does nothing here, and is deliberately not passed.** `ThreadCommentSort`
- * declares `ID`/`ID_DESC` and AniList accepts either — then returns the
- * byte-identical page. Measured on two threads in every spelling (`[ID_DESC]`,
- * `ID_DESC`, `[ID]`), so oldest-first is not a choice, it is the only order
- * there is. Wiring it would look like it worked and quietly change nothing. The
- * `id` argument is inert in the same way; only `threadId` and `userId` filter.
- *
- * `$userId` is what tier 2 of the jump uses — see `THREAD_QUERY`. Null on the
- * ordinary read, which is how a nullable GraphQL argument means "unfiltered".
- */
+/** A page of comments; `childComments` is an untyped Json scalar, and `sort` is inert on the `threadId` shape. */
 export const THREAD_COMMENTS_QUERY = `
 query ($threadId: Int!, $page: Int, $userId: Int) {
   Page(page: $page, perPage: 10) {
@@ -900,32 +696,7 @@ export async function threadComments(
   return { pageInfo: data.Page.pageInfo, comments: data.Page.threadComments ?? [] };
 }
 
-/**
- * One comment and everything under it, with **no page-depth cap**.
- *
- * `Page.threadComments` cannot reach past 5,000 entries, which puts the end of
- * every big thread out of reach — thread 1 is 7,045 root comments and thread
- * 15346 is 70,348, so 71% and 7% of them are readable that way. This is the way
- * around it, and the difference is that `ThreadComment` is a **root LIST field
- * rather than a `Page`**: the cap is a property of paging, so nothing here is
- * capped.
- *
- * Two measured behaviours it depends on:
- *
- * 1. **It resolves to the *root* of the tree, not to the id asked for.**
- *    `ThreadComment(id: 3236565)` — thread 1's `replyCommentId` — answers with
- *    comment `3236562` by a different user, and the id asked for is three
- *    levels down inside its `childComments`. That is the whole point: the reply
- *    arrives with the conversation around it rather than on its own.
- * 2. **A missing id answers `"Not Found."` and returns `null`.** Deleted
- *    comments are ordinary, so the caller treats an empty list as "no tree",
- *    not as an error. It is also why this is never aliased beside anything
- *    else: one not-found root nulls every sibling in the same request, the way
- *    `FOLLOW_COUNTS_QUERY` documents for `User`. Verified here too — forty
- *    aliased `ThreadComment` roots all came back null because one id was gone.
- *
- * `sort` is not passed for the same reason `THREAD_COMMENTS_QUERY` omits it.
- */
+/** The tree a comment sits in, uncapped as a LIST field; never alias it, one not-found root nulls every sibling. */
 export const THREAD_COMMENT_TREE_QUERY = `
 query ($id: Int!) {
   ThreadComment(id: $id) {
@@ -935,13 +706,7 @@ query ($id: Int!) {
   }
 }`;
 
-/**
- * The newest reply's conversation, in one request.
- *
- * Returns the raw list `flattenComments` already takes — same shape as
- * `threadComments().comments`, so the render path does not change. Empty when
- * the comment has been deleted.
- */
+/** The newest reply's conversation in one request, shaped for `flattenComments`; empty when deleted. */
 export async function threadCommentTree(id: number): Promise<unknown[]> {
   const data = await gql<{ ThreadComment: unknown[] | null }>(
     THREAD_COMMENT_TREE_QUERY,
@@ -950,28 +715,7 @@ export async function threadCommentTree(id: number): Promise<unknown[]> {
   return data.ThreadComment ?? [];
 }
 
-/**
- * Everything one user has said in the forum, across every thread, newest
- * first.
- *
- * Two measured facts make this query what it is:
- *
- * 1. **`threadComments` with `userId` alone works** — `threadId` is genuinely
- *    optional at the API, and the result is what anilist.co's own "Forum
- *    Comments" profile page draws, nested replies included. `thread { id
- *    title }` resolves on each row, and `total` is honest (a real count, not
- *    the 5,000 sentinel — measured `total: 3` for a 3-comment user).
- * 2. **`sort: [ID_DESC]` works here, and only here.** With a `threadId` the
- *    sort argument is inert — the byte-identical page comes back however it
- *    is spelled, which `THREAD_COMMENTS_QUERY` documents. With only `userId`
- *    the ids actually reverse, measured against the unsorted call. Newest
- *    first is exactly what a profile wants, so this is the one place the app
- *    passes `sort` to this field.
- *
- * No `childComments` — that field is the untyped 13×-cost blob, and a
- * comments list has no use for reply trees — which is why `perPage` can be 25
- * where the thread view pays for the blob with 10.
- */
+/** One user's forum comments, newest first; `sort` is honoured on the `userId` shape and inert on `threadId`. */
 export const USER_FORUM_COMMENTS_QUERY = `
 query ($userId: Int!, $page: Int) {
   Page(page: $page, perPage: 25) {
@@ -1044,17 +788,7 @@ export async function toggleThreadSubscription(
   return data.ToggleThreadSubscription;
 }
 
-/**
- * Creates a thread — `SaveThread` without an `id` is a create (verified by
- * introspection: `id, title, body, categories: [Int], mediaCategories: [Int],
- * sticky, locked`; the last two are moderator toys and never sent).
- *
- * Karasu is create-only by decision: no edit, no delete. Editing and deleting
- * live on anilist.co, where a destructive click has the site's own confirm
- * around it.
- *
- * Returns only the id, which is all the navigation to the new thread needs.
- */
+/** Creates a thread; create-only by decision, since editing and deleting stay on anilist.co. */
 export const SAVE_THREAD_MUTATION = `
 mutation ($title: String!, $body: String!, $categories: [Int]) {
   SaveThread(title: $title, body: $body, categories: $categories) {
@@ -1073,16 +807,7 @@ export async function saveThread(input: {
 
 // --- Account settings -----------------------------------------------------
 
-/**
- * `UpdateUser`, with only the arguments this pane is willing to send.
- *
- * **`animeListOptions` and `mangaListOptions` are deliberately absent from the
- * variable list**, not merely unused: `MediaListOptionsInput.customLists` is a
- * full replacement with no undo on AniList's side. `lib/anilistUserFields`
- * carries the reasoning and a test that keeps it out.
- *
- * Returns what the pane needs to reconcile, so a save never costs a refetch.
- */
+/** `UpdateUser`; keep `animeListOptions` and `mangaListOptions` out, since `customLists` is a full replacement. */
 export const UPDATE_USER_MUTATION = `
 mutation (
   $about: String
@@ -1145,13 +870,7 @@ export async function updateUser(vars: Record<string, unknown>): Promise<Updated
   return data.UpdateUser;
 }
 
-/**
- * The viewer's notification options, on their own key.
- *
- * Separate from `USER_PROFILE_QUERY` and read with `staleTime: 0` because
- * `UpdateUser(notificationOptions:)` replaces the **whole array** — merging
- * against a stale copy would silently disable whatever changed elsewhere since.
- */
+/** The viewer's notification options, read fresh on their own key since `UpdateUser` replaces the array. */
 export const NOTIFICATION_OPTIONS_QUERY = `
 query ($id: Int!) {
   User(id: $id) { id options { notificationOptions { type enabled } } }
@@ -1168,18 +887,7 @@ export async function notificationOptions(
 
 // --- Forum index ----------------------------------------------------------
 
-/**
- * AniList's forum categories, by id.
- *
- * Hardcoded because there is **no root query for them** — `Query.ThreadCategory`
- * does not exist, and a category is only reachable through a thread that happens
- * to be in it. This list was collected empirically: ten pages of threads across
- * five sort orders, plus a direct `categoryId` probe of ids 1–20. Seventeen
- * exist; 6 and anything above 18 return nothing, presumably merged or removed.
- *
- * If AniList adds one, threads in it still appear under "All" — only the filter
- * chip is missing, which is a visible gap rather than a silent failure.
- */
+/** AniList's forum categories, hardcoded because no root query lists them; a new one still shows under "All". */
 export const THREAD_CATEGORIES: { id: number; name: string }[] = [
   { id: 1, name: "Anime" },
   { id: 2, name: "Manga" },
@@ -1200,13 +908,7 @@ export const THREAD_CATEGORIES: { id: number; name: string }[] = [
   { id: 18, name: "AniList Apps" },
 ];
 
-/**
- * The forum index: recent threads, one category, a search, or your subscriptions.
- *
- * `sort` is a parameter because search wants `SEARCH_MATCH` while browsing wants
- * `REPLIED_AT_DESC` — and both are total orders, which paging needs.
- * `subscribed: true` is viewer-scoped and returns nothing without a token.
- */
+/** The forum index; `sort` is a variable because search wants `SEARCH_MATCH` and browsing `REPLIED_AT_DESC`. */
 export const FORUM_THREADS_QUERY = `
 query ($page: Int, $categoryId: Int, $search: String, $subscribed: Boolean, $sort: [ThreadSort]) {
   Page(page: $page, perPage: 25) {
@@ -1233,8 +935,7 @@ export async function forumThreads(vars: ForumQuery, page = 1): Promise<ThreadPa
     {
       ...vars,
       page,
-      // A search sorted by activity buries the match; browsing sorted by
-      // relevance is meaningless.
+      // A search sorted by activity buries the match; browsing sorted by relevance is meaningless.
       sort: vars.search ? ["SEARCH_MATCH"] : ["IS_STICKY", "REPLIED_AT_DESC"],
     },
   );
@@ -1243,12 +944,7 @@ export async function forumThreads(vars: ForumQuery, page = 1): Promise<ThreadPa
 
 // --- Reviews ---------------------------------------------------------------
 
-/**
- * A title's reviews, best-rated first. `body` is requested as markdown
- * (never `asHtml`) so the social renderer applies; five per page because
- * bodies are long — a review is an essay, not a comment — and the fold that
- * shows them is opened deliberately.
- */
+/** A title's reviews, best-rated first; `body` is markdown (never `asHtml`) so the social renderer applies. */
 export const REVIEWS_QUERY = `
 query ($mediaId: Int!, $page: Int) {
   Page(page: $page, perPage: 5) {
@@ -1335,15 +1031,7 @@ export async function saveReview(input: {
   return data.SaveReview.id;
 }
 
-/**
- * The viewer's own review of a title, if any — the composer's prefill.
- *
- * Its own lookup rather than a scan of the loaded pages: the feed sorts by
- * rating, so a review of yours that nobody voted on may sit pages deep. Spent
- * on the "write a review" click, which is the user-initiated moment; `private`
- * is requested here and only here, because on your own review it is the one
- * flag the composer must not silently reset.
- */
+/** The viewer's own review, the composer's prefill; `private` comes along so the composer never resets it. */
 export const MY_REVIEW_QUERY = `
 query ($mediaId: Int!, $userId: Int!) {
   Page(page: 1, perPage: 1) {
@@ -1376,15 +1064,7 @@ export async function myReview(mediaId: number, userId: number): Promise<MyRevie
 
 // --- Another user's list ---------------------------------------------------
 
-/**
- * A foreign list, read-only. Deliberately a plain `gql` fetch rather than
- * `fetchMediaList`: the Rust command writes its result into the SQLite list
- * cache keyed by user id and drains the offline queue — machinery that
- * exists for *your* list and must not run for someone else's. `score` is
- * requested bare, so it arrives in the owner's own format; the caller pairs
- * it with `UserProfile.mediaListOptions.scoreFormat` to render their numbers
- * the way they chose them. Private entries are simply absent server-side.
- */
+/** A foreign list, read-only; never `fetchMediaList`, whose cache write and queue drain are for your own list. */
 export const USER_LIST_QUERY = `
 query ($userId: Int!, $type: MediaType!) {
   MediaListCollection(userId: $userId, type: $type) {
@@ -1439,22 +1119,7 @@ export async function userList(
 
 // --- Site notifications ----------------------------------------------------
 
-/**
- * AniList's own notification feed — the bell's second view.
- *
- * Nineteen inline fragments because the union has nineteen members the bell
- * renders; each selects only what its row draws (a name, a title, a route),
- * never the covers or avatars the icon tiles replace. The twentieth member,
- * `ActivityMessageNotification`, is private mail and is excluded the same
- * three ways `MessageActivity` is on the feeds: absent from `type_in`, given
- * no inline fragment, and normalised to null in `lib/siteNotifications` with
- * a test that says so. One consequence is honest and accepted: a message can
- * make the server's unread count exceed what the list shows.
- *
- * `$reset` is passed as true on the first page only — that is AniList's own
- * "mark seen": the server zeroes `unreadNotificationCount` when it serves the
- * page. Later pages must not reset; they are history, not news.
- */
+/** The bell's site view; ActivityMessageNotification stays out of type_in, the fragments and the normalizer. */
 export const SITE_NOTIFICATIONS_QUERY = `
 query ($page: Int, $reset: Boolean) {
   Page(page: $page, perPage: 15) {
@@ -1495,6 +1160,7 @@ export interface SiteNotifPage {
   rows: SiteNotifRow[];
 }
 
+/** `reset` is AniList's own mark-seen and belongs on the first page only; later pages are history, not news. */
 export async function siteNotifications(page: number, reset: boolean): Promise<SiteNotifPage> {
   const data = await gql<{
     Page: { pageInfo: PageInfo; notifications: (RawSiteNotification | null)[] | null };
@@ -1507,9 +1173,7 @@ export async function siteNotifications(page: number, reset: boolean): Promise<S
   };
 }
 
-/** How much is waiting — the bell's badge and the tab's chip. Cheap by
-    construction: one scalar off the viewer, fetched at startup, on a slow
-    interval, and when the panel opens; the feed's mark-seen zeroes it. */
+/** How much is waiting, for the bell's badge; one scalar off the viewer, and the feed's mark-seen zeroes it. */
 export const SITE_NOTIF_COUNT_QUERY = `
 query { Viewer { unreadNotificationCount } }`;
 
@@ -1522,15 +1186,7 @@ export async function siteNotifCount(): Promise<number> {
 
 // --- Favourites -----------------------------------------------------------
 
-/**
- * Toggle a favourite. One id per call, and which key you use picks the kind.
- *
- * Returns nothing useful — AniList answers with the viewer's whole favourites
- * connection, which is far more than a heart needs — so the caller patches its
- * own cache from the fact that the call succeeded rather than from the response.
- * That is the one place in this file where the optimistic value is also the
- * final value.
- */
+/** Toggle a favourite, one id per call; the caller patches its own cache from success, not from the response. */
 export const TOGGLE_FAVOURITE_MUTATION = `
 mutation ($animeId: Int, $mangaId: Int, $characterId: Int, $staffId: Int, $studioId: Int) {
   ToggleFavourite(
@@ -1558,17 +1214,7 @@ export async function toggleFavourite(kind: FavouriteKind, id: number): Promise<
   await gql<unknown>(TOGGLE_FAVOURITE_MUTATION, { [FAV_ARG[kind]]: id });
 }
 
-/**
- * Every favourite of every kind, for the reorder modal.
- *
- * All five connections share one page counter: an exhausted kind returns an
- * empty page while a longer one keeps going, and the request count is the
- * *longest* kind's page count instead of five separate sweeps — one request
- * for the common case of fewer than 25 per kind. Bounded at
- * `FAVOURITES_MAX_PAGES` because `UpdateFavouriteOrder` replaces the whole
- * set: a reorder built on a truncated read would silently drop the tail, so
- * `truncated: true` is the signal to refuse the save, not to shrug.
- */
+/** Every favourite of every kind, all five connections on one page counter, so the common case is one request. */
 export const FAVOURITES_PAGE_QUERY = `
 query ($id: Int!, $page: Int) {
   User(id: $id) {
@@ -1654,15 +1300,7 @@ export async function allFavourites(userId: number): Promise<AllFavourites> {
   return out;
 }
 
-/**
- * The favourite people and their birthdays — the dashboard digest's read.
- *
- * Its own lean query rather than a `dateOfBirth` on `FAVOURITES_PAGE_QUERY`:
- * the favourites modal renders discs and names and would carry the field for
- * nothing, and this one skips the three kinds without a birthday to have.
- * Paged like `allFavourites` and for the same reason, but a truncated read
- * here only shortens a greeting, so the cap is a shrug rather than a refusal.
- */
+/** Favourite people and their birthdays for the dashboard digest; a truncated read only shortens a greeting. */
 export const BIRTHDAYS_QUERY = `
 query ($id: Int!, $page: Int) {
   User(id: $id) {
@@ -1705,18 +1343,7 @@ export async function favouriteBirthdays(userId: number): Promise<BirthdayPerson
   return out;
 }
 
-/**
- * Reorder one kind's favourites. Whole-array by the API's design — the same
- * replace-the-set shape as `customLists` — which is why the caller always
- * sends the complete id list from a fresh `allFavourites` read (`staleTime: 0`
- * in the modal), never a cached or partial one. `lib/favouritesOrder` builds
- * the variables and its tests assert the set stays complete.
- *
- * One kind per call: the other kinds' arguments are omitted entirely, which
- * the API treats as "leave untouched" (per-kind saves are how the website's
- * own editor writes). Verified against the schema by introspection; never
- * validated by running it.
- */
+/** Reorder one kind's favourites; a whole-set replace, so the caller always sends every id from a fresh read. */
 export const UPDATE_FAVOURITE_ORDER_MUTATION = `
 mutation (
   $animeIds: [Int]
@@ -1754,17 +1381,7 @@ export async function updateFavouriteOrder(
 
 // --- People and studios ---------------------------------------------------
 
-/**
- * Characters, staff and studios — the four `Query` roots the app never touched.
- *
- * They live here rather than in `queries.ts` for the same reason the profile
- * does: `queries.ts` is the media-and-statistics file, and these are the pages
- * you reach *from* a title rather than the title itself.
- *
- * Each was validated live, and the studio one caught a real error: the edge field
- * is `isMainStudio`, not `isMain` — `isMain` exists on `StudioEdge` (used by
- * `DETAIL_QUERY`) but not on the `MediaEdge` a studio's own media returns.
- */
+/** Characters, staff and studios; a studio's media edge is `isMainStudio`, not the `isMain` of `StudioEdge`. */
 
 export interface PersonMediaEdge {
   node: SocialMedia;
@@ -1790,10 +1407,7 @@ export interface CharacterDetail {
   media: { edges: PersonMediaEdge[] } | null;
 }
 
-/** `description(asHtml: false)` on purpose — the raw form is **markdown** (0 raw
- *  HTML tags across 24 staff+character samples; `asHtml: true` returns
- *  markdown-it output), so it goes through `lib/anilistMarkdown` like a bio.
- *  Media descriptions are the opposite case and keep `lib/anilistHtml`. */
+/** `asHtml: false` on purpose: the description is markdown, rendered by `lib/anilistMarkdown` like a bio. */
 export const CHARACTER_QUERY = `
 query ($id: Int!) {
   Character(id: $id) {

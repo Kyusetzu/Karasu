@@ -1,13 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { isTauri } from "./anilist";
 
-/**
- * The diagnostics and log surface.
- *
- * Kept apart from `anilist.ts` because none of it talks to AniList — it is the
- * app describing itself so a bug report can be written without the reporter
- * having to know where any of it lives.
- */
+/** The diagnostics and log surface, kept apart from `anilist.ts` because none of it talks to AniList. */
 
 export type LogLevel = "error" | "warn" | "info" | "debug";
 
@@ -67,14 +61,7 @@ export const setLogDebug = (enabled: boolean) =>
 export const exportDiagnostics = (redact: boolean) =>
   invoke<boolean>("export_diagnostics", { redact });
 
-/**
- * Sends a frontend crash to the same log the backend writes.
- *
- * Swallows its own failure on purpose: this is called from an error boundary
- * and from `window.onerror`, so a throw here would be a crash inside the crash
- * handler. Outside Tauri there is no backend to tell, and the console is the
- * only place left.
- */
+/** Sends a frontend crash to the backend log, swallowing its own failure: a throw here is a crash inside the crash handler. */
 export async function reportError(error: unknown, stack?: string) {
   const message = error instanceof Error ? error.message : String(error);
   const detail = stack ?? (error instanceof Error ? error.stack : undefined);
@@ -89,14 +76,7 @@ export async function reportError(error: unknown, stack?: string) {
   }
 }
 
-/**
- * Puts the redacted report on the clipboard. Returns whether it worked.
- *
- * The one existing clipboard call site swallows its rejection, which for a
- * "copy this so you can paste it" button is the worst possible failure — the
- * user pastes whatever was there before and never learns. The caller decides
- * what to show; this only reports.
- */
+/** Puts the redacted report on the clipboard and reports whether it worked, so a failed copy is never silent. */
 export async function copyDiagnostics(): Promise<boolean> {
   try {
     const text = await diagnosticsReport(true);

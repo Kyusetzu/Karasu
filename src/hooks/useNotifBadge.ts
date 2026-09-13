@@ -5,17 +5,7 @@ import { getNotifications, isTauri } from "@/api/anilist";
 import { siteNotifCount } from "@/api/social";
 import { useAuth } from "@/stores/auth";
 
-/**
- * How many notifications are waiting, both sides summed — for anything that
- * wants to wear the number without being the bell.
- *
- * The phone shell's More button is the customer: the bell lives inside its
- * sheet there, so the closed sheet needs the count on the outside. The site
- * half shares the exact query key the bell uses (viewer id included — the
- * cross-account lesson), so this adds observers to a cached query, never a
- * second request. The local half re-reads on the same `notifications-changed`
- * event the bell listens for.
- */
+/** Waiting notifications, both sides summed; the site half shares the bell's query key, so it never adds a request. */
 export function useNotifBadge(): number {
   const mode = useAuth((s) => s.mode);
   const viewerId = useAuth((s) => s.viewer?.id ?? null);

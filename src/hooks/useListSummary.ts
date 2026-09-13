@@ -16,6 +16,7 @@ export interface ListSummary {
   syncedAt: number | null;
 }
 
+/** Counts the way MediaList filters, so the sidebar number and the rows on screen can never disagree. */
 function countEntries(
   data: ListResult | undefined,
   level: ReturnType<typeof useContentFilter.getState>["level"],
@@ -29,18 +30,7 @@ function countEntries(
   return total;
 }
 
-/**
- * A read-only view of the two list queries, for the sidebar.
- *
- * `enabled: false` is the whole point: this subscribes to the cache and never
- * fetches. `MediaList` owns the fetching, and a second observer with its own
- * `staleTime` would otherwise pull both lists on every launch just to render
- * two numbers — two AniList round trips against a ~30 req/min budget, for
- * decoration.
- *
- * Filtered the same way `MediaList` filters, so the count in the sidebar and
- * the rows on the screen can never disagree.
- */
+/** A read-only view of the two list queries for the sidebar; keep `enabled: false`, or it refetches both lists. */
 export function useListSummary(userId: number | undefined): ListSummary {
   const level = useContentFilter((s) => s.level);
 
@@ -54,8 +44,7 @@ export function useListSummary(userId: number | undefined): ListSummary {
 
   const [anime, manga] = results;
 
-  // Relative time has to keep moving on its own; nothing else re-renders the
-  // sidebar between navigations, so "Synced 4 min ago" would stay at 4.
+  // Nothing else re-renders the sidebar between navigations, so the relative time ticks on its own.
   const [, tick] = useState(0);
   useEffect(() => {
     const id = setInterval(() => tick((n) => n + 1), 60_000);

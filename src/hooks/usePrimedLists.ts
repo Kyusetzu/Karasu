@@ -5,27 +5,7 @@ import type { MediaType } from "@/api/types";
 
 const TYPES: MediaType[] = ["ANIME", "MANGA"];
 
-/**
- * Paints the list from SQLite while the real fetch is still in flight.
- *
- * `fetch_media_list` always awaits AniList, so without this a cold start shows
- * a loading state for a full round trip even though a complete list is already
- * on disk. Priming the query cache from SQLite lets the first frame render real
- * content, and the refetch swaps in fresh data underneath.
- *
- * This has to be `setQueryData`, not `placeholderData`: the cached list arrives
- * over an async IPC call, and `placeholderData` is required to be synchronous.
- *
- * **`updatedAt: 0` is load-bearing.** It backdates the entry so it is already
- * stale, which is what keeps the mounting `useQuery` firing its own refetch.
- * Without it TanStack treats the primed value as fresh and suppresses the
- * network call for the whole `staleTime` — the list would silently stop
- * updating for five minutes after every launch.
- *
- * Priming is racy by nature and that is fine: if a query is already in flight
- * the observer simply renders this data as soon as it lands and the real
- * response overwrites it a moment later.
- */
+/** Paints the list from SQLite while the real fetch is in flight; `placeholderData` cannot, since IPC is async. */
 export function usePrimedLists(userId: number | undefined) {
   const qc = useQueryClient();
 
@@ -40,6 +20,7 @@ export function usePrimedLists(userId: number | undefined) {
           const key = ["mediaList", mediaType, userId];
           // Never clobber a response that already arrived.
           if (qc.getQueryData(key)) return;
+          // Keep `updatedAt: 0`; it backdates the entry to stale so the mounting `useQuery` still refetches.
           qc.setQueryData(key, cached, { updatedAt: 0 });
         })
         .catch(() => {});

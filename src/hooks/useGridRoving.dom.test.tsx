@@ -34,11 +34,7 @@ describe("useGridRoving", () => {
     expect(onOpen).toHaveBeenCalledWith(0);
   });
 
-  /**
-   * The reason the hook owns the count rather than the page: a filter typed or
-   * a page changed shrinks the result set under the cursor, and an index past
-   * the end would hand `onOpen` an undefined card.
-   */
+  /** A shrinking result set must pull the cursor back, or an index past the end hands `onOpen` an undefined card. */
   it("pulls the cursor back when the results shrink", () => {
     const { rerender } = render(<Grid count={9} onOpen={vi.fn()} />);
     fireEvent.keyDown(window, { key: "ArrowDown" });

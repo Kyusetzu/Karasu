@@ -2,15 +2,7 @@ import { gql } from "./anilist";
 import { isBlocked, type ContentFilterLevel } from "@/lib/contentFilter";
 import type { MediaListStatus, MediaTitle, MediaType } from "./types";
 
-/**
- * Loads a media's franchise as a relation graph via a bounded, batched
- * breadth-first walk over AniList's `relations`. Every relation shown under
- * AniList's "Relations" heading is displayed (both media types), and the walk
- * follows the franchise-structural relations — including cross-medium
- * adaptation/source links — to assemble the whole franchise. Loose links
- * (character/other/summary) are shown but not expanded through, and the walk
- * is depth- and node-capped so deep or cyclic graphs can't blow up.
- */
+/** Loads a franchise graph by a depth- and node-capped, batched BFS over `relations`; loose links are shown, not walked. */
 
 const FRANCHISE_QUERY = `
 query ($ids: [Int]) {
@@ -47,9 +39,7 @@ query ($ids: [Int]) {
   }
 }`;
 
-// Relation types we walk *through* to complete the franchise (cross-medium
-// adaptation/source included). Everything else (character/summary/other) is
-// still shown as a node, just not expanded from.
+// The relation types the walk expands through; character, summary and other are shown as nodes but not walked.
 const TRAVERSE = new Set([
   "ADAPTATION",
   "SOURCE",
@@ -116,8 +106,7 @@ export async function loadFranchise(
   let frontier = [rootId];
   let truncated = false;
 
-  // A filtered node is dropped entirely — no node, no edge, no traversal —
-  // so the graph never renders an edge pointing at something invisible.
+  // A filtered node is dropped entirely, so the graph never renders an edge pointing at something invisible.
   const hidden = (m: RawMedia | null | undefined) =>
     isBlocked(m ? { isAdult: m.isAdult, genres: m.genres } : null, level);
 
@@ -145,10 +134,7 @@ export async function loadFranchise(
     );
 
   for (let depth = 0; depth <= MAX_DEPTH && frontier.length; depth++) {
-    // 50 is `Page.media(id_in:)`'s own limit, so the cap is not negotiable —
-    // but dropping the remainder silently was. A frontier wider than one page
-    // left reachable nodes unexpanded while the graph rendered as though it
-    // were complete, which is the one thing a relations view must not do.
+    // The cap is `Page.media(id_in:)`'s own page size; a frontier wider than it must mark the graph truncated.
     const pending = frontier.filter((id) => !visited.has(id));
     if (pending.length > 50) truncated = true;
     const ids = pending.slice(0, 50);
@@ -186,9 +172,7 @@ export async function loadFranchise(
           depth < MAX_DEPTH &&
           TRAVERSE.has(edge.relationType) &&
           !visited.has(node.id) &&
-          // Deduped: a hub — a long-running parent story, say — is reachable
-          // from most of its own frontier, and pushing it once per parent ate
-          // slots out of the 50 above that other nodes then never got.
+          // Deduped: a hub reachable from most of its frontier would otherwise eat page slots once per parent.
           !next.includes(node.id)
         ) {
           next.push(node.id);

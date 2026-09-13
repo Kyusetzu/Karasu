@@ -4,34 +4,20 @@ import { toggleFollow, type SocialUser, type UserPage, type UserProfile } from "
 import { followRelation, nextRelation, relationFlags } from "@/lib/follows";
 import { showToast } from "@/stores/toast";
 
-/**
- * Follow and unfollow, optimistically, from anywhere.
- *
- * Four screens can start this — a profile header, a follower row, a following
- * row, a search result — and the same user can be on screen in more than one of
- * them at once. So the patch does not target "the thing that was clicked"; it
- * rewrites every cached place that user appears, keyed on id.
- *
- * Follows the shape `useListMutations` established: cancel, snapshot, patch,
- * receipt with an undo, restore and offer a retry on failure. The one difference
- * is that undo here is the *same* call again — `nextRelation` is its own
- * inverse, so unfollowing is following applied twice.
- */
+/** Follow and unfollow optimistically from anywhere, patching every cached place the user appears by id. */
 export function useFollow() {
   const qc = useQueryClient();
   const { t } = useTranslation();
 
   /** Rewrites this user wherever they are cached, and returns what to undo to. */
   const patch = (userId: number, apply: (relation: ReturnType<typeof followRelation>) => ReturnType<typeof followRelation>) => {
-    // Profiles: keyed by name, so the id is not in the key and every entry has
-    // to be examined. There are only ever a handful.
+    // Profiles are keyed by name, so every cached entry has to be examined for the id.
     qc.setQueriesData<UserProfile>({ queryKey: ["social", "user"] }, (old) => {
       if (!old || old.id !== userId) return old;
       return { ...old, ...relationFlags(apply(followRelation(old))) };
     });
 
-    // Follower / following / search pages: infinite queries, so every loaded
-    // page has to be walked. Cheap — these are arrays of fifty at most.
+    // Follower, following and search pages are infinite queries, so every loaded page is walked.
     for (const scope of ["followers", "following", "userSearch"] as const) {
       qc.setQueriesData<InfiniteData<UserPage>>({ queryKey: ["social", scope] }, (old) => {
         if (!old) return old;
@@ -46,8 +32,7 @@ export function useFollow() {
             ),
           };
         });
-        // Returning a new object when nothing changed would re-render every
-        // consumer of every page for no reason.
+        // A new object when nothing changed would re-render every consumer of every page for no reason.
         return touched ? { ...old, pages } : old;
       });
     }
@@ -63,8 +48,7 @@ export function useFollow() {
       return { before };
     },
     onSuccess: (result, { name }) => {
-      // AniList returns the authoritative flags, so replace the guess rather
-      // than trusting it — a race with another client resolves here.
+      // AniList returns the authoritative flags, so replace the guess; a race with another client resolves here.
       if (result) patch(result.id, () => followRelation(result));
       const nowFollowing = result?.isFollowing === true;
       showToast({
@@ -79,14 +63,11 @@ export function useFollow() {
       });
     },
     onError: (_err, vars, ctx) => {
-      // The UI already showed this as done, so the rollback is invisible
-      // without a receipt saying otherwise.
+      // The UI already showed this as done, so the rollback needs a receipt saying otherwise.
       if (ctx?.before) patch(vars.userId, () => ctx.before!);
       showToast({
         kind: "error",
-        // Deliberately only the name and a generic reason. `main.tsx` funnels
-        // errors into the diagnostics report a user pastes into a bug report,
-        // and a social mutation's variables are the last thing to put there.
+        // Only the name and a generic reason; `main.tsx` funnels errors into the diagnostics report.
         text: t("social.followFailed", { name: vars.name }),
         detail: t("social.followFailedDetail"),
         action: { label: t("common.retry"), run: () => follow.mutate(vars) },

@@ -11,19 +11,9 @@ export interface NowPlaying {
   parsedTitle: string;
   /** The season the parse carried — half the key a correction is stored under. */
   season: number | null;
-  /**
-   * The episode as resolved — after a correction's offset and after any
-   * relations redirect. This is what the card shows and what gets written.
-   */
+  /** The episode as resolved, after the correction's offset and the relations redirect; what the card shows and writes. */
   episode: number | null;
-  /**
-   * The episode as the source reported it, before either of those.
-   *
-   * An offset is `chosen - detected`, and `detected` is this one. Measuring
-   * against `episode` stored a wrong offset as soon as a correction was edited
-   * a second time — and confirming the pre-filled number stored `0`, wiping a
-   * correction that was working.
-   */
+  /** The episode as the source reported it; keep offsets measured against this, or re-editing a correction drifts it. */
   sourceEpisode: number | null;
   mediaId: number | null;
   matchedTitle: string | null;
@@ -36,8 +26,7 @@ export interface NowPlaying {
 export type ScrobblePhase =
   | "idle"
   | "watching"
-  /** Due, but another Karasu on the same Jellyfin account outranks this one
-      and goes first; this one writes after a grace unless it already has. */
+  /** Due, but another Karasu on the same Jellyfin account goes first; this one writes after a grace if it still must. */
   | "yielding"
   | "pending"
   | "updating"
@@ -47,14 +36,7 @@ export type ScrobblePhase =
   | "blocked"
   | "cancelled";
 
-/**
- * Why an auto-update will not happen, as a code and its numbers.
- *
- * Deliberately not a sentence: it used to be English prose formatted in Rust
- * and rendered verbatim, so a German UI read English. The card maps `code`
- * through a literal switch, which is also what keeps every key visible to
- * `i18nKeys.test.ts`.
- */
+/** Why an auto-update will not happen, as a code the card maps through a literal switch; prose would defeat i18n. */
 export type BlockReason =
   | { code: "alreadyWatched"; episode: number; progress: number }
   | { code: "episodeGap"; episode: number; progress: number }
@@ -64,8 +46,7 @@ export type BlockReason =
 export interface ScrobbleState {
   phase: ScrobblePhase;
   reason: BlockReason | null;
-  /** Whether "Update now" may override the block. Decided in Rust, where the
-      command that would carry it out lives. */
+  /** Whether "Update now" may override the block; decided in Rust, where the command that would carry it out lives. */
   forceable: boolean;
   mediaId: number | null;
   episode: number | null;
@@ -129,11 +110,7 @@ export interface DetectionOverride {
 export const listDetectionOverrides = () =>
   invoke<DetectionOverride[]>("list_detection_overrides");
 
-/**
- * "What is playing is actually this." Keyed on the parse, so it holds for
- * every later detection of the same title; applied at once, because the
- * detection loop only rebuilds a match when the title itself changes.
- */
+/** A correction keyed on the parse, applied at once because the loop only rebuilds a match on a title change. */
 export const setDetectionOverride = (input: {
   title: string;
   season: number | null;
@@ -185,11 +162,7 @@ export interface MediaSession {
   url: string;
 }
 
-/**
- * What the desktop currently reports. Players fill these fields
- * inconsistently, so this is the honest way to see why something was or
- * wasn't detected.
- */
+/** The live media sessions; players fill the fields inconsistently, so this is the way to see why detection missed. */
 export const mediaSessions = () => invoke<MediaSession[]>("media_sessions");
 
 export interface JellyfinSettings {
@@ -230,8 +203,7 @@ export interface JellyfinSession {
   matched: boolean;
   /** Set when the row is a Karasu — this one included — with its platform. */
   karasu: "desktop" | "mobile" | null;
-  /** Seconds since that row was last heard from, measured on the server's
-      clock against this instance's own row. */
+  /** Seconds since that row was last heard from, on the server's clock against this instance's own row. */
   activeAgoSec: number | null;
 }
 
@@ -253,11 +225,7 @@ export interface JellyfinServerInfo {
   version: string;
 }
 
-/**
- * Jellyfin's own discovery: a UDP broadcast on the local network, answered
- * by every server on it. Two seconds of listening plus a confirmation per
- * answer — a button, never something a screen does on its own.
- */
+/** Jellyfin's own UDP discovery plus a confirmation per answer; a button, never something a screen does on its own. */
 export const discoverJellyfinServers = () =>
   invoke<DiscoveredServer[]>("discover_jellyfin_servers");
 
@@ -275,8 +243,7 @@ export interface JellyfinBackground {
 export const getJellyfinBackground = () =>
   invoke<JellyfinBackground>("get_jellyfin_background");
 
-/** Whether to keep a foreground service up so tracking survives the screen
-    going off — a persistent notification, hence opt-in. */
+/** Whether a foreground service keeps tracking alive with the screen off; a persistent notification, hence opt-in. */
 export const setJellyfinBackground = (enabled: boolean) =>
   invoke<void>("set_jellyfin_background", { enabled });
 
@@ -284,16 +251,11 @@ export const setJellyfinBackground = (enabled: boolean) =>
 export const requestBatteryExemption = () =>
   invoke<void>("request_battery_exemption");
 
-/** Saves the settings that aren't part of signing in. The external address
-    is checked against the server's identity when it can be reached. */
+/** Saves the settings outside sign-in; the external address is checked against the server's identity when reachable. */
 export const setJellyfinSettings = (url: string, device: string, externalUrl: string) =>
   invoke<void>("set_jellyfin_settings", { url, device, externalUrl });
 
-/**
- * Exchanges a username and password for an access token. Any Jellyfin account
- * works — no administrator rights. The password is sent once and never stored;
- * only the returned token reaches the credential store.
- */
+/** Exchanges a username and password for a token; the password is sent once and never stored, only the token. */
 export const jellyfinSignIn = (
   url: string,
   username: string,
@@ -303,9 +265,5 @@ export const jellyfinSignIn = (
 export const jellyfinSignOut = () =>
   invoke<JellyfinSettings>("jellyfin_sign_out");
 
-/**
- * The signed-in account's own sessions, flagged with whether the device filter
- * accepts each one. Showing the non-matching ones is the point: it's the only
- * way to find out what Jellyfin calls your device.
- */
+/** The account's sessions, flagged by the device filter; the non-matching ones show what Jellyfin calls your device. */
 export const testJellyfin = () => invoke<JellyfinTest>("test_jellyfin");

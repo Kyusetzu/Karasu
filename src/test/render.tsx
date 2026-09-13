@@ -5,13 +5,7 @@ import type { ReactElement, ReactNode } from "react";
 import { useAuth } from "@/stores/auth";
 import type { Viewer } from "@/api/types";
 
-/**
- * The wrapper every component test needs, and the store state most of them set.
- *
- * Lives outside `src/lib` on purpose: it imports Testing Library, so it must
- * never be reachable from the node test project. Only `*.dom.test.tsx` files
- * import it — see the projects block in `vite.config.ts`.
- */
+/** The component-test wrapper; it imports Testing Library, so nothing in the node test project may import it. */
 
 /** Retries off and no cache between tests, so a failure is this test's own. */
 function client(): QueryClient {
@@ -23,9 +17,7 @@ function client(): QueryClient {
   });
 }
 
-// Return type inferred rather than annotated as `RenderResult`: Testing
-// Library's own type is assembled from `@testing-library/dom`'s query set, and
-// naming it here invites a second copy of those types into the graph.
+// Return type inferred, not `RenderResult`: naming it invites a second copy of `@testing-library/dom`'s types.
 export function renderWithProviders(
   ui: ReactElement,
   { route = "/" }: { route?: string } = {},
@@ -46,13 +38,7 @@ const VIEWER: Viewer = {
   avatar: { large: null },
 };
 
-/**
- * Drives the real Zustand store rather than mocking the module.
- *
- * A mock would let a component read a shape the store cannot actually produce;
- * setting real state cannot. `useAuth` is a plain store with no IPC in its
- * setter, so this is just an assignment.
- */
+/** Drives the real Zustand store rather than a mock, so a component cannot read a shape the store cannot produce. */
 export function signIn(overrides: Partial<Viewer> = {}): Viewer {
   const viewer = { ...VIEWER, ...overrides };
   useAuth.setState({ viewer, mode: "anilist", loading: false });
@@ -60,9 +46,7 @@ export function signIn(overrides: Partial<Viewer> = {}): Viewer {
 }
 
 export function signOut(): void {
-  // `sessionExpired` too, mirroring the real `logout`. It is plain state that
-  // nothing else resets, so an `afterEach(signOut)` that left it set would make
-  // every later test in the file depend on the order it ran in.
+  // `sessionExpired` too, mirroring the real `logout`; left set, later tests would depend on the order they ran in.
   useAuth.setState({
     viewer: null,
     mode: "none",

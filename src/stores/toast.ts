@@ -8,11 +8,7 @@ export interface ToastAction {
 export interface Toast {
   /** Bumped per toast so the component can re-run its entrance animation. */
   id: number;
-  /**
-   * `info` is for a real outcome that is not yet the promised one — a save
-   * that went to the offline queue rather than to AniList. It exists so the
-   * green check cannot be shown for a write the server has not seen.
-   */
+  /** `info` is a real outcome that is not yet the promised one, so a queued write never shows the green check. */
   kind: "success" | "error" | "info";
   text: string;
   /** Second line — the consequence, not a repeat of the first. */
@@ -26,24 +22,13 @@ interface ToastState {
   dismiss: () => void;
 }
 
-/** Long enough to read two lines and reach the button, short enough that it is
-    gone before it becomes furniture. */
+/** Long enough to read two lines and reach the button, short enough to be gone before it becomes furniture. */
 const DISMISS_MS = 4200;
 
 let seq = 0;
 let timer: ReturnType<typeof setTimeout> | undefined;
 
-/**
- * Write receipts.
- *
- * Every optimistic write needs a visible, reversible receipt: the UI has
- * already claimed the change succeeded, so without one a failure is a silent
- * lie and a mistake has no way back.
- *
- * One toast at a time, deliberately. A +1 held down produces a burst of writes,
- * and a stack would turn that into a wall — the newest receipt replaces the
- * previous one and restarts the clock, because it is the one still undoable.
- */
+/** Write receipts, one at a time on purpose: the newest replaces the last, since it is the one still undoable. */
 export const useToast = create<ToastState>((set) => ({
   toast: null,
 

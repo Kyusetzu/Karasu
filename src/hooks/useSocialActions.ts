@@ -10,20 +10,7 @@ import {
 import { toggleLike as flipLike } from "@/lib/activity";
 import { showToast } from "@/stores/toast";
 
-/**
- * Likes and replies, with their cache patches in one place.
- *
- * One file rather than one per mutation because they write into neighbouring
- * keys: a reply changes an activity's `replyCount` in the feed *and* appends to
- * that activity's reply list. Splitting them would put half of that map in each
- * file and guarantee they drift.
- *
- * A like is optimistic and silent. There is no toast: a heart that fills is its
- * own receipt, and `useListMutations`'s rule — every optimistic write needs a
- * visible, reversible receipt — is satisfied by the icon itself, which is
- * also the undo. A *failed* like still speaks up, because that is the case the
- * UI has already lied about.
- */
+/** Likes and replies with their cache patches in one place, since they write into neighbouring keys. */
 export function useSocialActions() {
   const qc = useQueryClient();
   const { t } = useTranslation();
@@ -52,14 +39,7 @@ export function useSocialActions() {
     }
   };
 
-  /**
-   * And for a thread, which is a single cached object rather than a page.
-   *
-   * Without this the `else` branch below patched an *activity* with the
-   * thread's id — nothing on the thread page, and a same-numbered activity
-   * elsewhere if one happened to be loaded. The heart on a thread simply did
-   * not move, while the request behind it succeeded.
-   */
+  /** The same for a thread, a single cached object; keep it, or a thread like patches a same-numbered activity. */
   const patchThread = (
     id: number,
     apply: (a: { likeCount: number; isLiked: boolean }) => { likeCount: number; isLiked: boolean },
@@ -88,20 +68,7 @@ export function useSocialActions() {
     );
   };
 
-  /**
-   * `THREAD_COMMENT` is handled by the caller, not here — the three arms below
-   * skip it explicitly rather than letting it fall through.
-   *
-   * It used to fall into the `patchActivity` branch, which is a real bug and
-   * not a cosmetic one: a comment id and an activity id are different id
-   * spaces that overlap numerically, so liking a comment could flip the like
-   * state of whichever unrelated activity happened to share its number. The
-   * same trap the offline queue documents for `save` versus `delete`.
-   *
-   * It is not patched here instead because thread comments live inside a raw
-   * `childComments` JSON blob that `lib/comments` flattens on read — there is
-   * no tidy cache shape to patch. `Thread.tsx` keeps a small overlay of its own.
-   */
+  /** Keep `THREAD_COMMENT` skipped in all three arms; comment and activity ids overlap, and `Thread.tsx` patches its own. */
   const like = useMutation({
     mutationFn: (vars: { id: number; type: LikeableType; activityId?: number }) =>
       toggleLikeApi(vars.id, vars.type),
@@ -116,8 +83,7 @@ export function useSocialActions() {
       }
     },
     onSuccess: (result, vars) => {
-      // AniList returns the authoritative count, so replace the guess rather
-      // than keeping it — this is where a race with another client resolves.
+      // AniList returns the authoritative count, so replace the guess; a race with another client resolves here.
       if (!result) return;
       const settle = () => ({ likeCount: result.likeCount, isLiked: result.isLiked });
       if (vars.type === "ACTIVITY_REPLY" && vars.activityId !== undefined) {
@@ -129,8 +95,7 @@ export function useSocialActions() {
       }
     },
     onError: (_err, vars) => {
-      // `flipLike` is its own inverse, so undoing the optimistic patch is the
-      // same call again rather than a stored snapshot.
+      // `flipLike` is its own inverse, so the undo is the same call again rather than a stored snapshot.
       if (vars.type === "ACTIVITY_REPLY" && vars.activityId !== undefined) {
         patchReply(vars.activityId, vars.id, flipLike);
       } else if (vars.type === "THREAD") {
@@ -149,24 +114,19 @@ export function useSocialActions() {
   const reply = useMutation({
     mutationFn: (vars: { activityId: number; text: string }) =>
       saveActivityReply(vars.activityId, vars.text),
-    // Deliberately *not* optimistic. A reply carries the user's own words, and
-    // showing it as posted before the server has it means a failure erases
-    // something they wrote. The box stays disabled for the round trip instead.
+    // Deliberately not optimistic: a reply carries the user's own words, and a failure must not erase them.
     onSuccess: (created, vars) => {
       qc.setQueryData<ActivityReply[]>(
         ["social", "activityReplies", vars.activityId],
         (old) => (old ? [...old, created] : [created]),
       );
-      // The feed's own `replyCount` has to move too, or the row still says the
-      // old number until its staleTime lapses.
+      // The feed's own `replyCount` has to move too, or the row keeps the old number until staleTime lapses.
       bumpReplyCount(qc, vars.activityId);
     },
     onError: (_err, vars) => {
       showToast({
         kind: "error",
-        // The text is never in the message. `main.tsx` funnels errors into the
-        // diagnostics report a user pastes into a bug report, and a reply's
-        // body is the last thing that should travel with it.
+        // Never the reply text; `main.tsx` funnels errors into the diagnostics report, and it must not travel.
         text: t("social.replyFailed"),
         detail: t("social.replyFailedDetail"),
         action: { label: t("common.retry"), run: () => reply.mutate(vars) },

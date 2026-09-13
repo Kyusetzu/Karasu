@@ -1,11 +1,4 @@
-/**
- * English — the primary language and the source of truth for the key shape.
- *
- * `de.ts` is typed `typeof en`, so anything added here without a German
- * counterpart is a compile error rather than a string that silently renders as
- * its own key. See `lib/i18nKeys.test.ts` for the other direction: a key used
- * in the source that exists in neither file.
- */
+/** English, the source of truth for the key shape; `de.ts` is typed `typeof en`, so a missing German key fails tsc. */
 export const en = {
   nav: {
     groupLibrary: "Library",
@@ -414,14 +407,11 @@ export const en = {
     legendCommunity: "community",
     releaseYearsHint: "When what you watch was made.",
     startYearsHint: "When you were watching it.",
-    // Two grids, two sources, and the copy has to say which is on screen — the
-    // hint below described the local one while the account's history was being
-    // drawn. See `dayHeatmapFromHistory`.
+    // Two day grids from two sources, so the copy must say which one is on screen (`dayHeatmapFromHistory`).
     activityDays: "Days at the list",
     activityDaysHint:
       "Every action AniList recorded on your account, one cell per day, shaded by how busy it was. This is AniList’s own history rather than anything rebuilt here, so it covers whatever range it keeps.",
-    // The legend under the day grid. The range is spelled out because
-    // AniList's history window is not a year and the grid must not imply one.
+    // The day grid's legend spells out the range because AniList's history window is not a year.
     activityRange: "{{from}} – {{to}} · {{total}} actions",
     legendLess: "Less",
     legendMore: "More",
@@ -1041,12 +1031,7 @@ export const en = {
     saving: "Saving …",
     tabActivity: "Activity",
     noActivity: "{{name}} hasn't posted anything yet",
-    // Verbs. AniList composes these sentences itself and only in English, so
-    // they are translated from a key — see `lib/activity`.
-    // Whole sentences, one per verb: {{n}} is the episode/chapter number or
-    // range, %t% is where the media title link is rendered (`splitSentence` in
-    // lib/activity). Each language owns its word order this way — German puts
-    // the participle after the title, which no verb-first fragment could.
+    // Whole verb sentences keyed by `lib/activity`, %t% marking the title link, so each language owns its word order.
     sentWatchedEpisode: "watched episode {{n}} of %t%",
     sentRewatchedEpisode: "rewatched episode {{n}} of %t%",
     sentReadChapter: "read chapter {{n}} of %t%",
@@ -1104,9 +1089,7 @@ export const en = {
     unsubscribe: "Subscribed",
     subscribeFailed: "Couldn't change that subscription",
     deeperReplies: "{{n}} more in this chain on AniList",
-    // Distinct from `following`, which is the button's *state* ("you follow
-    // them"). This is the set of people *they* follow. Identical in English,
-    // "Folgt" vs "Gefolgte" in German.
+    // The set of people they follow, distinct from `following` (the button's state); only English spells them alike.
     tabFollowing: "Following",
     noFollowers: "Nobody follows {{name}} yet",
     noFollowing: "{{name}} isn't following anyone yet",
@@ -1244,15 +1227,12 @@ export const en = {
     alSaved: "Saved on AniList",
     alSaveFailed: "That setting wasn’t saved",
     alSaveFailedDetail: "Nothing was sent. Account changes are not queued offline.",
-    // The three cross-referenced settings. Each names where the effect actually
-    // lands — a generic "affects AniList" would not tell anyone what to expect.
+    // The three cross-referenced settings; each names where the effect actually lands.
     alOverrideTitleLanguage:
       "Karasu picks titles with its own setting and ignores this one.",
     alOverrideAdult:
       "Karasu filters adult content with its own setting, which is the stricter of the two.",
-    // The coupling needs *both* switches on, which is what `anilistCoversAiring`
-    // checks and what the note on the Detection pane is gated behind. Stating it
-    // unconditionally here contradicted that screen.
+    // The coupling needs both switches on, as `anilistCoversAiring` checks; stating it unconditionally contradicts Detection.
     alOverrideAiring:
       "Karasu reads this one. While it and Karasu’s own airing notifications are both on, a new episode reaches you as a desktop notification and its bell row comes from AniList — the row that opens the entry. With either one off, Karasu writes that row itself.",
     alOverrideWhere: "Karasu’s setting →",
@@ -1322,8 +1302,7 @@ export const en = {
       "Shown, not editable. AniList replaces the whole set when it is written, and has no undo — so Karasu will not send them. Edit these on anilist.co.",
     alCustomListsNone: "None",
     alNotifications: "AniList notifications",
-    // Not "AniList's own site" — these decide what AniList *creates*, and
-    // Karasu's bell has an AniList tab that renders all of it. See `Bell`.
+    // These decide what AniList creates at all, and `Bell`'s AniList tab renders all of it, so the copy says so.
     alNotificationsHint:
       "What AniList notifies you about. Nineteen of these also decide what appears in Karasu’s own bell, under its AniList tab — turning one off means the notification is never created, so neither place shows it. Karasu’s own notifications are separate and live under Detection.",
     alNotifActivityMessage: "Private messages",
@@ -1338,9 +1317,7 @@ export const en = {
     alNotifActivityReplyLike: "Likes on my replies",
     alNotifThreadLike: "Likes on my threads",
     alNotifThreadCommentLike: "Likes on my forum comments",
-    // *Activity*, not threads — `alNotifThreadSubscribed` above is the forum
-    // one, and this was labelled as a second copy of it. Karasu's own bell
-    // renders this type as "replied to an activity you follow".
+    // Activity, not threads; `alNotifThreadSubscribed` is the forum one and this must not read as a copy of it.
     alNotifReplySubscribed: "Replies to activity I follow",
     alNotifRelatedMedia: "Related titles added",
     alNotifMediaDataChange: "Title data changed",

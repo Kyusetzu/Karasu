@@ -9,31 +9,10 @@ export interface Presence {
   leaving: boolean;
 }
 
-/**
- * The default exit hold, and it MUST match `--duration-exit` in `index.css`:
- * the CSS plays the exit for that long, this keeps the node alive exactly as
- * long. A JS constant because a hook cannot read a CSS token without a DOM
- * round trip on every close.
- */
+/** The default exit hold; keep it equal to `--duration-exit` in `index.css`, or the node dies before the CSS finishes. */
 const EXIT_MS = 120;
 
-/**
- * Keeps a node mounted for the length of its exit animation.
- *
- * CSS cannot animate an element React has already removed, and every overlay in
- * this app was plain conditional rendering — `{open && <Modal/>}` — so they all
- * arrived with an animation and vanished mid-frame. This is the missing half:
- * `mounted` stays true for `exitMs` after `open` goes false, with `leaving` set
- * so the caller can swap in the exit animation.
- *
- * Under reduced motion `exitMs` collapses to 0 and the unmount is immediate,
- * which is why the duration goes through `motionDuration` rather than being
- * used raw — the CSS `!important` rules cannot reach a `setTimeout`.
- *
- * The timer is keyed to the close it was started for: reopening while an exit
- * is in flight cancels it, so a fast toggle cannot unmount a node that is open
- * again by the time the timer fires.
- */
+/** Keeps a node mounted for its exit animation; the wait goes through `motionDuration` because CSS cannot reach a timer. */
 export function usePresence(open: boolean, exitMs = EXIT_MS): Presence {
   const [mounted, setMounted] = useState(open);
   const [leaving, setLeaving] = useState(false);
@@ -83,15 +62,7 @@ export interface ValuePresence<T> extends Presence {
   value: T | null;
 }
 
-/**
- * `usePresence` for overlays whose visibility *is* their data.
- *
- * Most dialogs here are opened by setting state to the thing they edit —
- * `{editing && <EntryEditModal entry={editing}/>}` — so closing sets it to null
- * and the content vanishes before it can animate out. Retaining the last
- * non-null value lets the exit render what the user was just looking at, rather
- * than an empty shell or a flash of the next thing.
- */
+/** `usePresence` for overlays whose visibility is their data; the last non-null value is retained so the exit renders it. */
 export function usePresentValue<T>(
   value: T | null | undefined,
   exitMs = EXIT_MS,

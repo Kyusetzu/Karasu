@@ -10,12 +10,7 @@ export interface TitleKey {
   title: string;
   /** -1 where the release name carried no season. */
   season: number;
-  /**
-   * Whether this parse is the one carrying a correction. A row can merge
-   * several parses and only one of them is usually corrected, so the row's own
-   * `manual` cannot say which. Optional only so the two key literals on the
-   * library screen, which have no parse to speak for, still typecheck.
-   */
+  /** Whether this parse carries the correction; a row merges several parses, so its own `manual` cannot say which. */
   manual?: boolean;
 }
 
@@ -53,12 +48,7 @@ export interface UnmatchedGroup {
   title: string;
   season: number;
   files: LibraryFile[];
-  /**
-   * What AniList thinks this is. Unconfirmed — a search hit is a weaker claim
-   * than a match against the user's own list, and open search returns
-   * *something* for almost any input. `null` when nothing scored well enough,
-   * which is what puts a group in the failed section.
-   */
+  /** AniList's unconfirmed guess; `null` when nothing scored well enough, which puts the group in the failed section. */
   suggestion: { mediaId: number; score: number } | null;
 }
 
@@ -92,22 +82,14 @@ export const scanLibrary = () => invoke<ScanSummary>("scan_library");
 export const getLibraryUnmatched = () =>
   invoke<UnmatchedGroup[]>("get_library_unmatched");
 
-/**
- * Points every file that parses to `title`/`season` at `mediaId`, and returns
- * the rebuilt index so the caller does not have to refetch it.
- */
+/** Points every file that parses to `title`/`season` at `mediaId` and returns the rebuilt index. */
 export const setLibraryMatch = (title: string, season: number, mediaId: number) =>
   invoke<LibraryEntry[]>("set_library_match", { title, season, mediaId });
 
 export const clearLibraryMatch = (title: string, season: number) =>
   invoke<LibraryEntry[]>("clear_library_match", { title, season });
 
-/**
- * Confirms a season split: the row's episodes `from..=to` — the numbers the
- * screen shows, whatever earlier splits renumbered them from — belong to
- * `dstMediaId`, renumbered from `dstStart`. The backend resolves the actual
- * files and persists disk-keyed rules (schema v11), so the next scan agrees.
- */
+/** Confirms a season split keyed on the numbers the row shows; the backend persists disk-keyed rules for the next scan. */
 export const setLibraryRedirect = (
   mediaId: number,
   from: number,
@@ -136,8 +118,7 @@ export interface LibraryRedirectRow {
 export const listLibraryRedirects = () =>
   invoke<LibraryRedirectRow[]>("list_library_redirects");
 
-/** Removes one split range, giving the files back to whatever the rest of
- *  the parse still answers to. */
+/** Removes one split range, giving the files back to whatever the rest of the parse still answers to. */
 export const clearLibraryRedirect = (title: string, season: number, epFrom: number) =>
   invoke<LibraryEntry[]>("clear_library_redirect", { title, season, epFrom });
 

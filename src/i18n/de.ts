@@ -1,9 +1,6 @@
 import { en } from "./en";
 
-/**
- * German. Typed against the English object, so a missing or misspelled key is
- * a type error at the line that omits it.
- */
+/** German, typed against the English object so a missing or misspelled key is a type error at the line that omits it. */
 export const de: typeof en = {
   nav: {
     groupLibrary: "Bibliothek",
@@ -1044,12 +1041,7 @@ export const de: typeof en = {
     saving: "Speichere …",
     tabActivity: "Aktivität",
     noActivity: "{{name}} hat noch nichts gepostet",
-    // Verben. AniList setzt diese Sätze selbst zusammen, und nur auf Englisch —
-    // deshalb werden sie aus einem Schlüssel übersetzt, siehe `lib/activity`.
-    // {{n}} ist die Episoden-/Kapitelnummer (oder ein Bereich wie 162–170),
-    // %t% der Titel-Link. Kleingeschrieben, weil der Satz den Nutzernamen
-    // darüber fortsetzt. Kein "von 170": der Bereich ist ein Stück am Stück,
-    // keine Angabe eines Gesamtumfangs.
+    // Verben aus `lib/activity`, kleingeschrieben, weil der Satz den Nutzernamen darüber fortsetzt; %t% ist der Titel-Link.
     sentWatchedEpisode: "hat Episode {{n}} von %t% geschaut",
     sentRewatchedEpisode: "hat Episode {{n}} von %t% erneut geschaut",
     sentReadChapter: "hat Kapitel {{n}} von %t% gelesen",
@@ -1108,8 +1100,7 @@ export const de: typeof en = {
     unsubscribe: "Abonniert",
     subscribeFailed: "Konnte das Abo nicht ändern",
     deeperReplies: "{{n}} weitere in diesem Verlauf auf AniList",
-    // Nicht `following` ("Folgt" — der Zustand des Buttons), sondern die Menge
-    // der Personen, denen dieser Nutzer folgt.
+    // Nicht `following` (der Zustand des Buttons), sondern die Menge der Personen, denen dieser Nutzer folgt.
     tabFollowing: "Gefolgte",
     noFollowers: "{{name}} hat noch keine Follower",
     noFollowing: "{{name}} folgt noch niemandem",
@@ -1249,8 +1240,7 @@ export const de: typeof en = {
     alSaveFailed: "Diese Einstellung wurde nicht gespeichert",
     alSaveFailedDetail:
       "Es wurde nichts gesendet. Kontoänderungen werden offline nicht zwischengespeichert.",
-    // Die drei Karasu-Überschreibungen. Jede nennt, wo die Wirkung tatsächlich
-    // landet — ein allgemeines "betrifft AniList" würde niemandem helfen.
+    // Die drei Karasu-Überschreibungen; jede nennt, wo die Wirkung tatsächlich landet.
     alOverrideTitleLanguage:
       "Karasu wählt Titel mit seiner eigenen Einstellung und ignoriert diese.",
     alOverrideAdult:

@@ -9,19 +9,7 @@ import {
 import { backendErrorText } from "@/lib/backendError";
 import { showToast } from "@/stores/toast";
 
-/**
- * Posting and deleting a status update.
- *
- * Its own file because it is the one hook carrying the CLAUDE.md override: this
- * is the mutation the rejected-features carve-out exists for. Keeping it apart
- * from `useSocialActions` means the diff that adds posting is the diff that
- * amends the document.
- *
- * Neither is optimistic. A post is the user's own words — showing it as sent
- * before the server has it means a failure erases something they wrote — and a
- * delete is irreversible, so claiming it early would be claiming something
- * unrecoverable. Both wait for the round trip.
- */
+/** Posting and deleting a status update, the CLAUDE.md carve-out's own hook; neither is optimistic on purpose. */
 export function useActivityPost(viewerId: number | undefined) {
   const qc = useQueryClient();
   const { t } = useTranslation();
@@ -36,10 +24,7 @@ export function useActivityPost(viewerId: number | undefined) {
   const post = useMutation({
     mutationFn: (text: string) => saveTextActivity(text),
     onSuccess: (created) => {
-      // Pushed onto the front of the loaded pages rather than invalidating.
-      // `refetch` on an infinite query refetches *every* retained page, so a
-      // post from someone six pages deep would cost six requests to show one
-      // new row.
+      // Pushed onto the front of the loaded pages, because `refetch` on an infinite query refetches every retained page.
       for (const key of feedKeys()) {
         qc.setQueryData<InfiniteData<ActivityPage>>(key, (old) => {
           if (!old?.pages.length) return old;
@@ -65,22 +50,14 @@ export function useActivityPost(viewerId: number | undefined) {
     onError: () => {
       showToast({
         kind: "error",
-        // Never the text. `main.tsx` funnels errors into the diagnostics report
-        // a user pastes into a bug report.
+        // Never the post's text: `main.tsx` funnels errors into the diagnostics report a user pastes into a bug report.
         text: t("social.postFailed"),
         detail: t("social.postFailedDetail"),
       });
     },
   });
 
-  /**
-   * Rewrites one activity in every feed that holds it, whoever's feed it is.
-   *
-   * Prefix keys, not the viewer's two: the activity is also cached under
-   * `["social", "activity", id]` by its own page, and under other users'
-   * feeds when it was seen there. The exact-key version patched the two
-   * feeds and left the page the click was made on unchanged.
-   */
+  /** Rewrites one activity under every prefix key that holds it, including its own page and other users' feeds. */
   const patchEverywhere = (id: number, apply: (raw: object) => object | null) => {
     for (const scope of ["feed", "activities"] as const) {
       qc.setQueriesData<InfiniteData<ActivityPage>>({ queryKey: ["social", scope] }, (old) => {
@@ -107,8 +84,7 @@ export function useActivityPost(viewerId: number | undefined) {
     mutationFn: (id: number) => deleteActivity(id),
     onSuccess: (_ok, id) => {
       patchEverywhere(id, () => null);
-      // No undo offered, because there is none: AniList has no way to restore a
-      // deleted activity, and a button implying otherwise would be a lie.
+      // No undo offered, because AniList has no way to restore a deleted activity.
       showToast({ kind: "success", text: t("social.postDeleted") });
     },
     onError: () => {
@@ -116,20 +92,7 @@ export function useActivityPost(viewerId: number | undefined) {
     },
   });
 
-  /**
-   * Pin or unpin one of the viewer's own activities.
-   *
-   * The flag is patched in place across the loaded pages — the *ordering*
-   * (pinned floats to the top of the profile feed) only changes on the next
-   * refetch, which is honest: reshuffling rows under the cursor to celebrate a
-   * click is worse than a badge appearing where the row already is.
-   *
-   * A refusal carries AniList's own sentence into the toast: pinning is a
-   * donator feature over there, and "Sorry, you must be at least a tier 2
-   * donator" is the whole explanation. `lib/donator` keeps the control off
-   * accounts the viewer query already knows cannot pin; this covers the
-   * viewer blob that predates the field.
-   */
+  /** Pins or unpins an own activity in place; ordering waits for the next refetch, and a refusal shows AniList's sentence. */
   const pin = useMutation({
     mutationFn: (vars: { id: number; pinned: boolean }) =>
       toggleActivityPin(vars.id, vars.pinned),

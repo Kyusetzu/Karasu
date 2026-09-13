@@ -1,15 +1,7 @@
 import { create } from "zustand";
 import { isTauri } from "@/api/anilist";
 
-/**
- * Where Karasu is running, for the handful of screens whose honest answer
- * differs by platform.
- *
- * Read once at startup and cached: none of it can change while the app is
- * open. `null` until then, and every consumer guards on that rather than
- * assuming Windows — the wrong guess is what puts a Windows-only sentence in
- * front of a Linux user.
- */
+/** Where Karasu is running, read once at startup; `null` until then, and consumers guard on that rather than guess. */
 export interface PlatformInfo {
   os: string;
   /** Running from an AppImage: the updater works and portable mode has a home. */
@@ -33,12 +25,5 @@ export const usePlatform = create<PlatformState>((set, get) => ({
 /** True only when we know it is Linux — never as a default. */
 export const isLinux = (info: PlatformInfo | null) => info?.os === "linux";
 
-/**
- * True only when we know it is Android — never as a default, and this is the
- * capability signal, not `usePhoneShell`: the shell is a *width* (a narrowed
- * desktop window takes the phone layout on purpose), while what the platform
- * can do — scan a library, watch SMTC, spawn mpv — does not change with the
- * window. The one frame before `load()` resolves reads as not-Android, which
- * is the desktop-correct guess and at worst a flicker on a phone.
- */
+/** True only when we know it is Android: the capability key, never the width key `usePhoneShell` answers. */
 export const isAndroid = (info: PlatformInfo | null) => info?.os === "android";

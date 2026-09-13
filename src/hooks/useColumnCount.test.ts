@@ -13,19 +13,13 @@ describe("parseColumnCount", () => {
   });
 
   it("falls back to one column when the grid is not laid out", () => {
-    // What getComputedStyle returns for a display:none or detached element:
-    // the specified value, which happens to contain two space-separated parts.
+    // A display:none or detached element computes to the specified value, which has two space-separated parts.
     expect(parseColumnCount("repeat(auto-fill, minmax(9.375rem, 1fr))")).toBe(1);
     expect(parseColumnCount("none")).toBe(1);
     expect(parseColumnCount("")).toBe(1);
   });
 
-  /**
-   * `repeat(var(--cover-cols))` with the variable unset is an invalid
-   * declaration, and the property then computes to `none`. That must read as
-   * one column rather than throwing — but the real defence is the fallback
-   * baked into the `media-grid` utility, so it never gets here.
-   */
+  /** An unset `--cover-cols` computes the property to `none`, which must read as one column rather than throw. */
   it("survives the unset-token case that would collapse the grid", () => {
     expect(parseColumnCount("none")).toBe(1);
     expect(parseColumnCount("repeat(auto-fill, )")).toBe(1);

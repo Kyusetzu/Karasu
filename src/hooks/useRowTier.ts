@@ -1,18 +1,7 @@
 import { useEffect, useState, type RefObject } from "react";
 import { tierForWidth, type Tier } from "@/components/list/columns";
 
-/**
- * Which set of list columns fits in `ref`'s current width.
- *
- * Measured rather than derived from a viewport breakpoint, because the space a
- * row actually gets is the window minus the sidebar minus the page padding — and
- * a `2xl:` guess would be wrong for anyone running the window at anything other
- * than full screen.
- *
- * A `ResizeObserver` and not a `matchMedia` listener for the same reason: the
- * element's width is the input, so watching the element is watching the thing
- * that decides. One observer for the whole list, not one per row.
- */
+/** Which set of list columns fits the measured element width; a viewport breakpoint cannot see the sidebar or padding. */
 export function useRowTier(
   ref: RefObject<HTMLElement | null>,
   manga: boolean,
@@ -22,9 +11,7 @@ export function useRowTier(
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    // Seed from the current width: the observer fires on connect in every
-    // browser that matters, but reading once means the first paint is already
-    // right rather than briefly compact.
+    // Seed from the current width so the first paint is already right rather than briefly compact.
     setWidth(el.clientWidth);
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) setWidth(entry.contentRect.width);
@@ -33,7 +20,6 @@ export function useRowTier(
     return () => observer.disconnect();
   }, [ref]);
 
-  // Until measured, the narrow set — it fits everywhere, so the first frame can
-  // never overflow. Guessing wide and correcting would show a broken row.
+  // Until measured, the narrow set: it fits everywhere, so the first frame can never overflow.
   return width === 0 ? "compact" : tierForWidth(width, manga);
 }

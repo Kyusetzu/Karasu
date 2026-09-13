@@ -19,11 +19,7 @@ import { displayTitle } from "@/api/types";
 import { headline, inverse, type EntrySnapshot } from "@/lib/receipt";
 import { showToast } from "@/stores/toast";
 
-/**
- * Mutations on a media list (anime or manga) with optimistic cache
- * updates. Status changes move the entry locally into the matching group
- * so no expensive refetch (rate limit!) is needed.
- */
+/** Mutations on one media list with optimistic cache updates; a status change moves the entry locally, no refetch. */
 export function useListMutations(userId: number, mediaType: MediaType) {
   const qc = useQueryClient();
   const { t } = useTranslation();
@@ -65,9 +61,7 @@ export function useListMutations(userId: number, mediaType: MediaType) {
           status: t(`status.${mediaType}.${head.value as string}`),
         });
       case "score":
-        // Rendered, not interpolated raw: a smiley account should read
-        // "scored 🙂", not "scored 2", and a decimal one keeps its ".0".
-        // Local mode's cache holds POINT_10, matching its controls.
+        // Rendered, not raw: a smiley account should read "scored 🙂", not "scored 2"; local mode's cache holds POINT_10.
         return t("receipt.score", {
           title,
           n: formatScore(currentScoreFormat(), head.value as number),
@@ -77,22 +71,7 @@ export function useListMutations(userId: number, mediaType: MediaType) {
     }
   };
 
-  /**
-   * Applies one patch to every listed media id, in a single cache write.
-   *
-   * Taking a set rather than one id is what lets a bulk edit be one mutation:
-   * patching per entry meant N passes over the whole collection, and N
-   * optimistic mutations whose rollbacks then fought each other.
-   */
-  /**
-   * One entry with `input` applied — `??` throughout, so an absent key means
-   * "leave it alone" rather than "clear it" (`private: false` is a real
-   * value, which is why `||` would be wrong). One function on purpose: the
-   * status-move insert below used to spread the raw input instead, which
-   * behaved differently from the in-place map (it copied `mediaId` along and
-   * wrote explicitly-undefined keys), and any field added to one path was
-   * silently missing from the other.
-   */
+  /** `??` throughout, so an absent key means leave alone; both patch paths share this so no field goes missing. */
   const applyInput = (
     e: MediaListEntry,
     input: Omit<SaveEntryInput, "mediaId">,
@@ -114,13 +93,10 @@ export function useListMutations(userId: number, mediaType: MediaType) {
     startedAt: input.startedAt ?? e.startedAt,
     completedAt: input.completedAt ?? e.completedAt,
     updatedAt: now,
-    // Deliberately not patched from `input.advancedScores`: it is a positional
-    // array and the entry holds a name-keyed map, so rebuilding one from the
-    // other here would mean this function knowing the account's category
-    // order. `onSuccess` takes the server's map instead, which is authoritative
-    // anyway because AniList recomputes the overall score from it.
+    // `advancedScores` is not patched here: the input is positional, the entry a map; `onSuccess` takes the server's.
   });
 
+  /** Applies one patch to every listed media id in one cache write, so a bulk edit is one mutation with one rollback. */
   const patchCacheMany = (
     mediaIds: Set<number>,
     input: Omit<SaveEntryInput, "mediaId">,
@@ -147,9 +123,7 @@ export function useListMutations(userId: number, mediaType: MediaType) {
           (g) => !g.isCustomList && g.status === input.status,
         );
         if (target) {
-          // By media id: an entry also present in a custom list appears more
-          // than once in this flat pass, and inserting it twice would render
-          // it twice.
+          // By media id: an entry also in a custom list appears more than once in this flat pass and would be inserted twice.
           const moved = new Map<number, MediaListEntry>();
           for (const e of old.lists.flatMap((g) => g.entries)) {
             if (!mediaIds.has(e.mediaId) || moved.has(e.mediaId)) continue;
@@ -174,9 +148,7 @@ export function useListMutations(userId: number, mediaType: MediaType) {
       const previous = qc.getQueryData<ListResult>(key);
       const entry = findEntry(previous, input.mediaId);
       patchCache(input);
-      // Captured *before* the patch, and captured per-entry rather than as a
-      // whole-cache snapshot — see `lib/receipt.ts` for why undo has to be a
-      // new write instead of a restore.
+      // Captured before the patch and per entry; `lib/receipt.ts` is why undo is a new write rather than a restore.
       return {
         previous,
         before: entry ? snapshot(entry) : undefined,
@@ -184,11 +156,7 @@ export function useListMutations(userId: number, mediaType: MediaType) {
       };
     },
     onSuccess: (res, input, ctx) => {
-      // AniList *derives* the overall score from the categories, so an
-      // advanced-scoring save is the one case where the optimistic patch
-      // cannot know the answer — it wrote whatever the score slider said,
-      // which the server has just overruled. Reconcile from the mutation's own
-      // result instead of leaving a number that will change on the next fetch.
+      // AniList derives the overall score from the categories, so reconcile from the mutation's result, not the guess.
       if (res?.entry?.advancedScores) {
         const { score, advancedScores } = res.entry;
         qc.setQueryData<ListResult>(key, (old) =>
@@ -207,14 +175,9 @@ export function useListMutations(userId: number, mediaType: MediaType) {
       }
       if (!ctx?.before || !ctx.title) return;
       const undo = inverse(input, ctx.before);
-      // A save that changed nothing gets no receipt. Undoing a no-op is noise,
-      // and so is announcing one.
+      // A save that changed nothing gets no receipt; undoing a no-op is noise, and so is announcing one.
       if (!undo) return;
-      // `queued` means the write never reached AniList — it is sitting in
-      // SQLite waiting for a drain. It came back as a success because the edit
-      // is not lost, but saying so in the same green receipt as a landed write
-      // is the one assurance a tracker must not get wrong. The undo still
-      // works: it queues too.
+      // `queued` is not success: the edit still sits in SQLite, so it must not wear the green receipt of a landed write.
       showToast({
         kind: res?.queued ? "info" : "success",
         text: res?.queued
@@ -228,8 +191,7 @@ export function useListMutations(userId: number, mediaType: MediaType) {
     },
     onError: (_err, input, ctx) => {
       if (ctx?.previous) qc.setQueryData(key, ctx.previous);
-      // An optimistic write that failed has already been shown as succeeding,
-      // so the rollback above is invisible without this.
+      // An optimistic write that failed has already shown as succeeding, so the rollback is invisible without this.
       showToast({
         kind: "error",
         text: t("receipt.failed", { title: ctx?.title ?? "" }).trim(),
@@ -239,31 +201,14 @@ export function useListMutations(userId: number, mediaType: MediaType) {
     },
   });
 
-  /**
-   * One status or score across a selection, as a single mutation.
-   *
-   * Deliberately not `selection.forEach(save.mutate)`, which is what this
-   * replaces. That fired one request per entry — hundreds at once against a
-   * ~30/min budget — and, because each `onMutate` snapshotted a cache the
-   * earlier siblings had already patched, a single failure restored a snapshot
-   * that erased the siblings which had succeeded. One mutation has no siblings
-   * to erase, and its rollback covers exactly what it changed.
-   */
+  /** One patch across a selection as a single mutation; per-entry mutations fanned out and their rollbacks fought. */
   const bulkSave = useMutation({
     mutationFn: ({
       entries,
       patch,
     }: {
       entries: MediaListEntry[];
-      /**
-       * What `UpdateMediaListEntries` accepts and is sensible to set across a
-       * whole selection. Confirmed by schema introspection rather than by
-       * running the mutation, which would have meant editing real entries to
-       * find out.
-       *
-       * `notes` is left out on purpose: tags are serialized into it, so a bulk
-       * set would wipe every selected entry's tags.
-       */
+      /** What `UpdateMediaListEntries` takes across a selection; `notes` is left out because tags are serialized into it. */
       patch: BulkPatch;
     }) => bulkSaveEntries(entries, patch),
     onMutate: async ({ entries, patch }) => {
@@ -279,11 +224,7 @@ export function useListMutations(userId: number, mediaType: MediaType) {
       });
     },
     onError: (err, vars, ctx) => {
-      // A selection is sent in chunks and stops on the first failure, so some
-      // of it may well be written. Restoring the snapshot then would show the
-      // old values for entries AniList has already changed — worse than the
-      // failure itself, because it looks settled. Refetch instead and let the
-      // server say what is true.
+      // The chunks stop at the first failure, so part may be written; refetch rather than restore a snapshot that lies.
       const partial = err instanceof BulkSaveError && err.updated > 0;
       if (partial) void qc.invalidateQueries({ queryKey: key });
       else if (ctx?.previous) qc.setQueryData(key, ctx.previous);
@@ -296,8 +237,7 @@ export function useListMutations(userId: number, mediaType: MediaType) {
             })
           : t("receipt.bulkFailed", { count: ctx?.count ?? 0 }),
         detail: t("receipt.failedDetail"),
-        // No retry offer on a partial run: the same selection would be sent
-        // again, including the part that landed.
+        // No retry offer on a partial run: the same selection would be sent again, including the part that landed.
         action: partial
           ? undefined
           : { label: t("common.retry"), run: () => bulkSave.mutate(vars) },
@@ -308,9 +248,7 @@ export function useListMutations(userId: number, mediaType: MediaType) {
   const remove = useMutation({
     mutationFn: deleteListEntry,
     onError: () => {
-      // Without this a failed removal is completely silent: `onSuccess` never
-      // runs so the row stays on screen, and the confirm dialog has already
-      // closed as though it worked.
+      // Without this a failed removal is silent: the row stays on screen and the confirm dialog has already closed.
       showToast({
         kind: "error",
         text: t("receipt.removeFailed"),
@@ -332,21 +270,7 @@ export function useListMutations(userId: number, mediaType: MediaType) {
     },
   });
 
-  /**
-   * Removes a whole selection, one request at a time.
-   *
-   * `selection.forEach(remove.mutate)` is what this replaces — the same
-   * fan-out `bulkSave` exists to prevent, still live on the delete path. It
-   * fired one concurrent request per entry against a ~30/min budget, so a
-   * fifty-entry removal was a burst of fifty mutations, a wall of 429s and a row
-   * of error toasts.
-   *
-   * There is no batch delete to switch to: `DeleteMediaListEntry` takes a single
-   * id and nothing else, confirmed against the schema. So the fix is not one
-   * request, it is *sequential* requests — awaited in turn so the client's rate
-   * limiter can pace them — with the cache patched once at the end rather than
-   * once per entry.
-   */
+  /** Removes a selection sequentially, since `DeleteMediaListEntry` takes one id and a burst of them earns 429s. */
   const bulkRemove = useMutation({
     mutationFn: async (entries: MediaListEntry[]) => {
       const removed: number[] = [];
@@ -356,9 +280,7 @@ export function useListMutations(userId: number, mediaType: MediaType) {
           await deleteListEntry(entry.id);
           removed.push(entry.id);
         } catch {
-          // Carry on rather than abandoning the rest: a selection half-removed
-          // and reported is better than one that stops at the first failure and
-          // leaves the user guessing where it got to.
+          // Carry on: a selection half-removed and reported beats one that stops and leaves the user guessing.
           failed.push(displayTitle(entry.media.title));
         }
       }

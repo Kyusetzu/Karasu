@@ -3,28 +3,16 @@ export interface Viewer {
   name: string;
   siteUrl: string;
   avatar: { large: string | null } | null;
-  /** AniList's donator tier, 0 for none. Carried by `VIEWER_QUERY` because
-   *  pinning an activity is a tier-2 feature — `lib/donator` decides whether
-   *  the pin control is offered at all. Optional: a viewer blob cached before
-   *  the field existed lacks it, and reads as "unknown", which keeps the
-   *  control (a refusal then explains itself in the toast). */
+  /** AniList's donator tier, 0 for none; optional so an older cached viewer reads as unknown and keeps the pin. */
   donatorTier?: number | null;
-  /** Carried by `VIEWER_QUERY` so the whole app can follow the account's
-   *  score format without a profile fetch. Optional: cached viewer blobs from
-   *  before the field existed lack it, and read as ten-point. */
+  /** The account's score format without a profile fetch; optional, since an older cached viewer reads as ten-point. */
   mediaListOptions?: {
     scoreFormat: string | null;
-    /** Per media type, because AniList keeps them per media type. The names
-     *  are seeded even when the feature is off, so `advancedScoringEnabled` is
-     *  the signal and a non-empty `advancedScoring` is not. */
+    /** Per media type, as AniList keeps them; names are seeded even when off, so `advancedScoringEnabled` is the signal. */
     animeList?: AdvancedScoringOptions | null;
     mangaList?: AdvancedScoringOptions | null;
   } | null;
-  /** Carried by `VIEWER_QUERY` for the airing watcher — see
-   *  `alerts/airing.rs`, which holds the copy of the rules that actually
-   *  decides. Optional for the same reason as above: a viewer blob cached
-   *  before the field existed lacks it, and reads as "AniList will not cover
-   *  this", which is the safe answer. */
+  /** For the airing watcher (`alerts/airing.rs` decides); optional, so an older cached viewer reads as not covered. */
   options?: {
     airingNotifications: boolean | null;
     notificationOptions: { type: string | null; enabled: boolean | null }[] | null;
@@ -55,17 +43,11 @@ export interface MediaTitle {
 
 export interface Media {
   id: number;
-  /** MyAnimeList id — what the MAL XML export keys on. Optional: blobs
-      cached before the export existed lack it, and some titles are
-      AniList-only and genuinely have none. */
+  /** MyAnimeList id, what the MAL export keys on; optional since older cached blobs lack it and some titles have none. */
   idMal?: number | null;
   type?: MediaType;
   title: MediaTitle;
-  // `extraLarge` and `bannerImage` are optional because only the detail query
-  // asks for them. The list and grid queries return hundreds of entries at a
-  // time and nothing there renders either field; carrying them cost a
-  // deserialise, a re-serialise into the SQLite cache, an IPC hop and a
-  // JSON.parse for roughly 160 dead bytes per entry.
+  // Keep `extraLarge` and `bannerImage` optional: only the detail query asks; a list page would carry dead weight.
   coverImage: { large: string | null; extraLarge?: string | null };
   bannerImage?: string | null;
   episodes: number | null;
@@ -85,14 +67,7 @@ export interface Media {
   nextAiringEpisode: { episode: number; airingAt: number } | null;
 }
 
-/**
- * An AniList date that may be only partly known.
- *
- * Every part is nullable because the API genuinely returns "2024" or
- * "March 2024" — a reader who remembers the year but not the day is the normal
- * case, not an edge one. That is why these cannot be `<input type="date">` and
- * why `fuzzyDate` in `lib/format.ts` drops the parts it does not have.
- */
+/** An AniList date that may be only partly known: a year alone is a normal answer, so every part is nullable. */
 export interface FuzzyDate {
   year: number | null;
   month: number | null;
@@ -112,19 +87,11 @@ export interface MediaListEntry {
   updatedAt: number;
   /** Hidden from other users on AniList. */
   private: boolean;
-  /** Kept off the status lists on anilist.co (custom lists only). Optional:
-      SQLite-cached lists from before the field existed lack it. */
+  /** Kept off the status lists on anilist.co (custom lists only); optional because older SQLite-cached lists lack it. */
   hiddenFromStatusLists?: boolean | null;
-  /** Reads as a name→member map (AniList `Json`); *writes* take a plain
-      array of member names — the asymmetry is the API's, not ours. */
+  /** Reads as a name→member map (AniList `Json`); writes take a plain array of names, the asymmetry is the API's. */
   customLists?: Record<string, boolean> | null;
-  /** Reads as a name→score map (AniList `Json`); *writes* take a **positional**
-      `[Float]` ordered by `mediaListOptions.<type>List.advancedScoring` — the
-      same asymmetry as `customLists`, but with a sharper edge, since a wrong
-      order silently files one category's score under another. `lib/
-      advancedScores` is the only place that builds the array. Absent unless
-      the account has advanced scoring on: the list query asks for it behind an
-      `@include`, because it is +8% of a large list's payload. */
+  /** Read as a name→score map; the write is positional and only `lib/advancedScores` builds it; absent unless enabled. */
   advancedScores?: Record<string, number> | null;
   startedAt: FuzzyDate | null;
   completedAt: FuzzyDate | null;
@@ -144,34 +111,15 @@ export interface ListResult {
   lists: MediaListGroup[];
 }
 
-/**
- * What the client knows about the ~30/min budget, as of the last response.
- *
- * Everything is nullable and each null means something different. `remaining`
- * and `limit` are null until a response header has actually been seen — the
- * client seeds a 30 to start with, and reporting a seed as a measurement is the
- * one thing a headroom display must not do.
- */
+/** The rate budget as of the last response; `remaining` and `limit` stay null until a header is seen, never a seed. */
 export interface RateSnapshot {
   remaining: number | null;
   limit: number | null;
   /** How long ago those numbers were read off a response. */
   observedAgoMs: number | null;
-  /**
-   * How much longer the client is parked. **Never derived from `remaining`**:
-   * if AniList omits the header on a 429, `remaining` keeps its comfortable
-   * pre-429 value while the client waits out a two-minute `Retry-After`.
-   */
+  /** How much longer the client is parked; never derive it from `remaining`, which a header-less 429 leaves untouched. */
   throttledForMs: number | null;
-  /**
-   * Why it is parked, spelled **exactly** as the Rust side emits it.
-   *
-   * A union rather than `string`, because it was `string` and the panel
-   * compared against `"retry-after"` while `client.rs` emits `"retryAfter"` —
-   * so for a release every genuine 429 rendered as the app pacing itself, which
-   * is the one distinction this field exists to draw. A typo is now a type
-   * error instead of a silent mislabel.
-   */
+  /** Why it is parked, spelled exactly as `client.rs` emits it; a union so a mislabel is a type error, not silent. */
   throttleKind: ThrottleKind | null;
 }
 
@@ -194,18 +142,11 @@ export interface QueuedEdit {
 export interface RequestLogEntry {
   /** Monotonic within a session — a stable React key, not an AniList id. */
   seq: number;
-  /**
-   * The root field the request asked for (`Media`, `Page`,
-   * `SaveMediaListEntry`). Never the variables: they carry notes and scores.
-   */
+  /** The root field the request asked for, never the variables: they carry notes and scores. */
   operation: string;
   startedAgoMs: number;
   durationMs: number;
-  /**
-   * How long the client made this request wait on its own pacing before
-   * sending. Separate from `durationMs` on purpose — self-inflicted delay and
-   * AniList being slow look identical from outside and have different fixes.
-   */
+  /** Self-imposed pacing delay before sending, kept apart from `durationMs` because the two have different fixes. */
   pacedMs: number;
   status: number | null;
   remainingAfter: number | null;
@@ -233,13 +174,9 @@ export interface SaveEntryInput {
   notes?: string;
   private?: boolean;
   hiddenFromStatusLists?: boolean;
-  /** The complete set of custom lists this entry belongs to — the API
-      replaces membership wholesale, so always send every checked name. */
+  /** Every custom list the entry belongs to: the API replaces membership wholesale, so always send every checked name. */
   customLists?: string[];
-  /** Positional, ordered by the account's `advancedScoring` names — build it
-      with `lib/advancedScores`'s `toAdvancedArray` and nothing else. Plain
-      floats in the display scale: there is no `advancedScoresRaw` on the
-      schema, so the `scoreRaw` discipline does not extend here. */
+  /** Positional, display-scale floats (the schema has no `advancedScoresRaw`); only `lib/advancedScores` may build it. */
   advancedScores?: number[];
   startedAt?: FuzzyDate;
   completedAt?: FuzzyDate;
@@ -256,9 +193,7 @@ export interface MutationResult {
     repeat: number;
     notes: string | null;
     updatedAt: number;
-    /** AniList derives the overall score from these, so the server's answer is
-        the only true one — `useListMutations` reconciles from it rather than
-        keeping the optimistic guess. */
+    /** AniList derives the overall score from these, so `useListMutations` reconciles from the server's answer. */
     advancedScores?: Record<string, number> | null;
   } | null;
 }

@@ -13,12 +13,7 @@ import type {
 // Re-exported because several stats/detail consumers import it from here.
 export type { FuzzyDate };
 
-/**
- * Every query that spreads `MEDIA_FIELDS` (or otherwise selects an entry's
- * `score`) must declare `$scoreFormat: ScoreFormat` and spread this into its
- * variables — scores arrive in the account's own scale, which is what every
- * control and cell renders since the scoreRaw change made writes match.
- */
+/** Spread into every query that selects an entry's score, so scores arrive in the account's own scale. */
 const scoreFormatVar = () => ({ scoreFormat: currentScoreFormat() });
 
 /** Media fields for discovery grids, including the user's own list entry. */
@@ -58,9 +53,7 @@ export interface MediaWithListStatus extends Media {
   mediaListEntry: ListEntryStub | null;
 }
 
-// `$isAdult` is filtered server-side rather than after the fact: a page
-// filtered only on arrival can come back almost empty and read as "no
-// results".
+// `$isAdult` filters server-side: a page filtered only on arrival can come back nearly empty.
 const SEARCH_QUERY = `
 query ($search: String!, $type: MediaType!, $page: Int, $isAdult: Boolean, $scoreFormat: ScoreFormat) {
   Page(page: $page, perPage: 30) {
@@ -83,13 +76,7 @@ export async function searchMedia(
   return data.Page;
 }
 
-/**
- * The filterable search — every argument optional, so one query serves
- * "search for X", "browse trending", and any combination. `gql`'s JSON body
- * drops undefined keys, and AniList treats an absent variable's argument as
- * no filter (its own site pages exactly this shape). Kept separate from
- * `SEARCH_QUERY`, which the match picker and split modal still use bare.
- */
+/** The filterable search: an absent variable is no filter to AniList, so one query serves every combination. */
 const BROWSE_QUERY = `
 query ($search: String, $type: MediaType!, $page: Int, $isAdult: Boolean, $genreIn: [String], $genreNotIn: [String], $tagIn: [String], $tagNotIn: [String], $seasonYear: Int, $season: MediaSeason, $format: MediaFormat, $status: MediaStatus, $source: MediaSource, $countryOfOrigin: CountryCode, $sort: [MediaSort], $scoreFormat: ScoreFormat) {
   Page(page: $page, perPage: 30) {
@@ -100,16 +87,7 @@ query ($search: String, $type: MediaType!, $page: Int, $isAdult: Boolean, $genre
   }
 }`;
 
-/**
- * Every `MediaSource` the enum has, verified by introspection rather than
- * copied from the website.
- *
- * The *labels* are `lib/format`'s `sourceLabel` and have shipped in both
- * languages since the detail page needed them — this is only the order they
- * appear in a dropdown. The origin list is `lib/format`'s `ORIGINS` for the
- * same reason: `countryOfOrigin` is a `CountryCode` scalar, so the four that
- * have anime and manga were already spelled out for the manga list's filter.
- */
+/** Every `MediaSource` the enum has, verified by introspection; the labels live in `lib/format`'s `sourceLabel`. */
 export const MEDIA_SOURCES = [
   "ORIGINAL",
   "MANGA",
@@ -158,10 +136,7 @@ export async function browseMedia(
     type,
     page,
     search: filters.search || undefined,
-    // `undefined` rather than `[]` throughout: `gql` drops undefined keys and
-    // an absent argument is no filter, where `genre_in: []` is a filter that
-    // matches nothing. `lib/multiFilter`'s `toQueryArgs` is the other half of
-    // this contract and has a test for it.
+    // `undefined` rather than `[]`: an absent argument is no filter, while `genre_in: []` is a filter matching nothing.
     genreIn: filters.genreIn?.length ? filters.genreIn : undefined,
     genreNotIn: filters.genreNotIn?.length ? filters.genreNotIn : undefined,
     tagIn: filters.tagIn?.length ? filters.tagIn : undefined,
@@ -179,11 +154,7 @@ export async function browseMedia(
   return data.Page;
 }
 
-/**
- * The filter vocabularies AniList defines server-side. One request, cached
- * effectively forever — genres change on the order of years. Adult-only
- * tags carry their flag so the content filter can drop them from the picker.
- */
+/** The server-defined filter vocabularies; adult-only tags carry their flag so the content filter can drop them. */
 const GENRE_TAG_QUERY = `
 query {
   GenreCollection
@@ -216,23 +187,7 @@ query ($season: MediaSeason!, $year: Int!, $page: Int, $isAdult: Boolean, $score
   }
 }`;
 
-/**
- * The season's most popular titles, with artwork wide enough to be a banner.
- *
- * Separate from `SEASONAL_QUERY` on purpose, and the split is the point.
- * CLAUDE.md forbids `bannerImage` and `coverImage.extraLarge` on the list and
- * grid queries because those run at 30–50 titles a page and nothing renders
- * them there. This runs at **five**, and the hero is the one place in the app
- * that genuinely needs a 2:1 image — a 2:3 poster stretched across the top of
- * the Overview looks exactly as bad as it sounds. Same reasoning
- * `social.ts:164` uses for the profile banner: the rule is about pages of
- * thirty, not about the field being forbidden everywhere.
- *
- * Deliberately narrow beyond that. No `mediaListEntry`, no `genres`, no
- * `synonyms` — the hero draws a title, an image and a link, so it asks for a
- * title, an image and a link, plus the two fields `isBlocked` needs to filter
- * it. `MEDIA_FIELDS` would have been ten times the payload for nothing.
- */
+/** The hero's handful of titles with banner art; CLAUDE.md's wide-image rule is about pages of thirty, not this. */
 const SEASON_HERO_QUERY = `
 query ($season: MediaSeason!, $year: Int!, $isAdult: Boolean) {
   Page(page: 1, perPage: 10) {
@@ -302,18 +257,7 @@ export async function seasonalAnime(
 
 // --- Airing calendar --------------------------------------------------------
 
-/**
- * A time window of the global airing schedule, deliberately slim.
- *
- * Not `MEDIA_FIELDS`: a calendar row draws a cover, a title and a time, and
- * list membership comes from the cached list rather than `mediaListEntry`
- * (free, and it works in local mode). `isAdult` and `genres` are here only so
- * `isBlocked` can run — `airingSchedules` takes no `isAdult` argument, so the
- * content filter can only happen client-side.
- *
- * `pageInfo.total` is the capped 5000 sentinel on this connection (measured),
- * so the caller pages by `hasNextPage` with a hard cap, never by `total`.
- */
+/** A slim airing slice; `isAdult` and `genres` are for `isBlocked`, and paging goes by `hasNextPage`, never `total`. */
 export const CALENDAR_QUERY = `
 query ($gt: Int!, $lt: Int!, $page: Int) {
   Page(page: $page, perPage: 50) {
@@ -348,11 +292,7 @@ export interface AiringSlot {
 /** More pages than any real week needs — measured at 3 for ~120 airings. */
 const CALENDAR_MAX_PAGES = 5;
 
-/**
- * Every airing in `(gt, lt]`, paged sequentially until AniList says stop or
- * the cap does. One user action spends at most `CALENDAR_MAX_PAGES` requests —
- * the bounded-traversal shape, not a fan-out.
- */
+/** Every airing in `(gt, lt]`, paged in turn until AniList or the cap says stop: bounded traversal, never a fan-out. */
 export async function airingWeek(gt: number, lt: number): Promise<AiringSlot[]> {
   const out: AiringSlot[] = [];
   for (let page = 1; page <= CALENDAR_MAX_PAGES; page++) {
@@ -367,11 +307,7 @@ export async function airingWeek(gt: number, lt: number): Promise<AiringSlot[]> 
 
 // --- Sequels ----------------------------------------------------------------
 
-/**
- * The direct relations of one title, slim — the season-split card's candidate
- * list. One request per card opened, on demand; the franchise page's BFS is
- * the wrong tool for "what comes after this", which is one hop by definition.
- */
+/** One title's direct relations for the season-split card: one hop on demand, not the franchise page's BFS. */
 export const SEQUELS_QUERY = `
 query ($id: Int!) {
   Media(id: $id) {
@@ -434,31 +370,10 @@ query ($ids: [Int], $scoreFormat: ScoreFormat) {
   }
 }`;
 
-/**
- * Media for a set of ids, batched into pages of 50.
- *
- * The local library can hold titles that are not on the user's list — a manual
- * match points files at whatever they choose, and the whole reason a title
- * needed correcting is usually that it was never on the list for the matcher to
- * find. Those rows have no cached list entry to draw from, so the media is
- * fetched directly.
- *
- * Relations are deliberately absent: `loadFranchise` asks for the same ids with
- * a relations tree attached and that query is expensive. This one only needs
- * enough to draw a row.
- */
+/** Media for ids the list cache lacks (a manual match can point off the list); batched, no costly relations. */
 export async function mediaByIds(ids: number[]): Promise<Media[]> {
   if (ids.length === 0) return [];
-  // Sequential, not `Promise.all`. The chunks are 50 ids each, and a large
-  // unmatched library is several of them — fired at once they arrive as one
-  // burst against a ~30/min budget shared with the scrobbler and three alert
-  // passes, and `LocalLibrary` mounts two of these. The limiter in
-  // `anilist/client.rs` reads its budget and drops the lock before any response
-  // header lands, so it cannot see a burst it has not sent yet; spacing them
-  // here is what keeps it able to.
-  //
-  // The cost is latency on a screen that is already waiting for a scan, which
-  // is the right side of that trade.
+  // Sequential rather than `Promise.all`: the limiter in `anilist/client.rs` cannot see a burst it has not sent yet.
   const out: Media[] = [];
   for (const batch of chunk(ids)) {
     const page = await gql<{ Page: { media: Media[] } }>(MEDIA_BY_IDS_QUERY, {
@@ -472,10 +387,7 @@ export async function mediaByIds(ids: number[]): Promise<Media[]> {
 
 // --- Recommendations -------------------------------------------------------
 
-// One request covers every seed: `id_in` batches the completed entries and
-// each carries its own recommendation list. Verified against the live schema —
-// 25 seeds x 8 recommendations returns ~116 nodes without tripping AniList's
-// query-complexity limit, so the whole feature costs one request per type.
+// One request covers every seed: `id_in` batches them and each carries its own recommendation list.
 const RECOMMENDATIONS_QUERY = `
 query ($ids: [Int], $scoreFormat: ScoreFormat) {
   Page(perPage: 50) {
@@ -500,11 +412,7 @@ export interface RawRecommendationNode {
   media: MediaWithListStatus;
 }
 
-/**
- * Votes on one recommendation pairing. Keyed on the (seed, suggestion) pair
- * because that is what AniList's recommendation *is* — the dashboard votes
- * on the pairing its "because you finished …" line already names.
- */
+/** Votes on one pairing, keyed on (seed, suggestion) because that is what an AniList recommendation is. */
 const SAVE_RECOMMENDATION_MUTATION = `
 mutation ($mediaId: Int, $mediaRecommendationId: Int, $rating: RecommendationRating) {
   SaveRecommendation(mediaId: $mediaId, mediaRecommendationId: $mediaRecommendationId, rating: $rating) {
@@ -522,10 +430,7 @@ export async function saveRecommendation(
   await gql(SAVE_RECOMMENDATION_MUTATION, { mediaId, mediaRecommendationId, rating });
 }
 
-/**
- * Community recommendations for a batch of media, flattened and paired with
- * the seed that produced each one. Ranking happens in `lib/recommend.ts`.
- */
+/** Recommendations for a batch of media, each paired with the seed that produced it; `lib/recommend.ts` ranks them. */
 export async function recommendationsFor(
   ids: number[],
 ): Promise<RawRecommendationNode[]> {
@@ -561,10 +466,7 @@ export async function recommendationsFor(
   return out;
 }
 
-// The extra selections live here rather than in MEDIA_FIELDS on purpose:
-// MEDIA_FIELDS is shared with search (30/page) and seasonal (50/page), where
-// this metadata would be dead weight. Detail is a single Media(id:) call, so
-// widening it costs no extra request.
+// The extra selections stay out of MEDIA_FIELDS: search and seasonal share it and would carry them as dead weight.
 const DETAIL_QUERY = `
 query ($id: Int!, $scoreFormat: ScoreFormat) {
   Media(id: $id) {
@@ -678,13 +580,7 @@ export interface MediaDetail extends MediaWithListStatus {
   };
 }
 
-/**
- * The per-episode titles/thumbnails, deliberately NOT on `DETAIL_QUERY`:
- * measured at +49 KB on a long-runner (One Piece), i.e. a 6× payload for a
- * section most visits never open. Fetched when the Episodes section is
- * expanded — a user-initiated moment — and cached long, since a licensed
- * episode list barely changes.
- */
+/** Deliberately not on `DETAIL_QUERY`: the episode list multiplies the payload for a section most visits never open. */
 const EPISODES_QUERY = `
 query ($id: Int!) {
   Media(id: $id) {
@@ -707,15 +603,7 @@ export async function streamingEpisodes(id: number): Promise<StreamingEpisode[]>
   return data.Media.streamingEpisodes ?? [];
 }
 
-/**
- * Cast and staff, paged together behind the detail page's fold.
- *
- * One `$page` drives both edge lists — coarse, but it keeps "load more" at
- * one request per click, and whichever list runs out first simply stops
- * contributing rows while its `hasNextPage` goes false. Voice actors are the
- * Japanese cast, matching the site's default. No `pageInfo.total` is read:
- * on these collections it is the capped sentinel, so the button is countless.
- */
+/** One `$page` drives both edge lists, one request per click; `pageInfo.total` is the capped sentinel, never read. */
 const CAST_QUERY = `
 query ($id: Int!, $page: Int) {
   Media(id: $id) {
@@ -781,11 +669,7 @@ export async function mediaCast(id: number, page: number): Promise<CastPage> {
   };
 }
 
-/**
- * The trending curve — how much the site is talking about a title, day by
- * day. One page of 25 is the last few weeks, which is the part with a shape;
- * fetched only when the fold opens, like the episode list above.
- */
+/** The trending curve, one page of recent days (the part with a shape), fetched only when the fold opens. */
 const TRENDS_QUERY = `
 query ($id: Int!) {
   Page(perPage: 25) {
@@ -837,11 +721,7 @@ export interface StatEntry {
 export interface NamedPerson {
   id: number;
   name: { full: string };
-  /**
-   * `medium`, not `large`: the only consumer is a 32×32 circle in the
-   * statistics rows. Measured on the live CDN, the large portrait is 19,073
-   * bytes against 5,233 for medium — and "Show all" mounts dozens at once.
-   */
+  /** `medium`, not `large`: the only consumer is a small circle in the statistics rows, and "Show all" mounts dozens. */
   image: { medium: string | null } | null;
 }
 
@@ -895,8 +775,7 @@ export interface UserStats {
   statistics: { anime: AnimeStats; manga: MangaStats };
 }
 
-// Shared fields on every ranked category row. Both time metrics are requested
-// so a single TS shape covers anime (minutesWatched) and manga (chaptersRead).
+// Shared fields on every ranked row; both time metrics are requested so one TS shape covers anime and manga.
 const STAT_ROW = "count meanScore minutesWatched chaptersRead";
 
 const USER_STATS_QUERY = `
@@ -951,25 +830,13 @@ query ($id: Int!) {
   }
 }`;
 
-/**
- * Everything the statistics screen reads, on the account's display scale.
- *
- * The endpoint mixes two scales and says so nowhere: `meanScore` and
- * `standardDeviation` — top level and on every ranked row — are always
- * AniList's internal hundred-point numbers, while the `scores` distribution
- * arrives in whatever format the user has chosen to *see*. Normalizing at the
- * boundary is the only place a reader does not have to remember which of the
- * two they are holding — and `normalizeStatsBlock` walks *every* ranked list
- * rather than the ones a given screen happens to render, which is what caught
- * `startYears.meanScore` arriving hundred-point for years, fetched and never
- * shown.
- */
 /** One day of AniList's own activity record. `date` is unix seconds, UTC. */
 export interface ActivityHistoryDay {
   date: number;
   amount: number;
 }
 
+/** Everything the statistics screen reads, normalized here because AniList mixes two score scales. */
 export async function userStatistics(
   userId: number,
   format: ScoreFormat,
@@ -1018,8 +885,7 @@ export interface WrappedEntry {
   duration: number | null;
   genres: string[];
   isAdult: boolean;
-  /** The *broadcast* season — what "Winter 2026" means everywhere else in
-   *  the app — as opposed to `year`, which is the completion year. */
+  /** The *broadcast* season, as opposed to `year`, which is the completion year. */
   season: Season | null;
   seasonYear: number | null;
   title: MediaTitle;
@@ -1078,17 +944,7 @@ export async function wrappedEntries(
 
 // --- MAL import resolution -------------------------------------------------
 
-/**
- * MAL ids back into AniList media, for the local-mode list import.
- *
- * One chunk per call and the *caller* loops, so the import screen can show
- * honest progress between requests instead of a spinner over an unbounded
- * wait. Fifty ids per request is the `id_in` batching rule; the loop's
- * length is the list's, so a two-thousand-entry import is forty requests
- * through the limiter, paced like everything else. Selects what the local
- * cache stores and re-serves (`LIST_QUERY`'s media shape) -- no
- * `mediaListEntry`, because local mode has no account to ask about.
- */
+/** One chunk of MAL ids per call so the import can show progress; no `mediaListEntry`, local mode has no account. */
 export const MAL_RESOLVE_QUERY = `
 query ($idMal: [Int], $type: MediaType!, $page: Int) {
   Page(page: $page, perPage: 50) {
@@ -1116,8 +972,7 @@ query ($idMal: [Int], $type: MediaType!, $page: Int) {
   }
 }`;
 
-/** One chunk of at most fifty ids. Ids AniList has never heard of simply
-    do not come back; the caller counts them as unmatched. */
+/** One chunk of ids; ids AniList has never heard of do not come back, and the caller counts them as unmatched. */
 export async function resolveMalChunk(
   idsMal: number[],
   type: MediaType,

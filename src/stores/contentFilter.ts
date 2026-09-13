@@ -10,34 +10,18 @@ import { toLevel, type ContentFilterLevel } from "@/lib/contentFilter";
 
 interface ContentFilterState {
   level: ContentFilterLevel;
-  /**
-   * Blur explicit artwork until it is clicked. Independent of `level` — see
-   * `shouldBlur` — and defaulted to true by the backend.
-   */
+  /** Blur explicit artwork until clicked; independent of `level` (`shouldBlur`) and defaulted to true by the backend. */
   blurAdult: boolean;
   /** False until the stored level has been read, so nothing renders early. */
   ready: boolean;
-  /**
-   * Why the last change did not stick, or null.
-   *
-   * This setting is the one place in the app where a silently-dropped save has
-   * a consequence beyond the setting itself, so it is the one store that keeps
-   * an error rather than swallowing it.
-   */
+  /** Why the last change did not stick, or null; a silently dropped save here shows content the user asked not to see. */
   error: string | null;
   init: () => Promise<void>;
   setLevel: (level: ContentFilterLevel) => Promise<void>;
   setBlurAdult: (blur: boolean) => Promise<void>;
 }
 
-/**
- * The filter level is needed by roughly a dozen render sites, so it lives in a
- * store rather than each page invoking the backend for itself.
- *
- * `level` starts at "strict" and `ready` at false: the level is read
- * asynchronously, and defaulting to the permissive end would flash blocked
- * content on every launch before the real value arrives.
- */
+/** One store for the many render sites; `level` starts strict so a launch never flashes blocked content before the read. */
 export const useContentFilter = create<ContentFilterState>((set, get) => ({
   level: "strict",
   blurAdult: true,
@@ -58,16 +42,7 @@ export const useContentFilter = create<ContentFilterState>((set, get) => ({
     }
   },
 
-  /**
-   * Paints, then persists — and puts the level back if persisting fails.
-   *
-   * It used to be `.catch(() => {})`. The screen then showed the level the user
-   * chose while the database kept the old one, so the choice quietly did not
-   * survive a restart: someone who set "strict" got the permissive list back on
-   * the next launch with nothing having said otherwise. Reverting is the honest
-   * failure, because the wrong direction here is content the user asked not to
-   * see.
-   */
+  /** Paints, then persists, and puts the level back if persisting fails; a swallowed error shows the wrong content. */
   setLevel: async (level) => {
     const previous = get().level;
     set({ level, error: null });

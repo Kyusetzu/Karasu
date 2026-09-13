@@ -32,53 +32,25 @@ export const startLogin = () => invoke<string>("anilist_start_login");
 export const connect = (token: string) =>
   invoke<Viewer>("anilist_connect", { token });
 export const session = () => invoke<Viewer | null>("anilist_session");
-/** Refetches the viewer (one request) and replaces the cached blob — how a
- *  scoreFormat change reaches the store without a re-login. */
+/** Refetches the viewer and replaces the cached blob, so a scoreFormat change needs no re-login. */
 export const refreshViewer = () => invoke<Viewer>("refresh_viewer");
 export const logout = () => invoke<void>("anilist_logout");
 
 // --- GraphQL --------------------------------------------------------------
 
-/**
- * The stable code `client.rs` returns when AniList rejects the token.
- *
- * Matched exactly rather than by substring: an entry's notes can contain any
- * text at all, and a queued edit whose body happened to mention this must not
- * sign the user out.
- */
+/** The token-rejected code from `client.rs`; matched exactly, since an entry's notes can contain any text. */
 export const TOKEN_REJECTED = "anilist.tokenRejected";
 
 export const isTokenRejected = (e: unknown): boolean =>
   (e instanceof Error ? e.message : String(e)).trim() === TOKEN_REJECTED;
 
-/**
- * Told when the token is rejected, so the auth store can raise **one** banner
- * instead of every screen rendering its own load failure.
- *
- * A callback the store registers rather than an import, mirroring
- * `setProfileModeCache` below: `stores/auth` imports this module, so importing
- * the store from here would be a cycle.
- */
+/** Told on a rejected token so the auth store raises one banner; registered, not imported, to avoid a cycle. */
 let onTokenRejected: () => void = () => {};
 export const setTokenRejectedHandler = (fn: () => void) => {
   onTokenRejected = fn;
 };
 
-/**
- * Told when the app changes which account it is acting as, so the query cache
- * can be dropped whole.
- *
- * A registered callback for the same reason as `setTokenRejectedHandler`
- * above: the `QueryClient` lives in `main.tsx` and `stores/auth` already
- * imports this module, so reaching for either from here would be a cycle.
- *
- * Why the cache must be *cleared* and not invalidated: most keys carry no
- * viewer — `["mediaDetail", id]`, `["search", …]`, `["seasonal", …]` — while
- * the payload behind them does (`MEDIA_FIELDS` spreads `mediaListEntry`, which
- * is this account's progress, score and private notes). Invalidation marks
- * those entries stale but keeps them renderable during the refetch, which is
- * exactly the window in which the previous account's entry seeds the editor.
- */
+/** Told on an account change; the cache is cleared, not invalidated, since keys carry no viewer but payloads do. */
 let onIdentityChanged: () => void = () => {};
 export const setIdentityChangedHandler = (fn: () => void) => {
   onIdentityChanged = fn;
@@ -87,14 +59,7 @@ export const setIdentityChangedHandler = (fn: () => void) => {
 /** Raised by the auth store on every sign-in, sign-out and mode switch. */
 export const identityChanged = () => onIdentityChanged();
 
-/**
- * Every read goes through here, which is why the rejection is caught here.
- *
- * `anilist_query` attaches the bearer to *every* query — including the public
- * ones behind search, seasonal, the forum and detail pages — so one dead token
- * fails all of them at once. That is why it read as the app randomly breaking
- * rather than as a sign-in problem.
- */
+/** Every read passes through here, so the token rejection is caught once rather than on every screen. */
 async function guarded<T>(call: Promise<T>): Promise<T> {
   try {
     return await call;
@@ -112,29 +77,20 @@ export function gql<T>(query: string, variables?: object): Promise<T> {
 
 export type ProfileMode = "anilist" | "local" | "none";
 
-// Cached so the list functions below can route without an async lookup each
-// call. Kept in sync by the auth store.
+// Cached by the auth store so the list functions below route without an async lookup per call.
 let profileMode: ProfileMode = "anilist";
 export const setProfileModeCache = (mode: ProfileMode) => {
   profileMode = mode;
 };
 
-// The account's score format, cached the same way and by the same owner (the
-// auth store), so the save paths below can convert display-format scores to
-// `scoreRaw` without importing a React store into the api layer.
+// The account's score format, cached by the auth store so the save paths below convert to `scoreRaw`.
 let scoreFormat: ScoreFormat = "POINT_10";
 export const setScoreFormatCache = (format: ScoreFormat) => {
   scoreFormat = format;
 };
 export const currentScoreFormat = () => scoreFormat;
 
-/**
- * `score` (display units) → `scoreRaw` (0–100), leaving everything else
- * untouched. Applied to every AniList-bound save: the bare `score` float is
- * interpreted in the account's format, which is how ten-point writes were
- * silently corrupting non-ten-point accounts. Absent stays absent — "do not
- * change" must not become "clear".
- */
+/** Converts `score` to `scoreRaw`, as a bare score is read in the account's format; absent stays absent. */
 function withRawScore<T extends { score?: number }>(
   input: T,
   format: ScoreFormat = scoreFormat,
@@ -152,33 +108,20 @@ export const enableLocalMode = () => invoke<void>("enable_local_mode");
 export const fetchMediaList = (userId: number, mediaType: MediaType) =>
   profileMode === "local"
     ? invoke<ListResult>("local_fetch_list", { mediaType })
-    : // Guarded like `gql`: this is the one AniList read that does not go
-      // through it, and it is the request behind every list screen.
+    : // Guarded like `gql`: the one AniList read that bypasses it, and the request behind every list screen.
       guarded(invoke<ListResult>("fetch_media_list", { userId, mediaType }));
 
-/**
- * The last cached list, read straight from SQLite with no network access.
- * `null` when nothing is cached yet.
- *
- * Only meaningful in AniList mode — the local profile's list *is* the database,
- * so `fetchMediaList` already returns instantly there and priming would just
- * duplicate the read.
- */
+/** The last cached list from SQLite, or `null`; AniList mode only, since the local list is the database. */
 export const cachedMediaList = (userId: number, mediaType: MediaType) =>
   profileMode === "local"
     ? Promise.resolve(null)
     : invoke<ListResult | null>("cached_media_list", { userId, mediaType });
 
-/**
- * Saves an entry. In local mode the change goes to the local SQLite list; on
- * a first add pass `media` so the entry renders offline (field-only edits may
- * omit it). AniList mode ignores `media`.
- */
+/** Saves an entry; local mode wants `media` on a first add to render offline, AniList mode ignores it. */
 export const saveListEntry = (input: SaveEntryInput, media?: Media) =>
   profileMode === "local"
     ? invoke<MutationResult>("local_save_entry", {
-        // Local mode keeps the display value — its list is the database and
-        // there is no account format to be misread by.
+        // Local mode keeps the display value: its list is the database, with no account format to misread it.
         input: { ...input, media, mediaType: media?.type },
       })
     : invoke<MutationResult>("save_list_entry", { input: withRawScore(input) });
@@ -188,28 +131,7 @@ export const deleteListEntry = (id: number) =>
     ? invoke<MutationResult>("local_delete_entry", { id })
     : invoke<MutationResult>("delete_list_entry", { id });
 
-/**
- * One status or score across a whole selection.
- *
- * AniList mode sends the entry ids to `UpdateMediaListEntries`, batched in the
- * backend, so a 500-entry selection costs ten requests rather than five hundred
- * against a ~30/min budget. Local mode has no such budget — its list is the
- * SQLite file — so it simply writes each row, keyed on media id the way
- * `local_save_entry` expects.
- */
-/**
- * What can be set across a whole selection in one request.
- *
- * Exactly the arguments `UpdateMediaListEntries` accepts *and* that mean
- * something applied to many entries at once — established by introspecting the
- * live schema, because the only way to validate a mutation by running it is to
- * edit real entries.
- *
- * `notes` is absent deliberately, though the schema takes it: tags live inside
- * the notes field, so one bulk set would erase every selected entry's tags, and
- * appending instead is a read-modify-write per entry — the fan-out this whole
- * path exists to avoid.
- */
+/** What one request can set across a selection; keep `notes` out, a bulk set would erase every entry's tags. */
 export type BulkPatch = Pick<
   SaveEntryInput,
   | "status"
@@ -222,15 +144,7 @@ export type BulkPatch = Pick<
   | "completedAt"
 >;
 
-/**
- * A bulk edit that stopped partway, carrying what it *did* write.
- *
- * The backend chunks a selection into ten-ish requests and stops on the first
- * failure, so "it failed" and "nothing changed" are different statements. A
- * caller that rolls its optimistic update back on the second reading puts
- * already-written entries back to their old values on screen while AniList
- * holds the new ones.
- */
+/** A bulk edit that stopped partway, carrying what it did write, so a caller does not roll back landed entries. */
 export class BulkSaveError extends Error {
   constructor(
     message: string,
@@ -247,6 +161,7 @@ interface BulkResult {
   error?: string;
 }
 
+/** One status or score across a whole selection, batched in the backend against the rate budget. */
 export const bulkSaveEntries = async (
   entries: { id: number; mediaId: number }[],
   patch: BulkPatch,
@@ -260,9 +175,7 @@ export const bulkSaveEntries = async (
     }
     return entries.length;
   }
-  // Nulls rather than omissions: the Rust command forwards each straight into
-  // the GraphQL variables, and an absent variable and an explicit null mean the
-  // same thing to AniList — "do not change this".
+  // Nulls rather than omissions: Rust forwards each into the GraphQL variables, where null means "do not change".
   const res = await invoke<BulkResult>("bulk_save_list_entries", {
     ids: entries.map((e) => e.id),
     status: patch.status ?? null,
@@ -287,24 +200,10 @@ export const setNotifSchedule = (minutes: number) =>
 export const discardQueuedEdit = (id: number) =>
   invoke<boolean>("discard_queued_edit", { id });
 
-/**
- * What the sync is doing, for the panel behind the pending line.
- *
- * Costs no AniList request — it reads SQLite and two in-process values — which
- * is the only reason polling it is acceptable at all. The ~30/min budget it
- * reports on is shared with the scrobbler and three alert passes, and a status
- * surface that spent it would be the problem it exists to show.
- */
+/** What the sync is doing, for the pending panel; it costs no AniList request, which is why polling it is fine. */
 export const syncStatus = () => invoke<SyncStatus>("sync_status");
 
-/**
- * Fetches a bio image in Rust and returns it as a `data:` URI.
- *
- * Rejects on anything at all — refused host, wrong content type, too large,
- * unreachable — and the caller falls back to the chip. See
- * `commands/images.rs` for what the backend will and will not fetch, and
- * `components/RichText.tsx` for why this exists rather than a wider CSP.
- */
+/** Fetches a bio image in Rust as a `data:` URI rather than widening the CSP; on failure the caller shows the chip. */
 export const fetchBioImage = (url: string) =>
   invoke<string>("fetch_bio_image", { url });
 
@@ -320,14 +219,12 @@ export interface LocalEntryRow {
   mediaType: MediaType;
   status: MediaListStatus;
   progress: number;
-  /** Manga's second axis. Emitted by the command since v7 and simply never
-      declared here, which is how the merge came to drop it. */
+  /** Manga's second axis; keep it declared here, or the merge drops it. */
   progressVolumes: number;
   score: number;
   repeat: number;
   notes: string;
-  /** Since schema v14 — and the merge has to carry all three across, because
-      it deletes the local row once it has pushed. */
+  /** The merge must carry these three across, because it deletes the local row once pushed. */
   private: boolean;
   startedAt: FuzzyDate | null;
   completedAt: FuzzyDate | null;
@@ -343,9 +240,7 @@ export const localAllEntries = () =>
 export const localClearEntry = (mediaId: number) =>
   invoke<MutationResult>("local_delete_entry", { id: mediaId });
 
-/** Pushes an entry to AniList, bypassing the local dispatch. Local scores are
- *  always ten-point (there is no account to follow), so the raw conversion is
- *  pinned to POINT_10 whatever the connected account uses. */
+/** Pushes an entry straight to AniList; POINT_10 is pinned because a local list's scores are always ten-point. */
 export const anilistSaveEntry = (input: SaveEntryInput) =>
   invoke<MutationResult>("save_list_entry", {
     input: withRawScore(input, "POINT_10"),
@@ -362,8 +257,7 @@ export interface UpdateInfo {
   latest: string | null;
   url: string | null;
   isNewer: boolean;
-  /** The selected channel has no release at all — distinct from being current.
-   *  A 404 used to render as "you're on the latest version". */
+  /** The selected channel has no release at all, which is distinct from being current. */
   channelEmpty: boolean;
 }
 
@@ -395,12 +289,7 @@ export interface DownloadedUpdate {
 export const downloadPendingUpdate = () =>
   invoke<DownloadedUpdate | null>("download_pending_update");
 
-/**
- * What is already downloaded and waiting, if anything.
- *
- * The stash lives in the backend's memory, so a background download at startup
- * is invisible to this page unless it asks.
- */
+/** What is already downloaded and waiting, since a background download at startup is invisible unless asked. */
 export const pendingUpdate = () =>
   invoke<DownloadedUpdate | null>("pending_update");
 
@@ -411,11 +300,7 @@ export const installPendingUpdate = () =>
 /** Full four-part app version (MAJOR.MINOR.PATCH.COMMIT#) for the About page. */
 export const appVersion = () => invoke<string>("app_version");
 
-/**
- * Windows' Accessibility → Text size multiplier (1.0 = 100%). Display scaling
- * needs no help — WebView2 applies that itself — but the text-size slider is
- * separate and the WebView ignores it, so App applies it to the root element.
- */
+/** Windows' Accessibility text-size multiplier, which WebView2 ignores, so App applies it to the root element. */
 export const getTextScale = () => invoke<number>("get_text_scale");
 
 // --- Airing notifications --------------------------------------------------
@@ -440,12 +325,7 @@ export const setSequelNotify = (enabled: boolean) =>
 
 export type ImageFormat = "png" | "jpeg";
 
-/**
- * Opens a save dialog and writes the image; false if cancelled.
- * The dialog reopens wherever the last export went.
- *
- * `data` is base64 — see `lib/base64.ts` for why bytes are not passed directly.
- */
+/** Opens a save dialog where the last export went and writes the base64 `data`; false if cancelled. */
 export const saveImage = (
   data: string,
   defaultName: string,
@@ -461,14 +341,9 @@ export const saveText = (
 ) =>
   invoke<boolean>("save_text", { contents, defaultName, filterLabel, extension });
 
-/**
- * The interface size, a percentage kept in Rust (it is applied before the
- * first paint, so it cannot live in localStorage like the rest of the theme).
- * `setUiZoom` answers with what Rust actually applied — clamped — and tells
- * the window about it, so the Appearance select and the Ctrl+plus shortcut
- * stay one setting rather than two views of it that drift.
- */
+/** Fired with the zoom Rust applied, so the Appearance select and the Ctrl+plus shortcut stay one setting. */
 export const UI_ZOOM_EVENT = "karasu-ui-zoom";
+/** The interface size, a percentage kept in Rust because it is applied before the first paint. */
 export const getUiZoom = () => invoke<number>("get_ui_zoom");
 export const setUiZoom = async (percent: number) => {
   const applied = await invoke<number>("set_ui_zoom", { percent });
@@ -484,9 +359,7 @@ export interface AppNotification {
   title: string;
   body: string;
   createdMs: number;
-  /** What the row opens, or `null`: the app-update notice, a dropped-queue
-   *  report and every row written before schema v15 have nowhere to go.
-   *  `null` rather than `undefined` — serde emits `None` as JSON null. */
+  /** What the row opens, or `null` (never `undefined`, serde emits JSON null) when it has nowhere to go. */
   mediaId: number | null;
   read: boolean;
 }

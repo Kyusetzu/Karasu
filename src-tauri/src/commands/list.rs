@@ -130,7 +130,8 @@ pub(crate) async fn live_entry(
     media_id: i64,
 ) -> Option<Option<(u32, String)>> {
     match api
-        .query(
+        .query_from(
+            "live",
             Some(token),
             ENTRY_PROGRESS_QUERY,
             json!({ "userId": user_id, "mediaId": media_id }),
@@ -228,7 +229,8 @@ pub async fn fetch_media_list(
     }
 
     match api
-        .query(
+        .query_from(
+            "list",
             token.as_deref(),
             LIST_QUERY,
             json!({
@@ -306,7 +308,7 @@ pub(crate) async fn save_entry_core(
         }
     }
 
-    match api.query(Some(token), SAVE_MUTATION, input.clone()).await {
+    match api.query_from("save", Some(token), SAVE_MUTATION, input.clone()).await {
         // Queued rather than raised for anything that could work later, or the edit is lost outright.
         Err(e) if e.is_retryable() => {
             queue_push_deduped(db, "save", &input.to_string())?;
@@ -447,7 +449,7 @@ pub async fn bulk_save_list_entries(
             "scoreFormat": viewer_score_format(&db),
         });
         // No queue for a bulk edit, which would replay per entry; the first failure stops the run but keeps the count.
-        match api.query(Some(&token), UPDATE_ENTRIES_MUTATION, vars).await {
+        match api.query_from("bulk", Some(&token), UPDATE_ENTRIES_MUTATION, vars).await {
             Ok(data) => {
                 let echoed = data
                     .pointer("/UpdateMediaListEntries")
@@ -490,7 +492,7 @@ pub async fn delete_list_entry(
         }
     }
 
-    match api.query(Some(&token), DELETE_MUTATION, input.clone()).await {
+    match api.query_from("delete", Some(&token), DELETE_MUTATION, input.clone()).await {
         Ok(_) => {
             // A deleted entry left in the cache stays a scrobble candidate, and a scrobble would recreate it.
             if let Some(user_id) = viewer_id(&db) {
@@ -773,7 +775,7 @@ async fn process_queue(
             }
         }
         let mutation = if kind == "delete" { DELETE_MUTATION } else { SAVE_MUTATION };
-        match api.query(token, mutation, variables).await {
+        match api.query_from("drain", token, mutation, variables).await {
             Ok(data) => {
                 // The scrobbler's guards read this cache, and a drained edit is a write like any other.
                 if let Some(echo) = data.get("SaveMediaListEntry") {
@@ -832,6 +834,8 @@ pub struct SyncStatus {
     pub rate: RateSnapshot,
     /// Recent AniList traffic, newest first, so the panel can show what moved the headroom.
     pub recent: Vec<RequestLogEntry>,
+    /// Requests per source since the app started, so the panel can say who is spending the budget.
+    pub traffic: crate::anilist::client::TrafficSnapshot,
 }
 
 /// The state of the sync, for the panel behind the pending badge.
@@ -864,6 +868,7 @@ pub async fn sync_status(
         queued,
         rate: api.rate_snapshot().await,
         recent: api.request_log().await,
+        traffic: api.traffic_snapshot(),
     })
 }
 

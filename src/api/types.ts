@@ -161,6 +161,16 @@ export interface SyncStatus {
   rate: RateSnapshot;
   /** Recent traffic, newest first. */
   recent: RequestLogEntry[];
+  traffic: TrafficSnapshot;
+}
+
+/** Requests per source since the app started; the budget is shared, so the panel says who spent it. */
+export interface TrafficSnapshot {
+  sources: { source: string; total: number }[];
+  /** HTTP 429 answers since the app started. */
+  throttled: number;
+  remaining: number | null;
+  limit: number | null;
 }
 
 export interface SaveEntryInput {

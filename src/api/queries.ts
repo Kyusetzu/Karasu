@@ -72,7 +72,7 @@ export async function searchMedia(
 ) {
   const data = await gql<{
     Page: { pageInfo: { hasNextPage: boolean }; media: MediaWithListStatus[] };
-  }>(SEARCH_QUERY, { search, type, page, ...adultVars(isAdult), ...scoreFormatVar() });
+  }>(SEARCH_QUERY, { search, type, page, ...adultVars(isAdult), ...scoreFormatVar() }, { source: "search" });
   return data.Page;
 }
 
@@ -150,7 +150,9 @@ export async function browseMedia(
     sort: [filters.sort],
     ...adultVars(isAdult),
     ...scoreFormatVar(),
-  });
+  },
+    { source: "search" },
+  );
   return data.Page;
 }
 
@@ -170,7 +172,7 @@ export async function genreTagCollections(): Promise<GenreTagCollections> {
   const data = await gql<{
     GenreCollection: (string | null)[] | null;
     MediaTagCollection: { name: string; isAdult: boolean | null }[] | null;
-  }>(GENRE_TAG_QUERY, {});
+  }>(GENRE_TAG_QUERY, {}, { source: "genreTags" });
   return {
     genres: (data.GenreCollection ?? []).filter((g): g is string => !!g),
     tags: data.MediaTagCollection ?? [],
@@ -229,7 +231,9 @@ export async function seasonHero(
     season,
     year,
     ...adultVars(isAdult),
-  });
+  },
+    { source: "seasonHero" },
+  );
   return data.Page.media ?? [];
 }
 
@@ -251,7 +255,7 @@ export async function seasonalAnime(
 ) {
   const data = await gql<{
     Page: { pageInfo: { hasNextPage: boolean }; media: MediaWithListStatus[] };
-  }>(SEASONAL_QUERY, { season, year, page, ...adultVars(isAdult), ...scoreFormatVar() });
+  }>(SEASONAL_QUERY, { season, year, page, ...adultVars(isAdult), ...scoreFormatVar() }, { source: "seasonal" });
   return data.Page;
 }
 
@@ -298,7 +302,7 @@ export async function airingWeek(gt: number, lt: number): Promise<AiringSlot[]> 
   for (let page = 1; page <= CALENDAR_MAX_PAGES; page++) {
     const data = await gql<{
       Page: { pageInfo: { hasNextPage: boolean }; airingSchedules: AiringSlot[] };
-    }>(CALENDAR_QUERY, { gt, lt, page });
+    }>(CALENDAR_QUERY, { gt, lt, page }, { source: "calendar" });
     out.push(...data.Page.airingSchedules);
     if (!data.Page.pageInfo.hasNextPage) break;
   }
@@ -352,7 +356,7 @@ export async function sequelsOf(id: number): Promise<SequelCandidate[]> {
         edges: { relationType: string | null; node: SequelCandidate | null }[];
       } | null;
     } | null;
-  }>(SEQUELS_QUERY, { id });
+  }>(SEQUELS_QUERY, { id }, { source: "sequels" });
   return (data.Media?.relations?.edges ?? [])
     .filter((e) => e.relationType === "SEQUEL" && e.node)
     .map((e) => e.node!)
@@ -379,7 +383,9 @@ export async function mediaByIds(ids: number[]): Promise<Media[]> {
     const page = await gql<{ Page: { media: Media[] } }>(MEDIA_BY_IDS_QUERY, {
       ids: batch,
       ...scoreFormatVar(),
-    });
+    },
+      { source: "mediaByIds" },
+    );
     out.push(...page.Page.media);
   }
   return out;
@@ -448,7 +454,7 @@ export async function recommendationsFor(
         } | null;
       }[];
     };
-  }>(RECOMMENDATIONS_QUERY, { ids, ...scoreFormatVar() });
+  }>(RECOMMENDATIONS_QUERY, { ids, ...scoreFormatVar() }, { source: "recommendations" });
 
   const out: RawRecommendationNode[] = [];
   for (const seed of data.Page.media ?? []) {
@@ -599,6 +605,7 @@ export async function streamingEpisodes(id: number): Promise<StreamingEpisode[]>
   const data = await gql<{ Media: { streamingEpisodes: StreamingEpisode[] | null } }>(
     EPISODES_QUERY,
     { id },
+    { source: "episodes" },
   );
   return data.Media.streamingEpisodes ?? [];
 }
@@ -660,7 +667,7 @@ export async function mediaCast(id: number, page: number): Promise<CastPage> {
         edges: CastPage["staff"];
       };
     };
-  }>(CAST_QUERY, { id, page });
+  }>(CAST_QUERY, { id, page }, { source: "cast" });
   return {
     characters: data.Media.characters.edges ?? [],
     staff: data.Media.staff.edges ?? [],
@@ -687,6 +694,7 @@ export async function mediaTrends(id: number): Promise<MediaTrendPoint[]> {
   const data = await gql<{ Page: { mediaTrends: MediaTrendPoint[] | null } }>(
     TRENDS_QUERY,
     { id },
+    { source: "trends" },
   );
   // DATE_DESC arrives newest-first; the chart reads left-to-right in time.
   return [...(data.Page.mediaTrends ?? [])].reverse();
@@ -696,7 +704,9 @@ export async function animeDetail(id: number) {
   const data = await gql<{ Media: MediaDetail }>(DETAIL_QUERY, {
     id,
     ...scoreFormatVar(),
-  });
+  },
+    { source: "mediaDetail" },
+  );
   return data.Media;
 }
 
@@ -841,7 +851,7 @@ export async function userStatistics(
   userId: number,
   format: ScoreFormat,
 ): Promise<UserStats> {
-  const data = await gql<{ User: UserStats }>(USER_STATS_QUERY, { id: userId });
+  const data = await gql<{ User: UserStats }>(USER_STATS_QUERY, { id: userId }, { source: "userStats" });
   const { anime, manga } = data.User.statistics;
   return {
     ...data.User,
@@ -916,7 +926,7 @@ export async function wrappedEntries(
         }[];
       }[];
     };
-  }>(WRAPPED_QUERY, { userId, type, ...scoreFormatVar() });
+  }>(WRAPPED_QUERY, { userId, type, ...scoreFormatVar() }, { source: "wrapped" });
 
   const seen = new Set<number>();
   const out: WrappedEntry[] = [];
@@ -982,6 +992,8 @@ export async function resolveMalChunk(
     idMal: idsMal.slice(0, 50),
     type,
     page: 1,
-  });
+  },
+    { source: "malResolve" },
+  );
   return data.Page.media ?? [];
 }

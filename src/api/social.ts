@@ -183,7 +183,7 @@ query ($name: String, $id: Int) {
 export async function userProfile(
   key: { name: string } | { id: number },
 ): Promise<UserProfile> {
-  const data = await gql<{ User: UserProfile | null }>(USER_PROFILE_QUERY, key);
+  const data = await gql<{ User: UserProfile | null }>(USER_PROFILE_QUERY, key, { source: "profile" });
   // A null `User` with no error would otherwise render a blank profile rather than the not-found state.
   if (!data.User) throw new Error("NOT_FOUND");
   return data.User;
@@ -1164,7 +1164,7 @@ export interface SiteNotifPage {
 export async function siteNotifications(page: number, reset: boolean): Promise<SiteNotifPage> {
   const data = await gql<{
     Page: { pageInfo: PageInfo; notifications: (RawSiteNotification | null)[] | null };
-  }>(SITE_NOTIFICATIONS_QUERY, { page, reset });
+  }>(SITE_NOTIFICATIONS_QUERY, { page, reset }, { source: "siteNotifs" });
   return {
     pageInfo: data.Page.pageInfo,
     rows: (data.Page.notifications ?? [])
@@ -1180,6 +1180,8 @@ query { Viewer { unreadNotificationCount } }`;
 export async function siteNotifCount(): Promise<number> {
   const data = await gql<{ Viewer: { unreadNotificationCount: number | null } | null }>(
     SITE_NOTIF_COUNT_QUERY,
+    {},
+    { source: "notifCount" },
   );
   return data.Viewer?.unreadNotificationCount ?? 0;
 }
@@ -1280,7 +1282,7 @@ export async function allFavourites(userId: number): Promise<AllFavourites> {
           studios: FavPage<FavStudio> | null;
         } | null;
       } | null;
-    }>(FAVOURITES_PAGE_QUERY, { id: userId, page });
+    }>(FAVOURITES_PAGE_QUERY, { id: userId, page }, { source: "favouritesAll" });
     const fav = data.User?.favourites;
     if (!fav) break;
     out.anime.push(...(fav.anime?.nodes ?? []));
@@ -1333,7 +1335,7 @@ export async function favouriteBirthdays(userId: number): Promise<BirthdayPerson
           staff: FavPage<Node> | null;
         } | null;
       } | null;
-    }>(BIRTHDAYS_QUERY, { id: userId, page });
+    }>(BIRTHDAYS_QUERY, { id: userId, page }, { source: "birthdays" });
     const fav = data.User?.favourites;
     if (!fav) break;
     out.push(...(fav.characters?.nodes ?? []).map((n) => ({ ...n, kind: "character" as const })));

@@ -101,7 +101,7 @@ async fn check(app: &AppHandle) {
     };
 
     let api = app.state::<AniList>();
-    let data = match api.query(Some(&token), SITE_QUERY, json!({})).await {
+    let data = match api.query_from("site", Some(&token), SITE_QUERY, json!({})).await {
         Ok(d) => d,
         Err(e) => {
             // Once per transition, not per tick — the debug_changed lesson.

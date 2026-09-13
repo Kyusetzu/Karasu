@@ -69,8 +69,14 @@ async function guarded<T>(call: Promise<T>): Promise<T> {
   }
 }
 
-export function gql<T>(query: string, variables?: object): Promise<T> {
-  return guarded(invoke<T>("anilist_query", { query, variables }));
+/** What a caller may say about its request: a short source name, so the sync panel and the log can name the spender. */
+export interface GqlOptions {
+  /** `[a-z][a-zA-Z0-9]{0,31}`; anything else is replaced in Rust by the query's root field. */
+  source?: string;
+}
+
+export function gql<T>(query: string, variables?: object, opts?: GqlOptions): Promise<T> {
+  return guarded(invoke<T>("anilist_query", { query, variables, source: opts?.source }));
 }
 
 // --- Profile mode (AniList account vs. account-free local list) ------------

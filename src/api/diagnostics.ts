@@ -40,6 +40,11 @@ export interface Diagnostics {
   /** The mpv IPC pipe — the source that outranks every other one. */
   mpv: boolean;
   logDebug: boolean;
+  /** Requests per source since the app started, as [source, count] pairs. */
+  anilistRequests: [string, number][];
+  anilistThrottled: number;
+  /** [remaining, limit] from the last header, or null before the first request. */
+  anilistBudget: [number, number] | null;
   linux: LinuxInfo | null;
 }
 

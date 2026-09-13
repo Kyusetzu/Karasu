@@ -327,6 +327,32 @@ export default function SyncPanel({
                 )}
               </div>
 
+              {/* Who spent the budget since the app started; the recent list above only shows the last fifty. */}
+              <div className="border-t border-hair">
+                <h3 className="px-3 pb-1 pt-2 text-[.5625rem] font-semibold uppercase tracking-[.14em] text-ink-600">
+                  {t("syncPanel.sources")}
+                </h3>
+                {data.traffic.sources.length === 0 ? (
+                  <p className="px-3 pb-3 text-2xs text-ink-600">{t("syncPanel.sourcesEmpty")}</p>
+                ) : (
+                  <ul className="max-h-36 overflow-y-auto pb-2">
+                    {[...data.traffic.sources]
+                      .sort((a, b) => b.total - a.total)
+                      .map((s) => (
+                        <li key={s.source} className="flex items-baseline gap-2 px-3 py-0.5 text-2xs">
+                          <span className="min-w-0 flex-1 truncate text-ink-300">{s.source}</span>
+                          <span className="shrink-0 tabular-nums text-ink-500">{s.total}</span>
+                        </li>
+                      ))}
+                    {data.traffic.throttled > 0 && (
+                      <li className="px-3 pt-1 text-2xs text-gold">
+                        {t("syncPanel.throttled429", { n: data.traffic.throttled })}
+                      </li>
+                    )}
+                  </ul>
+                )}
+              </div>
+
               {manual.available && (
                 <div className="border-t border-hair p-2">
                   <Button

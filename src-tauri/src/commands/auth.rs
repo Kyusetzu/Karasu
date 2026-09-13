@@ -95,7 +95,7 @@ pub async fn connect_with_token(db: &Db, api: &AniList, input: &str) -> Result<V
     // One bounded retry here only: a token AniList just issued is more likely caught in a replication race than dead.
     let viewer = {
         let fetch = || async {
-            let data = api.query(Some(&token), VIEWER_QUERY, json!({})).await?;
+            let data = api.query_from("connect", Some(&token), VIEWER_QUERY, json!({})).await?;
             data.get("Viewer")
                 .filter(|v| !v.is_null())
                 .cloned()
@@ -222,7 +222,7 @@ pub async fn refresh_viewer(
     api: State<'_, AniList>,
 ) -> Result<Value, String> {
     let token = auth::load_token().ok_or("Not connected to AniList")?;
-    let data = api.query(Some(&token), VIEWER_QUERY, json!({})).await?;
+    let data = api.query_from("viewer", Some(&token), VIEWER_QUERY, json!({})).await?;
     let viewer = data
         .get("Viewer")
         .filter(|v| !v.is_null())
@@ -233,6 +233,20 @@ pub async fn refresh_viewer(
     Ok(viewer)
 }
 
+/// A passthrough source as the frontend named it, or `gql:<root field>` when it did not; never anything it could not spell.
+fn passthrough_source(source: Option<&str>, query: &str) -> String {
+    match source {
+        Some(s)
+            if (1..=32).contains(&s.len())
+                && s.starts_with(|c: char| c.is_ascii_lowercase())
+                && s.chars().all(|c| c.is_ascii_alphanumeric()) =>
+        {
+            s.to_string()
+        }
+        _ => format!("gql:{}", crate::anilist::client::operation_name(query)),
+    }
+}
+
 /// Generic GraphQL proxy: the frontend supplies query and variables, Rust attaches the token and paces the request.
 #[tauri::command]
 pub async fn anilist_query(
@@ -240,7 +254,9 @@ pub async fn anilist_query(
     db: State<'_, Db>,
     query: String,
     variables: Option<Value>,
+    source: Option<String>,
 ) -> Result<Value, String> {
+    let source = passthrough_source(source.as_deref(), &query);
     // Local mode sends no bearer whatever the credential store holds, so a surviving token cannot poison public queries.
     let token = if crate::commands::profile_mode(&db) == "local" {
         None
@@ -248,7 +264,8 @@ pub async fn anilist_query(
         auth::load_token()
     };
     Ok(api
-        .query(
+        .query_from(
+            &source,
             token.as_deref(),
             &query,
             variables.unwrap_or_else(|| json!({})),

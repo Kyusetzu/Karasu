@@ -1,5 +1,5 @@
 use serde_json::{json, Value};
-use std::collections::VecDeque;
+use std::collections::{BTreeMap, VecDeque};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use tokio::sync::Mutex;
@@ -12,7 +12,7 @@ const API_URL: &str = "https://graphql.anilist.co";
 const LOG_CAP: usize = 50;
 
 /// The root field a query asks for, from the query text alone; the variables carry secrets and are never read here.
-fn operation_name(query: &str) -> String {
+pub fn operation_name(query: &str) -> String {
     // The selection set opens at the first `{` outside the variable list.
     let mut depth = 0usize;
     let mut rest = query;
@@ -177,13 +177,87 @@ pub struct AniList {
     rate: Mutex<RateState>,
     /// The recent-traffic ring behind the sync panel; in memory only, never written to `karasu.log`.
     log: Mutex<VecDeque<Recorded>>,
+    /// Requests counted per source since start and per five-minute window; a std mutex, since diagnostics reads it sync.
+    traffic: std::sync::Mutex<Traffic>,
     /// The last token probe's verdict and when it was reached; `token_alive` reads it, `PROBE_TTL` ages it.
     probe: Mutex<Option<(Instant, bool)>>,
+}
+
+/// Who sent a request, as the caller named itself: a background pass, a list command, or a screen through the passthrough.
+pub type Source = String;
+
+/// The per-source tallies behind the diagnostics rows, the sync panel's table and the five-minute log line.
+#[derive(Default)]
+pub struct Traffic {
+    since_start: BTreeMap<Source, u32>,
+    window: BTreeMap<Source, u32>,
+    throttled_total: u32,
+    throttled_window: u32,
+    min_remaining_window: Option<u32>,
+    last_remaining: Option<u32>,
+    last_limit: Option<u32>,
+}
+
+impl Traffic {
+    fn count(&mut self, source: &str, status: Option<u16>, remaining: Option<u32>) {
+        *self.since_start.entry(source.to_string()).or_default() += 1;
+        *self.window.entry(source.to_string()).or_default() += 1;
+        if status == Some(429) {
+            self.throttled_total += 1;
+            self.throttled_window += 1;
+        }
+        if let Some(r) = remaining {
+            self.last_remaining = Some(r);
+            self.min_remaining_window = Some(self.min_remaining_window.map_or(r, |m| m.min(r)));
+        }
+    }
+
+    /// The five-minute line, and the window it describes is cleared; a zero line is the proof a quiet night was quiet.
+    pub fn report_window(&mut self) -> String {
+        let total: u32 = self.window.values().sum();
+        let by_source = self
+            .window
+            .iter()
+            .map(|(k, v)| format!("{k} {v}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let min = self
+            .min_remaining_window
+            .map_or("-".to_string(), |m| m.to_string());
+        let line = format!(
+            "{total} requests in the last 5 min: {}; 429s {}, min remaining {min}",
+            if by_source.is_empty() { "none".to_string() } else { by_source },
+            self.throttled_window,
+        );
+        self.window.clear();
+        self.throttled_window = 0;
+        self.min_remaining_window = None;
+        line
+    }
+}
+
+/// What the panel and the diagnostics report see of the tallies.
+#[derive(serde::Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct TrafficSnapshot {
+    /// Requests per source since the app started, alphabetical.
+    pub sources: Vec<TrafficSource>,
+    /// HTTP 429 answers since the app started.
+    pub throttled: u32,
+    pub remaining: Option<u32>,
+    pub limit: Option<u32>,
+}
+
+#[derive(serde::Serialize, Clone)]
+pub struct TrafficSource {
+    pub source: String,
+    pub total: u32,
 }
 
 /// One finished request, stored with a monotonic instant so its age is computed at read time.
 struct Recorded {
     seq: u64,
+    source: Source,
     operation: String,
     at: Instant,
     duration: Duration,
@@ -198,6 +272,8 @@ struct Recorded {
 pub struct RequestLogEntry {
     /// Monotonic within a session, so the panel has a stable React key.
     pub seq: u64,
+    /// The caller's name for itself, so the panel can say which screen or pass spent the budget.
+    pub source: String,
     /// The root field asked for. Never the variables — see `operation_name`.
     pub operation: String,
     #[serde(rename = "startedAgoMs")]
@@ -327,6 +403,7 @@ impl AniList {
                 reset_at: None,
             }),
             log: Mutex::new(VecDeque::with_capacity(LOG_CAP)),
+            traffic: std::sync::Mutex::new(Traffic::default()),
             probe: Mutex::new(None),
         }
     }
@@ -339,7 +416,7 @@ impl AniList {
             }
         }
         crate::logging::info("anilist", "probing the token after an ambiguous refusal");
-        let res = Box::pin(self.query_with(Some(token), PROBE_QUERY, json!({}), Probe::Never)).await;
+        let res = Box::pin(self.query_with("probe", Some(token), PROBE_QUERY, json!({}), Probe::Never)).await;
         let alive = match res {
             Ok(_) => Some(true),
             Err(ApiError::Auth(_)) => Some(false),
@@ -363,6 +440,7 @@ impl AniList {
     #[allow(clippy::too_many_arguments)]
     async fn record(
         &self,
+        source: &str,
         operation: &str,
         at: Instant,
         paced: Duration,
@@ -370,6 +448,9 @@ impl AniList {
         remaining_after: Option<u32>,
         outcome: &'static str,
     ) {
+        if let Ok(mut traffic) = self.traffic.lock() {
+            traffic.count(source, status, remaining_after);
+        }
         let mut log = self.log.lock().await;
         let seq = log.back().map_or(0, |r: &Recorded| r.seq) + 1;
         if log.len() >= LOG_CAP {
@@ -377,6 +458,7 @@ impl AniList {
         }
         log.push_back(Recorded {
             seq,
+            source: source.to_string(),
             operation: operation.to_string(),
             at,
             duration: at.elapsed(),
@@ -395,6 +477,7 @@ impl AniList {
             .rev()
             .map(|r| RequestLogEntry {
                 seq: r.seq,
+                source: r.source.clone(),
                 operation: r.operation.clone(),
                 started_ago_ms: now.duration_since(r.at).as_millis() as u64,
                 duration_ms: r.duration.as_millis() as u64,
@@ -422,17 +505,43 @@ impl AniList {
         }
     }
 
-    pub async fn query(
+    /// The tallies as the panel and the diagnostics report show them; sync, so `diagnostics::collect` can read it.
+    pub fn traffic_snapshot(&self) -> TrafficSnapshot {
+        let traffic = self.traffic.lock().unwrap_or_else(|e| e.into_inner());
+        TrafficSnapshot {
+            sources: traffic
+                .since_start
+                .iter()
+                .map(|(source, total)| TrafficSource { source: source.clone(), total: *total })
+                .collect(),
+            throttled: traffic.throttled_total,
+            remaining: traffic.last_remaining,
+            limit: traffic.last_limit,
+        }
+    }
+
+    /// The five-minute line for the log; the caller decides the cadence.
+    pub fn report_window(&self) -> String {
+        self.traffic
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .report_window()
+    }
+
+    /// One request, tagged with who sent it; every caller names itself so the budget can be read per source.
+    pub async fn query_from(
         &self,
+        source: &str,
         token: Option<&str>,
         query: &str,
         variables: Value,
     ) -> Result<Value, ApiError> {
-        self.query_with(token, query, variables, Probe::Allowed).await
+        self.query_with(source, token, query, variables, Probe::Allowed).await
     }
 
     async fn query_with(
         &self,
+        source: &str,
         token: Option<&str>,
         query: &str,
         variables: Value,
@@ -489,7 +598,7 @@ impl AniList {
                 Err(e) => {
                     // Never the body and never the headers: the request carries the bearer token this module keeps in Rust.
                     crate::logging::warn("anilist", format!("request failed: {e}"));
-                    self.record(&operation, sent, paced, None, None, "error").await;
+                    self.record(source, &operation, sent, paced, None, None, "error").await;
                     return Err(ApiError::Network(e.to_string()));
                 }
             };
@@ -521,6 +630,9 @@ impl AniList {
                     rate.limit = Some(l);
                 }
             }
+            if let (Some(l), Ok(mut traffic)) = (limit, self.traffic.lock()) {
+                traffic.last_limit = Some(l);
+            }
 
             if resp.status().as_u16() == 429 && attempt == 0 {
                 crate::logging::warn(
@@ -538,7 +650,12 @@ impl AniList {
                     .lock()
                     .await
                     .park(Duration::from_secs(wait), "retryAfter");
-                self.record(&operation, sent, paced, Some(429), remaining, "throttled")
+                // The line a budget report needs: who hit the wall, how long the server asked for, what it had left.
+                crate::logging::debug(
+                    "anilist",
+                    format!("429 for {source}: retry-after {wait}s, remaining {remaining:?}"),
+                );
+                self.record(source, &operation, sent, paced, Some(429), remaining, "throttled")
                     .await;
                 tokio::time::sleep(Duration::from_secs(wait)).await;
                 continue;
@@ -548,7 +665,7 @@ impl AniList {
             let body: Value = match resp.json::<Value>().await {
                 Ok(b) => b,
                 Err(e) => {
-                    self.record(&operation, sent, paced, Some(status), remaining, "error")
+                    self.record(source, &operation, sent, paced, Some(status), remaining, "error")
                         .await;
                     return Err(classify(
                         status,
@@ -571,7 +688,7 @@ impl AniList {
                     })
                     .collect::<Vec<_>>()
                     .join("; ");
-                self.record(&operation, sent, paced, Some(status), remaining, "error")
+                self.record(source, &operation, sent, paced, Some(status), remaining, "error")
                     .await;
                 let msg = if msg.is_empty() {
                     format!("AniList error (HTTP {status})")
@@ -619,6 +736,7 @@ impl AniList {
                 REFUSED_REPORTED.store(false, Ordering::Relaxed);
             }
             self.record(
+                source,
                 &operation,
                 sent,
                 paced,
@@ -645,6 +763,23 @@ impl AniList {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The tallies count per source and per window, and the report line empties the window but not the totals.
+    #[test]
+    fn traffic_counts_per_source_and_reports_the_window() {
+        let mut t = Traffic::default();
+        t.count("list", Some(200), Some(28));
+        t.count("list", Some(200), Some(27));
+        t.count("airing", Some(429), Some(0));
+        assert_eq!(
+            t.report_window(),
+            "3 requests in the last 5 min: airing 1, list 2; 429s 1, min remaining 0"
+        );
+        assert_eq!(t.report_window(), "0 requests in the last 5 min: none; 429s 0, min remaining -");
+        assert_eq!(t.since_start.get("list"), Some(&2));
+        assert_eq!(t.throttled_total, 1);
+        assert_eq!(t.last_remaining, Some(0));
+    }
 
     fn fresh() -> RateState {
         RateState {
@@ -835,7 +970,7 @@ mod tests {
         let api = AniList::new();
         let now = Instant::now();
         for _ in 0..(LOG_CAP + 10) {
-            api.record("Media", now, Duration::ZERO, Some(200), Some(28), "ok")
+            api.record("test", "Media", now, Duration::ZERO, Some(200), Some(28), "ok")
                 .await;
         }
         let rows = api.request_log().await;

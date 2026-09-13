@@ -862,8 +862,18 @@ import it.
   minute pay the full `MAX_PACE` and go out anyway — is bounded and known. Do
   **not** heal proportionally: right for a rolling window, and for this one it
   hands out budget that does not exist and earns the 429s the limiter exists
-  to avoid. (Whether the bucket is per IP or per token is still unmeasured;
-  the probe's header says how to find out.)
+  to avoid. **The bucket is per IP, not per token** — measured on
+  2026-09-13: the anonymous probe read 17 after a burn, one signed-in
+  request through the rig then read 16, and the next anonymous sample 15.
+  So the phone and the PC share one budget only on the same network, and
+  the rig and the installed app always do. Every request is tagged with a
+  source (`AniList::query_from`; the passthrough takes `gql(query, vars,
+  { source })`), tallied per source, and reported three ways: the verbose
+  line `N requests in the last 5 min: …; 429s n, min remaining m` every
+  five minutes, the "AniList requests this run" rows of the diagnostics
+  report, and the "Requests by source" table in the sync panel. A cold
+  start measured 8 requests in its first 30 s on 2026-09-13 (two lists,
+  two recommendation sets, season hero, birthdays, bell count, airing).
 - **An agent shell launched from the Claude desktop app sees a virtualized
   AppData.** That app is an MSIX package (`Claude_pzs8sxrjxfjjc`), and every
   child process inherits its file-system virtualization: any path under

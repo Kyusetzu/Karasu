@@ -100,7 +100,7 @@ pub async fn identify(
     for batch in items.chunks(PER_REQUEST).take(MAX_BATCHES) {
         let refs: Vec<&Unidentified> = batch.iter().collect();
         let Ok(data) = api
-            .query(token, &batch_query(&refs), serde_json::json!({}))
+            .query_from("identify", token, &batch_query(&refs), serde_json::json!({}))
             .await
         else {
             break;

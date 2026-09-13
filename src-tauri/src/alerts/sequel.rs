@@ -153,7 +153,7 @@ async fn check(app: &AppHandle) {
         for at in window(start, chunks.len(), MAX_BATCHES) {
             let chunk = chunks[at];
             let vars = json!({ "ids": chunk, "type": media_type });
-            let Ok(data) = api.query(token.as_deref(), RELATIONS_QUERY, vars).await else {
+            let Ok(data) = api.query_from("sequel", token.as_deref(), RELATIONS_QUERY, vars).await else {
                 // Keep the ground this run did cover before giving up, or a flaky connection leaves the window still.
                 if done > 0 {
                     let _ = db.kv_set(&cursor_key, &((start + done) % chunks.len()).to_string());

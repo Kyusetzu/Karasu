@@ -20,6 +20,7 @@ const IDLE: SyncStatus = {
   draining: false,
   queued: [],
   recent: [],
+  traffic: { sources: [], throttled: 0, remaining: 24, limit: 30 },
   rate: {
     remaining: 24,
     limit: 30,

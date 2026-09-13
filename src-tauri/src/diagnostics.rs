@@ -43,6 +43,12 @@ pub struct Diagnostics {
     /// The mpv IPC pipe; it outranks every other source, so a report has to say whether it was on.
     pub mpv: bool,
     pub log_debug: bool,
+    /// AniList requests per source since the app started; the budget is shared, so a report has to say who spent it.
+    pub anilist_requests: Vec<(String, u32)>,
+    /// HTTP 429 answers since the app started.
+    pub anilist_throttled: u32,
+    /// The limiter's last measured headroom, `remaining/limit`, or none before the first header.
+    pub anilist_budget: Option<(u32, u32)>,
     pub linux: Option<LinuxInfo>,
 }
 
@@ -119,6 +125,7 @@ pub fn collect(app: &tauri::AppHandle) -> Diagnostics {
         app.state::<crate::library::LibraryIndex>(),
     );
     let portable = crate::portable::is_portable();
+    let traffic = app.state::<crate::anilist::client::AniList>().traffic_snapshot();
     let data_dir = if portable {
         crate::portable::portable_data_dir()
     } else {
@@ -158,6 +165,9 @@ pub fn collect(app: &tauri::AppHandle) -> Diagnostics {
         }),
         mpv: crate::commands::mpv_ipc_config(&db).is_some(),
         log_debug: crate::logging::debug_enabled(),
+        anilist_requests: traffic.sources.iter().map(|s| (s.source.clone(), s.total)).collect(),
+        anilist_throttled: traffic.throttled,
+        anilist_budget: traffic.remaining.zip(traffic.limit),
         linux: linux_info(),
     }
 }
@@ -227,6 +237,24 @@ pub fn render(d: &Diagnostics, redact: bool) -> String {
     row("Update channel", d.update_channel.clone());
     row("Queued edits", d.queued.to_string());
     row("Debug logging", yn(d.log_debug).into());
+    row(
+        "AniList requests this run",
+        if d.anilist_requests.is_empty() {
+            "none".to_string()
+        } else {
+            d.anilist_requests
+                .iter()
+                .map(|(s, n)| format!("{s} {n}"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        },
+    );
+    row("Rate limited (429)", d.anilist_throttled.to_string());
+    row(
+        "AniList budget",
+        d.anilist_budget
+            .map_or("not measured yet".to_string(), |(r, l)| format!("{r}/{l} left")),
+    );
     out
 }
 
@@ -277,6 +305,9 @@ mod tests {
             schema: 10,
             update_channel: "stable".into(),
             queued: 2,
+            anilist_requests: vec![("list".into(), 2)],
+            anilist_throttled: 0,
+            anilist_budget: Some((27, 30)),
             signed_in: true,
             profile_mode: "anilist".into(),
             library_configured: true,

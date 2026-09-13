@@ -145,7 +145,7 @@ async fn check(app: &AppHandle) {
     let vars = json!({ "ids": ids, "from": last, "to": now });
     // The token when there is one: an outage refusing unauthenticated requests still answers signed-in ones.
     let token = crate::anilist::auth::load_token();
-    let data = match api.query(token.as_deref(), AIRING_QUERY, vars).await {
+    let data = match api.query_from("airing", token.as_deref(), AIRING_QUERY, vars).await {
         Ok(data) => data,
         Err(e) => {
             // `From<ApiError> for String` distinguishes a network error from an API one, which is worth recording.

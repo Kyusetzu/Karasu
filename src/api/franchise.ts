@@ -147,7 +147,7 @@ export async function loadFranchise(
           relations: { edges: { relationType: string; node: RawMedia }[] };
         })[];
       };
-    }>(FRANCHISE_QUERY, { ids });
+    }>(FRANCHISE_QUERY, { ids }, { source: "franchise" });
 
     const next: number[] = [];
     for (const media of data.Page.media) {

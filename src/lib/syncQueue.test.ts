@@ -24,6 +24,7 @@ const status = (over: Partial<SyncStatus> = {}): SyncStatus => ({
   draining: false,
   queued: [],
   recent: [],
+  traffic: { sources: [], throttled: 0, remaining: null, limit: null },
   rate: quiet,
   ...over,
 });

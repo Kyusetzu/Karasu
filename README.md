@@ -157,8 +157,12 @@ the same set the [website](https://kyusetzu.github.io/Karasu/) shows at full siz
 - **Person, character and studio pages** — voice actors, staff and studios each
   get a page of their own, with their roles and works, reachable from any
   detail page or statistic
-- **Airing calendar** — a real week grid, Monday-first, with two lenses:
-  just your shows (instant, works offline) or the complete schedule
+- **Airing calendar** — Monday-first, in whichever shape fits: a real week
+  grid, a tiled overview or a running agenda, with two lenses on each (just
+  your shows, instant and offline, or the complete schedule). Episodes that
+  have already aired stay in view, greyed once you have watched them, so a
+  week reads as what happened as well as what is coming. The week grid needs
+  980 px; narrower than that, or on a phone, the agenda takes over
 - **Recommendations** for anime and manga on the dashboard, built from the
   titles you've completed — the higher you scored something, the more its
   suggestions count, and anything already on your list is left out
@@ -229,6 +233,13 @@ the same set the [website](https://kyusetzu.github.io/Karasu/) shows at full siz
   pick, so nothing is hardcoded
 - **Covers per row** as a typed number, 1–40, previewed live as you type —
   and a **reduce motion** switch
+- **Interface size** — zooms the whole window in eight steps from 75% to 200%,
+  on <kbd>Ctrl</kbd>+<kbd>+</kbd>, <kbd>Ctrl</kbd>+<kbd>-</kbd> and
+  <kbd>Ctrl</kbd>+<kbd>0</kbd> as well as in Settings, for a 4K display or a TV
+  across the room
+- **Density** — compact, comfortable or spacious for the screens that crowd:
+  the calendar, the local library and the digests. Everything else keeps its
+  size
 - A **content filter** for adult and suggestive titles, with a disclosure
   line wherever it hides something — explicit (18+) and suggestive (Ecchi)
   counted separately, linking straight to the setting

@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 3fd36b6 -->
+<!-- generated-through: faf9af8 -->
 
 ### Fixed
 
@@ -79,6 +79,7 @@ tag time is then optional rather than load-bearing.
 - A pinch on Android no longer zooms the whole screen; the interface size under Appearance is the one zoom.
 - The sidebar collapses to icons on a short window instead of pushing its lower entries out of view.
 - Restarting Karasu right after it spent its AniList budget no longer fires a burst of requests into the limit.
+- The twice-daily sequel check spreads its requests out instead of sending them in one burst.
 
 ### Added
 
@@ -96,6 +97,8 @@ tag time is then optional rather than load-bearing.
 
 - The Android battery hint says which vendor setting keeps tracking alive with the screen off (nubia/ZTE: "Runs in background" → "Allowed").
 - Your list is read from the local copy for fifteen minutes after a fetch and refreshed quietly in the background after that; "Sync now" still fetches at once.
+- Karasu now waits for the next episode's airing time instead of polling AniList every twenty minutes for new episodes.
+- The Wrapped page is built from the list Karasu already holds, and saving from a title's page no longer reloads it.
 ## 1.0.0 — 2026-09-05
 
 Karasu 1.0.0 is the first tagged release: a desktop and Android tracker built

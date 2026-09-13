@@ -171,10 +171,28 @@ const PROBE_TTL: Duration = Duration::from_secs(60);
 /// Whether the current run of non-auth refusals has been logged; cleared by the next success, like `AUTH_REPORTED`.
 static REFUSED_REPORTED: AtomicBool = AtomicBool::new(false);
 
+/// The limiter's last measurement on disk, so a process started seconds after another does not assume a full budget.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PersistedRate {
+    pub remaining: u32,
+    pub limit: Option<u32>,
+    /// Wall-clock milliseconds, compared only for age; the live state stays monotonic.
+    pub observed_ms: i64,
+    pub retry_until_ms: Option<i64>,
+}
+
+/// Where the limiter keeps `PersistedRate`; closures, so this module knows nothing about the database or tauri.
+pub struct RateStore {
+    pub load: Box<dyn Fn() -> Option<PersistedRate> + Send + Sync>,
+    pub save: Box<dyn Fn(&PersistedRate) + Send + Sync>,
+}
+
 /// AniList GraphQL client with centralized rate limiting, paced by the X-RateLimit headers.
 pub struct AniList {
     http: reqwest::Client,
     rate: Mutex<RateState>,
+    store: Option<RateStore>,
     /// The recent-traffic ring behind the sync panel; in memory only, never written to `karasu.log`.
     log: Mutex<VecDeque<Recorded>>,
     /// Requests counted per source since start and per five-minute window; a std mutex, since diagnostics reads it sync.
@@ -368,6 +386,48 @@ impl RateState {
     fn claim(&mut self) {
         self.remaining = self.remaining.saturating_sub(1);
     }
+
+    /// The state a stored measurement restores, or none when it is older than the window or from a clock that went back.
+    fn restored(p: &PersistedRate, now_ms: i64, now: Instant) -> Option<RateState> {
+        let age_ms = now_ms - p.observed_ms;
+        if age_ms < 0 || age_ms as u128 >= WINDOW.as_millis() {
+            return None;
+        }
+        let observed = now.checked_sub(Duration::from_millis(age_ms as u64))?;
+        let mut state = RateState {
+            remaining: p.remaining,
+            limit: p.limit,
+            observed: Some(observed),
+            sleeping_until: None,
+            sleeping_kind: None,
+            reset_at: None,
+        };
+        if let Some(until) = p.retry_until_ms.filter(|u| *u > now_ms) {
+            state.park(Duration::from_millis((until - now_ms) as u64), "retryAfter");
+        }
+        Some(state)
+    }
+
+    /// What to write to disk after a header or a park; wall-clock stamps, so the next process can compute the age.
+    fn persisted(&self, now: Instant, now_ms: i64) -> Option<PersistedRate> {
+        let observed = self.observed?;
+        let age = now.saturating_duration_since(observed).as_millis() as i64;
+        Some(PersistedRate {
+            remaining: self.remaining,
+            limit: self.limit,
+            observed_ms: now_ms - age,
+            retry_until_ms: self
+                .throttled_for(now)
+                .map(|d| now_ms + d.as_millis() as i64),
+        })
+    }
+}
+
+fn wall_ms() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0)
 }
 
 /// What the sync panel shows about the limiter; local state only, so reading it costs no request.
@@ -386,22 +446,28 @@ pub struct RateSnapshot {
 }
 
 impl AniList {
-    pub fn new() -> Self {
-        Self {
-            http: crate::net::client_builder()
-                .user_agent(concat!("Karasu/", env!("CARGO_PKG_VERSION")))
-                .timeout(Duration::from_secs(30))
-                .build()
-                .expect("reqwest client"),
-            // A seed rather than an observation; `observed` says whether a header has landed yet.
-            rate: Mutex::new(RateState {
+    pub fn new(store: Option<RateStore>) -> Self {
+        // A recent measurement from the last process beats the seed; a build swap used to earn a 429 burst here.
+        let rate = store
+            .as_ref()
+            .and_then(|s| (s.load)())
+            .and_then(|p| RateState::restored(&p, wall_ms(), Instant::now()))
+            .unwrap_or(RateState {
                 remaining: SEED,
                 limit: None,
                 observed: None,
                 sleeping_until: None,
                 sleeping_kind: None,
                 reset_at: None,
-            }),
+            });
+        Self {
+            http: crate::net::client_builder()
+                .user_agent(concat!("Karasu/", env!("CARGO_PKG_VERSION")))
+                .timeout(Duration::from_secs(30))
+                .build()
+                .expect("reqwest client"),
+            rate: Mutex::new(rate),
+            store,
             log: Mutex::new(VecDeque::with_capacity(LOG_CAP)),
             traffic: std::sync::Mutex::new(Traffic::default()),
             probe: Mutex::new(None),
@@ -502,6 +568,13 @@ impl AniList {
                 .map(|t| now.duration_since(t).as_millis() as u64),
             throttled_for_ms: rate.throttled_for(now).map(|d| d.as_millis() as u64),
             throttle_kind: rate.throttled_for(now).and(rate.sleeping_kind),
+        }
+    }
+
+    /// Writes the limiter's measurement for the next process; called under the rate lock, one small kv write.
+    fn persist(&self, rate: &RateState) {
+        if let (Some(store), Some(p)) = (&self.store, rate.persisted(Instant::now(), wall_ms())) {
+            (store.save)(&p);
         }
     }
 
@@ -629,6 +702,7 @@ impl AniList {
                 if let Some(l) = limit {
                     rate.limit = Some(l);
                 }
+                self.persist(&rate);
             }
             if let (Some(l), Ok(mut traffic)) = (limit, self.traffic.lock()) {
                 traffic.last_limit = Some(l);
@@ -646,10 +720,11 @@ impl AniList {
                     .and_then(|v| v.parse::<u64>().ok())
                     .unwrap_or(60)
                     .min(120);
-                self.rate
-                    .lock()
-                    .await
-                    .park(Duration::from_secs(wait), "retryAfter");
+                {
+                    let mut rate = self.rate.lock().await;
+                    rate.park(Duration::from_secs(wait), "retryAfter");
+                    self.persist(&rate);
+                }
                 // The line a budget report needs: who hit the wall, how long the server asked for, what it had left.
                 crate::logging::debug(
                     "anilist",
@@ -781,6 +856,48 @@ mod tests {
         assert_eq!(t.last_remaining, Some(0));
     }
 
+    /// A measurement younger than the window seeds the next process; an expired or future-dated one is ignored.
+    #[test]
+    fn a_recent_measurement_restores_and_an_old_one_does_not() {
+        let now = Instant::now();
+        let p = PersistedRate { remaining: 4, limit: Some(30), observed_ms: 10_000, retry_until_ms: None };
+        let r = RateState::restored(&p, 30_000, now).expect("20 s old restores");
+        assert_eq!(r.remaining, 4);
+        assert_eq!(r.limit, Some(30));
+        assert!(r.observed.is_some_and(|o| now.duration_since(o) >= Duration::from_secs(20)));
+        assert!(RateState::restored(&p, 10_000 + WINDOW.as_millis() as i64, now).is_none());
+        assert!(RateState::restored(&p, 5_000, now).is_none(), "a clock that went back is not trusted");
+    }
+
+    /// A Retry-After that has not passed is parked again, so the retry layer stays one deep across a restart.
+    #[test]
+    fn a_pending_retry_after_is_parked_again() {
+        let now = Instant::now();
+        let p = PersistedRate { remaining: 0, limit: Some(30), observed_ms: 1_000, retry_until_ms: Some(41_000) };
+        let r = RateState::restored(&p, 2_000, now).expect("1 s old restores");
+        let left = r.throttled_for(now).expect("parked");
+        assert!(left > Duration::from_millis(38_500) && left <= Duration::from_millis(39_500));
+        assert_eq!(r.sleeping_kind, Some("retryAfter"));
+        let done = PersistedRate { retry_until_ms: Some(1_500), ..p };
+        assert!(RateState::restored(&done, 2_000, now).unwrap().throttled_for(now).is_none());
+    }
+
+    /// What goes to disk carries the wall-clock moment of the observation and the deadline, not the durations.
+    #[test]
+    fn persisted_state_round_trips() {
+        let now = Instant::now();
+        let mut r = fresh();
+        r.remaining = 7;
+        r.limit = Some(30);
+        r.observed = Some(now - Duration::from_secs(3));
+        r.park(Duration::from_secs(20), "retryAfter");
+        let p = r.persisted(now, 100_000).expect("observed");
+        assert_eq!(p.remaining, 7);
+        assert_eq!(p.observed_ms, 97_000);
+        assert!(p.retry_until_ms.is_some_and(|u| (119_900..=120_000).contains(&u)));
+        assert!(fresh().persisted(now, 100_000).is_none(), "a seed is not a measurement");
+    }
+
     fn fresh() -> RateState {
         RateState {
             remaining: SEED,
@@ -858,7 +975,7 @@ mod tests {
     /// The seed is a guess; reporting it as a measurement would draw a full headroom bar before any request.
     #[tokio::test]
     async fn headroom_is_unknown_until_a_header_lands() {
-        let api = AniList::new();
+        let api = AniList::new(None);
         let snap = api.rate_snapshot().await;
         assert_eq!(snap.remaining, None);
         assert_eq!(snap.limit, None);
@@ -967,7 +1084,7 @@ mod tests {
     /// Bounded, because this is an in-memory ring on the hot path of every call.
     #[tokio::test]
     async fn the_log_keeps_the_newest_and_reports_newest_first() {
-        let api = AniList::new();
+        let api = AniList::new(None);
         let now = Instant::now();
         for _ in 0..(LOG_CAP + 10) {
             api.record("test", "Media", now, Duration::ZERO, Some(200), Some(28), "ok")

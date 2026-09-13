@@ -309,7 +309,7 @@ pub fn run() {
             );
             // The "new release" bell row dies with the install it announced, before the frontend reads the bell.
             commands::clear_stale_update_notice(&app.state::<db::Db>());
-            app.manage(anilist::client::AniList::new());
+            app.manage(anilist::client::AniList::new(Some(anilist::rate_store(app.handle().clone()))));
             anilist::spawn_traffic_reporter(app.handle().clone());
             app.manage(playback::scrobbler::PlaybackState(std::sync::Mutex::new(None)));
             app.manage(playback::scrobbler::ScrobbleSession(std::sync::Mutex::new(None)));

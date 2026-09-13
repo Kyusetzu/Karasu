@@ -95,6 +95,19 @@ fn check(env: &mut JNIEnv, context: &JObject) -> Result<String, String> {
             .send()
             .await
             .map_err(|e| format!("send: {e}"))?;
+        // The live app restores this at its next start, so the job's one request is not a surprise to its limiter.
+        let header = |name: &str| resp.headers().get(name).and_then(|v| v.to_str().ok()).and_then(|v| v.parse::<u32>().ok());
+        if let Some(remaining) = header("x-ratelimit-remaining") {
+            let state = crate::anilist::client::PersistedRate {
+                remaining,
+                limit: header("x-ratelimit-limit"),
+                observed_ms: now_ms(),
+                retry_until_ms: None,
+            };
+            if let Ok(json) = serde_json::to_string(&state) {
+                let _ = db.kv_set(crate::anilist::RATE_STATE_KEY, &json);
+            }
+        }
         if !resp.status().is_success() {
             return Err(format!("HTTP {}", resp.status()));
         }

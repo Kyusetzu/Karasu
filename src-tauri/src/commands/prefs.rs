@@ -2,8 +2,7 @@ use crate::db::Db;
 use crate::sync::LockExt;
 use tauri::{Manager, State};
 
-// Siblings in the same module tree; `mod.rs` re-exports all of it, so
-// every command keeps the path it had when they shared one file.
+// Siblings in the same module tree; `mod.rs` re-exports all of it, so every command keeps its old path.
 #[allow(unused_imports)]
 use super::*;
 
@@ -45,26 +44,13 @@ pub fn set_discord_settings(
     Ok(())
 }
 
-/// Mirrors the interface language into the kv store.
-///
-/// The setting itself lives in the WebView's localStorage, which Rust has no
-/// way to read — and Rust is what composes every desktop notification, every
-/// bell row and the tray menu. Without this mirror all of them are English
-/// whatever the app says around them, which is what they were.
-///
-/// Called on start and on every change, so it is a copy rather than a source of
-/// truth: an unset or unrecognised value simply means English.
+/// Mirrors the interface language into kv, because Rust composes notifications, bell rows and the tray menu.
 #[tauri::command]
 pub fn set_ui_language(app: tauri::AppHandle, db: State<'_, Db>, language: String) -> Result<(), String> {
     db.kv_set(crate::i18n::LANGUAGE_KEY, &language)?;
     // The widget projection carries pre-rendered labels in this language.
     crate::widgets::refresh(&app);
-    // The tray's labels are set once at launch, so it needs telling; every
-    // other Rust-composed string reads the mirror at the moment it composes.
-    //
-    // The title is cloned out before the call, not read through a held guard:
-    // `tray_set_now_playing` is somebody else's lock order and this path is not
-    // worth finding that out on.
+    // The tray's labels are set once at launch; the title is cloned out first so no guard is held into the call.
     let title = app
         .state::<crate::playback::scrobbler::PlaybackState>()
         .0
@@ -111,11 +97,7 @@ pub fn set_stale_settings(
     db.kv_set("stale_months", &months.clamp(1, 24).to_string())
 }
 
-/// The background-notification interval in minutes; 0 = off (the default).
-///
-/// One number rather than an enabled/value pair: "off" and "how often" are
-/// the same question here, and Android's JobScheduler consumes the identical
-/// kv key, so the two platforms cannot disagree about what is configured.
+/// The background-notification interval in minutes, 0 meaning off; one kv key both platforms read.
 #[tauri::command]
 pub fn get_notif_schedule(db: State<'_, Db>) -> i64 {
     crate::alerts::site::interval_min(&db)
@@ -132,32 +114,17 @@ pub fn set_notif_schedule(db: State<'_, Db>, minutes: i64) -> Result<(), String>
             crate::alerts::site::INTERVAL_MAX,
         )
     };
-    // The setting is stored first and unconditionally: a scheduling failure is
-    // recoverable — `spawn_schedule_assert` retries it at every start — so the
-    // user's choice must survive it.
+    // Stored first and unconditionally: `spawn_schedule_assert` retries a failed schedule at every start.
     db.kv_set(crate::alerts::site::INTERVAL_KEY, &clamped.to_string())?;
-    // ...but it is not swallowed. This used to log and return `Ok`, so a
-    // JobScheduler that refused the job left the pane reading "every 15
-    // minutes" with no job registered — `cmd jobscheduler run` answers
-    // "Could not find job 46231", and nothing on screen ever said why. The
-    // stored value is still correct, which is what the message promises.
+    // The failure is still reported, or a refused job leaves the pane claiming a schedule nobody registered.
     reassert_notif_job(clamped)
 }
 
-/// The stable code a failed reschedule is reported under —
-/// `src/lib/notifSchedule.ts` is the other half, which turns it into the
-/// translated toast and keeps the platform's own reason as the detail line. A
-/// sentence here would be shown verbatim, in English, on a German phone. It
-/// covers every arm of `assert_schedule`, JobScheduler's refusal and the JNI
-/// plumbing alike: the reason line tells them apart, the headline says only
-/// what is true of all of them — not scheduled, setting kept, retried at the
-/// next start.
+/// The stable code a failed reschedule is reported under; `src/lib/notifSchedule.ts` turns it into the toast.
 #[cfg(target_os = "android")]
 const NOTIF_JOB_REFUSED: &str = "settings.notifJobRefused";
 
-/// Cfg'd pair: Android mirrors the setting into its JobScheduler so the
-/// dead-app half fires on the same cadence; everywhere else the in-app pass
-/// reads the kv on its next tick and nothing more is needed.
+/// Cfg'd pair: Android mirrors the setting into its JobScheduler; elsewhere the in-app pass reads kv itself.
 #[cfg(target_os = "android")]
 fn reassert_notif_job(minutes: i64) -> Result<(), String> {
     crate::background::assert_schedule(minutes).map_err(|e| {
@@ -182,9 +149,7 @@ pub fn set_sequel_notify(db: State<'_, Db>, enabled: bool) -> Result<(), String>
     db.kv_set("sequel_notify", if enabled { "1" } else { "0" })
 }
 
-/// Content filter level: `"off"`, `"moderate"` (hide adult) or `"strict"`
-/// (also hide suggestive/Ecchi). Defaults to `"strict"`, so a missing key —
-/// a fresh install or an existing one upgrading — starts filtered.
+/// Content filter level, `off`, `moderate` (hide adult) or `strict` (also Ecchi); a missing key means strict.
 pub fn read_content_filter(db: &Db) -> String {
     match db.kv_get("content_filter").as_deref() {
         Some("off") => "off".to_string(),
@@ -193,9 +158,7 @@ pub fn read_content_filter(db: &Db) -> String {
     }
 }
 
-/// Mirror of the frontend's `isBlocked` for the background passes (airing /
-/// sequel notifications, Discord presence), which never touch React. Takes a
-/// media JSON node so every caller can hand over whatever it already parsed.
+/// Mirror of the frontend's `isBlocked` for the background passes, over whatever media JSON the caller has.
 pub fn media_blocked(media: &serde_json::Value, level: &str) -> bool {
     if level == "off" {
         return false;
@@ -216,8 +179,7 @@ pub fn media_blocked(media: &serde_json::Value, level: &str) -> bool {
         .unwrap_or(false)
 }
 
-/// Whether a media id on the user's cached list is filtered. Used by the
-/// Discord presence, which only knows the id of what is playing.
+/// Whether a media id on the cached list is filtered, for the Discord presence that only knows the id.
 pub fn media_id_blocked(db: &Db, media_id: i64, level: &str) -> bool {
     if level == "off" {
         return false;
@@ -252,16 +214,7 @@ pub fn get_content_filter(db: State<'_, Db>) -> String {
     read_content_filter(&db)
 }
 
-/// Whether explicit artwork is blurred until clicked.
-///
-/// Separate from the *level*, because they answer different questions. The
-/// level decides what reaches the screen at all; this decides how what does
-/// reach it arrives. It is only ever consulted for titles the level allowed
-/// through, which in practice means the filter is Off — at moderate and strict
-/// an adult title is excluded server-side and never gets here.
-///
-/// Defaults to **on**: the cost of a blur the user did not want is one click,
-/// and the cost of the opposite is explicit art appearing unasked.
+/// Whether explicit artwork the level let through is blurred until clicked; defaults on, since a blur costs one click.
 const BLUR_ADULT_KEY: &str = "blur_adult";
 
 #[tauri::command]
@@ -287,8 +240,7 @@ pub fn set_content_filter(
         return Err("Unknown content filter level".into());
     }
     db.kv_set("content_filter", &level)?;
-    // Without this, a blocked title lingers on the home screen until the
-    // next list fetch happens to rewrite the projection.
+    // Otherwise a blocked title lingers on the home screen until the next list fetch rewrites the projection.
     crate::widgets::refresh(&app);
     Ok(())
 }

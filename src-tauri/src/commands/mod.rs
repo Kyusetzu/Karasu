@@ -1,9 +1,4 @@
-//! The Tauri command surface, grouped by what each command is about.
-//!
-//! Split out of a single 1513-line file holding 62 commands. Everything is
-//! re-exported here, so `commands::x` paths and the `generate_handler!` list in
-//! `lib.rs` resolve exactly as they did — a command's name is a string on the
-//! frontend, and renaming one is a runtime break the compiler cannot see.
+//! The Tauri command surface by subject, re-exported so `commands::x` paths and `generate_handler!` still resolve.
 
 pub(crate) mod auth;
 mod images;

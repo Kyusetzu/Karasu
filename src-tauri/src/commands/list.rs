@@ -7,20 +7,11 @@ use serde_json::{json, Value};
 use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{AppHandle, State};
 
-// Siblings in the same module tree; `mod.rs` re-exports all of it, so
-// every command keeps the path it had when they shared one file.
+// Siblings in the same module tree; `mod.rs` re-exports all of it, so every command keeps its old path.
 #[allow(unused_imports)]
 use super::*;
 
-/// `advancedScores` is behind `@include`, not merely optional.
-///
-/// Measured on a real 638-entry list in this exact shape: the field adds
-/// 51,040 JSON characters, +8.3% of the whole response and +26% of the entry
-/// fields alone. `reqwest`'s gzip crushes a repetitive map on the wire, but
-/// `cache_list` stores the blob uncompressed, so the disk cost is the full
-/// figure. Most accounts have advanced scoring off — `advancedScoringEnabled`
-/// is false even on ones AniList has seeded category names for — so the
-/// default is to not ask for it at all.
+/// `advancedScores` is behind `@include` because it is large, cached uncompressed, and off for most accounts.
 const LIST_QUERY: &str = "
 query ($userId: Int!, $type: MediaType!, $scoreFormat: ScoreFormat, $withAdvanced: Boolean!) {
   MediaListCollection(userId: $userId, type: $type) {
@@ -77,13 +68,7 @@ fn validate_media_type(media_type: &str) -> Result<&str, String> {
     }
 }
 
-/// The account's score format, from the cached viewer blob.
-///
-/// Every `score(format:)` selection in this file takes it as a variable, so
-/// scores arrive in the scale the user actually chose — the display half of
-/// the `scoreRaw` note on `SAVE_MUTATION`. Validated against the enum rather
-/// than passed through: a corrupted blob must degrade to ten-point, not to a
-/// GraphQL error on every list fetch.
+/// The account's score format from the cached viewer blob, validated so a corrupted blob degrades to ten-point.
 pub(crate) fn viewer_score_format(db: &Db) -> &'static str {
     let stored = db
         .kv_get("anilist_viewer")
@@ -102,14 +87,7 @@ pub(crate) fn viewer_score_format(db: &Db) -> &'static str {
     }
 }
 
-/// Whether this media type has advanced scoring switched on, from the same
-/// cached viewer blob `viewer_score_format` reads.
-///
-/// The flag is the signal, never the name list: AniList seeds
-/// `advancedScoring` with five defaults on accounts that have the feature
-/// *off*, so "there are category names" would turn it on for almost everyone.
-/// Anything unexpected in the blob reads as off, which costs the field on the
-/// list query and nothing else.
+/// Whether this media type has advanced scoring on; the flag is the signal, since AniList seeds names even when off.
 pub(crate) fn viewer_advanced_scoring(db: &Db, media_type: &str) -> bool {
     let key = if media_type == "MANGA" {
         "/mediaListOptions/mangaList/advancedScoringEnabled"
@@ -122,26 +100,14 @@ pub(crate) fn viewer_advanced_scoring(db: &Db, media_type: &str) -> bool {
         .unwrap_or(false)
 }
 
-/// The signed-in account, from the cached viewer blob.
-///
-/// Every queue read and write is scoped by this. `None` means no account is
-/// connected, which for the queue means there is nothing to drain and nothing
-/// may be enqueued: a queued row is a write waiting for a token, and one that
-/// cannot name its account is one that would land on whoever signs in next.
+/// The signed-in account from the cached viewer blob; every queue read and write is scoped by it.
 pub(crate) fn viewer_id(db: &Db) -> Option<i64> {
     db.kv_get("anilist_viewer")
         .and_then(|blob| serde_json::from_str::<Value>(&blob).ok())
         .and_then(|v| v.get("id").and_then(|i| i.as_i64()))
 }
 
-/// One entry's live progress and status, the scrobbler's last look before it
-/// writes.
-///
-/// A `Page` around `mediaList`, not a `MediaList` root: the root answers a
-/// missing entry with HTTP 404 and nulls every sibling with it (CLAUDE.md),
-/// while an empty page is an ordinary answer meaning "not on the list".
-/// Validated 2026-09-11 through the rig's `anilist_query`:
-/// `{"Page":{"mediaList":[{"progress":25,"status":"COMPLETED"}]}}`.
+/// One entry's live progress and status; a `Page`, because a `MediaList` root 404s on a missing entry.
 pub(crate) const ENTRY_PROGRESS_QUERY: &str = "query ($userId: Int, $mediaId: Int) { Page(perPage: 1) { mediaList(userId: $userId, mediaId: $mediaId) { progress status } } }";
 
 /// Reads the page shape above. `None` is the empty page — not on the list.
@@ -156,11 +122,7 @@ pub(crate) fn parse_live_entry(data: &Value) -> Option<(u32, String)> {
     Some((progress, status))
 }
 
-/// Asks AniList what the entry holds right now.
-///
-/// The outer `None` is "could not ask" — offline, throttled, refused — and the
-/// caller decides on the cache's word instead; the inner `None` is the empty
-/// page. One request per scrobble, inside the shared limiter like any other.
+/// Asks AniList what the entry holds now; the outer `None` is "could not ask", the inner one is the empty page.
 pub(crate) async fn live_entry(
     api: &AniList,
     token: &str,
@@ -187,22 +149,12 @@ pub(crate) async fn live_entry(
     }
 }
 
-/// How many edits the signed-in account is waiting to sync. Zero when signed
-/// out — another account's rows are not this account's business.
+/// How many edits the signed-in account is waiting to sync; zero when signed out.
 pub(crate) fn pending(db: &Db) -> usize {
     viewer_id(db).map_or(0, |u| db.queue_len(u))
 }
 
-/// `startedAt`/`completedAt` are `FuzzyDateInput` — `{ year, month, day }`, each
-/// nullable, because AniList lets a date be partial ("2024", "March 2024"). That
-/// is why they are not plain dates on the frontend either.
-///
-/// **`$scoreRaw: Int`, never `$score: Float`.** The bare `score` argument is
-/// interpreted in the *account's* scoreFormat, so a ten-point value written to
-/// a 100-point account stored 8/100 — a silent corruption this app shipped for
-/// months. `scoreRaw` is the format-independent 0–100 integer; the frontend
-/// converts through `lib/scoreFormat.toRaw` before invoking, which also makes
-/// the offline queue safe to replay across a format change.
+/// `$scoreRaw: Int`, never `$score: Float`: a bare score is read in the account's format and silently corrupts.
 const SAVE_MUTATION: &str = "
 mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int, $progressVolumes: Int, $scoreRaw: Int, $repeat: Int, $notes: String, $private: Boolean, $hiddenFromStatusLists: Boolean, $customLists: [String], $advancedScores: [Float], $startedAt: FuzzyDateInput, $completedAt: FuzzyDateInput, $scoreFormat: ScoreFormat) {
   SaveMediaListEntry(mediaId: $mediaId, status: $status, progress: $progress, progressVolumes: $progressVolumes, scoreRaw: $scoreRaw, repeat: $repeat, notes: $notes, private: $private, hiddenFromStatusLists: $hiddenFromStatusLists, customLists: $customLists, advancedScores: $advancedScores, startedAt: $startedAt, completedAt: $completedAt) {
@@ -218,23 +170,7 @@ mutation ($id: Int) {
   DeleteMediaListEntry(id: $id) { deleted }
 }";
 
-/// One request for a whole selection, keyed on **list-entry** ids (not media
-/// ids, unlike `SaveMediaListEntry`'s `mediaId`).
-///
-/// Verified against the live schema before wiring: the batch mutation is
-/// `UpdateMediaListEntries(ids: [Int], …) -> [MediaList]`. It is *not* called
-/// `SaveMediaListEntries`, which does not exist — the reason CLAUDE.md insists
-/// on checking the schema rather than the shape one expects.
-/// Widened past status/score after checking the live schema by introspection
-/// rather than by running it — a mutation cannot be validated by executing it
-/// against real data. `UpdateMediaListEntries` accepts `progress`,
-/// `progressVolumes`, `repeat`, `private`, `startedAt` and `completedAt` too.
-///
-/// `notes` is deliberately **not** here even though the schema accepts it: tags
-/// are serialized into the notes field, so setting it across a selection would
-/// destroy every selected entry's tags. Appending instead would be a
-/// read-modify-write per entry, which is the fan-out this mutation exists to
-/// avoid — so bulk tag editing is a separate problem, not a missing argument.
+/// One request for a whole selection, keyed on list-entry ids; `notes` stays out, since it would destroy every tag.
 const UPDATE_ENTRIES_MUTATION: &str = "
 mutation ($ids: [Int], $status: MediaListStatus, $scoreRaw: Int, $progress: Int, $progressVolumes: Int, $repeat: Int, $private: Boolean, $startedAt: FuzzyDateInput, $completedAt: FuzzyDateInput, $scoreFormat: ScoreFormat) {
   UpdateMediaListEntries(ids: $ids, status: $status, scoreRaw: $scoreRaw, progress: $progress, progressVolumes: $progressVolumes, repeat: $repeat, private: $private, startedAt: $startedAt, completedAt: $completedAt) {
@@ -245,9 +181,7 @@ mutation ($ids: [Int], $status: MediaListStatus, $scoreRaw: Int, $progress: Int,
   }
 }";
 
-/// Entry ids per request. AniList documents no cap for this mutation, so this
-/// matches the ≤50 the read side uses for `Page.media(id_in:)` rather than
-/// inventing a second number.
+/// Entry ids per request, matching the read side's `Page.media(id_in:)` bound rather than inventing a second number.
 const BULK_CHUNK: usize = 50;
 
 #[derive(serde::Serialize)]
@@ -260,17 +194,7 @@ pub struct ListResult {
     lists: Value,
 }
 
-/// The last cached list for this user and type, with no network access at all.
-///
-/// `fetch_media_list` always awaits AniList, so a cold start stares at a
-/// loading state even though a complete list is sitting on disk. This lets the
-/// frontend paint that immediately and let the real fetch land underneath it.
-///
-/// `from_cache` is deliberately `false` here. That flag means "you are offline
-/// and this is all we have" — it drives the amber banner in MediaList — and
-/// this path is a head start on a refresh that is already in flight, not an
-/// offline fallback. Returns `None` when nothing has been cached yet, so the
-/// caller simply falls back to the normal loading state.
+/// The last cached list with no network access, a head start on the fetch; `from_cache` stays false, it is not a fallback.
 #[tauri::command]
 pub fn cached_media_list(
     db: State<'_, Db>,
@@ -286,9 +210,7 @@ pub fn cached_media_list(
     })
 }
 
-/// Loads the anime/manga list; offline, the last known state is served
-/// from SQLite. The offline queue is drained first so that the server
-/// response already includes the user's own pending changes.
+/// Loads the list, draining the offline queue first so the response already holds the user's own pending changes.
 #[tauri::command]
 pub async fn fetch_media_list(
     app: AppHandle,
@@ -299,12 +221,7 @@ pub async fn fetch_media_list(
 ) -> Result<ListResult, String> {
     let media_type = validate_media_type(&media_type)?;
     let token = auth::load_token();
-    // Not fatal — a fetch is still worth doing with the queue undrained — but a
-    // silent failure here presented as a stale list with a pending count that
-    // never went down, and nothing said why.
-    //
-    // This is also the drain that runs on every list mount, so it is where a
-    // dropped edit is most likely to be noticed and reported.
+    // Not fatal, a fetch is still worth doing with the queue undrained, but the failure is logged rather than silent.
     match process_queue(&db, &api, token.as_deref()).await {
         Ok(drained) => report_dropped(&app, &drained.dropped),
         Err(e) => crate::logging::warn("queue", format!("cannot drain the offline queue: {e}")),
@@ -332,8 +249,7 @@ pub async fn fetch_media_list(
                 // Every cold start then hits the network instead of the cache.
                 crate::logging::warn("cache", format!("cannot cache the {media_type} list: {e}"));
             }
-            // The home-screen widgets render a projection of exactly this
-            // cache; a fresh list is the moment it moves.
+            // The home-screen widgets render a projection of exactly this cache; a fresh list is the moment it moves.
             crate::widgets::refresh(&app);
             Ok(ListResult {
                 from_cache: false,
@@ -341,21 +257,13 @@ pub async fn fetch_media_list(
                 lists,
             })
         }
-        // Offline *or* throttled: a complete list sits in SQLite and the one
-        // moment it is genuinely useful — a 429, a 5xx, a timeout — was the one
-        // moment nothing consulted it, so every list screen showed an error
-        // page instead. Deliberately not extended to `Auth`: a rejected token
-        // must reach the frontend, which is what raises the one sign-in banner
-        // instead of each screen inventing its own failure.
+        // Offline or throttled falls back to the cache; `Auth` does not, since a rejected token must reach the frontend.
         Err(e @ (ApiError::Network(_) | ApiError::Retryable(_))) => {
             let cached = db.cached_list(user_id, media_type).ok_or_else(|| {
                 let _ = &e;
                 "Offline and no local list cache available yet".to_string()
             })?;
-            // The cache did not move, but the projection file can still be
-            // missing (an update shipped the widgets after the cache was
-            // written) — refreshing here is idempotent and closes that gap
-            // for the offline path too.
+            // The cache did not move, but the projection file can still be missing; refreshing is idempotent.
             crate::widgets::refresh(&app);
             Ok(ListResult {
                 from_cache: true,
@@ -375,8 +283,7 @@ pub struct MutationResult {
     pub(crate) entry: Option<Value>,
 }
 
-/// Core of list saving, also used by the scrobbler: straight to the API
-/// when online, into the queue when offline (order is preserved).
+/// Core of list saving, also used by the scrobbler: straight to the API when online, into the queue when offline.
 pub(crate) async fn save_entry_core(
     app: &AppHandle,
     db: &Db,
@@ -384,25 +291,11 @@ pub(crate) async fn save_entry_core(
     token: &str,
     mut input: Value,
 ) -> Result<MutationResult, String> {
-    // The echoed entry must come back in the account's display format, so the
-    // format rides along as a variable. Injected here rather than by callers
-    // because the scrobbler saves through this path too — and injected at
-    // replay time as well, since a queued payload's format may have changed
-    // between enqueue and drain.
+    // The format rides along here rather than from callers, because the scrobbler saves through this path too.
     if let Some(vars) = input.as_object_mut() {
         vars.insert("scoreFormat".into(), json!(viewer_score_format(db)));
     }
-    // The drain's drops are reported here rather than swallowed. A payload
-    // AniList refuses outright is removed from the queue by `process_queue`,
-    // and this path used to discard that list — so a permanently-rejected edit
-    // vanished with only a log line, while the pending badge fell to zero and
-    // the list simply did not contain the change.
-    //
-    // A drain that *skipped* leaves the queue standing, so it takes the same
-    // exit as a drain that failed. Otherwise this write goes out live while a
-    // concurrent drain still holds older rows for the same entry, and the older
-    // one lands on top of it — the ordering this block exists to preserve,
-    // undone by a case that used to be indistinguishable from success.
+    // A skipped drain takes the failed exit: a live write would otherwise be overwritten by older rows it still holds.
     if pending(db) > 0 {
         match process_queue(db, api, Some(token)).await {
             Ok(drained) if !drained.skipped => report_dropped(app, &drained.dropped),
@@ -414,21 +307,14 @@ pub(crate) async fn save_entry_core(
     }
 
     match api.query(Some(token), SAVE_MUTATION, input.clone()).await {
-        // Queued rather than raised for anything that could work later. A 429
-        // used to surface as a hard error here, which lost the edit outright:
-        // it was never written and never queued either.
+        // Queued rather than raised for anything that could work later, or the edit is lost outright.
         Err(e) if e.is_retryable() => {
             queue_push_deduped(db, "save", &input.to_string())?;
             Ok(MutationResult { queued: true, entry: None })
         }
         Ok(data) => {
             let entry = data.get("SaveMediaListEntry").cloned();
-            // The local cache is what the scrobbler's anti-regression guards
-            // read. Leaving it on the pre-edit value is how a hand-set
-            // "24 / COMPLETED" could be overwritten by a scrobble of episode 5:
-            // both guards compared against a number the user had already
-            // replaced. Patched from the server's echo, so the cache holds what
-            // AniList accepted rather than what was asked for.
+            // The scrobbler's anti-regression guards read this cache, so it is patched from what AniList accepted.
             if let Some(echo) = entry.as_ref() {
                 cache_entry_echo(db, echo);
             }
@@ -438,11 +324,7 @@ pub(crate) async fn save_entry_core(
     }
 }
 
-/// Mirrors a saved entry into the SQLite list cache.
-///
-/// Takes the fields the cache actually carries and the guards actually read;
-/// anything absent from the echo is left alone rather than blanked, which is
-/// the same absent-means-unchanged rule the mutation itself follows.
+/// Mirrors a saved entry into the SQLite list cache; anything absent from the echo is left alone, not blanked.
 pub(crate) fn cache_entry_echo(db: &Db, echo: &Value) {
     let Some(user_id) = viewer_id(db) else { return };
     let Some(media_id) = echo
@@ -477,8 +359,7 @@ pub(crate) fn cache_entry_echo(db: &Db, echo: &Value) {
     db.cache_patch_entry(user_id, media_type, media_id, &Value::Object(patch));
 }
 
-/// Saves a list entry (status/progress/score). Offline, the change is
-/// queued and synced later.
+/// Saves a list entry; offline, the change is queued and synced later.
 #[tauri::command]
 pub async fn save_list_entry(
     app: AppHandle,
@@ -490,35 +371,21 @@ pub async fn save_list_entry(
     save_entry_core(&app, &db, &api, &token, input).await
 }
 
-/// What a bulk edit managed, and what stopped it if anything did.
-///
-/// Two fields rather than a `Result` because the two facts are independent: a
-/// run can both write hundreds of entries and fail, and the caller needs the
-/// number to decide whether rolling its optimistic update back would be a lie.
+/// What a bulk edit managed and what stopped it; two fields, because a run can both write hundreds and fail.
 #[derive(serde::Serialize)]
 pub struct BulkResult {
     pub updated: usize,
-    /// The failure that ended the run. Whatever `updated` counts is already
-    /// written to AniList and is not undone by it.
+    /// The failure that ended the run; whatever `updated` counts is already written and not undone by it.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
 }
 
-/// Splits ids into request-sized chunks.
-///
-/// Pure so the bound can be tested without a network call — the whole point of
-/// this command is that a 500-entry selection is ten requests rather than five
-/// hundred, and nothing else would catch that regressing.
+/// Splits ids into request-sized chunks; pure, so the bound is tested without a network call.
 pub(crate) fn bulk_chunks(ids: &[i64]) -> Vec<Vec<i64>> {
     ids.chunks(BULK_CHUNK).map(|c| c.to_vec()).collect()
 }
 
-/// Applies one status or score to many entries at once.
-///
-/// Replaces a `forEach` over the selection that issued one mutation per entry:
-/// selecting a whole list and picking a status fired hundreds of concurrent
-/// requests against a ~30/min budget, which AniList answers with 429s, and the
-/// per-entry rollback that followed then undid the ones that had succeeded.
+/// Applies one change to many entries in a few requests, rather than one mutation per entry against the rate budget.
 #[tauri::command]
 pub async fn bulk_save_list_entries(
     app: AppHandle,
@@ -526,26 +393,21 @@ pub async fn bulk_save_list_entries(
     api: State<'_, AniList>,
     ids: Vec<i64>,
     status: Option<String>,
-    // The 0–100 raw score — see `SAVE_MUTATION`'s note on why never a float.
+    // The format-independent raw score, never a float.
     score_raw: Option<i64>,
     progress: Option<i64>,
-    // snake_case here, camelCase on the wire: Tauri maps the two, the same way
-    // `save_image`'s `default_name` receives `defaultName`.
+    // snake_case here, camelCase on the wire: Tauri maps the two.
     progress_volumes: Option<i64>,
     repeat: Option<i64>,
     private: Option<bool>,
-    // `FuzzyDateInput`, forwarded as an opaque `{year, month, day}` rather than
-    // re-modelled here: every part is nullable and this layer only passes it on.
+    // `FuzzyDateInput`, forwarded as an opaque `{year, month, day}` because every part is nullable.
     started_at: Option<Value>,
     completed_at: Option<Value>,
 ) -> Result<BulkResult, String> {
     if ids.is_empty() {
         return Ok(BulkResult { updated: 0, error: None });
     }
-    // Every field absent means the caller asked for nothing. Worth rejecting
-    // rather than sending: AniList would happily accept the mutation, touch
-    // every selected entry's `updatedAt`, and change nothing — which would
-    // reorder a list sorted by "last updated" for no reason.
+    // Every field absent is rejected, or AniList would touch every selected entry's `updatedAt` and change nothing.
     if status.is_none()
         && score_raw.is_none()
         && progress.is_none()
@@ -559,19 +421,11 @@ pub async fn bulk_save_list_entries(
     }
     let token = auth::load_token().ok_or("Not connected to AniList")?;
 
-    // Anything already queued has to land first, or this write would be
-    // overwritten by an older one replaying on top of it.
-    //
-    // A bulk edit cannot be queued itself (see below), so a drain that skipped
-    // has no safe continuation: the precondition is simply unmet. Refusing with
-    // a reason is the honest answer, and the sync it is waiting on is the one
-    // the panel is showing.
+    // Anything queued lands first, and a bulk edit cannot be queued itself, so a skipped drain has to refuse.
     if pending(&db) > 0 {
         let drained = process_queue(&db, &api, Some(&token)).await?;
         if drained.skipped {
-            // A stable code, not a sentence — `lib/backendError.ts` turns it
-            // into the reader's language, the way every other user-facing
-            // failure composed in Rust does.
+            // A stable code, not a sentence; `lib/backendError.ts` turns it into the reader's language.
             return Err("queue.busy".into());
         }
         report_dropped(&app, &drained.dropped);
@@ -592,17 +446,7 @@ pub async fn bulk_save_list_entries(
             "completedAt": completed_at,
             "scoreFormat": viewer_score_format(&db),
         });
-        // No offline queue for this one: the queue replays `SaveMediaListEntry`
-        // per entry, so draining a bulk edit through it would reintroduce
-        // exactly the fan-out this exists to avoid. Failing honestly lets the
-        // caller roll back and say so.
-        //
-        // Stopping on the first failure, but reporting rather than discarding
-        // what landed before it. A bare `?` here threw the count away, so a
-        // selection of 500 that died on chunk 7 told the caller only "it
-        // failed" — and the caller's rollback then put 300 already-written
-        // entries back to their old values on screen while AniList held the
-        // new ones.
+        // No queue for a bulk edit, which would replay per entry; the first failure stops the run but keeps the count.
         match api.query(Some(&token), UPDATE_ENTRIES_MUTATION, vars).await {
             Ok(data) => {
                 let echoed = data
@@ -611,13 +455,7 @@ pub async fn bulk_save_list_entries(
                     .cloned()
                     .unwrap_or_default();
                 updated += echoed.len();
-                // Each accepted chunk is mirrored as it lands, so a run that
-                // dies halfway leaves the cache agreeing with AniList about the
-                // entries that did change. Without this an offline refetch
-                // after a partial failure served every row at its pre-edit
-                // value — including the ones the server had already accepted,
-                // which is the outcome the caller's invalidate-don't-restore
-                // choice exists to avoid.
+                // Each accepted chunk is mirrored as it lands, so a run that dies halfway leaves the cache agreeing.
                 for entry in &echoed {
                     cache_entry_echo(&db, entry);
                 }
@@ -641,13 +479,7 @@ pub async fn delete_list_entry(
     let token = auth::load_token().ok_or("Not connected to AniList")?;
     let input = json!({ "id": id });
 
-    // A drain that *skipped* leaves the queue standing, so it takes the same
-    // exit as one that failed — the exit `save_entry_core` has always taken and
-    // this path did not. Deleting live while a concurrent drain still holds an
-    // older `save` for the same entry meant the drain replayed it afterwards,
-    // and `SaveMediaListEntry(mediaId:)` creates an entry: the row the user had
-    // just confirmed deleting came back, carrying only the fields that save
-    // knew about.
+    // A skipped drain takes the failed exit, or an older queued save replays after the delete and recreates the row.
     if pending(&db) > 0 {
         match process_queue(&db, &api, Some(&token)).await {
             Ok(drained) if !drained.skipped => report_dropped(&app, &drained.dropped),
@@ -660,9 +492,7 @@ pub async fn delete_list_entry(
 
     match api.query(Some(&token), DELETE_MUTATION, input.clone()).await {
         Ok(_) => {
-            // A deleted entry left in the cache is not merely stale: it stays a
-            // scrobble candidate, and `SaveMediaListEntry(mediaId:)` *creates*
-            // an entry — so playing that title brought the row back.
+            // A deleted entry left in the cache stays a scrobble candidate, and a scrobble would recreate it.
             if let Some(user_id) = viewer_id(&db) {
                 db.cache_forget_entry_id(user_id, id);
             }
@@ -697,28 +527,14 @@ pub fn get_profile_mode(db: State<'_, Db>) -> String {
     profile_mode(&db)
 }
 
-/// Switches into account-free local mode. Connecting AniList later flips it
-/// back to "anilist" (and offers to merge — see the frontend merge flow).
-///
-/// **Deletes any stored token, and that is the fix for a real bug.** The token
-/// lives in the OS credential store, which survives a reinstall that the
-/// SQLite database does not — so a "fresh" install choosing local mode looked
-/// account-free to the UI (no cached viewer) while `anilist_query` kept
-/// attaching the stale bearer to every request. AniList answers a bad bearer
-/// with "Invalid token" even on public queries, and Search rendered
-/// `anilist.tokenRejected` in an app that supposedly had no account. Choosing
-/// to use Karasu without an account *means* no token; someone switching back
-/// signs in again, which is the flow's shape anyway.
+/// Switches into account-free local mode and deletes the token, which survives a reinstall the database does not.
 #[tauri::command]
 pub fn enable_local_mode(db: State<'_, Db>) -> Result<(), String> {
-    // Through the one switch, so the outgoing account's bell rows, dedupe keys
-    // and widget projection do not sit behind the account-free list — and so
-    // the stale viewer blob cannot keep scoping a queue nothing can drain.
+    // Through the one switch, so nothing of the outgoing account sits behind the account-free list.
     crate::commands::auth::switch_identity(&db, crate::commands::auth::Identity::Local)
 }
 
-/// Loads the local list for a media type, shaped exactly like the online
-/// `ListResult` so the UI is identical.
+/// Loads the local list for a media type, shaped exactly like the online `ListResult` so the UI is identical.
 #[tauri::command]
 pub fn local_fetch_list(
     db: State<'_, Db>,
@@ -734,9 +550,7 @@ pub fn local_fetch_list(
     })
 }
 
-/// Saves a local entry. On a first add the caller supplies `media` (the
-/// AniList media object) so the list renders offline; field-only edits may
-/// omit it and the stored metadata is kept.
+/// Saves a local entry; a first add supplies `media` so the list renders offline, later edits may omit it.
 #[tauri::command]
 pub fn local_save_entry(
     db: State<'_, Db>,
@@ -755,18 +569,7 @@ pub fn local_save_entry(
         .ok_or("mediaType required for a new local entry")?;
     validate_media_type(&media_type)?;
 
-    // Absent means "leave it alone", exactly as it does for AniList, and that
-    // has to hold for every field rather than some of them: a `+1` from a list
-    // row sends `progress` alone, the status dropdown sends `status` alone, the
-    // bulk bar sends one field across a whole selection, and the detail editor
-    // never sends `progressVolumes`. Defaulting the absent ones here is what
-    // used to reset the rest of the row on every quick edit — the neutral
-    // values now live in `local_upsert`'s `VALUES` list, where they apply only
-    // to a row that has no previous value to keep.
-    //
-    // Dates are stored as the `FuzzyDate` object the frontend already speaks;
-    // clearing one arrives as that object with every part null, which is a
-    // value rather than an absence.
+    // Absent means "leave it alone" for every field, exactly as it does for AniList; defaulting here reset rows.
     let status = input.get("status").and_then(|v| v.as_str());
     let progress = input.get("progress").and_then(|v| v.as_i64());
     let progress_volumes = input.get("progressVolumes").and_then(|v| v.as_i64());
@@ -798,13 +601,7 @@ pub fn local_save_entry(
         updated_ms: ts,
     })?;
 
-    // Only the facts this call actually established. It used to echo all six
-    // scalars, which after the change above would be a fabrication: an absent
-    // `score` is not `0`, it is whatever the row already held, and this function
-    // no longer knows. Nothing reads them today — `MediaCard` takes `entry.id`
-    // and `useListMutations` takes `advancedScores`, which local mode never
-    // sends — but a future reconcile-from-response would have inherited the very
-    // bug this commit removes.
+    // Only the facts this call established; echoing the scalars would fabricate values the row may still hold.
     Ok(MutationResult {
         queued: false,
         entry: Some(json!({
@@ -815,12 +612,7 @@ pub fn local_save_entry(
     })
 }
 
-/// A `FuzzyDate` argument as the JSON text the local list stores, or `None`
-/// when the caller did not send one.
-///
-/// Null is folded into `None` on purpose: AniList treats an explicit null and
-/// an absent variable the same way, and the frontend's `?? null` idiom means
-/// both spellings reach here for "not touched".
+/// A `FuzzyDate` argument as the JSON text the local list stores; null folds into `None`, as AniList treats it.
 fn fuzzy_date_text(input: &Value, key: &str) -> Option<String> {
     input
         .get(key)
@@ -828,8 +620,7 @@ fn fuzzy_date_text(input: &Value, key: &str) -> Option<String> {
         .map(|v| v.to_string())
 }
 
-/// Deletes a local entry. In local mode the frontend entry id equals the
-/// media id.
+/// Deletes a local entry; in local mode the frontend entry id equals the media id.
 #[tauri::command]
 pub fn local_delete_entry(db: State<'_, Db>, id: i64) -> Result<MutationResult, String> {
     if let Some(media_type) = db.local_find_type(id) {
@@ -838,8 +629,7 @@ pub fn local_delete_entry(db: State<'_, Db>, id: i64) -> Result<MutationResult, 
     Ok(MutationResult { queued: false, entry: None })
 }
 
-/// All local rows across both media types, for the sign-in merge. Each row
-/// carries its media metadata so the frontend can present a conflict prompt.
+/// All local rows across both media types with their media metadata, for the sign-in merge's conflict prompt.
 #[tauri::command]
 pub fn local_all_entries(db: State<'_, Db>) -> Value {
     let rows: Vec<Value> = db
@@ -860,12 +650,7 @@ pub fn local_all_entries(db: State<'_, Db>) -> Value {
                 "score": r.score,
                 "repeat": r.repeat,
                 "notes": r.notes,
-                // Everything the local row holds, because this is what the
-                // sign-in merge pushes and then *deletes the local copy of*.
-                // v14's three fields were missing here, so a local user who
-                // recorded when they started something lost that the moment
-                // they connected an account — the one moment the app promises
-                // not to lose anything.
+                // Everything the local row holds, because the merge pushes this and then deletes the local copy.
                 "private": r.private,
                 "startedAt": Db::fuzzy_date(r.started_at.as_deref()),
                 "completedAt": Db::fuzzy_date(r.completed_at.as_deref()),
@@ -877,31 +662,18 @@ pub fn local_all_entries(db: State<'_, Db>) -> Value {
     json!(rows)
 }
 
-/// What a drain did. More than one number, because a dropped row is something
-/// the user typed and will not get back.
+/// What a drain did; more than one number, because a dropped row is something the user typed and will not get back.
 pub(crate) struct Drained {
     pub flushed: usize,
     /// One message per queued edit AniList refused permanently.
     pub dropped: Vec<String>,
-    /// Another drain held the lock, so this call did nothing at all.
-    ///
-    /// Without this, the contention path returns `Ok { flushed: 0 }` — the exact
-    /// shape of "the queue was empty" — and a status surface reading that would
-    /// report "nothing to sync" at the precise moment a sync is running. That is
-    /// the lie the panel exists to end, so the distinction is in the type rather
-    /// than inferred by any one caller.
+    /// Another drain held the lock, so this call did nothing; without it, contention looks exactly like an empty queue.
     pub skipped: bool,
 }
 
-/// What a queued payload is *about*, before it is spelled as a dedupe key.
-///
-/// The formatter below is the only thing that turns this into a string. Two
-/// readers of the same payload — the dedupe and the sync panel — cannot then
-/// disagree about which entry a row touches or which fields it changes, which is
-/// what re-parsing the key string would have risked.
+/// What a queued payload is about, shared by the dedupe and the sync panel so the two cannot disagree.
 pub(crate) struct QueueParts {
-    /// `mediaId` for a save, the list-entry `id` for a delete. The two number
-    /// spaces overlap freely; `kind` is what disambiguates them.
+    /// `mediaId` for a save, the list-entry `id` for a delete; the number spaces overlap, `kind` tells them apart.
     pub subject: i64,
     /// The non-null fields the payload changes, sorted, `scoreFormat` excluded.
     pub fields: Vec<String>,
@@ -929,35 +701,13 @@ pub(crate) fn queue_parts(kind: &str, payload: &str) -> Option<QueueParts> {
     Some(QueueParts { subject, fields })
 }
 
-/// The identity a newly queued mutation supersedes.
-///
-/// A second offline edit to the same entry *touching the same fields* makes the
-/// first one dead weight: replaying both spends two requests out of a ~30/min
-/// budget to reach the state the second one already describes — and running
-/// that budget down is what provokes the 429 the classification above now has
-/// to survive.
-///
-/// The field set is half the key on purpose, and the *non-null* fields at that.
-/// The frontend sends an explicit `null` for everything the user did not touch,
-/// so keying on which keys are present would make every save on one entry look
-/// alike and let a queued progress edit swallow an earlier status one, with no
-/// error anywhere. `scoreFormat` is excluded because it is re-stamped at drain
-/// time and says nothing about what changed.
-///
-/// `None` for a payload with no identifiable subject: it is left alone rather
-/// than guessed at.
+/// The dedupe key: kind, subject and the non-null fields, so a progress edit cannot swallow a status edit.
 pub(crate) fn queue_key(kind: &str, payload: &str) -> Option<String> {
     let QueueParts { subject, fields } = queue_parts(kind, payload)?;
     Some(format!("{kind}:{subject}:{}", fields.join(",")))
 }
 
-/// Queues a mutation against the signed-in account, dropping any queued one it
-/// makes redundant.
-///
-/// Refuses outright when there is no account. Every caller here already holds a
-/// token, so this is unreachable in practice — but a queued row with no owner is
-/// precisely the shape that used to replay onto whoever signed in next, and the
-/// type is what keeps that unwritable rather than merely unwritten.
+/// Queues a mutation against the signed-in account, dropping any it makes redundant; a row with no owner is refused.
 fn queue_push_deduped(db: &Db, kind: &str, payload: &str) -> Result<(), String> {
     let user_id = viewer_id(db).ok_or("Not connected to AniList")?;
     if let Some(key) = queue_key(kind, payload) {
@@ -970,47 +720,13 @@ fn queue_push_deduped(db: &Db, kind: &str, payload: &str) -> Result<(), String> 
     db.queue_push(user_id, kind, payload)
 }
 
-/// Drains the offline queue in order.
-///
-/// Anything that could succeed later — offline, rate limited, an expired token,
-/// AniList being down — aborts the drain and leaves the whole queue intact.
-/// Only a payload AniList rejects on its own terms (validation, an entry that
-/// no longer exists) is dropped, because replaying that one forever would wedge
-/// every edit queued behind it.
-///
-/// That split is the entire point of this function, and it is newer than the
-/// function is. It used to drop a row for *any* non-transport error while
-/// `client.rs` classed an expired token and a surviving 429 as exactly that:
-/// the pending badge fell to zero and the edits were gone, with no error and no
-/// log line, because the `Ok(0)` it returned told the caller all was well.
-/// One drain at a time, process-wide.
-///
-/// `fetch_media_list` drains before it fetches, and the Dashboard mounts an
-/// anime and a manga list in the same render. Both calls read `queue_all`
-/// before either removes a row, so both sent the same N mutations — into a
-/// ~30/min budget shared with the scrobbler and three alert passes. No data is
-/// corrupted (the payloads are absolute values) but the budget is spent twice.
-///
-/// `try_lock` and skip, never a held lock. Awaiting this one would park the
-/// second list behind however long the first drain takes, and a drain that hits
-/// a 429 sleeps out its `Retry-After` — up to two minutes of a blank Dashboard
-/// to avoid duplicate requests, which is the worse trade.
+/// One drain at a time, process-wide, taken with `try_lock` and skipped rather than awaited behind a sleeping drain.
 static DRAIN: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
-/// Whether a drain is running right now, readable without touching `DRAIN`.
-///
-/// Deliberately *not* `DRAIN.try_lock().is_err()`. That takes the real lock, and
-/// since `process_queue` also acquires it with `try_lock`, a status read polling
-/// at 1 Hz would every so often be the reason a genuine drain skipped its pass.
-/// A status surface must not be able to change what it reports on.
+/// Whether a drain is running, readable without touching `DRAIN`, so a status poll can never make a drain skip.
 static DRAINING: AtomicBool = AtomicBool::new(false);
 
-/// Sets `DRAINING` for as long as it lives.
-///
-/// A `Drop` guard rather than a pair of stores because `process_queue` has three
-/// exits — the loop's `return Err` on a retryable failure, the normal end, and a
-/// panic — and a flag left standing after any of them would report a drain that
-/// is not happening for the rest of the process's life.
+/// Sets `DRAINING` for as long as it lives; a `Drop` guard, because `process_queue` has three exits including a panic.
 struct DrainMark;
 
 impl DrainMark {
@@ -1042,10 +758,7 @@ async fn process_queue(
         return Ok(Drained { flushed, dropped, skipped: true });
     };
     let _mark = DrainMark::set();
-    // Only this account's rows. The drain runs on every list fetch with
-    // whatever token is loaded now, and the queue outlives a sign-out, so an
-    // unscoped read here is what wrote one user's pending edits onto another
-    // user's list. Signed out there is nothing to drain at all.
+    // Only this account's rows: the queue outlives a sign-out, and an unscoped read drains one user's edits onto another.
     let Some(user_id) = viewer_id(db) else {
         return Ok(Drained { flushed, dropped, skipped: false });
     };
@@ -1053,19 +766,7 @@ async fn process_queue(
         let (id, kind, payload) = (row.id, row.kind, row.payload);
         let mut variables: Value =
             serde_json::from_str(&payload).unwrap_or_else(|_| json!({}));
-        // Re-stamped at drain time: the format may have changed since the
-        // payload was queued, and the echoed entry should come back in the
-        // format the app is displaying *now*. The score itself is `scoreRaw`,
-        // so the write is format-independent either way.
-        //
-        // `advancedScores` deliberately is *not* re-stamped, and cannot be: it
-        // is a positional `[Float]` whose meaning comes from the account's
-        // category order at the moment it was built. Renaming or reordering a
-        // category on anilist.co between queueing and draining would move a
-        // value into the wrong category — but re-keying it here would need the
-        // names the payload was built against, which the payload does not
-        // carry. The window is small (a queued edit drains on the next list
-        // mount) and the alternative is guessing.
+        // The format is re-stamped at drain time; `advancedScores` cannot be, since the payload lacks its category names.
         if kind == "save" {
             if let Some(vars) = variables.as_object_mut() {
                 vars.insert("scoreFormat".into(), json!(viewer_score_format(db)));
@@ -1074,9 +775,7 @@ async fn process_queue(
         let mutation = if kind == "delete" { DELETE_MUTATION } else { SAVE_MUTATION };
         match api.query(token, mutation, variables).await {
             Ok(data) => {
-                // Same reason the live save path does it: the scrobbler's
-                // guards read this cache, and a drained edit is a write like
-                // any other.
+                // The scrobbler's guards read this cache, and a drained edit is a write like any other.
                 if let Some(echo) = data.get("SaveMediaListEntry") {
                     cache_entry_echo(db, echo);
                 }
@@ -1098,41 +797,24 @@ async fn process_queue(
     Ok(Drained { flushed, dropped, skipped: false })
 }
 
-/// Tells the user when a queued edit was thrown away.
-///
-/// Otherwise a drop is silent by construction: the row is gone, the pending
-/// badge falls to zero, and the list simply does not contain the change. The
-/// bell is the right place for it because the window may well be in the tray
-/// when a background drain runs.
+/// Tells the user through the bell when a queued edit was thrown away, since a drop is otherwise silent.
 fn report_dropped(app: &AppHandle, dropped: &[String]) {
     let Some(first) = dropped.first() else { return };
     let body = match dropped.len() {
         1 => crate::i18n::Msg::QueueBodyOne { reason: first },
         n => crate::i18n::Msg::QueueBodyMany { count: n, reason: first },
     };
-    // No media id, though `process_queue` one frame up does have them in its
-    // payloads. One report can stand for several dropped edits across several
-    // titles, so a row that opened *one* of them would misreport the rest —
-    // and splitting into a row per drop turns one drain into n bell rows.
+    // No media id: one report can stand for several titles, and a row opening one of them would misreport the rest.
     crate::alerts::notify::notify(app, "queue", crate::i18n::Msg::QueueTitle, body, None);
 }
 
-/// One queued edit, described rather than replayed.
-///
-/// The payload itself never crosses to the frontend. It carries a `scoreRaw`, a
-/// notes body and whatever else the user typed, and none of that is needed to
-/// say "progress and status, waiting since 10 minutes ago".
+/// One queued edit, described rather than replayed; the payload itself never crosses to the frontend.
 #[derive(serde::Serialize)]
 pub struct QueuedEdit {
     pub id: i64,
     /// `"save"` or `"delete"`.
     pub kind: String,
-    /// The media id for a save, the list-entry id for a delete — and `None`
-    /// when the payload does not parse.
-    ///
-    /// A row with no subject is still a row. Dropping it would make the panel's
-    /// count disagree with the pending badge, which reads `COUNT(*)`, and the
-    /// unlabelled row is exactly the one a user would want to see.
+    /// The media id for a save, the list-entry id for a delete, `None` when the payload does not parse but still a row.
     pub subject: Option<i64>,
     /// The fields this edit changes, for the row's summary line.
     pub fields: Vec<String>,
@@ -1140,25 +822,15 @@ pub struct QueuedEdit {
     pub queued_at: i64,
 }
 
-/// Everything the sync panel renders.
-///
-/// Costs no AniList request: SQLite and two in-process values. That is what
-/// makes polling it acceptable at all — the ~30/min budget is shared with the
-/// scrobbler and three alert passes, and a status surface that spent it would be
-/// the problem it is meant to show.
+/// Everything the sync panel renders, at the cost of no AniList request, which is what makes polling it acceptable.
 #[derive(serde::Serialize)]
 pub struct SyncStatus {
-    /// Signed in to AniList. False in local mode, where nothing syncs by
-    /// design and an empty queue is not the same statement.
+    /// Signed in to AniList; false in local mode, where an empty queue is not the same statement.
     pub connected: bool,
     pub draining: bool,
     pub queued: Vec<QueuedEdit>,
     pub rate: RateSnapshot,
-    /// Recent AniList traffic, newest first.
-    ///
-    /// The answer to "the number changes and no data is shown": an idle app has
-    /// no queued edits, so the panel had nothing to list while the headroom
-    /// moved underneath it. This is what moved it.
+    /// Recent AniList traffic, newest first, so the panel can show what moved the headroom.
     pub recent: Vec<RequestLogEntry>,
 }
 
@@ -1195,13 +867,7 @@ pub async fn sync_status(
     })
 }
 
-/// Discards one queued edit — the user saying "that write should not land".
-///
-/// Scoped to the signed-in account in the DELETE itself, never trusting the
-/// id alone: the id comes from a UI snapshot that can straddle a sign-out,
-/// and an unscoped delete would reopen v16's cross-account hole from a new
-/// direction. Deleting a queued edit is a loss class (the queue is the only
-/// copy), which is why the UI confirms before calling this.
+/// Discards one queued edit, scoped to the signed-in account in the DELETE itself since the id may straddle a sign-out.
 #[tauri::command]
 pub fn discard_queued_edit(db: State<'_, Db>, id: i64) -> Result<bool, String> {
     let user_id = viewer_id(&db).ok_or("Not connected to AniList")?;
@@ -1225,8 +891,7 @@ pub async fn flush_queue(
 mod tests {
     use super::{bulk_chunks, queue_key, queue_parts, BULK_CHUNK};
 
-    /// The panel and the dedupe read one function, so they cannot disagree
-    /// about what a payload touches. This is that agreement, spelled out.
+    /// The parts and the key describe the same edit, so the panel and the dedupe cannot disagree.
     #[test]
     fn the_parts_and_the_key_describe_the_same_edit() {
         for (kind, payload) in [
@@ -1243,9 +908,7 @@ mod tests {
         assert!(queue_key("save", r#"{"progress":3}"#).is_none());
     }
 
-    /// The subject names the entry rather than describing a change to it, so
-    /// it does not appear in the row's summary. Equivalence is untouched: a
-    /// save always carries `mediaId`, so removing it removes a constant.
+    /// The subject names the entry rather than describing a change, so it stays out of the row's summary.
     #[test]
     fn the_subject_is_not_one_of_the_changed_fields() {
         let parts = queue_parts("save", r#"{"mediaId":7,"progress":3}"#).unwrap();
@@ -1253,9 +916,7 @@ mod tests {
         assert!(queue_parts("delete", r#"{"id":42}"#).unwrap().fields.is_empty());
     }
 
-    /// Same exclusion as the key's, for the same reason: `scoreFormat` is
-    /// re-stamped at drain time and describes the app, not the edit. A row
-    /// reading "score format, score" would name a field the user never set.
+    /// `scoreFormat` is never a changed field, since it describes the app rather than the edit.
     #[test]
     fn the_score_format_is_never_a_changed_field() {
         let parts =
@@ -1264,9 +925,7 @@ mod tests {
         assert_eq!(parts.fields, ["scoreRaw"]);
     }
 
-    /// The case the dedupe exists for: bump progress five times offline and
-    /// five identical mutations replay into a ~30/min budget to reach the
-    /// state the last one already describes.
+    /// Repeated offline edits to one field collapse into the last one.
     #[test]
     fn repeated_edits_to_one_field_collapse() {
         let first = queue_key("save", r#"{"mediaId":1,"progress":3}"#);
@@ -1275,9 +934,7 @@ mod tests {
         assert!(first.is_some());
     }
 
-    /// The case it must *not* swallow. Both payloads name the same entry and
-    /// carry one field each; collapsing them loses the progress edit, and
-    /// nothing anywhere would report it.
+    /// Edits to different fields of one entry are kept apart, or a progress edit would be lost silently.
     #[test]
     fn edits_to_different_fields_are_kept_apart() {
         assert_ne!(
@@ -1286,9 +943,7 @@ mod tests {
         );
     }
 
-    /// The frontend sends an explicit null for every field the user did not
-    /// touch, so a key built from which *keys* are present would make the two
-    /// payloads above identical. Only the non-null fields count.
+    /// Untouched fields, sent as explicit nulls, do not join the key.
     #[test]
     fn untouched_fields_do_not_join_the_key() {
         assert_eq!(
@@ -1297,8 +952,7 @@ mod tests {
         );
     }
 
-    /// `scoreFormat` is re-stamped at drain time from the account's current
-    /// setting, so it describes the app rather than the edit.
+    /// `scoreFormat` never splits two edits, since it is re-stamped at drain time anyway.
     #[test]
     fn the_score_format_never_splits_two_edits() {
         assert_eq!(
@@ -1313,16 +967,14 @@ mod tests {
             queue_key("save", r#"{"mediaId":1,"progress":3}"#),
             queue_key("save", r#"{"mediaId":2,"progress":3}"#),
         );
-        // A delete is keyed on the list-entry id, a save on the media id, and
-        // the two number spaces overlap freely.
+        // A delete is keyed on the list-entry id, a save on the media id, and the two number spaces overlap freely.
         assert_ne!(
             queue_key("delete", r#"{"id":1}"#),
             queue_key("save", r#"{"mediaId":1}"#),
         );
     }
 
-    /// A payload with no identifiable subject is left alone rather than
-    /// guessed at — the fallback is the old behaviour, one row per edit.
+    /// A payload with no identifiable subject deduplicates against nothing rather than being guessed at.
     #[test]
     fn an_unrecognizable_payload_deduplicates_against_nothing() {
         assert_eq!(queue_key("save", r#"{"progress":3}"#), None);
@@ -1330,8 +982,7 @@ mod tests {
         assert_eq!(queue_key("something-else", r#"{"mediaId":1}"#), None);
     }
 
-    /// The reason this command exists: a whole-list selection has to become a
-    /// handful of requests, not one per entry against a ~30/min budget.
+    /// A whole-list selection becomes a handful of requests, not one per entry.
     #[test]
     fn a_large_selection_becomes_few_requests() {
         let ids: Vec<i64> = (1..=500).collect();
@@ -1356,7 +1007,7 @@ mod tests {
         assert!(bulk_chunks(&[]).is_empty());
     }
 
-    /// The exact shape the rig returned on 2026-09-11 for a completed entry.
+    /// A live entry is read from the page shape AniList returns for a completed entry.
     #[test]
     fn a_live_entry_is_read_from_the_page_shape() {
         let data = serde_json::json!({

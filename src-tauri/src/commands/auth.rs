@@ -3,36 +3,14 @@ use crate::db::Db;
 use serde_json::{json, Value};
 use tauri::State;
 
-// Siblings in the same module tree; `mod.rs` re-exports all of it, so
-// every command keeps the path it had when they shared one file.
+// Siblings in the same module tree; `mod.rs` re-exports all of it, so every command keeps its old path.
 #[allow(unused_imports)]
 use super::*;
 
-/// users; the ID is public, not a secret). Empty = users need their own
-/// client ID. Set once by the maintainer.
+/// The built-in AniList client id (public, never a secret); empty means every user needs their own.
 pub const BUILTIN_ANILIST_CLIENT_ID: &str = "46231";
 
-/// `mediaListOptions.scoreFormat` rides along because the whole app follows
-/// it — score controls, list cells, statistics. It lands in the cached
-/// `anilist_viewer` kv blob and the frontend auth store at zero extra request
-/// cost, which is how the list screens read it without a profile fetch.
-///
-/// The advanced-scoring pair rides the same way and for the same reason: the
-/// entry editor needs to know whether the feature is on and what the user
-/// called their categories, and this is the one call that can carry both for
-/// free. Per media type, because AniList keeps them per media type — one
-/// account-wide flag would be wrong. The names are populated even when the
-/// flag is off (verified on a real account), so `advancedScoringEnabled` is
-/// the signal and a non-empty name list is not.
-///
-/// `options` rides along for the airing watcher, which needs to know whether
-/// the account will get AniList's *own* AIRING notification before deciding to
-/// write a bell row of its own. Two switches govern that on AniList's side and
-/// they are separate settings on separate pages, so both are carried — see
-/// `alerts::airing::anilist_covers_airing` for why it takes both. One scalar
-/// and twenty small pairs on a query that already runs at connect and on
-/// `refresh_viewer`, so it costs no extra request, and this is the only
-/// token-bearing path that runs with nobody waiting on it.
+/// The viewer plus score format, advanced-scoring names and notification options, all cached at no extra request.
 const VIEWER_QUERY: &str = "
 query {
   Viewer {
@@ -60,10 +38,7 @@ pub struct AuthInfo {
     pub has_builtin_client_id: bool,
     #[serde(rename = "customClientId")]
     pub custom_client_id: Option<String>,
-    /// The redirect URL an API client must register — built from
-    /// `login::AUTH_CALLBACK_PORT` so the port has one origin. The frontend
-    /// used to hardcode this string, which is exactly the drift a type
-    /// checker cannot see across the IPC boundary.
+    /// The redirect URL an API client must register, built from `login::AUTH_CALLBACK_PORT` so the port has one origin.
     #[serde(rename = "callbackUrl")]
     pub callback_url: String,
 }
@@ -102,36 +77,22 @@ fn configured_client_id(db: &Db) -> Result<String, String> {
     Ok(client_id)
 }
 
-/// The authorize URL for the manual-paste flow, where the user copies the
-/// token out of the page. No callback server runs, so no `state` is needed.
+/// The authorize URL for the manual-paste flow; no callback server runs, so no `state` is needed.
 #[tauri::command]
 pub fn anilist_login_url(db: State<'_, Db>) -> Result<String, String> {
     Ok(auth::authorize_url(&configured_client_id(&db)?, None))
 }
 
-/// Validates a token against the Viewer query, stores it in the Windows
-/// Credential Manager and caches the viewer. Shared by the manual paste flow
-/// and the one-click callback server.
+/// Validates a token against the Viewer query, stores it and caches the viewer; shared by both sign-in flows.
 pub async fn connect_with_token(db: &Db, api: &AniList, input: &str) -> Result<Value, String> {
     // Accepts a raw token as well as the full redirect URL
     let token = auth::extract_token(input);
     if token.is_empty() {
         return Err("Please paste the token from the AniList page".into());
     }
-    // Timed per phase: a slow first sign-in was reported on Android, and the
-    // three suspects — the viewer fetch over a cold TLS handshake, the token
-    // write (whose first Keystore use also generates the hardware key), and
-    // the kv writes — cannot be told apart from the outside. Debug level, so
-    // an ordinary sign-in stays quiet unless verbose logging is on.
+    // Timed per phase, so a slow sign-in can name the viewer fetch, the kv writes or the token save.
     let t0 = std::time::Instant::now();
-    // One bounded retry, in this path only. The token arrived seconds ago
-    // from AniList's own redirect, so a rejection here is far more likely a
-    // replication race than a genuinely bad token — and that is exactly what
-    // a device showed: the first viewer fetch after the callback failed, an
-    // immediate second press succeeded. The client already retries transport
-    // errors internally; this covers the GraphQL-level rejection those
-    // retries deliberately do not touch. A truly dead token still fails the
-    // second attempt and surfaces exactly as before.
+    // One bounded retry here only: a token AniList just issued is more likely caught in a replication race than dead.
     let viewer = {
         let fetch = || async {
             let data = api.query(Some(&token), VIEWER_QUERY, json!({})).await?;
@@ -153,30 +114,14 @@ pub async fn connect_with_token(db: &Db, api: &AniList, input: &str) -> Result<V
         }
     };
     let t1 = std::time::Instant::now();
-    // Identity first, credential second — and both through the one switch, so
-    // the previous account's bell rows, dedupe keys, widget projection and
-    // held Jellyfin session go with it. A successful connection makes AniList
-    // the active profile; any local entries stay untouched until an explicit
-    // merge (see local_merge_*).
-    //
-    // The order matters on failure: if `save_token` below fails now, the
-    // install is left as "this account, no credential" — signed out, and the
-    // queue drain finds no rows to send. Writing the token first left "new
-    // credential, old identity", under which the drain sent one account's
-    // queued edits with another account's bearer.
+    // Identity before credential: a failed `save_token` then leaves no bearer that could drain another account's edits.
     switch_identity(&db, Identity::AniList(viewer.clone()))?;
     let t2 = std::time::Instant::now();
     auth::save_token(&token).inspect_err(|_| {
         // Do not leave a viewer nobody can act as.
         let _ = switch_identity(&db, Identity::None);
     })?;
-    // The order of these two was swapped, which mattered more than a swapped
-    // label usually does: this line exists to say *which* of three suspects is
-    // slow on a device, and it named the wrong one. `t2 - t1` spans
-    // `switch_identity` -- the kv writes -- and everything after `t2` is
-    // `save_token`, whose first use on Android also generates the hardware
-    // Keystore key. That is the expensive candidate the comment above names,
-    // and the log was crediting it to the cheap one.
+    // `t2 - t1` is `switch_identity` and everything after `t2` is `save_token`; the labels must not swap again.
     crate::logging::debug(
         "auth",
         format!(
@@ -198,23 +143,19 @@ pub async fn anilist_connect(
     connect_with_token(&db, &api, &token).await
 }
 
-/// Starts the one-click login: spins up the localhost callback server and
-/// returns the AniList authorize URL for the frontend to open in the browser.
+/// Starts the one-click login: spins up the localhost callback server and returns the authorize URL.
 #[tauri::command]
 pub fn anilist_start_login(
     app: tauri::AppHandle,
     db: State<'_, Db>,
 ) -> Result<String, String> {
     let client_id = configured_client_id(&db)?;
-    // The server first: it mints the nonce the URL has to carry, and starting
-    // it after building the URL would mean advertising a state nothing is
-    // checking against.
+    // The server first: it mints the nonce the URL carries, so nothing advertises a state nobody checks.
     let state = crate::anilist::login::start(app)?;
     Ok(auth::authorize_url(&client_id, Some(&state)))
 }
 
-/// Returns the cached viewer if a token is stored — without an API call,
-/// so app startup works offline and doesn't burn rate limit.
+/// Returns the cached viewer if a token is stored, without an API call, so startup works offline.
 #[tauri::command]
 pub fn anilist_session(db: State<'_, Db>) -> Option<Value> {
     auth::load_token()?;
@@ -232,23 +173,7 @@ pub enum Identity {
     None,
 }
 
-/// **The only way the app changes which account it acts as.**
-///
-/// Identity was spread over eight stores updated by four code paths, and each
-/// path cleared a different subset: the token, the cached viewer, the profile
-/// mode, the per-account tables, the alert passes' dedupe keys and Jellyfin's
-/// held session. What one path forgot, the next account inherited — B reading
-/// A's bell rows, or being denied notifications A had already consumed.
-///
-/// Two ordering rules are load-bearing here:
-///
-/// 1. **The previous account's state goes first.** Nothing may survive into a
-///    session that is already answering as someone else.
-/// 2. **The identity is written before the credential.** A failure between the
-///    two then leaves "new identity, no credential" — for which the queue
-///    drain finds no rows and does nothing — rather than "new credential, old
-///    identity", which is the pairing that drains one account's edits under
-///    another account's bearer.
+/// The only way the app changes account: the old state goes first, and the identity is written before the credential.
 pub fn switch_identity(db: &Db, next: Identity) -> Result<(), String> {
     // 1. Forget the outgoing account.
     db.notif_clear_owned()?;
@@ -256,15 +181,10 @@ pub fn switch_identity(db: &Db, next: Identity) -> Result<(), String> {
     db.kv_delete_prefix("aired:");
     db.kv_delete_prefix("sequel_seen:");
     db.kv_delete_prefix("stale_done:");
-    // The site-notification cursor is per account too, and it only ever moves
-    // forward: left behind, it either starves the next account (lower ids are
-    // never "newer") or fires on its first pass. It leaked here until the
-    // device pass looked for why a phone that had held two accounts never
-    // notified.
+    // The site-notification cursor only moves forward, so left behind it starves the next account or misfires.
     db.kv_delete(crate::alerts::site::SEEN_KEY);
     db.kv_delete(crate::alerts::site::LAST_CHECK_KEY);
-    // The widget projection holds this account's titles and must not outlive
-    // it, exactly like the token beside it.
+    // The widget projection holds this account's titles and must not outlive it.
     crate::widgets::clear();
     // A held Jellyfin session belongs to whoever was signed in to Jellyfin.
     crate::playback::detection::jellyfin::forget_last_good();
@@ -295,12 +215,7 @@ pub fn anilist_logout(db: State<'_, Db>) {
     }
 }
 
-/// Refetches the viewer and replaces the cached blob.
-///
-/// `anilist_session` deliberately never touches the network, so a
-/// `scoreFormat` changed on anilist.co (or through Karasu's own pane, which
-/// calls this on success) would otherwise stay stale until the next login.
-/// One request, on demand, never in the background.
+/// Refetches the viewer and replaces the cached blob, on demand only, since `anilist_session` never goes online.
 #[tauri::command]
 pub async fn refresh_viewer(
     db: State<'_, Db>,
@@ -313,16 +228,12 @@ pub async fn refresh_viewer(
         .filter(|v| !v.is_null())
         .cloned()
         .ok_or("Token invalid or expired")?;
-    // Deliberately not `switch_identity`: this is the *same* account with
-    // fresher data (a `scoreFormat` changed on anilist.co), not a different
-    // one. Routing it through the switch would throw away this account's own
-    // bell rows and dedupe keys every time the pane refreshed.
+    // Deliberately not `switch_identity`: the same account with fresher data must keep its bell rows and dedupe keys.
     db.kv_set("anilist_viewer", &viewer.to_string())?;
     Ok(viewer)
 }
 
-/// Generic GraphQL proxy: the frontend supplies query + variables, the
-/// backend attaches the token and handles rate limiting.
+/// Generic GraphQL proxy: the frontend supplies query and variables, Rust attaches the token and paces the request.
 #[tauri::command]
 pub async fn anilist_query(
     api: State<'_, AniList>,
@@ -330,9 +241,7 @@ pub async fn anilist_query(
     query: String,
     variables: Option<Value>,
 ) -> Result<Value, String> {
-    // Local mode sends no bearer, whatever the credential store still holds —
-    // the second half of `enable_local_mode`'s fix, so a token that survives
-    // by any path at all still cannot poison public queries.
+    // Local mode sends no bearer whatever the credential store holds, so a surviving token cannot poison public queries.
     let token = if crate::commands::profile_mode(&db) == "local" {
         None
     } else {
@@ -353,10 +262,7 @@ pub async fn anilist_query(
 mod tests {
     use super::*;
 
-    /// The site-notification cursor belongs to the account that advanced it.
-    /// Deliberately the `AniList` arm: `Local` and `None` reach
-    /// `auth::delete_token`, which clears this machine's real credential
-    /// store — a test must never take that path.
+    /// Switching accounts drops the site-notification cursor; the `AniList` arm only, since the others delete a real token.
     #[test]
     fn switching_accounts_forgets_the_site_notification_cursor() {
         let db = crate::db::tests::mem_db();

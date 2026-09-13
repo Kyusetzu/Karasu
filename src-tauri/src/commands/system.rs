@@ -2,23 +2,14 @@ use crate::db::Db;
 use crate::sync::LockExt;
 use tauri::{AppHandle, Manager, State};
 
-// Siblings in the same module tree; `mod.rs` re-exports all of it, so
-// every command keeps the path it had when they shared one file.
+// Siblings in the same module tree; `mod.rs` re-exports all of it, so every command keeps its old path.
 #[allow(unused_imports)]
 use super::*;
 
 /// Where the last Wrapped poster was saved, so the next one opens there.
 const EXPORT_DIR_KEY: &str = "export_dir";
 
-/// Writes what a save dialog answered with, wherever that is.
-///
-/// Desktop dialogs answer with a path. Android's answer with a `content://`
-/// URI from the Storage Access Framework, which `FilePath::into_path` refuses
-/// — so every export here used to let the picker create the document and
-/// then write nothing into it: a 0-byte file in Downloads and `Ok(false)`
-/// with no error, measured on the phone on 2026-09-03. The fs plugin opens
-/// either through the platform's own descriptor. Returns the folder worth
-/// remembering for the next dialog, which a content URI does not have.
+/// Writes what a save dialog answered with, a path or Android's `content://` URI, through the fs plugin.
 fn write_picked(
     app: &tauri::AppHandle,
     picked: tauri_plugin_fs::FilePath,
@@ -35,9 +26,7 @@ fn write_picked(
     Ok(dir)
 }
 
-/// `write_picked`'s opposite, bounded because the only caller is the list
-/// import and a list export is kilobytes: a mistaken pick of something huge
-/// should fail, not OOM.
+/// `write_picked`'s opposite, bounded so a mistaken pick of something huge fails rather than OOMs.
 fn read_picked(
     app: &tauri::AppHandle,
     picked: tauri_plugin_fs::FilePath,
@@ -57,10 +46,7 @@ fn read_picked(
     if file.metadata().map(|m| m.len()).unwrap_or(0) > max_bytes {
         return Err(TOO_LARGE.into());
     }
-    // The metadata of a content URI can be silent about the size, so the
-    // read itself is capped too — as bytes first, so an oversize file is
-    // reported as oversize even when the byte after the cap splits a
-    // multi-byte character, which `read_to_string` would call invalid UTF-8.
+    // A content URI's metadata can be silent about the size, so the read is capped too, as bytes before UTF-8.
     let mut bytes = Vec::new();
     file.take(max_bytes + 1)
         .read_to_end(&mut bytes)
@@ -86,12 +72,10 @@ fn remember_dir(db: &Db, dir: Option<std::path::PathBuf>) {
         let _ = db.kv_set(EXPORT_DIR_KEY, &dir.to_string_lossy());
     }
 }
-/// Verbose logging. Off by default — the errors that matter are recorded either
-/// way, and this is the switch for reproducing something on request.
+/// Verbose logging, off by default; the errors that matter are recorded either way.
 pub(crate) const LOG_DEBUG_KEY: &str = "log_debug";
 
-/// Reports the page the user is currently on, so the idle Discord presence
-/// can show "Looking at <page>".
+/// Reports the page the user is on, so the idle Discord presence can show "Looking at <page>".
 #[tauri::command]
 pub fn set_ui_page(app: tauri::AppHandle, page: String) {
     *app.state::<crate::discord::UiPage>().0.guard() = page;
@@ -100,13 +84,7 @@ pub fn set_ui_page(app: tauri::AppHandle, page: String) {
 
 // --- Display scaling ---------------------------------------------------------
 
-/// Windows' Accessibility → Text size setting, as a multiplier (1.0 = 100%).
-///
-/// Display scaling needs nothing from us — WebView2 already applies it, so a
-/// CSS pixel is a scaled pixel. The text-size slider is separate and the
-/// WebView does *not* honour it, so the frontend reads this once at startup
-/// and sets the root font size. Anything unexpected returns 1.0: an
-/// accessibility preference is not worth failing a launch over.
+/// Windows' Accessibility text-size multiplier; WebView2 ignores it, so the frontend sets the root font size.
 #[tauri::command]
 pub fn get_text_scale() -> f64 {
     #[cfg(windows)]
@@ -114,8 +92,7 @@ pub fn get_text_scale() -> f64 {
         use windows::UI::ViewManagement::UISettings;
         if let Ok(settings) = UISettings::new() {
             if let Ok(scale) = settings.TextScaleFactor() {
-                // The slider tops out at 225%; clamp anyway so a bogus value
-                // can't render the app unusable.
+                // Clamped so a bogus value cannot render the app unusable.
                 return scale.clamp(1.0, 2.25);
             }
         }
@@ -125,22 +102,13 @@ pub fn get_text_scale() -> f64 {
 
 // --- Platform ----------------------------------------------------------------
 
-/// What the screen needs to know about where it is running.
-///
-/// Capabilities rather than an OS string alone, because every consumer's real
-/// question is a capability — "can this self-update", "is there a folder
-/// portable mode can write to". `@tauri-apps/plugin-os` would be a new npm
-/// dependency, a new Rust dependency and a new capability grant to answer less
-/// than this does. Tray presence is deliberately *not* here: `get_close_to_tray`
-/// already reports it, and two sources for one fact is how they drift.
+/// What the screen needs to know about where it runs; tray presence stays with `get_close_to_tray`, one source.
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PlatformInfo {
-    /// "windows" | "linux" | "android" — whatever `std::env::consts::OS`
-    /// says (macOS never ships, but the string would be honest there too).
+    /// "windows" | "linux" | "android", whatever `std::env::consts::OS` says.
     pub os: String,
-    /// Running from an AppImage. The updater can only replace one of those on
-    /// Linux, and it is the only Linux layout portable mode can write beside.
+    /// Running from an AppImage, the only Linux layout the updater can replace and portable mode can write beside.
     pub app_image: bool,
 }
 
@@ -148,28 +116,17 @@ pub struct PlatformInfo {
 pub fn platform_info() -> PlatformInfo {
     PlatformInfo {
         os: std::env::consts::OS.to_string(),
-        // Same gate portable mode applies, so the UI and the data folder can
-        // never disagree about whether this is an AppImage.
+        // The same gate portable mode applies, so the UI and the data folder never disagree about it.
         app_image: crate::portable::running_from_appimage(),
     }
 }
 
 // --- Close to tray -----------------------------------------------------------
 
-/// A constant rather than a literal because `lib.rs`'s window handler reads
-/// the same key, and the two disagreeing would be invisible.
+/// A constant rather than a literal because `lib.rs`'s window handler reads the same key.
 pub const CLOSE_TO_TRAY_KEY: &str = "close_to_tray";
 
-/// Whether closing the window hides it instead of quitting.
-///
-/// Unset means "whatever this desktop can support": hiding is only safe when
-/// something can bring the window back. On Windows that is always the tray; on
-/// Linux the tray may not exist at all, and a hidden window with no tray icon
-/// is an app the user cannot reach.
-///
-/// An explicit choice always wins, including "hide anyway" with no tray —
-/// re-launching Karasu re-shows the window through the single-instance hook,
-/// so that is a recoverable preference rather than a trap.
+/// Whether closing the window hides it; unset follows the tray, since a hidden window with no tray is unreachable.
 pub(crate) fn close_hides_window(setting: Option<&str>, tray_present: bool) -> bool {
     match setting {
         Some("1") => true,
@@ -182,9 +139,7 @@ pub(crate) fn close_hides_window(setting: Option<&str>, tray_present: bool) -> b
 pub struct CloseToTray {
     /// What closing the window does right now.
     pub enabled: bool,
-    /// Whether a tray icon was actually created at startup. The screen needs
-    /// this to explain *why* the setting reads the way it does — without it a
-    /// Linux user sees "closing quits" with no reason given.
+    /// Whether a tray icon was created at startup, so the screen can say why the setting reads as it does.
     pub tray: bool,
 }
 
@@ -204,22 +159,13 @@ pub fn set_close_to_tray(db: State<'_, Db>, enabled: bool) -> Result<(), String>
 
 // --- Interface size ---------------------------------------------------------
 
-/// The WebView's zoom, as a percentage, kept so a 4K display or a TV across
-/// the room does not have to be re-zoomed every launch (issue #21).
-///
-/// It is the browser's own zoom (`set_zoom`), not a CSS trick: everything in
-/// the window scales together, the way Ctrl and plus does in a browser, and
-/// the virtualized lists keep measuring what they draw. Applied in `setup`
-/// before the first paint and again on change; the zoom hotkeys in
-/// `tauri.conf.json` stay off so nothing can drift from the stored value.
-/// Android has no `set_zoom`, so the row is desktop only.
+/// The WebView's own zoom as a percentage; the built-in zoom hotkeys stay off so nothing drifts from the stored value.
 pub const UI_ZOOM_KEY: &str = "ui_zoom";
 pub const UI_ZOOM_DEFAULT: u32 = 100;
 pub const UI_ZOOM_MIN: u32 = 50;
 pub const UI_ZOOM_MAX: u32 = 200;
 
-/// The stored value made safe to apply: the default when absent or unparsable,
-/// clamped otherwise. Pure, so the range is a test rather than a promise.
+/// The stored value made safe to apply: the default when absent or unparsable, clamped otherwise.
 pub fn normalize_ui_zoom(raw: Option<&str>) -> u32 {
     raw.and_then(|s| s.trim().parse::<u32>().ok())
         .map(|n| n.clamp(UI_ZOOM_MIN, UI_ZOOM_MAX))
@@ -230,8 +176,7 @@ pub fn read_ui_zoom(db: &Db) -> u32 {
     normalize_ui_zoom(db.kv_get(UI_ZOOM_KEY).as_deref())
 }
 
-/// Zooms the main window. A failure is logged and otherwise ignored — the
-/// window still works at 100 %, which beats a launch that fails over a zoom.
+/// Zooms the main window; a failure is logged and ignored, since the window still works at 100 %.
 #[cfg(desktop)]
 pub fn apply_ui_zoom(app: &tauri::AppHandle, percent: u32) {
     use tauri::Manager;
@@ -251,8 +196,7 @@ pub fn get_ui_zoom(db: State<'_, Db>) -> u32 {
     read_ui_zoom(&db)
 }
 
-/// Stores and applies the zoom; answers with what was actually applied, so
-/// the pane shows the clamped number rather than the one typed.
+/// Stores and applies the zoom, answering with the clamped value so the pane shows what was applied.
 #[tauri::command]
 pub fn set_ui_zoom(app: tauri::AppHandle, db: State<'_, Db>, percent: u32) -> Result<u32, String> {
     let percent = percent.clamp(UI_ZOOM_MIN, UI_ZOOM_MAX);
@@ -263,9 +207,7 @@ pub fn set_ui_zoom(app: tauri::AppHandle, db: State<'_, Db>, percent: u32) -> Re
 
 // --- Global hotkey -----------------------------------------------------------
 
-/// The accelerator that summons (or hides) the window from anywhere, or unset
-/// for off — off by default, because a hotkey the user never chose that
-/// swallows a system-wide key combination is a bug report, not a feature.
+/// The accelerator that summons or hides the window from anywhere; off by default, nobody chose it.
 const GLOBAL_HOTKEY_KEY: &str = "global_hotkey";
 
 pub(crate) fn read_global_hotkey(db: &Db) -> Option<String> {
@@ -277,9 +219,7 @@ pub fn get_global_hotkey(db: State<'_, Db>) -> Option<String> {
     read_global_hotkey(&db)
 }
 
-/// Registers first, stores second: an accelerator the OS rejects must leave
-/// the stored setting untouched, or the same failure comes back silently at
-/// every startup. `None` (or blank) unregisters and turns the feature off.
+/// Registers first, stores second, so an accelerator the OS rejects never comes back silently at every startup.
 #[tauri::command]
 pub fn set_global_hotkey(
     app: tauri::AppHandle,
@@ -300,9 +240,7 @@ pub struct PortableStatus {
     pub portable: bool,
     /// Absolute path where the database currently lives.
     pub dir: String,
-    /// A database sitting in the folder this switch would move *away* from
-    /// using — the portable one while running from AppData, and the AppData one
-    /// while running portable. `None` when that folder holds nothing.
+    /// A database in the folder this switch would move away from; `None` when that folder holds nothing.
     pub other: Option<DatabaseInfo>,
 }
 
@@ -311,20 +249,12 @@ pub struct PortableStatus {
 pub struct DatabaseInfo {
     pub path: String,
     pub bytes: u64,
-    /// Last modified, in milliseconds since the epoch. 0 when the filesystem
-    /// will not say — a date is a nice-to-have here, the file's existence is
-    /// the part that decides anything.
+    /// Last modified in milliseconds since the epoch, or 0 when the filesystem will not say.
     #[serde(rename = "modifiedMs")]
     pub modified_ms: i64,
 }
 
-/// Describes the database at `path`, or `None` if there is none.
-///
-/// Split out from the command because it is the whole basis of the warning:
-/// enabling portable mode used to copy the database only `if !dest.exists()`,
-/// so enable → disable → months of ordinary use → enable again silently went
-/// back to the months-old file left behind the first time. Nothing was deleted,
-/// but nothing said the current list had been put aside either.
+/// Describes the database at `path`, or `None` if there is none; the whole basis of the portable warning.
 pub(crate) fn describe_database(path: &std::path::Path) -> Option<DatabaseInfo> {
     let meta = std::fs::metadata(path).ok()?;
     if !meta.is_file() {
@@ -362,25 +292,7 @@ pub fn get_portable_status(app: tauri::AppHandle) -> PortableStatus {
     }
 }
 
-/// Enables portable mode: copies the current database next to the exe, moves
-/// the token into the encrypted portable file and only then writes the marker.
-/// Takes effect after a restart.
-///
-/// The marker goes **last** on purpose. `is_portable()` is a live check for
-/// that file, so the moment it exists the app reads from the portable folder —
-/// there is no restart to wait for. Writing it first (as this did) meant any
-/// later failure returned an error the UI reported as "it did not work" while
-/// the app had in fact already switched, to a folder holding no token and
-/// possibly no database. Done in this order, a failure leaves an unused folder
-/// and nothing else.
-///
-/// `replace` decides what happens when a database is already sitting beside the
-/// exe, and the command refuses rather than picking for you. It used to copy
-/// only `if !dest.exists()`, which reads as "don't clobber" and behaves as
-/// "adopt whatever is there": enable → disable → months of AppData use → enable
-/// again came back on a months-old list, with no warning and nothing on screen
-/// to explain where the recent one went. `get_portable_status` reports the file
-/// so the pane can ask before this is ever called with either answer.
+/// Enables portable mode: the database and token are copied first and the marker written last, because it is live.
 #[tauri::command]
 pub fn enable_portable(
     app: AppHandle,
@@ -393,8 +305,7 @@ pub fn enable_portable(
     let dest = dest_dir.join("karasu.db");
     match (dest.exists(), replace) {
         (false, _) => db.snapshot_to(&dest)?,
-        // `snapshot_over`, because `VACUUM INTO` refuses a destination that
-        // exists — which is every case that reaches this arm.
+        // `snapshot_over`, because `VACUUM INTO` refuses a destination that exists.
         (true, Some(true)) => db.snapshot_over(&dest)?,
         (true, Some(false)) => {
             crate::logging::info(
@@ -409,50 +320,27 @@ pub fn enable_portable(
             ))
         }
     }
-    // Copy before the marker, clear after it. Doing both first meant a failed
-    // marker write left the token gone from the credential store while
-    // `is_portable()` was still false, so a switch that *reported failure* came
-    // back signed out.
+    // Copy before the marker, clear after it, so a failed marker write cannot leave the install signed out.
     crate::anilist::auth::copy_token_to_portable_file()?;
     crate::portable::create_marker()?;
     crate::anilist::auth::clear_credential_store_token();
 
-    // `Db` was opened once against the startup-resolved directory and is never
-    // reopened, while `is_portable()` is a live check of the marker. Between
-    // this call and the next launch, every scrobble, queued edit and setting
-    // would therefore be written to the database the app is about to stop
-    // using — and silently discarded. Restarting here is what makes the
-    // snapshot taken above the last word.
+    // `Db` is never reopened while `is_portable()` is live, so restarting now makes the snapshot the last word.
     crate::logging::info("portable", "portable mode on — restarting onto it");
     app.restart();
 }
 
-/// Disables portable mode (removes the marker). Takes effect after a restart.
-///
-/// Deliberately leaves the portable folder alone: it is the user's data and
-/// this is a switch, not a delete. What that means — the app comes back on
-/// whatever is in AppData, which may be much older — is the pane's job to say,
-/// and `PortableStatus::other` is what it says it with.
+/// Disables portable mode by removing the marker, leaving the portable folder alone: a switch, not a delete.
 #[tauri::command]
 pub fn disable_portable(app: AppHandle) -> Result<(), String> {
-    // Mirror of the way in, in mirrored order: the token goes back to the
-    // credential store *before* the marker leaves, because `load_token`
-    // follows `is_portable()` and would otherwise read an empty store. Without
-    // this, enable → disable → restart signed the user out with no message.
+    // The token goes back to the credential store before the marker leaves, because `load_token` follows the marker.
     crate::anilist::auth::copy_token_from_portable_file()?;
     crate::portable::remove_marker()?;
     crate::logging::info("portable", "portable mode off — restarting onto AppData");
     app.restart();
 }
 
-/// Opens a native save dialog and writes the image (e.g. the yearly wrap-up
-/// card). Returns false if the user cancelled.
-///
-/// `data` is base64, not a byte array. Tauri serializes a command's arguments
-/// with `JSON.stringify`, whose replacer expands any typed array into a JSON
-/// array of numbers — so a 4 MB poster crossed the bridge as ~16 MB of ASCII
-/// digits and was rebuilt one `serde_json` number at a time. Base64 is ~1.37x
-/// the bytes and one decode.
+/// Saves an image through a native dialog; `data` is base64, since a typed array crosses the bridge as JSON numbers.
 #[tauri::command]
 pub fn save_image(
     app: tauri::AppHandle,
@@ -468,9 +356,7 @@ pub fn save_image(
         .decode(data.as_bytes())
         .map_err(|e| format!("Could not decode the image: {e}"))?;
 
-    // Only the two the encoder actually produces. An unchecked string here
-    // would end up as the file extension and the dialog filter, so a typo
-    // would silently write an unopenable file.
+    // Only the two the encoder produces; an unchecked string would become the extension and write an unopenable file.
     let (label, ext) = match format.as_str() {
         "png" => ("PNG image", "png"),
         "jpeg" => ("JPEG image", "jpg"),
@@ -478,9 +364,7 @@ pub fn save_image(
     };
 
     let mut builder = app.dialog().file().set_file_name(&default_name);
-    // Reopening in the same folder the last poster went to. A year-in-review
-    // is exported in bursts — five presets, three sizes — and re-navigating
-    // from the home directory each time is the whole friction of the feature.
+    // Reopens in the folder the last poster went to, because a year-in-review is exported in bursts.
     if let Some(dir) = db.kv_get(EXPORT_DIR_KEY) {
         let dir = std::path::PathBuf::from(dir);
         if dir.is_dir() {
@@ -501,19 +385,13 @@ pub fn save_image(
 
 // --- Diagnostics -------------------------------------------------------------
 
-/// Everything a bug report needs, in one round trip.
-///
-/// One command rather than the frontend firing six, so a reporter cannot end up
-/// with half a picture because one of them failed.
+/// Everything a bug report needs in one round trip, so a reporter cannot end up with half a picture.
 #[tauri::command]
 pub fn diagnostics(app: tauri::AppHandle) -> crate::diagnostics::Diagnostics {
     crate::diagnostics::collect(&app)
 }
 
-/// The same facts as a markdown block, ready to paste into an issue.
-///
-/// Redacted by default — the destination is a public comment, and the data
-/// folder is the one field that names a person.
+/// The same facts as a markdown block for an issue; redacted, because the data folder names a person.
 #[tauri::command]
 pub fn diagnostics_report(app: tauri::AppHandle, redact: bool) -> String {
     crate::diagnostics::render(&crate::diagnostics::collect(&app), redact)
@@ -525,12 +403,7 @@ pub fn get_logs(limit: Option<usize>) -> Vec<crate::logging::LogEntry> {
     crate::logging::entries(limit.unwrap_or(200).min(crate::logging::RING_CAPACITY))
 }
 
-/// A crash or unhandled rejection from the WebView.
-///
-/// The frontend had no error boundary and no `onerror`, so a render throw blanked
-/// the window and left nothing behind. Routing it here puts a UI crash in the
-/// same file as a backend one, in order, which is usually how the connection
-/// between the two becomes visible.
+/// A crash or unhandled rejection from the WebView, logged beside the backend's so the two line up in order.
 #[tauri::command]
 pub fn log_frontend_error(message: String, stack: Option<String>) {
     let detail = stack
@@ -550,11 +423,7 @@ pub fn set_log_debug(db: State<'_, Db>, enabled: bool) -> Result<(), String> {
     db.kv_set(LOG_DEBUG_KEY, if enabled { "1" } else { "0" })
 }
 
-/// Writes the report and the log to a file the user picks.
-///
-/// Rust-driven dialog like `save_image`, so the WebView needs no new capability.
-/// `redact` is passed through rather than assumed: the button offering this is
-/// explicit about which one it is asking for.
+/// Writes the report and the log to a file the user picks, through a Rust-driven dialog like `save_image`.
 #[tauri::command]
 pub fn export_diagnostics(
     app: tauri::AppHandle,
@@ -567,8 +436,7 @@ pub fn export_diagnostics(
     let mut out = String::from("# Karasu diagnostics\n\n");
     out.push_str(&crate::diagnostics::render(&d, redact));
     out.push_str("\n## Log\n\n```\n");
-    // Oldest first here: a log is read forwards when it is the story of what
-    // happened, even though the viewer shows the newest at the top.
+    // Oldest first here: a log is read forwards when it is the story of what happened.
     for entry in crate::logging::entries(crate::logging::RING_CAPACITY)
         .iter()
         .rev()
@@ -609,10 +477,7 @@ pub fn export_diagnostics(
     }
 }
 
-/// Saves caller-supplied text through the same dialog + remembered-folder
-/// idiom as `export_diagnostics` above. The frontend builds the content (the
-/// airing `.ics` today); Rust owns only the dialog and the write, so the
-/// WebView still gets no filesystem door.
+/// Saves caller-supplied text through the same dialog as `export_diagnostics`; the WebView gets no filesystem door.
 #[tauri::command]
 pub fn save_text(
     app: tauri::AppHandle,
@@ -645,11 +510,7 @@ pub fn save_text(
     }
 }
 
-/// `save_text`'s opposite: an open dialog plus the read, same remembered
-/// folder, same division of labour — the WebView asks for a *kind* of file
-/// and receives text, never a path and never a filesystem door. Bounded at
-/// 16 MB because the only caller is the list import and a list export is
-/// kilobytes; a mistaken pick of something huge should fail, not OOM.
+/// `save_text`'s opposite: the WebView asks for a kind of file and receives bounded text, never a path.
 #[tauri::command]
 pub fn open_text(
     app: tauri::AppHandle,
@@ -686,8 +547,7 @@ pub fn open_text(
 pub struct BackupSettings {
     pub enabled: bool,
     pub keep: usize,
-    /// Where the files land — the settings hint shows it, so "where did my
-    /// backup go" never needs asking.
+    /// Where the files land, shown in the settings hint so nobody has to ask.
     pub dir: String,
 }
 
@@ -706,16 +566,7 @@ pub fn get_backup_settings(app: tauri::AppHandle, db: State<'_, Db>) -> BackupSe
     }
 }
 
-/// Opens the backup folder in the file manager.
-///
-/// The card has always *named* the directory, which is one step short of
-/// useful: restoring a backup means replacing `karasu.db` with one of these
-/// files while the app is closed, and the first move in that is getting to
-/// them. Karasu deliberately does not do the replacing itself — see the hint
-/// beside this button — but it can at least open the door.
-///
-/// Creates the folder when the daily backup has not run yet, so the button is
-/// never a dead end on a fresh install.
+/// Opens the backup folder in the file manager, creating it first so the button is never a dead end.
 #[tauri::command]
 pub fn open_backup_dir(app: tauri::AppHandle, db: State<'_, Db>) -> Result<(), String> {
     use tauri_plugin_opener::OpenerExt;
@@ -739,14 +590,7 @@ pub async fn set_backup_settings(
 ) -> Result<(), String> {
     crate::backups::write_settings(&db, enabled, keep as usize)?;
     if enabled {
-        // Switching it on should produce a backup now, not within the hour.
-        //
-        // On a blocking thread for the same reason the hourly pass uses one:
-        // the work is a `VACUUM INTO` over the whole database, and
-        // `#[tauri::command(async)]` on a synchronous body only moves it to an
-        // async worker — where it parks that worker instead of the UI thread.
-        // The `.await` is what keeps the toast honest: the command still does
-        // not answer until the backup is on disk.
+        // A backup now, on a blocking thread since it is a whole-database `VACUUM INTO`, awaited so the toast is honest.
         tokio::task::spawn_blocking(move || crate::backups::run_once(&app))
             .await
             .map_err(|e| format!("Could not write the backup: {e}"))?;
@@ -764,9 +608,7 @@ pub fn set_autostart(app: tauri::AppHandle, enabled: bool) -> Result<(), String>
     autostart_apply(&app, enabled)
 }
 
-// The autostart plugin is `#![cfg(not(android/ios))]` at the crate root, so
-// on mobile these paths would be unresolved — the commands stay registered
-// (the handler list is shared) and the platform split lives in this pair.
+// The autostart plugin does not exist on mobile, so the shared handler list keeps the commands and this pair splits.
 #[cfg(desktop)]
 fn autostart_enabled(app: &tauri::AppHandle) -> bool {
     use tauri_plugin_autostart::ManagerExt;
@@ -827,8 +669,7 @@ mod tests {
         UI_ZOOM_MIN,
     };
 
-    /// The zoom is applied before the first paint, so a bad stored value must
-    /// come out safe rather than as a window nobody can read.
+    /// A stored zoom is clamped and a missing one is the default, since it is applied before the first paint.
     #[test]
     fn a_stored_zoom_is_clamped_and_a_missing_one_is_the_default() {
         assert_eq!(normalize_ui_zoom(None), UI_ZOOM_DEFAULT);
@@ -840,9 +681,7 @@ mod tests {
         assert_eq!(normalize_ui_zoom(Some("")), UI_ZOOM_DEFAULT);
     }
 
-    /// The portable warning stands or falls on this: an existing file has to
-    /// be reported, and a folder that merely exists must not be mistaken for
-    /// one holding a database.
+    /// Only a real file is described, so a folder that merely exists is never mistaken for a database.
     #[test]
     fn only_a_real_file_is_described() {
         let dir = std::env::temp_dir().join("karasu-portable-probe");
@@ -857,8 +696,7 @@ mod tests {
         assert_eq!(info.bytes, 16);
         assert!(info.path.ends_with("karasu.db"));
 
-        // A directory of that name is not a database, and `is_file` is what
-        // keeps `metadata` from reporting one.
+        // A directory of that name is not a database; `is_file` is what keeps `metadata` from reporting one.
         let as_dir = dir.join("folder.db");
         std::fs::create_dir_all(&as_dir).unwrap();
         assert!(describe_database(&as_dir).is_none());
@@ -866,17 +704,14 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
-    /// The default has to follow the desktop, because the failure is not
-    /// symmetric: hiding with no tray loses the window, while quitting with a
-    /// tray merely surprises someone once.
+    /// An unset preference follows the tray, because hiding with no tray loses the window.
     #[test]
     fn an_unset_preference_follows_whether_a_tray_exists() {
         assert!(close_hides_window(None, true));
         assert!(!close_hides_window(None, false));
     }
 
-    /// An explicit choice wins both ways — including "hide anyway" with no
-    /// tray, which re-launching recovers from via the single-instance hook.
+    /// An explicit choice wins both ways, including "hide anyway" with no tray.
     #[test]
     fn an_explicit_preference_beats_the_tray() {
         assert!(close_hides_window(Some("1"), false));

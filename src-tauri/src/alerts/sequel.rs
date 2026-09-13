@@ -12,6 +12,8 @@ const STARTUP_DELAY: Duration = Duration::from_secs(120);
 /// Source media per run, a rotating window rather than a fixed prefix, so a long list's tail is reached.
 const BATCH: usize = 50;
 const MAX_BATCHES: usize = 6;
+/// Between batches, so one twelve-hourly run trickles into the budget instead of spending twelve at once.
+const BATCH_GAP: Duration = Duration::from_secs(3);
 
 const RELATIONS_QUERY: &str = "
 query ($ids: [Int], $type: MediaType) {
@@ -150,7 +152,10 @@ async fn check(app: &AppHandle) {
         // The token when there is one: an outage refusing only unauthenticated requests no longer stalls the pass.
         let token = crate::anilist::auth::load_token();
 
-        for at in window(start, chunks.len(), MAX_BATCHES) {
+        for (nth, at) in window(start, chunks.len(), MAX_BATCHES).into_iter().enumerate() {
+            if nth > 0 {
+                tokio::time::sleep(BATCH_GAP).await;
+            }
             let chunk = chunks[at];
             let vars = json!({ "ids": chunk, "type": media_type });
             let Ok(data) = api.query_from("sequel", token.as_deref(), RELATIONS_QUERY, vars).await else {

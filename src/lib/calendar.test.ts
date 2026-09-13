@@ -3,7 +3,9 @@ import {
   addDays,
   bucketByLocalDay,
   fromList,
+  fromSchedule,
   localMidnight,
+  releaseState,
   weekDays,
   weekStartOf,
 } from "./calendar";
@@ -141,5 +143,44 @@ describe("fromList", () => {
   it("the window is half-open: past the start, up to and including the end", () => {
     expect(fromList([entry(1, "CURRENT", 1000)], gt, lt)).toHaveLength(0);
     expect(fromList([entry(1, "CURRENT", 2000)], gt, lt)).toHaveLength(1);
+  });
+});
+
+describe("fromSchedule", () => {
+  const entry = (id: number, status: MediaListEntry["status"], progress = 0) =>
+    ({ id, mediaId: id, status, progress, media: { id } }) as unknown as MediaListEntry;
+  const slot = (mediaId: number, episode: number, airingAt: number) => ({
+    airingAt,
+    episode,
+    media: { id: mediaId },
+  });
+
+  it("keeps every airing of a show on the list, past ones included, soonest first", () => {
+    const onList = new Map([
+      [1, entry(1, "CURRENT")],
+      [2, entry(2, "PLANNING")],
+      [3, entry(3, "DROPPED")],
+    ]);
+    const out = fromSchedule(
+      [slot(1, 6, 1800), slot(1, 5, 1100), slot(2, 1, 1500), slot(3, 9, 1200), slot(4, 2, 1300)],
+      onList,
+      ["CURRENT", "REPEATING", "PLANNING"],
+    );
+    expect(out.map((x) => [x.media.id, x.episode])).toEqual([
+      [1, 5],
+      [2, 1],
+      [1, 6],
+    ]);
+    expect(out[0].entry.status).toBe("CURRENT");
+  });
+});
+
+describe("releaseState", () => {
+  it("tells an upcoming episode from a released one the entry has or has not reached", () => {
+    expect(releaseState(2000, 5, 4, 1000)).toBe("upcoming");
+    expect(releaseState(900, 5, 5, 1000)).toBe("watched");
+    expect(releaseState(900, 5, 6, 1000)).toBe("watched");
+    expect(releaseState(900, 5, 4, 1000)).toBe("unwatched");
+    expect(releaseState(1000, 5, 4, 1000)).toBe("unwatched");
   });
 });

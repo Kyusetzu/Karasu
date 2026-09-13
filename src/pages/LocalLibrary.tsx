@@ -53,6 +53,7 @@ import { Button } from "@/components/ui/button";
 import { Presence } from "@/components/ui/presence";
 import { EmptyState, FolderStack } from "@/components/EmptyState";
 import { cn } from "@/lib/utils";
+import { useTheme, type Density } from "@/stores/theme";
 
 /** Above this the match was exact: a test for `best_match_prepared`'s equality branch, not a tolerance. */
 const EXACT = 0.999;
@@ -585,6 +586,7 @@ function DetectedOffList({
   onReject: (key: TitleKey) => void;
   onSplit: (t: SplitTarget) => void;
 }) {
+  const density = useTheme((s) => s.density);
   const { t } = useTranslation();
   // One virtualizer over a tagged union of both row shapes; two would each measure a start and overlap.
   const items = useMemo(
@@ -607,7 +609,7 @@ function DetectedOffList({
       <VirtualRows
         items={items}
         scrollRef={scrollRef}
-        estimateRowHeight={ROW_HEIGHT}
+        estimateRowHeight={ROW_HEIGHT[density]}
         getKey={(item) =>
           item.kind === "row"
             ? `r:${item.row.lib.mediaId}`
@@ -667,7 +669,7 @@ function SuggestionRow({
         !last && "border-b border-surface-950",
       )}
     >
-      <div className="h-13 w-8.75 shrink-0 overflow-hidden rounded-md bg-surface-800 opacity-60">
+      <div className="dense-row-cover shrink-0 overflow-hidden rounded-md bg-surface-800 opacity-60">
         {media?.coverImage.large && (
           <img
             src={media.coverImage.large}
@@ -680,7 +682,7 @@ function SuggestionRow({
 
       <span className="min-w-0 flex-1">
         {/* Both names, because judging the guess means comparing the parsed title with the suggestion. */}
-        <span className="block truncate text-[.8125rem] text-ink-500">
+        <span className="dense-text-lg block truncate text-ink-500">
           {group.title}
           {group.season > 0 && (
             <span className="ml-1.5 text-2xs text-ink-600">S{group.season}</span>
@@ -690,7 +692,7 @@ function SuggestionRow({
             {media ? displayTitle(media.title) : `#${guess.mediaId}`}
           </span>
         </span>
-        <span className="block truncate text-[.6875rem] text-ink-600">
+        <span className="dense-text block truncate text-ink-600">
           {t("library.fileCount", { n: group.files.length })}
         </span>
       </span>
@@ -732,6 +734,7 @@ function Unplaced({
   scrollRef: RefObject<HTMLDivElement | null>;
   onAssign: (key: TitleKey) => void;
 }) {
+  const density = useTheme((s) => s.density);
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const [filter, setFilter] = useState("");
@@ -798,7 +801,7 @@ function Unplaced({
       <VirtualRows
         items={shown}
         scrollRef={scrollRef}
-        estimateRowHeight={ROW_HEIGHT}
+        estimateRowHeight={ROW_HEIGHT[density]}
         getKey={(group) => `${group.title}:${group.season}`}
         className="overflow-hidden rounded-xl border border-hair"
         renderItem={(group, _i, isLast) => (
@@ -808,11 +811,11 @@ function Unplaced({
               !isLast && "border-b border-surface-950",
             )}
           >
-            <span className="grid h-13 w-8.75 shrink-0 place-items-center rounded-md bg-surface-800 text-ink-600">
+            <span className="dense-row-cover grid shrink-0 place-items-center rounded-md bg-surface-800 text-ink-600">
               <HelpCircle className="size-4" />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-[.8125rem] font-medium text-ink-300">
+              <span className="dense-text-lg block truncate font-medium text-ink-300">
                 {group.title}
                 {group.season > 0 && (
                   <span className="ml-1.5 text-2xs text-ink-600">
@@ -820,7 +823,7 @@ function Unplaced({
                   </span>
                 )}
               </span>
-              <span className="block truncate text-[.6875rem] text-ink-600">
+              <span className="dense-text block truncate text-ink-600">
                 {fileName(group.files[0]?.path ?? "")}
               </span>
             </span>
@@ -880,6 +883,7 @@ function Group({
   onAdd: (media: Media) => void;
   onSplit: (t: SplitTarget) => void;
 }) {
+  const density = useTheme((s) => s.density);
   if (rows.length === 0) return null;
   return (
     <section className="pt-4">
@@ -889,7 +893,7 @@ function Group({
       <VirtualRows
         items={rows}
         scrollRef={scrollRef}
-        estimateRowHeight={ROW_HEIGHT}
+        estimateRowHeight={ROW_HEIGHT[density]}
         getKey={(row) => row.lib.mediaId}
         className="overflow-hidden rounded-xl border border-hair"
         renderItem={(row, _i, isLast) => (
@@ -909,8 +913,8 @@ function Group({
   );
 }
 
-/** Collapsed row height, the virtualizer's first guess; keep the divider in it or the scrollbar creeps. */
-const ROW_HEIGHT = 69;
+/** The collapsed row height per density, the virtualizer's first guess; keep the divider in it or the scrollbar creeps. */
+const ROW_HEIGHT: Record<Density, number> = { compact: 69, comfortable: 81, spacious: 93 };
 
 const fileName = (path: string) => path.split(/[\\/]/).pop() ?? path;
 
@@ -954,7 +958,7 @@ function LibraryRow({
     >
       <div className="flex items-center gap-3.5 px-3.5 py-2">
         <Link to={`/media/${lib.mediaId}`} className="shrink-0">
-          <div className="h-13 w-8.75 overflow-hidden rounded-md bg-surface-800">
+          <div className="dense-row-cover overflow-hidden rounded-md bg-surface-800">
             {media.coverImage.large && (
               <img
                 src={media.coverImage.large}
@@ -969,12 +973,12 @@ function LibraryRow({
         <span className="min-w-0 flex-1">
           <Link
             to={`/media/${lib.mediaId}`}
-            className="block truncate text-[.8125rem] font-medium text-ink-100 hover:text-accent-400"
+            className="dense-text-lg block truncate font-medium text-ink-100 hover:text-accent-400"
           >
             {title}
           </Link>
           {/* The file name, not a summary: this is the one screen where the name on disk is the subject. */}
-          <span className="block truncate text-[.6875rem] text-ink-600">
+          <span className="dense-text block truncate text-ink-600">
             {next
               ? fileName(next.path)
               : t("library.watchedOf", {

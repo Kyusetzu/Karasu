@@ -636,6 +636,13 @@ export const en = {
     emptyMine: "Nothing of yours airs this week.",
     emptyMineHint: "The Everything lens shows the whole schedule.",
     emptyAll: "Nothing airs this week.",
+    emptyDay: "Nothing airs.",
+    view: "How to draw the week",
+    viewWeek: "Week",
+    viewTiles: "Tiles",
+    viewAgenda: "Agenda",
+    watched: "Watched",
+    unwatched: "Aired, not watched yet",
   },
   time: {
     none: "done",
@@ -1590,6 +1597,12 @@ export const en = {
     uiZoomHint:
       "Zooms the whole window, like Ctrl and plus in a browser. For a 4K display, or a TV across the room.",
     reduceMotion: "Reduce motion",
+    density: "Density",
+    densityHint:
+      "How much the dense screens spread out: the calendar, the local library and the digests. The rest of the app keeps its size.",
+    density_compact: "Compact",
+    density_comfortable: "Comfortable",
+    density_spacious: "Spacious",
     reduceMotionHint:
       "Skip animations and transitions. Already on if your system asks for it.",
     autostart: "Start with the system",

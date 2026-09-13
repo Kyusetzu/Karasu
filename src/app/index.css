@@ -402,6 +402,65 @@ html {
   touch-action: pan-x pan-y;
 }
 
+/* The density setting: the dense screens (calendar, local library, digests) size their text, art and tiles from these. */
+:root,
+:root[data-density="compact"] {
+  --dense-text: 0.625rem;
+  --dense-text-lg: 0.8125rem;
+  --dense-cover-h: 1.75rem;
+  --dense-cover-w: 1.25rem;
+  --dense-row-h: 3.25rem;
+  --dense-row-cover-h: 2.875rem;
+  --dense-row-cover-w: 2.125rem;
+  --dense-tile: 7.5rem;
+}
+:root[data-density="comfortable"] {
+  --dense-text: 0.75rem;
+  --dense-text-lg: 0.9375rem;
+  --dense-cover-h: 2.5rem;
+  --dense-cover-w: 1.75rem;
+  --dense-row-h: 4rem;
+  --dense-row-cover-h: 3.5rem;
+  --dense-row-cover-w: 2.5rem;
+  --dense-tile: 9.5rem;
+}
+:root[data-density="spacious"] {
+  --dense-text: 0.875rem;
+  --dense-text-lg: 1.0625rem;
+  --dense-cover-h: 3.25rem;
+  --dense-cover-w: 2.25rem;
+  --dense-row-h: 4.75rem;
+  --dense-row-cover-h: 4.25rem;
+  --dense-row-cover-w: 3rem;
+  --dense-tile: 12rem;
+}
+
+/* Text at the density's small size; the calendar's time and episode line, a digest's note. */
+@utility dense-text {
+  font-size: var(--dense-text);
+  line-height: 1.4;
+}
+/* Text at the density's larger size; a title in a row or a card. */
+@utility dense-text-lg {
+  font-size: var(--dense-text-lg);
+  line-height: 1.35;
+}
+/* The small cover beside a calendar card's text. */
+@utility dense-cover {
+  height: var(--dense-cover-h);
+  width: var(--dense-cover-w);
+}
+/* The cover in a list row (local library, digest). */
+@utility dense-row-cover {
+  height: var(--dense-row-cover-h);
+  width: var(--dense-row-cover-w);
+}
+/* A tile grid whose columns are as many tiles of the density's width as fit. */
+@utility dense-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--dense-tile), 1fr));
+}
+
 body {
   @apply bg-surface-950 text-ink-100 font-sans antialiased;
   overflow: hidden;

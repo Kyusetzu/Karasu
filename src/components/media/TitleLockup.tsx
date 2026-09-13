@@ -6,6 +6,7 @@ export function TitleLockup({
   title,
   clamp = 1,
   tone = "primary",
+  dense = false,
   className,
 }: {
   title: MediaTitle;
@@ -13,6 +14,8 @@ export function TitleLockup({
   clamp?: 1 | 2;
   /** `muted` steps back a shade for captions under cover art, where the artwork already carries the identity. */
   tone?: "primary" | "muted";
+  /** Sizes both lines from the density setting; the dense screens opt in, the list rows keep their fixed tracks. */
+  dense?: boolean;
   className?: string;
 }) {
   const latin = displayTitle(title);
@@ -22,7 +25,7 @@ export function TitleLockup({
     <div className={cn("min-w-0", className)}>
       <p
         className={cn(
-          "text-[.8125rem] font-medium",
+          dense ? "dense-text-lg font-medium" : "text-[.8125rem] font-medium",
           tone === "muted"
             ? "text-ink-300 group-hover:text-ink-100"
             : "text-ink-100",
@@ -32,7 +35,7 @@ export function TitleLockup({
         {latin}
       </p>
       {native && (
-        <p className="truncate font-brand-jp text-2xs text-ink-600">{native}</p>
+        <p className={cn("truncate font-brand-jp text-ink-600", dense ? "dense-text" : "text-2xs")}>{native}</p>
       )}
     </div>
   );

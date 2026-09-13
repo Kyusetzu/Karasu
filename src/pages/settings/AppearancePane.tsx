@@ -10,7 +10,9 @@ import {
   ACCENT_PRESETS,
   COVER_COLS_MAX,
   COVER_COLS_MIN,
+  DENSITIES,
   useTheme,
+  type Density,
   type ThemeMode,
 } from "@/stores/theme";
 import {
@@ -37,6 +39,8 @@ export function AppearanceSection() {
   const coverCols = useTheme((s) => s.coverCols);
   const setCoverCols = useTheme((s) => s.setCoverCols);
   const reduceMotion = useTheme((s) => s.reduceMotion);
+  const density = useTheme((s) => s.density);
+  const setDensity = useTheme((s) => s.setDensity);
   const setReduceMotion = useTheme((s) => s.setReduceMotion);
   const setThemeMode = useTheme((s) => s.setMode);
   const setAccent = useTheme((s) => s.setAccent);
@@ -154,6 +158,21 @@ export function AppearanceSection() {
             <div key={i} className="aspect-[2/3] rounded bg-surface-800" />
           ))}
         </div>
+
+        <Row label={t("settings.density")} hint={t("settings.densityHint")}>
+          <select
+            value={density}
+            onChange={(e) => setDensity(e.target.value as Density)}
+            className={SELECT}
+            aria-label={t("settings.density")}
+          >
+            {DENSITIES.map((d) => (
+              <option key={d} value={d}>
+                {t(`settings.density_${d}`)}
+              </option>
+            ))}
+          </select>
+        </Row>
 
         <Toggle
           checked={reduceMotion}

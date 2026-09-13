@@ -639,6 +639,13 @@ export const de: typeof en = {
     emptyMine: "Diese Woche läuft nichts von deinen Serien.",
     emptyMineHint: "Die Ansicht „Alles“ zeigt den kompletten Sendeplan.",
     emptyAll: "Diese Woche läuft nichts.",
+    emptyDay: "Nichts läuft.",
+    view: "Wie die Woche gezeichnet wird",
+    viewWeek: "Woche",
+    viewTiles: "Kacheln",
+    viewAgenda: "Agenda",
+    watched: "Gesehen",
+    unwatched: "Ausgestrahlt, noch nicht gesehen",
   },
   time: {
     none: "fertig",
@@ -1602,6 +1609,12 @@ export const de: typeof en = {
     uiZoomHint:
       "Vergrößert das ganze Fenster, wie Strg und Plus im Browser. Für ein 4K-Display oder einen Fernseher auf Abstand.",
     reduceMotion: "Bewegung reduzieren",
+    density: "Dichte",
+    densityHint:
+      "Wie weit die dichten Ansichten auseinanderrücken: Kalender, lokale Bibliothek und die Zusammenfassungen. Der Rest der App behält seine Größe.",
+    density_compact: "Kompakt",
+    density_comfortable: "Bequem",
+    density_spacious: "Weit",
     reduceMotionHint:
       "Animationen und Übergänge überspringen. Bereits aktiv, wenn dein System es verlangt.",
     autostart: "Mit dem System starten",

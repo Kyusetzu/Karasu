@@ -30,6 +30,7 @@ const DYNAMIC_PREFIXES = [
   "sort.",
   "merge.strategy.",
   "settings.theme_",
+  "settings.density_",
   "settings.contentLevel_",
   "settings.contentHint_",
   // `t(`search.${chip.key}`)` over a const table of chips.

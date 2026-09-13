@@ -11,6 +11,11 @@ import {
 
 export type ThemeMode = "system" | "light" | "dark";
 
+/** How much the dense screens (calendar, local library, digests) spread out; "compact" is the look they always had. */
+export type Density = "compact" | "comfortable" | "spacious";
+export const DENSITIES: readonly Density[] = ["compact", "comfortable", "spacious"];
+const isDensity = (v: unknown): v is Density => (DENSITIES as readonly unknown[]).includes(v);
+
 /** Default accent + a few quick-pick swatches alongside the colour picker. */
 export const DEFAULT_ACCENT = "#4b3fc7";
 export const ACCENT_PRESETS = [
@@ -41,6 +46,8 @@ const COVER_COLS_KEY = "karasu-cover-cols";
 /** The pre-slider setting, read once for migration and then deleted. */
 const DENSITY_KEY = "karasu-density";
 const REDUCE_MOTION_KEY = "karasu-reduce-motion";
+/** Not `karasu-density`, which held the old s/m/l cover setting and would read back as a stray value. */
+const UI_DENSITY_KEY = "karasu-ui-density";
 const STATUS_COLORS_KEY = "karasu-status-colors";
 
 /** Kills every transition for one frame; keep both reflows and the timeout, or var() colours hold the old value. */
@@ -65,6 +72,7 @@ function apply(
   coverCols: number,
   reduceMotion: boolean,
   statusColors: StatusPalette,
+  density: Density,
 ): void {
   const dark = mode === "dark" || (mode === "system" && systemDark());
   const html = document.documentElement;
@@ -72,6 +80,8 @@ function apply(
   html.dataset.theme = dark ? "dark" : "light";
   html.toggleAttribute("data-reduce-motion", reduceMotion);
   html.style.setProperty("--cover-cols", String(clampCols(coverCols)));
+  // The dense screens read their sizes from the tokens index.css keys on this attribute.
+  html.dataset.density = density;
 
   const base = isHex(accent) ? accent : DEFAULT_ACCENT;
   const { a400, a500, a600, ink, rgb, w1, w2, hair } = accentShades(base, {
@@ -101,12 +111,14 @@ interface ThemeState {
   accent: string;
   coverCols: number;
   reduceMotion: boolean;
+  density: Density;
   /** One colour per list status — see `lib/statusColors`. */
   statusColors: StatusPalette;
   setMode: (mode: ThemeMode) => void;
   setAccent: (accent: string) => void;
   setCoverCols: (coverCols: number) => void;
   setReduceMotion: (reduceMotion: boolean) => void;
+  setDensity: (density: Density) => void;
   /** Sets one status's colour, leaving the other five alone. */
   setStatusColor: (status: MediaListStatus, hex: string) => void;
   resetStatusColors: () => void;
@@ -146,6 +158,11 @@ const storedAccent = (): string => {
 };
 
 /** The one non-scalar setting; `commit` stringifies, and an object would read back as the defaults forever. */
+const storedDensity = (): Density => {
+  const raw = localStorage.getItem(UI_DENSITY_KEY);
+  return isDensity(raw) ? raw : "compact";
+};
+
 const storedStatusColors = (): StatusPalette => {
   try {
     return normalizeStatusColors(JSON.parse(localStorage.getItem(STATUS_COLORS_KEY) ?? "null"));
@@ -157,8 +174,8 @@ const storedStatusColors = (): StatusPalette => {
 export const useTheme = create<ThemeState>((set, get) => {
   /** Writes whatever the store currently holds, so no call site repeats the argument list. */
   const flush = () => {
-    const { mode, accent, coverCols, reduceMotion, statusColors } = get();
-    apply(mode, accent, coverCols, reduceMotion, statusColors);
+    const { mode, accent, coverCols, reduceMotion, statusColors, density } = get();
+    apply(mode, accent, coverCols, reduceMotion, statusColors, density);
   };
 
   /** The palette's own writer, JSON rather than `commit`; the `try` because private-mode storage throws on write. */
@@ -186,6 +203,7 @@ export const useTheme = create<ThemeState>((set, get) => {
     accent: storedAccent(),
     coverCols: storedCoverCols(),
     reduceMotion: localStorage.getItem(REDUCE_MOTION_KEY) === "true",
+    density: storedDensity(),
     statusColors: storedStatusColors(),
 
     setMode: (mode) => commit(MODE_KEY, "mode", mode),
@@ -194,6 +212,7 @@ export const useTheme = create<ThemeState>((set, get) => {
       commit(COVER_COLS_KEY, "coverCols", clampCols(coverCols)),
     setReduceMotion: (reduceMotion) =>
       commit(REDUCE_MOTION_KEY, "reduceMotion", reduceMotion),
+    setDensity: (density) => commit(UI_DENSITY_KEY, "density", density),
 
     // Not via `commit`, which stringifies; per status, so a stale copy of the other five cannot quietly undo them.
     setStatusColor: (status, hex) => {

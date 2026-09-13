@@ -53,6 +53,28 @@ export interface ListAiring {
   entry: MediaListEntry;
 }
 
+/** The whole week's schedule narrowed to the list, so episodes that already aired stay on the calendar, dimmed. */
+export function fromSchedule<S extends { airingAt: number; episode: number; media: { id: number } }>(
+  schedule: S[],
+  onList: Map<number, MediaListEntry>,
+  statuses: MediaListStatus[],
+): (S & { entry: MediaListEntry })[] {
+  return schedule
+    .flatMap((s) => {
+      const entry = onList.get(s.media.id);
+      return entry && statuses.includes(entry.status) ? [{ ...s, entry }] : [];
+    })
+    .sort((a, b) => a.airingAt - b.airingAt);
+}
+
+/** What a released episode means to the entry: watched when the progress has reached it, otherwise still owed. */
+export type ReleaseState = "upcoming" | "watched" | "unwatched";
+
+export function releaseState(airingAt: number, episode: number, progress: number, nowSec: number): ReleaseState {
+  if (airingAt > nowSec) return "upcoming";
+  return progress >= episode ? "watched" : "unwatched";
+}
+
 /** The list's own `nextAiringEpisode` data projected into `(gt, lt]`, soonest first — one episode per show. */
 export function fromList(
   entries: MediaListEntry[],

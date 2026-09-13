@@ -2,22 +2,41 @@ import { describe, expect, it } from "vitest";
 import { countdownFraction, ringOffset, splitRemaining } from "./countdown";
 
 describe("countdownFraction", () => {
+  const MIN = 60_000;
+  const armed = 1_700_000_000_000;
+
   it("runs from nothing done to all of it", () => {
-    expect(countdownFraction(1000, 1000)).toBe(0);
-    expect(countdownFraction(500, 1000)).toBe(0.5);
-    expect(countdownFraction(0, 1000)).toBe(1);
+    expect(countdownFraction(armed, armed + 1000, armed)).toBe(0);
+    expect(countdownFraction(armed, armed + 1000, armed + 500)).toBe(0.5);
+    expect(countdownFraction(armed, armed + 1000, armed + 1000)).toBe(1);
   });
 
-  /** The clock can overshoot the target between ticks, so both ends are pinned or the ring draws outside itself. */
-  it("clamps past either end", () => {
-    expect(countdownFraction(-5000, 1000)).toBe(1);
-    expect(countdownFraction(2000, 1000)).toBe(0);
+  /** The bug this replaced: a card mounted mid-wait had only seen the time left and drew an empty ring. */
+  it("starts partway round on a card mounted mid-session", () => {
+    const due = armed + 25 * MIN;
+    const first = countdownFraction(armed, due, armed + 14 * MIN);
+    expect(first).toBeCloseTo(14 / 25, 10);
+    expect(first).toBeGreaterThan(0.5);
+    // And keeps going from there rather than restarting.
+    expect(countdownFraction(armed, due, armed + 15 * MIN)).toBeGreaterThan(first);
+  });
+
+  /** Due is a closed ring, and so is anything the clock overshot. */
+  it("is complete when due and stays so past it", () => {
+    const due = armed + 25 * MIN;
+    expect(countdownFraction(armed, due, due)).toBe(1);
+    expect(countdownFraction(armed, due, due + 5000)).toBe(1);
+  });
+
+  /** A clock behind the arming stamp must not draw outside the ring. */
+  it("clamps before the start", () => {
+    expect(countdownFraction(armed, armed + 1000, armed - 2000)).toBe(0);
   });
 
   /** A zero or negative span would divide by zero; treat it as already due. */
-  it("treats an unknown span as complete", () => {
-    expect(countdownFraction(1000, 0)).toBe(1);
-    expect(countdownFraction(1000, -1)).toBe(1);
+  it("treats an empty or inverted span as complete", () => {
+    expect(countdownFraction(armed, armed, armed)).toBe(1);
+    expect(countdownFraction(armed, armed - 1, armed)).toBe(1);
   });
 });
 

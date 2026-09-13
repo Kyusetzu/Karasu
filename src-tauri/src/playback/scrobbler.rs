@@ -164,6 +164,8 @@ pub struct Session {
     /// When the auto-update is due (None = auto-update disabled)
     pub update_at: Option<Instant>,
     pub update_at_epoch_ms: Option<u64>,
+    /// When that deadline was armed (ms since epoch), set together with it and re-stamped by a yield; the ring needs both ends.
+    pub armed_at_epoch_ms: Option<u64>,
     pub phase: Phase,
     /// Consecutive empty polls; a pause looks like a stop, so the session is held rather than dropped.
     pub missed_ticks: u32,
@@ -188,9 +190,20 @@ struct ScrobbleEvent {
     episode: Option<u32>,
     #[serde(rename = "updateAtMs")]
     update_at_ms: Option<u64>,
+    /// When the wait behind `update_at_ms` began; carried exactly when it is.
+    #[serde(rename = "armedAtMs")]
+    armed_at_ms: Option<u64>,
     /// The Karasu a `yielding` session waits for; `None` in every other phase.
     #[serde(rename = "yieldingTo")]
     yielding_to: Option<YieldTarget>,
+}
+
+/// Whether the card is shown this session's deadline and its arming stamp; an unarmed block has no epoch to leak.
+fn counting_down(s: &Session) -> bool {
+    matches!(
+        s.phase,
+        Phase::Watching | Phase::Blocked(BlockReason::EpisodeGap { .. }) | Phase::Yielding(_)
+    )
 }
 
 fn emit_session(app: &AppHandle, session: Option<&Session>) {
@@ -202,6 +215,7 @@ fn emit_session(app: &AppHandle, session: Option<&Session>) {
             media_id: None,
             episode: None,
             update_at_ms: None,
+            armed_at_ms: None,
             yielding_to: None,
         },
         Some(s) => ScrobbleEvent {
@@ -227,14 +241,8 @@ fn emit_session(app: &AppHandle, session: Option<&Session>) {
             },
             media_id: Some(s.media_id),
             episode: Some(s.episode),
-            update_at_ms: match &s.phase {
-                Phase::Watching => s.update_at_epoch_ms,
-                // An armed gap block carries its lift time so the card can say when; unarmed blocks never got an epoch.
-                Phase::Blocked(BlockReason::EpisodeGap { .. }) => s.update_at_epoch_ms,
-                // The end of the grace, so the card can count down the wait.
-                Phase::Yielding(_) => s.update_at_epoch_ms,
-                _ => None,
-            },
+            update_at_ms: counting_down(s).then_some(s.update_at_epoch_ms).flatten(),
+            armed_at_ms: counting_down(s).then_some(s.armed_at_epoch_ms).flatten(),
             yielding_to: match &s.phase {
                 Phase::Yielding(target) => Some(target.clone()),
                 _ => None,
@@ -1159,6 +1167,7 @@ async fn drive_session(app: &AppHandle) {
                         started_ms: now_ms(),
                         update_at: armed_in.map(|d| Instant::now() + d),
                         update_at_epoch_ms: armed_in.map(epoch_ms_in),
+                        armed_at_epoch_ms: armed_in.map(|_| epoch_ms_in(Duration::ZERO)),
                         phase,
                         missed_ticks: 0,
                     };
@@ -1213,6 +1222,7 @@ async fn drive_session(app: &AppHandle) {
                         // Another Karasu goes first; wait, then come back as newly due, and the live check finds its write.
                         session.update_at = Some(Instant::now() + YIELD_GRACE);
                         session.update_at_epoch_ms = Some(epoch_ms_in(YIELD_GRACE));
+                        session.armed_at_epoch_ms = Some(epoch_ms_in(Duration::ZERO));
                         crate::logging::debug(
                             "scrobble",
                             format!(
@@ -1529,6 +1539,7 @@ mod tests {
             started_ms: 0,
             update_at: None,
             update_at_epoch_ms: None,
+            armed_at_epoch_ms: None,
             phase: Phase::Watching,
             missed_ticks: 0,
         }

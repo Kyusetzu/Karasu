@@ -51,6 +51,8 @@ export interface ScrobbleState {
   mediaId: number | null;
   episode: number | null;
   updateAtMs: number | null;
+  /** When the wait behind `updateAtMs` began; set exactly when it is, so the ring has both ends. */
+  armedAtMs: number | null;
   /** The Karasu a `yielding` session waits for; null in every other phase. */
   yieldingTo: { platform: "desktop" | "mobile"; device: string } | null;
 }
@@ -68,6 +70,7 @@ const IDLE: ScrobbleState = {
   mediaId: null,
   episode: null,
   updateAtMs: null,
+  armedAtMs: null,
   yieldingTo: null,
 };
 

@@ -1,9 +1,14 @@
-/** Ring numbers for the scrobble countdown; the span is inferred from the largest remaining time seen, not sent. */
+/** Ring numbers for the scrobble countdown; the backend sends both ends of the wait. */
 
-/** How far through the wait we are, 0 at the start and 1 when it is due. */
-export function countdownFraction(remainingMs: number, spanMs: number): number {
-  if (spanMs <= 0) return 1;
-  const done = 1 - remainingMs / spanMs;
+/** How far through the wait we are at `nowMs`: 0 when armed, 1 when due; a mid-wait mount lands right at first render. */
+export function countdownFraction(
+  armedAtMs: number,
+  updateAtMs: number,
+  nowMs: number,
+): number {
+  const span = updateAtMs - armedAtMs;
+  if (span <= 0) return 1;
+  const done = (nowMs - armedAtMs) / span;
   return Math.min(1, Math.max(0, done));
 }
 

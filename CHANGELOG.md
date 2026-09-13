@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: faf9af8 -->
+<!-- generated-through: a86a9a0 -->
 
 ### Fixed
 
@@ -80,6 +80,7 @@ tag time is then optional rather than load-bearing.
 - The sidebar collapses to icons on a short window instead of pushing its lower entries out of view.
 - Restarting Karasu right after it spent its AniList budget no longer fires a burst of requests into the limit.
 - The twice-daily sequel check spreads its requests out instead of sending them in one burst.
+- The now-playing ring no longer restarts on a card mounted mid-session (1.10.3.620).
 
 ### Added
 

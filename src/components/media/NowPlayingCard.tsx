@@ -22,14 +22,18 @@ import { cn } from "@/lib/utils";
 import { countdownFraction, ringOffset, splitRemaining } from "@/lib/countdown";
 import { usePresentValue } from "@/hooks/usePresence";
 
-/** Countdown text and ring fraction; the span is remembered from the largest remaining time seen. */
-function useCountdown(targetMs: number | null): {
+/** Countdown text and ring fraction; both ends come from the backend, so a mid-session mount draws where the text says. */
+function useCountdown(wait: {
+  armedAtMs: number | null;
+  updateAtMs: number | null;
+}): {
   label: string | null;
   fraction: number;
 } {
   const { t } = useTranslation();
   const [, tick] = useState(0);
-  const span = useRef<{ target: number; ms: number } | null>(null);
+  const targetMs = wait.updateAtMs;
+  const firstSeen = useRef<{ target: number; at: number } | null>(null);
 
   useEffect(() => {
     if (targetMs === null) return;
@@ -38,19 +42,19 @@ function useCountdown(targetMs: number | null): {
   }, [targetMs]);
 
   if (targetMs === null) {
-    span.current = null;
+    firstSeen.current = null;
     return { label: null, fraction: 0 };
   }
 
-  const diff = targetMs - Date.now();
-  if (span.current?.target !== targetMs) {
-    span.current = { target: targetMs, ms: Math.max(diff, 1) };
-  } else if (diff > span.current.ms) {
-    // More time left than seen before means the session predates the card; widen rather than run the ring backwards.
-    span.current.ms = diff;
+  const now = Date.now();
+  if (firstSeen.current?.target !== targetMs) {
+    firstSeen.current = { target: targetMs, at: now };
   }
+  // A stamp arriving without its twin pins the start at first sight rather than drawing a full ring.
+  const armedAt = wait.armedAtMs ?? firstSeen.current.at;
+  const diff = targetMs - now;
 
-  const fraction = countdownFraction(diff, span.current.ms);
+  const fraction = countdownFraction(armedAt, targetMs, now);
   if (diff <= 0) return { label: t("nowPlaying.soon"), fraction: 1 };
   const { minutes, seconds } = splitRemaining(diff);
   return {
@@ -72,8 +76,8 @@ export default function NowPlayingCard() {
     scrobble.phase === "watching" ||
       scrobble.phase === "blocked" ||
       scrobble.phase === "yielding"
-      ? scrobble.updateAtMs
-      : null,
+      ? scrobble
+      : { armedAtMs: null, updateAtMs: null },
   );
   const qc = useQueryClient();
   const { t } = useTranslation();

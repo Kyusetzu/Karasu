@@ -1,6 +1,7 @@
 pub mod auth;
 pub mod client;
 pub mod login;
+pub mod query_cache;
 
 use std::time::Duration;
 use tauri::Manager;

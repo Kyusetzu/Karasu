@@ -69,15 +69,28 @@ async function guarded<T>(call: Promise<T>): Promise<T> {
   }
 }
 
-/** What a caller may say about its request: a short source name, so the sync panel and the log can name the spender. */
+/** What a caller may say about its request: a source name, and how long Rust may keep the answer for an allowlisted source. */
 export interface GqlOptions {
   /** `[a-z][a-zA-Z0-9]{0,31}`; anything else is replaced in Rust by the query's root field. */
   source?: string;
+  /** Seconds Rust may serve this answer without asking again; ignored unless `source` is on the cache allowlist. */
+  ttlSec?: number;
+  /** The media a detail answer is about, so an own edit of that entry evicts the cached answer. */
+  mediaId?: number;
 }
 
 export function gql<T>(query: string, variables?: object, opts?: GqlOptions): Promise<T> {
-  return guarded(invoke<T>("anilist_query", { query, variables, source: opts?.source }));
+  const cache = opts?.ttlSec ? { ttlSec: opts.ttlSec, mediaId: opts.mediaId ?? null } : undefined;
+  return guarded(invoke<T>("anilist_query", { query, variables, source: opts?.source, cache }));
 }
+
+/** Seconds, for the `ttlSec` of an allowlisted `gql` call; the Rust allowlist caps each, so these are the wish. */
+export const TTL = {
+  minute: 60,
+  hour: 3600,
+  day: 24 * 3600,
+  week: 7 * 24 * 3600,
+} as const;
 
 // --- Profile mode (AniList account vs. account-free local list) ------------
 

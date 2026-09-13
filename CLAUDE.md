@@ -322,7 +322,7 @@ of AniList's own list fields, it costs nothing to carry, and the local list has
 stored it since schema v7. The rejected idea is tracking **purchases**, which
 would need price data the app has no source for.
 
-The schema is at **v19**. `library_match` (v8) holds the scanner's per-title
+The schema is at **v20**. `library_match` (v8) holds the scanner's per-title
 match confidence, which is what the local library's `exact` / `close` column
 reads. v9 adds `library_override` — the user's corrections, keyed on the parsed
 `(title, season)` with `season = -1` for a release name that carried none, and
@@ -399,6 +399,23 @@ means created just now), **not** by whether `kv` is empty — v17 has already
 written a row by the time v19 runs on a fresh install, so v17's own test would
 call every new install an old one. The accepted gap: a first launch that dies
 mid-chain leaves a fresh file with a version, and the next open seeds it.
+
+v20 adds `query_cache`, the answer cache behind the `anilist_query`
+passthrough: a row per `(source, query, variables, viewer)` sha256 key,
+with the payload and its fetch time. The rule that keeps it inside "no
+local activity store" is an **allowlist**, in `anilist/query_cache.rs`
+(`CACHEABLE`), not a blocklist: a source not named there is never stored,
+so a new feed or activity query is uncached until someone deliberately
+adds it, and fails open the safe way. The frontend passes a wished TTL
+through `gql(query, vars, { source, ttlSec, mediaId })`; Rust caps it at
+the allowlist's own maximum. `mediaId` on a detail answer lets an own edit
+evict it: `cache_patch_entry` and `cache_forget_entry_id` both call
+`query_cache_forget_media`, so a reopened detail can never show a stale
+entry the list no longer has. `switch_identity` clears the whole table,
+and `setup` prunes rows older than a week. Never cached, by omission from
+the allowlist: feeds, activities, replies, threads, comments,
+notifications, favourites, search, and every mutation. The list itself is
+not here — it has its own 15-minute window in `fetch_media_list` (below).
 
 **AniList has two name spaces for a custom list, and only one is writable.**
 `MediaListCollection.lists[].name` is a *display* value: it upper-cases the

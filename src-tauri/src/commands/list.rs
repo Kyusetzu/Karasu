@@ -226,7 +226,7 @@ fn list_plan(age_secs: Option<i64>, force: bool) -> ListPlan {
 /// Which (user, type) lists a background refresh is already fetching; two mounts must cost one request.
 static REFRESHING: std::sync::Mutex<Vec<(i64, &'static str)>> = std::sync::Mutex::new(Vec::new());
 
-fn unix_now() -> i64 {
+pub(crate) fn unix_now() -> i64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_secs() as i64)

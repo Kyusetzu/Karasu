@@ -220,6 +220,20 @@ PRAGMA user_version = 19;
 /// v19 for a database that did not exist before it: nothing to preserve.
 const MIGRATION_V19_FRESH: &str = "PRAGMA user_version = 19;";
 
+/// v20: the passthrough's answer cache, keyed per account and query; the allowlist keeps feeds and activities out.
+const MIGRATION_V20: &str = "
+CREATE TABLE IF NOT EXISTS query_cache (
+    key        TEXT PRIMARY KEY,
+    user_id    INTEGER NOT NULL,
+    source     TEXT NOT NULL,
+    media_id   INTEGER,
+    payload    TEXT NOT NULL,
+    fetched_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS query_cache_media ON query_cache (media_id);
+PRAGMA user_version = 20;
+";
+
 /// One detection correction: what was detected, and what it really is.
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -431,7 +445,51 @@ impl Db {
                 apply(&conn, 19, MIGRATION_V19)?;
             }
         }
+        if version < 20 {
+            apply(&conn, 20, MIGRATION_V20)?;
+        }
         Ok(Db(Mutex::new(conn)))
+    }
+
+    // --- Query cache --------------------------------------------------------
+
+    /// The cached answer and its fetch time for a key, or none.
+    pub fn query_cache_get(&self, key: &str) -> Option<(String, i64)> {
+        let conn = self.0.guard();
+        conn.query_row(
+            "SELECT payload, fetched_at FROM query_cache WHERE key = ?1",
+            [key],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .ok()
+    }
+
+    pub fn query_cache_put(&self, key: &str, user_id: i64, source: &str, media_id: Option<i64>, payload: &str) {
+        let conn = self.0.guard();
+        let _ = conn.execute(
+            "INSERT INTO query_cache (key, user_id, source, media_id, payload, fetched_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, strftime('%s','now'))
+             ON CONFLICT(key) DO UPDATE SET payload = excluded.payload, fetched_at = excluded.fetched_at",
+            rusqlite::params![key, user_id, source, media_id, payload],
+        );
+    }
+
+    /// Drops every cached answer about one media, so a detail row never outlives an own edit of that entry.
+    pub fn query_cache_forget_media(&self, media_id: i64) {
+        let conn = self.0.guard();
+        let _ = conn.execute("DELETE FROM query_cache WHERE media_id = ?1", [media_id]);
+    }
+
+    /// Drops rows fetched before `cutoff` (unix seconds); the startup sweep.
+    pub fn query_cache_prune(&self, cutoff: i64) -> usize {
+        let conn = self.0.guard();
+        conn.execute("DELETE FROM query_cache WHERE fetched_at < ?1", [cutoff])
+            .unwrap_or(0)
+    }
+
+    pub fn query_cache_clear(&self) {
+        let conn = self.0.guard();
+        let _ = conn.execute("DELETE FROM query_cache", []);
     }
 
     pub fn kv_get(&self, key: &str) -> Option<String> {
@@ -593,6 +651,8 @@ impl Db {
         media_id: i64,
         patch: &serde_json::Value,
     ) -> bool {
+        // Whatever the answer cache says about this media carried the old entry; it must not outlive the edit.
+        self.query_cache_forget_media(media_id);
         let Some(fields) = patch.as_object() else {
             return false;
         };
@@ -622,18 +682,32 @@ impl Db {
 
     /// Drops an entry from both cached lists by entry id, or a deleted entry stays a scrobble candidate and gets recreated.
     pub fn cache_forget_entry_id(&self, user_id: i64, entry_id: i64) -> bool {
-        let anime = self.forget_where(user_id, "ANIME", "id", entry_id);
-        let manga = self.forget_where(user_id, "MANGA", "id", entry_id);
+        let mut media_ids = Vec::new();
+        let anime = self.forget_where(user_id, "ANIME", "id", entry_id, &mut media_ids);
+        let manga = self.forget_where(user_id, "MANGA", "id", entry_id, &mut media_ids);
+        // A delete evicts the entry's cached answers too, so a reopened detail does not show it back on the list.
+        for media_id in media_ids {
+            self.query_cache_forget_media(media_id);
+        }
         anime || manga
     }
 
-    fn forget_where(&self, user_id: i64, media_type: &str, field: &str, value: i64) -> bool {
+    fn forget_where(&self, user_id: i64, media_type: &str, field: &str, value: i64, removed_media: &mut Vec<i64>) -> bool {
         self.edit_cached_list(user_id, media_type, |lists| {
             let mut removed = false;
             for group in lists.as_array_mut().into_iter().flatten() {
                 if let Some(entries) = group.get_mut("entries").and_then(|v| v.as_array_mut()) {
                     let before = entries.len();
-                    entries.retain(|e| e.get(field).and_then(|v| v.as_i64()) != Some(value));
+                    entries.retain(|e| {
+                        if e.get(field).and_then(|v| v.as_i64()) == Some(value) {
+                            if let Some(mid) = e.pointer("/media/id").and_then(|v| v.as_i64()) {
+                                removed_media.push(mid);
+                            }
+                            false
+                        } else {
+                            true
+                        }
+                    });
                     removed |= entries.len() != before;
                 }
             }
@@ -1343,7 +1417,29 @@ pub(crate) mod tests {
         conn.execute_batch(MIGRATION_V18).unwrap();
         // The fresh-database arm, which is what an in-memory database is.
         conn.execute_batch(MIGRATION_V19_FRESH).unwrap();
+        conn.execute_batch(MIGRATION_V20).unwrap();
         Db(Mutex::new(conn))
+    }
+
+    /// v20 is re-runnable and the helpers round-trip, evict by media and prune by age.
+    #[test]
+    fn v20_query_cache_round_trips_evicts_and_prunes() {
+        let db = mem_db();
+        db.0.guard().execute_batch(MIGRATION_V20).unwrap();
+        assert_eq!(db.schema_version(), 20);
+        db.query_cache_put("k1", 1, "mediaDetail", Some(100), "{\"a\":1}");
+        db.query_cache_put("k2", 1, "seasonal", None, "[]");
+        assert_eq!(db.query_cache_get("k1").map(|(p, _)| p).as_deref(), Some("{\"a\":1}"));
+        db.query_cache_put("k1", 1, "mediaDetail", Some(100), "{\"a\":2}");
+        assert_eq!(db.query_cache_get("k1").map(|(p, _)| p).as_deref(), Some("{\"a\":2}"), "a put replaces");
+        db.query_cache_forget_media(100);
+        assert!(db.query_cache_get("k1").is_none(), "an own edit evicts the media's rows");
+        assert!(db.query_cache_get("k2").is_some());
+        db.0.guard().execute("UPDATE query_cache SET fetched_at = 1", []).unwrap();
+        assert_eq!(db.query_cache_prune(2), 1);
+        db.query_cache_put("k3", 1, "cast", None, "[]");
+        db.query_cache_clear();
+        assert!(db.query_cache_get("k3").is_none());
     }
 
     /// Measures the cached-list read that is the other half of `hydrate`'s startup cost; a measurement, not an assertion.
@@ -1694,7 +1790,7 @@ pub(crate) mod tests {
         let version: i64 = conn
             .query_row("PRAGMA user_version", [], |r| r.get(0))
             .unwrap();
-        assert_eq!(version, 19, "and must end up fully migrated");
+        assert_eq!(version, 20, "and must end up fully migrated");
         drop(conn);
 
         // Every other `ALTER TABLE ADD COLUMN` step needs the same proof: the column present, the version behind.
@@ -1718,7 +1814,7 @@ pub(crate) mod tests {
             let version: i64 = conn
                 .query_row("PRAGMA user_version", [], |r| r.get(0))
                 .unwrap();
-            assert_eq!(version, 19);
+            assert_eq!(version, 20);
         }
 
         let _ = std::fs::remove_dir_all(&dir);

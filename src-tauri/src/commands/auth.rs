@@ -186,6 +186,8 @@ pub fn switch_identity(db: &Db, next: Identity) -> Result<(), String> {
     db.kv_delete(crate::alerts::site::LAST_CHECK_KEY);
     // The widget projection holds this account's titles and must not outlive it.
     crate::widgets::clear();
+    // The passthrough's cached answers are this account's; the key is viewer-scoped, but the disk still holds them.
+    db.query_cache_clear();
     // A held Jellyfin session belongs to whoever was signed in to Jellyfin.
     crate::playback::detection::jellyfin::forget_last_good();
 
@@ -247,7 +249,15 @@ fn passthrough_source(source: Option<&str>, query: &str) -> String {
     }
 }
 
-/// Generic GraphQL proxy: the frontend supplies query and variables, Rust attaches the token and paces the request.
+/// What the frontend asks the passthrough to cache: a TTL, and the media a detail answer is about so an edit evicts it.
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CacheOpts {
+    pub ttl_sec: u32,
+    pub media_id: Option<i64>,
+}
+
+/// Generic GraphQL proxy: Rust attaches the token, paces it, and serves an allowlisted source from cache within its TTL.
 #[tauri::command]
 pub async fn anilist_query(
     api: State<'_, AniList>,
@@ -255,6 +265,7 @@ pub async fn anilist_query(
     query: String,
     variables: Option<Value>,
     source: Option<String>,
+    cache: Option<CacheOpts>,
 ) -> Result<Value, String> {
     let source = passthrough_source(source.as_deref(), &query);
     // Local mode sends no bearer whatever the credential store holds, so a surviving token cannot poison public queries.
@@ -263,14 +274,28 @@ pub async fn anilist_query(
     } else {
         auth::load_token()
     };
-    Ok(api
-        .query_from(
-            &source,
-            token.as_deref(),
-            &query,
-            variables.unwrap_or_else(|| json!({})),
-        )
-        .await?)
+    let variables = variables.unwrap_or_else(|| json!({}));
+
+    // A TTL only takes effect for an allowlisted source; anything else, and every mutation, fetches as before.
+    let ttl = cache
+        .as_ref()
+        .and_then(|c| crate::anilist::query_cache::allowed_ttl(&source, c.ttl_sec));
+    if let Some(ttl) = ttl {
+        let viewer = crate::commands::viewer_id(&db).unwrap_or(0);
+        let key = crate::anilist::query_cache::cache_key(&source, &query, &variables, viewer);
+        if let Some((payload, fetched_at)) = db.query_cache_get(&key) {
+            let age = crate::commands::unix_now() - fetched_at;
+            if age >= 0 && (age as u64) < ttl as u64 {
+                if let Ok(value) = serde_json::from_str::<Value>(&payload) {
+                    return Ok(value);
+                }
+            }
+        }
+        let value = api.query_from(&source, token.as_deref(), &query, variables).await?;
+        db.query_cache_put(&key, viewer, &source, cache.as_ref().and_then(|c| c.media_id), &value.to_string());
+        return Ok(value);
+    }
+    Ok(api.query_from(&source, token.as_deref(), &query, variables).await?)
 }
 
 // --- Media list: loading with cache, mutations with offline queue -----------

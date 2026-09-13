@@ -1,4 +1,4 @@
-import { gql } from "./anilist";
+import { gql, TTL } from "./anilist";
 import { isBlocked, type ContentFilterLevel } from "@/lib/contentFilter";
 import type { MediaListStatus, MediaTitle, MediaType } from "./types";
 
@@ -147,7 +147,7 @@ export async function loadFranchise(
           relations: { edges: { relationType: string; node: RawMedia }[] };
         })[];
       };
-    }>(FRANCHISE_QUERY, { ids }, { source: "franchise" });
+    }>(FRANCHISE_QUERY, { ids }, { source: "franchise", ttlSec: TTL.day });
 
     const next: number[] = [];
     for (const media of data.Page.media) {

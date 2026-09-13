@@ -1,4 +1,4 @@
-import { gql } from "./anilist";
+import { gql, TTL } from "./anilist";
 import type { Media, MediaType } from "./types";
 import {
   normalizeSiteNotification,
@@ -183,7 +183,7 @@ query ($name: String, $id: Int) {
 export async function userProfile(
   key: { name: string } | { id: number },
 ): Promise<UserProfile> {
-  const data = await gql<{ User: UserProfile | null }>(USER_PROFILE_QUERY, key, { source: "profile" });
+  const data = await gql<{ User: UserProfile | null }>(USER_PROFILE_QUERY, key, { source: "profile", ttlSec: 10 * TTL.minute });
   // A null `User` with no error would otherwise render a blank profile rather than the not-found state.
   if (!data.User) throw new Error("NOT_FOUND");
   return data.User;
@@ -1335,7 +1335,7 @@ export async function favouriteBirthdays(userId: number): Promise<BirthdayPerson
           staff: FavPage<Node> | null;
         } | null;
       } | null;
-    }>(BIRTHDAYS_QUERY, { id: userId, page }, { source: "birthdays" });
+    }>(BIRTHDAYS_QUERY, { id: userId, page }, { source: "birthdays", ttlSec: TTL.day });
     const fav = data.User?.favourites;
     if (!fav) break;
     out.push(...(fav.characters?.nodes ?? []).map((n) => ({ ...n, kind: "character" as const })));
@@ -1431,7 +1431,7 @@ query ($id: Int!) {
 }`;
 
 export async function character(id: number): Promise<CharacterDetail> {
-  const data = await gql<{ Character: CharacterDetail | null }>(CHARACTER_QUERY, { id });
+  const data = await gql<{ Character: CharacterDetail | null }>(CHARACTER_QUERY, { id }, { source: "person", ttlSec: TTL.day });
   if (!data.Character) throw new Error("NOT_FOUND");
   return data.Character;
 }
@@ -1480,7 +1480,7 @@ query ($id: Int!) {
 }`;
 
 export async function staff(id: number): Promise<StaffDetail> {
-  const data = await gql<{ Staff: StaffDetail | null }>(STAFF_QUERY, { id });
+  const data = await gql<{ Staff: StaffDetail | null }>(STAFF_QUERY, { id }, { source: "person", ttlSec: TTL.day });
   if (!data.Staff) throw new Error("NOT_FOUND");
   return data.Staff;
 }
@@ -1506,7 +1506,7 @@ query ($id: Int!) {
 }`;
 
 export async function studio(id: number): Promise<StudioDetail> {
-  const data = await gql<{ Studio: StudioDetail | null }>(STUDIO_QUERY, { id });
+  const data = await gql<{ Studio: StudioDetail | null }>(STUDIO_QUERY, { id }, { source: "person", ttlSec: TTL.day });
   if (!data.Studio) throw new Error("NOT_FOUND");
   return data.Studio;
 }

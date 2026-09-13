@@ -311,6 +311,9 @@ pub fn run() {
             commands::clear_stale_update_notice(&app.state::<db::Db>());
             app.manage(anilist::client::AniList::new(Some(anilist::rate_store(app.handle().clone()))));
             anilist::spawn_traffic_reporter(app.handle().clone());
+            // Drop passthrough answers older than a week, so an abandoned screen's row cannot linger.
+            let prune_cutoff = commands::unix_now() - anilist::query_cache::PRUNE_AFTER_SECS;
+            app.state::<db::Db>().query_cache_prune(prune_cutoff);
             app.manage(playback::scrobbler::PlaybackState(std::sync::Mutex::new(None)));
             app.manage(playback::scrobbler::ScrobbleSession(std::sync::Mutex::new(None)));
             app.manage(playback::relations::Relations(std::sync::RwLock::new(Vec::new())));

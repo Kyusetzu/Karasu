@@ -1,8 +1,4 @@
-//! Background sequel watcher: periodically inspects the relations of the
-//! anime/manga you've completed or are watching and fires a desktop
-//! notification when a sequel or side story is announced (upcoming or newly
-//! releasing) that isn't on your list yet — the kind of heads-up the website
-//! never gives you. Opt-in; off by default.
+//! Background sequel watcher: notifies when a sequel or side story of a listed title is announced. Opt-in.
 
 use crate::anilist::client::AniList;
 use crate::db::Db;
@@ -13,12 +9,7 @@ use tauri::{AppHandle, Manager};
 
 const CHECK_INTERVAL: Duration = Duration::from_secs(12 * 3600);
 const STARTUP_DELAY: Duration = Duration::from_secs(120);
-/// Source media queried per run (chunks of 50), to stay under the rate limit.
-///
-/// 300 entries a run is a *window*, not a prefix. It used to be
-/// `sources.chunks(BATCH).take(MAX_BATCHES)` against a list in cache order,
-/// which is the same 300 every twelve hours forever — a list longer than that
-/// had a tail the watcher never once looked at.
+/// Source media per run, a rotating window rather than a fixed prefix, so a long list's tail is reached.
 const BATCH: usize = 50;
 const MAX_BATCHES: usize = 6;
 
@@ -87,8 +78,7 @@ fn list_ids(db: &Db, user_id: i64, media_type: &str, statuses: Option<&[&str]>) 
     ids
 }
 
-/// Whether a relation edge should raise an alert: a sequel or side story that
-/// is upcoming or currently releasing and isn't already on the user's list.
+/// Whether an edge is a sequel or side story that is upcoming or releasing and not on the list yet.
 fn is_alertable(rel: &str, status: &str, node_id: i64, on_list: &HashSet<i64>) -> bool {
     matches!(rel, "SEQUEL" | "SIDE_STORY")
         && matches!(status, "NOT_YET_RELEASED" | "RELEASING")
@@ -109,11 +99,7 @@ fn pick_title(title: Option<&Value>) -> String {
         .unwrap_or_else(|| "A related title".to_string())
 }
 
-/// The chunk indices one run covers, given where the last one stopped.
-///
-/// Pure so the rotation can be tested without a list, a database or a network:
-/// the property that matters is that repeated runs eventually touch every
-/// index, and that is not observable from anything `check` returns.
+/// The chunk indices one run covers; pure so the rotation is testable without a list or a network.
 fn window(start: usize, len: usize, max: usize) -> Vec<usize> {
     if len == 0 {
         return Vec::new();
@@ -131,10 +117,7 @@ async fn check(app: &AppHandle) {
     };
     let api = app.state::<AniList>();
 
-    // Record everything currently found without notifying, so we only announce
-    // genuinely new relations afterwards. This has to stay on until the cursor
-    // below has been all the way round *both* lists — otherwise the run that
-    // first reaches entry 301 announces its long-known sequels as new.
+    // Seed silently until the cursor has been all the way round both lists, or a long-known sequel reads as new.
     let seeding = db.kv_get("sequel_seeded").is_none();
     let level = crate::commands::read_content_filter(&db);
 
@@ -149,16 +132,11 @@ async fn check(app: &AppHandle) {
             Some(&["COMPLETED", "CURRENT", "REPEATING"]),
         );
 
-        // Where this run picks up. The cursor is per media type and wraps, so
-        // twelve hours later the window has moved on rather than re-reading the
-        // same six chunks.
+        // Where this run picks up: the cursor is per media type and wraps, so the window moves on every run.
         let chunks: Vec<&[i64]> = sources.chunks(BATCH).collect();
         let covered_key = format!("sequel_covered:{media_type}");
         if chunks.is_empty() {
-            // Nothing to walk. Note this also covers "the cache for this type
-            // was never fetched", which is not the same thing — but a list we
-            // cannot read is one we cannot announce from either, so seeding
-            // must not wait on it.
+            // Nothing to walk, a never-fetched cache included; a list we cannot read must not hold seeding up either.
             let _ = db.kv_set(&covered_key, "1");
             continue;
         }
@@ -169,17 +147,14 @@ async fn check(app: &AppHandle) {
             .unwrap_or(0)
             % chunks.len();
         let mut done = 0usize;
-        // The token when there is one, for the same reason `airing.rs` sends
-        // it: public data, same budget, and an outage that refuses only
-        // unauthenticated requests no longer stalls the pass.
+        // The token when there is one: an outage refusing only unauthenticated requests no longer stalls the pass.
         let token = crate::anilist::auth::load_token();
 
         for at in window(start, chunks.len(), MAX_BATCHES) {
             let chunk = chunks[at];
             let vars = json!({ "ids": chunk, "type": media_type });
             let Ok(data) = api.query(token.as_deref(), RELATIONS_QUERY, vars).await else {
-                // Keep the ground this run did cover before giving up, or a
-                // flaky connection would make the window stand still.
+                // Keep the ground this run did cover before giving up, or a flaky connection leaves the window still.
                 if done > 0 {
                     let _ = db.kv_set(&cursor_key, &((start + done) % chunks.len()).to_string());
                 }
@@ -208,8 +183,7 @@ async fn check(app: &AppHandle) {
                     if !is_alertable(rel, status, node_id, &on_list) {
                         continue;
                     }
-                    // An announced sequel can be adult even when the source on
-                    // the user's list is not.
+                    // An announced sequel can be adult even when the source on the user's list is not.
                     if let Some(node) = edge.get("node") {
                         if crate::commands::media_blocked(node, &level) {
                             continue;
@@ -229,9 +203,7 @@ async fn check(app: &AppHandle) {
                         "sequel",
                         crate::i18n::Msg::SequelTitle { side_story: rel != "SEQUEL" },
                         crate::i18n::Msg::SequelBody { title: &title },
-                        // The *sequel's* id, not the entry it was announced
-                        // from: the row names the sequel, so that is what it
-                        // should open.
+                        // The sequel's id, not the source entry's: the row names the sequel, so that is what it opens.
                         Some(node_id),
                     );
                 }
@@ -240,17 +212,7 @@ async fn check(app: &AppHandle) {
         }
 
         let _ = db.kv_set(&cursor_key, &((start + done) % chunks.len()).to_string());
-        // Did the window reach the end of this list? The cursor starts at 0 and
-        // only ever advances, so "start + done past the last chunk" is exactly
-        // "every chunk has been seen at least once".
-        //
-        // Recorded per type and persisted, not ANDed inside one run. Both
-        // cursors advance by six per run in their own modulus, so requiring
-        // them to land in their last window *simultaneously* is a coincidence
-        // of two orbits: 29 and 35 chunks would have taken 170 runs — 85 days
-        // — and every sequel announced in that window is marked seen and
-        // silently swallowed. Per type it is ceil(len/6) runs, which is what
-        // "all the way round both lists" was supposed to mean.
+        // Coverage is recorded per type and persisted; requiring both cursors to wrap in one run would swallow sequels.
         if start + done >= chunks.len() {
             let _ = db.kv_set(&covered_key, "1");
         }
@@ -270,10 +232,7 @@ mod tests {
     use super::{is_alertable, window, MAX_BATCHES};
     use std::collections::HashSet;
 
-    /// The whole point of the cursor: a list longer than one run's window is
-    /// still covered, just over several runs. The old code took the first
-    /// `MAX_BATCHES` chunks of a list in cache order every single time, so on a
-    /// 500-entry list entries 301..500 were never once queried.
+    /// A list longer than one run's window is still covered, just over several runs.
     #[test]
     fn successive_runs_cover_a_list_longer_than_one_window() {
         let len = 17; // 17 chunks of 50 — a ~850-entry list
@@ -288,8 +247,7 @@ mod tests {
         assert_eq!(seen.len(), len, "three runs of six cover all seventeen");
     }
 
-    /// A window shorter than the batch cap must not repeat a chunk inside one
-    /// run — that would query the same fifty ids twice and pay for it twice.
+    /// A window shorter than the batch cap must not repeat a chunk inside one run.
     #[test]
     fn a_short_list_is_covered_once_per_run() {
         assert_eq!(window(0, 3, MAX_BATCHES), vec![0, 1, 2]);

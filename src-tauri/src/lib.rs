@@ -18,19 +18,14 @@ mod portable;
 mod sync;
 
 use tauri::{AppHandle, Manager, Wry};
-// These three are used only from the desktop half of this file (the tray's
-// menu handles and its emits), so they gate with it — an unconditional import
-// is an unused-import warning on every Android check.
+// Used only from the desktop half of this file, so they gate with it, or Android warns of an unused import.
 #[cfg(desktop)]
 use crate::sync::LockExt;
 #[cfg(desktop)]
 use std::sync::Mutex;
 #[cfg(desktop)]
 use tauri::Emitter;
-// The menu and tray modules do not exist in a mobile build of tauri, so the
-// imports gate with the code that uses them. `cfg(desktop)` / `cfg(mobile)`
-// are tauri-build's own flags — the blessed spelling for this split, where a
-// hand-rolled `not(target_os = "android")` would silently miss iOS.
+// `cfg(desktop)` / `cfg(mobile)` are tauri-build's own flags; a hand-rolled `not(android)` would silently miss iOS.
 #[cfg(desktop)]
 use tauri::{
     menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem},
@@ -47,10 +42,7 @@ fn show_main_window(app: &AppHandle) {
     }
 }
 
-/// The global hotkey's action: summon the window, or put it away if it is the
-/// thing on top right now. Focus decides, not visibility — a window that is
-/// technically visible but buried under something else should come forward,
-/// not vanish.
+/// The global hotkey's action; focus decides, not visibility, so a buried window comes forward rather than vanishing.
 #[cfg(desktop)]
 fn toggle_main_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
@@ -64,11 +56,7 @@ fn toggle_main_window(app: &AppHandle) {
     }
 }
 
-/// (Re)binds the summon hotkey. The hotkey is the only global shortcut Karasu
-/// registers, so `unregister_all` is exact rather than approximate; `None`
-/// simply leaves everything unbound. Lives here beside the window helpers it
-/// drives — `commands::set_global_hotkey` and startup both call through this,
-/// so a registration failure looks identical from either path.
+/// (Re)binds the summon hotkey, the only global shortcut Karasu registers, so `unregister_all` is exact.
 #[cfg(desktop)]
 pub(crate) fn apply_global_hotkey(app: &AppHandle, accel: Option<&str>) -> Result<(), String> {
     use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
@@ -86,22 +74,13 @@ pub(crate) fn apply_global_hotkey(app: &AppHandle, accel: Option<&str>) -> Resul
     Ok(())
 }
 
-/// No global shortcuts on mobile — and that is an *error*, not a quiet Ok.
-/// The first version returned Ok on the theory that only startup calls this;
-/// wrong twice over: mobile's `setup_platform` never reads the stored hotkey,
-/// and the `set_global_hotkey` command is registered everywhere — so a
-/// vacuous Ok let the settings field accept and store an accelerator that
-/// would never fire, the exact silent-success the autostart pair refuses.
+/// No global shortcuts on mobile, as an error rather than a quiet Ok, or Settings would store a hotkey that never fires.
 #[cfg(mobile)]
 pub(crate) fn apply_global_hotkey(_app: &AppHandle, _accel: Option<&str>) -> Result<(), String> {
     Err("Global shortcuts are not available on this platform".into())
 }
 
-/// The tray menu items that change at runtime. Held in managed state because
-/// the builder's handles are the only way to mutate a menu after `build` —
-/// rebuilding the whole menu per update would tear it down under an open
-/// click. `None` when the tray itself failed to build (Linux without an
-/// AppIndicator host), and every writer tolerates that.
+/// The tray menu items that change at runtime; `None` when the tray failed to build, and every writer tolerates that.
 #[cfg(desktop)]
 pub struct TrayHandles(pub Mutex<Option<TrayItems>>);
 
@@ -109,23 +88,14 @@ pub struct TrayHandles(pub Mutex<Option<TrayItems>>);
 pub struct TrayItems {
     pub now_playing: MenuItem<Wry>,
     pub detection: CheckMenuItem<Wry>,
-    /// Held only so their labels can be re-set when the language changes —
-    /// rebuilding the menu instead would tear it down under an open click,
-    /// which is the same reason `now_playing` is held.
+    /// Held so their labels can be re-set when the language changes; rebuilding the menu would tear it down under a click.
     pub scrobble: MenuItem<Wry>,
     pub sync: MenuItem<Wry>,
     pub show: MenuItem<Wry>,
     pub quit: MenuItem<Wry>,
 }
 
-/// Reflects the current detection into the tray: the disabled first row
-/// names what is playing, the tooltip mirrors it for hover.
-///
-/// The language comes from the kv mirror the frontend writes, because the
-/// setting itself lives in the WebView's localStorage and Rust cannot read it.
-/// The labels are only rebuilt when this runs, which is on every detection
-/// tick — so a language change reaches the tray within five seconds rather
-/// than at the next launch.
+/// Reflects the current detection into the tray; the labels are re-read here too, so a language change lands within a tick.
 #[cfg(desktop)]
 pub fn tray_set_now_playing(app: &AppHandle, title: Option<&str>) {
     let lang = i18n::lang(&app.state::<db::Db>());
@@ -150,36 +120,14 @@ pub fn tray_set_now_playing(app: &AppHandle, title: Option<&str>) {
     }
 }
 
-/// There is no tray to reflect anything into on a phone; the scrobbler and
-/// the prefs command call this on every state change, so the pair keeps those
-/// call sites compiling everywhere.
+/// No tray on a phone; the pair keeps the scrobbler's and the prefs command's call sites compiling everywhere.
 #[cfg(mobile)]
 pub fn tray_set_now_playing(_app: &AppHandle, _title: Option<&str>) {}
 
-/// Whether a tray icon exists.
-///
-/// Nothing may hide the window without asking this first: on a desktop with no
-/// StatusNotifier host there is nothing left to click to bring it back.
-/// Managed on every platform — always `false` on mobile — because
-/// `close_hides_window` and the diagnostics read it unconditionally.
+/// Whether a tray icon exists; nothing may hide the window without asking, since there is nothing else to click.
 pub struct TrayPresent(pub bool);
 
-/// A debug build starts in the tray instead of in front of you.
-///
-/// `cargo tauri dev` is usually run while something else is being read or
-/// written, and a window that takes focus every time the Rust side rebuilds is
-/// the single most disruptive thing about the loop. The app is still fully
-/// running — detection, scrobbling, the lot — and one click on the tray icon
-/// brings it up.
-///
-/// Gated on `tray_present` because of the invariant on `TrayPresent` above: with
-/// no tray there is nothing left to click, and a hidden window with no way back
-/// is worse than a window that stole focus.
-///
-/// Written as a cfg'd **pair of functions** rather than a `#[cfg]` on the call.
-/// A cfg'd statement is stripped before type-checking, so the release build
-/// would never compile the debug arm and the first anyone would hear of a
-/// mistake in it is a broken dev loop.
+/// A debug build starts in the tray so a rebuild does not steal focus; gated on the tray, or there is no way back.
 #[cfg(all(desktop, debug_assertions))]
 fn hide_window_in_dev(app: &tauri::App, tray_present: bool) {
     use tauri::Manager as _;
@@ -195,10 +143,7 @@ fn hide_window_in_dev(app: &tauri::App, tray_present: bool) {
 #[cfg(all(desktop, not(debug_assertions)))]
 fn hide_window_in_dev(_app: &tauri::App, _tray_present: bool) {}
 
-/// Builds the tray, or reports why it could not be built.
-///
-/// Split out of `setup` so the whole thing can be wrapped in `catch_unwind` —
-/// see the call site for why an ordinary `?` is not enough.
+/// Builds the tray, or reports why it could not; split out so `setup_platform` can wrap the whole thing in `catch_unwind`.
 #[cfg(desktop)]
 fn build_tray(app: &tauri::App) -> tauri::Result<()> {
     let db = app.state::<db::Db>();
@@ -206,9 +151,7 @@ fn build_tray(app: &tauri::App) -> tauri::Result<()> {
     let lang = i18n::lang(&db);
     let label = |m| i18n::text(lang, m);
 
-    // The first row states what detection sees; disabled because it is a
-    // fact, not an action — clicking a title with nothing behind it would be
-    // a button that does nothing.
+    // The first row states what detection sees; disabled because it is a fact, not an action.
     let now_playing =
         MenuItem::with_id(app, "now", label(i18n::Msg::TrayNothingPlaying), false, None::<&str>)?;
     let scrobble =
@@ -240,8 +183,7 @@ fn build_tray(app: &tauri::App) -> tauri::Result<()> {
         quit: quit.clone(),
     }))));
 
-    // A window with no icon is a launch worth continuing, not one worth
-    // aborting — the tray simply goes without.
+    // A window with no icon is a launch worth continuing, not one worth aborting; the tray simply goes without.
     let Some(icon) = app.default_window_icon().cloned() else {
         return Err(tauri::Error::UnknownPath);
     };
@@ -254,8 +196,7 @@ fn build_tray(app: &tauri::App) -> tauri::Result<()> {
         .on_menu_event(|app, event| match event.id.as_ref() {
             "show" => show_main_window(app),
             "quit" => app.exit(0),
-            // Same path as the in-app confirm button; errors ("nothing is
-            // playing") land in the log rather than a toast nobody can see.
+            // Same path as the in-app confirm button; errors land in the log rather than a toast nobody can see.
             "scrobble" => {
                 let handle = app.clone();
                 tauri::async_runtime::spawn(async move {
@@ -264,14 +205,11 @@ fn build_tray(app: &tauri::App) -> tauri::Result<()> {
                     }
                 });
             }
-            // The frontend owns the sync (it drives the query cache), so the
-            // tray only rings the bell — GlobalKeys listens.
+            // The frontend owns the sync, since it drives the query cache, so the tray only rings the bell.
             "sync" => {
                 let _ = app.emit("manual-sync", ());
             }
-            // The check item toggles itself; the kv follows *it*, so the menu
-            // is the source of truth for what was just clicked. The 5s poll
-            // reads the key per tick, so it takes effect within one cycle.
+            // The check item toggles itself and the kv follows it; the poll reads the key per tick, so it lands within one.
             "detection" => {
                 if let Some(handles) = app.try_state::<TrayHandles>() {
                     if let Some(items) = handles.0.guard().as_ref() {
@@ -297,19 +235,7 @@ fn build_tray(app: &tauri::App) -> tauri::Result<()> {
     Ok(())
 }
 
-/// WebKitGTK's DMA-BUF renderer paints a blank window on a long list of
-/// driver/compositor combinations — the NVIDIA proprietary driver most often.
-/// The app starts, the process runs, and the user sees nothing, which is the
-/// single most common way a Tauri app "fails" on Linux. Only set when the user
-/// has not chosen for themselves.
-///
-/// A cfg'd **pair** rather than `#[cfg(target_os = "linux")]` on the `if` this
-/// used to be. An attribute on a *statement* is stripped wholesale on every
-/// other platform, so nothing inside it is ever compiled here — CLAUDE.md names
-/// that trap, and it was sitting in the file whose own doc explains it. The
-/// body is still Linux-only by nature; what the pair buys is a call site that
-/// is type-checked on Windows too, so this cannot be renamed or given arguments
-/// without the local build noticing.
+/// WebKitGTK's DMA-BUF renderer paints a blank window on many driver combinations; set only when the user has not chosen.
 #[cfg(target_os = "linux")]
 fn avoid_blank_webkit_window() {
     if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
@@ -321,32 +247,20 @@ fn avoid_blank_webkit_window() {
 #[cfg(not(target_os = "linux"))]
 fn avoid_blank_webkit_window() {}
 
-// The mobile entry point — on `run`, where it must be. It spent its whole
-// life decorating `avoid_blank_webkit_window` two items up: inert on every
-// desktop build (`cfg_attr(mobile, …)` compiles to nothing there), and on
-// Android it decorated a function that `#[cfg(target_os = "linux")]` had
-// already removed, so no entry symbol was emitted at all. The first APK
-// build's "missing required runtime symbols" is what finally proved it.
+// The mobile entry point belongs on `run`; on any other item the attribute emits no entry symbol on Android.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // First, before anything can panic. Until this existed every panic in the
-    // app went to a stderr no packaged build has — see `logging`.
+    // First, before anything can panic; a packaged build has no stderr for the default hook to print to.
     logging::install_panic_hook();
 
     avoid_blank_webkit_window();
 
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        // Android's manifest intent-filter for anilist.co is *generated* from
-        // the tauri.conf `deep-link` block at build time — the regeneration-
-        // safe alternative to hand-editing the gen manifest. The frontend
-        // listens via onOpenUrl and routes through `lib/anilistUrl`, the same
-        // mapping in-app links already use.
+        // Android's anilist.co intent-filter is generated from the tauri.conf `deep-link` block, safe across regeneration.
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_notification::init())
-        // Not exposed to the WebView (no capability names it): the fs plugin
-        // is here so `commands::system` can write into what a save dialog
-        // answered with — on Android a content:// URI, not a path.
+        // Not exposed to the WebView: the fs plugin lets `commands::system` write into a save dialog's content:// URI.
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init());
 
@@ -354,14 +268,9 @@ pub fn run() {
         .setup(|app| {
             let data_dir = portable::data_dir(app.path().app_data_dir()?);
             portable::remember_data_dir(&data_dir);
-            // Before the database, so a failure to open *that* is the first
-            // thing the log records rather than something it misses.
+            // Before the database, so a failure to open that is the first thing the log records.
             logging::init(data_dir.clone());
-            // A database that will not open used to end the launch here, while
-            // up to a week of good snapshots sat in a folder beside it —
-            // reachable only through the app that would not start. One attempt
-            // to restore the newest readable one first; if that fails too, the
-            // launch ends as before, with both failures in the log.
+            // A database that will not open gets one attempt at restoring the newest backup before the launch ends.
             let db = match db::Db::open(data_dir.clone()) {
                 Ok(db) => db,
                 Err(first) => {
@@ -382,15 +291,12 @@ pub fn run() {
                 }
             };
             app.manage(db);
-            // The window from tauri.conf.json already exists here, and the
-            // page has not painted yet — so the stored zoom lands before
-            // anything is drawn rather than as a visible jump after.
+            // The window exists and the page has not painted, so the stored zoom lands before anything is drawn.
             commands::apply_ui_zoom(
                 app.handle(),
                 commands::read_ui_zoom(&app.state::<db::Db>()),
             );
-            // The verbose switch survives a restart, so a "turn it on and
-            // reproduce it" request does not have to be re-armed each launch.
+            // The verbose switch survives a restart, so "turn it on and reproduce it" need not be re-armed each launch.
             logging::set_debug(
                 app.state::<db::Db>()
                     .kv_get(commands::LOG_DEBUG_KEY)
@@ -401,8 +307,7 @@ pub fn run() {
                 "startup",
                 format!("Karasu {}", commands::app_version_string()),
             );
-            // The "new release" bell row dies with the install it announced —
-            // on both platforms, before the frontend ever reads the bell.
+            // The "new release" bell row dies with the install it announced, before the frontend reads the bell.
             commands::clear_stale_update_notice(&app.state::<db::Db>());
             app.manage(anilist::client::AniList::new());
             app.manage(playback::scrobbler::PlaybackState(std::sync::Mutex::new(None)));
@@ -422,18 +327,14 @@ pub fn run() {
         alerts::site::spawn(app.handle().clone());
         assert_notif_schedule(app.handle());
         {
-            // The widget projection used to exist only after a network list
-            // fetch wrote it — a fresh install (or update) showed four empty
-            // widgets until then. Project once from the cache at startup,
-            // delayed a beat so the JNI poke finds the tao context ready.
+            // Project the widgets from the cache once at startup, delayed a beat so the JNI poke finds tao's context ready.
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 tokio::time::sleep(std::time::Duration::from_secs(3)).await;
                 widgets::refresh(&handle);
             });
         }
-            // Before their first toast can land: on Android this is the
-            // system permission dialog, everywhere else a granted no-op.
+            // Before the first toast can land: on Android this is the system permission dialog, elsewhere a no-op.
             alerts::notify::ensure_permission(app.handle());
             backups::spawn(app.handle().clone());
             // Show the idle presence right away (if Discord is enabled).
@@ -566,13 +467,7 @@ pub fn run() {
         .expect("error while running tauri application");
 }
 
-/// The four desktop-only plugins and the close-to-tray window handler.
-///
-/// Three of the plugin crates are `#![cfg(not(android/ios))]` at the *crate*
-/// root, so on mobile every `init()` path here would be unresolved — this is
-/// the cfg'd-pair spelling of that fact, per the house rule that a statement
-/// is never cfg'd. The updater rides along: its distribution model is the
-/// desktop's.
+/// The desktop-only plugins and the close-to-tray handler; a cfg'd pair, since those crates do not exist on mobile.
 #[cfg(desktop)]
 fn attach_desktop(builder: tauri::Builder<Wry>) -> tauri::Builder<Wry> {
     builder
@@ -586,9 +481,7 @@ fn attach_desktop(builder: tauri::Builder<Wry>) -> tauri::Builder<Wry> {
             None,
         ))
         .on_window_event(|window, event| {
-            // Closing minimizes to the tray instead of quitting (quit via tray
-            // menu) — but only where there is a tray to minimize *to*. Hiding
-            // into a tray that does not exist leaves no way back to the window.
+            // Closing hides to the tray instead of quitting, but only where there is a tray to hide into.
             if let WindowEvent::CloseRequested { api, .. } = event {
                 let app = window.app_handle();
                 let tray = app.state::<TrayPresent>().0;
@@ -609,17 +502,7 @@ fn attach_desktop(builder: tauri::Builder<Wry>) -> tauri::Builder<Wry> {
 /// The desktop half of setup: the tray, the dev-build hide, the hotkey.
 #[cfg(desktop)]
 fn setup_platform(app: &tauri::App) {
-    // `catch_unwind`, not `?`, because the tray does not fail politely
-    // on Linux: `libappindicator-sys` *panics* when it cannot dlopen
-    // libayatana-appindicator3.so.1, and a panic walks straight past
-    // `?`. That aborted startup on every desktop without the library
-    // installed — the app did not merely lose its tray, it never came
-    // up. A dlopen probe would not be enough either: `build()` can
-    // also return Err and the menu can panic on its own.
-    //
-    // The outcome goes to the log, not to stderr. This is the single
-    // most-asked Linux question ("why does closing quit?") and until
-    // there was a log the answer was written to a handle nobody has.
+    // `catch_unwind`, not `?`: libappindicator panics when it cannot dlopen its library, and never `panic = "abort"`.
     let built = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         build_tray(app)
     }));
@@ -645,9 +528,7 @@ fn setup_platform(app: &tauri::App) {
     // Debug builds only, and only with a tray to come back from.
     hide_window_in_dev(app, built);
 
-    // A stored hotkey that no longer registers (another app claimed
-    // it, a layout changed) must not fail the launch — it goes to the
-    // log and the setting stays put for the user to see and change.
+    // A stored hotkey that no longer registers must not fail the launch; it goes to the log and the setting stays.
     if let Some(accel) = commands::read_global_hotkey(&app.state::<db::Db>()) {
         if let Err(e) = apply_global_hotkey(app.handle(), Some(&accel)) {
             logging::warn(
@@ -659,15 +540,13 @@ fn setup_platform(app: &tauri::App) {
 
 }
 
-/// Mobile has no tray, so the single bit of platform state everything else
-/// reads unconditionally is managed at its honest value.
+/// Mobile has no tray, so the one bit of platform state everything reads unconditionally is managed at its honest value.
 #[cfg(mobile)]
 fn setup_platform(app: &tauri::App) {
     app.manage(TrayPresent(false));
 }
 
-/// Cfg'd pair, per the house rule: the setup call site compiles on every
-/// platform while only Android re-asserts its JobScheduler registration.
+/// A cfg'd pair, so the setup call site compiles everywhere while only Android re-asserts its JobScheduler registration.
 #[cfg(target_os = "android")]
 fn assert_notif_schedule(app: &tauri::AppHandle) {
     background::spawn_schedule_assert(app.clone());

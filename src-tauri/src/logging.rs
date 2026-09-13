@@ -1,32 +1,4 @@
-//! The background log: what Karasu was doing when something went wrong.
-//!
-//! Until this existed a shipped build had no diagnostics at all. `main.rs` sets
-//! `windows_subsystem = "windows"`, so a release binary on Windows has no
-//! console and every `eprintln!` is written to an invalid handle and dropped on
-//! the floor; on Linux the AppImage is started from a desktop file, a tray click
-//! or autostart, so its stderr reaches the session journal at best and nothing
-//! at worst. A user could not tell us why the tray failed, why a notification
-//! never appeared, or why scrobbling stopped — and neither could we.
-//!
-//! Two sinks, on purpose. A bounded **ring in memory** is what the in-app viewer
-//! reads, so opening it never touches the disk. A **rotating file** beside the
-//! database is what survives a crash and gets attached to an issue.
-//!
-//! Deliberately a file rather than a table in `karasu.db`, for three reasons
-//! that each decide it on their own: the panic hook must never take the `Db`
-//! mutex (a panic *inside* a `Db` lock would re-enter it and abort the process);
-//! `Db` is a single mutex already shared with the five-second detection poll and
-//! whole-transaction library scans, so a chatty logger would contend with the
-//! app's hot path; and `enable_portable` copies the database with `VACUUM INTO`,
-//! which would carry the log onto a USB stick with it.
-//!
-//! **Everything is scrubbed on write, not on read.** `anilist_connect` receives
-//! the raw access token and `jellyfin_sign_in` receives a plaintext password —
-//! both as ordinary command arguments — so a careless `format!` anywhere could
-//! put a live credential in a file the user is about to paste into a public
-//! issue. Scrubbing at the write boundary means the file on disk is safe, and
-//! that `get_logs` can never become a way for the WebView to read a token back
-//! out (CLAUDE.md: the token stays in the backend).
+//! The background log: a bounded ring for the viewer and a rotating file beside the database, scrubbed on write.
 
 use std::collections::VecDeque;
 use std::io::Write;
@@ -34,31 +6,23 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
-/// How many entries the viewer can see. Bounded so a long uptime cannot grow
-/// the process; the file is the durable half.
+/// How many entries the viewer can see; bounded so a long uptime cannot grow the process.
 pub const RING_CAPACITY: usize = 1000;
-/// Roll over at a megabyte, keeping one previous file — so the worst case on
-/// disk is ~2 MB whatever happens.
+/// Roll over past this size, keeping one previous file, so the worst case on disk is bounded.
 const ROTATE_BYTES: u64 = 1024 * 1024;
 const LOG_FILE: &str = "karasu.log";
 const ROTATED_FILE: &str = "karasu.log.1";
 
-// --- Redaction vocabulary ---------------------------------------------------
-// A named placeholder rather than a blanket `***`: the log still records *that*
-// a credential was about to be written and *which* one, which is itself a
-// diagnostic (it says which code path is leaking) and makes the scrubber's own
-// coverage auditable from a log file alone.
+// Named placeholders rather than a blanket `***`: the log still records which credential was about to be written.
 pub const ANILIST_LOGIN: &str = "<CREDENTIAL_anilist-login>";
 pub const JELLYFIN_LOGIN: &str = "<CREDENTIAL_jellyfin-login>";
 pub const JELLYFIN_PASSWORD: &str = "<CREDENTIAL_jellyfin-password>";
 pub const PORTABLE_KEY: &str = "<CREDENTIAL_portable-key>";
 pub const MOBILE_SEALED: &str = "<CREDENTIAL_mobile-sealed-token>";
-/// Anything secret-shaped that matched no specific rule. This is what makes an
-/// unforeseen leak fail *safe* rather than land in the file unnoticed.
+/// Anything secret-shaped that matched no specific rule, so an unforeseen leak fails safe.
 pub const UNKNOWN_CREDENTIAL: &str = "<CREDENTIAL_unknown>";
 
-/// Severity. Ordered `Error < Warn < Info < Debug`, so "is this at or above the
-/// threshold" is a plain comparison.
+/// Severity, ordered `Error < Warn < Info < Debug`, so a threshold check is a plain comparison.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Level {
@@ -79,8 +43,7 @@ impl Level {
     }
 }
 
-/// One line. `target` is the subsystem ("tray", "scrobbler", "jellyfin"), so the
-/// viewer can group without parsing the message.
+/// One line; `target` is the subsystem, so the viewer can group without parsing the message.
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct LogEntry {
     pub ms: i64,
@@ -101,15 +64,7 @@ fn sink() -> &'static Mutex<Option<PathBuf>> {
 
 static DEBUG_ON: AtomicBool = AtomicBool::new(false);
 
-/// Takes a lock without caring whether it is poisoned.
-///
-/// The whole point of this module is to still work when something has panicked,
-/// and a poisoned mutex means exactly that. `unwrap()` here would turn "we
-/// logged a panic" into "we panicked while logging a panic", which aborts.
-///
-/// Kept as a free function because this module reaches for it constantly and
-/// `guard(sink())` reads better than the alternative; the recovery itself is
-/// `crate::sync`'s, which is now what every lock in the crate goes through.
+/// Takes a lock whether or not it is poisoned; panicking while logging a panic would abort the process.
 fn guard<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
     crate::sync::LockExt::guard(m)
 }
@@ -122,14 +77,7 @@ fn now_ms() -> i64 {
         .unwrap_or(0)
 }
 
-// --- Timestamps -------------------------------------------------------------
-
-/// `YYYY-MM-DDTHH:MM:SSZ` from epoch milliseconds.
-///
-/// Hand-rolled because the tree has no date crate and pulling one in for a log
-/// header is not worth a dependency. The civil-date conversion is Howard
-/// Hinnant's `civil_from_days`, which is exact for every day this will ever see
-/// and, being pure arithmetic, is testable without a clock.
+/// `YYYY-MM-DDTHH:MM:SSZ` from epoch milliseconds, hand-rolled because a log header is not worth a date crate.
 pub fn format_utc(ms: i64) -> String {
     let days = ms.div_euclid(86_400_000);
     let rem = ms.rem_euclid(86_400_000);
@@ -138,12 +86,12 @@ pub fn format_utc(ms: i64) -> String {
     format!("{y:04}-{m:02}-{d:02}T{h:02}:{min:02}:{s:02}Z")
 }
 
-/// The civil UTC date for an epoch-seconds instant. The log formatter above
-/// uses the same arithmetic; the backup file namer is the other caller.
+/// The civil UTC date for an epoch-seconds instant; the backup file namer is the other caller.
 pub(crate) fn civil_date(epoch_secs: i64) -> (i64, u32, u32) {
     civil_from_days(epoch_secs.div_euclid(86_400))
 }
 
+/// Howard Hinnant's `civil_from_days`, exact for every day this will ever see and pure arithmetic.
 fn civil_from_days(z: i64) -> (i64, u32, u32) {
     let z = z + 719_468;
     let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
@@ -157,17 +105,13 @@ fn civil_from_days(z: i64) -> (i64, u32, u32) {
     (if m <= 2 { y + 1 } else { y }, m, d)
 }
 
-// --- Scrubbing --------------------------------------------------------------
-
-/// The rules, most specific first. Each is `(pattern, replacement)` where the
-/// replacement may use `$1` to keep the surrounding context — knowing that a
-/// bearer header was present is useful; knowing its value is a liability.
+/// The scrub rules, most specific first; a replacement may use `$1` to keep the context around the credential.
 fn rules() -> &'static [(regex::Regex, String)] {
     static RULES: OnceLock<Vec<(regex::Regex, String)>> = OnceLock::new();
     RULES.get_or_init(|| {
         let r = |p: &str| regex::Regex::new(p).expect("scrub pattern");
         vec![
-            // `Authorization: Bearer <token>` — anilist/client.rs `bearer_auth`.
+            // `Authorization: Bearer <token>`, from `bearer_auth` in anilist/client.rs.
             (
                 r(r"(?i)(bearer\s+)[A-Za-z0-9._\-~+/=]{8,}"),
                 format!("${{1}}{ANILIST_LOGIN}"),
@@ -182,7 +126,7 @@ fn rules() -> &'static [(regex::Regex, String)] {
                 r(r#"(?i)("Pw"\s*:\s*")[^"]*"#),
                 format!("${{1}}{JELLYFIN_PASSWORD}"),
             ),
-            // `MediaBrowser … Token="…"` — jellyfin.rs `auth_header`.
+            // `MediaBrowser … Token="…"`, from `auth_header` in jellyfin.rs.
             (
                 r(r#"(?i)(token\s*=\s*")[^"]{8,}"#),
                 format!("${{1}}{JELLYFIN_LOGIN}"),
@@ -201,18 +145,12 @@ fn rules() -> &'static [(regex::Regex, String)] {
                 r(r"KRSU1[A-Za-z0-9+/=]*"),
                 PORTABLE_KEY.to_string(),
             ),
-            // The Keystore-sealed mobile token file. `KRSA1` is its magic
-            // (keystore.rs).
+            // The Keystore-sealed mobile token file. `KRSA1` is its magic (keystore.rs).
             (
                 r(r"KRSA1[A-Za-z0-9+/=]*"),
                 MOBILE_SEALED.to_string(),
             ),
-            // Catch-all. A long unbroken run of base64 alphabet with no
-            // separators is not something this app legitimately writes: release
-            // names carry dots, dashes, brackets or spaces, and paths carry
-            // slashes. Deliberately excludes `.`, `-` and `_` so a filename
-            // cannot trip it — the specific rules above already cover the token
-            // shapes that contain those.
+            // Catch-all: a long unbroken base64 run; `.`, `-` and `_` are excluded so a filename cannot trip it.
             (
                 r(r"[A-Za-z0-9+/=]{40,}"),
                 UNKNOWN_CREDENTIAL.to_string(),
@@ -221,10 +159,7 @@ fn rules() -> &'static [(regex::Regex, String)] {
     })
 }
 
-/// Replaces anything credential-shaped with its labelled placeholder.
-///
-/// Applied to every message on the way in, so neither the ring nor the file can
-/// hold a secret regardless of what a call site passes.
+/// Replaces anything credential-shaped with its labelled placeholder, on every message on the way in.
 pub fn scrub(input: &str) -> String {
     let mut out = input.to_string();
     for (pattern, replacement) in rules() {
@@ -235,10 +170,7 @@ pub fn scrub(input: &str) -> String {
     out
 }
 
-// --- Writing ----------------------------------------------------------------
-
-/// Points the file sink at `dir` and flushes whatever was logged before it was
-/// known — early startup and any panic that beat `setup` still reach the file.
+/// Points the file sink at `dir` and flushes whatever was logged before it was known.
 pub fn init(dir: PathBuf) {
     if std::fs::create_dir_all(&dir).is_err() {
         return;
@@ -284,8 +216,7 @@ fn write_lines(path: &Path, lines: &[String]) {
             let _ = std::fs::rename(path, path.with_file_name(ROTATED_FILE));
         }
     }
-    // Every failure here is discarded on purpose: this *is* the error path, and
-    // a logger that logs its own failures recurses.
+    // Every failure here is discarded on purpose: a logger that logs its own failures recurses.
     if let Ok(mut file) = std::fs::OpenOptions::new()
         .create(true)
         .append(true)
@@ -297,8 +228,7 @@ fn write_lines(path: &Path, lines: &[String]) {
     }
 }
 
-/// Records one entry. Scrubs, appends to the ring, and appends to the file when
-/// there is one.
+/// Records one entry: scrubs, appends to the ring, and appends to the file when there is one.
 pub fn log(level: Level, target: &str, message: impl AsRef<str>) {
     if level == Level::Debug && !debug_enabled() {
         return;
@@ -344,20 +274,9 @@ fn last_seen() -> &'static Mutex<std::collections::HashMap<&'static str, String>
     LAST.get_or_init(|| Mutex::new(std::collections::HashMap::new()))
 }
 
-/// `debug`, but only when the line for `key` differs from the last one.
-///
-/// The detection pass runs every `POLL_INTERVAL` — five seconds, so 17,280 times
-/// a day. A plain `debug` anywhere inside it would fill the 1 MB file within
-/// hours and rotate away the handful of lines that actually explain a bug, which
-/// defeats the point of having it. Nearly everything worth recording from a poll
-/// loop is worth recording only when it *changes*.
-///
-/// `key` is a `&'static str` rather than the message so that "the same fact, a
-/// different value" replaces the previous entry instead of accumulating one per
-/// distinct string — an unbounded map keyed on messages would be its own leak.
+/// debug_changed, never debug, on the 5 s poll: a line per tick rotates the interesting part off disk.
 pub fn debug_changed(target: &str, key: &'static str, message: impl AsRef<str>) {
-    // Before the map and before the message is even borrowed: with the toggle
-    // off this must be as close to free as a function call gets.
+    // Before the map and before the message is borrowed: with the toggle off this must be as close to free as it gets.
     if !debug_enabled() {
         return;
     }
@@ -368,13 +287,7 @@ pub fn debug_changed(target: &str, key: &'static str, message: impl AsRef<str>) 
     log(Level::Debug, target, message);
 }
 
-/// Whether `message` differs from the last one recorded under `key`, recording
-/// it either way.
-///
-/// Split out so the dedupe can be tested on its own. Going through
-/// `debug_changed` would mean depending on the process-global `DEBUG_ON` and on
-/// the shared ring, both of which other tests in this module mutate in
-/// parallel — a test that passes alone and fails in a suite is worse than none.
+/// Whether `message` differs from the last one under `key`; keyed on the fact, so the map stays bounded.
 fn differs_from_last(key: &'static str, message: &str) -> bool {
     let mut seen = guard(last_seen());
     if seen.get(key).is_some_and(|previous| previous == message) {
@@ -384,46 +297,22 @@ fn differs_from_last(key: &'static str, message: &str) -> bool {
     true
 }
 
-/// The newest `limit` entries, newest first — the order the viewer shows them,
-/// matching `notif_all`.
+/// The newest `limit` entries, newest first, the order the viewer shows them.
 pub fn entries(limit: usize) -> Vec<LogEntry> {
     let ring = guard(ring());
     ring.iter().rev().take(limit).cloned().collect()
 }
 
-/// How many times a background loop may be restarted before it is left down.
-///
-/// Bounded because the realistic cause is a poisoned `Db` mutex, which does not
-/// heal: without a cap the supervisor would respawn a task that panics on its
-/// first lock, forever, at whatever the backoff allows.
+/// How many restarts a background loop gets; bounded, since a poisoned mutex does not heal.
 const MAX_RESTARTS: u32 = 5;
 const FIRST_BACKOFF_SECS: u64 = 5;
 
-/// How long to wait before restart number `restarts`, or `None` to give up.
-///
-/// Split out so the schedule can be tested without actually sleeping through
-/// it — the alternative is a test that takes five seconds to prove arithmetic.
+/// How long to wait before restart number `restarts`, or `None` to give up; pure, so the schedule is testable.
 fn restart_plan(restarts: u32) -> Option<u64> {
     (restarts <= MAX_RESTARTS).then(|| FIRST_BACKOFF_SECS << (restarts - 1))
 }
 
-/// Runs a background loop, and puts it back if it panics.
-///
-/// The four long-lived loops — detection, airing, stale, sequel — were spawned
-/// with their `JoinHandle`s dropped on the floor. A panic inside one unwound the
-/// task, was captured into a `JoinError` nobody joined, and printed to the
-/// stderr that does not exist: the loop was simply gone for the rest of the
-/// process. The symptom is "scrobbling stopped working" with no event, no toast
-/// and nothing to report.
-///
-/// A supervisor task rather than `catch_unwind` inside the loop, because
-/// `catch_unwind` does not work across an `await` without pulling in
-/// `futures::FutureExt`. Tauri's `JoinHandle` already resolves to a `Result`, so
-/// the panic is observable for free.
-///
-/// Restarting is not a fix and does not pretend to be one — the log line is the
-/// point. But a detection loop that comes back after a transient panic is worth
-/// more than one that stays dead until the next restart.
+/// Runs a background loop and puts it back if it panics; restarting is not a fix, the log line is the point.
 pub fn supervise<F, Fut>(name: &'static str, make: F)
 where
     F: Fn() -> Fut + Send + 'static,
@@ -433,8 +322,7 @@ where
         let mut restarts = 0u32;
         loop {
             match tauri::async_runtime::spawn(make()).await {
-                // These loops never return, so this is only reachable if one is
-                // ever rewritten to finish. Worth a line either way.
+                // These loops never return, so this is only reachable if one is ever rewritten to finish.
                 Ok(()) => {
                     info(name, "background loop ended");
                     return;
@@ -465,16 +353,7 @@ where
     });
 }
 
-/// Installs the panic hook. Call this **first** in `run()`.
-///
-/// Until this existed, a panic in one of the four background loops killed that
-/// loop for the rest of the process and said nothing: the `JoinHandle`s are
-/// dropped, so nobody observes the `JoinError`, and the default hook printed to
-/// a stderr no packaged build has. "Scrobbling just stopped working" was the
-/// only symptom, and it was unreportable.
-///
-/// Chains to the previous hook rather than replacing it, so a debug run still
-/// prints to the terminal it does have.
+/// Installs the panic hook, first thing in `run()`; it chains to the previous hook so a debug run still prints.
 pub fn install_panic_hook() {
     let previous = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
@@ -502,16 +381,10 @@ pub fn install_panic_hook() {
 mod tests {
     use super::*;
 
-    /// The ring, the sink and the debug flag are process-global, and `cargo
-    /// test` runs threads in parallel — so every test that writes or measures
-    /// that state takes this lock. Without it the suite is green by
-    /// scheduling luck: on a CI runner the ring-flood test evicted the panic
-    /// hook's entry between the panic and the assertion reading it, a
-    /// failure no local run had ever produced.
+    /// The ring, the sink and the debug flag are process-global, so every test that touches them takes this lock.
     static GLOBAL_LOG_STATE: Mutex<()> = Mutex::new(());
 
-    /// An assertion failure in one locked test must not poison the rest —
-    /// they would all die reporting the lock instead of their own state.
+    /// An assertion failure in one locked test must not poison the rest.
     fn serialize() -> std::sync::MutexGuard<'static, ()> {
         GLOBAL_LOG_STATE.lock().unwrap_or_else(|e| e.into_inner())
     }
@@ -528,20 +401,18 @@ mod tests {
         assert_eq!(format_utc(0), "1970-01-01T00:00:00Z");
         // A leap day, to exercise the era arithmetic rather than a happy path.
         assert_eq!(format_utc(1_709_164_800_000), "2024-02-29T00:00:00Z");
-        // 1_786_000_000_000 ms is 20671 whole days plus 25_600 s = 07:06:40.
+        // Whole days plus a remainder, so the time-of-day arithmetic is exercised too.
         assert_eq!(format_utc(1_786_000_000_000), "2026-08-06T07:06:40Z");
     }
 
-    // --- Scrubbing. The fixtures are the literal shapes the code really
-    // produces, so a change to one of those call sites breaks a test here
-    // rather than silently starting to leak.
+    // The scrub fixtures are the literal shapes the code produces, so a changed call site breaks a test here.
 
     #[test]
     fn an_anilist_bearer_header_is_labelled() {
         let out = scrub("GET https://graphql.anilist.co Authorization: Bearer eyJhbGciOiJSUzI1NiJ9abcdef");
         assert!(out.contains(ANILIST_LOGIN), "{out}");
         assert!(!out.contains("eyJhbGciOiJSUzI1NiJ9abcdef"), "{out}");
-        // The context survives — that a bearer header was sent is the useful half.
+        // The context survives: that a bearer header was sent is the useful half.
         assert!(out.contains("Bearer"), "{out}");
     }
 
@@ -557,7 +428,7 @@ mod tests {
         let out = scrub(r#"POST /Users/AuthenticateByName {"Username":"kyu","Pw":"hunter2"}"#);
         assert!(out.contains(JELLYFIN_PASSWORD), "{out}");
         assert!(!out.contains("hunter2"), "{out}");
-        // The username is not a credential and stays — it is diagnostic.
+        // The username is not a credential and stays; it is diagnostic.
         assert!(out.contains("kyu"), "{out}");
     }
 
@@ -590,8 +461,7 @@ mod tests {
         assert!(!out.contains(&secret), "{out}");
     }
 
-    /// The catch-all must not eat ordinary diagnostics. Release names and paths
-    /// are the two things this log exists to carry.
+    /// The catch-all must not eat release names and paths, the two things this log exists to carry.
     #[test]
     fn ordinary_release_names_and_paths_survive() {
         for sample in [
@@ -609,8 +479,7 @@ mod tests {
         let _serial = serialize();
         set_debug(false);
         assert!(!debug_enabled());
-        // Presence of the message, not ring length: a length comparison lies
-        // once the bounded ring is full (a push evicts, the length holds).
+        // Presence of the message, not ring length: a full ring evicts on push, so the length holds.
         debug("test", "a debug line that must be dropped");
         assert!(
             !entries(RING_CAPACITY)
@@ -627,9 +496,7 @@ mod tests {
         set_debug(false);
     }
 
-    /// The mechanism that keeps a five-second poll loop from rotating the
-    /// interesting lines off disk. Without the dedupe the detection pass alone
-    /// would write 17,280 lines a day into a 1 MB file.
+    /// The dedupe that keeps the poll loop from rotating the interesting lines off disk.
     #[test]
     fn a_repeated_line_is_recorded_once() {
         // A key unique to this test, since the map is process-global.
@@ -644,8 +511,7 @@ mod tests {
         }
     }
 
-    /// "Differs from last", not "never seen" — a value flapping between two
-    /// states has to stay visible, or an intermittent bug becomes one line.
+    /// "Differs from last", not "never seen": a flapping value has to stay visible.
     #[test]
     fn a_value_returning_to_a_previous_one_is_still_a_change() {
         const KEY: &str = "dedupe-flap";
@@ -655,9 +521,7 @@ mod tests {
         assert!(!differs_from_last(KEY, "a"));
     }
 
-    /// Keyed on the fact, not the message, so a changing value replaces its
-    /// predecessor instead of adding an entry per distinct string — an
-    /// unbounded map keyed on messages would be its own slow leak.
+    /// Keyed on the fact, not the message, so a changing value replaces its predecessor.
     #[test]
     fn each_key_holds_one_entry_however_many_values_it_sees() {
         const KEY: &str = "dedupe-bound";
@@ -668,7 +532,7 @@ mod tests {
         assert_eq!(seen.keys().filter(|k| **k == KEY).count(), 1);
     }
 
-    /// Costs nothing with the toggle off — not even the map lookup.
+    /// Costs nothing with the toggle off, not even the map lookup.
     #[test]
     fn debug_changed_records_nothing_while_disabled() {
         const KEY: &str = "dedupe-off";
@@ -681,18 +545,14 @@ mod tests {
 
     #[test]
     fn the_ring_is_bounded_and_newest_first() {
-        // The lock is also what makes "newest first" checkable at all: any
-        // concurrent writer's entry would land on top of ours.
+        // The lock is also what makes "newest first" checkable: a concurrent writer's entry would land on top of ours.
         let _serial = serialize();
         for i in 0..(RING_CAPACITY + 50) {
             info("ringtest", format!("entry {i}"));
         }
         let all = entries(RING_CAPACITY * 2);
         assert!(all.len() <= RING_CAPACITY, "ring grew past its cap");
-        // Newest first — of *our* entries. The ring is process-global and the
-        // panic hook writes to it from any thread, so `all[0]` is not
-        // necessarily ours even under `serialize()`, which only orders the
-        // tests that take it.
+        // Newest of our entries: the panic hook writes to the ring from any thread, so `all[0]` need not be ours.
         let newest = all
             .iter()
             .find(|e| e.target == "ringtest")
@@ -704,14 +564,10 @@ mod tests {
         );
     }
 
-    /// The end-to-end guarantee, checked against the artefact that actually
-    /// leaves the machine. Every unit test above proves `scrub` transforms a
-    /// string; this one proves nothing secret reaches the file a user attaches
-    /// to a public issue, which is the property that actually matters.
+    /// Nothing secret reaches the file a user attaches to a public issue.
     #[test]
     fn no_secret_survives_to_the_file_on_disk() {
-        // Locked for the sink: `init` points the process-global sink at this
-        // test's directory, and a concurrent writer would land in its file.
+        // Locked for the sink: `init` points the process-global sink at this directory, and a concurrent writer would land in it.
         let _serial = serialize();
         let dir = std::env::temp_dir().join(format!("karasu-scrub-test-{}", now_ms()));
         std::fs::create_dir_all(&dir).unwrap();
@@ -745,15 +601,11 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
-    /// The hook is the whole reason a panic is reportable at all, so verify it
-    /// captures one rather than trusting that `set_hook` was called.
+    /// The hook captures a panic, rather than trusting that `set_hook` was called.
     #[test]
     fn the_panic_hook_records_the_panic() {
         const PANIC_MARKER: &str = "a deliberate test panic";
-        // The CI flake this lock exists for: the ring-flood test evicting
-        // this entry between the panic and the read. (A `len > before`
-        // assertion also used to live here — wrong for a different reason:
-        // a full ring evicts on push, so the length never moves.)
+        // Locked so the ring-flood test cannot evict this entry between the panic and the read.
         let _serial = serialize();
         install_panic_hook();
 
@@ -761,21 +613,17 @@ mod tests {
         let _ = std::panic::catch_unwind(|| panic!("{PANIC_MARKER}"));
 
         let recorded = entries(RING_CAPACITY);
-        // Matched on our own message, not on the target alone: `sync.rs`'s
-        // poisoned-lock test panics deliberately too, and the hook records it
-        // into this same global ring without taking `serialize()`.
+        // Matched on our own message, not the target alone: another module's test panics deliberately too.
         let entry = recorded
             .iter()
             .find(|e| e.target == "panic" && e.message.contains(PANIC_MARKER))
             .expect("the hook recorded no entry for our panic");
         assert_eq!(entry.level, Level::Error);
-        // The location is what makes it actionable, given `strip = true` leaves
-        // backtraces near-symbol-free.
+        // The location is what makes it actionable, since `strip = true` leaves backtraces near-symbol-free.
         assert!(entry.message.contains("logging.rs"), "{}", entry.message);
     }
 
-    /// Backoff doubles and then stops. Without the cap, a poisoned `Db` mutex —
-    /// which does not heal — would have the supervisor respawning forever.
+    /// Backoff doubles and then stops; without the cap a poisoned mutex would have the supervisor respawning forever.
     #[test]
     fn restarts_back_off_and_then_give_up() {
         assert_eq!(restart_plan(1), Some(5));

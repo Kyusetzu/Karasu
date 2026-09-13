@@ -8,23 +8,10 @@ use tokio::time::Instant;
 
 const API_URL: &str = "https://graphql.anilist.co";
 
-/// How many recent requests the sync panel can show.
-///
-/// Bounded because this is an in-memory ring on the hot path of every AniList
-/// call, and because a panel is for glancing at. Fifty covers a page load and
-/// its retries several times over.
+/// How many recent requests the sync panel can show; bounded, since this ring sits on the hot path of every call.
 const LOG_CAP: usize = 50;
 
-/// The root field a query asks for — `Media`, `Page`, `SaveMediaListEntry`.
-///
-/// **The query text and nothing else.** Every query in this tree is a compile
-/// -time constant, so naming one leaks nothing; the *variables* carry notes, a
-/// score and sometimes a Jellyfin password, and they are never touched here.
-/// That is the same rule `logging::scrub` exists to enforce elsewhere.
-///
-/// AniList's operations are anonymous (`query ($id: Int!) { … }`), so there is
-/// no operation name to read — the first root selection is the informative part
-/// anyway, since it is what the request is *for*.
+/// The root field a query asks for, from the query text alone; the variables carry secrets and are never read here.
 fn operation_name(query: &str) -> String {
     // The selection set opens at the first `{` outside the variable list.
     let mut depth = 0usize;
@@ -42,9 +29,7 @@ fn operation_name(query: &str) -> String {
             _ => {}
         }
     }
-    // First identifier in the selection, and if it is an alias (`a: Thread`)
-    // take what it aliases — `FOLLOW_COUNTS_QUERY` aliases two `Page` roots and
-    // "a" would say nothing.
+    // The first identifier in the selection, or what an alias aliases, since "a" would say nothing.
     fn ident(s: &str) -> Option<(String, &str)> {
         let s = s.trim_start();
         let end = s
@@ -61,43 +46,20 @@ fn operation_name(query: &str) -> String {
     }
 }
 
-/// How a failed request should be treated by anything holding an unsent write.
-///
-/// `Network` is a transport failure — offline, DNS, timeout — where the request
-/// never reached AniList at all. `Retryable` did reach it and came back with an
-/// answer about the *connection*: rate limiting, a server fault, a token that
-/// has expired. `Api` is AniList rejecting **this payload**, which no amount of
-/// waiting will fix.
-///
-/// The split exists because the offline queue acts on it: a queued edit is kept
-/// for the first two and dropped for the third. Until the classification below
-/// was written this enum had no middle case, so an expired token and a 429 that
-/// outlived the single retry both arrived as `Api` — and `process_queue`
-/// deleted the user's edits on the strength of it.
+/// How a failed request is treated by anything holding an unsent write: the offline queue keeps all but `Api`.
 #[derive(Debug)]
 pub enum ApiError {
     Network(String),
-    /// AniList rejected the *token*, not the payload.
-    ///
-    /// Split out of `Retryable` because the two need opposite handling on
-    /// screen while needing the same handling in the queue. A 429 is "wait";
-    /// this is "nothing will change until you sign in again", and rendering it
-    /// as one more load failure is what made a dead token look like the app
-    /// randomly breaking. The queued write is still perfectly good — it is the
-    /// credential that went stale — so `is_retryable` still holds.
+    /// AniList rejected the token, not the payload; still retryable, since it is the credential that went stale.
     Auth(String),
     Retryable(String),
     Api(String),
 }
 
-/// What the frontend gets for an `Auth` failure. `lib/backendError.ts` turns it
-/// into a sentence; `stores/auth` turns it into one banner for the whole app.
+/// What the frontend gets for an `Auth` failure; `lib/backendError.ts` turns it into a sentence.
 pub const TOKEN_REJECTED: &str = "anilist.tokenRejected";
 
-/// Whether the current run of rejections has already been logged.
-///
-/// Cleared by the next success, so a *later* rejection is reported rather than
-/// swallowed as a repeat of one the user has already dealt with.
+/// Whether the current run of rejections has been logged; cleared by the next success, so a later one is reported.
 static AUTH_REPORTED: AtomicBool = AtomicBool::new(false);
 
 impl ApiError {
@@ -114,75 +76,34 @@ impl From<ApiError> for String {
     fn from(e: ApiError) -> Self {
         match e {
             ApiError::Network(m) => format!("Network error: {m}"),
-            // A stable code rather than AniList's wording. "Invalid token" is
-            // English, is not actionable, and was rendered raw into
-            // "Failed to load: Invalid token" on every screen at once.
+            // A stable code rather than AniList's wording, which is English, unactionable and was rendered raw everywhere.
             ApiError::Auth(_) => TOKEN_REJECTED.into(),
             ApiError::Retryable(m) | ApiError::Api(m) => m,
         }
     }
 }
 
-/// HTTP statuses that mean "not now" rather than "not ever".
-///
-/// A 429 reaching this point has already outlived the one retry below. 401 is
-/// about the token rather than the payload, so a re-sign-in fixes it and the
-/// write is still good; 403 is AniList refusing on grounds it spells out in
-/// the message — an outage, a donator feature — and the write is still good
-/// then too. 5xx is AniList being down.
+/// HTTP statuses that mean "not now" rather than "not ever"; a 429 here has already outlived the one retry.
 fn status_is_retryable(code: u16) -> bool {
     matches!(code, 401 | 403 | 429) || (500..600).contains(&code)
 }
 
-/// The stable code a rate-limited request answers with.
-///
-/// A code rather than the server's sentence, for the reason `TOKEN_REJECTED`
-/// is one: the frontend has to *recognise* this class to stop retrying it, and
-/// matching on prose would mean re-implementing `verdict` in TypeScript — the
-/// same rule in two languages, free to drift. `lib/backendError.ts` turns it
-/// into a sentence.
+/// The stable code for a rate-limited request, so the frontend need not re-implement `verdict` in TypeScript.
 pub const RATE_LIMITED: &str = "anilist.rateLimited";
 
-/// What one failed response means, before it becomes an `ApiError`.
-///
-/// A separate step so the one case the status and the wording cannot settle
-/// between them — `Ambiguous` — is visible to the caller, which can go and
-/// find out (see `token_alive`) instead of guessing.
+/// What one failed response means before it becomes an `ApiError`; `Ambiguous` is the case the caller must go and settle.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Verdict {
     RateLimited,
-    /// The credential is dead. Only a 401 or an explicit "invalid token" says
-    /// so on its own.
+    /// The credential is dead; only a 401 or an explicit "invalid token" says so on its own.
     Auth,
-    /// A bare `Unauthorized.` with a token sent: AniList uses the same word for
-    /// a dead token and for a resolver refusing a payload the token is not
-    /// allowed to perform. Nothing in the response tells the two apart.
+    /// A bare `Unauthorized.` with a token sent: AniList uses the same word for a dead token and a refused payload.
     Ambiguous,
     Retryable,
     Api,
 }
 
-/// The truth table, in order of precedence.
-///
-/// **A 403 is not a dead token.** AniList answers a bad token with HTTP 400 and
-/// the reason in the `errors` array; a 403 carries a *sentence* about something
-/// else — `Sorry, you must be at least a tier 2 donator to pin activities`,
-/// `The AniList API has been temporarily disabled…`, `Forbidden. (Use graphql
-/// subdomain)`. For as long as `matches!(code, 401 | 403)` made every one of
-/// those an auth failure, pinning an activity signed the user out and an
-/// outage read as an expired session. A 403 keeps its sentence and stays
-/// retryable, because the queue and the cached-list fallback branch on that
-/// and an outage must not drop a queued edit.
-///
-/// `sent_token` is what keeps "your session expired" honest. A request that
-/// carried no bearer cannot have had its token rejected — yet a Cloudflare or
-/// captive-portal 401 in front of graphql.anilist.co matches the same status
-/// check, and used to sign the message "token rejected" to a user who never
-/// had a token. Tokenless auth-shaped failures are retryable network weather.
-///
-/// "too many requests" is deliberately not auth: a 429 is about how fast we
-/// asked, and calling it an auth failure would sign the user out for being
-/// busy.
+/// The truth table in order of precedence; a 403 is not a dead token, and a tokenless auth-shaped failure is weather.
 fn verdict(code: u16, msg: &str, sent_token: bool) -> Verdict {
     if code == 429 {
         return Verdict::RateLimited;
@@ -195,9 +116,7 @@ fn verdict(code: u16, msg: &str, sent_token: bool) -> Verdict {
             Verdict::Retryable
         };
     }
-    // The whole message, not a substring: `Unauthorized: cannot edit this
-    // review` is a resolver explaining itself, and only the bare word is the
-    // form a dead token and a refused payload share.
+    // The whole message, not a substring: only the bare word is the form a dead token and a refused payload share.
     let bare = m.trim().trim_end_matches('.').trim();
     if bare == "unauthorized" {
         return if sent_token {
@@ -213,18 +132,11 @@ fn verdict(code: u16, msg: &str, sent_token: bool) -> Verdict {
     }
 }
 
-/// `verdict`, mapped onto `ApiError` without asking anyone.
-///
-/// `Ambiguous` becomes `Auth` here — the answer this function gave for years
-/// and the right one for the probe's own request, which must not probe again.
-/// The response path resolves `Ambiguous` through `token_alive` first and only
-/// falls back to this for the rest.
+/// `verdict` mapped onto `ApiError` with no probe; `Ambiguous` becomes `Auth`, which the probe's own request relies on.
 fn classify(code: u16, msg: String, sent_token: bool) -> ApiError {
     match verdict(code, &msg, sent_token) {
         Verdict::RateLimited => {
-            // 429 is the one retryable class worth naming: it is the only one
-            // the frontend must not spend a second round trip on, because the
-            // answer is guaranteed to be the same until the window rolls.
+            // 429 is the one retryable class worth naming: the frontend must not spend a second round trip on it.
             crate::logging::debug("anilist", format!("rate limited: {msg}"));
             ApiError::Retryable(RATE_LIMITED.into())
         }
@@ -234,12 +146,7 @@ fn classify(code: u16, msg: String, sent_token: bool) -> ApiError {
     }
 }
 
-/// What an `Ambiguous` refusal means once the token has been probed.
-///
-/// Alive: the payload was refused, which is a permanent answer with AniList's
-/// own sentence on it. Dead: the credential is gone. Unknown — the probe hit
-/// the network or the rate limit — is *not* a sign-out: nobody is signed out on
-/// missing evidence, and the next real request asks again.
+/// What an `Ambiguous` refusal means once probed; nobody is signed out on an inconclusive probe.
 fn resolve_ambiguous(msg: String, alive: Option<bool>) -> ApiError {
     match alive {
         Some(true) => ApiError::Api(msg),
@@ -248,49 +155,33 @@ fn resolve_ambiguous(msg: String, alive: Option<bool>) -> ApiError {
     }
 }
 
-/// Whether a request may probe the token to settle an `Ambiguous` refusal.
-/// The probe's own request may not, or a dead token would probe forever.
+/// Whether a request may probe the token to settle an `Ambiguous` refusal; the probe's own request may not.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Probe {
     Allowed,
     Never,
 }
 
-/// The cheapest authenticated query there is: it answers `Unauthorized` on a
-/// dead token and a viewer id on a live one, and nothing else.
+/// The cheapest authenticated query there is: `Unauthorized` on a dead token, a viewer id on a live one.
 const PROBE_QUERY: &str = "{ Viewer { id } }";
 
-/// How long one probe's answer stands. A screen fires several queries at
-/// once; without this, every ambiguous refusal among them would spend a
-/// request of its own against a 30-a-minute budget to learn the same thing.
+/// How long one probe's answer stands, so a screen's several ambiguous refusals do not each spend a request.
 const PROBE_TTL: Duration = Duration::from_secs(60);
 
-/// Whether the current run of non-auth refusals has already been logged.
-/// Cleared by the next success, like `AUTH_REPORTED`.
+/// Whether the current run of non-auth refusals has been logged; cleared by the next success, like `AUTH_REPORTED`.
 static REFUSED_REPORTED: AtomicBool = AtomicBool::new(false);
 
-/// GraphQL client for AniList with centralized rate limiting.
-///
-/// AniList nominally allows 90 requests/minute (currently throttled to 30
-/// server-side). We track the X-RateLimit headers and pause before running
-/// into the limit; on a 429 we wait once for Retry-After.
+/// AniList GraphQL client with centralized rate limiting, paced by the X-RateLimit headers.
 pub struct AniList {
     http: reqwest::Client,
     rate: Mutex<RateState>,
-    /// The recent-traffic ring behind the sync panel. See `LOG_CAP`.
-    ///
-    /// In memory only — it is never written to `karasu.log` and never leaves the
-    /// process except through `rate_snapshot`'s sibling command. A panel that
-    /// said "28 of 30" with nothing to attribute it to was the complaint this
-    /// answers: the number moved and there was no way to see what moved it.
+    /// The recent-traffic ring behind the sync panel; in memory only, never written to `karasu.log`.
     log: Mutex<VecDeque<Recorded>>,
-    /// The last token probe's verdict and when it was reached — see
-    /// `token_alive` and `PROBE_TTL`.
+    /// The last token probe's verdict and when it was reached; `token_alive` reads it, `PROBE_TTL` ages it.
     probe: Mutex<Option<(Instant, bool)>>,
 }
 
-/// One finished request, stored with a monotonic instant so its age is computed
-/// at read time rather than frozen at write time.
+/// One finished request, stored with a monotonic instant so its age is computed at read time.
 struct Recorded {
     seq: u64,
     operation: String,
@@ -313,9 +204,7 @@ pub struct RequestLogEntry {
     pub started_ago_ms: u64,
     #[serde(rename = "durationMs")]
     pub duration_ms: u64,
-    /// How long this request waited on the client's own pacing before going
-    /// out. Separate from `durationMs` on purpose: self-inflicted delay and
-    /// AniList being slow are different problems with different fixes.
+    /// How long this request waited on the client's own pacing; separate from `durationMs`, since the fixes differ.
     #[serde(rename = "pacedMs")]
     pub paced_ms: u64,
     pub status: Option<u16>,
@@ -325,91 +214,33 @@ pub struct RequestLogEntry {
     pub outcome: &'static str,
 }
 
-/// The budget assumed before any header has been seen.
-///
-/// A guess, not a measurement — `observed` is what separates the two. Worth
-/// knowing when reading the panel: a cold client's *first* response reports
-/// `x-ratelimit-remaining: 28` of a limit of 30, measured twice against the live
-/// API 70 s apart. AniList never reports 29 or 30, so "28 while idle" is its
-/// accounting rather than two requests Karasu spent.
+/// The budget assumed before any header has been seen; a guess, not a measurement, and `observed` separates the two.
 const SEED: u32 = 30;
 
-/// Requests held in reserve before the client starts pacing itself.
-///
-/// Not 1. At a threshold of one the guard engages only when the next request is
-/// already the last one available, which is far too late to avoid the 429 it
-/// exists to avoid.
+/// Requests held in reserve before pacing starts; a threshold of one engages only on the last request, far too late.
 const RESERVE: u32 = 2;
 
-/// AniList's accounting window.
-///
-/// Load-bearing, because `remaining` is otherwise a number that only ever falls:
-/// it is assigned from a response header and from nothing else. One response
-/// reporting 0 used to pin the limiter at 0 for the life of the process, and
-/// every later request then paid the pre-flight nap for nothing — while the only
-/// way to learn a better number was to send a request, which napped first. That
-/// was the whole of the "everything is slow" bug.
+/// AniList's accounting window; without it `remaining` only ever falls, and one 0 pins the limiter for the process.
 const WINDOW: Duration = Duration::from_secs(60);
 
-/// One pacing slice. Short on purpose: the point is to re-check, not to sleep,
-/// and a concurrent response landing mid-wait can raise the budget at any
-/// moment.
-///
-/// That is the only way budget comes back early. AniList's window **steps**:
-/// measured twice on 2026-09-03 with `scripts/ratelimit-probe.mjs`, the count
-/// sat exactly where a burn left it for 45 s (each sample costing one) and was
-/// back at the full limit at +60 s. So a slice never finds budget that quietly
-/// returned mid-window — it finds a response that landed, or the step itself.
-/// This comment once said the window rolls continuously; it does not.
+/// One pacing slice, short on purpose: the point is to re-check, since a response landing mid-wait can raise the budget.
 const SLICE: Duration = Duration::from_millis(400);
 
-/// The longest one caller paces before sending regardless.
-///
-/// Sending into a 429 costs a `Retry-After`; stalling costs the whole screen,
-/// with nothing on it to explain why. The 429 path is a backstop and a better
-/// one than an app that never answers, so the self-imposed wait is bounded and
-/// the server's own instruction is not.
+/// The longest one caller paces before sending regardless; a stalled screen costs more than the 429 it avoids.
 const MAX_PACE: Duration = Duration::from_secs(5);
 
 struct RateState {
-    /// The working count: assigned from `x-ratelimit-remaining`, decremented by
-    /// `claim` for requests in flight, and reset by `headroom` when the window
-    /// has rolled.
+    /// The working count: from `x-ratelimit-remaining`, decremented by `claim`, reset by `headroom` when the window rolled.
     remaining: u32,
-    /// `x-ratelimit-limit`. AniList sends it — verified against the live API —
-    /// and it was read by nothing until the sync panel needed a denominator.
+    /// `x-ratelimit-limit`, the sync panel's denominator.
     limit: Option<u32>,
-    /// When a header last landed. `None` means `remaining` is still the *seed*
-    /// below, which is a guess rather than a measurement — a panel rendering
-    /// "30 left" off it would be inventing data.
+    /// When a header last landed; `None` means `remaining` is still the seed, a guess the panel must not render as data.
     observed: Option<Instant>,
-    /// The monotonic deadline this client is deliberately not sending until.
-    ///
-    /// **Nothing ever clears it, and it only ever moves forward.** Both rules
-    /// are load-bearing:
-    ///
-    /// - Clearing would need task identity. One client is shared by the
-    ///   scrobbler, three alert passes, `identify.rs` and every passthrough, so
-    ///   a 5s pre-flight nap waking up and clearing the flag while another task
-    ///   is 90s into a `Retry-After` would report the client as free while it is
-    ///   parked. And a future dropped mid-sleep would leave it stuck for the
-    ///   life of the process. An expiring deadline needs no cleanup path at all.
-    /// - Without the forward-only rule, a 5s nap beginning during a 120s
-    ///   `Retry-After` would shorten the reported wait to 5s.
+    /// The monotonic deadline this client will not send before; nothing ever clears it and it only ever moves forward.
     sleeping_until: Option<Instant>,
-    /// `"preflight" | "retryAfter"`, replaced only together with the deadline.
-    ///
-    /// **These exact strings are the contract with the panel.** `SyncPanel`
-    /// branches on them to tell "the app is pacing itself" from "AniList refused
-    /// us", which is the whole reason the field exists — and it compared against
-    /// `"retry-after"` for a release, so every real 429 rendered as self-pacing.
+    /// `"preflight" | "retryAfter"`, replaced only with the deadline; these exact strings are the contract with `SyncPanel`.
     sleeping_kind: Option<&'static str>,
-    /// When the limiter last reset its own count because `WINDOW` had elapsed.
-    ///
-    /// Deliberately *not* `observed`. That one means a header landed and is what
-    /// the panel reports the age of; folding a local reset into it would render
-    /// a guess as a fresh measurement, which is the one thing the headroom
-    /// display must not do.
+    /// When the limiter last reset its own count; deliberately not `observed`, or a guess would render as a measurement.
     reset_at: Option<Instant>,
 }
 
@@ -424,7 +255,7 @@ enum Wait {
 }
 
 impl RateState {
-    /// Parks until at least `d` from now. See the field docs for the two rules.
+    /// Parks until at least `d` from now; forward only, so a short nap never shortens a long `Retry-After`.
     fn park(&mut self, d: Duration, kind: &'static str) {
         let until = Instant::now() + d;
         if self.sleeping_until.is_none_or(|t| until > t) {
@@ -433,16 +264,14 @@ impl RateState {
         }
     }
 
-    /// How much longer this client will not send, or `None`. A deadline in the
-    /// past is simply not a throttle, which is what makes never clearing safe.
+    /// How much longer this client will not send, or `None`; a deadline in the past is simply not a throttle.
     fn throttled_for(&self, now: Instant) -> Option<Duration> {
         self.sleeping_until
             .filter(|t| *t > now)
             .map(|t| t.duration_since(now))
     }
 
-    /// The last moment `remaining` meant anything — a header landing, or a local
-    /// reset once the window rolled.
+    /// The last moment `remaining` meant anything: a header landing, or a local reset once the window rolled.
     fn counted_at(&self) -> Option<Instant> {
         match (self.observed, self.reset_at) {
             (Some(a), Some(b)) => Some(a.max(b)),
@@ -450,25 +279,7 @@ impl RateState {
         }
     }
 
-    /// What is available *now*, healing a count that belongs to a window which
-    /// has since rolled.
-    ///
-    /// `&mut` because it repairs rather than merely reports: a stale count is
-    /// not evidence of a low budget, it is the absence of evidence, and the old
-    /// code treated the two as the same thing.
-    ///
-    /// **This models a stepped window, which is what AniList runs.** Measured
-    /// twice on 2026-09-03 with `scripts/ratelimit-probe.mjs`: after a burn
-    /// the count held exactly as left (17 at +45 s, each sample costing one)
-    /// and read 29 of 30 at +60 s — flat, then the whole budget at once. A
-    /// count therefore holds until a full `WINDOW` has passed and then jumps
-    /// to the limit, and the cost of that is bounded and known: one response
-    /// reporting `remaining: 0` makes every request in the following minute
-    /// pay the full `MAX_PACE` before going out anyway.
-    ///
-    /// Do not heal proportionally. That is right for a rolling window and
-    /// actively harmful for this one — it would hand out budget that does not
-    /// exist and earn the 429s this whole type exists to avoid.
+    /// What is available now, healing a stale count; the window steps, it does not roll, so do not heal proportionally.
     fn headroom(&mut self, now: Instant) -> u32 {
         if self.counted_at().is_none_or(|t| now.duration_since(t) >= WINDOW) {
             self.remaining = self.limit.unwrap_or(SEED);
@@ -477,21 +288,13 @@ impl RateState {
         self.remaining
     }
 
-    /// Books a request against the budget before it goes out.
-    ///
-    /// Without this the limiter is blind to its own in-flight work: `remaining`
-    /// was only ever assigned from a response header, so a burst of concurrent
-    /// callers all read the same pre-burst value, all cleared the guard, and all
-    /// arrived together — which is how a 429 was earned while the panel showed
-    /// comfortable headroom. The header stays authoritative when it lands; this
-    /// only covers the gap between sending and hearing back.
+    /// Books a request against the budget before it goes out, so a burst can see its own in-flight work.
     fn claim(&mut self) {
         self.remaining = self.remaining.saturating_sub(1);
     }
 }
 
-/// What the sync panel shows about the limiter. Local state only — reading it
-/// costs no AniList request.
+/// What the sync panel shows about the limiter; local state only, so reading it costs no request.
 #[derive(serde::Serialize)]
 pub struct RateSnapshot {
     /// `None` until a response header has been seen this session.
@@ -499,10 +302,7 @@ pub struct RateSnapshot {
     pub limit: Option<u32>,
     #[serde(rename = "observedAgoMs")]
     pub observed_ago_ms: Option<u64>,
-    /// **Independent of `remaining`, never derived from it.** If AniList omits
-    /// `x-ratelimit-remaining` on a 429, `remaining` keeps its stale pre-429
-    /// value — a panel branching on that would show comfortable headroom while
-    /// the client is parked for two minutes. This is the signal to branch on.
+    /// Independent of `remaining`, never derived from it: a 429 may omit the header, and this is the signal to branch on.
     #[serde(rename = "throttledForMs")]
     pub throttled_for_ms: Option<u64>,
     #[serde(rename = "throttleKind")]
@@ -517,9 +317,7 @@ impl AniList {
                 .timeout(Duration::from_secs(30))
                 .build()
                 .expect("reqwest client"),
-            // 30 is the documented limit and matches what the live API
-            // reports, but it is a seed rather than an observation — see
-            // `observed`.
+            // A seed rather than an observation; `observed` says whether a header has landed yet.
             rate: Mutex::new(RateState {
                 remaining: SEED,
                 limit: None,
@@ -533,14 +331,7 @@ impl AniList {
         }
     }
 
-    /// Whether `token` still works, decided by one `{ Viewer { id } }` and
-    /// remembered for `PROBE_TTL`.
-    ///
-    /// Called only to settle an `Ambiguous` refusal. `Probe::Never` on the
-    /// probe's own request is what stops a dead token from probing itself in
-    /// a loop; `Box::pin` is what lets an async fn call the one it is called
-    /// from. `None` means the probe could not say — network, pace — and the
-    /// caller must not sign anyone out on that.
+    /// Whether `token` still works, decided by one probe and remembered for `PROBE_TTL`; `None` must not sign anyone out.
     async fn token_alive(&self, token: &str) -> Option<bool> {
         if let Some((at, alive)) = *self.probe.lock().await {
             if at.elapsed() < PROBE_TTL {
@@ -615,19 +406,12 @@ impl AniList {
             .collect()
     }
 
-    /// A snapshot of the limiter for the sync panel.
-    ///
-    /// `rate` is a `tokio::sync::Mutex`, so this is async by construction. The
-    /// lock is never held across a network await, so a poller cannot delay a
-    /// request — but it is on the hot path of every AniList call in the app, so
-    /// this stays a short read and nothing more.
+    /// A snapshot of the limiter for the sync panel; on the hot path of every call, so a short read and nothing more.
     pub async fn rate_snapshot(&self) -> RateSnapshot {
         let now = Instant::now();
         let rate = self.rate.lock().await;
         RateSnapshot {
-            // Gated on `observed`: without a header this is the seed, and
-            // reporting a guess as a measurement is the one thing a headroom
-            // display must not do.
+            // Gated on `observed`: without a header this is the seed, and a guess must not be reported as a measurement.
             remaining: rate.observed.map(|_| rate.remaining),
             limit: rate.limit,
             observed_ago_ms: rate
@@ -654,21 +438,7 @@ impl AniList {
         variables: Value,
         probe: Probe,
     ) -> Result<Value, ApiError> {
-        // Pace into the budget rather than run into the 429, then book the
-        // request before sending it.
-        //
-        // Each decision and its `park` are one critical section on purpose: the
-        // original dropped the lock and *then* slept, leaving a window in which
-        // the client was about to nap and every reader saw it as clear.
-        //
-        // The loop is the fix for the bug this used to have. It slept a flat 5 s
-        // and then sent unconditionally, decrementing nothing and re-checking
-        // nothing — so once any response reported a low count, every request for
-        // the rest of the session paid 5 s up front, and the only way to learn a
-        // better number was to send a request, which napped first. Re-checking in
-        // short slices means the wait ends the moment the budget returns; the
-        // `claim` means a burst can see itself; and `headroom` heals a count left
-        // over from a window that has since rolled.
+        // Pace into the budget in short re-checking slices; each decision and its `park` are one critical section on purpose.
         let started = Instant::now();
         loop {
             // Two different reasons to wait, and only one of them is ours.
@@ -676,11 +446,7 @@ impl AniList {
                 let mut rate = self.rate.lock().await;
                 let now = Instant::now();
                 if let Some(left) = rate.throttled_for(now) {
-                    // A deadline the *server* set, from a `Retry-After` we were
-                    // given. It used to be recorded and never read here, so
-                    // every other caller on this shared client kept sending
-                    // into a window AniList had already closed — earning more
-                    // 429s, each with a longer deadline than the last.
+                    // A deadline the server set: a `Retry-After` outranks the local budget; one retry layer, never two.
                     Wait::Server(left.min(SLICE))
                 } else if rate.headroom(now) > RESERVE {
                     rate.claim();
@@ -692,10 +458,7 @@ impl AniList {
             };
             let d = match wait {
                 Wait::Go => break,
-                // `MAX_PACE` bounds our *own* pacing: stalling a screen for
-                // longer than that costs more than the 429 it avoids. It does
-                // not apply to a server deadline, which is not ours to shorten
-                // and where sending early is a guaranteed rejection.
+                // `MAX_PACE` bounds only our own pacing; a server deadline is not ours to shorten.
                 Wait::Local(d) => {
                     if started.elapsed() >= MAX_PACE {
                         self.rate.lock().await.claim();
@@ -707,9 +470,7 @@ impl AniList {
             };
             tokio::time::sleep(d).await;
         }
-        // Recorded per request so the panel can separate our own pacing from
-        // AniList being slow. They look identical from the outside and have
-        // completely different fixes.
+        // Recorded per request so the panel can separate our own pacing from AniList being slow.
         let paced = started.elapsed();
         let operation = operation_name(query);
 
@@ -726,20 +487,14 @@ impl AniList {
             let resp = match req.send().await {
                 Ok(r) => r,
                 Err(e) => {
-                    // The status class only. Never the body and never the
-                    // headers: the request carries `Authorization: Bearer
-                    // <token>` and the response to a Jellyfin sign-in carries an
-                    // access token, so a logger that reached for either would be
-                    // the leak this whole module exists to prevent.
+                    // Never the body and never the headers: the request carries the bearer token this module keeps in Rust.
                     crate::logging::warn("anilist", format!("request failed: {e}"));
                     self.record(&operation, sent, paced, None, None, "error").await;
                     return Err(ApiError::Network(e.to_string()));
                 }
             };
 
-            // One line when it changes, so a device log can prove which
-            // protocol the TLS handshake actually negotiated — the Android
-            // ALPN regression (net.rs) was invisible without it.
+            // One line when it changes, so a device log can prove which protocol the TLS handshake negotiated.
             crate::logging::debug_changed(
                 "anilist",
                 "http-version",
@@ -757,10 +512,7 @@ impl AniList {
             if remaining.is_some() || limit.is_some() {
                 let mut rate = self.rate.lock().await;
                 if let Some(rem) = remaining {
-                    // Authoritative: it overwrites whatever `claim` guessed, and
-                    // it retires the local reset — otherwise `counted_at` would
-                    // keep answering with a stale repair that is now older than
-                    // the measurement standing beside it.
+                    // Authoritative: it overwrites whatever `claim` guessed and retires the local reset, now older than it.
                     rate.remaining = rem;
                     rate.observed = Some(Instant::now());
                     rate.reset_at = None;
@@ -826,9 +578,7 @@ impl AniList {
                 } else {
                     msg
                 };
-                // A bare `Unauthorized.` with a token sent is the one answer
-                // the response cannot settle. Ask, once, rather than sign the
-                // user out for a payload AniList would not let them send.
+                // A bare `Unauthorized.` with a token sent is the one answer the response cannot settle; ask once, do not sign out.
                 let err = match (verdict(status, &msg, token.is_some()), token, probe) {
                     (Verdict::Ambiguous, Some(t), Probe::Allowed) => {
                         let alive = self.token_alive(t).await;
@@ -836,12 +586,7 @@ impl AniList {
                     }
                     _ => classify(status, msg, token.is_some()),
                 };
-                // The status and AniList's own wording, once per transition.
-                // A screen fires several queries, so an unguarded warn would
-                // write the same line a dozen times and rotate the interesting
-                // part of a 1 MB log off disk — the `debug_changed` lesson.
-                // Never the header and never the body: the request carries the
-                // bearer token this whole module exists to keep in Rust.
+                // Once per transition, never the header or the body; an unguarded warn would rotate the interesting part off disk.
                 match &err {
                     ApiError::Auth(reason) => {
                         if !AUTH_REPORTED.swap(true, Ordering::Relaxed) {
@@ -851,9 +596,7 @@ impl AniList {
                             );
                         }
                     }
-                    // A refusal that is not about the credential — the
-                    // donator sentence, an outage — is the line a bug report
-                    // needs, and the classifier used to throw it away.
+                    // A refusal that is not about the credential is the line a bug report needs.
                     ApiError::Retryable(reason) | ApiError::Api(reason)
                         if matches!(status, 401 | 403) =>
                     {
@@ -871,8 +614,7 @@ impl AniList {
 
             let data = body.get("data").cloned();
             if data.is_some() {
-                // Armed again, so a *later* rejection is logged rather than
-                // swallowed as a repeat of one the user has already fixed.
+                // Armed again, so a later rejection is logged rather than swallowed as a repeat of one already fixed.
                 AUTH_REPORTED.store(false, Ordering::Relaxed);
                 REFUSED_REPORTED.store(false, Ordering::Relaxed);
             }
@@ -915,11 +657,7 @@ mod tests {
         }
     }
 
-    /// A deadline in the past is not a throttle. This is what makes "nothing
-    /// ever clears it" safe — there is no cleanup path to get wrong.
-    /// The deadline was recorded and never consulted, so every other caller on
-    /// this shared client kept sending into a window AniList had closed —
-    /// earning further 429s, each with a longer deadline than the last.
+    /// A server deadline is checked before the local budget, or every caller keeps sending into a closed window.
     #[test]
     fn a_server_deadline_outranks_a_healthy_local_budget() {
         let mut rate = fresh();
@@ -936,9 +674,7 @@ mod tests {
         );
     }
 
-    /// 429 answers with a stable code rather than the server's prose, so the
-    /// frontend can recognise the class without re-implementing
-    /// `message_is_retryable` in TypeScript.
+    /// 429 answers with a stable code, so the frontend can recognise the class without re-implementing `verdict`.
     #[test]
     fn a_rate_limit_is_named_not_described() {
         let e = classify(429, "Too Many Requests".into(), true);
@@ -946,8 +682,7 @@ mod tests {
         assert!(e.is_retryable(), "and it still keeps a queued edit");
     }
 
-    /// A tokenless 429 is the same class: the code says what happened, and
-    /// `sent_token` only ever decides auth-shaped failures.
+    /// A tokenless 429 is the same class; `sent_token` only ever decides auth-shaped failures.
     #[test]
     fn a_rate_limit_is_named_with_or_without_a_token() {
         assert!(
@@ -967,12 +702,7 @@ mod tests {
         assert!(r.throttled_for(now + Duration::from_secs(10)).is_none());
     }
 
-    /// The concurrency bug the forward-only rule exists for.
-    ///
-    /// One client is shared by the scrobbler, three alert passes, `identify.rs`
-    /// and every passthrough. A 5s pre-flight nap beginning while another task
-    /// is most of the way through a 120s `Retry-After` must not shorten the
-    /// reported wait to 5s.
+    /// A short pre-flight nap beginning during another task's long `Retry-After` must not shorten the reported wait.
     #[test]
     fn a_short_park_never_shortens_a_long_one() {
         let now = Instant::now();
@@ -990,8 +720,7 @@ mod tests {
         assert!(r.throttled_for(now).unwrap() > Duration::from_secs(200));
     }
 
-    /// The seeded 30 is a guess. Reporting it as a measurement would draw a
-    /// full headroom bar for a session that has not sent a single request.
+    /// The seed is a guess; reporting it as a measurement would draw a full headroom bar before any request.
     #[tokio::test]
     async fn headroom_is_unknown_until_a_header_lands() {
         let api = AniList::new();
@@ -1002,17 +731,7 @@ mod tests {
         assert_eq!(snap.throttled_for_ms, None);
     }
 
-    /// **The sticky-nap bug.** `remaining` is only ever assigned from a response
-    /// header, so one response reporting 0 used to pin the limiter at 0 for the
-    /// life of the process — every later request paying a flat 5 s for nothing,
-    /// while the only way to learn a better number was to send a request, which
-    /// napped first. A count belonging to a window that has since rolled is the
-    /// absence of evidence, not evidence of a low budget.
-    ///
-    /// Pins the *stepped* reading, measured against the live API on 2026-09-03
-    /// (`scripts/ratelimit-probe.mjs`, twice: flat through +45 s, full again
-    /// at +60 s). If that ever changes, this test is the one that has to
-    /// change with `headroom` — deliberately, and not by accident.
+    /// The stepped reading: a count holds for a full `WINDOW` and then jumps to the limit, all at once.
     #[test]
     fn a_count_from_a_rolled_window_stops_counting() {
         let now = Instant::now();
@@ -1027,10 +746,7 @@ mod tests {
         assert_eq!(r.headroom(now + WINDOW + Duration::from_secs(1)), 30);
     }
 
-    /// A limiter that never sees its own in-flight work lets a burst through:
-    /// every caller reads the same pre-burst value, every one clears the guard,
-    /// and they all arrive together — earning a 429 while the panel showed
-    /// comfortable headroom.
+    /// A limiter blind to its own in-flight work lets a burst through while the panel shows comfortable headroom.
     #[test]
     fn a_claim_is_visible_to_the_next_caller() {
         let now = Instant::now();
@@ -1040,8 +756,7 @@ mod tests {
         assert_eq!(r.headroom(now), before - 1, "the next caller sees it");
     }
 
-    /// Saturating, because the count is `u32` and a burst can outrun the budget.
-    /// An underflow here would wrap to ~4 billion and disable pacing entirely.
+    /// Saturating: a burst can outrun the budget, and an underflow would wrap and disable pacing entirely.
     #[test]
     fn claiming_past_empty_stops_at_zero() {
         let mut r = fresh();
@@ -1052,9 +767,7 @@ mod tests {
         assert_eq!(r.remaining, 0);
     }
 
-    /// A local repair is not a measurement. The panel gates its headroom display
-    /// on `observed` precisely to keep the two apart, so `headroom` healing a
-    /// stale count must not make the seed look like something AniList said.
+    /// A local repair is not a measurement, so healing a stale count must not make the seed look like a header.
     #[tokio::test]
     async fn healing_the_count_does_not_fake_an_observation() {
         let now = Instant::now();
@@ -1064,10 +777,7 @@ mod tests {
         assert!(r.observed.is_none(), "but nothing was measured");
     }
 
-    /// The exact strings `SyncPanel` branches on. It compared against
-    /// `"retry-after"` for a release while this side emitted `"retryAfter"`, so
-    /// every genuine 429 rendered as the app pacing itself — the one distinction
-    /// the field exists to draw.
+    /// The exact strings `SyncPanel` branches on; a mismatch renders every genuine 429 as the app pacing itself.
     #[test]
     fn the_throttle_kinds_are_the_strings_the_panel_compares() {
         let now = Instant::now();
@@ -1080,8 +790,7 @@ mod tests {
         assert_eq!(r.throttled_for(now).and(r.sleeping_kind), Some("retryAfter"));
     }
 
-    /// The reserve has to leave room to act on. At a threshold of one the guard
-    /// engages only when the next request is already the last one available.
+    /// The reserve has to leave room to act on; at a threshold of one the guard engages too late.
     #[test]
     fn the_reserve_is_more_than_the_last_request() {
         assert!(RESERVE > 1, "a threshold of 1 is too late to be a guard");
@@ -1089,10 +798,7 @@ mod tests {
         assert!(SLICE < MAX_PACE, "the point of a slice is to re-check");
     }
 
-    /// The panel's whole point is attribution: "28 of 30" with nothing to
-    /// attribute it to was the complaint. So the name has to be the root field
-    /// the request is *for*, read past the variable list — the `(` and `)` of
-    /// `query ($id: Int!)` contain no selection set.
+    /// The name is the root field the request is for, read past the variable list.
     #[test]
     fn a_request_is_named_by_what_it_asks_for() {
         for (query, want) in [
@@ -1105,8 +811,7 @@ mod tests {
         }
     }
 
-    /// `FOLLOW_COUNTS_QUERY` aliases two `Page` roots, and a row reading "a"
-    /// would say nothing at all.
+    /// An aliased root is reported as what it aliases, or a row would read "a" and say nothing.
     #[test]
     fn an_alias_is_reported_as_what_it_aliases() {
         assert_eq!(
@@ -1115,8 +820,7 @@ mod tests {
         );
     }
 
-    /// Never a panic and never a variable. Anything unrecognisable degrades to
-    /// a generic label rather than reaching for the payload for a better one.
+    /// Anything unrecognisable degrades to a generic label, never a panic and never a variable.
     #[test]
     fn an_unreadable_query_is_named_generically() {
         for query in ["", "query", "query (", "{", "{ }", "((("] {
@@ -1141,8 +845,7 @@ mod tests {
         assert_eq!(rows[0].seq, (LOG_CAP + 10) as u64);
     }
 
-    /// The bug this file's classification was written for: every one of these
-    /// used to be an `ApiError::Api`, and the offline queue deletes those.
+    /// Every one of these must be retryable, because the offline queue deletes `Api` failures.
     #[test]
     fn recoverable_failures_survive() {
         for code in [401, 403, 429, 500, 502, 503, 504] {
@@ -1153,8 +856,7 @@ mod tests {
         }
     }
 
-    /// The other half: a payload AniList will refuse for as long as it exists
-    /// has to be droppable, or one bad row wedges every edit queued behind it.
+    /// A payload AniList will refuse forever must be droppable, or one bad row wedges every edit behind it.
     #[test]
     fn payload_failures_are_permanent() {
         for code in [200, 400, 404, 422] {
@@ -1166,9 +868,7 @@ mod tests {
         }
     }
 
-    /// AniList reports an expired token as HTTP 400 with the reason in the
-    /// errors array, so the status alone would call it permanent and throw the
-    /// write away. This is the one case the message has to decide.
+    /// An expired token arrives as HTTP 400 with the reason in the message, so the message has to decide.
     #[test]
     fn an_expired_token_is_read_out_of_the_message() {
         assert!(classify(400, "Invalid token".into(), true).is_retryable());
@@ -1176,9 +876,7 @@ mod tests {
             classify(400, "Invalid token".into(), true),
             ApiError::Auth(_)
         ));
-        // A request that carried no bearer cannot have had its token
-        // rejected: a proxy or Cloudflare 403 on a tokenless request is
-        // weather, not a sign-out.
+        // A request that carried no bearer cannot have had its token rejected; a tokenless 403 is weather.
         assert!(matches!(
             classify(403, "Forbidden".into(), false),
             ApiError::Retryable(_)
@@ -1190,9 +888,7 @@ mod tests {
         assert!(classify(400, "Too Many Requests".into(), true).is_retryable());
     }
 
-    /// The split this file exists for. Both keep a queued edit — the write is
-    /// good either way, it is the credential that went stale — but only one of
-    /// them means "nothing will change until you sign in again".
+    /// Both keep a queued edit, but only a rejected token means "nothing will change until you sign in again".
     #[test]
     fn a_rejected_token_is_not_the_same_as_a_busy_server() {
         for (code, msg) in [(400, "Invalid token"), (401, "nope"), (403, "invalid token")] {
@@ -1201,25 +897,21 @@ mod tests {
                 "HTTP {code} / {msg:?} is an auth failure"
             );
         }
-        // A 429 is about how fast we asked. Calling it an auth failure would
-        // sign the user out for being busy.
+        // A 429 is about how fast we asked; calling it an auth failure would sign the user out for being busy.
         for (code, msg) in [(429, "Too Many Requests."), (400, "Too Many Requests")] {
             assert!(
                 matches!(classify(code, msg.into(), true), ApiError::Retryable(_)),
                 "HTTP {code} / {msg:?} is pace, not auth"
             );
         }
-        // And a payload AniList refuses stays permanent, or one bad row wedges
-        // every edit behind it.
+        // A refused payload stays permanent, or one bad row wedges every edit behind it.
         assert!(matches!(
             classify(400, "validation: {\"progress\":[\"invalid\"]}".into(), true),
             ApiError::Api(_)
         ));
     }
 
-    /// The bug that made pinning an activity sign the user out. AniList's 403
-    /// carries a sentence about the *payload*; the credential is fine, the
-    /// sentence has to reach the toast, and nothing may raise the banner.
+    /// A donator 403 is about the payload: the sentence reaches the toast and nothing raises the banner.
     #[test]
     fn a_donator_refusal_is_not_an_auth_failure() {
         let msg = "Sorry, you must be at least a tier 2 donator to pin activities";
@@ -1229,8 +921,7 @@ mod tests {
         assert_ne!(String::from(classify(403, msg.into(), true)), TOKEN_REJECTED);
     }
 
-    /// The other 403 seen in the wild: AniList switching its API off. An
-    /// outage is not an expired session, and a queued edit must survive it.
+    /// An outage 403 is not an expired session, and a queued edit must survive it.
     #[test]
     fn an_api_outage_403_keeps_a_queued_edit() {
         let msg = "The AniList API has been temporarily disabled due to severe stability issues.";
@@ -1240,25 +931,21 @@ mod tests {
         assert_eq!(String::from(err), msg);
     }
 
-    /// The one shape the response cannot settle: AniList says `Unauthorized.`
-    /// both for a dead token and for a payload the token may not send. With a
-    /// token it is a question to go and ask; without one it is weather.
+    /// A bare `Unauthorized.` is a question to go and ask with a token, and weather without one.
     #[test]
     fn a_bare_unauthorized_is_ambiguous_with_a_token_and_weather_without() {
         assert_eq!(verdict(403, "Unauthorized.", true), Verdict::Ambiguous);
         assert_eq!(verdict(400, "Unauthorized", true), Verdict::Ambiguous);
         assert_eq!(verdict(400, "  unauthorized. ", true), Verdict::Ambiguous);
         assert_eq!(verdict(403, "Unauthorized.", false), Verdict::Retryable);
-        // Without a probe the old answer stands, which is what the probe's own
-        // request relies on.
+        // Without a probe the old answer stands, which the probe's own request relies on.
         assert!(matches!(
             classify(403, "Unauthorized.".into(), true),
             ApiError::Auth(_)
         ));
     }
 
-    /// A resolver explaining itself is not the bare word: it is a refusal of
-    /// the payload, with the explanation kept.
+    /// A resolver explaining itself is a refusal of the payload, with the explanation kept.
     #[test]
     fn unauthorized_inside_a_sentence_is_a_permission_error() {
         let v = verdict(403, "Unauthorized: cannot edit this review", true);
@@ -1266,8 +953,7 @@ mod tests {
         assert_eq!(verdict(400, "Unauthorized: cannot edit this review", true), Verdict::Api);
     }
 
-    /// The probe's three answers. `None` is the one that matters: nobody is
-    /// signed out on missing evidence.
+    /// The probe's three answers; nobody is signed out on an inconclusive one.
     #[test]
     fn an_inconclusive_probe_does_not_sign_out() {
         assert!(matches!(
@@ -1286,8 +972,7 @@ mod tests {
     /// The probe's own request must never become another probe.
     #[test]
     fn a_probe_never_probes_itself() {
-        // `Probe::Never` is what the response path checks; with it, an
-        // ambiguous answer takes `classify`'s direct mapping.
+        // With `Probe::Never` an ambiguous answer takes `classify`'s direct mapping.
         assert_ne!(Probe::Never, Probe::Allowed);
         assert!(matches!(
             classify(400, "Unauthorized".into(), true),
@@ -1301,8 +986,7 @@ mod tests {
         assert!(classify(401, "Invalid token".into(), true).is_retryable());
     }
 
-    /// The frontend branches on this exact code, and AniList's own wording is
-    /// English, unactionable, and was rendered raw on every screen at once.
+    /// The frontend branches on this exact code; AniList's own wording is English and unactionable.
     #[test]
     fn an_auth_failure_reaches_the_frontend_as_a_stable_code() {
         assert_eq!(
@@ -1319,8 +1003,7 @@ mod tests {
         assert_eq!(verdict(400, "token is fine, mediaId is not", true), Verdict::Api);
     }
 
-    /// `status_is_retryable` is a range check, and the ends of a range are
-    /// where an off-by-one lives. 600 is not a status; 499 is a client error.
+    /// The ends of a range are where an off-by-one lives: 600 is not a status, 499 is a client error.
     #[test]
     fn only_real_server_errors_count_as_server_errors() {
         assert!(status_is_retryable(500));
@@ -1329,15 +1012,13 @@ mod tests {
         assert!(!status_is_retryable(600));
     }
 
-    /// A transport failure never reached AniList, so nothing about the payload
-    /// has been judged yet — it is the most retryable case there is.
+    /// A transport failure never reached AniList, so it is the most retryable case there is.
     #[test]
     fn a_network_error_is_retryable() {
         assert!(ApiError::Network("dns".into()).is_retryable());
     }
 
-    /// The message reaches the UI verbatim for the two server-side cases; only
-    /// reqwest's own Display is technical enough to need a prefix.
+    /// The message reaches the UI verbatim for the server-side cases; only reqwest's own Display needs a prefix.
     #[test]
     fn only_transport_errors_are_prefixed() {
         assert_eq!(

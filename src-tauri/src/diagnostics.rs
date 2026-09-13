@@ -1,57 +1,33 @@
-//! The facts a bug report needs, gathered in one place.
-//!
-//! Every one of these was already knowable — through `app_version`,
-//! `platform_info`, `get_portable_status`, `get_close_to_tray` and
-//! `get_library_status` — but only by asking five commands and knowing to ask.
-//! A reporter should not have to know the shape of the app to describe it, so
-//! this composes the existing sources rather than re-deriving any of them; two
-//! sources for one fact is how they drift.
-//!
-//! What is deliberately **not** here: the AniList token (a boolean says whether
-//! one exists and nothing more), the Jellyfin URL and username, and the library
-//! folder. The destination for this text is a public issue, so the library path
-//! is reduced to "configured or not" and the data directory is redacted unless
-//! the user explicitly asks for the unredacted export. The log file is where
-//! full detail lives; that one stays local until the user attaches it.
+//! The facts a bug report needs, composed from the commands that already know them; never a token, a URL or a path.
 
 use crate::db::Db;
 use tauri::Manager;
 
-/// The Linux-only half. `None` on Windows, so the shape says which platform
-/// produced it without a second field to keep in step.
+/// The Linux-only half; `None` on Windows, so the shape says which platform produced it.
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LinuxInfo {
     /// `PRETTY_NAME` from `/etc/os-release`.
     pub distro: Option<String>,
-    /// `XDG_CURRENT_DESKTOP` — GNOME needs an extension before a tray icon
-    /// appears at all, which is the most common "the tray is broken" report.
+    /// `XDG_CURRENT_DESKTOP`; GNOME needs an extension before a tray icon appears at all.
     pub desktop: Option<String>,
-    /// `XDG_SESSION_TYPE`: `wayland` or `x11`. The single most useful Linux
-    /// fact here — under Wayland one application cannot read another's window
-    /// titles at all, so half of "detection does not work" is answered by it.
+    /// `XDG_SESSION_TYPE`; under Wayland one application cannot read another's window titles at all.
     pub session: Option<String>,
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Diagnostics {
-    /// The four-part `MAJOR.MINOR.PATCH.COMMIT#`. The commit counter is the
-    /// only precise build identifier; the semver core repeats across builds.
+    /// The four-part `MAJOR.MINOR.PATCH.COMMIT#`; the commit counter is the only precise build identifier.
     pub version: String,
     pub os: String,
     pub app_image: bool,
     pub portable: bool,
-    /// Where the database lives. Redacted by `render`, not here, so the viewer
-    /// can still show the real path to the person who owns it.
+    /// Where the database lives; redacted by `render`, not here, so the viewer can show the owner the real path.
     pub data_dir: String,
     pub tray: bool,
     pub schema: u32,
-    /// Which manifest the updater polls. After v1.0.0 the same four-part
-    /// version can run on either channel — the tag build and the rolling
-    /// build off the same commit are identical — so a report that could not
-    /// say which was missing the first thing to check for any "it says I am
-    /// up to date" or "it keeps offering the same build".
+    /// Which manifest the updater polls; the same four-part version can run on either channel.
     pub update_channel: String,
     pub queued: usize,
     /// Whether a token exists. Never the token.
@@ -62,12 +38,9 @@ pub struct Diagnostics {
     pub library_matched: usize,
     pub media_sessions: bool,
     pub jellyfin: bool,
-    /// Which Jellyfin address the last successful request went to — `local`
-    /// or `external` — and `None` without a sign-in. The first thing to check
-    /// for "it works at home and not away", and it names no host.
+    /// Which Jellyfin address the last successful request went to, `local` or `external`; it names no host.
     pub jellyfin_base: Option<String>,
-    /// The mpv IPC pipe. It outranks every other source, so a bug report that
-    /// could not say whether it was on was missing the first thing to check.
+    /// The mpv IPC pipe; it outranks every other source, so a report has to say whether it was on.
     pub mpv: bool,
     pub log_debug: bool,
     pub linux: Option<LinuxInfo>,
@@ -76,14 +49,7 @@ pub struct Diagnostics {
 // --- Pure parsing ------------------------------------------------------------
 
 /// `PRETTY_NAME` out of an `/etc/os-release`.
-///
-/// Outside the `#[cfg]` so it is tested on both platforms rather than only in
-/// the Linux CI job — the shared-module half of the convention that keeps
-/// platform code honest, which is why Windows needs telling it is unused.
-///
-/// Worth knowing why `npm run verify` never caught this: the only other caller
-/// is in `#[cfg(test)]`, so `cargo test` keeps the function alive and a release
-/// build does not. The warning appears in `tauri build` alone.
+// Outside the `#[cfg]` so it is tested on both platforms, which a Windows release build reads as unused.
 #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 pub fn parse_os_release(text: &str) -> Option<String> {
     for line in text.lines() {
@@ -98,11 +64,7 @@ pub fn parse_os_release(text: &str) -> Option<String> {
     None
 }
 
-/// Replaces the user's own name in a path with a placeholder.
-///
-/// `C:\Users\Kyu\AppData\…` and `/home/kyu/.local/share/…` both carry a real
-/// name into whatever the report is pasted into. The rest of the path is the
-/// diagnostic part and survives.
+/// Replaces the user's own name in a path with a placeholder; the rest of the path is the diagnostic part.
 pub fn redact_home(path: &str) -> String {
     for marker in ["\\Users\\", "/Users/", "/home/"] {
         let Some(start) = path.find(marker) else {
@@ -123,9 +85,7 @@ pub fn redact_home(path: &str) -> String {
 
 // --- Platform probes ---------------------------------------------------------
 
-/// A cfg'd *pair* rather than a cfg'd statement: a `#[cfg]` on a statement is
-/// stripped on Windows, so nothing inside it is ever compiled here and the
-/// first anyone hears of a mistake is the Linux CI job.
+/// A cfg'd pair rather than a cfg'd statement, which is stripped on Windows and never compiled here.
 #[cfg(target_os = "linux")]
 fn linux_info() -> Option<LinuxInfo> {
     let env = |key: &str| {
@@ -153,9 +113,7 @@ fn linux_info() -> Option<LinuxInfo> {
 
 pub fn collect(app: &tauri::AppHandle) -> Diagnostics {
     let db = app.state::<Db>();
-    // The library facts come from the command the library screen already uses,
-    // rather than reaching into `LibraryIndex` a second way — the same reason
-    // tray presence is read from `TrayPresent` instead of probed again.
+    // From the command the library screen already uses, rather than reaching into `LibraryIndex` a second way.
     let library = crate::library::get_library_status(
         app.state::<Db>(),
         app.state::<crate::library::LibraryIndex>(),
@@ -178,17 +136,14 @@ pub fn collect(app: &tauri::AppHandle) -> Diagnostics {
         tray: app.state::<crate::TrayPresent>().0,
         schema: db.schema_version(),
         update_channel: crate::commands::stored_channel(&db),
-        // This account's, matching what the pending badge shows. Another
-        // account's rows exist but are neither drained nor counted here.
+        // This account's, matching the pending badge; another account's rows are neither drained nor counted.
         queued: crate::commands::pending(&db),
         // A boolean. The token itself must never leave the backend.
         signed_in: crate::anilist::auth::load_token().is_some(),
         profile_mode: db
             .kv_get("profile_mode")
             .unwrap_or_else(|| "none".to_string()),
-        // The path itself is deliberately not carried — it names a person and
-        // says what they watch. Whether one is set, and the two counts, are the
-        // parts that discriminate a scanner bug.
+        // The path itself names a person and says what they watch; whether one is set and the counts are enough.
         library_configured: library.path.is_some(),
         library_files: library.files_seen,
         library_matched: library.matched,
@@ -207,10 +162,7 @@ pub fn collect(app: &tauri::AppHandle) -> Diagnostics {
     }
 }
 
-/// The block a reporter pastes into an issue.
-///
-/// Markdown rather than JSON: it is going into a GitHub comment, and a table
-/// nobody has to unfold is worth more than a shape a machine could parse.
+/// The block a reporter pastes into an issue, as Markdown, since it is going into a GitHub comment.
 pub fn render(d: &Diagnostics, redact: bool) -> String {
     let yn = |b: bool| if b { "yes" } else { "no" };
     let dir = if redact {
@@ -298,8 +250,7 @@ mod tests {
         assert_eq!(parse_os_release("PRETTY_NAME=\"\"\n"), None);
     }
 
-    /// The report is pasted in public, so the one thing in it that names a
-    /// person has to go.
+    /// The report is pasted in public, so the one thing in it that names a person has to go.
     #[test]
     fn a_home_directory_loses_the_user_name() {
         assert_eq!(

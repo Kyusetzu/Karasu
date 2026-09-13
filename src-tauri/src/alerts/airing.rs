@@ -1,6 +1,4 @@
-//! Background airing watcher: periodically asks AniList which episodes of
-//! the user's watching anime have aired since the last check and fires a
-//! native desktop notification for each — something the website cannot do.
+//! Background airing watcher: asks AniList which watched episodes aired since the last check and toasts each one.
 
 use crate::anilist::client::AniList;
 use crate::db::Db;
@@ -11,15 +9,9 @@ use tauri::{AppHandle, Manager};
 const CHECK_INTERVAL: Duration = Duration::from_secs(20 * 60);
 /// Let the list cache populate before the first check.
 const STARTUP_DELAY: Duration = Duration::from_secs(30);
-/// Must equal the `perPage` in `AIRING_QUERY`; a test pins the two together.
-/// Getting a full page back is the only signal that the answer was truncated —
-/// the query asks for no `pageInfo`.
+/// Must equal the `perPage` in `AIRING_QUERY`; a full page is the only signal that the answer was truncated.
 const PAGE_SIZE: usize = 50;
-/// How long an `aired:` dedupe key is worth keeping.
-///
-/// Generous on purpose: the checkpoint only ever moves forward, so a key older
-/// than the longest plausible backlog-drain can never be consulted again. Thirty
-/// days is far past that and still bounds the table.
+/// How long an `aired:` dedupe key is kept; generous, since the checkpoint only ever moves forward.
 const AIRED_KEY_TTL_SECS: i64 = 30 * 24 * 3600;
 
 const AIRING_QUERY: &str = "
@@ -34,9 +26,7 @@ query ($ids: [Int], $from: Int, $to: Int) {
 }";
 
 pub fn spawn(app: AppHandle) {
-    // Supervised: a panic in here used to take the airing checks down for the
-    // rest of the session with nothing said. The startup delay repeating on a
-    // restart is deliberate — it doubles as the first backoff.
+    // Supervised so a panic cannot silently end the airing checks; the repeated startup delay is the first backoff.
     crate::logging::supervise("airing", move || {
         let app = app.clone();
         async move {
@@ -57,33 +47,13 @@ fn now_secs() -> i64 {
         .unwrap_or(0)
 }
 
-/// The cached viewer blob, parsed. Both readers below want it, so the pass
-/// parses it once rather than once each.
+/// The cached viewer blob, parsed once for both readers below.
 fn cached_viewer(db: &Db) -> Option<Value> {
     db.kv_get("anilist_viewer")
         .and_then(|s| serde_json::from_str::<Value>(&s).ok())
 }
 
-/// Whether AniList will raise its own AIRING notification for this account.
-///
-/// Two switches govern that, and they are separate settings on separate AniList
-/// pages: the account-wide `options.airingNotifications`, and the per-type
-/// `notificationOptions[AIRING].enabled` from the twenty-checkbox grid. Which
-/// of the two the server consults when it *creates* the notification is
-/// undocumented, and cannot be settled by introspection or without flipping a
-/// real account's settings and waiting for an episode. So this asks for both.
-///
-/// The asymmetry is the whole design. Being wrong towards "AniList has it"
-/// costs the user a notice they will never see; being wrong the other way costs
-/// a duplicate bell row, which is precisely the behaviour this replaces. So
-/// anything unknown reads as `false`: no `options` block (a viewer blob cached
-/// before it was queried, or no account at all), either switch off, either
-/// switch absent.
-///
-/// The one thing read as on without being said so is an *entry* missing from
-/// `notificationOptions`, or the array being absent entirely — that is
-/// AniList's own default for a type it has never stored, and the same default
-/// `mergeNotificationOptions` applies on the frontend.
+/// Whether AniList will raise its own AIRING row: both switches must be on, and anything unknown reads as `false`.
 fn anilist_covers_airing(viewer: Option<&Value>) -> bool {
     let Some(options) = viewer
         .and_then(|v| v.get("options"))
@@ -152,11 +122,7 @@ fn pick_title(title: Option<&Value>) -> String {
 async fn check(app: &AppHandle) {
     let db = app.state::<Db>();
     if db.kv_get("airing_notify").as_deref() == Some("0") {
-        // The checkpoint moves even while the setting is off. It used to return
-        // before touching it, so `airing_last_check` froze at whatever second
-        // the toggle was flipped — and switching the feature back on months
-        // later replayed every episode that had aired in between, as a desktop
-        // toast and a bell row each. Turning a notification off must not arm it.
+        // The checkpoint moves even while the setting is off, or re-enabling it replays every episode aired since.
         let _ = db.kv_set("airing_last_check", &now_secs().to_string());
         return;
     }
@@ -165,8 +131,7 @@ async fn check(app: &AppHandle) {
     if ids.is_empty() {
         return;
     }
-    // Decided once per pass, not per episode: it is an account setting, and the
-    // blob cannot change mid-loop.
+    // Decided once per pass: it is an account setting, and the blob cannot change mid-loop.
     let anilist_has_it = anilist_covers_airing(viewer.as_ref());
 
     let now = now_secs();
@@ -178,20 +143,12 @@ async fn check(app: &AppHandle) {
 
     let api = app.state::<AniList>();
     let vars = json!({ "ids": ids, "from": last, "to": now });
-    // Keep last_check and retry next round either way, but say which it was:
-    // a network blip and a schema break took the same silent branch, so "airing
-    // notifications stopped" had no cause anyone could report.
-    // With the account's token when there is one. The data is public and the
-    // budget window is the same either way, but an outage that refuses
-    // unauthenticated requests — 2026-09-10/11: HTTP 403 "temporarily
-    // disabled" for those, normal answers for signed-in ones — used to fail
-    // this check every round for as long as it lasted.
+    // The token when there is one: an outage refusing unauthenticated requests still answers signed-in ones.
     let token = crate::anilist::auth::load_token();
     let data = match api.query(token.as_deref(), AIRING_QUERY, vars).await {
         Ok(data) => data,
         Err(e) => {
-            // `From<ApiError> for String` is what distinguishes a network error
-            // from an API one, which is the distinction worth recording.
+            // `From<ApiError> for String` distinguishes a network error from an API one, which is worth recording.
             crate::logging::warn(
                 "airing",
                 format!("the airing check failed: {}", String::from(e)),
@@ -207,15 +164,13 @@ async fn check(app: &AppHandle) {
         .and_then(|v| v.as_array())
         .map(|v| v.as_slice())
         .unwrap_or(&[]);
-    // How far this run actually got. `sort: TIME` is ascending, so a full page
-    // is the *oldest* 50 in the window and the newest are the ones missing.
+    // How far this run got: `sort: TIME` is ascending, so a full page is the oldest and the newest are missing.
     let mut reached = last;
 
     for sched in page {
         let episode = sched.get("episode").and_then(|v| v.as_i64()).unwrap_or(0);
         let media_id = sched.pointer("/media/id").and_then(|v| v.as_i64()).unwrap_or(0);
-        // Before the dedupe: a schedule that was skipped was still *seen*, and
-        // the checkpoint is about what the window covered, not what it notified.
+        // Before the dedupe: a skipped schedule was still seen, and the checkpoint covers the window, not the notices.
         reached = reached.max(sched.get("airingAt").and_then(|v| v.as_i64()).unwrap_or(0));
         let key = format!("aired:{media_id}:{episode}");
         if db.kv_get(&key).is_some() {
@@ -231,10 +186,7 @@ async fn check(app: &AppHandle) {
         let head = crate::i18n::Msg::AiringTitle;
         let body = crate::i18n::Msg::AiringBody { title: &title, episode };
         if anilist_has_it {
-            // AniList's own row is strictly the better of the two — it links to
-            // the entry and names the episode — so writing a second one beside
-            // it in the same panel is a duplicate. The desktop toast is the
-            // half AniList cannot do, and is why this pass exists at all.
+            // AniList's own row is the better one, so only the desktop toast, the half AniList cannot do, is sent.
             crate::alerts::notify::notify_toast(app, "airing", head, body);
         } else {
             crate::alerts::notify::notify(
@@ -242,8 +194,7 @@ async fn check(app: &AppHandle) {
                 "airing",
                 head,
                 body,
-                // `media_id` above falls back to 0, and a row carrying that
-                // would mint a `/media/0` route the bell would happily open.
+                // `media_id` falls back to 0, and a row carrying that would mint a `/media/0` route the bell would open.
                 (media_id > 0).then_some(media_id),
             );
         }
@@ -251,20 +202,10 @@ async fn check(app: &AppHandle) {
         let _ = db.kv_set(&key, &now.to_string());
     }
 
-    // One kv row per episode, kept forever, was the shape here: a few thousand
-    // a year for someone following a full season, none of them ever read again
-    // once the checkpoint has moved past that episode. `airing_last_check` is
-    // what actually stops a re-notification — these keys only absorb the
-    // overlap at the window boundary, so anything older than the retention
-    // below cannot be consulted again and is safe to drop.
+    // The `aired:` keys only absorb the window-boundary overlap, so anything older than the retention is safe to drop.
     db.kv_prune_older("aired:", now - AIRED_KEY_TTL_SECS);
 
-    // A full page means the answer was cut off, and moving the checkpoint to
-    // `now` would step over every episode past the fiftieth — permanently, since
-    // no `aired:` key was written for them and no later window reaches back.
-    // Stopping at the last one seen lets the 20-minute interval drain the
-    // backlog instead. `airingAt_greater` is strictly greater, so the -1 keeps
-    // any schedule sharing that second; the `aired:` keys absorb the overlap.
+    // A full page was cut off: stop at the last one seen so later rounds drain the backlog; the -1 keeps a shared second.
     let checkpoint = if page.len() >= PAGE_SIZE { reached.saturating_sub(1) } else { now };
     let _ = db.kv_set("airing_last_check", &checkpoint.to_string());
 }
@@ -273,10 +214,7 @@ async fn check(app: &AppHandle) {
 mod tests {
     use super::*;
 
-    /// The truncation check reads a page length against `PAGE_SIZE`, and the
-    /// page length is whatever the query asked for. Nothing else ties them
-    /// together, so lowering `perPage` for a rate-limit tune would silently
-    /// turn the checkpoint back into the bug it fixes: never full, always `now`.
+    /// Lowering `perPage` without `PAGE_SIZE` would silently make the checkpoint never full and always `now`.
     #[test]
     fn the_page_size_matches_the_query_that_produces_it() {
         assert!(
@@ -285,8 +223,7 @@ mod tests {
         );
     }
 
-    /// Both switches on, spelled out. The only state in which Karasu leaves the
-    /// bell row to AniList.
+    /// Both switches on is the only state in which Karasu leaves the bell row to AniList.
     #[test]
     fn both_switches_on_means_anilist_covers_it() {
         let viewer = json!({
@@ -302,8 +239,7 @@ mod tests {
         assert!(anilist_covers_airing(Some(&viewer)));
     }
 
-    /// An entry AniList has never stored for this account is on, which is
-    /// AniList's own default and the one `mergeNotificationOptions` applies.
+    /// An entry AniList has never stored reads as on, which is AniList's own default.
     #[test]
     fn an_unlisted_airing_entry_reads_as_on() {
         let listed = json!({
@@ -318,9 +254,7 @@ mod tests {
         assert!(anilist_covers_airing(Some(&no_array)));
     }
 
-    /// Either switch off is enough to put the row back. They are separate
-    /// settings on separate AniList pages, and which one the server consults is
-    /// undocumented — so neither is allowed to speak for the other.
+    /// Either switch off is enough to keep the row; neither setting may speak for the other.
     #[test]
     fn either_switch_off_keeps_karasus_own_row() {
         let account_wide_off = json!({
@@ -340,12 +274,7 @@ mod tests {
         assert!(!anilist_covers_airing(Some(&per_type_off)));
     }
 
-    /// The direction that costs something, pinned by name.
-    ///
-    /// A blob cached before `options` was ever queried — and the signed-out case
-    /// — must read as "AniList will not cover this". The wrong answer here is a
-    /// notice the user never sees anywhere; the wrong answer the other way is
-    /// the duplicate row this change exists to remove, which is merely today.
+    /// A blob without `options`, or no account at all, must read as "AniList will not cover this".
     #[test]
     fn anything_unknown_keeps_karasus_own_row() {
         assert!(!anilist_covers_airing(None), "signed out");

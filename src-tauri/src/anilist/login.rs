@@ -1,13 +1,4 @@
-//! One-click OAuth login via a temporary localhost callback server.
-//!
-//! AniList uses the implicit grant, so the access token arrives in the URL
-//! *fragment* of the redirect — which an HTTP server never receives. The
-//! server therefore serves a tiny bridge page on `/callback` whose JS
-//! re-sends the fragment as a query string to `/token`, where the token is
-//! validated, stored in the credential manager, and announced to the UI.
-//!
-//! The AniList client's registered redirect URL must be
-//! `http://localhost:46231/callback`.
+//! One-click OAuth login: a localhost callback server whose bridge page re-sends the URL fragment to `/token`.
 
 use crate::anilist::client::AniList;
 use crate::sync::LockExt;
@@ -18,9 +9,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 
-/// Fixed port so the redirect URL registered on AniList always matches.
-/// Deliberately below the ephemeral range to avoid clashes with OS-assigned
-/// ports; the listener only runs during an active login attempt.
+/// Fixed so the redirect URL registered on AniList always matches; deliberately below the ephemeral range.
 pub const AUTH_CALLBACK_PORT: u16 = 46231;
 
 /// How long the callback server waits for the user to finish in the browser.
@@ -28,17 +17,7 @@ const LOGIN_WINDOW: Duration = Duration::from_secs(600);
 
 static ACTIVE: AtomicBool = AtomicBool::new(false);
 
-/// The `state` nonce for the login attempt currently in flight.
-///
-/// Without one, `/token` acted on any GET that reached the port. The listener
-/// is open for ten minutes while the user is in their browser, and
-/// `http://127.0.0.1` counts as a potentially-trustworthy origin, so any page
-/// open in that browser — an ad iframe in a background tab is enough — could
-/// issue `new Image().src = "http://127.0.0.1:46231/token?access_token=…"` and
-/// hand Karasu *its* AniList token. It validates, so it gets saved, and from
-/// then on every scrobble and list edit the victim makes is written to the
-/// attacker's account while the victim's screen shows the attacker's list.
-/// Textbook login CSRF; the nonce is what closes it.
+/// The `state` nonce for the login in flight; without it any page in the browser could hand Karasu its own token.
 static PENDING_STATE: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
 
 /// A fresh 256-bit nonce, hex-encoded.
@@ -63,15 +42,10 @@ const BRIDGE_HTML: &str = concat!(
     "<noscript>JavaScript is required to complete the login.</noscript></body></html>",
 );
 
-/// Starts the callback server (if not already running) and returns once the
-/// listener is bound. The actual token handling happens on a background
-/// thread; the UI is notified through the `anilist-auth` /
-/// `anilist-auth-error` events.
-/// Returns the `state` nonce the authorize URL must carry.
+/// Starts the callback server if it is not running and returns the `state` nonce the authorize URL must carry.
 pub fn start<R: Runtime>(app: AppHandle<R>) -> Result<String, String> {
     if ACTIVE.swap(true, Ordering::SeqCst) {
-        // A previous login attempt is still waiting — reuse its listener, and
-        // its nonce, since that is what the running server will check against.
+        // A previous attempt is still waiting: reuse its listener and its nonce, which is what the server checks.
         return PENDING_STATE
             .guard()
             .clone()
@@ -95,11 +69,7 @@ pub fn start<R: Runtime>(app: AppHandle<R>) -> Result<String, String> {
     std::thread::spawn(move || {
         // Validates the token, persists it and notifies the frontend.
         let on_token = |token: &str| -> Result<(), String> {
-            // Front the app *before* the connect rather than after: the
-            // browser tab resolves immediately now (see the respond-early
-            // note in `handle_connection`), so this window is where the
-            // outcome — the signed-in flip or `anilist-auth-error` — lands,
-            // and it should be on screen while its waiting state shows.
+            // Front the app before the connect: the browser tab resolves at once, so the outcome lands in this window.
             surface_main_window(&app);
             let db = app.state::<Db>();
             let api = app.state::<AniList>();
@@ -111,9 +81,7 @@ pub fn start<R: Runtime>(app: AppHandle<R>) -> Result<String, String> {
                     Ok(())
                 }
                 Err(e) => {
-                    // Logged as well as emitted: the emit paints one screen
-                    // once, and a user reporting "it showed an error" needs
-                    // that error to still exist somewhere afterwards.
+                    // Logged as well as emitted, so the error still exists somewhere after the one screen it paints.
                     crate::logging::warn(
                         "auth",
                         format!("connect after the callback failed: {e}"),
@@ -131,8 +99,7 @@ pub fn start<R: Runtime>(app: AppHandle<R>) -> Result<String, String> {
     Ok(state)
 }
 
-/// Binds the callback port in non-blocking mode so the accept loop can
-/// enforce the login window timeout.
+/// Binds the callback port non-blocking so the accept loop can enforce the login window timeout.
 fn bind(port: u16) -> Result<TcpListener, String> {
     let listener = TcpListener::bind(("127.0.0.1", port)).map_err(|e| {
         format!(
@@ -166,18 +133,12 @@ fn serve(
     }
 }
 
-/// Handles one HTTP request. Returns true once a state-valid token was
-/// delivered — whether the connect then succeeds is the app's story.
+/// Handles one request; true once a state-valid token was delivered, whatever the connect then does.
 fn handle_connection(
     mut stream: TcpStream,
     on_token: &dyn Fn(&str) -> Result<(), String>,
 ) -> bool {
-    // The listener is non-blocking so the accept loop can time out, and on
-    // Windows the accepted socket inherits that flag — which would make the
-    // read below fail with `WouldBlock` (and silently drop the request)
-    // whenever the browser's bytes have not landed by the time `accept`
-    // returned. Put this socket back into blocking mode so the read timeout
-    // actually applies and a partial write cannot be lost either.
+    // Back to blocking: on Windows the accepted socket inherits the listener's flag and the read fails with `WouldBlock`.
     let _ = stream.set_nonblocking(false);
     let _ = stream.set_read_timeout(Some(Duration::from_secs(5)));
     let request = match read_request(&mut stream) {
@@ -190,11 +151,7 @@ fn handle_connection(
         respond(&mut stream, 200, BRIDGE_HTML);
         false
     } else if let Some(query) = path.strip_prefix("/token?") {
-        // The bridge page is same-origin and sends no `Origin`; a cross-site
-        // fetch always does. Cheap to check and it costs a legitimate login
-        // nothing — but it is only the second line, because a plain
-        // `new Image().src` sends no Origin either. The nonce below is what
-        // actually holds.
+        // The bridge page sends no `Origin` and a cross-site fetch always does; cheap, but the nonce is what holds.
         if has_origin_header(&request) || !state_ok(query) {
             respond(
                 &mut stream,
@@ -208,19 +165,9 @@ fn handle_connection(
         }
         match query_param(query, "access_token") {
             Some(token) if !token.is_empty() => {
-                // The page goes out *before* the connect. The connect is a
-                // network viewer fetch plus the token write — seconds on a
-                // cold path, and on Android the `karasu://` hop back to the
-                // app lives inside this very page, so serving it afterwards
-                // kept the user staring at a blank tab for the whole
-                // connect. The page claims only the handoff, never success:
-                // on a failed connect it is all the browser ever shows.
+                // The page goes out before the connect and claims only the handoff: on a failed connect it is all the tab shows.
                 respond(&mut stream, 200, &handoff_page());
-                // `true` either way: the browser's job ended at delivery, so
-                // the window closes and a transient connect failure can no
-                // longer be retried by the still-open tab. The in-app button
-                // is the retry now, with the error visible in the app
-                // through `anilist-auth-error` instead of a dead tab.
+                // `true` either way: the browser's job ended at delivery, and the in-app button is the retry now.
                 let _ = on_token(token);
                 true
             }
@@ -259,13 +206,7 @@ fn has_origin_header(request: &str) -> bool {
         .any(|l| l.to_ascii_lowercase().starts_with("origin:"))
 }
 
-/// Reads the request head, i.e. everything up to the blank line that ends the
-/// headers. One `read` is not enough: TCP gives no framing guarantees, so the
-/// first segment can carry as little as `GET ` — parsing that alone yields no
-/// path at all and would answer a valid `/callback` with a 404.
-///
-/// Returns `None` if nothing was received, so the caller can drop the
-/// connection.
+/// Reads the request head up to the blank line; one `read` is not enough, since TCP gives no framing guarantees.
 fn read_request(stream: &mut TcpStream) -> Option<String> {
     let mut buf = [0u8; 8192];
     let mut len = 0;
@@ -285,8 +226,7 @@ fn read_request(stream: &mut TcpStream) -> Option<String> {
     (len > 0).then(|| String::from_utf8_lossy(&buf[..len]).into_owned())
 }
 
-/// Extracts a raw query parameter value (no percent-decoding — AniList
-/// tokens are URL-safe JWTs).
+/// Extracts a raw query parameter value; no percent-decoding, since AniList tokens are URL-safe JWTs.
 fn query_param<'a>(query: &'a str, key: &str) -> Option<&'a str> {
     query
         .split('&')
@@ -306,21 +246,11 @@ fn respond(stream: &mut TcpStream, status: u16, body: &str) {
     );
     let _ = stream.write_all(response.as_bytes());
     let _ = stream.flush();
-    // Half-close so the peer sees a clean end-of-response (we announced
-    // `Connection: close`) instead of inferring it from the socket being
-    // dropped, which can surface as a reset mid-read.
+    // Half-close so the peer sees a clean end-of-response instead of a reset mid-read.
     let _ = stream.shutdown(Shutdown::Write);
 }
 
-/// The page a delivered token shows — a cfg'd pair, per the house rule,
-/// because the two platforms owe the reader different things.
-///
-/// It is served *before* the connect runs (see `handle_connection`), so it
-/// claims only the handoff, never success — on a failed connect this page is
-/// all the browser ever shows, and the outcome lands in the app instead.
-///
-/// On desktop the app has already been fronted and the browser tab was the
-/// detour, so the page only has to say the tab's part is over.
+/// The page a delivered token shows, served before the connect runs, so it claims only the handoff, never success.
 #[cfg(not(target_os = "android"))]
 fn handoff_page() -> String {
     page(
@@ -329,13 +259,7 @@ fn handoff_page() -> String {
     )
 }
 
-/// On Android the browser is now the foreground app and has no way to yield
-/// by itself, so the page carries the hop back: a `karasu://login` link — the
-/// custom scheme the deep-link plugin registers from `tauri.conf.json`, which
-/// re-enters the running `singleTask` activity — plus an automatic attempt.
-/// The attempt is best-effort (Chrome may demand a user gesture for scheme
-/// navigation); the button is the load-bearing half. The message string is
-/// trusted HTML into `page`'s `<p>`, like every other call site's.
+/// On Android the page carries the hop back to the app: a `karasu://login` link plus a best-effort automatic attempt.
 #[cfg(target_os = "android")]
 fn handoff_page() -> String {
     page(
@@ -364,12 +288,10 @@ mod tests {
     use super::*;
     use std::sync::mpsc;
 
-    /// Spins up the server on an OS-assigned port with a scripted token
-    /// handler and returns (port, join handle).
-    /// The nonce the tests hand to `/token`. Every test uses the same one, so
-    /// the shared `PENDING_STATE` is safe to set from each of them.
+    /// The nonce every test hands to `/token`, so the shared `PENDING_STATE` is safe to set from each of them.
     const TEST_STATE: &str = "0123456789abcdef";
 
+    /// Spins up the server on an OS-assigned port with a scripted token handler.
     fn spawn_server(
         accept: &'static str,
         done: mpsc::Sender<()>,
@@ -391,12 +313,7 @@ mod tests {
         (port, handle)
     }
 
-    /// Sends one request and reads the response until the server closes.
-    ///
-    /// Every failure mode here is loud on purpose: a discarded read error or a
-    /// truncated body would come back as an empty string and fail whichever
-    /// content assertion ran next with a message that says nothing about the
-    /// actual cause.
+    /// Sends one request and reads the response until the server closes; every failure mode is loud on purpose.
     fn get(port: u16, path: &str) -> String {
         let mut s = TcpStream::connect(("127.0.0.1", port)).unwrap();
         s.set_read_timeout(Some(Duration::from_secs(10))).unwrap();
@@ -414,8 +331,7 @@ mod tests {
             .unwrap_or_else(|e| panic!("sending {path} failed: {e}"));
     }
 
-    /// Reads to end-of-stream and checks the response arrived whole, so a
-    /// short read fails as a short read rather than as a missing status line.
+    /// Reads to end-of-stream and checks the response arrived whole, so a short read fails as a short read.
     fn read_response(s: &mut TcpStream, path: &str) -> String {
         let mut response = String::new();
         s.read_to_string(&mut response)
@@ -455,8 +371,7 @@ mod tests {
         let unknown = get(port, "/somewhere");
         assert!(unknown.contains("404"), "unknown path: {unknown}");
 
-        // A token with no `state`, or the wrong one, is what a page on some
-        // other site can produce. It must never reach the token handler.
+        // A token with no `state`, or the wrong one, must never reach the token handler.
         let unstamped = get(port, "/token?access_token=GOOD&token_type=Bearer");
         assert!(unstamped.contains("403"), "state-less token: {unstamped}");
         let wrong = get(port, "/token?access_token=GOOD&state=deadbeefdeadbeef");
@@ -476,10 +391,7 @@ mod tests {
         handle.join().unwrap();
     }
 
-    /// The other half of the respond-early contract: a token the connect
-    /// later rejects gets the *same* handoff page and still ends the window.
-    /// The browser's job ended at delivery; the outcome — here a failure —
-    /// reaches the app through `anilist-auth-error`, not this tab.
+    /// A token the connect later rejects gets the same handoff page and still ends the window.
     #[test]
     fn a_rejected_token_still_ends_the_window_with_the_handoff_page() {
         let (tx, rx) = mpsc::channel();
@@ -496,19 +408,7 @@ mod tests {
         handle.join().unwrap();
     }
 
-    /// Pins the two timing assumptions the server must not make, both of which
-    /// a browser can violate and neither of which `full_callback_flow` exercises
-    /// reliably — it just happens to lose the race about once in twenty runs.
-    ///
-    /// 1. The accept loop polls a non-blocking listener, and on Windows the
-    ///    accepted socket inherits that flag, so a request whose bytes arrive
-    ///    after `accept` returned used to fail the read with `WouldBlock` and be
-    ///    dropped without any response.
-    /// 2. TCP does not preserve write boundaries, so the first `read` can return
-    ///    a fragment too short to contain the path.
-    ///
-    /// Connecting before sending, and splitting the request line, makes both
-    /// orderings certain rather than a race.
+    /// A request whose bytes arrive after `accept`, split across two writes, is still served.
     #[test]
     fn serves_a_request_that_arrives_late_and_split() {
         let (tx, rx) = mpsc::channel();
@@ -516,8 +416,7 @@ mod tests {
 
         let mut s = TcpStream::connect(("127.0.0.1", port)).unwrap();
         s.set_read_timeout(Some(Duration::from_secs(10))).unwrap();
-        // Longer than one poll of the accept loop, so the server has certainly
-        // accepted this connection while its receive buffer is still empty.
+        // Longer than one poll of the accept loop, so the connection is accepted while its buffer is still empty.
         std::thread::sleep(Duration::from_millis(250));
         send(&mut s, "/callback", "GET ");
         std::thread::sleep(Duration::from_millis(50));
@@ -536,8 +435,7 @@ mod tests {
         handle.join().unwrap();
     }
 
-    /// The `Origin` header is the cheap half of the check: the bridge page is
-    /// same-origin and sends none, a cross-site fetch always does.
+    /// The `Origin` header is the cheap half of the check: the bridge page sends none, a cross-site fetch always does.
     #[test]
     fn a_request_carrying_an_origin_is_refused() {
         let (tx, _rx) = mpsc::channel();
@@ -562,8 +460,7 @@ mod tests {
         assert!(state_matches("abc123", "abc123"));
         assert!(!state_matches("abc123", "abc124"));
         assert!(!state_matches("abc123", "abc12"));
-        // An empty expectation must never match, or a login that was never
-        // started would accept anything.
+        // An empty expectation must never match, or a login that was never started would accept anything.
         assert!(!state_matches("", ""));
     }
 
@@ -586,10 +483,7 @@ mod tests {
     }
 }
 
-/// Brings Karasu back to the front once the browser half of the sign-in is
-/// done. `unminimize` does not exist on a mobile `WebviewWindow`, and the
-/// system brings the app forward itself when the callback URL resolves — so
-/// the mobile arm is a real no-op rather than a stub.
+/// Fronts Karasu once the browser half is done; on mobile the system does that itself, so that arm is a real no-op.
 #[cfg(desktop)]
 fn surface_main_window<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
     use tauri::Manager;

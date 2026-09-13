@@ -1,31 +1,4 @@
-//! The AniList-notification summary pass — the scheduler's in-app half.
-//!
-//! One bounded request per fire: the server's unread count plus the newest
-//! notification id, compared against a persisted cursor, surfaced as a
-//! single summary **toast** — never a bell row. The bell already renders the
-//! site rows themselves, so a local "N new notifications" row would sit
-//! beside the very rows it summarizes; the toast is the half the bell cannot
-//! do (reach the desktop while Karasu sits in the tray, or the phone while
-//! the app is backgrounded). Same resolution as the airing watcher's
-//! duplicate-refusal, same mechanism (`notify_toast`).
-//!
-//! Off by default, like `stale` and `sequel`: this is the first thing in the
-//! app that spends the shared ~30/min budget with nobody asking, and even at
-//! the 15-minute floor it costs 4 requests an hour.
-//!
-//! The interval is re-read every tick rather than slept, deliberately unlike
-//! the compile-time-constant passes — a settings change takes effect without
-//! a restart, and Android's JobScheduler shares the same kv vocabulary
-//! (`notif_bg_interval_min`, `site_notif_seen_id`,
-//! `site_notif_last_check_ms`), which is how the two halves coordinate: the
-//! job defers to a fresh `site_notif_last_check_ms`, and the cursor advances
-//! through `kv_advance_max` so two connections cannot both toast one batch.
-//!
-//! Arming is silent: with no cursor on record the first successful fetch
-//! only writes the baseline. The airing watcher's lesson — turning a
-//! notification on must not fire the backlog — with the request-free twist
-//! that while *off* this pass fetches nothing at all, so the baseline is
-//! taken at the first fetch instead of maintained on a clock.
+//! The site-notification summary toast, never a bell row; its kv vocabulary is shared with background.rs's Android job.
 
 use crate::anilist::client::AniList;
 use crate::db::Db;
@@ -37,17 +10,11 @@ const TICK: Duration = Duration::from_secs(60);
 const STARTUP_DELAY: Duration = Duration::from_secs(45);
 
 pub const INTERVAL_KEY: &str = "notif_bg_interval_min";
-/// The cursor, per account: the newest notification id already announced and
-/// when it was last checked. `background.rs` shares both, and
-/// `commands::auth::switch_identity` clears both — `kv_advance_max` only ever
-/// moves the id forward, so one account's cursor left behind would either
-/// starve the next account (its ids are lower, nothing is ever "newer") or
-/// fire on its first pass.
+/// The cursor per account; `switch_identity` clears it, since `kv_advance_max` only ever moves it forward.
 pub(crate) const SEEN_KEY: &str = "site_notif_seen_id";
 pub(crate) const LAST_CHECK_KEY: &str = "site_notif_last_check_ms";
 
-/// Android's JobScheduler floor — one vocabulary on both platforms, so the
-/// desktop cannot promise a cadence the phone quietly rounds up.
+/// Android's JobScheduler floor, one vocabulary on both platforms so the desktop cannot promise a faster cadence.
 pub const INTERVAL_MIN: i64 = 15;
 pub const INTERVAL_MAX: i64 = 720;
 
@@ -64,12 +31,7 @@ pub fn interval_min(db: &Db) -> i64 {
     }
 }
 
-/// The one request. `resetNotificationCount` is deliberately absent — its
-/// default is false, and a background pass marking the user's site feed seen
-/// would be a real bug, pinned by a test below. The 19 inline fragments are
-/// the price of `notifications` being a union with no common id field;
-/// `ActivityMessageNotification` is excluded exactly as everywhere else
-/// (absent from `type_in`, no fragment).
+/// The one request; `resetNotificationCount` is deliberately absent, and message notifications stay excluded.
 pub(crate) const SITE_QUERY: &str = "
 query {
   Viewer { unreadNotificationCount }
@@ -105,10 +67,7 @@ query {
   }
 }";
 
-/// How long a failed check waits before the next attempt.
-///
-/// Long enough that an unreachable server is not polled at the tick rate,
-/// short enough that a blip does not cost the whole configured interval.
+/// How long a failed check waits: neither the tick rate nor the whole configured interval.
 const RETRY_AFTER_FAILURE_MS: i64 = 5 * 60_000;
 
 pub fn spawn(app: AppHandle) {
@@ -147,14 +106,7 @@ async fn check(app: &AppHandle) {
         Err(e) => {
             // Once per transition, not per tick — the debug_changed lesson.
             crate::logging::debug_changed("site", "check", format!("check failed: {e:?}"));
-            // Not stamped as a success — that would silence the next interval,
-            // which is the whole point of stamping late. But not left unstamped
-            // either: this loop ticks every 60 s and only this stamp holds it
-            // back, so a server that stays unreachable turned a 15-to-720
-            // minute pass into one request a minute, out of a shared budget,
-            // exactly when the API is least able to answer. The next attempt is
-            // pushed out by the shorter of the configured interval and
-            // `RETRY_AFTER_FAILURE_MS`.
+            // Not a success stamp, yet not left unstamped: an unreachable server must not be polled at the tick rate.
             let interval_ms = interval * 60_000;
             let retry_in = interval_ms.min(RETRY_AFTER_FAILURE_MS);
             let _ = db.kv_set(
@@ -164,8 +116,7 @@ async fn check(app: &AppHandle) {
             return;
         }
     };
-    // Stamped only on success, like the update throttle: a failed fetch must
-    // not silence the next interval (or Android's job, which defers to this).
+    // Stamped only on success: a failed fetch must not silence the next interval, nor Android's job.
     let _ = db.kv_set(
         LAST_CHECK_KEY,
         &crate::alerts::notify::now_ms().to_string(),
@@ -187,9 +138,7 @@ async fn check(app: &AppHandle) {
     match seen {
         // First fetch ever: baseline written, nothing announced.
         None => {}
-        // News, and this connection is the one that claimed it. A zero
-        // unread count means the user already read it in the bell — the
-        // cursor still moved, the toast stays quiet.
+        // News this connection claimed; a zero unread count means it was read in the bell, so the toast stays quiet.
         Some(s) if newest > s && unread > 0 && advanced => {
             crate::alerts::notify::notify_toast(
                 app,
@@ -206,9 +155,7 @@ async fn check(app: &AppHandle) {
 mod tests {
     use super::SITE_QUERY;
 
-    /// A background pass must never mark the user's site feed seen. The
-    /// argument's default is false; this pins that nobody "helpfully" adds
-    /// it back while touching the query.
+    /// A background pass must never mark the user's site feed seen.
     #[test]
     fn the_query_never_resets_the_unread_count() {
         assert!(!SITE_QUERY.contains("resetNotificationCount"));

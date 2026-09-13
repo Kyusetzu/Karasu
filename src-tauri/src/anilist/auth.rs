@@ -1,15 +1,4 @@
-//! Token storage. In normal installs the token lives in the OS credential
-//! store (keyring — Windows Credential Manager, or the Secret Service on
-//! Linux). In portable mode it is stored in a file next to the executable so
-//! it travels with the folder, encrypted on both platforms: DPAPI on Windows,
-//! XChaCha20-Poly1305 under a Secret Service-held key on Linux. Either way the
-//! token never leaves the Rust backend.
-//!
-//! Both schemes bind the file to the machine and account, and that is not an
-//! accident of the Linux one. `CryptProtectData` with no entropy has always
-//! been per-user, so a Windows portable token has never decrypted on another
-//! machine either. The folder is portable; the sign-in is not, on either
-//! platform.
+//! Token storage: the OS credential store, or an encrypted file in portable mode; the token never leaves Rust.
 
 #[cfg(any(windows, target_os = "linux"))]
 const SERVICE: &str = "dev.kyu.karasu";
@@ -36,28 +25,15 @@ pub fn load_token() -> Option<String> {
     if crate::portable::is_portable() {
         return load_token_file();
     }
-    // The empty filter the mobile arm has always had: a zero-length stored
-    // credential would otherwise become `Authorization: Bearer ` — which
-    // AniList rejects as an invalid token even on public queries.
+    // A zero-length credential would become an empty Bearer header, which AniList rejects even on public queries.
     entry().ok()?.get_password().ok().filter(|t| !t.is_empty())
 }
 
-/// Clears the sign-in from **both** stores, whichever mode is active.
-///
-/// Branching on `is_portable()` here was a hole: an install that had been
-/// switched to portable mode signed out of the file and left the token sitting
-/// in the credential store — still valid, readable by anything running as that
-/// user, and still wired up, because turning portable mode back off made
-/// `load_token()` find it again and silently sign the user back in. The mirror
-/// case left `token.dat` on disk forever after disabling portable mode.
-///
-/// Sign-out means signed out, so it clears everywhere a token can live.
+/// Clears the sign-in from both stores whichever mode is active; sign-out means signed out everywhere.
 #[cfg(any(windows, target_os = "linux"))]
 pub fn delete_token() {
     if let Some(path) = crate::portable::token_file() {
-        // `NotFound` is the ordinary case (not portable, or never migrated) and
-        // is not worth a line; anything else means a live token may still be on
-        // disk after the user asked to be signed out.
+        // `NotFound` is the ordinary case; anything else means a live token may still be on disk after sign-out.
         if let Err(e) = std::fs::remove_file(&path) {
             if e.kind() != std::io::ErrorKind::NotFound {
                 crate::logging::error(
@@ -86,10 +62,7 @@ pub fn delete_token() {
     delete_portable_key();
 }
 
-/// Drops the key the portable file was sealed with — it only ever protected
-/// the file `delete_token` just removed. Written as a pair rather than a
-/// `#[cfg]` on the call above so the call site itself compiles everywhere;
-/// a cfg'd statement is invisible to `cargo test` on Windows.
+/// Drops the key the portable file was sealed with; a cfg'd pair so the call site compiles everywhere.
 #[cfg(target_os = "linux")]
 fn delete_portable_key() {
     if let Ok(e) = keyring::Entry::new(SERVICE, PORTABLE_KEY_USER) {
@@ -103,27 +76,11 @@ fn delete_portable_key() {
         }
     }
 }
-// Windows, not "everything that is not Linux": the desktop `delete_token`
-// above is this stub's only caller, and on mobile that caller does not exist
-// — a not-linux gate left this as dead code on every Android check.
+// Windows, not not-Linux: the desktop `delete_token` is this stub's only caller, and mobile has no such caller.
 #[cfg(windows)]
 fn delete_portable_key() {}
 
-/// Moves the current credential-store token into the encrypted portable file
-/// (used when switching a running install into portable mode).
-///
-/// The distinction between "nothing is stored" and "the store could not be
-/// read" is the whole point. Collapsing both into "no token" — which
-/// `get_password().ok()` does — reported a successful migration for a user
-/// whose keyring was merely locked, and the sign-in was then unreachable
-/// through a portable folder that had never received it.
-///
-/// Split into copy and clear on purpose, and the caller runs them either side
-/// of the marker. Doing both before the marker meant a failed marker write
-/// left the token deleted from the credential store while `is_portable()` was
-/// still false — the app came back signed out, from a switch that had
-/// reported failure. Copying first and clearing last leaves the token
-/// readable through whichever side wins.
+/// Copies the credential-store token into the portable file; clearing is separate so a failed switch never loses it.
 #[cfg(any(windows, target_os = "linux"))]
 pub fn copy_token_to_portable_file() -> Result<(), String> {
     let entry = entry()?;
@@ -135,11 +92,7 @@ pub fn copy_token_to_portable_file() -> Result<(), String> {
     save_token_file(&token)
 }
 
-/// Drops the credential-store copy once portable mode is actually in effect.
-///
-/// A failure is recorded rather than raised: the switch has succeeded, and the
-/// cost is a stale bearer token in a store that sign-out (which follows
-/// `is_portable()`) will no longer reach.
+/// Drops the credential-store copy once portable mode is in effect; a failure is logged, since the switch succeeded.
 #[cfg(any(windows, target_os = "linux"))]
 pub fn clear_credential_store_token() {
     let Ok(entry) = entry() else { return };
@@ -153,13 +106,7 @@ pub fn clear_credential_store_token() {
     }
 }
 
-/// The way back out: portable file → credential store.
-///
-/// Without this, enable → disable → restart signed the user out silently. The
-/// token had been moved into the portable folder and `load_token` follows
-/// `is_portable()`, so once the marker was gone it read an empty credential
-/// store and found nothing. The portable file is left in place — it is the
-/// user's data and `disable_portable` is a switch, not a delete.
+/// The way back out, portable file to credential store; the portable file is left in place as the user's data.
 #[cfg(any(windows, target_os = "linux"))]
 pub fn copy_token_from_portable_file() -> Result<(), String> {
     let Some(token) = load_token_file() else {
@@ -170,27 +117,11 @@ pub fn copy_token_from_portable_file() -> Result<(), String> {
         .map_err(|e| format!("Could not restore the stored sign-in: {e}"))
 }
 
-// --- Mobile ------------------------------------------------------------------
-//
-// `cfg(mobile)`, not `cfg(not(any(windows, linux)))`, and the difference is
-// macOS: the module header's stance is that a macOS build fails to compile
-// rather than silently getting a backend nobody has tested, and a
-// not-windows-not-linux arm would hand it this one.
-//
-// On Android the file is sealed through the Keystore (`crate::keystore` —
-// `KRSA1 || iv || ct`, key hardware-backed, `TokenCipher.kt` on the other
-// side), with a plaintext token from an earlier build re-wrapped in place on
-// first read. iOS keeps the plain file: nothing has ever tested a Keychain
-// arm, and an untested crypto path is the thing this module's macOS stance
-// exists to prevent. The invariant that holds regardless: the token stays in
-// Rust and never reaches the WebView.
+// Mobile is `cfg(mobile)`, not not-desktop, so a macOS build fails to compile rather than getting an untested backend.
 #[cfg(mobile)]
 const MOBILE_TOKEN_FILE: &str = "anilist_token.dat";
 
-/// One read per process, not one per scrobbler tick: `load_token` sits on the
-/// 5-second detection loop, and a JNI round-trip per tick is the
-/// 17,280-reads-a-day mistake jellyfin's own cache documents. `None` = not
-/// yet looked; `Some(None)` = looked, signed out.
+/// One read per process, not one JNI round-trip per detection tick; `None` = not yet looked, `Some(None)` = signed out.
 #[cfg(target_os = "android")]
 static TOKEN_CACHE: std::sync::Mutex<Option<Option<String>>> = std::sync::Mutex::new(None);
 
@@ -208,23 +139,20 @@ pub fn save_token(token: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Reads the Keystore-sealed token; a plaintext token from an older build is re-wrapped in place on first read.
 #[cfg(target_os = "android")]
 pub fn load_token() -> Option<String> {
     if let Some(cached) = TOKEN_CACHE.lock().unwrap().clone() {
         return cached;
     }
-    // The data dir not being recorded yet is "could not look", never cached —
-    // the same distinction jellyfin's mobile arm draws.
+    // The data dir not being known yet is "could not look", never cached.
     let path = crate::portable::mobile_secret_file(MOBILE_TOKEN_FILE)?;
     let token = match std::fs::read(&path) {
         Ok(raw) => match crate::keystore::classify(&raw) {
             crate::keystore::Stored::Sealed(sealed) => match crate::keystore::open(sealed) {
                 Ok(plain) => String::from_utf8(plain).ok().filter(|t| !t.is_empty()),
                 Err(e) => {
-                    // Undecryptable reads as signed out — the quiet sign-in
-                    // screen — never a crash loop. Named in the log, because
-                    // from the UI it is indistinguishable from "never signed
-                    // in".
+                    // Undecryptable reads as signed out, never a crash loop; named in the log, since the UI cannot tell.
                     crate::logging::warn(
                         "auth",
                         format!("stored token would not decrypt; signed out: {e}"),
@@ -232,9 +160,7 @@ pub fn load_token() -> Option<String> {
                     None
                 }
             },
-            // A token written before sealing existed: re-wrap it in place.
-            // A failed re-wrap keeps the session alive on the old bytes —
-            // migration must never cost a sign-in — and retries next launch.
+            // A token written before sealing existed is re-wrapped in place; a failed re-wrap must never cost a sign-in.
             crate::keystore::Stored::Legacy(plain) => {
                 let token = String::from_utf8(plain.to_vec())
                     .ok()
@@ -271,8 +197,7 @@ pub fn load_token() -> Option<String> {
 #[cfg(target_os = "android")]
 pub fn delete_token() {
     *TOKEN_CACHE.lock().unwrap() = Some(None);
-    // The Keystore key alias stays: it holds no secret without the file, and
-    // dropping it would orphan a sealed Jellyfin token sharing the same key.
+    // The Keystore key alias stays: dropping it would orphan a sealed Jellyfin token sharing the same key.
     let Some(path) = crate::portable::mobile_secret_file(MOBILE_TOKEN_FILE) else {
         return;
     };
@@ -318,9 +243,7 @@ pub fn delete_token() {
     }
 }
 
-/// Portable mode is an exe-relative concept and phones have no exe dir, so
-/// there is never anything to migrate. A cfg'd trio rather than a cfg on the
-/// call site, per the house rule.
+/// Phones have no exe dir, so there is nothing to migrate; a cfg'd trio rather than a cfg on the call site.
 #[cfg(mobile)]
 pub fn copy_token_to_portable_file() -> Result<(), String> {
     Ok(())
@@ -441,26 +364,18 @@ mod dpapi_tests {
     }
 }
 
-/// The AniList authorize URL.
-///
-/// `state` is a per-attempt nonce that AniList echoes back in the redirect
-/// fragment; the callback server requires it before acting on a token. Without
-/// it, `/token` had nothing to distinguish the real redirect from any other
-/// page on the machine hitting the same port.
+/// The AniList authorize URL; `state` is the per-attempt nonce the callback server requires before acting on a token.
 pub fn authorize_url(client_id: &str, state: Option<&str>) -> String {
     let base =
         format!("https://anilist.co/api/v2/oauth/authorize?client_id={client_id}&response_type=token");
-    // `None` is the manual-paste fallback: no callback server is listening, so
-    // there is nothing for a nonce to protect — the user copies the token out
-    // of the page themselves.
+    // `None` is the manual-paste fallback: no callback server is listening, so there is nothing for a nonce to protect.
     match state {
         Some(s) => format!("{base}&state={s}"),
         None => base,
     }
 }
 
-/// Extracts the access token from any user input: raw token, complete
-/// redirect URL (`…#access_token=…&token_type=…`) or bare fragment.
+/// Extracts the access token from a raw token, a complete redirect URL or a bare fragment.
 pub fn extract_token(input: &str) -> String {
     let input = input.trim();
     match input.find("access_token=") {
@@ -499,29 +414,17 @@ mod tests {
 
 // --- Linux portable-token encryption ----------------------------------------
 
-/// Credential-store entry holding the key the portable token file is sealed
-/// with. Separate from the token entry: this one exists precisely so the token
-/// does *not* have to live in the credential store.
+/// The credential-store entry holding the portable file's key, so the token itself need not live there.
 #[cfg(target_os = "linux")]
 const PORTABLE_KEY_USER: &str = "portable-key";
 
-/// Distinguishes this file format from the plaintext one that never shipped,
-/// and gives a future change something to branch on. Without it a wrong-format
-/// file reaches the AEAD as garbage and fails with nothing to say.
+/// Identifies the file format, so a wrong-format file fails with something to say rather than as AEAD garbage.
 #[cfg(target_os = "linux")]
 const MAGIC: &[u8; 5] = b"KRSU1";
 #[cfg(target_os = "linux")]
 const NONCE_LEN: usize = 24;
 
-/// The portable file's key, generated on first use and kept in the Secret
-/// Service.
-///
-/// Failing closed is deliberate. The alternative — writing the token in the
-/// clear when no keyring daemon is running — is what this replaces, and
-/// shipping that under the word "encrypted" would be a lie. Note the default,
-/// non-portable path already requires the Secret Service (`entry()` above), so
-/// this asks for nothing new; a desktop without one cannot store a token at
-/// all, in either mode.
+/// The portable file's key, generated on first use and kept in the Secret Service; failing closed is deliberate.
 #[cfg(target_os = "linux")]
 fn portable_key() -> Result<[u8; 32], String> {
     use base64::Engine as _;
@@ -536,15 +439,12 @@ fn portable_key() -> Result<[u8; 32], String> {
                     return Ok(key);
                 }
             }
-            // A key that cannot be read is worse than none: it would decrypt
-            // nothing and silently re-seal under a new one. Say so instead.
+            // A key that cannot be read is worse than none: it would decrypt nothing and silently re-seal under a new one.
             return Err("The stored portable key is unreadable; sign in again".into());
         }
         // First use — fall through and generate one.
         Err(keyring::Error::NoEntry) => {}
-        // Anything else (locked collection, no D-Bus) is not "no key yet".
-        // Treating it as such would generate a replacement for a key that
-        // exists, which is how an existing token.dat becomes undecryptable.
+        // A locked collection or no D-Bus is not "no key yet"; a replacement key makes the existing token.dat undecryptable.
         Err(e) => return Err(format!("Portable mode needs a login keyring: {e}")),
     }
 
@@ -582,8 +482,7 @@ fn open(key: &[u8; 32], blob: &[u8]) -> Result<Vec<u8>, String> {
     use chacha20poly1305::aead::{Aead, KeyInit};
     use chacha20poly1305::{XChaCha20Poly1305, XNonce};
 
-    // Length first, so a short file is an error rather than a panic on the
-    // slice below — the obvious way to get this wrong.
+    // Length first, so a short file is an error rather than a panic on the slice below.
     let head = MAGIC.len() + NONCE_LEN;
     if blob.len() <= head || &blob[..MAGIC.len()] != MAGIC {
         return Err("That token file is not in a format Karasu wrote".into());
@@ -627,8 +526,7 @@ mod portable_crypto_tests {
         assert!(open(&[9u8; 32], &sealed).is_err(), "a wrong key must not open it");
     }
 
-    /// A truncated file must error, not panic — slicing past the end is how
-    /// this would otherwise take the app down on a corrupt USB stick.
+    /// A truncated file must error, not panic.
     #[test]
     fn a_truncated_file_is_an_error_not_a_panic() {
         assert!(open(&KEY, b"").is_err());

@@ -1,30 +1,4 @@
-//! The dead-app notification check — Android's half of the scheduler.
-//!
-//! `NotifJobService` (Kotlin, JobScheduler) calls the one exported symbol
-//! here on its own background thread, in a process where Tauri may never
-//! have started: no `AppHandle`, no managed state, no tao context. Every
-//! dependency is therefore taken by hand — the data dir from the passed
-//! `Context`, the token file read directly (`RESOLVED_DATA_DIR` is unset
-//! cold, so `auth::load_token` cannot serve), the seal opened through the
-//! env-parameterized keystore core, the database opened by path. The token
-//! never crosses into Kotlin: the JSON handed back is a rendered title and
-//! body, nothing more — the invariant CLAUDE.md states survives the
-//! dead-app path.
-//!
-//! Coordination with the in-app pass (`alerts/site.rs`) is the shared kv
-//! vocabulary: this entry defers to a fresh `site_notif_last_check_ms`
-//! (written by whichever half checked last — an alive-but-Dozed app must
-//! not starve the job, which is why the predicate is freshness, not
-//! app-running), advances `site_notif_seen_id` through the same
-//! compare-and-set, and reads the same interval key. The request bypasses
-//! the managed client's limiter by construction — there is no managed
-//! client — which the freshness stamp bounds to one request per interval.
-//!
-//! The other half of the file is the glue for the *live* app's Android-only
-//! machinery — the tracking service, the battery exemption and the
-//! foreground flag (`TrackingService.kt`, `MainActivity.kt`) — which goes
-//! the other way: Rust calling Kotlin statics through the activity's class
-//! loader, the dance `assert_schedule` established.
+//! The dead-app notification check, Android's half; its kv vocabulary is shared with `alerts/site.rs`, keep them in step.
 
 #![cfg(target_os = "android")]
 
@@ -46,11 +20,7 @@ fn now_ms() -> i64 {
         .unwrap_or(0)
 }
 
-/// `context.getDataDir().getAbsolutePath()`, by hand — the package root,
-/// matching tauri's own `app_data_dir` (its PathPlugin resolves `getDataDir`
-/// to `activity.dataDir`), which is where the token, the database and the
-/// widget projection all live. `getFilesDir` is one level below and finds
-/// none of them — measured, not guessed: four empty widgets.
+/// `getDataDir` by hand, matching tauri's own `app_data_dir`; `getFilesDir` is one level below and finds nothing.
 fn data_dir(env: &mut JNIEnv, context: &JObject) -> Result<PathBuf, String> {
     let file = env
         .call_method(context, "getDataDir", "()Ljava/io/File;", &[])
@@ -67,11 +37,7 @@ fn data_dir(env: &mut JNIEnv, context: &JObject) -> Result<PathBuf, String> {
     Ok(PathBuf::from(s))
 }
 
-/// The token, read and unsealed without any of the app's machinery.
-///
-/// `Stored::Legacy` is used read-only — migration stays the running app's
-/// job (`anilist/auth.rs`), and a background worker has no business
-/// rewriting secret files.
+/// The token, read and unsealed without the app's machinery; `Legacy` is read-only, since migration is the app's job.
 fn read_token(env: &mut JNIEnv, context: &JObject, dir: &PathBuf) -> Option<String> {
     let raw = std::fs::read(dir.join("anilist_token.dat")).ok()?;
     let plain = match crate::keystore::classify(&raw) {
@@ -83,8 +49,7 @@ fn read_token(env: &mut JNIEnv, context: &JObject, dir: &PathBuf) -> Option<Stri
     String::from_utf8(plain).ok().filter(|t| !t.is_empty())
 }
 
-/// The whole check, returning the rendered `{"title","body"}` JSON when a
-/// summary should be posted, or an empty string for "nothing to say".
+/// The whole check; the JSON handed back is a rendered title and body, and the token never crosses into Kotlin.
 fn check(env: &mut JNIEnv, context: &JObject) -> Result<String, String> {
     let dir = data_dir(env, context)?;
     let db = Db::open(dir.clone())?;
@@ -99,10 +64,7 @@ fn check(env: &mut JNIEnv, context: &JObject) -> Result<String, String> {
     if interval == 0 {
         return Ok(String::new());
     }
-    // Freshness, not app-running: the in-app pass stamps this on every
-    // successful check, so a live foreground app makes this job a no-op,
-    // while a Dozed one (sockets blocked outside maintenance windows —
-    // exactly when this job runs inside one) does not starve it.
+    // Freshness, not app-running: a live app makes this job a no-op, while a Dozed one must not starve it.
     let last = db
         .kv_get(LAST_CHECK_KEY)
         .and_then(|s| s.parse::<i64>().ok())
@@ -115,9 +77,7 @@ fn check(env: &mut JNIEnv, context: &JObject) -> Result<String, String> {
         return Ok(String::new());
     };
 
-    // One request on a throwaway current-thread runtime. `net.rs`'s Android
-    // arm needs no JNI (baked webpki roots), so this works from a bare
-    // JVM-owned thread.
+    // One request on a throwaway current-thread runtime; the Android TLS arm needs no JNI, so a bare JVM thread will do.
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -171,10 +131,7 @@ fn check(env: &mut JNIEnv, context: &JObject) -> Result<String, String> {
     .to_string())
 }
 
-/// The exported symbol `dev.kyu.karasu.KarasuNative.backgroundNotifCheck`
-/// binds to. A panic unwinding across JNI aborts the process, so the whole
-/// body sits under `catch_unwind`; every failure — panic or error — answers
-/// with an empty string, which Kotlin reads as "post nothing".
+/// The symbol `KarasuNative.backgroundNotifCheck` binds to; under `catch_unwind`, since a panic across JNI aborts.
 #[no_mangle]
 pub extern "system" fn Java_dev_kyu_karasu_KarasuNative_backgroundNotifCheck(
     mut env: JNIEnv,
@@ -194,13 +151,7 @@ pub extern "system" fn Java_dev_kyu_karasu_KarasuNative_backgroundNotifCheck(
         .unwrap_or(std::ptr::null_mut())
 }
 
-/// Runs `f` with an attached env, the activity, and an app class loaded
-/// through the activity's own class loader — the dance every Kotlin static
-/// here shares. Goes through the running app's tao context, exactly like the
-/// keystore's own `call`; `main_android_context` is `None` before tao's
-/// `onActivityCreate`, which callers treat as "not ready yet" rather than as
-/// a failure. A pending Java exception is cleared on the way out, so a
-/// failed call cannot poison the next one.
+/// Runs `f` with an attached env, the activity and an app class loaded through the activity's own class loader.
 fn with_app_class<T>(
     name: &str,
     f: impl FnOnce(&mut JNIEnv<'_>, &JObject<'_>, &JClass<'_>) -> jni::errors::Result<T>,
@@ -239,21 +190,16 @@ fn with_app_class<T>(
     })
 }
 
-/// A Kotlin static's `String` answer as Rust text.
-///
-/// Bound to a local first: the `JavaStr` borrows `answer`, and a temporary
-/// in the tail expression would outlive it.
+/// A Kotlin static's `String` answer as Rust text; bound to a local first, since the `JavaStr` borrows it.
 fn answer_text(env: &mut JNIEnv<'_>, answer: JObject<'_>) -> jni::errors::Result<String> {
     let answer = JString::from(answer);
     let text: String = env.get_string(&answer)?.into();
     Ok(text)
 }
 
-/// (Re-)asserts the JobScheduler registration to match the setting — called
-/// on every settings change and once at startup.
+/// (Re-)asserts the JobScheduler registration to match the setting, on every settings change and once at startup.
 pub fn assert_schedule(minutes: i64) -> Result<(), String> {
-    // `schedule` answers with the reason it could not register the job, in
-    // Android's own words, or an empty string; `cancel` has nothing to refuse.
+    // `schedule` answers with Android's own reason it could not register the job, or an empty string.
     let reason = with_app_class("dev.kyu.karasu.NotifScheduler", |env, activity, class| {
         if minutes > 0 {
             let answer = env
@@ -275,12 +221,7 @@ pub fn assert_schedule(minutes: i64) -> Result<(), String> {
             Ok(String::new())
         }
     })?;
-    // The JNI call succeeding only means Kotlin ran. Whether JobScheduler
-    // accepted the job is the answer, which used to be dropped — so a refusal
-    // left the pane reading "every 15 minutes" with nothing registered, and
-    // this function reporting Ok. The first reason ever surfaced was
-    // `SecurityException: ACCESS_NETWORK_STATE required for jobs with a
-    // connectivity constraint`, which is why the text is carried verbatim.
+    // The JNI call succeeding only means Kotlin ran; whether JobScheduler accepted the job is the answer, kept verbatim.
     if reason.is_empty() {
         Ok(())
     } else {
@@ -290,11 +231,7 @@ pub fn assert_schedule(minutes: i64) -> Result<(), String> {
 
 // --- The live app's Android-only machinery -----------------------------------
 
-/// Whether the activity is on screen. `MainActivity` reports resume and pause
-/// over `setForeground`; the scrobbler reads it for its poll cadence and for
-/// the one moment a foreground service may be started — Android 12+ refuses
-/// a foreground start from the background. Starts true: the process begins
-/// with its activity showing.
+/// Whether the activity is on screen; the scrobbler reads it, since Android refuses a foreground start from behind.
 static FOREGROUND: AtomicBool = AtomicBool::new(true);
 
 /// `dev.kyu.karasu.KarasuNative.setForeground`.
@@ -311,12 +248,7 @@ pub fn is_foreground() -> bool {
     FOREGROUND.load(Ordering::Relaxed)
 }
 
-/// Starts (`on`) or stops the tracking service. `title` and `body` are the
-/// persistent notification's text, rendered in Rust in the user's language —
-/// Kotlin composes nothing. `Err` carries Android's own reason for a refused
-/// start, most often `ForegroundServiceStartNotAllowedException` when asked
-/// from the background; the scrobbler gates on `is_foreground` so that one
-/// is rare, and backs off when it happens anyway.
+/// Starts or stops the tracking service; `Err` carries Android's own reason for a refused start.
 pub fn tracking_service(on: bool, title: &str, body: &str) -> Result<(), String> {
     let reason = with_app_class("dev.kyu.karasu.TrackingControl", |env, activity, class| {
         if on {
@@ -365,8 +297,7 @@ pub fn battery_exempt() -> Result<bool, String> {
     })
 }
 
-/// Opens the system dialog that asks for the exemption. The dialog answers
-/// nothing back; the pane re-reads `battery_exempt` when it regains focus.
+/// Opens the system dialog asking for the exemption; it answers nothing, so the pane re-reads `battery_exempt` on focus.
 pub fn request_battery_exemption() -> Result<(), String> {
     let reason = with_app_class("dev.kyu.karasu.TrackingControl", |env, activity, class| {
         let answer = env
@@ -386,10 +317,7 @@ pub fn request_battery_exemption() -> Result<(), String> {
     }
 }
 
-/// Startup re-assertion, retried briefly: `main_android_context` races the
-/// spawned setup (tao populates it in `onActivityCreate`), so a bare call
-/// here can land a beat too early — the keystore treats not-ready as an
-/// error for the same reason.
+/// Startup re-assertion, retried briefly, since `main_android_context` races the spawned setup.
 pub fn spawn_schedule_assert(app: tauri::AppHandle) {
     use tauri::Manager;
     tauri::async_runtime::spawn(async move {
@@ -404,8 +332,7 @@ pub fn spawn_schedule_assert(app: tauri::AppHandle) {
                 }
             }
         }
-        // The last reason, not just the fact: "not ready yet" twenty times is a
-        // different bug from a JobScheduler refusal.
+        // The last reason, not just the fact: "not ready yet" every time is a different bug from a JobScheduler refusal.
         crate::logging::warn(
             "background",
             format!("could not re-assert the notification job schedule at startup: {last}"),

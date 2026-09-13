@@ -1,12 +1,4 @@
-//! Single entry point for user notifications: records the item in the in-app
-//! notification centre (SQLite), shows the native desktop toast, and tells the
-//! frontend to refresh its bell. The background watchers (airing, stale,
-//! sequel) all go through here so nothing is shown without also being logged.
-//!
-//! Two functions here skip the bell row on purpose, and each says why beside
-//! itself: `notify_scrobble_confirm`, and `notify_toast` for news that gets its
-//! row somewhere else. In both cases the log lines are what serve the rule
-//! above.
+//! The single entry point for notifications: the bell row, the desktop toast and the frontend refresh, together.
 
 use crate::db::Db;
 use crate::i18n::Msg;
@@ -21,33 +13,7 @@ pub(crate) fn now_ms() -> i64 {
         .unwrap_or(0)
 }
 
-/// Record + toast + notify the UI. `kind` groups notifications
-/// ("airing" | "stale" | "sequel").
-///
-/// Every step reports its own failure without any of them being fatal — the
-/// bell entry is worth keeping even when the toast will not show, and vice
-/// versa. Takes messages rather than sentences, rendered in `render` so the
-/// toast, the bell row and the log cannot disagree about what was said.
-///
-/// What this does *not* do is re-render a bell row when the language changes
-/// later: the row is stored as text, so yesterday's news stays in yesterday's
-/// language. Storing the key and its parameters instead would fix that and
-/// costs a migration, a payload format and a second renderer on the frontend —
-/// for rows that expire at 500 and are read the day they arrive. The toast has
-/// to be composed in Rust either way, since the OS shows it and no WebView is
-/// involved.
-///
-/// `media_id` is what the bell row opens, and `None` is a real answer rather
-/// than a gap: the app-update notice and an aggregated queue report are not
-/// about a title. A row without one still marks itself read on click and does
-/// nothing else, which is what every row did before schema v15.
-/// Who a bell row belongs to.
-///
-/// Everything the alert passes produce is about *this account's* list — an
-/// episode that aired for a title it holds, an announced sequel, a paused
-/// entry, a queued edit that was refused. Only the app-update notice is about
-/// the install, and it must stay readable while signed out and in local mode,
-/// so it alone is stored unowned.
+/// Who a bell row belongs to: only the app-update notice is unowned, so it stays readable while signed out.
 fn owner_for(kind: &str, db: &Db) -> Option<i64> {
     if kind == "update" {
         None
@@ -56,6 +22,7 @@ fn owner_for(kind: &str, db: &Db) -> Option<i64> {
     }
 }
 
+/// Record, toast and refresh the bell; every step reports its own failure and none of them is fatal.
 pub fn notify(app: &AppHandle, kind: &str, title: Msg<'_>, body: Msg<'_>, media_id: Option<i64>) {
     let db = app.state::<Db>();
     let (title, body) = render(app, title, body);
@@ -69,30 +36,13 @@ pub fn notify(app: &AppHandle, kind: &str, title: Msg<'_>, body: Msg<'_>, media_
     }
 }
 
-/// The toast without the bell row — for news that gets its row somewhere else.
-///
-/// The second function in this file to skip the bell on purpose, and for a
-/// cousin of the reason `notify_scrobble_confirm` does: a row is worth writing
-/// only when it is *the* record of the news. The one caller is the airing
-/// watcher, on an account whose own AniList airing notifications are on.
-/// AniList's row is strictly the better of the two there — it links to the
-/// entry, it names the episode, and it is one segment away in the same panel —
-/// so two rows are one row and a duplicate. What AniList cannot do is put a
-/// toast on the desktop while Karasu sits in the tray, which is the entire
-/// reason that watcher exists, so that half is untouched.
-///
-/// A separate function rather than a `record: bool` on `notify`: the flag would
-/// have to sit beside the `media_id` of a row it is not writing, which is both
-/// expressible and meaningless. And "does this belong in the bell" is a
-/// property of the kind of news, settled once per call site, not a runtime
-/// choice.
+/// The toast without the bell row, for news whose row AniList already renders better than a duplicate would.
 pub fn notify_toast(app: &AppHandle, kind: &str, title: Msg<'_>, body: Msg<'_>) {
     let (title, body) = render(app, title, body);
     toast(app, kind, &title, &body, false);
 }
 
-/// Compose once, in the user's language — the toast, the bell row and the log
-/// cannot then disagree about what was said.
+/// Compose once in the user's language, so the toast, the bell row and the log cannot disagree.
 fn render(app: &AppHandle, title: Msg<'_>, body: Msg<'_>) -> (String, String) {
     let lang = crate::i18n::lang(&app.state::<Db>());
     (
@@ -101,14 +51,7 @@ fn render(app: &AppHandle, title: Msg<'_>, body: Msg<'_>) -> (String, String) {
     )
 }
 
-/// The desktop half.
-///
-/// All three steps used to discard their result, which made "Karasu never tells
-/// me anything" undiagnosable: a desktop that refuses toasts (Focus Assist on
-/// Windows, no notification daemon on a bare Linux WM) looked exactly like a
-/// watcher that had found nothing to say. Still not fatal — but it leaves a
-/// line, and `in_bell` decides whether that line can honestly promise the news
-/// survived the refusal.
+/// The desktop half; not fatal, but a refused toast leaves a line saying whether the news survived in the bell.
 fn toast(app: &AppHandle, kind: &str, title: &str, body: &str, in_bell: bool) {
     if let Err(e) = app.notification().builder().title(title).body(body).show() {
         let fallback = if in_bell {
@@ -123,20 +66,7 @@ fn toast(app: &AppHandle, kind: &str, title: &str, body: &str, in_bell: bool) {
     }
 }
 
-/// The scrobble-confirm toast — the one notification with a button, because
-/// its whole purpose *is* an action and the window it would otherwise be
-/// confirmed in may be hidden in the tray.
-///
-/// Deliberately not recorded in the bell, unlike everything else in this file:
-/// it is a transient prompt about a session that resolves within minutes, not
-/// news, and a bell holding last week's stale "confirm?" rows would bury the
-/// notices that are. The header's "nothing shown without being logged" rule is
-/// served by the scrobble log lines instead.
-///
-/// The button's click can arrive minutes late, so it carries the session it
-/// was raised for and the confirm path re-checks `applies_to` — a toast for
-/// episode 5 must never confirm episode 6. When the platform path fails, the
-/// plain plugin toast is the fallback: the news still lands, just buttonless.
+/// The one toast with a button, kept out of the bell because a stale "confirm?" row would bury real news.
 pub fn notify_scrobble_confirm(
     app: &AppHandle,
     title: &str,
@@ -158,11 +88,7 @@ pub fn notify_scrobble_confirm(
     }
 }
 
-/// The one button on the one toast that has one.
-///
-/// Read per toast rather than cached: the language can change between two
-/// scrobbles, and this costs a kv lookup on a path that already talks to the
-/// OS notification service.
+/// The one button's label, read per toast because the language can change between two scrobbles.
 #[cfg(any(windows, target_os = "linux"))]
 fn action_label(app: &AppHandle) -> String {
     crate::i18n::text(
@@ -171,13 +97,7 @@ fn action_label(app: &AppHandle) -> String {
     )
 }
 
-/// Windows: `tauri-winrt-notification` directly, since the plugin wrapping it
-/// drops buttons. Toasts are attributed by AppUserModelID; installed builds
-/// registered the bundle identifier through NSIS, while a dev build has no
-/// registration at all — the PowerShell id is the same stand-in the plugin
-/// uses there.
-/// Mobile: the notification plugin shows plain toasts and nothing here can
-/// carry a button, so the fallback path below is simply the path.
+/// Mobile: the notification plugin's toasts carry no button, so the plain fallback is simply the path.
 #[cfg(mobile)]
 fn toast_with_action(
     _app: &AppHandle,
@@ -189,6 +109,7 @@ fn toast_with_action(
     Err("action toasts are desktop-only".into())
 }
 
+/// Windows: `tauri-winrt-notification` directly, since the plugin wrapping it drops buttons.
 #[cfg(windows)]
 fn toast_with_action(
     app: &AppHandle,
@@ -227,11 +148,7 @@ fn toast_with_action(
         .map_err(|e| e.to_string())
 }
 
-/// Linux: `notify-rust` directly, same reasoning as the Windows half. The
-/// daemon reports clicks through `wait_for_action`, which parks its thread
-/// until the toast is acted on or dismissed — a spawned thread's, never the
-/// async runtime's. A daemon without action support simply reports a close,
-/// which the exact-match guard ignores.
+/// Linux: `notify-rust` directly; `wait_for_action` parks a spawned thread, never the async runtime's.
 #[cfg(target_os = "linux")]
 fn toast_with_action(
     app: &AppHandle,
@@ -267,16 +184,7 @@ fn toast_with_action(
     Ok(())
 }
 
-/// Asks the OS for notification permission, once, at startup.
-///
-/// Not a cfg'd pair, deliberately: the desktop backends answer `Granted`
-/// unconditionally, so this is a no-op everywhere the question does not
-/// exist. On Android 13+ the first launch shows the system dialog — the
-/// honest moment, because the airing alert defaults *on* and a fresh
-/// install would otherwise `show()` into the void with nothing ever asking.
-/// Its own thread because the mobile request blocks until the user answers,
-/// and `Denied` is respected: asked once by us, again only by the OS's own
-/// rules, never nagged.
+/// Asks for notification permission once at startup, on its own thread, and never nags after a `Denied`.
 pub fn ensure_permission(app: &AppHandle) {
     let app = app.clone();
     std::thread::spawn(move || {

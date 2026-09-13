@@ -1,7 +1,4 @@
-//! Background "on-hold reminder": periodically looks at the user's paused
-//! (PAUSED) entries and fires a single desktop notification for any that have
-//! sat untouched longer than the configured number of months — a gentle nudge
-//! to resume or drop them. Disabled by default; opt-in via Settings.
+//! Background on-hold reminder: one notification per paused entry untouched longer than the configured months. Opt-in.
 
 use crate::db::Db;
 use serde_json::Value;
@@ -61,12 +58,7 @@ fn pick_title(title: Option<&Value>) -> String {
         .unwrap_or_else(|| "Title".to_string())
 }
 
-/// (media_id, updated_at, title) of every PAUSED entry in a cached list that
-/// has been untouched for at least `cutoff` seconds.
-/// `level` is applied here rather than at the call site because the media
-/// object is only in scope inside this loop. Airing and sequel both filter
-/// before they speak; this pass did not, and a desktop toast naming a title the
-/// user asked never to see is the least undoable place to leak one.
+/// The stale PAUSED entries of a cached list; the content filter applies here, where the media object is in scope.
 fn stale_entries(
     lists: &Value,
     now: i64,
@@ -117,9 +109,7 @@ fn check(app: &AppHandle) {
     let now = now_secs();
     let months = stale_months(&db);
     let cutoff = months * SECS_PER_MONTH;
-    // Airing and sequel both filter before they speak; this pass did not, so a
-    // title the user has asked never to see could still arrive as a desktop
-    // toast naming it — the one place the filter is least able to be undone.
+    // A filtered title must not arrive as a desktop toast, the one place the filter cannot be taken back.
     let level = crate::commands::read_content_filter(&db);
 
     for media_type in ["ANIME", "MANGA"] {
@@ -130,9 +120,7 @@ fn check(app: &AppHandle) {
             continue;
         };
         for (media_id, updated, title) in stale_entries(&lists, now, cutoff, &level) {
-            // Notify at most once per (entry, updatedAt): touching the entry
-            // bumps updatedAt and makes it eligible again, otherwise it stays
-            // quiet — this is the built-in dismiss.
+            // At most once per (entry, updatedAt): touching the entry makes it eligible again, the built-in dismiss.
             let key = format!("stale_done:{media_id}");
             if db.kv_get(&key).and_then(|s| s.parse::<i64>().ok()) == Some(updated) {
                 continue;
@@ -186,9 +174,7 @@ mod tests {
         assert!(stale_entries(&lists, now, 100, "off").is_empty());
     }
 
-    /// Airing and sequel both call `media_blocked` before they speak. This pass
-    /// did not, so a filtered title could arrive as a desktop toast naming it —
-    /// which is the one place the filter cannot be taken back.
+    /// A filtered title never becomes a reminder toast.
     #[test]
     fn a_filtered_title_never_becomes_a_reminder() {
         let now = 1_000_000_000;

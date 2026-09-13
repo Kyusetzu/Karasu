@@ -1,51 +1,22 @@
-//! Android-Keystore sealing for the mobile secret files.
-//!
-//! The mobile arms of `anilist::auth` and `detection::jellyfin` used to write
-//! their tokens as plain UTF-8 into the app-private data dir — sandboxed per
-//! app by the OS, but not encrypted at rest, and both files named Keystore as
-//! the follow-up. This is that follow-up: the bytes on disk become
-//! `KRSA1 || iv(12) || ciphertext+tag`, AES-256-GCM under a key that never
-//! leaves the Android Keystore (`TokenCipher.kt` in the generated tree — a
-//! hand-written file, restore it from git if a wiped gen/ tree loses it).
-//!
-//! The JNI route is tao's own: `main_android_context()` hands over the
-//! `JavaVM` and the activity, and the class is resolved through the
-//! activity's ClassLoader — a bare JNI `FindClass` from a native thread
-//! cannot see app classes at all. `jni` and `tao` are pinned to the versions
-//! tauri already compiles (Cargo.lock), so this adds no second copy — the
-//! rustls-skew class of mistake `net.rs` documents.
-//!
-//! Failure honesty follows `portable_key()`'s: a Keystore refusal is an
-//! error carried upward, never silently "no key yet" — but the *call sites*
-//! render an undecryptable file as "signed out" (the quiet sign-in screen),
-//! never a crash loop. The framing half below is pure and tested on every
-//! platform; only the sealing itself needs the phone.
+//! Android-Keystore sealing for the mobile secret files, the Rust side of `TokenCipher.kt`.
 
-/// Distinguishes the sealed format from the plaintext files that shipped
-/// before it — the legacy branch of `classify` is what migrates them.
-// The framing half is deliberately compiled everywhere so its tests run on
-// desktop (see the header) — which a desktop *release* build reads as "never
-// used", since the Android arms and `#[cfg(test)]` are both absent there.
-// Same shape as `diagnostics::parse_os_release`; visible in `tauri build`
-// alone, never in `cargo test`.
+/// Distinguishes the sealed format from the plaintext files that shipped before it.
+// The framing half is compiled everywhere so its tests run on desktop, where a release build reads it as unused.
 #[cfg_attr(not(target_os = "android"), allow(dead_code))]
 pub const MAGIC: &[u8; 5] = b"KRSA1";
 
 /// What a mobile secret file holds.
 #[cfg_attr(not(target_os = "android"), allow(dead_code))]
 pub enum Stored<'a> {
-    /// `MAGIC` was present; the rest is `iv || ciphertext` for `open`.
-    /// May still fail to decrypt — truncation, tampering, a vanished key.
+    /// `MAGIC` was present; the rest is `iv || ciphertext` for `open`, which may still fail to decrypt.
     Sealed(&'a [u8]),
-    /// No magic: a token written by a build before sealing existed,
-    /// to be re-wrapped in place on first read.
+    /// No magic: a token written by a build before sealing existed, re-wrapped in place on first read.
     Legacy(&'a [u8]),
 }
 
 #[cfg_attr(not(target_os = "android"), allow(dead_code))]
 pub fn classify(blob: &[u8]) -> Stored<'_> {
-    // Length first, so a short file is a branch rather than a panic on the
-    // slice below — the same note `open` in anilist/auth.rs carries.
+    // Length first, so a short file is a branch rather than a panic on the slice below.
     if blob.len() >= MAGIC.len() && &blob[..MAGIC.len()] == MAGIC {
         Stored::Sealed(&blob[MAGIC.len()..])
     } else {
@@ -71,16 +42,8 @@ pub mod jni_impl {
         move |e| format!("keystore {what}: {e}")
     }
 
-    /// The core, parameterized over any JVM thread's env and any `Context`.
-    ///
-    /// Two callers with two lifecycles: the running app reaches it through
-    /// tao's context in `call` below, and a background JobScheduler worker
-    /// hands in its own env and service context — a thread that already
-    /// belongs to the JVM (no attach), in a process where tao may never
-    /// have started (no `main_android_context`). The split is what lets the
-    /// token stay in Rust even on the dead-app path.
-    // Consumed by the background-notification entry point; the allow goes
-    // when that lands in the same round.
+    /// The core, parameterized over any JVM thread's env and any `Context`, so the dead-app job can use it too.
+    // Consumed by the background-notification entry point; the allow goes when that lands.
     #[allow(dead_code)]
     pub fn call_with_env(
         env: &mut JNIEnv,
@@ -88,8 +51,7 @@ pub mod jni_impl {
         method: &str,
         data: &[u8],
     ) -> Result<Vec<u8>, String> {
-        // Through the context's ClassLoader, not FindClass: a native
-        // thread's JNI FindClass only sees system classes.
+        // Through the context's ClassLoader, not FindClass: a native thread's FindClass only sees system classes.
         let result = (|| -> jni::errors::Result<Vec<u8>> {
             let loader = env
                 .call_method(context, "getClassLoader", "()Ljava/lang/ClassLoader;", &[])?
@@ -116,8 +78,7 @@ pub mod jni_impl {
         })();
 
         result.map_err(|e| {
-            // A pending Java exception poisons every later JNI call on the
-            // thread; clear it and carry the message instead.
+            // A pending Java exception poisons every later JNI call on the thread; clear it and carry the message.
             if env.exception_check().unwrap_or(false) {
                 let _ = env.exception_clear();
             }
@@ -144,9 +105,7 @@ pub mod jni_impl {
     }
 }
 
-// `call_with_env` stays addressed as `keystore::jni_impl::call_with_env` by
-// the background entry point; re-exporting it here tripped unused-import
-// until that caller landed, so the module path is the address.
+// `call_with_env` stays addressed by its module path; a re-export here tripped unused-import before its caller landed.
 #[cfg(target_os = "android")]
 pub use jni_impl::{open, seal};
 
@@ -180,8 +139,7 @@ mod tests {
 
     #[test]
     fn a_bare_magic_is_sealed_with_an_empty_payload() {
-        // `open` then fails on the phone — truncation is a decrypt error,
-        // never a silent fallback to treating "KRSA1" as somebody's token.
+        // `open` then fails on the phone: truncation is a decrypt error, never a silent fallback to "KRSA1" as a token.
         assert!(matches!(classify(MAGIC), Stored::Sealed(rest) if rest.is_empty()));
     }
 }

@@ -11,19 +11,7 @@ import { isAndroid, usePlatform } from "@/stores/platform";
 import Bell from "@/components/shell/Bell";
 import { useNotifBadge } from "@/hooks/useNotifBadge";
 
-/**
- * The phone shell's navigation: a five-slot bottom bar.
- *
- * The sidebar's eleven destinations do not fit a thumb row, so the four the
- * ROADMAP calls the app's identity — Overview, the two lists, Search — are
- * the slots, and everything else lives behind "More", a sheet that rises over
- * the bar. That is the standard mobile answer, and the sheet reuses the
- * sidebar's own `GROUPS` so a destination added there appears here without
- * anyone remembering to mirror it.
- *
- * The accent rail marker (`useRailMarker`) has no meaning on a horizontal
- * bar and is deliberately absent — active state is the accent ink instead.
- */
+/** The phone shell's four bar slots; everything else is behind a More sheet built from the sidebar's `GROUPS`. */
 const SLOTS = ["/", "/list", "/manga", "/search"];
 
 function slotItems(): NavItem[] {
@@ -34,23 +22,18 @@ function slotItems(): NavItem[] {
 }
 
 function sheetGroups(android: boolean): { label: string; items: NavItem[] }[] {
-  // Platform filtering lives in `visibleGroups` beside GROUPS itself, shared
-  // with the sidebar and the palette so the three ways to navigate cannot
-  // disagree; this sheet only subtracts what the bar already shows.
+  // Platform filtering stays in `visibleGroups` so the three ways to navigate agree; this only removes the slots.
   const groups = visibleGroups(android)
     .map((g) => ({
       label: g.label,
       items: g.items.filter((i) => !SLOTS.includes(i.to)),
     }))
     .filter((g) => g.items.length > 0);
-  // Settings and About sit *outside* `GROUPS` in the sidebar (its footer), so
-  // without this the phone shell simply has no way to reach either — found by
-  // opening the sheet and counting.
+  // Settings and About sit outside `GROUPS` in the sidebar's footer; without this the phone cannot reach either.
   groups.push({
     label: "nav.groupApp",
     items: [
-      // The phone's one road to the queue and the sync button — the
-      // desktop's sidebar panel never renders here.
+      // The phone's one road to the queue and the sync button; the desktop's sidebar panel never renders here.
       { to: "/settings?pane=data", key: "nav.sync", icon: RefreshCw },
       { to: "/settings", key: "nav.settings", icon: Settings },
       { to: "/about", key: "nav.about", icon: Info },
@@ -69,9 +52,7 @@ export default function BottomBar() {
   useBackClose(moreOpen, () => setMoreOpen(false));
   const sheet = usePresence(moreOpen);
   const sheetRef = useRef<HTMLDivElement>(null);
-  // The sheet claims `data-overlay`, which silences every screen-level key
-  // handler — so it must supply what it silenced: Escape closes it, and Tab
-  // stays inside while it is up, like every other overlay in the app.
+  // `data-overlay` silences every screen-level key handler, so the sheet must supply Escape and the focus trap itself.
   useDialogFocus(sheetRef, moreOpen && !sheet.leaving);
   useEffect(() => {
     if (!moreOpen) return;
@@ -81,8 +62,7 @@ export default function BottomBar() {
   }, [moreOpen]);
   const { pathname } = useLocation();
   const badge = useNotifBadge();
-  // "More" reads active when the current page is none of the four slots —
-  // the bar must always show where you are, even off its slots.
+  // "More" reads active when the page is none of the four slots; the bar must always show where you are.
   const inSheet = !SLOTS.some((s) =>
     s === "/" ? pathname === "/" : pathname.startsWith(s),
   );
@@ -108,9 +88,7 @@ export default function BottomBar() {
             role="dialog"
             aria-label={t("nav.more")}
             className={cn(
-              // max-h + scroll: the vertical list is taller than the tile
-              // grid was, and a short phone must never push the top rows
-              // under the status bar.
+              // max-h plus scroll: a short phone must never push the top rows under the status bar.
               "absolute inset-x-2 bottom-16 max-h-[70vh] overflow-y-auto rounded-2xl border border-surface-700 bg-surface-900 p-3 shadow-[0_1rem_3rem_rgba(0,0,0,.6)]",
               sheet.leaving ? "animate-rise-out" : "animate-rise-in",
             )}
@@ -120,10 +98,7 @@ export default function BottomBar() {
                 {t("nav.more")}
               </span>
               <div className="flex items-center gap-1">
-                {/* The bell lives here on the phone — an unlabeled icon in
-                    the nav row read as decoration; inside the sheet it sits
-                    with the other destinations, and the More button outside
-                    carries its count. */}
+                {/* The bell lives in the sheet, since an unlabeled icon in the nav row read as decoration; More carries its count. */}
                 <Bell barSlot />
                 <button
                   type="button"
@@ -140,10 +115,7 @@ export default function BottomBar() {
                 <p className="px-1 pb-1 text-[.625rem] font-medium uppercase tracking-wide text-ink-700">
                   {t(g.label)}
                 </p>
-                {/* One destination per row, not a 3-wide tile grid: rows
-                    read top to bottom the way a menu does, give every label
-                    its full width instead of truncating at a third of the
-                    screen, and make the whole row the touch target. */}
+                {/* One destination per row, not a tile grid: labels get their full width and the whole row is the touch target. */}
                 <div className="flex flex-col gap-0.5">
                   {g.items.map((item) => (
                     <NavLink
@@ -170,10 +142,7 @@ export default function BottomBar() {
         </div>
       )}
 
-      {/* The primary navigation landmark — named as such, not "More": a
-          screen reader lists landmarks by these labels, and the app's whole
-          navigation announcing as the overflow button's name is wrong on its
-          face. Matches no other landmark, which is the one rule that matters. */}
+      {/* The primary navigation landmark, named as such and like no other landmark, since screen readers list them by label. */}
       <nav
         aria-label={t("nav.primary")}
         className="flex shrink-0 items-stretch gap-1 border-t border-hair bg-surface-900 px-2 pb-[max(env(safe-area-inset-bottom),0.375rem)] pt-1.5"
@@ -186,6 +155,7 @@ export default function BottomBar() {
             className={({ isActive }) =>
               cn(
                 slotClass,
+                // No `useRailMarker` on purpose: it means nothing on a horizontal bar; active state is the accent ink.
                 isActive ? "text-accent-400" : "text-ink-500 hover:text-ink-200",
               )
             }
@@ -198,10 +168,7 @@ export default function BottomBar() {
           type="button"
           onClick={() => setMoreOpen((v) => !v)}
           aria-expanded={moreOpen}
-          // One exclusive ternary, not stacked conditions: `cn` runs
-          // tailwind-merge, and two text-colour classes in one call keep only
-          // the *last* — the stacked version deleted the accent every time,
-          // so the bar showed nothing as current on any off-slot route.
+          // Keep the one exclusive ternary; `cn` runs tailwind-merge, which keeps only the last text-colour class.
           className={cn(
             slotClass,
             moreOpen

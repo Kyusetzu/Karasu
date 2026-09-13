@@ -7,18 +7,7 @@ export interface StatusTab<T extends string> {
   count?: number;
 }
 
-/**
- * The list's status tabs, with one accent bar that slides between them.
- *
- * One bar rather than a per-tab underline: the movement itself says the two
- * are alternatives, which a fill or a colour swap has to be learned to mean.
- *
- * The bar is measured from the live DOM rather than computed, because the tab
- * widths depend on the label text and the counts — both of which change under
- * the app (a save moves an entry between statuses, and the German labels are a
- * different length again). `useLayoutEffect` so it is placed before paint;
- * measuring in `useEffect` shows the bar at its old position for a frame.
- */
+/** The list's status tabs with one sliding accent bar, measured from the DOM in `useLayoutEffect` so it lands before paint. */
 export function StatusTabs<T extends string>({
   tabs,
   value,
@@ -37,17 +26,11 @@ export function StatusTabs<T extends string>({
     top: number;
   } | null>(null);
 
-  // `top` is tracked, not assumed: a narrow window wraps the row, and a bar
-  // pinned to the container's bottom would then float under a tab it does not
-  // belong to. Measured from the active tab, it follows wherever that lands.
+  // `top` is measured from the active tab, not pinned to the container: a narrow window wraps the row.
   const measure = useCallback(() => {
     const el = refs.current.get(value);
     if (!el) return setBar(null);
-    // Whether the active tab sits on the LAST wrapped row. The +14 below is
-    // calibrated to the consumer's own bottom padding and is only right
-    // there; applied to an earlier row it put the 2px bar six pixels into
-    // the next row's line boxes — an accent strike-through, photographed on
-    // the second device round of the phone shell.
+    // Keep the +14 to the last wrapped row only: it matches the consumer's bottom padding and strikes through any row above.
     let maxTop = 0;
     for (const tab of refs.current.values()) {
       if (tab.offsetTop > maxTop) maxTop = tab.offsetTop;
@@ -61,14 +44,11 @@ export function StatusTabs<T extends string>({
     });
   }, [value]);
 
-  // The signature covers everything that can change a tab's width: the active
-  // one, the labels, and the counts.
+  // The signature covers everything that can change a tab's width: the active one, the labels, and the counts.
   const signature = tabs.map((tab) => `${tab.label}:${tab.count ?? ""}`).join("|");
   useLayoutEffect(measure, [measure, signature]);
 
-  // A resize can rewrap the row even though no tab's own width changed —
-  // and so can a *container* resize with no window resize at all (the
-  // sidebar collapsing), which is what the ResizeObserver is for.
+  // Keep the ResizeObserver: the sidebar collapsing rewraps the row with no window resize at all.
   const listRef = useRef<HTMLDivElement | null>(null);
   useLayoutEffect(() => {
     window.addEventListener("resize", measure);

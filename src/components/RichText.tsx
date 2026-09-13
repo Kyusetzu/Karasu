@@ -9,43 +9,13 @@ import type { ChipWidth, MdInline } from "@/lib/anilistMarkdown";
 import { internalRoute } from "@/lib/anilistUrl";
 import { createPromiseCache } from "@/lib/promiseCache";
 
-/**
- * One fetch per URL per session. Every `InlineImage` used to ask Rust the
- * moment it mounted, so a profile opened twice fetched its images twice and
- * a re-rendered feed row fetched again; the cache dedupes the calls in
- * flight and keeps every answer, refusals included — a host that said no a
- * second ago will say no again, and the chip is right both times.
- */
+/** One fetch per URL per session, refusals included, so a re-render or a second open never asks Rust again. */
 const bioImages = createPromiseCache((href: string) => fetchBioImage(href));
 
-/**
- * Whether the nodes being rendered are already inside a link.
- *
- * A linked image — `[img33(pic)](target)` — puts the chip *inside* the link's
- * children, which `anilistMarkdown.test.ts` pins as the real shape bios use. So
- * both the anchor and the image's own button called `openUrl`, and one click
- * opened two tabs: the picture and the link's target. `Chip` and `Spoiler` sit
- * in the same position and double-fired identically.
- *
- * Context rather than a prop because `RichText` recurses into its own children:
- * a prop would have to be threaded through every branch of the switch, and the
- * one branch that forgot would be the bug all over again.
- */
+/** Whether the nodes are already inside a link, so a nested chip or spoiler does not fire the anchor's click too. */
 const InLink = createContext(false);
 
-/**
- * Renders inline nodes as React elements. The only renderer for user-written
- * text in the app, and there is no `dangerouslySetInnerHTML` in it.
- *
- * Cross-cutting rather than in a folder, like `EmptyState` and `Skeleton`: two
- * unrelated things feed it. `lib/anilistMarkdown` parses bios, comments and
- * activity text; `lib/anilistHtml` parses media descriptions, which are HTML.
- * Both produce the same node union, so one renderer draws both — and the safety
- * argument only has to be made once.
- */
-
-/** Opens outside the app. Tauri has no browser chrome, so a bare `<a>` would
- *  replace the whole window with someone else's page. */
+/** Opens outside the app; Tauri has no browser chrome, so a bare `<a>` would replace the whole window. */
 export function ExternalAnchor({
   href,
   children,
@@ -69,33 +39,7 @@ export function ExternalAnchor({
   );
 }
 
-/**
- * An image, fetched by Rust and inlined — or the chip below if that fails.
- *
- * **The measurement this replaces, and what it did and did not say.** Across 89
- * real bios containing 350 images, only 6 (2%) were on `*.anilist.co`; the rest
- * were imgur (147), tumblr (57), pinimg, postimg, catbox and discord. That
- * killed the idea of *widening `img-src`*, and it still does: an allowlist over
- * that tail hands an unbounded set of third parties the user's IP and which
- * profile they opened, and every render would repeat the request from the page
- * itself.
- *
- * Proxying is a different trade, and the maintainer took it. **The CSP does not
- * move.** `img-src 'self' data:` already permits the result, so the WebView
- * still never talks to imgur — what crosses the network is one bounded request
- * made in Rust, with a size cap, a content-type allowlist, a timeout, no cookies
- * and no `Referer`, and with local and private hosts refused so a crafted bio
- * cannot make the app probe the LAN. See `commands/images.rs`.
- *
- * The host still learns the user's IP. That is unavoidable in any design that
- * shows the image at all, and it is the honest residue rather than the part that
- * was solved.
- *
- * Anything that fails — refused host, wrong type, too large, unreachable, or not
- * running under Tauri at all — falls back to the chip, which is exactly what
- * shipped before. About one profile in twelve is images and nothing else, so
- * that fallback is still the entire visible content of those.
- */
+/** An image proxied through `commands/images.rs`, or the chip if that fails; the proxy stays, `img-src` never widens. */
 function InlineImage({
   host,
   href,
@@ -122,17 +66,13 @@ function InlineImage({
   }, [href]);
 
   if (failed) return <Chip kind="image" host={host} href={href} />;
-  // Nothing while it is in flight: a chip that turns into an image would reflow
-  // the paragraph around it, and a bio is mostly one paragraph.
+  // Nothing while in flight: a chip that turns into an image would reflow the paragraph around it.
   if (!src) return null;
 
-  // The author's declared width, applied as an inline style rather than a
-  // class: Tailwind's scanner only ever sees literal source, so a computed
-  // `w-[33px]` would emit no rule at all and silently do nothing.
+  // The declared width as an inline style: Tailwind only sees literal source, so a computed class emits no rule.
   const style = width ? { width: `${width.value}${width.unit}` } : undefined;
 
-  // Inside a link the surrounding anchor is already the click target, so this
-  // renders as a plain image. See `InLink`.
+  // Inside a link the anchor is already the click target, so this renders as a plain image; see `InLink`.
   if (inLink) {
     return (
       <span
@@ -150,38 +90,22 @@ function InlineImage({
       onClick={() => void openUrl(href)}
       title={href}
       style={style}
-      // **Inline-level, not `block`.** `~~~centered~~~` renders as
-      // `text-align: center` (see the `center` case in `Markdown.tsx`, whose
-      // comment says exactly this), and `text-align` does nothing to a block
-      // box — so a `block` image sat hard left inside a centred bio while the
-      // text around it centred correctly. The chip this replaced was
-      // `inline-flex` and inherited the alignment for free; this has to be
-      // inline-level for the same reason.
+      // Keep this inline-level: `~~~centered~~~` is `text-align: center`, which does nothing to a block box.
       className="my-1 inline-block max-w-full overflow-hidden rounded-lg border border-surface-800 align-middle"
     >
-      {/* Bios embed 2000px GIFs, which is why the chip never had a layout
-          problem and this does. Capped rather than scaled to the column so a
-          small image is not blown up into a blurry one. */}
+      {/* Bios embed huge GIFs; capped rather than scaled to the column so a small image is not blown up blurry. */}
       <img
         src={src}
         alt=""
         loading="lazy"
-        // `w-full` rather than `max-w-full` so a declared width on the wrapper
-        // is what decides the size; without a declared width the wrapper is
-        // shrink-to-fit and the two are the same thing.
+        // `w-full` rather than `max-w-full` so a declared width on the wrapper decides the size.
         className="max-h-80 w-full object-contain"
       />
     </button>
   );
 }
 
-/**
- * The fallback, and the only rendering for a video embed.
- *
- * Video is never inlined: it would be a media element pointed at a third party,
- * which is the exposure the proxy exists to avoid, and `media-src` does not
- * permit it anyway.
- */
+/** The fallback, and the only rendering for video, which is never inlined; `media-src` forbids it anyway. */
 function Chip({ kind, host, href }: { kind: "image" | "video"; host: string; href: string }) {
   const { t } = useTranslation();
   const inLink = useContext(InLink);
@@ -218,15 +142,7 @@ function Chip({ kind, host, href }: { kind: "image" | "video"; host: string; hre
   );
 }
 
-/**
- * Hidden until clicked, and hidden by *absence* rather than by CSS — text that
- * is merely invisible is still selectable and still in the accessibility tree,
- * which is not what anyone means by a spoiler.
- *
- * `block` is the form `Markdown` draws for a spoiler that spans paragraphs:
- * a full-width bar in place of the whole run, and the blocks in a bordered
- * well once revealed. Same absence rule.
- */
+/** Hidden until clicked, by absence rather than CSS, since invisible text is still selectable and still read aloud. */
 export function Spoiler({ children, block = false }: { children: ReactNode; block?: boolean }) {
   const { t } = useTranslation();
   const [shown, setShown] = useState(false);
@@ -241,8 +157,7 @@ export function Spoiler({ children, block = false }: { children: ReactNode; bloc
     <button
       type="button"
       onClick={(e) => {
-        // Revealing a spoiler inside a link must not also follow the link —
-        // `ExternalAnchor` listens on the bubble. See `InLink`.
+        // Revealing a spoiler inside a link must not also follow the link; `ExternalAnchor` listens on the bubble.
         e.stopPropagation();
         setShown(true);
       }}
@@ -257,6 +172,7 @@ export function Spoiler({ children, block = false }: { children: ReactNode; bloc
   );
 }
 
+/** The one renderer for user-written text in the app, and there is no `dangerouslySetInnerHTML` in it. */
 export function RichText({ nodes }: { nodes: MdInline[] }) {
   return (
     <>
@@ -294,10 +210,7 @@ export function RichText({ nodes }: { nodes: MdInline[] }) {
               </code>
             );
           case "link": {
-            // The parsers guarantee http/https or a leading slash. A leading
-            // slash is already ours; an anilist.co URL the app can draw is
-            // routed inward too — `internalRoute` says which, and answers
-            // null for everything that must stay in the browser.
+            // A leading slash is ours; `internalRoute` routes the anilist.co URLs the app can draw inward, else null.
             const to = n.href.startsWith("/") ? n.href : internalRoute(n.href);
             return to !== null ? (
               <Link key={i} to={to} className="text-accent-400 hover:underline">
@@ -330,32 +243,21 @@ export function RichText({ nodes }: { nodes: MdInline[] }) {
               </Spoiler>
             );
           case "centered":
-            // `~~~x~~~` inside a line — the site's `<center>` inside an
-            // `<h1>`. A block-level span, so it takes its own line and
-            // centres it, and the heading or paragraph around it is intact.
+            // `~~~x~~~` inside a line: a block-level span, so it takes its own line and centres it.
             return (
               <span key={i} className="block text-center">
                 <RichText nodes={n.children} />
               </span>
             );
           case "accent":
-            // A bare `<a>` — anilist.co colours it like a link, and profile
-            // decoration relies on exactly that. Colour only: it goes
-            // nowhere, so no underline and no cursor.
+            // A bare `<a>`, which anilist.co colours like a link; colour only, since it goes nowhere.
             return (
               <span key={i} className="text-accent-400">
                 <RichText nodes={n.children} />
               </span>
             );
           case "chip":
-            // Keyed by href as well as position. `InlineImage` holds `failed`
-            // in state, and an index-only key makes React reuse the instance
-            // when the *document* changes under it — so the undebounced live
-            // preview in `ProfileEditModal` latched one 404 and every image
-            // typed after it rendered as a failure.
-            //
-            // Images are attempted inline; video is always a chip, and so is an
-            // image past `MAX_INLINE_IMAGES`.
+            // Keyed by href too: `InlineImage` holds `failed` in state, so an index-only key latches a failure across edits.
             return n.kind === "image" && !n.capped ? (
               <InlineImage
                 key={`${i}:${n.href}`}

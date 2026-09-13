@@ -4,11 +4,7 @@ import SessionExpired from "./SessionExpired";
 import { useAuth } from "@/stores/auth";
 import { renderWithProviders, signIn, signOut, useLocalProfile } from "@/test/render";
 
-/**
- * One banner for a rejected token, and the three cases where there must not be
- * one. The condition is a property of the session, not of any screen — which is
- * why it lives above the whole shell.
- */
+/** Proves one banner for a rejected token and none in the three cases where the session needs no fix. */
 
 afterEach(signOut);
 
@@ -27,16 +23,11 @@ describe("SessionExpired", () => {
     renderWithProviders(<SessionExpired />);
     expect(screen.getByText("auth.expiredTitle")).toBeTruthy();
     expect(screen.getByRole("button", { name: "auth.expiredAction" })).toBeTruthy();
-    // A status region, not an alert: the cached list is still readable and the
-    // banner must not steal focus from whatever the user was doing.
+    // A status region, not an alert: the cached list is still readable and the banner must not steal focus.
     expect(screen.getByRole("status")).toBeTruthy();
   });
 
-  /**
-   * The account-free profile has no token to reject, and signed out already
-   * shows the sign-in screen — a banner there would be asking for what is
-   * already on offer. Both are reachable because the flag is plain state.
-   */
+  /** Proves the banner stays off where there is no token to reject or the sign-in screen is already showing. */
   it("stays out of local mode and of signed out", () => {
     useLocalProfile();
     expire();
@@ -52,11 +43,7 @@ describe("SessionExpired", () => {
 });
 
 describe("reportSessionExpired", () => {
-  /**
-   * A screen fires several queries and every one of them fails, so this is
-   * called in a burst. Setting an already-set flag would re-render every
-   * subscriber for nothing.
-   */
+  /** Proves a burst of failed queries sets the flag once, so subscribers are not re-rendered for nothing. */
   it("is idempotent", () => {
     signIn();
     const before = useAuth.getState();

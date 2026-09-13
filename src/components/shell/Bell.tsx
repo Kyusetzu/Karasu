@@ -57,11 +57,7 @@ const KIND_ICON: Record<string, typeof BellIcon> = {
   sequel: Film,
 };
 
-/**
- * Each kind of notice gets its own tint, because they are not the same news:
- * an episode is out (accent — act on it), something has gone quiet (ink — a
- * fact about you), a sequel was announced (green — good news, nothing to do).
- */
+/** Each kind of notice gets its own tint, because an episode, a stale entry and a sequel are not the same news. */
 const KIND_TINT: Record<string, string> = {
   airing: "bg-accent-500/14 text-accent-400",
   stale: "bg-surface-800 text-ink-500",
@@ -69,9 +65,7 @@ const KIND_TINT: Record<string, string> = {
 };
 const DEFAULT_TINT = "bg-surface-800 text-ink-500";
 
-/** The site rows reuse the same vocabulary: an episode is still accent, a
-    person is green, a like is a heart, talk is quiet ink, site housekeeping
-    is a film reel. Grouped by what the news *is*, not by API type. */
+/** The site rows reuse the same vocabulary, grouped by what the news is rather than by API type. */
 const SITE_ICON: Record<SiteNotifKind, typeof BellIcon> = {
   AIRING: CalendarClock,
   FOLLOWING: UserPlus,
@@ -116,8 +110,7 @@ const SITE_TINT: Record<SiteNotifKind, string> = {
   CHARACTER_SUBMISSION_UPDATE: "bg-gold/14 text-gold",
 };
 
-/** Literal `t()` per case, so `i18nKeys.test.ts` sees every key. AniList's own
-    `context` strings are English-only compositions and are never rendered. */
+/** Literal `t()` per case so `i18nKeys.test.ts` sees every key; AniList's English-only `context` is never rendered. */
 function siteVerb(
   row: SiteNotifRow,
   t: (k: string, o?: Record<string, unknown>) => string,
@@ -188,29 +181,23 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
   const qc = useQueryClient();
   const android = isAndroid(usePlatform((s) => s.info));
   const mode = useAuth((s) => s.mode);
-  // Part of both AniList query keys below. Without it, sign out of A and into
-  // B within a staleTime and B's badge shows A's count.
+  // Part of both AniList query keys, or a sign-out and sign-in within a staleTime shows the old account's badge.
   const viewerId = useAuth((s) => s.viewer?.id ?? null);
   const [items, setItems] = useState<AppNotification[]>([]);
   const [open, setOpen] = useState(false);
   useBackClose(open, () => setOpen(false));
   const panel = usePresence(open);
   const ref = useRef<HTMLDivElement>(null);
-  // Which grouped rows are unfolded. Reset on every open — a fresh glance at
-  // the bell starts collapsed, like the badge it answers.
+  // Which grouped rows are unfolded; reset on every open so a fresh glance starts collapsed.
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  // How many site rows wear the unread dot. AniList has no per-row read bit,
-  // only a count the first page's fetch resets — so the count is snapshotted
-  // at open, before that reset. An honest approximation, no more.
+  // How many site rows wear the unread dot: a snapshot taken at open, before the page-1 fetch resets the count.
   const [siteUnseen, setSiteUnseen] = useState(0);
 
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const load = useCallback(() => {
     if (!isTauri) return;
-    // A swallowed failure rendered the empty state, so a bell that could not
-    // read its own table said "You're all caught up." — the most reassuring
-    // possible way to report a broken database.
+    // Report the failure; a swallowed one renders the empty state, which reads as all caught up.
     getNotifications()
       .then((rows) => {
         setItems(rows);
@@ -219,11 +206,7 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
       .catch((e) => setLoadError(String(e)));
   }, []);
 
-  // `load` guards itself, but `listen` does not — outside Tauri it reaches for
-  // `__TAURI_INTERNALS__.transformCallback` and throws. That throw is in a
-  // passive effect during mount, so the shell's ErrorBoundary catches it and
-  // the *whole window* renders as the error screen: `npm run dev` in a plain
-  // browser showed an empty page, and nothing pointed at the bell.
+  // Keep the guard; outside Tauri `listen` throws during mount and the ErrorBoundary blanks the whole window.
   useEffect(() => {
     if (!isTauri) return;
     load();
@@ -250,17 +233,7 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
 
   const anilist = mode === "anilist";
 
-  // One scalar off the viewer. It used to be gated on `open`, which meant it
-  // could never feed the always-visible badge — so an account with twelve
-  // AniList notifications and no Karasu ones showed no badge at all.
-  //
-  // The badge has to keep being true after startup, and nothing else ever
-  // touches this key: with `refetchOnWindowFocus` off globally and the bell
-  // mounted exactly once, `staleTime` alone would freeze the badge at its
-  // boot value for the whole session. Hence the interval — six requests an
-  // hour against a ~30/minute budget — and a refetch on every open (below),
-  // which is the freshness the old `enabled: open` gate used to provide.
-  // The feed's mark-seen still zeroes it the moment it is actually read.
+  // Feeds the always-visible badge; keep the interval, or staleTime freezes it since nothing else touches this key.
   const count = useQuery({
     queryKey: ["social", "notifCount", viewerId],
     queryFn: siteNotifCount,
@@ -269,13 +242,7 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
     refetchInterval: 10 * 60_000,
   });
 
-  // The feed costs a request per bell-open for a signed-in account — the
-  // user-initiated moment; there is no second tab to defer it behind any
-  // more. The first page passes `reset`, which is AniList's own mark-seen;
-  // when that page lands, the count is zeroed right here in the resolution
-  // path — cancel first, the house rule for every optimistic write, because
-  // an in-flight count read computed before the reset would otherwise land
-  // afterwards and resurrect the chip.
+  // Page 1's `reset` is AniList's mark-seen, so the count is zeroed here; cancel first or a stale in-flight read wins.
   const site = useInfiniteQuery({
     queryKey: ["social", "siteNotifs", viewerId],
     queryFn: async ({ pageParam }) => {
@@ -293,13 +260,7 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
     staleTime: 60_000,
   });
 
-  // Trim retained pages when the panel closes, so a later stale open refetches
-  // one page rather than every page the last session walked — the infinite-
-  // query trap `UserList` documents, stepped around the way `Thread` does.
-  // The fetch-time clock is preserved on purpose: `setQueryData` stamps "now"
-  // by default, and a trim is housekeeping, not fresh data — restamping would
-  // postpone the reopen refetch (and its mark-seen) for as long as the user
-  // keeps glancing at the bell. Same lesson `usePrimedLists` backdates for.
+  // Trim retained pages on close so a stale reopen refetches one page; keep `updatedAt` or the trim postpones it.
   useEffect(() => {
     if (open) return;
     const updatedAt = qc.getQueryState(["social", "siteNotifs", viewerId])?.dataUpdatedAt;
@@ -315,10 +276,7 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
 
   const unread = items.filter((n) => !n.read).length;
 
-  // On the rising edge of open: snapshot the unseen count before the feed's
-  // page-1 reset zeroes it (the dots live off the snapshot), start collapsed,
-  // and refetch a stale count — the freshness the old `enabled: open` gate
-  // used to provide.
+  // On the rising edge of open: snapshot the unseen count before page 1 zeroes it, collapse, refetch the count.
   const wasOpen = useRef(false);
   useEffect(() => {
     const rising = open && !wasOpen.current;
@@ -338,23 +296,15 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
 
   const readAll = async () => {
     await markAllNotificationsRead().catch(() => {});
-    // The AniList half was already marked seen server-side by the page-1
-    // fetch's reset; what remains is the client face — the dots.
+    // The AniList half was already marked seen server-side by the page-1 reset; what remains is the dots.
     setSiteUnseen(0);
     load();
   };
 
-  // The one number on the bell, computed in one place — the same hook the
-  // phone shell's More button wears, sharing the count query by key so this
-  // adds an observer rather than a second request.
+  // The one number on the bell, computed once and shared with the phone shell's More button by query key.
   const badge = useNotifBadge();
 
-  // Filtered here, once, before grouping: the bell was the one surface where a
-  // hidden title could still be named, because the query asked for neither
-  // `isAdult` nor `genres` and `isBlocked` therefore had nothing to judge. Both
-  // are on the query now, and a row about a blocked title is dropped rather
-  // than shown with its name — an aired-episode line is a title on screen just
-  // as much as a cover is.
+  // Filtered once before grouping: a row about a blocked title is dropped, since the row itself names the title.
   const level = useContentFilter((s) => s.level);
   const siteRows = useMemo(
     () =>
@@ -364,10 +314,7 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
     [site.data, level],
   );
 
-  // One stream, grouped. Recomputed over the whole loaded set on every page —
-  // a group may grow when "Load more" surfaces older members, which is the
-  // point rather than a glitch. Signed out there are no site rows and the
-  // stream is simply Karasu's own.
+  // One stream, grouped in presentation only: recomputed over the loaded set, so a group may grow as older pages land.
   const groups = useMemo(
     () => buildGroups(unify(items, anilist ? siteRows : [], siteUnseen)),
     [items, anilist, siteRows, siteUnseen],
@@ -381,25 +328,13 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
     navigate(row.target);
   };
 
-  // The local twin of `openSite`, and deliberately not the same shape: an
-  // AniList row with no target is `disabled`, because marking read is
-  // AniList's own job and a dead row has nothing left to do. A Karasu row
-  // always has something to do — mark itself read — so it stays enabled and
-  // the navigation is the extra. Rows written before schema v15 carry no media
-  // id and simply stop there.
+  // Local twin of `openSite`, never disabled: a Karasu row can always mark itself read, and navigation is the extra.
   const openLocal = async (n: AppNotification) => {
     await readOne(n);
-    // An update row's whole message is "ready to install" — tapping it does
-    // that, rather than opening a page that offers the same button again.
-    // `download` first because a restart empties the in-memory pending: it
-    // answers instantly when the bytes are already held, re-fetches when they
-    // are not, and `install` does not return on success (the installer takes
-    // over and the process exits).
+    // Tapping an update row installs it; `download` first, because a restart empties the in-memory pending update.
     if (n.kind === "update") {
       setOpen(false);
-      // Android never downloads or installs — its update row is a notice,
-      // and About holds the release link. download→install there produced
-      // an error toast off a row that was working as designed.
+      // Android never downloads or installs; its update row is a notice and About holds the release link.
       if (android) {
         navigate("/about");
         return;
@@ -417,9 +352,7 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
     navigate(`/media/${n.mediaId}`);
   };
 
-  // An airing group has one destination, so it goes there (marking its local
-  // members read on the way). An actor group's members each lead somewhere
-  // else, so the row unfolds instead.
+  // An airing group has one destination, so it goes there; an actor group's members differ, so it unfolds.
   const openGroup = (g: NotifGroup) => {
     if (g.label?.kind === "airing") {
       for (const m of g.items) if (m.local) void readOne(m.local);
@@ -468,9 +401,7 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
           <span className="mt-0.5 block text-xs text-ink-500">{n.body}</span>
           <span className="mt-0.5 block text-2xs text-ink-600">{rowTime(n.createdMs)}</span>
         </span>
-        {/* Two rows that look identical must not behave differently. An
-            app-update or dropped-queue row, and anything written before v15,
-            has nowhere to go and says so by omitting this. */}
+        {/* Two rows that look identical must not behave differently: a row with nowhere to go omits the chevron. */}
         {n.mediaId != null && (
           <ChevronRight aria-hidden className="mt-1 size-3 shrink-0 self-start text-ink-600" />
         )}
@@ -478,8 +409,7 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
     );
   };
 
-  // The actor's own page, for rows whose *press* goes to the activity — the
-  // name is then the profile's only door, so it becomes a link of its own.
+  // The actor's own page, for rows whose press goes to the activity; the name is then the profile's only door.
   const profileOf = (row: SiteNotifRow): string | null =>
     row.activityId != null && row.actorName
       ? `/user/${encodeURIComponent(row.actorName)}`
@@ -501,9 +431,7 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-2">
             {profile ? (
-              // Nested target, so the container is a div-button below — a
-              // real <button> cannot legally hold a link. `stopPropagation`
-              // is the ListRow idiom for a control inside a clickable row.
+              // Nested link, so the container below is a div-button: a real <button> cannot legally hold a link.
               <Link
                 to={profile}
                 onClick={(e) => {
@@ -571,9 +499,7 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
     const label = g.label!;
     const isOpen = expanded.has(g.key);
     const lead = label.kind === "airing" ? label.title : label.name;
-    // An actor group's press unfolds it, so the name carries the profile —
-    // the same split every activity row makes. Nested link means the
-    // container is a div-button, like `renderSite`'s.
+    // An actor group's press unfolds it, so the name carries the profile, making the container a div-button.
     const leadProfile =
       label.kind !== "airing" && g.items[0]?.site?.actorName
         ? `/user/${encodeURIComponent(g.items[0].site.actorName)}`
@@ -658,8 +584,7 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
     <div ref={ref} className="relative flex items-center">
       <button
         onClick={() => setOpen((v) => !v)}
-        // On the phone shell this button is a bottom-bar slot rather than a
-        // titlebar corner, so it wears the bar's proportions there.
+        // On the phone shell this button is a bottom-bar slot, so it wears the bar's proportions there.
         className={cn(
           "relative transition-surface",
           barSlot
@@ -671,11 +596,7 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
       >
         <BellIcon className={barSlot ? "size-5" : "size-3.75"} />
         {badge > 0 && (
-          // The `s950` ring is what separates the badge from the bell glyph
-          // beneath it — without it the two silhouettes merge at this size.
-          // Breathes while there is something unread. The count is small and
-          // sits in the corner of a quiet titlebar, so a badge that merely
-          // appears is easy to walk past; this stops the moment it is read.
+          // Keep the `s950` ring, or the badge and bell glyph merge at this size; the pulse stops once read.
           <span className="animate-idle-pulse absolute right-1.5 top-1.5 grid h-3.25 min-w-3.25 place-items-center rounded-[.4375rem] border border-surface-950 bg-accent-500 px-1 text-[.5625rem] font-semibold text-accent-ink">
             {badge > 9 ? "9+" : badge}
           </span>
@@ -684,15 +605,10 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
 
       {panel.mounted && (
         <div
-          // The `data-overlay` convention: this panel is over the page and owns
-          // the keyboard while it is, so a `j` or a `/` behind it does not move
-          // a list selection nobody can see. Kept through the exit animation,
-          // like every other overlay.
+          // `data-overlay`: the panel owns the keyboard while it is over the page, and keeps it through the exit animation.
           data-overlay
           className={cn(
-            // Anchored under the titlebar bell on desktop; on the phone shell
-            // the anchor sits in the bottom bar, so the panel becomes a sheet
-            // pinned above it instead — `fixed` to escape the bar's box.
+            // Under the titlebar bell on desktop; a sheet above the phone shell's bottom bar, `fixed` to escape the bar's box.
             barSlot
               ? "fixed inset-x-2 bottom-[calc(var(--shell-bottom,0px)+0.5rem)] z-50 origin-bottom overflow-hidden rounded-xl border border-hair bg-surface-900 shadow-2xl panel-wash"
               : "absolute right-0 top-full z-50 mt-1 w-88 origin-top-right overflow-hidden rounded-xl border border-hair bg-surface-900 shadow-2xl panel-wash",
@@ -710,10 +626,7 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
                 </span>
               )}
             </span>
-            {/* Both sides: Karasu's rows get their read bit written, and the
-                AniList dots clear — their server half already happened when
-                the page-1 fetch reset the count on open. Gated on the sum, so
-                a site-only backlog still gets its button. */}
+            {/* Both sides clear here; gated on the sum so a site-only backlog still gets its button. */}
             {unread + siteUnseen > 0 && (
               <button onClick={readAll} className="text-xs text-accent-400 hover:underline">
                 {t("notif.markAll")}

@@ -3,13 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Modal } from "@/components/ui/modal";
 import { usePresence } from "@/hooks/usePresence";
 
-/**
- * The shortcut reference, on `?`.
- *
- * It lists what is wired and nothing else. A reference that names keys the app
- * does not answer to is worse than no reference — the reader tries one, gets
- * nothing, and stops trusting the rest of the sheet.
- */
+/** The shortcut reference on `?`; it lists what is wired and nothing else, or the reader stops trusting the sheet. */
 export default function KeyboardSheet() {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -119,13 +113,7 @@ function Cap({ children }: { children: string }) {
   );
 }
 
-/**
- * True while the caret is in something that takes text.
- *
- * Every single-key shortcut has to ask: `?` and `/` are characters people type
- * into the search field, and a global handler that fires anyway makes the
- * field unusable for exactly the words it is there to receive.
- */
+/** True while the caret is in something that takes text; every single-key shortcut must ask, or it eats typed characters. */
 export function isTyping(): boolean {
   const el = document.activeElement as HTMLElement | null;
   if (!el) return false;

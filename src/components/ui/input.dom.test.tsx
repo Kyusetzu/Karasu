@@ -3,11 +3,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { Input } from "./input";
 
 describe("Input", () => {
-  /**
-   * The reason `onClear` is opt-in. ~25 call sites pass width classes expecting
-   * them to land on the `<input>` itself; an unconditional wrapper would move
-   * every one of them onto a `<div>` and leave the field full-width inside it.
-   */
+  /** Proves `onClear` is opt-in: callers pass width classes expecting them to land on the `<input>` itself. */
   it("renders a bare input with no wrapper when no clear is asked for", () => {
     const { container } = render(<Input value="x" onChange={vi.fn()} className="w-20" />);
     expect(container.firstElementChild?.tagName).toBe("INPUT");
@@ -22,8 +18,7 @@ describe("Input", () => {
     expect(container.querySelector("input")?.className).toContain("w-20");
   });
 
-  /** A button that does nothing is worse than none, and it would sit in the
-   *  tab order permanently. */
+  /** Proves the button appears only with something to clear; an idle one would sit in the tab order permanently. */
   it("shows the button only when there is something to clear", () => {
     const { rerender } = render(
       <Input value="" onChange={vi.fn()} onClear={vi.fn()} clearLabel="Clear" />,
@@ -44,10 +39,7 @@ describe("Input", () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
-  /**
-   * Taking focus on mousedown would blur the caret, and several of these boxes
-   * commit on blur — so the press must not steal it.
-   */
+  /** Proves the press does not take focus: several of these boxes commit on blur, so it must not steal the caret. */
   it("does not take focus from the field", () => {
     render(<Input value="abc" onChange={vi.fn()} onClear={vi.fn()} clearLabel="Clear" />);
     const prevented = fireEvent.mouseDown(screen.getByRole("button", { name: "Clear" }));

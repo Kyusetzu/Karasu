@@ -36,8 +36,7 @@ export default function Titlebar() {
         </span>
         {version && (
           <>
-            {/* The divider is what makes the version read as metadata rather
-                than as part of the wordmark. */}
+            {/* The divider is what makes the version read as metadata rather than as part of the wordmark. */}
             <span className="h-3 w-px bg-surface-800" />
             <span className="font-brand text-2xs tabular-nums text-ink-600">
               {version}
@@ -50,10 +49,7 @@ export default function Titlebar() {
 
       <div className="flex h-full items-center">
         <Bell />
-        {/* Min/max/close are window furniture a phone has not got — Android
-            supplies its own task management, and `minimize` on a mobile
-            WebviewWindow is at best a no-op. The bell stays: it is content,
-            not chrome. */}
+        {/* Min/max/close are window furniture a phone has not got; the bell stays because it is content, not chrome. */}
         {!phone && (
           <>
         <button
@@ -70,12 +66,7 @@ export default function Titlebar() {
         >
           <Square className="size-3" />
         </button>
-        {/* Closing still hides to the tray so the app keeps detecting — but
-            Rust decides that, not this button. `close()` raises
-            CloseRequested, whose handler is the only place that knows whether
-            a tray icon actually exists; calling `hide()` straight from here
-            hid the window on Linux desktops with no tray to restore it from.
-            Don't put `hide()` back. */}
+        {/* Keep `close()`, never `hide()`: Rust's CloseRequested handler decides between hiding to the tray and quitting. */}
         <button
           onClick={() => appWindow?.close()}
           className="grid h-full w-12 place-items-center text-ink-500 transition-surface hover:bg-[#b3232c] hover:text-white"

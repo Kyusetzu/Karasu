@@ -12,11 +12,7 @@ interface ModalProps {
   children: ReactNode;
   /** Width override — the default is the entry editor's `28rem`. */
   className?: string;
-  /**
-   * On its way out: swap the entrance for the exit. Supplied by `usePresence`
-   * at the call site, which is what keeps this mounted long enough to be seen.
-   * Omitted, the modal simply behaves as it always did.
-   */
+  /** On its way out: swaps the entrance for the exit, supplied by `usePresence` at the call site. */
   leaving?: boolean;
 }
 
@@ -30,16 +26,13 @@ export function Modal({
   const { t } = useTranslation();
   const panel = useRef<HTMLDivElement>(null);
   const titleId = useId();
-  // One hook here covers every dialog in the app, because they all render
-  // through this component.
+  // One hook here covers every dialog in the app, because they all render through this component.
   useDialogFocus(panel, !leaving);
-  // Same economy: the Android back gesture (and the browser back button)
-  // closes the dialog instead of leaving the page.
+  // Once for every dialog, so the back gesture closes it; Escape and the backdrop must keep working on their own.
   useBackClose(!leaving, onClose);
 
   useEffect(() => {
-    // Nothing to close once it is already leaving — and Escape during the exit
-    // would otherwise fire the parent's handler a second time.
+    // Nothing to close once leaving; Escape during the exit would fire the parent's handler a second time.
     if (leaving) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
@@ -48,9 +41,7 @@ export function Modal({
 
   return (
     <div
-      // Kept while leaving: screen-level key handlers check for this, and
-      // handing the keyboard back mid-exit would let a keypress act on the list
-      // behind a dialog the user can still see.
+      // Kept while leaving, so a keypress mid-exit cannot act on the list behind a dialog the user can still see.
       data-overlay
       className={cn(
         "fixed inset-0 z-50 grid place-items-center bg-[rgba(4,5,8,.55)] p-4",
@@ -62,11 +53,7 @@ export function Modal({
     >
       <div
         ref={panel}
-        // The semantics every dialog in Karasu was missing: without them a
-        // screen reader announces this as an ordinary group of text, gives no
-        // name for it, and does not tell the user that the rest of the page has
-        // gone inert. `aria-modal` is the claim; `useDialogFocus` above is what
-        // makes the claim true.
+        // The dialog semantics; `aria-modal` is the claim and `useDialogFocus` is what makes it true.
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}

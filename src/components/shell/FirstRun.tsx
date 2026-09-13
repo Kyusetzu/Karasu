@@ -6,40 +6,26 @@ import { useAniListLogin } from "@/hooks/useAniListLogin";
 import { useAuth } from "@/stores/auth";
 import { isAndroid, usePlatform } from "@/stores/platform";
 
-/**
- * The first thing anyone sees.
- *
- * Two columns rather than a centred card, because the mark at 22rem is the
- * only place in the app the bird is ever this large — and a first run is the
- * one moment where the app is allowed to introduce itself rather than get out
- * of the way. The three steps are there because "it tracks automatically" is
- * a claim; naming what happens is the proof.
- */
+/** The first thing anyone sees: the one moment the app introduces itself, with the three steps as proof of the claim. */
 export default function FirstRun() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const enableLocal = useAuth((s) => s.enableLocal);
   const login = useAniListLogin();
-  // The desktop steps promise player detection a phone has not got — on
-  // Android, Jellyfin is the whole of detection, so the story says so
-  // instead of describing machinery the Settings pane greys out.
+  // On Android, Jellyfin is the whole of detection, so the steps say so instead of promising player detection.
   const android = isAndroid(usePlatform((s) => s.info));
   const steps = android
     ? [t("firstRun.step1"), t("firstRun.step2Android"), t("firstRun.step3Android")]
     : [t("firstRun.step1"), t("firstRun.step2"), t("firstRun.step3")];
 
-  // The button used to be a bare link to /settings — which on the phone shell
-  // is the pane *list*, putting the actual OAuth button three taps away from
-  // the very first screen. Start the handoff here; only a failed start (no
-  // browser, port taken) falls back to the Account pane's manual paste.
+  // Start the OAuth handoff here; only a failed start falls back to the Account pane's manual paste.
   const connect = async () => {
     if (!(await login.start())) navigate("/settings?pane=account");
   };
 
   return (
     <div className="relative grid h-full place-items-center overflow-hidden">
-      {/* Two washes off the derived accent hues — the same pair the panels
-          use, thrown wide so the whole screen carries the colour. */}
+      {/* Two washes off the derived accent hues, the panels' pair thrown wide so the whole screen carries the colour. */}
       <div
         className="pointer-events-none absolute inset-0"
         style={{
@@ -50,9 +36,7 @@ export default function FirstRun() {
       />
 
       <div className="relative flex w-full max-w-6xl items-center">
-        {/* Phone: one centred column with the mark above the words — the
-            desktop's 56px left gutter and 480px text column overflowed a
-            375px viewport, cutting the title mid-word. */}
+        {/* Phone: one centred column with the mark above the words, since the desktop gutter overflows a phone viewport. */}
         <div className="w-full max-w-120 px-6 py-8 md:w-auto md:shrink-0 md:px-0 md:py-8 md:pl-14 md:pr-8">
           <KarasuMark className="mb-6 w-20 md:hidden" />
           <p className="text-2xs font-semibold uppercase tracking-[.18em] text-accent-400">
@@ -66,15 +50,9 @@ export default function FirstRun() {
           </p>
 
           <div className="mt-6 flex flex-wrap items-center gap-3">
-            {/* Deliberately NOT disabled while waiting: this is the one moment
-                where a closed browser tab must be recoverable by pressing
-                again (the backend reuses the pending login), and the hook's
-                in-flight guard already stops a double-tap opening two tabs.
-                "Look around" during a pending login is fine too — a late
-                completion still signs in through the auth store's listener. */}
+            {/* Keep this enabled while waiting: a closed browser tab must be recoverable by pressing again. */}
             <Button onClick={() => void connect()}>{t("dashboard.connect")}</Button>
-            {/* Switches to the account-free list in place — the store flips
-                `mode`, which re-renders straight into the dashboard. */}
+            {/* Switches to the account-free list in place: the store flips `mode` and re-renders into the dashboard. */}
             <Button variant="ghost" onClick={() => enableLocal()}>
               {t("firstRun.lookAround")}
             </Button>

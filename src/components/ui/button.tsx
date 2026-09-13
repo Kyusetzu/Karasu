@@ -3,8 +3,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  // `transition-surface`, not `transition-colors`: the latter animates `color`,
-  // which makes the browser hold the old value across a theme swap.
+  // `transition-surface`, not `transition-colors`: animating `color` holds the old value across a theme swap.
   "inline-flex items-center justify-center gap-2 rounded-lg text-sm font-medium transition-surface disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-accent-500",
   {
     variants: {
@@ -15,10 +14,7 @@ const buttonVariants = cva(
         outline:
           "border border-surface-700 text-ink-300 hover:bg-surface-850 hover:text-ink-100",
         ghost: "text-ink-300 hover:bg-surface-850 hover:text-ink-100",
-        // `text-surface-950` rather than white, because it inverts with the
-        // theme: 7.12:1 over the dark-theme red and 6.07:1 over the light one.
-        // The handoff specifies white ink, which measures 2.73:1 on the dark
-        // red and fails.
+        // `text-surface-950` rather than white: it inverts with the theme and keeps contrast where white ink fails.
         danger: "bg-danger text-surface-950 hover:opacity-90",
         /** Destructive but not the primary action — bulk Remove, reset rows. */
         dangerGhost: "text-danger hover:bg-danger/10",

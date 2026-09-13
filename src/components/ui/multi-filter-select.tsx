@@ -13,19 +13,7 @@ import {
 import { usePresence } from "@/hooks/usePresence";
 import { useBackClose } from "@/hooks/useBackClose";
 
-/**
- * `FilterSelect`'s bigger sibling: many answers, and each one can be a "not".
- *
- * The single-answer control wraps a native `<select>`, which is the right call
- * there — it inherits the OS dropdown, type-ahead and screen-reader behaviour
- * for free. None of that survives a tri-state, so this one is built out of
- * buttons and has to earn each of those back: Escape closes it, the trigger
- * says what it is set to without being opened, and the option list is
- * filterable because AniList ships roughly six hundred tags.
- *
- * The tri-state itself is `lib/multiFilter`, which is tested. This file is the
- * part that has to be looked at.
- */
+/** `FilterSelect`'s tri-state sibling, built from buttons because a native `<select>` cannot express a "not". */
 export function MultiFilterSelect({
   label,
   value,
@@ -50,8 +38,7 @@ export function MultiFilterSelect({
   const panel = usePresence(open);
   useBackClose(open, () => setOpen(false));
 
-  // Escape and click-outside, the two ways a popover closes. Registered only
-  // while it is open, so nothing listens for a control nobody is using.
+  // Escape and click-outside, registered only while open, so nothing listens for a control nobody is using.
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -71,16 +58,13 @@ export function MultiFilterSelect({
     };
   }, [open]);
 
-  // Prepared once per vocabulary, not per keystroke — AniList ships roughly
-  // six hundred tags.
+  // Prepared once per vocabulary rather than per keystroke; the tag vocabulary is long.
   const docs = useMemo(
     () => new Map(options.map((o) => [o, prepareDoc([o])] as const)),
     [options],
   );
 
-  // The chosen options first, so a filter set from a six-hundred-item list can
-  // still be read and undone without scrolling for it. Within each half the
-  // fuzzy score orders (the sort is stable), so a typo still surfaces its tag.
+  // Chosen options first, so a filter is undone without scrolling; the stable sort keeps fuzzy order in each half.
   const shown = useMemo(() => {
     const needle = term.trim();
     let matches: string[];
@@ -130,8 +114,7 @@ export function MultiFilterSelect({
 
       {panel.mounted && (
         <div
-          // Over the page and holding the keyboard while it is — the same
-          // convention every dialog and the bell follow.
+          // Holds the keyboard while up, the convention every dialog and the bell follow.
           data-overlay
           className={cn(
             "absolute left-0 top-full z-50 mt-1 w-64 origin-top-left overflow-hidden",
@@ -150,9 +133,7 @@ export function MultiFilterSelect({
                 aria-label={t("search.filterOptions")}
                 className="h-9 w-full bg-transparent pl-8 pr-8 text-xs text-ink-100 placeholder:text-ink-600 focus:outline-none"
               />
-              {/* Clears the *search term*, not the selection — the footer's
-                  "Clear" already owns that, and conflating the two would make
-                  one of them a trap. */}
+              {/* Clears the search term only; the footer's Clear owns the selection, and conflating the two makes one a trap. */}
               {term && (
                 <button
                   type="button"
@@ -178,9 +159,7 @@ export function MultiFilterSelect({
                 <li key={option}>
                   <button
                     type="button"
-                    // The state is on the button, not only in its colour —
-                    // a forced palette or a colour-blind reader gets the same
-                    // three answers everyone else does.
+                    // The state is on the button, not only its colour, so a forced palette or colour-blind reader reads it too.
                     aria-pressed={state !== "off"}
                     onClick={() => onChange(cycle(value, option))}
                     className={cn(

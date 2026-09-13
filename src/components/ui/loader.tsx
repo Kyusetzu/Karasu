@@ -1,22 +1,6 @@
 import { cn } from "@/lib/utils";
 
-/**
- * The chevron loader — for indeterminate work with no shape.
- *
- * The app now has three loading vocabularies, on purpose, and this header is
- * where the split is written down so a fourth does not appear by accident:
- * `Skeleton` where the incoming content's *shape* is known (grids, detail
- * pages — the placeholder promises a layout); this loader where the wait has
- * no shape at all (a page still computing, a sync read, a search in flight);
- * and the spinning `RefreshCw` as the busy state of an icon button that
- * already shows that icon at rest.
- *
- * A `role="status"` live region with the visible caption *inside* it — the
- * Toast/SessionExpired precedent — because an empty labelled div is announced
- * unreliably; the chevrons themselves are `aria-hidden` decoration. The
- * animation is pure CSS (`loader-sweep` in index.css), so the reduced-motion
- * collapse reaches it and freezes it fully revealed.
- */
+/** The loader for a wait with no shape; `Skeleton` covers a known shape and a spinning `RefreshCw` a busy icon button. */
 export function Loader({
   label,
   size = "md",
@@ -33,8 +17,7 @@ export function Loader({
       role="status"
       className={cn("flex flex-col items-start gap-2.5", className)}
     >
-      {/* The colour class sits on the animated element itself rather than
-          being inherited — see the WebKitGTK note beside the utility. */}
+      {/* Keep the colour class on the animated element itself; WebKitGTK resolves inherited currentColor in filters stalely. */}
       <span
         aria-hidden
         className={cn(

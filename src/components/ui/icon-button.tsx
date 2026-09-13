@@ -10,8 +10,7 @@ const iconButtonVariants = cva(
         ghost: "text-ink-500 hover:bg-surface-850 hover:text-ink-100",
         surface: "bg-surface-800 text-ink-300 hover:bg-surface-700 hover:text-ink-100",
         accent: "bg-accent-500 text-accent-ink hover:bg-accent-600",
-        /** For the action circles that sit *on* cover art, where the artwork
-            beneath is unpredictable and the fill has to be near-opaque. */
+        /** For the action circles that sit on cover art, where the fill has to be near-opaque over unknown artwork. */
         onCover: "bg-[rgba(4,5,8,.86)] text-ink-300 border border-surface-700 hover:text-ink-100",
         success: "text-success hover:bg-success/10",
         danger: "text-danger hover:bg-danger/10",
@@ -24,23 +23,14 @@ const iconButtonVariants = cva(
         /** 1.75rem — the quick actions in a list row. */
         xs: "size-7",
       },
-      /** The radius lives here and nowhere else. Splitting it across `size`
-          and `round` puts two `rounded-*` utilities of equal specificity on
-          the same element, and the stylesheet's order decides — which meant
-          `round` silently did nothing. */
+      /** Keep the radius here only; a `rounded-*` on `size` too lets stylesheet order decide and `round` does nothing. */
       round: { true: "rounded-full", false: "rounded-md" },
     },
     defaultVariants: { variant: "ghost", size: "control", round: false },
   },
 );
 
-/**
- * A square (or round) button holding nothing but an icon.
- *
- * Always needs an `aria-label` — there is no text to read. The three sizes are
- * the three the design actually uses; the round form is for the action circles
- * that overlay cover art.
- */
+/** A square or round button holding nothing but an icon, so it always needs an `aria-label`. */
 export const IconButton = forwardRef<
   HTMLButtonElement,
   ButtonHTMLAttributes<HTMLButtonElement> &

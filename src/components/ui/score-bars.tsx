@@ -3,8 +3,7 @@ import { formatScore, scoreOptions, scoreScale } from "@/lib/scoreFormat";
 import { useScoreFormat } from "@/stores/auth";
 import { cn } from "@/lib/utils";
 
-/** How full each bar is drawn, low to high — resampled to however many bars
-    the active format has, so a five-star scale still reads as a rising ramp. */
+/** How full each bar is drawn, low to high, resampled to the format's bar count so any scale reads as a rising ramp. */
 const FILL_RANGE: [number, number] = [26, 89];
 
 function fillFor(index: number, count: number): number {
@@ -13,16 +12,7 @@ function fillFor(index: number, count: number): number {
   return Math.round(lo + (index / (count - 1)) * (hi - lo));
 }
 
-/**
- * The score control of the entry editor, in the account's own format.
- *
- * Discrete formats (10, 5, 3) keep the clickable histogram — it shows the
- * *shape* of the scale while setting it, and clicking the current score
- * clears it, which is the only way to say "no score" without a separate
- * control. The smiley scale labels its three bars with the smileys AniList
- * itself uses. The two continuous formats (100 and 10-decimal) get a number
- * input instead: a hundred bars is not a control.
- */
+/** The entry editor's score control in the account's format: a clickable histogram, or a number input for continuous ones. */
 export function ScoreBars({
   value,
   onChange,

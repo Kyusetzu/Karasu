@@ -20,12 +20,7 @@ import { useBackClose } from "@/hooks/useBackClose";
 import { useSyncStatus } from "@/hooks/useSyncStatus";
 import { useManualSync } from "@/hooks/useManualSync";
 
-/**
- * A literal `t()` per field, so `i18nKeys.test.ts` sees every key. The names
- * come from AniList's own mutation arguments; anything the schema grows later
- * falls through to the raw name, which is worse than a label and much better
- * than an empty cell.
- */
+/** A literal `t()` per field, so `i18nKeys.test.ts` sees every key; the names are AniList's mutation arguments. */
 export function fieldLabel(field: QueueField, t: (k: string) => string): string {
   switch (field) {
     case "status":
@@ -71,20 +66,7 @@ function phaseLabel(phase: SyncPhase, t: (k: string) => string): string {
   }
 }
 
-/**
- * What the sync is doing, on demand.
- *
- * A popover rather than a settings pane because the question it answers — "is
- * anything of mine unsent?" — is asked in passing, from wherever the user
- * happens to be. It owns its trigger the way `Bell` does; the caller supplies
- * only what the trigger looks like.
- *
- * Nothing in here costs an AniList request. It reads SQLite and two in-process
- * values, which is the only reason it may poll at all — the ~30/min budget it
- * reports on is shared with the scrobbler and three alert passes, and a status
- * surface that spent it would be the problem it exists to show. Its one network
- * control is the existing manual sync, behind a click.
- */
+/** What the sync is doing, on demand; nothing in it may cost an AniList request, since that budget is shared. */
 export default function SyncPanel({
   label,
   children,
@@ -115,10 +97,7 @@ export default function SyncPanel({
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       setOpen(false);
-      // Focus goes back where it came from — a popover dismissed by keyboard
-      // must not strand the caret on `<body>`. Deliberately not done on the
-      // outside-click path: the user is already somewhere else by then, and
-      // pulling focus back would undo their click.
+      // Focus returns to the trigger on Escape only; after an outside click the user is already elsewhere.
       trigger.current?.focus();
     };
     window.addEventListener("mousedown", onDown);
@@ -129,10 +108,7 @@ export default function SyncPanel({
     };
   }, [open]);
 
-  // Titles come from the lists already in the cache — no request, and no join
-  // in Rust either, where `cached_list` hands back the whole payload as one
-  // string and labelling a dozen rows would mean parsing megabytes a second.
-  // Cache-only: a row whose list has never been fetched simply goes unlabelled.
+  // Titles come from the cached lists only, never a request; an unfetched list's row simply goes unlabelled.
   const entries = qc
     .getQueriesData<ListResult>({ queryKey: ["mediaList"] })
     .flatMap(([, data]) => data?.lists.flatMap((g) => g.entries) ?? []);
@@ -182,10 +158,7 @@ export default function SyncPanel({
           </span>
           <span className="min-w-0 flex-1">
             <span className="block truncate text-[.8125rem] font-medium text-ink-100">
-              {/* Three different unknowns, said differently. A title we have;
-                  an id we have but no title for; and a payload the backend
-                  could not parse at all — which is still a row, because the
-                  count here has to agree with the pending badge. */}
+              {/* An unparsed payload is still a row, because the count here has to agree with the pending badge. */}
               {title ??
                 (edit.subject == null
                   ? t("syncPanel.rowUnparsed")
@@ -221,10 +194,7 @@ export default function SyncPanel({
         <div
           role="dialog"
           aria-label={t("syncPanel.title")}
-          // Over the page and owning the keyboard while it is, so a `j` or a
-          // `/` behind it does not move a list nobody can see. Kept through the
-          // exit, like every other overlay. Not a focus *trap*, though: this is
-          // a popover, and trapping Tab in one is wrong.
+          // Owns the keyboard while up, exit included; not a focus trap, because trapping Tab in a popover is wrong.
           data-overlay
           className={cn(
             "absolute bottom-full left-0 z-50 mb-1 w-76 origin-bottom-left overflow-hidden rounded-xl border border-hair bg-surface-900 shadow-2xl panel-wash",
@@ -249,9 +219,7 @@ export default function SyncPanel({
             )}
           </div>
 
-          {/* A status read that failed is a state, not a reason to show the
-              reassuring empty one — the same lesson the bell learned about a
-              database it could not read. */}
+          {/* A failed status read is a state to render, not a reason to show the reassuring empty one. */}
           {status.error != null ? (
             <p className="px-3 py-4 text-xs text-danger">
               {t("common.error", { message: String(status.error) })}
@@ -264,9 +232,7 @@ export default function SyncPanel({
                 <div className="flex items-baseline justify-between gap-3">
                   <dt className="text-ink-600">{t("syncPanel.headroom")}</dt>
                   <dd className="tabular-nums text-ink-300">
-                    {/* Null until a response header has been seen. The client
-                        seeds a 30 to start with, and rendering a seed as a
-                        measurement is the one thing this row must not do. */}
+                    {/* Null until a response header has been seen; the client's seed must never render as a measurement. */}
                     {rate?.remaining != null && rate.limit != null
                       ? t("syncPanel.headroomValue", {
                           left: rate.remaining,
@@ -275,13 +241,7 @@ export default function SyncPanel({
                       : t("syncPanel.headroomUnknown")}
                   </dd>
                 </div>
-                {/* The age, which the panel computed and threw away. Without it
-                    an hours-old reading renders as if it were live — and the
-                    number only moves when a request lands, so an idle app pins
-                    it indefinitely. Worth knowing while reading it: AniList's
-                    own first response after an idle window reports 28 of 30,
-                    measured, so a steady 28 is its accounting rather than two
-                    requests Karasu spent. */}
+                {/* The reading's age, or an hours-old figure renders as live: the number only moves when a request lands. */}
                 {rate?.observedAgoMs != null && (
                   <div className="flex items-baseline justify-between gap-3">
                     <dt className="text-ink-600">{t("syncPanel.measured")}</dt>
@@ -298,10 +258,7 @@ export default function SyncPanel({
                   <div className="flex items-baseline justify-between gap-3">
                     <dt className="text-ink-600">{t("syncPanel.throttle")}</dt>
                     <dd className="tabular-nums text-accent-400">
-                      {/* Two very different waits: a self-imposed breather when
-                          headroom runs low, and a 429 the server asked us to
-                          wait out. Saying which is the difference between "the
-                          app is pacing itself" and "something went wrong". */}
+                      {/* Says which wait this is: the app pacing itself, or a 429 the server asked it to sit out. */}
                       {rate.throttleKind === "retryAfter"
                         ? t("syncPanel.throttleLimited", {
                             s: seconds(rate.throttledForMs),
@@ -322,9 +279,7 @@ export default function SyncPanel({
                 <ul className="max-h-52 overflow-y-auto">{data.queued.map(row)}</ul>
               )}
 
-              {/* The traffic. An idle app has nothing queued, so the panel had
-                  nothing to list while the headroom moved underneath it — "the
-                  value changes and no data is shown". This is what moves it. */}
+              {/* The traffic, which is what moves the headroom while an idle app has nothing queued to list. */}
               <div className="border-t border-hair">
                 <h3 className="px-3 pb-1 pt-2 text-[.5625rem] font-semibold uppercase tracking-[.14em] text-ink-600">
                   {t("syncPanel.recent")}
@@ -354,9 +309,7 @@ export default function SyncPanel({
                         <span className="min-w-0 flex-1 truncate text-ink-300">
                           {r.operation}
                         </span>
-                        {/* Only when it happened. Self-inflicted waiting is the
-                            thing worth spotting, and a 0 ms column on every
-                            healthy row would bury it. */}
+                        {/* Only when it waited; a column on every healthy row would bury the self-inflicted wait worth spotting. */}
                         {r.pacedMs > 0 && (
                           <span className="shrink-0 tabular-nums text-gold">
                             {t("syncPanel.paced", { ms: r.pacedMs })}

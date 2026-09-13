@@ -4,16 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-/**
- * Shared back control for the pages you can only arrive at from somewhere else
- * — media detail, the franchise graph, a thread, a profile, and the
- * character/staff/studio pages. Everything reachable from the sidebar is a
- * top-level destination and deliberately has none.
- *
- * It carries a visible label rather than a bare glyph, and a bordered,
- * translucent-blurred fill so it stays readable on the detail page, where it
- * sits directly on banner artwork of unpredictable brightness.
- */
+/** Shared back control for pages reached only from elsewhere, filled and blurred so it stays readable on banner art. */
 export default function BackButton({ className }: { className?: string }) {
   const { t } = useTranslation();
   const navigate = useNavigate();

@@ -8,14 +8,7 @@ export interface Segment<T extends string> {
   title?: string;
 }
 
-/**
- * Two or three mutually exclusive options, shown all at once.
- *
- * For switches between *views of the same thing* — grid or rows, anime or
- * manga, PNG or JPEG. The whole control is one bordered track and the active
- * segment is a raised fill inside it, which is what distinguishes it from a
- * row of {@link Pill}s: those choose a value, this chooses a lens.
- */
+/** Two or three exclusive views of one thing in a single bordered track; {@link Pill}s choose a value, this chooses a lens. */
 export function Segmented<T extends string>({
   segments,
   value,

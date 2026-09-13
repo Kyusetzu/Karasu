@@ -2,20 +2,7 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { initialFor } from "@/lib/initials";
 
-/**
- * A user's avatar, and the avatar plus their name.
- *
- * Three screens had drawn this by hand at three sizes — the sidebar's account
- * block, the statistics header and the account settings pane — and the social
- * screens need it at three more, in lists of fifty. Two exports rather than one
- * because the shared part is only the *disc*: the statistics header's text side
- * is a page title with a chart icon for a fallback, not a name, so forcing it
- * through a name/sub stack would be the wrong shape for the sake of one import.
- *
- * Not used by `stats/RankedList`, which draws voice-actor portraits with a
- * three-state `undefined | null | string` (no column / no portrait / portrait).
- * That is a different thing wearing the same border-radius.
- */
+/** A user's avatar, and the avatar plus their name; two exports because only the disc is shared by every caller. */
 
 export type AvatarSize = "sm" | "md" | "lg" | "xl" | "2xl";
 
@@ -57,8 +44,7 @@ interface AvatarProps {
 export function Avatar({ src, name, size = "md", fallback, className }: AvatarProps) {
   const disc = cn(DISC[size], "shrink-0 rounded-full", className);
 
-  // `alt=""` on purpose: every call site renders the name next to the disc, so
-  // a screen reader that announced it too would read the name twice.
+  // `alt=""` on purpose: every call site renders the name next to the disc, so announcing it would read it twice.
   if (src) {
     return (
       <img

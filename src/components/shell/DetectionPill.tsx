@@ -3,21 +3,12 @@ import { useNowPlaying } from "@/stores/nowPlaying";
 import { isTauri } from "@/api/anilist";
 import { cn } from "@/lib/utils";
 
-/**
- * The centre of the titlebar: what the detector can see, right now.
- *
- * This is the app quietly proving it is working, so it lives in the chrome and
- * never demands attention — no button, no colour change, no badge. It is also
- * `pointer-events-none` on purpose: it sits inside the drag region, and a
- * non-interactive element that swallowed the drag would make the middle third
- * of the titlebar unusable for moving the window.
- */
+/** The centre of the titlebar: what the detector sees now; keep `pointer-events-none` so it does not swallow the drag. */
 export default function DetectionPill() {
   const { t } = useTranslation();
   const current = useNowPlaying((s) => s.current);
 
-  // Outside the Tauri shell nothing ever reports, so an idle pill would be a
-  // permanent lie rather than a status.
+  // Outside the Tauri shell nothing ever reports, so an idle pill would be a permanent lie rather than a status.
   if (!isTauri) return null;
 
   const parts = current
@@ -44,8 +35,7 @@ export default function DetectionPill() {
       <span
         className={cn(
           "size-1.5 shrink-0 animate-blip rounded-full",
-          // Accent while something is actually playing, muted while merely
-          // listening — a glance tells the two apart without reading the line.
+          // Accent while something is actually playing, muted while merely listening, so a glance tells them apart.
           current ? "bg-accent-500" : "bg-ink-600",
         )}
       />

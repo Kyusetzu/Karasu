@@ -70,14 +70,7 @@ export default function CommandPalette() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
-        // Not while another overlay is up. Ctrl+K over the open entry editor
-        // opened the palette *behind* it — both scrims are `fixed inset-0
-        // z-50` in one stacking context — and picking a result navigated,
-        // remounting `<main key={pathname}>` and discarding every unsaved
-        // field with no prompt.
-        //
-        // Conditional on `!open`, because the palette carries `data-overlay`
-        // itself: an unconditional bail would break Ctrl+K-to-close.
+        // Stands down over another overlay unless it is this one, or Ctrl+K could never close the palette.
         if (!open && document.querySelector("[data-overlay]")) return;
         e.preventDefault();
         setOpen((o) => !o);
@@ -91,10 +84,7 @@ export default function CommandPalette() {
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("open-command-palette", onOpen);
     };
-    // `open` is read, not just written, since the overlay guard above has to
-    // know whether the overlay in the DOM is this one. The toggle itself still
-    // uses the functional form; this dependency is only about that read, and
-    // re-registering two listeners on a toggle costs nothing.
+    // `open` is read by the overlay guard, so it is a dependency; re-registering two listeners costs nothing.
   }, [open]);
 
   useEffect(() => {
@@ -105,9 +95,7 @@ export default function CommandPalette() {
     }
   }, [open]);
 
-  // Entries from the cached lists (searchable across all title variants).
-  // This reads the query cache directly rather than going through MediaList,
-  // so it needs its own content-filter check — MediaList's does not apply.
+  // Cached list entries, read past MediaList, so the content filter has to be applied here.
   const entries = useMemo(() => {
     if (!open || !viewer) return [];
     const out: { item: Item; doc: FuzzyDoc }[] = [];
@@ -138,13 +126,10 @@ export default function CommandPalette() {
     return out;
   }, [open, viewer, qc, t, level]);
 
-  // Grouped, because the two kinds of hit are not interchangeable: one moves
-  // you to a screen, the other to a title. A single ranked list makes the user
-  // read every row to work out which kind they are looking at.
+  // Grouped: a page and a title are different kinds of hit, and one ranked list hides which is which.
   const groups = useMemo<Group[]>(() => {
     const q = query.trim();
-    // The same platform set the sidebar and bottom bar consult — Ctrl+K must
-    // not be the one way an Android tablet still reaches the library.
+    // The same hidden set the sidebar consults, so Ctrl+K is not a back door to the library on Android.
     const navItems: Item[] = NAV.filter(
       (n) => !(android && ANDROID_HIDDEN_ROUTES.has(n.path)),
     ).map((n) => ({
@@ -154,8 +139,7 @@ export default function CommandPalette() {
     }));
     if (!q) return [{ key: "palette.groupGoTo", items: navItems }];
     const pq = prepareQuery(q);
-    // Ranked within each group; the sort is stable, so equal scores keep
-    // cache-insertion order the way the old filter did.
+    // Ranked within each group; the stable sort keeps equal scores in cache-insertion order.
     const nav = navItems
       .map((item) => ({ item, score: fuzzyScore(prepareDoc([item.label]), pq) }))
       .filter((x) => x.score > 0)
@@ -173,24 +157,15 @@ export default function CommandPalette() {
     ].filter((g) => g.items.length > 0);
   }, [query, entries, t, android]);
 
-  // One flat order for the keyboard, so ↑↓ crosses group boundaries the way
-  // the eye does.
+  // One flat order for the keyboard, so ↑↓ crosses group boundaries the way the eye does.
   const results = useMemo(() => groups.flatMap((g) => g.items), [groups]);
 
   useEffect(() => setSel(0), [query]);
 
-  // Escape should feel deliberate rather than abrupt: the panel leaves the
-  // way it came. `data-overlay` stays on it while it does, so the list
-  // behind cannot act on a keypress meant for a palette still on screen.
+  // Keep `data-overlay` on the leaving panel, so the list behind cannot act on a keypress meant for it.
   if (!presence.mounted) return null;
 
-  // The keyboard cursor is state, and nothing tied it to the scroll box. The
-  // navigation list overflows a `max-h-96` (384px) container, so on a bare
-  // Ctrl+K the last items are already below the fold: arrowing down moved an
-  // invisible highlight and Enter opened something never on screen.
-  //
-  // `block: "nearest"` so it only scrolls when it has to — jumping the list on
-  // every keypress is its own kind of disorienting.
+  // Keeps the highlighted row in view; `block: "nearest"` so the list moves only when it has to.
   const rowRef = (i: number) => (el: HTMLLIElement | null) => {
     if (el && i === sel) el.scrollIntoView({ block: "nearest" });
   };
@@ -238,9 +213,7 @@ export default function CommandPalette() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onInputKey}
-            // The cursor lives on the input while the highlight is on a row, so
-            // a screen reader had no way to know which row was current — the
-            // visual selection was the only signal.
+            // The caret stays on the input, so a screen reader is told which row is highlighted.
             role="combobox"
             aria-expanded
             aria-controls="palette-results"
@@ -316,8 +289,7 @@ export default function CommandPalette() {
           )}
         </div>
 
-        {/* The strip is the whole tutorial: nobody reads documentation for a
-            palette, they read the bottom of it. */}
+        {/* The strip is the whole tutorial: nobody reads documentation for a palette, they read the bottom of it. */}
         <div className="flex items-center gap-3 border-t border-hair px-3.5 py-1.5 text-2xs text-ink-600">
           <span>{t("palette.hintMove")}</span>
           <span>{t("palette.hintRun")}</span>

@@ -8,47 +8,28 @@ import { useManualSync } from "@/hooks/useManualSync";
 import { stepZoom, UI_ZOOM_DEFAULT, zoomShortcut } from "@/lib/uiZoom";
 import { isAndroid, usePlatform } from "@/stores/platform";
 
-/**
- * The global shortcut group.
- *
- * Mounted once in the shell rather than per screen, because these are meant to
- * work from anywhere — a shortcut that only fires on the page it belongs to is
- * a button with extra steps. `Ctrl/Cmd+K` and `?` live with the overlays they
- * open; everything else in the group is here.
- */
+/** The global shortcut group, mounted once in the shell so it works from anywhere. */
 export default function GlobalKeys() {
   const navigate = useNavigate();
   const qc = useQueryClient();
-  // Destructured so the effect's deps stay stable across the `syncing` flips
-  // the hook's state makes — `sync` is a stable callback.
+  // Destructured so the effect's deps survive the hook's `syncing` flips; `sync` is a stable callback.
   const { sync, available } = useManualSync();
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const mod = e.ctrlKey || e.metaKey;
 
-      // A dialog owns the keyboard while it is open — the `data-overlay`
-      // convention, which MediaList already honours and this did not. Without
-      // it, pressing `/` with the entry editor open (focus on a status pill, so
-      // `isTyping` is false) navigated to Search, remounted the page and threw
-      // away every unsaved edit with no prompt. Ctrl+1/2/3 did the same from
-      // any open dialog.
+      // Keep the `data-overlay` check; without it `/` and Ctrl+1/2/3 fire behind an open dialog and discard its edits.
       const overlay = document.querySelector("[data-overlay]") !== null;
 
-      // Single-key shortcuts must not fire while the caret is in a field —
-      // `/` is a character before it is a command.
+      // Not while the caret is in a field, since `/` is a character before it is a command.
       if (!mod && e.key === "/" && !isTyping() && !overlay) {
         e.preventDefault();
         navigate("/search");
         return;
       }
 
-      // The interface size, browser-style: Ctrl+plus, Ctrl+minus, Ctrl+0.
-      // Tauri's own zoom hotkeys stay off, because they would zoom the
-      // window without storing it — the next launch would come up at the
-      // Appearance select's number, not the one the keys reached. Allowed
-      // through an open dialog on purpose (it is the one shortcut that
-      // changes no data), and not on Android, which has no zoom to set.
+      // Zoom keys; Tauri's own stay off because they do not store, and these alone pass through an open dialog.
       const zoom = zoomShortcut(e);
       if (zoom !== null && isTauri && !isAndroid(usePlatform.getState().info)) {
         e.preventDefault();
@@ -70,13 +51,7 @@ export default function GlobalKeys() {
       }
 
       if (e.key.toLowerCase() === "r") {
-        // Reload is not a thing a desktop app should do: the WebView would
-        // drop every cache and re-authenticate to show the same screen. Sync
-        // is what the user means by refresh here — the same full sync as the
-        // sidebar button, which actually *fetches* (an invalidation alone
-        // refetches only mounted observers, so from most pages it did
-        // nothing visible). Local mode keeps the invalidation: its lists
-        // read SQLite and there is no server to ask.
+        // Refresh means the sidebar's full sync, which fetches; an invalidation alone refetches only mounted observers.
         e.preventDefault();
         if (available) void sync();
         else qc.invalidateQueries({ queryKey: ["mediaList"] });
@@ -86,9 +61,7 @@ export default function GlobalKeys() {
     return () => window.removeEventListener("keydown", onKey);
   }, [navigate, qc, sync, available]);
 
-  // The tray's "Sync now" — Rust only rings the bell, because the sync has
-  // to drive the frontend's query cache. Same StrictMode-safe cleanup as
-  // NowPlayingCard: the registration promise is awaited before unlistening.
+  // Rust only rings the bell for the tray's Sync now; the cleanup awaits the registration so StrictMode cannot leak it.
   useEffect(() => {
     if (!isTauri) return;
     const registered = listen("manual-sync", () => {

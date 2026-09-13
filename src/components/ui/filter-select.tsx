@@ -6,18 +6,7 @@ export interface FilterOption {
   label: string;
 }
 
-/**
- * A dropdown that states what it is filtering by *and* what it is set to,
- * without being opened.
- *
- * Reading the whole filter state off the toolbar is the point — three bare
- * values in a row ("Last updated", "All tags", "Evening") do not say which
- * control owns which, so each carries its own label inline.
- *
- * The real `<select>` is still there, stretched invisibly over the top. It
- * keeps the OS dropdown, keyboard navigation, type-ahead and screen-reader
- * behaviour that a div-and-popover reimplementation would have to earn back.
- */
+/** A labelled dropdown readable unopened; keep the real `<select>` stretched over it for the native keyboard and a11y. */
 export function FilterSelect({
   label,
   value,

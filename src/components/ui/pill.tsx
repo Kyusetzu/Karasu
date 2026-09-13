@@ -1,17 +1,7 @@
 import { forwardRef, type ButtonHTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 
-/**
- * A single-select chip.
- *
- * The entry editor spends six of these on status rather than a dropdown,
- * because status is the most-changed field in the app and a dropdown hides
- * five of the six options behind a click. Also used for the search filter
- * chips and the export dialog's format and scale rows.
- *
- * Inactive is an outline rather than a fill, so a row of them reads as one
- * control with one thing chosen — not six buttons.
- */
+/** A single-select chip; inactive is an outline, not a fill, so a row reads as one control with one thing chosen. */
 export const Pill = forwardRef<
   HTMLButtonElement,
   ButtonHTMLAttributes<HTMLButtonElement> & { active?: boolean }

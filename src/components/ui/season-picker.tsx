@@ -7,9 +7,7 @@ import { cn } from "@/lib/utils";
 
 const SEASONS: Season[] = ["WINTER", "SPRING", "SUMMER", "FALL"];
 
-/** Not translated: the kanji is the same in every language Karasu speaks.
- *  Exported for the Wrapped poster's seasonal caption, so the two surfaces
- *  spell a season the same way. */
+/** Untranslated, since the kanji is the same in every language; exported so Wrapped spells a season the same way. */
 export const SEASON_KANJI: Record<Season, string> = {
   WINTER: "冬",
   SPRING: "春",
@@ -17,14 +15,7 @@ export const SEASON_KANJI: Record<Season, string> = {
   FALL: "秋",
 };
 
-/**
- * Season and year in two clicks.
- *
- * The arrows either side of this reach the next season, which is what they are
- * for. Everything further away is where they fall apart — Spring two years
- * back is nine of them — so the title itself opens a panel: four years, four
- * seasons, any combination in two clicks.
- */
+/** Season and year in two clicks; the arrows reach the next season, and the panel reaches everything further away. */
 export default function SeasonPicker({
   season,
   year,
@@ -34,22 +25,16 @@ export default function SeasonPicker({
   season: Season;
   year: number;
   onPick: (next: { season: Season; year: number }) => void;
-  /**
-   * The years on offer. Defaults to the rolling four-year window the
-   * seasonal page browses; Wrapped passes its own list, because a
-   * completion history reaches years no rolling window does.
-   */
+  /** The years on offer; defaults to the seasonal page's rolling window, while Wrapped passes its own, longer history. */
   years?: number[];
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
-  // Exit through `usePresence`, like its sibling `multi-filter-select`: with
-  // `{open && …}` alone the panel popped in and vanished mid-frame.
+  // Exit through `usePresence`, since with `{open && …}` alone the panel would vanish mid-frame.
   const panel = usePresence(open);
 
-  // The default years end at the newest season anyone can browse, which is
-  // next year's Winter — AniList lists it well before it airs.
+  // The default years end at next year's Winter, the newest season AniList already lists.
   const latest = new Date().getFullYear() + 1;
   const shownYears = years ?? [latest - 3, latest - 2, latest - 1, latest];
 
@@ -90,9 +75,7 @@ export default function SeasonPicker({
       </button>
 
       {panel.mounted && (
-        // `data-overlay` like every other popover — the Bell, the context menu,
-        // the filter selects. Without it the screen-level key handlers stayed
-        // live while this was open, so `/` and Ctrl+1/2/3 fired underneath it.
+        // `data-overlay` like every popover, or the screen-level key handlers stay live and `/` fires underneath it.
         <div
           data-overlay
           className={cn(
@@ -100,8 +83,7 @@ export default function SeasonPicker({
             panel.leaving ? "animate-pop-out" : "animate-pop-in",
           )}
         >
-          {/* Wraps rather than stretching: a data-driven year list can hold
-              a decade where the default window holds four. */}
+          {/* Wraps rather than stretching: a data-driven year list can be far longer than the default window. */}
           <div className="flex flex-wrap gap-1">
             {shownYears.map((y) => (
               <button

@@ -2,16 +2,7 @@ import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 
-/**
- * The content filter's disclosure line: what was hidden, split the way the
- * filter itself splits — explicit (18+) versus suggestive (Ecchi) — in the
- * settings pane's own vocabulary, linking to where the filter lives. One
- * component for the list, the local library and the search results, so the
- * three sentences cannot drift. Renders nothing when nothing is hidden.
- *
- * Three literal `t()` branches rather than a computed key, the shape
- * `i18nKeys.test.ts` can see.
- */
+/** The content filter's one disclosure line, shared by the three surfaces so their sentences cannot drift. */
 export function FilteredNotice({
   adult,
   suggestive,
@@ -23,6 +14,7 @@ export function FilteredNotice({
 }) {
   const { t } = useTranslation();
   if (adult + suggestive === 0) return null;
+  // Three literal `t()` calls, never a computed key: `i18nKeys.test.ts` can only see literal keys.
   const text =
     adult > 0 && suggestive > 0
       ? t("list.hiddenBoth", { a: adult, s: suggestive })

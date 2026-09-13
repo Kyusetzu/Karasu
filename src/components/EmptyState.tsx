@@ -2,15 +2,7 @@ import type { ReactNode } from "react";
 import KarasuMark from "@/components/KarasuMark";
 import { cn } from "@/lib/utils";
 
-/**
- * An empty surface, said out loud.
- *
- * Each visual below is a different composition on purpose. Nine identical
- * "nothing here" panels read as one unfinished template; a small set of
- * distinct ones reads as a considered part of the app. This is also the only
- * place the corvid shows itself — the daily surfaces stay quiet, and an empty
- * one has the room.
- */
+/** An empty surface, said out loud; each visual differs on purpose, and only here does the corvid show itself. */
 export function EmptyState({
   visual,
   title,
@@ -38,34 +30,20 @@ export function EmptyState({
   );
 }
 
-/**
- * A rule fading to nothing with the mark perched on it — for a queue that has
- * run out rather than one that was never filled.
- */
+/** A rule fading to nothing with the mark perched on it, for a queue that has run out rather than one never filled. */
 export function PerchRule() {
   return (
     <div className="relative h-8 w-full max-w-80">
       <span className="section-rule absolute inset-x-0 bottom-0 block" />
-      {/* The bird actually lands. This visual is a corvid perched on a
-          rule — the one place the file's own comment says the mark may
-          show itself — and it arrived already sitting there.
-
-          The full-colour mark, not the flat silhouette that used to be here:
-          that one filled the disc *and* the bird in a single colour, so the
-          raven was invisible inside its own disc and what rendered was a grey
-          blob with a tail. */}
+      {/* The bird lands on arrival; the full-colour mark, because a flat silhouette vanishes inside its own disc. */}
       <KarasuMark className="animate-land absolute bottom-0 left-1/2 size-6 -translate-x-1/2 opacity-70" />
     </div>
   );
 }
 
-/**
- * Graded tick marks — an empty schedule drawn as the thing it is missing.
- * Used for a quiet week and for an empty notification list.
- */
+/** Graded tick marks, an empty schedule drawn as the thing it is missing. */
 export function TickMarks({ count = 7 }: { count?: number }) {
-  // Graded rather than uniform so it reads as a chart with no data, not as a
-  // decorative divider.
+  // Graded rather than uniform so it reads as a chart with no data, not as a decorative divider.
   const heights = [40, 64, 28, 80, 36, 56, 24];
   return (
     <div className="flex h-20 items-end gap-2.5" aria-hidden="true">
@@ -84,11 +62,7 @@ export function TickMarks({ count = 7 }: { count?: number }) {
 export function CoverOutline() {
   return (
     <div className="grid h-30 w-20 place-items-center rounded-lg border border-dashed border-surface-700">
-      {/* Two pixels over six seconds. An empty screen is the one place in the
-          app with nothing else asking for attention, so the bird is allowed to
-          be alive here — but only just. `PerchRule`'s bird deliberately does
-          not get this: it already animates on arrival, and `land` owns the
-          same `transform` an idle float would need. */}
+      {/* Barely alive, as nothing else here competes; not on PerchRule's bird, whose `land` owns the same transform. */}
       <KarasuMark className="animate-idle-float size-13 opacity-80" />
     </div>
   );
@@ -109,12 +83,7 @@ export function FolderStack() {
   );
 }
 
-/**
- * A year drawn in outline — the shape of a page that hasn't been filled in.
- *
- * Stroked rather than filled because a solid 7rem number would be the loudest
- * thing on a screen whose whole message is that there is nothing to show.
- */
+/** A year in outline; stroked, not filled, or it is the loudest thing on a screen whose message is nothing. */
 export function OutlineYear({ year }: { year: number }) {
   return (
     <p
@@ -129,13 +98,7 @@ export function OutlineYear({ year }: { year: number }) {
   );
 }
 
-/**
- * The query that found nothing, struck through at size.
- *
- * Repeating it back is the point: most empty results are a typo or a filter
- * the user forgot was on, and both are answered by seeing the actual string
- * that was searched.
- */
+/** The query that found nothing, struck through; seeing the string answers a typo or a forgotten filter. */
 export function StruckQuery({ query }: { query: string }) {
   return (
     <p className="max-w-full truncate text-[2.5rem] font-bold leading-none text-surface-700 line-through">

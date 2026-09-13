@@ -1,19 +1,12 @@
 import type { HTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 
-/**
- * A raised panel: the surface fill, the iridescent wash and the 1px catch-light
- * along the top edge. The wash is what makes overlapping panels read as
- * feathers rather than stacked grey cards, and it follows the user's accent —
- * see `panel-wash` in index.css.
- */
+/** A raised panel: the surface fill, the accent-following wash (`panel-wash` in index.css) and the top catch-light. */
 export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
       className={cn(
-        // No `overflow-hidden`: the catch-light is a gradient that starts and
-        // ends transparent, so it already fades out before the rounded corners
-        // and clipping would only risk cutting off anything a card contains.
+        // No `overflow-hidden`: the catch-light fades out before the corners, and clipping would only cut off contents.
         "panel-wash panel-top rounded-xl border border-surface-800 bg-surface-900 p-5",
         className,
       )}

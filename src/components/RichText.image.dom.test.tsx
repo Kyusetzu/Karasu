@@ -1,10 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, waitFor } from "@testing-library/react";
 
-/**
- * The inlined bio image, which only exists under Tauri — everywhere else it
- * falls back to the chip, which is why the other RichText suites never see it.
- */
+/** Proves the bio image inlines under Tauri and falls back to the chip everywhere else. */
 const fetches = vi.hoisted(() => ({ count: 0 }));
 vi.mock("@/api/anilist", async (orig) => ({
   ...(await orig<typeof import("@/api/anilist")>()),
@@ -27,10 +24,7 @@ describe("an inlined bio image", () => {
       expect(el).not.toBeNull();
       return el!;
     });
-    // `~~~centered~~~` is `text-align: center`, which does nothing to a block
-    // box — a `block` image sat hard left in a centred bio while the text
-    // around it centred. The class is the mechanism, so the class is the
-    // assertion.
+    // `~~~centered~~~` is `text-align: center`, which does nothing to a block box, so the class is the assertion.
     const box = img.closest("button")!;
     expect(box.className).toContain("inline-block");
     expect(box.className).not.toMatch(/(^|\s)block(\s|$)/);
@@ -55,9 +49,5 @@ describe("an inlined bio image", () => {
     expect(fetches.count - before).toBe(2);
   });
 
-  /**
-   * The chip fallback is not re-tested here: `Markdown.dom.test.tsx` runs with
-   * `isTauri` false, which is exactly the failure path, and every image in that
-   * suite is already asserted to be a chip.
-   */
+  /** The chip fallback is not re-tested here: `Markdown.dom.test.tsx` runs with `isTauri` false and covers it. */
 });

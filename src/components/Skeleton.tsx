@@ -1,18 +1,11 @@
 import { skeletonDelay } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
-/** Title and metadata bar widths — coprime lengths, so the pair doesn't
-    repeat every six cells the way the stagger does. */
+/** Title and metadata bar widths, coprime in length so the pair does not repeat in step with the stagger. */
 const TITLE_W = ["w-11/12", "w-3/4", "w-5/6", "w-2/3", "w-full", "w-4/5", "w-3/5"];
 const META_W = ["w-1/2", "w-2/5", "w-3/5", "w-1/3", "w-5/12"];
 
-/**
- * One placeholder block.
- *
- * `index` offsets the sweep. Without it every cell on screen lights at the
- * same instant, which reads as one flat pulse the size of the page; six
- * offsets are enough to make it travel without looking like a queue.
- */
+/** One placeholder block; `index` offsets the sweep so the cells do not light as one flat page-sized pulse. */
 export function Shimmer({
   index = 0,
   className,
@@ -23,29 +16,20 @@ export function Shimmer({
   return (
     <div
       className={cn("shimmer-fill rounded-md", className)}
-      // The phase offset lives in lib/motion with the other stagger
-      // vocabulary, so the two rhythms are defined side by side.
+      // The phase offset lives in lib/motion beside the other stagger vocabulary, so the two rhythms stay together.
       style={{ animationDelay: `${skeletonDelay(index)}ms` }}
     />
   );
 }
 
-/**
- * A cover grid that hasn't loaded yet, at the real track width — so nothing
- * moves sideways when the covers arrive, only the placeholders fill in.
- *
- * The two metadata bars underneath vary in width per cell: identical bars read
- * as a table of one repeated row, and real titles are never the same length.
- */
+/** A cover grid that has not loaded yet, at the real track width so nothing moves sideways when the covers arrive. */
 export function CoverGridSkeleton({ count = 12 }: { count?: number }) {
   return (
     <div className="media-grid gap-x-4 gap-y-6" aria-hidden="true">
       {Array.from({ length: count }, (_, i) => (
         <div key={i}>
           <Shimmer index={i} className="aspect-2/3 w-full rounded-lg" />
-          {/* Widths come from the index, not from `Math.random`: a re-render
-              must not reshuffle them, which would read as the data changing
-              under the placeholder. */}
+          {/* Widths come from the index, not `Math.random`: a re-render must not reshuffle them. */}
           <Shimmer index={i} className={cn("mt-2 h-2.5", TITLE_W[i % TITLE_W.length])} />
           <Shimmer index={i} className={cn("mt-1.5 h-2", META_W[i % META_W.length])} />
         </div>
@@ -65,13 +49,7 @@ export function HeaderSkeleton({ index = 0 }: { index?: number }) {
   );
 }
 
-/**
- * The detail screen while it loads, at the hero's real proportions.
- *
- * It used to be a single line of text at the top-left, so the page arrived
- * *underneath* it and everything moved twice — the same objection MediaList's
- * comment raises against a sentence where a wall of covers is about to appear.
- */
+/** The detail screen while it loads, at the hero's real proportions so the page does not arrive underneath a line of text. */
 export function DetailSkeleton() {
   return (
     <div aria-hidden="true">

@@ -6,28 +6,18 @@ import { IconButton } from "@/components/ui/icon-button";
 import { cn } from "@/lib/utils";
 import { usePresentValue } from "@/hooks/usePresence";
 
-/**
- * The write receipt, bottom-centre.
- *
- * Keyed on the toast id so a replacement replays `riseIn` rather than silently
- * swapping its text — a receipt that changes without moving is one you can miss
- * while looking straight at it.
- */
+/** The write receipt, bottom-centre, keyed on the toast id so a replacement replays `riseIn` instead of swapping text. */
 export default function Toast() {
   const { t } = useTranslation();
   const toast = useToast((s) => s.toast);
   const dismiss = useToast((s) => s.dismiss);
-  // Dismissing used to remove the node mid-frame, which for the one surface
-  // whose whole job is "this happened" read as a glitch rather than a
-  // departure. The last toast is retained through the exit so it leaves the
-  // way it arrived.
+  // The last toast is retained through the exit so it leaves the way it arrived instead of vanishing mid-frame.
   const shown = usePresentValue(toast);
 
   if (!shown.value) return null;
   const current = shown.value;
   const error = current.kind === "error";
-  // Queued work gets neither the alarm nor the checkmark: it has not failed,
-  // and it has not landed either.
+  // Queued work gets neither the alarm nor the checkmark: it has not failed, and it has not landed either.
   const info = current.kind === "info";
 
   return (
@@ -36,12 +26,10 @@ export default function Toast() {
       role="status"
       aria-live="polite"
       className={cn(
-        // `--shell-bottom` lifts this clear of the phone shell's bottom bar;
-        // on desktop the variable is 0px and nothing moves.
+        // `--shell-bottom` lifts this clear of the phone shell's bottom bar; on desktop it is 0px and nothing moves.
         "panel-wash panel-top pointer-events-auto fixed bottom-[calc(1.25rem+var(--shell-bottom,0px))] left-1/2 z-50 flex",
         "max-w-[calc(100vw-4rem)] items-center gap-3",
-        // The existing -translate-x-1/2 is what centres this, so the exit has
-        // to animate opacity and a *nested* transform rather than replacing it.
+        // Keep -translate-x-1/2 as the centring; the exit animates opacity and a nested transform, never this one.
         "-translate-x-1/2",
         shown.leaving ? "animate-fade-out" : "animate-rise-in",
         "rounded-xl border border-surface-800 bg-surface-900 py-2.5 pl-3 pr-2.5 shadow-2xl",

@@ -4,14 +4,7 @@ import { describe, expect, it } from "vitest";
 import { RichText } from "./RichText";
 import { parseAniListHtml } from "@/lib/anilistHtml";
 
-/**
- * The description path, end to end: AniList's HTML in, elements out.
- *
- * `lib/anilistHtml.test.ts` proves the tree is clean. This proves the pair
- * together produce no markup — which is the claim that actually matters, since
- * the old code was a clean *string* handed to `dangerouslySetInnerHTML` and the
- * risk lived in that handoff rather than in either half.
- */
+/** Proves the description path end to end produces no markup, the claim `lib/anilistHtml.test.ts` alone cannot make. */
 
 function description(html: string) {
   return render(
@@ -87,9 +80,7 @@ describe("a description keeps its formatting", () => {
   });
 
   it("hides a spoiler behind a button instead of deleting it", () => {
-    // The behaviour change from the sanitizer, which removed spoilers *and their
-    // contents* — silently dropping part of the synopsis. Now the text is kept
-    // but absent from the DOM until asked for.
+    // The spoiler's text is kept but absent from the DOM until asked for, not dropped from the synopsis.
     description("Kaneki ~!becomes a ghoul!~ eventually.");
     expect(screen.queryByText(/ghoul/)).toBeNull();
     expect(screen.getByRole("button").textContent).toContain("social.mdSpoiler");

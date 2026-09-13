@@ -39,8 +39,7 @@ import { useManualSync } from "@/hooks/useManualSync";
 import { Avatar, UserLockup } from "@/components/ui/user-lockup";
 import SyncPanel from "./SyncPanel";
 
-/** The rail is the state change — one marker slides between items rather than
-    each growing its own. See `useRailMarker`. */
+/** The rail is the state change: `useRailMarker` slides one marker between items rather than each growing its own. */
 const itemClass =
   "relative flex items-center gap-2.75 rounded-lg px-2.5 py-1.75 transition-surface";
 
@@ -52,19 +51,7 @@ const stateClass = (isActive: boolean) =>
     ? "bg-surface-850 text-ink-100"
     : "text-ink-500 hover:bg-surface-850 hover:text-ink-100";
 
-/**
- * Where the accent rail should sit, measured from whichever item is active.
- *
- * Each item used to carry its own `::before` stripe and animate its height, so
- * moving between two of them collapsed one and grew another — the rail
- * blinked out and reappeared elsewhere rather than travelling, which is the one
- * thing a rail is for. `StatusTabs` already slides a measured bar; this is the
- * same trick applied to the nav.
- *
- * Found by `aria-current`, which `NavLink` sets itself, so nothing has to
- * enumerate the items — the set is not fixed (the link-account button only
- * exists in local mode) and a route outside the rail simply yields no marker.
- */
+/** Where the accent rail should sit, found by `aria-current` so nothing has to enumerate a set that is not fixed. */
 function useRailMarker(deps: unknown[]) {
   const navRef = useRef<HTMLElement>(null);
   const [top, setTop] = useState<number | null>(null);
@@ -75,15 +62,13 @@ function useRailMarker(deps: unknown[]) {
     if (!nav || !active) return setTop(null);
     const navBox = nav.getBoundingClientRect();
     const itemBox = active.getBoundingClientRect();
-    // The item's centre; the marker is centred on it and sized in rem, so this
-    // survives the Windows text-scale setting the app already honours.
+    // The item's centre; the marker is centred on it and sized in rem, so it survives the Windows text-scale setting.
     setTop(itemBox.top - navBox.top + itemBox.height / 2);
   }, []);
 
   useLayoutEffect(measure, [measure, ...deps]);
 
-  // The rail is a fixed width, but its content is not: a wrapped label or a
-  // scrollbar appearing changes item heights.
+  // The rail is a fixed width but its content is not: a wrapped label or a scrollbar changes item heights.
   useEffect(() => {
     const nav = navRef.current;
     if (!nav || typeof ResizeObserver === "undefined") return;
@@ -120,8 +105,7 @@ export const GROUPS: { label: string; items: NavItem[] }[] = [
     items: [
       { to: "/search", key: "nav.search", icon: Search },
       { to: "/seasonal", key: "nav.seasonal", icon: CalendarDays },
-      // CalendarRange, not CalendarDays (Seasonal's) or CalendarClock (the
-      // Bell's) — three calendar surfaces, three distinguishable glyphs.
+      // CalendarRange, not CalendarDays (Seasonal's) or CalendarClock (the Bell's): three calendar surfaces, three glyphs.
       { to: "/calendar", key: "nav.calendar", icon: CalendarRange },
       { to: "/social", key: "nav.social", icon: Users },
       { to: "/forum", key: "nav.forum", icon: MessagesSquare },
@@ -137,14 +121,7 @@ export const GROUPS: { label: string; items: NavItem[] }[] = [
   },
 ];
 
-/**
- * What Android does not offer at all — the scanner needs a filesystem scoped
- * storage will not hand out. Keyed on the platform, never the shell width
- * (the Settings sets' lesson): an Android *tablet* takes the desktop layout
- * and still has no files, while a narrowed desktop window still does.
- * One set, consumed by the sidebar, the bottom bar's sheet and the palette,
- * so the three ways to navigate cannot disagree.
- */
+/** What Android cannot do, keyed on the platform rather than the shell width, and shared by every way to navigate. */
 export const ANDROID_HIDDEN_ROUTES = new Set(["/library"]);
 
 /** `GROUPS` minus what this platform cannot do. */
@@ -172,9 +149,7 @@ function Item({
     <NavLink
       to={item.to}
       end={item.end}
-      // The label text *is* the accessible name for all fourteen links, so
-      // hiding it would leave a rail of unnamed icons. `title` gives the
-      // pointer a tooltip and `aria-label` gives everything else the name.
+      // The label is the accessible name, so collapsed it moves to `aria-label` and `title` rather than vanishing.
       aria-label={collapsed ? label : undefined}
       title={collapsed ? label : undefined}
       className={({ isActive }) =>
@@ -192,14 +167,7 @@ function Item({
   );
 }
 
-/**
- * "Is my data safe?" answered without a click.
- *
- * A tracker someone opens daily for years accumulates edits made offline, and
- * the only thing worse than losing them is not knowing they are at risk. So the
- * queue length outranks everything: if anything is unsent, that is what the
- * line says, in the accent, regardless of how recently a sync succeeded.
- */
+/** "Is my data safe?" without a click: anything unsent outranks everything else, whatever the last sync said. */
 function syncLine(
   t: TFunction,
   local: boolean,
@@ -253,13 +221,7 @@ function Account({
     </span>
   );
 
-  /**
-   * The line, and behind it the panel that explains it — except in local mode.
-   *
-   * A local list issues no request ever, so "0 queued · 30/30 · not throttled"
-   * would be three true statements implying a sync relationship that does not
-   * exist. There the line stays what it always was: a fact, not a button.
-   */
+  /** The line with the panel behind it, except in local mode, where a list that never syncs has nothing to explain. */
   const syncNode = local ? (
     <span className="mt-1 block px-1">{line}</span>
   ) : (
@@ -268,9 +230,7 @@ function Account({
     </SyncPanel>
   );
 
-  // Collapsed, the sync line has nowhere to go — but "something is unsent" is
-  // the one thing on it that must not disappear with the labels, so it becomes
-  // a dot on the avatar. The title carries the sentence the line would have.
+  // Collapsed, the sync line becomes a dot on the avatar, since "something is unsent" must not vanish with the labels.
   if (collapsed) {
     const body = (
       <span className="relative block" title={`${name} — ${sync.text}`}>
@@ -293,9 +253,7 @@ function Account({
         ) : (
           body
         )}
-        {/* The panel survives the collapse — it is the only way to *read* what
-            the dot above is warning about, and losing it with the labels would
-            make the collapsed rail the one place the queue is unreadable. */}
+        {/* The panel survives the collapse; it is the only way to read what the dot above is warning about. */}
         {!local && (
           <SyncPanel label={t("syncPanel.open")} className="w-auto">
             <span
@@ -330,9 +288,7 @@ function Account({
 
   return (
     <div className="mx-2.5 mb-2 border-b border-surface-800 pb-3 pt-2">
-      {/* Only a link with an AniList account behind it. The local profile has no
-          AniList page to open, so there it stays plain text rather than a link
-          that would 404 on a name AniList has never heard of. */}
+      {/* Only a link with an AniList account behind it; the local profile has no AniList page and would 404. */}
       {viewer ? (
         <NavLink
           to={`/user/${encodeURIComponent(viewer.name)}`}
@@ -343,9 +299,7 @@ function Account({
       ) : (
         lockup
       )}
-      {/* A sibling of the lockup rather than its `sub`, because the lockup is
-          wrapped in a link to the profile and a button inside an anchor is
-          invalid markup — the browser is free to drop either one. */}
+      {/* A sibling of the lockup rather than its `sub`: a button inside the profile link is invalid markup. */}
       {syncNode}
     </div>
   );
@@ -358,11 +312,7 @@ export default function Sidebar() {
   const mode = useAuth((s) => s.mode);
   const login = useAniListLogin();
   const manualSync = useManualSync();
-  // `?? 0`, matching every list screen. Local mode has no viewer, so `viewer?.id`
-  // keyed these queries on `undefined` while `MediaList`, `Dashboard`, `Calendar`
-  // and `LocalLibrary` all key theirs on `0` — a different cache entry, never
-  // written by anything, so the sidebar's Anime and Manga counts were blank for
-  // the whole of account-free mode.
+  // `?? 0`, matching every list screen; keying on `undefined` in local mode reads a cache entry nothing writes.
   const { counts, pending, syncedAt } = useListSummary(viewer?.id ?? 0);
   const android = isAndroid(usePlatform((s) => s.info));
   const [collapsed, setCollapsed] = useState(loadCollapsed);
@@ -373,13 +323,10 @@ export default function Sidebar() {
     saveCollapsed(next);
   };
   const { pathname } = useLocation();
-  // Re-measured when the route changes and when the item set does — the
-  // link-account button exists only in local mode, and Android drops the
-  // library entry.
+  // Re-measured when the route changes and when the item set does; local mode and Android each change the set.
   const { navRef, top } = useRailMarker([pathname, mode, collapsed, android]);
 
-  // If the browser handoff can't start, Settings is where the manual token
-  // paste lives — so send the user there rather than failing silently.
+  // If the browser handoff cannot start, Settings holds the manual token paste, so send the user there.
   const linkAccount = async () => {
     if (!(await login.start())) navigate("/settings?pane=account");
   };
@@ -389,16 +336,12 @@ export default function Sidebar() {
       ref={navRef}
       className={cn(
         "rail-wash relative flex shrink-0 flex-col border-r border-hair bg-surface-900 pb-2.5 pt-3",
-        // Surface motion, so the plain utility inherits the 140ms
-        // `--ease-karasu` default and the reduce-motion rules kill it for
-        // free. The shell is flexbox, so `<main>` reflows on its own and this
-        // width is the only layout change the collapse makes.
+        // Surface motion: the plain utility inherits `--ease-karasu` and the reduce-motion rules kill it for free.
         "transition-[width]",
         collapsed ? "w-14" : "w-52",
       )}
     >
-      {/* One rail for the whole nav, travelling between items. Hidden when the
-          route is not in it at all — during a page transition, say. */}
+      {/* One rail for the whole nav, travelling between items; hidden when the route is not in it at all. */}
       {top !== null && (
         <span
           aria-hidden="true"
@@ -409,17 +352,14 @@ export default function Sidebar() {
       <div className="flex flex-1 flex-col gap-px px-2.5">
         {visibleGroups(android).map((group, i) => (
           <div key={group.label} className="contents">
-            {/* Collapsed, the heading is text with no room and no icon to
-                stand in for it — a rule keeps the grouping the labels carried,
-                and the first group needs neither since nothing precedes it. */}
+            {/* Collapsed, a rule keeps the grouping the headings carried; the first group needs none since nothing precedes it. */}
             {collapsed ? (
               i > 0 && <div className="mx-2 my-2 border-t border-surface-800" />
             ) : (
               <div
                 className={cn(
                   "px-2.5 pb-1.75 text-[.5625rem] font-semibold uppercase tracking-[.16em] text-ink-600",
-                  // The first label sits under the titlebar's own breathing room;
-                  // the later ones have to open the gap themselves.
+                  // The first label sits under the titlebar's own breathing room; the later ones open the gap themselves.
                   i === 0 ? "pt-1.5" : "pt-3.75",
                 )}
               >
@@ -439,8 +379,7 @@ export default function Sidebar() {
       </div>
 
       <div className="flex flex-col gap-px px-2.5">
-        {/* The chip below *says* when the last sync was; this is the way to
-            cause one. Signed-in only — a local list has nothing to sync. */}
+        {/* Causes a sync where the chip below only reports one; signed-in only, since a local list has nothing to sync. */}
         {manualSync.available && (
           <button
             type="button"
@@ -465,8 +404,7 @@ export default function Sidebar() {
           </button>
         )}
         <Account pending={pending} syncedAt={syncedAt} collapsed={collapsed} />
-        {/* A local profile is usable on its own, but linking AniList is the
-            one action it can't reach from anywhere else in one click. */}
+        {/* Linking AniList is the one action a local profile cannot reach elsewhere in one click. */}
         {mode === "local" && (
           <button
             type="button"
@@ -506,8 +444,7 @@ export default function Sidebar() {
           <Settings className="size-4.25 shrink-0" />
           {!collapsed && <span className={labelClass}>{t("nav.settings")}</span>}
         </NavLink>
-        {/* Last, and below the navigation on purpose: it changes the shape of
-            the rail rather than going anywhere. */}
+        {/* Last, and below the navigation on purpose: it changes the shape of the rail rather than going anywhere. */}
         <button
           type="button"
           onClick={toggleCollapsed}

@@ -38,16 +38,14 @@ describe("toRaw", () => {
   });
 
   it("uses AniList's own 35/60/85 mapping for the smiley scale", () => {
-    // The site writes these exact raw values; inventing 33/66/100 would make
-    // Karasu's smileys disagree with anilist.co's.
+    // The site writes these exact raw values; any other mapping makes Karasu's smileys disagree with anilist.co's.
     expect(toRaw("POINT_3", 1)).toBe(35);
     expect(toRaw("POINT_3", 2)).toBe(60);
     expect(toRaw("POINT_3", 3)).toBe(85);
   });
 
   it("the same rating is raw-equal across formats — what the sign-in merge compares on", () => {
-    // A local 6/10 against an online 😐 on a POINT_3 account is one rating,
-    // not a conflict; likewise ★8 against 80 on a POINT_100 account.
+    // A local 6/10 against an online 😐 on a POINT_3 account is one rating, not a conflict.
     expect(toRaw("POINT_10", 6)).toBe(toRaw("POINT_3", 2));
     expect(toRaw("POINT_10", 8)).toBe(toRaw("POINT_100", 80));
     expect(toRaw("POINT_10", 8)).toBe(toRaw("POINT_5", 4));

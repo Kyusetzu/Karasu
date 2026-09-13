@@ -111,8 +111,7 @@ describe("shouldBlur", () => {
   const ecchi = { isAdult: false, genres: ["Ecchi"] };
   const plain = { isAdult: false, genres: ["Action"] };
 
-  /** The case it exists for: filter Off, so the title is on screen, but the
-   *  artwork should not arrive unannounced. */
+  /** The case it exists for: the filter is off so the title shows, but the artwork must not arrive unannounced. */
   it("veils an explicit title when the filter lets it through", () => {
     expect(shouldBlur(adult, "off", true)).toBe(true);
   });
@@ -121,8 +120,7 @@ describe("shouldBlur", () => {
     expect(shouldBlur(adult, "off", false)).toBe(false);
   });
 
-  /** Ecchi is an ordinary genre — blurring it would blur a large slice of an
-   *  ordinary list, which is the level's job to decide, not this one's. */
+  /** Ecchi is an ordinary genre; whether to hide a slice of an ordinary list is the level's decision, not this one's. */
   it("only ever veils isAdult, never a suggestive genre", () => {
     expect(shouldBlur(ecchi, "off", true)).toBe(false);
     expect(shouldBlur(plain, "off", true)).toBe(false);
@@ -134,16 +132,7 @@ describe("shouldBlur", () => {
     expect(shouldBlur({}, "off", true)).toBe(false);
   });
 
-  /**
-   * The two levels the suite never asked about, and the reason the last line
-   * of `shouldBlur` is not the tautology it looks like.
-   *
-   * At moderate and strict an adult title is excluded server-side and never
-   * reaches a render site — so this is unreachable in practice. It still has to
-   * answer *veil* rather than *bare*, because the one way it becomes reachable
-   * is a render site that forgot `isBlocked`, and failing open there would show
-   * the artwork to precisely the person who set the filter to strict.
-   */
+  /** Unreachable unless a render site forgot `isBlocked`, and failing open there shows the artwork to a strict user. */
   it("still veils at moderate and strict, where it should never be asked", () => {
     expect(shouldBlur(adult, "moderate", true)).toBe(true);
     expect(shouldBlur(adult, "strict", true)).toBe(true);

@@ -13,30 +13,22 @@ describe("backendErrorText", () => {
       "T:settings.jfErrBadCredentials",
     );
     expect(backendErrorText("jellyfin.badUrl", t)).toBe("T:settings.jfErrBadUrl");
-    // The address answered, but with a web page or another service — the
-    // probe on sign-in and on the external address is what says so.
+    // The address answered, but with a web page or another service.
     expect(backendErrorText("jellyfin.notJellyfin", t)).toBe("T:settings.jfErrNotJellyfin");
-    // The external address: a different server behind it, or a server whose
-    // identity the app has not learned yet.
+    // The external address: a different server behind it, or one whose identity the app has not learned.
     expect(backendErrorText("jellyfin.externalOtherServer", t)).toBe(
       "T:settings.jfErrExternalOtherServer",
     );
     expect(backendErrorText("jellyfin.externalUnknownServer", t)).toBe(
       "T:settings.jfErrExternalUnknownServer",
     );
-    // A bulk edit refused because a drain already holds the queue lock. It
-    // cannot be queued itself, so the refusal has to say why.
+    // A bulk edit refused because a drain holds the queue lock cannot be queued itself, so it says why.
     expect(backendErrorText("queue.busy", t)).toBe("T:receipt.syncBusy");
-    // AniList's own wording for this is "Invalid token" — English, not
-    // actionable, and it used to be rendered raw on every screen at once.
+    // AniList's own wording is "Invalid token": English and not actionable, so it gets a translation.
     expect(backendErrorText("anilist.tokenRejected", t)).toBe("T:auth.tokenRejected");
   });
 
-  /**
-   * Transport detail carries its diagnosis in the part no dictionary covers,
-   * and a code that lost its translation has to degrade to the sentence that
-   * shipped before rather than to an empty box.
-   */
+  /** Proves transport detail and an untranslated code degrade to the raw sentence, never an empty box. */
   it("passes anything else through unchanged", () => {
     const raw = "Could not reach the server: dns error";
     expect(backendErrorText(raw, t)).toBe(raw);

@@ -58,11 +58,7 @@ describe("readableInk", () => {
     expect(readableInk("#000000", UI_INK)).toBe(UI_INK.light);
   });
 
-  /**
-   * The UI pair is the two ends of the app's own ink scale, so a button's text
-   * matches the ink everywhere else instead of jumping to an absolute the rest
-   * of the interface never uses. It still has to clear the floor.
-   */
+  /** The UI pair is the app's own ink scale, so button text matches the interface and still clears the floor. */
   it("keeps the softer UI inks above 4.5:1 on every preset accent", () => {
     const accents = [
       "#4b3fc7", "#6c7fff", "#3b93e6", "#46a5b3",
@@ -75,11 +71,7 @@ describe("readableInk", () => {
     }
   });
 
-  /**
-   * The old rule was `luminance > 0.45`, but the two ratios actually cross far
-   * lower. Everything in between was given white when black was more readable,
-   * and on these three that meant shipping below the 4.5:1 floor.
-   */
+  /** A luminance threshold hands mid-luminance accents white ink when black is the more readable one. */
   it("picks black for mid-luminance accents, where the old threshold did not", () => {
     for (const accent of ["#46a5b3", "#3b93e6", "#34c78a"]) {
       expect(readableInk(accent)).toBe("#000000");

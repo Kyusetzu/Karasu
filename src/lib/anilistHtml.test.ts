@@ -29,8 +29,7 @@ function textOf(nodes: MdInline[]): string {
 
 describe("the five tags the old sanitizer allowed", () => {
   it("keeps bold and italic, collapsing the synonymous pairs", () => {
-    // `<b>` and `<strong>` render identically, as do `<i>` and `<em>`, so one
-    // node each loses nothing visible and halves the cases downstream.
+    // `<b>`/`<strong>` and `<i>`/`<em>` render identically, so one node each halves the cases downstream.
     expect(types(parseAniListHtml("<b>a</b>"))).toContain("strong");
     expect(types(parseAniListHtml("<strong>a</strong>"))).toContain("strong");
     expect(types(parseAniListHtml("<i>a</i>"))).toContain("em");
@@ -58,9 +57,7 @@ describe("everything the old sanitizer dropped", () => {
   });
 
   it("drops an attribute-carrying allowed tag's attributes with no trace", () => {
-    // The exact hole the sanitizer's comment describes: `\b` matched at the
-    // space before an attribute, so `<b onmouseover=…>` passed through whole.
-    // Here the attributes cannot survive, because nothing carries them.
+    // The old regex sanitizer let `<b onmouseover=…>` through whole; here nothing carries attributes at all.
     const nodes = parseAniListHtml('<b onmouseover="alert(1)">hi</b>');
     expect(nodes[0].type).toBe("strong");
     expect(textOf(nodes)).toBe("hi");
@@ -122,10 +119,7 @@ describe("unbalanced markup", () => {
   });
 
   it("cannot overflow the stack, however deep the nesting", () => {
-    // An explicit stack rather than recursion is why. 2,000 opens, none closed
-    // — and 2,000 rather than 5,000 because `<b>` is three characters, so 5,000
-    // of them exceed the 8,000-character limit and the trailing `x` is truncated
-    // away. That is the bound working; this test is about the stack.
+    // An explicit stack rather than recursion; kept under the length limit so truncation is not what passes it.
     const deep = "<b>".repeat(2000) + "x";
     expect(deep.length).toBeLessThan(8000);
     expect(() => parseAniListHtml(deep)).not.toThrow();
@@ -156,8 +150,7 @@ describe("unbalanced markup", () => {
 
 describe("entities", () => {
   it("decodes the named ones descriptions actually use", () => {
-    // `&nbsp;` becomes a real U+00A0 rather than a space — an author writing it
-    // wants the line not to break there.
+    // `&nbsp;` becomes a real U+00A0 rather than a space, because the author wants no break there.
     expect(textOf(parseAniListHtml("&amp;&lt;&gt;&quot;&nbsp;"))).toBe('&<>" ');
     expect(textOf(parseAniListHtml("a&mdash;b&hellip;"))).toBe("a—b…");
   });
@@ -172,15 +165,13 @@ describe("entities", () => {
   });
 
   it("refuses a surrogate or out-of-range code point", () => {
-    // `String.fromCodePoint` would throw on the second and yield half a pair on
-    // the first, so both stay literal.
+    // `String.fromCodePoint` would throw on the second and yield half a pair on the first, so both stay literal.
     expect(textOf(parseAniListHtml("&#xD800;"))).toBe("&#xD800;");
     expect(textOf(parseAniListHtml("&#1114112;"))).toBe("&#1114112;");
   });
 
   it("does not turn an escaped tag back into a tag", () => {
-    // `&lt;script&gt;` must stay text. It decodes to characters, not markup,
-    // because the decode happens after parsing rather than before.
+    // `&lt;script&gt;` stays text because entities decode after parsing rather than before.
     const nodes = parseAniListHtml("&lt;script&gt;alert(1)&lt;/script&gt;");
     expect(textOf(nodes)).toBe("<script>alert(1)</script>");
     expect(types(nodes)).toEqual(["text"]);
@@ -189,10 +180,7 @@ describe("entities", () => {
 
 describe("spoilers", () => {
   it("keeps the text behind a spoiler node instead of deleting it", () => {
-    // A behaviour change from the sanitizer, which removed spoilers *and their
-    // contents* — silently dropping part of the synopsis. The renderer keeps
-    // spoiler text out of the DOM until it is asked for, so nothing is spoiled
-    // and nothing is lost.
+    // The renderer keeps spoiler text out of the DOM until asked, so nothing is spoiled and nothing is lost.
     const nodes = parseAniListHtml("safe ~!he dies!~ safe");
     expect(types(nodes)).toContain("spoiler");
     expect(textOf(nodes)).toContain("he dies");
@@ -219,8 +207,7 @@ describe("htmlToPlain", () => {
   });
 
   it("includes spoiler text, so callers must not use it for a preview", () => {
-    // Documented rather than asserted as safety: the renderer hides spoilers,
-    // this flattens everything, and a preview is not a place for a reveal.
+    // Documented rather than asserted as safety: this flattens everything, and a preview is no place for a reveal.
     expect(htmlToPlain("~!secret!~")).toBe("secret");
   });
 });

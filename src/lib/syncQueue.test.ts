@@ -33,10 +33,7 @@ describe("syncPhase", () => {
     expect(syncPhase(status())).toBe("idle");
   });
 
-  /**
-   * The distinction the panel exists for. Local mode issues no request ever, so
-   * an empty queue there is not "everything is synced" — it is "nothing syncs".
-   */
+  /** Local mode issues no request, so an empty queue there means "nothing syncs", not "everything is synced". */
   it("never calls a local list empty", () => {
     expect(syncPhase(status({ connected: false }))).toBe("offline");
     // Even with the exact shape an idle account would have.
@@ -57,10 +54,7 @@ describe("syncPhase", () => {
     ).toBe("draining");
   });
 
-  /**
-   * A queue parked on a 429 and a queue merely waiting its turn are different
-   * answers to "why has this not sent yet", so the throttle wins.
-   */
+  /** A queue parked on a throttle and one waiting its turn answer "why not sent" differently, so the throttle wins. */
   it("prefers the reason over the backlog", () => {
     expect(
       syncPhase(
@@ -70,10 +64,7 @@ describe("syncPhase", () => {
     expect(syncPhase(status({ queued: [edit()] }))).toBe("waiting");
   });
 
-  /**
-   * A throttle with nothing queued is still worth saying — a scrobble or an
-   * alert pass may be the thing waiting.
-   */
+  /** A throttle with nothing queued is still worth saying; a scrobble or an alert pass may be what waits. */
   it("reports a throttle with an empty queue", () => {
     expect(syncPhase(status({ rate: { ...quiet, throttledForMs: 900 } }))).toBe(
       "throttled",
@@ -82,9 +73,7 @@ describe("syncPhase", () => {
 });
 
 describe("queuedMediaId", () => {
-  // The trap, built on purpose: entry A's *list-entry* id is entry B's *media*
-  // id. A lookup that tried both fields would resolve either row to whichever
-  // it checked first, and label it with the wrong title.
+  // Built so entry A's list-entry id is entry B's media id; a lookup trying both fields labels the wrong title.
   const entries = [
     { id: 500, mediaId: 1 },
     { id: 7, mediaId: 500 },

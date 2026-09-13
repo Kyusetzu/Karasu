@@ -15,12 +15,7 @@ const group = (
   }) as unknown as MediaListGroup;
 
 describe("customListNames", () => {
-  /**
-   * The bug this exists for. AniList's group `name` is display-cased; the
-   * membership map and `SaveMediaListEntry(customLists:)` use the raw name.
-   * Reading the first and writing the second is what made the whole feature
-   * silently do nothing for anyone who did not capitalise their list.
-   */
+  /** Group `name` is display-cased; the membership map and `SaveMediaListEntry(customLists:)` use the raw name. */
   it("takes the raw names from the entries, not the display names from the groups", () => {
     const groups = [
       group("Watching", false, [{ backlog: false, unaired: true }]),

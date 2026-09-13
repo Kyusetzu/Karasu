@@ -37,18 +37,14 @@ describe("conflicts", () => {
     expect(conflicts(side(), side())).toBe(false);
   });
 
+  /** Scores compare raw, or every scored entry on a hundred-point account would read as a conflict. */
   it("compares each tracked field", () => {
     expect(conflicts(side(), side({ status: "COMPLETED" }))).toBe(true);
     expect(conflicts(side(), side({ progress: 4 }))).toBe(true);
     expect(conflicts(side(), side({ scoreRaw: 80 }))).toBe(true);
   });
 
-  /**
-   * The reason the interface takes a raw score. A local ★8 reaches this
-   * function as 80 and so does an online 80 on a hundred-point account; the
-   * comparison would otherwise call every scored entry on such an account a
-   * conflict and offer to overwrite it.
-   */
+  /** A differing timestamp alone is no conflict. */
   it("ignores a differing timestamp on its own", () => {
     expect(conflicts(side(), side({ updatedAt: 99_999 }))).toBe(false);
   });
@@ -72,10 +68,7 @@ describe("localWins", () => {
     expect(localWins(side(), online, "anilist")).toBe(false);
   });
 
-  /**
-   * The data-loss case this whole module was extracted for: a local row left
-   * at episode 3 must not overwrite an account that has since reached 50.
-   */
+  /** The data-loss case: a stale local row must not overwrite an account that has since moved on. */
   it("keeps the newer side under the newest strategy", () => {
     const stale = side({ progress: 3, updatedAt: 1_000 });
     const fresh = side({ progress: 50, updatedAt: 9_000 });
@@ -90,12 +83,7 @@ describe("localWins", () => {
 });
 
 describe("residual", () => {
-  /**
-   * The defect: `conflicts` weighs three fields, the merge deletes the local
-   * row on the strength of that answer, and the other six went with it while
-   * the tally said "merged". A row agreeing on status, progress and score can
-   * still be the only place a rewatch count or a start date exists.
-   */
+  /** A row agreeing on status, progress and score can still be the only place a rewatch count or date exists. */
   it("reports what only the local row holds", () => {
     const out = residual(
       localBare({
@@ -117,15 +105,7 @@ describe("residual", () => {
     expect(hasResidual(out)).toBe(true);
   });
 
-  /**
-   * Why this is not simply `conflicts` widened to nine fields.
-   *
-   * AniList returns `notes: null` and all-null `FuzzyDate`s exactly where the
-   * local list stores `""` and nulls. Comparing them raw makes every untouched
-   * row look like a conflict, and under the default "newest" strategy — where
-   * ties go local — those phantom conflicts resolve by overwriting a real
-   * AniList entry. Empty is empty in both dialects.
-   */
+  /** Empty is empty in both dialects; comparing null and "" raw makes phantom conflicts that overwrite AniList. */
   it("finds nothing between two empty rows spelled differently", () => {
     expect(hasResidual(residual(localBare(), bare()))).toBe(false);
     expect(
@@ -139,11 +119,7 @@ describe("residual", () => {
     expect(hasResidual(residual(localBare({ notes: "   " }), bare()))).toBe(false);
   });
 
-  /**
-   * Additive only. Where both sides have a value it is a conflict, and
-   * `localWins` plus the user's chosen strategy already own that decision —
-   * a residual push must never be a second, silent arbiter.
-   */
+  /** Additive only: `localWins` and the chosen strategy own conflicts, a residual push is never a second arbiter. */
   it("never overwrites a value AniList already has", () => {
     const out = residual(
       localBare({

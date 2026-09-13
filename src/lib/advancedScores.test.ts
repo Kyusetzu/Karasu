@@ -52,12 +52,7 @@ describe("orderedCategories", () => {
 });
 
 describe("toAdvancedArray", () => {
-  /**
-   * THE test. `SaveMediaListEntry(advancedScores:)` is a bare `[Float]` with
-   * no names in it — position is the identity. Building it from the read map's
-   * key order works until the user reorders a category on anilist.co, and then
-   * writes Story's score into Characters with nothing reporting it.
-   */
+  /** `advancedScores` is a bare `[Float]` where position is identity; the map's key order writes into the wrong category. */
   it("is ordered by the account's category list, whatever order the values came in", () => {
     const values = { Visuals: 7, Story: 9, Characters: 8 };
     expect(toAdvancedArray(NAMES, values)).toEqual([9, 8, 7]);
@@ -67,10 +62,7 @@ describe("toAdvancedArray", () => {
     ]);
   });
 
-  /**
-   * Complete, never sparse. A short array does not mean "the rest unchanged";
-   * it shifts every category after the gap by one position.
-   */
+  /** Complete, never sparse: a short array shifts every category after the gap by one position. */
   it("sends a zero for an unscored category rather than a shorter array", () => {
     expect(toAdvancedArray(NAMES, { Characters: 8 })).toEqual([0, 8, 0]);
     expect(toAdvancedArray(NAMES, {})).toEqual([0, 0, 0]);

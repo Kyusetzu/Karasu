@@ -71,12 +71,7 @@ describe("pickSeeds", () => {
     expect(seeds.map((s) => s.score)).toEqual([9, 9, 9, 9, 8]);
   });
 
-  /**
-   * Pins the reason RecommendedSection sorts the ids before using them as a
-   * query key. Any save bumps `updatedAt`, which reshuffles entries inside a
-   * score tie — so the raw seed order is unstable and would mint a new cache
-   * key, and a fresh AniList request, for a byte-identical result.
-   */
+  /** Any save bumps `updatedAt` and reshuffles a score tie, which is why RecommendedSection sorts ids before keying. */
   it("reorders within a score tie when updatedAt changes", () => {
     const before = pickSeeds([
       entry({ mediaId: 1, score: 8, updatedAt: 100 }),
@@ -107,8 +102,7 @@ describe("rankRecommendations", () => {
   const base = { seeds, exclude: new Set<number>(), type: "ANIME" as MediaType };
 
   it("drops down-voted recommendations", () => {
-    // AniList lets users vote a pairing down; a negative rating means "these
-    // are nothing alike" and must not count as support.
+    // A negative rating is a down-vote saying the pair are nothing alike, and must not count as support.
     const out = rankRecommendations(
       [rec(1, -50, 100), rec(1, 0, 101), rec(1, 10, 102)],
       base,

@@ -20,9 +20,7 @@ describe("followRelation", () => {
   });
 
   it("treats null, undefined and absent as not-following", () => {
-    // A signed-out request returns false for both no matter the truth, and an
-    // unknown flag has to fail safe — offering a follow is recoverable, claiming
-    // a relationship that does not exist is not.
+    // An unknown flag fails safe: offering a follow is recoverable, claiming a relationship that does not exist is not.
     expect(followRelation({})).toBe("none");
     expect(followRelation({ isFollowing: null, isFollower: null })).toBe("none");
     expect(followRelation({ isFollowing: undefined, isFollower: true })).toBe("followsYou");
@@ -97,8 +95,7 @@ describe("isSelf", () => {
   });
 
   it("does not treat id 0 as absent", () => {
-    // `viewerId != null` rather than a truthiness check: AniList ids start at 1,
-    // but a truthy test here is the kind of thing that survives until it does not.
+    // Keep the `!= null` check rather than truthiness; a truthy test breaks the day an id is 0.
     expect(isSelf(0, 0)).toBe(true);
     expect(isSelf(0, 1)).toBe(false);
   });

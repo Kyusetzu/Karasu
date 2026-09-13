@@ -1,9 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { NOTIF_JOB_REFUSED, notifScheduleFailure } from "./notifSchedule";
 
-// Vite's own glob rather than `node:fs`, the way notices.test.ts reads its
-// files: the node types are not part of the frontend tsconfig. The options
-// must be an inline literal — the plugin rewrites the call at transform time.
+// Vite's glob rather than `node:fs` (no node types in the frontend tsconfig); the options must stay an inline literal.
 const RUST = import.meta.glob("/src-tauri/src/commands/prefs.rs", {
   query: "?raw",
   import: "default",
@@ -28,11 +26,7 @@ describe("notifScheduleFailure", () => {
     });
   });
 
-  /**
-   * The code is spelled twice — here and in `commands/prefs.rs` — and only
-   * Android ever sends it, so a drift would surface as a raw code in a toast
-   * on a phone and nowhere else. This is the one place both spellings meet.
-   */
+  /** Only Android sends the code, so a drift from `commands/prefs.rs` would surface as a raw code in a phone toast. */
   it("is spelled the way prefs.rs spells it", () => {
     const [rust] = Object.values(RUST);
     expect(rust).toBeDefined();

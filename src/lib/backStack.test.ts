@@ -1,11 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createBackStack, type HistoryLike } from "./backStack";
 
-/**
- * A history that behaves like the browser's: `back()` moves the index but the
- * popstate event arrives separately — the tests deliver it by calling
- * `stack.onPopState()`, exactly as the hook's listener would.
- */
+/** A browser-like history: `back()` moves the index, and the test delivers popstate by calling `stack.onPopState()`. */
 function fakeHistory() {
   const entries: unknown[] = [null];
   let idx = 0;

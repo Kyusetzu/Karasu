@@ -50,8 +50,7 @@ describe("inverse", () => {
   });
 
   it("clears a note that had none, rather than skipping it", () => {
-    // An entry with no note reads back as `null`, but the mutation only takes
-    // a string — so undoing "added a note" has to send the empty string.
+    // An entry with no note reads back as `null`, but the mutation takes only a string, so undo sends "".
     expect(inverse({ mediaId: 1, notes: "oops" }, before)).toEqual({
       mediaId: 1,
       notes: "",
@@ -111,13 +110,7 @@ describe("headline", () => {
 });
 
 describe("inverse, for the fields it cannot reverse", () => {
-  /**
-   * `customLists` and `advancedScores` are read as maps and written as arrays —
-   * the second one *positional*, ordered by the account's own category list. A
-   * snapshot cannot reconstruct either, so an Undo that silently skipped them
-   * reversed five-sixths of a write while claiming to reverse it. No button is
-   * better than a button the user stops trusting.
-   */
+  /** A snapshot cannot rebuild the array forms of `customLists` or `advancedScores`, so a partial undo would lie. */
   it("declines to undo a save that touched a whole-value field", () => {
     expect(
       inverse({ mediaId: 1, progress: 14, customLists: ["Rewatching"] }, before),

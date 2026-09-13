@@ -9,12 +9,7 @@ import {
 } from "./calendar";
 import type { MediaListEntry } from "@/api/types";
 
-/**
- * Everything here builds its expectations through the same local `Date` the
- * implementation uses, so the suite holds in any timezone the machine runs in
- * — including ones with DST, which is the whole reason the module goes
- * through `Date` instead of adding 86 400s.
- */
+/** Expectations go through the same local `Date` the module uses, so the suite holds in any timezone, DST included. */
 
 /** Local wall-clock constructor, in seconds. */
 const at = (y: number, mo: number, d: number, h = 0, mi = 0) =>
@@ -55,8 +50,7 @@ describe("weekDays / addDays", () => {
   });
 
   it("addDays stays at midnight across a DST-length week", () => {
-    // Late March, where European zones change clocks. In a zone without DST
-    // this is simply seven ordinary days — the assertion holds either way.
+    // Late March, where European zones change clocks; without DST it is seven ordinary days and holds either way.
     const days = weekDays(weekStartOf(new Date(2026, 2, 26).getTime()));
     for (const sec of days) {
       expect(new Date(sec * 1000).getHours()).toBe(0);

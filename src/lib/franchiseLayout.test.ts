@@ -54,8 +54,7 @@ describe("layoutFranchise", () => {
       [edge(1, 2), edge(2, 3), edge(3, 1)],
       1,
     );
-    // 3 is reached straight from 1 over the undirected 3–1 edge, so it is a
-    // child of the root rather than of 2 — and it is not parented twice.
+    // 3 is reached straight from 1 over the undirected 3–1 edge, so it is the root's child and is parented once.
     expect(tree.get(3)!.parent).toBe(1);
     expect(tree.get(1)!.children).toEqual([2, 3]);
     expect(tree.get(2)!.children).toEqual([]);
@@ -101,8 +100,7 @@ describe("layoutFranchise", () => {
   });
 
   it("closes ranks when a branch collapses instead of leaving a hole", () => {
-    // Depth 2 holds 5 and 6, so 6 sits in the second row of a column that is
-    // centred against the three-row depth-1 column.
+    // Depth 2 holds 5 and 6, so 6 sits in the second row of a column centred against the three-row depth-1 column.
     const before = fanLayout().positions.get(6)!.y;
     expect(before).toBe(PAD + (3 * ROW_STEP - 2 * ROW_STEP) / 2 + ROW_STEP);
     // With 5 gone, 6 is the only node left at that depth and re-centres.

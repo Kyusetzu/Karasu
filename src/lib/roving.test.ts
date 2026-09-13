@@ -28,8 +28,7 @@ describe("nextFocus", () => {
   });
 
   it("survives a column count that has not been measured yet", () => {
-    // `useColumnCount` reports 0 before the probe is laid out, and a step of
-    // zero would pin the focus in place with the key apparently doing nothing.
+    // `useColumnCount` reports 0 before the probe is laid out, and a zero step would pin the focus in place.
     expect(nextFocus(4, "down", 0, 30)).toBe(5);
   });
 
@@ -49,23 +48,15 @@ describe("ownsKeyboard", () => {
     expect(ownsKeyboard(container, body, container)).toBe(true);
   });
 
-  /**
-   * The write bug. Space on a focused button ran the list's own `+1` against
-   * the roving entry — a different title — and cancelled the button's press
-   * while doing it.
-   */
+  /** Space on a focused button must not run the list's `+1` against the roving entry, a different title. */
   it("stands down for any other focused control", () => {
     expect(ownsKeyboard({ tag: "button" }, body, container)).toBe(false);
     expect(ownsKeyboard({ tag: "a" }, body, container)).toBe(false);
-    // A `<select>` matters twice over: arrow keys change its value, and the
-    // handler used to preventDefault them to move the roving index instead.
+    // Arrow keys change a `<select>`'s value, so the handler must not preventDefault them for the roving index.
     expect(ownsKeyboard({ tag: "select" }, body, container)).toBe(false);
   });
 
-  /**
-   * The refuted fix, pinned so it is not reintroduced: "outside the grid"
-   * would let every row's own button through, and each of those is inside.
-   */
+  /** Keep this: an "outside the grid" test would let every row's own button through, and those are inside. */
   it("stands down for a control inside the grid too", () => {
     const rowButton = { tag: "button", inside: container };
     expect(ownsKeyboard(rowButton, body, container)).toBe(false);

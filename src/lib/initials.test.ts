@@ -25,10 +25,7 @@ describe("initialFor", () => {
   });
 
   it("returns one whole code point for an astral first character", () => {
-    // The bug this function exists to not have: `"𝐊yu".slice(0, 1)` is a lone
-    // high surrogate, which renders as a replacement glyph. Asserting the
-    // length is the real check — a broken half is also a 1-unit string, so
-    // comparing only the character would pass on the broken implementation.
+    // Keep the length assertion; a character-only comparison would pass a lone high surrogate from `slice(0, 1)`.
     expect(initialFor("𝐊yu")).toBe("𝐊");
     expect([...initialFor("𝐊yu")]).toHaveLength(1);
     expect(initialFor("🍕place")).toBe("🍕");

@@ -30,11 +30,7 @@ const entry = (over: Record<string, unknown> = {}): MediaListEntry =>
   }) as unknown as MediaListEntry;
 
 describe("parseJsonExport", () => {
-  /**
-   * The property that matters: whatever the exporter writes, the importer
-   * reads. Testing the two against each other rather than against a fixture is
-   * what keeps them in step when the export shape changes.
-   */
+  /** Tested against the exporter rather than a fixture, so the two stay in step when the shape changes. */
   it("reads back what the exporter wrote", () => {
     const json = buildJsonExport([entry()], [entry({ mediaId: 20 })], "POINT_10", 0);
     const out = parseJsonExport(json);
@@ -45,8 +41,7 @@ describe("parseJsonExport", () => {
     expect(anime.mediaId).toBe(10);
     expect(anime.title).toBe("Frieren");
     expect(anime.status).toBe("CURRENT");
-    // Ten-point 8 is raw 80 — the format-independent number the export carries
-    // precisely so this does not have to be guessed.
+    // The export carries the format-independent raw score so the importer never has to guess it.
     expect(anime.scoreRaw).toBe(80);
     expect(anime.progress).toBe(5);
     expect(anime.repeat).toBe(1);
@@ -55,11 +50,7 @@ describe("parseJsonExport", () => {
     expect(anime.completedAt).toBeNull();
   });
 
-  /**
-   * Local mode stores the media beside the row so the list renders with no
-   * network at all — an import that dropped it would leave title-less cards
-   * waiting on a fetch that never comes.
-   */
+  /** Local mode renders from the stored media with no network, so an import that dropped it leaves blank cards. */
   it("rebuilds enough media for a local row to render itself", () => {
     const json = buildJsonExport([entry()], [], "POINT_10", 0);
     const media = parseJsonExport(json).rows[0].media;
@@ -108,10 +99,7 @@ describe("parseJsonExport", () => {
     expect(out.skipped).toBe(3);
   });
 
-  /**
-   * A partial date is a real answer on AniList; an object with no year is not
-   * a date at all and must not arrive as an empty `{}`.
-   */
+  /** A partial date is a real answer on AniList; a yearless object is no date and must not arrive as `{}`. */
   it("keeps a partial date and rejects a yearless one", () => {
     const out = parseJsonExport(
       JSON.stringify({

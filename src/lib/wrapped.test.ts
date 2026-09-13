@@ -67,8 +67,7 @@ describe("aggregate", () => {
   });
 
   it("buckets a season by broadcast, not by completion", () => {
-    // Finished in 2026, aired Winter 2024 — the season card claims it, the
-    // 2024 year card does not. That is the whole semantic split.
+    // Finished in 2026 but aired Winter 2024: the season card claims it, the 2024 year card does not.
     const late = entry({
       mediaId: 9,
       year: 2026,

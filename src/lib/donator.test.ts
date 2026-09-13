@@ -3,9 +3,7 @@ import { canTogglePin, donatorLabel, PIN_TIER, pinAbility } from "./donator";
 
 describe("donatorLabel", () => {
   it("shows nothing at tier 0, however the badge reads", () => {
-    // The regression this file exists for. Both of these are real accounts, and
-    // both came back with the default label despite never having donated — so a
-    // truthiness check on the badge badges essentially everyone.
+    // Tier-0 accounts still carry a badge string, so a truthiness check on the badge badges essentially everyone.
     expect(donatorLabel({ donatorTier: 0, donatorBadge: "Donator" })).toBeNull();
     expect(donatorLabel({ donatorTier: 0, donatorBadge: "anything at all" })).toBeNull();
   });

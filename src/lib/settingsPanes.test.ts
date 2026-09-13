@@ -17,12 +17,7 @@ describe("resolvePane", () => {
     expect(resolvePane("no-such-pane")).toBe(DEFAULT_PANE);
   });
 
-  /**
-   * The reason the aliases exist. These two ids shipped, so they are in links
-   * the app itself hands out and in whatever anyone bookmarked; without this
-   * they would land on Account, which reads as a broken link rather than a
-   * moved one.
-   */
+  /** Retired ids live on in shipped links and bookmarks; landing them on Account would read as a broken link. */
   it("sends a retired pane where its contents went", () => {
     expect(resolvePane("content")).toBe("appearance");
     expect(resolvePane("integrations")).toBe("desktop");

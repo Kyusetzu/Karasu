@@ -1,18 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
-/**
- * Every `t("…")` in the source has to resolve.
- *
- * A missing key does not throw and does not fall back — i18next renders the
- * key itself, so the screen shows `entry.scoreHint` to the user and nothing
- * anywhere reports a problem. `de: typeof en` already guards the other
- * direction (an English key with no German counterpart); this guards the one
- * that actually shipped.
- *
- * The sources are pulled in through Vite's own glob rather than `node:fs`, so
- * the suite needs no node type definitions and reads exactly the files the
- * bundle does.
- */
+/** Every `t("…")` in the source has to resolve, because i18next renders a missing key instead of throwing. */
 
 const FILES = import.meta.glob("/src/**/*.{ts,tsx}", {
   query: "?raw",
@@ -23,35 +11,14 @@ const FILES = import.meta.glob("/src/**/*.{ts,tsx}", {
 // `t("a")` — the anchored form, and the overwhelming majority.
 const CALL = /\bt\(\s*"([a-zA-Z0-9_.]+)"/g;
 
-// `t(cond ? "a" : "b")`, which the anchored form could not see either branch of
-// — 26 keys across 21 call sites were invisible, and each one is a chance to
-// render a raw key on screen with the suite green.
-//
-// Matched as the whole ternary rather than "any literal inside `t(`": the loose
-// form picks up comparison operands too, so `t(view === "mine" ? … )` asserted
-// that a key called `mine` exists. A pattern that reports things which are not
-// keys makes the failure list unreadable, which is how a real one gets skimmed
-// past.
+// `t(cond ? "a" : "b")`, matched as the whole ternary so a comparison operand like `"mine"` is not reported as a key.
 const TERNARY =
   /\bt\(\s*[^)]*?\?\s*"([a-zA-Z0-9_.]+)"\s*:\s*"([a-zA-Z0-9_.]+)"/g;
 
-// For the dead-key direction only: a key mentioned *anywhere* as a literal.
-//
-// Several namespaces are reached from a const table — `NAV` holds `{ key:
-// "nav.dashboard" }` and the component renders `t(item.key)` — so the string is
-// in the source but never adjacent to a `t(`. That is a perfectly good caller;
-// it is only invisible to a scan that insists on the call shape.
+// For the dead-key direction only: a key reached through a const table is a literal never adjacent to a `t(`.
 const ANY_LITERAL = /"([a-zA-Z0-9_]+(?:\.[a-zA-Z0-9_]+)+)"/g;
 
-/**
- * Namespaces reached only through a template literal — `` t(`status.${type}.${s}`) ``.
- *
- * They cannot be enumerated by reading the source, so they are exempt from the
- * dead-key direction below and listed here by hand. The cost of that is real
- * and worth naming: a member missing from one of these families is invisible to
- * *both* directions and ships as a raw key. `i18nFamilies.test.ts` covers the
- * ones with a fixed membership.
- */
+/** Template-literal namespaces, exempt from the dead-key check; a missing member is invisible to both directions. */
 const DYNAMIC_PREFIXES = [
   "status.",
   "season.",
@@ -69,13 +36,7 @@ const DYNAMIC_PREFIXES = [
   "search.chip",
 ];
 
-/**
- * Dynamic keys whose membership *is* closed, listed exactly.
- *
- * Better than a prefix: a prefix only exempts, while these are also asserted to
- * exist, so dropping a member of the union that produces them fails here rather
- * than rendering `stats.people` on a tab. Each group names its union.
- */
+/** Dynamic keys with a closed membership, listed exactly so they are asserted to exist rather than merely exempted. */
 const DYNAMIC_KEYS = [
   // `Category` in `components/stats/shared.tsx`, via `t(`stats.${c}`)`.
   "stats.overview",
@@ -83,11 +44,7 @@ const DYNAMIC_KEYS = [
   "stats.years",
   "stats.genresTags",
   "stats.people",
-  // `PANES` in `pages/Settings.tsx`, via `t(`settings.pane_${p.id}`)`. Listed
-  // rather than prefixed because a prefix only *exempts*: a pane whose label
-  // went missing in a reshuffle rendered `settings.pane_data` on the button and
-  // nothing in the suite noticed. These are asserted to exist, so a rename has
-  // to move both ends.
+  // `PANES` in `pages/Settings.tsx`, via `t(`settings.pane_${p.id}`)`; listed so a missing pane label fails here.
   "settings.pane_account",
   "settings.pane_anilist",
   "settings.pane_appearance",
@@ -98,9 +55,7 @@ const DYNAMIC_KEYS = [
   "settings.pane_advanced",
 ];
 
-// `src/i18n/index.ts` initialises i18next on import, which reads the browser's
-// language preference and the saved override. The suite runs in node, so both
-// have to exist before the module is pulled in — hence the dynamic import.
+// `@/i18n` reads `navigator` and `localStorage` on import, so both are shimmed before the dynamic import.
 let en: unknown;
 beforeAll(async () => {
   Object.defineProperty(globalThis, "localStorage", {
@@ -130,8 +85,7 @@ describe("i18n keys", () => {
   const found = new Map<string, string>();
   const mentioned = new Set<string>();
   for (const [path, text] of Object.entries(FILES)) {
-    // Both extensions: the glob above takes .ts *and* .tsx, and the repo now
-    // has a .tsx test, which this skip used to walk straight past.
+    // Both extensions, or a .tsx test walks straight past this skip.
     if (/\.test\.tsx?$/.test(path)) continue;
     for (const match of text.matchAll(CALL)) {
       if (!found.has(match[1])) found.set(match[1], path);
@@ -145,8 +99,7 @@ describe("i18n keys", () => {
   }
 
   it("finds the calls at all", () => {
-    // A glob or a regex that silently matched nothing would make the
-    // assertion below pass while checking exactly nothing.
+    // A glob or regex that silently matched nothing would make the resolve check pass while checking nothing.
     expect(found.size).toBeGreaterThan(100);
   });
 
@@ -157,14 +110,7 @@ describe("i18n keys", () => {
     expect(missing).toEqual([]);
   });
 
-  /**
-   * The direction nothing guarded: a key in `en.ts` that nothing reaches.
-   *
-   * `de: typeof en` checks en→de and the test above checks use→en. Neither
-   * notices a string that no longer has a caller, so a rename left the old key
-   * behind in *both* files, and the next person to read them could not tell
-   * which of two similar strings was live.
-   */
+  /** A key in `en.ts` that nothing reaches; `de: typeof en` and the resolve check cover only the other two directions. */
   it("has no key nothing reaches", () => {
     const leaves: string[] = [];
     const walk = (node: unknown, path: string) => {
@@ -185,14 +131,7 @@ describe("i18n keys", () => {
     expect(dead).toEqual([]);
   });
 
-  /**
-   * Every exempt prefix has to still name something.
-   *
-   * The exemptions above are the one place this file stops checking, so a
-   * renamed namespace would silently widen that hole rather than failing —
-   * `status.` surviving as a prefix after the keys beneath it moved would
-   * exempt nothing and hide nothing, but nobody would know.
-   */
+  /** Every exempt prefix has to still name something, or a renamed namespace silently widens the hole. */
   it("keeps every dynamic prefix pointing at real keys", () => {
     const leaves: string[] = [];
     const walk = (node: unknown, path: string) => {

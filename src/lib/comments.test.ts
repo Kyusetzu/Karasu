@@ -28,8 +28,7 @@ describe("flattenComments", () => {
   });
 
   it("flattens at two levels and counts what it hides", () => {
-    // The real shape: thread 12753 nests 48 deep. Two levels render; the rest
-    // is reported as a number so the conversation is not silently lost.
+    // Real threads nest far deeper; two levels render and the rest is a number so the conversation is not lost.
     const deep = c(1, [c(11, [c(111, [c(1111)])])]);
     const out = flattenComments([deep]);
     expect(out.map((x) => x.id)).toEqual([1, 11]);
@@ -95,8 +94,7 @@ describe("flattenComments", () => {
   });
 
   it("terminates on a deeply nested blob", () => {
-    // 5,000 levels. `countDescendants` recurses, so this is the assertion that
-    // it cannot blow the stack on a pathological chain.
+    // `countDescendants` recurses, so this asserts it cannot blow the stack on a pathological chain.
     let node: unknown = c(0);
     for (let i = 1; i < 5000; i++) node = c(i, [node]);
     expect(() => flattenComments([node])).not.toThrow();
@@ -105,12 +103,7 @@ describe("flattenComments", () => {
 });
 
 describe("rootId", () => {
-  /**
-   * The bug this exists for: a reply parented to a *reply* becomes a depth-2
-   * comment, which the flatten folds into `hiddenReplies` and never renders.
-   * The post succeeds and disappears. Every row must therefore name the
-   * top-level comment it hangs off, not itself.
-   */
+  /** A reply parented to a reply is folded into `hiddenReplies` and vanishes, so every row names its top-level comment. */
   it("points every reply at its top-level comment", () => {
     const flat = flattenComments([
       {

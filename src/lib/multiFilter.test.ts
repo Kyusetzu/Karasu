@@ -23,11 +23,7 @@ describe("cycle", () => {
     expect(isEmpty(v)).toBe(true);
   });
 
-  /**
-   * The reason this is one control rather than two lists: a genre cannot be
-   * both required and forbidden, and cycling makes that unrepresentable
-   * instead of merely discouraged.
-   */
+  /** One control rather than two lists, because cycling makes "required and forbidden" unrepresentable. */
   it("never leaves an option on both sides", () => {
     let v = cycle(cycle(EMPTY, "Action"), "Action"); // now excluded
     expect(v.include).not.toContain("Action");
@@ -45,11 +41,7 @@ describe("cycle", () => {
 });
 
 describe("encode", () => {
-  /**
-   * This string is the query cache key. Unsorted, picking the same two genres
-   * in a different order would mint a second cache entry for a byte-identical
-   * request — the trap `RecommendedSection` documents for its seed ids.
-   */
+  /** This string is the query cache key; unsorted, a different pick order mints a second entry for the same request. */
   it("is stable whatever order the user picked in", () => {
     const a = cycle(cycle(EMPTY, "Action"), "Drama");
     const b = cycle(cycle(EMPTY, "Drama"), "Action");
@@ -87,11 +79,7 @@ describe("summarize", () => {
 });
 
 describe("toQueryArgs", () => {
-  /**
-   * `undefined`, never `[]`. An absent GraphQL argument is no filter; an empty
-   * list is a filter that matches nothing, which would silently empty the
-   * results the moment somebody cleared a chip.
-   */
+  /** `undefined`, never `[]`: an absent GraphQL argument is no filter, an empty list matches nothing. */
   it("omits an empty side rather than sending an empty list", () => {
     expect(toQueryArgs(EMPTY)).toEqual({ in: undefined, notIn: undefined });
 

@@ -21,8 +21,7 @@ describe("anilistCoversAiring", () => {
     ).toBe(true);
   });
 
-  // AniList's own default for a type it has never stored, and the same default
-  // `mergeNotificationOptions` applies on the settings pane.
+  // AniList's own default for a type it never stored, the same one `mergeNotificationOptions` applies.
   it("reads an unlisted AIRING entry as on", () => {
     expect(
       anilistCoversAiring(
@@ -37,8 +36,7 @@ describe("anilistCoversAiring", () => {
     ).toBe(true);
   });
 
-  // They are separate settings on separate AniList pages and which one the
-  // server consults is undocumented, so neither speaks for the other.
+  // Two settings on separate AniList pages, and which one the server consults is undocumented.
   it("puts the row back when either switch is off", () => {
     expect(
       anilistCoversAiring(
@@ -58,9 +56,7 @@ describe("anilistCoversAiring", () => {
     ).toBe(false);
   });
 
-  // The direction that costs something: the wrong answer here is a notice the
-  // user never sees anywhere, while the wrong answer the other way is only the
-  // duplicate row this replaced.
+  // A wrong "covered" is a notice the user never sees; a wrong "not covered" is only a duplicate row.
   it("keeps Karasu's own row for anything unknown", () => {
     expect(anilistCoversAiring(null)).toBe(false);
     expect(anilistCoversAiring(undefined)).toBe(false);

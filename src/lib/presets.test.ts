@@ -40,9 +40,7 @@ describe("presets", () => {
     expect(loadPresets("ANIME")).toEqual([]);
   });
 
-  /** A preset saved before the format/origin/tag filters existed loads with
-      those fields absent — the apply site's `?? ""` is what turns absence
-      into "clear the filter" rather than "keep whatever is set". */
+  /** An older preset loads with the filter fields absent, and the apply site's `?? ""` reads absence as "clear". */
   it("loads legacy presets without the newer filter fields", () => {
     localStorage.setItem(
       "karasu-presets",

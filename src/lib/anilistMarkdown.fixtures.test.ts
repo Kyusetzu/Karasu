@@ -2,37 +2,19 @@ import { describe, expect, it } from "vitest";
 import { parseAniListMarkdown, type MdInline, type MdNode } from "./anilistMarkdown";
 import fixtures from "./fixtures/anilistMarkdown.fixtures.json";
 
-/**
- * Structural parity with anilist.co's own rendering.
- *
- * `scripts/sample-markdown.mjs` fetches every sample twice — the raw markdown
- * and its `(asHtml: true)` form, the HTML the website puts on screen — and
- * this compares the two by *counting* what a reader would notice: the
- * spoilers hidden, the images shown, the links offered, the headings set.
- * Never by matching markup. AniList's HTML is not a target to reproduce (its
- * `<h1><center>…</center> ~~~<span …>` for a centred heading is not even
- * well-formed); it is evidence of how many things the site hides, shows and
- * links, and that number is what a user compares Karasu against.
- *
- * A mismatch here is a finding, not a failure to paper over: the first run
- * found an ICO favicon the proxy refused, `&plus;` left undecoded and a
- * centred `- ✧ -` read as a list. Resample with the script when AniList's
- * rendering is suspected of having moved; the ids are documented there.
- */
+/** Parity with anilist.co's `asHtml` form by counting what a reader notices, never by matching markup. */
 
 interface Sample {
   kind: "about" | "comment" | "text";
   id: number;
   note: string;
-  /** The counts graded against `asHtml`; absent means all four. The sampler
-   *  documents why a sample narrows it. */
+  /** Spoilers and images are graded everywhere, headings and links only where the sampler says the API can be trusted. */
   compare?: (keyof Tally)[];
   raw: string;
   html: string;
 }
 
-// A plain JSON import (`resolveJsonModule`), so the file is typed from its
-// own shape and the test needs no Node API the app's tsconfig does not know.
+// A plain JSON import, so the file is typed from its own shape and needs no Node API the tsconfig lacks.
 const { samples } = fixtures as { samples: Sample[] };
 
 interface Tally {

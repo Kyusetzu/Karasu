@@ -11,14 +11,7 @@ import {
 
 describe("formToUpdateUserVars", () => {
   it("never emits animeListOptions or mangaListOptions", () => {
-    // THE guard. `MediaListOptionsInput.customLists` is a full replacement with
-    // no undo on AniList's side, so sending the object with a stale or absent
-    // list deletes custom lists the user built by hand. It is also entirely
-    // unnecessary: `scoreFormat` and `rowOrder` are top-level UpdateUser
-    // arguments, while that input object holds only sectionOrder,
-    // splitCompletedSectionByFormat, customLists, advancedScoring,
-    // advancedScoringEnabled and theme. This test is what stops a later
-    // "let's finish the pane" from quietly reintroducing it.
+    // Keep this guard: `MediaListOptionsInput.customLists` replaces the whole list, so a stale one deletes lists.
     const everything = {
       about: "hi",
       titleLanguage: "ENGLISH",
@@ -44,8 +37,7 @@ describe("formToUpdateUserVars", () => {
   });
 
   it("omits anything the user did not touch", () => {
-    // Absent means "don't change" — the same convention list writes use. Sending
-    // every field would let a stale value overwrite a change made elsewhere.
+    // Absent means "don't change", as with list writes; sending every field lets a stale value overwrite.
     expect(formToUpdateUserVars({ about: "only this" })).toEqual({ about: "only this" });
     expect(formToUpdateUserVars({})).toEqual({});
   });
@@ -86,10 +78,7 @@ describe("hasChanges", () => {
 
 describe("NOTIFICATION_TYPES", () => {
   it("holds exactly the twenty types AniList's enum has", () => {
-    // The drift guard. If AniList adds a twenty-first type, this is where it is
-    // discovered — rather than a user finding out by silently not being
-    // notified, because a partial `notificationOptions` array disables anything
-    // it omits.
+    // The drift guard: a partial `notificationOptions` array disables anything it omits, so a new type must land here.
     expect(NOTIFICATION_TYPES).toHaveLength(20);
     expect(new Set(NOTIFICATION_TYPES).size).toBe(20);
     // The exact set, read off the live schema.
@@ -118,8 +107,7 @@ describe("mergeNotificationOptions", () => {
   });
 
   it("preserves the seventeen the user did not touch", () => {
-    // The whole hazard in one assertion: a three-field patch must not disable
-    // the other seventeen.
+    // The whole hazard in one assertion: a three-field patch must not disable the other seventeen.
     const current = NOTIFICATION_TYPES.map((type) => ({ type, enabled: false }));
     const merged = mergeNotificationOptions(current, {
       AIRING: true,
@@ -221,11 +209,7 @@ describe("mergeListActivity", () => {
 
 describe("LOCAL_OVERRIDES", () => {
   it("names exactly the three settings whose effect lands elsewhere", () => {
-    // scoreFormat left this list on purpose: since the scoreRaw change the
-    // whole app follows the account's format, so the setting simply works.
-    // `airingNotifications` is here for the opposite reason to the other two —
-    // Karasu reads it rather than ignoring it, and the note cross-references
-    // the Detection pane it is coupled to.
+    // scoreFormat is absent on purpose (the app follows the account's format); airingNotifications is read, not ignored.
     expect(Object.keys(LOCAL_OVERRIDES).sort()).toEqual([
       "airingNotifications",
       "displayAdultContent",

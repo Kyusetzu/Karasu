@@ -17,8 +17,7 @@ describe("toBase64", () => {
   });
 
   it("handles a payload past the chunk boundary", () => {
-    // Spreading this many arguments at once is what overflows the stack, and
-    // a poster at 3x is an order of magnitude bigger again.
+    // Spreading this many arguments at once overflows the stack, and a real poster is bigger still.
     const bytes = new Uint8Array(300_000);
     for (let i = 0; i < bytes.length; i++) bytes[i] = i % 251;
     const decoded = Uint8Array.from(atob(toBase64(bytes)), (c) =>

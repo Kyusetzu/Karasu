@@ -18,10 +18,7 @@ describe("reducedMotion", () => {
     expect(reducedMotion(true, false)).toBe(true);
   });
 
-  /**
-   * The toggle only ever adds — a user cannot opt back *into* motion the OS has
-   * asked to suppress, which the settings hint states as intended.
-   */
+  /** The toggle only ever adds: a user cannot opt back into motion the OS asked to suppress. */
   it("follows the OS even with the toggle off", () => {
     expect(reducedMotion(false, true)).toBe(true);
   });
@@ -32,10 +29,7 @@ describe("motionDuration", () => {
     expect(motionDuration(280, false)).toBe(280);
   });
 
-  /**
-   * The point of the helper: a duration held in JS is invisible to the CSS
-   * `!important` rules, so it has to collapse here or it ships as real motion.
-   */
+  /** A duration held in JS is invisible to the CSS `!important` rules, so it must collapse here. */
   it("collapses to zero under reduced motion", () => {
     expect(motionDuration(280, true)).toBe(0);
   });
@@ -58,10 +52,7 @@ describe("staggerDelay", () => {
     }
   });
 
-  /**
-   * A stagger whose duration is zeroed but whose delay is not becomes a
-   * staggered *wait*. The delay has to go too.
-   */
+  /** A stagger whose duration is zeroed but whose delay is not becomes a staggered wait. */
   it("is flat under reduced motion", () => {
     expect(staggerDelay(3, true)).toBe(0);
     expect(staggerDelay(97, true)).toBe(0);
@@ -75,10 +66,7 @@ describe("seriesDelay", () => {
     expect(seriesDelay(5, 6, false)).toBe(5 * STAGGER_STEP_MS);
   });
 
-  /**
-   * The whole reason it exists: a chart is one shape arriving, so the delay
-   * must never return to zero partway through the way `staggerDelay` does.
-   */
+  /** A chart is one shape arriving, so the delay must never return to zero partway like `staggerDelay`. */
   it("never restarts, however long the series", () => {
     for (const count of [7, 14, 40, 200]) {
       let previous = -1;

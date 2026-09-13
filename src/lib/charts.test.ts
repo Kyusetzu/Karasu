@@ -42,8 +42,7 @@ describe("arcPath", () => {
   });
 
   it("draws a full ring as two arcs", () => {
-    // One arc back to its own start point renders nothing at all, so a
-    // category holding everything would silently disappear.
+    // One arc back to its own start point renders nothing, so a category holding everything would disappear.
     const d = arcPath(0, 0, 5, 10, 0, 360);
     expect(d.match(/A10,10/g)?.length).toBe(2);
     expect(d.match(/A5,5/g)?.length).toBe(2);
@@ -104,8 +103,7 @@ describe("squarify", () => {
   });
 
   it("beats slice-and-dice on the worst aspect ratio", () => {
-    // The whole reason for the algorithm: a sliver carries no area
-    // impression, so the shapes have to stay roughly square.
+    // A sliver carries no area impression, so the shapes have to stay roughly square.
     const values = [40, 25, 15, 10, 6, 4];
     const worst = Math.max(
       ...squarify(values, box.w, box.h).map((r) => Math.max(r.w / r.h, r.h / r.w)),

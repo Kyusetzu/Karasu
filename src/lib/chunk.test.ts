@@ -32,11 +32,7 @@ describe("missingIds", () => {
     expect(missingIds([7, 7, 7], new Set())).toEqual([7]);
   });
 
-  /**
-   * The reason this function sorts at all. The same set arriving in a different
-   * order must produce the same array, or a query key built from it changes on
-   * every render and the cache is defeated.
-   */
+  /** The same set in a different order must give the same array, or a query key built from it defeats the cache. */
   it("is stable regardless of input order", () => {
     expect(missingIds([3, 1, 2], new Set())).toEqual(
       missingIds([2, 3, 1], new Set()),

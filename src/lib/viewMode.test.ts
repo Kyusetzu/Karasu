@@ -86,10 +86,7 @@ describe("loadViewMode", () => {
     expect(loadViewMode("MANGA")).toBe(DEFAULT_VIEW);
   });
 
-  /**
-   * Private-mode localStorage throws on access, not just on write. Losing the
-   * preference is fine; taking the screen down with it is not.
-   */
+  /** Private-mode localStorage throws on read too; losing the preference is fine, taking the screen down is not. */
   it("survives a storage that throws", () => {
     vi.stubGlobal("localStorage", {
       getItem: () => {

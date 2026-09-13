@@ -21,11 +21,7 @@ describe("groupByFormat", () => {
     expect(groups[0].items).toHaveLength(2);
   });
 
-  /**
-   * `Media.format` is `string | null`, not a union — AniList can grow one and
-   * a title with it must land somewhere rather than disappearing from a page
-   * that claims to show the season.
-   */
+  /** `Media.format` is `string | null`, so a format AniList grows must land somewhere rather than vanish. */
   it("keeps a format it has never heard of, at the end", () => {
     const groups = groupByFormat(of("TV", "HOLOGRAM", null));
     expect(groups.map((g) => g.format)).toEqual(["TV", null]);
@@ -52,8 +48,7 @@ describe("groupByFormat", () => {
 });
 
 describe("nextFocusGrouped", () => {
-  // Two sections: 5 items then 3, at 3 columns.
-  //   A: 0 1 2 / 3 4        B: 5 6 7
+  // Two sections at 3 columns: A holds 0 1 2 / 3 4, B holds 5 6 7.
   const sizes = [5, 3];
 
   it("starts at the first item whichever way it was pressed", () => {
@@ -74,11 +69,7 @@ describe("nextFocusGrouped", () => {
     expect(nextFocusGrouped(3, "up", 3, sizes)).toBe(0);
   });
 
-  /**
-   * The bug a flat `nextFocus` has here: from index 2 (`A` row 1, column 2)
-   * `2 + 3 = 5` lands in section B, skipping A's second row entirely. A ragged
-   * last row has to be visited before leaving the section.
-   */
+  /** A flat `nextFocus` adds a row and lands in the next section; a ragged last row must be visited first. */
   it("does not skip a ragged last row on the way out", () => {
     expect(nextFocusGrouped(2, "down", 3, sizes)).toBe(4);
   });

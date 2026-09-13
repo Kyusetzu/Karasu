@@ -36,8 +36,7 @@ describe("normalizeProfileColor", () => {
   });
 
   it("rejects three-digit hex rather than expanding it", () => {
-    // Expanding would send a value the user did not type, and AniList returns
-    // six digits, so there is nothing to be compatible with.
+    // Expanding would send a value the user did not type, and AniList only ever returns six digits.
     expect(normalizeProfileColor("#abc")).toBeNull();
   });
 

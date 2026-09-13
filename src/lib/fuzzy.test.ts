@@ -76,8 +76,7 @@ describe("fuzzyScore tiers", () => {
   });
 
   it("never matches across two titles of one entry", () => {
-    // The straddle bug the old NUL-joined haystack existed to prevent: joined
-    // with a space, "titan bleach" would match this entry.
+    // Per-title docs are what keep a query from straddling two adjacent names of one entry.
     expect(score(["Attack on Titan", "Bleach"], "titan bleach")).toBe(0);
   });
 
@@ -93,9 +92,7 @@ describe("fuzzyScore tiers", () => {
   });
 
   it("does not let a repeated query word double-claim one title word", () => {
-    // "steins steins" may still match on trigrams — "steins" really is in the
-    // title — but it must not earn the token-prefix tier by matching the same
-    // title word twice.
+    // Trigrams may still hit, but the token-prefix tier must not be earned by matching one title word twice.
     expect(score(["Steins;Gate"], "steins steins")).toBeLessThan(0.6);
   });
 });

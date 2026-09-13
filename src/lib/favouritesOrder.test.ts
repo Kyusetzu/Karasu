@@ -63,8 +63,7 @@ describe("toOrderVars", () => {
   });
 
   it("argument names match the mutation for every kind", () => {
-    // The mutation's variable list is the source of truth; a typo here would
-    // silently no-op the save (unknown variables are ignored by the API).
+    // The API ignores unknown variables, so a typo here would silently no-op the save.
     expect(Object.values(FAV_ORDER_ARGS).flat().sort()).toEqual(
       [
         "animeIds", "animeOrder",

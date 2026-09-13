@@ -8,21 +8,17 @@ import {
   type MdNode,
 } from "./anilistMarkdown";
 
-/** Every node type the renderer knows how to draw. Hardcoded on purpose: adding
- *  a member to the union without adding it here fails the walk below, which is
- *  the pressure we want — a new node type must be reviewed, not absorbed. */
+/** Every node type the renderer draws, hardcoded so a new union member must be reviewed here, not absorbed. */
 const BLOCK_TYPES = new Set(["p", "h", "quote", "list", "codeBlock", "hr", "center", "spoiler"]);
 const INLINE_TYPES = new Set([
   "text", "strong", "em", "strike", "code", "link", "mention", "spoiler", "chip", "br",
   "accent", "centered",
 ]);
 
-/** Fields a node is allowed to carry. Anything else could be unrendered markup
- *  smuggled through as data. */
+/** Fields a node is allowed to carry; anything else could be unrendered markup smuggled through as data. */
 const ALLOWED_FIELDS = new Set([
   "type", "text", "children", "level", "items", "ordered", "href", "name", "kind", "host",
-  // Both are plain data on a chip and neither can carry markup: `width` is a
-  // clamped number plus a unit from a closed union, `capped` is a boolean.
+  // Plain chip data that cannot carry markup: a clamped number with a closed-union unit, and a boolean.
   "width", "capped",
 ]);
 
@@ -68,8 +64,7 @@ function types(nodes: (MdNode | MdInline)[]): string[] {
 // --- The security boundary -------------------------------------------------
 
 describe("the tree cannot carry executable content", () => {
-  // Deliberately nasty, and drawn from what real bios contain: raw tags, event
-  // handlers, and AniList's own layout blob.
+  // Deliberately nasty and drawn from real bios: raw tags, event handlers, and AniList's own layout blob.
   const HOSTILE = [
     `<script>alert(1)</script>`,
     `<b onmouseover=alert(1)>hi</b>`,
@@ -116,11 +111,7 @@ describe("the tree cannot carry executable content", () => {
     }
   });
 
-  /**
-   * `//evil.example` starts with a slash and would take the *internal* branch
-   * in RichText, handing a foreign host to the router. The HashRouter defangs
-   * it today; the parser refuses it so nothing ever depends on that.
-   */
+  /** A leading slash would take RichText's internal branch and hand a foreign host to the router. */
   it("refuses protocol-relative URLs outright", () => {
     const nodes = parse("[click](//evil.example/pwn) and //evil.example/raw");
     walk(nodes, (n) => {
@@ -169,9 +160,7 @@ describe("raw HTML drops the tag and keeps the words", () => {
   });
 
   it("drops a script or style body entirely, contents included", () => {
-    // Not merely inert — gone. Every other element's text is prose worth
-    // keeping; theirs is code nobody meant to read, and rendering it produced
-    // `bold bitalert(1)` on a real HTML-art bio.
+    // Every other element's text is prose worth keeping; theirs is code nobody meant to read.
     expect(textOf(parse(`<script>alert(1)</script>`))).toBe("");
     expect(textOf(parse(`<style>body{color:red}</style>`))).toBe("");
     expect(textOf(parse(`before<script>alert(1)</script>after`))).toBe("beforeafter");
@@ -204,8 +193,7 @@ describe("raw HTML drops the tag and keeps the words", () => {
     });
     const n = parse(`[Wiki](https://en.wikipedia.org/wiki/Foo_(bar) 'title')`)[0] as { children: MdInline[] };
     expect(n.children[0]).toMatchObject({ type: "link", href: "https://en.wikipedia.org/wiki/Foo_(bar)" });
-    // An unclosed target is not a markdown link: the bracket stays as text,
-    // and only the bare URL after it autolinks.
+    // An unclosed target is not a markdown link: the bracket stays as text and only the bare URL autolinks.
     const open = parse(`[x](https://a.co`)[0] as { children: MdInline[] };
     expect(textOf([open.children[0]])).toBe("[x](");
     expect(open.children[1]).toMatchObject({ type: "link", href: "https://a.co" });
@@ -262,12 +250,7 @@ describe("inline forms", () => {
   });
 
   it("does not nest a same-character triple — a known, bounded limitation", () => {
-    // `**bold *and italic***` needs CommonMark's delimiter-run algorithm to
-    // decide that the third closing `*` belongs to the inner emphasis. This
-    // parser matches greedily instead, so the outer strong wins and the inner
-    // `*` is left as text. Recorded as a test rather than left to be
-    // rediscovered: the whole run still renders, just bold rather than
-    // bold-italic, and no content is lost.
+    // Greedy matching lacks CommonMark's delimiter-run algorithm, so the outer strong wins and nothing is lost.
     const n = first(`**bold *and italic***`)[0];
     expect(n.type).toBe("strong");
     expect(types([n])).not.toContain("em");
@@ -281,11 +264,7 @@ describe("inline forms", () => {
   });
 
   it("follows CommonMark's asymmetry: `*` emphasises intraword, `_` does not", () => {
-    // Not a preference — markdown-it is what AniList runs, and it follows
-    // CommonMark, where `a*b*c` is `a<em>b</em>c` and `a_b_c` is literal.
-    // Matching the real dialect matters more than matching intuition, and the
-    // `_` half is load-bearing: underscores are ordinary inside usernames, file
-    // names and URLs, so without it `snake_case_name` renders half italic.
+    // AniList runs markdown-it, and the `_` half is load-bearing: without it `snake_case_name` renders half italic.
     expect(types(parse(`a*b*c`))).toContain("em");
     expect(types(parse(`a_b_c`))).not.toContain("em");
     expect(textOf(parse(`a_b_c`))).toBe("a_b_c");
@@ -452,11 +431,7 @@ describe("images and embeds become chips, never pictures", () => {
     expect(types(parse(`img(https://i.imgur.com/a.png)`))).toContain("chip");
   });
 
-  /**
-   * The size group was non-capturing, so every one of these rendered at the
-   * same size as a bare `img(u)` — and this module's header records that 24 of
-   * 44 sampled bios use the sized form.
-   */
+  /** The sized form is what most real bios use, so a non-capturing size group ignores nearly every author's width. */
   it("keeps the width the author asked for", () => {
     const chip = (src: string) => chipsOf(src)[0];
 
@@ -471,8 +446,7 @@ describe("images and embeds become chips, never pictures", () => {
     expect(chip("img(https://i.imgur.com/a.png)")).not.toHaveProperty("width");
   });
 
-  /** AniList documents `###` as pixels (thread 6125); absurd values are not a
-   *  layout, so they clamp rather than reaching the DOM. */
+  /** AniList documents the number as pixels; an absurd value is not a layout, so it clamps before the DOM. */
   it("clamps a width that is not a layout", () => {
     expect(parseImageWidth("999999")).toEqual({ value: 2000, unit: "px" });
     expect(parseImageWidth("500%")).toEqual({ value: 100, unit: "%" });
@@ -481,11 +455,7 @@ describe("images and embeds become chips, never pictures", () => {
     expect(parseImageWidth("")).toBeUndefined();
   });
 
-  /**
-   * Each inlined image is its own bounded request in Rust, all issued at mount.
-   * Past the cap the chip still renders — nothing disappears, it just stops
-   * being a network call a stranger's bio gets to make.
-   */
+  /** Each inlined image is a request issued at mount; past the cap the chip still renders but makes no call. */
   it("stops inlining past the per-document cap", () => {
     const src = Array.from(
       { length: MAX_INLINE_IMAGES + 3 },
@@ -503,9 +473,7 @@ describe("images and embeds become chips, never pictures", () => {
   it("handles an image nested inside a link, as real bios write it", () => {
     // `[img33(url) ](target)` — a linked image. Both survive, in that order.
     const nodes = parse(`[img33(https://i.imgur.com/a.png) ](https://myanimelist.net/x)`);
-    // The markdown spelling of the same idiom: a bracketed label holding an
-    // image. The label's own `]` used to end the link's label early, and the
-    // whole thing came out as a link with the image lost.
+    // The markdown spelling of the same idiom; the label's own `]` must not end the link's label early.
     const md = parse(`[![badge](https://i.imgur.com/b.png)](https://example.com/me)`);
     const link = (md[0] as { children: MdInline[] }).children[0];
     expect(link).toMatchObject({ type: "link", href: "https://example.com/me" });
@@ -524,8 +492,7 @@ describe("images and embeds become chips, never pictures", () => {
 
 describe("block structure", () => {
   it("makes a single newline a break and a blank line a new paragraph", () => {
-    // The bio-shape assertion: 36 of 44 sampled bios are line-oriented, and
-    // collapsing newlines would render every one of them as a single blob.
+    // Most real bios are line-oriented, and collapsing newlines would render each as a single blob.
     const one = parse(`line one\nline two`);
     expect(one).toHaveLength(1);
     expect(types(one)).toContain("br");
@@ -545,11 +512,7 @@ describe("block structure", () => {
   });
 
   it("reads a hashtag at the start of a line as a heading, as the site does", () => {
-    // marked's heading rule, which anilist.co runs, does not need the space:
-    // `#__Day 235__` is an <h1> on the site (activity 1154093188, measured in
-    // the browser 2026-09-10). This used to assert the CommonMark reading —
-    // "a hashtag is not a heading" — and rendered every 365-day-challenge
-    // post as a `#` followed by bold text. Matching the site is the point.
+    // marked's heading rule, which anilist.co runs, needs no space after the `#`; matching the site is the point.
     expect(parse(`#nothashtag`)[0]).toMatchObject({ type: "h", level: 1 });
     expect(parse(`#__Day 235__`)[0]).toMatchObject({ type: "h", level: 1 });
     expect(types(parse(`#__Day 235__`))).toContain("strong");
@@ -599,9 +562,7 @@ describe("block structure", () => {
     expect(oneLine.type).toBe("center");
     expect(types([oneLine])).toContain("chip");
 
-    // Content on the opening fence's own line. This is the form that shipped a
-    // literal `~~~` to screen — a real bio opens with `~~~ ren | they/them | de`
-    // and the old rule demanded a bare `~~~` line.
+    // Content on the opening fence's own line, which real bios write and a bare-line rule shows as literal `~~~`.
     const trailing = parse(`~~~ ren | they/them\n\n[insta](https://instagram.com/x)\n\n~~~`);
     expect(trailing[0].type).toBe("center");
     expect(textOf(trailing)).toContain("they/them");
@@ -615,8 +576,7 @@ describe("block structure", () => {
       `~~~\nbare\n~~~`,
       `~~~one line~~~`,
       `~~~ unclosed content`,
-      // The closing fence glued to the last content line — how a real bio
-      // ends (`img220(url)~~~`), and the form that shipped a literal `~~~`.
+      // The closing fence glued to the last content line, as real bios end.
       `~~~ opening\nimg220(https://i.imgur.com/a.jpg)~~~`,
     ]) {
       expect(textOf(parse(src)), src).not.toContain("~~~");
@@ -624,8 +584,7 @@ describe("block structure", () => {
   });
 
   it("keeps the closing line's content when the fence is glued to it", () => {
-    // The exact shape of the maintainer's own bio: multi-line centred block,
-    // images on their own lines, close glued to the last image.
+    // The shape of the maintainer's own bio: a multi-line centred block with the close glued to the last image.
     const nodes = parse(
       `~~~__Hi.__\n[a link](https://example.com)\n\n` +
         `img220(https://i.imgur.com/a.jpeg)\n\n\n` +
@@ -666,8 +625,7 @@ describe("bounds", () => {
   });
 
   it("never leaves an unclosed element when truncation splits a delimiter", () => {
-    // Nodes are only created on a complete match, so a split delimiter can only
-    // ever degrade to text. Asserted rather than trusted.
+    // Nodes are only created on a complete match, so a split delimiter can only degrade to text.
     const r = parseAniListMarkdown(`${"x".repeat(7998)}**bold**`, { limit: 8000 });
     expect(r.truncated).toBe(true);
     walk(r.nodes, (n) => {
@@ -676,15 +634,7 @@ describe("bounds", () => {
   });
 
   it("does not let a nested match rewind the outer scan", () => {
-    // The bug this pins, because it was real and it was not obvious: the
-    // patterns are module-level objects and `parseInline` recurses into its own
-    // matches, so an inner call mutated the `lastIndex` the outer loop was
-    // about to advance by — and a failed sticky `exec` resets it to 0. `~!~!~!`
-    // was enough: the index went backwards and the loop allocated until the
-    // heap died. Every branch now advances by the match's own length.
-    //
-    // Short, self-terminating inputs, so a regression is a hang rather than a
-    // slow test — which is why the timing assertion below exists as well.
+    // Keep every branch advancing by the match's own length; recursive `parseInline` resets a shared `lastIndex`.
     for (const src of ["~!~!~!", "~!~!~!~!~!~!", "**a**b**c**", "*a*b*c*", "[a](b)[c](d)"]) {
       const r = parseAniListMarkdown(src);
       expect(Array.isArray(r.nodes), src).toBe(true);
@@ -771,9 +721,7 @@ describe("renderPlain", () => {
   });
 
   it("never puts a spoiler's text in a preview", () => {
-    // A preview is exactly where a spoiler leaks: the profile's comment list
-    // shows the first lines of every comment, and this used to flatten the
-    // hidden part into plain view there.
+    // A preview is exactly where a spoiler leaks: the profile's comment list shows the first lines of every comment.
     expect(renderPlain(`~!secret!~ did it`)).toBe("[…] did it");
     expect(renderPlain(`before\n~!\nsecret\n\nlines\n!~\nafter`)).toBe("before […] after");
     expect(renderPlain(`~!secret!~`, 200, "Spoiler")).toBe("Spoiler");
@@ -781,23 +729,16 @@ describe("renderPlain", () => {
   });
 
   it("flattens accent decoration into its text", () => {
-    // Without the `accent` case in the walk, `18<a>&#8593;</a>` previews as
-    // just "18" — the arrow silently gone.
+    // Without the `accent` case in the walk, the arrow is silently gone from the preview.
     expect(renderPlain(`18<a>&#8593;</a>`)).toBe("18↑");
   });
 });
 
-// --- HTML entities ---------------------------------------------------------
-// Mirrors the `entities` block in anilistHtml.test.ts — same decoder, shared
-// via lib/htmlEntities, exercised through the *markdown* path this time,
-// because that is the path that never decoded and real bios showed literal
-// `&nbsp;` on screen.
+// --- HTML entities: the shared lib/htmlEntities decoder, exercised through the markdown path ---
 
 describe("entities", () => {
   it("decodes named, decimal and hex forms in text", () => {
-    // The non-ASCII expectations here were verified by codepoint
-    // (hex(ord(c))), not by eye — the console codepage once hid a mojibake
-    // regression behind identical-looking glyphs.
+    // Verify the non-ASCII expectations by codepoint, not by eye; the console codepage hides mojibake.
     expect(textOf(parse(`stars &starf; and &#9825; and &#x2605;`))).toBe(
       "stars ★ and ♡ and ★",
     );
@@ -820,10 +761,7 @@ describe("entities", () => {
   });
 
   it("decodes an entity-encoded tag to characters, never to markup", () => {
-    // The decode runs after parsing, in text position — so this is visible
-    // text that React will escape, not a script element and not a dropped
-    // one. Deliberately not in HOSTILE: the strict no-angle-bracket walk
-    // there asserts about *source* markup, and these brackets are content.
+    // Decoded after parsing, so this is visible text React escapes; not in HOSTILE because these brackets are content.
     const nodes = parse(`&lt;script&gt;alert(1)&lt;/script&gt;`);
     expect(types(nodes)).not.toContain("codeBlock");
     expect(textOf(nodes)).toBe("<script>alert(1)</script>");
@@ -835,10 +773,7 @@ describe("entities", () => {
   });
 
   it("decodes an entity inside a URL before judging it", () => {
-    // CommonMark decodes link destinations and `href` is attribute-encoded,
-    // so `&amp;` in a query string is one ampersand on the wire — and the
-    // whitelist runs on the decoded bytes, which is what keeps a smuggled
-    // scheme out (see HOSTILE).
+    // CommonMark decodes link destinations, and the scheme whitelist runs on the decoded bytes to catch smuggling.
     const n = parse(`[x](https://a.co/?a=1&amp;b=2)`)[0] as { children: MdInline[] };
     expect(n.children[0]).toMatchObject({ type: "link", href: "https://a.co/?a=1&b=2" });
     expect(types(parse(`[x](java&#115;cript:alert(1))`))).not.toContain("link");
@@ -886,9 +821,7 @@ describe("inline HTML kept as structure", () => {
   });
 
   it("keeps a linked image inside the link — the favicon-row idiom", () => {
-    // `<a href="…">img16(favicon)</a>` must be one click target: the chip
-    // sits inside the link's children, the same shape `[img33(u)](t)`
-    // produces, and RichText's InLink context does the rest.
+    // One click target: the chip sits inside the link's children, the same shape `[img33(u)](t)` produces.
     const n = first(
       `<a href="https://steamcommunity.com/id/x">img16(https://a.favicon.im/steamcommunity.com)</a>`,
     )[0];
@@ -902,10 +835,7 @@ describe("inline HTML kept as structure", () => {
     expect(textOf([n])).toBe("★");
   });
 
-  /// anilist.co strips a refused target to an `<a>` without href and colours
-  /// it like any bare anchor (activity 1154088020's `[__…__](javascript:;)`
-  /// heading is blue there, measured 2026-09-11). Colour, never a link: the
-  /// HOSTILE walk above still finds no `link`, no `chip` and no href.
+  // anilist.co strips a refused target to a bare `<a>` and colours it like any anchor: colour, never a link.
   it("renders a rejected href as accent decoration, never as a link", () => {
     for (const src of [
       `<a href="javascript:alert(1)">x</a>`,
@@ -980,8 +910,7 @@ describe("block HTML kept as structure", () => {
   });
 
   it("renders the fixture profile's shape — the bug that started this", () => {
-    // Distilled from a real bio: entity spacers, centred
-    // divs, an h5 with bare-<a> decoration, a linked favicon image.
+    // Distilled from a real bio: entity spacers, centred divs, an h5 with bare-<a> decoration, a linked favicon.
     const real =
       `&nbsp;\n` +
       `<div align="center"><h5>˗ˏˋ <a>&#x2605;</a> ˎˊ˗</h5></div>\n` +
@@ -1003,14 +932,10 @@ describe("block HTML kept as structure", () => {
   });
 });
 
-// --- the whole browser entity set ------------------------------------------
-// `htmlEntities.data.ts` is the WHATWG table, generated by
-// scripts/gen-entities.mjs. anilist.co leaves entities in its HTML for the
-// browser, so what a browser decodes is the definition of correct here.
+// --- the whole browser entity set: the generated WHATWG table, since a browser's decode defines correct here ---
 describe("entities, the whole browser set", () => {
   it("decodes names the hand-picked table did not know", () => {
-    // `&plus;` is straight out of user 6975140's bio, where the site shows a
-    // plus sign and Karasu showed the seven characters (sampled 2026-09-10).
+    // `&plus;` is straight out of a real bio, where the site shows a plus sign.
     expect(textOf(parse(`18 &plus; &check; &frac12;`))).toBe("18 + ✓ ½");
   });
 
@@ -1020,18 +945,12 @@ describe("entities, the whole browser set", () => {
   });
 
   it("does not answer an entity with an Object property", () => {
-    // Both fit the name pattern, and a plain-object lookup answers them with
-    // functions rather than glyphs.
+    // Both fit the name pattern, and a plain-object lookup answers them with functions rather than glyphs.
     expect(textOf(parse(`&constructor; &toString;`))).toBe("&constructor; &toString;");
   });
 });
 
-// --- one-line centred HTML rows --------------------------------------------
-// Sampled 2026-09-10 through `about(asHtml: true)` on user 6975140 (the row is
-// in fixtures/anilistMarkdown.fixtures.json): anilist.co keeps
-// `<div align="center">- <a>✧</a> -</div>` as the three characters, so
-// markdown block rules do not run inside a row that opens and closes on one
-// line. `parseHtmlInner` is the branch.
+// --- one-line centred HTML rows: block rules do not run inside a row that opens and closes on one line ---
 describe("one-line centred HTML rows", () => {
   it("does not read a leading dash as a bullet", () => {
     const nodes = parse(`<div align="center">- <a>&#x2727;</a> -</div>`);
@@ -1049,13 +968,7 @@ describe("one-line centred HTML rows", () => {
   });
 
   it("keeps the markdown reading for a block that spans lines", () => {
-    // No sample has contradicted this form; the one-line rule is the measured
-    // one and the only one changed. Looked for on 2026-09-11: 200 recent text
-    // activities and the bios of the maintainer's following and followers
-    // hold not one multi-line `<div align>` block with a list or heading
-    // inside, so there was nothing to measure on the site — the multi-line
-    // `<center>` case (activity 1154093188, markdown rendered) is the nearest
-    // evidence, and it points this way.
+    // Unmeasured on the site; the multi-line `<center>` case is the nearest evidence and points this way.
     const src = `<center>
 - a
 - b
@@ -1064,11 +977,7 @@ describe("one-line centred HTML rows", () => {
   });
 });
 
-// --- inline ~~~centre~~~ ------------------------------------------------------
-// anilist.co turns `~~~` pairs into `<center>` tags before markdown runs, so
-// they can sit inside a heading or a sentence. Read as `~~`+`~` by the strike
-// rule, the spoiler after them was lost (activity 1154078329, measured in the
-// browser 2026-09-10: `<h1><center>…</center> <center><spoiler>…</center></h1>`).
+// --- inline ~~~centre~~~: the site makes `<center>` of the pair before markdown runs, so it can sit in a heading ---
 describe("inline ~~~centre~~~", () => {
   it("centres part of a heading and keeps the spoiler after it", () => {
     const nodes = parse(
@@ -1107,12 +1016,7 @@ describe("<hr> on its own line", () => {
   });
 });
 
-// --- what the site draws inside a multi-line <center> ------------------------
-// Measured in the browser on 2026-09-10 (activity 1154093188, the fixture that
-// grades only spoilers and images): anilist.co renders markdown inside a
-// `<center>` block that spans lines — `#__[t](u)__` is an <h1> holding a bold
-// link, a bare anime URL is a link (drawn as a media card there), `<hr>` is a
-// rule — while the API's `asHtml` leaves all of it literal. The site wins.
+// --- what the site draws inside a multi-line <center>: markdown, where the API's `asHtml` leaves it literal ---
 describe("what the site draws inside a multi-line <center>", () => {
   it("reads #__bold link__ rows as headings, <hr> as a rule and a bare URL as a link", () => {
     const src = `<center>

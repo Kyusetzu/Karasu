@@ -23,10 +23,7 @@ describe("sidebar collapse", () => {
     expect(loadCollapsed()).toBe(false);
   });
 
-  /**
-   * Anything a hand-edit or an older build left behind has to read as the
-   * default rather than throw on the shell's very first render.
-   */
+  /** Whatever a hand-edit or an older build left behind reads as the default rather than throwing on first render. */
   it("treats anything but the literal as expanded", () => {
     for (const junk of ["1", "yes", "TRUE", "", "{}"]) {
       store.set("karasu-sidebar", junk);

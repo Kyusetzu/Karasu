@@ -14,10 +14,7 @@ describe("isNotFound", () => {
     expect(isNotFound("AniList error: Not Found.")).toBe(true);
   });
 
-  /**
-   * The whole point. Each of these used to render "No such user" — a definite
-   * claim about someone else's account, made because the network was down.
-   */
+  /** A transport failure must not render as "No such user", a definite claim about someone else's account. */
   it("does not mistake a failure to ask for an answer", () => {
     expect(isNotFound(new Error("Network error: connection refused"))).toBe(false);
     expect(isNotFound(new Error("Too Many Requests"))).toBe(false);
@@ -37,9 +34,7 @@ describe("isOffline", () => {
   });
 
   it("does not claim every failure is the network", () => {
-    // The three that have their own handling, and must keep it: a rate limit
-    // is a stable code, a rejected token raises the sign-in banner, and a
-    // not-found is a real answer about a real thing.
+    // Keep these three out: a rate limit is a stable code, a rejected token raises the banner, not-found is an answer.
     expect(isOffline("anilist.rateLimited")).toBe(false);
     expect(isOffline(NOT_FOUND)).toBe(false);
     expect(isOffline("Invalid token")).toBe(false);
@@ -48,8 +43,7 @@ describe("isOffline", () => {
   });
 
   it("anchors on the prefix rather than the transport's wording", () => {
-    // reqwest's sentence is a library detail; a message that merely mentions
-    // a network is not this.
+    // reqwest's sentence is a library detail; a message that merely mentions a network is not this.
     expect(isOffline("Something about the network went wrong")).toBe(false);
   });
 });

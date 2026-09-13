@@ -66,11 +66,7 @@ describe("buildMalXml", () => {
     expect(xml).toContain("<user_total_anime>1</user_total_anime>");
   });
 
-  /**
-   * The MAL export is the one that hands the list to someone else, so it is
-   * the one where "private" has to bite. Counted separately from `skipped`:
-   * missing a MAL id is a limit of the format, private is a choice.
-   */
+  /** Private is counted apart from `skipped`: a missing MAL id is a limit of the format, private is a choice. */
   it("leaves a private entry out and says how many", () => {
     const secret = entry({ private: true });
     const { count, skipped, omitted, xml } = buildMalXml(

@@ -66,8 +66,7 @@ describe("validatePost", () => {
   });
 
   it("collapses runs of blank lines, since a newline is a visible break", () => {
-    // AniList renders single newlines as `<br>`, so five blank lines is five
-    // blank lines in the feed.
+    // AniList renders single newlines as `<br>`, so five blank lines is five blank lines in the feed.
     expect(validatePost("one\n\n\n\n\ntwo").text).toBe("one\n\ntwo");
     // Two is deliberate and preserved — that is a paragraph break.
     expect(validatePost("one\n\ntwo").text).toBe("one\n\ntwo");

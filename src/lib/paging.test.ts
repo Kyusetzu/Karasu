@@ -12,8 +12,7 @@ describe("nextPageParam", () => {
   });
 
   it("stops rather than guessing when pageInfo is unusable", () => {
-    // `undefined` is what tells useInfiniteQuery there is no more. Returning a
-    // number on bad input would load page NaN forever.
+    // `undefined` is what tells useInfiniteQuery there is no more; a number on bad input would load page NaN forever.
     expect(nextPageParam(null)).toBeUndefined();
     expect(nextPageParam(undefined)).toBeUndefined();
     expect(nextPageParam({})).toBeUndefined();
@@ -38,9 +37,7 @@ describe("remainingCount", () => {
   });
 
   it("counts fetched rows, not visible ones — the filter must not inflate it", () => {
-    // A strict content filter can leave 4 of 25 fetched rows on screen. Counting
-    // the visible 4 would promise 21 more when the next page brings nothing new,
-    // which misrepresents the rate limit a click costs.
+    // Counting the rows left after the content filter would promise more when the next page brings nothing new.
     const fetched = 25;
     const visibleAfterFilter = 4;
     expect(remainingCount({ total: 25 }, fetched)).toBe(0);

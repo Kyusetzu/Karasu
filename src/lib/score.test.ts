@@ -27,8 +27,7 @@ describe("distributionColumns", () => {
   });
 
   it("fractional buckets aggregate onto integer steps instead of vanishing", () => {
-    // A POINT_10_DECIMAL account holds 8.5 buckets; exact-matching integer
-    // steps drew this chart empty.
+    // A POINT_10_DECIMAL account holds fractional buckets; exact-matching integer steps draw the chart empty.
     const out = distributionColumns(
       [
         { score: 8.5, count: 4 },
@@ -72,8 +71,7 @@ describe("distributionColumns", () => {
   });
 
   it("data above the stated max escalates to deciles — the payload outranks the prop", () => {
-    // A cached hundred-point distribution just after switching to POINT_10:
-    // clamping would pile 11–100 into one bar, dropping would blank the chart.
+    // A cached hundred-point distribution after switching to POINT_10: clamping piles into one bar, dropping blanks.
     const out = distributionColumns(
       [
         { score: 85, count: 4 },
@@ -147,8 +145,7 @@ describe("normalizeDistribution", () => {
   });
 
   it("sums the buckets that land on the same score", () => {
-    // 85 and 87 are both a 9; two columns would invent a distinction the
-    // user never made.
+    // Two buckets that round to the same score are one column; two would invent a distinction the user never made.
     expect(normalizeDistribution([
       { score: 85, count: 4 },
       { score: 87, count: 6 },
@@ -195,9 +192,7 @@ describe("normalizeStatsBlock", () => {
   };
 
   it("normalizes every ranked list that carries a meanScore — startYears and lengths included", () => {
-    // The trap this function exists for: the old per-list spelling covered
-    // only the lists the screen rendered, so startYears/lengths arrived
-    // hundred-point, fetched and waiting for someone to render them raw.
+    // Normalizing per rendered list leaves startYears and lengths hundred-point, waiting to be rendered raw.
     const out = normalizeStatsBlock(block, "POINT_10");
     expect(out.meanScore).toBeCloseTo(7.06, 2);
     expect(out.standardDeviation).toBeCloseTo(1.86, 2);

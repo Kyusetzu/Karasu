@@ -50,9 +50,7 @@ describe("normalizeActivity", () => {
   });
 
   it("returns null for a MessageActivity — private mail, never rendered", () => {
-    // The property, not the query argument. `type_in` excludes MESSAGE and the
-    // query has no fragment for it, but this is the layer that cannot be
-    // widened by editing a string, so it is the one worth asserting.
+    // The normalizer is the one exclusion of MESSAGE that cannot be widened by editing a query string.
     expect(
       normalizeActivity({
         __typename: "MessageActivity",
@@ -197,8 +195,7 @@ describe("parseProgress", () => {
 describe("formatProgress", () => {
   it("renders a single value bare and a range with an en dash", () => {
     expect(formatProgress({ from: 12 })).toBe("12");
-    // An en dash, not "von"/"of": AniList's "162 - 170" is a batch read in one
-    // sitting, and phrasing it as "162 of 170" would claim a total it never sent.
+    // An en dash, not "of": a range is a batch read in one sitting, and "of" would claim a total never sent.
     expect(formatProgress({ from: 162, to: 170 })).toBe("162–170");
   });
 });
@@ -213,8 +210,7 @@ describe("splitSentence", () => {
   });
 
   it("degrades to the verb-first order when the token is missing", () => {
-    // A translation that lost %t% must not eat the title — it falls back to
-    // sentence-then-title, the pre-template rendering.
+    // A translation that lost %t% must not eat the title; it falls back to sentence-then-title.
     expect(splitSentence("watched episode 5")).toEqual({
       before: "watched episode 5",
       after: "",
@@ -227,9 +223,7 @@ describe("splitSentence", () => {
 });
 
 describe("the sentence templates themselves", () => {
-  // The failure mode a translator hits: dropping the title token or the
-  // progress slot. Asserted against both files so `de: typeof en` (key parity)
-  // and this test (value shape) cover different mistakes.
+  // Asserted against both languages: `de: typeof en` covers key parity, this covers value shape.
   const SENT_KEYS = [
     "sentWatchedEpisode",
     "sentRewatchedEpisode",
@@ -268,8 +262,7 @@ describe("the sentence templates themselves", () => {
   });
 
   it("PROGRESS_VERBS matches the keys that take a number", () => {
-    // The set gates the fallback in ListSentence; if it drifts from the
-    // templates, a progress verb renders with an empty slot.
+    // The set gates the fallback in ListSentence; drift from the templates renders an empty slot.
     expect([...PROGRESS_VERBS].sort()).toEqual([
       "readChapter",
       "rereadChapter",

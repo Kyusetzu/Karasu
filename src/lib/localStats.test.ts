@@ -187,11 +187,7 @@ describe("localTotals", () => {
     expect(out.byStatus).toContainEqual({ status: "CURRENT", count: 1 });
   });
 
-  /**
-   * The same rule the rest of this file follows: an unscored entry is an
-   * absence, not a zero. Averaging it in drags the mean toward an opinion
-   * nobody holds.
-   */
+  /** An unscored entry is an absence, not a zero; averaging it in drags the mean toward an opinion nobody holds. */
   it("leaves the unscored out of the mean and the distribution", () => {
     const out = localTotals([row({ score: 0 }), row({ mediaId: 2, score: 9 })]);
     expect(out.meanScore).toBe(9);
@@ -225,13 +221,7 @@ describe("localTotals", () => {
 describe("dayHeatmapFromHistory", () => {
   const day = (iso: string) => Math.floor(Date.parse(`${iso}T00:00:00Z`) / 1000);
 
-  /**
-   * The measurement this exists for. AniList's `date` values sit either on UTC
-   * midnight or 82,800s before one, and an account spanning late March carries
-   * both — midnight in Europe/London, which is UTC in winter and UTC+1 in
-   * summer. Rounding recovers the London date from either spelling without
-   * consulting a timezone.
-   */
+  /** AniList's `date` is London midnight, UTC or UTC+1 by season; rounding recovers the day without a timezone. */
   it("reads both spellings of a day bucket as the same day", () => {
     expect(historyDay(day("2026-01-05"))).toBe(day("2026-01-05"));
     // 23:00Z on the 16th is London's 17th.
@@ -282,8 +272,7 @@ describe("dayHeatmapFromHistory", () => {
     expect(new Set(grid.months.map((m) => m.column)).size).toBe(grid.months.length);
   });
 
-  /** Two rows for one day is not a shape AniList has shown, so it is folded
-   *  rather than trusted to be absent. */
+  /** Two rows for one day is not a shape AniList has shown, so it is folded rather than trusted to be absent. */
   it("folds a repeated day instead of dropping one", () => {
     const grid = dayHeatmapFromHistory([
       { date: day("2026-01-05"), amount: 2, level: 1 },

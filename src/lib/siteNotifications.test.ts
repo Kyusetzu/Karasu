@@ -30,8 +30,7 @@ describe("normalizeSiteNotification", () => {
       userId: null,
       mediaId: 42,
       activityId: null,
-      // Carried through so the bell can apply the content filter: an
-      // aired-episode line names a title just as a cover shows one.
+      // Carried so the bell can apply the content filter: an aired-episode line names a title as a cover shows one.
       media: { isAdult: false, genres: ["Adventure"] },
     });
   });
@@ -46,8 +45,7 @@ describe("normalizeSiteNotification", () => {
     });
     expect(row?.kind).toBe("ACTIVITY_LIKE");
     expect(row?.title).toBe("Alice");
-    // The press goes to the news; the bell renders the name as the
-    // profile's own link off `actorName`/`userId`.
+    // The press goes to the news; the bell renders the name as the profile's own link off `actorName`/`userId`.
     expect(row?.target).toBe("/activity/4242");
     expect(row?.activityId).toBe(4242);
     expect(row?.userId).toBe(7);
@@ -174,9 +172,7 @@ describe("normalizeSiteNotification", () => {
     ).toMatchObject({ title: "Ichigo", target: "/character/66" });
   });
 
-  // A row about a hidden title must be droppable by the caller, which needs
-  // the fields to judge with. The query asked for neither before this, so the
-  // bell was the one surface where a filtered title could still be named.
+  // The caller drops a row about a hidden title, so it needs the fields to judge with.
   it("carries the filter fields for a title it is about", () => {
     const row = normalizeSiteNotification({
       __typename: "AiringNotification",

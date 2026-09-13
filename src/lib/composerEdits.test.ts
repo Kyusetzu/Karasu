@@ -153,8 +153,7 @@ describe("image, video, centre and code", () => {
 
 describe("editSpan", () => {
   it("finds the smallest replacement", () => {
-    // Wrapping `sel` in `**…**` is one insertion at 2 plus one at 5; the
-    // span form has to widen to cover both, replacing `sel` with `**sel**`.
+    // Wrapping `sel` is two separate insertions, so the span widens to cover both and replaces `sel` with `**sel**`.
     expect(editSpan("a sel b", "a **sel** b")).toEqual({ start: 2, end: 5, insert: "**sel**" });
   });
 

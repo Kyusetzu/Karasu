@@ -8,11 +8,7 @@ describe("countdownFraction", () => {
     expect(countdownFraction(0, 1000)).toBe(1);
   });
 
-  /**
-   * The clock can overshoot the target between ticks, and the span is inferred
-   * rather than given — so both ends have to be pinned or the ring draws
-   * outside itself.
-   */
+  /** The clock can overshoot the target between ticks, so both ends are pinned or the ring draws outside itself. */
   it("clamps past either end", () => {
     expect(countdownFraction(-5000, 1000)).toBe(1);
     expect(countdownFraction(2000, 1000)).toBe(0);

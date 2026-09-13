@@ -31,7 +31,7 @@ export function useManualSync() {
         (["ANIME", "MANGA"] as MediaType[]).map((type) =>
           qc.fetchQuery({
             queryKey: ["mediaList", type, userId],
-            queryFn: () => fetchMediaList(userId, type),
+            queryFn: () => fetchMediaList(userId, type, { force: true }),
             staleTime: 0,
           }),
         ),

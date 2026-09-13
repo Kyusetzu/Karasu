@@ -111,11 +111,12 @@ export const enableLocalMode = () => invoke<void>("enable_local_mode");
 
 // --- Anime/manga list (loaded via Rust: cache + offline queue) -------------
 
-export const fetchMediaList = (userId: number, mediaType: MediaType) =>
+/** Rust serves its copy while it is younger than fifteen minutes and refreshes older ones behind; `force` always fetches. */
+export const fetchMediaList = (userId: number, mediaType: MediaType, opts?: { force?: boolean }) =>
   profileMode === "local"
     ? invoke<ListResult>("local_fetch_list", { mediaType })
     : // Guarded like `gql`: the one AniList read that bypasses it, and the request behind every list screen.
-      guarded(invoke<ListResult>("fetch_media_list", { userId, mediaType }));
+      guarded(invoke<ListResult>("fetch_media_list", { userId, mediaType, force: opts?.force ?? false }));
 
 /** The last cached list from SQLite, or `null`; AniList mode only, since the local list is the database. */
 export const cachedMediaList = (userId: number, mediaType: MediaType) =>
@@ -254,7 +255,7 @@ export const anilistSaveEntry = (input: SaveEntryInput) =>
 
 /** Fetches an AniList list, bypassing the local dispatch (merge only). */
 export const anilistFetchList = (userId: number, mediaType: MediaType) =>
-  invoke<ListResult>("fetch_media_list", { userId, mediaType });
+  invoke<ListResult>("fetch_media_list", { userId, mediaType, force: true });
 
 // --- Update check ----------------------------------------------------------
 

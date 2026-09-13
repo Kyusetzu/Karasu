@@ -5,7 +5,7 @@ use crate::anilist::{
 use crate::db::Db;
 use serde_json::{json, Value};
 use std::sync::atomic::{AtomicBool, Ordering};
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Manager, State};
 
 // Siblings in the same module tree; `mod.rs` re-exports all of it, so every command keeps its old path.
 #[allow(unused_imports)]
@@ -61,9 +61,10 @@ query ($userId: Int!, $type: MediaType!, $scoreFormat: ScoreFormat, $withAdvance
   }
 }";
 
-fn validate_media_type(media_type: &str) -> Result<&str, String> {
+fn validate_media_type(media_type: &str) -> Result<&'static str, String> {
     match media_type {
-        "ANIME" | "MANGA" => Ok(media_type),
+        "ANIME" => Ok("ANIME"),
+        "MANGA" => Ok("MANGA"),
         _ => Err(format!("Invalid media type: {media_type}")),
     }
 }
@@ -160,6 +161,7 @@ const SAVE_MUTATION: &str = "
 mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int, $progressVolumes: Int, $scoreRaw: Int, $repeat: Int, $notes: String, $private: Boolean, $hiddenFromStatusLists: Boolean, $customLists: [String], $advancedScores: [Float], $startedAt: FuzzyDateInput, $completedAt: FuzzyDateInput, $scoreFormat: ScoreFormat) {
   SaveMediaListEntry(mediaId: $mediaId, status: $status, progress: $progress, progressVolumes: $progressVolumes, scoreRaw: $scoreRaw, repeat: $repeat, notes: $notes, private: $private, hiddenFromStatusLists: $hiddenFromStatusLists, customLists: $customLists, advancedScores: $advancedScores, startedAt: $startedAt, completedAt: $completedAt) {
     id mediaId status progress progressVolumes repeat notes updatedAt private hiddenFromStatusLists customLists advancedScores
+    media { type }
     startedAt { year month day }
     completedAt { year month day }
     score(format: $scoreFormat)
@@ -192,7 +194,109 @@ pub struct ListResult {
     from_cache: bool,
     /// number of changes not yet synced
     pending: usize,
+    /// When this list was last fetched from AniList, unix seconds; the frontend seeds its own staleness from it.
+    #[serde(rename = "fetchedAt")]
+    fetched_at: i64,
     lists: Value,
+}
+
+/// How long a fetched list is served without asking AniList again; own edits patch the cache, so it stays right.
+const LIST_FRESH_SECS: i64 = 15 * 60;
+
+/// What a list read does, decided from the cache's age alone so the rule is testable without a database.
+#[derive(Debug, PartialEq, Eq)]
+enum ListPlan {
+    /// Fresh enough: the cache, no request.
+    Serve,
+    /// Stale but present: the cache now, one request in the background.
+    ServeAndRefresh,
+    /// Forced, or nothing cached: fetch inline.
+    Fetch,
+}
+
+fn list_plan(age_secs: Option<i64>, force: bool) -> ListPlan {
+    match age_secs {
+        _ if force => ListPlan::Fetch,
+        None => ListPlan::Fetch,
+        Some(age) if age < LIST_FRESH_SECS => ListPlan::Serve,
+        Some(_) => ListPlan::ServeAndRefresh,
+    }
+}
+
+/// Which (user, type) lists a background refresh is already fetching; two mounts must cost one request.
+static REFRESHING: std::sync::Mutex<Vec<(i64, &'static str)>> = std::sync::Mutex::new(Vec::new());
+
+fn unix_now() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0)
+}
+
+/// One list fetch, cached and projected; both the inline path and the background refresh go through here.
+async fn fetch_and_cache(
+    app: &AppHandle,
+    db: &Db,
+    api: &AniList,
+    token: Option<&str>,
+    user_id: i64,
+    media_type: &'static str,
+) -> Result<Value, ApiError> {
+    let data = api
+        .query_from(
+            "list",
+            token,
+            LIST_QUERY,
+            json!({
+                "userId": user_id,
+                "type": media_type,
+                "scoreFormat": viewer_score_format(db),
+                "withAdvanced": viewer_advanced_scoring(db, media_type),
+            }),
+        )
+        .await?;
+    let lists = data
+        .pointer("/MediaListCollection/lists")
+        .cloned()
+        .unwrap_or_else(|| json!([]));
+    if let Err(e) = db.cache_list(user_id, media_type, &lists.to_string()) {
+        // Every cold start then hits the network instead of the cache.
+        crate::logging::warn("cache", format!("cannot cache the {media_type} list: {e}"));
+    }
+    // The home-screen widgets render a projection of exactly this cache; a fresh list is the moment it moves.
+    crate::widgets::refresh(app);
+    crate::alerts::airing::replan();
+    Ok(lists)
+}
+
+/// Refreshes a stale list behind the answer already given; the frontend hears `list-refreshed` and re-reads the cache.
+fn spawn_list_refresh(app: &AppHandle, user_id: i64, media_type: &'static str) {
+    {
+        let mut busy = REFRESHING.lock().unwrap_or_else(|e| e.into_inner());
+        if busy.contains(&(user_id, media_type)) {
+            return;
+        }
+        busy.push((user_id, media_type));
+    }
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let db = app.state::<Db>();
+        let api = app.state::<AniList>();
+        let token = auth::load_token();
+        let result = fetch_and_cache(&app, &db, &api, token.as_deref(), user_id, media_type).await;
+        REFRESHING
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .retain(|k| *k != (user_id, media_type));
+        match result {
+            Ok(_) => {
+                use tauri::Emitter;
+                let _ = app.emit("list-refreshed", json!({ "userId": user_id, "mediaType": media_type }));
+            }
+            // The cache the screen already shows stays; the next read past the window tries again.
+            Err(e) => crate::logging::debug("list", format!("background refresh of {media_type} failed: {}", String::from(e))),
+        }
+    });
 }
 
 /// The last cached list with no network access, a head start on the fetch; `from_cache` stays false, it is not a fallback.
@@ -203,15 +307,16 @@ pub fn cached_media_list(
     media_type: String,
 ) -> Option<ListResult> {
     let media_type = validate_media_type(&media_type).ok()?;
-    let cached = db.cached_list(user_id, media_type)?;
+    let (cached, fetched_at) = db.cached_list_with_age(user_id, media_type)?;
     Some(ListResult {
         from_cache: false,
         pending: db.queue_len(user_id),
+        fetched_at,
         lists: serde_json::from_str(&cached).ok()?,
     })
 }
 
-/// Loads the list, draining the offline queue first so the response already holds the user's own pending changes.
+/// Loads the list: the cache inside the window, the cache plus a background refresh past it, AniList when forced.
 #[tauri::command]
 pub async fn fetch_media_list(
     app: AppHandle,
@@ -219,62 +324,55 @@ pub async fn fetch_media_list(
     api: State<'_, AniList>,
     user_id: i64,
     media_type: String,
+    force: Option<bool>,
 ) -> Result<ListResult, String> {
     let media_type = validate_media_type(&media_type)?;
     let token = auth::load_token();
-    // Not fatal, a fetch is still worth doing with the queue undrained, but the failure is logged rather than silent.
-    match process_queue(&db, &api, token.as_deref()).await {
-        Ok(drained) => report_dropped(&app, &drained.dropped),
-        Err(e) => crate::logging::warn("queue", format!("cannot drain the offline queue: {e}")),
+    // Only a queue with rows costs a request here; an idle app must be able to read its list for nothing.
+    if db.queue_len(user_id) > 0 {
+        match process_queue(&db, &api, token.as_deref()).await {
+            Ok(drained) => report_dropped(&app, &drained.dropped),
+            Err(e) => crate::logging::warn("queue", format!("cannot drain the offline queue: {e}")),
+        }
     }
 
-    match api
-        .query_from(
-            "list",
-            token.as_deref(),
-            LIST_QUERY,
-            json!({
-                "userId": user_id,
-                "type": media_type,
-                "scoreFormat": viewer_score_format(&db),
-                "withAdvanced": viewer_advanced_scoring(&db, media_type),
-            }),
-        )
-        .await
-    {
-        Ok(data) => {
-            let lists = data
-                .pointer("/MediaListCollection/lists")
-                .cloned()
-                .unwrap_or_else(|| json!([]));
-            if let Err(e) = db.cache_list(user_id, media_type, &lists.to_string()) {
-                // Every cold start then hits the network instead of the cache.
-                crate::logging::warn("cache", format!("cannot cache the {media_type} list: {e}"));
-            }
-            // The home-screen widgets render a projection of exactly this cache; a fresh list is the moment it moves.
-            crate::widgets::refresh(&app);
-            Ok(ListResult {
+    // Read after the drain, so a drained edit is already in the copy served.
+    let cached = db.cached_list_with_age(user_id, media_type);
+    let age = cached.as_ref().map(|(_, at)| unix_now() - at);
+    let serve = |payload: &str, fetched_at: i64, from_cache: bool| -> Result<ListResult, String> {
+        Ok(ListResult {
+            from_cache,
+            pending: db.queue_len(user_id),
+            fetched_at,
+            lists: serde_json::from_str(payload).map_err(|e| format!("Cache corrupted: {e}"))?,
+        })
+    };
+    match list_plan(age, force.unwrap_or(false)) {
+        ListPlan::Serve => {
+            let (payload, at) = cached.expect("Serve implies a cache");
+            serve(&payload, at, false)
+        }
+        ListPlan::ServeAndRefresh => {
+            let (payload, at) = cached.expect("ServeAndRefresh implies a cache");
+            spawn_list_refresh(&app, user_id, media_type);
+            serve(&payload, at, false)
+        }
+        ListPlan::Fetch => match fetch_and_cache(&app, &db, &api, token.as_deref(), user_id, media_type).await {
+            Ok(lists) => Ok(ListResult {
                 from_cache: false,
                 pending: db.queue_len(user_id),
+                fetched_at: unix_now(),
                 lists,
-            })
-        }
-        // Offline or throttled falls back to the cache; `Auth` does not, since a rejected token must reach the frontend.
-        Err(e @ (ApiError::Network(_) | ApiError::Retryable(_))) => {
-            let cached = db.cached_list(user_id, media_type).ok_or_else(|| {
-                let _ = &e;
-                "Offline and no local list cache available yet".to_string()
-            })?;
-            // The cache did not move, but the projection file can still be missing; refreshing is idempotent.
-            crate::widgets::refresh(&app);
-            Ok(ListResult {
-                from_cache: true,
-                pending: db.queue_len(user_id),
-                lists: serde_json::from_str(&cached)
-                    .map_err(|e| format!("Cache corrupted: {e}"))?,
-            })
-        }
-        Err(e) => Err(e.into()),
+            }),
+            // Offline or throttled falls back to the cache; `Auth` does not, since a rejected token must reach the frontend.
+            Err(ApiError::Network(_) | ApiError::Retryable(_)) => {
+                let (payload, at) = cached.ok_or_else(|| "Offline and no local list cache available yet".to_string())?;
+                // The cache did not move, but the projection file can still be missing; refreshing is idempotent.
+                crate::widgets::refresh(&app);
+                serve(&payload, at, true)
+            }
+            Err(e) => Err(e.into()),
+        },
     }
 }
 
@@ -358,7 +456,10 @@ pub(crate) fn cache_entry_echo(db: &Db, echo: &Value) {
             }
         }
     }
-    db.cache_patch_entry(user_id, media_type, media_id, &Value::Object(patch));
+    // A first add has no cached entry to patch, so the served cache would miss it until the next fetch; make that fetch due.
+    if !db.cache_patch_entry(user_id, media_type, media_id, &Value::Object(patch)) {
+        db.cache_mark_stale(user_id, media_type);
+    }
 }
 
 /// Saves a list entry; offline, the change is queued and synced later.
@@ -548,6 +649,8 @@ pub fn local_fetch_list(
     Ok(ListResult {
         from_cache: false,
         pending: 0,
+        // The local list is the database itself; it is always as fresh as now.
+        fetched_at: unix_now(),
         lists,
     })
 }
@@ -894,7 +997,18 @@ pub async fn flush_queue(
 
 #[cfg(test)]
 mod tests {
-    use super::{bulk_chunks, queue_key, queue_parts, BULK_CHUNK};
+    use super::{bulk_chunks, list_plan, queue_key, queue_parts, ListPlan, BULK_CHUNK, LIST_FRESH_SECS};
+
+    /// The window in one place: fresh serves for nothing, stale serves and refreshes behind, forced or empty fetches.
+    #[test]
+    fn a_fresh_cache_answers_without_a_request_and_a_forced_read_ignores_the_window() {
+        assert_eq!(list_plan(Some(0), false), ListPlan::Serve);
+        assert_eq!(list_plan(Some(LIST_FRESH_SECS - 1), false), ListPlan::Serve);
+        assert_eq!(list_plan(Some(LIST_FRESH_SECS), false), ListPlan::ServeAndRefresh);
+        assert_eq!(list_plan(Some(-5), false), ListPlan::Serve, "a clock that went back still serves");
+        assert_eq!(list_plan(None, false), ListPlan::Fetch);
+        assert_eq!(list_plan(Some(10), true), ListPlan::Fetch);
+    }
 
     /// The parts and the key describe the same edit, so the panel and the dedupe cannot disagree.
     #[test]

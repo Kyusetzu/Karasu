@@ -108,6 +108,8 @@ export interface MediaListGroup {
 export interface ListResult {
   fromCache: boolean;
   pending: number;
+  /** When Rust last fetched this list from AniList, unix seconds; own edits patch the copy without moving it. */
+  fetchedAt: number;
   lists: MediaListGroup[];
 }
 

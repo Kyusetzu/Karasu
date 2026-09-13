@@ -534,13 +534,27 @@ impl Db {
     }
 
     pub fn cached_list(&self, user_id: i64, media_type: &str) -> Option<String> {
+        self.cached_list_with_age(user_id, media_type).map(|(payload, _)| payload)
+    }
+
+    /// The cached list and when it was last fetched from AniList, unix seconds; patches do not move that stamp.
+    pub fn cached_list_with_age(&self, user_id: i64, media_type: &str) -> Option<(String, i64)> {
         let conn = self.0.guard();
         conn.query_row(
-            "SELECT payload FROM list_cache WHERE user_id = ?1 AND media_type = ?2",
+            "SELECT payload, fetched_at FROM list_cache WHERE user_id = ?1 AND media_type = ?2",
             rusqlite::params![user_id, media_type],
-            |r| r.get(0),
+            |r| Ok((r.get(0)?, r.get(1)?)),
         )
         .ok()
+    }
+
+    /// Marks the cached list as never fetched so the next read goes to AniList; a first add needs that.
+    pub fn cache_mark_stale(&self, user_id: i64, media_type: &str) {
+        let conn = self.0.guard();
+        let _ = conn.execute(
+            "UPDATE list_cache SET fetched_at = 0 WHERE user_id = ?1 AND media_type = ?2",
+            rusqlite::params![user_id, media_type],
+        );
     }
 
     /// Reads, edits and writes the cached list under one lock, or a fetch landing in the gap is overwritten by a stale copy.
@@ -563,11 +577,9 @@ impl Db {
         if !edit(&mut lists) {
             return false;
         }
+        // Keep `fetched_at` where it is: a patch is our own edit, not a fetch, and the freshness window reads that stamp.
         conn.execute(
-            "INSERT INTO list_cache (user_id, media_type, payload, fetched_at)
-             VALUES (?1, ?2, ?3, strftime('%s','now'))
-             ON CONFLICT(user_id, media_type) DO UPDATE
-                SET payload = excluded.payload, fetched_at = excluded.fetched_at",
+            "UPDATE list_cache SET payload = ?3 WHERE user_id = ?1 AND media_type = ?2",
             rusqlite::params![user_id, media_type, lists.to_string()],
         )
         .is_ok()
@@ -2325,6 +2337,21 @@ pub(crate) mod tests {
         assert_eq!(entry["status"], "COMPLETED");
         // The neighbour is untouched.
         assert_eq!(cached_entry(&db, 200).unwrap()["progress"], 1);
+    }
+
+    /// A patch is our own edit, not a fetch: the fetch stamp the freshness window reads must not move with it.
+    #[test]
+    fn a_patch_keeps_the_fetch_time_and_a_stale_mark_zeroes_it() {
+        let db = mem_db();
+        seed_list(&db);
+        db.0.guard()
+            .execute("UPDATE list_cache SET fetched_at = 1000 WHERE user_id = 1", [])
+            .unwrap();
+        db.cache_patch_entry(1, "ANIME", 100, &serde_json::json!({ "progress": 5 }));
+        assert_eq!(db.cached_list_with_age(1, "ANIME").unwrap().1, 1000, "a patch is not a fetch");
+        db.cache_mark_stale(1, "ANIME");
+        assert_eq!(db.cached_list_with_age(1, "ANIME").unwrap().1, 0, "a first add makes the next read fetch");
+        assert!(db.cached_list(1, "ANIME").is_some(), "the payload itself stays");
     }
 
     /// Proves a patch changes only the fields it names, the same absent-means-unchanged rule the mutation follows.

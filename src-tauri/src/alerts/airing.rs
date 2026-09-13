@@ -25,6 +25,13 @@ query ($ids: [Int], $from: Int, $to: Int) {
   }
 }";
 
+/// Woken by a list refresh, so a show added a minute ago is scheduled without waiting out the current sleep.
+static REPLAN: tokio::sync::Notify = tokio::sync::Notify::const_new();
+
+pub fn replan() {
+    REPLAN.notify_one();
+}
+
 pub fn spawn(app: AppHandle) {
     // Supervised so a panic cannot silently end the airing checks; the repeated startup delay is the first backoff.
     crate::logging::supervise("airing", move || {

@@ -249,7 +249,9 @@ its subject, not its age.
 - **i18n key parity.** `de` is typed `de: typeof en`, so every English key needs
   a German counterpart. Add both, or `tsc` fails.
 - **AniList rate limit (~30 req/min).** Batch requests (`Page.media(id_in:)`,
-  ≤50 ids) and bound BFS/traversal work; never fan out unboundedly.
+  ≤50 ids) and bound BFS/traversal work; never fan out unboundedly. The
+  budget is one shared pool, so every request names its spender and the
+  cheap answer is the cached one — see "The request budget" below.
 
 ### Explicitly rejected — never implement (or propose)
 
@@ -476,6 +478,42 @@ the app would download and reinstall itself on a loop. The comparator supplies
 `COMMIT_NUMBER` as the running commit number instead. `version_parts` in
 `commands/update.rs` treats `+` and `.` alike so both spellings compare equal.
 **Don't "tidy" that `+` back into a dot, and don't drop the comparator.**
+
+## The request budget
+
+One ~30/min pool serves every screen, the scrobbler and the alert passes, so
+the rule is: **name the spender, cache the answer, wake for a reason.**
+
+- **Every request names its source.** `AniList::query_from(source, …)`; the
+  passthrough takes it from `gql(query, vars, { source, ttlSec, mediaId })`
+  and falls back to `gql:<root field>`. The tallies land in three places: a
+  verbose line every five minutes (`N requests in the last 5 min: list 3,
+  airing 1; 429s 0, min remaining 17`, zero included), the diagnostics
+  report's three rows, and the sync panel's "Requests by source". Start any
+  budget question by reading those, never by guessing.
+- **The limiter's last measurement outlives the process** (kv `rate_state`,
+  restored when younger than the window, a pending `Retry-After` re-parked).
+  A build swap used to seed a full thirty and earn a burst of 429s.
+- **The own list has a fifteen-minute window** in `fetch_media_list`: inside
+  it the SQLite copy answers with no request; past it the copy answers at
+  once and one background fetch refreshes it, emitting `list-refreshed` so
+  the frontend re-reads the fresh copy for nothing. `force` (the sync button,
+  the merge) always fetches. `fetched_at` is stamped only by `cache_list` —
+  a patch is our own edit, not a fetch, so `edit_cached_list` must never
+  touch it — and a first add, which no patch can invent, calls
+  `cache_mark_stale` so the next read fetches.
+- **The passthrough caches allowlisted answers** (schema v20, above).
+- **The airing watcher wakes for the next episode** (`plan_next_wake`),
+  clamped to [1 min, 6 h], re-timed by `replan()` after a list refresh. A
+  replan re-times the sleep; it must never force a check, or every list
+  refresh costs a request.
+- **The bucket is per IP, not per token** (measured, see the window note), so
+  the phone and the PC share one budget on one network.
+
+Measured on the rig on 2026-09-13: a cold start fell from 8 requests in the
+first 30 s to 2 (the bell count and one airing check); a restart inside the
+window plus four screen changes cost no list request; a reopened detail and
+the whole Wrapped page cost none.
 
 ## The commit loop
 

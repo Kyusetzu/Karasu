@@ -10,16 +10,7 @@ import { Shimmer } from "@/components/Skeleton";
 import { useContentFilter } from "@/stores/contentFilter";
 import { isBlocked } from "@/lib/contentFilter";
 
-/**
- * One activity, on its own page — where the bell's activity notifications
- * land, and where an `anilist.co/activity/N` link points now that
- * `internalRoute` maps it. The card is the feed's own `ActivityCard`, replies
- * open, so this page never grows a second way of drawing an activity.
- *
- * A deleted id answers "Not Found." and a `MessageActivity` normalises to
- * null (private mail, refused everywhere) — both read as the same gone-state
- * on purpose: naming the second would advertise what it is.
- */
+/** One activity on its own page through the feed's `ActivityCard`; a `MessageActivity` reads as gone on purpose. */
 export default function Activity() {
   const { t } = useTranslation();
   const { id } = useParams();

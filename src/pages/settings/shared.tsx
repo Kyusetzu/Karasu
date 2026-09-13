@@ -3,31 +3,13 @@ import { AlertTriangle, Globe } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { hexToHsv, hsvToHex, type Hsv } from "@/lib/contrast";
 
-/**
- * The controls every settings pane shares.
- *
- * They live here rather than in `components/ui` because none of them is a
- * primitive: the toggle knows what a settings row looks like, and the colour
- * picker exists only because the native `<input type="color">` opens an OS
- * dialog that misbehaves inside the Tauri window.
- */
+/** The controls every settings pane shares; none is a `components/ui` primitive, since each knows the pane. */
 
 /** The one select skin, so the four of them cannot drift apart. */
 export const SELECT =
   "h-9 rounded-lg border border-surface-700 bg-surface-900 px-2 text-sm focus:border-accent-500 focus:outline-none";
 
-/**
- * A label-and-hint on the left, a control on the right.
- *
- * `Toggle` below has always owned this shape for itself; every *other* row was
- * the same eleven lines of JSX pasted per setting. Extracted now because the
- * AniList account pane adds a dozen more, and because a few of them need a
- * third line — `note` — which is not something to hand-place a dozen times.
- *
- * `items-center` rather than `Toggle`'s `items-start`: a select is taller than
- * one line of text, so centring it reads better, while a switch is shorter and
- * wants to sit with the label's first line.
- */
+/** A label-and-hint on the left, a control on the right; `items-center` because a select is taller than a line. */
 export function Row({
   label,
   hint,
@@ -52,22 +34,7 @@ export function Row({
   );
 }
 
-/**
- * "This one changes your AniList account, not Karasu."
- *
- * Karasu deliberately overrides three of AniList's own account settings —
- * it keeps its own display-title preference, runs its own content filter,
- * and raises its own airing alerts. (Score format used to be the fourth;
- * since the scoreRaw change the whole app follows the account's format, so
- * that row simply works and carries no note.) Editing the three on the
- * account is still legitimate: they are the user's settings and other
- * clients honour them. But a settings row that appears to do nothing is a
- * bug report waiting to happen, so each one says plainly where its effect
- * lands.
- *
- * Gold, not danger: nothing is broken and nothing is at risk. It is a caveat,
- * and `NowPlayingCard` already established gold as this app's caveat colour.
- */
+/** Marks a row that changes the AniList account rather than Karasu; gold is the app's caveat colour. */
 export function ExternalNote({ children }: { children: ReactNode }) {
   return (
     <span className="mt-1 flex items-start gap-1.5 text-xs text-gold">
@@ -77,17 +44,7 @@ export function ExternalNote({ children }: { children: ReactNode }) {
   );
 }
 
-/**
- * Says why a pane or a section is empty, instead of letting it vanish.
- *
- * Every settings section that needs an AniList account used to `return null`
- * when there was none, which on the AniList pane meant three of them in a row
- * and a completely blank page — indistinguishable from a crash, and no help at
- * all to someone deciding whether signing in would gain them anything.
- *
- * Muted rather than gold: nothing here is a caveat about a setting that quietly
- * does nothing, which is what `ExternalNote` is for. This is an explanation.
- */
+/** Says why a section needs an account instead of letting it vanish; muted, because it explains rather than warns. */
 export function NeedsAccount({
   title,
   children,
@@ -103,19 +60,7 @@ export function NeedsAccount({
   );
 }
 
-/**
- * "You can break something here."
- *
- * The third note in the set, and the one that was missing. `ExternalNote` is
- * gold — a caveat, nothing at risk. `NeedsAccount` is muted — an explanation.
- * This is danger, and it is the only one of the three that describes a control
- * rather than a limitation: rescaling every score, moving the whole database to
- * a portable folder, and reading a log that carries what detection saw are not
- * things to discover by clicking.
- *
- * A block rather than an inline line, because it heads a whole pane. Filled
- * rather than outlined so it cannot be mistaken for one more section.
- */
+/** Heads a pane whose controls can break something; filled so it cannot be mistaken for one more section. */
 export function DangerNote({
   title,
   children,
@@ -174,10 +119,7 @@ export function Toggle({
         <span
           className={cn(
             "absolute top-[.0625rem] size-4.25 rounded-full transition-all",
-            // The thumb has to hold on both tracks in both themes. White works
-            // on the accent fill (600 is the darkened shade in either theme)
-            // but disappears on the light theme's pale grey track, where the
-            // ink colour — which inverts — is the one that reads.
+            // White holds on the accent fill in both themes, but only the inverting ink reads on the off track.
             checked ? "left-4 bg-white" : "left-[.0625rem] bg-ink-100",
           )}
         />
@@ -186,8 +128,7 @@ export function Toggle({
   );
 }
 
-/** Inline saturation/value + hue picker — replaces the native `<input type="color">`,
- * which spawns an OS-level colour dialog that can misbehave inside the Tauri window. */
+/** Inline HSV picker replacing the native colour input, whose OS dialog misbehaves inside the Tauri window. */
 export function ColorPicker({
   value,
   onChange,

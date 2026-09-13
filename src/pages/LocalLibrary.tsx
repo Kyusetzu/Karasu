@@ -54,24 +54,13 @@ import { Presence } from "@/components/ui/presence";
 import { EmptyState, FolderStack } from "@/components/EmptyState";
 import { cn } from "@/lib/utils";
 
-/**
- * Above this the matcher hit the title exactly; below it, it guessed.
- *
- * `best_match_prepared` returns exactly `1.0` from its string-equality short
- * circuit, so this is a test for that branch rather than a tolerance.
- */
+/** Above this the match was exact: a test for `best_match_prepared`'s equality branch, not a tolerance. */
 const EXACT = 0.999;
 
-/// Hoisted for the same measured reason as MediaList's — see the note there.
-/// Options left at the defaults so the ordering matches what `localeCompare()`
-/// produced.
+// Hoisted because `localeCompare` builds a collator per call; default options keep its ordering.
 const COLLATOR = new Intl.Collator();
 
-/**
- * The scanned local library. The index only stores media ids, so titles come
- * from the cached anime list — the scanner only ever matches titles already
- * on it, so the join always resolves and costs no extra AniList request.
- */
+/** The scanned local library; the index holds only media ids, so titles join from the cached list. */
 export default function LocalLibrary() {
   const { t } = useTranslation();
   const viewer = useAuth((s) => s.viewer);
@@ -100,12 +89,7 @@ export default function LocalLibrary() {
 interface Row {
   lib: LibraryEntry;
   media: Media;
-  /**
-   * The list entry, when there is one. A manual match can point files at a
-   * title the user has never added — indeed that is the usual case, since a
-   * title absent from the list is exactly what the matcher could not place —
-   * and such a row has no progress, no status and nothing to scrobble against.
-   */
+  /** The list entry, if any; a manual match can point files at a title the user never added. */
   entry: MediaListEntry | null;
   /** The first file past the user's progress, if there is one. */
   next: LibraryFile | null;
@@ -120,8 +104,7 @@ function LibraryView({ userId }: { userId: number }) {
   const level = useContentFilter((s) => s.level);
   const [scanning, setScanning] = useState(false);
 
-  // The full index is fetched here rather than at startup — this is the only
-  // screen that reads the paths and scores in it.
+  // The full index is fetched here rather than at startup; only this screen reads its paths and scores.
   useEffect(() => {
     loadEntries();
   }, [loadEntries]);
@@ -131,17 +114,14 @@ function LibraryView({ userId }: { userId: number }) {
     queryFn: () => fetchMediaList(userId, "ANIME"),
   });
 
-  // What the path row says. Kept in the cache rather than in state so a rescan
-  // can invalidate it in one place.
+  // What the path row says, kept in the query cache so a rescan can invalidate it in one place.
   const { data: status, refetch: refetchStatus } = useQuery({
     queryKey: ["libraryStatus"],
     queryFn: getLibraryStatus,
     enabled: isTauri,
   });
 
-  // media_id → list entry, so each library row can show cover and progress.
-  // Filtered titles never enter the map, so they cannot be listed here even
-  // though the scanner still indexes them (playback itself stays intact).
+  // Filtered titles never enter this media_id → list entry map, so they cannot be listed here.
   const byMedia = useMemo(() => {
     const map = new Map<number, MediaListEntry>();
     for (const group of data?.lists ?? []) {
@@ -154,10 +134,7 @@ function LibraryView({ userId }: { userId: number }) {
     return map;
   }, [data, level]);
 
-  // Every id the list holds, blocked ones included. `byMedia` cannot answer
-  // "is this on the list?" because a content-filtered title is deliberately
-  // missing from it — asking that one would send us to AniList to fetch the
-  // very titles the filter exists to keep off this screen.
+  // Every list id, blocked ones included; asking `byMedia` would refetch the titles the filter hides.
   const onList = useMemo(() => {
     const ids = new Set<number>();
     for (const group of data?.lists ?? []) {
@@ -167,19 +144,13 @@ function LibraryView({ userId }: { userId: number }) {
     return ids;
   }, [data]);
 
-  // Library ids with no cached list entry. Sorted and de-duplicated, because
-  // this array is a query key: an unsorted one reshuffles on every render and
-  // mints a fresh key each time, which defeats the cache it is meant to use.
+  // Off-list library ids; keep them sorted and de-duplicated, or this query key defeats the cache.
   const offList = useMemo(
     () => missingIds(entries.map((e) => e.mediaId), onList),
     [entries, onList],
   );
 
-  // `placeholderData` is what keeps the section on screen while it refetches.
-  // The key is the whole id set, so confirming one suggestion mints a new key,
-  // and a new key has no cached data — without this the entire "detected but
-  // not on the list" section blanks for a round trip after every correction,
-  // which reads as having deleted the row rather than moved it.
+  // Keep `placeholderData`: a correction mints a new key, and the section would blank while it refetches.
   const { data: fetched } = useQuery({
     queryKey: ["libraryMedia", offList],
     queryFn: () => mediaByIds(offList),
@@ -193,9 +164,7 @@ function LibraryView({ userId }: { userId: number }) {
     [fetched],
   );
 
-  // Why each blocked ON-LIST id is hidden. `byMedia` deliberately lacks these
-  // rows, so their absence used to be countable but not explainable — the
-  // reason has to come from the list data itself.
+  // Why each blocked on-list id is hidden, read from the list data because `byMedia` lacks these rows.
   const blockedOnList = useMemo(() => {
     const map = new Map<number, BlockReason>();
     for (const group of data?.lists ?? []) {
@@ -208,10 +177,7 @@ function LibraryView({ userId }: { userId: number }) {
     return map;
   }, [data, level]);
 
-  // What the filter kept off this screen, by reason: blocked on-list titles,
-  // plus off-list titles AniList resolved as blocked. Counted from the same
-  // structures the rows are built from, so the line and the list cannot
-  // disagree.
+  // What the filter hid, by reason, counted from the rows' inputs so the line and list cannot disagree.
   const { hiddenAdult, hiddenSuggestive } = useMemo(() => {
     let adult = 0;
     let suggestive = 0;
@@ -227,9 +193,7 @@ function LibraryView({ userId }: { userId: number }) {
   const rows = useMemo<Row[]>(() => {
     const built = entries.flatMap((lib) => {
       const entry = byMedia.get(lib.mediaId) ?? null;
-      // A row needs a title to draw. It comes from the list when the title
-      // is on it and from AniList directly when it is not; only an id that
-      // AniList itself does not know leaves us with nothing to show.
+      // The title comes from the list or, when not on it, from AniList; an unknown id has nothing to draw.
       const media = entry?.media ?? byId.get(lib.mediaId);
       if (!media) return [];
       if (isBlocked(media, level)) return [];
@@ -237,11 +201,7 @@ function LibraryView({ userId }: { userId: number }) {
       const next = lib.files.find((f) => f.episode > progress) ?? null;
       return [{ lib, media, entry, next }];
     });
-    // Titles resolved once and the collator hoisted, the same way MediaList
-    // does it: `localeCompare` builds a fresh collator per call, and both it
-    // and `displayTitle` were being run twice per comparison — n·log n times
-    // over a library that can hold thousands of titles, re-run on every
-    // rescan, every correction and every content-filter change.
+    // Titles resolved once and sorted with the hoisted collator, not re-derived for every comparison.
     const titles = new Map(built.map((r) => [r.lib.mediaId, displayTitle(r.media.title)]));
     return built.sort((a, b) =>
       COLLATOR.compare(
@@ -251,25 +211,20 @@ function LibraryView({ userId }: { userId: number }) {
     );
   }, [entries, byMedia, byId, level]);
 
-  // Files the scanner could not place. Kept in the cache next to the status so
-  // one rescan invalidates both.
+  // Files the scanner could not place, cached beside the status so one rescan invalidates both.
   const { data: unmatched, refetch: refetchUnmatched } = useQuery({
     queryKey: ["libraryUnmatched"],
     queryFn: getLibraryUnmatched,
     enabled: isTauri,
   });
 
-  // A group with a suggestion is something AniList recognised; without one it
-  // is a genuine failure. The two get their own sections, because "we think
-  // this is Hunter x Hunter, confirm?" and "we have no idea what this is" are
-  // different questions and only one of them has an answer to check.
+  // A suggested group has an answer to check and a bare one has none, so the two get separate sections.
   const suggested = useMemo(
     () => (unmatched ?? []).filter((g) => g.suggestion),
     [unmatched],
   );
 
-  // Covers and titles for the suggested media, fetched the same way the
-  // off-list rows are.
+  // Covers and titles for the suggested media, fetched the same way the off-list rows are.
   const suggestedIds = useMemo(
     () => missingIds(suggested.map((g) => g.suggestion!.mediaId), new Set()),
     [suggested],
@@ -286,19 +241,7 @@ function LibraryView({ userId }: { userId: number }) {
     [suggestedMedia],
   );
 
-  // A suggestion is the one row on this screen AniList picked rather than the
-  // user, and nothing upstream filters it: the identify pass asks by title with
-  // no `isAdult` constraint. Filtering only the confirmed rows would invert the
-  // guarantee — accept the guess and the title vanishes, leave it and it shows.
-  // Blocking on unresolved media would be wrong the other way, so an id whose
-  // media has not arrived yet stays visible as the bare `#id` placeholder.
-  //
-  // A blocked guess demotes the group to "failed" rather than deleting it. The
-  // files are still on disk and still unplaced, and the suggestion row is the
-  // only thing that carries "Not this" — dropping the group outright would
-  // take away the one way to say the guess was wrong, and with it the only
-  // route to the picker. Unplaced prints the parsed filename, never the
-  // AniList title, so nothing blocked reaches the screen.
+  // The identify pass has no `isAdult` constraint, so suggestions are filtered here; unresolved media stays visible.
   const blocked = useCallback(
     (g: UnmatchedGroup) =>
       !!g.suggestion && isBlocked(suggestedById.get(g.suggestion.mediaId), level),
@@ -308,18 +251,13 @@ function LibraryView({ userId }: { userId: number }) {
     () => suggested.filter((g) => !blocked(g)),
     [suggested, blocked],
   );
+  // A blocked guess is demoted to unplaced, which prints only the parsed name, not dropped with its picker route.
   const failed = useMemo(
     () => (unmatched ?? []).filter((g) => !g.suggestion || blocked(g)),
     [unmatched, blocked],
   );
 
-  // The scroll container every section virtualizes against, and which rows
-  // are expanded.
-  //
-  // The expand state used to be a `useState` inside `LibraryRow`. Virtualizing
-  // unmounts a row that scrolls out of view, which would have taken that state
-  // with it: expand a row, scroll past it, come back, and it had quietly
-  // closed. Held here it survives, because the page outlives the row.
+  // One scroller for every section's VirtualRows; expand state lives here because virtual rows unmount.
   const scrollRef = useRef<HTMLDivElement>(null);
   const [expandedRows, setExpandedRows] = useState<ReadonlySet<number>>(
     () => new Set(),
@@ -332,28 +270,14 @@ function LibraryView({ userId }: { userId: number }) {
     });
   }, []);
 
-  // What the picker is currently open on: either a row being corrected or an
-  // unplaced group being assigned. One piece of state, because only one of
-  // them can be open at a time and two would let both be.
+  // What the picker is open on, a row or an unplaced group; one state, so two cannot be open at once.
   const [editing, setEditing] = useState<{
     key: TitleKey;
     current?: string;
     hasOverride: boolean;
   } | null>(null);
 
-  // A correction that fails must not look like one that did nothing. Both of
-  // these used to let a rejected command fall on the floor: the dialog stayed
-  // open, no row moved, and there was no way to tell a backend error from a
-  // successful no-op.
-  //
-  // The reason belongs *in* the dialog. On failure the picker stays mounted at
-  // z-110, so routing this through the app-level playback banner would draw the
-  // explanation in the far corner, under the picker's own scrim, and clear it
-  // after six seconds.
-  // Not every correction comes from the dialog, though: confirming a
-  // suggestion is one click on the row itself, and reporting *that* failure
-  // into a picker that is not open would lose it entirely. Such callers pass
-  // the app-level banner instead, which is the only thing on screen for them.
+  // The error shows in the picker, which covers the banner; a caller with no picker open passes the banner.
   const [correctError, setCorrectError] = useState<string | null>(null);
   const runCorrection = useCallback(
     async (
@@ -372,9 +296,7 @@ function LibraryView({ userId }: { userId: number }) {
     [refresh, refetchStatus, refetchUnmatched, t],
   );
 
-  // The season-split card: which overflowing row it is open on, and its own
-  // error line — the same reasoning as `correctError`, the reason belongs *in*
-  // the dialog that stays mounted over everything else.
+  // The season-split target and its own error line, kept in the dialog because it covers the app banner.
   const [splitting, setSplitting] = useState<SplitTarget | null>(null);
   const [splitError, setSplitError] = useState<string | null>(null);
   const [splitPending, setSplitPending] = useState(false);
@@ -384,8 +306,7 @@ function LibraryView({ userId }: { userId: number }) {
       setSplitError(null);
       setSplitPending(true);
       try {
-        // Keyed on the row and its displayed numbers; the backend resolves
-        // the files, so a chained split cannot target the wrong ones.
+        // Keyed on the row's displayed numbers; the backend resolves files, so a chained split cannot miss.
         await setLibraryRedirect(
           splitting.mediaId,
           splitting.overflow.firstExtra,
@@ -394,8 +315,7 @@ function LibraryView({ userId }: { userId: number }) {
           dstStart,
         );
         setSplitting(null);
-        // The visible confirmation the third split was missing: the row often
-        // barely changes, so the toast is what says the answer landed.
+        // The row often barely changes, so the toast is what says the split landed.
         showToast({
           kind: "success",
           text: t("library.splitDone", {
@@ -434,9 +354,7 @@ function LibraryView({ userId }: { userId: number }) {
     [editing, runCorrection],
   );
 
-  // Accepting a suggestion is an ordinary correction — the same command, the
-  // same override row. The only difference is that the answer came from a
-  // search rather than from the picker.
+  // Accepting a suggestion is an ordinary correction: same command, same override row, answered by search.
   const confirmSuggestion = useCallback(
     (key: TitleKey, mediaId: number) =>
       runCorrection(
@@ -446,16 +364,7 @@ function LibraryView({ userId }: { userId: number }) {
     [runCorrection, setError],
   );
 
-  // Adding a corrected title to the list is what makes it trackable: the
-  // scrobbler builds its candidates from the cached list (`candidates_from_cache`),
-  // so a title that is not on it can be played from here all evening and never
-  // record a thing.
-  //
-  // The whole media object, not just the id: every row here is by definition
-  // absent from the list, and `local_save_entry` has no row to read a type off,
-  // so a local-profile add without it is rejected outright. And the invalidate
-  // is what moves the row — `useListMutations` patches entries that already
-  // exist, which a first add never does, so this path cannot use it.
+  // Adding makes the title scrobblable; the media goes along because `local_save_entry` needs its type.
   const qc = useQueryClient();
   const addToList = useCallback(
     async (media: Media) => {
@@ -464,6 +373,7 @@ function LibraryView({ userId }: { userId: number }) {
           { mediaId: media.id, status: loadDefaultAddStatus() },
           media,
         );
+        // The invalidate moves the row; `useListMutations` patches existing entries and a first add has none.
         await qc.invalidateQueries({ queryKey: ["mediaList", "ANIME", userId] });
       } catch (e) {
         setError(typeof e === "string" ? e : t("library.addFailed"));
@@ -472,9 +382,7 @@ function LibraryView({ userId }: { userId: number }) {
     [qc, userId, setError, t],
   );
 
-  // On the list, split into a list of things to do tonight and a list of
-  // things already done. Titles that resolved but were never added are a
-  // different state entirely and get their own section below.
+  // On-list rows split into ready and done; titles resolved but never added are their own section below.
   const onListRows = rows.filter((r) => r.entry);
   const ready = onListRows.filter((r) => r.next);
   const done = onListRows.filter((r) => !r.next);
@@ -495,9 +403,7 @@ function LibraryView({ userId }: { userId: number }) {
   };
 
   const change = async () => {
-    // This page has no error line of its own, so a rejection here has nowhere
-    // to go but a toast — the alternative was an unhandled rejection and a
-    // button that silently did nothing.
+    // This page has no error line of its own, so a rejection here goes to a toast rather than nowhere.
     try {
       const picked = await pickLibraryFolder();
       if (!picked) return;
@@ -531,8 +437,7 @@ function LibraryView({ userId }: { userId: number }) {
           </Button>
         </div>
 
-        {/* The folder, and what the last scan made of it. Without this the
-            screen never says where any of these files came from. */}
+        {/* The folder and what the last scan made of it, or the screen never says where the files came from. */}
         <div className="mt-3.5 flex max-w-176 items-center gap-2.5 rounded-lg border border-surface-800 bg-surface-900 px-3 py-2.25">
           <FolderOpen className="size-3.75 shrink-0 text-ink-500" />
           <span className="min-w-0 flex-1 truncate text-xs tabular-nums text-ink-300">
@@ -654,16 +559,7 @@ function LibraryView({ userId }: { userId: number }) {
   );
 }
 
-/**
- * Titles that resolved to an AniList show you have not added.
- *
- * Two kinds of row live here, and the difference is who decided. Confirmed
- * ones — corrections you made, suggestions you accepted — are ordinary rows
- * that play. Unconfirmed suggestions are greyed: AniList answered, but open
- * search returns *something* for almost any input, and its top hit for
- * "digimon" is a 2005 film rather than the series. Nothing moves until you say
- * so.
- */
+/** Titles resolved to a show you have not added; unconfirmed suggestions stay greyed until confirmed. */
 function DetectedOffList({
   rows,
   suggestions,
@@ -690,9 +586,7 @@ function DetectedOffList({
   onSplit: (t: SplitTarget) => void;
 }) {
   const { t } = useTranslation();
-  // Two row shapes in one card, so they go through one virtualizer as a
-  // tagged union rather than two — two would each measure their own start and
-  // the second would sit on top of the first.
+  // One virtualizer over a tagged union of both row shapes; two would each measure a start and overlap.
   const items = useMemo(
     () => [
       ...rows.map((row) => ({ kind: "row" as const, row })),
@@ -785,9 +679,7 @@ function SuggestionRow({
       </div>
 
       <span className="min-w-0 flex-1">
-        {/* Both names, because judging the guess means comparing them. The
-            parsed title alone cannot be checked and the suggestion alone hides
-            what it was guessed from. */}
+        {/* Both names, because judging the guess means comparing the parsed title with the suggestion. */}
         <span className="block truncate text-[.8125rem] text-ink-500">
           {group.title}
           {group.season > 0 && (
@@ -830,14 +722,7 @@ function SuggestionRow({
   );
 }
 
-/**
- * Files the scanner read but could not place at all.
- *
- * Before this they were simply absent — the screen listed what matched and
- * said nothing about the rest, so a show missing from the library looked
- * identical to a show that was never on disk. The count in the path row was the
- * only hint that anything had been left behind, and it did not say what.
- */
+/** Files the scanner read but could not place, so a missing show does not look like one never on disk. */
 function Unplaced({
   groups,
   scrollRef,
@@ -851,8 +736,7 @@ function Unplaced({
   const [expanded, setExpanded] = useState(false);
   const [filter, setFilter] = useState("");
 
-  // Parsed release titles are exactly where typos and odd spellings live, so
-  // the filter matches them fuzzily and orders by how well.
+  // Parsed release titles are where typos live, so the filter matches them fuzzily and orders by score.
   const docs = useMemo(
     () => new Map(groups.map((g) => [g, prepareDoc([g.title])] as const)),
     [groups],
@@ -870,11 +754,7 @@ function Unplaced({
 
   if (groups.length === 0) return null;
 
-  // A real library leaves over a hundred of these — mostly extras, specials and
-  // one-off files that legitimately match nothing. Showing them all buries the
-  // part of the screen that works, and showing five means correcting one just
-  // promotes the next into view, which reads as nothing having happened.
-  // Filtering is how you reach a specific show without either.
+  // Most of these are extras that match nothing; a few show by default and the filter reaches the rest.
   const shown = expanded || filter ? matching : matching.slice(0, 5);
   const hidden = matching.length - shown.length;
 
@@ -894,9 +774,7 @@ function Unplaced({
               placeholder={t("library.filterUnplaced")}
               className="h-7 w-full rounded-md border border-surface-800 bg-surface-900 pl-7 pr-6 text-2xs text-ink-200 placeholder:text-ink-600 focus:border-accent-500 focus:outline-none"
             />
-            {/* Hand-rolled rather than `IconButton`: its smallest size is
-                1.75rem and this box is `h-7` (1.75rem), so the button would be
-                the whole field. */}
+            {/* Hand-rolled rather than `IconButton`, whose smallest size would be the whole field. */}
             {filter && (
               <button
                 type="button"
@@ -1031,19 +909,7 @@ function Group({
   );
 }
 
-/**
- * Collapsed height of a row, for the virtualizer's first guess.
- *
- * `h-13` for the cover plus `py-2` above and below: 3.25rem + 1rem at the
- * 16px root the app pins, plus the 1px `border-b` every row but the last
- * carries. Only ever an estimate — every mounted row is measured, which is
- * what an expanded row's file list needs — but a wrong one makes the
- * scrollbar creep as you scroll into unmeasured territory: at 68 the divider
- * was left out, every newly mounted row measured 69, and a real WebView2
- * pass on 2026-09-03 watched `scrollHeight` grow by one pixel per row from
- * 9102 to 9194 across a single scroll to the bottom. The last row of a list
- * is one pixel over-estimated instead, which shrinks rather than jumps.
- */
+/** Collapsed row height, the virtualizer's first guess; keep the divider in it or the scrollbar creeps. */
 const ROW_HEIGHT = 69;
 
 const fileName = (path: string) => path.split(/[\\/]/).pop() ?? path;
@@ -1060,11 +926,9 @@ function LibraryRow({
 }: {
   row: Row;
   muted: boolean;
-  /** Virtualized rows are absolutely positioned, so `last:` cannot see which
-      one closes the card. */
+  /** Virtualized rows are absolutely positioned, so `last:` cannot see which one closes the card. */
   last: boolean;
-  /** Owned by the page: a row scrolled out of view is unmounted, and state
-      held here would go with it. */
+  /** Owned by the page: a row scrolled out of view is unmounted, and state held here would go with it. */
   open: boolean;
   onToggle: (mediaId: number) => void;
   onCorrect: (c: Correction) => void;
@@ -1075,18 +939,10 @@ function LibraryRow({
   const playEpisode = useLibrary((s) => s.playEpisode);
   const { lib, media, entry, next } = row;
   const title = displayTitle(media.title);
-  // A zero is not a bad match — it is *no* match on record. Only a scan writes
-  // confidences, so an index carried over from a build before they existed has
-  // none, and calling that "close" would be the screen inventing a judgement it
-  // was never given.
+  // A zero is no match on record, not a bad one; an index without confidences must not read "close".
   const scored = lib.score > 0;
   const exact = lib.score >= EXACT;
-  // A row can be the merge of several parsed titles. Correcting it means
-  // correcting the parse that produced it, so with more than one there is no
-  // single answer — offer the corrected one if there is one, since that is the
-  // parse "remove correction" has to be keyed on. Source order is walk order,
-  // so picking the first would offer the auto-matched parse about as often as
-  // not, and clearing that one deletes nothing.
+  // Corrections key on the parse, so a merged row offers its corrected one; clearing another deletes nothing.
   const source = lib.sources?.find((s) => s.manual) ?? lib.sources?.[0];
 
   return (
@@ -1117,8 +973,7 @@ function LibraryRow({
           >
             {title}
           </Link>
-          {/* The file, not a summary of it. This is the one screen where the
-              name on disk is the thing being talked about. */}
+          {/* The file name, not a summary: this is the one screen where the name on disk is the subject. */}
           <span className="block truncate text-[.6875rem] text-ink-600">
             {next
               ? fileName(next.path)
@@ -1129,10 +984,7 @@ function LibraryRow({
           </span>
         </span>
 
-        {/* Not on the list, so nothing here scrobbles: the scrobbler builds its
-            candidates from the cached list and cannot see this title at all.
-            The files still play — they just would not have recorded anything,
-            which is worth saying out loud rather than leaving to be noticed. */}
+        {/* Not on the list, so nothing scrobbles; the scrobbler takes its candidates from the cached list alone. */}
         {!entry && (
           <button
             type="button"
@@ -1154,9 +1006,7 @@ function LibraryRow({
           <ChevronDown className={cn("size-3 transition-transform", open && "rotate-180")} />
         </button>
 
-        {/* The folder holds more than the show: almost always the next season
-            under one folder name. Detection is the scanner's; the decision is
-            the user's — this chip opens the split card, nothing more. */}
+        {/* The folder holds more than the show; the user decides, so this chip only opens the split card. */}
         {lib.overflow && (
           <button
             type="button"
@@ -1178,12 +1028,7 @@ function LibraryRow({
           </button>
         )}
 
-        {/* The match, and the way to disagree with it. A confidence the user
-            cannot act on is just a number; the button is what makes saying
-            "close" worth the width it takes.
-            A row with no source parse — one restored from an index written
-            before corrections existed — has nothing to key a correction on, so
-            it stays a label until the next scan gives it one. */}
+        {/* The match and the way to disagree; a row with no source parse has nothing to key on and stays a label. */}
         {source ? (
           <button
             type="button"
@@ -1243,15 +1088,11 @@ function LibraryRow({
         )}
       </div>
 
-      {/* Every episode on disk, one click away. The design drops these for the
-          next-file row, but playing something out of order is what this screen
-          could already do and there is no reason to take it away. */}
+      {/* Every episode on disk, one click away, because playing out of order is worth keeping. */}
       {open && (
         <div className="flex flex-wrap gap-1.5 border-t border-surface-950 px-3.5 py-2.5 pl-[3.9375rem]">
           {lib.files.map((file) => {
-            // No list entry means no recorded progress, so nothing counts as
-            // watched — every episode is offered as unseen rather than the
-            // whole season being greyed out on a progress of zero it never had.
+            // No list entry means no recorded progress, so every episode is offered as unseen rather than greyed.
             const watched = file.episode <= (entry?.progress ?? 0);
             return (
               <button

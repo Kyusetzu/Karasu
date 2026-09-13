@@ -30,23 +30,10 @@ import { IconButton } from "@/components/ui/icon-button";
 import { cn } from "@/lib/utils";
 import { statusColorVar } from "@/lib/statusColors";
 
-/**
- * List status → node outline, from the user's own palette.
- *
- * This map used to live here, with Watching on the accent and Completed on a
- * fixed green. It moved to `lib/statusColors` when cover rings needed the same
- * idea: two maps would have meant a colour saying one thing on a card and
- * another in this graph. Watching no longer rides the accent, which also stops
- * the graph repainting half its outlines when the accent changes.
- */
+/** List status → node outline, from `lib/statusColors` so cover rings and this graph never disagree. */
 const colorOf = statusColorVar;
 
-/**
- * Planning and not-on-list are the two muted greys in the palette, and they
- * measure three RGB points apart — as outlines they are one colour. The line
- * style carries the distinction the colours can't: a title you have not
- * tracked is drawn dashed.
- */
+/** Planning and not-on-list are near-identical greys, so an untracked title is drawn dashed instead. */
 const outline = (status: MediaListStatus | null) =>
   `2px ${status ? "solid" : "dashed"} ${colorOf(status)}`;
 
@@ -66,23 +53,14 @@ export default function Franchise() {
 
   const level = useContentFilter((s) => s.level);
   const filterReady = useContentFilter((s) => s.ready);
-  // `?? 0` for the same reason as every other screen: in local mode the cached
-  // list lives under `0`, so keying on `undefined` meant the rail could not see
-  // a local entry — no status badge, and the editor opened on nothing.
+  // `?? 0` like every other screen: local mode keys the list under 0, so undefined hides every local entry.
   const userId = useAuth((s) => s.viewer?.id) ?? 0;
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["franchise", rootId, level],
     queryFn: () => loadFranchise(rootId, level),
     enabled: isTauri && filterReady && Number.isFinite(rootId),
-    // A franchise graph is a bounded BFS over several batched requests — by
-    // far the most expensive thing Karasu fetches — and relations barely
-    // change. `gcTime` matters as much as `staleTime` here: the page is
-    // unmounted the moment you navigate away, and the default 30-minute
-    // collection would throw the graph out before a stale one ever mattered.
-    //
-    // Not a full day, though: `listStatus` drives every node's outline colour,
-    // so the graph would keep showing yesterday's progress.
+    // Keep `gcTime` with `staleTime` or navigating away drops the costliest fetch; longer shows yesterday's list status.
     staleTime: 60 * 60 * 1000,
     gcTime: 60 * 60 * 1000,
   });
@@ -95,8 +73,7 @@ export default function Franchise() {
   const viewport = useRef<HTMLDivElement>(null);
   const pan = usePanZoom(viewport);
 
-  // A new franchise is a new graph: nothing about the last one's collapse set
-  // or selection means anything here.
+  // A new franchise is a new graph: the last one's collapse set and selection mean nothing here.
   useEffect(() => {
     setCollapsed(new Set());
     setSelected(data?.rootId ?? null);
@@ -113,7 +90,7 @@ export default function Franchise() {
     [data],
   );
 
-  /** Which vocabulary the status legend speaks — see its comment below. */
+  /** The status legend's vocabulary: the root's own type, which is what the user navigated from. */
   const legendType = byId.get(data?.rootId ?? -1)?.type ?? "ANIME";
 
   const links = useMemo(
@@ -126,10 +103,7 @@ export default function Franchise() {
     [data, layout],
   );
 
-  // Hover wins over selection so pointing at a node previews its branch
-  // without losing what the rail is showing. A hovered node that a collapse
-  // removes never gets its `mouseleave`, so the hover is dropped the moment it
-  // stops being on screen — otherwise the graph dims around a ghost.
+  // Hover wins over selection; a folded-away node never gets `mouseleave`, so the hover is dropped once off screen.
   const focus =
     hovered !== null && layout?.visible.has(hovered) ? hovered : selected;
   const connected = useMemo(() => {
@@ -149,8 +123,7 @@ export default function Franchise() {
       if (!next.delete(nodeId)) next.add(nodeId);
       return next;
     });
-    // Selecting something and then folding it away leaves the rail describing
-    // a node that is no longer on screen; the fold itself is the new subject.
+    // Folding the selected node away makes the fold the new subject, or the rail describes a hidden node.
     setSelected((cur) => {
       if (cur === null || !layout) return cur;
       let walk = layout.tree.get(cur)?.parent ?? null;
@@ -182,12 +155,7 @@ export default function Franchise() {
                 className="size-2.5 rounded-[.1875rem]"
                 style={{ border: outline(status) }}
               />
-              {/* The graph carries manga by construction — an adaptation edge
-                  is the usual reason to open it — and the node cards below
-                  resolve `status.${node.type}`, so a pinned ANIME here read
-                  "Watching" for a legend sitting over "Reading". The root's own
-                  type is the franchise's, and it is what the user navigated
-                  from. */}
+              {/* Resolved on the root's type, or a pinned ANIME legend reads "Watching" over nodes that say "Reading". */}
               {status
                 ? t(`status.${legendType}.${status}`)
                 : t("franchise.notOnList")}
@@ -206,22 +174,18 @@ export default function Franchise() {
       )}
 
       {data && layout && data.nodes.length > 1 && (
-        // Column below `xl`, row above: the rail holds the page's only open
-        // and edit buttons, so hiding it under 1280px left the whole screen
-        // without an affordance — the reported "can't click anything".
+        // Column below `xl`, row above: the rail holds the page's only open and edit buttons, so it cannot hide.
         <div className="flex min-h-0 flex-1 flex-col gap-4 xl:flex-row">
           <div
             ref={viewport}
             {...pan.handlers}
             className={cn(
-              // `touch-none`, or Chromium reclaims a touch drag with a
-              // pointercancel mid-gesture and the pan stutters dead.
+              // `touch-none`, or Chromium reclaims a touch drag with a pointercancel mid-gesture and the pan stutters dead.
               "relative min-h-0 min-w-0 flex-1 select-none touch-none overflow-hidden rounded-xl border border-hair bg-surface-900",
               pan.dragging ? "cursor-grabbing" : "cursor-grab",
             )}
             style={{
-              // The dot grid rides the pan offset, so the canvas reads as one
-              // surface being moved rather than nodes sliding over a backdrop.
+              // The dot grid rides the pan offset, so the canvas reads as one surface being moved.
               backgroundImage:
                 "radial-gradient(circle at 1px 1px, var(--catch-light) 1px, transparent 0)",
               backgroundSize: "1.5rem 1.5rem",
@@ -246,8 +210,7 @@ export default function Franchise() {
                 {links.map((e, i) => {
                   const a = layout.positions.get(e.from)!;
                   const b = layout.positions.get(e.to)!;
-                  // Draw left-to-right whichever way the edge was recorded, so
-                  // the curve always leaves one node's right edge.
+                  // Draw left-to-right whichever way the edge was recorded, so the curve leaves one node's right edge.
                   const [l, r] = a.x <= b.x ? [a, b] : [b, a];
                   const x1 = l.x + NODE_W;
                   const y1 = l.y + COVER_H / 2;
@@ -261,8 +224,7 @@ export default function Franchise() {
                       key={i}
                       d={`M${x1},${y1} C${mid},${y1} ${mid},${y2} ${x2},${y2}`}
                       fill="none"
-                      // Non-scaling so the hairline stays a hairline at 1.6×,
-                      // where a scaled 1px would render as a cable.
+                      // Non-scaling so the hairline stays a hairline when zoomed in instead of thickening into a cable.
                       vectorEffect="non-scaling-stroke"
                       style={{
                         stroke: lit
@@ -358,8 +320,7 @@ export default function Franchise() {
         </div>
       )}
 
-      {/* The one EntryEditModal call site that had no exit — every other one
-          already goes through Presence/PresenceIf. */}
+      {/* Through Presence like every other EntryEditModal call site, so the editor has an exit animation. */}
       <Presence value={editing}>
         {(mediaId, leaving) => (
           <EntryEditor
@@ -439,9 +400,7 @@ function GraphNode({
             boxShadow: isSelected
               ? "0 .5em 1.25em rgba(0,0,0,.5)"
               : "0 .125em .375em rgba(0,0,0,.3)",
-            // A gapped ring, so the selection floats clear of the 2px status
-            // border instead of fusing with it into a two-hue fringe. An
-            // outline follows the radius and `overflow-hidden` cannot clip it.
+            // An outline with an offset: it follows the radius, cannot be clipped, and floats clear of the status border.
             ...(isSelected && {
               outline: "2px solid rgba(var(--accent-rgb), .9)",
               outlineOffset: "2px",
@@ -537,9 +496,7 @@ function Rail({
   const native = node.title.native !== latin ? node.title.native : null;
 
   return (
-    // Keyed on the node so the pane re-runs `settle` when the selection moves,
-    // which is the only cue that the rail changed at all. Below `xl` it sits
-    // under the canvas, full-width and height-capped, instead of vanishing.
+    // Keyed on the node so the pane re-runs `settle` when the selection moves; below `xl` it sits under the canvas.
     <aside
       key={node.id}
       className="max-h-64 w-full shrink-0 animate-settle overflow-y-auto rounded-xl border border-hair bg-surface-900 p-4 panel-wash xl:max-h-none xl:w-60"
@@ -613,14 +570,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
-/**
- * The entry editor, opened from the rail.
- *
- * It runs off the cached list entry rather than a fetch: the franchise query
- * carries status and progress but not score, repeat or notes, and pulling a
- * whole media just to open a dialog would spend a request from a ~30/min
- * budget on something the list screens already hold.
- */
+/** The entry editor from the rail, run off the cached list entry so opening it spends no request. */
 function EntryEditor({
   mediaId,
   leaving,
@@ -638,8 +588,7 @@ function EntryEditor({
   const entry = useCachedEntry(userId, type, mediaId);
   const { save, remove } = useListMutations(userId ?? 0, type);
 
-  // No cached entry means there is nothing to edit — say so instead of
-  // closing mutely, which read as a broken button.
+  // No cached entry means nothing to edit, so say so rather than closing mutely like a broken button.
   useEffect(() => {
     if (!entry) {
       showToast({ kind: "error", text: t("franchise.editMissing") });

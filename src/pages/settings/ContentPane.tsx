@@ -4,11 +4,7 @@ import { cn } from "@/lib/utils";
 import { useContentFilter } from "@/stores/contentFilter";
 import { CONTENT_FILTER_LEVELS } from "@/lib/contentFilter";
 import { Toggle } from "./shared";
-/**
- * Content filter. A three-stop slider rather than a toggle: "hide everything
- * 18+" and "hide suggestive material too" are genuinely different asks, and
- * AniList only flags the former (`isAdult`) — Ecchi is an ordinary genre.
- */
+/** A three-stop slider rather than a toggle: hiding adult and hiding suggestive are different asks. */
 export function ContentSection() {
   const { t } = useTranslation();
   const level = useContentFilter((s) => s.level);

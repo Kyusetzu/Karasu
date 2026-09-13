@@ -24,41 +24,13 @@ import { MediaStrip } from "@/components/media/MediaStrip";
 import { FavouriteButton } from "@/components/media/FavouriteButton";
 import { cn } from "@/lib/utils";
 
-/**
- * Characters, staff and studios — one component for three routes.
- *
- * They are the same page with different words: a portrait, some facts, a
- * description, and a row of titles with a role caption. Three files would be
- * three chances for the layout to drift, and the differences are small enough to
- * carry as data.
- *
- * These exist because the statistics screen already lists voice actors and staff
- * with portraits, and the detail page already lists studios — all of them dead
- * ends until now. Reached from those, and by id.
- *
- * One request per page. `description` here is **markdown, not HTML** — measured
- * across 24 staff and character samples, none carried a raw tag, while media
- * descriptions have `<br>` in every one. So it renders through `Markdown`, the
- * same path as a bio: no innerHTML, and spoilers stay behind a click.
- */
+/** The three routes one Person component serves; they are the same page with different words. */
 type Kind = "character" | "staff" | "studio";
 
-/**
- * The three shapes, as a union.
- *
- * Declared rather than inferred because inference plus `as` casts collapsed the
- * shared fields to `{}`: TypeScript will happily read a property present on every
- * member of a union, but only if it can still see the union.
- */
+/** Declared rather than inferred, because inference plus casts collapsed the shared fields to `{}`. */
 type PersonData = CharacterDetail | StaffDetail | StudioDetail;
 
-/**
- * Narrowing helpers, so nothing below needs a cast.
- *
- * The value is unused on purpose: `kind` is the discriminant and the data carries
- * no field that distinguishes the three, so these assert what the route already
- * knows rather than inspecting anything.
- */
+/** Narrowing helpers; the value is unused because `kind` is the discriminant, not any field of the data. */
 const isCharacter = (_d: PersonData, k: Kind): _d is CharacterDetail => k === "character";
 const isStaff = (_d: PersonData, k: Kind): _d is StaffDetail => k === "staff";
 const isStudio = (_d: PersonData, k: Kind): _d is StudioDetail => k === "studio";
@@ -67,8 +39,7 @@ function useFuzzyDate() {
   const { i18n } = useTranslation();
   return (d: { year: number | null; month: number | null; day: number | null } | null) => {
     if (!d?.year && !d?.month) return null;
-    // Month-and-day with no year is normal for a character's birthday, so the
-    // year is genuinely optional rather than missing data.
+    // Month-and-day with no year is normal for a character's birthday, so the year is optional.
     const parts = [d.day, d.month, d.year].filter((n): n is number => n != null);
     if (!parts.length) return null;
     if (d.year && d.month && d.day) {
@@ -89,6 +60,7 @@ function Fact({ label, value }: { label: string; value: string | number | null |
   );
 }
 
+/** One request per page; `description` is markdown, not HTML, so it renders through `Markdown` like a bio. */
 export default function Person({ kind }: { kind: Kind }) {
   const { id = "" } = useParams();
   const numericId = Number(id);
@@ -133,16 +105,10 @@ export default function Person({ kind }: { kind: Kind }) {
     );
   }
 
-  // A *disabled* query is not a missing entry. TanStack reports `pending` with
-  // `fetchStatus: "idle"` when `enabled` is false, and `isLoading` is false along
-  // with it — so without this the not-found state below would claim the id does
-  // not exist whenever the query simply never ran.
+  // A disabled query is idle with no data and no error, so without this the not-found state would report a missing id.
   if (q.fetchStatus === "idle" && !q.data && !q.error) return null;
 
-  // A rejection is only "does not exist" when it says so. Anything else — an
-  // expired token, a rate limit, no connection — is a failure to ask, and
-  // asserting the person is gone because the network is down is a definite
-  // claim about someone else's data. See `lib/apiError`.
+  // Only a real not-found means the person is gone; any other failure is a failure to ask (lib/apiError).
   if (q.error && !isNotFound(q.error)) {
     return (
       <div className="px-8 pt-7">
@@ -171,8 +137,7 @@ export default function Person({ kind }: { kind: Kind }) {
     );
   }
 
-  // `id`, `favourites`, `siteUrl` and `isFavourite` exist on all three, so they
-  // are read straight off the union; everything else goes through a guard.
+  // The fields all three share are read straight off the union; everything else goes through a guard.
   const data: PersonData = q.data;
   const ch = isCharacter(data, kind) ? data : null;
   const st = isStaff(data, kind) ? data : null;
@@ -286,8 +251,7 @@ export default function Person({ kind }: { kind: Kind }) {
         </section>
       )}
 
-      {/* A voice actor's most-favourited roles, which is the one thing a staff
-          page has that the others do not. */}
+      {/* A voice actor's most-favourited roles, the one thing a staff page has that the others do not. */}
       {st?.characters?.nodes?.length ? (
         <section className="mt-8 space-y-3">
           <SectionHeader icon={Users} title={t("person.characters")} />
@@ -304,8 +268,7 @@ export default function Person({ kind }: { kind: Kind }) {
         </section>
       ) : null}
 
-      {/* A character's Japanese cast, deduplicated: the same actor across five
-          seasons is one person, not five. */}
+      {/* A character's Japanese cast, deduplicated: the same actor across every season is one person. */}
       {ch?.media?.edges?.length ? <VoiceActors edges={ch.media.edges} /> : null}
     </div>
   );

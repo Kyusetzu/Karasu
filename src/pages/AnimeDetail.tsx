@@ -92,18 +92,13 @@ export default function AnimeDetail() {
   const { t, i18n } = useTranslation();
   const { id } = useParams();
   const mediaId = Number(id);
-  // Subscribe to the *data*, not to `hasNext` — the same fix `ListRow` already
-  // carries with the same comment. A selector returning the store's function
-  // has an identity that never changes, so this page never re-rendered after a
-  // library scan and the play button stayed missing until something else
-  // happened to re-render it.
+  // Subscribe to the data, not a store function: a function's identity never changes, so a scan would never re-render.
   const episodes = useLibrary((s) => s.episodes[mediaId]);
   const play = useLibrary((s) => s.play);
   const level = useContentFilter((s) => s.level);
   const blurAdult = useContentFilter((s) => s.blurAdult);
   const profileMode = useAuth((s) => s.mode);
-  // The raw hexes, not the `var()`: `readableInk` needs a colour it can
-  // measure, and a CSS variable is opaque to it.
+  // The raw hexes, not the var(): readableInk needs a colour it can measure, and a CSS variable is opaque to it.
   const statusColors = useTheme((st) => st.statusColors);
   const [revealed, setRevealed] = useState(false);
   const [coverOpen, setCoverOpen] = useState(false);
@@ -114,45 +109,12 @@ export default function AnimeDetail() {
     queryFn: () => animeDetail(mediaId),
     enabled: isTauri && Number.isFinite(mediaId),
   });
-  /**
-   * The local list's entry, for the account-free profile.
-   *
-   * `mediaListEntry` rides `DETAIL_QUERY`, but in local mode `anilist_query`
-   * sends no token and AniList has never heard of the local list — so it is
-   * null for every title, including ones being actively tracked. Reading the
-   * cached local list is what makes the pill true and, far more importantly,
-   * what stops `ListEditor` seeding PLANNING/0/0 over a real entry.
-   *
-   * Above the early returns because it is a hook. `useCachedEntry` no-ops in
-   * AniList mode, where `mediaListEntry` is authoritative.
-   */
-  /**
-   * The local list's entry, for the account-free profile.
-   *
-   * `mediaListEntry` rides `DETAIL_QUERY`, but in local mode `anilist_query`
-   * sends no token and AniList has never heard of the local list — so it comes
-   * back null for every title, including ones being actively tracked. Reading
-   * the cached local list is what makes the pill below true and, far more
-   * importantly, what stops `ListEditor` seeding PLANNING/0/0 over a real entry
-   * the moment Save is pressed.
-   *
-   * `useCachedEntry` no-ops in AniList mode, where `mediaListEntry` is
-   * authoritative. The local list is keyed on user 0, the `?? 0` convention
-   * every list screen uses.
-   */
+  /** The local list's entry, since mediaListEntry is null in local mode; keeps ListEditor from seeding over a real entry. */
   const cachedEntry = useCachedEntry(0, data?.type, mediaId);
 
-  // A skeleton at the hero's real proportions rather than a line of text:
-  // the text sat at the top-left and then the whole page arrived underneath
-  // it, which moves everything twice. Same reasoning as MediaList's.
+  // A skeleton at the hero's real proportions rather than a line of text, so the page does not move twice.
   if (isLoading) return <DetailSkeleton />;
-  // Offline gets its own answer. This page has no cache of its own —
-  // `DETAIL_QUERY` is a live passthrough — so a dropped connection used to
-  // paint the transport's own English sentence across the whole screen, in
-  // any UI language, with no retry. `OfflineDetail` serves what the *list*
-  // cache already holds instead, which is enough to see the title and to
-  // press +1 (the save queues). A real device pass could not test the offline
-  // queue at all because of this: the page died before the button existed.
+  // Offline gets its own answer: DETAIL_QUERY has no cache, so OfflineDetail serves what the list cache already holds.
   if (error && isOffline(error))
     return <OfflineDetail mediaId={mediaId} onRetry={() => void refetch()} />;
   if (error)
@@ -163,15 +125,13 @@ export default function AnimeDetail() {
     );
   if (!data) return null;
 
-  // Reachable by a direct link even when everything else is filtered, so it
-  // gets an explicit reveal rather than a blank page.
+  // Reachable by a direct link even when filtered, so it gets an explicit reveal rather than a blank page.
   if (isBlocked(data, level) && !revealed) {
     return (
       <div className="grid h-full place-items-center p-8">
         <div className="max-w-sm text-center">
           <p className="text-sm text-ink-300">{t("detail.filtered")}</p>
-          {/* The sentence always said "you can change this in Settings" —
-              now it goes there. */}
+          {/* The sentence says the setting lives in Settings, so it links there. */}
           <Link
             to="/settings?pane=appearance"
             className="mt-1 block text-xs text-accent-400 hover:underline"
@@ -188,11 +148,9 @@ export default function AnimeDetail() {
 
   const title = displayTitle(data.title);
 
-  // The list entry, for the badge under the title. `mediaListEntry` rides on
-  // `DETAIL_QUERY`, so this costs nothing beyond what the page already fetched.
+  // The list entry for the badge under the title; mediaListEntry rides DETAIL_QUERY, so it costs no request.
   const entry = data.mediaListEntry ?? cachedEntry;
-  // Local mode only: the pill must not claim "not on your list" before the
-  // local list has been read. See `useCachedEntry`'s null-vs-undefined note.
+  // Local mode only: the pill must not claim "not on your list" while useCachedEntry is still undefined (unread).
   const localPending = profileMode === "local" && cachedEntry === undefined;
   const total = data.type === "MANGA" ? data.chapters : data.episodes;
   const progressLabel =
@@ -204,17 +162,7 @@ export default function AnimeDetail() {
 
   const coverSrc = data.coverImage.extraLarge ?? data.coverImage.large ?? "";
 
-  /**
-   * The banner and the cover, veiled together and revealed together.
-   *
-   * Sharing `revealed` with the filter gate above is the point: someone who
-   * has already pressed "Show anyway" to reach a blocked title has answered
-   * this question, and asking it again on the same screen would be the app not
-   * listening. One flag, one press, both images.
-   *
-   * The no-banner fallback is left alone — it is the cover at `blur-2xl` and
-   * 40% opacity already, which is a wash of colour rather than an image.
-   */
+  /** The banner and the cover share revealed with the filter gate, so one "Show anyway" press answers for both images. */
   const veiled = shouldBlur(data, level, blurAdult) && !revealed;
 
   const studioEdges = data.studios?.edges ?? [];
@@ -224,8 +172,7 @@ export default function AnimeDetail() {
     ? data.nextAiringEpisode.airingAt - Math.floor(Date.now() / 1000)
     : 0;
 
-  // AniList's relations connection takes no arguments, so an adult spin-off of
-  // an all-ages title can only be dropped here, client-side.
+  // AniList's relations connection takes no arguments, so an adult spin-off can only be dropped here, client-side.
   const relatedEdges = data.relations.edges.filter(
     (e) =>
       (e.node.type === "ANIME" || e.node.type === "MANGA") &&
@@ -234,10 +181,7 @@ export default function AnimeDetail() {
 
   return (
     <div>
-      {/* Fixed-height banner slot regardless of whether AniList has a real
-          bannerImage (common for manga) — the cover below overlaps into its
-          bottom edge by a fixed amount, so a shorter slot here would push it
-          off the top of the page. */}
+      {/* Fixed-height banner slot even without a bannerImage: the cover overlaps its bottom edge by a fixed amount. */}
       <div className="relative h-64">
         {data.bannerImage ? (
           <DecodedImage
@@ -257,17 +201,13 @@ export default function AnimeDetail() {
           )
         )}
         <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-surface-950 to-transparent" />
-        {/* Anchored to the banner, not to the centred column below — otherwise
-            it drifts inward with the gutter and strands itself mid-artwork on
-            a wide display. */}
+        {/* Anchored to the banner, not the centred column, or it drifts inward with the gutter on a wide display. */}
         <BackButton className="absolute left-6 top-4 z-10" />
       </div>
 
       <div className="relative mx-auto max-w-4xl px-8 pb-10 2xl:max-w-none">
         <div className="-mt-14 flex gap-6">
-          {/* The incoming half of the cover-to-hero morph. Unconditional here
-              because this page shows exactly one cover, so the name is unique
-              by construction — the grid side has to be applied per click. */}
+          {/* The incoming half of the cover-to-hero morph; unconditional because this page shows exactly one cover. */}
           <div className="relative h-57 w-38 shrink-0">
             <img
               src={coverSrc}
@@ -289,8 +229,7 @@ export default function AnimeDetail() {
                 </span>
               </button>
             )}
-            {/* Only once revealed — a lightbox must not be a way around the
-                blur. Same overlay-button shape as the veil above. */}
+            {/* Only once revealed: a lightbox must not be a way around the blur. */}
             {!veiled && coverSrc && (
               <button
                 type="button"
@@ -312,9 +251,7 @@ export default function AnimeDetail() {
             <h1 className="text-[1.625rem] font-bold leading-tight text-ink-100">
               {title}
             </h1>
-            {/* Native first, romaji only as a fallback — the Japanese face is
-                part of the app's identity and this is the one screen with the
-                room to set it properly. */}
+            {/* Native first, romaji only as a fallback: the Japanese face is part of the app's identity. */}
             {data.title.native && data.title.native !== title ? (
               <p className="font-brand-jp text-[1.0625rem] text-ink-500">
                 {data.title.native}
@@ -325,20 +262,14 @@ export default function AnimeDetail() {
                 <p className="text-sm text-ink-500">{data.title.romaji}</p>
               )
             )}
-            {/* Whether this is on your list, said where the title is rather
-                than only inside the editor panel far below — which is where it
-                was, and is why the answer was not visible without scrolling.
-                Coloured from the same palette as the cover rings, so the badge
-                here and the border on the card you arrived from agree. */}
+            {/* Whether this is on your list, said beside the title and coloured from the same palette as the cover rings. */}
             <p className="mt-2.5">
               {entry ? (
                 <span
                   className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-2xs font-semibold"
                   style={{
                     backgroundColor: statusColorVar(entry.status),
-                    // The palette is user-chosen, so the ink cannot be assumed:
-                    // `readableInk` picks whichever of the app's two ink ends
-                    // actually has contrast against the hue they picked.
+                    // The palette is user-chosen, so readableInk picks whichever ink end has contrast against their hue.
                     color: readableInk(
                       statusColors[entry.status] ?? "#000000",
                       UI_INK,
@@ -349,9 +280,7 @@ export default function AnimeDetail() {
                   {progressLabel && <span className="opacity-80">{progressLabel}</span>}
                 </span>
               ) : (
-                // `undefined` from `useCachedEntry` means "not loaded yet" and
-                // "not on the list" alike, so in local mode the honest thing
-                // before it resolves is to say nothing rather than the second.
+                // undefined from useCachedEntry means not loaded yet as well as not listed, so say nothing until it resolves.
                 localPending ? null : (
                   <span className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-surface-700 px-2.5 py-0.5 text-2xs text-ink-500">
                     {t("detail.notOnList")}
@@ -438,11 +367,7 @@ export default function AnimeDetail() {
                     minute: "2-digit",
                   }),
                 })}
-                {/* `> 0`, not truthiness. `countdown` returns "" once the time
-                    has passed, so a negative value — which is every moment
-                    between an episode airing and AniList moving to the next —
-                    rendered an empty pair of brackets; and at exactly zero,
-                    `0 && …` renders the literal 0. */}
+                {/* > 0, not truthiness: countdown returns "" once past, and at exactly zero 0 && renders a literal 0. */}
                 {untilNext > 0 && (
                   <span className="ml-2 text-ink-500">
                     ({countdown(untilNext, t)})
@@ -482,11 +407,7 @@ export default function AnimeDetail() {
           </div>
         </div>
 
-        {/* Prose left, metadata right. The prose column is the *narrow* one
-            and capped at a reading measure — stretching a synopsis across
-            1400px would be worse than the gutters this replaces. The metadata
-            column takes the slack instead, because everything in it (the
-            information grid, tags, links) wraps and genuinely fills. */}
+        {/* Prose left at a reading measure, metadata right taking the slack, since everything in it wraps and fills. */}
         <div className="mt-6 grid gap-6 2xl:grid-cols-[minmax(0,48rem)_minmax(0,1fr)] 2xl:items-start">
           <div className="min-w-0 space-y-6">
             <ListEditor
@@ -499,13 +420,7 @@ export default function AnimeDetail() {
             {data.description && (
               <Card>
                 <CardTitle>{t("detail.description")}</CardTitle>
-                {/* Capped at a reading measure and set loose. A synopsis is
-                    the only long-form prose in the app; `pretty` keeps it off
-                    orphaned last words.
-
-                    Elements, not `dangerouslySetInnerHTML`. This was the last
-                    innerHTML in the app, and the sanitizer it needed had already
-                    been a live XSS once — see `lib/anilistHtml`. */}
+                {/* Elements, not dangerouslySetInnerHTML: lib/anilistHtml parses to nodes so no __html string ever exists. */}
                 <p className="mt-3 max-w-176 text-[.8125rem] leading-[1.75] text-pretty text-ink-300">
                   <RichText nodes={parseAniListHtml(data.description)} />
                 </p>
@@ -525,17 +440,7 @@ export default function AnimeDetail() {
             {data.trailer?.id && (
               <Card>
                 <CardTitle>{t("detail.trailer")}</CardTitle>
-                {/* No `<img>`. The thumbnail is on a YouTube/Dailymotion host,
-                    and `img-src` allows `self`, `data:` and `*.anilist.co` only
-                    — so this rendered a broken-image box on every detail page
-                    that has a trailer. Widening the policy is refused on
-                    principle: it hands a third party the user's IP and what
-                    they are looking at, for a thumbnail. CLAUDE.md measured the
-                    same question for bio images and settled it there.
-
-                    The card keeps its shape and its click; the art is what
-                    goes. `aria-label` because its only content was the alt-less
-                    image and two decorative spans, so it had no name at all. */}
+                {/* No img: the thumbnail is on a third-party host img-src refuses, and widening it would leak the user's IP. */}
                 <button
                   onClick={() => openUrl(trailerUrl(data.trailer!))}
                   aria-label={t("detail.trailerPlay")}
@@ -576,8 +481,7 @@ export default function AnimeDetail() {
                   {t("franchise.view")}
                 </Link>
               </div>
-              {/* Wraps instead of scrolling sideways: across both columns
-                  there is room to show the whole franchise at once. */}
+              {/* Wraps instead of scrolling sideways: across both columns there is room for the whole franchise. */}
               <div className="mt-3 grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-4">
                 {relatedEdges.map((e) => (
                   <Link
@@ -585,9 +489,7 @@ export default function AnimeDetail() {
                     to={`/media/${e.node.id}`}
                     className="group block"
                   >
-                    {/* The same lift the trailer thumbnail has had all
-                        along — these are equally clickable and said so
-                        with nothing at all. */}
+                    {/* The same lift as the trailer thumbnail; these are equally clickable and should say so. */}
                     <img
                       src={e.node.coverImage.large ?? ""}
                       alt=""
@@ -613,15 +515,7 @@ export default function AnimeDetail() {
   );
 }
 
-/**
- * The licensed episode list — titles and thumbnails — behind a fold.
- *
- * Deliberately its own on-demand query rather than a `DETAIL_QUERY` field:
- * measured at +49 KB for a long-runner, a 6× payload for a section most
- * visits never open. Opening the fold is the user-initiated moment that
- * spends the request; the six-hour staleTime makes reopening free. An empty
- * answer renders as a quiet line — only AniList-licensed titles carry these.
- */
+/** The licensed episode list behind a fold; opening spends its own request rather than bloating DETAIL_QUERY. */
 function EpisodesSection({ mediaId }: { mediaId: number }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -665,9 +559,7 @@ function EpisodesSection({ mediaId }: { mediaId: number }) {
                   className="group block text-left"
                   title={ep.site ?? undefined}
                 >
-                  {/* Same policy as the trailer above: these thumbnails live on
-                      streaming CDNs the CSP does not allow, so they were broken
-                      boxes. The tile stays as the click target. */}
+                  {/* Same policy as the trailer: these thumbnails live on CDNs the CSP does not allow, so no img. */}
                   <div className="grid aspect-video w-full place-items-center overflow-hidden rounded-lg bg-surface-800 transition-surface group-hover:bg-surface-700">
                     <Play className="size-5 text-ink-600" />
                   </div>
@@ -682,9 +574,7 @@ function EpisodesSection({ mediaId }: { mediaId: number }) {
   );
 }
 
-/** Literal switch, so `i18nKeys.test.ts` sees every key. Staff roles are
-    free text from the API and render as data; only character roles are a
-    closed enum worth translating. */
+/** Literal switch so i18nKeys.test.ts sees every key; only character roles are a closed enum worth translating. */
 function characterRole(role: string | null, t: (k: string) => string): string {
   switch (role) {
     case "MAIN":
@@ -698,12 +588,7 @@ function characterRole(role: string | null, t: (k: string) => string): string {
   }
 }
 
-/**
- * Cast and staff behind a fold, finally linking the character/staff pages
- * from the one place people expect to reach them. One request per "load
- * more" click pages both lists together; the button is countless because
- * `pageInfo.total` is the capped sentinel on these collections.
- */
+/** Cast and staff behind a fold; one request pages both lists, and the button is countless since total is a sentinel. */
 function CastSection({ mediaId }: { mediaId: number }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -824,17 +709,7 @@ function CastSection({ mediaId }: { mediaId: number }) {
   );
 }
 
-/**
- * Reviews behind a fold — essays, so five per page and a reading measure.
- *
- * Same on-demand contract as the other folds: opening spends the request,
- * "load more" is a countless button. Rows collapse to their summary; the
- * click that expands one is free, since the body already arrived. Voting
- * patches the page in place with what `RateReview` returns — the server's
- * numbers, not a guess — and the composer prefilms from `myReview`, its own
- * user-initiated lookup, because a review of yours that nobody voted on can
- * sit pages deep in a RATING_DESC feed.
- */
+/** Reviews behind a fold: opening spends the request, and voting patches the page with the server's numbers. */
 function ReviewsSection({ mediaId }: { mediaId: number }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
@@ -875,8 +750,7 @@ function ReviewsSection({ mediaId }: { mediaId: number }) {
       showToast({ kind: "error", text: t("common.error", { message: String(e) }) }),
   });
 
-  // The lookup happens on the click, not the mount — a fourth query racing
-  // the detail page's own would clear no pre-flight budget check.
+  // The lookup happens on the click, not the mount; a query racing the detail page's own skips the budget check.
   const compose = useMutation({
     mutationFn: () => myReview(mediaId, viewer!.id),
     onSuccess: (mine) => setComposer({ existing: mine }),
@@ -942,9 +816,7 @@ function ReviewsSection({ mediaId }: { mediaId: number }) {
           </div>
         </div>
       )}
-      {/* `Presence`, not `PresenceIf`: the composer state is a value, and the
-          boolean variant would hand the child a nulled `existing` for the
-          length of the exit — an edit session's title flipping to "write". */}
+      {/* Presence, not PresenceIf: the boolean variant would hand the child a nulled existing for the length of the exit. */}
       <Presence value={composer}>
         {(c, leaving) => (
           <ReviewComposerModal
@@ -1010,9 +882,7 @@ function ReviewCard({
 
       {expanded && (
         <div className="mt-2 border-t border-surface-800 pt-2">
-          {/* `siteUrl` backs the parser's truncation notice: a review body is
-              an essay, and past the 8,000-char limit the "read the rest" line
-              needs somewhere to go. */}
+          {/* siteUrl backs the parser's truncation notice, so "read the rest" has somewhere to go. */}
           <Markdown source={r.body} siteUrl={r.siteUrl ?? undefined} />
         </div>
       )}
@@ -1054,11 +924,7 @@ function ReviewCard({
   );
 }
 
-/**
- * The trending curve behind a fold — how loudly the site is talking about
- * this title, drawn with the statistics page's own AreaChart. Same on-demand
- * contract as the episode fold: the click spends the request.
- */
+/** The trending curve behind a fold, drawn with the statistics page's AreaChart; the click spends the request. */
 function TrendSection({ mediaId }: { mediaId: number }) {
   const { t, i18n } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -1112,20 +978,14 @@ function TrendSection({ mediaId }: { mediaId: number }) {
   );
 }
 
-/**
- * The community's numbers: ranking shelves, the score distribution, and what
- * status everyone else has the title under. All of it arrives on the detail
- * query — no extra request — and the two charts are the statistics page's own
- * components, so the same data draws the same way everywhere.
- */
+/** The community's numbers, all from the detail query, drawn with the statistics page's own components. */
 function CommunitySection({ data }: { data: MediaDetail }) {
   const { t } = useTranslation();
   const scores = data.stats?.scoreDistribution ?? [];
   const statuses = [...(data.stats?.statusDistribution ?? [])].sort(
     (a, b) => b.amount - a.amount,
   );
-  // The shelves worth a badge: all-time first, then the best seasonal/yearly
-  // one per type — a full list repeats itself ("#12 of 2019, #43 of 2018…").
+  // All-time shelves first, then the best seasonal or yearly one per type; a full list repeats itself.
   const rankings = [...(data.rankings ?? [])]
     .sort((a, b) => Number(b.allTime ?? false) - Number(a.allTime ?? false) || a.rank - b.rank)
     .filter(
@@ -1198,14 +1058,7 @@ function trailerUrl(trailer: { id: string; site: string }): string {
     : `https://www.youtube.com/watch?v=${trailer.id}`;
 }
 
-/** One label/value row; renders nothing when there is no value. */
-/**
- * A comma-joined list of studios, each linking to its own page.
- *
- * `Row` takes a `ReactNode`, so this needed no change there. Studios were a dead
- * end until the studio page existed — the names were already right, they just
- * went nowhere.
- */
+/** A comma-joined list of studios, each linking to its own page. */
 function StudioLinks({ studios }: { studios: { id: number; name: string }[] }) {
   if (!studios.length) return null;
   return (
@@ -1222,6 +1075,7 @@ function StudioLinks({ studios }: { studios: { id: number; name: string }[] }) {
   );
 }
 
+/** One label/value row; renders nothing when there is no value. */
 function Row({ label, value }: { label: string; value: ReactNode }) {
   if (value === null || value === undefined || value === "") return null;
   return (
@@ -1329,10 +1183,7 @@ function AlternativeTitles({ data }: { data: MediaDetail }) {
   );
 }
 
-/**
- * Media tags with their community rank. Spoiler tags stay collapsed behind an
- * explicit reveal — the whole point of the flag.
- */
+/** Media tags with their community rank; spoiler tags stay collapsed behind an explicit reveal. */
 function TagList({ tags }: { tags: MediaTag[] }) {
   const { t } = useTranslation();
   const [showSpoilers, setShowSpoilers] = useState(false);
@@ -1470,8 +1321,7 @@ function ListEditor({
       <CardTitle>
         {entry ? t("detail.myEntry") : t("detail.addToList")}
       </CardTitle>
-      {/* Same six pills as the modal — this is the panel people actually
-          live in, so the two must not disagree about how status is set. */}
+      {/* Same six pills as the modal: this is the panel people live in, so the two must not disagree on status. */}
       <div className="mt-3 text-sm">
         <span className="mb-1.5 block text-ink-500">{t("common.status")}</span>
         <div className="flex flex-wrap gap-0.75">

@@ -54,9 +54,7 @@ export default function About() {
 
   return (
     <div className="relative overflow-hidden">
-      {/* A single wash falling from the top, so the mark sits in light rather
-          than on a flat panel. Narrower and stronger than `panel-wash`: this
-          page has one subject and can afford to point at it. */}
+      {/* One wash from the top, narrower and stronger than `panel-wash`, so the mark sits in light. */}
       <div
         className="pointer-events-none absolute inset-x-0 top-0 h-80"
         style={{
@@ -71,9 +69,7 @@ export default function About() {
           <h1 className="mt-4 font-brand text-[2rem] font-bold uppercase leading-none tracking-[.22em] text-ink-100">
             Karasu
           </h1>
-          {/* カラス, not 烏. The app's Japanese flair is the katakana — it is
-              how the name is written everywhere else in the project, and the
-              handoff's kanji would make About the one place that disagrees. */}
+          {/* Katakana, not kanji: it is how the name is written everywhere else in the project. */}
           <p className="mt-2 font-brand-jp text-lg text-accent-400">カラス</p>
           <p className="mt-3 text-sm text-ink-500">{t("about.tagline")}</p>
           <p className="mt-4 text-sm leading-relaxed text-ink-300">
@@ -135,14 +131,7 @@ export default function About() {
   );
 }
 
-/**
- * The report, and the two places it can go.
- *
- * Directly above the contact card on purpose: copy, then click through to the
- * form that wants it pasted. Bugs belong on GitHub — that is where they get
- * tracked — and the button says so rather than leaving a reporter to find the
- * repo link one card down and guess.
- */
+/** The diagnostics report and the two places it can go, sitting above the contact card on purpose. */
 function DiagnosticsSection() {
   const { t } = useTranslation();
   const [report, setReport] = useState<string | null>(null);
@@ -166,9 +155,7 @@ function DiagnosticsSection() {
 
   const save = async () => {
     setSaving(true);
-    // Redacted, matching the copy button: both are headed somewhere public.
-    // The unredacted path is the log file itself, which the user attaches
-    // deliberately.
+    // Redacted like the copy button, since both are headed somewhere public; the log file is the raw path.
     await exportDiagnostics(true).catch(() => false);
     setSaving(false);
   };
@@ -178,8 +165,7 @@ function DiagnosticsSection() {
       <CardTitle>{t("about.diagnostics")}</CardTitle>
       <p className="mt-1 text-xs text-ink-600">{t("about.diagnosticsHint")}</p>
 
-      {/* The actual facts, not just a button that promises them — so the user
-          can see what they are about to paste before they paste it. */}
+      {/* The actual facts, so the user can see what they are about to paste before they paste it. */}
       {report && (
         <pre className="mt-3 max-h-56 overflow-auto rounded-lg bg-surface-850 p-2.5 font-mono text-2xs leading-relaxed text-ink-500">
           {report}
@@ -192,10 +178,7 @@ function DiagnosticsSection() {
           {copied ? t("common.copied") : t("about.copyDiagnostics")}
         </Button>
         <Button variant="secondary" onClick={save} disabled={saving}>
-          {/* The spinning RefreshCw is the house busy idiom. (`index.css`
-              does allow overshoot for feature motion these days — but a
-              busy indicator is not a feature moment, and Tailwind's
-              `animate-bounce` is not one of the app's registers.) */}
+          {/* The spinning RefreshCw is the house busy idiom; a busy indicator is not a feature moment. */}
           {saving ? (
             <RefreshCw className="size-3.5 animate-spin" />
           ) : (
@@ -241,10 +224,7 @@ function UpdateSection() {
   const [installing, setInstalling] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // An update downloaded in the background at startup is already sitting in
-  // the backend's stash. Without asking, this page only knew about downloads
-  // it had started itself, so that one was unreachable: no Restart button
-  // here, and the toast telling the user to restart would have discarded it.
+  // Ask for the backend's stash, or an update downloaded at startup has no Restart button here.
   useEffect(() => {
     if (!isTauri) return;
     pendingUpdate().then(setDownloaded).catch(() => {});
@@ -269,8 +249,7 @@ function UpdateSection() {
     try {
       const result = await checkForUpdates(true);
       setInfo(result);
-      // Android checks and never downloads — the notice plus the release
-      // link below are the whole feature there, per the no-updater rule.
+      // Android checks and never downloads: the notice and the release link are the whole feature there.
       if (result.isNewer && !isAndroid(platform)) await startDownload();
     } catch (e) {
       setError(String(e));
@@ -288,9 +267,7 @@ function UpdateSection() {
     } catch (e) {
       setError(String(e));
       setInstalling(false);
-      // The backend keeps the download on a failed install, so the button
-      // stays — but re-read rather than assume, so what is on screen is what
-      // is actually there.
+      // The backend keeps the download on a failed install, but re-read rather than assume it did.
       pendingUpdate().then(setDownloaded).catch(() => {});
     }
   };
@@ -329,10 +306,7 @@ function UpdateSection() {
               {t("about.updateAvailable", { version: info.latest })}
             </span>
           ) : info.channelEmpty ? (
-            // Not a tick and not "up to date". This channel has no release to
-            // compare against, and answering a check the user asked for with
-            // "you are on the latest version" is a claim about a thing that
-            // does not exist.
+            // Not "up to date": this channel has no release to compare against, and saying so is honest.
             <span className="flex items-center gap-1.5 text-sm text-gold">
               <AlertTriangle className="size-4" /> {t("about.channelEmpty")}
             </span>
@@ -357,16 +331,13 @@ function UpdateSection() {
           {t("about.updateReady", { version: downloaded.version })}
         </p>
       )}
-      {/* On Linux the updater can only replace an AppImage in place. A distro
-          package or a build run from source has to be updated the way it was
-          installed, and saying so beats a download that cannot apply. */}
+      {/* On Linux the updater can only replace an AppImage; anything else updates the way it was installed. */}
       {isLinux(platform) && !platform?.appImage && (
         <p className="mt-3 text-sm text-ink-500">
           {t("about.updateAppImageOnly")}
         </p>
       )}
-      {/* Android's twin of the AppImage note: nothing installs from here —
-          a new version is a fresh APK from the release page. */}
+      {/* Nothing installs from here on Android: a new version is a fresh APK from the release page. */}
       {isAndroid(platform) && (
         <p className="mt-3 text-sm text-ink-500">{t("about.updateAndroidHint")}</p>
       )}

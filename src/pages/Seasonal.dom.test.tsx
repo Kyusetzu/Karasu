@@ -4,13 +4,7 @@ import type { MediaWithListStatus } from "@/api/queries";
 import { useContentFilter } from "@/stores/contentFilter";
 import { renderWithProviders, signIn, signOut } from "@/test/render";
 
-/**
- * The grouping arithmetic is proven in `lib/formatGroups.test.ts`. This is the
- * other half — that the JSX carries it: right sections, right order, right
- * counts, and a roving offset that survives being split across grids.
- *
- * The page gates its query on `isTauri`, so the module is the seam.
- */
+/** Proves the JSX carries the grouping `lib/formatGroups.test.ts` proves; `isTauri` is the mock seam. */
 const seasonal = vi.fn();
 
 vi.mock("@/api/anilist", async (orig) => ({
@@ -76,11 +70,7 @@ describe("Seasonal grouping", () => {
     await waitFor(() => expect(headings()).toEqual(["format.TV"]));
   });
 
-  /**
-   * `Media.format` is `string | null`, so a value AniList adds later has to
-   * land somewhere rather than dropping off a page that claims to show the
-   * season.
-   */
+  /** A format AniList adds later has to land somewhere rather than drop off the page. */
   it("keeps an unknown format under a trailing heading", async () => {
     seasonal.mockResolvedValue({
       media: [media("TV"), media("HOLOGRAM"), media(null)],
@@ -105,11 +95,7 @@ describe("Seasonal grouping", () => {
     expect(screen.getByText("1")).toBeTruthy();
   });
 
-  /**
-   * The badge only ever appears with the filter off — `adultQueryArg` excludes
-   * these server-side at moderate and strict, so they never reach a card. That
-   * is correct, and it is why this test sets the level explicitly.
-   */
+  /** The badge only appears with the filter off, since `adultQueryArg` excludes adult titles server-side otherwise. */
   it("marks adult titles, and only those", async () => {
     seasonal.mockResolvedValue({
       media: [media("TV", { isAdult: true }), media("TV", { isAdult: false })],

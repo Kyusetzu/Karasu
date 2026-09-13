@@ -28,10 +28,7 @@ export function LibrarySection() {
 
   const choose = async () => {
     setError(null);
-    // `setLibraryPath` is a database write and can reject. Outside the try it
-    // took `setPath` and the scan down with it and left the pane showing the
-    // old folder, so picking a folder looked like it had done nothing at all —
-    // with an error line sitting right there, unused.
+    // `setLibraryPath` is a database write and can reject; keep it inside the try so the error line shows.
     try {
       const picked = await library.pickLibraryFolder();
       if (!picked) return;
@@ -51,10 +48,7 @@ export function LibrarySection() {
       const summary = await library.scanLibrary();
       setMatched(summary.matched);
       await refreshLibrary();
-      // A scan started here changes what the Library screen shows, and those
-      // two caches live only over there. Without this the folder row and the
-      // unplaced list keep serving pre-scan answers for a whole staleTime —
-      // long enough to offer "Assign" on a group the scan already placed.
+      // Keep these invalidations; without them the Library screen serves pre-scan answers for a staleTime.
       await Promise.all([
         qc.invalidateQueries({ queryKey: ["libraryStatus"] }),
         qc.invalidateQueries({ queryKey: ["libraryUnmatched"] }),
@@ -94,17 +88,7 @@ export function LibrarySection() {
   );
 }
 
-/**
- * The confirmed season splits — written by the split modal, applied by every
- * scan, and until this list existed shown nowhere: the only undo was
- * `clearLibraryMatch` taking the whole title with it.
- *
- * Rows are keyed on the *parse* — the release name and season as the files
- * on disk spell them — because that is the key the clear command deletes by.
- * The destination joins a display title once the media resolves and shows
- * the bare `#id` until then rather than blocking on it, the unplaced list's
- * own convention.
- */
+/** The confirmed season splits, keyed on the parse because that is the key the clear command deletes by. */
 export function LibrarySplitsSection() {
   const { t } = useTranslation();
   const refreshLibrary = useLibrary((s) => s.refresh);
@@ -137,8 +121,7 @@ export function LibrarySplitsSection() {
     try {
       await library.clearLibraryRedirect(row.title, row.season, row.epFrom);
       load();
-      // Removing a split re-homes files, which the Library screen renders
-      // from its own caches — same invalidation the scan performs.
+      // Removing a split re-homes files, so this performs the same invalidation the scan does.
       await refreshLibrary();
       await Promise.all([
         qc.invalidateQueries({ queryKey: ["libraryStatus"] }),

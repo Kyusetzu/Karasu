@@ -74,9 +74,7 @@ type SortDir = "asc" | "desc";
 
 const SORT_KEYS: SortKey[] = ["updated", "title", "score", "progress"];
 
-/** What each key means with no direction chosen — the order the list has
-    always used, so a bare URL keeps its meaning. The toggle flips *from*
-    this, and flipping back deletes the param again. */
+/** What each key means with no direction chosen, so a bare URL keeps its meaning; the toggle flips from this. */
 const SORT_DEFAULT_DIR: Record<SortKey, SortDir> = {
   updated: "desc",
   title: "asc",
@@ -84,9 +82,7 @@ const SORT_DEFAULT_DIR: Record<SortKey, SortDir> = {
   progress: "desc",
 };
 
-// `String.localeCompare` builds a fresh collator on every call, which a sort
-// over a few thousand titles pays for n·log n times. Options are deliberately
-// left at the defaults so the ordering matches what `localeCompare()` gave.
+// One collator, since localeCompare builds a fresh one per call; default options keep the ordering it gave.
 const COLLATOR = new Intl.Collator();
 
 export default function MediaList({ type }: { type: MediaType }) {
@@ -116,11 +112,7 @@ export default function MediaList({ type }: { type: MediaType }) {
 
 function ListView({ userId, type }: { userId: number; type: MediaType }) {
   const { t } = useTranslation();
-  // The view — tab, sort and both filters — lives in the URL, not in state.
-  // Back from a detail page then restores exactly the view that was left
-  // (`replace: true` keeps the `/anime` history entry current in place), while
-  // a sidebar click is a fresh navigation with no params and so a clean
-  // default view. Same reasoning as the profile's `?tab=`.
+  // The view lives in the URL, so back from a detail page restores it and a sidebar click starts clean.
   const [params, setParams] = useSearchParams();
   const rawTab = params.get("tab");
   const tab: MediaListStatus = STATUS_ORDER.includes(rawTab as MediaListStatus)
@@ -138,27 +130,15 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
   const rawFormat = params.get("format") ?? "";
   const formatFilter = (formats as readonly string[]).includes(rawFormat) ? rawFormat : "";
   const rawCountry = params.get("country") ?? "";
-  // Origin is a manga question — a Korean-made anime is not what anyone
-  // filters an anime list by, so the param is simply ignored there.
+  // Origin is a manga question, so the param is simply ignored on an anime list.
   const countryFilter =
     type === "MANGA" && (ORIGINS as readonly string[]).includes(rawCountry) ? rawCountry : "";
   const listFilter = params.get("list") ?? "";
-  // The text filter is the one piece that keeps local state: the input echoes
-  // every keystroke, and writing `history.replaceState` per keystroke is the
-  // thing to avoid. It mirrors into `?q=` through the debounce below.
+  // The text filter alone keeps local state and mirrors into ?q= on a debounce, not a replaceState per keystroke.
   const [filter, setFilter] = useState(() => params.get("q") ?? "");
-  // Remembered per media type: the screen remounts on every navigation, so
-  // component state meant re-picking the view every single time.
+  // Remembered per media type, since the screen remounts on every navigation.
   const [gridChoice, setGrid] = useState(() => loadViewMode(type) === "grid");
-  /**
-   * The phone shell always gets cards. The row layout is a table whose fixed
-   * tracks need ~580px before they stop overflowing (`minRowWidth`), and a
-   * phone tier of that table would be a fourth layout duplicating what
-   * `GridCard` already does — cards *are* the honest one-per-row answer the
-   * ROADMAP asks for, and `media-grid`'s auto-fill sizes them to the width.
-   * The stored preference is left alone, so a tablet rotated back past the
-   * breakpoint returns to whatever the user chose.
-   */
+  /** Phones always get cards, since the row table's fixed tracks overflow there; the stored preference stays. */
   const phone = usePhoneShell();
   const grid = phone || gridChoice;
   const [editing, setEditing] = useState<MediaListEntry | null>(null);
@@ -171,9 +151,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
   const [columns, setColumns] = useState(1);
   const [removing, setRemoving] = useState<MediaListEntry | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  // Which list columns fit. Measured off the scroll container rather than a
-  // viewport breakpoint — a fixed grid track overflows instead of shrinking, so
-  // the set has to change with the space a row really has.
+  // Which list columns fit, measured off the scroll container: a fixed grid track overflows instead of shrinking.
   const tier = useRowTier(scrollRef, type === "MANGA");
   const navigate = useNavigate();
 
@@ -189,16 +167,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
     });
   }, []);
 
-  /**
-   * The one writer for the URL-held view state.
-   *
-   * One writer rather than one per field because a preset sets three fields at
-   * once, and three separate `setParams` calls would each read a stale
-   * snapshot and clobber each other. The functional form closes the same gap
-   * against the debounced filter write landing between a click and its
-   * update. A field at its default is deleted, so the default view has a bare
-   * URL.
-   */
+  /** The one writer for the URL view; separate setParams calls read stale snapshots and clobber each other. */
   const setView = useCallback(
     (
       patch: Partial<{
@@ -234,15 +203,13 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
     [setParams],
   );
 
-  // Mirror the text filter into `?q=` on the same 500 ms the other searches
-  // debounce on — one URL write when typing settles, not one per keystroke.
+  // Mirror the text filter into ?q= on the same debounce the other searches use, one write when typing settles.
   useEffect(() => {
     const timer = setTimeout(() => {
       if (filter.trim() !== (params.get("q") ?? "")) setView({ filter });
     }, 500);
     return () => clearTimeout(timer);
-    // `params` deliberately not a dependency: it changes on the write this
-    // effect just made, and re-arming the timer for that is a no-op loop.
+    // `params` is deliberately not a dependency: it changes on the write this effect just made.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter, setView]);
 
@@ -250,8 +217,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
     const p = presets.find((x) => x.name === name);
     if (!p) return;
     setFilter(p.filter);
-    // `?? ""` on the newer fields: presets saved before they existed must
-    // clear the filters they never captured, not leave stale ones standing.
+    // `?? ""` on the newer fields: presets saved before they existed must clear the filters they never captured.
     setView({
       tab: p.tab as MediaListStatus,
       filter: p.filter,
@@ -271,8 +237,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
         tab,
         filter,
         sort,
-        // The raw param, so a preset saved on the default direction keeps
-        // following the key's default rather than pinning it.
+        // The raw param, so a preset saved on the default direction keeps following the key's default.
         dir: rawDir ?? "",
         tagFilter,
         format: formatFilter,
@@ -296,18 +261,10 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
   const { save, bulkSave, remove, bulkRemove } = useListMutations(userId, type);
 
   const level = useContentFilter((s) => s.level);
-  // Read here rather than in the row, because both row components are memoized
-  // and a store subscription inside one would re-render every card in the list
-  // whenever any part of that store moved. See `GridCard`'s `blurred`.
+  // Read here, not in the memoized rows: a store subscription there would re-render every card on any store move.
   const blurAdult = useContentFilter((s) => s.blurAdult);
 
-  // The content filter is applied here rather than further down, so every
-  // consumer of byStatus — the tabs, the random pick, the tag union — is
-  // covered by one check instead of each remembering to repeat it.
-  //
-  // Deliberately not applied at the cache layer: that same cache feeds the
-  // scrobbler and the library matcher, which must keep recognising every
-  // title the user actually tracks.
+  // Filtered here, not in the cache the scrobbler and matcher read, so every byStatus consumer shares one check.
   const { byStatus, hiddenAdult, hiddenSuggestive } = useMemo(() => {
     const map = new Map<MediaListStatus, MediaListEntry[]>();
     let adult = 0;
@@ -316,8 +273,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
     for (const group of data?.lists ?? []) {
       if (group.isCustomList) continue;
       for (const entry of group.entries) {
-        // Counted by reason in the same pass that drops them, so the
-        // disclosure line below and the rendered list can never disagree.
+        // Counted by reason in the pass that drops them, so the disclosure line and the list can never disagree.
         const reason = blockReason(entry.media, level);
         if (reason) {
           if (reason === "adult") adult++;
@@ -339,10 +295,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
     [byStatus],
   );
 
-  // The account's custom lists for this media type. Read from the entries'
-  // own membership maps rather than from the custom groups' `name`, because
-  // those two are different name spaces and only one of them is writable —
-  // see `lib/customLists` for what reading the wrong one broke.
+  // Custom list names from the entries' membership maps, never the groups' display name; lib/customLists says why.
   const listNames = useMemo(() => customListNames(data?.lists ?? []), [data]);
 
   // A tag that no longer exists anywhere must not keep the list empty.
@@ -356,12 +309,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
     if (data && listFilter && !listNames.includes(listFilter)) setView({ list: "" });
   }, [data, listNames, listFilter, setView]);
 
-  /**
-   * Search and sort keys, derived once per list change instead of once per
-   * entry per keystroke. Filtering used to lowercase four titles plus every
-   * synonym for every entry on each character typed, and sorting by title
-   * re-derived the display title on each of the n·log n comparisons.
-   */
+  /** Search and sort keys, derived once per list change instead of once per entry per keystroke. */
   const searchKeys = useMemo(() => {
     const map = new Map<
       number,
@@ -379,16 +327,13 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
     return map;
   }, [byStatus]);
 
-  // Keeps the text field responsive: React renders the (possibly huge) filtered
-  // list at a lower priority while the input echoes the keystroke immediately.
+  // Keeps the text field responsive: the filtered list renders at a lower priority than the keystroke echo.
   const deferredFilter = useDeferredValue(filter);
 
   const entries = useMemo(() => {
     let list = byStatus.get(tab) ?? [];
     const q = deferredFilter.trim();
-    // While a query is set, relevance owns the order — a fuzzy hit sorted by
-    // "recently updated" reads as a random result. The chosen sort survives
-    // as the tiebreak below.
+    // While a query is set, relevance owns the order; the chosen sort survives as the tiebreak.
     let scores: Map<number, number> | null = null;
     if (q) {
       const pq = prepareQuery(q);
@@ -409,16 +354,13 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
       list = list.filter((e) => e.media.format === formatFilter);
     }
     if (countryFilter) {
-      // Blobs cached before the field existed read `undefined` and simply
-      // don't match — a sync refreshes them, and undefined must not pass a
-      // country the entry never claimed.
+      // Blobs cached before the field existed read undefined and must not pass a country the entry never claimed.
       list = list.filter((e) => e.media.countryOfOrigin === countryFilter);
     }
     if (listFilter) {
       list = list.filter((e) => e.customLists?.[listFilter] === true);
     }
-    // Each comparator returns its key's *default* order; a flipped direction
-    // negates it wholesale rather than each branch knowing about `dir`.
+    // Each comparator returns its key's default order; a flipped direction negates it wholesale.
     const flip = dir === SORT_DEFAULT_DIR[sort] ? 1 : -1;
     return [...list].sort((a, b) => {
       if (scores) {
@@ -444,12 +386,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
     });
   }, [byStatus, tab, deferredFilter, tagFilter, formatFilter, countryFilter, listFilter, sort, dir, searchKeys]);
 
-  // Everything below must stay *above* the early returns: hooks after a
-  // conditional return blow up on the loading → loaded transition. They are
-  // memoized so the memoized cards below don't re-render on every keystroke.
-  //
-  // `mutate` is referentially stable across renders; the mutation object it
-  // hangs off is not, so depend on the function itself.
+  // Hooks stay above the early returns; mutate is the stable reference, the mutation object it hangs off is not.
   const { mutate: saveMutate } = save;
 
   const quickSave = useCallback(
@@ -479,13 +416,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
 
   const startEdit = useCallback((entry: MediaListEntry) => setEditing(entry), []);
 
-  // Above the early returns because the keydown effect below has no dependency
-  // array and so re-subscribes on every commit — including the error commit,
-  // which returns before this line. Declared down there, the live listener
-  // closed over a `const` that had never been initialized, and pressing Escape
-  // (or `s` then Escape) threw a TDZ error into the window handler, where it
-  // did nothing visible. The error branch renders with a full `entries`,
-  // because a failed refetch leaves the previous `data` in place.
+  // Above the early returns, or the keydown handler bound on the error commit closes over an uninitialized const.
   const exitSelect = useCallback(() => {
     setSelectMode(false);
     setSelected(new Set());
@@ -498,22 +429,12 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
 
   const { mutate: removeMutate } = remove;
 
-  /**
-   * The list's own key group.
-   *
-   * A roving index rather than real DOM focus: the rows are virtualized, so
-   * the element holding focus is unmounted the moment it scrolls out of view
-   * and the browser drops the focus to `body`. The index survives that, and
-   * `VirtualGrid` scrolls it back into existence when it moves.
-   */
+  /** The list's key group: a roving index rather than DOM focus, since a virtualized row unmounts when it scrolls away. */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      // Anything modal owns the keyboard while it is up, and a field owns it
-      // while the caret is in one.
+      // Anything modal owns the keyboard while it is up, and a field owns it while the caret is in one.
       if (isTyping() || document.querySelector("[data-overlay]")) return;
-      // …and so does any other focused control. See `ownsKeyboard` — this has
-      // to sit above the arrow branch as well, not just the action keys, since
-      // arrows are what a focused `<select>` reads too.
+      // Any other focused control owns it too; keep this above the arrow branch, a focused select reads arrows as well.
       if (!ownsKeyboard(document.activeElement, document.body, scrollRef.current))
         return;
       if (editing || removing || showRandom || showPresetSave) return;
@@ -527,8 +448,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
         const next = nextFocus(focus, direction, columns, entries.length);
         if (next === null) return;
         setFocus(next);
-        // Shift extends the selection one step at a time, which is what a
-        // range select is when the anchor is wherever you started holding it.
+        // Shift extends the selection one step at a time, which is what a range select is from a held anchor.
         if (e.shiftKey) {
           setSelectMode(true);
           setSelected((prev) => new Set(prev).add(entries[next].mediaId));
@@ -596,15 +516,10 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-    // Deliberately no dependency array. The handler closes over the focus, the
-    // selection and the filtered pool, all of which change constantly; a
-    // dependency list here would be every one of them, and getting it wrong
-    // leaves the keys acting on a stale list. Re-binding one window listener
-    // per render costs nothing next to the render itself.
+    // Deliberately no dependency array: a missed entry would leave the keys acting on a stale list, and a rebind is cheap.
   });
 
-  // A filter or a tab change re-pools the entries, and index 12 in the old
-  // pool is a different title in the new one.
+  // A filter or tab change re-pools the entries, so an old index would name a different title.
   useEffect(
     () => setFocus(null),
     [tab, deferredFilter, tagFilter, formatFilter, countryFilter, listFilter, sort],
@@ -613,8 +528,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
   const unit = type === "ANIME" ? t("common.episodes") : t("common.chapters");
 
   if (isLoading) {
-    // The grid, not a sentence: the list is the whole screen, and a line of
-    // text where a wall of covers is about to appear moves everything twice.
+    // The grid, not a sentence: a line of text where a wall of covers is about to appear moves everything twice.
     return (
       <div className="px-8 py-6">
         <CoverGridSkeleton />
@@ -634,8 +548,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
     );
   }
 
-  // One mutation for the whole selection, not one per entry — see
-  // `useListMutations.bulkSave`.
+  // One mutation for the whole selection, not one per entry (useListMutations.bulkSave).
   const bulkPatch = (patch: BulkPatch) =>
     bulkSave.mutate({ entries: selectedEntries, patch });
   const bulkStatus = (status: MediaListStatus) => bulkPatch({ status });
@@ -643,11 +556,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
   const bulkProgress = (progress: number) => bulkPatch({ progress });
   const bulkRepeat = (repeat: number) => bulkPatch({ repeat });
   const bulkPrivate = (hidden: boolean) => bulkPatch({ private: hidden });
-  // Sequential, through one mutation, rather than `forEach(remove.mutate)` —
-  // that fired one concurrent request per entry against a ~30/min budget, which
-  // is exactly the fan-out `bulkSave` was written to end and which the delete
-  // path never got. There is no batch delete to use instead:
-  // `DeleteMediaListEntry` takes a single id.
+  // One sequential mutation, not a concurrent request per entry, and there is no batch delete to use instead.
   const bulkDelete = () => {
     bulkRemove.mutate(selectedEntries);
     setSelected(new Set());
@@ -685,8 +594,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
             </span>
           </div>
           <div className="flex items-center gap-1.5">
-            {/* Labelled, not a bare icon: this one changes the whole
-                interaction model, so it is worth the width. */}
+            {/* Labelled, not a bare icon: this one changes the whole interaction model, so it is worth the width. */}
             <Button
               variant={selectMode ? "secondary" : "outline"}
               size="control"
@@ -737,8 +645,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
           <FilterSelect
             label={t("list.sortLabel")}
             value={sort}
-            // Changing the key clears the direction: "score, descending" was a
-            // choice about scores, not a standing instruction for titles.
+            // Changing the key clears the direction: "score, descending" was a choice about scores, not titles.
             onChange={(v) => setView({ sort: v as SortKey, dir: "" })}
             options={SORT_KEYS.map((k) => ({ value: k, label: t(`sort.${k}`) }))}
           />
@@ -842,16 +749,10 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
       </div>
 
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-8 pb-12 pt-1">
-        {/* Above the grid, not inside it — VirtualGrid takes entries only.
-            The whole-list count, not the tab's: the filter hides from the
-            list, and a per-tab number would jump around while meaning the
-            same titles. */}
+        {/* Above the grid, since VirtualGrid takes entries only; the whole-list count, so it does not jump per tab. */}
         <FilteredNotice adult={hiddenAdult} suggestive={hiddenSuggestive} className="mb-2" />
         {entries.length === 0 ? (
-          // Two different nothings. A tab with no entries is a fact about the
-          // list; a search that matched none is a fact about the query, and
-          // the old single message could not tell them apart — so it never
-          // offered the one thing that fixes the second case.
+          // Two different nothings: an empty tab is a fact about the list, a search that matched none is about the query.
           filter || tagFilter || formatFilter || countryFilter || listFilter ? (
             <EmptyState
               visual={
@@ -918,9 +819,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
         ) : (
           <div className="overflow-hidden rounded-xl border border-surface-800">
             <ListHeader tier={tier} selectMode={selectMode} mediaType={type} />
-            {/* One entry per row. `2xl:grid-cols-2` used to put two side by side
-                past 96rem, which is not a list — and it also made
-                `useColumnCount` report 2, so the down arrow moved by two. */}
+            {/* Keep one entry per row: two side by side made useColumnCount report 2, so the down arrow moved by two. */}
             <VirtualGrid
               items={entries}
               scrollRef={scrollRef}
@@ -964,9 +863,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
         />
       )}
 
-      {/* `Presence` rather than `{editing && …}`: the dialog keeps rendering
-          the entry it was opened with while it animates away, instead of
-          disappearing between frames. */}
+      {/* Presence rather than a bare conditional: the dialog keeps its entry while it animates away. */}
       <Presence value={editing}>
         {(entry, leaving) => (
           <EntryEditModal

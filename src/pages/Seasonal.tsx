@@ -63,9 +63,7 @@ export default function Seasonal() {
     staleTime: 30 * 60 * 1000,
   });
 
-  // Grouped by format, then flattened back: the roving index counts over the
-  // order the eye reads, not the order AniList sent. Fifty items and no
-  // virtualization, so a section is simply another `media-grid`.
+  // Grouped by format, then flattened back, so the roving index counts in the order the eye reads.
   const groups = useMemo(
     () => groupByFormat((data?.media ?? []).filter((m) => !isBlocked(m, level))),
     [data, level],
@@ -73,10 +71,7 @@ export default function Seasonal() {
   const results = useMemo(() => flattenGroups(groups), [groups]);
   const sections = useMemo(() => groups.map((g) => g.items.length), [groups]);
 
-  // Arrow keys over the wall of cards, the same movement and the same
-  // ownership rule the list view uses. `useColumnCount` reads the browser's
-  // resolved `grid-template-columns` rather than recomputing the CSS here,
-  // which is what keeps it right across a breakpoint and a cover-size change.
+  // Arrow keys over the cards as in the list view; `useColumnCount` reads the resolved grid, not the CSS.
   const gridRef = useRef<HTMLDivElement>(null);
   const columns = useColumnCount(gridRef, results.length);
   const navigate = useNavigate();
@@ -124,8 +119,7 @@ export default function Seasonal() {
         )}
         {isLoading && <Loader label={t("seasonal.loading")} />}
         {!isLoading && !error && results.length === 0 && (
-          // Four verticals rather than the schedule's seven: a season is a
-          // shorter unit than a week's worth of episodes.
+          // Four verticals rather than the schedule's seven: a season is a shorter unit than a week.
           <EmptyState visual={<TickMarks count={4} />} title={t("seasonal.empty")} />
         )}
         {groups.length > 0 && (
@@ -142,10 +136,7 @@ export default function Seasonal() {
                   meta={String(group.items.length)}
                   className="mb-3"
                 />
-                {/* The measured grid is the first section's. Every section uses
-                    the same `media-grid` track, so one probe answers for all of
-                    them — and `useColumnCount` needs an element that is
-                    actually laid out. */}
+                {/* Only the first section is measured: every section shares the `media-grid` track. */}
                 <div
                   ref={group.offset === 0 ? gridRef : undefined}
                   className="media-grid gap-x-4 gap-y-6"

@@ -47,12 +47,7 @@ export function DiscordSection() {
           hint={t("settings.discordEnableHint")}
         />
 
-        {/* The backend has honoured a custom app id since the day it was
-            written — `effective_app_id` falls back to the built-in one — and
-            nothing ever offered a way to set it. A field the app sends and
-            nobody can edit is either a bug or dead weight; this makes it the
-            first. Empty means the built-in, which is why the placeholder says
-            so rather than showing a required-looking blank. */}
+        {/* Empty means the built-in id (`effective_app_id` falls back to it), so the placeholder says so. */}
         <Row label={t("settings.discordAppId")} hint={t("settings.discordAppIdHint")}>
           <Input
             value={draft}

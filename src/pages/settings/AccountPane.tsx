@@ -17,11 +17,7 @@ import {
 import { useAniListLogin } from "@/hooks/useAniListLogin";
 import * as api from "@/api/anilist";
 
-/**
- * How the list gets written from this machine — beside the account section
- * because "you and your list" is one subject, and this pane is the only one
- * every platform and both profile modes can see.
- */
+/** How the list gets written from this machine, beside the account because every platform and mode sees this pane. */
 export function DefaultsSection() {
   const { t } = useTranslation();
   const [status, setStatus] = useState<MediaListStatus>(() =>
@@ -49,8 +45,7 @@ export function DefaultsSection() {
               const manga = t(`status.MANGA.${s}`);
               return (
                 <option key={s} value={s}>
-                  {/* One stored value serves both media types, so the two
-                      vocabularies share the label where they differ. */}
+                  {/* One stored value serves both media types, so the label shows both words where they differ. */}
                   {anime === manga ? anime : `${anime} / ${manga}`}
                 </option>
               );
@@ -132,12 +127,7 @@ export function AccountSection() {
     if (!(await login.start())) setShowManual(true);
   };
 
-  // The manual fallback's missing half: when the handoff cannot even start
-  // (callback port taken, no default browser), no browser tab ever opened —
-  // so there is no address bar to copy a token from. This opens the same
-  // authorize page with no callback server behind it; the redirect fails on
-  // purpose and the token sits in the address bar, which is exactly what the
-  // hint below tells the user to paste.
+  // Opens the authorize page with no callback server, so the token lands in the address bar for pasting.
   const openManual = async () => {
     setError(null);
     try {

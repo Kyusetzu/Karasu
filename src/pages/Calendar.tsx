@@ -24,27 +24,7 @@ import { EmptyState, TickMarks } from "@/components/EmptyState";
 import { Shimmer } from "@/components/Skeleton";
 import { cn } from "@/lib/utils";
 
-/**
- * The airing calendar: a real week grid — seven columns, Monday-first,
- * today's column washed in the accent, empty days present as empty cells
- * (on a calendar, emptiness is information).
- *
- * Two lenses, and they cost very different things:
- *
- * - **My shows** (default) is free — it projects the cached list's
- *   `nextAiringEpisode` into the week, so it opens instantly and works
- *   offline. One episode per show is that source's honest limit.
- * - **Everything** is the real schedule: `Page.airingSchedules` for the whole
- *   window, a *bounded* sequential fetch (measured ~120 airings ≈ 3 pages,
- *   capped at 5) behind the one user action of opening or paging the week,
- *   cached for 30 minutes. List membership is still marked from the cache —
- *   `mediaListEntry` per schedule row would widen the payload to answer a
- *   question the list already answers.
- *
- * Week and lens live in the URL, so Back restores the view and a week is a
- * link someone can keep. Anime only, and honestly so: AniList exposes no
- * chapter-release schedule for manga.
- */
+/** The two lenses: "mine" projects the cached list for free, "all" is a bounded `Page.airingSchedules` fetch. */
 
 type Lens = "mine" | "all";
 
@@ -57,6 +37,7 @@ interface Slot {
   entry: MediaListEntry | null;
 }
 
+/** The airing week grid; week and lens live in the URL, and it is anime only since manga has no schedule. */
 export default function Calendar() {
   const { t, i18n } = useTranslation();
   const [params, setParams] = useSearchParams();
@@ -67,8 +48,7 @@ export default function Calendar() {
   const lens: Lens = params.get("lens") === "all" ? "all" : "mine";
   const currentWeek = weekStartOf(Date.now());
   const rawWeek = Number(params.get("week"));
-  // A week param must be a real week start — anything else (including a
-  // hand-edited value) snaps to the week it falls in.
+  // A week param must be a real week start; anything else snaps to the week it falls in.
   const week = Number.isFinite(rawWeek) && rawWeek > 0 ? weekStartOf(rawWeek * 1000) : currentWeek;
   const weekEnd = addDays(week, 7);
   const days = weekDays(week);
@@ -91,9 +71,7 @@ export default function Calendar() {
     );
   };
 
-  // The cached list serves both lenses: it *is* the "My shows" data, and it
-  // marks membership on the "Everything" one. Same key the list page and the
-  // Dashboard use, so this is almost always a cache hit.
+  // The cached list serves both lenses, on the same key as the list page so it is almost always a hit.
   const list = useQuery({
     queryKey: ["mediaList", "ANIME", userId],
     queryFn: () => fetchMediaList(userId, "ANIME"),
@@ -114,10 +92,7 @@ export default function Calendar() {
     [entries],
   );
 
-  // Everything: fetched only while that lens is active — an unmounted query
-  // has no observer, and the mine lens must stay a zero-request screen. Not
-  // keyed on the filter level: blocking is client-side, and a filter change
-  // must not spend the budget again.
+  // Fetched only under the "all" lens, and not keyed on the filter level, so a filter change costs nothing.
   const all = useQuery({
     queryKey: ["calendar", week],
     queryFn: () => airingWeek(week, weekEnd),
@@ -199,9 +174,7 @@ export default function Calendar() {
           >
             <ChevronRight className="size-4.5" />
           </Button>
-          {/* Everything the export needs is already on screen — the same
-              slots the grid draws, as VEVENTs any calendar app imports.
-              Stable UIDs mean a re-export updates instead of duplicating. */}
+          {/* The export is the slots the grid draws, with stable UIDs so a re-export updates instead of duplicating. */}
           {slots.length > 0 && (
             <IconButton
               variant="ghost"
@@ -243,9 +216,7 @@ export default function Calendar() {
         />
       </div>
 
-      {/* `overflow-auto`, not `-y-`: the seven fixed-minimum columns are wider
-          than a narrow window, and scrolling the grid sideways beats crushing
-          a day into an unreadable sliver. */}
+      {/* `overflow-auto`, not `-y-`: seven fixed-minimum columns outgrow a narrow window and must scroll. */}
       <div className="min-h-0 flex-1 overflow-auto px-8 py-6">
         {error ? (
           <p className="text-sm text-danger">{t("common.error", { message: String(error) })}</p>
@@ -330,11 +301,7 @@ function DayColumn({
   );
 }
 
-/**
- * One airing in a day cell — `DigestRow` is the wrong shape for a column, so
- * the card stacks what the row spreads: time and episode on one line, the
- * title clamped beneath, the on-list pip trailing the first line.
- */
+/** One airing in a day cell, stacked where `DigestRow` spreads, because a row is the wrong shape for a column. */
 function CalendarCard({ slot }: { slot: Slot }) {
   const { t, i18n } = useTranslation();
   const title = displayTitle(slot.media.title);

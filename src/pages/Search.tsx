@@ -52,11 +52,7 @@ import { EmptyState, PerchRule, StruckQuery } from "@/components/EmptyState";
 import { Pill } from "@/components/ui/pill";
 import { UserList } from "@/components/social/UserList";
 
-/**
- * What the search is looking for. The comment on the pills below always said
- * the two mediums were "one choice among several the search will grow" — people
- * are the third.
- */
+/** What the search is looking for; the scope pills grew from two mediums to people and entities. */
 type Scope = MediaType | "USERS" | "CHARACTERS" | "STAFF" | "STUDIOS";
 
 /** The two scopes that browse media — everything the filter toolbar serves. */
@@ -107,16 +103,11 @@ export default function Search() {
   const [term, setTerm] = useState("");
   const [scope, setScope] = useState<Scope>("ANIME");
   const phone = usePhoneShell();
-  // Phone only: the nine filter chips collapse behind this. Desktop has the
-  // room and keeps its inline row.
+  // Phone only: the filter chips collapse behind this; desktop has the room and keeps its inline row.
   const [filtersOpen, setFiltersOpen] = useState(false);
-  // The phone fold pops in, so it must pop out — `{filtersOpen && …}` alone
-  // cut it away mid-frame on collapse. Desktop renders it statically either
-  // way and never consults this.
+  // The phone fold must pop out as well as in; a bare conditional cuts it away mid-frame on collapse.
   const filterPanel = usePresence(filtersOpen);
-  // Include *and* exclude, many at a time — `Page.media` takes `genre_in` /
-  // `genre_not_in` and the tag pair, which is what AniList's own browse page
-  // is built on. One genre and one tag was a lens, not a filter.
+  // Include and exclude, many at a time: one genre and one tag was a lens, not a filter.
   const [genre, setGenre] = useState(EMPTY);
   const [tag, setTag] = useState(EMPTY);
   const [year, setYear] = useState("");
@@ -137,8 +128,7 @@ export default function Search() {
   // A format from the other medium is meaningless after a scope flip.
   useEffect(() => {
     setFormat("");
-    // Season too: it only renders for ANIME, and an invisible stale season
-    // kept filtering MANGA after a scope flip.
+    // Season too: it only renders for ANIME, so a stale one would keep filtering MANGA invisibly.
     setSeason("");
   }, [scope]);
 
@@ -168,8 +158,7 @@ export default function Search() {
     !isEmpty(tag) ||
     !!(year || season || format || status || source || country);
 
-  // The toggle's badge — the same predicate as `hasFilters`, summed. Sort is
-  // deliberately not counted, matching that predicate's semantics.
+  // The toggle's badge: `hasFilters` summed, so sort is deliberately not counted either.
   const activeFilterCount =
     Number(!isEmpty(genre)) +
     Number(!isEmpty(tag)) +
@@ -207,12 +196,7 @@ export default function Search() {
   };
 
   const media = useInfiniteQuery({
-    // The level is part of the key: changing it must refetch, since the
-    // filtering happens server-side.
-    //
-    // Genre and tag go in *encoded*, not as arrays: `encode` sorts both sides,
-    // so picking the same two genres in a different order is one cache entry
-    // rather than two byte-identical requests.
+    // Level is keyed since filtering is server-side; genre and tag are encoded so pick order is one entry.
     queryKey: [
       "search",
       type,
@@ -235,15 +219,7 @@ export default function Search() {
     staleTime: 5 * 60 * 1000,
   });
 
-  // Server-side isAdult covers explicit works; the strict level additionally
-  // drops Ecchi, which AniList does not flag as adult.
-  // What arrived minus what the filter dropped locally, split by reason. The
-  // server already omits adult titles at both filtering levels
-  // (`adultQueryArg`), so in practice the adult bucket stays 0 and the drops
-  // are Ecchi at `strict` — the split is carried anyway so the sentence stays
-  // honest if that ever changes. Moving the filtering client-side to count
-  // "everything" is the sparse-page bug queries.ts documents; not doing that
-  // is the point.
+  // Adult stays server-side (`adultQueryArg`): filtering it here is the sparse-page bug; the split keeps the notice honest.
   const fetched = (media.data?.pages ?? []).flatMap((p) => p.media);
   let hiddenAdult = 0;
   let hiddenSuggestive = 0;
@@ -293,14 +269,7 @@ export default function Search() {
               className="h-11 pl-9"
             />
           </div>
-          {/* Chips rather than a segmented control: this was written when there
-              were two mediums and called them "one choice among several the
-              search will grow". People are the third, and the chips took it
-              without a layout change — which is what the shape was chosen for. */}
-          {/* One scrollable line on phone — the profile-tabs gesture — and
-              the old wrap on desktop. The divider travels with the chips in
-              one non-breaking group, so it can never orphan onto its own
-              wrapped line again. */}
+          {/* Chips scroll on phone and wrap on desktop; the divider is grouped with them so it cannot orphan onto its own line. */}
           <div
             className={cn(
               "mt-2.5 flex items-center gap-1.5",
@@ -381,8 +350,7 @@ export default function Search() {
                 placeholder={t("search.any")}
                 options={genres}
               />
-              {/* Searchable: AniList ships roughly six hundred tags, which is
-                  a scroll rather than a list. */}
+              {/* Searchable: the tag vocabulary is a scroll rather than a list. */}
               <MultiFilterSelect
                 label={t("search.tagLabel")}
                 value={tag}
@@ -430,10 +398,7 @@ export default function Search() {
                   label: mediaStatusLabel(s, t),
                 }))}
               />
-              {/* `sourceLabel` and `originLabel` are `lib/format`'s, not this
-                  file's: both already shipped with their labels in both
-                  languages, and a second copy is how "Manhua (China)" ends up
-                  spelled two ways. */}
+              {/* `sourceLabel` and `originLabel` stay `lib/format`'s; a second copy is how a label gets spelled two ways. */}
               <FilterSelect
                 label={t("search.sourceLabel")}
                 value={source}
@@ -490,13 +455,7 @@ export default function Search() {
   );
 }
 
-/**
- * Users need a longer query than media.
- *
- * Two characters make AniList return the exact match followed by a fixed set of
- * unrelated accounts, so the threshold is three — the point at which it starts
- * answering with real prefix matches. Media search is fine at two and keeps it.
- */
+/** Users need a longer query than media; a shorter one makes AniList pad the exact match with unrelated accounts. */
 function UserSearchResults({ term }: { term: string }) {
   const { t } = useTranslation();
   const mode = useAuth((s) => s.mode);
@@ -533,13 +492,7 @@ function UserSearchResults({ term }: { term: string }) {
   );
 }
 
-/**
- * Characters and staff share one list: same row, same page shape, different
- * fetcher and route. No account gate — these are public reads and work
- * signed out and in local mode — and the three-character floor is the
- * users' own, re-measured per entity (see `CHARACTER_SEARCH_QUERY`).
- * Paging is a button, as everywhere.
- */
+/** Characters and staff share one list, with no account gate because these are public reads. */
 function PersonSearchResults({
   kind,
   term,
@@ -727,10 +680,7 @@ function MediaResults({
 }) {
   const { t } = useTranslation();
 
-  // Arrow keys over the wall of cards, the same movement and the same
-  // ownership rule the list view uses. `useColumnCount` reads the browser's
-  // resolved `grid-template-columns` rather than recomputing the CSS here,
-  // which is what keeps it right across a breakpoint and a cover-size change.
+  // Arrow keys as in the list view; `useColumnCount` reads the resolved grid instead of recomputing CSS.
   const gridRef = useRef<HTMLDivElement>(null);
   const columns = useColumnCount(gridRef, results.length);
   const navigate = useNavigate();
@@ -746,16 +696,13 @@ function MediaResults({
     <>
       {error != null && (
         <p className="text-sm text-danger">
-          {/* Through the code translator: a backend error is a stable code
-              (`anilist.tokenRejected` reached users verbatim here), and
-              `backendErrorText` turns known codes into sentences. */}
+          {/* A backend error is a stable code; `backendErrorText` turns the known ones into sentences. */}
           {t("common.error", { message: backendErrorText(error, t) })}
         </p>
       )}
       {isFetching && <Loader size="sm" label={t("search.searching")} />}
       {!isFetching && !active && (
-        // No mark here, deliberately: on every other empty screen the visual
-        // is the subject, and on this one the field above it is.
+        // No mark here, deliberately: on this empty screen the field above is the subject, not a visual.
         <EmptyState title={t("search.prompt")} hint={t("search.promptHint")} />
       )}
       {!isFetching && active && (
@@ -764,8 +711,7 @@ function MediaResults({
       {!isFetching && active && results.length === 0 && (
         <EmptyState
           visual={<StruckQuery query={term || t("search.filtered")} />}
-          // The query is already on screen at 2.5rem — repeating it in the
-          // sentence underneath just says the same thing twice.
+          // The query is already on screen in the visual, so the sentence underneath does not repeat it.
           title={t("search.noResults")}
           hint={t("search.noResultsHint")}
         />
@@ -779,8 +725,7 @@ function MediaResults({
           </div>
           {hasNextPage && (
             <div className="mt-6 flex justify-center">
-              {/* Countless, per the house rule: `pageInfo.total` is the
-                  capped sentinel on search, so a number would be invented. */}
+              {/* Countless: `pageInfo.total` is a capped sentinel on search, so a number would be invented. */}
               <Button variant="outline" size="control" onClick={onMore} disabled={fetchingMore}>
                 {t("social.loadMorePlain")}
               </Button>

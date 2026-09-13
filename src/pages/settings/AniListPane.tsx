@@ -28,22 +28,7 @@ import { isAndroid, usePlatform } from "@/stores/platform";
 import { cn } from "@/lib/utils";
 import { notifScheduleFailure } from "@/lib/notifSchedule";
 
-/**
- * The eighth pane: AniList's own account settings.
- *
- * A pane rather than controls on the profile, for the reason `Settings.tsx`
- * already gives for itself — a pane is URL-addressable, so a dead end elsewhere
- * can point at the exact pane that fixes it. That is precisely what the three
- * override notes need.
- *
- * Reads through `["social", "user", <name>]`, the same cache entry the viewer's
- * own profile fills. Opening this after visiting your profile costs **zero**
- * requests, which is why `USER_PROFILE_QUERY` carries `options` at all.
- *
- * `about` and `profileColor` are absent on purpose: they are composed next to a
- * preview of themselves, so they live in the profile-edit modal. The link below
- * is the cross-reference, and no field lives in two places.
- */
+/** AniList's own account settings, served from the profile's cache entry; bio and colour stay in the profile editor. */
 
 const TITLE_LANGUAGES = [
   "ROMAJI",
@@ -66,12 +51,7 @@ const SCORE_FORMATS = [
 
 const ROW_ORDERS = ["title", "score", "updatedAt", "id"] as const;
 
-/**
- * Literal-switch labels for the four selects, so `i18nKeys.test.ts` sees
- * every key — the same trade `listActivityLabel` and `notificationLabel`
- * already make. The raw enum values ("ROMAJI_STYLISED", "POINT_10_DECIMAL")
- * are API vocabulary, not labels.
- */
+/** Literal switches for the selects, so `i18nKeys.test.ts` sees every key; the raw enum values are not labels. */
 function titleLanguageLabel(v: (typeof TITLE_LANGUAGES)[number], t: (k: string) => string): string {
   switch (v) {
     case "ROMAJI": return t("settings.alTitleRomaji");
@@ -149,13 +129,7 @@ function useViewerSettings() {
   return { viewer, ...q };
 }
 
-/**
- * The whole pane's answer when there is no account.
- *
- * Rendered first and alone: the three sections below each returned null, so
- * this pane was three `return null`s and an empty page — which reads as a crash
- * rather than as "there is nothing here for you yet".
- */
+/** The pane's answer without an account; the sections below return null, which read as a crash. */
 export function AniListSignedOutNote() {
   const { t } = useTranslation();
   const viewer = useAuth((s) => s.viewer);
@@ -311,9 +285,7 @@ export function AniListProfileSection() {
               />
             </Row>
 
-            {/* Per-status activity muting. The same whole-array write as the
-                notification grid: `mergeListActivity` always sends all six, so
-                flipping one cannot silently reset the other five. */}
+            {/* Per-status activity muting; `mergeListActivity` sends the whole array, so one flip cannot reset the rest. */}
             <div className="border-t border-surface-800 pt-3">
               <p className="text-sm text-ink-100">{t("settings.alListActivity")}</p>
               <p className="mt-0.5 text-xs text-ink-600">{t("settings.alListActivityHint")}</p>
@@ -339,8 +311,7 @@ export function AniListProfileSection() {
           </>
         )}
 
-        {/* The hard edge, stated rather than hidden: the API has no mutation
-            for these three, so no client can offer them. */}
+        {/* Stated rather than hidden: the API has no mutation for these, so no client can offer them. */}
         <ExternalNote>{t("settings.alNoUpload")}</ExternalNote>
 
         <div className="flex flex-wrap gap-2 border-t border-surface-800 pt-3">
@@ -366,11 +337,7 @@ function isActivityMuted(
   return (current ?? []).some((o) => o?.type === status && o.disabled === true);
 }
 
-/**
- * A literal switch, not `` t(`status.ANIME.${s}`) `` — partly for
- * `i18nKeys.test.ts`, partly because these labels cover anime *and* manga at
- * once, which the per-type status labels deliberately do not.
- */
+/** A literal switch, for `i18nKeys.test.ts` and because these labels cover anime and manga at once. */
 function listActivityLabel(status: ListActivityStatus, t: (k: string) => string): string {
   switch (status) {
     case "CURRENT":
@@ -437,32 +404,7 @@ export function AniListListOptionsSection() {
               </select>
             </Row>
 
-            {/* Read-only, and this is the one deliberate refusal in the pane.
-                `MediaListOptionsInput.customLists` is a full replacement with no
-                undo on AniList's side, so sending the object at all risks
-                deleting lists the user built by hand. See
-                `lib/anilistUserFields` and its test.
-
-                Creating, renaming and reordering were scoped for 1.0 and
-                dropped after introspecting the input type, for three reasons
-                that are worth writing down so nobody re-derives them:
-
-                - `MediaListOptionsInput.theme` is **write-only**. It exists on
-                  the input and on no output type in the schema — a full-schema
-                  field scan for /theme/ returns nothing — so a send cannot read
-                  it back to preserve it, and if an absent field nulls, any save
-                  here silently resets the user's list theme on anilist.co.
-                - Three more full-replacement arrays ride in the same object:
-                  `sectionOrder`, `advancedScoring` and `customLists` itself.
-                  Getting `sectionOrder` wrong scrambles the *status* sections
-                  too, and it is also where display order actually lives — so
-                  "reorder" was never `customLists` in the first place.
-                - Whether an omitted field inside that input means "leave alone"
-                  or "null it" cannot be settled by introspection, and settling
-                  it by experiment means editing a real account's settings.
-
-                A feature whose safety rests on an untested assumption about a
-                field the app cannot read is not one to ship into a 1.0. */}
+            {/* Read-only on purpose: `customLists` is a full replacement with no undo, so never send it (`lib/anilistUserFields`). */}
             <div className="rounded-lg border border-surface-800 bg-surface-950 p-3">
               <p className="text-xs font-medium text-ink-300">
                 {t("settings.alCustomLists")}
@@ -497,20 +439,7 @@ export function AniListListOptionsSection() {
   );
 }
 
-/**
- * Twenty toggles, collapsed.
- *
- * Seventeen of them are about AniList's own site and email, which a Karasu user
- * will never touch — unrolled they bury the three override warnings above
- * (`LOCAL_OVERRIDES` has exactly three keys, and a test pins the list), which
- * are the important content of this pane.
- *
- * Its own query with `staleTime: 0`, because `UpdateUser(notificationOptions:)`
- * replaces the **whole array**: merging against a stale copy would silently
- * disable whatever changed elsewhere since. `mergeNotificationOptions` always
- * emits all twenty, and a test asserts a three-field change preserves the other
- * seventeen.
- */
+/** The notification toggles, collapsed; fetched fresh on merge, because `UpdateUser` replaces the whole array. */
 export function AniListNotificationsSection() {
   const { t } = useTranslation();
   const viewer = useAuth((s) => s.viewer);
@@ -521,7 +450,7 @@ export function AniListNotificationsSection() {
     queryKey: ["social", "notificationOptions", viewer?.id],
     queryFn: () => notificationOptions(viewer!.id),
     enabled: isTauri && !!viewer?.id && open,
-    // Must be fresh at the moment of merging — see above.
+    // Must be fresh at the moment of merging: the write replaces the whole array.
     staleTime: 0,
     gcTime: 60 * 1000,
   });
@@ -585,13 +514,7 @@ export function AniListNotificationsSection() {
   );
 }
 
-/**
- * A literal `t()` per type, so `i18nKeys.test.ts` can see all twenty.
- *
- * Twenty lines of switch rather than `t(\`settings.alNotif_\${type}\`)`, which
- * that suite cannot resolve — the same trade `receiptText` and the activity
- * verbs already make.
- */
+/** A literal `t()` per type, so `i18nKeys.test.ts` sees every key; a template key is invisible to it. */
 function notificationLabel(
   type: NotificationTypeName,
   t: (k: string) => string,
@@ -620,22 +543,14 @@ function notificationLabel(
   }
 }
 
-/**
- * How often Karasu checks AniList for unread notifications in the
- * background, as a system notification. Off by default: it is the first
- * thing in the app that spends the shared request budget with nobody
- * asking, so enabling it is a choice. One number on both platforms - the
- * kv key drives the in-app pass here and Android's JobScheduler alike,
- * which is why the floor is 15 minutes (Android's) everywhere.
- */
+/** How often the background check runs, off by default; one key drives both platforms, so the floor is Android's. */
 export function NotificationScheduleSection() {
   const { t } = useTranslation();
   const viewer = useAuth((s) => s.viewer);
   const android = isAndroid(usePlatform((s) => s.info));
   const [minutes, setMinutes] = useState<number | null>(null);
   const [custom, setCustom] = useState(false);
-  // The field's text while editing - the covers-per-row lesson: binding a
-  // number input straight to committed state makes it uneditable.
+  // The field's text while editing; a number input bound straight to committed state is uneditable.
   const [draft, setDraft] = useState<string | null>(null);
 
   useEffect(() => {
@@ -650,20 +565,14 @@ export function NotificationScheduleSection() {
 
   const commit = (m: number) => {
     setMinutes(m);
-    // Swallowing the rejection was how a JobScheduler that refused the job
-    // left this pane reading "every 15 minutes" with nothing registered. The
-    // stored setting is still correct in that case, so the select keeps the
-    // new value; `notifScheduleFailure` says which of the two sentences is
-    // the true one. The toast truncates both of its lines to one row, and
-    // a phone shows about thirty characters of each — so the headline is the
-    // short fact, the reassurance leads the detail line, and the platform's
-    // own reason follows it for the wide screens and the bug reports.
+    // Never swallow the rejection; the setting stays stored, and `notifScheduleFailure` says which sentence is true.
     setNotifSchedule(m).catch((e) => {
       const failure = notifScheduleFailure(String(e));
       const refused = failure.kind === "refused";
       const detail = refused
         ? [t("settings.notifJobRefusedHint"), failure.detail].filter(Boolean).join(" · ")
         : failure.detail;
+      // A phone truncates each toast line, so the short fact leads and the platform's own reason trails.
       showToast({
         kind: "error",
         text: refused ? t("settings.notifJobRefused") : t("settings.notifScheduleFailed"),
@@ -676,10 +585,7 @@ export function NotificationScheduleSection() {
     <Card>
       <CardTitle>{t("settings.notifSchedule")}</CardTitle>
       <p className="mt-2 text-sm text-ink-500">{t("settings.notifScheduleHint")}</p>
-      {/* The job runs on the cadence chosen here only while Android lets it:
-          a rarely-opened app's periodic job is stretched to once a day by the
-          standby buckets, and the exemption under Detection → Jellyfin is the
-          lever. Said here, where the cadence is chosen. */}
+      {/* Android's standby buckets stretch the job; the exemption under Detection is the lever, so it is named here. */}
       {android && (
         <p className="mt-1 text-xs text-ink-600">
           {t("settings.notifScheduleAndroidHint")}{" "}

@@ -12,18 +12,7 @@ import { NewThreadModal } from "@/components/overlays/NewThreadModal";
 import { useAuth } from "@/stores/auth";
 import { cn } from "@/lib/utils";
 
-/**
- * The forum index.
- *
- * Deferred during the social work as "a second feature with its own rate-limit
- * story" — which it is, so it keeps every rule that story implies: paging is a
- * button, only the active lens is mounted, and nothing fetches on a keystroke.
- *
- * Three lenses, and they are lenses rather than tabs because AniList models them
- * as different arguments to one field: browse (optionally one category), search,
- * and your subscriptions. Category and lens live in the URL, so a category is a
- * link someone can keep.
- */
+/** Lenses rather than tabs, because AniList models the three as different arguments to one field. */
 type Lens = "browse" | "search" | "subscribed";
 
 const LENSES: Lens[] = ["browse", "search", "subscribed"];
@@ -32,6 +21,7 @@ function isLens(v: string | null): v is Lens {
   return LENSES.includes((v ?? "") as Lens);
 }
 
+/** The forum index: paging is a button, only the active lens is mounted, and nothing fetches on a keystroke. */
 export default function Forum() {
   const { t } = useTranslation();
   const [params, setParams] = useSearchParams();
@@ -44,10 +34,7 @@ export default function Forum() {
   const [term, setTerm] = useState(params.get("q") ?? "");
   const [composing, setComposing] = useState(false);
 
-  // The same 500 ms debounce the media search uses. A forum search on every
-  // keystroke would spend the shared rate limit faster than anything else here.
-  // The settled term is also written back to `?q=` — it was only ever *read*
-  // before, so a search did not survive Back from a thread.
+  // Debounced like the media search, and the settled term is written to `?q=` so it survives Back.
   useEffect(() => {
     const timer = setTimeout(() => {
       const next = input.trim();
@@ -145,9 +132,7 @@ export default function Forum() {
         )}
       </div>
 
-      {/* Keyed so switching lens replays the settle, and — more to the point —
-          so the previous lens unmounts. An unmounted infinite query has no
-          observer and cannot join a refetch. */}
+      {/* Keyed so the previous lens unmounts: an unmounted infinite query has no observer to join a refetch. */}
       <div
         key={`${lens}:${categoryId ?? "all"}:${lens === "search" ? term : ""}`}
         className={cn("min-h-0 flex-1 animate-settle overflow-y-auto px-8 py-6")}
@@ -177,15 +162,13 @@ export default function Forum() {
                   : t("forum.noThreads")
             }
             emptyHint={lens === "subscribed" ? t("forum.noSubscriptionsHint") : undefined}
-            // A search goes stale sooner than a category listing, but neither is
-            // volatile enough to justify a short window.
+            // A search goes stale sooner than a category listing, but neither justifies a short window.
             staleTime={lens === "search" ? 5 * 60 * 1000 : 10 * 60 * 1000}
           />
         )}
       </div>
 
-      {/* Through `PresenceIf` so the dialog can animate out — React unmounts
-          before CSS can, so `{open && <Modal/>}` only ever has an entrance. */}
+      {/* Through `PresenceIf` so the dialog can animate out; a bare conditional only ever has an entrance. */}
       <PresenceIf when={composing}>
         {(leaving) => <NewThreadModal onClose={() => setComposing(false)} leaving={leaving} />}
       </PresenceIf>

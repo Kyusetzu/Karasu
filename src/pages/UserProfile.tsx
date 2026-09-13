@@ -32,20 +32,7 @@ import { isSelf } from "@/lib/follows";
 import { displayTitle } from "@/api/types";
 import { cn } from "@/lib/utils";
 
-/**
- * Someone's AniList profile — the viewer's own included.
- *
- * Keyed on **name**, not id, because that is what AniList's own URLs carry,
- * what an `@mention` resolves to and what a pasted link contains. The id comes
- * back in the response and is what everything downstream keys on.
- *
- * Costs two requests cold: the profile, and the follower/following totals. The
- * totals need an id, which is only known once the profile resolves, so they
- * cannot share a document. Two is also the cap — the rate limiter in
- * `client.rs` reads its budget and releases the lock before any response header
- * lands, so it cannot see a burst it has not sent yet. Tab content therefore
- * mounts on tab activation, which is a second, user-initiated moment.
- */
+/** Someone's AniList profile, keyed on name because that is what AniList URLs and mentions carry. */
 export default function UserProfile() {
   const { name = "" } = useParams();
   const { t } = useTranslation();
@@ -57,15 +44,13 @@ export default function UserProfile() {
     queryFn: () => userProfile({ name }),
     enabled: isTauri && !!name && mode === "anilist",
     staleTime: 10 * 60 * 1000,
-    // An unknown name is HTTP 404 from AniList, and the default `retry: 1` would
-    // spend a second request confirming a typo.
+    // An unknown name is a 404, and the default retry would spend a second request confirming a typo.
     retry: false,
   });
 
   if (loading) return null;
 
-  // The social graph belongs to an account. In local mode there is no viewer to
-  // be following anyone, so this says so rather than rendering an empty profile.
+  // In local mode there is no viewer to be following anyone, so say so rather than render an empty profile.
   if (mode !== "anilist") {
     return (
       <div className="px-8 pt-7">
@@ -87,10 +72,7 @@ export default function UserProfile() {
 
   if (profile.isLoading) return <ProfileSkeleton />;
 
-  // A rejection is only "does not exist" when it says so. Anything else — an
-  // expired token, a rate limit, no connection — is a failure to ask, and
-  // asserting the user is gone because the network is down is a definite
-  // claim about someone else's data. See `lib/apiError`.
+  // Only a real not-found means the user is gone; any other failure is a failure to ask (lib/apiError).
   if (profile.error && !isNotFound(profile.error)) {
     return (
       <div className="px-8 pt-7">
@@ -121,8 +103,7 @@ export default function UserProfile() {
 
   const user = profile.data;
 
-  // A blocked profile returns a real user object with empty everything. Saying
-  // so beats rendering a profile that looks like an abandoned account.
+  // A blocked profile is a real user object with everything empty; say so rather than look abandoned.
   if (user.isBlocked) {
     return (
       <div className="px-8 pt-7">
@@ -141,8 +122,7 @@ export default function UserProfile() {
 
   return (
     <div className="pb-12">
-      {/* In flow above the banner rather than floating on it — the no-banner
-          profile puts the avatar exactly where a floated button would sit. */}
+      {/* In flow above the banner: a no-banner profile puts the avatar where a floated button would sit. */}
       <div className="px-8 pt-4">
         <BackButton />
       </div>
@@ -159,20 +139,7 @@ function isTab(value: string | null): value is Tab {
   return TABS.includes((value ?? "") as Tab);
 }
 
-/**
- * Tabs in the search param, not in state.
- *
- * `<main key={pathname}>` in `App.tsx` does not remount on a search-param
- * change, so tabs switch in place, deep-link, and survive back and forward —
- * the same reasoning the settings panes already use for `?pane=`.
- *
- * Each panel is **mounted on activation rather than gated with `enabled`**.
- * An unmounted query has no observer, so it cannot join a refetch either, and
- * within `gcTime` switching back is free. It also keeps the two-queries-per-
- * mount cap honest: tab content arrives at a second, user-initiated moment
- * instead of racing the profile's own pair past the rate limiter's pre-flight
- * check.
- */
+/** Tabs live in the search param, and each panel mounts on activation to keep the two-queries-per-mount cap. */
 function Tabbed({ user }: { user: UserProfileData }) {
   const { t } = useTranslation();
   const [params, setParams] = useSearchParams();
@@ -199,9 +166,7 @@ function Tabbed({ user }: { user: UserProfileData }) {
 
   return (
     <div className="mt-7 px-8">
-      {/* Scrollable rather than wrapping: six tabs do not fit a phone, and a
-          sideways flick is the one horizontal gesture the shell allows —
-          per-tab, not per-page. */}
+      {/* Scrolls rather than wraps: six tabs do not fit a phone, and the strip may scroll sideways where the page must not. */}
       <div
         role="tablist"
         className="flex gap-1 overflow-x-auto border-b border-surface-800"
@@ -214,8 +179,7 @@ function Tabbed({ user }: { user: UserProfileData }) {
               role="tab"
               aria-selected={active}
               onClick={() => {
-                // `replace` so a tab flick does not fill the back stack with
-                // steps the user has to walk out of.
+                // `replace` so a tab flick does not fill the back stack with steps to walk out of.
                 const next = new URLSearchParams(params);
                 if (id === "overview") next.delete("tab");
                 else next.set("tab", id);
@@ -249,8 +213,7 @@ function Tabbed({ user }: { user: UserProfileData }) {
         })}
       </div>
 
-      {/* Keyed on the tab so the panel replays `animate-settle`, exactly as the
-          settings panes do. */}
+      {/* Keyed on the tab so the panel replays `animate-settle`, as the settings panes do. */}
       <div key={tab} className="animate-settle pt-6">
         {tab === "overview" && <Favourites user={user} />}
         {tab === "lists" && <UserLists user={user} />}
@@ -288,8 +251,7 @@ function Favourites({ user }: { user: UserProfileData }) {
   const self = isSelf(viewer?.id, user.id);
   const [editing, setEditing] = useState(false);
 
-  // The filter has to run on other people's content too, and `favourites` takes
-  // no `isAdult` argument, so it can only happen here.
+  // The content filter must run here: `favourites` takes no `isAdult` argument, so nowhere else can.
   const anime = (user.favourites?.anime?.nodes ?? []).filter((m) => !isBlocked(m, level));
   const manga = (user.favourites?.manga?.nodes ?? []).filter((m) => !isBlocked(m, level));
   const characters = user.favourites?.characters?.nodes ?? [];
@@ -312,9 +274,7 @@ function Favourites({ user }: { user: UserProfileData }) {
     <div className="space-y-6">
       {editButton}
 
-      {/* This is a whole tab now, so "nothing here" has to say so. Returning
-          null was fine when favourites were one section among several; as a tab
-          body it renders an empty page that reads as a failure. */}
+      {/* As a whole tab body, an empty favourites list must say so or it reads as a failure. */}
       {empty && (
         <EmptyState
           visual={<CoverOutline />}
@@ -438,9 +398,7 @@ function ProfileSkeleton() {
           <Shimmer key={i} className={cn("h-3 rounded", i === 2 ? "w-1/2" : "w-full")} index={i + 3} />
         ))}
       </div>
-      {/* The tab bar, so the header does not jump when the real one arrives.
-          Widths written out: Tailwind scans source for literal class strings, so
-          an interpolated `w-${n}` is a class that never gets emitted. */}
+      {/* Widths are literal class strings because Tailwind never emits an interpolated `w-${n}`. */}
       <div className="mt-7 flex gap-4 border-b border-surface-800 pb-2">
         {["w-16", "w-20", "w-20"].map((w, i) => (
           <Shimmer key={i} className={cn("h-3 rounded", w)} index={i} />

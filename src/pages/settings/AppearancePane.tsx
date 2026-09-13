@@ -28,15 +28,9 @@ export function AppearanceSection() {
   const { t } = useTranslation();
   const [lang, setLang] = useState<LanguageSetting>(getLanguageSetting());
   const [showCustomAccent, setShowCustomAccent] = useState(false);
-  // One picker at a time. Six open pickers would be a wall, and the swatch
-  // itself is the affordance — same shape as the accent's Palette toggle.
+  // One picker at a time; the swatch itself is the affordance, as with the accent's Palette toggle.
   const [editingStatus, setEditingStatus] = useState<MediaListStatus | null>(null);
-  // The covers field's *text* while it is being edited, `null` when at rest.
-  // Binding the input straight to the committed number made the field
-  // uneditable on Android: clearing it fires onChange with "", the guard
-  // rejects that, React re-renders the old value — so the 2 snapped back and
-  // every keystroke appended to it (2 → 20 → 207). A draft lets "" exist
-  // while typing; blur snaps the text back to whatever actually committed.
+  // The covers field's text while editing: keep the draft, a bound number was uneditable on Android.
   const [colsDraft, setColsDraft] = useState<string | null>(null);
   const themeMode = useTheme((s) => s.mode);
   const accent = useTheme((s) => s.accent);
@@ -55,17 +49,13 @@ export function AppearanceSection() {
     setLanguageSetting(setting);
   };
 
-  // The window zoom lives in Rust (it is applied before the first paint, so
-  // it cannot be a localStorage setting like the rest of this pane), and
-  // Android has no zoom to set — the row is simply absent there, not greyed:
-  // the phone shell has the system's own text size for that.
+  // The window zoom lives in Rust because it applies before first paint; Android has none, so no row.
   const android = isAndroid(usePlatform((s) => s.info));
   const [zoom, setZoom] = useState<number | null>(null);
   useEffect(() => {
     if (!api.isTauri || android) return;
     api.getUiZoom().then(setZoom).catch(() => {});
-    // Ctrl+plus while this pane is open changes the same setting; the
-    // select follows rather than showing the number from before.
+    // Ctrl+plus while this pane is open changes the same setting, so the select follows it.
     const onZoom = (e: Event) => setZoom((e as CustomEvent<number>).detail);
     window.addEventListener(api.UI_ZOOM_EVENT, onZoom);
     return () => window.removeEventListener(api.UI_ZOOM_EVENT, onZoom);
@@ -119,8 +109,7 @@ export function AppearanceSection() {
               className={SELECT}
               aria-label={t("settings.uiZoom")}
             >
-              {/* A stored value off the list (an older build, a hand-edited
-                  database) is still shown, as its own option. */}
+              {/* A stored value off the list is still shown, as its own option. */}
               {(UI_ZOOM_STEPS as readonly number[]).includes(zoom) ? null : (
                 <option value={zoom}>{zoom} %</option>
               )}
@@ -134,8 +123,7 @@ export function AppearanceSection() {
         )}
 
         <Row label={t("settings.coverCols")} hint={t("settings.coverColsHint")}>
-          {/* A typed number, not a slider — the third device round asked to
-              go past a slider's sensible track length. The store clamps. */}
+          {/* A typed number, not a slider, because the wanted range outgrows a slider's track; the store clamps. */}
           <input
             type="number"
             min={COVER_COLS_MIN}
@@ -146,8 +134,7 @@ export function AppearanceSection() {
               const raw = e.target.value;
               setColsDraft(raw);
               const n = Number(raw);
-              // The store clamps to the 1..40 range; the guard here only
-              // keeps transient states ("", a lone "0") from committing.
+              // The store clamps the range; this guard only keeps transient states like "" from committing.
               if (raw !== "" && Number.isFinite(n) && n >= COVER_COLS_MIN) {
                 setCoverCols(n);
               }
@@ -157,9 +144,7 @@ export function AppearanceSection() {
             className="h-8 w-16 rounded-lg border border-surface-700 bg-surface-900 px-2 text-right text-sm tabular-nums text-ink-100 focus:border-accent-500 focus:outline-none"
           />
         </Row>
-        {/* One example row at the chosen count — proportional to this card's
-            width, which is the point: the number becomes a picture before the
-            pane is even closed. */}
+        {/* One example row at the chosen count, so the number becomes a picture before the pane closes. */}
         <div
           aria-hidden
           className="grid gap-1.5"
@@ -180,8 +165,7 @@ export function AppearanceSection() {
         <div className="space-y-3 py-1">
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-sm">
             <span className="block text-ink-100">{t("settings.accent")}</span>
-            {/* Wraps: nine swatches plus the custom button outgrow a phone
-                card, and the custom button was the one pushed outside it. */}
+            {/* Wraps: the swatches plus the custom button outgrow a phone card. */}
             <div className="flex flex-wrap items-center justify-end gap-2">
               {ACCENT_PRESETS.map((hex) => (
                 <button
@@ -190,9 +174,7 @@ export function AppearanceSection() {
                   className="size-6 rounded-full transition"
                   style={{
                     backgroundColor: hex,
-                    // A double ring rather than a border: its gap is drawn in
-                    // the panel colour, so the mark holds on a swatch of any
-                    // hue instead of sinking into the darker ones.
+                    // A double ring rather than a border, so the mark holds on a swatch of any hue.
                     boxShadow:
                       accent.toLowerCase() === hex.toLowerCase()
                         ? "0 0 0 2px var(--color-surface-900), 0 0 0 3.5px var(--color-accent-500)"
@@ -222,9 +204,7 @@ export function AppearanceSection() {
           )}
         </div>
 
-        {/* Six colours that have to be told apart at ring width, so this is a
-            list of labelled swatches rather than the accent's unlabelled row:
-            picking one means nothing without knowing which status it is. */}
+        {/* Labelled swatches, unlike the accent row: picking one means nothing without knowing the status. */}
         <div className="space-y-2 border-t border-surface-800 pt-3">
           <div className="flex items-center justify-between gap-4">
             <span className="block text-sm text-ink-100">
@@ -260,8 +240,7 @@ export function AppearanceSection() {
                           : undefined,
                     }}
                   />
-                  {/* Anime wording: the two lists share a palette, and
-                      "Watching"/"Reading" is the same status either way. */}
+                  {/* Anime wording: the two lists share a palette, and it is the same status either way. */}
                   {t(`status.ANIME.${status}`)}
                 </button>
               </div>

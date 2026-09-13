@@ -41,14 +41,7 @@ interface PortableStatus {
   other: DatabaseInfo | null;
 }
 
-/**
- * The one-shot score rescale: every scored entry inside a source range maps
- * linearly onto a target range. Planning is pure (`lib/rescale`) and shown
- * before anything is written — including the request count, because
- * AniList's bulk mutation takes one value per call, so the apply is one
- * request per distinct target score. Signed-in only: a local list can be
- * rescaled the day someone asks, but the tool exists for the account case.
- */
+/** The one-shot score rescale, planned purely in `lib/rescale` and previewed with its request count first. */
 export function RescaleSection() {
   const { t } = useTranslation();
   const qc = useQueryClient();
@@ -63,15 +56,7 @@ export function RescaleSection() {
   const [toMax, setToMax] = useState(scale.max);
   const [applying, setApplying] = useState(false);
 
-  // A `useQuery` on the same key the list screens use, not `getQueryData`.
-  //
-  // `getQueryData` is a point-in-time read: opening Settings before the list
-  // had landed left this section permanently claiming there was no list, and
-  // when there *was* one it planned — and then wrote — from whatever snapshot
-  // happened to be in the cache when the component mounted. This section
-  // rewrites real scores across a whole list, so it has to be looking at the
-  // list as it is now. Sharing the key means an already-fetched list costs
-  // nothing and a stale one refreshes itself.
+  // A `useQuery` on the list screens' key, not `getQueryData`, or the rescale writes from a stale snapshot.
   const { data } = useQuery<ListResult>({
     queryKey: ["mediaList", type, viewer?.id ?? 0],
     queryFn: () => api.fetchMediaList(viewer!.id, type),
@@ -109,8 +94,7 @@ export function RescaleSection() {
       });
       await qc.invalidateQueries({ queryKey: ["mediaList", type] });
     } catch (e) {
-      // Through the mapper, not `String(e)`: the backend answers with stable
-      // codes now, and a German UI showed them raw.
+      // Through the mapper, not `String(e)`, or a German UI shows the backend's stable codes raw.
       showToast({
         kind: "error",
         text: t("settings.rescaleFailed"),
@@ -195,31 +179,19 @@ export function PortableSection() {
 
   if (!status) return null;
 
-  /**
-   * `replace` is only read when enabling, and only matters when a database is
-   * already beside the exe: true takes the current one along, false adopts the
-   * one that is there. The backend refuses when neither was said, so the two
-   * buttons below are the only way in.
-   */
+  /** Enabling beside an existing database needs `replace`: true takes ours along, false adopts it, unset is refused. */
   const toggle = async (replace?: boolean) => {
     setError(null);
     const { invoke } = await import("@tauri-apps/api/core");
     try {
-      // Neither call returns on success: the backend relaunches the app onto
-      // the mode it just switched to. It has to — `Db` is opened once at
-      // startup and never reopened, so anything written between the switch and
-      // the next launch would go to the database the app is abandoning. What
-      // follows is therefore the failure path plus the belt-and-braces refresh.
+      // Neither call returns on success: the backend relaunches, as `Db` is opened once and never reopened.
       if (status.portable) await invoke("disable_portable");
       else await invoke("enable_portable", { replace: replace ?? null });
       setRestart(true);
     } catch (e) {
       setError(String(e));
     }
-    // Either way, re-read where the data actually lives rather than assuming
-    // the switch failed cleanly. The backend leaves portable mode off when
-    // enabling fails, but this pane should be showing what is true, not what
-    // it expected.
+    // Either way, re-read where the data actually lives rather than assuming the switch failed cleanly.
     await invoke<PortableStatus>("get_portable_status").then(setStatus);
   };
 
@@ -236,9 +208,7 @@ export function PortableSection() {
         <span className="text-sm text-ink-300">
           {status.portable ? t("settings.portableOn") : t("settings.portableOff")}
         </span>
-        {/* With a database already waiting, there is no single "enable" that
-            is safe to guess at — one of the two copies is about to be set
-            aside, and only the user knows which. */}
+        {/* With a database already waiting, only the user knows which of the two copies to set aside. */}
         {!status.portable && other ? (
           <>
             <Button variant="secondary" onClick={() => toggle(false)}>
@@ -285,17 +255,7 @@ export function PortableSection() {
   );
 }
 
-/**
- * Export the lists as files: MAL XML per medium (the migration lingua
- * franca), or everything as Karasu's own JSON. Composition is pure
- * (`lib/malExport`, tested); this section only fetches, composes and hands
- * the result to the same save dialog the other exports use.
- *
- * Works in both modes — a local list needs a way out at least as much as an
- * account does. The list reads go through the query cache, so on a warm
- * session they cost nothing; cold, they are the same two fetches the list
- * pages would spend anyway, and the click is the user-initiated moment.
- */
+/** Exports the lists as MAL XML per medium or Karasu's JSON, in both modes; `lib/malExport` composes the files. */
 export function ExportSection() {
   const { t } = useTranslation();
   const qc = useQueryClient();
@@ -351,8 +311,7 @@ export function ExportSection() {
             skipped > 0
               ? t("settings.exportDoneSkipped", { n: count, skipped })
               : t("settings.exportDone", { n: count }),
-          // Two different absences, so two different lines: no MAL id is a
-          // limit of the format, private is a choice the user made.
+          // Two different absences, two lines: no MAL id is a limit of the format, private is the user's choice.
           detail:
             omitted > 0 ? t("settings.exportOmittedPrivate", { n: omitted }) : undefined,
         });
@@ -394,18 +353,7 @@ export function ExportSection() {
   );
 }
 
-/**
- * MAL XML into the local list — deliberately local mode only, per the plan:
- * an account import would be one mutation per entry against the shared
- * ~30/min budget, a seventeen-minute job wearing a button's clothes. The
- * local list is a SQLite file; writing it is free.
- *
- * The costed part is *matching*, and it is paced and visible: fifty MAL ids
- * per request, one request per chunk, progress on screen between them. What
- * cannot be matched or parsed is counted into the final toast — an import
- * that silently drops rows is how two trackers drift apart unnoticed.
- * Imported per row: status, progress (both axes), score, rewatch count.
- */
+/** MAL XML into the local list only, since an account import is one mutation per entry against the shared budget. */
 export function ImportSection() {
   const { t } = useTranslation();
   const qc = useQueryClient();
@@ -413,9 +361,7 @@ export function ImportSection() {
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);
 
-  // Signed in, this section is genuinely unavailable rather than irrelevant, so
-  // it says which and why. Vanishing left the reasoning stranded in the comment
-  // above, where a user looking for an import button will not find it.
+  // Signed in, the section is unavailable rather than irrelevant, so it says so instead of vanishing.
   if (mode !== "local") {
     return (
       <NeedsAccount title={t("settings.import")}>
@@ -464,8 +410,7 @@ export function ImportSection() {
           unmatched += 1;
           continue;
         }
-        // Local scores are ten-point, which is MAL's own scale — no
-        // conversion, by construction rather than luck.
+        // Local scores are ten-point, which is MAL's own scale, so no conversion by construction.
         await api.saveListEntry(
           {
             mediaId: media.id,
@@ -496,16 +441,7 @@ export function ImportSection() {
     }
   };
 
-  /**
-   * Karasu's own JSON, which the app could write and not read — which makes it
-   * an export rather than a backup.
-   *
-   * Costs no requests at all, unlike the MAL path above: the file already
-   * carries the AniList media id and a format-independent `scoreRaw`, so there
-   * is nothing to resolve and nothing to guess. It also carries what a MAL
-   * round-trip cannot — notes, both progress axes, the private flag, and the
-   * dates as fuzzy dates rather than as MAL's all-or-nothing `0000-00-00`.
-   */
+  /** Karasu's own JSON back in; no requests, as the file carries the media id and a format-independent `scoreRaw`. */
   const importJson = async () => {
     if (busy) return;
     setBusy(true);
@@ -528,8 +464,7 @@ export function ImportSection() {
           {
             mediaId: row.mediaId,
             status: row.status,
-            // Local scores are ten-point; the raw scale is the one place every
-            // format converges, so this is the only conversion needed.
+            // Local scores are ten-point; the raw scale is where every format converges, so one conversion suffices.
             score: row.scoreRaw / 10,
             progress: row.progress,
             progressVolumes: row.progressVolumes,
@@ -539,10 +474,7 @@ export function ImportSection() {
             startedAt: row.startedAt ?? undefined,
             completedAt: row.completedAt ?? undefined,
           },
-          // Second argument, exactly as the MAL path passes it: local mode
-          // stores this beside the row so the list renders offline. Without it
-          // an imported entry is a title-less card waiting on a fetch that
-          // local mode never makes.
+          // Keep the media argument, as the MAL path does; without it local mode shows a title-less card forever.
           row.media,
         );
       }
@@ -590,12 +522,7 @@ interface BackupSettings {
   dir: string;
 }
 
-/**
- * Daily local database snapshots — on by default, because the first time
- * anyone thinks about backups is the moment they need one. The Rust side
- * owns the schedule and the retention; this card owns the two knobs and
- * shows where the files land, so "where did my backup go" answers itself.
- */
+/** Daily local database snapshots, on by default; Rust owns the schedule, this card owns the two knobs. */
 export function BackupSection() {
   const { t } = useTranslation();
   const [settings, setSettings] = useState<BackupSettings | null>(null);
@@ -685,13 +612,7 @@ interface CloseToTray {
   tray: boolean;
 }
 
-/**
- * How Karasu behaves as a program on this desktop.
- *
- * Split from the update settings it used to share a card with: "start with the
- * system" and "install pre-releases" are unrelated decisions, and the second is
- * the one people go looking for.
- */
+/** How Karasu behaves as a program on this desktop, kept apart from the unrelated update settings. */
 export function SystemSection() {
   const { t } = useTranslation();
   const platform = usePlatform((s) => s.info);
@@ -713,12 +634,7 @@ export function SystemSection() {
     });
   }, []);
 
-  // Both of these paint the switch first and then await a command that can
-  // genuinely fail — `set_autostart` cannot write its .desktop entry on a
-  // locked-down Linux session, `set_close_to_tray` is a database write. Without
-  // the rollback the switch kept reading "on" for the rest of the session while
-  // nothing had been configured, and the rejection went nowhere; reopening
-  // Settings then quietly showed "off" again with no explanation.
+  // Paint first, await, roll back on failure, or a refused write reads "on" for the rest of the session.
   const toggleAutostart = async (enabled: boolean) => {
     setAutostart(enabled);
     setError(null);
@@ -743,10 +659,7 @@ export function SystemSection() {
     }
   };
 
-  // Same rollback idiom as the toggles above, because this one genuinely
-  // fails: the OS refuses an accelerator another app holds, and a typo is not
-  // an accelerator at all. Registration happens before the store on the Rust
-  // side, so a rejected string never comes back at the next startup.
+  // Same rollback idiom: the OS can refuse an accelerator, and Rust registers before it stores one.
   const applyHotkey = async () => {
     const next = hotkeyDraft.trim();
     if (hotkey === null || next === hotkey) return;
@@ -766,9 +679,7 @@ export function SystemSection() {
     <Card>
       <CardTitle>{t("settings.app")}</CardTitle>
       <div className="mt-3 space-y-3">
-        {/* Hidden inside an AppImage: the plugin writes the autostart entry
-            from `current_exe()`, which there is a /tmp mount that is gone by
-            the next login. The toggle would report success and never work. */}
+        {/* Hidden inside an AppImage: the autostart entry would point at a /tmp mount gone by the next login. */}
         {autostart !== null && !platform?.appImage && (
           <Toggle
             checked={autostart}
@@ -778,8 +689,7 @@ export function SystemSection() {
           />
         )}
 
-        {/* Locked off where there is no tray: hiding into one that does not
-            exist is how the window becomes unreachable. */}
+        {/* Locked off without a tray; hiding into one that does not exist makes the window unreachable. */}
         {closeTray !== null && (
           <Toggle
             checked={closeTray.enabled}
@@ -822,10 +732,7 @@ export function SystemSection() {
 export function UpdatesSection() {
   const { t } = useTranslation();
   const [auto, setAuto] = useState<boolean | null>(null);
-  // Null until the stored value lands. It used to default to `"prerelease"`,
-  // so a stable-channel install rendered the wrong answer for one frame — and
-  // a settings row that flashes something the account is not set to is worse
-  // than one that arrives a moment late.
+  // Null until the stored value lands, or a stable-channel install flashes the wrong answer for a frame.
   const [channel, setChannel] = useState<api.UpdateChannel | null>(null);
 
   useEffect(() => {
@@ -876,17 +783,7 @@ export function UpdatesSection() {
   );
 }
 
-/**
- * The log, in the app.
- *
- * Collapsed by default and fetched on first expand, matching the media-session
- * diagnostic in DetectionPane — this is a thing you go looking for, not a thing
- * that should cost a round trip on every visit to Settings.
- *
- * Where it differs from that precedent: a failed fetch renders an error instead
- * of an empty list. "Nothing to show" and "could not read it" looking identical
- * is exactly the class of problem this whole feature exists to end.
- */
+/** The log in the app, fetched on first expand; a failed read shows an error, never an empty list. */
 export function LogSection() {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -1008,18 +905,7 @@ export function LogSection() {
 }
 
 
-/**
- * The offline queue, face to face.
- *
- * The queue was "the one copy the user cannot see" — the merge dialog's own
- * words — visible only as a count in the sidebar and the sync popover. This
- * is its management surface: every unsent edit as a row, and a per-row
- * discard behind a confirm, because a queued edit is the only copy of that
- * write and deleting one is a loss the schema notes name as such.
- *
- * Titles join from the list caches exactly like the sync popover — no
- * request, unlabelled when the list has never been fetched this session.
- */
+/** The offline queue as rows; discard is behind a confirm, since a queued edit is the only copy of its write. */
 export function QueueSection() {
   const { t } = useTranslation();
   const qc = useQueryClient();
@@ -1028,9 +914,7 @@ export function QueueSection() {
   const [status, setStatus] = useState<SyncStatus | null>(null);
   const [confirming, setConfirming] = useState<QueuedEdit | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // The whole-app sync, not a bare queue flush: on the phone this pane is
-  // the only sync surface at all (the sidebar and its panel never render
-  // there), so the button must do what the desktop button does.
+  // The whole-app sync, not a bare queue flush: on the phone this pane is the only sync surface at all.
   const manual = useManualSync();
 
   const load = () => {

@@ -7,16 +7,7 @@ import { EmptyState, PerchRule } from "@/components/EmptyState";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/stores/auth";
 
-/**
- * The following feed.
- *
- * A page rather than only a tab on your own profile, because it needs to be a
- * stable sidebar destination — `/user/:name` is not one when the name depends on
- * being signed in.
- *
- * One request per page, and the viewer's identity comes from the store rather
- * than a `Viewer` query, so opening this costs exactly one.
- */
+/** The following feed as a stable sidebar page; the viewer comes from the store, so opening it costs one request. */
 export default function Social() {
   const { t } = useTranslation();
   const loading = useAuth((s) => s.loading);

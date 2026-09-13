@@ -49,30 +49,15 @@ import { usePhoneShell } from "@/hooks/usePhoneShell";
 import { isAndroid, usePlatform } from "@/stores/platform";
 import { Button } from "@/components/ui/button";
 
-/**
- * The eight panes, in the order they are worth reading.
- *
- * They are keyed by a URL parameter rather than component state because the
- * screen re-mounts on every navigation (the router keys the pane on the path),
- * so state would drop the user back on Account each time — and because a
- * dead-end elsewhere in the app can then point at the exact pane that fixes
- * it, the way the empty local library points at Library.
- *
- * Ids are kept wherever a pane survived a reshuffle. Renaming `detection` for
- * cosmetics would break every deep link at no gain; `PANE_ALIASES` in
- * `lib/settingsPanes` covers the two that genuinely went away.
- */
+/** The panes, keyed by URL parameter so deep links land; keep the ids, since renaming one breaks every deep link. */
 const PANES = [
   { id: "account", icon: User, sections: [AccountSection, DefaultsSection] },
-  // Second, right after the account it belongs to: these are that account's own
-  // settings rather than Karasu's, and four of them are ones Karasu overrides —
-  // which is a thing to find while thinking about the account, not later.
+  // Right after the account: these are that account's own settings, and some are ones Karasu overrides.
   {
     id: "anilist",
     icon: Globe,
     sections: [
-      // First, and the only one that renders without an account — the three
-      // below hide themselves, which left this pane blank.
+      // The only one that renders signed out; the rest hide themselves, which left this pane blank.
       AniListSignedOutNote,
       AniListProfileSection,
       AniListListOptionsSection,
@@ -80,9 +65,7 @@ const PANES = [
       NotificationScheduleSection,
     ],
   },
-  // Content joins Appearance rather than holding a pane of its own. It was one
-  // slider, and it belongs to the same question the rest of this pane answers:
-  // what do I see.
+  // Content joins Appearance instead of its own pane; it answers the same question, what do I see.
   { id: "appearance", icon: Palette, sections: [AppearanceSection, ContentSection] },
   {
     id: "detection",
@@ -96,23 +79,19 @@ const PANES = [
     ],
   },
   { id: "library", icon: FolderOpen, sections: [LibrarySection, LibrarySplitsSection] },
-  // New. Everything about Karasu as a program on this desktop — which the old
-  // arrangement scattered between "Advanced" and a one-toggle "Integrations".
+  // Everything about Karasu as a program on this desktop.
   {
     id: "desktop",
     icon: Monitor,
     sections: [SystemSection, UpdatesSection, DiscordSection],
   },
-  // New. Moving a list in or out is not an advanced operation, it is the thing
-  // people come to a tracker's settings to do.
-  // The queue first: it is the live state, the others are file operations.
+  // Moving a list in or out is not advanced, it is the point; the queue first, being the live state.
   {
     id: "data",
     icon: Database,
     sections: [QueueSection, ExportSection, ImportSection, BackupSection],
   },
-  // What is left is what the warning is actually about: rewriting every score,
-  // reading a log that records what detection saw, and moving the database.
+  // What is left is what the warning is about: rescoring, the detection log, and moving the database.
   {
     id: "advanced",
     icon: SlidersHorizontal,
@@ -121,53 +100,18 @@ const PANES = [
   },
 ] as const;
 
-/**
- * A pane named in `lib/settingsPanes` with no entry above is a type error here.
- *
- * The ids live there because `resolvePane` and its aliases are worth testing on
- * their own, which splits the list from the components it selects. This is the
- * seam that keeps the two halves honest: adding an id without a pane, or
- * renaming one on one side only, fails the build rather than rendering nothing.
- */
+/** A pane named in `lib/settingsPanes` with no entry above is a type error here, so the two lists cannot drift. */
 type _EveryPaneIsRendered = Exclude<PaneId, (typeof PANES)[number]["id"]> extends never
   ? true
   : never;
 const _panesAreComplete: _EveryPaneIsRendered = true;
 
-/**
- * What Android hides, by identity rather than by file.
- *
- * Whole panes: the local library scanner cannot exist under scoped storage,
- * and everything in Desktop — autostart, the updater, Discord IPC — is
- * desktop by definition. Sections: SMTC/MPRIS and the mpv pipe are detection
- * sources a phone has not got (Jellyfin is the whole of detection there, per
- * the ROADMAP), and portable mode is an exe-relative idea.
- *
- * Keyed on the *platform*, not `usePhoneShell`: these are capabilities, and
- * they were width-keyed for a while — which hid the Library and Desktop panes
- * from anyone who narrowed a desktop window, and would have handed an Android
- * tablet (≥768px takes the desktop layout) live SMTC/mpv controls. Only the
- * master-detail layout below stays width-keyed.
- *
- * Component identity, not a string list, so a rename breaks the build here
- * instead of silently un-hiding a pane.
- */
+/** Panes Android hides, keyed on the platform rather than width: these are capabilities, not shell shape. */
 const ANDROID_HIDDEN_PANES: ReadonlySet<PaneId> = new Set(["library", "desktop"] as const);
+/** Sections Android hides, by component identity so a rename breaks the build instead of un-hiding one. */
 const ANDROID_HIDDEN_SECTIONS: ReadonlySet<unknown> = new Set([PortableSection]);
 
-/**
- * Desktop-only detection machinery, greyed rather than hidden on Android —
- * the user's call: seeing what the desktop can do explains what the phone
- * deliberately does not, where silent absence reads as a missing feature.
- * Jellyfin and the corrections come first there, being the parts that work.
- *
- * `ScrobbleSection` is deliberately *not* here. The scrobbler loop runs on
- * Android (Jellyfin is its source there) and reads these very switches —
- * tracking on/off, confirm, the threshold, the notification toggles — every
- * tick, so greying them left a phone writing to AniList on defaults it could
- * not change. The one row in it that is desktop machinery, the media-session
- * toggle, hides itself there.
- */
+/** Greyed on Android, not hidden; keep ScrobbleSection out, since the scrobbler runs there and reads its switches. */
 const ANDROID_DESKTOP_ONLY: ReadonlySet<unknown> = new Set([
   MediaSessionSection,
   MpvSection,
@@ -200,8 +144,7 @@ export default function Settings() {
   void _panesAreComplete;
 
   const panes = android ? PANES.filter((p) => !ANDROID_HIDDEN_PANES.has(p.id)) : PANES;
-  // A deep link can name a pane Android hides; falling back beats rendering
-  // a blank one.
+  // A deep link can name a pane Android hides; falling back beats rendering a blank one.
   const pane = panes.find((p) => p.id === active) ?? panes[0];
   const sections = android
     ? [...pane.sections]
@@ -211,8 +154,7 @@ export default function Settings() {
           (a, b) => Number(ANDROID_DESKTOP_ONLY.has(a)) - Number(ANDROID_DESKTOP_ONLY.has(b)),
         )
     : pane.sections;
-  // The badge follows the platform into *both* layout branches — an Android
-  // tablet takes the desktop layout and still has no SMTC to configure.
+  // The badge is platform-keyed in both layouts; an Android tablet at desktop width still has no SMTC.
   const wrap = (Section: (typeof sections)[number], i: number) =>
     android && ANDROID_DESKTOP_ONLY.has(Section) ? (
       <DesktopOnly key={i}>
@@ -222,14 +164,7 @@ export default function Settings() {
       <Section key={i} />
     );
 
-  /**
-   * Master-detail on the phone: the pane *list* first, a chosen pane
-   * full-width with a way back — the desktop's permanent sidebar squeezed
-   * both halves into columns neither could afford. `?pane=` stays the one
-   * source of truth, so deep links land exactly as they do on desktop; the
-   * only difference is that no param means "show the list" here where the
-   * desktop reads it as Account.
-   */
+  /** Master-detail on the phone, keyed on width alone; `?pane=` stays the source of truth, and no param means the list. */
   if (phone) {
     const listShown = rawPane === null || !panes.some((p) => p.id === active);
     if (listShown) {
@@ -306,17 +241,14 @@ export default function Settings() {
             >
               <Icon className="size-4 shrink-0" />
               <span className="flex-1">{t(`settings.pane_${p.id}`)}</span>
-              {/* The marking the pane itself repeats in full. On the button it
-                  is only a flag — enough to make someone pause before clicking,
-                  not enough to explain, which is the note's job. */}
+              {/* Only a flag here; explaining is the job of the pane's own note. */}
               {danger && <AlertTriangle aria-hidden className="size-3.25 shrink-0" />}
             </button>
           );
         })}
       </nav>
 
-      {/* Keyed on the pane so switching replays `settle` — otherwise a pane
-          swap in place is indistinguishable from the page not reacting. */}
+      {/* Keyed on the pane so switching replays `settle`; a swap in place looks like the page not reacting. */}
       <div key={active} className="min-w-0 flex-1 animate-settle overflow-y-auto">
         <div className="mx-auto max-w-2xl space-y-6 p-8">{sections.map(wrap)}</div>
       </div>

@@ -2,15 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { ExternalNote, Row, Toggle } from "./shared";
 
-/**
- * The settings row's shape, asserted instead of eyeballed.
- *
- * Five hand-pasted copies of this row were replaced by one component, and the
- * only evidence it matched was me measuring `getComputedStyle` in a browser by
- * hand. That check is worth having permanently — and it caught the one real
- * difference worth keeping: `Toggle` centres on its first line where `Row`
- * centres on the whole control, because a switch is shorter than a select.
- */
+/** The settings row's shape, asserted instead of eyeballed, including the one difference from `Toggle`. */
 
 describe("Row", () => {
   it("puts the label and hint on the left and the control on the right", () => {
@@ -21,8 +13,7 @@ describe("Row", () => {
     );
     const label = screen.getByText("settings.language");
     const control = screen.getByTestId("control");
-    // The control is a sibling of the text block, not inside it — which is what
-    // makes `justify-between` put them at opposite ends.
+    // The control is a sibling of the text block, which is what lets `justify-between` separate them.
     expect(label.parentElement).not.toContain(control);
     expect(screen.getByText("settings.languageHint")).toBeTruthy();
   });
@@ -37,8 +28,7 @@ describe("Row", () => {
   });
 
   it("omits the hint element entirely when there is no hint", () => {
-    // Rather than rendering an empty span, which would add its line height and
-    // make hinted and unhinted rows different heights.
+    // An empty span would add its line height and make hinted and unhinted rows different heights.
     const { container } = render(
       <Row label="a">
         <select />
@@ -57,8 +47,7 @@ describe("Row", () => {
   });
 
   it("centres the control, where Toggle aligns to the first line", () => {
-    // The one deliberate difference between the two, and the reason `Row` could
-    // not simply reuse `Toggle`'s container.
+    // The one deliberate difference between the two, and why `Row` does not reuse `Toggle`'s container.
     const row = render(
       <Row label="a">
         <select />
@@ -86,8 +75,7 @@ describe("Toggle", () => {
   });
 
   it("disables the control and dims the row together", () => {
-    // A setting this desktop cannot honour: the hint explains why, and both the
-    // switch and the label have to look unavailable or only half of it reads.
+    // Both the switch and the label have to look unavailable, or only half of the row reads as disabled.
     const { container } = render(
       <Toggle checked={false} onChange={() => {}} label="a" hint="why" disabled />,
     );

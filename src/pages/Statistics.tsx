@@ -55,13 +55,7 @@ import {
 } from "@/lib/localStats";
 import { RankedList, fmt, scoreText } from "@/components/stats/RankedList";
 import LocalStatistics from "@/components/stats/LocalStatistics";
-/**
- * Five themed tabs rather than one per ranked array. The old shape — a tab
- * each for genres, tags, voice actors, studios and staff — made eight stops
- * of one list apiece; the five ranked lists now live inside two themed tabs,
- * and both media types share one tab bar (the people tab simply holds fewer
- * sections on manga).
- */
+/** Five themed tabs shared by both media types; the ranked lists live inside two of them, not one each. */
 const CATEGORIES: Category[] = ["overview", "ratings", "years", "genresTags", "people"];
 
 export default function Statistics() {
@@ -73,9 +67,7 @@ export default function Statistics() {
 
   if (loading) return null;
 
-  // The account-free profile gets the panels that are counting rather than
-  // AniList aggregation — which is most of them. A sign-in wall here answered
-  // a question the user had already answered.
+  // The account-free profile gets every panel counted from the list rather than a sign-in wall.
   if (!viewer && mode === "local") {
     const type: MediaType = params.get("type") === "MANGA" ? "MANGA" : "ANIME";
     return (
@@ -134,10 +126,7 @@ function StatisticsContent({
   avatar: string | null;
 }) {
   const { t } = useTranslation();
-  // Type and tab in the URL, not in state — Statistics was the last tabbed
-  // screen on `useState`, so Back from anywhere lost the selection. Same
-  // validate-or-default, delete-at-default, `replace: true` shape as the list
-  // view and the profile.
+  // Type and tab live in the URL rather than state, so Back from anywhere keeps the selection.
   const [params, setParams] = useSearchParams();
   const type: MediaType = params.get("type") === "MANGA" ? "MANGA" : "ANIME";
   const rawTab = params.get("tab");
@@ -163,37 +152,24 @@ function StatisticsContent({
 
   const scoreFormat = useScoreFormat();
   const { data, isLoading, error } = useQuery({
-    // The format is part of the key: a format change rescales every number
-    // the normalizer produced, so the cached shape is simply for another
-    // scale and must not be served.
+    // The format is part of the key, because a format change rescales every number the normalizer produced.
     queryKey: ["userStats", userId, scoreFormat],
     queryFn: () => userStatistics(userId, scoreFormat),
     enabled: isTauri,
-    // AniList only recomputes these when list entries change, and Karasu is
-    // what changes them. Revisiting the page inside half an hour is free.
+    // AniList only recomputes these when list entries change, and Karasu is what changes them.
     staleTime: 30 * 60 * 1000,
   });
 
-  // Hoisted out of WatchTimeEstimate. Nested there it only mounted once the
-  // stats query had resolved, so a cold /stats waited for the *sum* of the two
-  // requests rather than the longer of them. The key is the same one the list
-  // page and the SQLite priming use, so this shares their result rather than
-  // adding a request.
+  // Hoisted out of WatchTimeEstimate so the list request runs beside the stats query instead of after it.
   const level = useContentFilter((s) => s.level);
-  // `isError` as well as `data`, for the reason `Dashboard` documents at its
-  // own loading gate: a query in the error state has `isLoading === false` and
-  // no data, so everything derived from the list below renders its empty
-  // answer — 0 minutes remaining, an empty sunburst, a blank heatmap — as
-  // settled fact, with nothing on screen separating "offline" from "you have
-  // watched nothing".
+  // Read `isError` beside `data`, or a failed list renders every derived panel's empty answer as settled fact.
   const { data: animeList, isError: animeListFailed } = useQuery({
     queryKey: ["mediaList", "ANIME", userId],
     queryFn: () => fetchMediaList(userId, "ANIME"),
     enabled: isTauri,
   });
   const remainingTotal = useMemo<number | null>(() => {
-    // No list, no answer. Zero is a claim, and "you have nothing left to
-    // watch" is the opposite of what a failed fetch knows.
+    // No list, no answer: zero is a claim a failed fetch cannot make.
     if (animeListFailed) return null;
     let sum = 0;
     for (const group of animeList?.lists ?? []) {
@@ -208,10 +184,7 @@ function StatisticsContent({
     return sum;
   }, [animeList, level]);
 
-  // The sunburst is the one panel AniList cannot answer: its statistics are
-  // one-dimensional, so "what formats are inside each status" has to be
-  // counted from the list itself. Same query key as the list screens, so on
-  // anime this is the request already in flight above rather than a new one.
+  // Formats per status are counted from the list, keyed like the list screens so anime adds no request.
   const { data: typeList, isError: typeListFailed } = useQuery({
     queryKey: ["mediaList", type, userId],
     queryFn: () => fetchMediaList(userId, type),
@@ -219,8 +192,7 @@ function StatisticsContent({
   });
   /** Whether anything drawn from the list itself can be trusted right now. */
   const listFailed = typeListFailed || (type === "ANIME" && animeListFailed);
-  // The list already in the cache, once, for every local panel below —
-  // filtered here so no panel can forget the check. Zero requests.
+  // The cached list, filtered once here so no local panel below can forget the content check.
   const localEntries = useMemo(
     () =>
       (typeList?.lists ?? [])
@@ -229,38 +201,17 @@ function StatisticsContent({
         .filter((e) => !isBlocked(e.media, level)),
     [typeList, level],
   );
-  // "My score against the crowd's" — the one figure AniList's statistics
-  // cannot answer.
+  // My score against the crowd's, the one figure AniList's statistics cannot answer.
   const delta = useMemo(
     () => scoreDelta(localEntries, 5, scoreScale(scoreFormat).max),
     [localEntries, scoreFormat],
   );
-  /**
-   * When the list was worked on.
-   *
-   * AniList's own record first, derived-from-the-list second. They are not the
-   * same measurement: the derived one can only ever see two events per entry —
-   * a start and a completion — and has to skip any fuzzy date with no month,
-   * because pinning "2019" to January fabricates a cell that reads exactly like
-   * a real one. The account's own history counts every recorded action and
-   * carries real timestamps.
-   *
-   * The fallback is not dead code: it is what local mode uses, where there is
-   * no account to ask, and what covers an account whose history is empty.
-   */
-  /**
-   * AniList's history at day resolution, which is the shape its own profile
-   * draws and the one that was asked for. Null in local mode and for an
-   * account whose history is empty — `activityHistory` belongs to an account,
-   * so there is no local equivalent to build one from.
-   */
+  /** AniList's own per-day history, null when the account has none; the month grid below is the fallback. */
   const dayHeatmap = useMemo(
     () => dayHeatmapFromHistory(data?.stats?.activityHistory),
     [data],
   );
-  // The month grid, still built from the local list's own dates. Only reached
-  // when the day grid has nothing, so the two never draw at once and the copy
-  // below can name whichever one is on screen.
+  // The month grid from the list's dates, only when the day grid is empty, so the two never draw at once.
   const heatmap = useMemo(
     () => (dayHeatmap ? null : activityHeatmap(localEntries)),
     [dayHeatmap, localEntries],
@@ -306,22 +257,17 @@ function StatisticsContent({
   return (
     <div className="mx-auto max-w-4xl space-y-6 p-8 2xl:max-w-none 3xl:max-w-[130rem]">
       <header className="flex items-center gap-4">
-        {/* Avatar without the lockup: the text beside it is this screen's title,
-            not the user's name, so there is no name/sub stack to share. */}
+        {/* Avatar without the lockup: the text beside it is the screen's title, not the user's name. */}
         <Avatar src={avatar} size="lg" fallback={<BarChart3 className="size-5" />} />
         <div className="min-w-0 flex-1">
-          {/* The same lockup the two list screens use: title, then its
-              Japanese form a shade back. */}
+          {/* The same lockup the two list screens use: title, then its Japanese form a shade back. */}
           <div className="flex items-baseline gap-2.5">
             <h1 className="text-xl font-bold">{t("stats.title")}</h1>
             <span className="font-brand-jp text-[.8125rem] tracking-[.04em] text-ink-600">
               統計
             </span>
           </div>
-          {/* The one place in the app that used a raw target="_blank"
-              anchor. The WebView has no tabs to open one in, so the click
-              went nowhere; `ExternalAnchor` routes it through the opener
-              plugin like every other outbound link. */}
+          {/* Keep `ExternalAnchor`; a raw target="_blank" anchor goes nowhere because the WebView has no tabs. */}
           <ExternalAnchor
             href={siteUrl}
             className="flex items-center gap-1 text-xs text-accent-400 hover:underline"
@@ -346,9 +292,7 @@ function StatisticsContent({
       </div>
 
       {isLoading && <Loader label={t("common.loading")} />}
-      {/* The account's own statistics can arrive while the list does not, and
-          several panels below are counted from the list rather than fetched.
-          Without this they would simply be empty, which reads as an answer. */}
+      {/* The stats can land while the list fails, and a list-counted panel left empty reads as an answer. */}
       {!isLoading && listFailed && (
         <p className="text-sm text-gold">{t("stats.listUnavailable")}</p>
       )}
@@ -541,13 +485,7 @@ function MangaView({
   );
 }
 
-/**
- * Picks the ranked array for a category (empty for categories a type lacks).
- *
- * These statistics are aggregated by AniList, so filtered titles cannot be
- * subtracted from the totals client-side. What we *can* do is stop a filtered
- * genre or tag name from being listed — see the note under the list.
- */
+/** Picks the ranked array for a category, minus blocked genre and tag names (the totals are AniList's). */
 function rowsFor(
   stats: AnimeStats | MangaStats,
   category: RankedCategory,
@@ -569,11 +507,7 @@ function rowsFor(
   }
 }
 
-/**
- * The Genres & Tags tab: the shape (radar), the long tail (treemap), the taste
- * check (each genre's mean against your overall mean), and the two ranked
- * lists — everything the list contains, one tab.
- */
+/** The Genres & Tags tab: the radar, the treemap, the taste check and the two ranked lists. */
 function GenresTagsView({
   stats,
   type,
@@ -585,14 +519,12 @@ function GenresTagsView({
   const level = useContentFilter((s) => s.level);
   const scoreMax = scoreScale(useScoreFormat()).max;
 
-  // Filter before slicing, or a blocked name costs one of the slots it was
-  // removed from; the treemap falls back to genres when tags are empty.
+  // Filter before slicing, or a blocked name costs a slot; the treemap falls back to genres without tags.
   const safeGenres = rowsFor(stats, "genres", level);
   const safeTags = rowsFor(stats, "tags", level);
   const radarGenres = safeGenres.slice(0, 6);
   const treemapTags = (safeTags.length ? safeTags : safeGenres).slice(0, 14);
-  // Genres against your own average — deviation from yourself, not from the
-  // crowd; the community version lives on the Ratings tab.
+  // Genres against your own average, not the crowd's; the community version lives on the Ratings tab.
   const genreDots = [...safeGenres]
     .filter((g) => g.meanScore > 0)
     .sort((a, b) => Math.abs(b.meanScore - stats.meanScore) - Math.abs(a.meanScore - stats.meanScore))
@@ -654,10 +586,7 @@ function GenresTagsView({
   );
 }
 
-/**
- * The People & Studios tab: the three portrait lists on anime, staff alone on
- * manga — who made what the list holds.
- */
+/** The People & Studios tab: three portrait lists on anime, staff alone on manga. */
 function PeopleView({
   stats,
   type,
@@ -689,12 +618,7 @@ function PeopleView({
   );
 }
 
-/**
- * The Ratings tab: how the scores sit — the distribution, the means AniList
- * computes per format and status (fetched for the first time here; they were
- * always on the endpoint), and the community comparison only the local cache
- * can draw.
- */
+/** The Ratings tab: the distribution, the means per format and status, and the community comparison. */
 function RatingsView({
   stats,
   type,
@@ -742,8 +666,7 @@ function RatingsView({
           data={scores.map((d: Distribution) => ({ score: d.score ?? 0, count: d.count }))}
           max={scoreMax}
         />
-        {/* Pinned to the full scale, or a 7.1 next to a 7.4 reads as a
-            landslide. */}
+        {/* Pinned to the full scale, or two close means read as a landslide. */}
         <GradientBars
           title={t("stats.meanByFormat")}
           hint={t("stats.meanByFormatHint")}
@@ -777,20 +700,7 @@ function RatingsView({
   );
 }
 
-/**
- * The Years tab: the list along its time axes. Release years say what you
- * watch, start years say when you were watching it, and the last panel says
- * when you were actually at it.
- *
- * That last one is **two panels and only ever one of them is on screen.** With
- * an account, `activityHistory` gives a real per-day record of everything the
- * account did, which is what AniList draws on its own profile and what this
- * draws too. Without one — local mode, or an account whose history is empty —
- * there is nothing to ask, so the month grid built from the local list's fuzzy
- * start and completion dates stays as the fallback. They are different
- * questions answered from different data, so the copy names which is showing
- * rather than describing one while the other is drawn.
- */
+/** The Years tab: release years, start years, and only ever one of the two activity grids on screen. */
 function YearsView({
   stats,
   heatmap,
@@ -829,8 +739,7 @@ function YearsView({
       ),
     [i18n.language],
   );
-  // Monday first, matching `dayHeatmapFromHistory`'s rotation. 2024-01-01 was a
-  // Monday, which is the whole trick.
+  // Monday first, matching `dayHeatmapFromHistory`'s rotation, because the seed date is a Monday.
   const dayLabels = useMemo(
     () =>
       Array.from({ length: 7 }, (_, d) =>
@@ -841,8 +750,7 @@ function YearsView({
       ),
     [i18n.language],
   );
-  // The cell dates are UTC midnights by construction, so they are read back as
-  // UTC — a local read would shift the label for anyone east or west of it.
+  // The cell dates are UTC midnights, so read them back as UTC or the label shifts for anyone off UTC.
   const formatDay = useCallback(
     (daySeconds: number) =>
       new Date(daySeconds * 1000).toLocaleDateString(i18n.language, {
@@ -946,15 +854,12 @@ function OverviewCharts({
   breakdown: Slice[];
 }) {
   const { t } = useTranslation();
-  // AniList returns the buckets unordered and spells them "1", "17-28",
-  // "101+" — sort on the number each one opens with.
+  // AniList returns the length buckets unordered, so sort on the number each one opens with.
   const lengths = [...stats.lengths]
     .filter((d) => d.length)
     .sort((a, b) => parseInt(a.length ?? "0", 10) - parseInt(b.length ?? "0", 10));
   const countries = [...stats.countries].filter((d) => d.country);
-  // The sunburst's outer ring is the formats inside each status. Totalled
-  // across statuses they are the same figures the Formats panel lists, but the
-  // ring needs its own key on its own card to be readable at all.
+  // The sunburst's outer ring needs its own key on its own card to be readable at all.
   const formatsInBreakdown = useMemo(() => {
     const totals = new Map<string, number>();
     for (const group of breakdown) {
@@ -966,12 +871,7 @@ function OverviewCharts({
       .sort((a, b) => b[1] - a[1])
       .map(([label, value]) => ({ label, value }));
   }, [breakdown]);
-  // Stretched, with every card a flex column that knows what to do with the
-  // slack. `items-start` used to be the answer here, on the grounds that a
-  // fixed-viewBox chart cannot grow — but that left ragged gaps *between* the
-  // panels instead, which is what this row now avoids: the bar panels grow
-  // their plot area into the extra height, and the SVG panels centre their
-  // chart in it so the leftover reads as padding rather than a hole.
+  // Keep the cards stretched as flex columns; `items-start` leaves ragged gaps between the panels instead.
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <StatusBar
@@ -985,16 +885,13 @@ function OverviewCharts({
         title={t("stats.formats")}
         data={stats.formats.map((d) => ({ label: d.format ?? "?", count: d.count }))}
       />
-      {/* The year serieses moved to the Years tab, which owns the time axis
-          now — two homes for one chart is how they drift apart. */}
+      {/* The year series live on the Years tab; two homes for one chart is how they drift apart. */}
 
       {breakdown.length > 0 && (
         <Card className="flex h-full flex-col">
           <CardTitle>{t("stats.breakdown")}</CardTitle>
           <p className="mt-1 text-2xs text-ink-600">{t("stats.breakdownHint")}</p>
-          {/* Chart beside its key rather than wrapped above it. The ring is
-              square, so letting it take the whole card width would make the
-              panel as tall as the page is wide. */}
+          {/* Chart beside its key; a square ring at full card width makes the panel as tall as the page is wide. */}
           <div className="mt-3 flex flex-1 items-center gap-6">
             <div className="w-40 shrink-0 sm:w-48">
               <Sunburst data={breakdown} />
@@ -1003,8 +900,7 @@ function OverviewCharts({
               <ToneLegend
                 items={breakdown.map((b) => ({ label: b.label, value: b.value }))}
               />
-              {/* The outer ring had no key at all — its formats were readable
-                  only by hovering, which is the thing this pass is undoing. */}
+              {/* The outer ring's key, so its formats are readable without hovering. */}
               {formatsInBreakdown.length > 0 && (
                 <div>
                   <p className="mb-1.5 text-2xs uppercase tracking-[.1em] text-ink-600">
@@ -1025,8 +921,7 @@ function OverviewCharts({
         </Card>
       )}
 
-      {/* The radar and the treemap moved to Genres & Tags — one home per
-          chart, same reasoning as the year serieses. */}
+      {/* The radar and the treemap live on Genres & Tags, one home per chart. */}
       <DistributionCard
         title={t("stats.lengths")}
         data={lengths.map((d) => ({

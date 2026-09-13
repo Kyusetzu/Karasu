@@ -59,8 +59,7 @@ function DashboardContent({ userId }: { userId: number }) {
     queryKey: ["mediaList", "ANIME", userId],
     queryFn: () => fetchMediaList(userId, "ANIME"),
   });
-  // Only the recommendation section needs the manga list; it is served from
-  // the same Rust-side cache the manga list page already fills.
+  // Only recommendations need the manga list; the Rust-side cache the manga list page fills serves it.
   const {
     data: mangaData,
     isLoading: mangaLoading,
@@ -73,8 +72,7 @@ function DashboardContent({ userId }: { userId: number }) {
   const { save: mangaSave } = useListMutations(userId, "MANGA");
   const level = useContentFilter((s) => s.level);
 
-  // One content-filtered base for every section below, so a new section can't
-  // accidentally skip the check.
+  // One content-filtered base for every section below, so a new section cannot skip the check.
   const allAnime = useMemo(
     () =>
       data?.lists
@@ -93,31 +91,13 @@ function DashboardContent({ userId }: { userId: number }) {
     [mangaData, level],
   );
 
-  // Every section is its own component, so the running order below is a plain
-  // list and rearranging it is a one-line move.
-  //
-  // The loading gate is not cosmetic. Every section renders an *empty state*
-  // from an empty list, so without it a cold start claims "you are not watching
-  // anything" and "no upcoming episodes" until the network answers — the app
-  // stating the opposite of the truth. The two lists are gated separately so a
-  // slow manga fetch can't hold back the anime sections.
-  //
-  // A *failed* fetch is the same hazard wearing a different hat, and it used to
-  // slip through: a query in the error state has `isLoading === false` and no
-  // data, so the sections rendered those same empty states as settled fact,
-  // with nothing on screen distinguishing "offline" from "you have watched
-  // nothing". It gets the error treatment the list page has.
+  // Keep the loading and error gates, one per list; an unloaded or failed list renders its empty states as fact.
   return (
     <div className="space-y-9 px-8 pb-12 pt-7">
-      {/* Pinned above the rest: this is the "right now" card, and it is only
-          useful while something is actually playing. */}
+      {/* Pinned above the rest: the "right now" card is only useful while something is playing. */}
       <NowPlayingCard />
 
-      {/* Below the now-playing card, which is pinned above the loading gate:
-          what you are watching right now outranks what the season is popular
-          for. Above everything else, because it is the only section that is
-          not about your own list — and outside the gate for the same reason,
-          since it does not need the list to render. */}
+      {/* Outside the gate, below only now-playing: the one section not about your list needs no list to render. */}
       <SeasonHero />
 
       {isLoading ? (
@@ -155,17 +135,11 @@ function DashboardContent({ userId }: { userId: number }) {
   );
 }
 
-/**
- * Stand-in for the sections above while the list loads: a stat row and two
- * poster grids, matching the real layout closely enough that nothing jumps
- * when the data lands. Unlabelled on purpose — no i18n keys needed.
- */
+/** Stand-in while the list loads, shaped like the real layout so nothing jumps; unlabelled on purpose. */
 function DashboardSkeleton() {
   return (
     <div className="space-y-9" aria-hidden="true">
-      {/* The stat cards keep their real frame and shimmer only the value, so
-          the row is already the right height and nothing shifts when the
-          numbers land. */}
+      {/* Real frame, shimmering value only, so the row is already the right height when the numbers land. */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {Array.from({ length: 4 }, (_, i) => (
           <div
@@ -209,9 +183,7 @@ function ContinueStrip({
     [entries],
   );
 
-  // `save` itself is a fresh object every render, but `save.mutate` is a stable
-  // reference — depending on the object would hand every card a new callback
-  // and defeat the memo on ContinueCard.
+  // Depend on the stable `save.mutate`, not the fresh `save` object, or the memo on ContinueCard is defeated.
   const { mutate } = save;
   const plusOne = useCallback(
     (entry: MediaListEntry) =>
@@ -219,9 +191,7 @@ function ContinueStrip({
     [mutate],
   );
 
-  // The anime strip keeps its empty state — it is the screen's anchor and
-  // the nudge toward the season. A manga twin saying "you read nothing" to
-  // every anime-only user is noise, so that one simply is not there.
+  // Anime keeps its empty state as the screen's anchor; a manga one would be noise for anime-only users.
   if (type === "MANGA" && watching.length === 0) return null;
 
   return (
@@ -300,15 +270,7 @@ function AiringSoon({ entries }: { entries: MediaListEntry[] }) {
 
 const WEEK_SECS = 7 * 24 * 3600;
 
-/**
- * "This week" digest: episodes of the shows you're watching that air within
- * the next seven days. Sourced entirely from the cached list (each entry
- * carries `nextAiringEpisode`) through `lib/calendar`'s `fromList`, which the
- * calendar page shares — one implementation of "what airs in this window".
- *
- * Manga is intentionally absent: AniList exposes no chapter-release schedule,
- * so there is no truthful "new chapters this week" to show.
- */
+/** This week's episodes through `lib/calendar`'s `fromList`, shared with the calendar page; manga has no release schedule. */
 function WeeklyDigest({ entries }: { entries: MediaListEntry[] }) {
   const { t, i18n } = useTranslation();
 
@@ -342,8 +304,7 @@ function WeeklyDigest({ entries }: { entries: MediaListEntry[] }) {
           />
         ))}
       </div>
-      {/* The digest is the teaser; the calendar is the real thing — per-day
-          grouping, other weeks, and everything airing rather than only yours. */}
+      {/* The digest is the teaser; the calendar is the real thing, with other weeks and everything airing. */}
       <Link
         to="/calendar"
         className="mt-2 inline-block px-2.5 text-xs text-accent-400 hover:underline"
@@ -354,16 +315,7 @@ function WeeklyDigest({ entries }: { entries: MediaListEntry[] }) {
   );
 }
 
-/**
- * Favourite characters and staff whose birthday is today. Absent entirely on
- * most days, which is what makes it worth glancing at on the others.
- *
- * One request per day, not per mount: the query key carries the date, so the
- * cached answer serves every remount until midnight mints a new key. And it
- * waits for the two list queries to settle (`settled`) so the dashboard's
- * mount burst stays at two concurrent requests — the birthday read is a
- * *third* moment, deliberately after, not alongside.
- */
+/** Favourites born today, keyed by date for one request a day; waits for `settled` so the mount burst stays at two. */
 function Birthdays({ userId, settled }: { userId: number; settled: boolean }) {
   const { t } = useTranslation();
   const mode = useAuth((s) => s.mode);
@@ -477,13 +429,7 @@ function Stats({ entries }: { entries: MediaListEntry[] }) {
   );
 }
 
-/**
- * Memoized: a +1 flips the mutation state on the parent twice (optimistic
- * patch, then settle), and without this every card in the section reconciles
- * both times. Safe to memo because — unlike `MediaCard` — it never writes
- * through its props, so a shallow compare sees every change that matters.
- * `onPlusOne` takes the entry so the parent can hand out one stable callback.
- */
+/** Memoized, safe because it never writes through its props; `onPlusOne` takes the entry so one callback serves all. */
 const ContinueCard = memo(function ContinueCard({
   type,
   entry,
@@ -499,8 +445,7 @@ const ContinueCard = memo(function ContinueCard({
   const { t } = useTranslation();
   const scoreFormat = useScoreFormat();
   const { media } = entry;
-  // The list's own check — `maxProgress` knows chapters, `media.episodes`
-  // does not, which is what kept this card anime-only for so long.
+  // The list's own check; `maxProgress` knows chapters where `media.episodes` does not.
   const canPlus = canIncrement(entry);
   const total = maxProgress(media);
 
@@ -514,9 +459,7 @@ const ContinueCard = memo(function ContinueCard({
       score={entry.score > 0 ? formatScore(scoreFormat, entry.score) : null}
       progress={total ? { current: entry.progress, total } : null}
       actions={
-        // Always visible, not hover-only: this is the most-used action in the
-        // app, and hiding it behind a hover costs a deliberate movement every
-        // single time.
+        // Always visible, not hover-only: the most-used action in the app must not cost a hover every time.
         canPlus && (
           <IconButton
             variant="accent"

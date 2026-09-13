@@ -55,50 +55,16 @@ import { showToast } from "@/stores/toast";
 import { useSocialActions } from "@/hooks/useSocialActions";
 import { cn } from "@/lib/utils";
 
-/**
- * A tree is not a page, and this is what saying so looks like.
- *
- * `threadCommentTree` reaches the newest comment through a root LIST field, so
- * there is no `pageInfo` to report and nothing downstream may act as if there
- * were: `hasNextPage: false` is the load-bearing part, since a "Load more" under
- * a conversation that has no next page would be a button to nowhere.
- */
+/** The tree route has no pageInfo; keep hasNextPage false so no "Load more" appears under a conversation. */
 const EMPTY_PAGE_INFO = { total: 0, currentPage: 1, lastPage: 1, hasNextPage: false };
 
 /** What the jump view came back with, and how it got there. */
 interface Newest extends CommentPage {
-  /**
-   * Which route answered — the copy differs per tier, and a boolean could not
-   * carry the outcomes. `"comment"` is the `?comment=` landing: the same
-   * uncapped tree field as `"tree"`, fed the linked id instead of the newest.
-   */
+  /** Which route answered; "comment" is the ?comment= landing through the same uncapped tree field as "tree". */
   via: JumpRoute | "comment";
 }
 
-/**
- * The newest reply, by whichever route can actually reach it.
- *
- * **`"page"`** — the thread's own last page, when AniList will serve it. Nearly
- * every thread (thread 2340 is `lastPage: 70`), and it arrives with ten root
- * comments of surrounding conversation.
- *
- * **`"tree"`** — past the 5,000-entry cap. `Thread.replyCommentId` names the
- * newest comment and `threadCommentTree` resolves it through a root LIST field
- * the cap does not apply to, answering with the root of its conversation and
- * everything under it. **One request, at any thread size** — thread 15346 is
- * 70,348 root comments and costs exactly the same as thread 1.
- *
- * This replaced a two-request walk through the last replier's own comments,
- * which worked but returned that person's history rather than the exchange the
- * newest reply belongs to. The screen had to apologise for the difference; now
- * it does not have to.
- *
- * **`"capped"`** — past the cap with nothing to resolve. Lands as deep as
- * allowed and says so.
- *
- * See `lib/threadJump` for the arithmetic, why `sort` cannot do any of this,
- * and what the website does instead.
- */
+/** The newest reply by the route lib/threadJump picks: the last page, the uncapped tree, or the capped fallback. */
 async function fetchNewest(
   threadId: number,
   lastPage: number,
@@ -107,9 +73,7 @@ async function fetchNewest(
   const deepest = jumpTarget(lastPage).page;
   if (jumpRoute(lastPage, replyCommentId) === "tree") {
     const comments = await threadCommentTree(replyCommentId as number);
-    // A deleted newest comment answers "Not Found." and arrives as an empty
-    // list rather than an error, so the capped page is the honest fallback
-    // rather than an empty screen under a banner promising the newest reply.
+    // A deleted newest comment arrives as an empty list, not an error, so fall back to the capped page.
     if (comments.length > 0) {
       return { pageInfo: EMPTY_PAGE_INFO, comments, via: "tree" };
     }
@@ -121,18 +85,7 @@ async function fetchNewest(
   };
 }
 
-/**
- * One forum thread: its body, its comments, and a box to add one.
- *
- * Two requests cold — the thread and the first page of comments — issued *in
- * parallel*, which they were not: the comments used to wait for the thread body
- * they do not need.
- *
- * Deliberately reachable by id and from a profile's Forum tab only. A browsable
- * forum index (categories, sort, search, subscriptions) is a second feature with
- * its own rate-limit story, and Karasu is not trying to replace the website's
- * forum.
- */
+/** One forum thread: its body, its comments, and a box to add one, at two parallel requests cold. */
 export default function Thread() {
   const { id = "" } = useParams();
   const threadId = Number(id);
@@ -144,27 +97,18 @@ export default function Thread() {
 
   const [params, setParams] = useSearchParams();
   const urlComment = parseCommentParam(params.get("comment"));
-  // Lazy initializer, load-bearing: derived in an effect instead, the first
-  // render would have `target === null`, the paged query would fire page 1,
-  // and a `?comment=` mount would cost a third request.
+  // Keep the lazy initializer; set in an effect, page 1 fires first and a ?comment= mount costs a third request.
   const [target, setTarget] = useState<ThreadTarget>(() =>
     urlComment != null ? { comment: urlComment } : null,
   );
-  // Adopt a *changed* param: `<main key={pathname}>` does not remount on a
-  // query-string change, so the bell navigating to another comment of the
-  // same thread lands here rather than in the initializer.
+  // Adopt a changed param: the page does not remount on a query-string change, so a second comment lands here.
   useEffect(() => {
     if (urlComment == null) return;
     setTarget((t) =>
       isCommentTarget(t) && t.comment === urlComment ? t : { comment: urlComment },
     );
   }, [urlComment]);
-  /**
-   * Every way of leaving or changing the view goes through this, so the
-   * `?comment=` param cannot outlive the view it describes. `replace` keeps
-   * history clean: no entry to walk back through, `lib/backStack` untouched,
-   * and F5 lands on the comment only while the reader is still looking at it.
-   */
+  /** Every way of leaving the view clears ?comment= with replace, so the param cannot outlive the view. */
   const changeView = useCallback(
     (next: ThreadTarget) => {
       setTarget(next);
@@ -195,42 +139,22 @@ export default function Thread() {
     queryFn: ({ pageParam }) => threadComments(threadId, pageParam),
     initialPageParam: 1,
     getNextPageParam: (last: CommentPage) => nextPageParam(last.pageInfo),
-    // Deliberately *not* gated on `th.data`. It was, and that made a cold
-    // thread two round-trips in series — AniList answers in ~1 s warm and much
-    // worse cold, so the wait was doubled for nothing. `threadId` comes from
-    // the route, so this needs the thread body for exactly no reason.
-    //
-    // It IS gated off while a `?comment=` landing owns the screen: page 1
-    // fetches when the reader leaves that view — a user-initiated moment —
-    // keeping the cold comment mount at two requests.
+    // Not gated on th.data (that serialized two requests), only off while a ?comment= landing owns the screen.
     enabled:
       isTauri && Number.isFinite(threadId) && threadId > 0 && !isCommentTarget(target),
     // You post into this and read it back, so it goes stale quickly.
     staleTime: 60 * 1000,
   });
 
-  // The newest reply, on demand. Its own query rather than pages appended to
-  // the infinite one above: that cache is contiguous from page 1, and dropping
-  // page 70 into it would leave a hole nothing renders correctly.
-  /**
-   * Which comments are on screen: the normal paged read (`null`), the
-   * newest-reply jump, or one page asked for by number.
-   *
-   * A page number is the practical half of the 5,000-entry cap. On a long
-   * thread the deepest *readable* comment is hundreds of "Load more" presses
-   * away, and pressing a button five hundred times is not a feature — this
-   * reaches it in one, and reaches anywhere else in one too.
-   */
+  /** The page-number box's draft; one press reaches any readable page where "Load more" would take hundreds. */
   const [pageDraft, setPageDraft] = useState("");
   const lastPage = comments.data?.pages[0]?.pageInfo?.lastPage ?? null;
   /** What the uncapped route resolves — see `fetchNewest`. */
   const replyCommentId = th.data?.replyCommentId ?? null;
 
+  // The jump view is its own query: the infinite cache is contiguous from page 1 and a hole in it renders wrong.
   const newest = useQuery({
-    // `lastPage` and `replyCommentId` decide the *route*, so they belong to the
-    // key only while a route is being chosen. On a numeric target they are
-    // noise that re-fetches an unchanged page whenever the thread gains a
-    // reply; on a comment target the route is already decided by the id.
+    // lastPage and replyCommentId pick the route, so they key the query only while a route is being chosen.
     queryKey: [
       "social",
       "threadJump",
@@ -240,9 +164,7 @@ export default function Thread() {
     ],
     queryFn: () => {
       if (isCommentTarget(target)) {
-        // The linked comment's whole conversation, uncapped — works past the
-        // page cap where no page number could. An empty answer (deleted id)
-        // is handled by the effect below, not here.
+        // The linked comment's whole conversation, uncapped; an empty answer (deleted id) is handled in an effect.
         return threadCommentTree(target.comment).then(
           (comments): Newest => ({ pageInfo: EMPTY_PAGE_INFO, comments, via: "comment" }),
         );
@@ -253,9 +175,7 @@ export default function Thread() {
             (p): Newest => ({ ...p, via: "page" }),
           );
     },
-    // The comment route needs nothing from the paged query, and must not wait
-    // for it — a cold `?comment=` mount is th + tree, in parallel, two
-    // requests exactly.
+    // The comment route must not wait for the paged query; a cold ?comment= mount is two requests in parallel.
     enabled:
       isTauri && target != null && (isCommentTarget(target) || lastPage != null),
     staleTime: 60 * 1000,
@@ -269,8 +189,7 @@ export default function Thread() {
     if (page !== null) changeView(page);
   };
 
-  // A deleted (or never-existing) linked comment answers an empty tree, not
-  // an error — say so and fall back to the ordinary paged view.
+  // A deleted linked comment answers an empty tree, not an error; say so and fall back to the paged view.
   useEffect(() => {
     if (!isCommentTarget(target) || newest.data?.via !== "comment") return;
     if (newest.data.comments.length === 0) {
@@ -288,13 +207,7 @@ export default function Thread() {
     [target, newest.data],
   );
 
-  // Memoized because it is not cheap and it ran on *every* render: it walks
-  // every retained page and recurses through `childComments` to count what it
-  // hides — and `draft` lives in this component, so it re-ran on every
-  // keystroke in the reply box.
-  // Flattened, plus which loaded page each comment came from. The map is what
-  // lets a reply re-read *its own* page instead of collapsing the thread back
-  // to page 1, and it is built in the same pass so nothing flattens twice.
+  // Flattened with each comment's page so a reply re-reads its own; memoized since draft re-renders every keystroke.
   const { flat, pageOfComment } = useMemo(() => {
     const pages = comments.data?.pages ?? [];
     const map = new Map<number, number>();
@@ -310,17 +223,7 @@ export default function Thread() {
     [newest.data],
   );
 
-  /**
-   * Optimistic like state for comments, kept here rather than in the query
-   * cache.
-   *
-   * Thread comments arrive inside a raw `childComments` JSON blob that
-   * `lib/comments` flattens on read, so there is no tidy cached shape to patch
-   * — and `useSocialActions` deliberately skips `THREAD_COMMENT` for exactly
-   * that reason. An overlay applied after flattening is the honest version:
-   * it survives a re-render, and it is dropped the moment the page unmounts,
-   * which is also when the cache it is overlaying goes.
-   */
+  /** Optimistic like overlay applied after flattening; the raw childComments blob has no cached shape to patch. */
   const [likes, setLikes] = useState<Map<number, { likeCount: number; isLiked: boolean }>>(
     new Map(),
   );
@@ -329,15 +232,7 @@ export default function Thread() {
     [likes],
   );
 
-  /**
-   * Which comment the box is open under, and which row a reply is parented to.
-   *
-   * They are not the same number. `replyTo` is the row that was pressed — it
-   * positions the box — while `replyRoot` is that row's top-level ancestor,
-   * which is what AniList must be given. Parenting to a *reply* creates a
-   * depth-2 comment that `flattenComments` never draws, so the post succeeds
-   * and disappears.
-   */
+  /** replyTo positions the box; replyRoot is its top-level ancestor, because a reply under a reply is never drawn. */
   const [replyTo, setReplyTo] = useState<number | null>(null);
   const [replyRoot, setReplyRoot] = useState<number | null>(null);
   const [replyDraft, setReplyDraft] = useState("");
@@ -351,8 +246,7 @@ export default function Thread() {
     setLikes((m) => new Map(m).set(c.id, next));
     toggleLike(c.id, "THREAD_COMMENT")
       .then((res) => {
-        // AniList returns the authoritative count; replace the guess rather
-        // than keeping it, which is where a race with the website resolves.
+        // AniList returns the authoritative count; replace the guess so a race with the website resolves.
         if (res) setLikes((m) => new Map(m).set(c.id, { likeCount: res.likeCount, isLiked: res.isLiked }));
       })
       .catch(() => {
@@ -366,26 +260,15 @@ export default function Thread() {
     setReplyTo(closing ? null : c.id);
     setReplyRoot(closing ? null : c.rootId);
     if (closing) return;
-    // Only seed a draft that is empty or is nothing but a previous prefill.
-    // It used to overwrite unconditionally, so clicking Reply on a second
-    // comment mid-sentence discarded what was typed — twelve lines from a
-    // comment saying erasing the user's own words is the thing to avoid.
+    // Only seed a draft that is empty or a previous prefill, so a second Reply mid-sentence keeps what was typed.
     setReplyDraft((d) =>
       d.trim() === "" || /^@\S+\s*$/.test(d) ? (c.user?.name ? `@${c.user.name} ` : "") : d,
     );
-    // Pre-filled with the mention. Every reply is parented to the top-level
-    // row, so an answer to a reply renders beside it rather than under it —
-    // naming who it answers is the only thing that keeps that readable.
+    // Prefill the mention: every reply is parented to the top-level row, so naming who it answers keeps it readable.
     setReplyDraft(c.user?.name ? `@${c.user.name} ` : "");
   };
 
-  /**
-   * Re-reads one loaded page and splices it back where it was.
-   *
-   * The alternative is `comments.refetch()`, which re-reads **every** retained
-   * page — one request per page out of the ~30/min budget to show one new
-   * reply, which is the trap `UserList`'s comment documents.
-   */
+  /** Re-reads one loaded page and splices it back; comments.refetch() would spend one request per retained page. */
   const rereadPage = useCallback(
     async (index: number) => {
       const cached = qc.getQueryData<{ pages: CommentPage[]; pageParams: unknown[] }>([
@@ -413,17 +296,7 @@ export default function Thread() {
       qc.setQueryData(["social", "thread", threadId], (old: typeof th.data) =>
         old ? { ...old, isSubscribed: res?.isSubscribed ?? !old.isSubscribed } : old,
       );
-      // The Forum's Subscribed lens is a different query key with a ten-minute
-      // `staleTime`, `refetchOnWindowFocus: false` and a thirty-minute
-      // `gcTime`, and `/forum` is a separate route — so it unmounts and
-      // remounts against a still-fresh cache. Subscribe, go back within ten
-      // minutes, and it serves the cached empty page without issuing a
-      // request. `NewThreadModal` already does the equivalent after creating a
-      // thread, which AniList auto-subscribes you to.
-      //
-      // `removeQueries`, not `invalidateQueries`: this is an infinite query, so
-      // invalidation makes the next mount refetch *every* retained page out of
-      // the shared ~30/min budget. Dropping the pages makes it cost one.
+      // Forget the Subscribed lens (its cache stays fresh across remounts); removing, not invalidating, so it refetches once.
       qc.removeQueries({ queryKey: ["social", "forum", "subscribed"] });
     },
     onError: () => showToast({ kind: "error", text: t("social.subscribeFailed") }),
@@ -439,12 +312,7 @@ export default function Thread() {
       setReplyRoot(null);
       setReplyDraft("");
       showToast({ kind: "success", text: t("social.replyPosted") });
-      // The reply lands inside its parent's `childComments`, so exactly that
-      // page has to be re-read — and only that one. This used to truncate the
-      // cache to page 1 and refetch, which on a reply made from page 7 threw
-      // away six loaded pages, bounced the reader to the top, and did not show
-      // the reply. `refetch()` is still avoided: it re-reads *every* retained
-      // page, the trap `UserList` documents.
+      // The reply lands in its parent's childComments, so re-read only that page; refetch() re-reads every retained page.
       if (refreshPlan(target) === "jump") {
         void newest.refetch();
         return;
@@ -463,21 +331,11 @@ export default function Thread() {
 
   const comment = useMutation({
     mutationFn: (text: string) => saveThreadComment(threadId, text),
-    // Not optimistic: it is the user's own words, and a failure that erased them
-    // would be worse than a moment of waiting.
+    // Not optimistic: it is the user's own words, and a failure that erased them would be worse than waiting.
     onSuccess: async () => {
       setDraft("");
       showToast({ kind: "success", text: t("social.commentPosted") });
-      // A new top-level comment is on the **last** page — comments are
-      // oldest-first and `sort` is inert, so it can never be on page 1. This
-      // used to re-read page 1 and call it done, which showed the new comment
-      // only on a single-page thread.
-      //
-      // Page 1 is read anyway for a fresh `lastPage`; if the thread has grown
-      // past one page, jump to where the comment actually is. Past the 5,000
-      // cap `pageAfterPosting` returns null: the comment exists and no page
-      // request can reach it, so the reader is left where they are rather than
-      // dropped somewhere that implies otherwise.
+      // A new comment lands on the last page, never page 1: re-read page 1 for lastPage, then jump there when reachable.
       const first = await threadComments(threadId, 1);
       qc.setQueryData<{ pages: CommentPage[]; pageParams: unknown[] }>(
         ["social", "threadComments", threadId],
@@ -495,8 +353,7 @@ export default function Thread() {
       }),
   });
 
-  // One reply box, rendered under whichever comment asked for it. Shared by
-  // both views, so the newest-replies jump can be answered into as well.
+  // One reply box under whichever comment asked for it, shared by both views so the jump view can be answered into.
   const replyBox = (
     <form
       onSubmit={(e) => {
@@ -562,10 +419,7 @@ export default function Thread() {
     );
   }
 
-  // A rejection is only "does not exist" when it says so. Anything else — an
-  // expired token, a rate limit, no connection — is a failure to ask, and
-  // asserting the thread is gone because the network is down is a definite
-  // claim about someone else's data. See `lib/apiError`.
+  // Only a not-found rejection means the thread is gone; any other failure is a failure to ask (lib/apiError).
   if (th.error && !isNotFound(th.error)) {
     return (
       <div className="px-8 pt-7">
@@ -596,8 +450,7 @@ export default function Thread() {
 
   const data = th.data;
   const check = validatePost(draft);
-  // No like or reply affordance without an account or on a locked thread — a
-  // button that can only fail is worse than no button.
+  // No like or reply without an account or on a locked thread; a button that can only fail is worse than none.
   const canPost = mode === "anilist" && !data.isLocked;
 
   return (
@@ -698,20 +551,12 @@ export default function Thread() {
       )}
 
       <section className="mt-6">
-        {/* Page 1 is the oldest and there is no way to reverse that — see
-            `lib/threadJump`. So on any thread past one page, the newest reply
-            is somewhere the reader cannot get to by scrolling. */}
-        {/* `|| target != null` so the way back never disappears. These controls
-            lived entirely under `canJump`, which reads `lastPage` from the
-            *paged* query — so a jump taken while that was known, followed by
-            anything that made it unknown, left the reader inside the jump view
-            with no button to leave it. */}
+        {/* Keep `|| target != null`: canJump can turn false mid-jump, and the reader needs a way back out of the jump view. */}
         {(canJump(lastPage) || target != null) && (
           <div className="mb-3 flex flex-wrap items-center gap-2">
             {canJump(lastPage) && (
               <>
-                {/* Deliberately *not* disabled while fetching: this is the way
-                    out, and a slow request is exactly when it is wanted. */}
+                {/* Not disabled while fetching: this is the way out, and a slow request is exactly when it is wanted. */}
                 <Button
                   variant={target === "newest" ? "outline" : "secondary"}
                   size="sm"
@@ -723,10 +568,7 @@ export default function Thread() {
                     : t("social.viewNewest")}
                 </Button>
 
-            {/* One press to anywhere, including the deepest readable page.
-                Capped at what AniList will actually serve rather than at
-                `lastPage`, which on a big thread is a number you cannot ask
-                for — see `lib/threadJump`. */}
+            {/* One press to any page, capped at what AniList will serve rather than at lastPage (lib/threadJump). */}
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
@@ -782,12 +624,7 @@ export default function Thread() {
               </p>
             ) : (
               <>
-                {/* Said plainly whenever the cap decided what arrived, because
-                    both of those tiers are a different thing from what the
-                    button promises. `"tree"` reaches the newest reply exactly
-                    but brings its conversation instead of its page; `"capped"`
-                    does not reach it at all. Showing either silently would be
-                    the lie. */}
+                {/* Say so whenever the cap decided what arrived: "tree" brings a conversation, "capped" misses the newest. */}
                 {newest.data && newest.data.via !== "page" && (
                   <p className="mb-3 rounded-lg border border-gold/30 bg-gold/8 px-3 py-2 text-2xs leading-relaxed text-ink-300">
                     {newest.data.via === "comment"

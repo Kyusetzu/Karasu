@@ -33,19 +33,11 @@ import { EmptyState, OutlineYear } from "@/components/EmptyState";
 import markUrl from "@/assets/karasu-mark.svg";
 import { toBase64 } from "@/lib/base64";
 
-/**
- * Poster type and geometry are expressed in `em`, like the design, and one
- * layout serves all five crops. Canvas has no `em`, so each preset carries the
- * pixel value of one — the design's root font size for that crop.
- */
+/** Poster type and geometry are written in em, like the design, so one layout serves every crop. */
 const FONT = '"SN Pro", system-ui, sans-serif';
 const FONT_JP = '"Kosugi Maru", "SN Pro", sans-serif';
 
-/**
- * The poster keeps the dark palette in both themes. It is an image that leaves
- * the app — it should look like Karasu wherever it is posted, not like the
- * theme of whoever exported it. Only the accent follows the user.
- */
+/** The poster keeps the dark palette in both themes, because it leaves the app; only the accent follows the user. */
 const POSTER_BG = "#07090d";
 const INK = "#f1f5f9";
 const INK_DIM = "rgba(238,241,246,.62)";
@@ -92,14 +84,7 @@ function roundRect(
   ctx.fill();
 }
 
-/**
- * Loads the mark once, for the canvas.
- *
- * An `<img>` mounts and paints itself; a canvas has to be handed something
- * already decoded, and `drawImage` with a half-loaded image silently draws
- * nothing. One module-level promise, so five presets and an export share the
- * single decode.
- */
+/** Loads the mark once: drawImage with a half-loaded image silently draws nothing, so every draw shares one decode. */
 let markPromise: Promise<HTMLImageElement | null> | null = null;
 function loadMark(): Promise<HTMLImageElement | null> {
   markPromise ??= new Promise((resolve) => {
@@ -111,16 +96,7 @@ function loadMark(): Promise<HTMLImageElement | null> {
   return markPromise;
 }
 
-/**
- * Requests the two poster faces, once. `document.fonts.ready` is not
- * enough here: it resolves immediately when a face was never *requested*,
- * and Kosugi Maru may never have rendered in the DOM before this page
- * mounts — the first draw then rasterized fallback glyphs into the canvas
- * and nothing ever redrew for the webfont. `load()` initiates the fetch;
- * weight 400 is the only registered face (the poster's heavier weights are
- * synthesized off it either way). Failure resolves rather than rejects —
- * a missing font is a cosmetic downgrade, not a reason to draw nothing.
- */
+/** Requests the two poster faces once; fonts.ready is not enough, it resolves at once for a face never requested. */
 let fontsPromise: Promise<unknown> | null = null;
 function ensurePosterFonts(): Promise<unknown> {
   fontsPromise ??= Promise.all([
@@ -134,16 +110,7 @@ function ensurePosterFonts(): Promise<unknown> {
 const markHeight = (mark: HTMLImageElement, size: number) =>
   size * (mark.naturalHeight / mark.naturalWidth || 978.44 / 890.73);
 
-/**
- * The corvid, in full colour — the same art the app shows, not a silhouette of
- * it. Drawn from the SVG so the poster's bird and the titlebar's are one file.
- *
- * Placed by its **centre**, not its top-left corner. Corner placement is what
- * put the watermark off the poster: the call site asked for a 42em bird 20em
- * from the right edge, which left 48% of it — the head, and only the head — on
- * the canvas, cropped at both edges. Rotating about a corner then walks the art
- * sideways as a side effect of the angle, which is the same bug in miniature.
- */
+/** Draws the corvid from the app's own SVG, placed by its centre; corner anchoring left half the bird off the poster. */
 function drawMark(
   ctx: CanvasRenderingContext2D,
   mark: HTMLImageElement | null,
@@ -164,12 +131,7 @@ function drawMark(
 }
 
 
-/**
- * Shrinks `weight size`px system-ui text down toward `minSize` until it fits
- * `maxWidth`. If it still doesn't fit at the floor size, `allowTruncate`
- * clips it with an ellipsis (never used for numeric values). Leaves
- * `ctx.font` set to the resolved size as a side effect.
- */
+/** Shrinks text toward minSize until it fits maxWidth, clipping with an ellipsis if allowed; leaves ctx.font set. */
 function fitText(
   ctx: CanvasRenderingContext2D,
   text: string,
@@ -205,12 +167,6 @@ interface Section {
   paint: (y: number) => void;
 }
 
-/**
- * Draws the review card. Sections are laid out with a running cursor
- * (each contributes a fixed height), so nothing can overlap, and the canvas
- * height is computed to fit the content exactly — no clipping, no dead space.
- */
-
 /** What the headline says — the one place the card knows year from season. */
 interface CardHeading {
   /** The big numeral (the year, in both modes). */
@@ -221,6 +177,7 @@ interface CardHeading {
   emptyLine: string;
 }
 
+/** Draws the review card; sections stack on a running cursor of fixed heights, so nothing can overlap. */
 function drawCard(
   canvas: HTMLCanvasElement,
   stats: WrappedStats,
@@ -230,30 +187,17 @@ function drawCard(
   lang: string,
   preset: Preset,
   mark: HTMLImageElement | null,
-  /**
-   * Output multiplier. Every coordinate and font size in this function is a
-   * hardcoded design-unit number, so the *only* way to render larger without
-   * blurring is a context transform — upscaling the finished bitmap would
-   * resample text that was already rasterized at 1x. With the transform, the
-   * glyphs are rasterized at the final size.
-   */
+  /** Output multiplier applied as a context transform, so glyphs rasterize at the final size instead of upscaling. */
   scale = 1,
 ) {
-  // Sections are painted onto an offscreen buffer sized to their natural
-  // content height first; the visible canvas is only assigned at the end,
-  // so square-preset scaling (below) can compose the finished buffer rather
-  // than needing to know the final size up front.
+  // Sections paint onto an offscreen buffer first; the visible canvas is assigned only at the end.
   const work = document.createElement("canvas");
   const ctx = work.getContext("2d");
   if (!ctx) return;
 
   const W = preset.W;
   const H = preset.H;
-  /**
-   * A 2.58:1 crop has no room for a stacked column — the two medium blocks
-   * would each get a couple of centimetres of height and the right third of
-   * the poster would stay empty. At that aspect they sit side by side.
-   */
+  /** A very wide crop has no room for a stacked column, so at that aspect the medium blocks sit side by side. */
   const row = preset.W / preset.H > 2;
 
   const a4 = cssVar("--color-accent-400", "#8b9dff");
@@ -266,29 +210,18 @@ function drawCard(
   const face = (weight: number, size: number, jp = false) => {
     ctx.font = `${weight} ${size}px ${jp ? FONT_JP : FONT}`;
   };
-  /** `letterSpacing` is Chromium-only and silently ignored elsewhere, which
-      is the right failure: tracking is a refinement, not the layout. */
+  /** letterSpacing is Chromium-only and silently ignored elsewhere, which is right: tracking is a refinement. */
   const track = (value: string) => {
     ctx.letterSpacing = value;
   };
 
-  /**
-   * Lays the card out at a given `em`, in pixels.
-   *
-   * Run twice: once at `em = 1`, which measures the card's natural height in
-   * ems, and then at the size that makes that height fill the preset's crop.
-   * A poster is a fixed frame, so the type scales to the frame rather than the
-   * frame drifting with however much the year happened to contain.
-   */
+  /** Lays the card out in em; measured once at em = 1, then drawn at the em that fills the preset's crop. */
   const build = (em: number) => {
     /** One `em`, in pixels — the unit every size below is written in. */
     const u = (n: number) => n * em;
     const P = u(9);
 
-    // Block painters run from `P` to `CW - P`, so a column's frame is its
-    // content plus a padding on each side — and the two frames overlap by one
-    // padding where they meet, which is what keeps the outer margins equal to
-    // the inner gap's half and the poster symmetrical.
+    // Painters run from P to CW - P, so the column frames overlap by one padding, which keeps the poster symmetrical.
     const gutter = u(4);
     const colContent = (W - P * 2 - gutter) / 2;
     const CW = row ? colContent + P * 2 : W;
@@ -306,10 +239,7 @@ function drawCard(
       track("0px");
     };
 
-    // --- Header -------------------------------------------------------------
-    // No coloured band: at poster scale a filled header reads as a UI chrome
-    // bar. The year carries the page on its own, with the accent spent on the
-    // rule beneath it and on the wash behind.
+    // --- Header --- no coloured band: at poster scale a filled header reads as a UI chrome bar.
     sections.push({
       height: u(15.5),
       paint: (y) => {
@@ -369,8 +299,7 @@ function drawCard(
         return;
       }
 
-      // Stat tiles: a top rule and text, no fill. A bordered box at this scale
-      // reads as a UI card that wandered into a poster.
+      // Stat tiles: a top rule and text, no fill, since a bordered box at this scale reads as a UI card.
       sections.push({
         height: u(7.4),
         paint: (y) => {
@@ -421,10 +350,7 @@ function drawCard(
               face(600, u(1.5));
               ctx.fillText(gv.name, P, y + u(1.9));
 
-              // The count sits *after* the bar, not on it: a number inside a
-              // filled track has to change colour to stay legible, and it did
-              // — which meant the same column read in two different inks
-              // depending on how long its bar happened to be.
+              // The count sits after the bar, not on it, so the column reads in one ink whatever the bar's length.
               const countW = u(3.2);
               const barX = CW / 2;
               const barW = CW / 2 - P - countW;
@@ -505,8 +431,7 @@ function drawCard(
       height: u(6),
       paint: (y) => {
         const size = u(1.6);
-        // Centre-placed like the watermark, so the two calls mean the same
-        // thing: the row's own middle, half a mark in from the margin.
+        // Centre-placed like the watermark: the row's own middle, half a mark in from the margin.
         drawMark(ctx, mark, P + size / 2, y + u(1.5), size, 1);
         ctx.textAlign = "left";
         ctx.textBaseline = "alphabetic";
@@ -563,8 +488,7 @@ function drawCard(
     return { paint, totalH };
   };
 
-  // Bounded above by the width: a sparse year would otherwise stretch a
-  // handful of lines into letters the height of a fist.
+  // Bounded above by the width, or a sparse year would stretch a few lines into fist-high letters.
   const natural = build(1).totalH;
   const em = Math.min(W / 62, H / natural);
   const card = build(em);
@@ -577,8 +501,7 @@ function drawCard(
   ctx.fillStyle = POSTER_BG;
   ctx.fillRect(0, 0, W, H);
 
-  // Three washes off the derived hues, the same pair the panels use. They are
-  // what keeps a near-black poster from reading as a screenshot of a terminal.
+  // Three washes off the derived hues keep a near-black poster from reading as a terminal screenshot.
   const wash = (
     cx: number,
     cy: number,
@@ -596,23 +519,16 @@ function drawCard(
   wash(W, H, W * 0.9, accentRgb, 0.13);
   wash(W * 0.5, H * 0.45, W * 0.7, w2, 0.07);
 
-  // A 1px highlight along the top edge — the same catch-light every panel in
-  // the app carries, which is what makes the surface read as lit from above.
+  // The top-edge catch-light every panel in the app carries, so the surface reads as lit from above.
   ctx.fillStyle = "rgba(255,255,255,.06)";
   ctx.fillRect(0, 0, W, 1);
 
-  // The mark bleeds off the bottom-right corner, painted before the content so
-  // the text sits over it. Its centre sits 0.4 of the art in from each edge, so
-  // nine tenths of the bird is on the poster and only the corner it is meant to
-  // run off actually runs off. The alpha is higher than a watermark usually
-  // wants because the art is mostly near-black — at .16 it was arithmetically
-  // invisible on this ground.
+  // The mark bleeds off the bottom-right corner under the text; the alpha is high because the art is near-black.
   const markW = em * 42;
   const markH = mark ? markHeight(mark, markW) : 0;
   drawMark(ctx, mark, W - markW * 0.4, H - markH * 0.4, markW, 0.34, -7);
 
-  // Centred, so a card that cannot quite fill its crop is framed by the ground
-  // rather than hanging from the top edge.
+  // Centred, so a card that cannot fill its crop is framed by the ground rather than hung from the top.
   card.paint(Math.max(0, (H - card.totalH) / 2));
 
   canvas.width = W * scale;
@@ -629,8 +545,7 @@ export default function Wrapped() {
   const level = useContentFilter((s) => s.level);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [year, setYear] = useState<number | null>(null);
-  // Which cut the card covers. Year is completion-bucketed, season is
-  // broadcast-bucketed - see WrappedPeriod's comment for why the words differ.
+  // Which cut the card covers: a year is completion-bucketed and a season broadcast-bucketed (WrappedPeriod).
   const [mode, setMode] = useState<"year" | "season">("year");
   const [seasonPick, setSeasonPick] = useState<{ season: Season; year: number } | null>(null);
   const [saved, setSaved] = useState(false);
@@ -639,18 +554,7 @@ export default function Wrapped() {
   const [scale, setScale] = useState(2);
   const preset = PRESETS.find((p) => p.key === presetKey) ?? PRESETS[2];
 
-  // Through the query cache, not a bare effect into `useState`. `<main
-  // key={pathname}>` remounts this page on every navigation, so the old effect
-  // refetched *both* completed collections every single time /wrapped was
-  // opened — two large responses out of a ~30/min budget for data that changes
-  // when you finish something, not when you change tabs. Half an hour matches
-  // what Statistics does for the same reason.
-  //
-  // `error` is destructured for the same reason the Dashboard destructures it:
-  // a failed query has `isLoading === false` and no data, so without it an
-  // offline year fell through to the empty state and told the user they had
-  // finished nothing all year. The one screen built to be exported and shared
-  // is the last place to state that on a dropped request.
+  // Cached because the page remounts per navigation; error keeps a dropped request from reading as an empty year.
   const { data, isLoading: loading, error, refetch } = useQuery({
     queryKey: ["wrapped", viewer?.id],
     queryFn: async () => {
@@ -666,9 +570,7 @@ export default function Wrapped() {
   const anime = data?.anime ?? EMPTY_ENTRIES;
   const manga = data?.manga ?? EMPTY_ENTRIES;
 
-  // This card gets exported as a PNG and shared, so filtered entries must not
-  // reach it — and neither must a filtered genre *name*, which would otherwise
-  // survive in the top-genres bars even with the entries removed.
+  // The card is exported and shared, so neither filtered entries nor filtered genre names may reach it.
   const visibleAnime = useMemo(
     () => anime.filter((e) => !isBlocked(e, level)),
     [anime, level],
@@ -704,9 +606,7 @@ export default function Wrapped() {
         ? { kind: "season", ...seasonPick }
         : null;
 
-  /** The headline in the chosen mode - the poster's one period-aware input.
-   *  The caption keeps the JP flourish; the season one leads with the
-   *  translated season name so the poster is legible without the kanji. */
+  /** The poster's one period-aware input; the season caption leads with the translated name, not the kanji. */
   const heading: CardHeading | null =
     period === null
       ? null
@@ -733,26 +633,18 @@ export default function Wrapped() {
             isBlockedGenre(g, level),
           )
         : null,
-    // `period` is derived fresh each render from mode/year/seasonPick, so its
-    // pieces are listed rather than the object identity.
+    // `period` is derived fresh each render, so its pieces are listed rather than the object identity.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [visibleAnime, visibleManga, mode, year, seasonPick, level],
   );
 
-  // The mark is decoded once and then held: the poster redraws on every
-  // preset change, and a fresh decode per draw would flash an empty corner.
-  // Three-valued on purpose — `undefined` is "decode still pending" and
-  // gates the first draw, `null` is "decode failed" and draws without the
-  // bird. Gating on truthiness instead would never draw on a failed decode,
-  // and gating on nothing drew the whole poster twice at mount.
+  // Three-valued on purpose: undefined (still decoding) gates the first draw, null (failed) draws without the bird.
   const [mark, setMark] = useState<HTMLImageElement | null | undefined>(undefined);
   useEffect(() => {
     loadMark().then(setMark);
   }, []);
 
-  // The preview canvas's CSS width (rounded, so the observer can't loop on
-  // subpixel churn). It decides the draw resolution below; 0 means the
-  // canvas hasn't mounted or been measured yet.
+  // The preview canvas's CSS width, rounded so the observer cannot loop on subpixel churn; 0 means unmeasured.
   const [previewWidth, setPreviewWidth] = useState(0);
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -765,8 +657,7 @@ export default function Wrapped() {
     const ro = new ResizeObserver(measure);
     ro.observe(canvas);
     return () => ro.disconnect();
-    // The canvas exists only on the data branch, so re-run when that
-    // branch's inputs settle.
+    // The canvas exists only on the data branch, so re-run when that branch's inputs settle.
   }, [loading, error, years.length]);
 
   useEffect(() => {
@@ -777,17 +668,9 @@ export default function Wrapped() {
     let cancelled = false;
     (async () => {
       await ensurePosterFonts();
-      // Checked after every await: preset pills can be clicked faster than
-      // the first font load resolves.
+      // Checked after every await: preset pills can be clicked faster than the first font load resolves.
       if (cancelled) return;
-      // The preview draws at its *displayed* size × devicePixelRatio, not at
-      // poster resolution — `scale` transforms the same design-unit layout
-      // the export uses, so preview and export stay bit-identical in layout
-      // while the preview rasters 4-25× fewer pixels (the phone shows ~340
-      // CSS px of a 1080-2010 px design). Never shrink `preset.W` instead:
-      // the fixed-pixel rules and fitText's 2px quantization don't scale
-      // with W, and the preview would lie about the export. Capped at 2 —
-      // beyond that the pixels outrun every display this renders on.
+      // Rasterize at the displayed size via scale, never by shrinking preset.W, or the preview lies about the export.
       const previewScale = Math.min(
         2,
         (previewWidth * (window.devicePixelRatio || 1)) / preset.W,
@@ -824,27 +707,17 @@ export default function Wrapped() {
     );
   }
 
-  /**
-   * Renders at the chosen scale and hands the bytes to the save dialog.
-   *
-   * Drawn into a throwaway canvas rather than the one on screen: the preview
-   * is sized for the page, and re-rendering it at 3x to export would leave a
-   * 4800px canvas mounted until the next preset change.
-   */
+  /** Renders at the chosen scale into a throwaway canvas and saves it, so no export-size canvas stays mounted. */
   const save = async () => {
     if (!stats || !heading || period === null) return;
     const out = document.createElement("canvas");
-    // Awaited rather than read from state: an export fired before the decode
-    // landed would write a poster with no bird on it. The fonts likewise —
-    // resolved long since in the normal case, but an export is the one draw
-    // that must never rasterize fallback glyphs.
+    // Awaited, not read from state: an export fired before the decodes landed would draw no bird and fallback glyphs.
     await ensurePosterFonts();
     const art = mark ?? (await loadMark());
     drawCard(out, stats, heading, viewer?.name ?? "", t, i18n.language, preset, art, scale);
 
     const blob = await new Promise<Blob | null>((resolve) =>
-      // Quality only applies to JPEG; PNG ignores it. 0.92 is the browser
-      // default and is visually lossless on flat poster art.
+      // Quality applies to JPEG only, and the browser default is visually lossless on flat poster art.
       out.toBlob(resolve, format === "png" ? "image/png" : "image/jpeg", 0.92),
     );
     if (!blob) return;
@@ -877,9 +750,7 @@ export default function Wrapped() {
               <Pill active={mode === "year"} onClick={() => setMode("year")}>
                 {t("wrapped.modeYear")}
               </Pill>
-              {/* A completion list can be all movies and specials - no
-                  broadcast seasons at all - in which case the mode has
-                  nothing to offer and the pill would be a dead end. */}
+              {/* A completion list can be all movies and specials, with no broadcast seasons, so the pill would be a dead end. */}
               {seasons.length > 0 && (
                 <Pill active={mode === "season"} onClick={() => setMode("season")}>
                   {t("wrapped.modeSeason")}
@@ -941,10 +812,7 @@ export default function Wrapped() {
               </Pill>
             ))}
           </ExportRow>
-          {/* Not a preview control — the on-screen poster draws at its own
-              display resolution regardless. Scale is what gets written to
-              disk, so the pixel size is shown rather than left to be
-              inferred from "2x". */}
+          {/* Not a preview control: scale is what gets written to disk, so the pixel size is shown outright. */}
           <ExportRow label={t("wrapped.size")}>
             {[1, 2, 3].map((n) => (
               <Pill
@@ -983,13 +851,7 @@ export default function Wrapped() {
   );
 }
 
-/** One labelled row of the export controls.
- *
- *  One scrollable line on the phone — the Search pill row's gesture — and
- *  the old wrap on desktop: five shape pills minus the label column is
- *  wider than a phone, and a picker that breaks onto a second line reads
- *  as two controls. The pills carry `shrink-0` at the call sites; without
- *  it they compress instead of scrolling. */
+/** One labelled export row: scrolls on the phone, wraps on desktop; keep shrink-0 on the pills or they compress. */
 function ExportRow({
   label,
   children,

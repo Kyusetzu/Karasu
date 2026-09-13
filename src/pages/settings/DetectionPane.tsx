@@ -61,14 +61,7 @@ export function ScrobbleSection() {
 
   if (!settings) return null;
 
-  /**
-   * Paint, persist, and put the control back if persisting failed.
-   *
-   * Every write on this pane was fire-and-forget, so a rejected `kv_set` left
-   * the switch showing one thing while the watcher that reads the key kept
-   * doing another — and nothing on screen said so. Same shape as
-   * `AdvancedPane`'s rollback, which is the house pattern for this.
-   */
+  /** Paint, persist, and roll the control back if persisting failed, so the switch cannot lie about the key. */
   const persist = (save: Promise<unknown>, revert: () => void) => {
     setSaveError(null);
     save.catch((e) => {
@@ -107,10 +100,7 @@ export function ScrobbleSection() {
   return (
     <Card>
       <CardTitle>{t("settings.tracking")}</CardTitle>
-      {/* Detection recognises a title by matching it against the AniList list,
-          and scrobbling writes to AniList. Without an account it will still
-          show what you are playing and nothing more — worth saying here rather
-          than leaving someone to conclude the feature is broken. */}
+      {/* Without an account detection only shows what is playing; say so, or the feature looks broken. */}
       {!viewer && (
         <p className="mt-2 text-sm text-gold">{t("settings.trackingNeedsAccount")}</p>
       )}
@@ -138,9 +128,7 @@ export function ScrobbleSection() {
           label={t("settings.trackingGapAuto")}
           hint={t("settings.trackingGapAutoHint")}
         />
-        {/* The one desktop-only row in a card the phone otherwise owns: a
-            phone has no SMTC to switch, so the row hides itself there rather
-            than greying the whole card (see `ANDROID_DESKTOP_ONLY`). */}
+        {/* The one desktop-only row here: a phone has no SMTC, so the row hides itself rather than greying the card. */}
         {mediaOn !== null && !isAndroid(platform) && (
           <Toggle
             checked={mediaOn}
@@ -150,9 +138,7 @@ export function ScrobbleSection() {
             }}
             label={t("settings.mediaSessions")}
             hint={
-              // Worth saying out loud on Linux: this pass is the only thing
-              // that sees a local player there, so switching it off is not
-              // the small refinement the generic hint suggests.
+              // On Linux this pass is the only thing that sees a local player, so the hint must say so.
               isLinux(platform)
                 ? t("settings.mediaSessionsLinuxOnly")
                 : t("settings.mediaSessionsHint")
@@ -181,11 +167,7 @@ export function ScrobbleSection() {
               label={t("settings.airingNotify")}
               hint={t("settings.airingNotifyHint")}
             />
-            {/* Says what the watcher will actually do, from the same cached
-                viewer blob the watcher itself reads — so a blob that has gone
-                stale against anilist.co is visibly wrong here rather than
-                silently wrong in the background. Costs nothing: the blob is
-                already in the auth store. */}
+            {/* Same cached viewer the watcher reads, so a stale blob is visibly wrong here rather than silently wrong. */}
             {airing && anilistCoversAiring(viewer) && (
               <ExternalNote>{t("settings.airingNotifyAniList")}</ExternalNote>
             )}
@@ -233,21 +215,7 @@ export function ScrobbleSection() {
   );
 }
 
-/**
- * Shows what the desktop currently reports for every media session.
- *
- * Players disagree about which field carries the show and which carries the
- * episode, and some publish nothing at all. Without this there is no way to
- * tell "Karasu ignored it" from "the player never told the system" — which is
- * exactly the question when a title isn't picked up.
- *
- * Its own card rather than a footnote under the scrobble settings, which is
- * where it used to live. On Linux the media-session pass *is* local detection —
- * there is no window enumerator and Wayland forbids one — so this is the first
- * screen to look at when nothing is picked up, not the last line of another
- * one. Still collapsed by default and still fetched on first expand: it is a
- * thing you go looking for, not a round trip every visit to Settings costs.
- */
+/** What every media session reports, fetched on first expand; on Linux this pass is all of local detection. */
 export function MediaSessionSection() {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -261,11 +229,7 @@ export function MediaSessionSection() {
       setSessions(await mediaSessions());
       setError(null);
     } catch (e) {
-      // Not `setSessions([])`. An empty list is "no player is reporting
-      // anything", which is a normal state and a completely different answer
-      // from "the session service could not be reached" — and on Linux this
-      // pass is the whole of local detection, so the second one means the
-      // feature is down rather than idle.
+      // Keep null, not []: an empty list means idle, while unreachable means the feature is down.
       setSessions(null);
       setError(String(e));
     } finally {
@@ -333,8 +297,7 @@ export function MediaSessionSection() {
                 <dd className="text-ink-300">{s.playbackType}</dd>
                 <dt>status</dt>
                 <dd className="text-ink-300">{s.status}</dd>
-                {/* MPRIS only. Rendered when present rather than always, so
-                    the Windows diagnostic looks exactly as it did. */}
+                {/* MPRIS only; rendered when present so the Windows diagnostic looks exactly as it did. */}
                 {s.url && (
                   <>
                     <dt>url</dt>
@@ -350,15 +313,7 @@ export function MediaSessionSection() {
   );
 }
 
-/**
- * The corrections made from the now-playing card, so they can be reviewed and
- * taken back somewhere other than the moment they were made.
- *
- * Absent entirely until there is one — an empty card explaining a feature
- * nobody has used is noise on a pane that already has plenty. Each row names
- * what detection *saw* and what it was told that means; removing one gives the
- * matcher its guess back.
- */
+/** The now-playing card's corrections, reviewable and revocable here; absent until there is one. */
 export function DetectionCorrectionsSection() {
   const { t } = useTranslation();
   const [rows, setRows] = useState<DetectionOverride[] | null>(null);
@@ -377,8 +332,7 @@ export function DetectionCorrectionsSection() {
     try {
       await clearDetectionOverride({
         title: row.title,
-        // Back to the `null` the command expects; `-1` is the storage
-        // sentinel, not something the API should have to know about.
+        // Back to the `null` the command expects; `-1` is the storage sentinel, not the API's business.
         season: row.season < 0 ? null : row.season,
         mediaType: row.mediaType,
       });
@@ -437,13 +391,7 @@ interface MpvIpcSettings {
   launchPath: string;
 }
 
-/**
- * The mpv IPC pipe — the detection source that knows the most, for the user
- * willing to add one line to `mpv.conf`. Opt-in, because probing a pipe
- * nobody configured every five seconds would be waste dressed as a feature.
- * The hint quotes the exact `input-ipc-server=` line for the *effective*
- * path, so the two sides of the pipe cannot quietly disagree.
- */
+/** The opt-in mpv IPC pipe; the hint quotes the effective path so the two sides of it cannot disagree. */
 export function MpvSection() {
   const { t } = useTranslation();
   const [settings, setSettings] = useState<MpvIpcSettings | null>(null);
@@ -542,22 +490,7 @@ export function MpvSection() {
   );
 }
 
-/**
- * Optional Jellyfin server connection.
- *
- * The system media-session pass already covers Jellyfin Media Player with no
- * setup. This is for when that isn't enough: the server reports the series,
- * season and episode as separate fields, so nothing has to be parsed.
- *
- * Signing in as a user rather than with an admin API key is deliberate and
- * load-bearing — Jellyfin scopes `/Sessions` to the calling account, but only
- * when the caller isn't an API key. It also means an ordinary account is
- * enough. The password is submitted once and never stored; only the returned
- * token reaches the credential store.
- *
- * Test connection still lists non-matching sessions, because a device name one
- * character off is otherwise indistinguishable from "nothing is playing".
- */
+/** Optional Jellyfin connection; signing in as a user, never an API key, is what scopes /Sessions to the account. */
 export function JellyfinSection() {
   const { t } = useTranslation();
   const [settings, setSettings] = useState<JellyfinSettings | null>(null);
@@ -608,8 +541,7 @@ export function JellyfinSection() {
       setPassword("");
       setUsername("");
       setSettings(next);
-      // The device and external fields are saved separately; persist whatever
-      // is in them now so signing in doesn't quietly discard an edit.
+      // Device and external URL are saved separately; persist them now so signing in cannot discard an edit.
       await setJellyfinSettings(url, device, externalUrl);
       setSettings(await getJellyfinSettings());
     } catch (e) {
@@ -658,8 +590,7 @@ export function JellyfinSection() {
       <CardTitle>{t("settings.jellyfin")}</CardTitle>
       <p className="mt-2 text-sm text-ink-500">{t("settings.jellyfinHint")}</p>
       <div className="mt-3 space-y-2">
-        {/* Jellyfin's own discovery, so the address need not be typed at
-            all: the servers on this network, by name, one click each. */}
+        {/* Jellyfin's own discovery: the servers on this network, one click each, so no address is typed. */}
         {!settings.connected && (
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <Button variant="secondary" size="sm" onClick={find} disabled={finding}>
@@ -733,22 +664,14 @@ export function JellyfinSection() {
           </>
         )}
 
-        {/* The placeholder states what an empty field *does*, and no longer
-            offers this machine's name — the backend used to prefill that as
-            the field's value, so a Save pinned the filter to this PC and
-            silently stopped detecting a browser or phone session. */}
+        {/* Placeholder only, never this machine's name as the value: that pins the filter to this PC. */}
         <Input
           value={device}
           onChange={(e) => setDevice(e.target.value)}
           placeholder={t("settings.jellyfinDeviceAny")}
         />
 
-        {/* The second address, for when the first is out of reach. Editable
-            while signed in — it is not part of the sign-in — and saved by
-            the same Save. The status line under it is the backend's word:
-            verified against the server's id, or not yet reachable from
-            here; and the warning when http would carry the token across the
-            internet, which the maintainer chose to allow rather than refuse. */}
+        {/* The fallback address, editable while signed in; the status and the plain-http warning are the backend's word. */}
         <div>
           <label className="block text-xs font-medium text-ink-300" htmlFor="jellyfin-external">
             {t("settings.jellyfinExternalUrl")}
@@ -819,13 +742,7 @@ export function JellyfinSection() {
   );
 }
 
-/**
- * Android only: the foreground service that keeps tracking alive with the
- * screen off, and the battery-optimisation exemption. Both are the user's
- * call — one is a permanent notification, the other a system dialog — so
- * neither is on by default, and the backend says whether the platform has
- * them at all rather than the pane guessing from the OS name.
- */
+/** Android only: the tracking service and battery exemption, both opt-in, offered only when the backend says so. */
 function JellyfinBackgroundRows() {
   const { t } = useTranslation();
   const [state, setState] = useState<JellyfinBackground | null>(null);
@@ -839,8 +756,7 @@ function JellyfinBackgroundRows() {
         .catch(() => {});
     };
     load();
-    // The exemption dialog answers nothing; the state is re-read when the
-    // window comes back from it.
+    // The exemption dialog answers nothing; the state is re-read when the window comes back from it.
     window.addEventListener("focus", load);
     return () => window.removeEventListener("focus", load);
   }, []);
@@ -894,8 +810,7 @@ function SessionList({
   via,
 }: {
   sessions: JellyfinSession[];
-  /** The external address, when that is what answered — worth saying, since
-      it means the first address was out of reach just now. */
+  /** The external address when that is what answered, which means the first was out of reach just now. */
   via: string | null;
 }) {
   const { t } = useTranslation();
@@ -936,8 +851,7 @@ function SessionList({
             {s.client && (
               <span className="text-xs text-ink-600">({s.client})</span>
             )}
-            {/* The other Karasus on this account, and how long ago each was
-                heard from — the numbers the write-order rule judges by. */}
+            {/* The other Karasus on this account and their age, the numbers the write-order rule judges by. */}
             {s.karasu === "desktop" && (
               <span className="rounded-full bg-accent-500/15 px-2 py-0.5 text-xs text-accent-400">
                 {t("settings.jellyfinKarasuDesktop")}

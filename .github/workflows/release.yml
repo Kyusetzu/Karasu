@@ -409,6 +409,12 @@ jobs:
         with:
           workspaces: src-tauri
 
+      # Caches the Gradle distribution and its dependency cache, which the build otherwise downloads on every run.
+      - name: Cache Gradle
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
       # The runner ships the SDK; the NDK pin matches scripts/android-check.ps1 so the two builds cannot drift.
       - name: Install NDK
         run: |

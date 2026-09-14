@@ -84,7 +84,7 @@ the same set the [website](https://kyusetzu.github.io/Karasu/) shows at full siz
 <td width="50%"><img src="assets/screenshots/statistics-genres.jpg" alt="Statistics, genres and tags" /><br /><sub>…and the shape of your taste: genres against your average, tags by weight</sub></td>
 </tr>
 <tr>
-<td width="50%"><img src="assets/screenshots/calendar.jpg" alt="Airing calendar" /><br /><sub>Calendar — a Monday-first week, your shows or everything, with iCal export</sub></td>
+<td width="50%"><img src="assets/screenshots/calendar.jpg" alt="Airing calendar" /><br /><sub>Calendar — the week as a grid, tiles or an agenda, your shows or everything, with iCal export</sub></td>
 <td width="50%"><img src="assets/screenshots/franchise.jpg" alt="Franchise graph" /><br /><sub>Franchise — the whole relation map, each node coloured by your status</sub></td>
 </tr>
 </table>

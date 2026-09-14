@@ -37,7 +37,8 @@ update manifest.
 if ($Android) {
     $androidPara = @"
 **Android** -- the ``.apk``, sideloaded. Take the ``_arm64`` one; ``_universal``
-is the fallback for anything that refuses it (old 32-bit phones, emulators).
+is the fallback for anything that refuses it (old 32-bit phones, emulators)
+and comes with tagged releases only -- a nightly ships arm64 alone.
 Both are signed with the project key, so installing over a previous release
 keeps your data. From 1.11 the app updates itself here too: it downloads the
 APK for your device over Wi-Fi, checks it, and opens the installer when you tap.

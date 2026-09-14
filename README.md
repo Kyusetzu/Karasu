@@ -347,7 +347,8 @@ with no UAC prompt and nothing written outside your own profile.
 > Karasu still runs, but closing the window quits instead of hiding it.
 >
 > Android ships as two APKs — take `Karasu_<version>_arm64.apk`, and fall
-> back to `_universal` only if your device refuses it. Both are
+> back to `_universal` only if your device refuses it (releases carry it;
+> a Nightly is arm64 alone). Both are
 > release-signed by CI with the same key every time, which is what lets a
 > newer version install straight over the older one with your data intact.
 > From 1.11 the app updates itself: it downloads the APK for your device

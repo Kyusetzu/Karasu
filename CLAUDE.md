@@ -659,7 +659,10 @@ import it.
   first, which wipes app-local data. This is why CI publishes only
   release-signed APKs (and only when the four `ANDROID_*` secrets exist), why
   the debug APK stays a workflow artifact, and why the phone should only ever
-  see release builds once one is installed.
+  see release builds once one is installed. A nightly builds the arm64 APK
+  alone; the universal one (four cargo targets plus R8 over all of them, nine
+  minutes measured on 2026-09-14) is a tag build's, since the 32-bit phones and
+  emulators it serves can wait for a release.
 - **The Android updater is `apk_update.rs`, not the Tauri plugin.**
   `updater_available()` stays false on mobile: that is the desktop plugin,
   which cannot install an APK. Android's own path, built deliberately on

@@ -461,12 +461,15 @@ jobs:
           )
           [IO.File]::WriteAllLines("src-tauri/gen/android/app/key.properties", $props)
 
-      # Two invocations on purpose: --split-per-abi builds the per-ABI flavors instead of universal, not beside it.
-      - name: Build release APKs (universal + arm64)
+      # The arm64 APK is what phones take and what the in-app updater fetches; every build carries it.
+      - name: Build the arm64 release APK
         if: env.HAS_ANDROID_KEYSTORE == 'true'
-        run: |
-          npx tauri android build --apk
-          npx tauri android build --apk --target aarch64 --split-per-abi
+        run: npx tauri android build --apk --target aarch64 --split-per-abi
+
+      # Tag builds only: four cargo targets plus R8 over all of them, for the 32-bit phones a release still serves.
+      - name: Build the universal release APK
+        if: env.HAS_ANDROID_KEYSTORE == 'true' && needs.precheck.outputs.rolling != 'true'
+        run: npx tauri android build --apk
 
       # Renamed to the 4-part version and collected flat, so the publisher's download sees bare *.apk names.
       - name: Rename and collect release APKs
@@ -479,11 +482,14 @@ jobs:
             $core = ($ref -replace "^refs/tags/", "") -replace "^v", ""
             if ($core -match "-") { $suffix = ($core -split "-", 2)[1] }
           }
-          $universal = ./scripts/release/rename-apk.ps1 -Flavor universal -Suffix $suffix
-          $arm64 = ./scripts/release/rename-apk.ps1 -Flavor arm64 -Suffix $suffix
           New-Item -ItemType Directory -Force android-apks | Out-Null
-          Copy-Item $universal android-apks/
+          $arm64 = ./scripts/release/rename-apk.ps1 -Flavor arm64 -Suffix $suffix
           Copy-Item $arm64 android-apks/
+          # Only a tag build made one; a nightly ships arm64 alone.
+          if (Test-Path "src-tauri/gen/android/app/build/outputs/apk/universal/release") {
+            $universal = ./scripts/release/rename-apk.ps1 -Flavor universal -Suffix $suffix
+            Copy-Item $universal android-apks/
+          }
 
       - name: Upload release APKs
         if: env.HAS_ANDROID_KEYSTORE == 'true'

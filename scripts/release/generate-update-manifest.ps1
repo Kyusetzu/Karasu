@@ -68,6 +68,21 @@ if ($appimage) {
     }
 }
 
+# The Android legs, optional like Linux: url, sha256 and size per ABI; the package signature is what Android verifies.
+$androidDir = Join-Path $repoRoot "android-artifacts"
+foreach ($leg in @(@{ key = "android-arm64"; suffix = "_arm64.apk" }, @{ key = "android-universal"; suffix = "_universal.apk" })) {
+    $apk = Get-ChildItem -Path $androidDir -Filter "*$($leg.suffix)" -ErrorAction SilentlyContinue |
+        Sort-Object LastWriteTime -Descending |
+        Select-Object -First 1
+    if ($apk) {
+        $platforms[$leg.key] = [ordered]@{
+            url    = "https://github.com/Kyusetzu/Karasu/releases/download/$Tag/$($apk.Name)"
+            sha256 = (Get-FileHash -Algorithm SHA256 -Path $apk.FullName).Hash.ToLower()
+            size   = $apk.Length
+        }
+    }
+}
+
 $manifest = [ordered]@{
     version   = $fullVersion
     notes     = $Notes

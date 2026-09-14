@@ -1,4 +1,4 @@
-<# Renames the Gradle APK to `Karasu_<version>_<flavor>.apk`; no .sig and no GITHUB_OUTPUT, as Android has no updater. #>
+<# Renames the Gradle APK to `Karasu_<version>_<flavor>.apk`; no .sig, since Android verifies the package signature itself. #>
 
 param(
     [ValidateSet("universal", "arm64", "arm", "x86", "x86_64")]

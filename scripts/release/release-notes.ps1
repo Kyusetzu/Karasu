@@ -39,10 +39,10 @@ if ($Android) {
 **Android** -- the ``.apk``, sideloaded. Take the ``_arm64`` one; ``_universal``
 is the fallback for anything that refuses it (old 32-bit phones, emulators).
 Both are signed with the project key, so installing over a previous release
-keeps your data. The built-in updater covers desktop only -- on Android a new
-version is installed the same way, over the top.
+keeps your data. From 1.11 the app updates itself here too: it downloads the
+APK for your device over Wi-Fi, checks it, and opens the installer when you tap.
 "@
-    # Before the updater paragraph, so the desktop-only caveat lands right above the sentence describing the updater.
+    # Before the updater paragraph, so the Android sentence lands right above the one describing the desktop updater.
     $marker = "Karasu's built-in updater"
     $idx = $boilerplate.IndexOf($marker)
     $boilerplate = $boilerplate.Substring(0, $idx) + $androidPara + "`n`n" + $boilerplate.Substring($idx)

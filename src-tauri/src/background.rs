@@ -165,7 +165,7 @@ pub extern "system" fn Java_dev_kyu_karasu_KarasuNative_backgroundNotifCheck(
 }
 
 /// Runs `f` with an attached env, the activity and an app class loaded through the activity's own class loader.
-fn with_app_class<T>(
+pub(crate) fn with_app_class<T>(
     name: &str,
     f: impl FnOnce(&mut JNIEnv<'_>, &JObject<'_>, &JClass<'_>) -> jni::errors::Result<T>,
 ) -> Result<T, String> {

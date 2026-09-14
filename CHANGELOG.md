@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 3178938 -->
+<!-- generated-through: aacaa9f -->
 
 ### Fixed
 
@@ -95,6 +95,7 @@ tag time is then optional rather than load-bearing.
 - The calendar has three views (week grid, tiles, agenda) and never scrolls sideways; "My shows" keeps the episodes that already aired, dimmed; a Density setting under Appearance sizes the calendar, the local library and the digests.
 - The sync panel and the diagnostics report show AniList requests per source since the app started.
 - Detail, seasonal, franchise and similar pages are cached on disk with a per-page lifetime, so reopening one after a restart usually costs no request.
+- Android downloads a new version by itself over Wi-Fi and opens the installer from About or the bell.
 
 ### Changed
 
@@ -103,6 +104,8 @@ tag time is then optional rather than load-bearing.
 - Karasu now waits for the next episode's airing time instead of polling AniList every twenty minutes for new episodes.
 - The Wrapped page is built from the list Karasu already holds, and saving from a title's page no longer reloads it.
 - Exit cleanly when Windows ends the session; the quit panic was never the tray (1.10.4.621).
+- Screen references for Claude Design: 59 desktop and 17 Android captures as cards.
+- The README screenshots show the current build.
 ## 1.0.0 — 2026-09-05
 
 Karasu 1.0.0 is the first tagged release: a desktop and Android tracker built

@@ -30,6 +30,10 @@
          manifest merge, but the tracking service's persistent notification
          must not depend on a dependency's manifest — the merger dedupes. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Hand-added: the in-app updater opens the system installer on the
+         APK it downloaded and verified; the per-app "install unknown apps"
+         switch is the consent, and About links to it (UpdateInstaller.kt). -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!-- AndroidTV support -->
     <uses-feature android:name="android.software.leanback" android:required="false" />

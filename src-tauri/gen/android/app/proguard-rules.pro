@@ -46,3 +46,7 @@
 # aapt but pinned anyway so a default-rule change cannot break them silently.
 -keep class dev.kyu.karasu.WidgetRefresher { *; }
 -keep class dev.kyu.karasu.Widgets$* { *; }
+
+# The in-app updater. UpdateInstaller shares NotifScheduler's failure mode
+# (JNI-by-name, nothing else keeps it).
+-keep class dev.kyu.karasu.UpdateInstaller { *; }

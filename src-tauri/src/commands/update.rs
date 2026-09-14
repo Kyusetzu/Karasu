@@ -8,7 +8,7 @@ use tauri::State;
 use super::*;
 
 /// Monotonic commit counter, the fourth version segment, bumped by one on every commit.
-pub const COMMIT_NUMBER: u32 = 624;
+pub const COMMIT_NUMBER: u32 = 625;
 
 /// The full four-part display version; the semver core comes from the crate version.
 pub fn app_version_string() -> String {
@@ -167,9 +167,19 @@ pub async fn check_for_updates(
         .ok_or("Update manifest has no version")?
         .trim_start_matches('v')
         .to_string();
-    // Desktop needs its platform in the manifest; Android, which is never in it and has no updater, gets a notice only.
+    // Both need their platform in the manifest; on Android the leg is the APK the updater will fetch, kept in kv.
     #[cfg(target_os = "android")]
-    let is_newer = version_gt(&latest, &current);
+    let is_newer = {
+        let key = crate::apk_update::abi_key(&crate::apk_update::device_abi().unwrap_or_default());
+        let asset = crate::apk_update::parse_asset(&body, key).filter(|_| version_gt(&latest, &current));
+        match &asset {
+            Some(a) => {
+                let _ = db.kv_set(crate::apk_update::PENDING_KEY, &serde_json::to_string(a).unwrap_or_default());
+            }
+            None => db.kv_delete(crate::apk_update::PENDING_KEY),
+        }
+        asset.is_some()
+    };
     #[cfg(not(target_os = "android"))]
     let is_newer = {
         let platform_key = if cfg!(target_os = "linux") {
@@ -184,7 +194,7 @@ pub async fn check_for_updates(
         has_platform && version_gt(&latest, &current)
     };
 
-    // Android never downloads, so the check posts the bell row itself, on the background path and once per version.
+    // Android posts its own bell row on the background path, once per version; the download follows from the frontend.
     #[cfg(target_os = "android")]
     if !force && is_newer && db.kv_get("last_notified_update_version").as_deref() != Some(&latest)
     {
@@ -237,7 +247,7 @@ fn can_install(is_linux: bool, from_appimage: bool) -> bool {
 }
 
 /// True if dotted-numeric version `a` is strictly greater than `b`.
-fn version_gt(a: &str, b: &str) -> bool {
+pub(crate) fn version_gt(a: &str, b: &str) -> bool {
     let (va, vb) = (version_parts(a), version_parts(b));
     for i in 0..va.len().max(vb.len()) {
         let x = va.get(i).copied().unwrap_or(0);

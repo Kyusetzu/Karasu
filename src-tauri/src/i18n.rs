@@ -38,7 +38,7 @@ pub enum Msg<'a> {
     SequelBody { title: &'a str },
     UpdateTitle,
     UpdateBody { version: &'a str },
-    /// Android's wording: nothing downloads or installs there, so the body points at the GitHub release instead.
+    /// Android's wording: the APK downloads on its own, and the tap on the row or About opens the installer.
     #[cfg_attr(not(mobile), allow(dead_code))]
     UpdateBodyAndroid { version: &'a str },
     SiteNotifTitle,
@@ -106,10 +106,10 @@ pub fn text(lang: Lang, msg: Msg<'_>) -> String {
             format!("Karasu {version} ist bereit. Zum Installieren „Über“ öffnen.")
         }
         (En, UpdateBodyAndroid { version }) => {
-            format!("Karasu {version} is out. The APK is on the GitHub release.")
+            format!("Karasu {version} is out. Open About to install it.")
         }
         (De, UpdateBodyAndroid { version }) => {
-            format!("Karasu {version} ist draußen. Die APK liegt im GitHub-Release.")
+            format!("Karasu {version} ist draußen. Zum Installieren „Über“ öffnen.")
         }
 
         (En, SiteNotifTitle) => "AniList notifications".into(),

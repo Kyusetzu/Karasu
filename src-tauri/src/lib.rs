@@ -1,5 +1,6 @@
 mod alerts;
 mod anilist;
+mod apk_update;
 mod backups;
 mod commands;
 mod db;
@@ -352,6 +353,7 @@ pub fn run() {
             alerts::sequel::spawn(app.handle().clone());
         alerts::site::spawn(app.handle().clone());
         assert_notif_schedule(app.handle());
+        sweep_apk_updates(app.handle());
         {
             // Project the widgets from the cache once at startup, delayed a beat so the JNI poke finds tao's context ready.
             let handle = app.handle().clone();
@@ -442,6 +444,15 @@ pub fn run() {
             commands::download_pending_update,
             commands::pending_update,
             commands::install_pending_update,
+            apk_update::apk_updater_available,
+            apk_update::apk_update_state,
+            apk_update::apk_download,
+            apk_update::apk_install,
+            apk_update::apk_open_install_permission,
+            apk_update::apk_discard,
+            apk_update::apk_prompt_if_ready,
+            apk_update::get_apk_download_metered,
+            apk_update::set_apk_download_metered,
             commands::get_text_scale,
             commands::get_media_detection,
             commands::set_media_detection,
@@ -585,3 +596,21 @@ fn assert_notif_schedule(app: &tauri::AppHandle) {
 
 #[cfg(not(target_os = "android"))]
 fn assert_notif_schedule(_app: &tauri::AppHandle) {}
+
+/// The same pair for the APK sweep, retried like the schedule because it needs the android context too.
+#[cfg(target_os = "android")]
+fn sweep_apk_updates(app: &tauri::AppHandle) {
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        for _ in 0..20 {
+            if tao::platform::android::prelude::main_android_context().is_some() {
+                apk_update::sweep(&app.state::<db::Db>());
+                return;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+        }
+    });
+}
+
+#[cfg(not(target_os = "android"))]
+fn sweep_apk_updates(_app: &tauri::AppHandle) {}

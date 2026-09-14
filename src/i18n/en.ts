@@ -491,8 +491,19 @@ export const en = {
     restartUpdate: "Restart & Update",
     updateAppImageOnly:
       "In-app updates work for the AppImage build. This install came from somewhere else, so update it the way you installed it.",
-    updateAndroidHint:
-      "Nothing installs from here on Android — a new version is a fresh APK from the release page.",
+    apkDownloading: "Downloading {{version}} — {{received}} of {{total}} MB",
+    apkInstall: "Install {{version}}",
+    apkNeedsPermission:
+      "Android needs your permission for Karasu to install updates: one switch, \"Install unknown apps\", just for this app.",
+    apkAllowInstall: "Allow installs",
+    apkPlayProtectHint: "Play Protect may ask once more; the file was checked against the release's checksum before it got here.",
+    apkBlockedMetered: "{{version}} is waiting for Wi-Fi. Loading it over mobile data costs about 23 MB.",
+    apkDownloadAnyway: "Load it anyway",
+    apkBlockedSpace: "Not enough free space to download and install {{version}}.",
+    apkBlockedSignature:
+      "The release is signed differently from this install, so it cannot update over it — install it by hand from the release page.",
+    apkBlockedNetwork: "The download of {{version}} stopped.",
+    apkRetry: "Try again",
     installing: "Installing …",
     viewRelease: "View release page",
     contact: "Contact",
@@ -1627,6 +1638,8 @@ export const en = {
       "Which releases Karasu checks against. Nightly is rebuilt on every push to main.",
     updateChannelPrerelease: "Nightly",
     updateChannelStable: "Stable",
+    apkMetered: "Download updates over mobile data",
+    apkMeteredHint: "Off, Karasu waits for Wi-Fi. A nightly build is about 23 MB.",
     language: "Language",
     languageHint: "“System” follows your system display language.",
   },

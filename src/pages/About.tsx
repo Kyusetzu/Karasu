@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { listen } from "@tauri-apps/api/event";
 import {
   Bug,
   ClipboardCopy,
@@ -16,12 +17,17 @@ import {
   Users,
 } from "lucide-react";
 import {
+  apkDownload,
+  apkInstall,
+  apkOpenInstallPermission,
+  apkUpdateState,
   appVersion,
   checkForUpdates,
   downloadPendingUpdate,
   installPendingUpdate,
   pendingUpdate,
   isTauri,
+  type ApkUpdateState,
   type DownloadedUpdate,
   type UpdateInfo,
 } from "@/api/anilist";
@@ -214,6 +220,104 @@ function Row({
   );
 }
 
+/** The Android half of the Updates card: the download's state, the installer button, and why it may be waiting. */
+function ApkUpdatePanel({ tick }: { tick: number }) {
+  const { t } = useTranslation();
+  const [state, setState] = useState<ApkUpdateState | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isTauri) return;
+    const reload = () => apkUpdateState().then(setState).catch(() => {});
+    reload();
+    // The installer and the permission screen both leave the app; whatever changed is read on the way back.
+    const un = listen<{ received: number; total: number }>("apk-download-progress", (e) =>
+      setState((s) => (s ? { ...s, status: "downloading", received: e.payload.received, total: e.payload.total } : s)),
+    );
+    const onBack = () => {
+      if (document.visibilityState === "visible") reload();
+    };
+    document.addEventListener("visibilitychange", onBack);
+    window.addEventListener("focus", onBack);
+    return () => {
+      un.then((f) => f());
+      document.removeEventListener("visibilitychange", onBack);
+      window.removeEventListener("focus", onBack);
+    };
+  }, [tick]);
+
+  const run = async (action: () => Promise<unknown>) => {
+    setError(null);
+    try {
+      await action();
+      setState(await apkUpdateState());
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
+  if (!state || !state.available || state.status === "none") return null;
+  const mb = (n: number) => (n / 1_048_576).toFixed(1);
+
+  return (
+    <div className="mt-3 space-y-2 text-sm">
+      {state.status === "downloading" && (
+        <div>
+          <p className="flex items-center gap-1.5 text-ink-500">
+            <RefreshCw className="size-4 animate-spin" />{" "}
+            {t("about.apkDownloading", { version: state.version, received: mb(state.received), total: mb(state.total) })}
+          </p>
+          <div className="mt-2 h-1 overflow-hidden rounded-full bg-surface-800">
+            <div
+              className="h-full bg-accent-500 transition-[width]"
+              style={{ width: `${state.total > 0 ? Math.round((state.received / state.total) * 100) : 0}%` }}
+            />
+          </div>
+        </div>
+      )}
+      {state.status === "ready" && state.needsInstallPermission && (
+        <>
+          <p className="text-ink-300">{t("about.apkNeedsPermission")}</p>
+          <Button variant="secondary" onClick={() => run(apkOpenInstallPermission)}>
+            {t("about.apkAllowInstall")}
+          </Button>
+        </>
+      )}
+      {state.status === "ready" && !state.needsInstallPermission && (
+        <>
+          <Button onClick={() => run(apkInstall)}>
+            <Download className="size-4" /> {t("about.apkInstall", { version: state.version })}
+          </Button>
+          <p className="text-ink-500">{t("about.apkPlayProtectHint")}</p>
+        </>
+      )}
+      {state.status === "blocked" && state.reason === "metered" && (
+        <>
+          <p className="text-ink-300">{t("about.apkBlockedMetered", { version: state.version })}</p>
+          <Button variant="secondary" onClick={() => run(() => apkDownload(true))}>
+            {t("about.apkDownloadAnyway")}
+          </Button>
+        </>
+      )}
+      {state.status === "blocked" && state.reason === "space" && (
+        <p className="text-gold">{t("about.apkBlockedSpace", { version: state.version })}</p>
+      )}
+      {state.status === "blocked" && (state.reason === "signature" || state.reason === "stale") && (
+        <p className="text-gold">{t("about.apkBlockedSignature")}</p>
+      )}
+      {state.status === "blocked" && (state.reason === "network" || state.reason === "foreground") && (
+        <>
+          <p className="text-ink-300">{t("about.apkBlockedNetwork", { version: state.version })}</p>
+          <Button variant="secondary" onClick={() => run(() => apkDownload(false))}>
+            {t("about.apkRetry")}
+          </Button>
+        </>
+      )}
+      {error && <p className="text-danger">{error}</p>}
+    </div>
+  );
+}
+
 function UpdateSection() {
   const { t } = useTranslation();
   const platform = usePlatform((s) => s.info);
@@ -223,6 +327,7 @@ function UpdateSection() {
   const [downloaded, setDownloaded] = useState<DownloadedUpdate | null>(null);
   const [installing, setInstalling] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [apkTick, setApkTick] = useState(0);
 
   // Ask for the backend's stash, or an update downloaded at startup has no Restart button here.
   useEffect(() => {
@@ -249,8 +354,13 @@ function UpdateSection() {
     try {
       const result = await checkForUpdates(true);
       setInfo(result);
-      // Android checks and never downloads: the notice and the release link are the whole feature there.
-      if (result.isNewer && !isAndroid(platform)) await startDownload();
+      // Android fetches the APK through its own path; the panel below shows where that got to.
+      if (result.isNewer && isAndroid(platform)) {
+        await apkDownload(false).catch(() => {});
+        setApkTick((n) => n + 1);
+      } else if (result.isNewer) {
+        await startDownload();
+      }
     } catch (e) {
       setError(String(e));
     } finally {
@@ -337,10 +447,7 @@ function UpdateSection() {
           {t("about.updateAppImageOnly")}
         </p>
       )}
-      {/* Nothing installs from here on Android: a new version is a fresh APK from the release page. */}
-      {isAndroid(platform) && (
-        <p className="mt-3 text-sm text-ink-500">{t("about.updateAndroidHint")}</p>
-      )}
+      {isAndroid(platform) && <ApkUpdatePanel tick={apkTick} />}
       {error && <p className="mt-3 text-sm text-danger">{error}</p>}
     </Card>
   );

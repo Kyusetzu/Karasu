@@ -317,6 +317,32 @@ export const pendingUpdate = () =>
 export const installPendingUpdate = () =>
   invoke<void>("install_pending_update");
 
+/** The Android APK updater's view: what is pending, how far the download is, and why it stopped. */
+export interface ApkUpdateState {
+  available: boolean;
+  status: "none" | "downloading" | "ready" | "blocked";
+  version: string | null;
+  reason: "metered" | "space" | "signature" | "stale" | "foreground" | "network" | null;
+  needsInstallPermission: boolean;
+  received: number;
+  total: number;
+}
+
+export const apkUpdaterAvailable = () => invoke<boolean>("apk_updater_available");
+export const apkUpdateState = () => invoke<ApkUpdateState>("apk_update_state");
+/** Fetches the pending APK; `forceMetered` is the user's own "load over mobile data anyway". */
+export const apkDownload = (forceMetered = false) =>
+  invoke<ApkUpdateState>("apk_download", { forceMetered });
+/** Opens the system installer on the verified file; rejects with "permission" while the unknown-apps switch is off. */
+export const apkInstall = () => invoke<void>("apk_install");
+export const apkOpenInstallPermission = () => invoke<void>("apk_open_install_permission");
+export const apkDiscard = () => invoke<void>("apk_discard");
+/** The start-time prompt: opens the installer once per pending version when the file is ready. */
+export const apkPromptIfReady = () => invoke<boolean>("apk_prompt_if_ready");
+export const getApkDownloadMetered = () => invoke<boolean>("get_apk_download_metered");
+export const setApkDownloadMetered = (enabled: boolean) =>
+  invoke<void>("set_apk_download_metered", { enabled });
+
 /** Full four-part app version (MAJOR.MINOR.PATCH.COMMIT#) for the About page. */
 export const appVersion = () => invoke<string>("app_version");
 

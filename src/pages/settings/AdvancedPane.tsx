@@ -16,7 +16,7 @@ import { resolveMalChunk } from "@/api/queries";
 import { scoreScale } from "@/lib/scoreFormat";
 import { useAuth, useScoreFormat } from "@/stores/auth";
 import { useManualSync } from "@/hooks/useManualSync";
-import { usePlatform } from "@/stores/platform";
+import { isAndroid, usePlatform } from "@/stores/platform";
 import { showToast } from "@/stores/toast";
 import type { ListResult, Media, MediaType } from "@/api/types";
 import { cn } from "@/lib/utils";
@@ -734,11 +734,14 @@ export function UpdatesSection() {
   const [auto, setAuto] = useState<boolean | null>(null);
   // Null until the stored value lands, or a stable-channel install flashes the wrong answer for a frame.
   const [channel, setChannel] = useState<api.UpdateChannel | null>(null);
+  const android = isAndroid(usePlatform((s) => s.info));
+  const [metered, setMetered] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (!api.isTauri) return;
     api.getUpdateCheckAuto().then(setAuto);
     api.getUpdateChannel().then(setChannel);
+    api.getApkDownloadMetered().then(setMetered);
   }, []);
 
   return (
@@ -777,6 +780,19 @@ export function UpdatesSection() {
               </option>
             </select>
           </Row>
+        )}
+
+        {/* Android only: the APK is 23 MB and the nightly channel rebuilds daily, so mobile data is opt-in. */}
+        {android && metered !== null && (
+          <Toggle
+            checked={metered}
+            onChange={(enabled) => {
+              setMetered(enabled);
+              api.setApkDownloadMetered(enabled);
+            }}
+            label={t("settings.apkMetered")}
+            hint={t("settings.apkMeteredHint")}
+          />
         )}
       </div>
     </Card>

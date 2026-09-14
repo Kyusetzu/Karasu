@@ -35,6 +35,8 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
   type AppNotification,
+  apkInstall,
+  apkUpdateState,
   downloadPendingUpdate,
   installPendingUpdate,
 } from "@/api/anilist";
@@ -339,8 +341,13 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
     // Tapping an update row installs it; `download` first, because a restart empties the in-memory pending update.
     if (n.kind === "update") {
       setOpen(false);
-      // Android never downloads or installs; its update row is a notice and About holds the release link.
+      // Android: a verified APK opens the installer right here; anything short of that is About's to explain.
       if (android) {
+        const state = await apkUpdateState().catch(() => null);
+        if (state?.status === "ready" && !state.needsInstallPermission) {
+          await apkInstall().catch((e) => showToast({ kind: "error", text: t("common.error", { message: String(e) }) }));
+          return;
+        }
         navigate("/about");
         return;
       }

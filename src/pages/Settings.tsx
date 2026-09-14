@@ -110,6 +110,10 @@ const _panesAreComplete: _EveryPaneIsRendered = true;
 const ANDROID_HIDDEN_PANES: ReadonlySet<PaneId> = new Set(["library", "desktop"] as const);
 /** Sections Android hides, by component identity so a rename breaks the build instead of un-hiding one. */
 const ANDROID_HIDDEN_SECTIONS: ReadonlySet<unknown> = new Set([PortableSection]);
+/** Sections Android shows elsewhere: the desktop pane is hidden there, but the updater has its channel and switch. */
+const ANDROID_EXTRA_SECTIONS: Partial<Record<PaneId, readonly (() => React.JSX.Element)[]>> = {
+  account: [UpdatesSection],
+};
 
 /** Greyed on Android, not hidden; keep ScrobbleSection out, since the scrobbler runs there and reads its switches. */
 const ANDROID_DESKTOP_ONLY: ReadonlySet<unknown> = new Set([
@@ -147,7 +151,7 @@ export default function Settings() {
   // A deep link can name a pane Android hides; falling back beats rendering a blank one.
   const pane = panes.find((p) => p.id === active) ?? panes[0];
   const sections = android
-    ? [...pane.sections]
+    ? [...pane.sections, ...(ANDROID_EXTRA_SECTIONS[pane.id] ?? [])]
         .filter((S) => !ANDROID_HIDDEN_SECTIONS.has(S))
         // The working sections above the greyed desktop ones.
         .sort(

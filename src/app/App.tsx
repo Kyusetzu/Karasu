@@ -12,6 +12,8 @@ import { usePrimedLists } from "@/hooks/usePrimedLists";
 import {
   isTauri,
   checkForUpdates,
+  apkDownload,
+  apkPromptIfReady,
   downloadPendingUpdate,
   getTextScale,
   getUpdateCheckAuto,
@@ -132,10 +134,15 @@ export default function App() {
     getUpdateCheckAuto().then((enabled) => {
       if (!enabled) return;
       checkForUpdates(false)
-        .then((info) => {
-          // Android checks and never downloads: the Rust check posts the bell row and installing is a fresh APK.
+        .then(async (info) => {
           const android = isAndroid(usePlatform.getState().info);
-          if (info.isNewer && !android) downloadPendingUpdate().catch(() => {});
+          if (!android) {
+            if (info.isNewer) downloadPendingUpdate().catch(() => {});
+            return;
+          }
+          // Android: a file verified earlier opens the installer once; otherwise whatever is pending resumes, quietly.
+          if (await apkPromptIfReady().catch(() => false)) return;
+          apkDownload(false).catch(() => {});
         })
         .catch(() => {});
     });

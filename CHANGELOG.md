@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 865b969 -->
+<!-- generated-through: e24879f -->
 
 ### Fixed
 
@@ -81,6 +81,7 @@ tag time is then optional rather than load-bearing.
 - Restarting Karasu right after it spent its AniList budget no longer fires a burst of requests into the limit.
 - The twice-daily sequel check spreads its requests out instead of sending them in one burst.
 - The now-playing ring no longer restarts on a card mounted mid-session (1.10.3.620).
+- An AniList profile link that carries the user's id, as the Statistics header's does, opens the profile in-app instead of "No such user".
 
 ### Added
 

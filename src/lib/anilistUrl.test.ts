@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { internalRoute } from "./anilistUrl";
+import { internalRoute, profileKey } from "./anilistUrl";
 
 describe("internalRoute", () => {
   it("maps media URLs, slug or not, either medium", () => {
@@ -59,5 +59,14 @@ describe("internalRoute", () => {
     expect(internalRoute("https://anilist.co/anime/")).toBeNull();
     expect(internalRoute("https://anilist.co/anime/abc")).toBeNull();
     expect(internalRoute("https://anilist.co/forum/thread/abc")).toBeNull();
+  });
+});
+
+describe("profileKey", () => {
+  /** AniList reports the viewer's own siteUrl as /user/<id>, and a name lookup on those digits is a 404. */
+  it("reads digits as an id and anything else as a name", () => {
+    expect(profileKey("6421433")).toEqual({ id: 6421433 });
+    expect(profileKey("hori")).toEqual({ name: "hori" });
+    expect(profileKey("hori2")).toEqual({ name: "hori2" });
   });
 });

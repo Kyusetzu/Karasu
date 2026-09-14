@@ -19,6 +19,7 @@ import { ActivityFeed } from "@/components/social/ActivityFeed";
 import { UserThreads } from "@/components/social/UserThreads";
 import { CoverOutline, EmptyState, PerchRule, StruckQuery } from "@/components/EmptyState";
 import { isNotFound } from "@/lib/apiError";
+import { profileKey } from "@/lib/anilistUrl";
 import { Shimmer } from "@/components/Skeleton";
 import { SectionHeader } from "@/components/ui/section-header";
 import { Button } from "@/components/ui/button";
@@ -32,7 +33,7 @@ import { isSelf } from "@/lib/follows";
 import { displayTitle } from "@/api/types";
 import { cn } from "@/lib/utils";
 
-/** Someone's AniList profile, keyed on name because that is what AniList URLs and mentions carry. */
+/** Someone's AniList profile, keyed on the URL param: a name from mentions and links, an id from `siteUrl`. */
 export default function UserProfile() {
   const { name = "" } = useParams();
   const { t } = useTranslation();
@@ -41,7 +42,7 @@ export default function UserProfile() {
 
   const profile = useQuery({
     queryKey: ["social", "user", name],
-    queryFn: () => userProfile({ name }),
+    queryFn: () => userProfile(profileKey(name)),
     enabled: isTauri && !!name && mode === "anilist",
     staleTime: 10 * 60 * 1000,
     // An unknown name is a 404, and the default retry would spend a second request confirming a typo.

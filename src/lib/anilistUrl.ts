@@ -30,3 +30,8 @@ export function internalRoute(href: string): string | null {
   }
   return null;
 }
+
+/** How to ask for a profile from the route param: digits are an id, as `User.siteUrl` and the website spell it. */
+export function profileKey(param: string): { id: number } | { name: string } {
+  return /^\d+$/.test(param) ? { id: Number(param) } : { name: param };
+}

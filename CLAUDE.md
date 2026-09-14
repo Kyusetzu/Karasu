@@ -160,7 +160,13 @@ src-tauri/src/
                      POST_NOTIFICATIONS, and the `<service>` with its
                      `specialUse` `<property>`, sit outside the markers like
                      the rest; MainActivity's onResume/onPause report the
-                     foreground flag through `KarasuNative.setForeground`).
+                     foreground flag through `KarasuNative.setForeground`);
+                     and UpdateInstaller.kt (the in-app updater's device
+                     half — ABI, cache dir, free space, metered state, the
+                     signing-certificate comparison and the two intents;
+                     JNI-by-name like NotifScheduler, proguard keep
+                     load-bearing; REQUEST_INSTALL_PACKAGES sits outside
+                     the markers with the rest).
                      Re-apply all of it after any re-init. Also committed here: the bundled copy
                      of THIRD-PARTY-NOTICES.md under app assets — the APK
                      cannot read the repository root, so it carries its own
@@ -223,7 +229,8 @@ scripts/             bump-version.mjs (every commit), anilist-query.mjs
                      release/ holds the five PowerShell scripts
                      the release workflow runs (installer, AppImage and APK
                      renamers are deliberate near-twins, release-notes, and
-                     generate-update-manifest — desktop-only on purpose)
+                     generate-update-manifest, whose Android legs feed the
+                     APK updater — see "The Android updater")
 ```
 
 **Where things go.** `lib/` is pure logic with tests beside it; `hooks/` is
@@ -653,10 +660,30 @@ import it.
   release-signed APKs (and only when the four `ANDROID_*` secrets exist), why
   the debug APK stays a workflow artifact, and why the phone should only ever
   see release builds once one is installed.
-- **Android has no updater and must not gain one by accident.**
-  `updater_available()` is a cfg'd pair answering false on mobile;
-  `generate-update-manifest.ps1` knows nothing about Android on purpose. APK
-  updates are `adb install -r` or a store, ever.
+- **The Android updater is `apk_update.rs`, not the Tauri plugin.**
+  `updater_available()` stays false on mobile: that is the desktop plugin,
+  which cannot install an APK. Android's own path, built deliberately on
+  2026-09-14: `latest.json` carries `platforms.android-arm64` and
+  `android-universal` (`url`, `sha256`, `size`, written by
+  `generate-update-manifest.ps1` from the same artifacts the checksum step
+  hashes); `check_for_updates` keeps the leg for `Build.SUPPORTED_ABIS[0]`
+  in kv `apk_pending`; `apk_download` streams it into
+  `<cacheDir>/updates/<version>.apk.part` (Range-resumed, sha256 over the
+  whole file, then `UpdateInstaller.inspect` must answer the installed
+  app's signing certificates and a higher `versionCode`) and renames it
+  into place; `apk_install` opens the system installer through the
+  FileProvider Tauri already ships (`cache-path "."`). It runs only in a
+  release build (`cfg!(debug_assertions)` — a debug build is signed
+  differently and the install would fail after the download), only while the
+  activity is in front, only on an unmetered network unless kv
+  `apk_download_metered` says otherwise (a nightly is 23 MB, several a
+  day), and only with room for two copies. `sweep` at start deletes every
+  file under `updates/` except the pending upgrade. The consent the app
+  cannot give itself is the per-app "install unknown apps" switch;
+  `apk_open_install_permission` leads to it, About explains it. The start
+  prompt (`apk_prompt_if_ready`) opens the installer once per version, kv
+  `apk_prompted_version`, so a cancel holds. Verification is two nightlies:
+  install the first by hand, watch it fetch and install the second.
 - **Android keeps `usesCleartextTraffic` in release** deliberately — a LAN
   Jellyfin over plain HTTP is a supported setup, and (see `net.rs`) on Android
   a *self-signed* Jellyfin needs plain HTTP anyway.

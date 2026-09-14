@@ -282,8 +282,8 @@ the same set the [website](https://kyusetzu.github.io/Karasu/) shows at full siz
   autostart
 - English / German with automatic system-language detection
 - One-click AniList login and a built-in *Check for updates* — on Android
-  the check only announces a new release and links to it; installing the new
-  APK over the old one stays the update path
+  the app downloads the APK for your device over Wi-Fi, verifies it, and opens
+  the system installer when you tap
 
 ## Installation
 
@@ -294,7 +294,8 @@ same files with each platform's notes beside its button. Each release
 carries one build per platform, always the newest: the Windows installer
 (`Karasu_<version>_x64-setup.exe`), the Linux `.AppImage`, and two Android
 APKs (`Karasu_<version>_arm64.apk`, plus a `_universal` fallback) — alongside
-`SHA256SUMS.txt` and `latest.json`, the manifest the desktop updater reads.
+`SHA256SUMS.txt` and `latest.json`, the manifest every updater reads — the
+desktop plugin its own key, Android the APK legs.
 
 Two releases sit on that page. **Karasu <version>** is the Stable channel and
 the one to take; **Nightly build** is the rolling per-commit build for anyone
@@ -348,9 +349,12 @@ with no UAC prompt and nothing written outside your own profile.
 > Android ships as two APKs — take `Karasu_<version>_arm64.apk`, and fall
 > back to `_universal` only if your device refuses it. Both are
 > release-signed by CI with the same key every time, which is what lets a
-> newer version install straight over the older one with your data intact;
-> there is no in-app updater on Android, and installing over the top *is*
-> the update path. The phone gets its own shell — keyed on width (767px),
+> newer version install straight over the older one with your data intact.
+> From 1.11 the app updates itself: it downloads the APK for your device
+> over Wi-Fi (mobile data is a switch), checks it against the release's
+> checksum and signature, and opens the installer when you tap — from
+> About, from the bell, or once at start. Android asks once for the
+> "install unknown apps" permission for Karasu; that switch is the consent. The phone gets its own shell — keyed on width (767px),
 > not on the device, so a narrow enough window gets it anywhere: navigation
 > moves to a bottom bar, the back gesture closes whatever is open instead
 > of leaving the page, and system notifications ask for their runtime

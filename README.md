@@ -122,6 +122,19 @@ the same set the [website](https://kyusetzu.github.io/Karasu/) shows at full siz
   your list. Your password is exchanged once for an access token and never
   stored. On Android this is the whole of detection — a phone shows no window
   titles and hands out no media sessions
+- The Jellyfin pane **finds the servers on your network by name**, the way
+  Jellyfin's own clients do, and checks that an address really is a
+  Jellyfin server before your password is sent anywhere. An optional
+  **second, external address** takes over when the first is out of reach —
+  a phone away from home — and only once it has answered as the same
+  server, so the token never travels to a stranger
+- **Two Karasus, one write.** The PC and the phone signed in as the same
+  Jellyfin user see the same playback; the desktop goes first, the phone
+  waits, and both ask AniList for the live progress right before writing, so
+  an episode lands once
+- On Android an opt-in **foreground service** keeps Jellyfin tracking alive
+  with the screen off, and the settings hint names the vendor rule that
+  actually matters where a ROM freezes background apps anyway
 - Automatic scrobbling after a configurable threshold, with optional
   confirmation, episode-gap protection and
   [anime-relations](https://github.com/erengy/anime-relations) episode redirects
@@ -144,6 +157,12 @@ the same set the [website](https://kyusetzu.github.io/Karasu/) shows at full siz
   badge and chart follows when you change it
 - Every edit can be **undone** from the toast it raises — and a failed write
   says so, queues itself and offers a retry
+- **Frugal with AniList's rate limit.** Your list is read from the local
+  copy for fifteen minutes after a fetch and refreshed quietly behind it after
+  that; details, seasons, franchises and recommendations are cached on disk
+  and survive a restart; the airing check wakes for the next episode instead
+  of polling. *Sync now* still fetches at once, and the sync panel shows every
+  request by what spent it
 
 **Discovery**
 - Search with an anime/manga toggle, seasonal charts, rich detail pages —
@@ -184,6 +203,10 @@ the same set the [website](https://kyusetzu.github.io/Karasu/) shows at full siz
   comment**, highlighted — even in threads deeper than AniList's own
   5,000-entry paging cap, which Karasu routes around via the uncapped
   comment tree
+- Every composer — status, reply, thread, comment, review, bio — has a
+  **formatting toolbar** for AniList's markdown (bold, spoiler, headings,
+  lists, links, images, YouTube, centre) and a preview, and renders
+  posts the way anilist.co does
 - All of it is AniList's own data, fetched live — Karasu stores none of it
 
 **Insights**
@@ -236,7 +259,8 @@ the same set the [website](https://kyusetzu.github.io/Karasu/) shows at full siz
 - **Interface size** — zooms the whole window in eight steps from 75% to 200%,
   on <kbd>Ctrl</kbd>+<kbd>+</kbd>, <kbd>Ctrl</kbd>+<kbd>-</kbd> and
   <kbd>Ctrl</kbd>+<kbd>0</kbd> as well as in Settings, for a 4K display or a TV
-  across the room
+  across the room. On a short window the sidebar collapses to its icon rail
+  by itself, so nothing drops off the bottom
 - **Density** — compact, comfortable or spacious for the screens that crowd:
   the calendar, the local library and the digests. Everything else keeps its
   size
@@ -347,8 +371,10 @@ with no UAC prompt and nothing written outside your own profile.
 > mpv (with the `mpv-mpris` plugin), VLC, SMPlayer and browser video — plus the
 > optional Jellyfin server. Manga sites, which publish no MPRIS, are not
 > detected there. On Android the answer is shorter still: Jellyfin is the
-> whole of detection, and the desktop detection settings sit greyed out
-> under a "desktop only" badge rather than pretending to work.
+> whole of detection; the desktop *sources* sit greyed out under a "desktop
+> only" badge rather than pretending to work, while the tracking settings —
+> threshold, confirmation, automatic updates — are live, since the phone
+> writes with them.
 
 ## Development
 

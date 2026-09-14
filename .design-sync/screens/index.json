@@ -1,0 +1,690 @@
+{
+  "captured": "2026-09-14",
+  "note": "Real screens of Karasu 1.10.6.623 on the isolated desktop rig at 1440x900 (rendered at 2x, stored at 1x), signed in as the maintainer unless the state says otherwise. Android captures come from the release APK over adb.",
+  "screens": [
+    {
+      "id": "overview",
+      "name": "ScreenOverview",
+      "title": "Overview",
+      "route": "#/",
+      "state": "signed in",
+      "platform": "desktop",
+      "description": "The dashboard. Left: the sidebar (Library / Discover / Insight groups, the account lockup with the sync line, About, Settings, Collapse). Top: the titlebar with the detection status pill and the bell. Main: a season hero banner with the most popular title and dot pager; a Statistics row of four stat Cards (anime, episodes, days watched, mean score); 'This week' digest rows with cover, title, episode and air time; 'Airing soon' rows; further down continue-watching and recommendation strips. Every section starts with a SectionHeader."
+    },
+    {
+      "id": "overview-local",
+      "name": "ScreenOverviewLocal",
+      "title": "Overview, local mode",
+      "route": "#/",
+      "state": "no account (local list)",
+      "platform": "desktop",
+      "description": "The same dashboard without an AniList account: the hero still shows the season, the digests show their empty states ('No upcoming episodes on your list', 'Nothing in flight') with a small icon and a hint line. The sidebar's account slot reads 'Local profile' with a 'Link AniList account' link in accent."
+    },
+    {
+      "id": "onboarding",
+      "name": "ScreenOnboarding",
+      "title": "First run",
+      "route": "#/",
+      "state": "signed out, first launch",
+      "platform": "desktop",
+      "description": "The onboarding that replaces the dashboard until an account is connected or 'Look around first' is chosen. Left column: a small uppercase 'Welcome to Karasu' label, the headline 'Never lose your place again.', one paragraph, a primary Button 'Connect with AniList' beside a ghost 'Look around first', then three numbered steps. Right: the Karasu mark large on a disc. The sidebar shows only the routes, no account."
+    },
+    {
+      "id": "anime-grid",
+      "name": "ScreenAnimeGrid",
+      "title": "Anime list, grid",
+      "route": "#/list",
+      "state": "signed in",
+      "platform": "desktop",
+      "description": "The list screen in cover-grid view. Header: title 'Anime' with the Japanese form, a Select button and a reload IconButton on the right. StatusTabs (Watching, Rewatching, Completed, Paused, Dropped, Planning with counts) with the sliding accent bar. Toolbar: search Input, Sort and Format FilterSelects, preset and random-pick IconButtons, a grid/rows Segmented on the right, and a filtered-notice line. Then the virtualised cover grid: poster, progress line along the bottom edge, title, native title, progress text."
+    },
+    {
+      "id": "anime-rows",
+      "name": "ScreenAnimeRows",
+      "title": "Anime list, rows",
+      "route": "#/list",
+      "state": "signed in, rows view",
+      "platform": "desktop",
+      "description": "The same list screen as rows: small cover, title and native title, status, score, progress editable in place with a +1, dates, tags — fixed column tracks so every row lines up. Same header, StatusTabs and toolbar as the grid."
+    },
+    {
+      "id": "manga-grid",
+      "name": "ScreenMangaGrid",
+      "title": "Manga list, grid",
+      "route": "#/manga",
+      "state": "signed in",
+      "platform": "desktop",
+      "description": "The manga twin of the anime grid: identical chrome, progress counted in chapters (and volumes in rows view)."
+    },
+    {
+      "id": "manga-rows",
+      "name": "ScreenMangaRows",
+      "title": "Manga list, rows",
+      "route": "#/manga",
+      "state": "signed in, rows view",
+      "platform": "desktop",
+      "description": "Manga as rows with chapters and volumes as two editable columns."
+    },
+    {
+      "id": "anime-local",
+      "name": "ScreenAnimeLocalEmpty",
+      "title": "Anime list, empty",
+      "route": "#/list",
+      "state": "no account, empty list",
+      "platform": "desktop",
+      "description": "The list screen with nothing in the active status: the header, tabs and toolbar stay, the body is an EmptyState — a small illustration, 'Nothing in Watching.' and a hint line. Sidebar counts read 0."
+    },
+    {
+      "id": "anime-signed-out",
+      "name": "ScreenAnimeSignedOut",
+      "title": "Anime list, signed out",
+      "route": "#/list",
+      "state": "signed out",
+      "platform": "desktop",
+      "description": "The list route without an account: a centred line Connect with AniList to see your list. and a Go to Settings Button."
+    },
+    {
+      "id": "detail-anime",
+      "name": "ScreenDetailAnime",
+      "title": "Title detail, anime",
+      "route": "#/media/154587",
+      "state": "signed in",
+      "platform": "desktop",
+      "description": "A title's page. A Back button over a full-width banner; the cover overlapping the banner's bottom edge; title, native title in the Japanese face, a status Pill, score, format, status, episode count, duration, season, studio; genre chips; time-to-finish; a primary 'Play next episode' / 'Add to list' Button with Favourite and 'Open on AniList' ghosts. Below: the 'My entry' panel (Status pills, Score bars, Progress with +1, Rewatches, Tags, Notes, Save) then Episodes / Cast & staff tabs, description, relations and recommendations."
+    },
+    {
+      "id": "detail-cast",
+      "name": "ScreenDetailCast",
+      "title": "Title detail, cast & staff",
+      "route": "#/media/154587",
+      "state": "signed in, Cast & staff tab",
+      "platform": "desktop",
+      "description": "The detail page scrolled to its Cast & staff tab: character cards with the voice actor beside each, then a staff grid; every person links to their own page."
+    },
+    {
+      "id": "detail-manga",
+      "name": "ScreenDetailManga",
+      "title": "Title detail, manga",
+      "route": "#/media/30002",
+      "state": "signed in",
+      "platform": "desktop",
+      "description": "The same detail layout for a manga: chapters and volumes instead of episodes, 'Continue reading' as the primary action."
+    },
+    {
+      "id": "search",
+      "name": "ScreenSearch",
+      "title": "Search, empty",
+      "route": "#/search",
+      "state": "signed in, nothing typed",
+      "platform": "desktop",
+      "description": "The search screen before a query: a wide search Input, the scope as a Pill row (Anime, Manga, People, Characters, Staff, Studios), a second Pill row of quick picks (Trending now, This season, All-time popular, Top scored), then a row of FilterSelects (Genre, Tag, Year, Season, Format, Status, Source, Origin, Sort). The body reads Search AniList. with a two-line hint."
+    },
+    {
+      "id": "search-results",
+      "name": "ScreenSearchResults",
+      "title": "Search, results",
+      "route": "#/search",
+      "state": "signed in, 'frieren' typed",
+      "platform": "desktop",
+      "description": "Search results as a cover grid with the list-status colour ring on titles already on the list; each result opens the shared entry editor from its card."
+    },
+    {
+      "id": "seasonal",
+      "name": "ScreenSeasonal",
+      "title": "Seasonal",
+      "route": "#/seasonal",
+      "state": "signed in",
+      "platform": "desktop",
+      "description": "One season's titles as a cover grid. The header carries the SeasonPicker (season, year, kanji, arrows) and a sort FilterSelect; each card shows the airing episode count and the status ring."
+    },
+    {
+      "id": "calendar-week",
+      "name": "ScreenCalendarWeek",
+      "title": "Calendar, week, my shows",
+      "route": "#/calendar",
+      "state": "signed in",
+      "platform": "desktop",
+      "description": "The Monday-first week grid: seven day columns with the date in the header, each episode as a compact card (cover, time, title, episode). Above: the 'My shows / Everything' Segmented, the Week / Tiles / Agenda Segmented, the week range with prev/next/today. Aired episodes stay in view at reduced opacity."
+    },
+    {
+      "id": "calendar-week-all",
+      "name": "ScreenCalendarWeekAll",
+      "title": "Calendar, week, everything",
+      "route": "#/calendar?lens=all",
+      "state": "signed in",
+      "platform": "desktop",
+      "description": "The week grid with the complete airing schedule — dense columns of every episode airing that day."
+    },
+    {
+      "id": "calendar-tiles",
+      "name": "ScreenCalendarTiles",
+      "title": "Calendar, tiles",
+      "route": "#/calendar?lens=all",
+      "state": "signed in, tiles view",
+      "platform": "desktop",
+      "description": "The calendar as a day-by-day stack: a dated header per day, then poster-first tiles that fill the width, the time strip on the art."
+    },
+    {
+      "id": "calendar-agenda",
+      "name": "ScreenCalendarAgenda",
+      "title": "Calendar, agenda",
+      "route": "#/calendar?lens=all",
+      "state": "signed in, agenda view",
+      "platform": "desktop",
+      "description": "The calendar as a running list: a dated header per day, then one compact digest row per episode with the time on the right and the state as the marker."
+    },
+    {
+      "id": "calendar-local",
+      "name": "ScreenCalendarEmpty",
+      "title": "Calendar, nothing airing",
+      "route": "#/calendar",
+      "state": "no account",
+      "platform": "desktop",
+      "description": "The week grid with no shows on the list: the chrome stays, the days read empty."
+    },
+    {
+      "id": "franchise",
+      "name": "ScreenFranchise",
+      "title": "Franchise graph",
+      "route": "#/franchise/5081",
+      "state": "signed in",
+      "platform": "desktop",
+      "description": "The relation map of one franchise: nodes as small cover cards coloured by list status, connected by relation lines, on a pannable, zoomable canvas; a legend and zoom controls in a corner; a node's card opens at the side."
+    },
+    {
+      "id": "library",
+      "name": "ScreenLibrary",
+      "title": "Local library",
+      "route": "#/library",
+      "state": "signed in",
+      "platform": "desktop",
+      "description": "The local folder matched to the list: rows of title, next unwatched file, match confidence column, a Play Button per row; a scan button and the folder path in the header; unplaced titles in their own section with AniList's guess to confirm."
+    },
+    {
+      "id": "library-empty",
+      "name": "ScreenLibraryLocal",
+      "title": "Local library, local mode",
+      "route": "#/library",
+      "state": "no account (local list)",
+      "platform": "desktop",
+      "description": "The library in local mode: the folder row with file count and Change, then a Detected but not on the list section — each row cover, title, an Add to list link, duration, match confidence, next file and a Play Button."
+    },
+    {
+      "id": "stats-overview",
+      "name": "ScreenStatsOverview",
+      "title": "Statistics, overview",
+      "route": "#/stats",
+      "state": "signed in",
+      "platform": "desktop",
+      "description": "The statistics page: avatar, 'Statistics' title with its Japanese form and a link to the profile, a Wrapped Button; Anime / Manga Tabs and the category Tabs (Overview, Ratings, Years, Genres & tags, People & studios); the overview tab with stat tiles, an area chart and a heatmap drawn in SVG."
+    },
+    {
+      "id": "stats-ratings",
+      "name": "ScreenStatsRatings",
+      "title": "Statistics, ratings",
+      "route": "#/stats?tab=ratings",
+      "state": "signed in",
+      "platform": "desktop",
+      "description": "Score distribution as gradient bars, mean deltas against the crowd, the titles you disagree on hardest."
+    },
+    {
+      "id": "stats-years",
+      "name": "ScreenStatsYears",
+      "title": "Statistics, years",
+      "route": "#/stats?tab=years",
+      "state": "signed in",
+      "platform": "desktop",
+      "description": "Titles and time per release year and per year watched, as bars and a dot plot."
+    },
+    {
+      "id": "stats-genres",
+      "name": "ScreenStatsGenres",
+      "title": "Statistics, genres & tags",
+      "route": "#/stats?tab=genresTags",
+      "state": "signed in",
+      "platform": "desktop",
+      "description": "A radar of genres, a sunburst, and ranked lists of genres and tags with counts and mean scores."
+    },
+    {
+      "id": "stats-people",
+      "name": "ScreenStatsPeople",
+      "title": "Statistics, people & studios",
+      "route": "#/stats?tab=people",
+      "state": "signed in",
+      "platform": "desktop",
+      "description": "Ranked lists of studios, staff and voice actors across the list, each row linking to its page."
+    },
+    {
+      "id": "stats-signed-out",
+      "name": "ScreenStatsSignedOut",
+      "title": "Statistics, signed out",
+      "route": "#/stats",
+      "state": "signed out",
+      "platform": "desktop",
+      "description": "The statistics route without an account: centred Statistics title, one line asking to connect, a primary Connect with AniList Button. The sidebar shows no counts."
+    },
+    {
+      "id": "wrapped",
+      "name": "ScreenWrapped",
+      "title": "Year in review",
+      "route": "#/wrapped",
+      "state": "signed in",
+      "platform": "desktop",
+      "description": "The Wrapped poster in the centre with the year / season picker above it; a side rail of crop presets (banner, square, page, compressed, detailed) and the export controls (PNG/JPEG, 1x/2x/3x)."
+    },
+    {
+      "id": "social",
+      "name": "ScreenSocial",
+      "title": "Activities",
+      "route": "#/social",
+      "state": "signed in",
+      "platform": "desktop",
+      "description": "The activity feed: a status composer with the markdown toolbar at the top, then activity cards — user lockup, verb sentence, media card or text, like and reply counts — and a 'Load more' Button at the end."
+    },
+    {
+      "id": "social-signed-out",
+      "name": "ScreenSocialSignedOut",
+      "title": "Activities, no account",
+      "route": "#/social",
+      "state": "no account",
+      "platform": "desktop",
+      "description": "The social route without an account: an EmptyState 'Profiles need an AniList account' with a 'Link account' Button."
+    },
+    {
+      "id": "profile",
+      "name": "ScreenProfile",
+      "title": "User profile",
+      "route": "#/user/Kyusetzu",
+      "state": "signed in, own profile",
+      "platform": "desktop",
+      "description": "A profile: Back button, banner, avatar, name with counts and mean scores, an 'Edit profile' (own) or Follow Button; the bio rendered as AniList markdown; Tabs (Overview, Lists, Activity, Followers, Following, Forum); the overview with favourite anime, manga, characters and staff rows."
+    },
+    {
+      "id": "profile-lists",
+      "name": "ScreenProfileLists",
+      "title": "User profile, lists tab",
+      "route": "#/user/Kyusetzu?tab=lists",
+      "state": "signed in",
+      "platform": "desktop",
+      "description": "Someone's lists inside their profile: status tabs and a cover grid, read-only."
+    },
+    {
+      "id": "activity",
+      "name": "ScreenActivity",
+      "title": "Single activity",
+      "route": "#/activity/1094438763",
+      "state": "signed in",
+      "platform": "desktop",
+      "description": "One activity on its own page with its replies underneath and a reply composer."
+    },
+    {
+      "id": "forum",
+      "name": "ScreenForum",
+      "title": "Forum",
+      "route": "#/forum",
+      "state": "signed in",
+      "platform": "desktop",
+      "description": "The forum: a search Input, a Browse / Recent / Subscribed lens, category Pills, thread rows (title, category chips, author lockup, reply count, last activity) and a 'New thread' Button."
+    },
+    {
+      "id": "thread",
+      "name": "ScreenThread",
+      "title": "Thread",
+      "route": "#/thread/92613",
+      "state": "signed in",
+      "platform": "desktop",
+      "description": "A thread: title and category chips, the opening post rendered as markdown, comments as nested cards two levels deep with like and reply, a 'Load more' Button, and the reply composer."
+    },
+    {
+      "id": "character",
+      "name": "ScreenCharacter",
+      "title": "Character",
+      "route": "#/character/176754",
+      "state": "signed in",
+      "platform": "desktop",
+      "description": "A character's page: portrait, name and native name, description, the titles they appear in as a cover grid with the voice actor per title."
+    },
+    {
+      "id": "staff",
+      "name": "ScreenStaff",
+      "title": "Staff",
+      "route": "#/staff/112215",
+      "state": "signed in",
+      "platform": "desktop",
+      "description": "A staff member's page: portrait, name, roles grouped by kind, works as a cover grid."
+    },
+    {
+      "id": "studio",
+      "name": "ScreenStudio",
+      "title": "Studio",
+      "route": "#/studio/11",
+      "state": "signed in",
+      "platform": "desktop",
+      "description": "A studio's page: name, favourite count, and its works as a cover grid by year."
+    },
+    {
+      "id": "settings-account",
+      "name": "ScreenSettingsAccount",
+      "title": "Settings, Account",
+      "route": "#/settings?pane=account",
+      "state": "signed in",
+      "platform": "desktop",
+      "description": "Settings: a pane list on the left (Account, AniList account, Appearance, Detection, Library, Desktop, Import & export, Advanced with a danger mark), the active pane as stacked Cards on the right. Account: the signed-in user lockup, sign-out, the offline queue with each queued edit, the default status for new adds."
+    },
+    {
+      "id": "settings-account-signed-out",
+      "name": "ScreenSettingsAccountSignedOut",
+      "title": "Settings, Account, signed out",
+      "route": "#/settings?pane=account",
+      "state": "signed out",
+      "platform": "desktop",
+      "description": "The Account pane before sign-in: a 'Connect with AniList' Card with the primary Button, 'Use without an account', and a collapsed 'Having trouble? Enter the token manually'."
+    },
+    {
+      "id": "settings-account-local",
+      "name": "ScreenSettingsAccountLocal",
+      "title": "Settings, Account, local mode",
+      "route": "#/settings?pane=account",
+      "state": "no account (local list)",
+      "platform": "desktop",
+      "description": "The Account pane in local mode: the connect Card explains the merge that a later sign-in performs."
+    },
+    {
+      "id": "settings-token-paste",
+      "name": "ScreenSettingsTokenPaste",
+      "title": "Settings, token fallback",
+      "route": "#/settings?pane=account",
+      "state": "signed out, fallback opened",
+      "platform": "desktop",
+      "description": "The manual token path unfolded: a Button that opens the AniList login page, an Input for the pasted token, a Connect Button."
+    },
+    {
+      "id": "settings-anilist",
+      "name": "ScreenSettingsAniList",
+      "title": "Settings, AniList account",
+      "route": "#/settings?pane=anilist",
+      "state": "signed in",
+      "platform": "desktop",
+      "description": "The account's own settings edited in place: title language, score format, activity posting, AniList's notification toggles, the background notification check with its interval presets."
+    },
+    {
+      "id": "settings-appearance",
+      "name": "ScreenSettingsAppearance",
+      "title": "Settings, Appearance",
+      "route": "#/settings?pane=appearance",
+      "state": "signed in",
+      "platform": "desktop",
+      "description": "Theme (system / light / dark), the accent picker with swatches, covers per row, interface size, density, reduce motion, status colours, the content filter, language."
+    },
+    {
+      "id": "settings-detection",
+      "name": "ScreenSettingsDetection",
+      "title": "Settings, Detection",
+      "route": "#/settings?pane=detection",
+      "state": "signed in",
+      "platform": "desktop",
+      "description": "Automatic tracking, the confirmation toggle, the threshold, media sessions, mpv, window titles, the Jellyfin card (server, discovery, sign-in, external address, test connection), detection corrections."
+    },
+    {
+      "id": "settings-library",
+      "name": "ScreenSettingsLibrary",
+      "title": "Settings, Library",
+      "route": "#/settings?pane=library",
+      "state": "signed in",
+      "platform": "desktop",
+      "description": "The library folder, scan options, the player used to open files, corrections and redirects."
+    },
+    {
+      "id": "settings-desktop",
+      "name": "ScreenSettingsDesktop",
+      "title": "Settings, Desktop",
+      "route": "#/settings?pane=desktop",
+      "state": "signed in",
+      "platform": "desktop",
+      "description": "Autostart, close-to-tray, Discord Rich Presence, the update channel and check, verbose logging."
+    },
+    {
+      "id": "settings-data",
+      "name": "ScreenSettingsData",
+      "title": "Settings, Import & export",
+      "route": "#/settings?pane=data",
+      "state": "signed in",
+      "platform": "desktop",
+      "description": "MAL XML and JSON export, import into a local list, daily local backups with the kept count."
+    },
+    {
+      "id": "settings-advanced",
+      "name": "ScreenSettingsAdvanced",
+      "title": "Settings, Advanced",
+      "route": "#/settings?pane=advanced",
+      "state": "signed in",
+      "platform": "desktop",
+      "description": "The danger pane: portable mode, cache and database actions, each destructive control in the danger colour with a confirm."
+    },
+    {
+      "id": "about",
+      "name": "ScreenAbout",
+      "title": "About",
+      "route": "#/about",
+      "state": "signed in",
+      "platform": "desktop",
+      "description": "About, centred: the mark on a glowing disc, the KARASU wordmark in the brand face with the katakana under it, one paragraph, the version line; then an Updates Card with Check for updates and a Diagnostics Card holding the bug-report table in monospace."
+    },
+    {
+      "id": "not-found",
+      "name": "ScreenNotFound",
+      "title": "404",
+      "route": "#/anything",
+      "state": "any",
+      "platform": "desktop",
+      "description": "The not-found page: 'Nothing lives here', one explanatory sentence, the failing path in the muted ink, and a 'Back to the dashboard' Button — all centred in the main area with the sidebar intact."
+    },
+    {
+      "id": "entry-editor",
+      "name": "OverlayEntryEditor",
+      "title": "Entry editor",
+      "route": "#/list",
+      "state": "signed in, Edit on a card",
+      "platform": "desktop",
+      "description": "The shared edit dialog (Modal, 28rem): title, Status pills, Progress with +1 and the max, Score bars, Rewatches, Started / Finished dates with clear, Private and Hide-from-status-lists checkboxes, Tags, Notes, Remove in danger ghost on the left, Cancel and Save on the right."
+    },
+    {
+      "id": "random-pick",
+      "name": "OverlayRandomPick",
+      "title": "Random pick",
+      "route": "#/list",
+      "state": "signed in",
+      "platform": "desktop",
+      "description": "A small Modal: a 'Max. episodes' Input, the picked title with cover, format and episode count, Open and Reroll Buttons."
+    },
+    {
+      "id": "preset",
+      "name": "OverlayPreset",
+      "title": "Save view as preset",
+      "route": "#/list",
+      "state": "signed in",
+      "platform": "desktop",
+      "description": "A small Modal with a name Input and the current filter and sort summarised, Cancel and Save."
+    },
+    {
+      "id": "bell",
+      "name": "OverlayBell",
+      "title": "Notification centre",
+      "route": "#/",
+      "state": "signed in, bell open",
+      "platform": "desktop",
+      "description": "The bell panel anchored under the titlebar bell: 'Notifications' label, 'Mark all read', grouped rows (actor lockup with a count badge, one line of text, relative time), expandable groups with a chevron."
+    },
+    {
+      "id": "command-palette",
+      "name": "OverlayCommandPalette",
+      "title": "Command palette",
+      "route": "#/",
+      "state": "Ctrl+K",
+      "platform": "desktop",
+      "description": "The palette over a scrim: a search Input, a 'Go to' section listing every screen, then titles from the list as you type; the footer lists the keys."
+    },
+    {
+      "id": "keyboard-sheet",
+      "name": "OverlayKeyboardSheet",
+      "title": "Keyboard shortcuts",
+      "route": "#/",
+      "state": "? pressed",
+      "platform": "desktop",
+      "description": "A Modal listing every shortcut in three columns — anywhere in the app, on a list screen, in a text box — each as label and key caps."
+    },
+    {
+      "id": "p-overview",
+      "name": "PhoneOverview",
+      "title": "Overview",
+      "route": "#/",
+      "state": "signed in",
+      "platform": "android",
+      "description": "The phone dashboard: the season hero full-width with a dot pager, the four stat Cards in two columns, This week and Airing soon digest rows, and the bottom bar (Overview, Anime, Manga, Search, More) instead of a sidebar. The status bar is drawn edge-to-edge."
+    },
+    {
+      "id": "p-anime",
+      "name": "PhoneAnimeGrid",
+      "title": "Anime list",
+      "route": "#/list",
+      "state": "signed in",
+      "platform": "android",
+      "description": "The list on a phone: title with Select and reload, StatusTabs wrapping to two rows, the search Input, Sort and Format FilterSelects, then a four-column cover grid; every cover carries edit and +1 action circles at its bottom edge."
+    },
+    {
+      "id": "p-manga",
+      "name": "PhoneMangaGrid",
+      "title": "Manga list",
+      "route": "#/manga",
+      "state": "signed in",
+      "platform": "android",
+      "description": "The manga list on a phone, same chrome, chapters as progress."
+    },
+    {
+      "id": "p-search",
+      "name": "PhoneSearch",
+      "title": "Search",
+      "route": "#/search",
+      "state": "signed in, nothing typed",
+      "platform": "android",
+      "description": "Search on a phone: the Input, scope Pills scrolling horizontally, a Filters Pill that opens the filter row, and the empty-state hint."
+    },
+    {
+      "id": "p-more",
+      "name": "PhoneMoreSheet",
+      "title": "More sheet",
+      "route": "#/search",
+      "state": "More tapped",
+      "platform": "android",
+      "description": "The bottom sheet behind More: the bell and a close IconButton in its header, then Discover (Seasonal, Calendar, Activities, Forum), Insight (Statistics, Wrapped) and App (Sync, Settings, About) as icon rows."
+    },
+    {
+      "id": "p-seasonal",
+      "name": "PhoneSeasonal",
+      "title": "Seasonal",
+      "route": "#/seasonal",
+      "state": "signed in",
+      "platform": "android",
+      "description": "One season on a phone: the SeasonPicker in the header with arrows, TV / Movie sections, a four-column cover grid with score badges on the covers."
+    },
+    {
+      "id": "p-calendar",
+      "name": "PhoneCalendar",
+      "title": "Calendar",
+      "route": "#/calendar",
+      "state": "signed in",
+      "platform": "android",
+      "description": "The calendar on a phone is the agenda by construction (the week grid needs 980 px): My shows / Everything and Tiles / Agenda Segmenteds, the week range with arrows, then day headers and one digest row per episode."
+    },
+    {
+      "id": "p-social",
+      "name": "PhoneSocial",
+      "title": "Activities",
+      "route": "#/social",
+      "state": "signed in",
+      "platform": "android",
+      "description": "The feed on a phone: the status composer with its markdown toolbar, then activity cards with the user lockup, the sentence and the cover, like and reply counts."
+    },
+    {
+      "id": "p-forum",
+      "name": "PhoneForum",
+      "title": "Forum",
+      "route": "#/forum",
+      "state": "signed in",
+      "platform": "android",
+      "description": "The forum on a phone: Browse / Search / Subscribed Tabs, category Pills wrapping, thread rows with title, category chip, author, reply and view counts."
+    },
+    {
+      "id": "p-stats",
+      "name": "PhoneStatistics",
+      "title": "Statistics",
+      "route": "#/stats",
+      "state": "signed in",
+      "platform": "android",
+      "description": "Statistics on a phone: the Anime / Manga Tabs, the category Tabs, four stat tiles, Statuses and Formats as gradient bars, what is on the list."
+    },
+    {
+      "id": "p-wrapped",
+      "name": "PhoneWrapped",
+      "title": "Year in review",
+      "route": "#/wrapped",
+      "state": "signed in",
+      "platform": "android",
+      "description": "Wrapped on a phone: year and season pickers, a Save image Button, the crop Segmented (banner, square, page, compressed, detailed), format and size Pills, the poster below."
+    },
+    {
+      "id": "p-about",
+      "name": "PhoneAbout",
+      "title": "About",
+      "route": "#/about",
+      "state": "signed in",
+      "platform": "android",
+      "description": "About on a phone: the mark, wordmark and katakana, the description, the Updates Card noting that Android installs from the release page, the Diagnostics Card."
+    },
+    {
+      "id": "p-settings",
+      "name": "PhoneSettings",
+      "title": "Settings",
+      "route": "#/settings",
+      "state": "signed in",
+      "platform": "android",
+      "description": "Settings on a phone is a pane list: Account, AniList account, Appearance, Detection, Import & export, Advanced (with the danger mark) as chevron rows — Library and Desktop are hidden on Android."
+    },
+    {
+      "id": "p-settings-appearance",
+      "name": "PhoneSettingsAppearance",
+      "title": "Settings, Appearance",
+      "route": "#/settings?pane=appearance",
+      "state": "signed in",
+      "platform": "android",
+      "description": "One pane on a phone with a Back link to Settings: Language, Theme, Covers per row with a live preview, Density, Reduce motion, the accent swatches, list status colours — stacked Cards with a select or switch on the right."
+    },
+    {
+      "id": "p-bell",
+      "name": "PhoneBell",
+      "title": "Notification centre",
+      "route": "#/",
+      "state": "bell opened from More",
+      "platform": "android",
+      "description": "The bell as a bottom sheet on a phone: the same grouped rows as on desktop, Mark all read, Load more."
+    },
+    {
+      "id": "p-detail",
+      "name": "PhoneDetail",
+      "title": "Title detail",
+      "route": "#/media/…",
+      "state": "signed in",
+      "platform": "android",
+      "description": "A title on a phone: Back over the banner, the cover overlapping, the title and native title, status Pill with progress, score and facts, genre chips, time-to-finish, Favourite and Open on AniList, then the My entry panel with Status pills, Progress and Score bars."
+    },
+    {
+      "id": "p-entry-editor",
+      "name": "PhoneEntryEditor",
+      "title": "Entry editor",
+      "route": "#/list",
+      "state": "Edit tapped on a cover",
+      "platform": "android",
+      "description": "The entry editor as a near-full-width Modal on a phone: Status pills wrapping, Progress and Score, Rewatches, Started / Finished, the checkboxes, Tags, Notes, Remove and Cancel / Save."
+    }
+  ]
+}

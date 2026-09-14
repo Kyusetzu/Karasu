@@ -53,5 +53,10 @@
     "file": "scripts/phone-measure.ps1",
     "startsWith": "Reads the phone's side of Jellyfin",
     "reason": "usage block: one invocation per line"
+  },
+  {
+    "file": ".design-sync/screens.mjs",
+    "startsWith": "Screen references for Claude Design",
+    "reason": "usage block: one invocation per line"
   }
 ]

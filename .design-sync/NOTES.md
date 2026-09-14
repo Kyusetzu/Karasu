@@ -10,7 +10,11 @@ Repo-specific facts a re-sync needs. The converter runs from the repo root; the 
 - **`@/i18n` must be imported as `@/i18n/index`** in anything the converter bundles — the story-import plugin resolves the alias to the directory and fails.
 - **Previews** are all authored (`.design-sync/previews/*.tsx`, 21 files); none generated. Stateful/open states (MultiFilterSelect open, SeasonPicker open, Input clear pressed) are not previewed — they need interaction.
 
+- **Screen references** live in `.design-sync/screens/` (index.json + one JPEG each, 1440 wide for desktop, 608 for the phone) and are emitted by `node .design-sync/screens.mjs` into `ds-bundle/components/screens/<Name>/` (card + prompt + image) and `guidelines/screens.md`. **Run it after the converter and before the upload** — the converter wipes `ds-bundle/`, and the close-out deletes any remote path the local bundle lacks. New captures: `site/scripts/capture-desktop.mjs` on the rig (`MSYS_NO_PATHCONV=1` in Git Bash, or `#/` becomes a Program Files path), `adb exec-out screencap -p` on the phone, then `screens.mjs --import <dir>`. Signed-out screens: move the rig's `token.dat` aside (never sign out — that clears the shared credential), and set `profile_mode` back to `anilist` in the rig's kv afterwards, since a token-less start writes `local`.
+
 ## Known render warns
+
+- `✗ count mismatch: N previews vs 21 components` from `package-validate.mjs` once the screen cards are in the bundle — the validator counts every `components/*/*/` html; the driver's own validate runs before `screens.mjs` and is clean. Not a defect.
 
 - `[RENDER_THIN] Modal: rendered height is 0px` — the dialog is `fixed inset-0`; the screenshot shows it fine. Benign.
 - `[RENDER_THIN] KarasuTheme: variants render identically` — the three cells share their DOM text and differ only in theme/accent colour; the sheet shows dark, light and green. Benign.

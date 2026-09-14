@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 44258f6 -->
+<!-- generated-through: 4513338 -->
 
 ### Fixed
 
@@ -82,6 +82,7 @@ tag time is then optional rather than load-bearing.
 - The twice-daily sequel check spreads its requests out instead of sending them in one burst.
 - The now-playing ring no longer restarts on a card mounted mid-session (1.10.3.620).
 - An AniList profile link that carries the user's id, as the Statistics header's does, opens the profile in-app instead of "No such user".
+- Reading notifications one by one now clears the bell's badge, and "Mark all read" is always available.
 
 ### Added
 

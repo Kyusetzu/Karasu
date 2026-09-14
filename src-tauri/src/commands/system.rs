@@ -651,13 +651,17 @@ pub fn unread_notification_count(db: State<'_, Db>) -> i64 {
 }
 
 #[tauri::command]
-pub fn mark_notification_read(db: State<'_, Db>, id: i64) -> Result<(), String> {
-    db.notif_mark_read(id)
+pub fn mark_notification_read(app: AppHandle, db: State<'_, Db>, id: i64) -> Result<(), String> {
+    db.notif_mark_read(id)?;
+    crate::alerts::notify::refresh_bell(&app);
+    Ok(())
 }
 
 #[tauri::command]
-pub fn mark_all_notifications_read(db: State<'_, Db>) -> Result<(), String> {
-    db.notif_mark_all_read()
+pub fn mark_all_notifications_read(app: AppHandle, db: State<'_, Db>) -> Result<(), String> {
+    db.notif_mark_all_read()?;
+    crate::alerts::notify::refresh_bell(&app);
+    Ok(())
 }
 
 // --- Version -----------------------------------------------------------------

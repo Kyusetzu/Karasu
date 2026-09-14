@@ -295,6 +295,11 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
   };
 
   const readAll = async () => {
+    // Always offered, so a badge the panel cannot explain still has a way out; an empty press says so.
+    if (unread + siteUnseen === 0) {
+      showToast({ kind: "info", text: t("notif.nothingToMark") });
+      return;
+    }
     await markAllNotificationsRead().catch(() => {});
     // The AniList half was already marked seen server-side by the page-1 reset; what remains is the dots.
     setSiteUnseen(0);
@@ -626,12 +631,10 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
                 </span>
               )}
             </span>
-            {/* Both sides clear here; gated on the sum so a site-only backlog still gets its button. */}
-            {unread + siteUnseen > 0 && (
-              <button onClick={readAll} className="text-xs text-accent-400 hover:underline">
-                {t("notif.markAll")}
-              </button>
-            )}
+            {/* Both sides clear here, and the button never hides: a stale badge needs it most. */}
+            <button onClick={readAll} className="text-xs text-accent-400 hover:underline">
+              {t("notif.markAll")}
+            </button>
           </div>
 
           <div className="max-h-96 overflow-y-auto">

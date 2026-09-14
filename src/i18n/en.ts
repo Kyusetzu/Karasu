@@ -99,6 +99,7 @@ export const en = {
     title: "Notifications",
     empty: "You're all caught up.",
     markAll: "Mark all read",
+    nothingToMark: "Nothing unread",
     now: "now",
     groupLikes: "liked {{n}} of your activities",
     groupReplyLikes: "liked {{n}} of your replies",

@@ -101,6 +101,7 @@ export const de: typeof en = {
     title: "Benachrichtigungen",
     empty: "Alles gelesen.",
     markAll: "Alle als gelesen",
+    nothingToMark: "Nichts Ungelesenes",
     now: "jetzt",
     groupLikes: "gefällt {{n}} deiner Aktivitäten",
     groupReplyLikes: "gefällt {{n}} deiner Antworten",

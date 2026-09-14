@@ -31,6 +31,11 @@ pub fn notify(app: &AppHandle, kind: &str, title: Msg<'_>, body: Msg<'_>, media_
         crate::logging::error("notify", format!("cannot record the {kind} notification: {e}"));
     }
     toast(app, kind, &title, &body, true);
+    refresh_bell(app);
+}
+
+/// Tell every bell and badge to re-read the table; every write to it ends here, or a badge keeps yesterday's count.
+pub fn refresh_bell(app: &AppHandle) {
     if let Err(e) = app.emit("notifications-changed", ()) {
         crate::logging::warn("notify", format!("cannot refresh the bell: {e}"));
     }

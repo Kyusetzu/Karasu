@@ -75,10 +75,12 @@ foreach ($leg in @(@{ key = "android-arm64"; suffix = "_arm64.apk" }, @{ key = "
         Sort-Object LastWriteTime -Descending |
         Select-Object -First 1
     if ($apk) {
+        # Empty `signature` on purpose: the desktop plugin needs the key on every platform or rejects the whole manifest.
         $platforms[$leg.key] = [ordered]@{
-            url    = "https://github.com/Kyusetzu/Karasu/releases/download/$Tag/$($apk.Name)"
-            sha256 = (Get-FileHash -Algorithm SHA256 -Path $apk.FullName).Hash.ToLower()
-            size   = $apk.Length
+            url       = "https://github.com/Kyusetzu/Karasu/releases/download/$Tag/$($apk.Name)"
+            signature = ""
+            sha256    = (Get-FileHash -Algorithm SHA256 -Path $apk.FullName).Hash.ToLower()
+            size      = $apk.Length
         }
     }
 }

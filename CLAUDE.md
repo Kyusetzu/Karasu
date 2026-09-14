@@ -664,7 +664,11 @@ import it.
   `updater_available()` stays false on mobile: that is the desktop plugin,
   which cannot install an APK. Android's own path, built deliberately on
   2026-09-14: `latest.json` carries `platforms.android-arm64` and
-  `android-universal` (`url`, `sha256`, `size`, written by
+  `android-universal` (`url`, `sha256`, `size` and an empty `signature` — the
+  desktop plugin parses every platform entry as `{url, signature}` and
+  rejects the whole manifest when the key is missing, which is what the
+  `the_desktop_updater_still_reads_a_manifest_with_android_legs` test
+  pins; written by
   `generate-update-manifest.ps1` from the same artifacts the checksum step
   hashes); `check_for_updates` keeps the leg for `Build.SUPPORTED_ABIS[0]`
   in kv `apk_pending`; `apk_download` streams it into

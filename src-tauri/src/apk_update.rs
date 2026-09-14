@@ -552,7 +552,7 @@ mod tests {
             "version": "1.11.0+630",
             "platforms": {
                 "windows-x86_64": { "signature": "x", "url": "https://x/setup.exe" },
-                "android-arm64": { "url": "https://x/Karasu_1.11.0.630_arm64.apk", "sha256": "AB".repeat(32), "size": 23141036 }
+                "android-arm64": { "url": "https://x/Karasu_1.11.0.630_arm64.apk", "signature": "", "sha256": "AB".repeat(32), "size": 23141036 }
             }
         })
     }
@@ -607,6 +607,21 @@ mod tests {
         assert!(!sweep_keeps(version_code_for(630), installed, false), "not the pending one");
         assert!(!sweep_keeps(version_code_for(624), installed, true), "same build");
         assert!(!sweep_keeps(version_code_for(600), installed, true), "older");
+    }
+
+    /// The desktop plugin parses every platform entry as {url, signature}; an Android leg must not break its manifest.
+    #[test]
+    fn the_desktop_updater_still_reads_a_manifest_with_android_legs() {
+        let mut m = manifest();
+        m["platforms"]["android-arm64"]["signature"] = json!("");
+        m["pub_date"] = json!("2026-09-14T12:00:00Z");
+        let release: tauri_plugin_updater::RemoteRelease = serde_json::from_value(m).expect("manifest parses");
+        assert!(release.download_url("windows-x86_64").is_ok());
+        assert_eq!(release.version.to_string(), "1.11.0+630");
+        let mut bare = manifest();
+        bare["platforms"]["android-arm64"].as_object_mut().unwrap().remove("signature");
+        bare["pub_date"] = json!("2026-09-14T12:00:00Z");
+        assert!(serde_json::from_value::<tauri_plugin_updater::RemoteRelease>(bare).is_err(), "without the key the whole manifest dies");
     }
 
     #[test]

@@ -1,0 +1,73 @@
+{
+  "projectId": "001205a0-9d1f-41c5-93a3-781f08381580",
+  "shape": "package",
+  "pkg": "karasu",
+  "globalName": "Karasu",
+  "tsconfig": "tsconfig.json",
+  "cssEntry": ".design-sync/.cache/app.css",
+  "entry": "src/ds.ts",
+  "componentSrcMap": {
+    "Button": "src/components/ui/button.tsx",
+    "Card": "src/components/ui/card.tsx",
+    "CardTitle": "src/components/ui/card.tsx",
+    "FilterSelect": "src/components/ui/filter-select.tsx",
+    "IconButton": "src/components/ui/icon-button.tsx",
+    "Input": "src/components/ui/input.tsx",
+    "Loader": "src/components/ui/loader.tsx",
+    "Modal": "src/components/ui/modal.tsx",
+    "MultiFilterSelect": "src/components/ui/multi-filter-select.tsx",
+    "Pill": "src/components/ui/pill.tsx",
+    "Presence": "src/components/ui/presence.tsx",
+    "PresenceIf": "src/components/ui/presence.tsx",
+    "ScoreBars": "src/components/ui/score-bars.tsx",
+    "SeasonPicker": "src/components/ui/season-picker.tsx",
+    "SectionHeader": "src/components/ui/section-header.tsx",
+    "Segmented": "src/components/ui/segmented.tsx",
+    "StatusTabs": "src/components/ui/status-tabs.tsx",
+    "Tabs": "src/components/ui/tabs.tsx",
+    "Avatar": "src/components/ui/user-lockup.tsx",
+    "UserLockup": "src/components/ui/user-lockup.tsx",
+    "KarasuTheme": "src/ds-theme.tsx"
+  },
+  "extraFonts": [
+    ".design-sync/fonts.css"
+  ],
+  "buildCmd": "npm run build && node .design-sync/app-css.mjs",
+  "provider": {
+    "component": "KarasuTheme",
+    "props": {
+      "theme": "dark"
+    }
+  },
+  "overrides": {
+    "Modal": {
+      "cardMode": "single",
+      "viewport": "720x480",
+      "primaryStory": "EditEntry"
+    },
+    "Avatar": {
+      "cardMode": "column"
+    },
+    "Card": {
+      "cardMode": "column",
+      "viewport": "900x900"
+    },
+    "Input": {
+      "cardMode": "column"
+    },
+    "KarasuTheme": {
+      "cardMode": "column",
+      "viewport": "900x900"
+    },
+    "SectionHeader": {
+      "cardMode": "column"
+    },
+    "StatusTabs": {
+      "cardMode": "column"
+    },
+    "UserLockup": {
+      "cardMode": "column"
+    }
+  },
+  "readmeHeader": ".design-sync/conventions.md"
+}

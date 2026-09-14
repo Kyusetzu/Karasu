@@ -1,0 +1,15 @@
+/* The two brand faces index.css declares, with paths the converter can copy; the app's compiled CSS points at /assets/. */
+@font-face {
+  font-family: "SN Pro";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../node_modules/@fontsource/sn-pro/files/sn-pro-latin-400-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Kosugi Maru";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../node_modules/@fontsource/kosugi-maru/files/kosugi-maru-japanese-400-normal.woff2") format("woff2");
+}

@@ -96,6 +96,8 @@ export default function ActionHost() {
         },
         tauri: isTauri,
         hasSelection: false,
+        // The sheet never draws the command group, so a sync it cannot show costs nothing to leave out.
+        canSync: false,
       });
       setOpen({
         target,

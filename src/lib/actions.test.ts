@@ -33,6 +33,7 @@ const CTX: ActionContext = {
   scrobble: { phase: "idle", forceable: false, hasCurrent: false, overridden: false },
   tauri: true,
   hasSelection: false,
+  canSync: false,
 };
 
 const ctx = (over: Partial<ActionContext> = {}): ActionContext => ({ ...CTX, ...over });
@@ -152,6 +153,7 @@ describe("resolveActions, entry", () => {
       "setScore",
       "removeFromList",
       "openAniList",
+      "search",
       "back",
       "forward",
       "reload",
@@ -197,7 +199,16 @@ describe("resolveActions, entry", () => {
 describe("resolveActions, without an account", () => {
   it("offers nothing that writes to a list", () => {
     const menu = ids(entry(), ctx({ signedIn: false }));
-    expect(menu).toEqual(["open", "openAniList", "back", "forward", "reload", "palette", "settings"]);
+    expect(menu).toEqual([
+      "open",
+      "openAniList",
+      "search",
+      "back",
+      "forward",
+      "reload",
+      "palette",
+      "settings",
+    ]);
   });
 });
 
@@ -276,6 +287,11 @@ describe("resolveActions, shape", () => {
       );
       expect([...seen].sort((a, b) => a - b)).toEqual(seen);
     }
+  });
+
+  it("offers a sync only where there is something to sync", () => {
+    expect(ids({ kind: "page" })).not.toContain("sync");
+    expect(ids({ kind: "page" }, ctx({ canSync: true }))).toContain("sync");
   });
 
   it("answers the same twice, so no module state leaked in", () => {

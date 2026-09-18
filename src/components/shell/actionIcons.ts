@@ -10,6 +10,7 @@ import {
   Plus,
   RefreshCw,
   SearchCheck,
+  Search,
   Settings,
   SquareArrowOutUpRight,
   Star,
@@ -42,4 +43,6 @@ export const ACTION_ICON: Record<ActionId, LucideIcon> = {
   reload: RefreshCw,
   palette: Command,
   settings: Settings,
+  sync: RefreshCw,
+  search: Search,
 };

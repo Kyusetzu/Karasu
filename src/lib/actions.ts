@@ -24,10 +24,12 @@ export type ActionId =
   | "forward"
   | "reload"
   | "palette"
-  | "settings";
+  | "settings"
+  | "sync"
+  | "search";
 
 /** Renderers draw a separator where this changes, and each picks the groups it is willing to show. */
-export type ActionGroup = "item" | "edit" | "detect" | "link" | "app";
+export type ActionGroup = "item" | "edit" | "detect" | "link" | "command" | "app";
 
 /** Fixed order; groups never interleave, which is what lets a renderer count its own separators in one pass. */
 export const ACTION_GROUP_ORDER: readonly ActionGroup[] = [
@@ -35,6 +37,7 @@ export const ACTION_GROUP_ORDER: readonly ActionGroup[] = [
   "edit",
   "detect",
   "link",
+  "command",
   "app",
 ];
 
@@ -60,6 +63,8 @@ export const ACTION_LABEL_KEY: Record<ActionId, string> = {
   reload: "ctx.reload",
   palette: "ctx.palette",
   settings: "ctx.settings",
+  sync: "sync.button",
+  search: "nav.search",
 };
 
 /** A submenu leaf carries the value it would write; its label is that value, not a phrase. */
@@ -118,6 +123,8 @@ export interface ActionContext {
   /** Opening a browser and reloading the shell are Tauri facts, so they are platform-keyed rather than width-keyed. */
   tauri: boolean;
   hasSelection: boolean;
+  /** `useManualSync().available` — local mode has nothing to sync and signed out has nobody to sync for. */
+  canSync: boolean;
 }
 
 export const STATUSES: readonly MediaListStatus[] = [
@@ -174,7 +181,9 @@ const act = (id: ActionId, group: ActionGroup, extra: Partial<Action> = {}): Act
 
 /** The chrome every target carries, so a right-click on a card still reaches Back, the palette and Settings. */
 function chrome(ctx: ActionContext): Action[] {
-  const out: Action[] = [act("back", "app"), act("forward", "app")];
+  const out: Action[] = [act("search", "command")];
+  if (ctx.canSync) out.push(act("sync", "command"));
+  out.push(act("back", "app"), act("forward", "app"));
   if (ctx.tauri) out.push(act("reload", "app"));
   out.push(act("palette", "app"), act("settings", "app"));
   return out;

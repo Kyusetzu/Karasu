@@ -718,6 +718,7 @@ export const de: typeof en = {
   palette: {
     placeholder: "Zu Seite oder Titel springen …",
     empty: "Keine Treffer.",
+    groupActions: "Aktionen",
     groupGoTo: "Gehe zu",
     groupList: "Deine Liste",
     hintMove: "↑↓ bewegen",

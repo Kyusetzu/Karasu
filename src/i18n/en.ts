@@ -715,6 +715,7 @@ export const en = {
   palette: {
     placeholder: "Jump to a page or title …",
     empty: "No matches.",
+    groupActions: "Actions",
     groupGoTo: "Go to",
     groupList: "Your list",
     hintMove: "↑↓ navigate",

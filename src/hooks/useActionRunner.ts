@@ -3,6 +3,7 @@ import { useNavigate } from "react-router";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useAuth } from "@/stores/auth";
 import { useListMutations } from "@/hooks/useListMutations";
+import { useManualSync } from "@/hooks/useManualSync";
 import { clearDetectionOverride, scrobbleCancel, scrobbleNow, useNowPlaying } from "@/stores/nowPlaying";
 import { loadDefaultAddStatus } from "@/lib/defaultAddStatus";
 import type { Action, ActionTarget } from "@/lib/actions";
@@ -32,6 +33,7 @@ export function useActionRunner(): (input: ActionRunInput) => ActionEffect {
   // Both, unconditionally: the hook rules forbid choosing one by the target's media type at call time.
   const anime = useListMutations(userId, "ANIME");
   const manga = useListMutations(userId, "MANGA");
+  const { sync: onSync } = useManualSync();
 
   return useCallback(
     ({ action, target, selection, entry }: ActionRunInput): ActionEffect => {
@@ -138,8 +140,15 @@ export function useActionRunner(): (input: ActionRunInput) => ActionEffect {
         case "settings":
           navigate("/settings");
           return done;
+        case "search":
+          navigate("/search");
+          return done;
+        case "sync":
+          // The lock is shared, so a sync already running from the tray or the pull gesture is not started twice.
+          void onSync();
+          return done;
       }
     },
-    [anime, manga, navigate],
+    [anime, manga, navigate, onSync],
   );
 }

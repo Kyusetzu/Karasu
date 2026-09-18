@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 63ceba3 -->
+<!-- generated-through: 55e146a -->
 
 ### Fixed
 
@@ -106,6 +106,7 @@ tag time is then optional rather than load-bearing.
 - The Wrapped page is built from the list Karasu already holds, and saving from a title's page no longer reloads it.
 - Exit cleanly when Windows ends the session; the quit panic was never the tray (1.10.4.621).
 - Every sync surface shares one lock, so a sync started elsewhere shows as running.
+- Pulling a screen down on the phone syncs, and Android drops the sync row (1.12.0.629).
 ## 1.0.0 — 2026-09-05
 
 Karasu 1.0.0 is the first tagged release: a desktop and Android tracker built

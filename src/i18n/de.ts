@@ -48,6 +48,11 @@ export const de: typeof en = {
     local: "Auf diesem PC gespeichert",
     localProfile: "Lokales Profil",
   },
+  pull: {
+    hint: "Zum Synchronisieren ziehen",
+    release: "Loslassen zum Synchronisieren",
+    syncing: "Wird synchronisiert \u2026",
+  },
   syncPanel: {
     title: "Synchronisierung",
     open: "Details zur Synchronisierung",

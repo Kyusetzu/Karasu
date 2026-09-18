@@ -46,6 +46,11 @@ export const en = {
     local: "Stored on this PC",
     localProfile: "Local profile",
   },
+  pull: {
+    hint: "Pull to sync",
+    release: "Release to sync",
+    syncing: "Syncing \u2026",
+  },
   syncPanel: {
     title: "Sync",
     open: "Show sync details",

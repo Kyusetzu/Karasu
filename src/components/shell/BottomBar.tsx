@@ -30,15 +30,13 @@ function sheetGroups(android: boolean): { label: string; items: NavItem[] }[] {
     }))
     .filter((g) => g.items.length > 0);
   // Settings and About sit outside `GROUPS` in the sidebar's footer; without this the phone cannot reach either.
-  groups.push({
-    label: "nav.groupApp",
-    items: [
-      // The phone's one road to the queue and the sync button; the desktop's sidebar panel never renders here.
-      { to: "/settings?pane=data", key: "nav.sync", icon: RefreshCw },
-      { to: "/settings", key: "nav.settings", icon: Settings },
-      { to: "/about", key: "nav.about", icon: Info },
-    ],
-  });
+  const app: NavItem[] = [
+    { to: "/settings", key: "nav.settings", icon: Settings },
+    { to: "/about", key: "nav.about", icon: Info },
+  ];
+  // Android pulls a screen down to sync, so the row would be a second door to one place; elsewhere it is the only one.
+  if (!android) app.unshift({ to: "/settings?pane=data", key: "nav.sync", icon: RefreshCw });
+  groups.push({ label: "nav.groupApp", items: app });
   return groups;
 }
 

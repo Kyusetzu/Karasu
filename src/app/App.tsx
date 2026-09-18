@@ -21,6 +21,7 @@ import {
 import Titlebar from "@/components/shell/Titlebar";
 import Sidebar from "@/components/shell/Sidebar";
 import BottomBar from "@/components/shell/BottomBar";
+import PullToSync from "@/components/shell/PullToSync";
 import { usePhoneShell } from "@/hooks/usePhoneShell";
 import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
 import { internalRoute } from "@/lib/anilistUrl";
@@ -214,6 +215,8 @@ export default function App() {
           </ErrorBoundary>
         </main>
       </div>
+      {/* The touch shell's sync affordance; the sidebar's button serves the mouse one, so it is width-keyed. */}
+      {phone && <PullToSync />}
       {phone && <BottomBar />}
     </div>
   );

@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 0ae904d -->
+<!-- generated-through: bf5398f -->
 
 ### Fixed
 
@@ -109,6 +109,7 @@ tag time is then optional rather than load-bearing.
 - Pulling a screen down on the phone syncs, and Android drops the sync row (1.12.0.629).
 - Long-pressing a title on touch opens what can be done with it (1.13.0.631).
 - Swiping up from the bottom bar opens the command palette (1.14.0.632).
+- Right-clicking a title offers what can be done with it (1.15.0.633).
 ## 1.0.0 — 2026-09-05
 
 Karasu 1.0.0 is the first tagged release: a desktop and Android tracker built

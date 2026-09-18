@@ -32,7 +32,6 @@ import KeyboardSheet from "@/components/shell/KeyboardSheet";
 import GlobalKeys from "@/components/shell/GlobalKeys";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useViewTransitions } from "@/hooks/useViewTransitions";
-import ContextMenu from "@/components/shell/ContextMenu";
 import ActionHost from "@/components/shell/ActionHost";
 import SignInMerge from "@/components/overlays/SignInMerge";
 import Dashboard from "@/pages/Dashboard";
@@ -160,8 +159,7 @@ export default function App() {
       <CommandPalette />
       <KeyboardSheet />
       <GlobalKeys />
-      <ContextMenu />
-      {/* Keyed on the input, not the shell's width: a touchscreen laptop long-presses too. */}
+      {/* Right-click and long press are one resolver with two renderers; the host owns both events. */}
       <ActionHost />
       <SignInMerge />
       <PlaybackError />

@@ -205,3 +205,40 @@ describe("ActionHost long press", () => {
     expect(onContext).not.toHaveBeenCalled();
   });
 });
+
+describe("ActionHost right click", () => {
+  const right = (el: HTMLElement) => fireEvent.contextMenu(el, { clientX: 40, clientY: 40 });
+
+  it("opens the menu on the card that was clicked", () => {
+    mount();
+    right(card());
+    expect(screen.getByRole("menu", { name: "ctx.menuLabel" })).toBeTruthy();
+    expect(screen.getByRole("menuitem", { name: "common.plusOne" })).toBeTruthy();
+  });
+
+  /** The one thing a rewrite here can quietly break: an editable field must keep the browser's own menu. */
+  it("leaves the native menu to editable content", () => {
+    mount();
+    const field = document.createElement("textarea");
+    document.body.appendChild(field);
+    right(field);
+    expect(screen.queryByRole("menu", { name: "ctx.menuLabel" })).toBeNull();
+  });
+
+  it("offers the app chrome on the background, where there is no card", () => {
+    mount();
+    const empty = document.createElement("div");
+    document.body.appendChild(empty);
+    right(empty);
+    expect(screen.getByRole("menuitem", { name: "ctx.back" })).toBeTruthy();
+    expect(screen.queryByRole("menuitem", { name: "common.plusOne" })).toBeNull();
+  });
+
+  it("does not fire straight after a touch, where the press already answered", () => {
+    mount();
+    const el = card();
+    press(el);
+    right(el);
+    expect(screen.queryByRole("menu", { name: "ctx.menuLabel" })).toBeNull();
+  });
+});

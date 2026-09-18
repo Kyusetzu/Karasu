@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Presence } from "@/components/ui/presence";
 import ActionSheet from "@/components/shell/ActionSheet";
+import ContextMenu from "@/components/shell/ContextMenu";
 import ConfirmDialog from "@/components/overlays/ConfirmDialog";
 import EntryEditModal, { type EntrySaveInput } from "@/components/media/EntryEditModal";
 import { findCachedMedia } from "@/hooks/useCachedMedia";
@@ -10,6 +11,7 @@ import { useActionRunner, type ActionOverlay } from "@/hooks/useActionRunner";
 import { useListMutations } from "@/hooks/useListMutations";
 import { resolveActions, type Action, type ActionTarget, type EntryFacts } from "@/lib/actions";
 import { useAuth, useScoreFormat } from "@/stores/auth";
+import { useManualSync } from "@/hooks/useManualSync";
 import { useNowPlaying } from "@/stores/nowPlaying";
 import { isTauri } from "@/api/anilist";
 import { collectTags } from "@/lib/tags";
@@ -34,6 +36,8 @@ interface Opened {
   title: string | null;
   selection: string;
   mediaType: MediaType;
+  /** A pointer names a place, a press names a thing; the two renderers differ in nothing else. */
+  at: { x: number; y: number } | null;
 }
 
 const factsOf = (entry: MediaListEntry): EntryFacts => ({
@@ -64,27 +68,30 @@ export default function ActionHost() {
   const [overlay, setOverlay] = useState<ActionOverlay | null>(null);
 
   const signedIn = viewer !== null || mode === "local";
+  const { available: canSync } = useManualSync();
   const editing = open?.entry ?? null;
   const list = useListMutations(viewer?.id ?? 0, open?.mediaType ?? "ANIME");
 
   const openFor = useCallback(
-    (el: HTMLElement) => {
-      const mediaId = Number(el.dataset.mediaId);
-      if (!Number.isFinite(mediaId) || mediaId <= 0) return;
-      const found = findCachedMedia(qc, mediaId);
-      const mediaType = found?.mediaType ?? ((el.dataset.mediaType as MediaType) || "ANIME");
-      const target: ActionTarget = found
-        ? { kind: "entry", mediaId, mediaType, entry: factsOf(found.entry) }
-        : {
-            kind: "media",
-            mediaId,
-            mediaType,
-            listed: anyListCached(qc.getQueriesData<ListResult>({ queryKey: ["mediaList"] }))
-              ? "no"
-              : "unknown",
-            // Local mode's first add needs the media object, which the DOM's id cannot supply.
-            canAdd: mode === "anilist",
-          };
+    (el: HTMLElement | null, at: { x: number; y: number } | null, selection: string) => {
+      const media = el?.closest<HTMLElement>("[data-media-id]") ?? null;
+      const mediaId = media ? Number(media.dataset.mediaId) : Number.NaN;
+      const found = Number.isFinite(mediaId) ? findCachedMedia(qc, mediaId) : null;
+      const mediaType = found?.mediaType ?? ((media?.dataset.mediaType as MediaType) || "ANIME");
+      const target: ActionTarget = !media
+        ? { kind: "page" }
+        : found
+          ? { kind: "entry", mediaId, mediaType, entry: factsOf(found.entry) }
+          : {
+              kind: "media",
+              mediaId,
+              mediaType,
+              listed: anyListCached(qc.getQueriesData<ListResult>({ queryKey: ["mediaList"] }))
+                ? "no"
+                : "unknown",
+              // Local mode's first add needs the media object, which the DOM's id cannot supply.
+              canAdd: mode === "anilist",
+            };
       const actions = resolveActions(target, {
         signedIn,
         scoreFormat,
@@ -95,20 +102,22 @@ export default function ActionHost() {
           overridden: current?.overridden ?? false,
         },
         tauri: isTauri,
-        hasSelection: false,
-        // The sheet never draws the command group, so a sync it cannot show costs nothing to leave out.
-        canSync: false,
+        hasSelection: selection.length > 0,
+        canSync,
       });
       setOpen({
         target,
         actions,
         entry: found?.entry ?? null,
-        title: found ? displayTitle(found.entry.media.title) : (el.dataset.mediaTitle ?? null),
-        selection: "",
+        title: found
+          ? displayTitle(found.entry.media.title)
+          : (media?.dataset.mediaTitle ?? null),
+        selection,
         mediaType,
+        at,
       });
     },
-    [qc, mode, signedIn, scoreFormat, scrobble, current],
+    [qc, mode, signedIn, scoreFormat, scrobble, current, canSync],
   );
 
   // One listener set for the whole shell; a per-screen version would register once per mounted list.
@@ -144,7 +153,7 @@ export default function ActionHost() {
         clickTimer = window.setTimeout(() => {
           pendingClick = false;
         }, CLICK_SWALLOW_MS);
-        openFor(media);
+        openFor(media, null, "");
       }, LONG_PRESS_MS);
     };
 
@@ -170,6 +179,16 @@ export default function ActionHost() {
       e.stopPropagation();
     };
 
+    // The right-click path; the native menu stays for editable content, exactly as it always has.
+    const onMouseContext = (e: MouseEvent) => {
+      if (Date.now() - touchedAt.at <= SWALLOW_MS) return;
+      const el = e.target instanceof HTMLElement ? e.target : null;
+      if (el?.closest("input, textarea, [contenteditable='true']")) return;
+      e.preventDefault();
+      openFor(el, { x: e.clientX, y: e.clientY }, window.getSelection()?.toString().trim() ?? "");
+    };
+
+    window.addEventListener("contextmenu", onMouseContext);
     window.addEventListener("pointerdown", onDown);
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", cancel);
@@ -180,6 +199,7 @@ export default function ActionHost() {
     return () => {
       cancel();
       if (clickTimer !== null) window.clearTimeout(clickTimer);
+      window.removeEventListener("contextmenu", onMouseContext);
       window.removeEventListener("pointerdown", onDown);
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", cancel);
@@ -230,16 +250,28 @@ export default function ActionHost() {
   return (
     <>
       <Presence value={overlay === null ? open : null}>
-        {(shown, leaving) => (
-          <ActionSheet
-            leaving={leaving}
-            title={shown.title}
-            actions={shown.actions}
-            mediaType={shown.mediaType}
-            onRun={onRun}
-            onClose={() => setOpen(null)}
-          />
-        )}
+        {(shown, leaving) =>
+          shown.at ? (
+            <ContextMenu
+              leaving={leaving}
+              x={shown.at.x}
+              y={shown.at.y}
+              actions={shown.actions}
+              mediaType={shown.mediaType}
+              onRun={onRun}
+              onClose={() => setOpen(null)}
+            />
+          ) : (
+            <ActionSheet
+              leaving={leaving}
+              title={shown.title}
+              actions={shown.actions}
+              mediaType={shown.mediaType}
+              onRun={onRun}
+              onClose={() => setOpen(null)}
+            />
+          )
+        }
       </Presence>
 
       {open && editing && overlay === "edit" && (

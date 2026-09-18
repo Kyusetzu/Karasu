@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { CheckCheck, Pencil, Play, Plus } from "lucide-react";
 import { useLibrary } from "@/stores/library";
 import {
+  displayTitle,
   maxProgress,
   STATUS_ORDER,
   type MediaListEntry,
@@ -117,6 +118,7 @@ export const ListRow = memo(function ListRow({
     <div
       data-media-id={media.id}
       data-media-type={media.type}
+      data-media-title={displayTitle(media.title)}
       onClick={rowClick}
       className={cn(
         "grid items-center gap-x-2.5 border-b border-surface-950 px-3.5 py-2 transition-surface",

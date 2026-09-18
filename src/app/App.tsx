@@ -33,6 +33,7 @@ import GlobalKeys from "@/components/shell/GlobalKeys";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useViewTransitions } from "@/hooks/useViewTransitions";
 import ContextMenu from "@/components/shell/ContextMenu";
+import ActionHost from "@/components/shell/ActionHost";
 import SignInMerge from "@/components/overlays/SignInMerge";
 import Dashboard from "@/pages/Dashboard";
 import MediaList from "@/pages/MediaList";
@@ -160,6 +161,8 @@ export default function App() {
       <KeyboardSheet />
       <GlobalKeys />
       <ContextMenu />
+      {/* Keyed on the input, not the shell's width: a touchscreen laptop long-presses too. */}
+      <ActionHost />
       <SignInMerge />
       <PlaybackError />
       <Toast />

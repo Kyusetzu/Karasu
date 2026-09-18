@@ -200,6 +200,7 @@ export const de: typeof en = {
     settings: "Einstellungen",
   },
   actions: {
+    sheetLabel: "Aktionen",
     addToList: "Zur Liste hinzuf\u00fcgen",
     plusVolume: "+1 Band",
     changeStatus: "Status \u00e4ndern",

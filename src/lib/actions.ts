@@ -96,7 +96,8 @@ export type ActionTarget =
       mediaId: number;
       mediaType: MediaType;
       listed: "no" | "unknown";
-      editable: boolean;
+      /** A first add needs the media blob in local mode, which a menu has no way to supply. */
+      canAdd: boolean;
     }
   | { kind: "detection"; mediaId: number | null }
   /** The background: nothing was under the pointer. */
@@ -214,7 +215,7 @@ function entryActions(
 function mediaActions(target: Extract<ActionTarget, { kind: "media" }>): Action[] {
   const out: Action[] = [act("open", "item")];
   // Only where a list cache actually answered: "unknown" would offer to add a title that is already tracked.
-  if (target.listed === "no" && target.editable) out.push(act("addToList", "edit"));
+  if (target.listed === "no" && target.canAdd) out.push(act("addToList", "edit"));
   return out;
 }
 

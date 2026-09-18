@@ -202,12 +202,12 @@ describe("resolveActions, without an account", () => {
 });
 
 describe("resolveActions, a title that is not an entry", () => {
-  const media = (listed: "no" | "unknown", editable = true): ActionTarget => ({
+  const media = (listed: "no" | "unknown", canAdd = true): ActionTarget => ({
     kind: "media",
     mediaId: 7,
     mediaType: "ANIME",
     listed,
-    editable,
+    canAdd,
   });
 
   it("offers to add a title the list answered for and does not hold", () => {
@@ -218,7 +218,7 @@ describe("resolveActions, a title that is not an entry", () => {
     expect(ids(media("unknown"))).not.toContain("addToList");
   });
 
-  it("offers nothing to add when the editor cannot be seeded", () => {
+  it("offers nothing to add where a first add has no media blob to carry", () => {
     expect(ids(media("no", false))).not.toContain("addToList");
   });
 

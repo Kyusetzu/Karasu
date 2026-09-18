@@ -1,13 +1,17 @@
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import type { ListResult, MediaListEntry, MediaType } from "@/api/types";
 
-/** The list entry for a media id from whichever list cache holds it; a read and never a fetch, for a failed screen. */
-export function useCachedMedia(mediaId: number | undefined): {
+export interface CachedMedia {
   entry: MediaListEntry;
   mediaType: MediaType;
   userId: number;
-} | null {
-  const qc = useQueryClient();
+}
+
+/** The hook's body, callable from an event handler, where a right-click or a long press has no render to hang off. */
+export function findCachedMedia(
+  qc: QueryClient,
+  mediaId: number | undefined,
+): CachedMedia | null {
   if (!mediaId) return null;
 
   for (const [key, data] of qc.getQueriesData<ListResult>({
@@ -23,4 +27,9 @@ export function useCachedMedia(mediaId: number | undefined): {
     return { entry, mediaType, userId };
   }
   return null;
+}
+
+/** The list entry for a media id from whichever list cache holds it; a read and never a fetch, for a failed screen. */
+export function useCachedMedia(mediaId: number | undefined): CachedMedia | null {
+  return findCachedMedia(useQueryClient(), mediaId);
 }

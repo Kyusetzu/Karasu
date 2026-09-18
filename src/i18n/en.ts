@@ -198,6 +198,7 @@ export const en = {
     settings: "Settings",
   },
   actions: {
+    sheetLabel: "Actions",
     addToList: "Add to list",
     plusVolume: "+1 volume",
     changeStatus: "Change status",

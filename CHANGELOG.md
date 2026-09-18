@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 347fb97 -->
+<!-- generated-through: 56f1955 -->
 
 ### Fixed
 
@@ -107,6 +107,7 @@ tag time is then optional rather than load-bearing.
 - Exit cleanly when Windows ends the session; the quit panic was never the tray (1.10.4.621).
 - Every sync surface shares one lock, so a sync started elsewhere shows as running.
 - Pulling a screen down on the phone syncs, and Android drops the sync row (1.12.0.629).
+- Long-pressing a title on touch opens what can be done with it (1.13.0.631).
 ## 1.0.0 — 2026-09-05
 
 Karasu 1.0.0 is the first tagged release: a desktop and Android tracker built

@@ -74,6 +74,7 @@ export default function MediaCard({
       revealLabel={displayTitle(media.title)}
       data-media-id={media.id}
       data-media-type={media.type}
+      data-media-title={displayTitle(media.title)}
       actions={
         hasProfile && (
           <>

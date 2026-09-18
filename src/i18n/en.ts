@@ -1186,6 +1186,9 @@ export const en = {
     mdTruncated: "This profile is longer than Karasu shows — read the rest on AniList.",
   },
   nowPlaying: {
+    title: "Now playing",
+    collapse: "Collapse",
+    expand: "Expand",
     heading: "Now playing · {{process}}",
     headingManga: "Now reading · {{process}}",
     updateIn: "Progress will update in {{time}}",

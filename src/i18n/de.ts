@@ -1197,6 +1197,9 @@ export const de: typeof en = {
     mdTruncated: "Dieses Profil ist länger als Karasu anzeigt — lies den Rest auf AniList.",
   },
   nowPlaying: {
+    title: "Jetzt l\u00e4uft",
+    collapse: "Einklappen",
+    expand: "Ausklappen",
     heading: "Läuft gerade · {{process}}",
     headingManga: "Wird gelesen · {{process}}",
     updateIn: "Fortschritt wird in {{time}} aktualisiert",

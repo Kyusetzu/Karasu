@@ -32,14 +32,18 @@ export function pullOffset(raw: number): number {
   return PULL_MAX_PX * (1 - Math.exp(-raw / PULL_MAX_PX));
 }
 
+/** Declared to scroll, whether or not it currently has anything to scroll. */
+export function scrollsByStyle(overflowY: string): boolean {
+  return overflowY === "auto" || overflowY === "scroll";
+}
+
 /** An overflow that scrolls and content that overflows it; anything else is a container the gesture must look past. */
 export function isScrollableStyle(
   overflowY: string,
   scrollHeight: number,
   clientHeight: number,
 ): boolean {
-  if (overflowY !== "auto" && overflowY !== "scroll") return false;
-  return scrollHeight > clientHeight;
+  return scrollsByStyle(overflowY) && scrollHeight > clientHeight;
 }
 
 /** Tracking starts only at the very top, with one finger, and never while a sync is already running. */

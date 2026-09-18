@@ -163,14 +163,27 @@ export function canScrobbleCancel(phase: ScrobblePhase, forceable: boolean): boo
   return canScrobbleNow(phase, forceable) && phase !== "cancelled" && phase !== "blocked";
 }
 
+/** The one increment rule, so the row button, the menu and the sheet cannot answer it differently. */
+export function canAdvance(progress: number, max: number | null): boolean {
+  return max === null || progress < max;
+}
+
 /** True while another episode or chapter can be added; an unknown run length never blocks the increment. */
 export function canIncrementFacts(entry: EntryFacts): boolean {
-  return entry.max === null || entry.progress < entry.max;
+  return canAdvance(entry.progress, entry.max);
 }
 
 /** The manga-only volume axis, gated the same way and on its own maximum. */
 export function canIncrementVolumes(entry: EntryFacts): boolean {
-  return entry.maxVolumes === null || entry.progressVolumes < entry.maxVolumes;
+  return canAdvance(entry.progressVolumes, entry.maxVolumes);
+}
+
+/** What "completed" writes; an unknown run length sets no progress at all, rather than rewriting the current number. */
+export function completePatch(max: number | null): {
+  status: MediaListStatus;
+  progress?: number;
+} {
+  return { status: "COMPLETED", ...(max !== null ? { progress: max } : {}) };
 }
 
 const act = (id: ActionId, group: ActionGroup, extra: Partial<Action> = {}): Action => ({

@@ -57,7 +57,8 @@ export default function DetectionPopup() {
         compact ? "px-3 py-2" : "px-4.5 py-4",
         shown.leaving ? "animate-rise-out" : "animate-rise-in",
       )}
-      // A detection the pointer is over is a detection being read, so the target is named for a screen reader too.
+      // A landmark, not a dialog: `aria-label` on a generic element is ignored, and a region is reachable without focus.
+      role="region"
       aria-label={t("nowPlaying.title")}
     >
       {/* Its own element: the card's `animation` is spoken for by the entrance and exit. */}

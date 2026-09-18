@@ -19,6 +19,17 @@ function touch(type: string, y: number, count = 1): Event {
   return event;
 }
 
+/** A list screen with nothing in it: the container still scrolls by CSS, it just has nothing to scroll. */
+function emptyScroller(): HTMLElement {
+  const el = document.createElement("div");
+  el.style.overflowY = "auto";
+  Object.defineProperty(el, "scrollHeight", { value: 600, configurable: true });
+  Object.defineProperty(el, "clientHeight", { value: 600, configurable: true });
+  el.scrollTop = 0;
+  document.body.appendChild(el);
+  return el;
+}
+
 /** A scroller jsdom will agree is one: real layout never runs here, so both sizes are declared. */
 function scroller(scrollTop: number): HTMLElement {
   const el = document.createElement("div");
@@ -117,5 +128,19 @@ describe("usePullToSync", () => {
       el.dispatchEvent(touch("touchmove", FAR, 2));
     });
     expect(phase()).toBe("idle");
+  });
+});
+
+/** An empty or short list is exactly where someone reaches for pull-to-sync, and it is the case with nothing to scroll. */
+describe("usePullToSync on a list with nothing to scroll", () => {
+  it("still syncs from a screen whose content does not overflow", () => {
+    render(<Probe />);
+    const el = emptyScroller();
+    drag(el, FAR);
+    expect(phase()).toBe("ready");
+    act(() => {
+      el.dispatchEvent(touch("touchend", FAR, 0));
+    });
+    expect(hooks.sync).toHaveBeenCalledTimes(1);
   });
 });

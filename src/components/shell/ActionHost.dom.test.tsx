@@ -3,6 +3,7 @@ import { act } from "react";
 import { fireEvent, screen } from "@testing-library/react";
 import ActionHost from "./ActionHost";
 import { renderWithProviders, signIn, signOut } from "@/test/render";
+import { useNowPlaying } from "@/stores/nowPlaying";
 import type { ListResult, MediaListEntry } from "@/api/types";
 
 const saveListEntry = vi.hoisted(() => vi.fn(() => Promise.resolve({ queued: false })));
@@ -52,11 +53,11 @@ const LIST: ListResult = {
 };
 
 /** A card as the three emitters render it: an id, a type, and a title, and nothing about the entry's state. */
-function card(): HTMLElement {
+function card(id = "1", title = "Cowboy Bebop"): HTMLElement {
   const el = document.createElement("div");
-  el.dataset.mediaId = "1";
+  el.dataset.mediaId = id;
   el.dataset.mediaType = "ANIME";
-  el.dataset.mediaTitle = "Cowboy Bebop";
+  el.dataset.mediaTitle = title;
   document.body.appendChild(el);
   return el;
 }
@@ -86,6 +87,24 @@ afterEach(() => {
 });
 
 const hold = () => act(() => void vi.advanceTimersByTime(600));
+
+/** A detection event as the store receives one: a fresh object, so every reference to it changes. */
+function detectionEvent(): void {
+  act(() => {
+    useNowPlaying.setState({
+      scrobble: {
+        phase: "watching",
+        reason: null,
+        forceable: true,
+        mediaId: 1,
+        episode: 5,
+        updateAtMs: null,
+        armedAtMs: null,
+        yieldingTo: null,
+      },
+    });
+  });
+}
 
 describe("ActionHost long press", () => {
   it("opens the sheet for the pressed card after the hold", () => {
@@ -239,6 +258,72 @@ describe("ActionHost right click", () => {
     const el = card();
     press(el);
     right(el);
+    expect(screen.queryByRole("menu", { name: "ctx.menuLabel" })).toBeNull();
+  });
+});
+
+/** Detection events arrive from Rust at any moment, and they must not be able to undo a gesture in progress. */
+describe("ActionHost against background detection events", () => {
+  it("still fires a press that a detection event interrupted", () => {
+    mount();
+    press(card());
+    detectionEvent();
+    hold();
+    expect(screen.getByRole("dialog")).toBeTruthy();
+  });
+
+  it("still swallows the tap when a detection event lands between the press and the tap", () => {
+    mount();
+    const el = card();
+    const onClick = vi.fn();
+    el.addEventListener("click", onClick);
+    press(el);
+    hold();
+    detectionEvent();
+    fireEvent.pointerUp(window);
+    fireEvent.click(el);
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
+  it("keeps suppressing the native menu after a detection event", () => {
+    mount();
+    const el = card();
+    const onContext = vi.fn();
+    window.addEventListener("contextmenu", onContext);
+    press(el);
+    detectionEvent();
+    hold();
+    fireEvent.contextMenu(el);
+    window.removeEventListener("contextmenu", onContext);
+    expect(onContext).not.toHaveBeenCalled();
+  });
+});
+
+/** The editor seeds its fields once and sends `media.id` from its props, so re-targeting it writes to the wrong title. */
+describe("ActionHost overlay exclusivity", () => {
+  /** Through the mouse path only, so the touch suppression window cannot mask what is being tested. */
+  function openEditorByRightClick(): void {
+    fireEvent.contextMenu(card(), { clientX: 40, clientY: 40 });
+    fireEvent.click(screen.getByRole("menuitem", { name: "common.edit" }));
+  }
+
+  it("does not re-target an open editor from a right-click behind it", () => {
+    mount();
+    openEditorByRightClick();
+    expect(screen.getByRole("dialog", { name: "Cowboy Bebop" })).toBeTruthy();
+
+    fireEvent.contextMenu(card("2", "Trigun"), { clientX: 60, clientY: 60 });
+    expect(screen.getByRole("dialog", { name: "Cowboy Bebop" })).toBeTruthy();
+  });
+
+  it("does not open a menu over a dialog that owns the screen", () => {
+    mount();
+    openEditorByRightClick();
+    // Past the menu's own exit animation, or the retained leaving node answers instead of the one being asserted about.
+    act(() => void vi.advanceTimersByTime(300));
+    expect(screen.queryByRole("menu", { name: "ctx.menuLabel" })).toBeNull();
+
+    fireEvent.contextMenu(card("2", "Trigun"), { clientX: 60, clientY: 60 });
     expect(screen.queryByRole("menu", { name: "ctx.menuLabel" })).toBeNull();
   });
 });

@@ -3,8 +3,10 @@ import {
   ACTION_GROUP_ORDER,
   ACTION_LABEL_KEY,
   STATUSES,
+  canAdvance,
   canIncrementFacts,
   canIncrementVolumes,
+  completePatch,
   canScrobbleCancel,
   canScrobbleNow,
   resolveActions,
@@ -103,7 +105,25 @@ describe("scoreLeaves", () => {
   });
 });
 
+describe("completePatch", () => {
+  /** The row button and the menu used to disagree here, which showed as a different receipt for the same action. */
+  it("sets the final episode where the run length is known", () => {
+    expect(completePatch(12)).toEqual({ status: "COMPLETED", progress: 12 });
+  });
+
+  it("writes no progress at all where it is unknown, rather than rewriting the current number", () => {
+    expect(completePatch(null)).toEqual({ status: "COMPLETED" });
+    expect("progress" in completePatch(null)).toBe(false);
+  });
+});
+
 describe("increment guards", () => {
+  it("is one rule, whichever axis or shape asks it", () => {
+    expect(canAdvance(3, 12)).toBe(true);
+    expect(canAdvance(12, 12)).toBe(false);
+    expect(canAdvance(999, null)).toBe(true);
+  });
+
   it("stops at the last episode and runs on when the length is unknown", () => {
     expect(canIncrementFacts({ ...FACTS, progress: 12 })).toBe(false);
     expect(canIncrementFacts({ ...FACTS, progress: 999, max: null })).toBe(true);

@@ -4,6 +4,7 @@ import { isSyncing } from "@/lib/syncLock";
 import {
   PULL_IDLE,
   isScrollableStyle,
+  scrollsByStyle,
   pullBegin,
   pullEnd,
   pullMove,
@@ -15,12 +16,16 @@ import {
 /** The element that actually scrolls under the finger — `#main` on most routes, a page's own div on the rest. */
 function scrollerOf(node: EventTarget | null): HTMLElement | null {
   let el = node instanceof HTMLElement ? node : null;
+  // An empty or short list scrolls nothing, and that is exactly where someone reaches for the gesture.
+  let declared: HTMLElement | null = null;
   while (el) {
     const style = getComputedStyle(el);
     if (isScrollableStyle(style.overflowY, el.scrollHeight, el.clientHeight)) return el;
+    if (!declared && scrollsByStyle(style.overflowY)) declared = el;
     el = el.parentElement;
   }
-  return null;
+  // Only once nothing on the path overflows: with nothing scrollable above it, the finger is necessarily at the top.
+  return declared;
 }
 
 /** One listener set on the document for the whole shell, rather than one per screen that mounts a list. */

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Presence } from "@/components/ui/presence";
@@ -72,8 +72,13 @@ export default function ActionHost() {
   const editing = open?.entry ?? null;
   const list = useListMutations(viewer?.id ?? 0, open?.mediaType ?? "ANIME");
 
+  // Read through a ref, not captured: detection events land at any moment, and they must not re-register the listeners.
+  const live = useRef({ mode, signedIn, scoreFormat, scrobble, current, canSync });
+  live.current = { mode, signedIn, scoreFormat, scrobble, current, canSync };
+
   const openFor = useCallback(
     (el: HTMLElement | null, at: { x: number; y: number } | null, selection: string) => {
+      const ctx = live.current;
       const media = el?.closest<HTMLElement>("[data-media-id]") ?? null;
       const mediaId = media ? Number(media.dataset.mediaId) : Number.NaN;
       const found = Number.isFinite(mediaId) ? findCachedMedia(qc, mediaId) : null;
@@ -90,20 +95,20 @@ export default function ActionHost() {
                 ? "no"
                 : "unknown",
               // Local mode's first add needs the media object, which the DOM's id cannot supply.
-              canAdd: mode === "anilist",
+              canAdd: ctx.mode === "anilist",
             };
       const actions = resolveActions(target, {
-        signedIn,
-        scoreFormat,
+        signedIn: ctx.signedIn,
+        scoreFormat: ctx.scoreFormat,
         scrobble: {
-          phase: scrobble.phase,
-          forceable: scrobble.forceable,
-          hasCurrent: current !== null,
-          overridden: current?.overridden ?? false,
+          phase: ctx.scrobble.phase,
+          forceable: ctx.scrobble.forceable,
+          hasCurrent: ctx.current !== null,
+          overridden: ctx.current?.overridden ?? false,
         },
         tauri: isTauri,
         hasSelection: selection.length > 0,
-        canSync,
+        canSync: ctx.canSync,
       });
       setOpen({
         target,
@@ -117,7 +122,8 @@ export default function ActionHost() {
         at,
       });
     },
-    [qc, mode, signedIn, scoreFormat, scrobble, current, canSync],
+    // Only the query client; everything else is read live, so the gesture listeners below register exactly once.
+    [qc],
   );
 
   // One listener set for the whole shell; a per-screen version would register once per mounted list.
@@ -182,6 +188,8 @@ export default function ActionHost() {
     // The right-click path; the native menu stays for editable content, exactly as it always has.
     const onMouseContext = (e: MouseEvent) => {
       if (Date.now() - touchedAt.at <= SWALLOW_MS) return;
+      // A dialog owns the screen while it is up, and re-targeting the host behind it would take the editor with it.
+      if (document.querySelector("[data-overlay]")) return;
       const el = e.target instanceof HTMLElement ? e.target : null;
       if (el?.closest("input, textarea, [contenteditable='true']")) return;
       e.preventDefault();

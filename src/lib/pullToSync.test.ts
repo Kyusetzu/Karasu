@@ -5,6 +5,7 @@ import {
   PULL_SLOP_PX,
   PULL_TRIGGER_PX,
   isScrollableStyle,
+  scrollsByStyle,
   pullBegin,
   pullEnd,
   pullMove,
@@ -67,6 +68,18 @@ describe("isScrollableStyle", () => {
   it("refuses overflow values that do not scroll", () => {
     expect(isScrollableStyle("hidden", 900, 600)).toBe(false);
     expect(isScrollableStyle("visible", 900, 600)).toBe(false);
+  });
+});
+
+describe("scrollsByStyle", () => {
+  it("separates what is declared to scroll from what currently does", () => {
+    expect(scrollsByStyle("auto")).toBe(true);
+    expect(scrollsByStyle("scroll")).toBe(true);
+    expect(scrollsByStyle("hidden")).toBe(false);
+    expect(scrollsByStyle("visible")).toBe(false);
+    // The point of the split: a short list scrolls nothing and is still the element the gesture belongs to.
+    expect(isScrollableStyle("auto", 600, 600)).toBe(false);
+    expect(scrollsByStyle("auto")).toBe(true);
   });
 });
 

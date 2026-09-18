@@ -147,8 +147,9 @@ export default function ContextMenu({
         ? "origin-top-right"
         : "origin-top-left";
 
-  // The flyout opens right unless the window has no room for a second panel, and carries its own top clamp.
-  const subLeft = left + width + window.scrollX > window.innerWidth - gap ? left - width : left + width;
+  // Room for a whole second panel, not just for its left edge: the edge test hung the flyout off the right of the window.
+  const roomRight = window.innerWidth - gap - (left + width);
+  const subLeft = roomRight >= width ? left + width : Math.max(gap, left - width);
   const subTop = (index: number): number => {
     const above = actions.slice(0, index).filter((_, i) => dividesAt(actions, i)).length;
     const offset = (index * MENU_ROW_H_REM + above * MENU_SEP_REM) * rem;

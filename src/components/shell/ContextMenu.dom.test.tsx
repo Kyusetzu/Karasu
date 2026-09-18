@@ -120,6 +120,29 @@ describe("ContextMenu", () => {
     expect(top + (6 * 1.875 + 2 * 0.5) * 16).toBeLessThanOrEqual(320);
   });
 
+  /** The root menu's clamp was asserted from the start; the flyout's own was not, and it is a second panel wide. */
+  it("keeps a submenu inside the viewport instead of hanging it off the right edge", () => {
+    window.innerWidth = 900;
+    window.innerHeight = 700;
+    menu(500, 100);
+    fireEvent.click(within(root()).getByRole("menuitem", { name: /actions\.changeStatus/ }));
+    const panels = screen.getAllByRole("menu");
+    const flyout = panels[panels.length - 1];
+    const left = parseFloat((flyout as HTMLElement).style.left);
+    expect(left).toBeGreaterThanOrEqual(0);
+    expect(left + 13.75 * 16).toBeLessThanOrEqual(900);
+  });
+
+  it("keeps a submenu on screen in a window too narrow for either side", () => {
+    window.innerWidth = 380;
+    window.innerHeight = 700;
+    menu(20, 100);
+    fireEvent.click(within(root()).getByRole("menuitem", { name: /actions\.changeStatus/ }));
+    const panels = screen.getAllByRole("menu");
+    const flyout = panels[panels.length - 1];
+    expect(parseFloat((flyout as HTMLElement).style.left)).toBeGreaterThanOrEqual(0);
+  });
+
   it("owns the keyboard while it is up", () => {
     menu();
     expect(document.querySelector("[data-overlay]")).not.toBeNull();

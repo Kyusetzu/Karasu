@@ -54,6 +54,12 @@ describe("DetectionPopup", () => {
     expect(screen.getByText(/common\.episode/)).toBeTruthy();
   });
 
+  it("is a named landmark, so a screen reader can reach it without it taking focus", () => {
+    playing(PLAYING);
+    renderWithProviders(<DetectionPopup />);
+    expect(screen.getByRole("region", { name: "nowPlaying.title" })).toBeTruthy();
+  });
+
   /** It arrives unprompted, so it must not take the keyboard away from whatever the user was doing. */
   it("is not an overlay and steals no focus", () => {
     playing(PLAYING);

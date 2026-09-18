@@ -6,7 +6,7 @@ import { useListMutations } from "@/hooks/useListMutations";
 import { useManualSync } from "@/hooks/useManualSync";
 import { clearDetectionOverride, scrobbleCancel, scrobbleNow, useNowPlaying } from "@/stores/nowPlaying";
 import { loadDefaultAddStatus } from "@/lib/defaultAddStatus";
-import type { Action, ActionTarget } from "@/lib/actions";
+import { completePatch, type Action, type ActionTarget } from "@/lib/actions";
 import type { MediaListEntry, MediaType } from "@/api/types";
 
 /** An action the runner cannot finish alone; the host renders the dialog, so nothing here has to hold overlay state. */
@@ -85,8 +85,7 @@ export function useActionRunner(): (input: ActionRunInput) => ActionEffect {
           if (target.kind === "entry") {
             save(target.mediaType).mutate({
               mediaId: target.mediaId,
-              status: "COMPLETED",
-              progress: target.entry.max ?? target.entry.progress,
+              ...completePatch(target.entry.max),
             });
           }
           return done;

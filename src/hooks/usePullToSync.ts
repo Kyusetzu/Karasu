@@ -32,12 +32,16 @@ export function usePullToSync(): {
   const { sync, syncing, available } = useManualSync();
   const [state, setState] = useState<PullState>(PULL_IDLE);
   const scroller = useRef<HTMLElement | null>(null);
-  // The listeners are registered once and read the live state through a ref, the shape `useGridRoving` established.
-  const live = useRef(state);
-  live.current = state;
+  // The ref is the gesture's state and the React copy only draws it; a render between two moves is not something to wait on.
+  const live = useRef<PullState>(PULL_IDLE);
 
   useEffect(() => {
     if (!available) return;
+
+    const apply = (next: PullState) => {
+      live.current = next;
+      setState(next);
+    };
 
     const onStart = (e: TouchEvent) => {
       // A dialog owns the gesture surface while it is up, the same stand-down every screen-level handler makes.
@@ -49,7 +53,7 @@ export function usePullToSync(): {
       scroller.current = el;
       const touch = e.touches[0];
       if (!touch) return;
-      setState(
+      apply(
         pullBegin({
           y: touch.clientY,
           scrollTop: el.scrollTop,
@@ -71,13 +75,13 @@ export function usePullToSync(): {
       });
       // Once the pull is ours the browser must not scroll as well; this is why `touchmove` is registered non-passive.
       if (next.phase === "pulling" || next.phase === "ready") e.preventDefault();
-      setState(next);
+      apply(next);
     };
 
     const onEnd = () => {
       const { next, sync: fire } = pullEnd(live.current);
       scroller.current = null;
-      setState(next);
+      apply(next);
       if (fire) void sync();
     };
 

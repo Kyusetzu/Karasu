@@ -49,7 +49,7 @@ export const en = {
   pull: {
     hint: "Pull to sync",
     release: "Release to sync",
-    syncing: "Syncing \u2026",
+    syncing: "Syncing …",
   },
   syncPanel: {
     title: "Sync",

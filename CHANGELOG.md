@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 12b2b0a -->
+<!-- generated-through: 18b9f76 -->
 
 ### Fixed
 
@@ -83,6 +83,7 @@ tag time is then optional rather than load-bearing.
 - The now-playing ring no longer restarts on a card mounted mid-session (1.10.3.620).
 - An AniList profile link that carries the user's id, as the Statistics header's does, opens the profile in-app instead of "No such user".
 - Reading notifications one by one now clears the bell's badge, and "Mark all read" is always available.
+- A pull-to-sync gesture could fail to arm when two touch events arrived in the same frame.
 
 ### Added
 

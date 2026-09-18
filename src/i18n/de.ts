@@ -51,7 +51,7 @@ export const de: typeof en = {
   pull: {
     hint: "Zum Synchronisieren ziehen",
     release: "Loslassen zum Synchronisieren",
-    syncing: "Wird synchronisiert \u2026",
+    syncing: "Wird synchronisiert …",
   },
   syncPanel: {
     title: "Synchronisierung",
@@ -201,14 +201,14 @@ export const de: typeof en = {
   },
   actions: {
     sheetLabel: "Aktionen",
-    addToList: "Zur Liste hinzuf\u00fcgen",
+    addToList: "Zur Liste hinzufügen",
     plusVolume: "+1 Band",
-    changeStatus: "Status \u00e4ndern",
-    changeScore: "Bewertung \u00e4ndern",
+    changeStatus: "Status ändern",
+    changeScore: "Bewertung ändern",
     remove: "Von der Liste entfernen",
     scrobbleNow: "Fortschritt jetzt aktualisieren",
     scrobbleCancel: "Diesen nicht aktualisieren",
-    fixMatch: "Richtigen Titel w\u00e4hlen",
+    fixMatch: "Richtigen Titel wählen",
     clearOverride: "Korrektur verwerfen",
   },
   notFound: {
@@ -1197,7 +1197,7 @@ export const de: typeof en = {
     mdTruncated: "Dieses Profil ist länger als Karasu anzeigt — lies den Rest auf AniList.",
   },
   nowPlaying: {
-    title: "Jetzt l\u00e4uft",
+    title: "Jetzt läuft",
     collapse: "Einklappen",
     expand: "Ausklappen",
     heading: "Läuft gerade · {{process}}",

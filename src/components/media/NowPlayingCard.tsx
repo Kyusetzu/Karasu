@@ -21,6 +21,7 @@ import MatchPicker from "@/components/overlays/MatchPicker";
 import { cn } from "@/lib/utils";
 import { countdownFraction, ringOffset, splitRemaining } from "@/lib/countdown";
 import { usePresentValue } from "@/hooks/usePresence";
+import { canScrobbleCancel, canScrobbleNow } from "@/lib/actions";
 
 /** Countdown text and ring fraction; both ends come from the backend, so a mid-session mount draws where the text says. */
 function useCountdown(wait: {
@@ -346,15 +347,9 @@ function ScrobbleActions({ playing }: { playing: NowPlaying }) {
     }
   };
 
-  const canScrobble =
-    (scrobble.phase === "pending" ||
-      scrobble.phase === "watching" ||
-      // "Now" forces straight through a yield: the wait is a courtesy to the other device, not a rule.
-      scrobble.phase === "yielding" ||
-      scrobble.phase === "cancelled" ||
-      scrobble.phase === "blocked") &&
-    // A block Rust will refuse anyway must not be offered; forcing over a gap and retrying a failure still are.
-    (scrobble.phase !== "blocked" || scrobble.forceable);
+  // The phase table lives in `lib/actions`, where the context menu and the long-press sheet read the same answer.
+  const canScrobble = canScrobbleNow(scrobble.phase, scrobble.forceable);
+  const canSkip = canScrobbleCancel(scrobble.phase, scrobble.forceable);
 
   return (
     <>
@@ -370,7 +365,7 @@ function ScrobbleActions({ playing }: { playing: NowPlaying }) {
             >
               <Check className="size-3.5" /> {t("nowPlaying.updateNow")}
             </Button>
-            {scrobble.phase !== "cancelled" && scrobble.phase !== "blocked" && (
+            {canSkip && (
               <Button
                 size="sm"
                 variant="secondary"

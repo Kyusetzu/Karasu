@@ -197,6 +197,17 @@ export const en = {
     palette: "Command palette",
     settings: "Settings",
   },
+  actions: {
+    addToList: "Add to list",
+    plusVolume: "+1 volume",
+    changeStatus: "Change status",
+    changeScore: "Change score",
+    remove: "Remove from list",
+    scrobbleNow: "Update progress now",
+    scrobbleCancel: "Don't update this one",
+    fixMatch: "Pick the right title",
+    clearOverride: "Forget this correction",
+  },
   notFound: {
     title: "Nothing lives here",
     body: "That address does not match any screen in Karasu. If you got here after an update, the page may have been renamed.",

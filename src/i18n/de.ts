@@ -199,6 +199,17 @@ export const de: typeof en = {
     palette: "Befehlspalette",
     settings: "Einstellungen",
   },
+  actions: {
+    addToList: "Zur Liste hinzuf\u00fcgen",
+    plusVolume: "+1 Band",
+    changeStatus: "Status \u00e4ndern",
+    changeScore: "Bewertung \u00e4ndern",
+    remove: "Von der Liste entfernen",
+    scrobbleNow: "Fortschritt jetzt aktualisieren",
+    scrobbleCancel: "Diesen nicht aktualisieren",
+    fixMatch: "Richtigen Titel w\u00e4hlen",
+    clearOverride: "Korrektur verwerfen",
+  },
   notFound: {
     title: "Hier ist nichts",
     body: "Diese Adresse gehört zu keinem Bereich in Karasu. Falls du nach einem Update hier gelandet bist, wurde die Seite vielleicht umbenannt.",

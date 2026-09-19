@@ -1219,6 +1219,12 @@ export const en = {
     yielding:
       "Karasu on {{device}} is tracking this too and goes first — updating here in {{time}} if it hasn't.",
     idle: "Watching for players — nothing playing",
+    seasonEpisode: "S{{s}} · E{{n}}",
+    episodeShort: "E{{n}}",
+    chapterShort: "Ch. {{n}}",
+    episodesShort: "{{n}} ep.",
+    chaptersShort: "{{n}} ch.",
+    dragHint: "Drag to move · double-click to dock",
   },
   settings: {
     pane_anilist: "AniList account",

@@ -1230,6 +1230,12 @@ export const de: typeof en = {
     yielding:
       "Karasu auf {{device}} erfasst das ebenfalls und hat Vorrang – hier wird in {{time}} aktualisiert, falls es dort nicht passiert.",
     idle: "Warte auf Player – nichts läuft",
+    seasonEpisode: "S{{s}} · E{{n}}",
+    episodeShort: "E{{n}}",
+    chapterShort: "Kap. {{n}}",
+    episodesShort: "{{n}} Ep.",
+    chaptersShort: "{{n}} Kap.",
+    dragHint: "Ziehen zum Verschieben · Doppelklick dockt an",
   },
   settings: {
     pane_anilist: "AniList-Konto",

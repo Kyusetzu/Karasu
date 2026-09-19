@@ -478,6 +478,11 @@ no autofocus, `z-30` under every real overlay — detection arrives unprompted
 and must not take the keyboard from whatever is being done. There is still one
 detection and one `DetectionSurface`; the popup only chooses how much of it to
 draw.
+On desktop it is a window: the header drags it anywhere and either edge
+changes its width, both remembered per machine by `lib/detectionLayout`
+(`karasu-detection-layout`); the phone keeps the dock above its bottom bar.
+The cover and the meta line come from the list cache, and for a title off
+the list from one allowlisted `mediaByIds` request (`useDetectionMedia`).
 
 ## Versioning (every commit)
 

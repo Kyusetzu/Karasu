@@ -15,6 +15,12 @@ import { useAuth } from "@/stores/auth";
 import { Button } from "@/components/ui/button";
 import { Presence } from "@/components/ui/presence";
 import MatchPicker from "@/components/overlays/MatchPicker";
+import { DecodedImage } from "@/components/media/DecodedImage";
+import type { Media } from "@/api/types";
+import { useContentFilter } from "@/stores/contentFilter";
+import { shouldBlur } from "@/lib/contentFilter";
+import { formatLabel } from "@/lib/format";
+import { episodeLabel, joinMeta, metaParts, nativeLine } from "@/lib/detectionIdentity";
 import { cn } from "@/lib/utils";
 import { countdownFraction, ringOffset, splitRemaining } from "@/lib/countdown";
 import { canScrobbleCancel, canScrobbleNow } from "@/lib/actions";
@@ -67,13 +73,43 @@ const RING_C = 2 * Math.PI * RING_R;
 /** How much of the detection is drawn; compact keeps only what says a detection exists and where it has got to. */
 export type DetectionVariant = "expanded" | "compact";
 
+/** The countdown drawn as a closing ring, only while counting down: a static full ring would read as pending. */
+function CountdownRing({ fraction, className }: { fraction: number; className: string }) {
+  return (
+    <svg className={cn("absolute inset-0 -rotate-90", className)} viewBox="0 0 44 44" aria-hidden>
+      <circle
+        cx="22"
+        cy="22"
+        r={RING_R}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeDasharray={RING_C}
+        strokeDashoffset={ringOffset(fraction, RING_C)}
+        // A plain transition, so the reduce-motion rules reach it and the ring only stops sliding.
+        style={{ transition: "stroke-dashoffset 1s linear" }}
+      />
+    </svg>
+  );
+}
+
+/** The source's kind at a glance: a reader, a browser tab or a player window. */
+function KindIcon({ playing, className }: { playing: NowPlaying; className: string }) {
+  if (playing.mediaType === "MANGA") return <BookOpen className={className} />;
+  return playing.streaming ? <Tv className={className} /> : <MonitorPlay className={className} />;
+}
+
 /** What the detector sees now, plus the scrobble state and its actions; the wrapper and the animation belong to callers. */
 export default function DetectionSurface({
   playing,
   variant = "expanded",
+  media = null,
 }: {
   playing: NowPlaying;
   variant?: DetectionVariant;
+  /** The matched entry's media, for the cover and the meta line; null draws the placeholder. */
+  media?: Media | null;
 }) {
   const scrobble = useNowPlaying((s) => s.scrobble);
   const countdown = useCountdown(
@@ -85,87 +121,111 @@ export default function DetectionSurface({
       : { armedAtMs: null, updateAtMs: null },
   );
   const { t } = useTranslation();
+  const level = useContentFilter((s) => s.level);
+  const blurAdult = useContentFilter((s) => s.blurAdult);
 
   const title = playing.matchedTitle ?? playing.parsedTitle;
-  const isManga = playing.mediaType === "MANGA";
   const compact = variant === "compact";
+  const ringing = scrobble.phase === "watching" && countdown.label !== null;
+  const label = episodeLabel(playing);
+  const labelText =
+    label === null
+      ? null
+      : label.kind === "seasonEpisode"
+        ? t("nowPlaying.seasonEpisode", { s: label.season, n: label.episode })
+        : label.kind === "episode"
+          ? t("nowPlaying.episodeShort", { n: label.episode })
+          : t("nowPlaying.chapterShort", { n: label.chapter });
+  const native = nativeLine(media?.title, title);
+  const meta = metaParts(media, playing.mediaType);
+  const metaText = meta
+    ? joinMeta([
+        formatLabel(meta.format, t),
+        meta.seasonYear
+          ? meta.season
+            ? `${t(`season.${meta.season}`, { defaultValue: meta.season })} ${meta.seasonYear}`
+            : String(meta.seasonYear)
+          : null,
+        meta.total === null
+          ? null
+          : meta.total.kind === "episodes"
+            ? t("nowPlaying.episodesShort", { n: meta.total.n })
+            : t("nowPlaying.chaptersShort", { n: meta.total.n }),
+      ])
+    : "";
+  const cover = media?.coverImage.large ?? null;
+  const veiled = media ? shouldBlur(media, level, blurAdult) : false;
+
+  const titleNode = playing.mediaId ? (
+    <Link to={`/media/${playing.mediaId}`} className="hover:underline">
+      {title}
+    </Link>
+  ) : (
+    title
+  );
+
+  if (compact) {
+    return (
+      <div className="relative flex items-center gap-2.5">
+        <span className="relative grid size-8 shrink-0 place-items-center rounded-full bg-accent-600/25 text-accent-400">
+          {ringing && <CountdownRing fraction={countdown.fraction} className="size-8" />}
+          <KindIcon playing={playing} className="size-4" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[.8125rem] font-semibold text-ink-100">
+            {titleNode}
+            {labelText && <span className="font-medium text-ink-500"> · {labelText}</span>}
+          </p>
+          <div key={scrobble.phase} className="animate-fade-in">
+            <ScrobbleStatus countdown={countdown.label} compact />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative">
-      <div className={cn("relative flex items-center", compact ? "gap-2.5" : "gap-4")}>
-        <span
-          className={cn(
-            "relative grid shrink-0 place-items-center rounded-full bg-accent-600/25 text-accent-400",
-            compact ? "h-8 w-8" : "h-11 w-11",
-          )}
-        >
-          {/* The wait drawn as a closing ring, and only while counting down: a static full ring reads as pending. */}
-          {scrobble.phase === "watching" && countdown.label && (
-            <svg
-              className={cn("absolute inset-0 -rotate-90", compact ? "size-8" : "size-11")}
-              viewBox="0 0 44 44"
-              aria-hidden
-            >
-              <circle
-                cx="22"
-                cy="22"
-                r={RING_R}
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeDasharray={RING_C}
-                strokeDashoffset={ringOffset(countdown.fraction, RING_C)}
-                // A plain transition, so the reduce-motion rules reach it and the ring only stops sliding.
-                style={{ transition: "stroke-dashoffset 1s linear" }}
+      <div className="flex gap-3">
+        <div className="relative h-21 w-14 shrink-0">
+          <div className="h-full w-full overflow-hidden rounded-md bg-surface-800">
+            {cover ? (
+              <DecodedImage
+                src={cover}
+                className={cn("h-full w-full object-cover", veiled && "scale-105 blur-xl")}
               />
-            </svg>
-          )}
-          {isManga ? (
-            <BookOpen className={compact ? "size-4" : "size-5"} />
-          ) : playing.streaming ? (
-            <Tv className={compact ? "size-4" : "size-5"} />
-          ) : (
-            <MonitorPlay className={compact ? "size-4" : "size-5"} />
-          )}
-        </span>
-        <div className="min-w-0 flex-1">
-          {!compact && (
-            <p className="text-2xs font-medium uppercase tracking-[.09em] text-accent-400">
-              {t(isManga ? "nowPlaying.headingManga" : "nowPlaying.heading", {
-                process: playing.process.replace(".exe", ""),
-              })}
-            </p>
-          )}
-          <p
-            className={cn(
-              "truncate font-semibold text-ink-100",
-              compact ? "text-[.8125rem]" : "text-[1.0625rem]",
-            )}
-          >
-            {playing.mediaId ? (
-              <Link to={`/media/${playing.mediaId}`} className="hover:underline">
-                {title}
-              </Link>
             ) : (
-              title
-            )}
-            {playing.episode !== null && (
-              <span className="font-medium text-ink-500">
-                {" "}
-                —{" "}
-                {t(isManga ? "common.chapter" : "common.episode", {
-                  n: playing.episode,
-                })}
+              <span className="grid h-full place-items-center text-ink-600">
+                <KindIcon playing={playing} className="size-5" />
               </span>
             )}
-          </p>
+          </div>
+          {/* The ring sits on the cover's corner, where the icon disc used to be the whole picture. */}
+          <span className="absolute -bottom-1.5 -right-1.5 grid size-7 place-items-center rounded-full bg-surface-900 text-accent-400 ring-2 ring-surface-900">
+            {ringing && <CountdownRing fraction={countdown.fraction} className="size-7" />}
+            <KindIcon playing={playing} className="size-3.5" />
+          </span>
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[.9375rem] font-semibold text-ink-100">{titleNode}</p>
+          {native && <p className="truncate font-brand-jp text-2xs text-ink-600">{native}</p>}
+          {(labelText || playing.episodeTitle) && (
+            <p className="truncate text-xs text-ink-300">
+              {labelText && <span className="font-medium tabular-nums text-ink-200">{labelText}</span>}
+              {labelText && playing.episodeTitle && " · "}
+              {playing.episodeTitle}
+            </p>
+          )}
+          {metaText && <p className="truncate text-2xs text-ink-500">{metaText}</p>}
           {/* Keyed on the phase so each state fades in; a silent text swap is easy to miss while looking at it. */}
-          <div key={scrobble.phase} className="animate-fade-in">
-            <ScrobbleStatus countdown={countdown.label} compact={compact} />
+          <div key={scrobble.phase} className="mt-1 animate-fade-in">
+            <ScrobbleStatus countdown={countdown.label} compact={false} />
           </div>
         </div>
-        {!compact && <ScrobbleActions playing={playing} />}
+      </div>
+      {/* Its own row: the cover took the width the buttons used to share with the title. */}
+      <div className="mt-2.5 flex justify-end">
+        <ScrobbleActions playing={playing} />
       </div>
     </div>
   );

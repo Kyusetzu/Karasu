@@ -218,8 +218,8 @@ export default function App() {
       </div>
       {/* The touch shell's sync affordance; the sidebar's button serves the mouse one, so it is width-keyed. */}
       {phone && <PullToSync />}
-      {/* One bottom-right stack: both float, and separately anchored they would sit on top of each other. */}
-      <div className="pointer-events-none fixed bottom-[calc(1rem+var(--shell-bottom,0px))] right-4 z-30 flex w-88 max-w-[calc(100vw-2rem)] flex-col items-stretch gap-2">
+      {/* One bottom-right stack for both while they float here; the popup leaves it on its own once dragged. */}
+      <div className="pointer-events-none fixed bottom-[calc(1rem+var(--shell-bottom,0px))] right-4 z-30 flex max-w-[calc(100vw-2rem)] flex-col items-end gap-2">
         <PlaybackError />
         <DetectionPopup />
       </div>
@@ -282,7 +282,7 @@ function PlaybackError() {
 
   if (!error) return null;
   return (
-    <div className="pointer-events-auto flex items-start gap-3 rounded-lg border border-surface-700 bg-surface-850 px-4 py-3 shadow-xl">
+    <div className="pointer-events-auto flex w-88 max-w-full items-start gap-3 rounded-lg border border-surface-700 bg-surface-850 px-4 py-3 shadow-xl">
       <span className="text-sm text-ink-300">{error}</span>
       <button
         onClick={clearError}

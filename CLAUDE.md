@@ -600,12 +600,18 @@ that, `--print` just reports the current version.
 
 **`npm run verify`** is `scripts/verify.mjs`, the whole gate and what CI runs,
 so the two cannot drift. Typecheck and the comment audit go first and stop the
-run on a failure; then vitest and `cargo test` run at the same time, cargo's
-output held back until it ends so the two never interleave, and a timing table
-closes the run. `verify:frontend` and `verify:rust` are the halves, for the
-commit that touched only one; `lint:rust` is clippy with warnings denied, which
-CI runs on the Linux job without blocking on it. Run it bare and read the exit
-code — see the note below on piping.
+run on a failure; then vitest and `cargo test` run at the same time. Every
+phase is captured, and a green run prints one line per phase — counts, seconds,
+any compiler warning — and nothing else, which is the point: the loop runs
+many times a day and its output is read by an agent. A failed phase prints its
+failure section (vitest's "Failed Tests", cargo's "failures:") and only that;
+`--verbose` streams everything as the tools print it. `verify:frontend` and
+`verify:rust` are the halves, for the commit that touched only one;
+`lint:rust` is clippy with warnings denied, which CI runs on the Linux job
+without blocking on it. Run it bare and read the exit code — see the note
+below on piping. The same rule holds for every script the loop runs:
+`bump-version` prints the version, `changelog` one line, `comment-audit` one
+line when clean and the offending lines when not.
 
 **`scripts/changelog.mjs`** runs *after* the commit, because it reads it —
 which is also why the loop above ends the way it does. Folding the generated
@@ -684,7 +690,11 @@ pure; a node test that needs a fresh module must say so with a `.dom.` name or
 `vi.resetModules`. A `slowTestThreshold` of 300 ms marks the tests to look at.
 The dom setup stubs `ResizeObserver` and `matchMedia` (desktop-shaped), mocks
 `react-i18next` (a key back, never the English copy), the opener and event
-plugins; a test that wants `isTauri` true mocks `@/api/anilist` itself.
+plugins; a test that wants `isTauri` true mocks `@/api/anilist` itself. Import
+`act` from `@testing-library/react`, never from `react`: Testing Library's
+copy raises the act environment flag around the call, React's own prints a
+warning per update, and the flag must not be set globally — with it on, every
+async update the real code makes after an await warns instead.
 
 ### Notes that have cost real time
 

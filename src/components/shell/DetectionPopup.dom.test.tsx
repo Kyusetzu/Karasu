@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { act } from "react";
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import DetectionPopup from "./DetectionPopup";
 import { renderWithProviders, signIn, signOut } from "@/test/render";
 import { useNowPlaying, type NowPlaying } from "@/stores/nowPlaying";

@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act } from "react";
-import { fireEvent, screen } from "@testing-library/react";
+import { act, fireEvent, screen } from "@testing-library/react";
 import ActionHost from "./ActionHost";
 import PullToSync from "./PullToSync";
 import { renderWithProviders, signIn, signOut } from "@/test/render";

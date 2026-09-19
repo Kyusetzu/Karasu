@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
-import { act } from "react";
+import { act, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useNavigate } from "react-router";
 import { usePullToSync } from "./usePullToSync";
 import { PULL_SLOP_PX } from "@/lib/pullToSync";

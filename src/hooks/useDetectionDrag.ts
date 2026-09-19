@@ -28,32 +28,12 @@ type Gesture =
 /** Controls inside the handle keep their own press; a drag starts only on the handle's own surface. */
 const OWN_PRESS = "a, button, input, select, textarea";
 
-export interface PointerHandlers {
+export interface PressHandlers {
   onPointerDown?: (e: ReactPointerEvent<HTMLElement>) => void;
-  onPointerMove?: (e: ReactPointerEvent<HTMLElement>) => void;
-  onPointerUp?: (e: ReactPointerEvent<HTMLElement>) => void;
-  onPointerCancel?: (e: ReactPointerEvent<HTMLElement>) => void;
   onDoubleClick?: () => void;
 }
 
 const viewport = () => ({ width: window.innerWidth, height: window.innerHeight });
-
-/** jsdom has no pointer capture, and a browser that refuses it only loses tracking past the window's edge. */
-function capture(e: ReactPointerEvent<HTMLElement>): void {
-  try {
-    e.currentTarget.setPointerCapture(e.pointerId);
-  } catch {
-    // Nothing to do: the gesture still works while the pointer stays over the element.
-  }
-}
-
-function release(e: ReactPointerEvent<HTMLElement>): void {
-  try {
-    if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
-  } catch {
-    // Same reason as in `capture`.
-  }
-}
 
 /** Moves and widens the floating card with the arithmetic in `lib/detectionLayout`; disabled, it binds nothing at all. */
 export function useDetectionDrag(card: RefObject<HTMLElement | null>, enabled: boolean) {
@@ -63,7 +43,7 @@ export function useDetectionDrag(card: RefObject<HTMLElement | null>, enabled: b
   const [dragging, setDragging] = useState(false);
   const live = useRef(layout);
   const gesture = useRef<Gesture | null>(null);
-  const moved = useRef(false);
+  const unbind = useRef<(() => void) | null>(null);
 
   const commit = useCallback((next: DetectionLayout) => {
     live.current = next;
@@ -97,47 +77,40 @@ export function useDetectionDrag(card: RefObject<HTMLElement | null>, enabled: b
     };
   }, [enabled, reclamp, card]);
 
-  const end = useCallback(
-    (e: ReactPointerEvent<HTMLElement>) => {
-      if (!gesture.current || gesture.current.pointerId !== e.pointerId) return;
-      release(e);
-      gesture.current = null;
-      setDragging(false);
-      if (moved.current) {
-        saveDetectionLayout(live.current);
-        // `click` fires after `pointerup`, so the flag outlives this handler and dies on the next tick.
-        setTimeout(() => (moved.current = false), 0);
-      }
-    },
-    [],
-  );
+  // The gesture's own listeners die with the component, or a card unmounted mid-drag would keep moving a ghost.
+  useEffect(() => () => unbind.current?.(), []);
 
-  const onHandleDown = useCallback((e: ReactPointerEvent<HTMLElement>) => {
-    if (e.button !== 0 || gesture.current) return;
-    if (e.target instanceof HTMLElement && e.target.closest(OWN_PRESS)) return;
-    gesture.current = {
-      kind: "drag",
-      pointerId: e.pointerId,
-      start: { x: e.clientX, y: e.clientY },
-      origin: null,
-    };
-    moved.current = false;
+  const end = useCallback(() => {
+    unbind.current?.();
+    unbind.current = null;
+    const g = gesture.current;
+    gesture.current = null;
+    setDragging(false);
+    const moved = g?.kind === "resize" || (g?.kind === "drag" && g.origin !== null);
+    if (moved) saveDetectionLayout(live.current);
   }, []);
 
-  const onHandleMove = useCallback(
-    (e: ReactPointerEvent<HTMLElement>) => {
+  const move = useCallback(
+    (e: PointerEvent) => {
       const g = gesture.current;
-      if (!g || g.kind !== "drag" || g.pointerId !== e.pointerId) return;
+      if (!g || g.pointerId !== e.pointerId) return;
       // A release outside the window delivers no `pointerup`; the next bare hover must not move the card.
-      if (e.buttons === 0) return end(e);
+      if (e.buttons === 0) return end();
+      if (g.kind === "resize") {
+        const { left, width } = resizeWidth(g.origin, g.edge, e.clientX, viewport());
+        const cur = live.current;
+        commit({
+          width,
+          position: cur.position && left !== null ? { left, top: cur.position.top } : cur.position,
+        });
+        return;
+      }
       if (!g.origin) {
         if (!pastThreshold(e.clientX - g.start.x, e.clientY - g.start.y)) return;
         // Seeded from where the card is drawn, so undocking moves it by the pointer's travel and nothing else.
         const box = card.current?.getBoundingClientRect();
         const from = live.current.position ?? { left: box?.left ?? 0, top: box?.top ?? 0 };
         g.origin = { pointer: g.start, position: from };
-        capture(e);
-        moved.current = true;
         setDragging(true);
       }
       const position = dragPosition(g.origin, { x: e.clientX, y: e.clientY }, size(), viewport());
@@ -146,57 +119,56 @@ export function useDetectionDrag(card: RefObject<HTMLElement | null>, enabled: b
     [card, commit, end, size],
   );
 
+  // Bound on the window for the gesture's life: a fast pointer leaves a two-rem handle before its second event.
+  const begin = useCallback(
+    (g: Gesture) => {
+      gesture.current = g;
+      window.addEventListener("pointermove", move);
+      window.addEventListener("pointerup", end);
+      window.addEventListener("pointercancel", end);
+      unbind.current = () => {
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", end);
+        window.removeEventListener("pointercancel", end);
+      };
+    },
+    [move, end],
+  );
+
+  const onHandleDown = useCallback(
+    (e: ReactPointerEvent<HTMLElement>) => {
+      if (e.button !== 0 || gesture.current) return;
+      if (e.target instanceof HTMLElement && e.target.closest(OWN_PRESS)) return;
+      // The default of a press is a text selection that would then follow the pointer across the page.
+      e.preventDefault();
+      begin({ kind: "drag", pointerId: e.pointerId, start: { x: e.clientX, y: e.clientY }, origin: null });
+    },
+    [begin],
+  );
+
+  const onEdgeDown = useCallback(
+    (edge: ResizeEdge) => (e: ReactPointerEvent<HTMLElement>) => {
+      if (e.button !== 0 || gesture.current) return;
+      e.preventDefault();
+      begin({
+        kind: "resize",
+        pointerId: e.pointerId,
+        edge,
+        origin: { pointerX: e.clientX, left: live.current.position?.left ?? null, width: live.current.width },
+      });
+      setDragging(true);
+    },
+    [begin],
+  );
+
   const reset = useCallback(() => {
     const next = { ...live.current, position: null };
     commit(next);
     saveDetectionLayout(next);
   }, [commit]);
 
-  const onEdgeDown = useCallback(
-    (edge: ResizeEdge) => (e: ReactPointerEvent<HTMLElement>) => {
-      if (e.button !== 0 || gesture.current) return;
-      gesture.current = {
-        kind: "resize",
-        pointerId: e.pointerId,
-        edge,
-        origin: { pointerX: e.clientX, left: live.current.position?.left ?? null, width: live.current.width },
-      };
-      moved.current = true;
-      capture(e);
-      setDragging(true);
-    },
-    [],
-  );
-
-  const onEdgeMove = useCallback(
-    (e: ReactPointerEvent<HTMLElement>) => {
-      const g = gesture.current;
-      if (!g || g.kind !== "resize" || g.pointerId !== e.pointerId) return;
-      if (e.buttons === 0) return end(e);
-      const { left, width } = resizeWidth(g.origin, g.edge, e.clientX, viewport());
-      const cur = live.current;
-      commit({
-        width,
-        position: cur.position && left !== null ? { left, top: cur.position.top } : cur.position,
-      });
-    },
-    [commit, end],
-  );
-
-  const handleProps: PointerHandlers = enabled
-    ? {
-        onPointerDown: onHandleDown,
-        onPointerMove: onHandleMove,
-        onPointerUp: end,
-        onPointerCancel: end,
-        onDoubleClick: reset,
-      }
-    : {};
-
-  const edgeProps = (edge: ResizeEdge): PointerHandlers =>
-    enabled
-      ? { onPointerDown: onEdgeDown(edge), onPointerMove: onEdgeMove, onPointerUp: end, onPointerCancel: end }
-      : {};
+  const handleProps: PressHandlers = enabled ? { onPointerDown: onHandleDown, onDoubleClick: reset } : {};
+  const edgeProps = (edge: ResizeEdge): PressHandlers => (enabled ? { onPointerDown: onEdgeDown(edge) } : {});
 
   return {
     position: enabled ? layout.position : null,

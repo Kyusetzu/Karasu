@@ -142,14 +142,14 @@ export default function DetectionPopup() {
         <div
           {...drag.edgeProps("left")}
           aria-hidden
-          className="absolute inset-y-0 left-0 w-1.5 cursor-ew-resize touch-none"
+          className="absolute inset-y-0 left-0 w-1.5 cursor-ew-resize touch-none select-none"
         />
       )}
       {free && (
         <div
           {...drag.edgeProps("right")}
           aria-hidden
-          className="absolute inset-y-0 right-0 w-1.5 cursor-ew-resize touch-none"
+          className="absolute inset-y-0 right-0 w-1.5 cursor-ew-resize touch-none select-none"
         />
       )}
     </div>

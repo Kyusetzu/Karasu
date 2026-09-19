@@ -331,7 +331,8 @@ function ScrobbleStatus({
     case "cancelled":
       return <p className="text-xs text-ink-500">{t("nowPlaying.skipped")}</p>;
     default:
-      if (current?.mediaId) {
+      // A match without a progress is a correction made signed out: there is an entry, but no list that holds it.
+      if (current?.mediaId && current.progress !== null) {
         return (
           <p className="text-xs text-ink-500">
             {t("nowPlaying.yourProgress", {

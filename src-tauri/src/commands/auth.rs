@@ -115,11 +115,11 @@ pub async fn connect_with_token(db: &Db, api: &AniList, input: &str) -> Result<V
     };
     let t1 = std::time::Instant::now();
     // Identity before credential: a failed `save_token` then leaves no bearer that could drain another account's edits.
-    switch_identity(&db, Identity::AniList(viewer.clone()))?;
+    switch_identity(db, Identity::AniList(viewer.clone()))?;
     let t2 = std::time::Instant::now();
     auth::save_token(&token).inspect_err(|_| {
         // Do not leave a viewer nobody can act as.
-        let _ = switch_identity(&db, Identity::None);
+        let _ = switch_identity(db, Identity::None);
     })?;
     // `t2 - t1` is `switch_identity` and everything after `t2` is `save_token`; the labels must not swap again.
     crate::logging::debug(

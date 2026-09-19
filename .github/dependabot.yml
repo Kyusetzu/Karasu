@@ -1,7 +1,7 @@
 version: 2
 
 # Security alerts were already on; this adds *version* updates, which is the
-# half that was missing. The third-party actions in both workflows are pinned to
+# half that was missing. The third-party actions in every workflow are pinned to
 # commit SHAs — correct, and it means nothing ever tells you they moved unless
 # something is watching.
 updates:
@@ -56,3 +56,7 @@ updates:
     directory: "/"
     schedule:
       interval: weekly
+    # One PR for the week's action bumps; each one used to run the full Windows and Linux Tauri builds on its own.
+    groups:
+      actions:
+        patterns: ["*"]

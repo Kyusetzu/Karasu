@@ -420,9 +420,9 @@ npm run tauri dev                # development build with hot reload
 npm run tauri build              # release build (NSIS on Windows, AppImage on Linux)
 npx tauri android build --apk    # Android release APK
 
-npm run verify       # the whole gate CI runs: typecheck, the one-line-comment audit, vitest, cargo test
+npm run verify       # the whole gate CI runs: typecheck, the one-line-comment audit, then vitest and cargo test together
 npm run typecheck    # TypeScript alone
-npm test             # frontend unit tests (vitest) alone
+npm test             # frontend unit tests (vitest) alone; test:watch, test:node, test:dom, test:changed narrow it
 cargo test --manifest-path src-tauri/Cargo.toml   # backend tests alone
 scripts/android-check.ps1   # fast cfg(mobile) compile gate — the checks above build none of the Android-only Rust
 ```

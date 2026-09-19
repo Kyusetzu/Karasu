@@ -490,6 +490,7 @@ pub(crate) fn bulk_chunks(ids: &[i64]) -> Vec<Vec<i64>> {
 
 /// Applies one change to many entries in a few requests, rather than one mutation per entry against the rate budget.
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn bulk_save_list_entries(
     app: AppHandle,
     db: State<'_, Db>,

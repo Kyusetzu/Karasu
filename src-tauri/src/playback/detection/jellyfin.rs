@@ -313,7 +313,7 @@ fn auth_header(device: &str, device_id: &str, token: Option<&str>) -> String {
 
 /// The header is a quoted-string list, so a stray quote or backslash in a hostname would corrupt every field after it.
 fn escape(value: &str) -> String {
-    value.replace('\\', "").replace('"', "")
+    value.replace(['\\', '"'], "")
 }
 
 /// Reads a PascalCase field, falling back to camelCase, since a casing mismatch fails as a silent "nothing is playing".
@@ -1084,9 +1084,7 @@ fn remember(found: Option<Playback>) -> Option<Playback> {
 /// The stand-in for a failed poll, reachable only from that branch, so it can never keep a finished episode alive.
 fn hold_last_good() -> Option<Playback> {
     let mut guard = LAST_GOOD.guard();
-    let Some((playback, used)) = guard.as_mut() else {
-        return None;
-    };
+    let (playback, used) = guard.as_mut()?;
     if *used >= HOLD_TICKS {
         crate::logging::debug_changed(
             "jellyfin",
@@ -1646,7 +1644,7 @@ mod tests {
         assert_eq!(target.device_name, "first", "the highest-ranked fresh peer");
         // A desktop never waits for a phone, however fresh.
         let pc = peer("pc-a", "first", Platform::Desktop, Some(1_000));
-        assert!(yield_to(&[own.clone()], &pc, FRESH).is_none());
+        assert!(yield_to(std::slice::from_ref(&own), &pc, FRESH).is_none());
     }
 
     #[test]

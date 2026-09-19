@@ -790,14 +790,13 @@ impl AniList {
                     }
                     // A refusal that is not about the credential is the line a bug report needs.
                     ApiError::Retryable(reason) | ApiError::Api(reason)
-                        if matches!(status, 401 | 403) =>
+                        if matches!(status, 401 | 403)
+                            && !REFUSED_REPORTED.swap(true, Ordering::Relaxed) =>
                     {
-                        if !REFUSED_REPORTED.swap(true, Ordering::Relaxed) {
-                            crate::logging::warn(
-                                "anilist",
-                                format!("refused (HTTP {status}): {reason}"),
-                            );
-                        }
+                        crate::logging::warn(
+                            "anilist",
+                            format!("refused (HTTP {status}): {reason}"),
+                        );
                     }
                     _ => {}
                 }
@@ -1044,6 +1043,7 @@ mod tests {
 
     /// The reserve has to leave room to act on; at a threshold of one the guard engages too late.
     #[test]
+    #[allow(clippy::assertions_on_constants)]
     fn the_reserve_is_more_than_the_last_request() {
         assert!(RESERVE > 1, "a threshold of 1 is too late to be a guard");
         assert!(MAX_PACE < WINDOW, "a caller must not wait out a whole window");

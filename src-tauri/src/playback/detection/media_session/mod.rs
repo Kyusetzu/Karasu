@@ -132,9 +132,9 @@ fn pick(sessions: &[MediaSession]) -> Option<&MediaSession> {
 pub fn local_file_name(url: &str) -> Option<String> {
     let path = url.strip_prefix("file://")?;
     // Strip the (usually empty) authority: file://host/path.
-    let path = match path.find('/') {
-        Some(i) => &path[i..],
-        None => return None,
+    let path = {
+        let i = path.find('/')?;
+        &path[i..]
     };
     let last = path.rsplit('/').find(|s| !s.is_empty())?;
     let decoded = percent_encoding::percent_decode_str(last)

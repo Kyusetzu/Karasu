@@ -115,19 +115,6 @@ pub(super) fn process_name(pid: u32) -> Option<String> {
     }
 }
 
-/// Manual live test: run `live_detect` with `--ignored --nocapture` and a player open to print the windows and the result.
-#[cfg(test)]
-mod live_tests {
-    #[test]
-    #[ignore]
-    fn live_detect() {
-        for w in super::enumerate_windows() {
-            println!("FENSTER: {} | {}", w.process, w.title);
-        }
-        println!("ERKANNT: {:?}", super::detect_windows());
-    }
-}
-
 /// Scans visible windows for anime playback or manga reading; the media-session pass is async and runs after this.
 pub fn detect_windows() -> Option<Playback> {
     let windows = enumerate_windows();
@@ -235,4 +222,17 @@ pub async fn detect_playback(
         }
     }
     found.or(paused_mpv)
+}
+
+/// Manual live test: run `live_detect` with `--ignored --nocapture` and a player open to print the windows and the result.
+#[cfg(test)]
+mod live_tests {
+    #[test]
+    #[ignore]
+    fn live_detect() {
+        for w in super::enumerate_windows() {
+            println!("FENSTER: {} | {}", w.process, w.title);
+        }
+        println!("ERKANNT: {:?}", super::detect_windows());
+    }
 }

@@ -537,6 +537,9 @@ fn persist(db: &Db, data: &LibraryData) -> Result<(), String> {
     db.library_publish(&rows, &score_rows, &data.unmatched_rows())
 }
 
+/// The matcher's answer per parsed `(title, season)`, memoised across a scan; None once a parse matched nothing.
+type MatchedTitles = HashMap<(String, Option<u32>), Option<(i64, f64)>>;
+
 /// Maps files to entries: split, then override, then the matcher memoized per parse; split episodes are stored renumbered.
 fn index_files(
     files: &[String],
@@ -546,7 +549,7 @@ fn index_files(
 ) -> Vec<ScannedFile> {
     let prepared = matcher::prepare(candidates);
     let mut scanned = Vec::new();
-    let mut matched_titles: HashMap<(String, Option<u32>), Option<(i64, f64)>> = HashMap::new();
+    let mut matched_titles: MatchedTitles = HashMap::new();
 
     for path in files {
         let name = Path::new(path)
@@ -784,6 +787,9 @@ pub struct RedirectPlan {
     pub files: Vec<(usize, u32)>,
 }
 
+/// Files per parse key as `(index, current episode, disk episode)`, the shape a redirect plan is built from.
+type RedirectGroups = HashMap<(String, i32), Vec<(usize, u32, u32)>>;
+
 /// Plans a split keyed on the current-frame range the row displays; re-keying on disk numbers was the chained-split bug.
 pub fn plan_redirect(
     files: &[ScannedFile],
@@ -795,7 +801,7 @@ pub fn plan_redirect(
     dst_start: u32,
 ) -> Result<RedirectPlan, String> {
     // Group by parse key; only the disk number needs the filename re-read, since `episode` may already be renumbered.
-    let mut groups: HashMap<(String, i32), Vec<(usize, u32, u32)>> = HashMap::new();
+    let mut groups: RedirectGroups = HashMap::new();
     for (i, f) in files.iter().enumerate() {
         if f.media_id != Some(media_id) || f.episode < from || f.episode > to {
             continue;
@@ -946,7 +952,7 @@ pub fn clear_library_redirect(
         let (_, _, disk) = reparse(&f.path);
         let still_split = disk
             .is_some_and(|ep| remaining.iter().any(|r| r.apply(&title, season, ep).is_some()));
-        (!still_split).then(|| (f.media_id, f.score, f.manual))
+        (!still_split).then_some((f.media_id, f.score, f.manual))
     });
 
     for f in &mut guard.files {
@@ -1399,11 +1405,11 @@ mod tests {
             &bocchi_files(&eps),
             &bocchi(Some(12)),
             &HashMap::new(),
-            &[first.clone()],
+            std::slice::from_ref(&first),
             &[],
         );
         // After the first split media 1 shows 1–12 and 25–36, so the next confirm reads "25–36" in current-frame numbers.
-        let plan = plan_redirect(&data.files, &[first.clone()], 1, 25, 36, 3, 1)
+        let plan = plan_redirect(&data.files, std::slice::from_ref(&first), 1, 25, 36, 3, 1)
             .expect("second split plans");
         assert!(plan.delete.is_empty(), "the first rule is untouched");
         assert_eq!(plan.insert.len(), 1);
@@ -1432,11 +1438,11 @@ mod tests {
             &bocchi_files(&eps),
             &bocchi(Some(12)),
             &HashMap::new(),
-            &[whole.clone()],
+            std::slice::from_ref(&whole),
             &[],
         );
         // Media 2 now shows 1–24; its overflow past 12 reads "13–24" in current-frame numbers, which live at disk 25–36.
-        let plan = plan_redirect(&data.files, &[whole.clone()], 2, 13, 24, 3, 1)
+        let plan = plan_redirect(&data.files, std::slice::from_ref(&whole), 2, 13, 24, 3, 1)
             .expect("split of a renumbered row plans");
         assert_eq!(plan.delete, vec![(whole.title.clone(), whole.season, 13)]);
         // The overlapped rule comes back trimmed to the half it still covers, plus the new rule, both in disk numbers.

@@ -20,6 +20,7 @@ object UpdateInstaller {
 
   /** The first supported ABI, which picks the manifest leg: arm64 gets its own APK, everything else the universal one. */
   @JvmStatic
+  @Suppress("UNUSED_PARAMETER")
   fun abi(context: Context): String = Build.SUPPORTED_ABIS.firstOrNull() ?: ""
 
   /** Where the download lives; the FileProvider's cache-path entry is what lets the installer read it from here. */

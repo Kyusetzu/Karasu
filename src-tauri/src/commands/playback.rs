@@ -135,7 +135,7 @@ pub(crate) fn mpv_ipc_config(
     let path = db
         .kv_get(MPV_IPC_PATH_KEY)
         .filter(|p| !p.trim().is_empty())
-        .unwrap_or_else(|| crate::playback::detection::mpv_ipc::default_pipe());
+        .unwrap_or_else(crate::playback::detection::mpv_ipc::default_pipe);
     if !is_pipe_path(&path) {
         crate::logging::debug_changed(
             "mpv",
@@ -156,7 +156,7 @@ pub(crate) fn mpv_launch_config(db: &Db) -> Option<(String, String)> {
     let pipe = db
         .kv_get(MPV_IPC_PATH_KEY)
         .filter(|p| !p.trim().is_empty())
-        .unwrap_or_else(|| crate::playback::detection::mpv_ipc::default_pipe());
+        .unwrap_or_else(crate::playback::detection::mpv_ipc::default_pipe);
     Some((player, pipe))
 }
 
@@ -545,6 +545,7 @@ pub fn list_detection_overrides(db: State<'_, Db>) -> Vec<crate::db::DetectionOv
 
 /// Stores a correction against the parse and applies it now, since the poll only rebuilds a match when the title changes.
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub fn set_detection_override(
     app: tauri::AppHandle,
     db: State<'_, Db>,

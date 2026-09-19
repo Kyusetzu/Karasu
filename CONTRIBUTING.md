@@ -62,8 +62,9 @@ npm run verify
 
 Typecheck, then the one-line-comment audit (`scripts/comment-audit.mjs
 --check` — every comment in a code file is one physical line, see
-"Comments: one line each" in `CLAUDE.md`), then the frontend tests, then the
-Rust tests. This is the whole gate
+"Comments: one line each" in `CLAUDE.md`), then the frontend tests and the
+Rust tests side by side, with a timing table at the end (`npm run
+verify:frontend` and `verify:rust` are the halves). This is the whole gate
 and exactly what CI runs, so the two cannot drift. **Run it bare and read the
 exit code** — piping it through `grep` reports *grep's* status and has let a
 type error sail through.

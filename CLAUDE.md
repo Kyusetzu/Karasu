@@ -248,7 +248,10 @@ scripts/             bump-version.mjs (every commit), anilist-query.mjs
                      comment-lexer.mjs and comment-allowlist.json (the
                      one-line-comment rule: the gate, the comment-only proof,
                      the shared scanner and the allowed exceptions — see
-                     "Comments: one line each");
+                     "Comments: one line each"), verify.mjs (the gate, see
+                     "The commit loop"), clean-target.mjs (reclaims the
+                     stale incremental sessions every version bump leaves
+                     under `src-tauri/target`, see the notes);
                      release/ holds the five PowerShell scripts
                      the release workflow runs (installer, AppImage and APK
                      renamers are deliberate near-twins, release-notes, and
@@ -581,7 +584,7 @@ Six commands, in this order. Don't do any of it by hand.
 
 ```sh
 node scripts/bump-version.mjs patch   # minor for features, major for breaks
-npm run verify                        # typecheck + comment audit + vitest + cargo test
+npm run verify                        # typecheck + comment audit, then vitest and cargo test side by side
 git commit                            # message ends with the Co-Authored-By trailer
 node scripts/changelog.mjs            # after the commit — it reads the commit
 git commit --amend --no-edit          # fold the changelog in, then re-run:
@@ -595,8 +598,14 @@ grep) and refuses to run when the tree holds nothing but version files, since a
 bump with nothing to describe is a mistake or a double-run. `--force` overrides
 that, `--print` just reports the current version.
 
-**`npm run verify`** is the whole gate and is what CI runs, so the two cannot
-drift. It short-circuits, so a type error stops it before the tests.
+**`npm run verify`** is `scripts/verify.mjs`, the whole gate and what CI runs,
+so the two cannot drift. Typecheck and the comment audit go first and stop the
+run on a failure; then vitest and `cargo test` run at the same time, cargo's
+output held back until it ends so the two never interleave, and a timing table
+closes the run. `verify:frontend` and `verify:rust` are the halves, for the
+commit that touched only one; `lint:rust` is clippy with warnings denied, which
+CI runs on the Linux job without blocking on it. Run it bare and read the exit
+code — see the note below on piping.
 
 **`scripts/changelog.mjs`** runs *after* the commit, because it reads it —
 which is also why the loop above ends the way it does. Folding the generated
@@ -665,7 +674,17 @@ no DOM, so an extension rule (`.tsx` ⇒ jsdom) dragged it into one and the suit
 went from 2.0 s to **14.1 s**. Needing a DOM is a decision, so it is spelled out
 in the filename. `src/test/render.tsx` holds the provider wrapper and the
 sign-in helpers; it imports Testing Library, so nothing in the node project may
-import it.
+import it. `src/test/fixtures.ts` holds the complete, typed `media`, `entry`,
+`listResult`, `nowPlaying` and `idleScrobble` builders both projects use — a
+test overrides the field it is about rather than spelling a sixteen-field
+literal — and `src/test/{markdown,markup,actions}.ts` the readers the split
+suites share. Both projects run on worker threads, and the node project runs
+without isolation (one module graph for every file) because its modules are
+pure; a node test that needs a fresh module must say so with a `.dom.` name or
+`vi.resetModules`. A `slowTestThreshold` of 300 ms marks the tests to look at.
+The dom setup stubs `ResizeObserver` and `matchMedia` (desktop-shaped), mocks
+`react-i18next` (a key back, never the English copy), the opener and event
+plugins; a test that wants `isTauri` true mocks `@/api/anilist` itself.
 
 ### Notes that have cost real time
 
@@ -985,6 +1004,15 @@ import it.
   the image, and it is the residue rather than the part that was solved. Anything
   that fails falls back to the chip. **Do not "simplify" this into a CSP
   change** — that is the thing the measurement rejected.
+- **Every version bump mints a new incremental session under
+  `src-tauri/target/debug/incremental`, and cargo never reclaims one.** The
+  package version is part of Cargo's metadata hash, so 566 bumps had left
+  2,810 session directories — 175 GB of a 269 GB `debug/` — of which the
+  current build reads one. `node scripts/clean-target.mjs` reports them and
+  `--apply` deletes every session older than a day (`--keep-days`), and
+  `--android` adds the cross-compile trees for a cold Android build's price.
+  Run it when the disk asks; it costs nothing but the next build's few
+  seconds of incremental warm-up.
 - **MSVC writes an 11 MB `karasu.pdb` on every release build and there is no
   flag reaching the linker to stop it.** `debug = 0` and `strip = true` are
   already set, `cargo build --release -v` shows no `/DEBUG`, no `-Cdebuginfo=`
@@ -1152,6 +1180,21 @@ review checkpoints are in `site/README.md`.
   `site/**`; the Site workflow runs the site's `check` and `build` on a PR that
   touches `site/**` or `src/app/index.css`, and is what the auto-merge below
   listens to for a site dependency bump.
+
+## The Actions cache is 10 GB, and a PR must not spend it
+
+Measured on 2026-09-19: the Nightly ran with no Rust cache at all because four
+Dependabot PRs two days earlier had each saved a ~1 GB Windows cache under
+their own `refs/pull/N/merge` key, and the store evicts oldest-first. So every
+rust-cache step names a `shared-key` per platform (`windows`, `linux`,
+`android`) that `ci.yml` and `release.yml` share, and the PR jobs carry
+`save-if: github.ref == 'refs/heads/main'` — a PR restores main's cache and
+never writes one. A PR that changes `Cargo.lock` therefore compiles on top of
+main's nearest cache and saves nothing, which is the intended price. Both
+workflows also ignore `*.md`, `assets/screenshots/**` and the issue forms, so a
+changelog-marker commit builds nothing; every job has a `timeout-minutes` and
+every artifact a `retention-days`; and the four small workflows pin
+`ubuntu-24.04` rather than ride `ubuntu-latest` into the 26.04 migration.
 
 ## Dependabot merges itself
 

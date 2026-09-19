@@ -11,6 +11,8 @@ pub struct Parsed {
     pub episode_marked: bool,
     pub season: Option<u32>,
     pub release_group: Option<String>,
+    /// The episode's own name when the source spells one after the number; a file rarely does, Jellyfin always.
+    pub episode_title: Option<String>,
 }
 
 pub(crate) const VIDEO_EXTENSIONS: &[&str] = &[
@@ -27,8 +29,8 @@ const KEYWORDS: &[&str] = &[
     "60fps", "batch", "remux", "vostfr", "german", "english", "amzn", "cr",
 ];
 
-fn regexes() -> &'static [Regex; 5] {
-    static RE: OnceLock<[Regex; 5]> = OnceLock::new();
+fn regexes() -> &'static [Regex; 6] {
+    static RE: OnceLock<[Regex; 6]> = OnceLock::new();
     RE.get_or_init(|| {
         [
             // S01E05, s2e12 — combined season/episode markers
@@ -37,6 +39,8 @@ fn regexes() -> &'static [Regex; 5] {
             Regex::new(r"(?i)\b(?:episode|folge|ep\.?|e)\s*(\d{1,4})(?:\s*v\d)?\b").unwrap(),
             // Classic fansub format: " - 28", " – 28v2"
             Regex::new(r"[\-–—]\s*(\d{1,4})(?:\s*v\d)?\s*$").unwrap(),
+            // The fansub format with the episode's name after it: " - 05 - The Mage's Journey"
+            Regex::new(r"[\-–—]\s*(\d{1,4})(?:\s*v\d)?\s*([\-–—]\s*\S.*)$").unwrap(),
             // "#28"
             Regex::new(r"#(\d{1,4})\b").unwrap(),
             // Bare trailing number ("One Piece 1071")
@@ -90,6 +94,7 @@ pub fn parse(input: &str) -> Parsed {
     let mut episode = None;
     let mut episode_marked = false;
     let mut season = None;
+    let mut episode_title = None;
     let mut title_end = work.len();
 
     for (i, re) in regexes().iter().enumerate() {
@@ -98,16 +103,23 @@ pub fn parse(input: &str) -> Parsed {
             let ep_group = if i == 0 { 2 } else { 1 };
             if let Some(ep) = caps.get(ep_group).and_then(|g| g.as_str().parse().ok()) {
                 // Trailing years (1950–2030) are not episodes
-                if i == 4 && (1950..=2030).contains(&ep) {
+                if i == 5 && (1950..=2030).contains(&ep) {
                     continue;
                 }
                 episode = Some(ep);
-                // Patterns 0, 1 and 3 spell the episode out; the dash and bare-trailing forms only infer it.
-                episode_marked = matches!(i, 0 | 1 | 3);
+                // Patterns 0, 1 and 4 spell the episode out; the dash and bare-trailing forms only infer it.
+                episode_marked = matches!(i, 0 | 1 | 4);
                 title_end = m.start();
                 if i == 0 {
                     season = caps.get(1).and_then(|g| g.as_str().parse().ok());
                 }
+                // Only the marker forms leave a tail that can be a name; the anchored forms end the string.
+                episode_title = match i {
+                    0 => episode_title_from(&work[m.end()..], false),
+                    1 => episode_title_from(&work[m.end()..], true),
+                    3 => caps.get(2).and_then(|g| episode_title_from(g.as_str(), true)),
+                    _ => None,
+                };
                 break;
             }
         }
@@ -147,7 +159,41 @@ pub fn parse(input: &str) -> Parsed {
         episode_marked,
         season,
         release_group,
+        episode_title,
     }
+}
+
+/// A name ends at the next dash, so a site or player suffix never becomes the episode's name; `dashed` demands one first.
+fn episode_title_from(tail: &str, dashed: bool) -> Option<String> {
+    let rest = tail.trim_start();
+    let rest = match rest.strip_prefix(['-', '–', '—']) {
+        Some(named) => named,
+        None if dashed => return None,
+        None => rest,
+    };
+    let end = [" - ", " – ", " — "]
+        .iter()
+        .filter_map(|sep| rest.find(sep))
+        .min()
+        .unwrap_or(rest.len());
+    let first = rest[..end].trim_matches(|c: char| c == ':' || c.is_whitespace());
+    let mut words: Vec<&str> = first.split_whitespace().collect();
+    // A scene name glues the group to the last keyword ("x264-GROUP"), so the word is judged by its keyword prefix.
+    while let Some(last) = words.last() {
+        let lower = last.to_ascii_lowercase();
+        let head = lower.split('-').next().unwrap_or("");
+        if KEYWORDS.contains(&lower.as_str()) || (lower.contains('-') && KEYWORDS.contains(&head)) {
+            words.pop();
+        } else {
+            break;
+        }
+    }
+    let name = words.join(" ");
+    let numeric = name.chars().all(|c| c.is_ascii_digit() || c == 'v');
+    if name.chars().count() < 2 || numeric {
+        return None;
+    }
+    Some(name)
 }
 
 fn chapter_regexes() -> &'static [Regex; 3] {
@@ -206,6 +252,7 @@ pub fn parse_manga(input: &str) -> Parsed {
         episode_marked: chapter_marked,
         season: None,
         release_group: None,
+        episode_title: None,
     }
 }
 
@@ -334,6 +381,53 @@ mod tests {
         let r = parse_manga("Read One Piece Chapter 1100");
         assert_eq!(r.title, "One Piece");
         assert_eq!(r.episode, Some(1100));
+    }
+
+    #[test]
+    fn episode_name_after_the_number() {
+        let r = p("[Grp] Show - 05 - The Mage's Journey [1080p].mkv");
+        assert_eq!(r.title, "Show");
+        assert_eq!(r.episode, Some(5));
+        assert_eq!(r.release_group.as_deref(), Some("Grp"));
+        assert_eq!(r.episode_title.as_deref(), Some("The Mage's Journey"));
+    }
+
+    #[test]
+    fn episode_name_after_a_season_marker() {
+        let r = p("Show S02E05 - Title.mkv");
+        assert_eq!(r.season, Some(2));
+        assert_eq!(r.episode, Some(5));
+        assert_eq!(r.episode_title.as_deref(), Some("Title"));
+    }
+
+    #[test]
+    fn no_episode_name_without_a_tail() {
+        assert_eq!(p("[SubsPlease] Frieren - 05 (1080p) [ABCD1234].mkv").episode_title, None);
+        let r = p("Show - 05v2 [720p].mkv");
+        assert_eq!(r.episode, Some(5));
+        assert_eq!(r.episode_title, None);
+    }
+
+    #[test]
+    fn episode_name_in_a_scene_name_loses_the_keywords() {
+        let r = p("Show.S01E05.The.Mages.Journey.1080p.WEB.x264-GROUP.mkv");
+        assert_eq!(r.episode, Some(5));
+        assert_eq!(r.episode_title.as_deref(), Some("The Mages Journey"));
+    }
+
+    #[test]
+    fn a_numeric_tail_is_not_a_name() {
+        let r = p("Show - 05 - 06.mkv");
+        assert_eq!(r.episode, Some(6));
+        assert_eq!(r.episode_title, None);
+        let r = p("Show S01E05 - 06.mkv");
+        assert_eq!(r.episode, Some(5));
+        assert_eq!(r.episode_title, None);
+    }
+
+    #[test]
+    fn manga_never_carries_an_episode_name() {
+        assert_eq!(parse_manga("Berserk Kapitel 380").episode_title, None);
     }
 
     #[test]

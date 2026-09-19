@@ -1005,6 +1005,8 @@ pub fn playback_from_session(session: &serde_json::Value) -> Option<Playback> {
             // Season 1 carries nothing for matching and is dropped; season 0 is Specials and must reach `season_informed`.
             season: season.filter(|s| *s != 1),
             release_group: None,
+            // A movie's name is already the title; only an episode's name is worth a line of its own.
+            episode_title: (kind == "Episode" && !episode_name.is_empty()).then(|| episode_name.trim().to_string()),
         }),
         position_sec,
         duration_sec,
@@ -1139,6 +1141,7 @@ mod tests {
         assert_eq!(parsed.title, "Frieren");
         assert_eq!(parsed.episode, Some(5));
         assert_eq!(parsed.season, Some(2));
+        assert_eq!(parsed.episode_title.as_deref(), Some("The Mage's Journey"));
         assert!(p.media_title.contains("Frieren"));
     }
 

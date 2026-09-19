@@ -55,6 +55,9 @@ pub struct NowPlaying {
     pub progress: Option<u32>,
     #[serde(rename = "totalEpisodes")]
     pub total_episodes: Option<u32>,
+    /// The episode's own name where the source had one, for the card; never part of any key.
+    #[serde(rename = "episodeTitle")]
+    pub episode_title: Option<String>,
     /// Episode length in minutes, kept from matching so nothing re-parses the cached list for it.
     #[serde(skip)]
     pub duration_min: Option<u32>,
@@ -520,6 +523,7 @@ fn build_now_playing(
         overridden: forced.is_some(),
         progress: resolved.progress,
         total_episodes: resolved.total,
+        episode_title: parsed.episode_title,
         duration_min: resolved.duration_min,
         cover_url: resolved.cover_url,
         position_sec: playback.position_sec,
@@ -691,6 +695,7 @@ fn unplaceable_season(now: &NowPlaying) -> Option<u32> {
         episode_marked: now.episode.is_some(),
         season: Some(season),
         release_group: None,
+        episode_title: None,
     };
     (!matcher::season_informed(&parsed)).then_some(season)
 }
@@ -884,6 +889,7 @@ pub fn requeue_match(app: &AppHandle) {
                 episode_marked: episode.is_some(),
                 season,
                 release_group: None,
+                episode_title: None,
             },
             &candidates,
         )
@@ -1346,6 +1352,7 @@ mod tests {
             overridden: false,
             progress: Some(0),
             total_episodes: Some(12),
+            episode_title: None,
             duration_min,
             cover_url: None,
             position_sec: None,

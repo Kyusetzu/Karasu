@@ -21,6 +21,8 @@ export interface NowPlaying {
   overridden: boolean;
   progress: number | null;
   totalEpisodes: number | null;
+  /** The episode's own name where the source had one: Jellyfin's item name, or a release name that spells it. */
+  episodeTitle: string | null;
 }
 
 export type ScrobblePhase =

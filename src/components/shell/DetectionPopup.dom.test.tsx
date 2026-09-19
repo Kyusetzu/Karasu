@@ -18,6 +18,7 @@ const PLAYING: NowPlaying = {
   overridden: false,
   progress: 4,
   totalEpisodes: 26,
+  episodeTitle: "Asteroid Blues",
 };
 
 const IDLE = {

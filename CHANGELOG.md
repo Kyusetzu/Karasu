@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: aecae80 -->
+<!-- generated-through: 000798c -->
 
 ### Fixed
 
@@ -85,6 +85,7 @@ tag time is then optional rather than load-bearing.
 - Reading notifications one by one now clears the bell's badge, and "Mark all read" is always available.
 - A pull-to-sync gesture could fail to arm when two touch events arrived in the same frame.
 - A pull-to-sync left mid-way by a navigation no longer leaves its hint on the next screen, and a long press no longer selects the action sheet's title.
+- A release name that carries the episode's title after its number now parses the number, and Jellyfin's episode name reaches the now-playing card.
 
 ### Added
 

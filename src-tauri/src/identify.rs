@@ -80,6 +80,7 @@ fn score(item: &Unidentified, node: &Value) -> Option<Suggestion> {
         episode_marked: false,
         season: if item.season < 0 { None } else { Some(item.season as u32) },
         release_group: None,
+        episode_title: None,
     };
     let m = matcher::best_match(&parsed, &[candidate])?;
     Some(Suggestion {

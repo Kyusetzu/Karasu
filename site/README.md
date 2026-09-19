@@ -31,7 +31,8 @@ simply keeps the end state.
 
 `verify-dist.mjs` fails the build for a rooted URL without `/Karasu/`, an
 external script or stylesheet, a link to a file that is not in `dist`, an
-image without `alt` or dimensions, an image over 250 kB, or more than 110 kB
+image without `alt` or dimensions, an image over its format's budget (250 kB
+for AVIF and PNG, 300 kB for WebP and JPEG), or more than 110 kB
 of gzipped JavaScript (react-dom 19.3 alone moved the figure from 94.8 to
 103.3 kB; the budget still catches a stray dependency, not React).
 
@@ -47,7 +48,7 @@ src/
   sections/             one file per section of the page
   content/              copy and data the sections render
   generated/            release.json (committed fallback; CI overwrites it)
-  assets/               the mark, the katakana, the processed screenshots
+  assets/               the mark and the processed screenshots
   dev/                  the sample page; never bundled
 scripts/                sync-tokens, prerender, verify-dist, release-info, icons, snap, captures
 public/                 favicons, fonts (SN Pro, OFL), robots.txt, .nojekyll

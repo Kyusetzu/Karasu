@@ -58,12 +58,13 @@ Because a local app can do things anilist.co simply can't:
 
 ## Screenshots
 
-Captures of the 1.0 release, at 2× on the desktop and straight off the phone —
-the same set the [website](https://kyusetzu.github.io/Karasu/) shows at full size.
+Captures at 2× on the desktop and straight off the phone — the same set the
+[website](https://kyusetzu.github.io/Karasu/) shows at full size. Most are from
+1.10; the Now Playing capture predates the floating window of 1.17.
 
 <p align="center">
   <img src="assets/screenshots/now-playing.jpg" alt="Now Playing — an episode detected in mpv, the update counting down" width="80%" /><br />
-  <sub>Now Playing — an episode detected in mpv, the update counting down; confirm, dismiss, or look it up</sub>
+  <sub>Now Playing — an episode detected in mpv, the update counting down; update now, skip it, or fix the match</sub>
 </p>
 
 <table>
@@ -109,7 +110,10 @@ the same set the [website](https://kyusetzu.github.io/Karasu/) shows at full siz
 
 **Tracking &amp; scrobbling**
 - Automatic detection in local players (mpv, VLC, MPC-HC/BE, PotPlayer, SMPlayer)
-  and in the browser (Crunchyroll and more)
+  and in the browser (Crunchyroll, ADN, Netflix); a paused player is read from
+  its audio session, so a pause defers the update rather than faking a watch
+- An opt-in **mpv IPC** source — point Karasu at mpv's JSON IPC socket and it
+  reads the real file path and the live position instead of a window title
 - Manga reading detection (MangaDex, MANGA Plus, Comick, Bato, MangaFire, Asura Scans)
 - **Media-session detection** (SMTC on Windows, MPRIS on Linux) for players
   that report to the system media controls instead of writing the title into
@@ -138,6 +142,13 @@ the same set the [website](https://kyusetzu.github.io/Karasu/) shows at full siz
 - Automatic scrobbling after a configurable threshold, with optional
   confirmation, episode-gap protection and
   [anime-relations](https://github.com/erengy/anime-relations) episode redirects
+- The **Now Playing window** floats over every screen: the cover, the title
+  with its native line, season and episode (`S2 · E5`) or chapter with the
+  episode's own name where the source knows it, the AniList line (format,
+  season, length), the countdown ring and the three verbs — update now, skip,
+  fix the match — in its header. On desktop it drags anywhere by that header,
+  resizes by its edges and remembers both; on the phone it docks above the
+  bottom bar; a chevron collapses it to one line
 
 **Lists &amp; editing**
 - Anime and manga lists with status tabs, grid/list views and an **offline queue**
@@ -278,8 +289,17 @@ the same set the [website](https://kyusetzu.github.io/Karasu/) shows at full siz
   toggles — so they apply on anilist.co and in every client at once. On
   Android the library and desktop panes are hidden, because nothing behind
   them exists there
-- An app-appropriate in-app right-click menu, system tray, single instance,
-  autostart
+- **One interaction model, three presentations**: right-click on a title
+  opens a context menu, a long press on the phone opens the same actions as
+  a bottom sheet, and the command palette lists them too — update progress,
+  change status or score, open, fix a detection, all resolved from one list
+  that only offers what would actually change something
+- On the phone: **pull a list down to sync**, and **swipe up from the
+  bottom bar** for the command palette
+- System tray, single instance, autostart, and a global hotkey that shows or
+  hides the window
+- **Daily local backups** of the database (one per day, the newest kept) —
+  what the app restores from by itself when the file will not open
 - English / German with automatic system-language detection
 - One-click AniList login and a built-in *Check for updates* — on Android
   the app downloads the APK for your device over Wi-Fi, verifies it, and opens
@@ -300,7 +320,8 @@ desktop plugin its own key, Android the APK legs.
 Two releases sit on that page. **Karasu <version>** is the Stable channel and
 the one to take; **Nightly build** is the rolling per-commit build for anyone
 who wants to stay on the edge. The built-in updater follows Stable on a fresh
-install; the channel is chosen under **Settings → Desktop → Updates**.
+install; the channel is chosen under **Settings → Desktop → Updates** (on
+Android, under **Settings → Account**, where the desktop pane does not exist).
 
 On first start, open **Settings → Log in with AniList** — your browser opens
 AniList, you approve access, and Karasu logs you in automatically. (A manual
@@ -352,8 +373,9 @@ with no UAC prompt and nothing written outside your own profile.
 > release-signed by CI with the same key every time, which is what lets a
 > newer version install straight over the older one with your data intact.
 > From 1.11 the app updates itself: it downloads the APK for your device
-> over Wi-Fi (mobile data is a switch), checks it against the release's
-> checksum and signature, and opens the installer when you tap — from
+> over Wi-Fi (mobile data is a switch), checks its sha256 against the
+> release manifest and its signing certificate against the installed app's,
+> and opens the installer when you tap — from
 > About, from the bell, or once at start. Android asks once for the
 > "install unknown apps" permission for Karasu; that switch is the consent. The phone gets its own shell — keyed on width (767px),
 > not on the device, so a narrow enough window gets it anywhere: navigation
@@ -383,7 +405,7 @@ with no UAC prompt and nothing written outside your own profile.
 
 ## Development
 
-Prerequisites: [Node.js](https://nodejs.org) ≥ 22.22, [Rust](https://rustup.rs)
+Prerequisites: [Node.js](https://nodejs.org) 22 (what CI runs), [Rust](https://rustup.rs)
 (MSVC toolchain on Windows), VS Build Tools with the C++ workload, WebView2
 (included in Windows 11). On Ubuntu, install `libwebkit2gtk-4.1-dev`,
 `libgtk-3-dev`, `libayatana-appindicator3-dev`, `librsvg2-dev`,
@@ -398,9 +420,10 @@ npm run tauri dev                # development build with hot reload
 npm run tauri build              # release build (NSIS on Windows, AppImage on Linux)
 npx tauri android build --apk    # Android release APK
 
-npm run typecheck    # TypeScript
-npm test             # frontend unit tests (vitest)
-cargo test --manifest-path src-tauri/Cargo.toml   # backend tests
+npm run verify       # the whole gate CI runs: typecheck, the one-line-comment audit, vitest, cargo test
+npm run typecheck    # TypeScript alone
+npm test             # frontend unit tests (vitest) alone
+cargo test --manifest-path src-tauri/Cargo.toml   # backend tests alone
 scripts/android-check.ps1   # fast cfg(mobile) compile gate — the checks above build none of the Android-only Rust
 ```
 
@@ -452,8 +475,8 @@ Karasu is developed with heavy assistance from AI coding tools — primarily
 used across the codebase: writing and refactoring features, tests and
 documentation, and reviewing changes. Every change is directed, reviewed and
 verified by a human maintainer before it lands, and the same checks apply to
-AI-written and hand-written code alike (`typecheck`, `vitest`, `cargo test`, and
-a build smoke check per commit). The repository-level [`CLAUDE.md`](CLAUDE.md)
+AI-written and hand-written code alike (`npm run verify` — typecheck, the
+comment audit, `vitest`, `cargo test` — and a build smoke check per commit). The repository-level [`CLAUDE.md`](CLAUDE.md)
 documents the conventions and guardrails these tools follow.
 
 ## Reporting a bug

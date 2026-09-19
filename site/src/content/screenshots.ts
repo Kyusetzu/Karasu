@@ -67,26 +67,22 @@ import s16_avif_2880 from "@/assets/screenshots/desktop/about-2880.avif";
 import s16_avif_1440 from "@/assets/screenshots/desktop/about-1440.avif";
 import s16_webp_1440 from "@/assets/screenshots/desktop/about-1440.webp";
 import s16_jpg_1440 from "@/assets/screenshots/desktop/about-1440.jpg";
-import s17_avif_1216 from "@/assets/screenshots/phone/phone-overview-1216.avif";
-import s17_avif_608 from "@/assets/screenshots/phone/phone-overview-608.avif";
-import s17_webp_608 from "@/assets/screenshots/phone/phone-overview-608.webp";
-import s17_jpg_608 from "@/assets/screenshots/phone/phone-overview-608.jpg";
-import s18_avif_1216 from "@/assets/screenshots/phone/phone-list-1216.avif";
-import s18_avif_608 from "@/assets/screenshots/phone/phone-list-608.avif";
-import s18_webp_608 from "@/assets/screenshots/phone/phone-list-608.webp";
-import s18_jpg_608 from "@/assets/screenshots/phone/phone-list-608.jpg";
-import s19_avif_1216 from "@/assets/screenshots/phone/phone-detail-1216.avif";
-import s19_avif_608 from "@/assets/screenshots/phone/phone-detail-608.avif";
-import s19_webp_608 from "@/assets/screenshots/phone/phone-detail-608.webp";
-import s19_jpg_608 from "@/assets/screenshots/phone/phone-detail-608.jpg";
-import s20_avif_1216 from "@/assets/screenshots/phone/phone-search-1216.avif";
-import s20_avif_608 from "@/assets/screenshots/phone/phone-search-608.avif";
-import s20_webp_608 from "@/assets/screenshots/phone/phone-search-608.webp";
-import s20_jpg_608 from "@/assets/screenshots/phone/phone-search-608.jpg";
-import s21_avif_1216 from "@/assets/screenshots/phone/phone-more-1216.avif";
-import s21_avif_608 from "@/assets/screenshots/phone/phone-more-608.avif";
-import s21_webp_608 from "@/assets/screenshots/phone/phone-more-608.webp";
-import s21_jpg_608 from "@/assets/screenshots/phone/phone-more-608.jpg";
+import s17_avif_1216 from "@/assets/screenshots/phone/phone-list-1216.avif";
+import s17_avif_608 from "@/assets/screenshots/phone/phone-list-608.avif";
+import s17_webp_608 from "@/assets/screenshots/phone/phone-list-608.webp";
+import s17_jpg_608 from "@/assets/screenshots/phone/phone-list-608.jpg";
+import s18_avif_1216 from "@/assets/screenshots/phone/phone-detail-1216.avif";
+import s18_avif_608 from "@/assets/screenshots/phone/phone-detail-608.avif";
+import s18_webp_608 from "@/assets/screenshots/phone/phone-detail-608.webp";
+import s18_jpg_608 from "@/assets/screenshots/phone/phone-detail-608.jpg";
+import s19_avif_1216 from "@/assets/screenshots/phone/phone-search-1216.avif";
+import s19_avif_608 from "@/assets/screenshots/phone/phone-search-608.avif";
+import s19_webp_608 from "@/assets/screenshots/phone/phone-search-608.webp";
+import s19_jpg_608 from "@/assets/screenshots/phone/phone-search-608.jpg";
+import s20_avif_1216 from "@/assets/screenshots/phone/phone-more-1216.avif";
+import s20_avif_608 from "@/assets/screenshots/phone/phone-more-608.avif";
+import s20_webp_608 from "@/assets/screenshots/phone/phone-more-608.webp";
+import s20_jpg_608 from "@/assets/screenshots/phone/phone-more-608.jpg";
 
 export interface Source {
   w: number;
@@ -125,8 +121,8 @@ export const SHOTS: Shot[] = [
     kind: "desktop",
     width: 2880,
     height: 1800,
-    alt: "The Overview with the Now Playing card at the top: Katanagatari, episode 3, playing in mpv, progress updating in 31 minutes.",
-    caption: "Now Playing — an episode detected in mpv, the update counting down",
+    alt: "The Now Playing window floating over the Overview: the cover of Katanagatari, episode 3 playing in mpv, the progress update counting down, and the update, skip and fix-match buttons in its header.",
+    caption: "Now Playing — the floating window, an episode detected in mpv",
     avif: [{ w: 2880, src: s1_avif_2880 }, { w: 1440, src: s1_avif_1440 }],
     webp: [{ w: 1440, src: s1_webp_1440 }],
     jpg: [{ w: 1440, src: s1_jpg_1440 }],
@@ -297,26 +293,15 @@ export const SHOTS: Shot[] = [
     jpg: [{ w: 1440, src: s16_jpg_1440 }],
   },
   {
-    id: "phone-overview",
-    kind: "phone",
-    width: 1216,
-    height: 2581,
-    alt: "The phone's Overview with the bottom bar.",
-    caption: "Android —overview",
-    avif: [{ w: 1216, src: s17_avif_1216 }, { w: 608, src: s17_avif_608 }],
-    webp: [{ w: 608, src: s17_webp_608 }],
-    jpg: [{ w: 608, src: s17_jpg_608 }],
-  },
-  {
     id: "phone-list",
     kind: "phone",
     width: 1216,
     height: 2581,
     alt: "The anime list on the phone as a four-column cover grid with the status tabs above.",
     caption: "Android —anime list",
-    avif: [{ w: 1216, src: s18_avif_1216 }, { w: 608, src: s18_avif_608 }],
-    webp: [{ w: 608, src: s18_webp_608 }],
-    jpg: [{ w: 608, src: s18_jpg_608 }],
+    avif: [{ w: 1216, src: s17_avif_1216 }, { w: 608, src: s17_avif_608 }],
+    webp: [{ w: 608, src: s17_webp_608 }],
+    jpg: [{ w: 608, src: s17_jpg_608 }],
   },
   {
     id: "phone-detail",
@@ -325,9 +310,9 @@ export const SHOTS: Shot[] = [
     height: 2581,
     alt: "A title's detail page on the phone with the entry editor.",
     caption: "Android —a title, with the entry editor",
-    avif: [{ w: 1216, src: s19_avif_1216 }, { w: 608, src: s19_avif_608 }],
-    webp: [{ w: 608, src: s19_webp_608 }],
-    jpg: [{ w: 608, src: s19_jpg_608 }],
+    avif: [{ w: 1216, src: s18_avif_1216 }, { w: 608, src: s18_avif_608 }],
+    webp: [{ w: 608, src: s18_webp_608 }],
+    jpg: [{ w: 608, src: s18_jpg_608 }],
   },
   {
     id: "phone-search",
@@ -336,9 +321,9 @@ export const SHOTS: Shot[] = [
     height: 2581,
     alt: "The search page on the phone.",
     caption: "Android —search",
-    avif: [{ w: 1216, src: s20_avif_1216 }, { w: 608, src: s20_avif_608 }],
-    webp: [{ w: 608, src: s20_webp_608 }],
-    jpg: [{ w: 608, src: s20_jpg_608 }],
+    avif: [{ w: 1216, src: s19_avif_1216 }, { w: 608, src: s19_avif_608 }],
+    webp: [{ w: 608, src: s19_webp_608 }],
+    jpg: [{ w: 608, src: s19_jpg_608 }],
   },
   {
     id: "phone-more",
@@ -347,9 +332,9 @@ export const SHOTS: Shot[] = [
     height: 2581,
     alt: "The More sheet on the phone listing the remaining screens.",
     caption: "Android —the More sheet",
-    avif: [{ w: 1216, src: s21_avif_1216 }, { w: 608, src: s21_avif_608 }],
-    webp: [{ w: 608, src: s21_webp_608 }],
-    jpg: [{ w: 608, src: s21_jpg_608 }],
+    avif: [{ w: 1216, src: s20_avif_1216 }, { w: 608, src: s20_avif_608 }],
+    webp: [{ w: 608, src: s20_webp_608 }],
+    jpg: [{ w: 608, src: s20_jpg_608 }],
   },
 ];
 

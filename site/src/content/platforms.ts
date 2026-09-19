@@ -52,8 +52,9 @@ export const PLATFORMS: Platform[] = [
       "Four home-screen widgets, drawn from the cache with no network",
       "Background notification check with the app closed",
       "Share an anilist.co link into Karasu",
+      "Updates itself: the APK for your device downloads over Wi-Fi and opens the installer when you tap",
     ],
-    limits: ["Detection is Jellyfin only", "No in-app updater: install the new APK over the old one"],
+    limits: ["Detection is Jellyfin only, and can keep running with the screen off", "No local library"],
   },
   {
     id: "linux",

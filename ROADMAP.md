@@ -43,14 +43,6 @@ maintainer's. Each says which, so none of them reads as unstarted work.
   from `strings_widgets.xml` (both locales already exist) instead. Deferred
   because seeing it costs a sign-out, and the maintainer had just signed back
   in.
-- **Dependabot #15 (rustls) and #16 (the npm group).** #15 touches the one
-  path nothing on this machine can check — Android TLS through the named
-  aws-lc-rs provider in `net.rs`; #16 moves the JS halves of two Tauri
-  plugins while their Rust halves stay pinned. Both after a device pass
-  re-verifies Android TLS and the deep link. #13 and #14 (the two actions)
-  are proven by any rolling run and can go first. A Dependabot squash does
-  not bump the version: `node scripts/bump-version.mjs patch --force` after
-  each merge keeps `COMMIT_NUMBER` monotonic.
 
 **Needs a user, or a decision already made:**
 
@@ -59,5 +51,15 @@ maintainer's. Each says which, so none of them reads as unstarted work.
 - **`MediaSessionManager` detection on Android** — moot while the app is
   sideloaded: the notification-listener permission is a Play policy
   question, and Play distribution is itself not planned (maintainer,
-  August 2026; sideload is the model, `adb install -r` is the update path,
-  and Android must never gain an updater by accident).
+  August 2026; sideload is the model, and since 1.11 the app fetches its
+  own APK from the GitHub release — see "The Android updater" in
+  CLAUDE.md).
+
+**Waiting on a tag:**
+
+- **A Stable release after 1.0.0.** Everything since 2026-09-05 — the
+  Android updater, the interaction model (pull-to-sync, long press,
+  navigation swipe, context menu), the floating detection window, Jellyfin
+  discovery and the external address, the query cache — is on `main` and in
+  the Nightly only. The website describes `main`; the Stable download it
+  links to is still 1.0.0 until the maintainer tags the next one.

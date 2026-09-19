@@ -81,6 +81,7 @@ const ROWS: Row[] = [
       "Bulk edit across a selection; undo for ten fields of a save",
       "Saved presets, tri-state filters and a typo-tolerant search",
       "Covers or rows, 1 to 40 covers per row, lists that stay quick at any size",
+      "Right-click a title for everything you can do to it; the palette and the phone's long press offer the same list",
     ],
     media: <Screenshot shot={shot("anime-rows")} />,
   },
@@ -98,7 +99,7 @@ const ROWS: Row[] = [
     text: "New episodes of what you are watching land as desktop notifications. Sequel announcements and on-hold reminders are there to switch on. Your AniList notifications share the same bell, grouped when they arrive in bursts.",
     bullets: [
       "A tray icon with Scrobble now, Sync now and the detection switch",
-      "An optional background check, every 15, 30 or 60 minutes",
+      "An optional background check, every 15, 30 or 60 minutes — or any interval you type",
     ],
     media: <Screenshot shot={shot("bell")} />,
   },
@@ -106,8 +107,8 @@ const ROWS: Row[] = [
     id: "android",
     eyebrow: "Android",
     title: "On your phone, with the app closed.",
-    text: "The Android build is a sideloaded APK with the same list, the same statistics and Jellyfin detection. Four home-screen widgets draw straight from the cached list with no network, and a background job checks AniList's notifications even while Karasu is closed.",
-    bullets: ["Share an anilist.co link into Karasu to open it there", "Widgets: Airing Today, Continue Watching, Continue Reading, This Week"],
+    text: "The Android build is a sideloaded APK that updates itself afterwards, with the same list, the same statistics and Jellyfin detection that can keep running with the screen off. Four home-screen widgets draw straight from the cached list with no network, and a background job checks AniList's notifications even while Karasu is closed.",
+    bullets: ["Pull a list down to sync, hold a title for its actions, swipe up from the bar for the palette", "Share an anilist.co link into Karasu to open it there", "Widgets: Airing Today, Continue Watching, Continue Reading, This Week"],
     media: <PhonePair a="phone-list" b="phone-detail" />,
   },
   {

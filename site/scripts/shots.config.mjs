@@ -9,7 +9,7 @@
  */
 export const DESKTOP = [
   { id: "overview", file: "overview.png", alt: "The Overview shows this season's most popular title in a banner, four statistics tiles, this week's airing episode and the titles airing soon.", caption: "Overview — the season, your numbers, what airs this week" },
-  { id: "now-playing", file: "now-playing.png", alt: "The Overview with the Now Playing card at the top: Katanagatari, episode 3, playing in mpv, progress updating in 31 minutes.", caption: "Now Playing — an episode detected in mpv, the update counting down" },
+  { id: "now-playing", file: "now-playing.png", alt: "The Now Playing window floating over the Overview: the cover of Katanagatari, episode 3 playing in mpv, the progress update counting down, and the update, skip and fix-match buttons in its header.", caption: "Now Playing — the floating window, an episode detected in mpv" },
   { id: "anime-grid", file: "anime-grid.png", alt: "The anime list as a cover grid, with status tabs, a search field, sort and format filters above it.", caption: "Anime list, grid view" },
   { id: "anime-rows", file: "anime-rows.png", alt: "The anime list as rows: cover, title, status, score and episode count editable in place, dates and tags beside them.", caption: "Anime list, rows — status, score and progress edited in place" },
   { id: "manga-grid", file: "manga-grid.png", alt: "The manga list as a cover grid.", caption: "Manga list, grid view" },

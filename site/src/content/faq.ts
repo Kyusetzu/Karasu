@@ -27,7 +27,7 @@ export const FAQ: Faq[] = [
   },
   {
     q: "Which platforms are supported?",
-    a: "Windows and Android are Stable, Linux is an experimental AppImage, and there is no macOS build. Windows has every feature. Android has the list, statistics, notifications, widgets and the social pages, but no local library, no tray and no in-app updater. Detection differs: Windows reads media sessions, player and browser windows, mpv and Jellyfin; Linux reads media sessions, mpv and Jellyfin, with no window titles; Android reads Jellyfin.",
+    a: "Windows and Android are Stable, Linux is an experimental AppImage, and there is no macOS build. Windows has every feature. Android has the list, statistics, notifications, widgets, the social pages and its own updater, but no local library and no tray. Detection differs: Windows reads media sessions, player and browser windows, mpv and Jellyfin; Linux reads media sessions, mpv and Jellyfin, with no window titles; Android reads Jellyfin.",
   },
   {
     q: "Does Karasu store my AniList credentials?",

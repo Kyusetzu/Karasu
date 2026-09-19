@@ -3,8 +3,10 @@
 Every claim the site makes, and what in the repository makes it true. A
 sentence with no row here does not go on the page; a row whose evidence
 moves takes the sentence with it. Paths are relative to the repository root;
-line numbers are as of the v1.0.0 tag and drift with edits, the file names
-do not.
+the file names are what a row points at, and a row whose file moves is
+rewritten with it. The site describes `main` (the Nightly), not only the
+newest tag; where a feature is newer than the Stable download, the row
+names the version that shipped it.
 
 Status: **confirmed** (read in the code), **partial** (true with the stated
 limit, and the page states it), **mock** (a drawn stand-in, labelled as
@@ -24,7 +26,7 @@ such in the code and showing no invented data).
 | 8 | "MIT licensed · © 2026 Kyu and Karasu contributors" | `LICENSE:3`, `src-tauri/tauri.conf.json` `copyright` | confirmed |
 | 9 | "not affiliated with or endorsed by AniList" | no affiliation exists; public API with a public client id | confirmed |
 | 10 | "SN Pro is used under the SIL Open Font License 1.1" | `site/public/fonts/OFL.txt` (from `@fontsource/sn-pro`) | confirmed |
-| 11 | The hero scene: mpv, "Anime Title", "Updated to episode 1" | a drawn scene in the app's Now Playing recipe (`src/components/media/NowPlayingCard.tsx`), neutral titles, no data | mock |
+| 11 | The hero scene: mpv, "Anime Title", "Updated to episode 1" | a drawn scene in the app's Now Playing recipe (`src/components/media/DetectionSurface.tsx`, drawn by `src/components/shell/DetectionPopup.tsx`), neutral titles, no data | mock |
 
 ## The problem, and how it works
 
@@ -60,7 +62,7 @@ such in the code and showing no invented data).
 |---|---|---|---|
 | 30 | List cached in a local SQLite database | `src-tauri/src/db.rs` `list_cache` | confirmed |
 | 31 | Offline detail page with a working +1 for a title on your list; nothing for one that is not | `src/components/media/OfflineDetail.tsx` | confirmed |
-| 32 | Edits queued, per account, inspectable and discardable in Settings, sent in order on return | `db.rs` `offline_queue` with `user_id` (schema v16); `src-tauri/src/commands/list.rs` drain paths; `QueueSection` in Settings → Advanced | confirmed |
+| 32 | Edits queued, per account, inspectable and discardable in Settings, sent in order on return | `db.rs` `offline_queue` with `user_id` (schema v16); `src-tauri/src/commands/list.rs` drain paths; `QueueSection` (defined in `AdvancedPane.tsx`, rendered in the Import & export pane, `src/lib/settingsPanes.ts` `data`) | confirmed |
 | 33 | "'Queued' is never 'saved' — the receipt says which" | `CLAUDE.md` invariant "Queued is not success", `Outcome::{Landed, Queued, Refused}`; `useListMutations.ts` receipt text | confirmed |
 
 ## Statistics
@@ -71,7 +73,7 @@ such in the code and showing no invented data).
 | 35 | Charts drawn by hand in SVG: radar, sunburst, treemap, area, dot plot, gradient bars, heatmaps; no chart library | `src/components/stats/Charts.tsx`, `AreaChart.tsx`, `DotPlot.tsx`, `GradientBars.tsx`, `Heatmap.tsx`, `DayHeatmap.tsx`; `CLAUDE.md` Charts note | confirmed |
 | 36 | "Your scores against the crowd … computed from your cached list" | `Statistics.tsx` `ScoreDeltaSummary` | confirmed |
 | 37 | "A poster of your year or season in five crops, exported as PNG or JPEG at up to 3×" | `src/pages/Wrapped.tsx` `PresetKey` (five), export format and scale; `src/lib/wrapped.ts` `availableSeasons` | confirmed |
-| 38 | "Half of it is drawn from the list Karasu already holds — the sunburst, your watch time, your scores against the crowd — and the rest is AniList's own statistics, fetched once and kept for half an hour" | `src/pages/Statistics.tsx`: the sunburst, watch time and `ScoreDeltaSummary` come from the cached `mediaList`; the ratings, years, genres and people tabs come from `useQuery` → `userStatistics` (`USER_STATS_QUERY` in `src/api/queries.ts`, `staleTime` 30 min); local mode is cache-only (`LocalStatistics`). The earlier wording "costs no requests and is there offline too" was wrong and was replaced on 2026-09-06 | confirmed |
+| 38 | "Half of it is drawn from the list Karasu already holds — the sunburst, your watch time, your scores against the crowd — and the rest is AniList's own statistics, fetched once and kept for half an hour" | `src/pages/Statistics.tsx`: the sunburst, watch time and `ScoreDeltaSummary` come from the cached `mediaList`; the ratings, years, genres and people tabs come from `useQuery` → `userStatistics` (`USER_STATS_QUERY` in `src/api/queries.ts`, `staleTime` 30 min in memory, plus the on-disk query cache's one-hour TTL for a reopened app); local mode is cache-only (`LocalStatistics`). The earlier wording "costs no requests and is there offline too" was wrong and was replaced on 2026-09-06 | confirmed |
 
 ## Features
 
@@ -85,7 +87,7 @@ such in the code and showing no invented data).
 | 44 | Manga in chapters and volumes; continue-reading row; manga sites recognised on Windows | list fields `progress`/`progressVolumes` (schema v7); `src/pages/Dashboard.tsx` continue-reading; `profiles.rs` manga sites; window detection Windows only | confirmed |
 | 45 | Airing notifications; opt-in sequel and on-hold reminders; AniList notifications in the same bell, grouped in bursts | `src-tauri/src/alerts/airing.rs`, `sequel.rs` (off by default), `stale.rs` (off by default), `site.rs`; `src/lib/notifGroups.ts` | confirmed |
 | 46 | Tray icon with Scrobble now, Sync now and the detection switch | `src-tauri/src/lib.rs` tray menu (desktop only) | confirmed |
-| 47 | Optional background check every 15, 30 or 60 minutes | `src/pages/settings/AniListPane.tsx` presets; `alerts/site.rs` `notif_bg_interval_min` | confirmed |
+| 47 | Optional background check every 15, 30 or 60 minutes, or any interval you type | `src/pages/settings/AniListPane.tsx` presets plus the custom field (15–720 min); `alerts/site.rs` `notif_bg_interval_min` | confirmed |
 | 48 | Android: sideloaded APK; the list, statistics, notifications, social pages; Jellyfin detection; four widgets from the cache with no network; background job with the app closed; share an anilist.co link | `release.yml` APK legs; `src-tauri/gen/android/.../Widgets.kt` + `src-tauri/src/widgets.rs`; `NotifJob.kt` + `src-tauri/src/background.rs`; `MainActivity.kt` SEND→VIEW; `AndroidManifest.xml` | confirmed |
 | 49 | Widgets: Airing Today, Continue Watching, Continue Reading, This Week | manifest receivers `Widgets$AiringToday`, `Widgets$ContinueWatching`, `Widgets$ContinueReading`, `Widgets$Week` | confirmed |
 | 50 | Seasonal page with a picker that reaches four years back (`src/components/ui/season-picker.tsx`, `latest - 3 … latest`, opened from the season title); Monday-first calendar with iCal export; franchise graph with pan and zoom; recommendations weighted by your scores; search across anime, manga, users, characters, staff, studios | `src/pages/Seasonal.tsx`; `src/lib/calendar.ts`, `src/lib/ical.ts`; `src/pages/Franchise.tsx`, `usePanZoom.ts`; `src/lib/recommend.ts`; `src/pages/Search.tsx` scopes | confirmed |
@@ -103,11 +105,11 @@ such in the code and showing no invented data).
 | 57 | Windows: installer, not code-signed (SmartScreen may warn), checksums | `release.yml` NSIS; `scripts/release/release-notes.ps1` "It is unsigned"; `SHA256SUMS.txt` published | confirmed |
 | 58 | Windows: every detection source; streaming and manga sites; tray; autostart; updater; portable mode | `profiles.rs`; `lib.rs` tray/autostart; `commands/update.rs`; `portable.rs` | confirmed |
 | 59 | Android: 7 and up; signed with the project key; arm64 and universal | `build.gradle.kts` `minSdk 24`; `release.yml` release signing; `rename-apk.ps1` | confirmed |
-| 60 | Android: detection is Jellyfin only; no in-app updater | `mpv_ipc.rs` mobile stub, no SMTC/MPRIS on mobile; `commands/update.rs` `updater_available()` false on mobile; `CLAUDE.md` | confirmed |
+| 60 | Android: detection is Jellyfin only and can keep running with the screen off; the app updates itself (the APK downloads over Wi-Fi, opens the installer on a tap); no local library | `mpv_ipc.rs` mobile stub, no SMTC/MPRIS on mobile; `TrackingService.kt` (1.9); `src-tauri/src/apk_update.rs` + `UpdateInstaller.kt` (1.11; `updater_available()` false on mobile is the desktop plugin, not the APK path); `src/pages/Settings.tsx` hides the Library pane; `CLAUDE.md` "The Android updater" | confirmed |
 | 61 | Linux: AppImage x86_64; needs webkit2gtk-4.1; MPRIS, mpv, Jellyfin; updater for a running AppImage; no window titles, no manga detection; tray needs a StatusNotifier host or closing quits | `release.yml` build-linux (ubuntu-22.04); `release-notes.ps1` boilerplate; `mpris.rs`; `detection/mod.rs`; `lib.rs` `tray_present` | confirmed |
 | 62 | "Stable … used every day by the maintainer; Experimental … built by CI, not used every day"; Linux Experimental | maintainer's statement, 2026-09-05; every Linux check in the repo is CI or a throwaway crate (`CLAUDE.md`) | confirmed (maintainer) |
 | 63 | "Version 1.0.0, released 2026-09-05"; the four asset links and the checksums | `site/src/generated/release.json` ← GitHub `releases/latest` via `site/scripts/release-info.mjs` (run by `pages.yml` with the workflow token; the committed file is the fallback) | confirmed |
-| 64 | Updates: Stable channel by default, checked once a day; Nightly one switch away in Settings → Desktop → Updates | `commands/update.rs` `stored_channel` default `stable` (schema v19 seeds `prerelease` for existing installs), `UPDATE_CHECK_THROTTLE_MS`; `src/pages/settings/AdvancedPane.tsx` `UpdatesSection` rendered in the Desktop pane | confirmed |
+| 64 | Updates: Stable channel by default, checked once a day; Nightly one switch away in Settings → Desktop → Updates | `commands/update.rs` `stored_channel` default `stable` (schema v19 seeds `prerelease` for existing installs), `UPDATE_CHECK_THROTTLE_MS`; `src/pages/settings/AdvancedPane.tsx` `UpdatesSection` rendered in the Desktop pane (on Android in the Account pane, `Settings.tsx` `ANDROID_EXTRA_SECTIONS`) | confirmed |
 
 ## AniList, open source, FAQ
 
@@ -116,7 +118,7 @@ such in the code and showing no invented data).
 | 65 | Reads and writes through the public GraphQL API; a token, never a password; no client secret | `src-tauri/src/anilist/client.rs`, `login.rs` (implicit grant) | confirmed |
 | 66 | Token kept in the OS credential store; an encrypted file in portable mode; the Android Keystore; never handed back to the web view (the browser hand-off is `src/hooks/useAniListLogin.ts` `openUrl`; the manual fallback in `commands/auth.rs` `anilist_connect` takes a pasted token once, and nothing returns it — `anilist_session` answers the cached viewer only) | `src-tauri/src/anilist/auth.rs` (keyring; DPAPI/XChaCha20 portable files); `src-tauri/src/keystore.rs`; `CLAUDE.md` hard constraint | confirmed |
 | 67 | "AniList allows about thirty requests a minute. Karasu batches, caches and never fetches on scroll" | `CLAUDE.md` rate-limit constraint and stepped-window measurement; `anilist/client.rs` limiter; no `IntersectionObserver` fetch anywhere | confirmed |
-| 68 | "Developed with heavy AI assistance, and every change reviewed by a human maintainer" | `CLAUDE.md` preamble; `README.md` | confirmed |
+| 68 | "Developed with heavy AI assistance, and every change reviewed by a human maintainer" | `CLAUDE.md` preamble; `README.md` "Built with AI" | confirmed |
 | 69 | Stack: Tauri 2, Rust, React 19 + TypeScript, Vite, Tailwind CSS v4, SQLite, TanStack Query, AniList GraphQL | `package.json`, `src-tauri/Cargo.toml`, `CLAUDE.md` Project | confirmed |
 | 70 | FAQ "What does Karasu talk to?": AniList API and image servers; GitHub for updates; the relations data on GitHub at most weekly; your Jellyfin server; Discord's local socket; bio images through a bounded proxy so those hosts learn your IP | `anilist/client.rs`; `tauri.conf.json` CSP `img-src *.anilist.co`; `commands/update.rs`; `playback/relations.rs` (7-day cache); `detection/jellyfin.rs`; `discord.rs`; `commands/images.rs` + `net.rs` (bounded, no cookies/referer, private hosts refused) | confirmed |
 | 71 | FAQ "Can Karasu work offline?" | rows 30–33 | confirmed |
@@ -139,14 +141,20 @@ description in row 80); the rest below were true but had no row.
 | 79 | The external links: Discord invite, the two issue templates, "Nightly builds" at `releases/tag/latest`, CONTRIBUTING, SECURITY, CHANGELOG, LICENSE | `site/src/site.config.ts` against `README.md` (invite), `.github/ISSUE_TEMPLATE/bug_report.yml` and `feature_request.yml`, `commands/update.rs` and `release.yml` (the `latest` tag), the four files at the repository root; every link answered 200 on 2026-09-06 | confirmed |
 | 80 | The head: title, meta description ("notices what you play — and, on Windows, what you read"), Open Graph, JSON-LD `SoftwareApplication` (`UtilitiesApplication`, price 0, author Kyu, MIT, `softwareVersion` from `release.json`) | `site/src/head.ts`, `site/src/site.config.ts`; rows 1–4, 8, 63; manga detection is window-title based and so Windows-only (`profiles.rs`), which is why the description names Windows | confirmed |
 | 81 | Screenshot captions and alt texts: "Command palette (Ctrl+K)", "Monday-first" calendar, the Seasonal switcher, "Everything" on the calendar | `src/components/shell/CommandPalette.tsx` (Ctrl+K), `src/lib/calendar.ts` (Monday first), `src/components/ui/season-picker.tsx`, the calendar's scope filter; `site/scripts/shots.config.mjs` is the source, `site/src/content/screenshots.ts` the generated copy | confirmed |
-| 82 | Gallery "a capture of the app as it ships"; Features "Each of these is in the current release" | the captures are of build 1.0.3.566, whose UI is 1.0.0's: the three commits between (`e45710f`, `ce767ef`, `2058537`) touch the roadmap, the Tailwind scan and the workflows only; every feature named is in the 1.0.0 release | confirmed |
-| 83 | FAQ "Windows has every feature. Android has the list, statistics, notifications, widgets and the social pages, but no local library, no tray and no in-app updater" | `src/pages/Settings.tsx` hides the Library and Desktop panes on Android; `commands/update.rs` `updater_available` false on mobile; `lib.rs` tray is desktop-only; rows 48, 60 | confirmed |
+| 82 | Gallery "a capture of the app as it ships"; Features "Each of these is in the current release" | desktop captures of 1.10.6.623 (2026-09-14; the calendar, palette and light-theme ones of 1.0.3.566) and phone captures of 1.0.3.566 (2026-09-06); every feature named is on `main` and in the Nightly, and in the next Stable tag | confirmed |
+| 83 | FAQ "Windows has every feature. Android has the list, statistics, notifications, widgets, the social pages and its own updater, but no local library and no tray" | `src/pages/Settings.tsx` hides the Library and Desktop panes on Android; `src-tauri/src/apk_update.rs`; `lib.rs` tray is desktop-only; rows 48, 60 | confirmed |
+| 84 | "Right-click a title for everything you can do to it; the palette and the phone's long press offer the same list" | `src/lib/actions.ts` resolves one action list; `src/components/shell/ActionHost.tsx` owns right-click and the 500 ms press and draws `ContextMenu.tsx` or `ActionSheet.tsx`; `CommandPalette.tsx` reads the same resolver (1.12–1.16) | confirmed |
+| 85 | Android: "Pull a list down to sync, hold a title for its actions, swipe up from the bar for the palette" | `src/hooks/usePullToSync.ts` + `src/lib/pullToSync.ts`; row 84; `src/components/shell/BottomBar.tsx` + `src/lib/navSwipe.ts`; measured on the maintainer's phone on 2026-09-19 (PR #27) | confirmed |
+| 86 | Android "updates itself: the APK for your device downloads over Wi-Fi and opens the installer when you tap" | `src-tauri/src/apk_update.rs` (metered network refused unless `apk_download_metered`, sha256 and signing-certificate checks), `UpdateInstaller.kt`, `src/pages/About.tsx` `ApkUpdatePanel`, the bell row, the start prompt (1.11) | confirmed |
+| 87 | Now Playing caption: "the floating window, an episode detected in mpv" | `src/components/shell/DetectionPopup.tsx` (floats on every route, drags and resizes on desktop, `lib/detectionLayout`), `src/components/media/DetectionSurface.tsx` (cover, season and episode, the episode's name, the three verbs in the header) (1.16–1.17) | confirmed |
 
 ## Screenshots
 
-All twenty-two are captures of build 1.0.3.566 taken on 2026-09-06 on the
-maintainer's account (desktop: the isolated rig at 1440×900, rendered at 2×;
-phone: the release APK over adb). The local library shows a folder of empty
-files named like clean releases. The Now Playing capture is a real mpv
-window under `--force-media-title`. Nothing is composited or edited beyond
-resizing and encoding. Approved by the maintainer on 2026-09-06.
+All twenty-two are captures on the maintainer's account: desktop from the
+isolated rig at 1440×900, rendered at 2× — fourteen of build 1.10.6.623
+(2026-09-14), the calendar, palette and light-theme ones of 1.0.3.566
+(2026-09-06); phone from the release APK of 1.0.3.566 over adb
+(2026-09-06). The local library shows a folder of empty files named like
+clean releases. The Now Playing capture is a real mpv window under
+`--force-media-title`. Nothing is composited or edited beyond resizing and
+encoding. Approved by the maintainer on 2026-09-06; the 1.10.6 set on 2026-09-19.

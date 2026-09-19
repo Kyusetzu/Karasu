@@ -12,7 +12,8 @@ verified by a human maintainer before it lands.
 [Taiga](https://github.com/erengy/taiga). It detects what you play/read locally
 and in the browser and scrobbles your AniList progress automatically.
 
-- **Shell:** Tauri 2 (Rust backend, WebView2)
+- **Shell:** Tauri 2 (Rust backend; WebView2 on Windows, WebKitGTK on Linux,
+  the system WebView on Android)
 - **Frontend:** React 19 + TypeScript + Vite + Tailwind CSS v4
 - **State:** TanStack Query (server), Zustand (client), i18next (i18n)
 - **Charts:** drawn by hand in SVG/JSX; `d3-array`, `d3-scale` and `d3-shape`
@@ -23,8 +24,9 @@ and in the browser and scrobbles your AniList progress automatically.
   `grid-template-columns` rather than recomputing the CSS in JS
 - **Storage:** SQLite via rusqlite (bundled); tokens in the OS credential store
 - **Detection:** system media sessions (SMTC on Windows, MPRIS on Linux) +
-  Win32 window enumeration (Windows only) + an optional Jellyfin `/Sessions`
-  source, with a custom release-name parser
+  Win32 window enumeration (Windows only, with WASAPI pause detection) + an
+  optional Jellyfin `/Sessions` source + an opt-in mpv JSON IPC socket (the
+  real file path and a live position), with a custom release-name parser
 - **Platforms:** Windows and Linux (x86_64), plus Android (sideloaded APK;
   arm64 is the one that matters). Window-title detection is Windows only —
   there is no X11/Wayland enumerator and Wayland forbids one — so on Linux the
@@ -49,10 +51,13 @@ src/
   components/
     ui/              primitives with no app knowledge (kebab-case files)
     shell/           the window frame and global machinery — titlebar, sidebar,
-                     bell, command palette, keyboard sheet, toast, the pull-to-sync
-                     indicator, the floating detection popup, and the action host,
+                     bottom bar, back button, bell, command palette, keyboard
+                     sheet, global keys, toast, first run, session expired, the
+                     sync panel, the pull-to-sync indicator, the detection pill
+                     and the floating detection window, and the action host,
                      which owns right-click and long press and renders the context
                      menu or the action sheet over one resolved list of actions
+                     (actionIcons/actionLabels are its two lookup tables)
     media/           anything that renders a title or edits an entry
     overlays/        modal flows (confirm, preset, random pick, sign-in merge,
                      profile edit, match picker, favourites, new thread,
@@ -67,40 +72,53 @@ src/
     social/          the parts UserProfile, Social and Thread draw — the
                      markdown renderer, follow button, user and activity and
                      thread rows, and the two composers
-    EmptyState · Skeleton · KarasuMark · FilteredNotice — cross-cutting,
-    belong to no group; FilteredNotice is the content filter's one disclosure
-    line, so the three surfaces that show it cannot drift apart
+    EmptyState · Skeleton · KarasuMark · FilteredNotice · ErrorBoundary ·
+    RichText — cross-cutting, belong to no group; FilteredNotice is the
+    content filter's one disclosure line, so the three surfaces that show it
+    cannot drift apart
   hooks/             shared hooks (useListMutations, usePrimedLists,
                      useColumnCount, useRowTier, useListSummary, usePanZoom,
                      useCachedEntry, usePresence, useViewTransitions,
                      useAniListLogin, useFollow, useSocialActions,
                      useFavourite, useActivityPost, useUpdateUser,
-                     usePhoneShell, useBackClose, useNotifBadge,
-                     useDialogFocus, useGridRoving, useSyncStatus,
-                     useManualSync, usePullToSync, useActionRunner)
+                     usePhoneShell, useShortViewport, useElementWidth,
+                     useBackClose, useNotifBadge, useDialogFocus,
+                     useGridRoving, useSyncStatus, useManualSync,
+                     usePullToSync, useActionRunner, useCachedMedia,
+                     useDetectionMedia, useDetectionDrag)
   i18n/              index.ts (setup) + en.ts + de.ts; `de: typeof en` enforces
                      key parity across the two files
   lib/               pure logic + its *.test.ts — the place testable code goes
-  pages/             one per route; settings/ holds the eight panes
+  pages/             one per route; settings/ holds the pane files — the eight
+                     pane ids live in `lib/settingsPanes.ts`, and the desktop
+                     and data panes are sections exported from AdvancedPane
   stores/            Zustand stores (auth, theme, library, nowPlaying, …)
+  assets/            karasu-mark.svg, the one asset the bundle inlines
+  test/              render.tsx — the provider wrapper and sign-in helpers for
+                     the jsdom project, and nothing in the node project imports it
 src-tauri/src/
-  commands/          95 of the 110 frontend-facing commands, by subject:
+  commands/          102 of the 126 frontend-facing commands, by subject:
                      auth · images · list · playback · prefs · system ·
-                     update. The other 15 are the library scanner's, in
-                     `library.rs`.
+                     update. The other 24 are the library scanner's 15 in
+                     `library.rs` and the Android updater's 9 in
+                     `apk_update.rs`.
                      `mod.rs` re-exports all of it, so `commands::x` paths and
                      `generate_handler!` do not care which file a command is in.
                      Note what is *not* here: the entire social surface adds no
                      command at all, because `anilist_query` in `auth.rs` is a
                      generic authenticated passthrough and the token stays in
                      Rust either way
-  playback/          the pipeline: detection/ (Win32 windows, media_session/
-                     — SMTC on Windows, Jellyfin) →
+  playback/          the pipeline: detection/ (Win32 windows + WASAPI audio
+                     state, media_session/ — SMTC on Windows, MPRIS on Linux —,
+                     Jellyfin with its UDP discovery, the opt-in mpv IPC socket,
+                     and profiles: which processes and sites count) →
                      recognition/ (release-name parser, fuzzy matcher) →
                      relations (episode redirects) → scrobbler (when to write)
   alerts/            the background passes that end in a notification —
-                     airing, sequel, stale, and notify itself
-  anilist/           auth (token handling), API client
+                     airing, sequel, stale, site (AniList's own notifications
+                     as a summary toast), and notify itself
+  anilist/           auth (token handling), login (the localhost OAuth
+                     callback), client (the limiter), query_cache (v20)
   db.rs              SQLite: PRAGMA user_version migrations + row helpers
   identify.rs        the AniList search pass for titles the local matcher
                      cannot place — 25 per request, capped at 8 requests a
@@ -199,7 +217,9 @@ src-tauri/src/
   widgets.rs         the home-screen widgets' projection file (widgets.json),
                      rewritten whenever the list cache moves; Widgets.kt
                      renders it with no network and no schema knowledge
-  discord.rs · library.rs · portable.rs
+  apk_update.rs      the Android in-app updater, see "The Android updater"
+  discord.rs · library.rs · portable.rs · lib.rs (setup, the handler list,
+  the background loops) · main.rs
 scripts/             bump-version.mjs (every commit), anilist-query.mjs
                      (validate a query live), android-check.ps1 (the fast
                      cfg(mobile) gate — cargo check for aarch64 with the NDK
@@ -561,7 +581,7 @@ Six commands, in this order. Don't do any of it by hand.
 
 ```sh
 node scripts/bump-version.mjs patch   # minor for features, major for breaks
-npm run verify                        # typecheck + vitest + cargo test
+npm run verify                        # typecheck + comment audit + vitest + cargo test
 git commit                            # message ends with the Co-Authored-By trailer
 node scripts/changelog.mjs            # after the commit — it reads the commit
 git commit --amend --no-edit          # fold the changelog in, then re-run:
@@ -639,7 +659,7 @@ intent: prefer one good line.
 **Two vitest projects, and the filename picks one.** Everything runs in **node**
 by default; only `*.dom.test.tsx` boots jsdom and Testing Library, via the
 `projects` block in `vite.config.ts`. That split is what keeps the suite fast
-(~900 tests in a handful of seconds), and it is a *name* rather than an inference on purpose:
+(~1,200 tests in a handful of seconds), and it is a *name* rather than an inference on purpose:
 `components/stats/Charts.test.tsx` renders with `renderToStaticMarkup` and needs
 no DOM, so an extension rule (`.tsx` ⇒ jsdom) dragged it into one and the suite
 went from 2.0 s to **14.1 s**. Needing a DOM is a decision, so it is spelled out
@@ -1230,9 +1250,9 @@ four or five places, made by careful code, because nothing said it once.
   out of the gated modules — `media_session/mod.rs` is the pattern: the backends
   supply data, the shared module decides, and its tests then run on both
   platforms instead of only in the Linux CI job. macOS is deliberately *not*
-  covered: the keyring dependency is `cfg(target_os = "linux")`, so a macOS
-  build fails at the manifest rather than compiling a Secret Service backend
-  that cannot work there.
+  covered: the keyring dependency is declared for `cfg(windows)` and
+  `cfg(target_os = "linux")` only, so a macOS build fails at the manifest
+  rather than compiling a Secret Service backend that cannot work there.
 - **Accent colours** derive shades + a readable ink colour (`src/lib/contrast.ts`);
   use `text-accent-ink` on accent-filled controls rather than hard-coded
   `text-white`.
@@ -1283,7 +1303,7 @@ four or five places, made by careful code, because nothing said it once.
   following, user search, activities, threads, comments — uses
   `useInfiniteQuery` with `fetchNextPage` on a click and no `IntersectionObserver`
   anywhere. The reason is the limiter in `anilist/client.rs`: it is a ~30/min
-  brake shared with the scrobbler and the three alert passes, and it reads its
+  brake shared with the scrobbler and the four alert passes, and it reads its
   budget then drops the lock *before* any response header lands, so it cannot see
   a burst it has not sent. A feed that fetches because the user scrolled spends
   that budget with nobody asking. Two further traps, worth knowing before

@@ -50,10 +50,10 @@ An ordinary account is enough; Karasu deliberately does not use an admin API
 key, because an API key makes Jellyfin report every session on the server
 rather than only your own.
 
-Karasu contacts AniList, GitHub (update checks on every platform, downloads
-on desktop only — on Android the check is a notice pointing at the releases
-page, and nothing is downloaded or installed) and a localhost callback during
-login. On
+Karasu contacts AniList, GitHub (update checks and downloads on every
+platform — on Android the APK for the device is downloaded into the app's
+cache, verified, and handed to the system installer only when you tap) and a
+localhost callback during login. On
 Android the callback server still runs on localhost; its success page hands
 control back to the app through the `karasu://` custom scheme. A Jellyfin
 server you configure yourself is contacted too; that is your machine, not
@@ -95,12 +95,18 @@ neither is obvious from the screen you are on:
 
 Things worth reporting: the app mishandling or leaking either secret, a way to
 execute arbitrary code via a malicious media title/filename/response, or a
-flaw in the desktop update mechanism (Karasu verifies every downloaded update
-against its own signing key — a way to bypass that would be serious). Android
-has no update mechanism to attack: the APK updates by `adb install -r` or a
-store, and its trust anchor is the Android signing key — CI signs release APKs
-from repository secrets, and Android itself refuses to install over an APK
-whose signature does not match.
+flaw in either update mechanism. On desktop Karasu verifies every downloaded
+update against its own minisign key — a way to bypass that would be serious.
+On Android the manifest carries no minisign signature; the downloaded APK is
+checked against the manifest's sha256, and then its signing certificates must
+equal the installed app's and its `versionCode` must be higher before the
+installer is ever opened (`src-tauri/src/apk_update.rs`, `UpdateInstaller.kt`).
+The trust anchor there is the Android signing key — CI signs release APKs from
+repository secrets, and Android itself refuses to install over an APK whose
+signature does not match. The download runs only in a release build, only
+while the app is in front, and only on an unmetered network unless you switch
+that off; the consent the app cannot give itself is the per-app "install
+unknown apps" permission.
 
 ## The log file
 
@@ -148,7 +154,8 @@ key will not verify against yours and vice versa.
 
 Karasu publishes two channels: tagged `v*` releases (the **Stable** channel,
 which the updater follows by default) and the rolling `latest` prerelease
-(the **Nightly** channel), rebuilt on every push to `main`. Only the newest
+(the **Nightly** channel), rebuilt on every push to `main` that touches the
+app (a website-only push builds nothing). Only the newest
 tagged release is supported; please report issues against it, or against the
 current `latest` build if you are on Nightly. There is no LTS branch.
 

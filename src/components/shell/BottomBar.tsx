@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { NavLink, useLocation } from "react-router";
 import { useTranslation } from "react-i18next";
-import { Info, LayoutGrid, RefreshCw, Settings, X } from "lucide-react";
+import { Command, Info, LayoutGrid, RefreshCw, Settings, X } from "lucide-react";
 import { GROUPS, visibleGroups, type NavItem } from "@/components/shell/Sidebar";
 import { usePresence } from "@/hooks/usePresence";
 import { useDialogFocus } from "@/hooks/useDialogFocus";
@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { isAndroid, usePlatform } from "@/stores/platform";
 import Bell from "@/components/shell/Bell";
 import { useNotifBadge } from "@/hooks/useNotifBadge";
+import { isPaletteSwipe } from "@/lib/navSwipe";
 
 /** The phone shell's four bar slots; everything else is behind a More sheet built from the sidebar's `GROUPS`. */
 const SLOTS = ["/", "/list", "/manga", "/search"];
@@ -30,15 +31,13 @@ function sheetGroups(android: boolean): { label: string; items: NavItem[] }[] {
     }))
     .filter((g) => g.items.length > 0);
   // Settings and About sit outside `GROUPS` in the sidebar's footer; without this the phone cannot reach either.
-  groups.push({
-    label: "nav.groupApp",
-    items: [
-      // The phone's one road to the queue and the sync button; the desktop's sidebar panel never renders here.
-      { to: "/settings?pane=data", key: "nav.sync", icon: RefreshCw },
-      { to: "/settings", key: "nav.settings", icon: Settings },
-      { to: "/about", key: "nav.about", icon: Info },
-    ],
-  });
+  const app: NavItem[] = [
+    { to: "/settings", key: "nav.settings", icon: Settings },
+    { to: "/about", key: "nav.about", icon: Info },
+  ];
+  // Android pulls a screen down to sync, so the row would be a second door to one place; elsewhere it is the only one.
+  if (!android) app.unshift({ to: "/settings?pane=data", key: "nav.sync", icon: RefreshCw });
+  groups.push({ label: "nav.groupApp", items: app });
   return groups;
 }
 
@@ -62,6 +61,11 @@ export default function BottomBar() {
   }, [moreOpen]);
   const { pathname } = useLocation();
   const badge = useNotifBadge();
+  // The bar is the gesture surface, so the swipe is recognised here rather than over a reserved strip of the page.
+  const swipe = useRef<{ x: number; y: number; at: number } | null>(null);
+  const swallowTap = useRef(false);
+
+  const openPalette = () => window.dispatchEvent(new Event("open-command-palette"));
   // "More" reads active when the page is none of the four slots; the bar must always show where you are.
   const inSheet = !SLOTS.some((s) =>
     s === "/" ? pathname === "/" : pathname.startsWith(s),
@@ -110,6 +114,17 @@ export default function BottomBar() {
                 </button>
               </div>
             </div>
+            <button
+              type="button"
+              onClick={() => {
+                setMoreOpen(false);
+                openPalette();
+              }}
+              className="mb-2 flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-sm text-ink-400 transition-surface hover:bg-surface-850 hover:text-ink-200"
+            >
+              <Command className="size-4.5 shrink-0" />
+              <span>{t("ctx.palette")}</span>
+            </button>
             {sheetGroups(android).map((g) => (
               <div key={g.label} className="mb-2 last:mb-0">
                 <p className="px-1 pb-1 text-[.625rem] font-medium uppercase tracking-wide text-ink-700">
@@ -145,7 +160,35 @@ export default function BottomBar() {
       {/* The primary navigation landmark, named as such and like no other landmark, since screen readers list them by label. */}
       <nav
         aria-label={t("nav.primary")}
-        className="flex shrink-0 items-stretch gap-1 border-t border-hair bg-surface-900 px-2 pb-[max(env(safe-area-inset-bottom),0.375rem)] pt-1.5"
+        // `touch-none`: the bar scrolls nothing, and without it Chromium claims the upward flick before it is recognised.
+        className="flex shrink-0 touch-none items-stretch gap-1 border-t border-hair bg-surface-900 px-2 pb-[max(env(safe-area-inset-bottom),0.375rem)] pt-1.5"
+        onPointerDown={(e) => {
+          if (e.pointerType === "mouse") return;
+          swipe.current = { x: e.clientX, y: e.clientY, at: Date.now() };
+        }}
+        onPointerUp={(e) => {
+          const from = swipe.current;
+          swipe.current = null;
+          if (!from || document.querySelector("[data-overlay]")) return;
+          const sample = {
+            dx: e.clientX - from.x,
+            dy: e.clientY - from.y,
+            ms: Date.now() - from.at,
+          };
+          if (!isPaletteSwipe(sample)) return;
+          // The slot under the finger would otherwise navigate on the click that follows the flick.
+          swallowTap.current = true;
+          openPalette();
+        }}
+        onPointerCancel={() => {
+          swipe.current = null;
+        }}
+        onClickCapture={(e) => {
+          if (!swallowTap.current) return;
+          swallowTap.current = false;
+          e.preventDefault();
+          e.stopPropagation();
+        }}
       >
         {slotItems().map((item) => (
           <NavLink

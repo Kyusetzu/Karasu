@@ -19,12 +19,20 @@ import { isAndroid, usePlatform } from "@/stores/platform";
 import { ANDROID_HIDDEN_ROUTES } from "@/components/shell/Sidebar";
 import { usePresence } from "@/hooks/usePresence";
 import { useBackClose } from "@/hooks/useBackClose";
+import { resolveActions } from "@/lib/actions";
+import { useActionLabel } from "@/components/shell/actionLabels";
+import { useActionRunner } from "@/hooks/useActionRunner";
+import { useManualSync } from "@/hooks/useManualSync";
+import { useScoreFormat } from "@/stores/auth";
+import { isTauri } from "@/api/anilist";
 
 interface Item {
   id: string;
   label: string;
   sub?: string;
+  /** Empty for a verb; `run` is what happens instead, so a command and a destination share one row. */
   path: string;
+  run?: () => void;
   cover?: string | null;
   native?: string | null;
 }
@@ -58,6 +66,11 @@ export default function CommandPalette() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const viewer = useAuth((s) => s.viewer);
+  const mode = useAuth((s) => s.mode);
+  const scoreFormat = useScoreFormat();
+  const label = useActionLabel();
+  const runAction = useActionRunner();
+  const { available: syncAvailable } = useManualSync();
   const level = useContentFilter((s) => s.level);
   const android = isAndroid(usePlatform((s) => s.info));
   const [open, setOpen] = useState(false);
@@ -126,6 +139,29 @@ export default function CommandPalette() {
     return out;
   }, [open, viewer, qc, t, level]);
 
+  // The verbs come from `lib/actions`, so the palette is a third presentation rather than a third list of commands.
+  const commands = useMemo<Item[]>(() => {
+    if (!open) return [];
+    return resolveActions(
+      { kind: "page" },
+      {
+        signedIn: viewer !== null || mode === "local",
+        scoreFormat,
+        scrobble: { phase: "idle", forceable: false, hasCurrent: false, overridden: false },
+        tauri: isTauri,
+        hasSelection: false,
+        canSync: syncAvailable,
+      },
+    )
+      .filter((a) => a.group === "command")
+      .map((action) => ({
+        id: `command:${action.id}`,
+        label: label(action, "ANIME"),
+        path: "",
+        run: () => runAction({ action, target: { kind: "page" }, selection: "", entry: null }),
+      }));
+  }, [open, viewer, mode, scoreFormat, syncAvailable, label, runAction]);
+
   // Grouped: a page and a title are different kinds of hit, and one ranked list hides which is which.
   const groups = useMemo<Group[]>(() => {
     const q = query.trim();
@@ -137,7 +173,12 @@ export default function CommandPalette() {
       label: t(n.key),
       path: n.path,
     }));
-    if (!q) return [{ key: "palette.groupGoTo", items: navItems }];
+    if (!q) {
+      return [
+        { key: "palette.groupActions", items: commands },
+        { key: "palette.groupGoTo", items: navItems },
+      ].filter((g) => g.items.length > 0);
+    }
     const pq = prepareQuery(q);
     // Ranked within each group; the stable sort keeps equal scores in cache-insertion order.
     const nav = navItems
@@ -151,11 +192,17 @@ export default function CommandPalette() {
       .sort((a, b) => b.score - a.score)
       .slice(0, MAX_RESULTS)
       .map((x) => x.item);
+    const verbs = commands
+      .map((item) => ({ item, score: fuzzyScore(prepareDoc([item.label]), pq) }))
+      .filter((x) => x.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .map((x) => x.item);
     return [
       { key: "palette.groupList", items: media },
+      { key: "palette.groupActions", items: verbs },
       { key: "palette.groupGoTo", items: nav },
     ].filter((g) => g.items.length > 0);
-  }, [query, entries, t, android]);
+  }, [query, entries, t, android, commands]);
 
   // One flat order for the keyboard, so ↑↓ crosses group boundaries the way the eye does.
   const results = useMemo(() => groups.flatMap((g) => g.items), [groups]);
@@ -172,7 +219,8 @@ export default function CommandPalette() {
 
   const go = (item: Item | undefined) => {
     if (!item) return;
-    navigate(item.path);
+    if (item.run) item.run();
+    else navigate(item.path);
     setOpen(false);
   };
 

@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 4e91b76 -->
+<!-- generated-through: 858fbe4 -->
 
 ### Fixed
 
@@ -83,6 +83,8 @@ tag time is then optional rather than load-bearing.
 - The now-playing ring no longer restarts on a card mounted mid-session (1.10.3.620).
 - An AniList profile link that carries the user's id, as the Statistics header's does, opens the profile in-app instead of "No such user".
 - Reading notifications one by one now clears the bell's badge, and "Mark all read" is always available.
+- A pull-to-sync gesture could fail to arm when two touch events arrived in the same frame.
+- A pull-to-sync left mid-way by a navigation no longer leaves its hint on the next screen, and a long press no longer selects the action sheet's title.
 
 ### Added
 
@@ -105,6 +107,14 @@ tag time is then optional rather than load-bearing.
 - Karasu now waits for the next episode's airing time instead of polling AniList every twenty minutes for new episodes.
 - The Wrapped page is built from the list Karasu already holds, and saving from a title's page no longer reloads it.
 - Exit cleanly when Windows ends the session; the quit panic was never the tray (1.10.4.621).
+- Every sync surface shares one lock, so a sync started elsewhere shows as running.
+- Pulling a screen down on the phone syncs, and Android drops the sync row (1.12.0.629).
+- Long-pressing a title on touch opens what can be done with it (1.13.0.631).
+- Swiping up from the bottom bar opens the command palette (1.14.0.632).
+- Right-clicking a title offers what can be done with it (1.15.0.633).
+- Detection floats over every screen, expanded or compact (1.16.0.634).
+- Four defects the adversarial pass found in the interaction work (1.16.2.636).
+- On the phone the list header no longer shows a reload button; pull the list down to sync.
 ## 1.0.0 — 2026-09-05
 
 Karasu 1.0.0 is the first tagged release: a desktop and Android tracker built

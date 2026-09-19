@@ -68,6 +68,7 @@ import { loadViewMode, saveViewMode, type ViewMode } from "@/lib/viewMode";
 import { usePhoneShell } from "@/hooks/usePhoneShell";
 import { BulkBar } from "@/components/list/BulkBar";
 import { canIncrement } from "@/components/list/shared";
+import { completePatch } from "@/lib/actions";
 
 type SortKey = "updated" | "title" | "score" | "progress";
 type SortDir = "asc" | "desc";
@@ -398,13 +399,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
   );
 
   const complete = useCallback(
-    (entry: MediaListEntry) => {
-      const max = maxProgress(entry.media);
-      quickSave(entry, {
-        status: "COMPLETED",
-        ...(max !== null ? { progress: max } : {}),
-      });
-    },
+    (entry: MediaListEntry) => quickSave(entry, completePatch(maxProgress(entry.media))),
     [quickSave],
   );
 
@@ -603,16 +598,19 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
               <CheckSquare className="size-3.75" />
               {t("bulk.select")}
             </Button>
-            <IconButton
-              variant="ghost"
-              onClick={() => refetch()}
-              disabled={isRefetching}
-              aria-label={t("common.reload")}
-            >
-              <RefreshCw
-                className={cn("size-4", isRefetching && "animate-spin")}
-              />
-            </IconButton>
+            {/* The phone shell syncs by pulling the list down, so the corner button would be a second spelling of it. */}
+            {!phone && (
+              <IconButton
+                variant="ghost"
+                onClick={() => refetch()}
+                disabled={isRefetching}
+                aria-label={t("common.reload")}
+              >
+                <RefreshCw
+                  className={cn("size-4", isRefetching && "animate-spin")}
+                />
+              </IconButton>
+            )}
           </div>
         </div>
 

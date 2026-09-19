@@ -54,6 +54,7 @@ export const GridCard = memo(function GridCard({
       statusRing={statusColorVar(entry.status)}
       data-media-id={media.id}
       data-media-type={media.type}
+      data-media-title={displayTitle(media.title)}
       // The focused cell wears the selection outline: both say "this is the one the next key acts on".
       selected={focused || (selectMode && selected)}
       // In select mode the cover is the checkbox target; navigating away mid-selection is never what the click meant.

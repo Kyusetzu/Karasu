@@ -1,10 +1,11 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { fetchMediaList, flushQueue } from "@/api/anilist";
 import type { MediaType } from "@/api/types";
 import { useAuth } from "@/stores/auth";
 import { showToast } from "@/stores/toast";
+import { acquire, isSyncing, release, subscribe } from "@/lib/syncLock";
 
 /** The whole-app sync; the lists are fetched explicitly because invalidation only refetches active observers. */
 export function useManualSync() {
@@ -12,18 +13,15 @@ export function useManualSync() {
   const { t } = useTranslation();
   const viewer = useAuth((s) => s.viewer);
   const mode = useAuth((s) => s.mode);
-  const [syncing, setSyncing] = useState(false);
-  // A ref guards re-entry, since a held Ctrl+R fires repeatedly and the callback would close over a stale `syncing`.
-  const busy = useRef(false);
+  // Shared rather than per-instance: the tray, Ctrl+R, the sidebar and the phone's pull gesture are one sync, not five.
+  const syncing = useSyncExternalStore(subscribe, isSyncing, isSyncing);
 
   /** Local mode has nothing to sync; signed out has nobody to sync for. */
   const available = mode === "anilist" && viewer !== null;
 
   const sync = useCallback(async () => {
     const userId = useAuth.getState().viewer?.id;
-    if (!userId || busy.current) return;
-    busy.current = true;
-    setSyncing(true);
+    if (!userId || !acquire()) return;
     try {
       // Drain first, so the lists fetched next already carry the queued edits; the order here is deliberate.
       await flushQueue().catch(() => {});
@@ -44,8 +42,7 @@ export function useManualSync() {
     } catch (e) {
       showToast({ kind: "error", text: t("sync.failed"), detail: String(e) });
     } finally {
-      busy.current = false;
-      setSyncing(false);
+      release();
     }
   }, [qc, t]);
 

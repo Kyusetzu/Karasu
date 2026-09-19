@@ -48,6 +48,11 @@ export const de: typeof en = {
     local: "Auf diesem PC gespeichert",
     localProfile: "Lokales Profil",
   },
+  pull: {
+    hint: "Zum Synchronisieren ziehen",
+    release: "Loslassen zum Synchronisieren",
+    syncing: "Wird synchronisiert …",
+  },
   syncPanel: {
     title: "Synchronisierung",
     open: "Details zur Synchronisierung",
@@ -193,6 +198,18 @@ export const de: typeof en = {
     reload: "Neu laden",
     palette: "Befehlspalette",
     settings: "Einstellungen",
+  },
+  actions: {
+    sheetLabel: "Aktionen",
+    addToList: "Zur Liste hinzufügen",
+    plusVolume: "+1 Band",
+    changeStatus: "Status ändern",
+    changeScore: "Bewertung ändern",
+    remove: "Von der Liste entfernen",
+    scrobbleNow: "Fortschritt jetzt aktualisieren",
+    scrobbleCancel: "Diesen nicht aktualisieren",
+    fixMatch: "Richtigen Titel wählen",
+    clearOverride: "Korrektur verwerfen",
   },
   notFound: {
     title: "Hier ist nichts",
@@ -701,6 +718,7 @@ export const de: typeof en = {
   palette: {
     placeholder: "Zu Seite oder Titel springen …",
     empty: "Keine Treffer.",
+    groupActions: "Aktionen",
     groupGoTo: "Gehe zu",
     groupList: "Deine Liste",
     hintMove: "↑↓ bewegen",
@@ -1179,6 +1197,9 @@ export const de: typeof en = {
     mdTruncated: "Dieses Profil ist länger als Karasu anzeigt — lies den Rest auf AniList.",
   },
   nowPlaying: {
+    title: "Jetzt läuft",
+    collapse: "Einklappen",
+    expand: "Ausklappen",
     heading: "Läuft gerade · {{process}}",
     headingManga: "Wird gelesen · {{process}}",
     updateIn: "Fortschritt wird in {{time}} aktualisiert",

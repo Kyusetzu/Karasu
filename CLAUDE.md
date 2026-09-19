@@ -49,7 +49,10 @@ src/
   components/
     ui/              primitives with no app knowledge (kebab-case files)
     shell/           the window frame and global machinery — titlebar, sidebar,
-                     bell, command palette, keyboard sheet, context menu, toast
+                     bell, command palette, keyboard sheet, toast, the pull-to-sync
+                     indicator, the floating detection popup, and the action host,
+                     which owns right-click and long press and renders the context
+                     menu or the action sheet over one resolved list of actions
     media/           anything that renders a title or edits an entry
     overlays/        modal flows (confirm, preset, random pick, sign-in merge,
                      profile edit, match picker, favourites, new thread,
@@ -74,7 +77,7 @@ src/
                      useFavourite, useActivityPost, useUpdateUser,
                      usePhoneShell, useBackClose, useNotifBadge,
                      useDialogFocus, useGridRoving, useSyncStatus,
-                     useManualSync)
+                     useManualSync, usePullToSync, useActionRunner)
   i18n/              index.ts (setup) + en.ts + de.ts; `de: typeof en` enforces
                      key parity across the two files
   lib/               pure logic + its *.test.ts — the place testable code goes
@@ -451,6 +454,31 @@ Metal Fury, three separate 51-episode entries, no spelling of "season 2" finds
 the right one — only the user can say, and the picker offers the AniList
 sequels so it is one click.
 
+**Interaction is one model with three presentations.** `lib/actions` resolves a
+target (a list entry, a title that is not one, the detection session, or the
+page) plus a context into the actions that would actually change something, and
+returns i18n *keys* rather than sentences. `ActionHost` owns both gestures —
+right-click from a mouse, a 500 ms press from a touch — resolves what was under
+it through the query cache (`findCachedMedia`, a read and never a fetch), and
+renders either the context menu or the bottom sheet. The palette reads the same
+resolver for its command group. So a new action is added once, in `lib/actions`
+plus its label and icon, and appears everywhere it applies. Two rules hold this
+together: an action that cannot run is omitted rather than drawn disabled, and
+every write goes through `useListMutations`, which is where receipts, Undo and
+the offline queue already live. The DOM carries identity only —
+`data-media-id`, `data-media-type` and `data-media-title` — because serialising
+an entry's state into attributes means keeping them in step with every quick
+save, and `dataset` is `string` either way.
+
+**The detection surface is the shell's, not the overview's.** `DetectionPopup`
+floats bottom-right on every route (docked above the bottom bar on the phone),
+in expanded or compact form, and the choice is a `localStorage` key
+(`lib/detectionView`). It is deliberately **not** a dialog: no `data-overlay`,
+no autofocus, `z-30` under every real overlay — detection arrives unprompted
+and must not take the keyboard from whatever is being done. There is still one
+detection and one `DetectionSurface`; the popup only chooses how much of it to
+draw.
+
 ## Versioning (every commit)
 
 Four-part scheme **`MAJOR.MINOR.PATCH.COMMIT#`**:
@@ -654,6 +682,16 @@ import it.
 - **`sdkmanager.bat --licenses` accepts only via cmd file redirection**
   (`< yes.txt`); both pipe forms feed it EOF and it exits silently having
   accepted nothing. Never run an installer with its output discarded.
+- **`tauri android build` rewrites `app/build.gradle.kts` on every run**, so a
+  hand edit there — an `applicationIdSuffix` for a side-by-side debug install,
+  say — is gone before the APK exists. Put such a local-only change in
+  `~/.gradle/init.d/*.gradle` instead (an init script sees the `android`
+  block of every project it builds); a debug APK under `dev.kyu.karasu.debug`
+  installs beside the release app, keeps its own data, and is what the
+  device test of 2026-09-19 ran on. Its WebView is debuggable — `adb forward
+  tcp:9223 localabstract:webview_devtools_remote_<pid>` plus Playwright's
+  `connectOverCDP` reads the DOM, and `adb shell run-as dev.kyu.karasu.debug`
+  reads its `karasu.log`. Neither works on the release package.
 - **Debug-signed and release-signed APKs do not install over each other.**
   Android refuses the signature change; the other one must be uninstalled
   first, which wipes app-local data. This is why CI publishes only

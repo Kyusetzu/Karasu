@@ -32,7 +32,6 @@ import {
   HeaderSkeleton,
   Shimmer,
 } from "@/components/Skeleton";
-import NowPlayingCard from "@/components/media/NowPlayingCard";
 import SeasonHero from "@/components/media/SeasonHero";
 import RecommendedSection from "@/components/media/RecommendedSection";
 
@@ -94,10 +93,7 @@ function DashboardContent({ userId }: { userId: number }) {
   // Keep the loading and error gates, one per list; an unloaded or failed list renders its empty states as fact.
   return (
     <div className="space-y-9 px-8 pb-12 pt-7">
-      {/* Pinned above the rest: the "right now" card is only useful while something is playing. */}
-      <NowPlayingCard />
-
-      {/* Outside the gate, below only now-playing: the one section not about your list needs no list to render. */}
+      {/* Outside the gate: the one section not about your list needs no list to render. */}
       <SeasonHero />
 
       {isLoading ? (

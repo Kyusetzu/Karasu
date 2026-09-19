@@ -21,6 +21,7 @@ import {
 import Titlebar from "@/components/shell/Titlebar";
 import Sidebar from "@/components/shell/Sidebar";
 import BottomBar from "@/components/shell/BottomBar";
+import PullToSync from "@/components/shell/PullToSync";
 import { usePhoneShell } from "@/hooks/usePhoneShell";
 import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
 import { internalRoute } from "@/lib/anilistUrl";
@@ -31,7 +32,8 @@ import KeyboardSheet from "@/components/shell/KeyboardSheet";
 import GlobalKeys from "@/components/shell/GlobalKeys";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useViewTransitions } from "@/hooks/useViewTransitions";
-import ContextMenu from "@/components/shell/ContextMenu";
+import ActionHost from "@/components/shell/ActionHost";
+import DetectionPopup from "@/components/shell/DetectionPopup";
 import SignInMerge from "@/components/overlays/SignInMerge";
 import Dashboard from "@/pages/Dashboard";
 import MediaList from "@/pages/MediaList";
@@ -158,9 +160,9 @@ export default function App() {
       <CommandPalette />
       <KeyboardSheet />
       <GlobalKeys />
-      <ContextMenu />
+      {/* Right-click and long press are one resolver with two renderers; the host owns both events. */}
+      <ActionHost />
       <SignInMerge />
-      <PlaybackError />
       <Toast />
       {/* The titlebar is desktop window furniture; the phone has the system status bar above and the bell in the bottom bar. */}
       {!phone && <Titlebar />}
@@ -213,6 +215,13 @@ export default function App() {
             </Suspense>
           </ErrorBoundary>
         </main>
+      </div>
+      {/* The touch shell's sync affordance; the sidebar's button serves the mouse one, so it is width-keyed. */}
+      {phone && <PullToSync />}
+      {/* One bottom-right stack: both float, and separately anchored they would sit on top of each other. */}
+      <div className="pointer-events-none fixed bottom-[calc(1rem+var(--shell-bottom,0px))] right-4 z-30 flex w-88 max-w-[calc(100vw-2rem)] flex-col items-stretch gap-2">
+        <PlaybackError />
+        <DetectionPopup />
       </div>
       {phone && <BottomBar />}
     </div>
@@ -273,7 +282,7 @@ function PlaybackError() {
 
   if (!error) return null;
   return (
-    <div className="fixed bottom-[calc(1rem+var(--shell-bottom,0px))] right-4 z-50 flex max-w-sm items-start gap-3 rounded-lg border border-surface-700 bg-surface-850 px-4 py-3 shadow-xl">
+    <div className="pointer-events-auto flex items-start gap-3 rounded-lg border border-surface-700 bg-surface-850 px-4 py-3 shadow-xl">
       <span className="text-sm text-ink-300">{error}</span>
       <button
         onClick={clearError}

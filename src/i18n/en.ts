@@ -1211,7 +1211,6 @@ export const en = {
     yourProgress: "Your progress: {{progress}}",
     noMatch: "No entry from your list recognized.",
     noAccount: "Detected, but there is no AniList list to match it against.",
-    updateNow: "Now",
     updateNowTitle: "Update progress now",
     correctTitle: "Wrong title? Pick the right one",
     skipTitle: "Don't update this one",

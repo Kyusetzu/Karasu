@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: f218d65 -->
+<!-- generated-through: e4debfa -->
 
 ### Fixed
 
@@ -117,6 +117,7 @@ tag time is then optional rather than load-bearing.
 - Four defects the adversarial pass found in the interaction work (1.16.2.636).
 - On the phone the list header no longer shows a reload button; pull the list down to sync.
 - The now-playing card is a small floating window with the cover, season and episode, the episode's name and the AniList details; on desktop it can be dragged anywhere and resized, and remembers both.
+- The now-playing window's update, skip and fix-match buttons sit in its header.
 ## 1.0.0 — 2026-09-05
 
 Karasu 1.0.0 is the first tagged release: a desktop and Android tracker built

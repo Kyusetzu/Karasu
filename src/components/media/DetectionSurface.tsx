@@ -12,7 +12,7 @@ import {
   type NowPlaying,
 } from "@/stores/nowPlaying";
 import { useAuth } from "@/stores/auth";
-import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/icon-button";
 import { Presence } from "@/components/ui/presence";
 import MatchPicker from "@/components/overlays/MatchPicker";
 import { DecodedImage } from "@/components/media/DecodedImage";
@@ -223,10 +223,6 @@ export default function DetectionSurface({
           </div>
         </div>
       </div>
-      {/* Its own row: the cover took the width the buttons used to share with the title. */}
-      <div className="mt-2.5 flex justify-end">
-        <ScrobbleActions playing={playing} />
-      </div>
     </div>
   );
 }
@@ -375,8 +371,8 @@ function blockedText(
   }
 }
 
-/** The card's buttons; the correction one is always there, since a wrong match needs fixing as much as a missing one. */
-function ScrobbleActions({ playing }: { playing: NowPlaying }) {
+/** The window's three verbs as icon buttons; the correction one is always there, a wrong match needs fixing too. */
+export function ScrobbleActions({ playing }: { playing: NowPlaying }) {
   const { t } = useTranslation();
   const scrobble = useNowPlaying((s) => s.scrobble);
   const [busy, setBusy] = useState(false);
@@ -409,34 +405,32 @@ function ScrobbleActions({ playing }: { playing: NowPlaying }) {
 
   return (
     <>
-      {/* Wrappable: two labelled buttons outgrow a phone in German, and `shrink-0` pushed the page wide instead. */}
-      <div className="flex flex-wrap justify-end gap-2">
+      <div className="flex shrink-0 items-center gap-0.5">
         {canScrobble && (
-          <>
-            <Button
-              size="sm"
-              disabled={busy}
-              onClick={() => act(scrobbleNow)}
-              title={t("nowPlaying.updateNowTitle")}
-            >
-              <Check className="size-3.5" /> {t("nowPlaying.updateNow")}
-            </Button>
-            {canSkip && (
-              <Button
-                size="sm"
-                variant="secondary"
-                disabled={busy}
-                onClick={() => act(scrobbleCancel)}
-                title={t("nowPlaying.skipTitle")}
-              >
-                <X className="size-3.5" />
-              </Button>
-            )}
-          </>
+          <IconButton
+            size="xs"
+            variant="success"
+            disabled={busy}
+            onClick={() => act(scrobbleNow)}
+            title={t("nowPlaying.updateNowTitle")}
+            aria-label={t("nowPlaying.updateNowTitle")}
+          >
+            <Check className="size-3.5" />
+          </IconButton>
         )}
-        <Button
-          size="sm"
-          variant="secondary"
+        {canScrobble && canSkip && (
+          <IconButton
+            size="xs"
+            disabled={busy}
+            onClick={() => act(scrobbleCancel)}
+            title={t("nowPlaying.skipTitle")}
+            aria-label={t("nowPlaying.skipTitle")}
+          >
+            <X className="size-3.5" />
+          </IconButton>
+        )}
+        <IconButton
+          size="xs"
           onClick={() => {
             setError(undefined);
             setCorrecting(playing);
@@ -445,7 +439,7 @@ function ScrobbleActions({ playing }: { playing: NowPlaying }) {
           aria-label={t("nowPlaying.correctTitle")}
         >
           <SearchCheck className="size-3.5" />
-        </Button>
+        </IconButton>
       </div>
 
       {/* `Presence`, not `PresenceIf`: the picker is opened by a value and would lose its seeded title during the exit. */}

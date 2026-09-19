@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { listen } from "@tauri-apps/api/event";
 import { ChevronDown, ChevronUp, GripHorizontal } from "lucide-react";
-import DetectionSurface from "@/components/media/DetectionSurface";
+import DetectionSurface, { ScrobbleActions } from "@/components/media/DetectionSurface";
 import { DecodedImage } from "@/components/media/DecodedImage";
 import { IconButton } from "@/components/ui/icon-button";
 import { useNowPlaying } from "@/stores/nowPlaying";
@@ -127,6 +127,7 @@ export default function DetectionPopup() {
           <p className="min-w-0 flex-1 truncate text-2xs font-medium uppercase tracking-[.09em] text-accent-400">
             {heading}
           </p>
+          <ScrobbleActions playing={playing} />
           {!phone && <GripHorizontal aria-hidden className="size-3.5 shrink-0 text-ink-600" />}
           {chevron}
         </div>

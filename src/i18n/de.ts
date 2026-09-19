@@ -1222,7 +1222,6 @@ export const de: typeof en = {
     yourProgress: "Dein Fortschritt: {{progress}}",
     noMatch: "Kein Eintrag deiner Liste erkannt.",
     noAccount: "Erkannt, aber es gibt keine AniList-Liste zum Abgleichen.",
-    updateNow: "Jetzt",
     updateNowTitle: "Fortschritt jetzt aktualisieren",
     correctTitle: "Falscher Titel? Den richtigen auswählen",
     skipTitle: "Nicht aktualisieren",

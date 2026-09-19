@@ -4,7 +4,7 @@ import { fireEvent, screen } from "@testing-library/react";
 import ActionHost from "./ActionHost";
 import { renderWithProviders, signIn, signOut } from "@/test/render";
 import { useNowPlaying } from "@/stores/nowPlaying";
-import type { ListResult, MediaListEntry } from "@/api/types";
+import { entry, listResult, media } from "@/test/fixtures";
 
 const saveListEntry = vi.hoisted(() => vi.fn(() => Promise.resolve({ queued: false })));
 vi.mock("@/api/anilist", async (importOriginal) => ({
@@ -13,44 +13,9 @@ vi.mock("@/api/anilist", async (importOriginal) => ({
   isTauri: true,
 }));
 
-const ENTRY: MediaListEntry = {
-  id: 55,
-  mediaId: 1,
-  status: "CURRENT",
-  score: 8,
-  progress: 3,
-  progressVolumes: 0,
-  repeat: 0,
-  notes: null,
-  updatedAt: 0,
-  private: false,
-  hiddenFromStatusLists: false,
-  customLists: {},
-  advancedScores: {},
-  startedAt: null,
-  completedAt: null,
-  media: {
-    id: 1,
-    title: { romaji: "Cowboy Bebop", english: null, native: null },
-    coverImage: { large: null },
-    episodes: 26,
-    format: "TV",
-    status: "FINISHED",
-    season: null,
-    seasonYear: null,
-    averageScore: null,
-    genres: [],
-    synonyms: [],
-    nextAiringEpisode: null,
-  },
-};
-
-const LIST: ListResult = {
-  lists: [{ name: "Watching", status: "CURRENT", isCustomList: false, entries: [ENTRY] }],
-  fromCache: false,
-  pending: 0,
-  fetchedAt: 0,
-};
+// Three episodes in, so a "+1" lands on 4 and the assertions below can name it.
+const ENTRY = entry({ progress: 3, media: media({ title: { romaji: "Cowboy Bebop", english: null, native: null } }) });
+const LIST = listResult([ENTRY]);
 
 /** A card as the three emitters render it: an id, a type, and a title, and nothing about the entry's state. */
 function card(id = "1", title = "Cowboy Bebop"): HTMLElement {

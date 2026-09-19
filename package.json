@@ -1,18 +1,29 @@
 {
   "name": "karasu",
   "private": true,
-  "version": "1.17.3",
+  "version": "1.17.4",
   "type": "module",
   "author": "Kyu",
   "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "typecheck": "tsc --noEmit",
-    "verify": "npm run typecheck && node scripts/comment-audit.mjs --check && npm test && cargo test --manifest-path src-tauri/Cargo.toml",
+    "verify": "node scripts/verify.mjs",
+    "verify:frontend": "node scripts/verify.mjs --frontend",
+    "verify:rust": "node scripts/verify.mjs --rust",
     "bump": "node scripts/bump-version.mjs",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:node": "vitest run --project node",
+    "test:dom": "vitest run --project dom",
+    "test:watch": "vitest",
+    "test:changed": "vitest run --changed HEAD",
+    "clean:target": "node scripts/clean-target.mjs",
+    "lint:rust": "cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings",
     "tauri": "tauri",
     "tauri:build": "tauri build",
     "tauri:build:win": "tauri build && powershell -ExecutionPolicy Bypass -File scripts/release/rename-installer.ps1"

@@ -35,3 +35,18 @@ if (!("ResizeObserver" in globalThis)) {
     disconnect() {}
   } as unknown as typeof ResizeObserver;
 }
+
+/** jsdom has no `matchMedia`; the shell hooks read it at mount, so a desktop-shaped answer is the default. */
+if (!("matchMedia" in window)) {
+  window.matchMedia = (query: string) =>
+    ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    }) as MediaQueryList;
+}

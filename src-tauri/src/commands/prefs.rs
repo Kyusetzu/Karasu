@@ -244,3 +244,54 @@ pub fn set_content_filter(
     crate::widgets::refresh(&app);
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    /// The same three answers `lib/contentFilter`'s `isBlocked` gives, so a background pass hides what the screens hide.
+    #[test]
+    fn media_blocked_mirrors_the_frontend_rule() {
+        let adult = json!({ "isAdult": true, "genres": ["Action"] });
+        let ecchi = json!({ "isAdult": false, "genres": ["Comedy", "Ecchi"] });
+        let plain = json!({ "isAdult": false, "genres": ["Drama"] });
+        for level in ["off", "moderate", "strict"] {
+            assert!(!media_blocked(&plain, level), "plain at {level}");
+        }
+        assert!(!media_blocked(&adult, "off"));
+        assert!(media_blocked(&adult, "moderate"));
+        assert!(media_blocked(&adult, "strict"));
+        assert!(!media_blocked(&ecchi, "moderate"));
+        assert!(media_blocked(&ecchi, "strict"));
+    }
+
+    #[test]
+    fn media_blocked_reads_the_genre_case_insensitively_and_survives_missing_fields() {
+        assert!(media_blocked(&json!({ "genres": ["ECCHI"] }), "strict"));
+        assert!(!media_blocked(&json!({}), "strict"));
+        assert!(!media_blocked(&json!({ "genres": "Ecchi" }), "strict"));
+    }
+
+    /// A missing or unknown value is strict, so a corrupted key can only hide more, never less.
+    #[test]
+    fn the_stored_level_defaults_to_strict() {
+        let db = crate::db::tests::mem_db();
+        assert_eq!(read_content_filter(&db), "strict");
+        db.kv_set("content_filter", "off").unwrap();
+        assert_eq!(read_content_filter(&db), "off");
+        db.kv_set("content_filter", "moderate").unwrap();
+        assert_eq!(read_content_filter(&db), "moderate");
+        db.kv_set("content_filter", "lenient").unwrap();
+        assert_eq!(read_content_filter(&db), "strict");
+    }
+
+    #[test]
+    fn an_unknown_id_or_a_signed_out_database_is_never_blocked() {
+        let db = crate::db::tests::mem_db();
+        assert!(!media_id_blocked(&db, 1, "strict"));
+        db.kv_set("anilist_viewer", r#"{"id": 7}"#).unwrap();
+        assert!(!media_id_blocked(&db, 1, "strict"));
+        assert!(!media_id_blocked(&db, 1, "off"));
+    }
+}

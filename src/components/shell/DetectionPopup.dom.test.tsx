@@ -4,7 +4,8 @@ import { fireEvent, screen, waitFor } from "@testing-library/react";
 import DetectionPopup from "./DetectionPopup";
 import { renderWithProviders, signIn, signOut } from "@/test/render";
 import { useNowPlaying, type NowPlaying } from "@/stores/nowPlaying";
-import type { ListResult, Media, MediaListEntry } from "@/api/types";
+import type { Media } from "@/api/types";
+import { entry, idleScrobble, listResult, media, nowPlaying } from "@/test/fixtures";
 import { DETECTION_MARGIN, DETECTION_MIN_WIDTH } from "@/lib/detectionLayout";
 
 /** jsdom has no `matchMedia`, so the shell shape is a flag the tests flip rather than the real media query. */
@@ -17,74 +18,10 @@ vi.mock("@/api/queries", async (importOriginal) => ({
   mediaByIds,
 }));
 
-const PLAYING: NowPlaying = {
-  process: "mpv.exe",
-  streaming: false,
-  mediaType: "ANIME",
-  rawTitle: "[Grp] Cowboy Bebop - 05.mkv",
-  parsedTitle: "Cowboy Bebop",
-  season: null,
-  episode: 5,
-  sourceEpisode: 5,
-  mediaId: 1,
-  matchedTitle: "Cowboy Bebop",
-  overridden: false,
-  progress: 4,
-  totalEpisodes: 26,
-  episodeTitle: "Asteroid Blues",
-};
-
-const MEDIA: Media = {
-  id: 1,
-  title: { romaji: "Cowboy Bebop", english: null, native: "カウボーイビバップ" },
-  coverImage: { large: "https://img.example/bebop.jpg" },
-  episodes: 26,
-  format: "TV",
-  status: "FINISHED",
-  season: "SPRING",
-  seasonYear: 1998,
-  averageScore: null,
-  genres: [],
-  synonyms: [],
-  nextAiringEpisode: null,
-};
-
-const ENTRY: MediaListEntry = {
-  id: 55,
-  mediaId: 1,
-  status: "CURRENT",
-  score: 8,
-  progress: 4,
-  progressVolumes: 0,
-  repeat: 0,
-  notes: null,
-  updatedAt: 0,
-  private: false,
-  hiddenFromStatusLists: false,
-  customLists: {},
-  advancedScores: {},
-  startedAt: null,
-  completedAt: null,
-  media: MEDIA,
-};
-
-const LIST: ListResult = {
-  lists: [{ name: "Watching", status: "CURRENT", isCustomList: false, entries: [ENTRY] }],
-  fromCache: false,
-  pending: 0,
-  fetchedAt: 0,
-};
-
-const IDLE = {
-  phase: "idle",
-  reason: null,
-  forceable: false,
-  mediaId: null,
-  episode: null,
-  updateAtMs: null,
-  armedAtMs: null,
-  yieldingTo: null,
-} as const;
+const PLAYING = nowPlaying();
+const MEDIA = media();
+const LIST = listResult([entry()]);
+const IDLE = idleScrobble();
 
 function playing(value: NowPlaying | null): void {
   useNowPlaying.setState({ current: value, scrobble: { ...IDLE } });

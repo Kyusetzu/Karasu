@@ -214,3 +214,15 @@ pub fn sync(app: &AppHandle, now: Option<&NowPlaying>) {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_blank_override_means_the_built_in_app_id() {
+        assert_eq!(effective_app_id(""), BUILTIN_DISCORD_APP_ID);
+        assert_eq!(effective_app_id("   "), BUILTIN_DISCORD_APP_ID);
+        assert_eq!(effective_app_id(" 123 "), "123");
+    }
+}

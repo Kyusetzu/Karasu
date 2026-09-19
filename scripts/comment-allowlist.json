@@ -53,5 +53,15 @@
     "file": "scripts/phone-measure.ps1",
     "startsWith": "Reads the phone's side of Jellyfin",
     "reason": "usage block: one invocation per line"
+  },
+  {
+    "file": "scripts/clean-target.mjs",
+    "startsWith": "Reclaims the Cargo target directory's dead weight",
+    "reason": "usage block: one invocation per line"
+  },
+  {
+    "file": "scripts/verify.mjs",
+    "startsWith": "The whole gate, as CI runs it",
+    "reason": "usage block: one invocation per line"
   }
 ]

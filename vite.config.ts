@@ -17,13 +17,19 @@ export default defineConfig(async () => ({
   },
 
   build: {
-    // Linux's webkit2gtk lags far behind Windows's evergreen WebView2, so it gets the conservative Safari target.
+    // Linux's webkit2gtk lags behind Windows's evergreen WebView2; Safari 15 is the oldest with top-level await.
     // @ts-expect-error process is a nodejs global
-    target: process.env.TAURI_ENV_PLATFORM === "windows" ? "chrome105" : "safari13",
+    target: process.env.TAURI_ENV_PLATFORM === "windows" ? "chrome105" : "safari15",
   },
 
   /** Node by default; only a `.dom.` in the filename boots jsdom, because needing a DOM is a decision, not an inference. */
   test: {
+    // Threads, not forks: nothing here needs a process of its own, and a worker thread starts in a fraction of the time.
+    pool: "threads",
+    // Failures as annotations on the PR's diff, where a red step alone would send the reader into the log.
+    reporters: process.env.GITHUB_ACTIONS ? ["default", "github-actions"] : ["default"],
+    // Reported in the summary, so a test that starts leaning on timers or the network shows up before it hurts.
+    slowTestThreshold: 300,
     projects: [
       {
         extends: true,
@@ -32,6 +38,8 @@ export default defineConfig(async () => ({
           include: ["src/**/*.test.{ts,tsx}"],
           exclude: ["src/**/*.dom.test.tsx"],
           environment: "node",
+          // Pure modules with no DOM to reset between files; sharing one module graph cuts the project to a quarter.
+          isolate: false,
         },
       },
       {

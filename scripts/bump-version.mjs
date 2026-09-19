@@ -139,7 +139,7 @@ if (args.includes("--check")) {
     problems.push(`tauri.conf.json says ${conf[1]}, package.json says ${current.core}`);
 
   const lock = readFileSync(CARGO_LOCK, "utf8");
-  if (!lock.includes(`name = "karasu"`) || !new RegExp(`name = "karasu"\\nversion = "${current.core.replace(/\./g, "\\.")}"`).test(lock)) {
+  if (!lock.includes(`name = "karasu"`) || !new RegExp(`name = "karasu"\\r?\\nversion = "${current.core.replace(/\./g, "\\.")}"`).test(lock)) {
     problems.push(`Cargo.lock does not carry ${current.core} for the karasu package`);
   }
 

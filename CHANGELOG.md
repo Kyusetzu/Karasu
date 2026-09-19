@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 5f75b38 -->
+<!-- generated-through: ad76acc -->
 
 ### Fixed
 
@@ -114,6 +114,7 @@ tag time is then optional rather than load-bearing.
 - Right-clicking a title offers what can be done with it (1.15.0.633).
 - Detection floats over every screen, expanded or compact (1.16.0.634).
 - Four defects the adversarial pass found in the interaction work (1.16.2.636).
+- On the phone the list header no longer shows a reload button; pull the list down to sync.
 ## 1.0.0 — 2026-09-05
 
 Karasu 1.0.0 is the first tagged release: a desktop and Android tracker built

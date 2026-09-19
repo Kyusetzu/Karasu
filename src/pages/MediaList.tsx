@@ -598,16 +598,19 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
               <CheckSquare className="size-3.75" />
               {t("bulk.select")}
             </Button>
-            <IconButton
-              variant="ghost"
-              onClick={() => refetch()}
-              disabled={isRefetching}
-              aria-label={t("common.reload")}
-            >
-              <RefreshCw
-                className={cn("size-4", isRefetching && "animate-spin")}
-              />
-            </IconButton>
+            {/* The phone shell syncs by pulling the list down, so the corner button would be a second spelling of it. */}
+            {!phone && (
+              <IconButton
+                variant="ghost"
+                onClick={() => refetch()}
+                disabled={isRefetching}
+                aria-label={t("common.reload")}
+              >
+                <RefreshCw
+                  className={cn("size-4", isRefetching && "animate-spin")}
+                />
+              </IconButton>
+            )}
           </div>
         </div>
 

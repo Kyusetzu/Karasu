@@ -697,7 +697,10 @@ literal — and `src/test/{markdown,markup,actions}.ts` the readers the split
 suites share. Both projects run on worker threads, and the node project runs
 without isolation (one module graph for every file) because its modules are
 pure; a node test that needs a fresh module must say so with a `.dom.` name or
-`vi.resetModules`. A `slowTestThreshold` of 300 ms marks the tests to look at.
+`vi.resetModules`. A `slowTestThreshold` of 300 ms marks the tests to look at. `happy-dom` was
+measured against jsdom on 2026-09-19 and lost: tests 5.9 → 2.9 s, but the
+environment boot 19.7 → 34.6 s across 29 small files, 7.0 → 8.5 s in all —
+the suite is boot-bound, not test-bound, so the faster DOM is the slower run.
 The dom setup stubs `ResizeObserver` and `matchMedia` (desktop-shaped), mocks
 `react-i18next` (a key back, never the English copy), the opener and event
 plugins; a test that wants `isTauri` true mocks `@/api/anilist` itself. Import

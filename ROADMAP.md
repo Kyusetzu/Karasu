@@ -63,3 +63,79 @@ maintainer's. Each says which, so none of them reads as unstarted work.
   discovery and the external address, the query cache — is on `main` and in
   the Nightly only. The website describes `main`; the Stable download it
   links to is still 1.0.0 until the maintainer tags the next one.
+
+## Tooling and packages to add
+
+Decided by the maintainer on 2026-09-19 after a survey of the stack ("preparation
+over repair"): every row below goes in, in a session of its own, and each is
+deleted here when it lands. The column says where it takes effect. Already in
+(2026-09-19): oxlint, knip, `@vitest/coverage-v8`, cargo-deny,
+`tauri-plugin-window-state`. Measured and rejected: `happy-dom` (see the
+vitest note in CLAUDE.md), `cargo-nextest` (a one-second suite), `msw` (HTTP
+lives in Rust), a formatter (one tree-wide diff for nothing).
+
+**Tests — deeper, not only more**
+
+| Package | Where | Why, in a line |
+| --- | --- | --- |
+| `@testing-library/user-event` | every `*.dom.test.tsx` that types or clicks: composers, search, palette, editor | `fireEvent` fires one event; `userEvent` runs the sequence a person causes (focus → key → input → change), which is what the components actually hear |
+| `@testing-library/jest-dom` (`/vitest` setup) | `vitest.setup.ts`, then the 96 `toBeTruthy()` sites | `toBeDisabled()`/`toHaveAttribute()` fail with the reason, not "false" — shorter output, the token rule |
+| `vitest-axe` | one `toHaveNoViolations()` per overlay and per page shell | the a11y lint rules are off because they argue with our role patterns; axe grades the rendered result instead |
+| `proptest` | `parser.rs`, `matcher.rs` | no input may panic, the episode never exceeds its digits, a non-empty name never parses to an empty title — thousands of cases a run |
+| `insta` | the diagnostics report, `widgets.json`, the MAL export | text blocks nobody pins today; a snapshot diff in review instead of "did something move" |
+| `cargo-mutants` | manual, occasionally, over `scrobbler.rs` and `db.rs` first | the honest answer to "77 % coverage, but how good": which injected bugs the suite does not catch |
+
+**Quality gates and hygiene**
+
+| Package | Where | Why, in a line |
+| --- | --- | --- |
+| `typos` (crate-ci) | a `verify` phase, `_typos.toml` for the anime vocabulary | spell-checks code and the ~3,000 lines of docs in a tenth of a second, knows camelCase, silent when clean |
+| `lychee` (Action, weekly cron) | README, CLAUDE.md, SECURITY.md, the site | ~80 outbound links that die quietly |
+| `cargo-machete` | manual, now and then | knip for Cargo: dependencies nothing uses |
+| `cargo-bloat` | once, then on demand | what the 26 MB exe is made of; the `windows` crate's feature list is the suspect |
+| `taplo` | `Cargo.toml`, `deny.toml`, `_typos.toml` | TOML lint; only worth it once typos brings a second TOML file |
+| Tauri Specta | `src/api/*.ts` wrappers, every `#[tauri::command]` | generates the TS bindings from the Rust signatures; knip found five hand-written wrappers nobody called, which generated ones cannot become |
+
+**Development loop**
+
+| Package | Where | Why, in a line |
+| --- | --- | --- |
+| `@tanstack/react-query-devtools` | `App.tsx`, dev builds only | the query cache on screen: what is stale, what refetched — the request-budget questions without log lines |
+| `react-scan` | dev builds only | renders highlighted live; the virtual grid and the charts are where one extra render costs forty cards |
+| `rollup-plugin-visualizer` | `npm run build -- --analyze`, on demand | a treemap of the 456 kB index chunk instead of guessing |
+
+**Tauri plugins — desktop**
+
+| Plugin | Where | Why, in a line |
+| --- | --- | --- |
+| `tauri-plugin-clipboard-manager` | `useActionRunner` (copy selection), `diagnostics.ts` (copy report) | `navigator.clipboard` is reliable in WebView2 and conditional in WebKitGTK; the plugin goes through Rust on both |
+| `tauri-plugin-prevent-default` | `attach_desktop` | WebView2 and WebKitGTK still answer F5 (reloads the app, losing state), Ctrl+F (the browser's find bar), Ctrl+P; a desktop app owns those keys |
+
+**Tauri plugins — Android**
+
+| Plugin | Where | Why, in a line |
+| --- | --- | --- |
+| `tauri-plugin-haptics` | `ActionHost` when the sheet opens, `usePullToSync` at "ready" | a gesture without feedback reads as dead; Android users expect the tick |
+| `tauri-plugin-sharesheet` | the detail page and the context menu ("share") | the reverse of the share target Karasu already is: hand an anilist.co link to any other app |
+| `tauri-plugin-android-battery-optimization` | replaces the hand-rolled exemption call in `background.rs`/`TrackingService.kt` | one less JNI surface to keep alive across `tauri android init` |
+
+**Distribution — Windows**
+
+| Item | Where | Why, in a line |
+| --- | --- | --- |
+| Code signing via SignPath Foundation | `release.yml`, the NSIS installer and the updater artifacts | free for OSI-licensed projects, no personal identity needed; ends the SmartScreen "unrecognised app" wall every new Windows user hits |
+| winget manifest (`wingetcreate` in the release workflow) | a tag build | `winget install Karasu` and `winget upgrade` for everyone who lives in a terminal; the NSIS installer is already the right shape (`nullsoft`) |
+
+**Distribution — Linux**
+
+| Item | Where | Why, in a line |
+| --- | --- | --- |
+| `.deb` and `.rpm` bundle targets | `tauri.conf.json` `bundle.targets`, `linux-build` | Tauri builds both from the same job; the AppImage stays the updater's format, the packages are what a distro user installs |
+| Flatpak / Flathub | a manifest built from the `.deb`, submitted once | the one Linux channel with an update path and a sandbox; the tray and the media-session pass need portal review first |
+
+**Distribution — Android**
+
+| Item | Where | Why, in a line |
+| --- | --- | --- |
+| F-Droid | reproducible-build metadata, a merge request to fdroiddata | the sideload model with an updater people already trust; requires the build to be reproducible, which the CI signing step must be checked against |
+| Follow the system accent (Material You; Windows DWM accent; GNOME 47) | `platform_info` + the accent store | one switch, "use the system colour", on all three; the derivation in `lib/contrast.ts` already takes any hex |

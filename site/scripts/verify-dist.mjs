@@ -14,7 +14,8 @@ const here = path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z
 const CLIENT = path.resolve(here, "..", "dist", "client");
 const BASE = "/Karasu/";
 const SITE_URL = "https://kyusetzu.github.io/Karasu/";
-const JS_BUDGET_GZ = 100 * 1024;
+// Sized for React 19.3, whose react-dom grew past what the old figure left room for; the app is on the same version.
+const JS_BUDGET_GZ = 110 * 1024;
 // Per format: AVIF is what every current browser downloads and carries the
 // 2x files; WebP and JPEG exist at 1x for the browsers that cannot.
 const IMAGE_BUDGET = { avif: 250 * 1024, webp: 300 * 1024, jpg: 300 * 1024, jpeg: 300 * 1024, png: 250 * 1024 };

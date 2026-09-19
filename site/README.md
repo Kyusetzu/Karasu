@@ -31,8 +31,9 @@ simply keeps the end state.
 
 `verify-dist.mjs` fails the build for a rooted URL without `/Karasu/`, an
 external script or stylesheet, a link to a file that is not in `dist`, an
-image without `alt` or dimensions, an image over 250 kB, or more than 100 kB
-of gzipped JavaScript.
+image without `alt` or dimensions, an image over 250 kB, or more than 110 kB
+of gzipped JavaScript (react-dom 19.3 alone moved the figure from 94.8 to
+103.3 kB; the budget still catches a stray dependency, not React).
 
 ## Layout
 

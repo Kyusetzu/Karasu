@@ -51,10 +51,3 @@ src-tauri/target/
 # invariants) and ROADMAP.md (what is left), which is where the last one's
 # findings went.
 /audit/
-
-# design-sync (claude.ai/design): staged converter, build output, machine state
-.ds-sync/
-ds-bundle/
-.design-sync/.cache/
-.design-sync/learnings/
-.design-sync/node_modules

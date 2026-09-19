@@ -1,0 +1,41 @@
+# What the dependency graph may contain; `cargo deny check` runs on every Linux PR job and reads this.
+
+[graph]
+all-features = true
+
+[advisories]
+# A yanked crate or an unmaintained one is worth a line on the PR, not a red build; a vulnerability is an error.
+yanked = "warn"
+unmaintained = "workspace"
+ignore = []
+
+[licenses]
+# The spread THIRD-PARTY-NOTICES.md describes; a crate outside it fails here before it can ship unlisted.
+allow = [
+  "MIT",
+  "MIT-0",
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "0BSD",
+  "ISC",
+  "Zlib",
+  "Unlicense",
+  "CC0-1.0",
+  "MPL-2.0",
+  "Unicode-3.0",
+  "CDLA-Permissive-2.0",
+]
+confidence-threshold = 0.8
+
+[bans]
+# Duplicates are the ecosystem's business; a second copy of a crate is noise here, not a defect.
+multiple-versions = "allow"
+wildcards = "allow"
+deny = []
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

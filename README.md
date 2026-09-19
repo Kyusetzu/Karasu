@@ -421,6 +421,7 @@ npm run tauri build              # release build (NSIS on Windows, AppImage on L
 npx tauri android build --apk    # Android release APK
 
 npm run verify       # the whole gate CI runs: typecheck, the one-line-comment audit, then vitest and cargo test together
+npm run lint         # oxlint: react-hooks, a11y, imports, vitest rules; part of verify
 npm run typecheck    # TypeScript alone
 npm test             # frontend unit tests (vitest) alone; test:watch, test:node, test:dom, test:changed narrow it
 cargo test --manifest-path src-tauri/Cargo.toml   # backend tests alone

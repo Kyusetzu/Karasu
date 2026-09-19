@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: c195438 -->
+<!-- generated-through: 3f5ecfa -->
 
 ### Fixed
 
@@ -100,6 +100,7 @@ tag time is then optional rather than load-bearing.
 - Detail, seasonal, franchise and similar pages are cached on disk with a per-page lifetime, so reopening one after a restart usually costs no request.
 - Android downloads a new version by itself over Wi-Fi and opens the installer from About or the bell.
 - Android shows the update's download and installs it from About, the bell, or once at start; the update channel is now reachable there too.
+- The window opens where and how large it was last closed.
 
 ### Changed
 

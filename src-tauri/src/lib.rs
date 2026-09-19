@@ -518,6 +518,8 @@ fn attach_desktop(builder: tauri::Builder<Wry>) -> tauri::Builder<Wry> {
         }))
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        // Size, position and maximised state come back on the next start; `center: true` only places a first run.
+        .plugin(tauri_plugin_window_state::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,

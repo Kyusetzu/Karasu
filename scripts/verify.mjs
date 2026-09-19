@@ -18,6 +18,7 @@ const verbose = flags.has("--verbose");
 const node = process.execPath;
 const TSC = path.join(ROOT, "node_modules", "typescript", "bin", "tsc");
 const VITEST = path.join(ROOT, "node_modules", "vitest", "vitest.mjs");
+const OXLINT = path.join(ROOT, "node_modules", "oxlint", "bin", "oxlint");
 
 const phases = [];
 
@@ -67,6 +68,8 @@ function summarizeCargo(out) {
   return warnings.length ? `${head} · ${warnings.length} compiler warning(s):\n      ${warnings.join("\n      ")}` : head;
 }
 
+/** oxlint's closing count line, which it prints only when it found something. */
+const summarizeLint = (out) => lines(strip(out)).findLast((l) => /^Found \d+ warning/.test(l)) ?? "clean";
 const summarizeTsc = (out) => (strip(out) ? `${lines(out).filter((l) => /error TS/.test(l)).length} error(s)` : "clean");
 const summarizeAudit = (out) => {
   const last = strip(out).split("\n").at(-1)?.replace(/^comment-audit: /, "") ?? "";
@@ -108,6 +111,7 @@ if (wantFrontend) {
   // Cheap and first: a type error stops the run before either suite spends its time.
   if (!(await run("typecheck", node, [TSC, "--noEmit"], summarizeTsc)).ok) report();
   if (!(await run("comment audit", node, ["scripts/comment-audit.mjs", "--check"], summarizeAudit)).ok) report();
+  if (!(await run("oxlint", node, [OXLINT, "--deny-warnings"], summarizeLint)).ok) report();
 }
 
 // Cargo compiles while vitest runs; both are captured, so the two never interleave and a green run prints two lines.

@@ -223,19 +223,9 @@ export interface DiscoveredServer {
   version: string | null;
 }
 
-/** What `/System/Info/Public` says a server is. */
-export interface JellyfinServerInfo {
-  name: string;
-  id: string;
-  version: string;
-}
-
 /** Jellyfin's own UDP discovery plus a confirmation per answer; a button, never something a screen does on its own. */
 export const discoverJellyfinServers = () =>
   invoke<DiscoveredServer[]>("discover_jellyfin_servers");
-
-export const probeJellyfinServer = (url: string) =>
-  invoke<JellyfinServerInfo>("probe_jellyfin_server", { url });
 
 /** The phone's background arrangements; `supported` is false everywhere else. */
 export interface JellyfinBackground {

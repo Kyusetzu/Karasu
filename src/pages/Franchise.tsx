@@ -72,13 +72,14 @@ export default function Franchise() {
 
   const viewport = useRef<HTMLDivElement>(null);
   const pan = usePanZoom(viewport);
+  const { reset: resetPan } = pan;
 
   // A new franchise is a new graph: the last one's collapse set and selection mean nothing here.
   useEffect(() => {
     setCollapsed(new Set());
     setSelected(data?.rootId ?? null);
-    pan.reset();
-  }, [data?.rootId, pan.reset]);
+    resetPan();
+  }, [data?.rootId, resetPan]);
 
   const layout = useMemo(
     () => (data ? layoutFranchise(data.nodes, data.edges, data.rootId, collapsed) : null),

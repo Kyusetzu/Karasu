@@ -182,7 +182,7 @@ function StatisticsContent({
       }
     }
     return sum;
-  }, [animeList, level]);
+  }, [animeList, animeListFailed, level]);
 
   // Formats per status are counted from the list, keyed like the list screens so anime adds no request.
   const { data: typeList, isError: typeListFailed } = useQuery({

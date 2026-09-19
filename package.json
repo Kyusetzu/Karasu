@@ -1,7 +1,7 @@
 {
   "name": "karasu",
   "private": true,
-  "version": "1.17.6",
+  "version": "1.17.7",
   "type": "module",
   "author": "Kyu",
   "license": "MIT",
@@ -23,7 +23,11 @@
     "test:watch": "vitest",
     "test:changed": "vitest run --changed HEAD",
     "clean:target": "node scripts/clean-target.mjs",
+    "lint": "oxlint --deny-warnings",
     "lint:rust": "cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings",
+    "deny": "cargo deny --manifest-path src-tauri/Cargo.toml check",
+    "test:coverage": "vitest run --coverage",
+    "knip": "knip",
     "tauri": "tauri",
     "tauri:build": "tauri build",
     "tauri:build:win": "tauri build && powershell -ExecutionPolicy Bypass -File scripts/release/rename-installer.ps1"
@@ -61,7 +65,10 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.1",
+    "@vitest/coverage-v8": "^4.1.11",
     "jsdom": "^30.0.1",
+    "knip": "^6.37.0",
+    "oxlint": "^1.83.0",
     "typescript": "~7.0.2",
     "vite": "^8.3.0",
     "vitest": "^4.1.11"

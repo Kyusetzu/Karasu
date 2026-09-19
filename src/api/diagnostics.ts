@@ -12,51 +12,12 @@ export interface LogEntry {
   message: string;
 }
 
-export interface LinuxInfo {
-  distro: string | null;
-  desktop: string | null;
-  session: string | null;
-}
-
-export interface Diagnostics {
-  version: string;
-  os: string;
-  appImage: boolean;
-  portable: boolean;
-  dataDir: string;
-  tray: boolean;
-  schema: number;
-  updateChannel: string;
-  queued: number;
-  signedIn: boolean;
-  profileMode: string;
-  libraryConfigured: boolean;
-  libraryFiles: number;
-  libraryMatched: number;
-  mediaSessions: boolean;
-  jellyfin: boolean;
-  /** Which Jellyfin address answered last — "local" or "external"; null without a sign-in. */
-  jellyfinBase: string | null;
-  /** The mpv IPC pipe — the source that outranks every other one. */
-  mpv: boolean;
-  logDebug: boolean;
-  /** Requests per source since the app started, as [source, count] pairs. */
-  anilistRequests: [string, number][];
-  anilistThrottled: number;
-  /** [remaining, limit] from the last header, or null before the first request. */
-  anilistBudget: [number, number] | null;
-  linux: LinuxInfo | null;
-}
-
-export const diagnostics = () => invoke<Diagnostics>("diagnostics");
-
 /** The markdown block for an issue. Redacted unless asked otherwise. */
 export const diagnosticsReport = (redact = true) =>
   invoke<string>("diagnostics_report", { redact });
 
 export const getLogs = (limit = 200) =>
   invoke<LogEntry[]>("get_logs", { limit });
-
 
 export const getLogDebug = () => invoke<boolean>("get_log_debug");
 export const setLogDebug = (enabled: boolean) =>

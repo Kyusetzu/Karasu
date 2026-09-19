@@ -88,15 +88,7 @@ export function RankedRow({
   const label = entryLabel(entry, category);
   const href = entryHref(entry, category);
   // Only the wrapping element changes, so a non-navigable category keeps exactly the layout it had.
-  const Wrapper = href
-    ? ({ children }: { children: React.ReactNode }) => (
-        <Link to={href} className="block">
-          {children}
-        </Link>
-      )
-    : ({ children }: { children: React.ReactNode }) => <>{children}</>;
-  return (
-    <Wrapper>
+  const row = (
     <div className="flex items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-surface-900">
       <span className="w-5 shrink-0 text-right text-xs tabular-nums text-ink-600">
         {rank}
@@ -131,7 +123,13 @@ export function RankedRow({
         {scoreText(entry.meanScore)}
       </span>
     </div>
-    </Wrapper>
+  );
+  return href ? (
+    <Link to={href} className="block">
+      {row}
+    </Link>
+  ) : (
+    row
   );
 }
 

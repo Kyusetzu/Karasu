@@ -51,3 +51,4 @@ src-tauri/target/
 # invariants) and ROADMAP.md (what is left), which is where the last one's
 # findings went.
 /audit/
+coverage/

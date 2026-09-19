@@ -328,7 +328,6 @@ export interface ApkUpdateState {
   total: number;
 }
 
-export const apkUpdaterAvailable = () => invoke<boolean>("apk_updater_available");
 export const apkUpdateState = () => invoke<ApkUpdateState>("apk_update_state");
 /** Fetches the pending APK; `forceMetered` is the user's own "load over mobile data anyway". */
 export const apkDownload = (forceMetered = false) =>
@@ -336,7 +335,6 @@ export const apkDownload = (forceMetered = false) =>
 /** Opens the system installer on the verified file; rejects with "permission" while the unknown-apps switch is off. */
 export const apkInstall = () => invoke<void>("apk_install");
 export const apkOpenInstallPermission = () => invoke<void>("apk_open_install_permission");
-export const apkDiscard = () => invoke<void>("apk_discard");
 /** The start-time prompt: opens the installer once per pending version when the file is ready. */
 export const apkPromptIfReady = () => invoke<boolean>("apk_prompt_if_ready");
 export const getApkDownloadMetered = () => invoke<boolean>("get_apk_download_metered");
@@ -412,8 +410,6 @@ export interface AppNotification {
 
 export const getNotifications = () =>
   invoke<AppNotification[]>("get_notifications");
-export const unreadNotificationCount = () =>
-  invoke<number>("unread_notification_count");
 export const markNotificationRead = (id: number) =>
   invoke<void>("mark_notification_read", { id });
 export const markAllNotificationsRead = () =>

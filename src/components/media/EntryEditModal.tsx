@@ -164,7 +164,7 @@ export default function EntryEditModal({
   /** Only when the entry carries the scores: an entry queried without them would save zeros over real scores. */
   const advancedAvailable = entry === null || entry.advancedScores != null;
   const [advanced, setAdvanced] = useState<Record<string, number>>(
-    () => ({ ...(entry?.advancedScores ?? {}) }),
+    () => ({ ...entry?.advancedScores }),
   );
   const [advancedDirty, setAdvancedDirty] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);

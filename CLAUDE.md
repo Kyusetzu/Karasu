@@ -608,8 +608,18 @@ failure section (vitest's "Failed Tests", cargo's "failures:") and only that;
 `--verbose` streams everything as the tools print it. `verify:frontend` and
 `verify:rust` are the halves, for the commit that touched only one;
 `lint:rust` is clippy with warnings denied, which CI runs on the Linux job
-without blocking on it. Run it bare and read the exit code — see the note
-below on piping. The same rule holds for every script the loop runs:
+without blocking on it. Between the audit and the suites sits **oxlint**
+(`npm run lint`, `.oxlintrc.json`): the correctness category plus
+`react-hooks`, `jsx-a11y`, `import` and `vitest`, warnings denied. The rules
+switched off there are switched off on purpose — the React Compiler set
+(`refs`, `purity`, `set-state-in-effect`) flags the live-ref and
+derived-state patterns this code uses knowingly, `prefer-tag-over-role` and
+`no-autofocus` argue with decisions the overlays document, and the rest is
+style — so a new warning is a finding, not a formatting opinion. Two more
+tools answer questions rather than gate: `npm run knip` (unused files,
+exports and dependencies; silent when clean, `knip.json`) and `npm run
+test:coverage` (four summary lines, the per-file map under `coverage/`).
+Run it bare and read the exit code — see the note below on piping. The same rule holds for every script the loop runs:
 `bump-version` prints the version, `changelog` one line, `comment-audit` one
 line when clean and the offending lines when not.
 
@@ -717,6 +727,11 @@ async update the real code makes after an await warns instead.
   panic `libappindicator-sys` raises when it cannot dlopen the AppIndicator
   library — that catch is the only reason Karasu starts on a Linux desktop
   without it, and `abort` would silently kill it.
+- **The window's size, position and maximised state come back through
+  `tauri-plugin-window-state`**, registered in `attach_desktop`; the
+  `center: true` in `tauri.conf.json` places a first run only. It saves on
+  close and on exit, so hide-to-tray is not a save — the state is whatever the
+  window had when it was last closed or the app quit.
 - **The media-detection kv key is still spelled `smtc_enabled`.** The setting
   is no longer Windows-only, but renaming the key would reset every existing
   user's opt-out. It is behind `MEDIA_DETECTION_KEY` in `commands/playback.rs`.
@@ -1190,6 +1205,18 @@ review checkpoints are in `site/README.md`.
   `site/**`; the Site workflow runs the site's `check` and `build` on a PR that
   touches `site/**` or `src/app/index.css`, and is what the auto-merge below
   listens to for a site dependency bump.
+
+## The dependency graph is checked, not trusted
+
+`src-tauri/deny.toml` is what `cargo deny check` (`npm run deny`, and the
+Linux PR job without blocking) holds the Rust graph to: the RustSec
+advisories, a licence allow-list that is the spread THIRD-PARTY-NOTICES.md
+describes — a crate under anything else fails here before it can ship
+unlisted — crates.io as the only source, and duplicates allowed because they
+are the ecosystem's business. It found `h2` under RUSTSEC-2026-0258 the day
+it was added; `cargo update -p h2` was the fix. Dependabot keeps the npm and
+cargo graphs moving; knip and cargo-deny say when something in them is dead
+or wrong.
 
 ## The Actions cache is 10 GB, and a PR must not spend it
 

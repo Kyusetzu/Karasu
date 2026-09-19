@@ -30,6 +30,14 @@ export default defineConfig(async () => ({
     reporters: process.env.GITHUB_ACTIONS ? ["default", "github-actions"] : ["default"],
     // Reported in the summary, so a test that starts leaning on timers or the network shows up before it hurts.
     slowTestThreshold: 300,
+    // `npm run test:coverage`: four lines on the terminal, the per-file map under coverage/ for a browser.
+    coverage: {
+      provider: "v8",
+      reporter: ["text-summary", "html"],
+      reportsDirectory: "coverage",
+      include: ["src/**/*.{ts,tsx}"],
+      exclude: ["src/**/*.test.{ts,tsx}", "src/test/**", "src/lib/htmlEntities.data.ts", "src/i18n/**"],
+    },
     projects: [
       {
         extends: true,

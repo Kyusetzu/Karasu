@@ -412,7 +412,7 @@ function lexHash(text, lang) {
           commentAt = j;
           break;
         }
-        if ((c === '"' || c === "'") && (j === 0 || /[\s:\[{,-]/.test(stripped[j - 1]))) quote = c;
+        if ((c === '"' || c === "'") && (j === 0 || /[\s:[{,-]/.test(stripped[j - 1]))) quote = c;
         j++;
       }
       const code = commentAt === -1 ? stripped : stripped.slice(0, commentAt);
@@ -645,7 +645,6 @@ export function blocks(text, lang) {
     for (let ln = t.line; ln <= t.endLine; ln++) {
       const lineStart = starts[ln - 1];
       const lineText = lines[ln - 1].replace(/\r$/, "");
-      const lineEnd = lineStart + lineText.length;
       // The line is comment-only when everything outside [t.start, t.end) is whitespace.
       const before = lineText.slice(0, Math.max(0, t.start - lineStart));
       const after = lineText.slice(Math.max(0, Math.min(lineText.length, t.end - lineStart)));

@@ -137,9 +137,9 @@ const RE = {
   // Openers only, `readParenTarget` reads the `(url)`; the optional size is img33(u) or img200%(u).
   image: /img(\d+%?)?\(/iy,
   // One nested bracket level in the label, so `[![alt](img)](target)` is a link holding an image.
-  mdImage: /!\[((?:[^\[\]]|\[[^\]]*\])*)\]\(/y,
+  mdImage: /!\[((?:[^[\]]|\[[^\]]*\])*)\]\(/y,
   video: /(?:youtube|webm)\(/iy,
-  link: /\[((?:[^\[\]]|\[[^\]]*\])*)\]\(/y,
+  link: /\[((?:[^[\]]|\[[^\]]*\])*)\]\(/y,
   // `<img>` is an image, not a tag to drop; dropping it left a linked badge as an empty link.
   htmlImg: /<img\b([^>]*)>/iy,
   autolink: /https?:\/\/[^\s<>()[\]]+/y,

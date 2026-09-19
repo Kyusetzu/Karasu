@@ -109,10 +109,18 @@ jobs:
       - name: Verify (typecheck + frontend tests + Rust tests)
         run: npm run verify
 
-      # The runner image ships cargo-audit; a fresh advisory is worth seeing on the PR without being able to block it.
-      - name: Audit Rust dependencies
+      # Advisories, licences, bans and sources against deny.toml; worth seeing on the PR without being able to block it.
+      - name: cargo deny
         continue-on-error: true
-        run: cargo audit --file src-tauri/Cargo.lock
+        uses: EmbarkStudios/cargo-deny-action@c3bbe7e4e3f7baeee1a3dd9aec0a3b2aded580fb # v2.1.1
+        with:
+          manifest-path: src-tauri/Cargo.toml
+          command: check
+
+      # Unused files, exports and dependencies; silent when clean, and a finding is a question, not a failure.
+      - name: knip
+        continue-on-error: true
+        run: npx knip
 
       # Clean at the time of writing; a new stable's new lint must not block a PR, only show on it.
       - name: Clippy

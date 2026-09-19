@@ -228,7 +228,7 @@ export default function Thread() {
     new Map(),
   );
   const applyLikes = useCallback(
-    (list: FlatComment[]) => list.map((c) => ({ ...c, ...(likes.get(c.id) ?? {}) })),
+    (list: FlatComment[]) => list.map((c) => ({ ...c, ...likes.get(c.id) })),
     [likes],
   );
 

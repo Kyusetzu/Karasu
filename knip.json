@@ -1,0 +1,23 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "scripts/*.mjs"
+  ],
+  "project": [
+    "src/**/*.{ts,tsx,css}",
+    "scripts/**/*.mjs"
+  ],
+  "ignore": [
+    "scripts/virtual-rows-check.mjs"
+  ],
+  "ignoreDependencies": [
+    "@fontsource/kosugi-maru",
+    "@fontsource/sn-pro"
+  ],
+  "ignoreExportsUsedInFile": true,
+  "vitest": {
+    "config": [
+      "vite.config.ts"
+    ]
+  }
+}

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { act } from "react";
+import { MemoryRouter, Route, Routes, useNavigate } from "react-router";
 import { usePullToSync } from "./usePullToSync";
 import { PULL_SLOP_PX } from "@/lib/pullToSync";
 
@@ -43,7 +44,26 @@ function scroller(scrollTop: number): HTMLElement {
 
 function Probe() {
   const { state } = usePullToSync();
-  return <output data-testid="phase">{state.phase}</output>;
+  const navigate = useNavigate();
+  return (
+    <>
+      <output data-testid="phase">{state.phase}</output>
+      <button type="button" onClick={() => navigate("/search")}>
+        away
+      </button>
+    </>
+  );
+}
+
+/** The hook reads the route, so every mount sits inside a router; the second route is where "navigate away" lands. */
+function mount(): void {
+  render(
+    <MemoryRouter initialEntries={["/list"]}>
+      <Routes>
+        <Route path="*" element={<Probe />} />
+      </Routes>
+    </MemoryRouter>,
+  );
 }
 
 const phase = () => screen.getByTestId("phase").textContent;
@@ -68,7 +88,7 @@ afterEach(() => {
 
 describe("usePullToSync", () => {
   it("arms and syncs when the pull starts at the top", () => {
-    render(<Probe />);
+    mount();
     const el = scroller(0);
     drag(el, FAR);
     expect(phase()).toBe("ready");
@@ -80,14 +100,14 @@ describe("usePullToSync", () => {
   });
 
   it("does nothing while the page is scrolled, the case a pull must never be mistaken for", () => {
-    render(<Probe />);
+    mount();
     drag(scroller(240), FAR);
     expect(phase()).toBe("idle");
     expect(hooks.sync).not.toHaveBeenCalled();
   });
 
   it("does not sync when the pull stops short of the threshold", () => {
-    render(<Probe />);
+    mount();
     const el = scroller(0);
     drag(el, PULL_SLOP_PX + 4);
     expect(phase()).toBe("pulling");
@@ -98,7 +118,7 @@ describe("usePullToSync", () => {
   });
 
   it("stands down while a dialog is up", () => {
-    render(<Probe />);
+    mount();
     const overlay = document.createElement("div");
     overlay.setAttribute("data-overlay", "");
     document.body.appendChild(overlay);
@@ -109,7 +129,7 @@ describe("usePullToSync", () => {
 
   it("registers nothing at all without an account to sync for", () => {
     hooks.available = false;
-    render(<Probe />);
+    mount();
     const el = scroller(0);
     drag(el, FAR);
     act(() => {
@@ -119,8 +139,22 @@ describe("usePullToSync", () => {
     expect(hooks.sync).not.toHaveBeenCalled();
   });
 
+  it("lets go of a pull when the screen under the finger navigates away", () => {
+    mount();
+    const el = scroller(0);
+    drag(el, PULL_SLOP_PX + 4);
+    expect(phase()).toBe("pulling");
+    // The list unmounts with the route, and Chromium then delivers the touch's end to nothing the document can hear.
+    act(() => {
+      el.remove();
+      screen.getByText("away").click();
+    });
+    expect(phase()).toBe("idle");
+    expect(hooks.sync).not.toHaveBeenCalled();
+  });
+
   it("gives the gesture up when a second finger lands", () => {
-    render(<Probe />);
+    mount();
     const el = scroller(0);
     drag(el, FAR);
     expect(phase()).toBe("ready");
@@ -134,7 +168,7 @@ describe("usePullToSync", () => {
 /** An empty or short list is exactly where someone reaches for pull-to-sync, and it is the case with nothing to scroll. */
 describe("usePullToSync on a list with nothing to scroll", () => {
   it("still syncs from a screen whose content does not overflow", () => {
-    render(<Probe />);
+    mount();
     const el = emptyScroller();
     drag(el, FAR);
     expect(phase()).toBe("ready");

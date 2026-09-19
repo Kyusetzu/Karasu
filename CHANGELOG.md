@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 02f0bae -->
+<!-- generated-through: 0f9df60 -->
 
 ### Fixed
 
@@ -84,6 +84,7 @@ tag time is then optional rather than load-bearing.
 - An AniList profile link that carries the user's id, as the Statistics header's does, opens the profile in-app instead of "No such user".
 - Reading notifications one by one now clears the bell's badge, and "Mark all read" is always available.
 - A pull-to-sync gesture could fail to arm when two touch events arrived in the same frame.
+- A pull-to-sync left mid-way by a navigation no longer leaves its hint on the next screen, and a long press no longer selects the action sheet's title.
 
 ### Added
 

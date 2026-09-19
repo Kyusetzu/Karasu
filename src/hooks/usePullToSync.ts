@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useLocation } from "react-router";
 import { useManualSync } from "@/hooks/useManualSync";
 import { isSyncing } from "@/lib/syncLock";
 import {
@@ -35,10 +36,18 @@ export function usePullToSync(): {
   available: boolean;
 } {
   const { sync, syncing, available } = useManualSync();
+  const { pathname } = useLocation();
   const [state, setState] = useState<PullState>(PULL_IDLE);
   const scroller = useRef<HTMLElement | null>(null);
   // The ref is the gesture's state and the React copy only draws it; a render between two moves is not something to wait on.
   const live = useRef<PullState>(PULL_IDLE);
+
+  // A touch's later events go to its start target, so a screen unmounted mid-pull ends the gesture without a touchend.
+  useEffect(() => {
+    scroller.current = null;
+    live.current = PULL_IDLE;
+    setState(PULL_IDLE);
+  }, [pathname]);
 
   useEffect(() => {
     if (!available) return;

@@ -682,6 +682,16 @@ import it.
 - **`sdkmanager.bat --licenses` accepts only via cmd file redirection**
   (`< yes.txt`); both pipe forms feed it EOF and it exits silently having
   accepted nothing. Never run an installer with its output discarded.
+- **`tauri android build` rewrites `app/build.gradle.kts` on every run**, so a
+  hand edit there — an `applicationIdSuffix` for a side-by-side debug install,
+  say — is gone before the APK exists. Put such a local-only change in
+  `~/.gradle/init.d/*.gradle` instead (an init script sees the `android`
+  block of every project it builds); a debug APK under `dev.kyu.karasu.debug`
+  installs beside the release app, keeps its own data, and is what the
+  device test of 2026-09-19 ran on. Its WebView is debuggable — `adb forward
+  tcp:9223 localabstract:webview_devtools_remote_<pid>` plus Playwright's
+  `connectOverCDP` reads the DOM, and `adb shell run-as dev.kyu.karasu.debug`
+  reads its `karasu.log`. Neither works on the release package.
 - **Debug-signed and release-signed APKs do not install over each other.**
   Android refuses the signature change; the other one must be uninstalled
   first, which wipes app-local data. This is why CI publishes only

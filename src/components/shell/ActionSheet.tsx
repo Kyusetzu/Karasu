@@ -74,6 +74,8 @@ export default function ActionSheet({
         className={cn(
           // Clears the bottom bar and the gesture area; `max-h` plus scroll so a long list never hides its first row.
           "absolute inset-x-2 bottom-[calc(var(--shell-bottom,0px)+0.5rem)] max-h-[70vh] overflow-y-auto",
+          // The sheet rises under a finger still held down, and Chromium's own long press would otherwise select its title.
+          "select-none",
           "rounded-2xl border border-surface-700 bg-surface-900 p-2 shadow-[0_1rem_3rem_rgba(0,0,0,.6)]",
           leaving ? "animate-rise-out" : "animate-rise-in",
         )}

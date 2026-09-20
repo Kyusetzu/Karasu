@@ -78,12 +78,6 @@ lives in Rust), a formatter (one tree-wide diff for nothing).
 | Code signing via SignPath Foundation | `release.yml`, the NSIS installer and the updater artifacts | free for OSI-licensed projects, no personal identity needed; ends the SmartScreen "unrecognised app" wall every new Windows user hits |
 | winget manifest (`wingetcreate` in the release workflow) | a tag build | `winget install Karasu` and `winget upgrade` for everyone who lives in a terminal; the NSIS installer is already the right shape (`nullsoft`) |
 
-**Distribution — Linux**
-
-| Item | Where | Why, in a line |
-| --- | --- | --- |
-| Flatpak / Flathub | a manifest built from the `.deb`, submitted once | the one Linux channel with an update path and a sandbox; the tray and the media-session pass need portal review first |
-
 **Distribution — Android**
 
 | Item | Where | Why, in a line |

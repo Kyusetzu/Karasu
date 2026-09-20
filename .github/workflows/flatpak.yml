@@ -1,0 +1,61 @@
+name: Flatpak
+
+# By hand, for a tag that carries a .deb: fills the manifest, validates the metainfo and builds the Flatpak once.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag whose .deb the manifest points at (v1.18.1 or later)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  # pwsh and appstreamcli live on the runner, not in the builder image, so the filled files travel as an artifact.
+  prepare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Fill the manifest from the release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./scripts/release/flatpak-manifest.ps1 -Tag "${{ inputs.tag }}" -OutDir flatpak-out
+
+      # Flathub runs the same validator; a failure here is the review comment before the review.
+      - name: Validate the metainfo
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y appstream
+          appstreamcli validate --pedantic flatpak-out/dev.kyu.karasu.metainfo.xml
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: flatpak-manifest
+          path: flatpak-out
+          retention-days: 7
+
+  build:
+    needs: prepare
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-50
+      options: --privileged
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: flatpak-manifest
+          path: flatpak-out
+
+      - name: Build
+        uses: flatpak/flatpak-github-actions/flatpak-builder@79327416609af08178ad73b352877e51450790b3 # v6.8
+        with:
+          bundle: karasu.flatpak
+          manifest-path: flatpak-out/dev.kyu.karasu.yml
+          cache: false
+          upload-artifact: true

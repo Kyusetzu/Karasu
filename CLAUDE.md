@@ -256,10 +256,10 @@ scripts/             bump-version.mjs (every commit), anilist-query.mjs
                      clean-target.mjs (reclaims the
                      stale incremental sessions every version bump leaves
                      under `src-tauri/target`, see the notes);
-                     release/ holds the six PowerShell scripts
+                     release/ holds the seven PowerShell scripts
                      the release workflow runs (installer, AppImage, Linux
                      package and APK renamers are deliberate near-twins,
-                     release-notes, and
+                     release-notes, flatpak-manifest, and
                      generate-update-manifest, whose Android legs feed the
                      APK updater — see "The Android updater")
 ```
@@ -1351,6 +1351,25 @@ its value), three were `emit_session` (a window event, unobservable from a unit
 test), and six pointed at real gaps that got tests the same day: `season_key`'s
 `-1`, `detection_override`'s three-part key, `cached_user_id` and
 `candidates_from_cache`. Read the misses as questions, not as a score to push.
+
+## Packaging beyond the release page
+
+`packaging/` holds what other channels need and the repository can prepare;
+the submissions themselves are the maintainer's. **Flatpak**:
+`packaging/flatpak/dev.kyu.karasu.yml` builds from the release `.deb` (extract,
+install the binary, re-name the desktop file and icons to the app id, which
+Flathub requires), `dev.kyu.karasu.metainfo.xml` is the AppStream data, and
+`scripts/release/flatpak-manifest.ps1 -Tag vX.Y.Z` fills the URL, the sha256
+and the release date from that tag. The `Flatpak` workflow (dispatch, input
+`tag`) validates the metainfo with `appstreamcli --pedantic` on the runner and
+builds the bundle in the GNOME 50 builder image; run it before a Flathub pull
+request. The `finish-args` are each a feature — StatusNotifier for the tray,
+`org.mpris.MediaPlayer2.*` for the media-session pass, `org.freedesktop.secrets`
+for the token, the settings portal for the accent, network for AniList and the
+OAuth callback — and `SUBMISSION.md` there lists what the sandbox changes
+(autostart writes an app-private folder, the updater stays off through
+`can_install`). Nothing under `packaging/` is built by the release; it reads
+the release.
 
 ## Links are checked weekly, not trusted
 

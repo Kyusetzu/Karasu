@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- AppStream metadata for the Flatpak; scripts/release/flatpak-manifest.ps1 writes the <releases> block from the tag. -->
+<component type="desktop-application">
+  <id>dev.kyu.karasu</id>
+  <name>Karasu</name>
+  <summary>Anime and manga tracker for AniList</summary>
+  <developer id="dev.kyu">
+    <name>Kyu</name>
+  </developer>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <description>
+    <p>
+      Karasu keeps your AniList list in step with what you actually watch and read. It notices the episode playing
+      in mpv, VLC or a browser tab, or on your Jellyfin server, and updates your progress once you have watched enough
+      of it — with a countdown you can see, skip or cancel.
+    </p>
+    <p>
+      The rest of AniList is here too: your lists with filters and bulk edits, the season calendar, statistics and a
+      year in review, your local library matched against your list, notifications, the social feed and the forum.
+      Everything talks to AniList directly; there is no server in between.
+    </p>
+  </description>
+  <launchable type="desktop-id">dev.kyu.karasu.desktop</launchable>
+  <url type="homepage">https://kyusetzu.github.io/Karasu/</url>
+  <url type="bugtracker">https://github.com/Kyusetzu/Karasu/issues</url>
+  <url type="vcs-browser">https://github.com/Kyusetzu/Karasu</url>
+  <screenshots>
+    <screenshot type="default">
+      <caption>The overview: what is airing, what you are watching, what is next</caption>
+      <image>https://raw.githubusercontent.com/Kyusetzu/Karasu/main/assets/screenshots/overview.jpg</image>
+    </screenshot>
+    <screenshot>
+      <caption>The anime list with filters and columns</caption>
+      <image>https://raw.githubusercontent.com/Kyusetzu/Karasu/main/assets/screenshots/anime-list.jpg</image>
+    </screenshot>
+    <screenshot>
+      <caption>An episode detected in mpv, counting down to the update</caption>
+      <image>https://raw.githubusercontent.com/Kyusetzu/Karasu/main/assets/screenshots/now-playing.jpg</image>
+    </screenshot>
+    <screenshot>
+      <caption>Statistics by genre, format and year</caption>
+      <image>https://raw.githubusercontent.com/Kyusetzu/Karasu/main/assets/screenshots/statistics.jpg</image>
+    </screenshot>
+  </screenshots>
+  <content_rating type="oars-1.1" />
+  <branding>
+    <color type="primary" scheme_preference="light">#4b3fc7</color>
+    <color type="primary" scheme_preference="dark">#0b0d12</color>
+  </branding>
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+  </supports>
+  <requires>
+    <display_length compare="ge">940</display_length>
+  </requires>
+  <releases>
+    <release version="RELEASE_TO_FILL" date="DATE_TO_FILL">
+      <url>https://github.com/Kyusetzu/Karasu/releases/tag/TAG_TO_FILL</url>
+    </release>
+  </releases>
+</component>

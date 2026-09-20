@@ -1,0 +1,45 @@
+# Flatpak manifest for Karasu, built from the release .deb; scripts/release/flatpak-manifest.ps1 fills the two fields.
+app-id: dev.kyu.karasu
+runtime: org.gnome.Platform
+runtime-version: "50"
+sdk: org.gnome.Sdk
+command: karasu
+
+finish-args:
+  # Wayland first, X11 where that is what runs, and the GPU for WebKitGTK.
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --share=ipc
+  - --device=dri
+  # AniList, Jellyfin on the LAN (its UDP discovery included) and the localhost OAuth callback.
+  - --share=network
+  # The tray is a StatusNotifier item; the media-session pass reads every MPRIS player on the bus.
+  - --talk-name=org.kde.StatusNotifierWatcher
+  - --talk-name=org.mpris.MediaPlayer2.*
+  # The AniList token rests in the Secret Service; notifications go through the portal without a name here.
+  - --talk-name=org.freedesktop.secrets
+  # The system accent, through the settings portal.
+  - --talk-name=org.freedesktop.portal.Settings
+  # The local library scanner reads the folders the user picks in the file dialog, which the portal grants per choice.
+  - --filesystem=xdg-videos:ro
+
+modules:
+  - name: karasu
+    buildsystem: simple
+    build-commands:
+      - bsdtar -xf karasu.deb data.tar.gz
+      - bsdtar -xf data.tar.gz
+      - install -Dm755 usr/bin/karasu /app/bin/karasu
+      - install -Dm644 -t /app/lib/karasu usr/lib/karasu/THIRD-PARTY-NOTICES.md
+      # The desktop file and the icons take the app id, which Flathub requires to match the manifest.
+      - install -Dm644 usr/share/applications/*.desktop /app/share/applications/dev.kyu.karasu.desktop
+      - desktop-file-edit --set-key=Icon --set-value=dev.kyu.karasu --set-key=Exec --set-value=karasu /app/share/applications/dev.kyu.karasu.desktop
+      - find usr/share/icons -name '*.png' | while read -r f; do install -Dm644 "$f" "/app/share/icons/$(dirname "${f#usr/share/icons/}")/dev.kyu.karasu.png"; done
+      - install -Dm644 dev.kyu.karasu.metainfo.xml /app/share/metainfo/dev.kyu.karasu.metainfo.xml
+    sources:
+      - type: file
+        dest-filename: karasu.deb
+        url: URL_TO_FILL
+        sha256: SHA256_TO_FILL
+      - type: file
+        path: dev.kyu.karasu.metainfo.xml

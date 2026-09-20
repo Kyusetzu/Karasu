@@ -58,3 +58,6 @@ coverage/
 # cargo-mutants writes its copies and its report here when run without --output
 src-tauri/mutants.out/
 src-tauri/mutants.out.old/
+
+# The filled manifest and metainfo, written by scripts/release/flatpak-manifest.ps1
+packaging/flatpak/out/

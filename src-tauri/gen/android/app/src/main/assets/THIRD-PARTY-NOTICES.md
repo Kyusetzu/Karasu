@@ -76,7 +76,7 @@ days.
 
 ## Rust crates
 
-605 crates in the resolved graph, `--all-features` across every target — the
+665 crates in the resolved graph, `--all-features` across every target — the
 superset of what a Windows and a Linux build each link. The licence spread:
 
 | Licence | Crates |
@@ -86,6 +86,7 @@ superset of what a Windows and a Linux build each link. The licence spread:
 | Zlib / BSD-2 / BSD-3 / 0BSD / Unlicense / ISC, each dual-licensed with MIT or Apache-2.0 | ~55 |
 | MPL-2.0 | 5 |
 | CDLA-Permissive-2.0 (`webpki-root-certs`) | 1 |
+| BSL-1.0 (`clipboard-win`, `error-code`, behind the clipboard plugin on Windows) | 2 |
 
 **No GPL, and no LGPL-only crate.** `r-efi` offers LGPL-2.1-or-later as one of
 three options; MIT is taken.
@@ -110,7 +111,7 @@ production dependencies:
 | tailwindcss, @tailwindcss/vite, tailwind-merge, clsx | MIT |
 | class-variance-authority | Apache-2.0 |
 | d3-array, d3-scale, d3-shape, lucide-react | ISC |
-| @tauri-apps/api, @tauri-apps/plugin-opener, @tauri-apps/plugin-deep-link | MIT or Apache-2.0 |
+| @tauri-apps/api, @tauri-apps/plugin-opener, @tauri-apps/plugin-deep-link, @tauri-apps/plugin-clipboard-manager | MIT or Apache-2.0 |
 | @fontsource/sn-pro | OFL-1.1 |
 | @fontsource/kosugi-maru | Apache-2.0 |
 

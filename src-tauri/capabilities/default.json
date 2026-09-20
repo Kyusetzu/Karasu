@@ -17,6 +17,7 @@
     "core:window:allow-show",
     "core:window:allow-set-focus",
     "core:window:allow-start-dragging",
-    "deep-link:default"
+    "deep-link:default",
+    "clipboard-manager:allow-write-text"
   ]
 }

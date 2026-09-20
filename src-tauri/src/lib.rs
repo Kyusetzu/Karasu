@@ -285,7 +285,8 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         // Not exposed to the WebView: the fs plugin lets `commands::system` write into a save dialog's content:// URI.
         .plugin(tauri_plugin_fs::init())
-        .plugin(tauri_plugin_dialog::init());
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_clipboard_manager::init());
 
     attach_desktop(builder)
         .setup(|app| {
@@ -520,6 +521,7 @@ fn attach_desktop(builder: tauri::Builder<Wry>) -> tauri::Builder<Wry> {
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         // Size, position and maximised state come back on the next start; `center: true` only places a first run.
         .plugin(tauri_plugin_window_state::Builder::new().build())
+        .plugin(prevent_browser_keys())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
@@ -541,6 +543,18 @@ fn attach_desktop(builder: tauri::Builder<Wry>) -> tauri::Builder<Wry> {
 #[cfg(mobile)]
 fn attach_desktop(builder: tauri::Builder<Wry>) -> tauri::Builder<Wry> {
     builder
+}
+
+/// The browser's own keys the WebView still answers: find bar, print, reload, view source, open, downloads, caret mode.
+#[cfg(desktop)]
+fn prevent_browser_keys() -> tauri::plugin::TauriPlugin<Wry> {
+    use tauri_plugin_prevent_default::Flags;
+    let mut flags = Flags::FIND | Flags::PRINT | Flags::SOURCE | Flags::OPEN | Flags::DOWNLOADS | Flags::CARET_BROWSING;
+    // A dev build keeps F5; the app's own Ctrl+R (sync) preventDefaults for itself either way.
+    if !cfg!(debug_assertions) {
+        flags |= Flags::RELOAD;
+    }
+    tauri_plugin_prevent_default::Builder::new().with_flags(flags).build()
 }
 
 /// The desktop half of setup: the tray, the dev-build hide, the hotkey.

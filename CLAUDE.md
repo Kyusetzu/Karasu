@@ -777,6 +777,22 @@ async update the real code makes after an await warns instead.
   `center: true` in `tauri.conf.json` places a first run only. It saves on
   close and on exit, so hide-to-tray is not a save — the state is whatever the
   window had when it was last closed or the app quit.
+- **The WebView's own shortcuts are taken away on desktop, and Shift+Tab is
+  not one of them.** `prevent_browser_keys` in `lib.rs` registers
+  `tauri-plugin-prevent-default` with an explicit flag set — find, print, view
+  source, open, downloads, caret browsing, and reload in a release build (a
+  dev build keeps F5) — never `init()` or `Flags::all()`, because the default
+  set includes `FOCUS_MOVE`, which is Shift+Tab. The injected script only
+  `preventDefault`s on a bubbling window listener, so the app's own handlers
+  (Ctrl+R sync, Ctrl+K palette) still run; measured on the rig on 2026-09-20:
+  every listed key prevented, Shift+Tab and Escape untouched, and the page
+  survived F5.
+- **The clipboard goes through Rust.** `lib/clipboard.ts` `copyText` calls
+  `tauri-plugin-clipboard-manager` inside the app and `navigator.clipboard`
+  outside it, because the browser API is reliable in WebView2 and conditional
+  in WebKitGTK; the capability grants `clipboard-manager:allow-write-text` and
+  nothing else of the plugin. The two callers are the action runner's copy
+  selection and the diagnostics copy.
 - **The media-detection kv key is still spelled `smtc_enabled`.** The setting
   is no longer Windows-only, but renaming the key would reset every existing
   user's opt-out. It is behind `MEDIA_DETECTION_KEY` in `commands/playback.rs`.

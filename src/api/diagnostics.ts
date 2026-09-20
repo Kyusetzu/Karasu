@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { copyText } from "@/lib/clipboard";
 import { isTauri } from "./anilist";
 
 /** The diagnostics and log surface, kept apart from `anilist.ts` because none of it talks to AniList. */
@@ -45,9 +46,7 @@ export async function reportError(error: unknown, stack?: string) {
 /** Puts the redacted report on the clipboard and reports whether it worked, so a failed copy is never silent. */
 export async function copyDiagnostics(): Promise<boolean> {
   try {
-    const text = await diagnosticsReport(true);
-    await navigator.clipboard.writeText(text);
-    return true;
+    return await copyText(await diagnosticsReport(true));
   } catch {
     return false;
   }

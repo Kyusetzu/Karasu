@@ -80,13 +80,6 @@ lives in Rust), a formatter (one tree-wide diff for nothing).
 | --- | --- | --- |
 | Tauri Specta | `src/api/*.ts` wrappers, every `#[tauri::command]` | generates the TS bindings from the Rust signatures; knip found five hand-written wrappers nobody called, which generated ones cannot become |
 
-**Tauri plugins — desktop**
-
-| Plugin | Where | Why, in a line |
-| --- | --- | --- |
-| `tauri-plugin-clipboard-manager` | `useActionRunner` (copy selection), `diagnostics.ts` (copy report) | `navigator.clipboard` is reliable in WebView2 and conditional in WebKitGTK; the plugin goes through Rust on both |
-| `tauri-plugin-prevent-default` | `attach_desktop` | WebView2 and WebKitGTK still answer F5 (reloads the app, losing state), Ctrl+F (the browser's find bar), Ctrl+P; a desktop app owns those keys |
-
 **Tauri plugins — Android**
 
 | Plugin | Where | Why, in a line |

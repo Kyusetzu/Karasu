@@ -1,6 +1,6 @@
 [package]
 name = "karasu"
-version = "1.17.15"
+version = "1.17.16"
 description = "A modern anime and manga tracker built exclusively for AniList"
 authors = ["Kyu"]
 license = "MIT"
@@ -70,6 +70,8 @@ tauri-plugin-fs = "2"
 tauri-plugin-updater = "2"
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-window-state = "2"
+# WebView2 and WebKitGTK answer F5, Ctrl+F and Ctrl+P themselves; a desktop app owns those keys.
+tauri-plugin-prevent-default = "5"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # reqwest 0.13 already defaults to rustls (pure-Rust TLS, no OpenSSL/schannel),
@@ -111,6 +113,8 @@ base64 = "0.22"
 # explicit dependency rather than a borrowed one.
 getrandom = "0.3"
 tauri-plugin-deep-link = "2.4.9"
+# The clipboard through Rust: `navigator.clipboard` is reliable in WebView2 and conditional in WebKitGTK.
+tauri-plugin-clipboard-manager = "2"
 
 # Tests only: property tests over the parser and the matcher, and snapshots of the text blocks nobody pins by hand.
 [dev-dependencies]

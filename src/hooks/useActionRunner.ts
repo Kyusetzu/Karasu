@@ -6,6 +6,7 @@ import { useListMutations } from "@/hooks/useListMutations";
 import { useManualSync } from "@/hooks/useManualSync";
 import { clearDetectionOverride, scrobbleCancel, scrobbleNow, useNowPlaying } from "@/stores/nowPlaying";
 import { loadDefaultAddStatus } from "@/lib/defaultAddStatus";
+import { copyText } from "@/lib/clipboard";
 import { completePatch, type Action, type ActionTarget } from "@/lib/actions";
 import type { MediaListEntry, MediaType } from "@/api/types";
 
@@ -53,7 +54,7 @@ export function useActionRunner(): (input: ActionRunInput) => ActionEffect {
           }
           return done;
         case "copySelection":
-          navigator.clipboard?.writeText(selection).catch(() => {});
+          void copyText(selection);
           return done;
         case "addToList":
           if (target.kind === "media") {

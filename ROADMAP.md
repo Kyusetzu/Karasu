@@ -77,9 +77,3 @@ lives in Rust), a formatter (one tree-wide diff for nothing).
 | --- | --- | --- |
 | Code signing via SignPath Foundation | `release.yml`, the NSIS installer and the updater artifacts | free for OSI-licensed projects, no personal identity needed; ends the SmartScreen "unrecognised app" wall every new Windows user hits |
 | winget manifest (`wingetcreate` in the release workflow) | a tag build | `winget install Karasu` and `winget upgrade` for everyone who lives in a terminal; the NSIS installer is already the right shape (`nullsoft`) |
-
-**Distribution — Android**
-
-| Item | Where | Why, in a line |
-| --- | --- | --- |
-| F-Droid | reproducible-build metadata, a merge request to fdroiddata | the sideload model with an updater people already trust; requires the build to be reproducible, which the CI signing step must be checked against |

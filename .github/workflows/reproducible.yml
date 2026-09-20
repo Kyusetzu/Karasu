@@ -1,0 +1,76 @@
+name: Reproducible
+
+# By hand, for a tag: rebuilds the arm64 APK the way F-Droid would and compares it with the one the release carries.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to rebuild and compare (v1.18.3 or later)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    env:
+      # The same three switches the fdroiddata recipe sets, so this job answers for that build and not a lookalike.
+      KARASU_NO_SELF_UPDATE: "1"
+      KARASU_UNSIGNED: "1"
+      RUSTFLAGS: --remap-path-prefix=${{ github.workspace }}=/build --remap-path-prefix=/home/runner/.cargo=/cargo
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Pin build time to the commit
+        run: echo "SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct)" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable
+        with:
+          toolchain: 1.97.1
+          targets: aarch64-linux-android
+
+      - name: Install NDK
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;27.1.12297006" "platforms;android-36" "build-tools;36.0.0" "build-tools;35.0.0" > /dev/null
+          echo "NDK_HOME=$ANDROID_HOME/ndk/27.1.12297006" >> "$GITHUB_ENV"
+
+      - run: npm ci
+
+      - name: Build the arm64 APK, unsigned
+        run: npx tauri android build --apk --target aarch64 --split-per-abi
+
+      - name: Fetch the release APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download "${{ inputs.tag }}" --pattern "*_arm64.apk" --dir release-apk
+
+      # apksigcopier's compare strips both signatures and diffs what is left; identical means F-Droid can sign ours.
+      - name: Compare
+        run: |
+          python3 -m pip install --quiet apksigcopier
+          ours=$(ls src-tauri/gen/android/app/build/outputs/apk/arm64/release/*.apk | head -1)
+          theirs=$(ls release-apk/*.apk | head -1)
+          echo "rebuilt: $ours"
+          echo "released: $theirs"
+          apksigcopier compare --unsigned "$ours" "$theirs" && echo "::notice::Reproducible: the rebuilt APK matches the release"
+
+      - name: Print the release signing key for the recipe
+        if: always()
+        run: |
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs release-apk/*.apk | grep -i "SHA-256" || true

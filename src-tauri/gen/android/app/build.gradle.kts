@@ -71,10 +71,12 @@ android {
         getByName("release") {
             // Kept on purpose: a LAN Jellyfin over plain HTTP is a supported setup, and Android has no other detection source.
             manifestPlaceholders["usesCleartextTraffic"] = "true"
-            signingConfig = if (keyProperties.containsKey("storeFile"))
-                signingConfigs.getByName("release")
-            else
-                signingConfigs.getByName("debug")
+            // Unsigned on request (F-Droid signs with its own key and compares against ours); debug-signed otherwise.
+            signingConfig = when {
+                keyProperties.containsKey("storeFile") -> signingConfigs.getByName("release")
+                System.getenv("KARASU_UNSIGNED") != null -> null
+                else -> signingConfigs.getByName("debug")
+            }
             isMinifyEnabled = true
             proguardFiles(
                 *fileTree(".") { include("**/*.pro") }

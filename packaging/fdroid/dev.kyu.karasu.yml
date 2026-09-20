@@ -1,0 +1,48 @@
+# The fdroiddata recipe (metadata/dev.kyu.karasu.yml there); scripts/release/fdroid-recipe.ps1 fills it from a tag.
+Categories:
+  - Multimedia
+  - Internet
+License: MIT
+AuthorName: Kyu
+SourceCode: https://github.com/Kyusetzu/Karasu
+IssueTracker: https://github.com/Kyusetzu/Karasu/issues
+Changelog: https://github.com/Kyusetzu/Karasu/blob/main/CHANGELOG.md
+WebSite: https://kyusetzu.github.io/Karasu/
+
+AutoName: Karasu
+
+RepoType: git
+Repo: https://github.com/Kyusetzu/Karasu
+
+Builds:
+  - versionName: VERSION_TO_FILL
+    versionCode: VERSIONCODE_TO_FILL
+    commit: TAG_TO_FILL
+    subdir: src-tauri/gen/android/app
+    sudo:
+      - apt-get update
+      - apt-get install -y --no-install-recommends curl ca-certificates build-essential pkg-config nodejs npm
+    init:
+      # rustup as the build user, the pinned toolchain only; the Gradle build spawns `node …/tauri.js` itself.
+      - curl -fsSL https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.97.1 --profile minimal
+      - . $HOME/.cargo/env && rustup target add aarch64-linux-android
+      - cd ../../.. && npm ci
+    gradle:
+      - yes
+    ndk: r27b
+    prebuild:
+      # The updater is off, the APK unsigned (both build-time switches), the paths remapped as the release job does.
+      - export KARASU_NO_SELF_UPDATE=1 KARASU_UNSIGNED=1
+      - export RUSTFLAGS="--remap-path-prefix=$(cd ../../.. && pwd)=/build --remap-path-prefix=$HOME/.cargo=/cargo"
+      - export SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct)
+    build:
+      - . $HOME/.cargo/env
+      - cd ../../.. && npx tauri android build --apk --target aarch64 --split-per-abi
+    output: build/outputs/apk/arm64/release/app-arm64-release-unsigned.apk
+
+AllowedAPKSigningKeys: SIGNING_KEY_TO_FILL
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags ^v[0-9.]+$
+CurrentVersion: VERSION_TO_FILL
+CurrentVersionCode: VERSIONCODE_TO_FILL

@@ -61,3 +61,6 @@ src-tauri/mutants.out.old/
 
 # The filled manifest and metainfo, written by scripts/release/flatpak-manifest.ps1
 packaging/flatpak/out/
+
+# The filled recipe, written by scripts/release/fdroid-recipe.ps1
+packaging/fdroid/out/

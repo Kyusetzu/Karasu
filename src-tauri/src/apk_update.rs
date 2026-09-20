@@ -183,9 +183,10 @@ mod android {
         BLOCKED.lock().unwrap_or_else(|p| p.into_inner()).clone()
     }
 
-    /// Whether this build may update itself: only a release build carries the project signature the APKs have.
+    /// Whether this build may update itself: a release build with the project signature, unless a store owns updates.
     pub fn apk_updater_available_impl() -> bool {
-        !cfg!(debug_assertions)
+        // F-Droid forbids self-updating apps and sets this at build time (packaging/fdroid); its client updates instead.
+        !cfg!(debug_assertions) && !crate::commands::self_update_disabled()
     }
 
     /// `"<versionCode>|same"`, `"<versionCode>|different"` or `"unreadable"` for a file on disk.

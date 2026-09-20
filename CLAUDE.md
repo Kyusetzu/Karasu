@@ -256,10 +256,10 @@ scripts/             bump-version.mjs (every commit), anilist-query.mjs
                      clean-target.mjs (reclaims the
                      stale incremental sessions every version bump leaves
                      under `src-tauri/target`, see the notes);
-                     release/ holds the seven PowerShell scripts
+                     release/ holds the eight PowerShell scripts
                      the release workflow runs (installer, AppImage, Linux
                      package and APK renamers are deliberate near-twins,
-                     release-notes, flatpak-manifest, and
+                     release-notes, flatpak-manifest, fdroid-recipe, and
                      generate-update-manifest, whose Android legs feed the
                      APK updater — see "The Android updater")
 ```
@@ -1368,8 +1368,26 @@ request. The `finish-args` are each a feature — StatusNotifier for the tray,
 for the token, the settings portal for the accent, network for AniList and the
 OAuth callback — and `SUBMISSION.md` there lists what the sandbox changes
 (autostart writes an app-private folder, the updater stays off through
-`can_install`). Nothing under `packaging/` is built by the release; it reads
-the release.
+`can_install`). **F-Droid**: `packaging/fdroid/dev.kyu.karasu.yml`
+is the fdroiddata recipe, `scripts/release/fdroid-recipe.ps1 -Tag` fills its
+version, code and commit, `fastlane/metadata/android/{en-US,de-DE}` is the
+listing F-Droid reads at the tag, and the `Reproducible` workflow (dispatch,
+input `tag`) rebuilds the arm64 APK on a fresh runner and diffs it against the
+release with `apksigcopier compare --unsigned`. Reproducibility rests on
+four things the tree now fixes: `rust-toolchain.toml` pins the exact version
+(and `src/lib/toolchain.test.ts` fails the gate when a workflow's
+`dtolnay/rust-toolchain` step or the recipe names another — CI passes the
+pin as `toolchain:` because the action does not read the file, and rustup's
+auto-install would otherwise leave the Android targets on the wrong
+toolchain), the Android job remaps `RUSTFLAGS --remap-path-prefix` for the
+workspace and `~/.cargo` and pins `SOURCE_DATE_EPOCH` to the commit, and two
+build-time switches — `KARASU_NO_SELF_UPDATE` (`self_update_disabled` in
+`commands/update.rs`; F-Droid forbids self-updating apps, so the check and
+the install both stand down) and `KARASU_UNSIGNED` (`build.gradle.kts` emits an
+unsigned release instead of falling back to debug signing). Bumping the
+Rust pin means the toolchain file, the five workflow steps and the recipe in
+one commit; the test says so. Nothing under `packaging/` is built by the
+release; it reads the release.
 
 ## Links are checked weekly, not trusted
 

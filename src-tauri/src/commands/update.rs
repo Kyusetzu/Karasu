@@ -8,7 +8,7 @@ use tauri::State;
 use super::*;
 
 /// Monotonic commit counter, the fourth version segment, bumped by one on every commit.
-pub const COMMIT_NUMBER: u32 = 661;
+pub const COMMIT_NUMBER: u32 = 662;
 
 /// The full four-part display version; the semver core comes from the crate version.
 pub fn app_version_string() -> String {
@@ -121,7 +121,8 @@ pub async fn check_for_updates(
         let last_check = db
             .kv_get("last_update_check_ms")
             .and_then(|s| s.parse::<i64>().ok());
-        if !check_due(last_check, now_ms(), UPDATE_CHECK_THROTTLE_MS) {
+        // An F-Droid build (packaging/fdroid) neither installs nor announces: its client is the update path.
+        if self_update_disabled() || !check_due(last_check, now_ms(), UPDATE_CHECK_THROTTLE_MS) {
             return Ok(UpdateInfo {
                 current,
                 latest: None,
@@ -239,6 +240,11 @@ fn updater_available() -> bool {
 #[cfg(mobile)]
 fn updater_available() -> bool {
     false
+}
+
+/// Set at build time for a store that owns updates; today only the F-Droid recipe sets it.
+pub(crate) fn self_update_disabled() -> bool {
+    option_env!("KARASU_NO_SELF_UPDATE").is_some()
 }
 
 /// Whether an in-place update can be installed; the `is_linux` half is what keeps the updater on for every Windows user.

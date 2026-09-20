@@ -1,0 +1,3 @@
+# The one Rust version every build uses, here and in CI, so an F-Droid rebuild can be bit-identical to the release.
+[toolchain]
+channel = "1.97.1"

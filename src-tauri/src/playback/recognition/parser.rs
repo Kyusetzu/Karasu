@@ -476,6 +476,8 @@ mod tests {
                 name in "[A-Za-z]{1,8}( [A-Za-z]{1,8}){0,3}",
                 ep in 1u32..=1899,
             ) {
+                // A last word that is a release keyword ("Cr", "Web") is stripped on purpose; that is another test.
+                prop_assume!(!KEYWORDS.contains(&name.rsplit(' ').next().unwrap().to_ascii_lowercase().as_str()));
                 let r = parse(&format!("{name} - {ep:02}.mkv"));
                 prop_assert_eq!(r.title, name);
                 prop_assert_eq!(r.episode, Some(ep));

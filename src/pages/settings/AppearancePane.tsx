@@ -44,6 +44,10 @@ export function AppearanceSection() {
   const setReduceMotion = useTheme((s) => s.setReduceMotion);
   const setThemeMode = useTheme((s) => s.setMode);
   const setAccent = useTheme((s) => s.setAccent);
+  const accentSource = useTheme((s) => s.accentSource);
+  const systemAccent = useTheme((s) => s.systemAccent);
+  const setAccentSource = useTheme((s) => s.setAccentSource);
+  const followSystem = accentSource === "system";
   const statusColors = useTheme((s) => s.statusColors);
   const setStatusColor = useTheme((s) => s.setStatusColor);
   const resetStatusColors = useTheme((s) => s.resetStatusColors);
@@ -181,7 +185,16 @@ export function AppearanceSection() {
           hint={t("settings.reduceMotionHint")}
         />
 
-        <div className="space-y-3 py-1">
+        {/* Disabled where the platform publishes no accent, with the hint saying so; the swatch stays as the fallback. */}
+        <Toggle
+          checked={followSystem && systemAccent !== null}
+          onChange={(v) => setAccentSource(v ? "system" : "custom")}
+          label={t("settings.accentSystem")}
+          hint={systemAccent === null ? t("settings.accentSystemUnavailable") : t("settings.accentSystemHint")}
+          disabled={systemAccent === null}
+        />
+
+        <div className={cn("space-y-3 py-1", followSystem && systemAccent !== null && "pointer-events-none opacity-55")}>
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-sm">
             <span className="block text-ink-100">{t("settings.accent")}</span>
             {/* Wraps: the swatches plus the custom button outgrow a phone card. */}

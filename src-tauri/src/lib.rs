@@ -469,6 +469,7 @@ pub fn run() {
             commands::discover_jellyfin_servers,
             commands::probe_jellyfin_server,
             commands::platform_info,
+            commands::system_accent,
             commands::get_close_to_tray,
             commands::set_close_to_tray,
             commands::get_global_hotkey,

@@ -42,6 +42,7 @@ const defaultCoverCols = (): number =>
 
 const MODE_KEY = "karasu-theme";
 const ACCENT_KEY = "karasu-accent";
+const ACCENT_SOURCE_KEY = "karasu-accent-source";
 const COVER_COLS_KEY = "karasu-cover-cols";
 /** The pre-slider setting, read once for migration and then deleted. */
 const DENSITY_KEY = "karasu-density";
@@ -60,6 +61,18 @@ function suspendTransitions(html: HTMLElement): void {
 }
 
 const isHex = (s: string) => /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(s);
+
+export type AccentSource = "custom" | "system";
+
+/** Who answers "what colour is the system's accent"; main.tsx plugs the Tauri command in, tests plug in a stub. */
+let systemAccentProvider: () => Promise<string | null> = () => Promise.resolve(null);
+export const setSystemAccentProvider = (fn: () => Promise<string | null>) => {
+  systemAccentProvider = fn;
+};
+
+/** The colour the ramp is derived from: the system's while that source is chosen and known, the user's otherwise. */
+export const effectiveAccent = (source: AccentSource, accent: string, systemAccent: string | null): string =>
+  source === "system" && systemAccent ? systemAccent : accent;
 
 function systemDark(): boolean {
   return window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? true;
@@ -109,6 +122,10 @@ function apply(
 interface ThemeState {
   mode: ThemeMode;
   accent: string;
+  /** "system" follows the OS accent; `accent` is kept underneath so switching back costs nothing. */
+  accentSource: AccentSource;
+  /** The OS accent as last read, null until asked or where the platform has none. */
+  systemAccent: string | null;
   coverCols: number;
   reduceMotion: boolean;
   density: Density;
@@ -116,6 +133,9 @@ interface ThemeState {
   statusColors: StatusPalette;
   setMode: (mode: ThemeMode) => void;
   setAccent: (accent: string) => void;
+  setAccentSource: (source: AccentSource) => void;
+  /** Re-reads the OS accent; the shell calls it on focus, since Windows lets the colour change while the app runs. */
+  refreshSystemAccent: () => Promise<void>;
   setCoverCols: (coverCols: number) => void;
   setReduceMotion: (reduceMotion: boolean) => void;
   setDensity: (density: Density) => void;
@@ -157,6 +177,9 @@ const storedAccent = (): string => {
   return saved && isHex(saved) ? saved : DEFAULT_ACCENT;
 };
 
+const storedAccentSource = (): AccentSource =>
+  localStorage.getItem(ACCENT_SOURCE_KEY) === "system" ? "system" : "custom";
+
 /** The one non-scalar setting; `commit` stringifies, and an object would read back as the defaults forever. */
 const storedDensity = (): Density => {
   const raw = localStorage.getItem(UI_DENSITY_KEY);
@@ -174,8 +197,8 @@ const storedStatusColors = (): StatusPalette => {
 export const useTheme = create<ThemeState>((set, get) => {
   /** Writes whatever the store currently holds, so no call site repeats the argument list. */
   const flush = () => {
-    const { mode, accent, coverCols, reduceMotion, statusColors, density } = get();
-    apply(mode, accent, coverCols, reduceMotion, statusColors, density);
+    const { mode, accent, accentSource, systemAccent, coverCols, reduceMotion, statusColors, density } = get();
+    apply(mode, effectiveAccent(accentSource, accent, systemAccent), coverCols, reduceMotion, statusColors, density);
   };
 
   /** The palette's own writer, JSON rather than `commit`; the `try` because private-mode storage throws on write. */
@@ -201,6 +224,8 @@ export const useTheme = create<ThemeState>((set, get) => {
   return {
     mode: storedMode(),
     accent: storedAccent(),
+    accentSource: storedAccentSource(),
+    systemAccent: null,
     coverCols: storedCoverCols(),
     reduceMotion: localStorage.getItem(REDUCE_MOTION_KEY) === "true",
     density: storedDensity(),
@@ -208,6 +233,14 @@ export const useTheme = create<ThemeState>((set, get) => {
 
     setMode: (mode) => commit(MODE_KEY, "mode", mode),
     setAccent: (accent) => commit(ACCENT_KEY, "accent", accent),
+    setAccentSource: (source) => commit(ACCENT_SOURCE_KEY, "accentSource", source),
+    refreshSystemAccent: async () => {
+      const read = await systemAccentProvider().catch(() => null);
+      const systemAccent = read && isHex(read) ? read.toLowerCase() : null;
+      if (systemAccent === get().systemAccent) return;
+      set({ systemAccent });
+      flush();
+    },
     setCoverCols: (coverCols) =>
       commit(COVER_COLS_KEY, "coverCols", clampCols(coverCols)),
     setReduceMotion: (reduceMotion) =>
@@ -232,6 +265,10 @@ export const useTheme = create<ThemeState>((set, get) => {
 
     init: () => {
       flush();
+      void get().refreshSystemAccent();
+      window.addEventListener("focus", () => {
+        if (get().accentSource === "system") void get().refreshSystemAccent();
+      });
       // Track the OS theme while in "system" mode.
       window
         .matchMedia?.("(prefers-color-scheme: dark)")

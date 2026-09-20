@@ -343,6 +343,8 @@ export const setApkDownloadMetered = (enabled: boolean) =>
 
 /** Full four-part app version (MAJOR.MINOR.PATCH.COMMIT#) for the About page. */
 export const appVersion = () => invoke<string>("app_version");
+/** The OS accent as `#rrggbb`, or null where the platform has none to publish. */
+export const systemAccent = () => invoke<string | null>("system_accent");
 
 /** Windows' Accessibility text-size multiplier, which WebView2 ignores, so App applies it to the root element. */
 export const getTextScale = () => invoke<number>("get_text_scale");

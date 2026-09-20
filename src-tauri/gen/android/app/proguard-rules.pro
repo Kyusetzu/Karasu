@@ -50,3 +50,7 @@
 # The in-app updater. UpdateInstaller shares NotifScheduler's failure mode
 # (JNI-by-name, nothing else keeps it).
 -keep class dev.kyu.karasu.UpdateInstaller { *; }
+
+# The system accent. SystemAccent shares NotifScheduler's failure mode
+# (JNI-by-name, nothing else keeps it).
+-keep class dev.kyu.karasu.SystemAccent { *; }

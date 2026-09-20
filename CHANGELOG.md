@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: e24fb9f -->
+<!-- generated-through: 9b57589 -->
 
 ### Fixed
 
@@ -104,6 +104,7 @@ tag time is then optional rather than load-bearing.
 - Android shows the update's download and installs it from About, the bell, or once at start; the update channel is now reachable there too.
 - The window opens where and how large it was last closed.
 - On Android, a long press and an armed pull-to-sync give a short haptic tick, and a title can be shared to another app from its menu or its page.
+- Appearance can follow the system's accent colour on Windows, GNOME/KDE and Android 12+, with your own colour kept for when you switch back.
 
 ### Changed
 

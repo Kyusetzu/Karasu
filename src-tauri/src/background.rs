@@ -297,6 +297,16 @@ pub fn tracking_service(on: bool, title: &str, body: &str) -> Result<(), String>
     }
 }
 
+/// Material You's primary accent as `#rrggbb` from `SystemAccent.get`, or an empty string below Android 12.
+pub fn system_accent() -> Result<String, String> {
+    with_app_class("dev.kyu.karasu.SystemAccent", |env, activity, class| {
+        let answer = env
+            .call_static_method(class, "get", "(Landroid/content/Context;)Ljava/lang/String;", &[JValue::Object(activity)])?
+            .l()?;
+        answer_text(env, answer)
+    })
+}
+
 /// Whether Android has exempted Karasu from battery optimisation.
 pub fn battery_exempt() -> Result<bool, String> {
     with_app_class("dev.kyu.karasu.TrackingControl", |env, activity, class| {

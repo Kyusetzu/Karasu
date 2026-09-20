@@ -90,4 +90,3 @@ lives in Rust), a formatter (one tree-wide diff for nothing).
 | Item | Where | Why, in a line |
 | --- | --- | --- |
 | F-Droid | reproducible-build metadata, a merge request to fdroiddata | the sideload model with an updater people already trust; requires the build to be reproducible, which the CI signing step must be checked against |
-| Follow the system accent (Material You; Windows DWM accent; GNOME 47) | `platform_info` + the accent store | one switch, "use the system colour", on all three; the derivation in `lib/contrast.ts` already takes any hex |

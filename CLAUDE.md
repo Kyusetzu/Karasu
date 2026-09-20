@@ -182,6 +182,8 @@ src-tauri/src/
                      `specialUse` `<property>`, sit outside the markers like
                      the rest; MainActivity's onResume/onPause report the
                      foreground flag through `KarasuNative.setForeground`);
+                     and SystemAccent.kt (Material You's primary accent for
+                     the theme store, JNI-by-name, proguard keep load-bearing);
                      and UpdateInstaller.kt (the in-app updater's device
                      half — ABI, cache dir, free space, metered state, the
                      signing-certificate comparison and the two intents;
@@ -1472,7 +1474,17 @@ four or five places, made by careful code, because nothing said it once.
   rather than compiling a Secret Service backend that cannot work there.
 - **Accent colours** derive shades + a readable ink colour (`src/lib/contrast.ts`);
   use `text-accent-ink` on accent-filled controls rather than hard-coded
-  `text-white`.
+  `text-white`. The accent has two sources: the user's hex (`karasu-accent`)
+  and the OS's, chosen by `karasu-accent-source` and read through
+  `system_accent` in `commands/system.rs` — `UISettings::GetColorValue(Accent)`
+  on Windows, the settings portal's `org.freedesktop.appearance accent-color`
+  on Linux (GNOME 47+, KDE; older portals answer an error, so `None`), and
+  `android.R.color.system_accent1_500` through `SystemAccent.kt` on Android
+  12+. The store keeps the user's colour underneath (`effectiveAccent`),
+  re-reads on window focus only while following the system, and the
+  Appearance toggle is disabled with a hint where the answer is `None`. On
+  the rig on 2026-09-20 the switch painted Windows' `#0078d4` and came back
+  to the saved colour; Linux and Android are compile-checked only.
 - **Overlays carry `data-overlay`.** Screen-level key handlers check for it and
   stand down, so a dialog owns the keyboard instead of the list behind it acting
   on the same press. `GlobalKeys` honours it too.

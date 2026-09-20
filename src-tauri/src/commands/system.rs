@@ -100,6 +100,70 @@ pub fn get_text_scale() -> f64 {
     1.0
 }
 
+// --- System accent -----------------------------------------------------------
+
+/// The desktop's or the phone's accent colour as `#rrggbb`, or nothing where the platform does not publish one.
+#[tauri::command]
+pub fn system_accent() -> Option<String> {
+    read_system_accent()
+}
+
+#[cfg(windows)]
+fn read_system_accent() -> Option<String> {
+    use windows::UI::ViewManagement::{UIColorType, UISettings};
+    let c = UISettings::new().ok()?.GetColorValue(UIColorType::Accent).ok()?;
+    Some(hex_from_rgb(c.R, c.G, c.B))
+}
+
+/// The settings portal's `accent-color`, which GNOME 47+ and KDE publish; an older portal answers with an error.
+#[cfg(target_os = "linux")]
+fn read_system_accent() -> Option<String> {
+    use zbus::blocking::{Connection, Proxy};
+    use zbus::zvariant::{OwnedValue, Value};
+    let conn = Connection::session().ok()?;
+    let proxy = Proxy::new(
+        &conn,
+        "org.freedesktop.portal.Desktop",
+        "/org/freedesktop/portal/desktop",
+        "org.freedesktop.portal.Settings",
+    )
+    .ok()?;
+    let value: OwnedValue = proxy
+        .call("ReadOne", &("org.freedesktop.appearance", "accent-color"))
+        .ok()?;
+    let Value::Structure(rgb) = &*value else {
+        return None;
+    };
+    let channel = |i: usize| rgb.fields().get(i).and_then(|v| f64::try_from(v.clone()).ok());
+    hex_from_unit(channel(0)?, channel(1)?, channel(2)?)
+}
+
+#[cfg(target_os = "android")]
+fn read_system_accent() -> Option<String> {
+    crate::background::system_accent().ok().filter(|s| !s.is_empty())
+}
+
+#[cfg(not(any(windows, target_os = "linux", target_os = "android")))]
+fn read_system_accent() -> Option<String> {
+    None
+}
+
+/// Bytes to the `#rrggbb` the theme store and `lib/contrast.ts` read.
+#[cfg_attr(not(any(windows, target_os = "android", test)), allow(dead_code))]
+pub fn hex_from_rgb(r: u8, g: u8, b: u8) -> String {
+    format!("#{r:02x}{g:02x}{b:02x}")
+}
+
+/// The portal's unit floats, where a negative channel is its way of saying "no accent set".
+#[cfg_attr(not(any(target_os = "linux", test)), allow(dead_code))]
+pub fn hex_from_unit(r: f64, g: f64, b: f64) -> Option<String> {
+    if [r, g, b].iter().any(|c| !c.is_finite() || *c < 0.0 || *c > 1.0) {
+        return None;
+    }
+    let byte = |c: f64| (c * 255.0).round() as u8;
+    Some(hex_from_rgb(byte(r), byte(g), byte(b)))
+}
+
 // --- Platform ----------------------------------------------------------------
 
 /// What the screen needs to know about where it runs; tray presence stays with `get_close_to_tray`, one source.
@@ -669,8 +733,8 @@ pub fn mark_all_notifications_read(app: AppHandle, db: State<'_, Db>) -> Result<
 #[cfg(test)]
 mod tests {
     use super::{
-        close_hides_window, describe_database, normalize_ui_zoom, UI_ZOOM_DEFAULT, UI_ZOOM_MAX,
-        UI_ZOOM_MIN,
+        close_hides_window, describe_database, hex_from_rgb, hex_from_unit, normalize_ui_zoom,
+        UI_ZOOM_DEFAULT, UI_ZOOM_MAX, UI_ZOOM_MIN,
     };
 
     /// A stored zoom is clamped and a missing one is the default, since it is applied before the first paint.
@@ -727,5 +791,17 @@ mod tests {
     fn an_unrecognised_value_reads_as_unset() {
         assert!(close_hides_window(Some(""), true));
         assert!(!close_hides_window(Some("yes"), false));
+    }
+
+    #[test]
+    fn an_accent_is_spelled_as_the_theme_store_reads_it() {
+        assert_eq!(hex_from_rgb(75, 63, 199), "#4b3fc7");
+        assert_eq!(hex_from_rgb(0, 0, 0), "#000000");
+        assert_eq!(hex_from_unit(1.0, 1.0, 1.0).as_deref(), Some("#ffffff"));
+        assert_eq!(hex_from_unit(0.2941, 0.2471, 0.7804).as_deref(), Some("#4b3fc7"));
+        // The portal answers `(-1, -1, -1)` for "no accent", and a NaN is nobody's colour.
+        assert_eq!(hex_from_unit(-1.0, -1.0, -1.0), None);
+        assert_eq!(hex_from_unit(f64::NAN, 0.0, 0.0), None);
+        assert_eq!(hex_from_unit(1.5, 0.0, 0.0), None);
     }
 }

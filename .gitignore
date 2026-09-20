@@ -10,6 +10,8 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+# the bundle treemap from `npm run build:analyze`
+dist-stats
 *.local
 
 # Editor directories and files

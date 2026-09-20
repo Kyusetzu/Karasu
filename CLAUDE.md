@@ -1263,6 +1263,23 @@ it was added; `cargo update -p h2` was the fix. Dependabot keeps the npm and
 cargo graphs moving; knip and cargo-deny say when something in them is dead
 or wrong.
 
+## The dev loop has eyes
+
+Three things a dev build shows that a release never carries. **TanStack Query
+devtools** mount in `main.tsx` under `import.meta.env.DEV` (lazy, so the
+production graph never sees the package — proven by grepping `dist/assets`),
+with the button bottom-left because the detection window owns the other
+corner; every request-budget question ("what refetched, what is stale") reads
+off it before anyone adds a log line. **react-scan** highlights renders live,
+but only when asked: `KARASU_SCAN=1` in the dev server's environment makes
+`vite.config.ts` inject `src/app/scan.ts` as the first module script, which is
+the one way to load it before `react-dom` (an inline script cannot resolve a
+bare specifier, a static import would ship it, and a dynamic one is too late
+for the DevTools hook). It slows the app and is off by default for that reason.
+`npm run build:analyze` is `rollup-plugin-visualizer` on rolldown — it works —
+writing a treemap of every chunk to `dist-stats/index.html` (ignored); open it
+before guessing what the index chunk is made of.
+
 ## Three Cargo tools that answer questions, run by hand
 
 `npm run deps:unused` is cargo-machete over the crate (it does not read

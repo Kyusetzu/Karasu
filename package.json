@@ -1,7 +1,7 @@
 {
   "name": "karasu",
   "private": true,
-  "version": "1.17.14",
+  "version": "1.17.15",
   "type": "module",
   "author": "Kyu",
   "license": "MIT",
@@ -11,6 +11,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:analyze": "vite build --mode analyze",
     "typecheck": "tsc --noEmit",
     "verify": "node scripts/verify.mjs",
     "verify:frontend": "node scripts/verify.mjs --frontend",
@@ -62,6 +63,7 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
+    "@tanstack/react-query-devtools": "^5.103.1",
     "@taplo/cli": "^0.7.0",
     "@tauri-apps/cli": "^2",
     "@testing-library/jest-dom": "^7.0.1",
@@ -78,6 +80,8 @@
     "jsdom": "^30.0.1",
     "knip": "^6.37.0",
     "oxlint": "^1.83.0",
+    "react-scan": "^0.5.7",
+    "rollup-plugin-visualizer": "^7.1.1",
     "typescript": "~7.0.2",
     "vite": "^8.3.0",
     "vitest": "^4.1.11",

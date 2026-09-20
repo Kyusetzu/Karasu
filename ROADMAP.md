@@ -74,24 +74,11 @@ deleted here when it lands. The column says where it takes effect. Already in
 vitest note in CLAUDE.md), `cargo-nextest` (a one-second suite), `msw` (HTTP
 lives in Rust), a formatter (one tree-wide diff for nothing).
 
-**Tests — deeper, not only more**
-
-| Package | Where | Why, in a line |
-| --- | --- | --- |
-
 **Quality gates and hygiene**
 
 | Package | Where | Why, in a line |
 | --- | --- | --- |
 | Tauri Specta | `src/api/*.ts` wrappers, every `#[tauri::command]` | generates the TS bindings from the Rust signatures; knip found five hand-written wrappers nobody called, which generated ones cannot become |
-
-**Development loop**
-
-| Package | Where | Why, in a line |
-| --- | --- | --- |
-| `@tanstack/react-query-devtools` | `App.tsx`, dev builds only | the query cache on screen: what is stale, what refetched — the request-budget questions without log lines |
-| `react-scan` | dev builds only | renders highlighted live; the virtual grid and the charts are where one extra render costs forty cards |
-| `rollup-plugin-visualizer` | `npm run build -- --analyze`, on demand | a treemap of the 456 kB index chunk instead of guessing |
 
 **Tauri plugins — desktop**
 

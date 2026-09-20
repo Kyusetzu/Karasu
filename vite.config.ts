@@ -1,14 +1,28 @@
-import { defineConfig } from "vite";
+import { defineConfig, type PluginOption } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+import { visualizer } from "rollup-plugin-visualizer";
 import path from "node:path";
 
 // @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
 
+/** react-scan must load before react-dom, so the dev server injects it as the first module script when asked. */
+const reactScan = (): PluginOption => ({
+  name: "karasu-react-scan",
+  transformIndexHtml: () => [{ tag: "script", attrs: { type: "module", src: "/src/app/scan.ts" }, injectTo: "head-prepend" }],
+});
+
 // https://vite.dev/config/
-export default defineConfig(async () => ({
-  plugins: [react(), tailwindcss()],
+export default defineConfig(async ({ command, mode }) => ({
+  plugins: [
+    react(),
+    tailwindcss(),
+    // @ts-expect-error process is a nodejs global
+    ...(command === "serve" && process.env.KARASU_SCAN ? [reactScan()] : []),
+    // `npm run build:analyze`: a treemap of what each chunk is made of, under dist-stats/, opened by hand.
+    ...(mode === "analyze" ? [visualizer({ filename: "dist-stats/index.html", gzipSize: true, template: "treemap" })] : []),
+  ],
 
   resolve: {
     alias: {

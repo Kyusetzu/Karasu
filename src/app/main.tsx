@@ -15,6 +15,11 @@ import "./index.css";
 // Apply the saved theme before the first paint to avoid a flash.
 useTheme.getState().init();
 
+// Dev builds only: the query cache on screen, bottom-left so it stays clear of the detection window's corner.
+const QueryDevtools = import.meta.env.DEV
+  ? React.lazy(() => import("@tanstack/react-query-devtools").then((m) => ({ default: m.ReactQueryDevtools })))
+  : null;
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -55,6 +60,11 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
           <App />
         </ErrorBoundary>
       </HashRouter>
+      {QueryDevtools && (
+        <React.Suspense fallback={null}>
+          <QueryDevtools buttonPosition="bottom-left" />
+        </React.Suspense>
+      )}
     </QueryClientProvider>
   </React.StrictMode>,
 );

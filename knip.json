@@ -1,7 +1,8 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "entry": [
-    "scripts/*.mjs"
+    "scripts/*.mjs",
+    "src/app/scan.ts"
   ],
   "project": [
     "src/**/*.{ts,tsx,css}",
@@ -12,12 +13,16 @@
   ],
   "ignoreDependencies": [
     "@fontsource/kosugi-maru",
-    "@fontsource/sn-pro"
+    "@fontsource/sn-pro",
+    "@taplo/cli"
   ],
   "ignoreExportsUsedInFile": true,
   "vitest": {
     "config": [
       "vite.config.ts"
     ]
-  }
+  },
+  "ignoreBinaries": [
+    "typos"
+  ]
 }

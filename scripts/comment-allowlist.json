@@ -63,5 +63,10 @@
     "file": "scripts/verify.mjs",
     "startsWith": "The whole gate, as CI runs it",
     "reason": "usage block: one invocation per line"
+  },
+  {
+    "file": "scripts/toml-check.mjs",
+    "startsWith": "Lints and format-checks the TOML files",
+    "reason": "usage block: one invocation per line"
   }
 ]

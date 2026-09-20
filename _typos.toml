@@ -1,0 +1,42 @@
+# Spell-check for code and docs; German copy is excluded because typos knows English, and the vocabulary is extended below.
+[files]
+extend-exclude = [
+  "*.lock",
+  "package-lock.json",
+  "dist/",
+  "coverage/",
+  "dist-stats/",
+  "site/dist/",
+  "site/node_modules/",
+  "site/src/generated/",
+  "src/lib/htmlEntities.data.ts",
+  "src/lib/__snapshots__/",
+  "src-tauri/src/snapshots/",
+  "src-tauri/gen/android/**/build/",
+  "src-tauri/gen/android/app/src/main/res/values-de/",
+  "src/i18n/de.ts",
+  "site/src/content/*.de.ts",
+  "CHANGELOG.md",
+]
+
+[default]
+# German strings in i18n.rs, the generated CSS header's hash, a JS regex's flag list, and an entity-split `javascript:`.
+extend-ignore-re = [
+  '\(De, .*',
+  '"[^"]*\b(?:ist|und|für|über|nicht|Monat|Monaten)\b[^"]*"',
+  'sha256 [0-9a-f]+',
+  '/[gimsuyd]{2,}[,)\s]',
+  'java&#\d+;cript',
+]
+
+[default.extend-identifiers]
+# The ordinal suffix in the season regexes, and a pinch-zoom distance beside `pd`; PNGs is a plural typos misreads.
+nd = "nd"
+PNGs = "PNGs"
+
+[default.extend-words]
+# Anime seasons come in cours; ADN is a streaming service; unparseable and mis-click are spellings, not slips.
+cours = "cours"
+ADN = "ADN"
+unparseable = "unparseable"
+mis = "mis"

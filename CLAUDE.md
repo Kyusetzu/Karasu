@@ -249,7 +249,9 @@ scripts/             bump-version.mjs (every commit), anilist-query.mjs
                      one-line-comment rule: the gate, the comment-only proof,
                      the shared scanner and the allowed exceptions — see
                      "Comments: one line each"), verify.mjs (the gate, see
-                     "The commit loop"), clean-target.mjs (reclaims the
+                     "The commit loop"), toml-check.mjs (taplo over the
+                     TOML files, one per stdin — see the same section),
+                     clean-target.mjs (reclaims the
                      stale incremental sessions every version bump leaves
                      under `src-tauri/target`, see the notes);
                      release/ holds the five PowerShell scripts
@@ -584,7 +586,7 @@ Six commands, in this order. Don't do any of it by hand.
 
 ```sh
 node scripts/bump-version.mjs patch   # minor for features, major for breaks
-npm run verify                        # typecheck + comment audit, then vitest and cargo test side by side
+npm run verify                        # typecheck, audits and lints, then vitest and cargo test side by side
 git commit                            # message ends with the Co-Authored-By trailer
 node scripts/changelog.mjs            # after the commit — it reads the commit
 git commit --amend --no-edit          # fold the changelog in, then re-run:
@@ -615,7 +617,16 @@ switched off there are switched off on purpose — the React Compiler set
 (`refs`, `purity`, `set-state-in-effect`) flags the live-ref and
 derived-state patterns this code uses knowingly, `prefer-tag-over-role` and
 `no-autofocus` argue with decisions the overlays document, and the rest is
-style — so a new warning is a finding, not a formatting opinion. Two more
+style — so a new warning is a finding, not a formatting opinion. Before oxlint sit two
+more cheap phases: **typos** (`_typos.toml`; the German copy is excluded by
+file and by a regex over the `(De, …)` arms of `i18n.rs`, because typos knows
+English, and the anime vocabulary — cours, ADN — is in `extend-words`; the
+binary comes from `cargo install typos-cli`, and a machine without it gets a
+visible `skip` line, never silence, while CI runs the `crate-ci/typos` action
+before `verify`) and **toml** (`scripts/toml-check.mjs`, taplo's npm build fed
+one file at a time over stdin, because its WASM globbing finds nothing on
+Windows; `taplo.toml` names the files and the style, `--fix` rewrites them).
+Two more
 tools answer questions rather than gate: `npm run knip` (unused files,
 exports and dependencies; silent when clean, `knip.json`) and `npm run
 test:coverage` (four summary lines, the per-file map under `coverage/`).

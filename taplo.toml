@@ -1,0 +1,19 @@
+# Formatting for the handful of TOML files; `scripts/toml-check.mjs` feeds them to taplo over stdin, one file at a time.
+include = [
+  "src-tauri/Cargo.toml",
+  "src-tauri/deny.toml",
+  "src-tauri/.cargo/config.toml",
+  "_typos.toml",
+  "taplo.toml",
+  "rust-toolchain.toml",
+]
+
+[formatting]
+align_entries = false
+align_comments = false
+reorder_keys = false
+reorder_arrays = false
+array_auto_collapse = false
+array_auto_expand = true
+column_width = 120
+indent_string = "  "

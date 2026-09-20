@@ -1491,7 +1491,7 @@ mod tests {
 
     /// The file's own duration beats the entry's rounded minutes.
     #[test]
-    fn the_sources_duration_beats_the_entrys_minutes() {
+    fn the_sources_duration_beats_the_entries_minutes() {
         // The entry's minutes say not yet but the file's own duration says due, and the file's truth wins.
         assert_eq!(position_due(Some(810), Some(1200), Some(24), 0), Some(true));
         // Without the source duration the entry's minutes decide.

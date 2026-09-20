@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// The whole gate, as CI runs it: typecheck, the comment audit, then the frontend and the Rust suites side by side.
+// The whole gate, as CI runs it: typecheck, the audits and lints, then the frontend and the Rust suites side by side.
 //
 //   node scripts/verify.mjs              everything; one line per phase, the full log only for a phase that failed
-//   node scripts/verify.mjs --frontend   typecheck, audit and vitest only
+//   node scripts/verify.mjs --frontend   typecheck, audits, lints and vitest only
 //   node scripts/verify.mjs --rust       cargo test only
 //   node scripts/verify.mjs --verbose    every phase's output as it runs, as the tools print it themselves
 import { spawn } from "node:child_process";
@@ -23,7 +23,7 @@ const OXLINT = path.join(ROOT, "node_modules", "oxlint", "bin", "oxlint");
 const phases = [];
 
 /** Runs one phase, captures its output unless verbose, and keeps what the summary needs. */
-function run(name, cmd, args, summarize) {
+function run(name, cmd, args, summarize, { optional } = {}) {
   const started = Date.now();
   return new Promise((resolve) => {
     const child = spawn(cmd, args, {
@@ -36,7 +36,17 @@ function run(name, cmd, args, summarize) {
       child.stdout.on("data", (d) => (out += d));
       child.stderr.on("data", (d) => (out += d));
     }
+    // A tool that is not installed is a visible skip for an optional phase and a failure for the rest.
+    let settled = false;
+    child.on("error", (err) => {
+      settled = true;
+      const missing = err.code === "ENOENT";
+      const phase = { name, ms: Date.now() - started, ok: missing && Boolean(optional), skipped: missing, out: String(err), summary: missing ? `skipped — not installed (${optional ?? cmd})` : String(err) };
+      phases.push(phase);
+      resolve(phase);
+    });
     child.on("close", (code) => {
+      if (settled) return;
       const phase = { name, ms: Date.now() - started, ok: code === 0, out, summary: summarize(out) };
       phases.push(phase);
       resolve(phase);
@@ -74,6 +84,12 @@ const summarizeLint = (out) => {
   return n ? `${n} finding(s)` : "clean";
 };
 const summarizeTsc = (out) => (strip(out) ? `${lines(out).filter((l) => /error TS/.test(l)).length} error(s)` : "clean");
+/** typos prints only findings, one `path:line:col: error:` line each, with `--format brief`. */
+const summarizeTypos = (out) => {
+  const n = lines(out).filter((l) => /: error: /.test(l)).length;
+  return n ? `${n} finding(s)` : "clean";
+};
+const summarizeToml = (out) => lines(strip(out)).at(-1)?.replace(/^toml-check: /, "") ?? "";
 const summarizeAudit = (out) => {
   const last = strip(out).split("\n").at(-1)?.replace(/^comment-audit: /, "") ?? "";
   const files = /in (\d+) file\(s\)/.exec(last)?.[1];
@@ -93,7 +109,8 @@ function failureExcerpt(out) {
 function report() {
   const width = Math.max(...phases.map((p) => p.name.length));
   for (const p of phases) {
-    console.log(`${p.ok ? "ok  " : "FAIL"} ${p.name.padEnd(width)}  ${(p.ms / 1000).toFixed(1).padStart(5)} s  ${p.summary}`);
+    const mark = p.skipped ? "skip" : p.ok ? "ok  " : "FAIL";
+    console.log(`${mark} ${p.name.padEnd(width)}  ${(p.ms / 1000).toFixed(1).padStart(5)} s  ${p.summary}`);
   }
   const failed = phases.filter((p) => !p.ok);
   for (const p of failed) {
@@ -114,6 +131,8 @@ if (wantFrontend) {
   // Cheap and first: a type error stops the run before either suite spends its time.
   if (!(await run("typecheck", node, [TSC, "--noEmit"], summarizeTsc)).ok) report();
   if (!(await run("comment audit", node, ["scripts/comment-audit.mjs", "--check"], summarizeAudit)).ok) report();
+  if (!(await run("typos", "typos", ["--format", "brief"], summarizeTypos, { optional: "cargo install typos-cli" })).ok) report();
+  if (!(await run("toml", node, ["scripts/toml-check.mjs"], summarizeToml)).ok) report();
   if (!(await run("oxlint", node, [OXLINT, "--deny-warnings"], summarizeLint)).ok) report();
 }
 

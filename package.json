@@ -1,7 +1,7 @@
 {
   "name": "karasu",
   "private": true,
-  "version": "1.17.11",
+  "version": "1.17.12",
   "type": "module",
   "author": "Kyu",
   "license": "MIT",
@@ -24,6 +24,8 @@
     "test:changed": "vitest run --changed HEAD",
     "clean:target": "node scripts/clean-target.mjs",
     "lint": "oxlint --deny-warnings",
+    "lint:typos": "typos --format brief",
+    "lint:toml": "node scripts/toml-check.mjs",
     "lint:rust": "cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings",
     "deny": "cargo deny --manifest-path src-tauri/Cargo.toml check",
     "test:coverage": "vitest run --coverage",
@@ -57,6 +59,7 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
+    "@taplo/cli": "^0.7.0",
     "@tauri-apps/cli": "^2",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",

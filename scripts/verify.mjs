@@ -68,8 +68,11 @@ function summarizeCargo(out) {
   return warnings.length ? `${head} · ${warnings.length} compiler warning(s):\n      ${warnings.join("\n      ")}` : head;
 }
 
-/** oxlint's closing count line, which it prints only when it found something. */
-const summarizeLint = (out) => lines(strip(out)).findLast((l) => /^Found \d+ warning/.test(l)) ?? "clean";
+/** oxlint prints one `file:line:col: level rule(...)` line per finding and nothing else without colour. */
+const summarizeLint = (out) => {
+  const n = lines(out).filter((l) => /^\S+:\d+:\d+: (error|warning) /.test(strip(l))).length;
+  return n ? `${n} finding(s)` : "clean";
+};
 const summarizeTsc = (out) => (strip(out) ? `${lines(out).filter((l) => /error TS/.test(l)).length} error(s)` : "clean");
 const summarizeAudit = (out) => {
   const last = strip(out).split("\n").at(-1)?.replace(/^comment-audit: /, "") ?? "";

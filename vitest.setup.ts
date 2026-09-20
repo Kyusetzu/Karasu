@@ -1,8 +1,12 @@
 import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";
-import { afterEach, vi } from "vitest";
+import { afterEach, expect, vi } from "vitest";
+import * as axeMatchers from "vitest-axe/matchers";
 
 /** Setup for the `dom` project only; `node` never loads it, which is why importing Testing Library here is safe. */
+
+// `toHaveNoViolations` for the a11y tests; jest-dom registers its own matchers on import.
+expect.extend(axeMatchers);
 
 // Unmount between tests, or `getByRole` matches leftovers from the previous test and looks like a component bug.
 afterEach(cleanup);
@@ -38,7 +42,7 @@ if (!("ResizeObserver" in globalThis)) {
 }
 
 /** jsdom has no `matchMedia`; the shell hooks read it at mount, so a desktop-shaped answer is the default. */
-if (!("matchMedia" in window)) {
+if (typeof window.matchMedia !== "function") {
   window.matchMedia = (query: string) =>
     ({
       matches: false,
@@ -50,4 +54,9 @@ if (!("matchMedia" in window)) {
       removeListener: () => {},
       dispatchEvent: () => false,
     }) as MediaQueryList;
+}
+
+/** jsdom has no `scrollIntoView`; the palette and the menus call it on the highlighted row. */
+if (typeof Element.prototype.scrollIntoView !== "function") {
+  Element.prototype.scrollIntoView = () => {};
 }

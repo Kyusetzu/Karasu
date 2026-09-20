@@ -711,7 +711,15 @@ person would (the composers, Tab through a dialog) it goes through
 `@testing-library/user-event` with `delay: null`, because `fireEvent.change`
 fires one event and a field hears focus, keydown, input and change; the
 pointer and long-press tests stay on `fireEvent`, which is the only way to
-dispatch a `pointerType: "touch"` sequence against a timer. A test that wants
+dispatch a `pointerType: "touch"` sequence against a timer. The a11y lint rules
+that argue with our role patterns are off in oxlint; **axe grades the rendered
+result instead**: `components/{overlays,shell}/a11y.dom.test.tsx` render every
+overlay and every piece of the frame once and expect `toHaveNoViolations()`
+(`vitest-axe`, options in `src/test/a11y.ts` — `color-contrast` and `region`
+are off there because jsdom has no layout and a fragment has no landmarks, and
+nowhere else). Its first run found two real ones: a cover link with no name and
+a palette listbox holding headings and `<ul>`s where only groups and options may
+sit. A new overlay is a new row in that table. A test that wants
 `isTauri` true mocks `@/api/anilist` itself. Import
 `act` from `@testing-library/react`, never from `react`: Testing Library's
 copy raises the act environment flag around the call, React's own prints a

@@ -58,7 +58,8 @@ export default function RandomPickModal({
 
         {picked ? (
           <div className="flex gap-4">
-            <Link to={`/media/${picked.media.id}`} onClick={onClose}>
+            {/* The same destination as the Open button below, so the cover is a picture and not a second tab stop. */}
+            <Link to={`/media/${picked.media.id}`} onClick={onClose} tabIndex={-1} aria-hidden>
               <img
                 src={picked.media.coverImage.large ?? ""}
                 alt=""

@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 99a5260 -->
+<!-- generated-through: fa0d30e -->
 
 ### Fixed
 
@@ -86,6 +86,7 @@ tag time is then optional rather than load-bearing.
 - A pull-to-sync gesture could fail to arm when two touch events arrived in the same frame.
 - A pull-to-sync left mid-way by a navigation no longer leaves its hint on the next screen, and a long press no longer selects the action sheet's title.
 - A release name that carries the episode's title after its number now parses the number, and Jellyfin's episode name reaches the now-playing card.
+- The command palette's result groups are announced as groups, and its input has a name.
 
 ### Added
 

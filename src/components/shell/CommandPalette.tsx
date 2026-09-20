@@ -269,6 +269,7 @@ export default function CommandPalette() {
               results.length > 0 ? `palette-item-${sel}` : undefined
             }
             placeholder={t("palette.placeholder")}
+            aria-label={t("palette.placeholder")}
             className="h-12 flex-1 bg-transparent text-sm text-ink-100 placeholder:text-ink-600 focus:outline-none"
           />
           <kbd className="shrink-0 rounded border border-surface-700 bg-surface-850 px-1.5 py-0.5 font-brand text-2xs font-semibold text-ink-600">
@@ -278,18 +279,25 @@ export default function CommandPalette() {
 
         <div id="palette-results" role="listbox" className="max-h-96 overflow-y-auto py-1">
           {results.length === 0 ? (
-            <p className="px-4 py-3 text-sm text-ink-600">{t("palette.empty")}</p>
+            <div role="option" aria-selected={false} aria-disabled className="px-4 py-3 text-sm text-ink-600">
+              {t("palette.empty")}
+            </div>
           ) : (
+            // A listbox may hold groups and options only, so each group is named by a roleless label, not a heading.
             groups.map((group) => (
-              <section key={group.key}>
-                <h3 className="px-3.5 pb-1 pt-2 text-[.5625rem] font-semibold uppercase tracking-[.14em] text-ink-600">
+              <div key={group.key} role="group" aria-labelledby={`palette-group-${group.key}`}>
+                <div
+                  id={`palette-group-${group.key}`}
+                  role="none"
+                  className="px-3.5 pb-1 pt-2 text-[.5625rem] font-semibold uppercase tracking-[.14em] text-ink-600"
+                >
                   {t(group.key)}
-                </h3>
-                <ul>
+                </div>
+                <ul role="none">
                   {group.items.map((item) => {
                     const i = results.indexOf(item);
                     return (
-                      <li key={item.id} ref={rowRef(i)}>
+                      <li key={item.id} ref={rowRef(i)} role="none">
                         <button
                           id={`palette-item-${i}`}
                           role="option"
@@ -332,7 +340,7 @@ export default function CommandPalette() {
                     );
                   })}
                 </ul>
-              </section>
+              </div>
             ))
           )}
         </div>

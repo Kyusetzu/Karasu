@@ -303,6 +303,12 @@ Two more, decided by the maintainer in August 2026:
 - **Plex and Emby integration.** The maintainer uses Jellyfin (free, open
   source) and has no use for supporting a paid product he doesn't run.
   Revisit only if actual users ask for it — do not propose it unprompted.
+- **Windows code signing through SignPath, and a winget manifest.** Both were
+  on the tooling backlog and were struck by the maintainer on 2026-09-20 for
+  good: the installer stays unsigned (the README, the release notes and the
+  website say so, and keep saying so), and there is no winget package. Do not
+  propose either again; the SmartScreen paragraph in the README is the
+  answer to the question it raises.
 - **RSS/torrent release feeds, and anything piracy-adjacent.** New releases
   are already reported through AniList's own airing data. The local library
   is the user's own files; how they got there is not the app's business, and

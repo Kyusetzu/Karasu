@@ -63,17 +63,12 @@ deleted here when it lands. The column says where it takes effect. Already in
 (2026-09-19): oxlint, knip, `@vitest/coverage-v8`, cargo-deny,
 `tauri-plugin-window-state`. Measured and rejected: `happy-dom` (see the
 vitest note in CLAUDE.md), `cargo-nextest` (a one-second suite), `msw` (HTTP
-lives in Rust), a formatter (one tree-wide diff for nothing).
+lives in Rust), a formatter (one tree-wide diff for nothing); struck by the
+maintainer on 2026-09-20: SignPath code signing and a winget manifest (see
+"Explicitly rejected" in CLAUDE.md).
 
 **Quality gates and hygiene**
 
 | Package | Where | Why, in a line |
 | --- | --- | --- |
 | Tauri Specta | `src/api/*.ts` wrappers, every `#[tauri::command]` | generates the TS bindings from the Rust signatures; knip found five hand-written wrappers nobody called, which generated ones cannot become |
-
-**Distribution — Windows**
-
-| Item | Where | Why, in a line |
-| --- | --- | --- |
-| Code signing via SignPath Foundation | `release.yml`, the NSIS installer and the updater artifacts | free for OSI-licensed projects, no personal identity needed; ends the SmartScreen "unrecognised app" wall every new Windows user hits |
-| winget manifest (`wingetcreate` in the release workflow) | a tag build | `winget install Karasu` and `winget upgrade` for everyone who lives in a terminal; the NSIS installer is already the right shape (`nullsoft`) |

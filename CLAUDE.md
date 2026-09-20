@@ -256,6 +256,8 @@ scripts/             bump-version.mjs (every commit), anilist-query.mjs
                      "Comments: one line each"), verify.mjs (the gate, see
                      "The commit loop"), toml-check.mjs (taplo over the
                      TOML files, one per stdin — see the same section),
+                     mutants.mjs (cargo-mutants in a copy tauri-build can
+                     still configure, see "Three Cargo tools"),
                      clean-target.mjs (reclaims the
                      stale incremental sessions every version bump leaves
                      under `src-tauri/target`, see the notes);

@@ -1,7 +1,9 @@
 #!/usr/bin/env node
-// The whole gate, as CI runs it: typecheck, the audits and lints, then the frontend and the Rust suites side by side.
+// The gate before a commit, and with --full the whole of it before a push: every check the repository owns, in one run.
 //
-//   node scripts/verify.mjs              everything; one line per phase, the full log only for a phase that failed
+//   node scripts/verify.mjs              the commit gate; one line per phase, the full log only for a phase that failed
+//   node scripts/verify.mjs --full       the push gate: the commit gate, then clippy, cargo-deny, knip, machete, the
+//                                        version files, the site, the Android check, a release build, a clean tree
 //   node scripts/verify.mjs --frontend   typecheck, audits, lints and vitest only
 //   node scripts/verify.mjs --rust       cargo test only
 //   node scripts/verify.mjs --verbose    every phase's output as it runs, as the tools print it themselves
@@ -14,22 +16,29 @@ const flags = new Set(process.argv.slice(2));
 const wantFrontend = !flags.has("--rust");
 const wantRust = !flags.has("--frontend");
 const verbose = flags.has("--verbose");
+const full = flags.has("--full");
 // The JS tools by their entry files under node itself: no `.cmd` shim to find, so no shell and nothing to escape.
 const node = process.execPath;
 const TSC = path.join(ROOT, "node_modules", "typescript", "bin", "tsc");
 const VITEST = path.join(ROOT, "node_modules", "vitest", "vitest.mjs");
 const OXLINT = path.join(ROOT, "node_modules", "oxlint", "bin", "oxlint");
+const KNIP = path.join(ROOT, "node_modules", "knip", "bin", "knip.js");
+const TAURI = path.join(ROOT, "node_modules", "@tauri-apps", "cli", "tauri.js");
+const SITE_TSC = path.join(ROOT, "site", "node_modules", "typescript", "bin", "tsc");
+const MANIFEST = ["--manifest-path", "src-tauri/Cargo.toml"];
+// npm itself, by its cli file beside node, for the same no-shim reason.
+const NPM = path.join(path.dirname(process.execPath), "node_modules", "npm", "bin", "npm-cli.js");
 
 const phases = [];
 
 /** Runs one phase, captures its output unless verbose, and keeps what the summary needs. */
-function run(name, cmd, args, summarize, { optional } = {}) {
+function run(name, cmd, args, summarize, { optional, cwd = ROOT, env = {} } = {}) {
   const started = Date.now();
   return new Promise((resolve) => {
     const child = spawn(cmd, args, {
-      cwd: ROOT,
+      cwd,
       stdio: verbose ? "inherit" : ["ignore", "pipe", "pipe"],
-      env: { ...process.env, FORCE_COLOR: "0", NO_COLOR: "1" },
+      env: { ...process.env, FORCE_COLOR: "0", NO_COLOR: "1", ...env },
     });
     let out = "";
     if (!verbose) {
@@ -102,6 +111,38 @@ const summarizeAudit = (out) => {
   return clean ? `clean (${files} files)` : last;
 };
 
+/** Clippy's and cargo-deny's own closing lines; a clean clippy prints nothing but `Finished`. */
+const summarizeClippy = (out) => {
+  const n = lines(out).filter((l) => /^(warning|error)(\[|:)/.test(strip(l)) && !/generated \d+ warning/.test(l)).length;
+  return n ? `${n} finding(s)` : "clean";
+};
+const summarizeDeny = (out) => lines(strip(out)).findLast((l) => /(advisories|bans|licenses|sources) (ok|FAILED)/.test(l)) ?? "(no summary line found)";
+/** knip is silent when clean; otherwise every section heading carries its count. */
+const summarizeKnip = (out) => {
+  const counts = [...strip(out).matchAll(/^([A-Za-z ]+) \((\d+)\)$/gm)].map((m) => `${m[2]} ${m[1].toLowerCase()}`);
+  return counts.length ? counts.join(", ") : "clean";
+};
+const summarizeMachete = (out) => (/didn't find any unused/.test(out) ? "clean" : "unused dependencies found");
+const summarizeVersions = (out) => lines(strip(out)).at(-1)?.replace(/^bump-version: /, "") ?? "";
+const summarizeSite = (out) => (strip(out).includes("up to date") ? "up to date" : lines(strip(out)).at(-1) ?? "");
+const summarizeCheck = (out) => {
+  const warnings = lines(out).map(strip).filter((l) => /^warning: /.test(l) && !/generated \d+ warning/.test(l));
+  return warnings.length ? `${warnings.length} compiler warning(s)` : "clean";
+};
+/** The bundle build: how many bundles, plus every rustc warning, which `cargo test` cannot see (see CLAUDE.md). */
+const summarizeBuild = (out) => {
+  const all = lines(out).map(strip);
+  const bundles = /Finished (\d+) bundles? at/.exec(all.join("\n"))?.[1];
+  const warnings = all.filter((l) => /^warning: /.test(l) && !/generated \d+ warning/.test(l));
+  const head = bundles ? `${bundles} bundle(s)` : "no bundle line found";
+  return warnings.length ? `${head} · ${warnings.length} compiler warning(s):\n      ${warnings.join("\n      ")}` : head;
+};
+const summarizeTree = (out) => (strip(out) ? `${lines(strip(out)).length} uncommitted path(s)` : "clean");
+const summarizeAudit2 = (out) => {
+  const m = /found (\d+) vulnerabilit/.exec(out);
+  return m ? (m[1] === "0" ? "clean" : `${m[1]} vulnerability(ies)`) : lines(strip(out)).at(-1) ?? "";
+};
+
 /** The part of a failed phase's log that names what failed: vitest's and cargo's failure sections, else everything. */
 function failureExcerpt(out) {
   const all = lines(out);
@@ -129,7 +170,7 @@ function report() {
     process.exit(1);
   }
   const total = phases.reduce((n, p) => n + p.ms, 0);
-  console.log(`verify: green in ${(total / 1000).toFixed(1)} s of work`);
+  console.log(`verify: green in ${(total / 1000).toFixed(1)} s of work${full ? " — ready to push" : ""}`);
 }
 
 if (wantFrontend) {
@@ -146,12 +187,42 @@ await Promise.all([
   wantRust && run("cargo test", "cargo", ["test", "--manifest-path", "src-tauri/Cargo.toml"], summarizeCargo),
   wantFrontend && run("vitest", node, [VITEST, "run", "--reporter=default"], summarizeVitest),
 ]);
-// `cargo test` just rewrote the bindings from the Rust signatures; a diff is a commit's business here and a failure in CI.
+// `cargo test` just rewrote the bindings; a diff is a commit's business here and, in CI or before a push, a stale copy.
 if (wantRust) {
   const phase = await run("bindings", "git", ["diff", "--numstat", "--", "src/api/bindings.ts"], summarizeBindings);
-  if (process.env.GITHUB_ACTIONS && phase.summary !== "unchanged") {
+  if ((process.env.GITHUB_ACTIONS || full) && phase.summary !== "unchanged") {
     phase.ok = false;
     phase.out = "src/api/bindings.ts is stale: run `cargo test` and commit the regenerated file";
   }
 }
+if (!full) {
+  report();
+  process.exit(0);
+}
+
+// --- The push gate: everything else the repository can check, cheap and independent first, the builds last. ---------
+if (phases.some((p) => !p.ok)) report();
+await Promise.all([
+  run("knip", node, [KNIP], summarizeKnip),
+  run("versions", node, ["scripts/bump-version.mjs", "--check"], summarizeVersions),
+  run("site", node, [SITE_TSC, "--noEmit"], () => "typecheck clean", { cwd: path.join(ROOT, "site") }),
+  run("site tokens", node, ["scripts/sync-tokens.mjs", "--check"], summarizeSite, { cwd: path.join(ROOT, "site") }),
+  run("npm audit", node, [NPM, "audit", "--audit-level=high", "--omit=dev"], summarizeAudit2),
+]);
+// The three cargo tools share the target directory's lock, so they run one after another.
+await run("clippy", "cargo", ["clippy", ...MANIFEST, "--all-targets", "--", "-D", "warnings"], summarizeClippy);
+await run("cargo deny", "cargo", ["deny", ...MANIFEST, "check"], summarizeDeny, { optional: "cargo install cargo-deny" });
+await run("machete", "cargo", ["machete", "--with-metadata", "src-tauri"], summarizeMachete, { optional: "cargo install cargo-machete" });
+if (phases.some((p) => !p.ok)) report();
+// The two builds: a cargo check for aarch64 with the NDK exported (Windows only), then the desktop bundle.
+if (process.platform === "win32") {
+  await run("android check", "powershell", ["-ExecutionPolicy", "Bypass", "-File", "scripts/android-check.ps1"], summarizeCheck);
+} else {
+  phases.push({ name: "android check", ms: 0, ok: true, skipped: true, out: "", summary: "skipped — scripts/android-check.ps1 is Windows only; CI's android job is the check elsewhere" });
+}
+await run("tauri build", node, [TAURI, "build"], summarizeBuild);
+// Last, so the builds above cannot have dirtied it: nothing uncommitted may ride along with a push.
+await run("clean tree", "git", ["status", "--porcelain"], summarizeTree).then((p) => {
+  if (p.summary !== "clean") p.ok = false;
+});
 report();

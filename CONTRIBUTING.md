@@ -70,6 +70,17 @@ exit code** — piping it through `grep` reports *grep's* status and has let a
 type error sail through.
 
 ```bash
+npm run verify:full
+```
+
+Before a push: the gate above, then knip, the version files, the site's
+typecheck and tokens, `npm audit`, clippy, cargo-deny, cargo-machete, the
+Android cargo check and a real `tauri build`, ending with a clean-tree check so
+nothing uncommitted rides along. About a minute and a half, most of it the
+bundle. `git config core.hooksPath .githooks` once on your clone makes git run
+it on every push (`.githooks/pre-push`).
+
+```bash
 git commit
 ```
 

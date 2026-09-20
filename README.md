@@ -423,7 +423,8 @@ npm run tauri dev                # development build with hot reload
 npm run tauri build              # release build (NSIS on Windows; AppImage, deb and rpm on Linux)
 npx tauri android build --apk    # Android release APK
 
-npm run verify       # the whole gate CI runs: typecheck, the one-line-comment audit, then vitest and cargo test together
+npm run verify       # the commit gate: typecheck, audits and lints, then vitest and cargo test together
+npm run verify:full  # the push gate: the commit gate plus knip, clippy, cargo-deny, machete, the site, the Android check, a bundle
 npm run lint         # oxlint: react-hooks, a11y, imports, vitest rules; part of verify
 npm run typecheck    # TypeScript alone
 npm test             # frontend unit tests (vitest) alone; test:watch, test:node, test:dom, test:changed narrow it

@@ -61,7 +61,7 @@
   },
   {
     "file": "scripts/verify.mjs",
-    "startsWith": "The whole gate, as CI runs it",
+    "startsWith": "The gate before a commit, and with --full",
     "reason": "usage block: one invocation per line"
   },
   {

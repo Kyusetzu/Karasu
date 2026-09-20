@@ -1,0 +1,3 @@
+#!/bin/sh
+# The push gate: every check the repository owns, once, before anything leaves the machine (see CLAUDE.md).
+exec node scripts/verify.mjs --full

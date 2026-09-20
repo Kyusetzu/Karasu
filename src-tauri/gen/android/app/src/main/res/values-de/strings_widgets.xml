@@ -9,4 +9,9 @@
     <string name="widget_reading_desc">Deine laufenden Manga mit Fortschritt</string>
     <string name="widget_week_label">Karasu · Diese Woche</string>
     <string name="widget_week_desc">Nächste Folgen der kommenden Woche</string>
+    <string name="widget_airing_title">Läuft heute</string>
+    <string name="widget_watching_title">Weiterschauen</string>
+    <string name="widget_reading_title">Weiterlesen</string>
+    <string name="widget_week_title">Diese Woche</string>
+    <string name="widget_open">Karasu öffnen</string>
 </resources>

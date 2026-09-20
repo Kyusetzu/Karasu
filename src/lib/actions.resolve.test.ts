@@ -136,6 +136,14 @@ describe("resolveActions, shape", () => {
     expect(ids({ kind: "page" }, ctx({ hasSelection: true }))).toContain("copySelection");
   });
 
+  it("shares a title only where a share sheet exists, and never the page", () => {
+    expect(ids(entry())).not.toContain("share");
+    expect(ids(entry(), ctx({ share: true }))).toContain("share");
+    expect(ids({ kind: "media", mediaId: 1, mediaType: "ANIME", listed: "no", canAdd: true }, ctx({ share: true }))).toContain("share");
+    expect(ids({ kind: "page" }, ctx({ share: true }))).not.toContain("share");
+    expect(ids(entry(), ctx({ share: true, tauri: false }))).not.toContain("share");
+  });
+
   it("leaves out what a browser cannot do", () => {
     const menu = ids(entry(), ctx({ tauri: false }));
     expect(menu).not.toContain("openAniList");

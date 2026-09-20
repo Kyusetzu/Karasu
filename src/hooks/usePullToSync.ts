@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router";
 import { useManualSync } from "@/hooks/useManualSync";
 import { isSyncing } from "@/lib/syncLock";
+import { tick } from "@/lib/haptics";
 import {
   PULL_IDLE,
   isScrollableStyle,
@@ -89,6 +90,8 @@ export function usePullToSync(): {
       });
       // Once the pull is ours the browser must not scroll as well; this is why `touchmove` is registered non-passive.
       if (next.phase === "pulling" || next.phase === "ready") e.preventDefault();
+      // The moment the pull arms is the one a finger should feel; the release itself is visible.
+      if (next.phase === "ready" && live.current.phase !== "ready") tick();
       apply(next);
     };
 

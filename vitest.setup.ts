@@ -28,6 +28,14 @@ vi.mock("@tauri-apps/plugin-opener", () => ({
   openUrl: vi.fn(() => Promise.resolve()),
 }));
 
+vi.mock("@tauri-apps/plugin-haptics", () => ({
+  selectionFeedback: vi.fn(() => Promise.resolve()),
+}));
+
+vi.mock("@choochmeque/tauri-plugin-sharekit-api", () => ({
+  shareText: vi.fn(() => Promise.resolve()),
+}));
+
 vi.mock("@tauri-apps/plugin-clipboard-manager", () => ({
   writeText: vi.fn(() => Promise.resolve()),
 }));

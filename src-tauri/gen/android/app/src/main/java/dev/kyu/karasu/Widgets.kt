@@ -67,6 +67,8 @@ abstract class KarasuWidgetBase : AppWidgetProvider() {
 
   /** The title's label key and the rows for this widget type. */
   abstract fun titleKey(): String
+  // The resource behind the title when there is no projection yet, so a signed-out phone reads its own language.
+  abstract fun titleRes(): Int
   abstract fun rows(doc: JSONObject, now: Long): List<String>
 
   override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
@@ -76,7 +78,8 @@ abstract class KarasuWidgetBase : AppWidgetProvider() {
 
     for (id in ids) {
       val views = RemoteViews(context.packageName, R.layout.karasu_widget)
-      views.setTextViewText(R.id.w_title, labels?.optString(titleKey()) ?: "Karasu")
+      val title = labels?.optString(titleKey())?.takeIf { it.isNotEmpty() } ?: context.getString(titleRes())
+      views.setTextViewText(R.id.w_title, title)
 
       val rows = if (doc != null) rows(doc, now) else emptyList()
       for ((i, rowId) in ROW_IDS.withIndex()) {
@@ -90,7 +93,8 @@ abstract class KarasuWidgetBase : AppWidgetProvider() {
 
       val generated = doc?.optLong("generatedAtMs") ?: 0L
       val footer = when {
-        doc == null || now - generated > STALE_MS -> labels?.optString("stale") ?: "Open Karasu"
+        doc == null || now - generated > STALE_MS ->
+          labels?.optString("stale")?.takeIf { it.isNotEmpty() } ?: context.getString(R.string.widget_open)
         rows.isEmpty() -> labels?.optString("empty") ?: ""
         else -> null
       }
@@ -147,6 +151,7 @@ abstract class KarasuWidgetBase : AppWidgetProvider() {
 class Widgets {
   class AiringToday : KarasuWidgetBase() {
     override fun titleKey() = "airingToday"
+    override fun titleRes() = R.string.widget_airing_title
     override fun rows(doc: JSONObject, now: Long): List<String> {
       val arr = airing(doc)
       val ep = doc.optJSONObject("labels")?.optString("episode") ?: "Ep"
@@ -160,16 +165,19 @@ class Widgets {
 
   class ContinueWatching : KarasuWidgetBase() {
     override fun titleKey() = "continueWatching"
+    override fun titleRes() = R.string.widget_watching_title
     override fun rows(doc: JSONObject, now: Long) = progressRows(doc, "continueWatching")
   }
 
   class ContinueReading : KarasuWidgetBase() {
     override fun titleKey() = "continueReading"
+    override fun titleRes() = R.string.widget_reading_title
     override fun rows(doc: JSONObject, now: Long) = progressRows(doc, "continueReading")
   }
 
   class Week : KarasuWidgetBase() {
     override fun titleKey() = "week"
+    override fun titleRes() = R.string.widget_week_title
     override fun rows(doc: JSONObject, now: Long): List<String> {
       val arr = airing(doc)
       val days = doc.optJSONArray("days")

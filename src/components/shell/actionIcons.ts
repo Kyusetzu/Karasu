@@ -17,6 +17,7 @@ import {
   Tag,
   Trash2,
   X,
+  Share2,
   type LucideIcon,
 } from "lucide-react";
 import type { ActionId } from "@/lib/actions";
@@ -25,6 +26,7 @@ import type { ActionId } from "@/lib/actions";
 export const ACTION_ICON: Record<ActionId, LucideIcon> = {
   open: SquareArrowOutUpRight,
   openAniList: ExternalLink,
+  share: Share2,
   copySelection: Copy,
   addToList: Plus,
   edit: Pencil,

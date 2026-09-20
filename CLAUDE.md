@@ -793,6 +793,26 @@ async update the real code makes after an await warns instead.
   in WebKitGTK; the capability grants `clipboard-manager:allow-write-text` and
   nothing else of the plugin. The two callers are the action runner's copy
   selection and the diagnostics copy.
+- **Android gets two plugins of its own, and the battery plugin was
+  rejected.** `attach_mobile` in `lib.rs` (a cfg pair on `target_os =
+  "android"`, with the crates in the Android dependency table so no desktop
+  build compiles them) registers `tauri-plugin-haptics` and
+  `tauri-plugin-sharekit`, and `capabilities/mobile.json` — `platforms:
+  ["android"]`, because a desktop build refuses a capability naming a
+  permission it cannot resolve — grants exactly `haptics:allow-selection-
+  feedback` and `sharekit:allow-share-text`. `lib/haptics.ts` `tick()` is the
+  one vibration, fired when the long-press sheet opens and when a pull arms,
+  and a no-op off Android. The `share` action (`lib/actions`, group `link`,
+  `ActionContext.share`) hands `lib/anilistUrl`'s `mediaUrl` to the system
+  share sheet from the context menu, the sheet and a button on the detail
+  page; sharekit was chosen over `tauri-plugin-sharesheet` because the latter
+  had not moved since August 2024. `tauri-plugin-android-battery-optimization`
+  (0.1.4, two stars, JS-only API) was looked at on 2026-09-20 and not taken:
+  `get_jellyfin_background` reads the exemption in Rust for its
+  `battery_exempt` field, which a JS-only plugin cannot serve, and the JNI
+  pair in `TrackingService.kt` was measured on the phone; do not re-propose
+  it. Both plugins compiled into a debug APK on 2026-09-20 (`tauri.settings.
+  gradle` lists both projects) and have not run on a device yet.
 - **The media-detection kv key is still spelled `smtc_enabled`.** The setting
   is no longer Windows-only, but renaming the key would reset every existing
   user's opt-out. It is behind `MEDIA_DETECTION_KEY` in `commands/playback.rs`.

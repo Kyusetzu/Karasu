@@ -7,6 +7,7 @@ import type { ScrobblePhase } from "@/stores/nowPlaying";
 export type ActionId =
   | "open"
   | "openAniList"
+  | "share"
   | "copySelection"
   | "addToList"
   | "edit"
@@ -45,6 +46,7 @@ export const ACTION_GROUP_ORDER: readonly ActionGroup[] = [
 export const ACTION_LABEL_KEY: Record<ActionId, string> = {
   open: "ctx.open",
   openAniList: "ctx.openAniList",
+  share: "ctx.share",
   copySelection: "ctx.copy",
   addToList: "actions.addToList",
   edit: "common.edit",
@@ -122,6 +124,8 @@ export interface ActionContext {
   scrobble: ScrobbleFacts;
   /** Opening a browser and reloading the shell are Tauri facts, so they are platform-keyed rather than width-keyed. */
   tauri: boolean;
+  /** The native share sheet exists on Android alone; the reverse of the share target Karasu already is. */
+  share: boolean;
   hasSelection: boolean;
   /** `useManualSync().available` — local mode has nothing to sync and signed out has nobody to sync for. */
   canSync: boolean;
@@ -271,6 +275,7 @@ export function resolveActions(target: ActionTarget, ctx: ActionContext): Action
 
   if ((target.kind === "entry" || target.kind === "media") && ctx.tauri) {
     out.push(act("openAniList", "link"));
+    if (ctx.share) out.push(act("share", "link"));
   }
   if (ctx.hasSelection) out.push(act("copySelection", "link"));
   out.push(...chrome(ctx));

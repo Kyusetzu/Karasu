@@ -11,4 +11,9 @@
     <string name="widget_reading_desc">Your current manga with progress</string>
     <string name="widget_week_label">Karasu · This week</string>
     <string name="widget_week_desc">Next episodes across the coming week</string>
+    <string name="widget_airing_title">Airing today</string>
+    <string name="widget_watching_title">Continue watching</string>
+    <string name="widget_reading_title">Continue reading</string>
+    <string name="widget_week_title">This week</string>
+    <string name="widget_open">Open Karasu</string>
 </resources>

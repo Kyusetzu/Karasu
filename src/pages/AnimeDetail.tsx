@@ -9,11 +9,14 @@ import {
 } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { isOffline } from "@/lib/apiError";
+import { mediaUrl } from "@/lib/anilistUrl";
+import { isAndroid, usePlatform } from "@/stores/platform";
 import { OfflineDetail } from "@/components/media/OfflineDetail";
 import {
   ChevronRight,
   Clock,
   ExternalLink,
+  Share2,
   Play,
   Star,
   ThumbsDown,
@@ -21,6 +24,7 @@ import {
   Trophy,
 } from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { shareText } from "@choochmeque/tauri-plugin-sharekit-api";
 import {
   animeDetail,
   mediaCast,
@@ -103,6 +107,7 @@ export default function AnimeDetail() {
   const [revealed, setRevealed] = useState(false);
   const [coverOpen, setCoverOpen] = useState(false);
   const coverViewer = usePresence(coverOpen);
+  const android = isAndroid(usePlatform((s) => s.info));
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["mediaDetail", mediaId],
@@ -394,15 +399,19 @@ export default function AnimeDetail() {
                 blocked={data.isFavouriteBlocked}
               />
               <button
-                onClick={() =>
-                  openUrl(
-                    `https://anilist.co/${data.type === "MANGA" ? "manga" : "anime"}/${data.id}`,
-                  )
-                }
+                onClick={() => openUrl(mediaUrl(data.type, data.id))}
                 className="flex items-center gap-1 text-xs text-ink-500 hover:text-accent-400"
               >
                 {t("detail.openOnAniList")} <ExternalLink className="size-2.75" />
               </button>
+              {android && (
+                <button
+                  onClick={() => void shareText(mediaUrl(data.type, data.id)).catch(() => {})}
+                  className="flex items-center gap-1 text-xs text-ink-500 hover:text-accent-400"
+                >
+                  {t("ctx.share")} <Share2 className="size-2.75" />
+                </button>
+              )}
             </div>
           </div>
         </div>

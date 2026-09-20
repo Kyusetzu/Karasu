@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 61bb776 -->
+<!-- generated-through: 34d3769 -->
 
 ### Fixed
 
@@ -103,6 +103,7 @@ tag time is then optional rather than load-bearing.
 - Android downloads a new version by itself over Wi-Fi and opens the installer from About or the bell.
 - Android shows the update's download and installs it from About, the bell, or once at start; the update channel is now reachable there too.
 - The window opens where and how large it was last closed.
+- On Android, a long press and an armed pull-to-sync give a short haptic tick, and a title can be shared to another app from its menu or its page.
 
 ### Changed
 

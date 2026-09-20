@@ -1,7 +1,7 @@
 {
   "name": "karasu",
   "private": true,
-  "version": "1.17.16",
+  "version": "1.17.17",
   "type": "module",
   "author": "Kyu",
   "license": "MIT",
@@ -39,6 +39,7 @@
     "tauri:build:win": "tauri build && powershell -ExecutionPolicy Bypass -File scripts/release/rename-installer.ps1"
   },
   "dependencies": {
+    "@choochmeque/tauri-plugin-sharekit-api": "^0.4.0-rc.7",
     "@fontsource/kosugi-maru": "^5.3.0",
     "@fontsource/sn-pro": "^5.3.0",
     "@tailwindcss/vite": "^4.3.3",
@@ -47,6 +48,7 @@
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-clipboard-manager": "^2.3.3",
     "@tauri-apps/plugin-deep-link": "^2.4.10",
+    "@tauri-apps/plugin-haptics": "^2.3.3",
     "@tauri-apps/plugin-opener": "^2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

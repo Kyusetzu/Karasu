@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { internalRoute, profileKey } from "./anilistUrl";
+import { internalRoute, mediaUrl, profileKey } from "./anilistUrl";
 
 describe("internalRoute", () => {
   it("maps media URLs, slug or not, either medium", () => {
@@ -68,5 +68,13 @@ describe("profileKey", () => {
     expect(profileKey("6421433")).toEqual({ id: 6421433 });
     expect(profileKey("hori")).toEqual({ name: "hori" });
     expect(profileKey("hori2")).toEqual({ name: "hori2" });
+  });
+});
+
+describe("mediaUrl", () => {
+  it("names the anime and manga pages, which internalRoute maps straight back", () => {
+    expect(mediaUrl("ANIME", 1)).toBe("https://anilist.co/anime/1");
+    expect(mediaUrl("MANGA", 30002)).toBe("https://anilist.co/manga/30002");
+    expect(internalRoute(mediaUrl("MANGA", 30002))).toBe("/media/30002");
   });
 });

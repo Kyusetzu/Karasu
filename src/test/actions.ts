@@ -16,6 +16,7 @@ export const CTX: ActionContext = {
   scoreFormat: "POINT_10",
   scrobble: { phase: "idle", forceable: false, hasCurrent: false, overridden: false },
   tauri: true,
+  share: false,
   hasSelection: false,
   canSync: false,
 };

@@ -190,6 +190,7 @@ export const en = {
     menuLabel: "Context menu",
     open: "Open",
     openAniList: "Open on AniList",
+    share: "Share",
     copy: "Copy",
     back: "Back",
     forward: "Forward",

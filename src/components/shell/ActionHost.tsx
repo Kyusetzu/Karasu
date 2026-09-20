@@ -14,6 +14,8 @@ import { useAuth, useScoreFormat } from "@/stores/auth";
 import { useManualSync } from "@/hooks/useManualSync";
 import { useNowPlaying } from "@/stores/nowPlaying";
 import { isTauri } from "@/api/anilist";
+import { isAndroid, usePlatform } from "@/stores/platform";
+import { tick } from "@/lib/haptics";
 import { collectTags } from "@/lib/tags";
 import { displayTitle, maxProgress, type ListResult, type MediaListEntry, type MediaType } from "@/api/types";
 
@@ -107,6 +109,7 @@ export default function ActionHost() {
           overridden: ctx.current?.overridden ?? false,
         },
         tauri: isTauri,
+        share: isTauri && isAndroid(usePlatform.getState().info),
         hasSelection: selection.length > 0,
         canSync: ctx.canSync,
       });
@@ -159,6 +162,7 @@ export default function ActionHost() {
         clickTimer = window.setTimeout(() => {
           pendingClick = false;
         }, CLICK_SWALLOW_MS);
+        tick();
         openFor(media, null, "");
       }, LONG_PRESS_MS);
     };

@@ -35,15 +35,6 @@ Everything still listed here is blocked on something no amount of work in the
 repository supplies — a device, a live API, or a decision that is the
 maintainer's. Each says which, so none of them reads as unstarted work.
 
-**Found by the pre-tag sweep of 2026-09-05, deferred on purpose:**
-
-- **The widgets' empty state is English on a German phone.** `Widgets.kt`
-  falls back to a hard-coded "Open Karasu" / "Karasu" when `widgets.json` is
-  absent — which is exactly what sign-out leaves behind. Read the two labels
-  from `strings_widgets.xml` (both locales already exist) instead. Deferred
-  because seeing it costs a sign-out, and the maintainer had just signed back
-  in.
-
 **Needs a user, or a decision already made:**
 
 - **User-installed CAs on Android** — the webpki-roots trade documented in
@@ -79,14 +70,6 @@ lives in Rust), a formatter (one tree-wide diff for nothing).
 | Package | Where | Why, in a line |
 | --- | --- | --- |
 | Tauri Specta | `src/api/*.ts` wrappers, every `#[tauri::command]` | generates the TS bindings from the Rust signatures; knip found five hand-written wrappers nobody called, which generated ones cannot become |
-
-**Tauri plugins — Android**
-
-| Plugin | Where | Why, in a line |
-| --- | --- | --- |
-| `tauri-plugin-haptics` | `ActionHost` when the sheet opens, `usePullToSync` at "ready" | a gesture without feedback reads as dead; Android users expect the tick |
-| `tauri-plugin-sharesheet` | the detail page and the context menu ("share") | the reverse of the share target Karasu already is: hand an anilist.co link to any other app |
-| `tauri-plugin-android-battery-optimization` | replaces the hand-rolled exemption call in `background.rs`/`TrackingService.kt` | one less JNI surface to keep alive across `tauri android init` |
 
 **Distribution — Windows**
 

@@ -149,6 +149,7 @@ export default function CommandPalette() {
         scoreFormat,
         scrobble: { phase: "idle", forceable: false, hasCurrent: false, overridden: false },
         tauri: isTauri,
+        share: false,
         hasSelection: false,
         canSync: syncAvailable,
       },

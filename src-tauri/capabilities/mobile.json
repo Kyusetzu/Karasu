@@ -1,0 +1,13 @@
+{
+  "$schema": "../gen/schemas/mobile-schema.json",
+  "identifier": "mobile",
+  "description": "Android only: the haptic tick the action sheet and pull-to-sync ask for, and the share sheet for a title's AniList page. Separate from default.json because these plugins are compiled for Android alone, and a desktop build refuses a capability naming a permission it cannot resolve.",
+  "platforms": ["android"],
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "haptics:allow-selection-feedback",
+    "sharekit:allow-share-text"
+  ]
+}

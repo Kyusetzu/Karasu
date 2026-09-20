@@ -1,5 +1,9 @@
 /** The one mapping from AniList's URL space onto app routes; anything Karasu draws less capably stays external. */
 
+/** The other direction: the page on anilist.co for a title, which the action runner opens and the share sheet sends. */
+export const mediaUrl = (mediaType: "ANIME" | "MANGA", mediaId: number) =>
+  `https://anilist.co/${mediaType === "MANGA" ? "manga" : "anime"}/${mediaId}`;
+
 /** `anilist.co` and `www.anilist.co`, http or https, nothing else. */
 const HOST = /^https?:\/\/(?:www\.)?anilist\.co\//i;
 

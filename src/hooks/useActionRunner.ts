@@ -1,12 +1,14 @@
 import { useCallback } from "react";
 import { useNavigate } from "react-router";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { shareText } from "@choochmeque/tauri-plugin-sharekit-api";
 import { useAuth } from "@/stores/auth";
 import { useListMutations } from "@/hooks/useListMutations";
 import { useManualSync } from "@/hooks/useManualSync";
 import { clearDetectionOverride, scrobbleCancel, scrobbleNow, useNowPlaying } from "@/stores/nowPlaying";
 import { loadDefaultAddStatus } from "@/lib/defaultAddStatus";
 import { copyText } from "@/lib/clipboard";
+import { mediaUrl } from "@/lib/anilistUrl";
 import { completePatch, type Action, type ActionTarget } from "@/lib/actions";
 import type { MediaListEntry, MediaType } from "@/api/types";
 
@@ -24,8 +26,6 @@ export interface ActionRunInput {
   entry: MediaListEntry | null;
 }
 
-const anilistUrl = (mediaType: MediaType, mediaId: number) =>
-  `https://anilist.co/${mediaType === "MANGA" ? "manga" : "anime"}/${mediaId}`;
 
 /** Turns an `Action` into the effect it names, reusing the paths that already carry receipts, Undo and the queue. */
 export function useActionRunner(): (input: ActionRunInput) => ActionEffect {
@@ -50,7 +50,12 @@ export function useActionRunner(): (input: ActionRunInput) => ActionEffect {
         }
         case "openAniList":
           if (target.kind === "entry" || target.kind === "media") {
-            void openUrl(anilistUrl(target.mediaType, target.mediaId)).catch(() => {});
+            void openUrl(mediaUrl(target.mediaType, target.mediaId)).catch(() => {});
+          }
+          return done;
+        case "share":
+          if (target.kind === "entry" || target.kind === "media") {
+            void shareText(mediaUrl(target.mediaType, target.mediaId)).catch(() => {});
           }
           return done;
         case "copySelection":

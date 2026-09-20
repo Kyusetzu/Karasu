@@ -288,7 +288,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init());
 
-    attach_desktop(builder)
+    attach_mobile(attach_desktop(builder))
         .setup(|app| {
             let data_dir = portable::data_dir(app.path().app_data_dir()?);
             portable::remember_data_dir(&data_dir);
@@ -542,6 +542,19 @@ fn attach_desktop(builder: tauri::Builder<Wry>) -> tauri::Builder<Wry> {
 
 #[cfg(mobile)]
 fn attach_desktop(builder: tauri::Builder<Wry>) -> tauri::Builder<Wry> {
+    builder
+}
+
+/// The Android-only plugins: haptics for the sheet and the pull, the share sheet for a title's AniList page.
+#[cfg(target_os = "android")]
+fn attach_mobile(builder: tauri::Builder<Wry>) -> tauri::Builder<Wry> {
+    builder
+        .plugin(tauri_plugin_haptics::init())
+        .plugin(tauri_plugin_sharekit::init())
+}
+
+#[cfg(not(target_os = "android"))]
+fn attach_mobile(builder: tauri::Builder<Wry>) -> tauri::Builder<Wry> {
     builder
 }
 

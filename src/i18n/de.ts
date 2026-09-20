@@ -192,6 +192,7 @@ export const de: typeof en = {
     menuLabel: "Kontextmenü",
     open: "Öffnen",
     openAniList: "Auf AniList öffnen",
+    share: "Teilen",
     copy: "Kopieren",
     back: "Zurück",
     forward: "Vorwärts",

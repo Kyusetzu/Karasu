@@ -353,4 +353,16 @@ mod tests {
         );
         assert_eq!(doc["continueWatching"].as_array().unwrap().len(), 1);
     }
+
+    /// Widgets.kt reads this file with no schema of its own, so the shape is pinned here as a snapshot, both locales.
+    #[test]
+    fn the_projection_keeps_its_shape() {
+        let now = 1_000_000_000_000i64;
+        let mut airing = entry("CURRENT", 4, 200, "Soon");
+        airing["media"]["nextAiringEpisode"] = json!({ "episode": 5, "airingAt": now / 1000 + 3600 });
+        let anime = payload(json!([airing, entry("REPEATING", 9, 100, "Again")]));
+        let manga = payload(json!([entry("CURRENT", 31, 150, "Pages")]));
+        insta::assert_json_snapshot!("projection_en", project(Some(&anime), Some(&manga), "off", false, Lang::En, now));
+        insta::assert_json_snapshot!("projection_de", project(Some(&anime), Some(&manga), "off", false, Lang::De, now));
+    }
 }

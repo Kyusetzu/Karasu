@@ -152,3 +152,42 @@ describe("buildJsonExport", () => {
     expect(out.manga).toEqual([]);
   });
 });
+
+/** The files a person hands to another site, pinned byte for byte; a diff here is what review reads, not a "did it move". */
+describe("the export files read as they did", () => {
+  const manga = entry({
+    id: 2,
+    mediaId: 20,
+    status: "COMPLETED",
+    score: 10,
+    progress: 116,
+    progressVolumes: 12,
+    completedAt: { year: 2025, month: 1, day: 2 },
+    notes: "Read it <twice> & loved it",
+    media: {
+      ...entry().media,
+      id: 20,
+      idMal: 2,
+      title: { romaji: "Berserk", english: "Berserk", native: "ベルセルク" },
+      format: "MANGA",
+      episodes: null,
+      chapters: null,
+      volumes: null,
+    },
+  });
+
+  it("anime XML", async () => {
+    const { xml } = buildMalXml([entry(), entry({ id: 3, mediaId: 30, status: "PLANNING", score: 0, progress: 0 })], "ANIME", "POINT_10");
+    await expect(xml).toMatchFileSnapshot("__snapshots__/mal-anime.xml");
+  });
+
+  it("manga XML", async () => {
+    const { xml } = buildMalXml([manga], "MANGA", "POINT_10");
+    await expect(xml).toMatchFileSnapshot("__snapshots__/mal-manga.xml");
+  });
+
+  it("JSON backup", async () => {
+    const json = buildJsonExport([entry()], [manga], "POINT_10", 1_700_000_000_000);
+    await expect(json).toMatchFileSnapshot("__snapshots__/backup.json");
+  });
+});

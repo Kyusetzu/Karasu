@@ -373,4 +373,11 @@ mod tests {
         assert!(!out.contains("Session"), "{out}");
         assert!(out.contains("window titles"), "{out}");
     }
+
+    /// The whole table, pinned: a moved row or a renamed label shows up as a diff in review instead of a feeling.
+    #[test]
+    fn the_report_reads_as_it_did() {
+        insta::assert_snapshot!("report_redacted", render(&sample(), true));
+        insta::assert_snapshot!("report_unredacted", render(&sample(), false));
+    }
 }

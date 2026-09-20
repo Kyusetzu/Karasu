@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<myanimelist>
+	<myinfo>
+		<user_export_type>2</user_export_type>
+		<user_total_manga>1</user_total_manga>
+	</myinfo>
+	<manga>
+		<manga_mangadb_id>2</manga_mangadb_id>
+		<manga_title><![CDATA[Berserk]]></manga_title>
+		<manga_chapters>0</manga_chapters>
+		<manga_volumes>0</manga_volumes>
+		<my_read_chapters>116</my_read_chapters>
+		<my_read_volumes>12</my_read_volumes>
+		<my_start_date>2024-03-09</my_start_date>
+		<my_finish_date>2025-01-02</my_finish_date>
+		<my_score>10</my_score>
+		<my_status>Completed</my_status>
+		<my_times_read>0</my_times_read>
+		<update_on_import>1</update_on_import>
+	</manga>
+</myanimelist>

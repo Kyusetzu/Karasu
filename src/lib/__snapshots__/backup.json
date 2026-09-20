@@ -1,0 +1,75 @@
+{
+  "source": "karasu",
+  "exportedAt": "2023-11-14T22:13:20.000Z",
+  "scoreFormat": "POINT_10",
+  "anime": [
+    {
+      "media": {
+        "id": 10,
+        "idMal": 5114,
+        "title": {
+          "romaji": "Hagane no Renkinjutsushi",
+          "english": "Fullmetal Alchemist",
+          "native": null
+        },
+        "format": "TV",
+        "episodes": 64,
+        "chapters": null,
+        "volumes": null
+      },
+      "status": "CURRENT",
+      "scoreRaw": 80,
+      "progress": 5,
+      "progressVolumes": 0,
+      "repeat": 0,
+      "notes": null,
+      "startedAt": {
+        "year": 2024,
+        "month": 3,
+        "day": 9
+      },
+      "completedAt": null,
+      "private": false,
+      "hiddenFromStatusLists": null,
+      "customLists": null,
+      "advancedScores": null
+    }
+  ],
+  "manga": [
+    {
+      "media": {
+        "id": 20,
+        "idMal": 2,
+        "title": {
+          "romaji": "Berserk",
+          "english": "Berserk",
+          "native": "ベルセルク"
+        },
+        "format": "MANGA",
+        "episodes": null,
+        "chapters": null,
+        "volumes": null
+      },
+      "status": "COMPLETED",
+      "scoreRaw": 100,
+      "progress": 116,
+      "progressVolumes": 12,
+      "repeat": 0,
+      "notes": "Read it <twice> & loved it",
+      "startedAt": {
+        "year": 2024,
+        "month": 3,
+        "day": 9
+      },
+      "completedAt": {
+        "year": 2025,
+        "month": 1,
+        "day": 2
+      },
+      "private": false,
+      "hiddenFromStatusLists": null,
+      "customLists": null,
+      "advancedScores": null
+    }
+  ]
+}

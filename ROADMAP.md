@@ -78,8 +78,6 @@ lives in Rust), a formatter (one tree-wide diff for nothing).
 
 | Package | Where | Why, in a line |
 | --- | --- | --- |
-| `proptest` | `parser.rs`, `matcher.rs` | no input may panic, the episode never exceeds its digits, a non-empty name never parses to an empty title — thousands of cases a run |
-| `insta` | the diagnostics report, `widgets.json`, the MAL export | text blocks nobody pins today; a snapshot diff in review instead of "did something move" |
 | `cargo-mutants` | manual, occasionally, over `scrobbler.rs` and `db.rs` first | the honest answer to "77 % coverage, but how good": which injected bugs the suite does not catch |
 
 **Quality gates and hygiene**

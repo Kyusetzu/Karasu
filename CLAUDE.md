@@ -643,6 +643,20 @@ NSIS bundle builds and `appimage` is correctly skipped; the AppImage is built by
 the `linux-build` job in CI, which is also the only place Linux-only code is
 compiled at all.
 
+**Two kinds of test that are not examples.** `proptest` runs the parser and the
+matcher over thousands of generated inputs a run (`parser.rs` and `matcher.rs`,
+`mod props` inside each `tests`): nothing panics, the episode and season never
+exceed their digit counts, a plain fansub or chapter name round-trips, and the
+prepared matcher agrees with the reference copy on random candidate sets. A
+failing case is minimised and written to `src-tauri/proptest-regressions/`,
+which is committed so the case stays a test. `insta` pins the text blocks
+nobody used to check — the diagnostics report (both redactions) and the widget
+projection (both locales) — as `src-tauri/src/snapshots/*.snap`; the MAL XML
+and the JSON backup are pinned the same way by vitest's `toMatchFileSnapshot`
+under `src/lib/__snapshots__/`. A snapshot diff is the review: accept a wanted
+change with `INSTA_UPDATE=always cargo test` (or `cargo insta review`) and
+`npx vitest run -u`, and commit the file with the change that caused it.
+
 Prefer extracting pure logic into `src/lib/*.ts` (or a pure Rust fn) and unit
 testing it. Untestable-by-construction logic in a component is the usual reason
 a regression here is invisible until it ships.

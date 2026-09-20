@@ -449,4 +449,49 @@ mod tests {
         let r = parse_manga("MangaDex Homepage");
         assert_eq!(r.episode, None);
     }
+
+    /// Thousands of inputs a run: nothing panics, the numbers stay inside their digit counts, and a plain name survives.
+    mod props {
+        use super::*;
+        use proptest::prelude::*;
+
+        proptest! {
+            #[test]
+            fn parse_never_panics(input in "\\PC{0,80}") {
+                let r = parse(&input);
+                prop_assert!(r.episode.is_none_or(|e| e <= 9999));
+                prop_assert!(r.season.is_none_or(|s| s <= 99));
+                prop_assert!(r.title.len() <= input.len());
+            }
+
+            #[test]
+            fn parse_manga_never_panics(input in "\\PC{0,80}") {
+                let r = parse_manga(&input);
+                prop_assert!(r.episode.is_none_or(|c| c <= 99999));
+                prop_assert!(r.title.len() <= input.len());
+            }
+
+            #[test]
+            fn a_plain_fansub_name_round_trips(
+                name in "[A-Za-z]{1,8}( [A-Za-z]{1,8}){0,3}",
+                ep in 1u32..=1899,
+            ) {
+                let r = parse(&format!("{name} - {ep:02}.mkv"));
+                prop_assert_eq!(r.title, name);
+                prop_assert_eq!(r.episode, Some(ep));
+                prop_assert!(r.episode_title.is_none());
+            }
+
+            #[test]
+            fn a_plain_chapter_name_round_trips(
+                name in "[A-Za-z]{1,8}( [A-Za-z]{1,8}){0,3}",
+                ch in 1u32..=99999,
+            ) {
+                let r = parse_manga(&format!("{name} - Chapter {ch}"));
+                prop_assert_eq!(r.title, name);
+                prop_assert_eq!(r.episode, Some(ch));
+                prop_assert!(r.episode_marked);
+            }
+        }
+    }
 }

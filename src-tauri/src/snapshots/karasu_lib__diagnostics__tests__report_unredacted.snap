@@ -1,0 +1,25 @@
+---
+source: src/diagnostics.rs
+expression: "render(&sample(), false)"
+---
+| | |
+|---|---|
+| Karasu | 0.67.2.229 |
+| OS | linux |
+| Distro | Arch Linux |
+| Desktop | GNOME |
+| Session | wayland |
+| AppImage | yes |
+| Tray | no |
+| Portable | no |
+| Data folder | `/home/kyu/.local/share/dev.kyu.karasu` |
+| Signed in | yes (anilist) |
+| Detection | MPRIS |
+| Library | 1200 files, 980 matched |
+| Schema | v10 |
+| Update channel | stable |
+| Queued edits | 2 |
+| Debug logging | no |
+| AniList requests this run | list 2 |
+| Rate limited (429) | 0 |
+| AniList budget | 27/30 left |

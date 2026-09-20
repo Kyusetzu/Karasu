@@ -432,4 +432,51 @@ mod tests {
         assert_eq!(m.media_id, 222);
         assert_eq!(m.score, 1.0);
     }
+
+    /// The fast path against the reference on random inputs, and the two invariants the fast path leans on.
+    mod props {
+        use super::*;
+        use proptest::prelude::*;
+
+        fn candidate() -> impl Strategy<Value = Candidate> {
+            (1i64..1000, prop::collection::vec("[A-Za-z0-9 :!'-]{1,24}", 1..4)).prop_map(|(media_id, titles)| Candidate {
+                media_id,
+                titles,
+                episodes: Some(12),
+                duration_min: Some(24),
+                cover_url: None,
+                progress: 0,
+                status: "CURRENT".into(),
+            })
+        }
+
+        proptest! {
+            #[test]
+            fn prepared_matches_the_reference_on_random_inputs(
+                list in prop::collection::vec(candidate(), 0..6),
+                name in "[A-Za-z0-9 :!'-]{0,30}( - [0-9]{1,3})?",
+            ) {
+                let parsed = parse(&name);
+                let reference = best_match_reference(&parsed, &list).map(|m| (m.media_id, m.score));
+                let fast = best_match_prepared(&parsed, &prepare(&list)).map(|m| (m.media_id, m.score));
+                prop_assert_eq!(reference, fast);
+            }
+
+            #[test]
+            fn normalize_is_idempotent(s in "\\PC{0,40}") {
+                let once = normalize(&s);
+                prop_assert_eq!(normalize(&once), once.clone());
+                prop_assert!(!once.starts_with(' ') && !once.ends_with(' '));
+            }
+
+            #[test]
+            fn prepare_keeps_every_candidate_in_order(list in prop::collection::vec(candidate(), 0..8)) {
+                let prepared = prepare(&list);
+                prop_assert_eq!(prepared.len(), list.len());
+                for (p, c) in prepared.iter().zip(&list) {
+                    prop_assert_eq!(p.media_id, c.media_id);
+                }
+            }
+        }
+    }
 }

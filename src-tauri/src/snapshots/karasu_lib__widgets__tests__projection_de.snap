@@ -1,0 +1,51 @@
+---
+source: src/widgets.rs
+expression: "project(Some(&anime), Some(&manga), \"off\", false, Lang::De, now)"
+---
+{
+  "airing": [
+    {
+      "airingAtMs": 1000003600000,
+      "episode": 5,
+      "title": "Soon"
+    }
+  ],
+  "continueReading": [
+    {
+      "progress": 31,
+      "title": "Pages",
+      "total": null
+    }
+  ],
+  "continueWatching": [
+    {
+      "progress": 4,
+      "title": "Soon",
+      "total": 12
+    },
+    {
+      "progress": 9,
+      "title": "Again",
+      "total": 12
+    }
+  ],
+  "days": [
+    "Mo",
+    "Di",
+    "Mi",
+    "Do",
+    "Fr",
+    "Sa",
+    "So"
+  ],
+  "generatedAtMs": 1000000000000,
+  "labels": {
+    "airingToday": "Läuft heute",
+    "continueReading": "Weiterlesen",
+    "continueWatching": "Weiterschauen",
+    "empty": "Gerade nichts hier",
+    "episode": "Ep",
+    "stale": "Karasu öffnen zum Aktualisieren",
+    "week": "Diese Woche"
+  }
+}

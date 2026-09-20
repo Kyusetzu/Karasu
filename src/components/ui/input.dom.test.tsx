@@ -26,7 +26,7 @@ describe("Input", () => {
     expect(screen.queryByRole("button", { name: "Clear" })).toBeNull();
 
     rerender(<Input value="a" onChange={vi.fn()} onClear={vi.fn()} clearLabel="Clear" />);
-    expect(screen.getByRole("button", { name: "Clear" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Clear" })).toBeInTheDocument();
   });
 
   it("reports the press without touching the value itself", () => {

@@ -33,7 +33,7 @@ describe("Markdown renders no executable content", () => {
     for (const src of [...HOSTILE, `img(https://i.imgur.com/a.png)`, `![alt](https://i.imgur.com/a.png)`]) {
       const { container, unmount } = draw(src);
       for (const img of container.querySelectorAll("img")) {
-        expect(img.getAttribute("src") ?? "", src).toMatch(/^data:/);
+        expect(img, src).toHaveAttribute("src", expect.stringMatching(/^data:/));
       }
       unmount();
     }
@@ -57,7 +57,7 @@ describe("Markdown renders no executable content", () => {
           expect(attr.toLowerCase().startsWith("on"), `${attr} on <${el.tagName}> from ${src}`).toBe(false);
         }
         // The parser drops every HTML attribute, so no style survives that a Tailwind class did not give.
-        expect(el.getAttribute("style"), src).toBeNull();
+        expect(el, src).not.toHaveAttribute("style");
       }
       unmount();
     }
@@ -79,8 +79,8 @@ describe("Markdown renders no executable content", () => {
 
   it("keeps the words when it drops the tag", () => {
     draw(`<div style="position:absolute"><span>tam</span> <b onmouseover=x>bold bit</b></div>`);
-    expect(screen.getByText(/tam/)).toBeTruthy();
-    expect(screen.getByText(/bold bit/)).toBeTruthy();
+    expect(screen.getByText(/tam/)).toBeInTheDocument();
+    expect(screen.getByText(/bold bit/)).toBeInTheDocument();
   });
 
   it("shows nothing at all for a script body", () => {
@@ -103,7 +103,7 @@ describe("Markdown renders the real structures", () => {
     const { container } = draw("hi @kyu");
     const a = container.querySelector("a");
     // MemoryRouter renders a relative href, which is the proof it is internal.
-    expect(a?.getAttribute("href")).toBe("/user/kyu");
+    expect(a).toHaveAttribute("href", "/user/kyu");
   });
 
   it("renders an image as a button chip naming its host", () => {
@@ -122,14 +122,14 @@ describe("Markdown renders the real structures", () => {
 
   it("hides a spoiler spanning paragraphs behind one button and reveals all of it", () => {
     draw(`Verdict: ~!\nthe butler did it\n\n- with the candlestick\n!~`);
-    expect(screen.getByText(/Verdict/)).toBeTruthy();
+    expect(screen.getByText(/Verdict/)).toBeInTheDocument();
     expect(screen.queryByText(/butler/)).toBeNull();
     expect(screen.queryByText(/candlestick/)).toBeNull();
     const buttons = screen.getAllByRole("button");
     expect(buttons).toHaveLength(1);
     fireEvent.click(buttons[0]);
-    expect(screen.getByText(/butler/)).toBeTruthy();
-    expect(screen.getByText(/candlestick/)).toBeTruthy();
+    expect(screen.getByText(/butler/)).toBeInTheDocument();
+    expect(screen.getByText(/candlestick/)).toBeInTheDocument();
     expect(screen.queryByRole("button")).toBeNull();
   });
 
@@ -160,7 +160,7 @@ describe("Markdown renders the real structures", () => {
     );
     const anchors = container.querySelectorAll("a");
     expect(anchors).toHaveLength(1);
-    expect(anchors[0].getAttribute("href")).toBe("https://steamcommunity.com/id/x");
+    expect(anchors[0]).toHaveAttribute("href", "https://steamcommunity.com/id/x");
     // Under jsdom the image is its chip, which inside an anchor is a span rather than a nested button.
     expect(anchors[0].querySelectorAll("button")).toHaveLength(0);
     expect(anchors[0].textContent).toContain("social.mdImage");
@@ -181,7 +181,7 @@ describe("Markdown renders the site's inline centring", () => {
     const centred = h1?.querySelectorAll(".text-center") ?? [];
     expect(centred).toHaveLength(2);
     expect(centred[0]?.textContent).toBe("Title");
-    expect(screen.getByRole("button", { name: /social\.mdSpoiler/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /social\.mdSpoiler/ })).toBeInTheDocument();
     expect(container.textContent).not.toContain("hidden words");
   });
 });

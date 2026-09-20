@@ -47,7 +47,7 @@ describe("TagEditor inside a caption", () => {
   // `combobox`, not `textbox`: the input carries a `list`, so it is one.
   it("gives the input an accessible name from that caption", () => {
     render(<Current onChange={vi.fn()} />);
-    expect(screen.getByRole("combobox", { name: "Tags" })).toBeTruthy();
+    expect(screen.getByRole("combobox", { name: "Tags" })).toBeInTheDocument();
   });
 
   /** The × still removes exactly its own chip. */

@@ -48,14 +48,14 @@ describe("SyncPanel", () => {
   it("costs nothing until it is opened", async () => {
     renderWithProviders(panel());
     // Cheap, but still a round-trip per tick with nothing to look at while the panel is shut.
-    await waitFor(() => expect(screen.getByRole("button")).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole("button")).toBeInTheDocument());
     expect(status).not.toHaveBeenCalled();
   });
 
   it("opens on the trigger and reads the status", async () => {
     renderWithProviders(panel());
     fireEvent.click(screen.getByRole("button", { name: "Show sync details" }));
-    await waitFor(() => expect(screen.getByRole("dialog")).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole("dialog")).toBeInTheDocument());
     expect(status).toHaveBeenCalled();
   });
 
@@ -63,18 +63,18 @@ describe("SyncPanel", () => {
   it("marks itself as an overlay and keeps doing so while it leaves", async () => {
     renderWithProviders(panel());
     fireEvent.click(screen.getByRole("button", { name: "Show sync details" }));
-    await waitFor(() => expect(document.querySelector("[data-overlay]")).toBeTruthy());
+    await waitFor(() => expect(document.querySelector("[data-overlay]")).toBeInTheDocument());
 
     fireEvent.keyDown(window, { key: "Escape" });
     // Still mounted, still marked — `usePresence` holds the node for the exit.
-    expect(document.querySelector("[data-overlay]")).toBeTruthy();
+    expect(document.querySelector("[data-overlay]")).toBeInTheDocument();
   });
 
   it("returns focus to the trigger when Escape closes it", async () => {
     renderWithProviders(panel());
     const trigger = screen.getByRole("button", { name: "Show sync details" });
     fireEvent.click(trigger);
-    await waitFor(() => expect(screen.getByRole("dialog")).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole("dialog")).toBeInTheDocument());
 
     fireEvent.keyDown(window, { key: "Escape" });
     expect(document.activeElement).toBe(trigger);
@@ -85,7 +85,7 @@ describe("SyncPanel", () => {
     status.mockRejectedValue(new Error("database is locked"));
     renderWithProviders(panel());
     fireEvent.click(screen.getByRole("button", { name: "Show sync details" }));
-    await waitFor(() => expect(screen.getByText(/database is locked/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/database is locked/)).toBeInTheDocument());
     expect(screen.queryByText("syncPanel.empty")).toBeNull();
   });
 
@@ -98,7 +98,7 @@ describe("SyncPanel", () => {
     renderWithProviders(panel());
     fireEvent.click(screen.getByRole("button", { name: "Show sync details" }));
     await waitFor(() =>
-      expect(screen.getByText("syncPanel.headroomUnknown")).toBeTruthy(),
+      expect(screen.getByText("syncPanel.headroomUnknown")).toBeInTheDocument(),
     );
   });
 
@@ -112,7 +112,7 @@ describe("SyncPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Show sync details" }));
     // Rounded up; a countdown that reaches 0 while the client is still parked is worse than over-reporting.
     await waitFor(() =>
-      expect(screen.getByText('syncPanel.throttleLimited:{"s":118}')).toBeTruthy(),
+      expect(screen.getByText('syncPanel.throttleLimited:{"s":118}')).toBeInTheDocument(),
     );
     unmount();
 
@@ -123,7 +123,7 @@ describe("SyncPanel", () => {
     renderWithProviders(panel());
     fireEvent.click(screen.getByRole("button", { name: "Show sync details" }));
     await waitFor(() =>
-      expect(screen.getByText('syncPanel.throttlePacing:{"s":1}')).toBeTruthy(),
+      expect(screen.getByText('syncPanel.throttlePacing:{"s":1}')).toBeInTheDocument(),
     );
   });
 
@@ -157,14 +157,14 @@ describe("SyncPanel", () => {
     renderWithProviders(panel());
     fireEvent.click(screen.getByRole("button", { name: "Show sync details" }));
 
-    await waitFor(() => expect(screen.getByText("MediaListCollection")).toBeTruthy());
-    expect(screen.getByText("syncPanel.empty")).toBeTruthy();
-    expect(screen.getByText('syncPanel.tookMs:{"ms":940}')).toBeTruthy();
+    await waitFor(() => expect(screen.getByText("MediaListCollection")).toBeInTheDocument());
+    expect(screen.getByText("syncPanel.empty")).toBeInTheDocument();
+    expect(screen.getByText('syncPanel.tookMs:{"ms":940}')).toBeInTheDocument();
     // Only the row that waited carries the pacing figure; a column on every healthy row would bury it.
-    expect(screen.getByText('syncPanel.paced:{"ms":800}')).toBeTruthy();
+    expect(screen.getByText('syncPanel.paced:{"ms":800}')).toBeInTheDocument();
     expect(screen.queryByText('syncPanel.paced:{"ms":0}')).toBeNull();
     // And the reading's age, which the panel computed and discarded before.
-    expect(screen.getByText("syncPanel.measuredNow")).toBeTruthy();
+    expect(screen.getByText("syncPanel.measuredNow")).toBeInTheDocument();
   });
 
   it("labels a queued row by what it changes", async () => {
@@ -184,10 +184,10 @@ describe("SyncPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Show sync details" }));
     // No cached title, so the row shows the id rather than vanishing: the count must match the pending badge.
     await waitFor(() =>
-      expect(screen.getByText('syncPanel.rowUntitled:{"id":21}')).toBeTruthy(),
+      expect(screen.getByText('syncPanel.rowUntitled:{"id":21}')).toBeInTheDocument(),
     );
     expect(
       screen.getByText("syncPanel.fieldProgress, syncPanel.fieldStatus"),
-    ).toBeTruthy();
+    ).toBeInTheDocument();
   });
 });

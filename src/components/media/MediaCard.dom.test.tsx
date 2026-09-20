@@ -67,7 +67,7 @@ describe("MediaCard in the account-free profile", () => {
     await waitFor(() =>
       expect(screen.queryByRole("button", { name: "media.addDefault" })).toBeNull(),
     );
-    expect(screen.getByTitle("status.ANIME.CURRENT")).toBeTruthy();
+    expect(screen.getByTitle("status.ANIME.CURRENT")).toBeInTheDocument();
   });
 
   /** A title genuinely absent must still offer the quick add. */
@@ -77,7 +77,7 @@ describe("MediaCard in the account-free profile", () => {
     );
     queryClient.setQueryData(["mediaList", "ANIME", 0], localList());
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "media.addDefault" })).toBeTruthy(),
+      expect(screen.getByRole("button", { name: "media.addDefault" })).toBeInTheDocument(),
     );
   });
 });

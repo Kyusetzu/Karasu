@@ -38,7 +38,7 @@ describe("FollowButton states", () => {
     renderWithProviders(<FollowButton {...OTHER} flags={{}} />);
     const button = screen.getByRole("button");
     expect(button.textContent).toContain("social.follow");
-    expect(button.getAttribute("aria-label")).toContain("social.followAria");
+    expect(button).toHaveAttribute("aria-label", expect.stringContaining("social.followAria"));
   });
 
   it("offers to follow someone who follows you", () => {
@@ -69,7 +69,7 @@ describe("FollowButton states", () => {
     renderWithProviders(<FollowButton {...OTHER} flags={{ isFollowing: true }} />);
     const button = screen.getByRole("button");
     expect(button.textContent).toContain("social.following");
-    expect(button.getAttribute("aria-label")).toContain("social.unfollowAria");
+    expect(button).toHaveAttribute("aria-label", expect.stringContaining("social.unfollowAria"));
   });
 
   it("treats null and undefined flags as not following", () => {

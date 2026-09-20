@@ -47,7 +47,7 @@ describe("a description cannot become markup", () => {
         for (const attr of el.getAttributeNames()) {
           expect(attr.toLowerCase().startsWith("on"), `${attr} from ${src}`).toBe(false);
         }
-        expect(el.getAttribute("style"), src).toBeNull();
+        expect(el, src).not.toHaveAttribute("style");
       }
       unmount();
     }

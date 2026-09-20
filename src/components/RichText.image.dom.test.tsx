@@ -33,7 +33,7 @@ describe("an inlined bio image", () => {
   it("still only ever carries a data: src", async () => {
     draw("img(https://i.imgur.com/a.png)");
     await waitFor(() => expect(document.querySelector("img")).not.toBeNull());
-    expect(document.querySelector("img")!.getAttribute("src")).toMatch(/^data:/);
+    expect(document.querySelector("img")).toHaveAttribute("src", expect.stringMatching(/^data:/));
   });
 
   it("fetches one URL once across mounts, and a second URL once more", async () => {

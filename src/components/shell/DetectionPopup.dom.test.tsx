@@ -78,26 +78,26 @@ describe("DetectionPopup", () => {
   it("names the title, the episode and the episode's own name once something plays", () => {
     playing(PLAYING);
     renderWithProviders(<DetectionPopup />);
-    expect(screen.getByText("Cowboy Bebop")).toBeTruthy();
-    expect(screen.getByText(/nowPlaying\.episodeShort/)).toBeTruthy();
-    expect(screen.getByText(/Asteroid Blues/)).toBeTruthy();
+    expect(screen.getByText("Cowboy Bebop")).toBeInTheDocument();
+    expect(screen.getByText(/nowPlaying\.episodeShort/)).toBeInTheDocument();
+    expect(screen.getByText(/Asteroid Blues/)).toBeInTheDocument();
   });
 
   it("spells the season only when the source carried one, and chapters for manga", () => {
     playing({ ...PLAYING, season: 2 });
     const first = renderWithProviders(<DetectionPopup />);
-    expect(screen.getByText(/nowPlaying\.seasonEpisode/)).toBeTruthy();
+    expect(screen.getByText(/nowPlaying\.seasonEpisode/)).toBeInTheDocument();
     first.unmount();
     playing({ ...PLAYING, mediaType: "MANGA", episode: 12 });
     renderWithProviders(<DetectionPopup />);
-    expect(screen.getByText(/nowPlaying\.chapterShort/)).toBeTruthy();
+    expect(screen.getByText(/nowPlaying\.chapterShort/)).toBeInTheDocument();
   });
 
   it("draws the cover, the native title and the AniList line from the list cache", () => {
     mountWithList();
     const img = region().querySelector("img[src='https://img.example/bebop.jpg']");
     expect(img).not.toBeNull();
-    expect(screen.getByText("カウボーイビバップ")).toBeTruthy();
+    expect(screen.getByText("カウボーイビバップ")).toBeInTheDocument();
     const meta = screen.getByText(/format\.TV/);
     expect(meta.textContent).toMatch(/season\.SPRING/);
     expect(meta.textContent).toMatch(/1998/);
@@ -119,7 +119,7 @@ describe("DetectionPopup", () => {
   it("is a named landmark, so a screen reader can reach it without it taking focus", () => {
     playing(PLAYING);
     renderWithProviders(<DetectionPopup />);
-    expect(region()).toBeTruthy();
+    expect(region()).toBeInTheDocument();
   });
 
   /** It arrives unprompted, so it must not take the keyboard away from whatever the user was doing. */
@@ -134,12 +134,12 @@ describe("DetectionPopup", () => {
     playing(PLAYING);
     renderWithProviders(<DetectionPopup />);
     // The eyebrow and the buttons are the expanded half; the title and the toggle survive the collapse.
-    expect(screen.getByText(/nowPlaying\.heading/)).toBeTruthy();
+    expect(screen.getByText(/nowPlaying\.heading/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "nowPlaying.collapse" }));
     expect(screen.queryByText(/nowPlaying\.heading/)).toBeNull();
-    expect(screen.getByText("Cowboy Bebop")).toBeTruthy();
+    expect(screen.getByText("Cowboy Bebop")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "nowPlaying.expand" }));
-    expect(screen.getByText(/nowPlaying\.heading/)).toBeTruthy();
+    expect(screen.getByText(/nowPlaying\.heading/)).toBeInTheDocument();
   });
 
   it("remembers the choice across a remount, which is what makes it a preference", () => {
@@ -149,7 +149,7 @@ describe("DetectionPopup", () => {
     first.unmount();
 
     renderWithProviders(<DetectionPopup />);
-    expect(screen.getByRole("button", { name: "nowPlaying.expand" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "nowPlaying.expand" })).toBeInTheDocument();
     expect(screen.queryByText(/nowPlaying\.heading/)).toBeNull();
   });
 });

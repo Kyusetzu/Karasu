@@ -78,8 +78,6 @@ lives in Rust), a formatter (one tree-wide diff for nothing).
 
 | Package | Where | Why, in a line |
 | --- | --- | --- |
-| `@testing-library/user-event` | every `*.dom.test.tsx` that types or clicks: composers, search, palette, editor | `fireEvent` fires one event; `userEvent` runs the sequence a person causes (focus → key → input → change), which is what the components actually hear |
-| `@testing-library/jest-dom` (`/vitest` setup) | `vitest.setup.ts`, then the 96 `toBeTruthy()` sites | `toBeDisabled()`/`toHaveAttribute()` fail with the reason, not "false" — shorter output, the token rule |
 | `vitest-axe` | one `toHaveNoViolations()` per overlay and per page shell | the a11y lint rules are off because they argue with our role patterns; axe grades the rendered result instead |
 | `proptest` | `parser.rs`, `matcher.rs` | no input may panic, the episode never exceeds its digits, a non-empty name never parses to an empty title — thousands of cases a run |
 | `insta` | the diagnostics report, `widgets.json`, the MAL export | text blocks nobody pins today; a snapshot diff in review instead of "did something move" |

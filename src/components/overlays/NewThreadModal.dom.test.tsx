@@ -1,4 +1,5 @@
-import { fireEvent, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { NewThreadModal } from "./NewThreadModal";
 import { renderWithProviders } from "@/test/render";
@@ -9,47 +10,52 @@ const createButton = () =>
   screen.getAllByRole("button").find((b) => b.textContent?.includes("forum.create") &&
     !b.textContent.includes("forum.creating")) as HTMLButtonElement;
 
-function fill({ title, body, category }: { title?: string; body?: string; category?: string }) {
+const user = userEvent.setup({ delay: null });
+
+/** Typed, not set: the field hears the same focus, key and input sequence a person causes. */
+async function fill({ title, body, category }: { title?: string; body?: string; category?: string }) {
   if (title !== undefined) {
-    fireEvent.change(screen.getByLabelText("forum.threadTitleLabel"), {
-      target: { value: title },
-    });
+    const el = screen.getByLabelText("forum.threadTitleLabel");
+    await user.clear(el);
+    await user.type(el, title);
   }
   if (body !== undefined) {
-    fireEvent.change(screen.getByLabelText("forum.bodyLabel"), { target: { value: body } });
+    const el = screen.getByLabelText("forum.bodyLabel");
+    await user.clear(el);
+    await user.type(el, body);
   }
   if (category !== undefined) {
-    fireEvent.click(screen.getByRole("button", { name: category }));
+    await user.click(screen.getByRole("button", { name: category }));
   }
 }
 
 describe("NewThreadModal", () => {
-  it("disables create until title, body and a category are all present", () => {
+  it("disables create until title, body and a category are all present", async () => {
     renderWithProviders(<NewThreadModal onClose={() => {}} />);
-    expect(createButton().disabled).toBe(true);
+    expect(createButton()).toBeDisabled();
 
-    fill({ title: "Weekly chapter talk" });
-    expect(createButton().disabled).toBe(true);
+    await fill({ title: "Weekly chapter talk" });
+    expect(createButton()).toBeDisabled();
 
-    fill({ body: "So, that ending." });
-    expect(createButton().disabled).toBe(true);
+    await fill({ body: "So, that ending." });
+    expect(createButton()).toBeDisabled();
 
-    fill({ category: "General" });
-    expect(createButton().disabled).toBe(false);
+    await fill({ category: "General" });
+    expect(createButton()).toBeEnabled();
   });
 
-  it("re-disables when the category is toggled back off", () => {
+  it("re-disables when the category is toggled back off", async () => {
     renderWithProviders(<NewThreadModal onClose={() => {}} />);
-    fill({ title: "t", body: "b", category: "General" });
-    expect(createButton().disabled).toBe(false);
+    await fill({ title: "t", body: "b", category: "General" });
+    expect(createButton()).toBeEnabled();
 
-    fill({ category: "General" });
-    expect(createButton().disabled).toBe(true);
+    await fill({ category: "General" });
+    expect(createButton()).toBeDisabled();
   });
 
-  it("a whitespace title does not count as one", () => {
+  it("a whitespace title does not count as one", async () => {
     renderWithProviders(<NewThreadModal onClose={() => {}} />);
-    fill({ title: "   ", body: "b", category: "General" });
-    expect(createButton().disabled).toBe(true);
+    await fill({ title: "   ", body: "b", category: "General" });
+    expect(createButton()).toBeDisabled();
   });
 });

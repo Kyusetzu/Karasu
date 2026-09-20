@@ -48,13 +48,13 @@ describe("useCachedMedia", () => {
     const qc = new QueryClient();
     qc.setQueryData(["mediaList", "ANIME", 153164], cachedList(110200, 0), { updatedAt: 0 });
     renderProbe(qc, 110200);
-    expect(screen.getByText("ANIME/153164/0")).toBeTruthy();
+    expect(screen.getByText("ANIME/153164/0")).toBeInTheDocument();
   });
 
   it("misses a title that is on no cached list", () => {
     const qc = new QueryClient();
     qc.setQueryData(["mediaList", "ANIME", 153164], cachedList(110200, 0), { updatedAt: 0 });
     renderProbe(qc, 21);
-    expect(screen.getByText("miss")).toBeTruthy();
+    expect(screen.getByText("miss")).toBeInTheDocument();
   });
 });

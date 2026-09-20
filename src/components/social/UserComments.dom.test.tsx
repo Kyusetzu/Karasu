@@ -40,9 +40,9 @@ describe("UserComments paging states", () => {
     fetchPage.mockResolvedValueOnce(page([comment(2, "Thread B", "second"), comment(3, "Thread C", "third")], false));
 
     renderWithProviders(<UserComments userId={1} emptyTitle="empty" />);
-    await waitFor(() => expect(screen.getByText("Thread A")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Thread A")).toBeInTheDocument());
     screen.getByRole("button", { name: "social.loadMorePlain" }).click();
-    await waitFor(() => expect(screen.getByText("Thread C")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Thread C")).toBeInTheDocument());
     expect(screen.getAllByText("Thread B")).toHaveLength(1);
   });
 
@@ -54,9 +54,9 @@ describe("UserComments paging states", () => {
 
     renderWithProviders(<UserComments userId={8205117} emptyTitle="empty" />);
 
-    expect(await screen.findByText("New User Intro Thread - Welcome!")).toBeTruthy();
+    expect(await screen.findByText("New User Intro Thread - Welcome!")).toBeInTheDocument();
     // `renderPlain` strips the markup and keeps the words.
-    expect(screen.getByText(/ello looking for a friend/)).toBeTruthy();
+    expect(screen.getByText(/ello looking for a friend/)).toBeInTheDocument();
     expect(screen.queryByText(/__ello__/)).toBeNull();
   });
 
@@ -68,9 +68,9 @@ describe("UserComments paging states", () => {
 
     renderWithProviders(<UserComments userId={3} emptyTitle="empty" />);
 
-    expect(await screen.findByText("Who did it?")).toBeTruthy();
+    expect(await screen.findByText("Who did it?")).toBeInTheDocument();
     // The word "Spoiler" (its key, under the stubbed `t`) stands in for the text.
-    expect(screen.getByText(/social\.mdSpoiler did it, obviously/)).toBeTruthy();
+    expect(screen.getByText(/social\.mdSpoiler did it, obviously/)).toBeInTheDocument();
     expect(screen.queryByText(/butler/)).toBeNull();
   });
 
@@ -80,8 +80,8 @@ describe("UserComments paging states", () => {
 
     renderWithProviders(<UserComments userId={2} emptyTitle="nothing yet" />);
 
-    expect(await screen.findByText("nothing yet")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "social.loadMorePlain" })).toBeTruthy();
+    expect(await screen.findByText("nothing yet")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "social.loadMorePlain" })).toBeInTheDocument();
   });
 
   it("keeps the loaded pages when a later one fails", async () => {
@@ -95,11 +95,11 @@ describe("UserComments paging states", () => {
 
     renderWithProviders(<UserComments userId={3} emptyTitle="empty" />);
 
-    expect(await screen.findByText("Thread A")).toBeTruthy();
+    expect(await screen.findByText("Thread A")).toBeInTheDocument();
     screen.getByRole("button", { name: "social.loadMorePlain" }).click();
 
     await waitFor(() => expect(fetchPage).toHaveBeenCalledTimes(2));
-    expect(screen.getByText("Thread A")).toBeTruthy();
-    expect(screen.getByText("Thread B")).toBeTruthy();
+    expect(screen.getByText("Thread A")).toBeInTheDocument();
+    expect(screen.getByText("Thread B")).toBeInTheDocument();
   });
 });

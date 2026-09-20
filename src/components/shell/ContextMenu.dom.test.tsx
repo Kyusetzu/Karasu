@@ -43,8 +43,8 @@ afterEach(() => {
 describe("ContextMenu", () => {
   it("draws the actions it was given", () => {
     menu();
-    expect(within(root()).getByRole("menuitem", { name: "ctx.open" })).toBeTruthy();
-    expect(within(root()).getByRole("menuitem", { name: /actions\.changeStatus/ })).toBeTruthy();
+    expect(within(root()).getByRole("menuitem", { name: "ctx.open" })).toBeInTheDocument();
+    expect(within(root()).getByRole("menuitem", { name: /actions\.changeStatus/ })).toBeInTheDocument();
   });
 
   it("runs a plain row and leaves a submenu row to open instead", () => {
@@ -55,7 +55,7 @@ describe("ContextMenu", () => {
     onRun.mockClear();
     fireEvent.click(within(root()).getByRole("menuitem", { name: /actions\.changeStatus/ }));
     expect(onRun).not.toHaveBeenCalled();
-    expect(screen.getByRole("menuitem", { name: "status.ANIME.COMPLETED" })).toBeTruthy();
+    expect(screen.getByRole("menuitem", { name: "status.ANIME.COMPLETED" })).toBeInTheDocument();
   });
 
   it("takes focus so it is operable from the keyboard the moment it appears", () => {
@@ -82,7 +82,7 @@ describe("ContextMenu", () => {
     fireEvent.keyDown(root(), { key: "ArrowDown" });
     fireEvent.keyDown(root(), { key: "ArrowDown" });
     fireEvent.keyDown(root(), { key: "ArrowRight" });
-    expect(screen.getByRole("menuitem", { name: "status.ANIME.COMPLETED" })).toBeTruthy();
+    expect(screen.getByRole("menuitem", { name: "status.ANIME.COMPLETED" })).toBeInTheDocument();
     fireEvent.keyDown(root(), { key: "ArrowLeft" });
     expect(screen.queryByRole("menuitem", { name: "status.ANIME.COMPLETED" })).toBeNull();
   });

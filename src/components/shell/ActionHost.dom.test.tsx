@@ -77,17 +77,17 @@ describe("ActionHost long press", () => {
     press(el);
     expect(screen.queryByRole("dialog")).toBeNull();
     hold();
-    expect(screen.getByRole("dialog")).toBeTruthy();
-    expect(screen.getByText("Cowboy Bebop")).toBeTruthy();
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByText("Cowboy Bebop")).toBeInTheDocument();
   });
 
   it("offers the writes a cached entry makes possible", () => {
     mount();
     press(card());
     hold();
-    expect(screen.getByRole("button", { name: "common.plusOne" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "actions.changeStatus" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "actions.remove" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "common.plusOne" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "actions.changeStatus" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "actions.remove" })).toBeInTheDocument();
   });
 
   it("writes the increment the entry's own progress implies", async () => {
@@ -195,8 +195,8 @@ describe("ActionHost right click", () => {
   it("opens the menu on the card that was clicked", () => {
     mount();
     right(card());
-    expect(screen.getByRole("menu", { name: "ctx.menuLabel" })).toBeTruthy();
-    expect(screen.getByRole("menuitem", { name: "common.plusOne" })).toBeTruthy();
+    expect(screen.getByRole("menu", { name: "ctx.menuLabel" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "common.plusOne" })).toBeInTheDocument();
   });
 
   /** The one thing a rewrite here can quietly break: an editable field must keep the browser's own menu. */
@@ -213,7 +213,7 @@ describe("ActionHost right click", () => {
     const empty = document.createElement("div");
     document.body.appendChild(empty);
     right(empty);
-    expect(screen.getByRole("menuitem", { name: "ctx.back" })).toBeTruthy();
+    expect(screen.getByRole("menuitem", { name: "ctx.back" })).toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: "common.plusOne" })).toBeNull();
   });
 
@@ -233,7 +233,7 @@ describe("ActionHost against background detection events", () => {
     press(card());
     detectionEvent();
     hold();
-    expect(screen.getByRole("dialog")).toBeTruthy();
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 
   it("still swallows the tap when a detection event lands between the press and the tap", () => {
@@ -274,10 +274,10 @@ describe("ActionHost overlay exclusivity", () => {
   it("does not re-target an open editor from a right-click behind it", () => {
     mount();
     openEditorByRightClick();
-    expect(screen.getByRole("dialog", { name: "Cowboy Bebop" })).toBeTruthy();
+    expect(screen.getByRole("dialog", { name: "Cowboy Bebop" })).toBeInTheDocument();
 
     fireEvent.contextMenu(card("2", "Trigun"), { clientX: 60, clientY: 60 });
-    expect(screen.getByRole("dialog", { name: "Cowboy Bebop" })).toBeTruthy();
+    expect(screen.getByRole("dialog", { name: "Cowboy Bebop" })).toBeInTheDocument();
   });
 
   it("does not open a menu over a dialog that owns the screen", () => {

@@ -48,7 +48,7 @@ describe("SeasonHero", () => {
     renderWithProviders(<SeasonHero />);
     const link = await screen.findByRole("link", { name: "Frieren" });
     // `renderWithProviders` uses a MemoryRouter, so no hash prefix here.
-    expect(link.getAttribute("href")).toBe("/media/1");
+    expect(link).toHaveAttribute("href", "/media/1");
   });
 
   /** Nothing is a better hero than a broken one. */
@@ -63,7 +63,7 @@ describe("SeasonHero", () => {
     useContentFilter.setState({ level: "moderate", ready: true, error: null });
     hero.mockResolvedValue([media(1, "Blocked", { isAdult: true }), media(2, "Fine")]);
     renderWithProviders(<SeasonHero />);
-    await waitFor(() => expect(screen.getByRole("link", { name: "Fine" })).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole("link", { name: "Fine" })).toBeInTheDocument());
     expect(screen.queryByRole("link", { name: "Blocked" })).toBeNull();
   });
 
@@ -71,7 +71,7 @@ describe("SeasonHero", () => {
     hero.mockResolvedValue([media(1, "A"), media(2, "B"), media(3, "C")]);
     const { unmount } = renderWithProviders(<SeasonHero />);
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "A" })).toBeTruthy(),
+      expect(screen.getByRole("button", { name: "A" })).toBeInTheDocument(),
     );
     // Three dots plus the prev/next pair.
     expect(screen.getAllByRole("button")).toHaveLength(5);
@@ -79,7 +79,7 @@ describe("SeasonHero", () => {
 
     hero.mockResolvedValue([media(9, "Only")]);
     renderWithProviders(<SeasonHero />);
-    await waitFor(() => expect(screen.getByRole("link", { name: "Only" })).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole("link", { name: "Only" })).toBeInTheDocument());
     // No dots and no arrows: there is nowhere to go.
     expect(screen.queryAllByRole("button")).toHaveLength(0);
   });
@@ -97,7 +97,7 @@ describe("SeasonHero", () => {
     fireEvent.click(screen.getByRole("button", { name: "dashboard.heroNext" }));
     expect(screen.getByRole("heading", { level: 2 }).textContent).toBe("B");
     // B's successor is C, so its banner exists now, preloaded for the crossfade and still hidden.
-    expect(container.querySelector('img[src*="banner/3"]')).toBeTruthy();
+    expect(container.querySelector('img[src*="banner/3"]')).toBeInTheDocument();
 
     // Backwards from the second, twice: past the first, wrapping to the last.
     const prev = screen.getByRole("button", { name: "dashboard.heroPrev" });

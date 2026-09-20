@@ -703,7 +703,16 @@ environment boot 19.7 → 34.6 s across 29 small files, 7.0 → 8.5 s in all —
 the suite is boot-bound, not test-bound, so the faster DOM is the slower run.
 The dom setup stubs `ResizeObserver` and `matchMedia` (desktop-shaped), mocks
 `react-i18next` (a key back, never the English copy), the opener and event
-plugins; a test that wants `isTauri` true mocks `@/api/anilist` itself. Import
+plugins, and loads `@testing-library/jest-dom`, so a DOM assertion says what it
+means — `toBeInTheDocument()`, `toBeDisabled()`, `toHaveAttribute()` — and fails
+with the reason rather than "expected null to be truthy"; `toBeTruthy()` on an
+element is the old idiom, not a choice. Where a test types or presses keys as a
+person would (the composers, Tab through a dialog) it goes through
+`@testing-library/user-event` with `delay: null`, because `fireEvent.change`
+fires one event and a field hears focus, keydown, input and change; the
+pointer and long-press tests stay on `fireEvent`, which is the only way to
+dispatch a `pointerType: "touch"` sequence against a timer. A test that wants
+`isTauri` true mocks `@/api/anilist` itself. Import
 `act` from `@testing-library/react`, never from `react`: Testing Library's
 copy raises the act environment flag around the call, React's own prints a
 warning per update, and the flag must not be set globally — with it on, every

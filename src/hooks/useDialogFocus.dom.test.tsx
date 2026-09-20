@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { useDialogFocus } from "./useDialogFocus";
 
@@ -45,11 +46,10 @@ function DialogWithField() {
   );
 }
 
-const press = (shift = false) =>
-  fireEvent.keyDown(document.activeElement ?? document, {
-    key: "Tab",
-    shiftKey: shift,
-  });
+const user = userEvent.setup({ delay: null });
+
+/** A real Tab: user-event moves the focus itself unless the hook took the key, so "left to the browser" is testable. */
+const press = (shift = false) => user.tab({ shift });
 
 /** Focus before clicking; jsdom does not focus on mousedown, and the hook would record `<body>` as the opener. */
 function open() {
@@ -72,36 +72,36 @@ describe("useDialogFocus", () => {
   });
 
   /** The bug: Tab from the last control reached the page under the scrim. */
-  it("wraps forward from the last control to the first", () => {
+  it("wraps forward from the last control to the first", async () => {
     render(<Harness />);
     open();
     screen.getByText("last").focus();
-    press();
+    await press();
     expect(document.activeElement).toBe(screen.getByText("first"));
   });
 
-  it("wraps backward from the first control to the last", () => {
+  it("wraps backward from the first control to the last", async () => {
     render(<Harness />);
     open();
-    press(true);
+    await press(true);
     expect(document.activeElement).toBe(screen.getByText("last"));
   });
 
-  it("does not intercept a Tab in the middle of the dialog", () => {
+  it("does not intercept a Tab in the middle of the dialog", async () => {
     render(<Harness />);
     open();
     screen.getByText("middle").focus();
-    press();
+    await press();
     // Left to the browser, which is the point — the hook only handles the ends.
-    expect(document.activeElement).toBe(screen.getByText("middle"));
+    expect(document.activeElement).toBe(screen.getByText("last"));
   });
 
   /** Focus that escaped — a click behind the scrim — is pulled back in. */
-  it("recaptures focus that ended up outside", () => {
+  it("recaptures focus that ended up outside", async () => {
     render(<Harness />);
     open();
     screen.getByText("behind").focus();
-    press();
+    await press();
     expect(document.activeElement).toBe(screen.getByText("first"));
   });
 

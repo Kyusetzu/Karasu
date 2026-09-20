@@ -46,9 +46,9 @@ describe("ThreadList paging states", () => {
       />,
     );
 
-    expect(await screen.findByText("Nothing subscribed here yet.")).toBeTruthy();
+    expect(await screen.findByText("Nothing subscribed here yet.")).toBeInTheDocument();
     // The button is the whole point: without it the reader cannot reach page 2.
-    expect(screen.getByRole("button", { name: "social.loadMorePlain" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "social.loadMorePlain" })).toBeInTheDocument();
   });
 
   it("offers nothing further when the empty page really is the end", async () => {
@@ -62,7 +62,7 @@ describe("ThreadList paging states", () => {
       />,
     );
 
-    expect(await screen.findByText("Nothing subscribed here yet.")).toBeTruthy();
+    expect(await screen.findByText("Nothing subscribed here yet.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "social.loadMorePlain" })).toBeNull();
   });
 
@@ -78,7 +78,7 @@ describe("ThreadList paging states", () => {
       />,
     );
 
-    expect(await screen.findByText("Browse the forum")).toBeTruthy();
+    expect(await screen.findByText("Browse the forum")).toBeInTheDocument();
   });
 
   /** A failure on a later page must not take the pages already on screen with it. */
@@ -98,13 +98,13 @@ describe("ThreadList paging states", () => {
       />,
     );
 
-    expect(await screen.findByText("Thread 1")).toBeTruthy();
+    expect(await screen.findByText("Thread 1")).toBeInTheDocument();
 
     screen.getByRole("button", { name: "social.loadMorePlain" }).click();
 
     await waitFor(() => expect(fetchPage).toHaveBeenCalledTimes(2));
     // Both rows survive the failure, rather than being replaced by one red line.
-    expect(screen.getByText("Thread 1")).toBeTruthy();
-    expect(screen.getByText("Thread 2")).toBeTruthy();
+    expect(screen.getByText("Thread 1")).toBeInTheDocument();
+    expect(screen.getByText("Thread 2")).toBeInTheDocument();
   });
 });

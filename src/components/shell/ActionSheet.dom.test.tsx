@@ -35,9 +35,9 @@ function sheet(onRun = vi.fn(), onClose = vi.fn()) {
 describe("ActionSheet", () => {
   it("names what was pressed and draws the actions it is willing to show", () => {
     sheet();
-    expect(screen.getByText("Cowboy Bebop")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "ctx.open" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "common.plusOne" })).toBeTruthy();
+    expect(screen.getByText("Cowboy Bebop")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "ctx.open" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "common.plusOne" })).toBeInTheDocument();
   });
 
   /** The app chrome belongs to a mouse menu; a phone has a navigation bar for it. */
@@ -56,12 +56,12 @@ describe("ActionSheet", () => {
     const { onRun } = sheet();
     fireEvent.click(screen.getByRole("button", { name: "actions.changeStatus" }));
     expect(onRun).not.toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: "status.ANIME.COMPLETED" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "status.ANIME.COMPLETED" })).toBeInTheDocument();
     // The root rows are gone while drilled in, or the sheet would be two menus at once.
     expect(screen.queryByRole("button", { name: "common.plusOne" })).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "actions.changeStatus" }));
-    expect(screen.getByRole("button", { name: "common.plusOne" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "common.plusOne" })).toBeInTheDocument();
   });
 
   it("runs the leaf a drill-down was opened for", () => {
@@ -78,7 +78,7 @@ describe("ActionSheet", () => {
     fireEvent.click(screen.getByRole("button", { name: "actions.changeStatus" }));
     fireEvent.keyDown(window, { key: "Escape" });
     expect(onClose).not.toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: "common.plusOne" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "common.plusOne" })).toBeInTheDocument();
     fireEvent.keyDown(window, { key: "Escape" });
     expect(onClose).toHaveBeenCalled();
   });

@@ -21,10 +21,10 @@ describe("SessionExpired", () => {
     signIn();
     expire();
     renderWithProviders(<SessionExpired />);
-    expect(screen.getByText("auth.expiredTitle")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "auth.expiredAction" })).toBeTruthy();
+    expect(screen.getByText("auth.expiredTitle")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "auth.expiredAction" })).toBeInTheDocument();
     // A status region, not an alert: the cached list is still readable and the banner must not steal focus.
-    expect(screen.getByRole("status")).toBeTruthy();
+    expect(screen.getByRole("status")).toBeInTheDocument();
   });
 
   /** Proves the banner stays off where there is no token to reject or the sign-in screen is already showing. */

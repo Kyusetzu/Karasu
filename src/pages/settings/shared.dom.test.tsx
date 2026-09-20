@@ -15,7 +15,7 @@ describe("Row", () => {
     const control = screen.getByTestId("control");
     // The control is a sibling of the text block, which is what lets `justify-between` separate them.
     expect(label.parentElement).not.toContain(control);
-    expect(screen.getByText("settings.languageHint")).toBeTruthy();
+    expect(screen.getByText("settings.languageHint")).toBeInTheDocument();
   });
 
   it("wraps everything in a label, so clicking the text reaches the control", () => {
@@ -43,7 +43,7 @@ describe("Row", () => {
         <select />
       </Row>,
     );
-    expect(screen.getByText("anilist only")).toBeTruthy();
+    expect(screen.getByText("anilist only")).toBeInTheDocument();
   });
 
   it("centres the control, where Toggle aligns to the first line", () => {
@@ -66,12 +66,12 @@ describe("Toggle", () => {
   it("is a switch with its state exposed, not a styled checkbox", () => {
     render(<Toggle checked onChange={() => {}} label="settings.reduceMotion" />);
     const sw = screen.getByRole("switch");
-    expect(sw.getAttribute("aria-checked")).toBe("true");
+    expect(sw).toHaveAttribute("aria-checked", "true");
   });
 
   it("reports unchecked as false rather than omitting the attribute", () => {
     render(<Toggle checked={false} onChange={() => {}} label="a" />);
-    expect(screen.getByRole("switch").getAttribute("aria-checked")).toBe("false");
+    expect(screen.getByRole("switch")).toHaveAttribute("aria-checked", "false");
   });
 
   it("disables the control and dims the row together", () => {
@@ -87,7 +87,7 @@ describe("Toggle", () => {
 describe("ExternalNote", () => {
   it("carries an icon and the text, so it does not read as another hint", () => {
     const { container } = render(<ExternalNote>changes anilist.co</ExternalNote>);
-    expect(container.querySelector("svg")).toBeTruthy();
-    expect(screen.getByText("changes anilist.co")).toBeTruthy();
+    expect(container.querySelector("svg")).toBeInTheDocument();
+    expect(screen.getByText("changes anilist.co")).toBeInTheDocument();
   });
 });

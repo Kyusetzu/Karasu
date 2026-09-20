@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { useState } from "react";
 import { MarkdownTextarea, type MarkdownTextareaProps } from "./MarkdownTextarea";
@@ -25,6 +26,8 @@ function Harness(props: Partial<MarkdownTextareaProps> & { initial?: string; onV
   );
 }
 
+const user = userEvent.setup({ delay: null });
+
 const field = () => screen.getByLabelText("the field") as HTMLTextAreaElement;
 
 function select(start: number, end: number) {
@@ -39,8 +42,8 @@ describe("MarkdownTextarea", () => {
     const toolbar = screen.getByRole("toolbar", { name: "composer.toolbar" });
     const buttons = toolbar.querySelectorAll("button");
     expect(buttons.length).toBe(13);
-    for (const b of buttons) expect(b.getAttribute("aria-label")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "composer.bold" }).getAttribute("title")).toContain("Ctrl+B");
+    for (const b of buttons) expect(b).toHaveAttribute("aria-label");
+    expect(screen.getByRole("button", { name: "composer.bold" })).toHaveAttribute("title", expect.stringContaining("Ctrl+B"));
   });
 
   it("wraps the selection when a button is pressed, keeping the focus in the field", () => {
@@ -58,30 +61,31 @@ describe("MarkdownTextarea", () => {
     expect([field().selectionStart, field().selectionEnd]).toEqual([4, 7]);
   });
 
-  it("binds Ctrl+B, Ctrl+I, Ctrl+Shift+X and Ctrl+Shift+S on the field", () => {
+  it("binds Ctrl+B, Ctrl+I, Ctrl+Shift+X and Ctrl+Shift+S on the field", async () => {
     render(<Harness initial="word" />);
     select(0, 4);
-    fireEvent.keyDown(field(), { key: "b", ctrlKey: true });
+    await user.keyboard("{Control>}b{/Control}");
     expect(field().value).toBe("**word**");
     select(2, 6);
-    fireEvent.keyDown(field(), { key: "i", ctrlKey: true });
+    await user.keyboard("{Control>}i{/Control}");
     expect(field().value).toBe("***word***");
     select(3, 7);
-    fireEvent.keyDown(field(), { key: "X", ctrlKey: true, shiftKey: true });
+    await user.keyboard("{Control>}{Shift>}X{/Shift}{/Control}");
     expect(field().value).toBe("***~~word~~***");
     select(5, 9);
-    fireEvent.keyDown(field(), { key: "S", ctrlKey: true, shiftKey: true });
+    await user.keyboard("{Control>}{Shift>}S{/Shift}{/Control}");
     expect(field().value).toBe("***~~~!word!~~~***");
   });
 
-  it("sends on Ctrl+Enter and only then", () => {
+  it("sends on Ctrl+Enter and only then", async () => {
     const onSubmit = vi.fn();
     render(<Harness initial="hi" onSubmit={onSubmit} />);
-    fireEvent.keyDown(field(), { key: "Enter" });
+    select(2, 2);
+    await user.keyboard("{Enter}");
     expect(onSubmit).not.toHaveBeenCalled();
-    fireEvent.keyDown(field(), { key: "Enter", ctrlKey: true });
+    await user.keyboard("{Control>}{Enter}{/Control}");
     expect(onSubmit).toHaveBeenCalledTimes(1);
-    fireEvent.keyDown(field(), { key: "Enter", metaKey: true });
+    await user.keyboard("{Meta>}{Enter}{/Meta}");
     expect(onSubmit).toHaveBeenCalledTimes(2);
   });
 
@@ -91,9 +95,9 @@ describe("MarkdownTextarea", () => {
     expect(field().hidden).toBe(true);
     expect(screen.getByLabelText("the field")).toBe(field());
     // Rendered, not raw: the word is there and the markers are not.
-    expect(screen.getByText("bold")).toBeTruthy();
+    expect(screen.getByText("bold")).toBeInTheDocument();
     expect(screen.queryByText(/\*\*/, { ignore: "textarea" })).toBeNull();
-    expect(screen.getByRole("button", { name: "composer.bold" }).hasAttribute("disabled")).toBe(true);
+    expect(screen.getByRole("button", { name: "composer.bold" })).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: /social\.previewOff/ }));
     expect(field().hidden).toBe(false);
   });
@@ -102,7 +106,7 @@ describe("MarkdownTextarea", () => {
     render(<Harness initial="   " preview="toggle" previewSource="" />);
     // The toggle is disabled on a blank draft, so this reaches the sentence through the side-by-side form instead.
     render(<Harness initial="" preview="side" previewEmpty="nothing here" />);
-    expect(screen.getByText("nothing here")).toBeTruthy();
+    expect(screen.getByText("nothing here")).toBeInTheDocument();
   });
 
   it("compact: no toolbar until the field is focused or has text, and a subset when it is", () => {
@@ -118,7 +122,7 @@ describe("MarkdownTextarea", () => {
   it("side preview renders the draft beside the field", () => {
     render(<Harness initial="~!hidden!~ shown" preview="side" />);
     // The spoiler is a button in the preview, and the field stays visible.
-    expect(screen.getByRole("button", { name: /social\.mdSpoiler/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /social\.mdSpoiler/ })).toBeInTheDocument();
     expect(screen.queryByText(/hidden/, { ignore: "textarea" })).toBeNull();
     expect(field().hidden).toBe(false);
     expect(field().value).toBe("~!hidden!~ shown");

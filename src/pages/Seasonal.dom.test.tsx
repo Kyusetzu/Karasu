@@ -91,8 +91,8 @@ describe("Seasonal grouping", () => {
     });
     renderWithProviders(<Seasonal />);
     await waitFor(() => expect(headings()).toEqual(["format.TV", "format.MOVIE"]));
-    expect(screen.getByText("3")).toBeTruthy();
-    expect(screen.getByText("1")).toBeTruthy();
+    expect(screen.getByText("3")).toBeInTheDocument();
+    expect(screen.getByText("1")).toBeInTheDocument();
   });
 
   /** The badge only appears with the filter off, since `adultQueryArg` excludes adult titles server-side otherwise. */
@@ -101,7 +101,7 @@ describe("Seasonal grouping", () => {
       media: [media("TV", { isAdult: true }), media("TV", { isAdult: false })],
     });
     renderWithProviders(<Seasonal />);
-    await waitFor(() => expect(screen.getByText("18+")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("18+")).toBeInTheDocument());
     expect(screen.getAllByText("18+")).toHaveLength(1);
   });
 

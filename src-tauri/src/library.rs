@@ -142,7 +142,7 @@ impl LibraryData {
 }
 
 /// The parse a correction is keyed on: what the release name said it was.
-#[derive(Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, serde::Serialize, serde::Deserialize, specta::Type)]
 pub struct TitleKey {
     pub title: String,
     pub season: i32,
@@ -152,7 +152,7 @@ pub struct TitleKey {
 }
 
 /// Files that parsed to a title the matcher could not place.
-#[derive(Clone, serde::Serialize)]
+#[derive(Clone, serde::Serialize, specta::Type)]
 pub struct UnmatchedGroup {
     pub title: String,
     pub season: i32,
@@ -161,10 +161,12 @@ pub struct UnmatchedGroup {
     pub suggestion: Option<Suggested>,
 }
 
-#[derive(Clone, serde::Serialize)]
+#[derive(Clone, serde::Serialize, specta::Type)]
 pub struct Suggested {
     #[serde(rename = "mediaId")]
+    #[specta(type = crate::commands::Num)]
     pub media_id: i64,
+    #[specta(type = crate::commands::Real)]
     pub score: f64,
 }
 
@@ -178,20 +180,22 @@ impl Default for LibraryIndex {
 }
 
 /// One episode present on disk.
-#[derive(Clone, serde::Serialize)]
+#[derive(Clone, serde::Serialize, specta::Type)]
 pub struct LibraryFile {
     pub episode: u32,
     pub path: String,
 }
 
 /// Which episodes of a matched entry are on disk; `episodes` stays a bare sorted list for existing callers.
-#[derive(Clone, serde::Serialize)]
+#[derive(Clone, serde::Serialize, specta::Type)]
 pub struct LibraryEntry {
     #[serde(rename = "mediaId")]
+    #[specta(type = crate::commands::Num)]
     pub media_id: i64,
     pub episodes: Vec<u32>,
     pub files: Vec<LibraryFile>,
     /// Matcher confidence; `1.0` is the exact-title short circuit and anything below reads as "close" on screen.
+    #[specta(type = crate::commands::Real)]
     pub score: f64,
     /// The release names that led here — what a correction has to be keyed on.
     pub sources: Vec<TitleKey>,
@@ -203,7 +207,7 @@ pub struct LibraryEntry {
 }
 
 /// The facts the season-split card needs, computed at reindex time.
-#[derive(Clone, serde::Serialize)]
+#[derive(Clone, serde::Serialize, specta::Type)]
 pub struct Overflow {
     /// AniList's episode count for the matched entry.
     #[serde(rename = "knownEpisodes")]
@@ -219,35 +223,41 @@ pub struct Overflow {
     pub hint: Option<SplitHint>,
 }
 
-#[derive(Clone, serde::Serialize)]
+#[derive(Clone, serde::Serialize, specta::Type)]
 pub struct SplitHint {
     #[serde(rename = "mediaId")]
+    #[specta(type = crate::commands::Num)]
     pub media_id: i64,
     #[serde(rename = "dstStart")]
     pub dst_start: u32,
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, specta::Type)]
 pub struct ScanSummary {
     pub entries: Vec<LibraryEntry>,
     /// Total video files seen (matched or not).
+    #[specta(type = crate::commands::Num)]
     pub files: usize,
+    #[specta(type = crate::commands::Num)]
     pub matched: usize,
 }
 
 /// What the library screen's path row says, without needing a scan to say it.
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, specta::Type)]
 pub struct LibraryStatus {
     pub path: Option<String>,
     /// Video files the last scan walked past, matched or not.
     #[serde(rename = "filesSeen")]
+    #[specta(type = crate::commands::Num)]
     pub files_seen: usize,
     /// Titles it could identify.
+    #[specta(type = crate::commands::Num)]
     pub matched: usize,
 }
 
 /// The folder and what the last scan made of it, so the row has something to show after a restart.
 #[tauri::command]
+#[specta::specta]
 pub fn get_library_status(db: State<'_, Db>, state: State<'_, LibraryIndex>) -> LibraryStatus {
     LibraryStatus {
         path: db.kv_get("library_path").filter(|p| !p.is_empty()),
@@ -260,17 +270,20 @@ pub fn get_library_status(db: State<'_, Db>, state: State<'_, LibraryIndex>) -> 
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn get_library_path(db: State<'_, Db>) -> Option<String> {
     db.kv_get("library_path")
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn set_library_path(db: State<'_, Db>, path: String) -> Result<(), String> {
     db.kv_set("library_path", path.trim())
 }
 
 /// Opens a native folder picker and returns the chosen path.
 #[tauri::command]
+#[specta::specta]
 pub fn pick_library_folder(app: AppHandle) -> Option<String> {
     pick_folder(&app)
 }
@@ -293,26 +306,30 @@ fn pick_folder(_app: &AppHandle) -> Option<String> {
 
 /// The most recent scan's full index; only the Library screen needs it, everyone else reads `get_library_episodes`.
 #[tauri::command]
+#[specta::specta]
 pub fn get_library_index(state: State<'_, LibraryIndex>) -> Vec<LibraryEntry> {
     state.0.guard().summary.clone()
 }
 
 /// Just which episodes exist per media id, so the launch-time read does not ship every absolute path over IPC.
 #[tauri::command]
+#[specta::specta]
 pub fn get_library_episodes(
     state: State<'_, LibraryIndex>,
-) -> std::collections::HashMap<i64, Vec<u32>> {
+) -> std::collections::HashMap<String, Vec<u32>> {
     state
         .0
         .guard()
         .summary
         .iter()
-        .map(|e| (e.media_id, e.episodes.clone()))
+        // A JSON object key is a string whatever Rust says, so the id is spelled out and the bindings say so.
+        .map(|e| (e.media_id.to_string(), e.episodes.clone()))
         .collect()
 }
 
 /// Scans the configured folder and rebuilds the index; `async` is load-bearing, a blocking command froze the window.
 #[tauri::command(async)]
+#[specta::specta]
 pub async fn scan_library(app: AppHandle) -> Result<ScanSummary, String> {
     let index = app.state::<LibraryIndex>();
     // Claim the flag before the first early return and drop-guard it, so every exit clears it.
@@ -486,19 +503,21 @@ fn redirect_rules(db: &Db) -> Vec<SplitRule> {
 }
 
 /// One confirmed split for the Settings list, keyed on the parse, which is what `clear_library_redirect` deletes by.
-#[derive(serde::Serialize, Clone)]
+#[derive(serde::Serialize, Clone, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct LibraryRedirectRow {
     pub title: String,
     pub season: i32,
     pub ep_from: u32,
     pub ep_to: u32,
+    #[specta(type = crate::commands::Num)]
     pub media_id: i64,
     pub dst_start: u32,
 }
 
 /// The confirmed splits for the Settings list, so a split can be undone on its own rather than with the whole key.
 #[tauri::command]
+#[specta::specta]
 pub fn list_library_redirects(app: AppHandle) -> Vec<LibraryRedirectRow> {
     let db = app.state::<Db>();
     db.library_redirects()
@@ -743,18 +762,21 @@ fn reparse(path: &str) -> (String, i32, Option<u32>) {
 
 /// Files the last scan could not place, grouped by what it read them as.
 #[tauri::command]
+#[specta::specta]
 pub fn get_library_unmatched(state: State<'_, LibraryIndex>) -> Vec<UnmatchedGroup> {
     state.0.guard().unmatched.clone()
 }
 
 /// Points every file of this parse at `media_id` in memory at once; the override row makes the next scan agree.
 #[tauri::command(async)]
+#[specta::specta]
 pub fn set_library_match(
     app: AppHandle,
     title: String,
     season: i32,
-    media_id: i64,
+    media_id: crate::commands::Num,
 ) -> Result<Vec<LibraryEntry>, String> {
+    let media_id = media_id.0;
     let state = app.state::<LibraryIndex>();
     if state.1.load(Ordering::Acquire) {
         return Err("A scan is running — try again when it finishes".into());
@@ -882,14 +904,17 @@ pub fn plan_redirect(
 
 /// Confirms a season split in memory at once; the rows `plan_redirect` produces make the next scan and restart agree.
 #[tauri::command(async)]
+#[specta::specta]
 pub fn set_library_redirect(
     app: AppHandle,
-    media_id: i64,
+    media_id: crate::commands::Num,
     from: u32,
     to: u32,
-    dst_media_id: i64,
+    dst_media_id: crate::commands::Num,
     dst_start: u32,
 ) -> Result<Vec<LibraryEntry>, String> {
+    let media_id = media_id.0;
+    let dst_media_id = dst_media_id.0;
     if to < from {
         return Err("The episode range is reversed".into());
     }
@@ -923,6 +948,7 @@ pub fn set_library_redirect(
 
 /// Removes a season split, giving the range back to a sibling of the same parse, or to "unplaced" when none remains.
 #[tauri::command(async)]
+#[specta::specta]
 pub fn clear_library_redirect(
     app: AppHandle,
     title: String,
@@ -980,6 +1006,7 @@ pub fn clear_library_redirect(
 
 /// Drops a correction; the matcher is not re-run, so the files land in "unplaced" until the next scan.
 #[tauri::command(async)]
+#[specta::specta]
 pub fn clear_library_match(
     app: AppHandle,
     title: String,
@@ -1026,7 +1053,9 @@ pub fn clear_library_match(
 
 /// Opens the next unwatched episode of `media_id` in the default player, for detection to pick up as usual.
 #[tauri::command]
-pub fn play_next(app: AppHandle, media_id: i64) -> Result<(), String> {
+#[specta::specta]
+pub fn play_next(app: AppHandle, media_id: crate::commands::Num) -> Result<(), String> {
+    let media_id = media_id.0;
     let db = app.state::<Db>();
     let progress = candidates_from_cache(&db, "ANIME")
         .iter()
@@ -1058,7 +1087,9 @@ pub fn play_next(app: AppHandle, media_id: i64) -> Result<(), String> {
 
 /// Opens one specific episode, which the library page lets the user pick and `play_next` cannot express.
 #[tauri::command]
-pub fn play_episode(app: AppHandle, media_id: i64, episode: u32) -> Result<(), String> {
+#[specta::specta]
+pub fn play_episode(app: AppHandle, media_id: crate::commands::Num, episode: u32) -> Result<(), String> {
+    let media_id = media_id.0;
     let path = {
         let state = app.state::<LibraryIndex>();
         let guard = state.0.guard();

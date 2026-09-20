@@ -1,6 +1,6 @@
 [package]
 name = "karasu"
-version = "1.18.3"
+version = "1.19.0"
 description = "A modern anime and manga tracker built exclusively for AniList"
 authors = ["Kyu"]
 license = "MIT"
@@ -115,6 +115,10 @@ getrandom = "0.3"
 tauri-plugin-deep-link = "2.4.9"
 # The clipboard through Rust: `navigator.clipboard` is reliable in WebView2 and conditional in WebKitGTK.
 tauri-plugin-clipboard-manager = "2"
+# The TypeScript bindings for every command are generated from these signatures (`src/api/bindings.ts`, see CLAUDE.md).
+specta = { version = "=2.0.0-rc.25", features = ["derive"] }
+tauri-specta = { version = "=2.0.0-rc.25", features = ["derive", "typescript"] }
+specta-typescript = "0.0.12"
 
 # Tests only: property tests over the parser and the matcher, and snapshots of the text blocks nobody pins by hand.
 [dev-dependencies]

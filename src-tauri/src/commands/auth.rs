@@ -1,4 +1,5 @@
 use crate::anilist::{auth, client::AniList};
+use crate::commands::Json;
 use crate::db::Db;
 use serde_json::{json, Value};
 use tauri::State;
@@ -31,7 +32,7 @@ query {
   }
 }";
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, specta::Type)]
 pub struct AuthInfo {
     /// true if a client ID is compiled in (login works without any setup)
     #[serde(rename = "hasBuiltinClientId")]
@@ -44,6 +45,7 @@ pub struct AuthInfo {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn anilist_auth_info(db: State<'_, Db>) -> AuthInfo {
     AuthInfo {
         has_builtin_client_id: !BUILTIN_ANILIST_CLIENT_ID.is_empty(),
@@ -56,6 +58,7 @@ pub fn anilist_auth_info(db: State<'_, Db>) -> AuthInfo {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn set_client_id(db: State<'_, Db>, client_id: String) -> Result<(), String> {
     let trimmed = client_id.trim();
     if trimmed.is_empty() || !trimmed.chars().all(|c| c.is_ascii_digit()) {
@@ -79,6 +82,7 @@ fn configured_client_id(db: &Db) -> Result<String, String> {
 
 /// The authorize URL for the manual-paste flow; no callback server runs, so no `state` is needed.
 #[tauri::command]
+#[specta::specta]
 pub fn anilist_login_url(db: State<'_, Db>) -> Result<String, String> {
     Ok(auth::authorize_url(&configured_client_id(&db)?, None))
 }
@@ -135,16 +139,18 @@ pub async fn connect_with_token(db: &Db, api: &AniList, input: &str) -> Result<V
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn anilist_connect(
     db: State<'_, Db>,
     api: State<'_, AniList>,
     token: String,
-) -> Result<Value, String> {
-    connect_with_token(&db, &api, &token).await
+) -> Result<Json, String> {
+    connect_with_token(&db, &api, &token).await.map(Json)
 }
 
 /// Starts the one-click login: spins up the localhost callback server and returns the authorize URL.
 #[tauri::command]
+#[specta::specta]
 pub fn anilist_start_login(
     app: tauri::AppHandle,
     db: State<'_, Db>,
@@ -157,10 +163,11 @@ pub fn anilist_start_login(
 
 /// Returns the cached viewer if a token is stored, without an API call, so startup works offline.
 #[tauri::command]
-pub fn anilist_session(db: State<'_, Db>) -> Option<Value> {
+#[specta::specta]
+pub fn anilist_session(db: State<'_, Db>) -> Option<Json> {
     auth::load_token()?;
     let cached = db.kv_get("anilist_viewer")?;
-    serde_json::from_str(&cached).ok()
+    serde_json::from_str(&cached).ok().map(Json)
 }
 
 /// Which account the app is about to act as.
@@ -211,6 +218,7 @@ pub fn switch_identity(db: &Db, next: Identity) -> Result<(), String> {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn anilist_logout(db: State<'_, Db>) {
     if let Err(e) = switch_identity(&db, Identity::None) {
         crate::logging::error("auth", format!("sign-out could not clear everything: {e}"));
@@ -219,10 +227,11 @@ pub fn anilist_logout(db: State<'_, Db>) {
 
 /// Refetches the viewer and replaces the cached blob, on demand only, since `anilist_session` never goes online.
 #[tauri::command]
+#[specta::specta]
 pub async fn refresh_viewer(
     db: State<'_, Db>,
     api: State<'_, AniList>,
-) -> Result<Value, String> {
+) -> Result<Json, String> {
     let token = auth::load_token().ok_or("Not connected to AniList")?;
     let data = api.query_from("viewer", Some(&token), VIEWER_QUERY, json!({})).await?;
     let viewer = data
@@ -232,7 +241,7 @@ pub async fn refresh_viewer(
         .ok_or("Token invalid or expired")?;
     // Deliberately not `switch_identity`: the same account with fresher data must keep its bell rows and dedupe keys.
     db.kv_set("anilist_viewer", &viewer.to_string())?;
-    Ok(viewer)
+    Ok(Json(viewer))
 }
 
 /// A passthrough source as the frontend named it, or `gql:<root field>` when it did not; never anything it could not spell.
@@ -250,18 +259,32 @@ fn passthrough_source(source: Option<&str>, query: &str) -> String {
 }
 
 /// What the frontend asks the passthrough to cache: a TTL, and the media a detail answer is about so an edit evicts it.
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct CacheOpts {
     pub ttl_sec: u32,
+    #[specta(type = Option<crate::commands::Num>)]
     pub media_id: Option<i64>,
 }
 
 /// Generic GraphQL proxy: Rust attaches the token, paces it, and serves an allowlisted source from cache within its TTL.
 #[tauri::command]
+#[specta::specta]
 pub async fn anilist_query(
     api: State<'_, AniList>,
     db: State<'_, Db>,
+    query: String,
+    variables: Option<Json>,
+    source: Option<String>,
+    cache: Option<CacheOpts>,
+) -> Result<Json, String> {
+    passthrough(&api, &db, query, variables.map(|j| j.0), source, cache).await.map(Json)
+}
+
+/// The passthrough's body, on plain `Value`s; the command above only wraps the answer for the bindings.
+async fn passthrough(
+    api: &AniList,
+    db: &Db,
     query: String,
     variables: Option<Value>,
     source: Option<String>,
@@ -269,7 +292,7 @@ pub async fn anilist_query(
 ) -> Result<Value, String> {
     let source = passthrough_source(source.as_deref(), &query);
     // Local mode sends no bearer whatever the credential store holds, so a surviving token cannot poison public queries.
-    let token = if crate::commands::profile_mode(&db) == "local" {
+    let token = if crate::commands::profile_mode(db) == "local" {
         None
     } else {
         auth::load_token()
@@ -281,7 +304,7 @@ pub async fn anilist_query(
         .as_ref()
         .and_then(|c| crate::anilist::query_cache::allowed_ttl(&source, c.ttl_sec));
     if let Some(ttl) = ttl {
-        let viewer = crate::commands::viewer_id(&db).unwrap_or(0);
+        let viewer = crate::commands::viewer_id(db).unwrap_or(0);
         let key = crate::anilist::query_cache::cache_key(&source, &query, &variables, viewer);
         if let Some((payload, fetched_at)) = db.query_cache_get(&key) {
             let age = crate::commands::unix_now() - fetched_at;

@@ -444,7 +444,7 @@ pub async fn authenticate(
 }
 
 /// One row of the Test-connection diagnostic.
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionSummary {
     pub user: String,
@@ -458,6 +458,7 @@ pub struct SessionSummary {
     /// Set when the row is a Karasu — this one included — with its platform.
     pub karasu: Option<Platform>,
     /// Seconds between this row's last activity and this instance's own row, on the server clock; what `yield_to` judges by.
+    #[specta(type = Option<crate::commands::Num>)]
     pub active_ago_sec: Option<i64>,
 }
 
@@ -490,7 +491,7 @@ pub async fn list_sessions(cfg: &JellyfinConfig) -> Result<Vec<SessionSummary>, 
 // --- Peers: the other Karasus on the same account ----------------------------
 
 /// Which kind of Karasu a `/Sessions` row is; ordered, because a desktop outranks a phone and that order is the rule.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, specta::Type)]
 #[serde(rename_all = "lowercase")]
 pub enum Platform {
     Mobile,
@@ -504,13 +505,14 @@ pub const OWN_PLATFORM: Platform = Platform::Desktop;
 pub const OWN_PLATFORM: Platform = Platform::Mobile;
 
 /// Another Karasu signed in as the same Jellyfin user, as `/Sessions` lists it.
-#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct Peer {
     pub device_id: String,
     pub device_name: String,
     pub platform: Platform,
     /// `LastActivityDate` as Unix seconds; `None` when absent or unreadable.
+    #[specta(type = Option<crate::commands::Num>)]
     pub last_activity: Option<i64>,
 }
 
@@ -735,7 +737,7 @@ pub fn external_accepted(info: &super::discovery::ServerInfo, server_id: &str) -
 }
 
 /// Which of the two addresses a request went to.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, specta::Type)]
 #[serde(rename_all = "lowercase")]
 pub enum Base {
     Local,

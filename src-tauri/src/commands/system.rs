@@ -77,6 +77,7 @@ pub(crate) const LOG_DEBUG_KEY: &str = "log_debug";
 
 /// Reports the page the user is on, so the idle Discord presence can show "Looking at <page>".
 #[tauri::command]
+#[specta::specta]
 pub fn set_ui_page(app: tauri::AppHandle, page: String) {
     *app.state::<crate::discord::UiPage>().0.guard() = page;
     crate::discord::sync_current(&app);
@@ -86,24 +87,26 @@ pub fn set_ui_page(app: tauri::AppHandle, page: String) {
 
 /// Windows' Accessibility text-size multiplier; WebView2 ignores it, so the frontend sets the root font size.
 #[tauri::command]
-pub fn get_text_scale() -> f64 {
+#[specta::specta]
+pub fn get_text_scale() -> crate::commands::Real {
     #[cfg(windows)]
     {
         use windows::UI::ViewManagement::UISettings;
         if let Ok(settings) = UISettings::new() {
             if let Ok(scale) = settings.TextScaleFactor() {
                 // Clamped so a bogus value cannot render the app unusable.
-                return scale.clamp(1.0, 2.25);
+                return crate::commands::Real(scale.clamp(1.0, 2.25));
             }
         }
     }
-    1.0
+    crate::commands::Real(1.0)
 }
 
 // --- System accent -----------------------------------------------------------
 
 /// The desktop's or the phone's accent colour as `#rrggbb`, or nothing where the platform does not publish one.
 #[tauri::command]
+#[specta::specta]
 pub fn system_accent() -> Option<String> {
     read_system_accent()
 }
@@ -167,7 +170,7 @@ pub fn hex_from_unit(r: f64, g: f64, b: f64) -> Option<String> {
 // --- Platform ----------------------------------------------------------------
 
 /// What the screen needs to know about where it runs; tray presence stays with `get_close_to_tray`, one source.
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct PlatformInfo {
     /// "windows" | "linux" | "android", whatever `std::env::consts::OS` says.
@@ -177,6 +180,7 @@ pub struct PlatformInfo {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn platform_info() -> PlatformInfo {
     PlatformInfo {
         os: std::env::consts::OS.to_string(),
@@ -199,7 +203,7 @@ pub(crate) fn close_hides_window(setting: Option<&str>, tray_present: bool) -> b
     }
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, specta::Type)]
 pub struct CloseToTray {
     /// What closing the window does right now.
     pub enabled: bool,
@@ -208,6 +212,7 @@ pub struct CloseToTray {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn get_close_to_tray(app: tauri::AppHandle, db: State<'_, Db>) -> CloseToTray {
     let tray = app.state::<crate::TrayPresent>().0;
     CloseToTray {
@@ -217,6 +222,7 @@ pub fn get_close_to_tray(app: tauri::AppHandle, db: State<'_, Db>) -> CloseToTra
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn set_close_to_tray(db: State<'_, Db>, enabled: bool) -> Result<(), String> {
     db.kv_set(CLOSE_TO_TRAY_KEY, if enabled { "1" } else { "0" })
 }
@@ -256,12 +262,14 @@ pub fn apply_ui_zoom(app: &tauri::AppHandle, percent: u32) {
 pub fn apply_ui_zoom(_app: &tauri::AppHandle, _percent: u32) {}
 
 #[tauri::command]
+#[specta::specta]
 pub fn get_ui_zoom(db: State<'_, Db>) -> u32 {
     read_ui_zoom(&db)
 }
 
 /// Stores and applies the zoom, answering with the clamped value so the pane shows what was applied.
 #[tauri::command]
+#[specta::specta]
 pub fn set_ui_zoom(app: tauri::AppHandle, db: State<'_, Db>, percent: u32) -> Result<u32, String> {
     let percent = percent.clamp(UI_ZOOM_MIN, UI_ZOOM_MAX);
     db.kv_set(UI_ZOOM_KEY, &percent.to_string())?;
@@ -279,12 +287,14 @@ pub(crate) fn read_global_hotkey(db: &Db) -> Option<String> {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn get_global_hotkey(db: State<'_, Db>) -> Option<String> {
     read_global_hotkey(&db)
 }
 
 /// Registers first, stores second, so an accelerator the OS rejects never comes back silently at every startup.
 #[tauri::command]
+#[specta::specta]
 pub fn set_global_hotkey(
     app: tauri::AppHandle,
     db: State<'_, Db>,
@@ -299,7 +309,7 @@ pub fn set_global_hotkey(
 
 // --- Portable mode -----------------------------------------------------------
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, specta::Type)]
 pub struct PortableStatus {
     pub portable: bool,
     /// Absolute path where the database currently lives.
@@ -309,12 +319,14 @@ pub struct PortableStatus {
 }
 
 /// Enough about a database file to say how old it is and whether it looks used.
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, specta::Type)]
 pub struct DatabaseInfo {
     pub path: String,
+    #[specta(type = crate::commands::Num)]
     pub bytes: u64,
     /// Last modified in milliseconds since the epoch, or 0 when the filesystem will not say.
     #[serde(rename = "modifiedMs")]
+    #[specta(type = crate::commands::Num)]
     pub modified_ms: i64,
 }
 
@@ -338,6 +350,7 @@ pub(crate) fn describe_database(path: &std::path::Path) -> Option<DatabaseInfo> 
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn get_portable_status(app: tauri::AppHandle) -> PortableStatus {
     let portable = crate::portable::is_portable();
     let here = crate::portable::portable_data_dir();
@@ -358,6 +371,7 @@ pub fn get_portable_status(app: tauri::AppHandle) -> PortableStatus {
 
 /// Enables portable mode: the database and token are copied first and the marker written last, because it is live.
 #[tauri::command]
+#[specta::specta]
 pub fn enable_portable(
     app: AppHandle,
     db: State<'_, Db>,
@@ -396,6 +410,7 @@ pub fn enable_portable(
 
 /// Disables portable mode by removing the marker, leaving the portable folder alone: a switch, not a delete.
 #[tauri::command]
+#[specta::specta]
 pub fn disable_portable(app: AppHandle) -> Result<(), String> {
     // The token goes back to the credential store before the marker leaves, because `load_token` follows the marker.
     crate::anilist::auth::copy_token_from_portable_file()?;
@@ -406,6 +421,7 @@ pub fn disable_portable(app: AppHandle) -> Result<(), String> {
 
 /// Saves an image through a native dialog; `data` is base64, since a typed array crosses the bridge as JSON numbers.
 #[tauri::command]
+#[specta::specta]
 pub fn save_image(
     app: tauri::AppHandle,
     db: State<'_, Db>,
@@ -451,24 +467,28 @@ pub fn save_image(
 
 /// Everything a bug report needs in one round trip, so a reporter cannot end up with half a picture.
 #[tauri::command]
+#[specta::specta]
 pub fn diagnostics(app: tauri::AppHandle) -> crate::diagnostics::Diagnostics {
     crate::diagnostics::collect(&app)
 }
 
 /// The same facts as a markdown block for an issue; redacted, because the data folder names a person.
 #[tauri::command]
+#[specta::specta]
 pub fn diagnostics_report(app: tauri::AppHandle, redact: bool) -> String {
     crate::diagnostics::render(&crate::diagnostics::collect(&app), redact)
 }
 
 /// The newest log entries, newest first.
 #[tauri::command]
-pub fn get_logs(limit: Option<usize>) -> Vec<crate::logging::LogEntry> {
-    crate::logging::entries(limit.unwrap_or(200).min(crate::logging::RING_CAPACITY))
+#[specta::specta]
+pub fn get_logs(limit: Option<u32>) -> Vec<crate::logging::LogEntry> {
+    crate::logging::entries(limit.map_or(200, |n| n as usize).min(crate::logging::RING_CAPACITY))
 }
 
 /// A crash or unhandled rejection from the WebView, logged beside the backend's so the two line up in order.
 #[tauri::command]
+#[specta::specta]
 pub fn log_frontend_error(message: String, stack: Option<String>) {
     let detail = stack
         .map(|s| format!("{message}\n{s}"))
@@ -477,11 +497,13 @@ pub fn log_frontend_error(message: String, stack: Option<String>) {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn get_log_debug(db: State<'_, Db>) -> bool {
     db.kv_get(LOG_DEBUG_KEY).as_deref() == Some("1")
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn set_log_debug(db: State<'_, Db>, enabled: bool) -> Result<(), String> {
     crate::logging::set_debug(enabled);
     db.kv_set(LOG_DEBUG_KEY, if enabled { "1" } else { "0" })
@@ -489,6 +511,7 @@ pub fn set_log_debug(db: State<'_, Db>, enabled: bool) -> Result<(), String> {
 
 /// Writes the report and the log to a file the user picks, through a Rust-driven dialog like `save_image`.
 #[tauri::command]
+#[specta::specta]
 pub fn export_diagnostics(
     app: tauri::AppHandle,
     db: State<'_, Db>,
@@ -543,6 +566,7 @@ pub fn export_diagnostics(
 
 /// Saves caller-supplied text through the same dialog as `export_diagnostics`; the WebView gets no filesystem door.
 #[tauri::command]
+#[specta::specta]
 pub fn save_text(
     app: tauri::AppHandle,
     db: State<'_, Db>,
@@ -576,6 +600,7 @@ pub fn save_text(
 
 /// `save_text`'s opposite: the WebView asks for a kind of file and receives bounded text, never a path.
 #[tauri::command]
+#[specta::specta]
 pub fn open_text(
     app: tauri::AppHandle,
     db: State<'_, Db>,
@@ -607,15 +632,17 @@ pub fn open_text(
 
 // --- Backups -----------------------------------------------------------------
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, specta::Type)]
 pub struct BackupSettings {
     pub enabled: bool,
+    #[specta(type = crate::commands::Num)]
     pub keep: usize,
     /// Where the files land, shown in the settings hint so nobody has to ask.
     pub dir: String,
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn get_backup_settings(app: tauri::AppHandle, db: State<'_, Db>) -> BackupSettings {
     let dir = app
         .path()
@@ -632,6 +659,7 @@ pub fn get_backup_settings(app: tauri::AppHandle, db: State<'_, Db>) -> BackupSe
 
 /// Opens the backup folder in the file manager, creating it first so the button is never a dead end.
 #[tauri::command]
+#[specta::specta]
 pub fn open_backup_dir(app: tauri::AppHandle, db: State<'_, Db>) -> Result<(), String> {
     use tauri_plugin_opener::OpenerExt;
 
@@ -646,6 +674,7 @@ pub fn open_backup_dir(app: tauri::AppHandle, db: State<'_, Db>) -> Result<(), S
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn set_backup_settings(
     app: tauri::AppHandle,
     db: State<'_, Db>,
@@ -663,11 +692,13 @@ pub async fn set_backup_settings(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn get_autostart(app: tauri::AppHandle) -> bool {
     autostart_enabled(&app)
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn set_autostart(app: tauri::AppHandle, enabled: bool) -> Result<(), String> {
     autostart_apply(&app, enabled)
 }
@@ -705,23 +736,28 @@ fn autostart_apply(_app: &tauri::AppHandle, _enabled: bool) -> Result<(), String
 
 /// Recent notifications, newest first (for the bell dropdown).
 #[tauri::command]
+#[specta::specta]
 pub fn get_notifications(db: State<'_, Db>) -> Vec<crate::db::NotificationRow> {
     db.notif_all(100, crate::commands::list::viewer_id(&db))
 }
 
 #[tauri::command]
-pub fn unread_notification_count(db: State<'_, Db>) -> i64 {
-    db.notif_unread_count(crate::commands::list::viewer_id(&db))
+#[specta::specta]
+pub fn unread_notification_count(db: State<'_, Db>) -> crate::commands::Num {
+    crate::commands::Num(db.notif_unread_count(crate::commands::list::viewer_id(&db)))
 }
 
 #[tauri::command]
-pub fn mark_notification_read(app: AppHandle, db: State<'_, Db>, id: i64) -> Result<(), String> {
+#[specta::specta]
+pub fn mark_notification_read(app: AppHandle, db: State<'_, Db>, id: crate::commands::Num) -> Result<(), String> {
+    let id = id.0;
     db.notif_mark_read(id)?;
     crate::alerts::notify::refresh_bell(&app);
     Ok(())
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn mark_all_notifications_read(app: AppHandle, db: State<'_, Db>) -> Result<(), String> {
     db.notif_mark_all_read()?;
     crate::alerts::notify::refresh_bell(&app);

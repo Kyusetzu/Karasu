@@ -8,6 +8,7 @@ use super::*;
 
 /// Currently detected playback (poll loop state).
 #[tauri::command]
+#[specta::specta]
 pub fn get_now_playing(
     state: State<'_, crate::playback::scrobbler::PlaybackState>,
 ) -> Option<crate::playback::scrobbler::NowPlaying> {
@@ -16,7 +17,7 @@ pub fn get_now_playing(
 
 // --- Scrobbler settings and control ------------------------------------------
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, specta::Type)]
 pub struct ScrobbleSettings {
     pub enabled: bool,
     /// true = require confirmation in the UI before updating
@@ -42,11 +43,13 @@ pub(crate) fn read_scrobble_settings(db: &Db) -> ScrobbleSettings {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn get_scrobble_settings(db: State<'_, Db>) -> ScrobbleSettings {
     read_scrobble_settings(&db)
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn set_scrobble_settings(
     db: State<'_, Db>,
     enabled: bool,
@@ -69,6 +72,7 @@ pub(crate) fn read_media_detection(db: &Db) -> bool {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn get_media_detection(db: State<'_, Db>) -> bool {
     read_media_detection(&db)
 }
@@ -79,6 +83,7 @@ pub(crate) fn write_media_detection(db: &Db, enabled: bool) -> Result<(), String
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn set_media_detection(db: State<'_, Db>, enabled: bool) -> Result<(), String> {
     write_media_detection(&db, enabled)
 }
@@ -160,7 +165,7 @@ pub(crate) fn mpv_launch_config(db: &Db) -> Option<(String, String)> {
     Some((player, pipe))
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct MpvIpcSettings {
     pub enabled: bool,
@@ -173,6 +178,7 @@ pub struct MpvIpcSettings {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn get_mpv_ipc(db: State<'_, Db>) -> MpvIpcSettings {
     let default_path = crate::playback::detection::mpv_ipc::default_pipe();
     MpvIpcSettings {
@@ -187,6 +193,7 @@ pub fn get_mpv_ipc(db: State<'_, Db>) -> MpvIpcSettings {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn set_mpv_ipc(
     db: State<'_, Db>,
     enabled: bool,
@@ -268,7 +275,7 @@ fn android_device_model() -> Option<String> {
     (!s.is_empty() && s.chars().all(|c| c.is_ascii_graphic() || c == ' ')).then_some(s)
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct JellyfinSettings {
     pub url: String,
@@ -290,6 +297,7 @@ pub struct JellyfinSettings {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn get_jellyfin_settings(db: State<'_, Db>) -> JellyfinSettings {
     let external = db.kv_get("jellyfin_external_url").unwrap_or_default();
     JellyfinSettings {
@@ -318,7 +326,7 @@ pub(crate) fn read_jellyfin_background(db: &Db) -> bool {
     db.kv_get("jellyfin_background").as_deref() == Some("1")
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct JellyfinBackground {
     pub enabled: bool,
@@ -329,6 +337,7 @@ pub struct JellyfinBackground {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn get_jellyfin_background(db: State<'_, Db>) -> JellyfinBackground {
     JellyfinBackground {
         enabled: read_jellyfin_background(&db),
@@ -339,12 +348,14 @@ pub fn get_jellyfin_background(db: State<'_, Db>) -> JellyfinBackground {
 
 /// Stores the choice; the scrobbler's next tick starts or stops the service.
 #[tauri::command]
+#[specta::specta]
 pub fn set_jellyfin_background(db: State<'_, Db>, enabled: bool) -> Result<(), String> {
     db.kv_set("jellyfin_background", if enabled { "1" } else { "0" })
 }
 
 /// Opens Android's exemption dialog; the desktop arm refuses, and the pane never shows the button there.
 #[tauri::command]
+#[specta::specta]
 pub fn request_battery_exemption() -> Result<(), String> {
     request_battery_exemption_impl()
 }
@@ -381,6 +392,7 @@ fn request_battery_exemption_impl() -> Result<(), String> {
 
 /// Saves the settings outside sign-in; an external address answering as another server is refused, an unreachable one kept.
 #[tauri::command]
+#[specta::specta]
 pub async fn set_jellyfin_settings(
     db: State<'_, Db>,
     url: String,
@@ -427,6 +439,7 @@ pub async fn set_jellyfin_settings(
 
 /// Exchanges a username and password for an access token; signing in as a user scopes `/Sessions` to this account.
 #[tauri::command]
+#[specta::specta]
 pub async fn jellyfin_sign_in(
     db: State<'_, Db>,
     url: String,
@@ -465,6 +478,7 @@ pub async fn jellyfin_sign_in(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn jellyfin_sign_out(db: State<'_, Db>) -> Result<JellyfinSettings, String> {
     crate::playback::detection::jellyfin::delete_token()?;
     crate::playback::detection::jellyfin::delete_legacy_api_key();
@@ -477,6 +491,7 @@ pub fn jellyfin_sign_out(db: State<'_, Db>) -> Result<JellyfinSettings, String> 
 
 /// Every Jellyfin server that answers the LAN broadcast and confirms itself; a button press, never a poll.
 #[tauri::command]
+#[specta::specta]
 pub async fn discover_jellyfin_servers(
 ) -> Result<Vec<crate::playback::detection::discovery::DiscoveredServer>, String> {
     crate::playback::detection::discovery::discover().await
@@ -484,6 +499,7 @@ pub async fn discover_jellyfin_servers(
 
 /// What the server at `url` says it is — name, version, id — anonymously.
 #[tauri::command]
+#[specta::specta]
 pub async fn probe_jellyfin_server(
     url: String,
 ) -> Result<crate::playback::detection::discovery::ServerInfo, String> {
@@ -492,6 +508,7 @@ pub async fn probe_jellyfin_server(
 
 /// Lists the account's sessions, non-matching ones included, because the device filter is otherwise undiagnosable.
 #[tauri::command]
+#[specta::specta]
 pub async fn test_jellyfin(db: State<'_, Db>) -> Result<JellyfinTest, String> {
     use crate::playback::detection::jellyfin;
     let cfg = jellyfin_config(&db).ok_or("Sign in to your Jellyfin server first")?;
@@ -505,7 +522,7 @@ pub async fn test_jellyfin(db: State<'_, Db>) -> Result<JellyfinTest, String> {
 }
 
 /// The Test-connection answer: the sessions, and which address answered.
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, specta::Type)]
 pub struct JellyfinTest {
     pub sessions: Vec<crate::playback::detection::jellyfin::SessionSummary>,
     pub base: crate::playback::detection::jellyfin::Base,
@@ -514,6 +531,7 @@ pub struct JellyfinTest {
 
 /// Every media session for the Settings diagnostic; a `Result`, because an empty list and an unreachable service differ.
 #[tauri::command]
+#[specta::specta]
 pub async fn media_sessions(
 ) -> Result<Vec<crate::playback::detection::media_session::MediaSession>, String> {
     // Blocking WinRT / D-Bus work: off the main thread, like the detection loop.
@@ -524,12 +542,14 @@ pub async fn media_sessions(
 
 /// Confirms the pending auto-update immediately (also from Blocked).
 #[tauri::command]
+#[specta::specta]
 pub async fn scrobble_now(app: tauri::AppHandle) -> Result<(), String> {
     crate::playback::scrobbler::confirm_pending(app, true).await
 }
 
 /// Discards the pending auto-update for this episode.
 #[tauri::command]
+#[specta::specta]
 pub async fn scrobble_cancel(app: tauri::AppHandle) -> Result<(), String> {
     crate::playback::scrobbler::confirm_pending(app, false).await
 }
@@ -537,6 +557,7 @@ pub async fn scrobble_cancel(app: tauri::AppHandle) -> Result<(), String> {
 // --- Detection corrections ---------------------------------------------------
 
 #[tauri::command]
+#[specta::specta]
 pub fn list_detection_overrides(db: State<'_, Db>) -> Vec<crate::db::DetectionOverride> {
     let mut rows = db.detection_overrides();
     rows.sort_by(|a, b| a.display_title.cmp(&b.display_title));
@@ -545,6 +566,7 @@ pub fn list_detection_overrides(db: State<'_, Db>) -> Vec<crate::db::DetectionOv
 
 /// Stores a correction against the parse and applies it now, since the poll only rebuilds a match when the title changes.
 #[tauri::command]
+#[specta::specta]
 #[allow(clippy::too_many_arguments)]
 pub fn set_detection_override(
     app: tauri::AppHandle,
@@ -552,10 +574,11 @@ pub fn set_detection_override(
     title: String,
     season: Option<u32>,
     media_type: String,
-    media_id: i64,
+    media_id: crate::commands::Num,
     display_title: String,
     episode_offset: Option<i32>,
 ) -> Result<(), String> {
+    let media_id = media_id.0;
     let title = title.trim();
     if title.is_empty() {
         return Err("Nothing is playing to correct".into());
@@ -574,6 +597,7 @@ pub fn set_detection_override(
 
 /// Forgets one, giving the matcher its guess back.
 #[tauri::command]
+#[specta::specta]
 pub fn clear_detection_override(
     app: tauri::AppHandle,
     db: State<'_, Db>,

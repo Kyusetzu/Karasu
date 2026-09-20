@@ -39,6 +39,7 @@ import { useAuth } from "@/stores/auth";
 import { ExternalNote, Row, Toggle } from "./shared";
 import { anilistCoversAiring } from "@/lib/airingCoverage";
 import { backendErrorText } from "@/lib/backendError";
+import { commands, unwrap } from "@/api/tauri";
 export function ScrobbleSection() {
   const { t } = useTranslation();
   const [settings, setSettings] = useState<ScrobbleSettings | null>(null);
@@ -401,9 +402,7 @@ export function MpvSection() {
 
   useEffect(() => {
     if (!api.isTauri) return;
-    import("@tauri-apps/api/core").then(({ invoke }) => {
-      invoke<MpvIpcSettings>("get_mpv_ipc").then(setSettings).catch(() => {});
-    });
+    commands.getMpvIpc().then(setSettings).catch(() => {});
   }, []);
 
   if (!settings) return null;
@@ -413,8 +412,7 @@ export function MpvSection() {
     setSettings({ ...settings, ...next });
     setError(null);
     try {
-      const { invoke } = await import("@tauri-apps/api/core");
-      await invoke("set_mpv_ipc", next);
+      await unwrap(commands.setMpvIpc(next.enabled, next.path, next.launchPath));
     } catch (e) {
       setSettings(prev);
       setError(String(e));

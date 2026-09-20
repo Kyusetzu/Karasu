@@ -1,6 +1,6 @@
-import { invoke } from "@tauri-apps/api/core";
 import { copyText } from "@/lib/clipboard";
 import { isTauri } from "./anilist";
+import { commands, unwrap } from "@/api/tauri";
 
 /** The diagnostics and log surface, kept apart from `anilist.ts` because none of it talks to AniList. */
 
@@ -15,18 +15,18 @@ export interface LogEntry {
 
 /** The markdown block for an issue. Redacted unless asked otherwise. */
 export const diagnosticsReport = (redact = true) =>
-  invoke<string>("diagnostics_report", { redact });
+  commands.diagnosticsReport(redact);
 
 export const getLogs = (limit = 200) =>
-  invoke<LogEntry[]>("get_logs", { limit });
+  commands.getLogs(limit);
 
-export const getLogDebug = () => invoke<boolean>("get_log_debug");
+export const getLogDebug = () => commands.getLogDebug();
 export const setLogDebug = (enabled: boolean) =>
-  invoke<void>("set_log_debug", { enabled });
+  unwrap(commands.setLogDebug(enabled));
 
 /** Writes the report plus the log to a file the user picks. */
 export const exportDiagnostics = (redact: boolean) =>
-  invoke<boolean>("export_diagnostics", { redact });
+  unwrap(commands.exportDiagnostics(redact));
 
 /** Sends a frontend crash to the backend log, swallowing its own failure: a throw here is a crash inside the crash handler. */
 export async function reportError(error: unknown, stack?: string) {
@@ -37,7 +37,7 @@ export async function reportError(error: unknown, stack?: string) {
     return;
   }
   try {
-    await invoke<void>("log_frontend_error", { message, stack: detail });
+    await commands.logFrontendError(message, detail ?? null);
   } catch {
     console.error("[karasu] could not record the error", message);
   }

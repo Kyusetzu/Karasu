@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { commands, unwrap } from "@/api/tauri";
 
 export interface LibraryFile {
   episode: number;
@@ -52,42 +52,29 @@ export interface UnmatchedGroup {
   suggestion: { mediaId: number; score: number } | null;
 }
 
-export interface LibraryStatus {
-  path: string | null;
-  /** Video files the last scan walked past, matched or not. */
-  filesSeen: number;
-  matched: number;
-}
-
-export interface ScanSummary {
-  entries: LibraryEntry[];
-  files: number;
-  matched: number;
-}
-
-export const getLibraryPath = () => invoke<string | null>("get_library_path");
+export const getLibraryPath = () => commands.getLibraryPath();
 export const setLibraryPath = (path: string) =>
-  invoke<void>("set_library_path", { path });
+  unwrap(commands.setLibraryPath(path));
 export const pickLibraryFolder = () =>
-  invoke<string | null>("pick_library_folder");
+  commands.pickLibraryFolder();
 /** The full index — paths and all. Only the library page needs this. */
 export const getLibraryIndex = () =>
-  invoke<LibraryEntry[]>("get_library_index");
+  commands.getLibraryIndex() as Promise<LibraryEntry[]>;
 /** Just media_id → episodes, which is all the "next episode" affordances read. */
 export const getLibraryEpisodes = () =>
-  invoke<Record<number, number[]>>("get_library_episodes");
+  commands.getLibraryEpisodes();
 export const getLibraryStatus = () =>
-  invoke<LibraryStatus>("get_library_status");
-export const scanLibrary = () => invoke<ScanSummary>("scan_library");
+  commands.getLibraryStatus();
+export const scanLibrary = () => unwrap(commands.scanLibrary());
 export const getLibraryUnmatched = () =>
-  invoke<UnmatchedGroup[]>("get_library_unmatched");
+  commands.getLibraryUnmatched();
 
 /** Points every file that parses to `title`/`season` at `mediaId` and returns the rebuilt index. */
 export const setLibraryMatch = (title: string, season: number, mediaId: number) =>
-  invoke<LibraryEntry[]>("set_library_match", { title, season, mediaId });
+  unwrap(commands.setLibraryMatch(title, season, mediaId));
 
 export const clearLibraryMatch = (title: string, season: number) =>
-  invoke<LibraryEntry[]>("clear_library_match", { title, season });
+  unwrap(commands.clearLibraryMatch(title, season));
 
 /** Confirms a season split keyed on the numbers the row shows; the backend persists disk-keyed rules for the next scan. */
 export const setLibraryRedirect = (
@@ -97,13 +84,7 @@ export const setLibraryRedirect = (
   dstMediaId: number,
   dstStart: number,
 ) =>
-  invoke<LibraryEntry[]>("set_library_redirect", {
-    mediaId,
-    from,
-    to,
-    dstMediaId,
-    dstStart,
-  });
+  unwrap(commands.setLibraryRedirect(mediaId, from, to, dstMediaId, dstStart));
 
 /** One confirmed split, keyed on the parse the clear command deletes by. */
 export interface LibraryRedirectRow {
@@ -116,13 +97,13 @@ export interface LibraryRedirectRow {
 }
 
 export const listLibraryRedirects = () =>
-  invoke<LibraryRedirectRow[]>("list_library_redirects");
+  commands.listLibraryRedirects();
 
 /** Removes one split range, giving the files back to whatever the rest of the parse still answers to. */
 export const clearLibraryRedirect = (title: string, season: number, epFrom: number) =>
-  invoke<LibraryEntry[]>("clear_library_redirect", { title, season, epFrom });
+  unwrap(commands.clearLibraryRedirect(title, season, epFrom));
 
 export const playNext = (mediaId: number) =>
-  invoke<void>("play_next", { mediaId });
+  unwrap(commands.playNext(mediaId));
 export const playEpisode = (mediaId: number, episode: number) =>
-  invoke<void>("play_episode", { mediaId, episode });
+  unwrap(commands.playEpisode(mediaId, episode));

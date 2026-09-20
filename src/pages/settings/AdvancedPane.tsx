@@ -28,6 +28,7 @@ import { fieldLabel } from "@/components/shell/SyncPanel";
 import { IconButton } from "@/components/ui/icon-button";
 import { Presence } from "@/components/ui/presence";
 import ConfirmDialog from "@/components/overlays/ConfirmDialog";
+import { commands, unwrap } from "@/api/tauri";
 interface DatabaseInfo {
   path: string;
   bytes: number;
@@ -172,9 +173,7 @@ export function PortableSection() {
 
   useEffect(() => {
     if (!api.isTauri) return;
-    import("@tauri-apps/api/core").then(({ invoke }) =>
-      invoke<PortableStatus>("get_portable_status").then(setStatus),
-    );
+    commands.getPortableStatus().then(setStatus);
   }, []);
 
   if (!status) return null;
@@ -182,17 +181,16 @@ export function PortableSection() {
   /** Enabling beside an existing database needs `replace`: true takes ours along, false adopts it, unset is refused. */
   const toggle = async (replace?: boolean) => {
     setError(null);
-    const { invoke } = await import("@tauri-apps/api/core");
     try {
       // Neither call returns on success: the backend relaunches, as `Db` is opened once and never reopened.
-      if (status.portable) await invoke("disable_portable");
-      else await invoke("enable_portable", { replace: replace ?? null });
+      if (status.portable) await unwrap(commands.disablePortable());
+      else await unwrap(commands.enablePortable(replace ?? null));
       setRestart(true);
     } catch (e) {
       setError(String(e));
     }
     // Either way, re-read where the data actually lives rather than assuming the switch failed cleanly.
-    await invoke<PortableStatus>("get_portable_status").then(setStatus);
+    await commands.getPortableStatus().then(setStatus);
   };
 
   const other = status.other;
@@ -374,11 +372,7 @@ export function ImportSection() {
     if (busy) return;
     setBusy(true);
     try {
-      const { invoke } = await import("@tauri-apps/api/core");
-      const xml = await invoke<string | null>("open_text", {
-        filterLabel: "MyAnimeList XML",
-        extension: "xml",
-      });
+      const xml = await unwrap(commands.openText("MyAnimeList XML", "xml"));
       if (xml == null) return;
       const parsed = parseMalXml(xml);
       if (parsed.rows.length === 0) {
@@ -446,11 +440,7 @@ export function ImportSection() {
     if (busy) return;
     setBusy(true);
     try {
-      const { invoke } = await import("@tauri-apps/api/core");
-      const text = await invoke<string | null>("open_text", {
-        filterLabel: "Karasu JSON",
-        extension: "json",
-      });
+      const text = await unwrap(commands.openText("Karasu JSON", "json"));
       if (text == null) return;
       const parsed = parseJsonExport(text);
       if (parsed.rows.length === 0) {
@@ -531,9 +521,7 @@ export function BackupSection() {
 
   useEffect(() => {
     if (!api.isTauri) return;
-    import("@tauri-apps/api/core").then(({ invoke }) => {
-      invoke<BackupSettings>("get_backup_settings").then(setSettings).catch(() => {});
-    });
+    commands.getBackupSettings().then(setSettings).catch(() => {});
   }, []);
 
   if (!settings) return null;
@@ -544,8 +532,7 @@ export function BackupSection() {
     setSettings({ ...settings, ...next });
     setError(null);
     try {
-      const { invoke } = await import("@tauri-apps/api/core");
-      await invoke("set_backup_settings", next);
+      await unwrap(commands.setBackupSettings(next.enabled, next.keep));
     } catch (e) {
       setSettings(prev);
       setError(String(e));
@@ -576,8 +563,7 @@ export function BackupSection() {
             variant="secondary"
             size="sm"
             onClick={async () => {
-              const { invoke } = await import("@tauri-apps/api/core");
-              await invoke("open_backup_dir").catch((e) => setError(String(e)));
+              await unwrap(commands.openBackupDir()).catch((e) => setError(String(e)));
             }}
           >
             <FolderOpen className="size-3.5" /> {t("settings.backupOpenButton")}
@@ -624,13 +610,11 @@ export function SystemSection() {
 
   useEffect(() => {
     if (!api.isTauri) return;
-    import("@tauri-apps/api/core").then(({ invoke }) => {
-      invoke<boolean>("get_autostart").then(setAutostart);
-      invoke<CloseToTray>("get_close_to_tray").then(setCloseTray);
-      invoke<string | null>("get_global_hotkey").then((v) => {
-        setHotkey(v ?? "");
-        setHotkeyDraft(v ?? "");
-      });
+    commands.getAutostart().then(setAutostart);
+    commands.getCloseToTray().then(setCloseTray);
+    commands.getGlobalHotkey().then((v) => {
+      setHotkey(v ?? "");
+      setHotkeyDraft(v ?? "");
     });
   }, []);
 
@@ -639,8 +623,7 @@ export function SystemSection() {
     setAutostart(enabled);
     setError(null);
     try {
-      const { invoke } = await import("@tauri-apps/api/core");
-      await invoke("set_autostart", { enabled });
+      await unwrap(commands.setAutostart(enabled));
     } catch (e) {
       setAutostart(!enabled);
       setError(String(e));
@@ -651,8 +634,7 @@ export function SystemSection() {
     setCloseTray((prev) => (prev ? { ...prev, enabled } : prev));
     setError(null);
     try {
-      const { invoke } = await import("@tauri-apps/api/core");
-      await invoke("set_close_to_tray", { enabled });
+      await unwrap(commands.setCloseToTray(enabled));
     } catch (e) {
       setCloseTray((prev) => (prev ? { ...prev, enabled: !enabled } : prev));
       setError(String(e));
@@ -665,8 +647,7 @@ export function SystemSection() {
     if (hotkey === null || next === hotkey) return;
     setError(null);
     try {
-      const { invoke } = await import("@tauri-apps/api/core");
-      await invoke("set_global_hotkey", { accelerator: next || null });
+      await unwrap(commands.setGlobalHotkey(next || null));
       setHotkey(next);
       setHotkeyDraft(next);
     } catch (e) {

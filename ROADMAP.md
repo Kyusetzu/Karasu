@@ -54,21 +54,3 @@ maintainer's. Each says which, so none of them reads as unstarted work.
   discovery and the external address, the query cache — is on `main` and in
   the Nightly only. The website describes `main`; the Stable download it
   links to is still 1.0.0 until the maintainer tags the next one.
-
-## Tooling and packages to add
-
-Decided by the maintainer on 2026-09-19 after a survey of the stack ("preparation
-over repair"): every row below goes in, in a session of its own, and each is
-deleted here when it lands. The column says where it takes effect. Already in
-(2026-09-19): oxlint, knip, `@vitest/coverage-v8`, cargo-deny,
-`tauri-plugin-window-state`. Measured and rejected: `happy-dom` (see the
-vitest note in CLAUDE.md), `cargo-nextest` (a one-second suite), `msw` (HTTP
-lives in Rust), a formatter (one tree-wide diff for nothing); struck by the
-maintainer on 2026-09-20: SignPath code signing and a winget manifest (see
-"Explicitly rejected" in CLAUDE.md).
-
-**Quality gates and hygiene**
-
-| Package | Where | Why, in a line |
-| --- | --- | --- |
-| Tauri Specta | `src/api/*.ts` wrappers, every `#[tauri::command]` | generates the TS bindings from the Rust signatures; knip found five hand-written wrappers nobody called, which generated ones cannot become |

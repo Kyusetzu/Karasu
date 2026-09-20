@@ -3,7 +3,7 @@
 use regex::Regex;
 use std::sync::OnceLock;
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, specta::Type)]
 pub struct Parsed {
     pub title: String,
     pub episode: Option<u32>,

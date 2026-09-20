@@ -23,7 +23,7 @@ pub const MOBILE_SEALED: &str = "<CREDENTIAL_mobile-sealed-token>";
 pub const UNKNOWN_CREDENTIAL: &str = "<CREDENTIAL_unknown>";
 
 /// Severity, ordered `Error < Warn < Info < Debug`, so a threshold check is a plain comparison.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, specta::Type)]
 #[serde(rename_all = "lowercase")]
 pub enum Level {
     Error,
@@ -44,8 +44,9 @@ impl Level {
 }
 
 /// One line; `target` is the subsystem, so the viewer can group without parsing the message.
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, specta::Type)]
 pub struct LogEntry {
+    #[specta(type = crate::commands::Num)]
     pub ms: i64,
     pub level: Level,
     pub target: String,

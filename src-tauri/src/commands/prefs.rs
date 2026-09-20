@@ -6,7 +6,7 @@ use tauri::{Manager, State};
 #[allow(unused_imports)]
 use super::*;
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, specta::Type)]
 pub struct DiscordSettings {
     pub enabled: bool,
     #[serde(rename = "appId")]
@@ -17,6 +17,7 @@ pub struct DiscordSettings {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn get_discord_settings(db: State<'_, Db>) -> DiscordSettings {
     DiscordSettings {
         enabled: db.kv_get("discord_enabled").as_deref() == Some("1"),
@@ -26,6 +27,7 @@ pub fn get_discord_settings(db: State<'_, Db>) -> DiscordSettings {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn set_discord_settings(
     app: tauri::AppHandle,
     db: State<'_, Db>,
@@ -46,6 +48,7 @@ pub fn set_discord_settings(
 
 /// Mirrors the interface language into kv, because Rust composes notifications, bell rows and the tray menu.
 #[tauri::command]
+#[specta::specta]
 pub fn set_ui_language(app: tauri::AppHandle, db: State<'_, Db>, language: String) -> Result<(), String> {
     db.kv_set(crate::i18n::LANGUAGE_KEY, &language)?;
     // The widget projection carries pre-rendered labels in this language.
@@ -63,23 +66,27 @@ pub fn set_ui_language(app: tauri::AppHandle, db: State<'_, Db>, language: Strin
 
 /// Whether new-episode desktop notifications are enabled (default on).
 #[tauri::command]
+#[specta::specta]
 pub fn get_airing_notify(db: State<'_, Db>) -> bool {
     db.kv_get("airing_notify").as_deref() != Some("0")
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn set_airing_notify(db: State<'_, Db>, enabled: bool) -> Result<(), String> {
     db.kv_set("airing_notify", if enabled { "1" } else { "0" })
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, specta::Type)]
 pub struct StaleSettings {
     enabled: bool,
+    #[specta(type = crate::commands::Num)]
     months: i64,
 }
 
 /// On-hold reminder settings (disabled by default).
 #[tauri::command]
+#[specta::specta]
 pub fn get_stale_settings(db: State<'_, Db>) -> StaleSettings {
     StaleSettings {
         enabled: db.kv_get("stale_notify").as_deref() == Some("1"),
@@ -88,23 +95,28 @@ pub fn get_stale_settings(db: State<'_, Db>) -> StaleSettings {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn set_stale_settings(
     db: State<'_, Db>,
     enabled: bool,
-    months: i64,
+    months: crate::commands::Num,
 ) -> Result<(), String> {
+    let months = months.0;
     db.kv_set("stale_notify", if enabled { "1" } else { "0" })?;
     db.kv_set("stale_months", &months.clamp(1, 24).to_string())
 }
 
 /// The background-notification interval in minutes, 0 meaning off; one kv key both platforms read.
 #[tauri::command]
-pub fn get_notif_schedule(db: State<'_, Db>) -> i64 {
-    crate::alerts::site::interval_min(&db)
+#[specta::specta]
+pub fn get_notif_schedule(db: State<'_, Db>) -> crate::commands::Num {
+    crate::commands::Num(crate::alerts::site::interval_min(&db))
 }
 
 #[tauri::command]
-pub fn set_notif_schedule(db: State<'_, Db>, minutes: i64) -> Result<(), String> {
+#[specta::specta]
+pub fn set_notif_schedule(db: State<'_, Db>, minutes: crate::commands::Num) -> Result<(), String> {
+    let minutes = minutes.0;
     // Clamped on write as well as on read, the stale_months discipline.
     let clamped = if minutes <= 0 {
         0
@@ -140,11 +152,13 @@ fn reassert_notif_job(_minutes: i64) -> Result<(), String> {
 
 /// Whether sequel-announcement notifications are enabled (default off).
 #[tauri::command]
+#[specta::specta]
 pub fn get_sequel_notify(db: State<'_, Db>) -> bool {
     db.kv_get("sequel_notify").as_deref() == Some("1")
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn set_sequel_notify(db: State<'_, Db>, enabled: bool) -> Result<(), String> {
     db.kv_set("sequel_notify", if enabled { "1" } else { "0" })
 }
@@ -210,6 +224,7 @@ pub fn media_id_blocked(db: &Db, media_id: i64, level: &str) -> bool {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn get_content_filter(db: State<'_, Db>) -> String {
     read_content_filter(&db)
 }
@@ -218,11 +233,13 @@ pub fn get_content_filter(db: State<'_, Db>) -> String {
 const BLUR_ADULT_KEY: &str = "blur_adult";
 
 #[tauri::command]
+#[specta::specta]
 pub fn get_blur_adult(db: State<'_, Db>) -> bool {
     db.kv_get(BLUR_ADULT_KEY).as_deref() != Some("0")
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn set_blur_adult(app: tauri::AppHandle, db: State<'_, Db>, blur: bool) -> Result<(), String> {
     db.kv_set(BLUR_ADULT_KEY, if blur { "1" } else { "0" })?;
     // The widgets hide what this blurs — a home screen cannot blur.
@@ -231,6 +248,7 @@ pub fn set_blur_adult(app: tauri::AppHandle, db: State<'_, Db>, blur: bool) -> R
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn set_content_filter(
     app: tauri::AppHandle,
     db: State<'_, Db>,

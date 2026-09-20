@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { isTauri } from "@/api/anilist";
+import { commands } from "@/api/tauri";
 
 /** Where Karasu is running, read once at startup; `null` until then, and consumers guard on that rather than guess. */
 export interface PlatformInfo {
@@ -17,8 +18,7 @@ export const usePlatform = create<PlatformState>((set, get) => ({
   info: null,
   load: async () => {
     if (!isTauri || get().info) return;
-    const { invoke } = await import("@tauri-apps/api/core");
-    set({ info: await invoke<PlatformInfo>("platform_info") });
+    set({ info: await commands.platformInfo() });
   },
 }));
 

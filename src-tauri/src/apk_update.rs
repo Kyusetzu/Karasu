@@ -15,11 +15,12 @@ pub const METERED_KEY: &str = "apk_download_metered";
 pub const VERSION_CODE_BASE: u32 = 1_000_000;
 
 /// One APK leg of `latest.json`, plus the manifest version it belongs to.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, specta::Type)]
 pub struct ApkAsset {
     pub version: String,
     pub url: String,
     pub sha256: String,
+    #[specta(type = crate::commands::Num)]
     pub size: u64,
 }
 
@@ -78,7 +79,7 @@ pub fn version_code_for(commit_number: u32) -> u32 {
 }
 
 /// What About and the bell show; `available` is false on every platform but an Android release build.
-#[derive(Clone, Debug, Default, Serialize)]
+#[derive(Clone, Debug, Default, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ApkUpdateState {
     pub available: bool,
@@ -88,17 +89,21 @@ pub struct ApkUpdateState {
     /// For `blocked`: `metered` · `space` · `signature` · `stale` · `foreground` · `network`.
     pub reason: Option<String>,
     pub needs_install_permission: bool,
+    #[specta(type = crate::commands::Num)]
     pub received: u64,
+    #[specta(type = crate::commands::Num)]
     pub total: u64,
 }
 
 /// The "download over mobile data" switch; read on Android only, kept everywhere so the setting has one home.
 #[tauri::command]
+#[specta::specta]
 pub fn get_apk_download_metered(db: tauri::State<'_, Db>) -> bool {
     db.kv_get(METERED_KEY).as_deref() == Some("1")
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn set_apk_download_metered(db: tauri::State<'_, Db>, enabled: bool) -> Result<(), String> {
     db.kv_set(METERED_KEY, if enabled { "1" } else { "0" })
 }
@@ -448,16 +453,19 @@ mod android {
     }
 
     #[tauri::command]
+    #[specta::specta]
     pub fn apk_updater_available() -> bool {
         apk_updater_available_impl()
     }
 
     #[tauri::command]
+    #[specta::specta]
     pub fn apk_update_state(db: State<'_, Db>) -> ApkUpdateState {
         state(&db)
     }
 
     #[tauri::command]
+    #[specta::specta]
     pub async fn apk_download(
         app: AppHandle,
         db: State<'_, Db>,
@@ -467,22 +475,26 @@ mod android {
     }
 
     #[tauri::command]
+    #[specta::specta]
     pub fn apk_install(db: State<'_, Db>) -> Result<(), String> {
         install(&db)
     }
 
     #[tauri::command]
+    #[specta::specta]
     pub fn apk_open_install_permission() -> Result<(), String> {
         open_install_permission()
     }
 
     #[tauri::command]
+    #[specta::specta]
     pub fn apk_discard(db: State<'_, Db>) {
         discard(&db)
     }
 
     /// Opens the installer once per pending version at start, when the file is ready; a cancel is honoured after that.
     #[tauri::command]
+    #[specta::specta]
     pub fn apk_prompt_if_ready(db: State<'_, Db>) -> bool {
         let s = state(&db);
         if s.status != "ready" || s.needs_install_permission {
@@ -507,16 +519,19 @@ mod desktop {
     use tauri::State;
 
     #[tauri::command]
+    #[specta::specta]
     pub fn apk_updater_available() -> bool {
         false
     }
 
     #[tauri::command]
+    #[specta::specta]
     pub fn apk_update_state(_db: State<'_, Db>) -> ApkUpdateState {
         ApkUpdateState { status: "none".into(), ..Default::default() }
     }
 
     #[tauri::command]
+    #[specta::specta]
     pub async fn apk_download(
         _db: State<'_, Db>,
         _force_metered: Option<bool>,
@@ -525,19 +540,23 @@ mod desktop {
     }
 
     #[tauri::command]
+    #[specta::specta]
     pub fn apk_install(_db: State<'_, Db>) -> Result<(), String> {
         Err("not on this platform".into())
     }
 
     #[tauri::command]
+    #[specta::specta]
     pub fn apk_open_install_permission() -> Result<(), String> {
         Err("not on this platform".into())
     }
 
     #[tauri::command]
+    #[specta::specta]
     pub fn apk_discard(_db: State<'_, Db>) {}
 
     #[tauri::command]
+    #[specta::specta]
     pub fn apk_prompt_if_ready(_db: State<'_, Db>) -> bool {
         false
     }

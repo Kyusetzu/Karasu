@@ -1,7 +1,6 @@
 import { lazy, Suspense, useEffect, useRef } from "react";
 import { Link, Routes, Route, useLocation, useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
-import { invoke } from "@tauri-apps/api/core";
 import { X } from "lucide-react";
 import { useAuth } from "@/stores/auth";
 import { isAndroid, usePlatform } from "@/stores/platform";
@@ -40,6 +39,7 @@ import MediaList from "@/pages/MediaList";
 import Search from "@/pages/Search";
 import Seasonal from "@/pages/Seasonal";
 import AnimeDetail from "@/pages/AnimeDetail";
+import { commands } from "@/api/tauri";
 
 // Pages reached deliberately are split out of the entry chunk; the launch and navigation hot path above stays eager.
 const Statistics = lazy(() => import("@/pages/Statistics"));
@@ -326,7 +326,7 @@ function PresenceReporter() {
           : pathname.startsWith("/thread/")
             ? "Forum"
             : "Karasu");
-    invoke("set_ui_page", { page: label }).catch(() => {});
+    commands.setUiPage(label).catch(() => {});
   }, [pathname]);
   return null;
 }

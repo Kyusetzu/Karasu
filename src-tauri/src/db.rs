@@ -235,7 +235,7 @@ PRAGMA user_version = 20;
 ";
 
 /// One detection correction: what was detected, and what it really is.
-#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct DetectionOverride {
     /// The parsed title this fires on — what detection saw.
@@ -243,6 +243,7 @@ pub struct DetectionOverride {
     /// `-1` where the parse carried no season.
     pub season: i32,
     pub media_type: String,
+    #[specta(type = crate::commands::Num)]
     pub media_id: i64,
     /// The chosen entry's title, stored so the Settings list and an off-list entry read correctly without a request.
     pub display_title: String,
@@ -251,16 +252,19 @@ pub struct DetectionOverride {
 }
 
 /// One in-app notification (mirrors a shown desktop toast).
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, specta::Type)]
 pub struct NotificationRow {
+    #[specta(type = crate::commands::Num)]
     pub id: i64,
     pub kind: String,
     pub title: String,
     pub body: String,
     #[serde(rename = "createdMs")]
+    #[specta(type = crate::commands::Num)]
     pub created_ms: i64,
     /// What the bell row opens; `None` for the update notice, a dropped-queue report and every row older than v15.
     #[serde(rename = "mediaId")]
+    #[specta(type = Option<crate::commands::Num>)]
     pub media_id: Option<i64>,
     pub read: bool,
 }

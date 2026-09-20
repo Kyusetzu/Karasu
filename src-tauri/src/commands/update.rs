@@ -8,7 +8,7 @@ use tauri::State;
 use super::*;
 
 /// Monotonic commit counter, the fourth version segment, bumped by one on every commit.
-pub const COMMIT_NUMBER: u32 = 662;
+pub const COMMIT_NUMBER: u32 = 663;
 
 /// The full four-part display version; the semver core comes from the crate version.
 pub fn app_version_string() -> String {
@@ -17,13 +17,14 @@ pub fn app_version_string() -> String {
 
 /// The running four-part version, shown in the About window.
 #[tauri::command]
+#[specta::specta]
 pub fn app_version() -> String {
     app_version_string()
 }
 
 // --- Update check ------------------------------------------------------------
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, specta::Type)]
 pub struct UpdateInfo {
     /// The running app version.
     pub current: String,
@@ -45,11 +46,13 @@ pub(crate) fn stored_channel(db: &Db) -> String {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn get_update_channel(db: State<'_, Db>) -> String {
     stored_channel(&db)
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn set_update_channel(
     db: State<'_, Db>,
     pending: State<'_, PendingUpdate>,
@@ -68,11 +71,13 @@ pub fn set_update_channel(
 
 /// Whether Karasu checks for updates automatically on startup; manual checks from About always work.
 #[tauri::command]
+#[specta::specta]
 pub fn get_update_check_auto(db: State<'_, Db>) -> bool {
     db.kv_get("update_check_auto").as_deref() != Some("0")
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn set_update_check_auto(db: State<'_, Db>, enabled: bool) -> Result<(), String> {
     db.kv_set("update_check_auto", if enabled { "1" } else { "0" })
 }
@@ -105,6 +110,7 @@ fn check_due(last: Option<i64>, now: i64, throttle: i64) -> bool {
 
 /// Compares the running version against the selected channel's manifest; `force: false` respects the daily throttle.
 #[tauri::command]
+#[specta::specta]
 pub async fn check_for_updates(
     app: tauri::AppHandle,
     db: State<'_, Db>,
@@ -428,7 +434,7 @@ fn remote_is_newer(remote: (u64, u64, u64, u64), current_core: (u64, u64, u64)) 
 #[derive(Default)]
 pub struct PendingUpdate(pub std::sync::Mutex<Option<(tauri_plugin_updater::Update, Vec<u8>)>>);
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, specta::Type)]
 pub struct DownloadedUpdate {
     pub version: String,
     pub notes: Option<String>,
@@ -436,6 +442,7 @@ pub struct DownloadedUpdate {
 
 /// Checks the selected channel's manifest, downloads a newer build into the stash and notifies once it is there.
 #[tauri::command]
+#[specta::specta]
 pub async fn download_pending_update(
     app: tauri::AppHandle,
     db: State<'_, Db>,
@@ -537,6 +544,7 @@ pub async fn download_pending_update(
 
 /// What is sitting in the stash, so About can show a download the startup check made.
 #[tauri::command]
+#[specta::specta]
 pub fn pending_update(pending: State<'_, PendingUpdate>) -> Option<DownloadedUpdate> {
     let guard = pending.0.guard();
     let (update, _) = guard.as_ref()?;
@@ -548,6 +556,7 @@ pub fn pending_update(pending: State<'_, PendingUpdate>) -> Option<DownloadedUpd
 
 /// Installs the stashed update and restarts the app; on success this call does not return.
 #[tauri::command]
+#[specta::specta]
 pub fn install_pending_update(
     app: tauri::AppHandle,
     pending: State<'_, PendingUpdate>,

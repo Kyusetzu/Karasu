@@ -1,6 +1,7 @@
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 import { en } from "./en";
+import { commands, unwrap } from "@/api/tauri";
 
 // Not dead: `i18nKeys.test.ts` reaches it as a property of the module object, which a grep for the import misses.
 export { en };
@@ -65,9 +66,7 @@ i18n.use(initReactI18next).init({
 /** Mirrors the language into SQLite for Rust's notifications and tray menu; fire-and-forget, it is only a copy. */
 function mirrorToBackend(lng: string) {
   if (!("__TAURI_INTERNALS__" in window)) return;
-  void import("@tauri-apps/api/core")
-    .then(({ invoke }) => invoke("set_ui_language", { language: lng }))
-    .catch(() => {});
+  void unwrap(commands.setUiLanguage(lng)).catch(() => {});
 }
 
 /** Keeps `<html lang>` on the rendered language, which screen readers and the WebView's spell-check read from. */

@@ -1,4 +1,3 @@
-import { invoke } from "@tauri-apps/api/core";
 import { toRaw, type ScoreFormat } from "@/lib/scoreFormat";
 import type {
   FuzzyDate,
@@ -11,6 +10,7 @@ import type {
   SyncStatus,
   Viewer,
 } from "./types";
+import { commands, unwrap } from "@/api/tauri";
 
 export const isTauri = "__TAURI_INTERNALS__" in window;
 
@@ -23,18 +23,18 @@ export interface AuthInfo {
   callbackUrl: string;
 }
 
-export const authInfo = () => invoke<AuthInfo>("anilist_auth_info");
+export const authInfo = () => commands.anilistAuthInfo();
 export const setClientId = (clientId: string) =>
-  invoke<void>("set_client_id", { clientId });
-export const loginUrl = () => invoke<string>("anilist_login_url");
+  unwrap(commands.setClientId(clientId));
+export const loginUrl = () => unwrap(commands.anilistLoginUrl());
 /** Starts the localhost callback server and returns the authorize URL. */
-export const startLogin = () => invoke<string>("anilist_start_login");
-export const connect = (token: string) =>
-  invoke<Viewer>("anilist_connect", { token });
-export const session = () => invoke<Viewer | null>("anilist_session");
+export const startLogin = () => unwrap(commands.anilistStartLogin());
+export const connect = (token: string): Promise<Viewer> =>
+  unwrap(commands.anilistConnect(token));
+export const session = (): Promise<Viewer | null> => commands.anilistSession();
 /** Refetches the viewer and replaces the cached blob, so a scoreFormat change needs no re-login. */
-export const refreshViewer = () => invoke<Viewer>("refresh_viewer");
-export const logout = () => invoke<void>("anilist_logout");
+export const refreshViewer = (): Promise<Viewer> => unwrap(commands.refreshViewer());
+export const logout = () => commands.anilistLogout();
 
 // --- GraphQL --------------------------------------------------------------
 
@@ -81,7 +81,7 @@ export interface GqlOptions {
 
 export function gql<T>(query: string, variables?: object, opts?: GqlOptions): Promise<T> {
   const cache = opts?.ttlSec ? { ttlSec: opts.ttlSec, mediaId: opts.mediaId ?? null } : undefined;
-  return guarded(invoke<T>("anilist_query", { query, variables, source: opts?.source, cache }));
+  return guarded(unwrap(commands.anilistQuery(query, variables ?? null, opts?.source ?? null, cache ?? null)));
 }
 
 /** Seconds, for the `ttlSec` of an allowlisted `gql` call; the Rust allowlist caps each, so these are the wish. */
@@ -119,37 +119,35 @@ function withRawScore<T extends { score?: number }>(
   return { ...rest, scoreRaw: toRaw(format, score) };
 }
 
-export const getProfileMode = () => invoke<ProfileMode>("get_profile_mode");
-export const enableLocalMode = () => invoke<void>("enable_local_mode");
+export const getProfileMode = () => commands.getProfileMode();
+export const enableLocalMode = () => unwrap(commands.enableLocalMode());
 
 // --- Anime/manga list (loaded via Rust: cache + offline queue) -------------
 
 /** Rust serves its copy while it is younger than fifteen minutes and refreshes older ones behind; `force` always fetches. */
-export const fetchMediaList = (userId: number, mediaType: MediaType, opts?: { force?: boolean }) =>
+export const fetchMediaList = (userId: number, mediaType: MediaType, opts?: { force?: boolean }): Promise<ListResult> =>
   profileMode === "local"
-    ? invoke<ListResult>("local_fetch_list", { mediaType })
+    ? unwrap(commands.localFetchList(mediaType))
     : // Guarded like `gql`: the one AniList read that bypasses it, and the request behind every list screen.
-      guarded(invoke<ListResult>("fetch_media_list", { userId, mediaType, force: opts?.force ?? false }));
+      guarded(unwrap(commands.fetchMediaList(userId, mediaType, opts?.force ?? false)));
 
 /** The last cached list from SQLite, or `null`; AniList mode only, since the local list is the database. */
-export const cachedMediaList = (userId: number, mediaType: MediaType) =>
+export const cachedMediaList = (userId: number, mediaType: MediaType): Promise<ListResult | null> =>
   profileMode === "local"
     ? Promise.resolve(null)
-    : invoke<ListResult | null>("cached_media_list", { userId, mediaType });
+    : commands.cachedMediaList(userId, mediaType);
 
 /** Saves an entry; local mode wants `media` on a first add to render offline, AniList mode ignores it. */
-export const saveListEntry = (input: SaveEntryInput, media?: Media) =>
+export const saveListEntry = (input: SaveEntryInput, media?: Media): Promise<MutationResult> =>
   profileMode === "local"
-    ? invoke<MutationResult>("local_save_entry", {
-        // Local mode keeps the display value: its list is the database, with no account format to misread it.
-        input: { ...input, media, mediaType: media?.type },
-      })
-    : invoke<MutationResult>("save_list_entry", { input: withRawScore(input) });
+    ? // Local mode keeps the display value: its list is the database, with no account format to misread it.
+      unwrap(commands.localSaveEntry({ ...input, media, mediaType: media?.type }))
+    : unwrap(commands.saveListEntry(withRawScore(input)));
 
-export const deleteListEntry = (id: number) =>
+export const deleteListEntry = (id: number): Promise<MutationResult> =>
   profileMode === "local"
-    ? invoke<MutationResult>("local_delete_entry", { id })
-    : invoke<MutationResult>("delete_list_entry", { id });
+    ? unwrap(commands.localDeleteEntry(id))
+    : unwrap(commands.deleteListEntry(id));
 
 /** What one request can set across a selection; keep `notes` out, a bulk set would erase every entry's tags. */
 export type BulkPatch = Pick<
@@ -176,11 +174,6 @@ export class BulkSaveError extends Error {
   }
 }
 
-interface BulkResult {
-  updated: number;
-  error?: string;
-}
-
 /** One status or score across a whole selection, batched in the backend against the rate budget. */
 export const bulkSaveEntries = async (
   entries: { id: number; mediaId: number }[],
@@ -189,14 +182,12 @@ export const bulkSaveEntries = async (
   if (!entries.length) return 0;
   if (profileMode === "local") {
     for (const e of entries) {
-      await invoke<MutationResult>("local_save_entry", {
-        input: { mediaId: e.mediaId, ...patch },
-      });
+      await unwrap(commands.localSaveEntry({ mediaId: e.mediaId, ...patch }));
     }
     return entries.length;
   }
   // Nulls rather than omissions: Rust forwards each into the GraphQL variables, where null means "do not change".
-  const res = await invoke<BulkResult>("bulk_save_list_entries", {
+  const res = await unwrap(commands.bulkSaveListEntries({
     ids: entries.map((e) => e.id),
     status: patch.status ?? null,
     scoreRaw: patch.score !== undefined ? toRaw(scoreFormat, patch.score) : null,
@@ -206,31 +197,31 @@ export const bulkSaveEntries = async (
     private: patch.private ?? null,
     startedAt: patch.startedAt ?? null,
     completedAt: patch.completedAt ?? null,
-  });
+  }));
   if (res.error) throw new BulkSaveError(res.error, res.updated);
   return res.updated;
 };
 
-export const flushQueue = () => invoke<number>("flush_queue");
+export const flushQueue = () => unwrap(commands.flushQueue());
 /** Background notification interval in minutes; 0 = off. */
-export const getNotifSchedule = () => invoke<number>("get_notif_schedule");
+export const getNotifSchedule = () => commands.getNotifSchedule();
 export const setNotifSchedule = (minutes: number) =>
-  invoke<void>("set_notif_schedule", { minutes });
+  unwrap(commands.setNotifSchedule(minutes));
 /** Discards one queued edit — scoped to the signed-in account in Rust. */
 export const discardQueuedEdit = (id: number) =>
-  invoke<boolean>("discard_queued_edit", { id });
+  unwrap(commands.discardQueuedEdit(id));
 
 /** What the sync is doing, for the pending panel; it costs no AniList request, which is why polling it is fine. */
-export const syncStatus = () => invoke<SyncStatus>("sync_status");
+export const syncStatus = () => unwrap(commands.syncStatus()) as Promise<SyncStatus>;
 
 /** Fetches a bio image in Rust as a `data:` URI rather than widening the CSP; on failure the caller shows the chip. */
 export const fetchBioImage = (url: string) =>
-  invoke<string>("fetch_bio_image", { url });
+  unwrap(commands.fetchBioImage(url));
 
 /** Blur explicit artwork until clicked. Independent of the filter level. */
-export const getBlurAdult = () => invoke<boolean>("get_blur_adult");
+export const getBlurAdult = () => commands.getBlurAdult();
 export const setBlurAdult = (blur: boolean) =>
-  invoke<void>("set_blur_adult", { blur });
+  unwrap(commands.setBlurAdult(blur));
 
 // --- Sign-in merge (local list -> AniList) ---------------------------------
 
@@ -253,22 +244,20 @@ export interface LocalEntryRow {
 }
 
 /** Every local row (both media types) — for the merge after connecting. */
-export const localAllEntries = () =>
-  invoke<LocalEntryRow[]>("local_all_entries");
+export const localAllEntries = (): Promise<LocalEntryRow[]> =>
+  commands.localAllEntries();
 
 /** Clears one local row regardless of the active profile mode. */
-export const localClearEntry = (mediaId: number) =>
-  invoke<MutationResult>("local_delete_entry", { id: mediaId });
+export const localClearEntry = (mediaId: number): Promise<MutationResult> =>
+  unwrap(commands.localDeleteEntry(mediaId));
 
 /** Pushes an entry straight to AniList; POINT_10 is pinned because a local list's scores are always ten-point. */
-export const anilistSaveEntry = (input: SaveEntryInput) =>
-  invoke<MutationResult>("save_list_entry", {
-    input: withRawScore(input, "POINT_10"),
-  });
+export const anilistSaveEntry = (input: SaveEntryInput): Promise<MutationResult> =>
+  unwrap(commands.saveListEntry(withRawScore(input, "POINT_10")));
 
 /** Fetches an AniList list, bypassing the local dispatch (merge only). */
-export const anilistFetchList = (userId: number, mediaType: MediaType) =>
-  invoke<ListResult>("fetch_media_list", { userId, mediaType, force: true });
+export const anilistFetchList = (userId: number, mediaType: MediaType): Promise<ListResult> =>
+  unwrap(commands.fetchMediaList(userId, mediaType, true));
 
 // --- Update check ----------------------------------------------------------
 
@@ -283,22 +272,22 @@ export interface UpdateInfo {
 
 /** `force: true` always hits the network; `false` respects the 24h background throttle. */
 export const checkForUpdates = (force: boolean) =>
-  invoke<UpdateInfo>("check_for_updates", { force });
+  unwrap(commands.checkForUpdates(force));
 
 export type UpdateChannel = "prerelease" | "stable";
 
 export const getUpdateChannel = () =>
-  invoke<UpdateChannel>("get_update_channel");
+  commands.getUpdateChannel() as Promise<UpdateChannel>;
 export const setUpdateChannel = (channel: UpdateChannel) =>
-  invoke<void>("set_update_channel", { channel });
+  unwrap(commands.setUpdateChannel(channel));
 
-export const getContentFilter = () => invoke<string>("get_content_filter");
+export const getContentFilter = () => commands.getContentFilter();
 export const setContentFilter = (level: string) =>
-  invoke<void>("set_content_filter", { level });
+  unwrap(commands.setContentFilter(level));
 
-export const getUpdateCheckAuto = () => invoke<boolean>("get_update_check_auto");
+export const getUpdateCheckAuto = () => commands.getUpdateCheckAuto();
 export const setUpdateCheckAuto = (enabled: boolean) =>
-  invoke<void>("set_update_check_auto", { enabled });
+  unwrap(commands.setUpdateCheckAuto(enabled));
 
 export interface DownloadedUpdate {
   version: string;
@@ -307,15 +296,15 @@ export interface DownloadedUpdate {
 
 /** Downloads the update for the selected channel, if one is newer than the running version. */
 export const downloadPendingUpdate = () =>
-  invoke<DownloadedUpdate | null>("download_pending_update");
+  unwrap(commands.downloadPendingUpdate());
 
 /** What is already downloaded and waiting, since a background download at startup is invisible unless asked. */
 export const pendingUpdate = () =>
-  invoke<DownloadedUpdate | null>("pending_update");
+  commands.pendingUpdate();
 
 /** Installs the previously-downloaded update and restarts the app. */
 export const installPendingUpdate = () =>
-  invoke<void>("install_pending_update");
+  unwrap(commands.installPendingUpdate());
 
 /** The Android APK updater's view: what is pending, how far the download is, and why it stopped. */
 export interface ApkUpdateState {
@@ -328,32 +317,32 @@ export interface ApkUpdateState {
   total: number;
 }
 
-export const apkUpdateState = () => invoke<ApkUpdateState>("apk_update_state");
+export const apkUpdateState = () => commands.apkUpdateState() as Promise<ApkUpdateState>;
 /** Fetches the pending APK; `forceMetered` is the user's own "load over mobile data anyway". */
 export const apkDownload = (forceMetered = false) =>
-  invoke<ApkUpdateState>("apk_download", { forceMetered });
+  unwrap(commands.apkDownload(forceMetered)) as Promise<ApkUpdateState>;
 /** Opens the system installer on the verified file; rejects with "permission" while the unknown-apps switch is off. */
-export const apkInstall = () => invoke<void>("apk_install");
-export const apkOpenInstallPermission = () => invoke<void>("apk_open_install_permission");
+export const apkInstall = () => unwrap(commands.apkInstall());
+export const apkOpenInstallPermission = () => unwrap(commands.apkOpenInstallPermission());
 /** The start-time prompt: opens the installer once per pending version when the file is ready. */
-export const apkPromptIfReady = () => invoke<boolean>("apk_prompt_if_ready");
-export const getApkDownloadMetered = () => invoke<boolean>("get_apk_download_metered");
+export const apkPromptIfReady = () => commands.apkPromptIfReady();
+export const getApkDownloadMetered = () => commands.getApkDownloadMetered();
 export const setApkDownloadMetered = (enabled: boolean) =>
-  invoke<void>("set_apk_download_metered", { enabled });
+  unwrap(commands.setApkDownloadMetered(enabled));
 
 /** Full four-part app version (MAJOR.MINOR.PATCH.COMMIT#) for the About page. */
-export const appVersion = () => invoke<string>("app_version");
+export const appVersion = () => commands.appVersion();
 /** The OS accent as `#rrggbb`, or null where the platform has none to publish. */
-export const systemAccent = () => invoke<string | null>("system_accent");
+export const systemAccent = () => commands.systemAccent();
 
 /** Windows' Accessibility text-size multiplier, which WebView2 ignores, so App applies it to the root element. */
-export const getTextScale = () => invoke<number>("get_text_scale");
+export const getTextScale = () => commands.getTextScale();
 
 // --- Airing notifications --------------------------------------------------
 
-export const getAiringNotify = () => invoke<boolean>("get_airing_notify");
+export const getAiringNotify = () => commands.getAiringNotify();
 export const setAiringNotify = (enabled: boolean) =>
-  invoke<void>("set_airing_notify", { enabled });
+  unwrap(commands.setAiringNotify(enabled));
 
 export interface StaleSettings {
   enabled: boolean;
@@ -361,13 +350,13 @@ export interface StaleSettings {
 }
 
 export const getStaleSettings = () =>
-  invoke<StaleSettings>("get_stale_settings");
+  commands.getStaleSettings();
 export const setStaleSettings = (enabled: boolean, months: number) =>
-  invoke<void>("set_stale_settings", { enabled, months });
+  unwrap(commands.setStaleSettings(enabled, months));
 
-export const getSequelNotify = () => invoke<boolean>("get_sequel_notify");
+export const getSequelNotify = () => commands.getSequelNotify();
 export const setSequelNotify = (enabled: boolean) =>
-  invoke<void>("set_sequel_notify", { enabled });
+  unwrap(commands.setSequelNotify(enabled));
 
 export type ImageFormat = "png" | "jpeg";
 
@@ -376,7 +365,7 @@ export const saveImage = (
   data: string,
   defaultName: string,
   format: ImageFormat,
-) => invoke<boolean>("save_image", { data, defaultName, format });
+) => unwrap(commands.saveImage(data, defaultName, format));
 
 /** Text twin of `saveImage` — same dialog, same remembered folder. */
 export const saveText = (
@@ -385,14 +374,14 @@ export const saveText = (
   filterLabel: string,
   extension: string,
 ) =>
-  invoke<boolean>("save_text", { contents, defaultName, filterLabel, extension });
+  unwrap(commands.saveText(contents, defaultName, filterLabel, extension));
 
 /** Fired with the zoom Rust applied, so the Appearance select and the Ctrl+plus shortcut stay one setting. */
 export const UI_ZOOM_EVENT = "karasu-ui-zoom";
 /** The interface size, a percentage kept in Rust because it is applied before the first paint. */
-export const getUiZoom = () => invoke<number>("get_ui_zoom");
+export const getUiZoom = () => commands.getUiZoom();
 export const setUiZoom = async (percent: number) => {
-  const applied = await invoke<number>("set_ui_zoom", { percent });
+  const applied = await unwrap(commands.setUiZoom(percent));
   window.dispatchEvent(new CustomEvent<number>(UI_ZOOM_EVENT, { detail: applied }));
   return applied;
 };
@@ -411,8 +400,8 @@ export interface AppNotification {
 }
 
 export const getNotifications = () =>
-  invoke<AppNotification[]>("get_notifications");
+  commands.getNotifications() as Promise<AppNotification[]>;
 export const markNotificationRead = (id: number) =>
-  invoke<void>("mark_notification_read", { id });
+  unwrap(commands.markNotificationRead(id));
 export const markAllNotificationsRead = () =>
-  invoke<void>("mark_all_notifications_read");
+  unwrap(commands.markAllNotificationsRead());

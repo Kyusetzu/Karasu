@@ -23,7 +23,7 @@ const MUSIC_PLAYERS: &[&str] = &[
 ];
 
 /// One media session as the desktop sees it, serialized straight into the Settings diagnostic.
-#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, specta::Type)]
 pub struct MediaSession {
     /// Source app: an executable path or package family name on Windows, a D-Bus bus name on Linux.
     #[serde(rename = "appId")]

@@ -59,6 +59,7 @@ use crate::net::is_public_http_url as url_is_fetchable;
 
 /// Fetches a bio image as one bounded Rust request and returns a `data:` URI; never widen `img-src` instead.
 #[tauri::command]
+#[specta::specta]
 pub async fn fetch_bio_image(url: String) -> Result<String, String> {
     let parsed = reqwest::Url::parse(&url).map_err(|_| "bad url".to_string())?;
     if !url_is_fetchable(&parsed) {

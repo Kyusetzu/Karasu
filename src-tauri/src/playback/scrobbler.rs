@@ -26,7 +26,7 @@ const SERVICE_RETRY: Duration = Duration::from_secs(60);
 /// How often the loop reports its own tick count, and only while verbose logging is on.
 const POLL_REPORT: Duration = Duration::from_secs(5 * 60);
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, specta::Type)]
 pub struct NowPlaying {
     pub process: String,
     pub streaming: bool,
@@ -46,6 +46,7 @@ pub struct NowPlaying {
     pub source_episode: Option<u32>,
     /// AniList media ID on a successful match against the list
     #[serde(rename = "mediaId")]
+    #[specta(type = Option<crate::commands::Num>)]
     pub media_id: Option<i64>,
     #[serde(rename = "matchedTitle")]
     pub matched_title: Option<String>,
@@ -79,7 +80,7 @@ pub struct NowPlaying {
 pub struct PlaybackState(pub Mutex<Option<NowPlaying>>);
 
 /// Why an auto-update will not happen, as a code the frontend translates rather than a sentence.
-#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, specta::Type)]
 #[serde(tag = "code", rename_all = "camelCase")]
 pub enum BlockReason {
     /// At or behind the list's progress; forcing it would lower progress, so the card offers no button.
@@ -122,7 +123,7 @@ impl BlockReason {
 }
 
 /// Who a `Yielding` session is waiting for, for the card.
-#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct YieldTarget {
     pub platform: detection::jellyfin::Platform,
@@ -182,19 +183,22 @@ fn applies_to(session: &Session, media_id: i64, episode: u32) -> bool {
     session.media_id == media_id && session.episode == episode
 }
 
-#[derive(Clone, serde::Serialize)]
+#[derive(Clone, serde::Serialize, specta::Type)]
 struct ScrobbleEvent {
     phase: String,
     reason: Option<BlockReason>,
     /// Whether the card may offer "Update now"; emitted so the button and the refusing command cannot drift apart.
     forceable: bool,
     #[serde(rename = "mediaId")]
+    #[specta(type = Option<crate::commands::Num>)]
     media_id: Option<i64>,
     episode: Option<u32>,
     #[serde(rename = "updateAtMs")]
+    #[specta(type = Option<crate::commands::Num>)]
     update_at_ms: Option<u64>,
     /// When the wait behind `update_at_ms` began; carried exactly when it is.
     #[serde(rename = "armedAtMs")]
+    #[specta(type = Option<crate::commands::Num>)]
     armed_at_ms: Option<u64>,
     /// The Karasu a `yielding` session waits for; `None` in every other phase.
     #[serde(rename = "yieldingTo")]

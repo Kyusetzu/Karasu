@@ -4,7 +4,7 @@ use crate::db::Db;
 use tauri::Manager;
 
 /// The Linux-only half; `None` on Windows, so the shape says which platform produced it.
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct LinuxInfo {
     /// `PRETTY_NAME` from `/etc/os-release`.
@@ -15,7 +15,7 @@ pub struct LinuxInfo {
     pub session: Option<String>,
 }
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct Diagnostics {
     /// The four-part `MAJOR.MINOR.PATCH.COMMIT#`; the commit counter is the only precise build identifier.
@@ -29,12 +29,15 @@ pub struct Diagnostics {
     pub schema: u32,
     /// Which manifest the updater polls; the same four-part version can run on either channel.
     pub update_channel: String,
+    #[specta(type = crate::commands::Num)]
     pub queued: usize,
     /// Whether a token exists. Never the token.
     pub signed_in: bool,
     pub profile_mode: String,
     pub library_configured: bool,
+    #[specta(type = crate::commands::Num)]
     pub library_files: usize,
+    #[specta(type = crate::commands::Num)]
     pub library_matched: usize,
     pub media_sessions: bool,
     pub jellyfin: bool,

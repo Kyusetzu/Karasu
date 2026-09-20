@@ -1,7 +1,7 @@
 import { create } from "zustand";
-import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { isTauri } from "@/api/anilist";
+import { commands, unwrap } from "@/api/tauri";
 
 export interface NowPlaying {
   process: string;
@@ -91,13 +91,13 @@ export const useNowPlaying = create<NowPlayingStore>((set) => ({
     await listen<ScrobbleState>("scrobble-state", (event) => {
       set({ scrobble: event.payload ?? IDLE });
     });
-    const current = await invoke<NowPlaying | null>("get_now_playing");
+    const current = (await commands.getNowPlaying()) as NowPlaying | null;
     set({ current });
   },
 }));
 
-export const scrobbleNow = () => invoke<void>("scrobble_now");
-export const scrobbleCancel = () => invoke<void>("scrobble_cancel");
+export const scrobbleNow = () => unwrap(commands.scrobbleNow());
+export const scrobbleCancel = () => unwrap(commands.scrobbleCancel());
 
 /** One stored detection correction, as the Settings list shows them. */
 export interface DetectionOverride {
@@ -113,7 +113,7 @@ export interface DetectionOverride {
 }
 
 export const listDetectionOverrides = () =>
-  invoke<DetectionOverride[]>("list_detection_overrides");
+  commands.listDetectionOverrides() as Promise<DetectionOverride[]>;
 
 /** A correction keyed on the parse, applied at once because the loop only rebuilds a match on a title change. */
 export const setDetectionOverride = (input: {
@@ -124,13 +124,23 @@ export const setDetectionOverride = (input: {
   displayTitle: string;
   /** What to add to the source's episode number. Omitted means "they agree". */
   episodeOffset?: number;
-}) => invoke<void>("set_detection_override", input);
+}) =>
+  unwrap(
+    commands.setDetectionOverride(
+      input.title,
+      input.season,
+      input.mediaType,
+      input.mediaId,
+      input.displayTitle,
+      input.episodeOffset ?? null,
+    ),
+  );
 
 export const clearDetectionOverride = (input: {
   title: string;
   season: number | null;
   mediaType: string;
-}) => invoke<void>("clear_detection_override", input);
+}) => unwrap(commands.clearDetectionOverride(input.title, input.season, input.mediaType));
 
 export interface ScrobbleSettings {
   enabled: boolean;
@@ -141,19 +151,14 @@ export interface ScrobbleSettings {
 }
 
 export const getScrobbleSettings = () =>
-  invoke<ScrobbleSettings>("get_scrobble_settings");
+  commands.getScrobbleSettings();
 export const setScrobbleSettings = (s: ScrobbleSettings) =>
-  invoke<void>("set_scrobble_settings", {
-    enabled: s.enabled,
-    confirm: s.confirm,
-    delayMin: s.delayMin,
-    gapAuto: s.gapAuto,
-  });
+  unwrap(commands.setScrobbleSettings(s.enabled, s.confirm, s.delayMin, s.gapAuto));
 
 /** Whether the system media-session pass runs (SMTC on Windows, MPRIS on Linux). */
-export const getMediaDetection = () => invoke<boolean>("get_media_detection");
+export const getMediaDetection = () => commands.getMediaDetection();
 export const setMediaDetection = (enabled: boolean) =>
-  invoke<void>("set_media_detection", { enabled });
+  unwrap(commands.setMediaDetection(enabled));
 
 /** One entry of the system media-session list, for the Settings diagnostic. */
 export interface MediaSession {
@@ -168,7 +173,7 @@ export interface MediaSession {
 }
 
 /** The live media sessions; players fill the fields inconsistently, so this is the way to see why detection missed. */
-export const mediaSessions = () => invoke<MediaSession[]>("media_sessions");
+export const mediaSessions = () => unwrap(commands.mediaSessions());
 
 export interface JellyfinSettings {
   url: string;
@@ -213,7 +218,7 @@ export interface JellyfinSession {
 }
 
 export const getJellyfinSettings = () =>
-  invoke<JellyfinSettings>("get_jellyfin_settings");
+  commands.getJellyfinSettings();
 
 /** A server that answered the LAN broadcast and confirmed itself. */
 export interface DiscoveredServer {
@@ -225,7 +230,7 @@ export interface DiscoveredServer {
 
 /** Jellyfin's own UDP discovery plus a confirmation per answer; a button, never something a screen does on its own. */
 export const discoverJellyfinServers = () =>
-  invoke<DiscoveredServer[]>("discover_jellyfin_servers");
+  unwrap(commands.discoverJellyfinServers());
 
 /** The phone's background arrangements; `supported` is false everywhere else. */
 export interface JellyfinBackground {
@@ -236,29 +241,29 @@ export interface JellyfinBackground {
 }
 
 export const getJellyfinBackground = () =>
-  invoke<JellyfinBackground>("get_jellyfin_background");
+  commands.getJellyfinBackground();
 
 /** Whether a foreground service keeps tracking alive with the screen off; a persistent notification, hence opt-in. */
 export const setJellyfinBackground = (enabled: boolean) =>
-  invoke<void>("set_jellyfin_background", { enabled });
+  unwrap(commands.setJellyfinBackground(enabled));
 
 /** Opens Android's dialog for the battery-optimisation exemption. */
 export const requestBatteryExemption = () =>
-  invoke<void>("request_battery_exemption");
+  unwrap(commands.requestBatteryExemption());
 
 /** Saves the settings outside sign-in; the external address is checked against the server's identity when reachable. */
 export const setJellyfinSettings = (url: string, device: string, externalUrl: string) =>
-  invoke<void>("set_jellyfin_settings", { url, device, externalUrl });
+  unwrap(commands.setJellyfinSettings(url, device, externalUrl));
 
 /** Exchanges a username and password for a token; the password is sent once and never stored, only the token. */
 export const jellyfinSignIn = (
   url: string,
   username: string,
   password: string,
-) => invoke<JellyfinSettings>("jellyfin_sign_in", { url, username, password });
+) => unwrap(commands.jellyfinSignIn(url, username, password));
 
 export const jellyfinSignOut = () =>
-  invoke<JellyfinSettings>("jellyfin_sign_out");
+  unwrap(commands.jellyfinSignOut());
 
 /** The account's sessions, flagged by the device filter; the non-matching ones show what Jellyfin calls your device. */
-export const testJellyfin = () => invoke<JellyfinTest>("test_jellyfin");
+export const testJellyfin = () => unwrap(commands.testJellyfin());

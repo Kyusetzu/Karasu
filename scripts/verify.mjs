@@ -90,6 +90,11 @@ const summarizeTypos = (out) => {
   return n ? `${n} finding(s)` : "clean";
 };
 const summarizeToml = (out) => lines(strip(out)).at(-1)?.replace(/^toml-check: /, "") ?? "";
+/** `git diff --numstat` prints `added deleted path` for a changed file and nothing for an unchanged one. */
+const summarizeBindings = (out) => {
+  const m = /^(\d+)\s+(\d+)\s/.exec(strip(out));
+  return m ? `regenerated, +${m[1]} -${m[2]} lines to commit` : "unchanged";
+};
 const summarizeAudit = (out) => {
   const last = strip(out).split("\n").at(-1)?.replace(/^comment-audit: /, "") ?? "";
   const files = /in (\d+) file\(s\)/.exec(last)?.[1];
@@ -141,4 +146,12 @@ await Promise.all([
   wantRust && run("cargo test", "cargo", ["test", "--manifest-path", "src-tauri/Cargo.toml"], summarizeCargo),
   wantFrontend && run("vitest", node, [VITEST, "run", "--reporter=default"], summarizeVitest),
 ]);
+// `cargo test` just rewrote the bindings from the Rust signatures; a diff is a commit's business here and a failure in CI.
+if (wantRust) {
+  const phase = await run("bindings", "git", ["diff", "--numstat", "--", "src/api/bindings.ts"], summarizeBindings);
+  if (process.env.GITHUB_ACTIONS && phase.summary !== "unchanged") {
+    phase.ok = false;
+    phase.out = "src/api/bindings.ts is stale: run `cargo test` and commit the regenerated file";
+  }
+}
 report();

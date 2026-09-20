@@ -4,6 +4,7 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import * as api from "@/api/anilist";
 import { Row, Toggle } from "./shared";
+import { commands, unwrap } from "@/api/tauri";
 interface DiscordSettings {
   enabled: boolean;
   appId: string;
@@ -17,23 +18,17 @@ export function DiscordSection() {
 
   useEffect(() => {
     if (!api.isTauri) return;
-    import("@tauri-apps/api/core").then(({ invoke }) =>
-      invoke<DiscordSettings>("get_discord_settings").then((s) => {
-        setSettings(s);
-        setDraft(s.appId);
-      }),
-    );
+    commands.getDiscordSettings().then((s) => {
+      setSettings(s);
+      setDraft(s.appId);
+    });
   }, []);
 
   if (!settings) return null;
 
   const save = async (next: DiscordSettings) => {
     setSettings(next);
-    const { invoke } = await import("@tauri-apps/api/core");
-    await invoke("set_discord_settings", {
-      enabled: next.enabled,
-      appId: next.appId,
-    });
+    await unwrap(commands.setDiscordSettings(next.enabled, next.appId));
   };
 
   return (

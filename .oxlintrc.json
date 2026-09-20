@@ -3,7 +3,7 @@
   "plugins": ["eslint", "typescript", "unicorn", "oxc", "react", "import", "jsx-a11y", "vitest"],
   "categories": { "correctness": "error", "suspicious": "warn" },
   "env": { "browser": true, "es2024": true },
-  "ignorePatterns": ["dist/**", "site/**", "src-tauri/**", "src/lib/htmlEntities.data.ts", "scripts/virtual-rows-check/**"],
+  "ignorePatterns": ["dist/**", "site/**", "src-tauri/**", "src/lib/htmlEntities.data.ts", "src/api/bindings.ts", "scripts/virtual-rows-check/**"],
   "rules": {
     "react-hooks/rules-of-hooks": "error",
     "react-hooks/exhaustive-deps": "warn",

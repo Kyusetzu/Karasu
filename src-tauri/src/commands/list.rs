@@ -2,6 +2,7 @@ use crate::anilist::{
     auth,
     client::{AniList, ApiError, RateSnapshot, RequestLogEntry},
 };
+use crate::commands::Json;
 use crate::db::Db;
 use serde_json::{json, Value};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -187,16 +188,19 @@ mutation ($ids: [Int], $status: MediaListStatus, $scoreRaw: Int, $progress: Int,
 /// Entry ids per request, matching the read side's `Page.media(id_in:)` bound rather than inventing a second number.
 const BULK_CHUNK: usize = 50;
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, specta::Type)]
 pub struct ListResult {
     /// true if the data comes from the local cache (offline)
     #[serde(rename = "fromCache")]
     from_cache: bool,
     /// number of changes not yet synced
+    #[specta(type = crate::commands::Num)]
     pending: usize,
     /// When this list was last fetched from AniList, unix seconds; the frontend seeds its own staleness from it.
     #[serde(rename = "fetchedAt")]
+    #[specta(type = crate::commands::Num)]
     fetched_at: i64,
+    #[specta(type = crate::commands::Json)]
     lists: Value,
 }
 
@@ -301,11 +305,13 @@ fn spawn_list_refresh(app: &AppHandle, user_id: i64, media_type: &'static str) {
 
 /// The last cached list with no network access, a head start on the fetch; `from_cache` stays false, it is not a fallback.
 #[tauri::command]
+#[specta::specta]
 pub fn cached_media_list(
     db: State<'_, Db>,
-    user_id: i64,
+    user_id: crate::commands::Num,
     media_type: String,
 ) -> Option<ListResult> {
+    let user_id = user_id.0;
     let media_type = validate_media_type(&media_type).ok()?;
     let (cached, fetched_at) = db.cached_list_with_age(user_id, media_type)?;
     Some(ListResult {
@@ -318,14 +324,16 @@ pub fn cached_media_list(
 
 /// Loads the list: the cache inside the window, the cache plus a background refresh past it, AniList when forced.
 #[tauri::command]
+#[specta::specta]
 pub async fn fetch_media_list(
     app: AppHandle,
     db: State<'_, Db>,
     api: State<'_, AniList>,
-    user_id: i64,
+    user_id: crate::commands::Num,
     media_type: String,
     force: Option<bool>,
 ) -> Result<ListResult, String> {
+    let user_id = user_id.0;
     let media_type = validate_media_type(&media_type)?;
     let token = auth::load_token();
     // Only a queue with rows costs a request here; an idle app must be able to read its list for nothing.
@@ -376,10 +384,11 @@ pub async fn fetch_media_list(
     }
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, specta::Type)]
 pub struct MutationResult {
     /// true if the change was queued offline
     pub(crate) queued: bool,
+    #[specta(type = Option<crate::commands::Json>)]
     pub(crate) entry: Option<Value>,
 }
 
@@ -464,19 +473,22 @@ pub(crate) fn cache_entry_echo(db: &Db, echo: &Value) {
 
 /// Saves a list entry; offline, the change is queued and synced later.
 #[tauri::command]
+#[specta::specta]
 pub async fn save_list_entry(
     app: AppHandle,
     db: State<'_, Db>,
     api: State<'_, AniList>,
-    input: Value,
+    input: Json,
 ) -> Result<MutationResult, String> {
+    let input = input.0;
     let token = auth::load_token().ok_or("Not connected to AniList")?;
     save_entry_core(&app, &db, &api, &token, input).await
 }
 
 /// What a bulk edit managed and what stopped it; two fields, because a run can both write hundreds and fail.
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, specta::Type)]
 pub struct BulkResult {
+    #[specta(type = crate::commands::Num)]
     pub updated: usize,
     /// The failure that ended the run; whatever `updated` counts is already written and not undone by it.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -488,26 +500,40 @@ pub(crate) fn bulk_chunks(ids: &[i64]) -> Vec<Vec<i64>> {
     ids.chunks(BULK_CHUNK).map(|c| c.to_vec()).collect()
 }
 
+/// One change for many entries; a struct because specta's function support stops at ten arguments.
+#[derive(serde::Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct BulkSaveInput {
+    #[specta(type = Vec<crate::commands::Num>)]
+    pub ids: Vec<i64>,
+    pub status: Option<String>,
+    /// The format-independent raw score, never a float.
+    #[specta(type = Option<crate::commands::Num>)]
+    pub score_raw: Option<i64>,
+    #[specta(type = Option<crate::commands::Num>)]
+    pub progress: Option<i64>,
+    #[specta(type = Option<crate::commands::Num>)]
+    pub progress_volumes: Option<i64>,
+    #[specta(type = Option<crate::commands::Num>)]
+    pub repeat: Option<i64>,
+    pub private: Option<bool>,
+    /// `FuzzyDateInput`, forwarded as an opaque `{year, month, day}` because every part is nullable.
+    #[specta(type = Option<crate::commands::Json>)]
+    pub started_at: Option<Value>,
+    #[specta(type = Option<crate::commands::Json>)]
+    pub completed_at: Option<Value>,
+}
+
 /// Applies one change to many entries in a few requests, rather than one mutation per entry against the rate budget.
 #[tauri::command]
-#[allow(clippy::too_many_arguments)]
+#[specta::specta]
 pub async fn bulk_save_list_entries(
     app: AppHandle,
     db: State<'_, Db>,
     api: State<'_, AniList>,
-    ids: Vec<i64>,
-    status: Option<String>,
-    // The format-independent raw score, never a float.
-    score_raw: Option<i64>,
-    progress: Option<i64>,
-    // snake_case here, camelCase on the wire: Tauri maps the two.
-    progress_volumes: Option<i64>,
-    repeat: Option<i64>,
-    private: Option<bool>,
-    // `FuzzyDateInput`, forwarded as an opaque `{year, month, day}` because every part is nullable.
-    started_at: Option<Value>,
-    completed_at: Option<Value>,
+    input: BulkSaveInput,
 ) -> Result<BulkResult, String> {
+    let BulkSaveInput { ids, status, score_raw, progress, progress_volumes, repeat, private, started_at, completed_at } = input;
     if ids.is_empty() {
         return Ok(BulkResult { updated: 0, error: None });
     }
@@ -574,12 +600,14 @@ pub async fn bulk_save_list_entries(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn delete_list_entry(
     app: AppHandle,
     db: State<'_, Db>,
     api: State<'_, AniList>,
-    id: i64,
+    id: crate::commands::Num,
 ) -> Result<MutationResult, String> {
+    let id = id.0;
     let token = auth::load_token().ok_or("Not connected to AniList")?;
     let input = json!({ "id": id });
 
@@ -627,12 +655,14 @@ pub(crate) fn profile_mode(db: &Db) -> String {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn get_profile_mode(db: State<'_, Db>) -> String {
     profile_mode(&db)
 }
 
 /// Switches into account-free local mode and deletes the token, which survives a reinstall the database does not.
 #[tauri::command]
+#[specta::specta]
 pub fn enable_local_mode(db: State<'_, Db>) -> Result<(), String> {
     // Through the one switch, so nothing of the outgoing account sits behind the account-free list.
     crate::commands::auth::switch_identity(&db, crate::commands::auth::Identity::Local)
@@ -640,6 +670,7 @@ pub fn enable_local_mode(db: State<'_, Db>) -> Result<(), String> {
 
 /// Loads the local list for a media type, shaped exactly like the online `ListResult` so the UI is identical.
 #[tauri::command]
+#[specta::specta]
 pub fn local_fetch_list(
     db: State<'_, Db>,
     media_type: String,
@@ -658,10 +689,12 @@ pub fn local_fetch_list(
 
 /// Saves a local entry; a first add supplies `media` so the list renders offline, later edits may omit it.
 #[tauri::command]
+#[specta::specta]
 pub fn local_save_entry(
     db: State<'_, Db>,
-    input: Value,
+    input: Json,
 ) -> Result<MutationResult, String> {
+    let input = input.0;
     let media_id = input
         .get("mediaId")
         .and_then(|v| v.as_i64())
@@ -728,7 +761,9 @@ fn fuzzy_date_text(input: &Value, key: &str) -> Option<String> {
 
 /// Deletes a local entry; in local mode the frontend entry id equals the media id.
 #[tauri::command]
-pub fn local_delete_entry(db: State<'_, Db>, id: i64) -> Result<MutationResult, String> {
+#[specta::specta]
+pub fn local_delete_entry(db: State<'_, Db>, id: crate::commands::Num) -> Result<MutationResult, String> {
+    let id = id.0;
     if let Some(media_type) = db.local_find_type(id) {
         db.local_delete(id, &media_type)?;
     }
@@ -737,7 +772,8 @@ pub fn local_delete_entry(db: State<'_, Db>, id: i64) -> Result<MutationResult, 
 
 /// All local rows across both media types with their media metadata, for the sign-in merge's conflict prompt.
 #[tauri::command]
-pub fn local_all_entries(db: State<'_, Db>) -> Value {
+#[specta::specta]
+pub fn local_all_entries(db: State<'_, Db>) -> Json {
     let rows: Vec<Value> = db
         .local_all()
         .into_iter()
@@ -765,7 +801,7 @@ pub fn local_all_entries(db: State<'_, Db>) -> Value {
             })
         })
         .collect();
-    json!(rows)
+    Json(json!(rows))
 }
 
 /// What a drain did; more than one number, because a dropped row is something the user typed and will not get back.
@@ -915,21 +951,24 @@ fn report_dropped(app: &AppHandle, dropped: &[String]) {
 }
 
 /// One queued edit, described rather than replayed; the payload itself never crosses to the frontend.
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, specta::Type)]
 pub struct QueuedEdit {
+    #[specta(type = crate::commands::Num)]
     pub id: i64,
     /// `"save"` or `"delete"`.
     pub kind: String,
     /// The media id for a save, the list-entry id for a delete, `None` when the payload does not parse but still a row.
+    #[specta(type = Option<crate::commands::Num>)]
     pub subject: Option<i64>,
     /// The fields this edit changes, for the row's summary line.
     pub fields: Vec<String>,
     #[serde(rename = "queuedAt")]
+    #[specta(type = crate::commands::Num)]
     pub queued_at: i64,
 }
 
 /// Everything the sync panel renders, at the cost of no AniList request, which is what makes polling it acceptable.
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, specta::Type)]
 pub struct SyncStatus {
     /// Signed in to AniList; false in local mode, where an empty queue is not the same statement.
     pub connected: bool,
@@ -944,6 +983,7 @@ pub struct SyncStatus {
 
 /// The state of the sync, for the panel behind the pending badge.
 #[tauri::command]
+#[specta::specta]
 pub async fn sync_status(
     db: State<'_, Db>,
     api: State<'_, AniList>,
@@ -978,22 +1018,25 @@ pub async fn sync_status(
 
 /// Discards one queued edit, scoped to the signed-in account in the DELETE itself since the id may straddle a sign-out.
 #[tauri::command]
-pub fn discard_queued_edit(db: State<'_, Db>, id: i64) -> Result<bool, String> {
+#[specta::specta]
+pub fn discard_queued_edit(db: State<'_, Db>, id: crate::commands::Num) -> Result<bool, String> {
+    let id = id.0;
     let user_id = viewer_id(&db).ok_or("Not connected to AniList")?;
     Ok(db.queue_remove_for(user_id, id))
 }
 
 /// Manually triggered sync of the offline queue (e.g. a button in the UI).
 #[tauri::command]
+#[specta::specta]
 pub async fn flush_queue(
     app: AppHandle,
     db: State<'_, Db>,
     api: State<'_, AniList>,
-) -> Result<usize, String> {
+) -> Result<u32, String> {
     let token = auth::load_token().ok_or("Not connected to AniList")?;
     let drained = process_queue(&db, &api, Some(&token)).await?;
     report_dropped(&app, &drained.dropped);
-    Ok(drained.flushed)
+    Ok(drained.flushed as u32)
 }
 
 #[cfg(test)]

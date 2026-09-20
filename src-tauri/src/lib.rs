@@ -1,8 +1,8 @@
 mod alerts;
 mod anilist;
-mod apk_update;
+pub mod apk_update;
 mod backups;
-mod commands;
+pub mod commands;
 mod db;
 mod diagnostics;
 mod discord;
@@ -10,7 +10,7 @@ mod identify;
 mod background;
 mod keystore;
 mod widgets;
-mod library;
+pub mod library;
 mod logging;
 mod net;
 mod playback;
@@ -373,7 +373,20 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![
+        .invoke_handler(specta_builder().invoke_handler())
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| match event {
+            tauri::RunEvent::ExitRequested { .. } => EXIT_REQUESTED.store(true, Ordering::SeqCst),
+            tauri::RunEvent::Exit => exit_now_if_unrequested(app),
+            _ => {}
+        });
+}
+
+/// Every command once: tauri-specta hands this list to the invoke handler and to tests/bindings.rs, which exports it.
+pub fn specta_builder() -> tauri_specta::Builder<Wry> {
+    tauri_specta::Builder::<Wry>::new()
+        .commands(tauri_specta::collect_commands![
             commands::anilist_auth_info,
             commands::set_client_id,
             commands::anilist_login_url,
@@ -502,14 +515,8 @@ pub fn run() {
             library::play_next,
             library::play_episode,
         ])
-        .build(tauri::generate_context!())
-        .expect("error while building tauri application")
-        .run(|app, event| match event {
-            tauri::RunEvent::ExitRequested { .. } => EXIT_REQUESTED.store(true, Ordering::SeqCst),
-            tauri::RunEvent::Exit => exit_now_if_unrequested(app),
-            _ => {}
-        });
 }
+
 
 /// The desktop-only plugins and the close-to-tray handler; a cfg'd pair, since those crates do not exist on mobile.
 #[cfg(desktop)]

@@ -30,7 +30,7 @@ pub struct WindowInfo {
 }
 
 /// Candidate from a player or browser window.
-#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, specta::Type)]
 pub struct Playback {
     pub process: String,
     /// Cleaned media title (file name or streaming/reading title)

@@ -1,3 +1,5 @@
 # The one Rust version every build uses, here and in CI, so an F-Droid rebuild can be bit-identical to the release.
 [toolchain]
 channel = "1.97.1"
+# The phone target rides along, so `scripts/android-check.ps1` works on a fresh clone; CI adds the other three.
+targets = ["aarch64-linux-android"]

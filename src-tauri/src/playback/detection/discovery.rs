@@ -15,7 +15,7 @@ const MAX_PROBES: usize = 8;
 const MAX_RECV_ERRORS: u8 = 8;
 
 /// A server that answered the broadcast, confirmed by its own info endpoint.
-#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct DiscoveredServer {
     pub name: String,
@@ -26,7 +26,7 @@ pub struct DiscoveredServer {
 }
 
 /// `/System/Info/Public`, the parts the app uses.
-#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ServerInfo {
     pub name: String,

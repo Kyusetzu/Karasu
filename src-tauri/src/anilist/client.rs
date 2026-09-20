@@ -172,13 +172,15 @@ const PROBE_TTL: Duration = Duration::from_secs(60);
 static REFUSED_REPORTED: AtomicBool = AtomicBool::new(false);
 
 /// The limiter's last measurement on disk, so a process started seconds after another does not assume a full budget.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct PersistedRate {
     pub remaining: u32,
     pub limit: Option<u32>,
     /// Wall-clock milliseconds, compared only for age; the live state stays monotonic.
+    #[specta(type = crate::commands::Num)]
     pub observed_ms: i64,
+    #[specta(type = Option<crate::commands::Num>)]
     pub retry_until_ms: Option<i64>,
 }
 
@@ -255,7 +257,7 @@ impl Traffic {
 }
 
 /// What the panel and the diagnostics report see of the tallies.
-#[derive(serde::Serialize, Clone)]
+#[derive(serde::Serialize, Clone, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct TrafficSnapshot {
     /// Requests per source since the app started, alphabetical.
@@ -266,7 +268,7 @@ pub struct TrafficSnapshot {
     pub limit: Option<u32>,
 }
 
-#[derive(serde::Serialize, Clone)]
+#[derive(serde::Serialize, Clone, specta::Type)]
 pub struct TrafficSource {
     pub source: String,
     pub total: u32,
@@ -286,20 +288,24 @@ struct Recorded {
 }
 
 /// One row of the panel's traffic list.
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, specta::Type)]
 pub struct RequestLogEntry {
     /// Monotonic within a session, so the panel has a stable React key.
+    #[specta(type = crate::commands::Num)]
     pub seq: u64,
     /// The caller's name for itself, so the panel can say which screen or pass spent the budget.
     pub source: String,
     /// The root field asked for. Never the variables — see `operation_name`.
     pub operation: String,
     #[serde(rename = "startedAgoMs")]
+    #[specta(type = crate::commands::Num)]
     pub started_ago_ms: u64,
     #[serde(rename = "durationMs")]
+    #[specta(type = crate::commands::Num)]
     pub duration_ms: u64,
     /// How long this request waited on the client's own pacing; separate from `durationMs`, since the fixes differ.
     #[serde(rename = "pacedMs")]
+    #[specta(type = crate::commands::Num)]
     pub paced_ms: u64,
     pub status: Option<u16>,
     #[serde(rename = "remainingAfter")]
@@ -431,15 +437,17 @@ fn wall_ms() -> i64 {
 }
 
 /// What the sync panel shows about the limiter; local state only, so reading it costs no request.
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, specta::Type)]
 pub struct RateSnapshot {
     /// `None` until a response header has been seen this session.
     pub remaining: Option<u32>,
     pub limit: Option<u32>,
     #[serde(rename = "observedAgoMs")]
+    #[specta(type = Option<crate::commands::Num>)]
     pub observed_ago_ms: Option<u64>,
     /// Independent of `remaining`, never derived from it: a 429 may omit the header, and this is the signal to branch on.
     #[serde(rename = "throttledForMs")]
+    #[specta(type = Option<crate::commands::Num>)]
     pub throttled_for_ms: Option<u64>,
     #[serde(rename = "throttleKind")]
     pub throttle_kind: Option<&'static str>,

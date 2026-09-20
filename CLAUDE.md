@@ -47,7 +47,10 @@ and in the browser and scrobbles your AniList progress automatically.
 src/
   app/               App.tsx, main.tsx, index.css — the entry, and only the entry
   api/               AniList GraphQL client, queries, types, franchise, library,
-                     social (the whole profile/follow/forum surface)
+                     social (the whole profile/follow/forum surface);
+                     bindings.ts is GENERATED from the Rust command signatures
+                     and tauri.ts is `unwrap`, the one seam over it — see
+                     "The bindings are generated"
   components/
     ui/              primitives with no app knowledge (kebab-case files)
     shell/           the window frame and global machinery — titlebar, sidebar,
@@ -635,7 +638,10 @@ visible `skip` line, never silence, while CI runs the `crate-ci/typos` action
 before `verify`) and **toml** (`scripts/toml-check.mjs`, taplo's npm build fed
 one file at a time over stdin, because its WASM globbing finds nothing on
 Windows; `taplo.toml` names the files and the style, `--fix` rewrites them).
-Two more
+Looked at for the gate on
+2026-09-19 and left out: `cargo-nextest` (a one-second suite gains nothing),
+`msw` (HTTP lives in Rust, so there is no fetch to mock), and a formatter (one
+tree-wide diff for nothing). Two more
 tools answer questions rather than gate: `npm run knip` (unused files,
 exports and dependencies; silent when clean, `knip.json`) and `npm run
 test:coverage` (four summary lines, the per-file map under `coverage/`).
@@ -687,6 +693,42 @@ change with `INSTA_UPDATE=always cargo test` (or `cargo insta review`) and
 Prefer extracting pure logic into `src/lib/*.ts` (or a pure Rust fn) and unit
 testing it. Untestable-by-construction logic in a component is the usual reason
 a regression here is invisible until it ships.
+
+## The bindings are generated, never written
+
+`src/api/bindings.ts` is what tauri-specta emits from the Rust command
+signatures: one `commands.x(args)` per `#[tauri::command]`, every argument and
+return type spelled out, doc comments carried over. `cargo test` writes it
+(`src-tauri/tests/bindings.rs`, an integration test because the lib test
+binary cannot start once it links every command — rfd's `TaskDialogIndirect`
+needs the comctl v6 manifest, which `build.rs` now embeds for test targets
+only), so the file is always as fresh as the last `npm run verify`; the gate's
+`bindings` phase reports a regenerated file locally and fails CI on one, since
+a stale committed copy is the one way the two sides can lie to each other.
+Nothing edits the file by hand, oxlint, knip and the comment audit skip it, and
+`@tauri-apps/api/core`'s `invoke` is imported nowhere else in `src/`. A new
+command is three things: `#[tauri::command] #[specta::specta]` on the function,
+`specta::Type` on every type in its signature, and its path in
+`specta_builder()`'s `collect_commands!` list in `lib.rs` — then `cargo test`,
+and the frontend calls `commands.newThing(...)` (through `unwrap` in
+`api/tauri.ts` when it returns a `Result`, which turns the generated
+`{ status, data | error }` back into the thrown string every catch expects).
+Four rules the export forced, each in `commands/mod.rs`: a bare `i64`, `u64`
+or `usize` is refused by specta-typescript (precision), so a 64-bit field
+carries `#[specta(type = crate::commands::Num)]` and a 64-bit argument or
+return is the `Num` newtype (`.0` at the top of the body); `serde_json::Value`
+is `Json` the same way, exported as `any`, because specta's own `Value`
+support (the `serde_json` feature) recurses without end; a bare `f64` exports
+as `number | null` for NaN's sake, so a float is `Real`; and a function takes
+at most ten arguments, which is why `bulk_save_list_entries` takes a
+`BulkSaveInput`. A `HashMap` keyed by a number becomes one keyed by `String`
+(JSON has no other key). The hand-written types in `api/types.ts` stay where
+they know more than Rust's signature can say — a `Value` field's real shape,
+a literal union behind a `String` — and the wrappers in `api/anilist.ts`
+annotate or cast to them; where the generated type was complete, the
+hand-written one is gone. Measured at the migration on 2026-09-20: 127
+`invoke` sites moved, two dead wrapper types found, zero behaviour changes on
+the rig.
 
 ## Comments: one line each
 

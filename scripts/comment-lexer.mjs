@@ -6,6 +6,8 @@ const DIRECTIVE = /^\s*(@ts-(expect-error|ignore|nocheck|check)\b|eslint|biome-i
 export function inScope(path) {
   const p = path.replace(/\\/g, "/");
   if (p.startsWith("site/") || p.startsWith(".claude/")) return false;
+  // Generated from the Rust signatures on every `cargo test`; its comments are specta's and the doc comments' copies.
+  if (p === "src/api/bindings.ts") return false;
   if (p === "vite.config.ts" || p === "vitest.setup.ts" || p === "index.html") return true;
   if (p.startsWith("src/") && /\.(ts|tsx|css)$/.test(p)) return true;
   if (p.startsWith("src-tauri/src/") && p.endsWith(".rs")) return true;

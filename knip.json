@@ -9,7 +9,8 @@
     "scripts/**/*.mjs"
   ],
   "ignore": [
-    "scripts/virtual-rows-check.mjs"
+    "scripts/virtual-rows-check.mjs",
+    "src/api/bindings.ts"
   ],
   "ignoreDependencies": [
     "@fontsource/kosugi-maru",

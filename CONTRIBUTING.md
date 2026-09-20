@@ -118,6 +118,9 @@ site commit never builds a Nightly.
 - `src/components/ui/` — primitives that know nothing about Karasu.
   `shell/` is the frame, `media/` renders titles, `overlays/` opens over things.
 - `src-tauri/src/commands/` — frontend-facing commands, grouped by subject.
+  `src/api/bindings.ts` is generated from them by `cargo test` (tauri-specta);
+  never edit it, and call `commands.x()` from `src/api/tauri.ts` rather than
+  `invoke` — see "The bindings are generated" in CLAUDE.md.
 - Platform-specific Rust is `#[cfg(...)]`-gated, and Windows, Linux and
   Android (`cfg(mobile)` / `cfg(target_os = "android")`) are all real
   implementations — no stubs. iOS is deliberately not among them: like macOS,

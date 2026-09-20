@@ -1,0 +1,25 @@
+# Link check for the docs and the website; `.github/workflows/links.yml` runs it weekly, `lychee .` runs it here.
+no_progress = true
+max_concurrency = 8
+timeout = 20
+max_retries = 2
+# GitHub answers a burst of HEADs with 429; AniList and a few CDNs refuse the default agent outright.
+accept = ["200..=204", "429"]
+user_agent = "Mozilla/5.0 (compatible; lychee/karasu-links)"
+# The one endpoint that is POST-only, the dev server, and the Jellyfin address the Settings hint uses as an example.
+exclude_all_private = true
+exclude = [
+  "^https://graphql\\.anilist\\.co",
+  "^http://localhost",
+  "^http://ipc\\.localhost",
+  "^https://img\\.example",
+]
+exclude_path = [
+  "node_modules",
+  "site/node_modules",
+  "site/dist",
+  "dist",
+  "coverage",
+  "CHANGELOG.md",
+  "src-tauri/target",
+]

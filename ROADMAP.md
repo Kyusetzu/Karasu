@@ -84,7 +84,6 @@ lives in Rust), a formatter (one tree-wide diff for nothing).
 
 | Package | Where | Why, in a line |
 | --- | --- | --- |
-| `lychee` (Action, weekly cron) | README, CLAUDE.md, SECURITY.md, the site | ~80 outbound links that die quietly |
 | `cargo-machete` | manual, now and then | knip for Cargo: dependencies nothing uses |
 | `cargo-bloat` | once, then on demand | what the 26 MB exe is made of; the `windows` crate's feature list is the suspect |
 | Tauri Specta | `src/api/*.ts` wrappers, every `#[tauri::command]` | generates the TS bindings from the Rust signatures; knip found five hand-written wrappers nobody called, which generated ones cannot become |

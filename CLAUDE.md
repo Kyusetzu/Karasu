@@ -1263,6 +1263,19 @@ it was added; `cargo update -p h2` was the fix. Dependabot keeps the npm and
 cargo graphs moving; knip and cargo-deny say when something in them is dead
 or wrong.
 
+## Links are checked weekly, not trusted
+
+`.github/workflows/links.yml` runs lychee every Monday (and by hand) over the
+markdown, the issue forms, the website's copy and the i18n files, with
+`lychee.toml` carrying the exclusions: the POST-only GraphQL endpoint, the dev
+server, private addresses (the Settings hint's example Jellyfin URL), and 429 as
+an accepted answer because GitHub throttles a burst of HEADs. The first run on
+2026-09-20 found 84 links alive and 10 redirecting for good reasons
+(`releases/latest`, the issue-form links that bounce through login), so a
+redirect is not a finding here; a failed run is, and it lands in Kyu's inbox as
+the workflow's own notification. `cargo install lychee` and `lychee --config
+lychee.toml -- '*.md'` reproduce it locally.
+
 ## The Actions cache is 10 GB, and a PR must not spend it
 
 Measured on 2026-09-19: the Nightly ran with no Rust cache at all because four

@@ -1263,6 +1263,32 @@ it was added; `cargo update -p h2` was the fix. Dependabot keeps the npm and
 cargo graphs moving; knip and cargo-deny say when something in them is dead
 or wrong.
 
+## Three Cargo tools that answer questions, run by hand
+
+`npm run deps:unused` is cargo-machete over the crate (it does not read
+`build.rs`, so `tauri-build` sits in `[package.metadata.cargo-machete]`);
+its first run on 2026-09-20 found `windows-future` declared and unused — the
+`join()` it was kept for reaches `smtc.rs` through `windows`' own re-export, so
+the line went. `npm run bloat` is cargo-bloat over the release exe, and the
+answer on 2026-09-20 was not the suspected one: of a 23.3 MiB file, `.text` is
+16.4 MiB and the `windows` crate is not in the top sixty (its bindings inline
+into `karasu_lib`); the weight is tauri 2.6 MiB, std 2.6, karasu_lib 2.2,
+tokio 1.3, the HTTP stack (reqwest, rustls, h2, hyper) ~1.5, and the regex
+family ~0.8. The one oddity is two crypto backends at once — `ring` (125 KiB)
+beside `aws_lc_sys` (197 KiB), because `tauri-plugin-updater`'s reqwest wants
+rustls with `ring` while ours resolves to aws-lc — worth ~300 KiB if anyone
+ever cares, which is not now. `npm run mutants` is cargo-mutants through
+`scripts/mutants.mjs` (the copy holds `src-tauri` alone, so the wrapper drops
+the `../THIRD-PARTY-NOTICES.md` resource through `TAURI_CONFIG` or
+tauri-build refuses to configure it); `src-tauri/.cargo/mutants.toml`
+excludes the arms that do not compile here. First run, 2026-09-20, `scrobbler.rs` alone with four jobs: 182 mutants in
+16 minutes, 151 caught, 19 missed, 10 unviable, 2 timeouts. Eight of the
+misses were the `* 60` in the duration constants (a constant has no test but
+its value), three were `emit_session` (a window event, unobservable from a unit
+test), and six pointed at real gaps that got tests the same day: `season_key`'s
+`-1`, `detection_override`'s three-part key, `cached_user_id` and
+`candidates_from_cache`. Read the misses as questions, not as a score to push.
+
 ## Links are checked weekly, not trusted
 
 `.github/workflows/links.yml` runs lychee every Monday (and by hand) over the

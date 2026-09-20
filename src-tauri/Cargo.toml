@@ -1,6 +1,6 @@
 [package]
 name = "karasu"
-version = "1.17.13"
+version = "1.17.14"
 description = "A modern anime and manga tracker built exclusively for AniList"
 authors = ["Kyu"]
 license = "MIT"
@@ -50,6 +50,10 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
+
+# cargo-machete does not read build.rs, which is the one place tauri-build is called.
+[package.metadata.cargo-machete]
+ignored = ["tauri-build"]
 
 [dependencies]
 tauri = { version = "2", features = ["tray-icon"] }
@@ -150,8 +154,6 @@ windows = { version = "0.62", features = [
   "Win32_System_Com_StructuredStorage",
   "Win32_System_Variant",
 ] }
-# The blocking `join()` on WinRT async operations lives here, not in `windows`.
-windows-future = "0.3"
 # The scrobble-confirm toast's button. Already compiled into this tree by
 # tauri-plugin-notification; the direct dependency exists because the plugin
 # *drops* action buttons on desktop, so the one toast that is an action talks

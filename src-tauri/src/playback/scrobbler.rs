@@ -1329,7 +1329,8 @@ async fn drive_session(app: &AppHandle) {
 #[cfg(test)]
 mod tests {
     use super::{
-        applies_to, armed_now, auto_arm, block_reason, defer_for_peer, grace_spent, position_due,
+        applies_to, armed_now, auto_arm, block_reason, cached_user_id, candidates_from_cache,
+        defer_for_peer, detection_override, grace_spent, position_due, season_key,
         service_transition, shift_episode, threshold, would_regress, BlockReason, NowPlaying,
         Phase, Session, YieldTarget, DEFAULT_THRESHOLD, EMPTY_TICK_GRACE, GAP_GRACE,
         HIDDEN_POLL_INTERVAL, MANGA_THRESHOLD, POLL_INTERVAL, SERVICE_RETRY, YIELD_GRACE,
@@ -1721,5 +1722,53 @@ mod tests {
     fn the_hidden_poll_is_slower_than_the_visible_one_and_still_inside_fresh() {
         assert!(HIDDEN_POLL_INTERVAL > POLL_INTERVAL);
         assert!(HIDDEN_POLL_INTERVAL < FRESH);
+    }
+
+    /// Schema v12 keys a correction on `(title, season, media_type)` with `-1` for "no season"; found by cargo-mutants.
+    #[test]
+    fn a_correction_is_found_by_its_whole_key_and_nothing_less() {
+        assert_eq!(season_key(None), -1);
+        assert_eq!(season_key(Some(2)), 2);
+        let db = crate::db::tests::mem_db();
+        db.detection_override_set("Frieren", -1, "ANIME", 154587, "Sousou no Frieren", 0).unwrap();
+        db.detection_override_set("Frieren", 2, "ANIME", 999, "Frieren S2", 12).unwrap();
+        let hit = detection_override(&db, "Frieren", None, "ANIME").expect("the seasonless row");
+        assert_eq!((hit.media_id, hit.episode_offset), (154587, 0));
+        let s2 = detection_override(&db, "Frieren", Some(2), "ANIME").expect("the season-two row");
+        assert_eq!((s2.media_id, s2.episode_offset), (999, 12));
+        assert!(detection_override(&db, "Frieren", Some(3), "ANIME").is_none());
+        assert!(detection_override(&db, "Frieren", None, "MANGA").is_none());
+        assert!(detection_override(&db, "Frieren!", None, "ANIME").is_none());
+    }
+
+    /// The matcher's whole candidate set comes out of the SQLite list cache this way; nothing had pinned the shape.
+    #[test]
+    fn candidates_come_from_the_cached_list_of_the_cached_viewer_only() {
+        let db = crate::db::tests::mem_db();
+        assert_eq!(cached_user_id(&db), None);
+        assert!(candidates_from_cache(&db, "ANIME").is_empty());
+        db.kv_set("anilist_viewer", r#"{"id": 6421433, "name": "Kyusetzu"}"#).unwrap();
+        assert_eq!(cached_user_id(&db), Some(6421433));
+        let lists = serde_json::json!([
+            { "isCustomList": true, "entries": [{ "mediaId": 1, "media": { "title": { "romaji": "Dup" } } }] },
+            { "isCustomList": false, "entries": [
+                { "mediaId": 1, "progress": 4, "status": "CURRENT", "media": {
+                    "title": { "romaji": "Cowboy Bebop", "english": "Cowboy Bebop", "native": null },
+                    "synonyms": ["Bebop"], "episodes": 26, "chapters": null, "duration": 24,
+                    "coverImage": { "large": "https://img.example/bebop.jpg" } } },
+                { "mediaId": 1, "progress": 9, "status": "CURRENT", "media": { "title": { "romaji": "Cowboy Bebop" } } },
+                { "mediaId": 2, "progress": 0, "status": "PLANNING", "media": { "title": { "romaji": null } } }
+            ] }
+        ]);
+        db.cache_list(6421433, "ANIME", &lists.to_string()).unwrap();
+        let out = candidates_from_cache(&db, "ANIME");
+        assert_eq!(out.len(), 1, "the custom-list copy, the duplicate and the titleless row all drop: {out:?}");
+        let c = &out[0];
+        assert_eq!(c.media_id, 1);
+        assert_eq!(c.titles, vec!["Cowboy Bebop", "Cowboy Bebop", "Bebop"]);
+        assert_eq!((c.episodes, c.duration_min, c.progress), (Some(26), Some(24), 4));
+        assert_eq!(c.status, "CURRENT");
+        assert_eq!(c.cover_url.as_deref(), Some("https://img.example/bebop.jpg"));
+        assert!(candidates_from_cache(&db, "MANGA").is_empty(), "the other type has no cache");
     }
 }

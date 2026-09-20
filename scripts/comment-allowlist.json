@@ -68,5 +68,10 @@
     "file": "scripts/toml-check.mjs",
     "startsWith": "Lints and format-checks the TOML files",
     "reason": "usage block: one invocation per line"
+  },
+  {
+    "file": "scripts/mutants.mjs",
+    "startsWith": "Runs cargo-mutants over the files",
+    "reason": "usage block: one invocation per line"
   }
 ]

@@ -1,7 +1,7 @@
 {
   "name": "karasu",
   "private": true,
-  "version": "1.17.13",
+  "version": "1.17.14",
   "type": "module",
   "author": "Kyu",
   "license": "MIT",
@@ -28,6 +28,9 @@
     "lint:toml": "node scripts/toml-check.mjs",
     "lint:rust": "cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings",
     "deny": "cargo deny --manifest-path src-tauri/Cargo.toml check",
+    "deps:unused": "cargo machete --with-metadata src-tauri",
+    "bloat": "cargo bloat --manifest-path src-tauri/Cargo.toml --release --crates -n 30",
+    "mutants": "node scripts/mutants.mjs",
     "test:coverage": "vitest run --coverage",
     "knip": "knip",
     "tauri": "tauri",

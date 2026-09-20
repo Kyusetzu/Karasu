@@ -1,0 +1,4 @@
+# cargo-mutants (`npm run mutants`): the honest answer to "covered, but how well" — which injected bugs the suite misses.
+exclude_globs = ["src/playback/detection/audio.rs", "src/playback/detection/media_session/mpris.rs", "src/keystore.rs", "src/background.rs", "src/apk_update.rs"]
+timeout_multiplier = 3.0
+minimum_test_timeout = 60.0

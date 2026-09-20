@@ -52,3 +52,7 @@ src-tauri/target/
 # findings went.
 /audit/
 coverage/
+
+# cargo-mutants writes its copies and its report here when run without --output
+src-tauri/mutants.out/
+src-tauri/mutants.out.old/

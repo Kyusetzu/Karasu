@@ -849,6 +849,14 @@ async update the real code makes after an await warns instead.
   exact-match edit on that line mysteriously fails to apply. Check with `grep -c $'\0' <file>` after writing. (The NUL
   that used to live in `src/lib/search.ts` died with the fuzzy refactor; the
   lesson did not.)
+- **vitest has failed twice under `verify` and never alone.** Both times
+  (2026-09-19 and 2026-09-20) a handful of tests in one file failed while
+  `cargo test` compiled beside it, and eight consecutive bare runs afterwards
+  were green. Nothing is known beyond that; the suspects, in order, are CPU
+  starvation against the dom project's timeouts and the node project's
+  `isolate: false`. Re-run `npm run verify` once before reading a failure that
+  a bare `npm test` does not reproduce as a regression, and write down the
+  file if it happens again.
 - **A suite that finishes far faster than usual failed early, it did not get
   faster.** The Rust suite takes ~0.5 s; a 0.02 s run means something bailed.
 - **Never pipe `npm run verify` through `grep`.** The pipe reports *grep's*

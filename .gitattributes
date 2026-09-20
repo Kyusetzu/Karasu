@@ -33,3 +33,6 @@ Cargo.lock text eol=lf
 *.webp binary
 *.avif binary
 *.woff2 binary
+
+# insta snapshots compare as text; a CRLF checkout would read as a changed report.
+*.snap text eol=lf

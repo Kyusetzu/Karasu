@@ -82,7 +82,6 @@ lives in Rust), a formatter (one tree-wide diff for nothing).
 
 | Item | Where | Why, in a line |
 | --- | --- | --- |
-| `.deb` and `.rpm` bundle targets | `tauri.conf.json` `bundle.targets`, `linux-build` | Tauri builds both from the same job; the AppImage stays the updater's format, the packages are what a distro user installs |
 | Flatpak / Flathub | a manifest built from the `.deb`, submitted once | the one Linux channel with an update path and a sandbox; the tray and the media-session pass need portal review first |
 
 **Distribution — Android**

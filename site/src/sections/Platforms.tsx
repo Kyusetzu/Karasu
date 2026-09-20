@@ -61,6 +61,21 @@ export function Platforms() {
                   <Download className="size-4" aria-hidden="true" />
                   {p.download.label}
                 </ButtonLink>
+                {p.extra?.some((e) => e.href) && (
+                  <div className="flex justify-center gap-3 text-xs text-ink-500">
+                    {p.extra
+                      .filter((e) => e.href)
+                      .map((e) => (
+                        <a
+                          key={e.label}
+                          href={e.href!}
+                          className="underline decoration-surface-600 underline-offset-2 transition-surface hover:text-ink-300"
+                        >
+                          {e.label}
+                        </a>
+                      ))}
+                  </div>
+                )}
                 {p.secondary && (
                   <a
                     href={p.secondary.href}

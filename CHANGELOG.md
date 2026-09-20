@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 2775b98 -->
+<!-- generated-through: 1c44d5f -->
 
 ### Fixed
 
@@ -105,6 +105,7 @@ tag time is then optional rather than load-bearing.
 - The window opens where and how large it was last closed.
 - On Android, a long press and an armed pull-to-sync give a short haptic tick, and a title can be shared to another app from its menu or its page.
 - Appearance can follow the system's accent colour on Windows, GNOME/KDE and Android 12+, with your own colour kept for when you switch back.
+- Linux releases ship a .deb and an .rpm beside the AppImage; the AppImage remains the one that updates itself.
 
 ### Changed
 

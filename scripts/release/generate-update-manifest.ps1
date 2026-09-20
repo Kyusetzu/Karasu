@@ -51,7 +51,8 @@ $platforms = [ordered]@{
 
 # The Linux leg is optional: a broken AppImage must not hold back a Windows release, and a client reads only its own key.
 $linuxDir = Join-Path $repoRoot "linux-artifacts"
-$appimage = Get-ChildItem -Path $linuxDir -Filter "*.AppImage" -ErrorAction SilentlyContinue |
+# Recursive, because the artifact keeps its appimage/, deb/ and rpm/ folders now that three bundles share it.
+$appimage = Get-ChildItem -Path $linuxDir -Filter "*.AppImage" -Recurse -ErrorAction SilentlyContinue |
     Sort-Object LastWriteTime -Descending |
     Select-Object -First 1
 if ($appimage) {

@@ -42,13 +42,17 @@ const info = {
   assets: {
     windows,
     linux: find(/\.AppImage$/),
+    linuxDeb: find(/_amd64\.deb$/) ?? null,
+    linuxRpm: find(/_x86_64\.rpm$/) ?? null,
     androidArm64: find(/_arm64\.apk$/),
     androidUniversal: find(/_universal\.apk$/),
     sums: find(/^SHA256SUMS\.txt$/),
   },
 };
+// The packages joined the release after 1.0.0, so their absence keeps the fallback's null rather than the whole fallback.
+const optional = new Set(["linuxDeb", "linuxRpm"]);
 for (const [k, v] of Object.entries(info.assets)) {
-  if (!v) {
+  if (!v && !optional.has(k)) {
     console.error(`release-info: release ${rel.tag_name} has no ${k} asset; keeping the committed fallback`);
     process.exit(0);
   }

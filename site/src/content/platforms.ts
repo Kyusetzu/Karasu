@@ -10,6 +10,8 @@ export interface Platform {
   install: string;
   download: { label: string; href: string };
   secondary?: { label: string; href: string };
+  /** Further formats of the same build; a null href (a release that predates the format) draws nothing. */
+  extra?: { label: string; href: string | null }[];
   works: string[];
   limits: string[];
 }
@@ -60,9 +62,13 @@ export const PLATFORMS: Platform[] = [
     id: "linux",
     name: "Linux",
     tier: "experimental",
-    install: "An AppImage for x86_64. It needs webkit2gtk-4.1 on the system (Ubuntu 22.04+, Debian 12+, Arch); make it executable and run it.",
+    install: "An AppImage for x86_64 that updates itself, or a .deb and an .rpm for the package manager. All three need webkit2gtk-4.1 on the system (Ubuntu 22.04+, Debian 12+, Fedora, Arch).",
     download: { label: "Download the AppImage", href: release.assets.linux },
     secondary: { label: "SHA256SUMS.txt", href: release.assets.sums },
+    extra: [
+      { label: ".deb (Debian, Ubuntu)", href: release.assets.linuxDeb },
+      { label: ".rpm (Fedora, openSUSE)", href: release.assets.linuxRpm },
+    ],
     works: [
       "Media sessions over MPRIS, mpv over its socket, Jellyfin",
       "Everything the list, statistics and social pages do",

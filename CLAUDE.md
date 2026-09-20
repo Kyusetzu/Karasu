@@ -256,9 +256,10 @@ scripts/             bump-version.mjs (every commit), anilist-query.mjs
                      clean-target.mjs (reclaims the
                      stale incremental sessions every version bump leaves
                      under `src-tauri/target`, see the notes);
-                     release/ holds the five PowerShell scripts
-                     the release workflow runs (installer, AppImage and APK
-                     renamers are deliberate near-twins, release-notes, and
+                     release/ holds the six PowerShell scripts
+                     the release workflow runs (installer, AppImage, Linux
+                     package and APK renamers are deliberate near-twins,
+                     release-notes, and
                      generate-update-manifest, whose Android legs feed the
                      APK updater — see "The Android updater")
 ```
@@ -652,9 +653,16 @@ scripts-only commits drop out without a trailer.
 
 For build-affecting changes — dependencies, `tauri.conf.json`, anything in the
 bundle — also run `npm run tauri build` as a smoke check. On Windows only the
-NSIS bundle builds and `appimage` is correctly skipped; the AppImage is built by
-the `linux-build` job in CI, which is also the only place Linux-only code is
-compiled at all.
+NSIS bundle builds and the three Linux targets are correctly skipped; the
+AppImage, the `.deb` and the `.rpm` are built by the `linux-build` job in CI,
+which is also the only place Linux-only code is compiled at all. The AppImage
+stays the updater's format; the packages install through a package manager and
+carry explicit `depends` (webkit2gtk-4.1, gtk3 and the ayatana appindicator,
+which `ldd` cannot see because it is dlopen'd), and every place that names a
+release file — the renamer twins under `scripts/release`, the checksum step,
+the Nightly's prune list, `release-info.mjs` on the site — walks the
+`karasu-linux` artifact recursively, because three bundle folders make the
+download keep its `appimage/`, `deb/` and `rpm/` subfolders where one did not.
 
 **Two kinds of test that are not examples.** `proptest` runs the parser and the
 matcher over thousands of generated inputs a run (`parser.rs` and `matcher.rs`,

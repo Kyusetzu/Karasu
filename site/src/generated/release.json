@@ -7,6 +7,8 @@
   "assets": {
     "windows": "https://github.com/Kyusetzu/Karasu/releases/download/v1.0.0/Karasu_1.0.0.563_x64-setup.exe",
     "linux": "https://github.com/Kyusetzu/Karasu/releases/download/v1.0.0/Karasu_1.0.0.563_amd64.AppImage",
+    "linuxDeb": null,
+    "linuxRpm": null,
     "androidArm64": "https://github.com/Kyusetzu/Karasu/releases/download/v1.0.0/Karasu_1.0.0.563_arm64.apk",
     "androidUniversal": "https://github.com/Kyusetzu/Karasu/releases/download/v1.0.0/Karasu_1.0.0.563_universal.apk",
     "sums": "https://github.com/Kyusetzu/Karasu/releases/download/v1.0.0/SHA256SUMS.txt"

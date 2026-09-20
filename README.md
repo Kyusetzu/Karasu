@@ -312,7 +312,7 @@ Download from the
 [website](https://kyusetzu.github.io/Karasu/#platforms), which carries the
 same files with each platform's notes beside its button. Each release
 carries one build per platform, always the newest: the Windows installer
-(`Karasu_<version>_x64-setup.exe`), the Linux `.AppImage`, and two Android
+(`Karasu_<version>_x64-setup.exe`), the Linux `.AppImage`, `.deb` and `.rpm`, and two Android
 APKs (`Karasu_<version>_arm64.apk`, plus a `_universal` fallback) — alongside
 `SHA256SUMS.txt` and `latest.json`, the manifest every updater reads — the
 desktop plugin its own key, Android the APK legs.
@@ -360,10 +360,13 @@ with no UAC prompt and nothing written outside your own profile.
 > **Platforms.** Windows and Linux, both x86_64, and Android as a sideloaded
 > APK.
 >
-> Linux ships as an **AppImage** — one file for Ubuntu, Debian and Arch alike.
-> It is built on Ubuntu 22.04, so it needs **glibc ≥ 2.35**, and it expects
-> **webkit2gtk-4.1** on the system (`libwebkit2gtk-4.1-0` on Ubuntu/Debian,
-> `webkit2gtk-4.1` on Arch); that one is not bundled. A tray icon needs a
+> Linux ships three ways: an **AppImage** — one file for Ubuntu, Debian and
+> Arch alike, and the one the in-app updater replaces — plus a **`.deb`** and an
+> **`.rpm`** for the package manager, which update with the next release rather
+> than in-app. All are built on Ubuntu 22.04, so they need **glibc ≥ 2.35**, and
+> expect **webkit2gtk-4.1** on the system (`libwebkit2gtk-4.1-0` on
+> Ubuntu/Debian, `webkit2gtk4.1` on Fedora, `webkit2gtk-4.1` on Arch); that one
+> is not bundled. A tray icon needs a
 > StatusNotifier host — on GNOME, the AppIndicator extension — and without one
 > Karasu still runs, but closing the window quits instead of hiding it.
 >
@@ -417,7 +420,7 @@ additionally need JDK 17 (Temurin), the Android SDK (platform 36, build-tools
 ```sh
 npm install
 npm run tauri dev                # development build with hot reload
-npm run tauri build              # release build (NSIS on Windows, AppImage on Linux)
+npm run tauri build              # release build (NSIS on Windows; AppImage, deb and rpm on Linux)
 npx tauri android build --apk    # Android release APK
 
 npm run verify       # the whole gate CI runs: typecheck, the one-line-comment audit, then vitest and cargo test together

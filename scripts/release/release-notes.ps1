@@ -22,10 +22,12 @@ $boilerplate = @"
 warn on first run. Verify the download against ``SHA256SUMS.txt`` if you want to
 confirm it wasn't tampered with in transit.
 
-**Linux** -- the ``.AppImage``, x86_64. ``chmod +x`` it and run it; it works on
-Ubuntu 22.04+, Debian 12+ and Arch. It needs **webkit2gtk-4.1** present on the
-system (``libwebkit2gtk-4.1-0`` on Ubuntu/Debian, ``webkit2gtk-4.1`` on Arch) --
-that one is not bundled. For a tray icon you also need a StatusNotifier host; on
+**Linux** -- the ``.AppImage``, x86_64, is the one the in-app updater replaces:
+``chmod +x`` it and run it; it works on Ubuntu 22.04+, Debian 12+ and Arch. The
+``.deb`` and ``.rpm`` install through the package manager instead (and update
+with the next release, not in-app). All three need **webkit2gtk-4.1** present on
+the system (``libwebkit2gtk-4.1-0`` on Ubuntu/Debian, ``webkit2gtk4.1`` on
+Fedora, ``webkit2gtk-4.1`` on Arch) -- that one is not bundled. For a tray icon you also need a StatusNotifier host; on
 GNOME that means the AppIndicator extension. Without one Karasu still runs and
 closing the window quits instead of hiding.
 

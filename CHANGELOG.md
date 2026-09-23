@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 4a2a780 -->
+<!-- generated-through: 1dfa6cc -->
 
 ### Fixed
 
@@ -88,7 +88,7 @@ tag time is then optional rather than load-bearing.
 - A release name that carries the episode's title after its number now parses the number, and Jellyfin's episode name reaches the now-playing card.
 - The command palette's result groups are announced as groups, and its input has a name.
 - F5, Ctrl+F and Ctrl+P no longer reach the browser engine under the app on desktop; copying works the same on Linux as on Windows.
-- the Linux AppImage no longer opens a black window with EGL_BAD_PARAMETER on Fedora 44, Ubuntu 26.04 and other systems with Mesa 26.
+- The Linux AppImage no longer opens a black window with EGL_BAD_PARAMETER on Fedora 44, Ubuntu 26.04 and other systems with Mesa 26.
 
 ### Added
 

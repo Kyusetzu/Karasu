@@ -370,6 +370,14 @@ with no UAC prompt and nothing written outside your own profile.
 > StatusNotifier host — on GNOME, the AppIndicator extension — and without one
 > Karasu still runs, but closing the window quits instead of hiding it.
 >
+> An AppImage up to 1.19.1.664 shows a black window on systems with Mesa 26
+> (Fedora 44, Ubuntu 26.04) and prints `Could not create default EGL display:
+> EGL_BAD_PARAMETER`: it bundled a `libwayland-client` too old for that Mesa.
+> Later builds leave it to the system. For an older file,
+> `LD_PRELOAD=/usr/lib64/libwayland-client.so.0 ./Karasu_*.AppImage` works around
+> it (`/usr/lib/x86_64-linux-gnu/` on Debian and Ubuntu), or take the `.rpm` or
+> `.deb`.
+>
 > Android ships as two APKs — take `Karasu_<version>_arm64.apk`, and fall
 > back to `_universal` only if your device refuses it (releases carry it;
 > a Nightly is arm64 alone). Both are

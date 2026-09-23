@@ -142,6 +142,11 @@ jobs:
           # linuxdeploy strips binaries by default and has been known to corrupt the runtime doing it.
           NO_STRIP: true
 
+      # The same repack the release runs, so a pull request finds a broken one first; no key here, so no re-sign.
+      - name: Take libwayland-client back out of the AppImage
+        shell: pwsh
+        run: ./scripts/release/slim-appimage.ps1
+
       # The tray library is dlopen'd and invisible to linuxdeploy; warn only, since the app survives a missing tray.
       - name: Check the AppImage carries the tray library
         working-directory: src-tauri/target/release/bundle/appimage

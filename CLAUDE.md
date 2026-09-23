@@ -261,9 +261,10 @@ scripts/             bump-version.mjs (every commit), anilist-query.mjs
                      clean-target.mjs (reclaims the
                      stale incremental sessions every version bump leaves
                      under `src-tauri/target`, see the notes);
-                     release/ holds the eight PowerShell scripts
+                     release/ holds the nine PowerShell scripts
                      the release workflow runs (installer, AppImage, Linux
                      package and APK renamers are deliberate near-twins,
+                     slim-appimage — see "The commit loop" —,
                      release-notes, flatpak-manifest, fdroid-recipe, and
                      generate-update-manifest, whose Android legs feed the
                      APK updater — see "The Android updater")
@@ -703,6 +704,26 @@ release file — the renamer twins under `scripts/release`, the checksum step,
 the Nightly's prune list, `release-info.mjs` on the site — walks the
 `karasu-linux` artifact recursively, because three bundle folders make the
 download keep its `appimage/`, `deb/` and `rpm/` subfolders where one did not.
+
+**The AppImage ships without `libwayland-client`, on purpose.** linuxdeploy
+bundles the build host's copy (ubuntu-22.04, wayland 1.20), the AppRun puts it
+first on `LD_LIBRARY_PATH`, and Mesa 26 cannot create an EGL display against
+it: `Could not create default EGL display: EGL_BAD_PARAMETER. Aborting...`,
+WebKit's web process dies, the window stays black. Reported from Fedora 44 on
+2026-09-23 and reproduced the same day on WSL's Ubuntu 26.04 (Mesa 26.0.3)
+with the 1.19.1.664 Nightly. `scripts/release/slim-appimage.ps1` runs after
+the build in `release.yml` and `ci.yml`: it extracts the AppImage, deletes
+that one library, repacks with a digest-pinned `appimagetool` over the
+runtime cut from Tauri's own file, and re-signs with the updater key,
+because the `.sig` covers the file's bytes. Only the client goes:
+tauri-apps/tauri#15976 lists ten display-stack libraries, but removing all
+ten failed on the same WSL host with `libwayland-server.so.0: cannot open
+shared object file`, which some hosts do not have, while removing only the
+client kept WebKit's web process alive there, repacked file included.
+Drop the script once Tauri ships `bundle.linux.appimage.excludeLibraries`
+(tauri-apps/tauri#15662) or excludes the library by default. The `.deb`,
+the `.rpm` and the Flatpak link against the host's libraries and never had
+the problem.
 
 **Two kinds of test that are not examples.** `proptest` runs the parser and the
 matcher over thousands of generated inputs a run (`parser.rs` and `matcher.rs`,

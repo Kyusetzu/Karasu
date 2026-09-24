@@ -123,3 +123,26 @@ describe("SeasonHero", () => {
 
   // No reduced-motion hold, deliberately: advancing is content, not motion, and the crossfade is what the CSS cuts.
 });
+
+describe("SeasonHero banner", () => {
+  /** Contained over a blur of itself: the whole picture shows, and nothing is stretched to fill the frame. */
+  it("draws the banner whole on top of its own blurred fill", async () => {
+    hero.mockResolvedValue([media(1, "Frieren")]);
+    const { container } = renderWithProviders(<SeasonHero />);
+    await screen.findByRole("link", { name: "Frieren" });
+    const images = [...container.querySelectorAll("img")].filter((i) => i.src.endsWith("/banner/1.jpg"));
+    expect(images).toHaveLength(2);
+    expect(images.some((i) => i.classList.contains("object-contain"))).toBe(true);
+    expect(images.some((i) => i.classList.contains("object-cover") && i.className.includes("blur"))).toBe(true);
+  });
+
+  it("shows only the blurred fill behind the adult veil", async () => {
+    useContentFilter.setState({ level: "off", ready: true, error: null, blurAdult: true });
+    hero.mockResolvedValue([media(1, "Veiled", { isAdult: true })]);
+    const { container } = renderWithProviders(<SeasonHero />);
+    await screen.findByRole("link", { name: "Veiled" });
+    const images = [...container.querySelectorAll("img")].filter((i) => i.src.endsWith("/banner/1.jpg"));
+    expect(images).toHaveLength(1);
+    expect(images[0].classList.contains("object-contain")).toBe(false);
+  });
+});

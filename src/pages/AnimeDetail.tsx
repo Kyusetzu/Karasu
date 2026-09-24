@@ -79,6 +79,7 @@ import BackButton from "@/components/shell/BackButton";
 import { DetailSkeleton, Shimmer } from "@/components/Skeleton";
 import { cn } from "@/lib/utils";
 import { DecodedImage } from "@/components/media/DecodedImage";
+import { BannerImage } from "@/components/media/BannerImage";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardTitle } from "@/components/ui/card";
@@ -190,13 +191,7 @@ export default function AnimeDetail() {
       {/* Fixed-height banner slot even without a bannerImage: the cover overlaps its bottom edge by a fixed amount. */}
       <div className="relative h-64">
         {data.bannerImage ? (
-          <DecodedImage
-            src={data.bannerImage}
-            className={cn(
-              "h-full w-full object-cover",
-              veiled && "scale-110 blur-2xl",
-            )}
-          />
+          <BannerImage src={data.bannerImage} veiled={veiled} />
         ) : (
           coverSrc && (
             <DecodedImage
@@ -206,7 +201,8 @@ export default function AnimeDetail() {
             />
           )
         )}
-        <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-surface-950 to-transparent" />
+        {/* A short fade into the page, so the contained banner stays whole above it. */}
+        <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-surface-950 to-transparent" />
         {/* Anchored to the banner, not the centred column, or it drifts inward with the gutter on a wide display. */}
         <BackButton className="absolute left-6 top-4 z-10" />
       </div>

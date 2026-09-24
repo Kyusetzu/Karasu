@@ -74,6 +74,7 @@ export function usePullToSync(): {
       apply(
         pullBegin({
           y: touch.clientY,
+          x: touch.clientX,
           scrollTop: el.scrollTop,
           touches: e.touches.length,
           syncing: isSyncing(),
@@ -85,8 +86,11 @@ export function usePullToSync(): {
       const el = scroller.current;
       const touch = e.touches[0];
       if (!el || !touch || live.current.phase === "idle") return;
+      // A long press can open its sheet while the finger is still down, and a pull behind a sheet must not sync.
+      if (document.querySelector("[data-overlay]")) return apply(PULL_IDLE);
       const next = pullMove(live.current, {
         y: touch.clientY,
+        x: touch.clientX,
         scrollTop: el.scrollTop,
         touches: e.touches.length,
         syncing: isSyncing(),

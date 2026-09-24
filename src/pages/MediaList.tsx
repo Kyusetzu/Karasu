@@ -70,6 +70,8 @@ import { usePhoneShell } from "@/hooks/usePhoneShell";
 import { BulkBar } from "@/components/list/BulkBar";
 import { canIncrement } from "@/components/list/shared";
 import { COMPLETION_CONFIRM_REQUESTS, splitBulkPatch } from "@/lib/completion";
+import { adjacentTab } from "@/lib/navSwipe";
+import { useTabSwipe } from "@/hooks/useTabSwipe";
 
 type SortKey = "updated" | "title" | "score" | "progress";
 type SortDir = "asc" | "desc";
@@ -152,6 +154,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
   const [columns, setColumns] = useState(1);
   const [removing, setRemoving] = useState<MediaListEntry | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   // Which list columns fit, measured off the scroll container: a fixed grid track overflows instead of shrinking.
   const tier = useRowTier(scrollRef, type === "MANGA", layout !== "text");
   const navigate = useNavigate();
@@ -161,6 +164,11 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
 
   // Clear the selection whenever the pool it refers to changes.
   useEffect(() => setSelected(new Set()), [tab]);
+
+  // A tab is another list, so it opens at its top rather than wherever the last one was left.
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+  }, [tab]);
 
   const toggleSelect = useCallback((mediaId: number) => {
     setSelected((prev) => {
@@ -263,6 +271,24 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
     queryFn: () => fetchMediaList(userId, type),
   });
   const { save, bulkSave, remove, bulkRemove } = useListMutations(userId, type);
+
+  // The phone's sideways swipe walks the tabs in their row order and stops at both ends, never wrapping round.
+  const canStepTab = useCallback((step: 1 | -1) => adjacentTab(STATUS_ORDER, tab, step) !== null, [tab]);
+  const stepTab = useCallback(
+    (step: 1 | -1) => {
+      const next = adjacentTab(STATUS_ORDER, tab, step);
+      if (next) setView({ tab: next });
+    },
+    [tab, setView],
+  );
+  useTabSwipe({
+    surface: rootRef,
+    content: scrollRef,
+    // Off while selecting, since a tab change clears the selection, and until the list has mounted to swipe.
+    enabled: phone && !selectMode && !isLoading && !error,
+    canStep: canStepTab,
+    onStep: stepTab,
+  });
 
   const level = useContentFilter((s) => s.level);
   // Read here, not in the memoized rows: a store subscription there would re-render every card on any store move.
@@ -568,7 +594,8 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
     setSelected(new Set());
   };
   return (
-    <div className="flex h-full flex-col">
+    // Clipped sideways, so the list following a swipe never gives the page a horizontal scroll.
+    <div ref={rootRef} className="flex h-full flex-col overflow-x-clip">
       {(data?.fromCache || (data?.pending ?? 0) > 0) && (
         <div className="flex items-center gap-3 border-b border-surface-800 bg-gold/10 px-8 py-2 text-xs text-gold">
           <CloudOff className="size-3.5" />

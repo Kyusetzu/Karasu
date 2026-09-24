@@ -10,11 +10,11 @@ vi.mock("@/hooks/useManualSync", () => ({
   useManualSync: () => ({ sync: hooks.sync, syncing: false, available: hooks.available }),
 }));
 
-/** jsdom implements no `TouchEvent`, and the hook only ever reads `touches[0].clientY`, so this is the whole surface. */
+/** jsdom implements no `TouchEvent`, and the hook reads only `touches[0]`'s coordinates, so this is the whole surface. */
 function touch(type: string, y: number, count = 1): Event {
   const event = new Event(type, { bubbles: true, cancelable: true });
   Object.defineProperty(event, "touches", {
-    value: Array.from({ length: count }, () => ({ clientY: y })),
+    value: Array.from({ length: count }, () => ({ clientY: y, clientX: 0 })),
   });
   return event;
 }

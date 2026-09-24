@@ -16,6 +16,7 @@ import {
 
 const at = (over: Partial<PullSample> = {}): PullSample => ({
   y: 0,
+  x: 0,
   scrollTop: 0,
   touches: 1,
   syncing: false,
@@ -86,7 +87,7 @@ describe("scrollsByStyle", () => {
 
 describe("pullBegin", () => {
   it("tracks from the very top", () => {
-    expect(pullBegin(at({ y: 120 }))).toEqual({ phase: "tracking", offset: 0, startY: 120 });
+    expect(pullBegin(at({ y: 120, x: 30 }))).toEqual({ phase: "tracking", offset: 0, startY: 120, startX: 30 });
   });
 
   it("refuses while scrolled, the case a pull must never be mistaken for", () => {
@@ -122,6 +123,22 @@ describe("pullMove", () => {
 
   it("gives the gesture up on a second finger", () => {
     expect(pullMove(start, at({ y: 300, touches: 2 }))).toEqual(PULL_IDLE);
+  });
+
+  /** A tab swipe on the list starts at the top as often as not, and must not drag the sync indicator along. */
+  it("gives a sideways drag up on the sample that leaves the slop", () => {
+    expect(pullMove(start, at({ y: 100 + 4, x: PULL_SLOP_PX + 6 }))).toEqual(PULL_IDLE);
+    expect(pullMove(start, at({ y: 100 - 3, x: -(PULL_SLOP_PX + 2) }))).toEqual(PULL_IDLE);
+  });
+
+  it("keeps a pull that is mostly downward, and one that drifts sideways once it is a pull", () => {
+    expect(pullMove(start, at({ y: 100 + 20, x: 12 })).phase).toBe("pulling");
+    const pulling = pullMove(start, at({ y: 100 + 20 }));
+    expect(pullMove(pulling, at({ y: 100 + 24, x: 60 })).phase).toBe("pulling");
+  });
+
+  it("reads a missing x as no sideways travel at all", () => {
+    expect(pullMove(start, at({ y: 100 + 20, x: Number.NaN })).phase).toBe("pulling");
   });
 
   it("ignores moves that arrive after it went idle", () => {

@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 742d464 -->
+<!-- generated-through: 9dec534 -->
 
 ### Fixed
 
@@ -110,6 +110,7 @@ tag time is then optional rather than load-bearing.
 - Linux releases ship a .deb and an .rpm beside the AppImage; the AppImage remains the one that updates itself.
 - Setting a title to Completed now fills in the final episode or chapter (and the volume count for manga) wherever the status changes.
 - A third, text-only list view beside the gallery and thumbnails, and all three views on the phone, laid out for its width.
+- On the phone, swipe left or right on the anime and manga lists to move between the status tabs.
 
 ### Changed
 

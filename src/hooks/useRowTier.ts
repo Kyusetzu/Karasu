@@ -5,6 +5,8 @@ import { tierForWidth, type Tier } from "@/components/list/columns";
 export function useRowTier(
   ref: RefObject<HTMLElement | null>,
   manga: boolean,
+  /** False for the text-only list, which fits more columns in the same width. */
+  cover = true,
 ): Tier {
   const [width, setWidth] = useState(0);
 
@@ -21,5 +23,5 @@ export function useRowTier(
   }, [ref]);
 
   // Until measured, the narrow set: it fits everywhere, so the first frame can never overflow.
-  return width === 0 ? "compact" : tierForWidth(width, manga);
+  return width === 0 ? "compact" : tierForWidth(width, manga, cover);
 }

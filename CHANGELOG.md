@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: a43f185 -->
+<!-- generated-through: 742d464 -->
 
 ### Fixed
 
@@ -109,6 +109,7 @@ tag time is then optional rather than load-bearing.
 - Appearance can follow the system's accent colour on Windows, GNOME/KDE and Android 12+, with your own colour kept for when you switch back.
 - Linux releases ship a .deb and an .rpm beside the AppImage; the AppImage remains the one that updates itself.
 - Setting a title to Completed now fills in the final episode or chapter (and the volume count for manga) wherever the status changes.
+- A third, text-only list view beside the gallery and thumbnails, and all three views on the phone, laid out for its width.
 
 ### Changed
 

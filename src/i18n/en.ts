@@ -573,8 +573,9 @@ export const en = {
     hiddenSuggestive: "{{n}} suggestive (Ecchi) hidden by your content filter",
     hiddenBoth: "{{a}} explicit (18+) and {{s}} suggestive hidden by your content filter",
     view: "View",
-    gridView: "Grid view",
-    listView: "List view",
+    viewGallery: "Gallery",
+    viewThumbs: "Thumbnails",
+    viewList: "List",
     progressMax: "Progress (max. {{max}})",
   },
   search: {

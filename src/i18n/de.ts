@@ -576,8 +576,9 @@ export const de: typeof en = {
     hiddenSuggestive: "{{n}} anzügliche (Ecchi) durch deinen Inhaltsfilter ausgeblendet",
     hiddenBoth: "{{a}} explizite (18+) und {{s}} anzügliche durch deinen Inhaltsfilter ausgeblendet",
     view: "Ansicht",
-    gridView: "Rasteransicht",
-    listView: "Listenansicht",
+    viewGallery: "Galerie",
+    viewThumbs: "Miniaturen",
+    viewList: "Liste",
     progressMax: "Fortschritt (max. {{max}})",
   },
   search: {

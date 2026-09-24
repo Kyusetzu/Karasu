@@ -17,6 +17,7 @@ import {
   CloudOff,
   Dices,
   LayoutGrid,
+  LayoutList,
   List as ListIcon,
   RefreshCw,
   Search as SearchIcon,
@@ -61,7 +62,8 @@ import { GridCard } from "@/components/list/GridCard";
 import { ListRow, type RowPatch } from "@/components/list/ListRow";
 import type { BulkPatch } from "@/api/anilist";
 import { ListHeader } from "@/components/list/ListHeader";
-import { ROW_HEIGHT_PX } from "@/components/list/columns";
+import { ROW_HEIGHT_PX, TEXT_ROW_HEIGHT_PX } from "@/components/list/columns";
+import { PHONE_ROW_PX, PhoneRow } from "@/components/list/PhoneRow";
 import { useRowTier } from "@/hooks/useRowTier";
 import { loadViewMode, saveViewMode, type ViewMode } from "@/lib/viewMode";
 import { usePhoneShell } from "@/hooks/usePhoneShell";
@@ -136,11 +138,10 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
   const listFilter = params.get("list") ?? "";
   // The text filter alone keeps local state and mirrors into ?q= on a debounce, not a replaceState per keystroke.
   const [filter, setFilter] = useState(() => params.get("q") ?? "");
-  // Remembered per media type, since the screen remounts on every navigation.
-  const [gridChoice, setGrid] = useState(() => loadViewMode(type) === "grid");
-  /** Phones always get cards, since the row table's fixed tracks overflow there; the stored preference stays. */
+  // Remembered per media type, since the screen remounts on every navigation; all three exist on the phone too.
+  const [layout, setLayout] = useState<ViewMode>(() => loadViewMode(type));
+  /** The table's fixed tracks overflow a phone, so the two row views draw `PhoneRow` there instead. */
   const phone = usePhoneShell();
-  const grid = phone || gridChoice;
   const [editing, setEditing] = useState<MediaListEntry | null>(null);
   const [showRandom, setShowRandom] = useState(false);
   const [presets, setPresets] = useState<Preset[]>(() => loadPresets(type));
@@ -152,7 +153,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
   const [removing, setRemoving] = useState<MediaListEntry | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   // Which list columns fit, measured off the scroll container: a fixed grid track overflows instead of shrinking.
-  const tier = useRowTier(scrollRef, type === "MANGA");
+  const tier = useRowTier(scrollRef, type === "MANGA", layout !== "text");
   const navigate = useNavigate();
   const profileMode = useAuth((s) => s.mode);
   // The request count of a bulk completion waiting on a yes; null while nothing is asking.
@@ -731,29 +732,33 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
           >
             <Dices className="size-4" />
           </IconButton>
-          {!phone && (
+          {/* In the wrapping filter row on the phone as well, where the header row has no width to spare. */}
           <Segmented
             className="ml-auto"
             aria-label={t("list.view")}
-            value={grid ? "grid" : "rows"}
+            value={layout}
             onChange={(v) => {
-              setGrid(v === "grid");
-              saveViewMode(type, v as ViewMode);
+              setLayout(v);
+              saveViewMode(type, v);
             }}
             segments={[
               {
                 value: "grid",
-                title: t("list.gridView"),
+                title: t("list.viewGallery"),
                 label: <LayoutGrid className="size-3.75" />,
               },
               {
                 value: "rows",
-                title: t("list.listView"),
+                title: t("list.viewThumbs"),
+                label: <LayoutList className="size-3.75" />,
+              },
+              {
+                value: "text",
+                title: t("list.viewList"),
                 label: <ListIcon className="size-3.75" />,
               },
             ]}
           />
-          )}
       </div>
 
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-8 pb-12 pt-1">
@@ -799,8 +804,10 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
               hint={t("list.emptyTabHint")}
             />
           )
-        ) : grid ? (
+        ) : layout === "grid" ? (
           <VirtualGrid
+            // Keyed on the view and the shell, so no row height measured for one layout is reused by another.
+            key={`grid-${phone}`}
             items={entries}
             scrollRef={scrollRef}
             gridClassName="media-grid gap-x-4"
@@ -824,16 +831,46 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
               />
             )}
           />
+        ) : phone ? (
+          <div className="overflow-hidden rounded-xl border border-surface-800">
+            <VirtualGrid
+              key={`phone-${layout}`}
+              items={entries}
+              scrollRef={scrollRef}
+              // One bounded track: an `auto` one grows to a nowrap title and pushes the buttons out of the row.
+              gridClassName="grid grid-cols-1"
+              rowGap={0}
+              estimateRowHeight={layout === "text" ? PHONE_ROW_PX.text : PHONE_ROW_PX.thumbs}
+              focusIndex={focus}
+              onColumns={setColumns}
+              renderItem={(entry, i) => (
+                <PhoneRow
+                  key={entry.id}
+                  entry={entry}
+                  variant={layout === "text" ? "text" : "thumbs"}
+                  unit={unit}
+                  focused={i === focus}
+                  blurred={shouldBlur(entry.media, level, blurAdult)}
+                  onPlusOne={plusOne}
+                  onEdit={startEdit}
+                  selectMode={selectMode}
+                  selected={selected.has(entry.mediaId)}
+                  onToggleSelect={toggleSelect}
+                />
+              )}
+            />
+          </div>
         ) : (
           <div className="overflow-hidden rounded-xl border border-surface-800">
-            <ListHeader tier={tier} selectMode={selectMode} mediaType={type} />
+            <ListHeader tier={tier} selectMode={selectMode} mediaType={type} cover={layout !== "text"} />
             {/* Keep one entry per row: two side by side made useColumnCount report 2, so the down arrow moved by two. */}
             <VirtualGrid
+              key={`table-${layout}`}
               items={entries}
               scrollRef={scrollRef}
               gridClassName="grid"
               rowGap={0}
-              estimateRowHeight={ROW_HEIGHT_PX}
+              estimateRowHeight={layout === "text" ? TEXT_ROW_HEIGHT_PX : ROW_HEIGHT_PX}
               focusIndex={focus}
               onColumns={setColumns}
               renderItem={(entry, i) => (
@@ -841,6 +878,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
                   key={entry.id}
                   entry={entry}
                   tier={tier}
+                  variant={layout === "text" ? "text" : "thumbs"}
                   focused={i === focus}
                   blurred={shouldBlur(entry.media, level, blurAdult)}
                   onQuickSave={quickSave}

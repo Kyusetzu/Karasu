@@ -51,6 +51,14 @@ describe("loadViewMode", () => {
     expect(loadViewMode("ANIME")).toBe("rows");
   });
 
+  /** The text-only list is the third view; a setting saved before it existed still reads as one of the other two. */
+  it("round-trips the text list beside the older two", () => {
+    stubStorage({ [KEY]: JSON.stringify({ ANIME: "rows" }) });
+    saveViewMode("MANGA", "text");
+    expect(loadViewMode("MANGA")).toBe("text");
+    expect(loadViewMode("ANIME")).toBe("rows");
+  });
+
   it("overwrites rather than accumulating", () => {
     const data = stubStorage();
     saveViewMode("ANIME", "rows");

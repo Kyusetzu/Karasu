@@ -50,3 +50,12 @@ export function pinchUpdate(
     ty: nm.y - (pm.y - v.ty) * scale,
   };
 }
+
+/** The view that puts content point `point` (unscaled px) in the middle of a `box`-sized viewport at `zoom`. */
+export function centerOn(
+  point: Point,
+  box: { width: number; height: number },
+  zoom: number,
+): ZoomView {
+  return { zoom, tx: box.width / 2 - point.x * zoom, ty: box.height / 2 - point.y * zoom };
+}

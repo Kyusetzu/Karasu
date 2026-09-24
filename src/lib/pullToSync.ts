@@ -37,6 +37,11 @@ export function scrollsByStyle(overflowY: string): boolean {
   return overflowY === "auto" || overflowY === "scroll";
 }
 
+/** A surface with `touch-action: none` handles its own drags, so a pull must never start on it. */
+export function ownsGestures(touchAction: string): boolean {
+  return touchAction === "none";
+}
+
 /** An overflow that scrolls and content that overflows it; anything else is a container the gesture must look past. */
 export function isScrollableStyle(
   overflowY: string,

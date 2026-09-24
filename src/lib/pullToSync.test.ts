@@ -5,6 +5,7 @@ import {
   PULL_SLOP_PX,
   PULL_TRIGGER_PX,
   isScrollableStyle,
+  ownsGestures,
   scrollsByStyle,
   pullBegin,
   pullEnd,
@@ -138,5 +139,14 @@ describe("pullEnd", () => {
     const short = pullMove(pullBegin(at({ y: 100 })), at({ y: 100 + PULL_SLOP_PX + 4 }));
     expect(pullEnd(short).sync).toBe(false);
     expect(pullEnd(PULL_IDLE).sync).toBe(false);
+  });
+});
+
+describe("ownsGestures", () => {
+  it("is true only for a surface that takes every touch itself", () => {
+    expect(ownsGestures("none")).toBe(true);
+    expect(ownsGestures("auto")).toBe(false);
+    expect(ownsGestures("pan-x pan-y")).toBe(false);
+    expect(ownsGestures("")).toBe(false);
   });
 });

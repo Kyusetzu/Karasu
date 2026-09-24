@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -17,6 +17,7 @@ import {
   type FranchiseTreeNode,
 } from "@/lib/franchiseLayout";
 import { BUTTON_STEP, usePanZoom } from "@/hooks/usePanZoom";
+import { centerOn } from "@/lib/zoomMath";
 import { useCachedEntry } from "@/hooks/useCachedEntry";
 import { useListMutations } from "@/hooks/useListMutations";
 import { displayTitle, type MediaListStatus } from "@/api/types";
@@ -72,19 +73,37 @@ export default function Franchise() {
 
   const viewport = useRef<HTMLDivElement>(null);
   const pan = usePanZoom(viewport);
-  const { reset: resetPan } = pan;
+  const { reset: resetPan, jumpTo } = pan;
 
-  // A new franchise is a new graph: the last one's collapse set and selection mean nothing here.
-  useEffect(() => {
+  // A new franchise is a new graph; a layout effect, so the rail has its content before the canvas is measured.
+  useLayoutEffect(() => {
     setCollapsed(new Set());
     setSelected(data?.rootId ?? null);
-    resetPan();
-  }, [data?.rootId, resetPan]);
+  }, [data?.rootId]);
 
   const layout = useMemo(
     () => (data ? layoutFranchise(data.nodes, data.edges, data.rootId, collapsed) : null),
     [data, collapsed],
   );
+
+  /** The title the user came from, in the middle of the canvas at the resting zoom, on either platform. */
+  const recenter = useCallback(() => {
+    const box = viewport.current?.getBoundingClientRect();
+    const spot = data ? layout?.positions.get(data.rootId) : undefined;
+    if (!box || !spot || box.width === 0) return resetPan();
+    // The canvas is laid out in rem, so the root's em position scales with the text size the user chose.
+    const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    const centre = { x: (spot.x + NODE_W / 2) * rem, y: (spot.y + NODE_H / 2) * rem };
+    jumpTo(centerOn(centre, box, 1));
+  }, [data, layout, jumpTo, resetPan]);
+
+  // Once per franchise, before paint and after the root is selected: the rail it fills shortens the canvas below `xl`.
+  const centred = useRef<number | null>(null);
+  useLayoutEffect(() => {
+    if (!data || !viewport.current || centred.current === data.rootId || selected !== data.rootId) return;
+    centred.current = data.rootId;
+    recenter();
+  }, [data, selected, recenter]);
 
   const byId = useMemo(
     () => new Map((data?.nodes ?? []).map((n) => [n.id, n])),
@@ -282,7 +301,7 @@ export default function Franchise() {
               </IconButton>
               <button
                 type="button"
-                onClick={pan.reset}
+                onClick={recenter}
                 title={t("franchise.resetView")}
                 className="min-w-11 rounded-md px-1 py-0.5 text-2xs tabular-nums text-ink-500 transition-surface hover:bg-surface-800 hover:text-ink-100"
               >

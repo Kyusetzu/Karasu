@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 3aa6c88 -->
+<!-- generated-through: 903d6c3 -->
 
 ### Fixed
 
@@ -89,6 +89,7 @@ tag time is then optional rather than load-bearing.
 - The command palette's result groups are announced as groups, and its input has a name.
 - F5, Ctrl+F and Ctrl+P no longer reach the browser engine under the app on desktop; copying works the same on Linux as on Windows.
 - The Linux AppImage no longer opens a black window with EGL_BAD_PARAMETER on Fedora 44, Ubuntu 26.04 and other systems with Mesa 26.
+- panning the franchise view on Android no longer triggers a sync, and the view opens centred on the title it was opened from.
 
 ### Added
 
@@ -107,7 +108,7 @@ tag time is then optional rather than load-bearing.
 - On Android, a long press and an armed pull-to-sync give a short haptic tick, and a title can be shared to another app from its menu or its page.
 - Appearance can follow the system's accent colour on Windows, GNOME/KDE and Android 12+, with your own colour kept for when you switch back.
 - Linux releases ship a .deb and an .rpm beside the AppImage; the AppImage remains the one that updates itself.
-- setting a title to Completed now fills in the final episode or chapter (and the volume count for manga) wherever the status changes.
+- Setting a title to Completed now fills in the final episode or chapter (and the volume count for manga) wherever the status changes.
 
 ### Changed
 

@@ -126,6 +126,21 @@ describe("usePullToSync", () => {
     expect(hooks.sync).not.toHaveBeenCalled();
   });
 
+  /** The franchise canvas: a page that never scrolls, holding a surface that pans on the same downward drag. */
+  it("leaves a surface that handles its own drags alone", () => {
+    mount();
+    const page = emptyScroller();
+    const canvas = document.createElement("div");
+    canvas.style.touchAction = "none";
+    page.appendChild(canvas);
+    drag(canvas, FAR);
+    expect(phase()).toBe("idle");
+    act(() => {
+      canvas.dispatchEvent(touch("touchend", FAR, 0));
+    });
+    expect(hooks.sync).not.toHaveBeenCalled();
+  });
+
   it("registers nothing at all without an account to sync for", () => {
     hooks.available = false;
     mount();

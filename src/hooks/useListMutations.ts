@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import {
@@ -17,6 +18,7 @@ import type {
 } from "@/api/types";
 import { displayTitle } from "@/api/types";
 import { headline, inverse, type EntrySnapshot } from "@/lib/receipt";
+import { splitBulkPatch, withCompletion } from "@/lib/completion";
 import { showToast } from "@/stores/toast";
 
 /** Mutations on one media list with optimistic cache updates; a status change moves the entry locally, no refetch. */
@@ -117,22 +119,23 @@ export function useListMutations(userId: number, mediaType: MediaType) {
               group.status === input.status,
           ),
       }));
-      // Insert into the target group if it exists
+      // Insert into the target group, minting it when the account has none yet so the entry cannot vanish.
       if (input.status) {
-        const target = lists.find(
+        let target = lists.find(
           (g) => !g.isCustomList && g.status === input.status,
         );
-        if (target) {
-          // By media id: an entry also in a custom list appears more than once in this flat pass and would be inserted twice.
-          const moved = new Map<number, MediaListEntry>();
-          for (const e of old.lists.flatMap((g) => g.entries)) {
-            if (!mediaIds.has(e.mediaId) || moved.has(e.mediaId)) continue;
-            if (target.entries.some((t) => t.mediaId === e.mediaId)) continue;
-            moved.set(e.mediaId, applyInput(e, input, now));
-          }
-          if (moved.size)
-            target.entries = [...moved.values(), ...target.entries];
+        if (!target) {
+          target = { name: input.status, status: input.status, isCustomList: false, entries: [] };
+          lists.push(target);
         }
+        // By media id: an entry also in a custom list appears more than once in this flat pass and would be inserted twice.
+        const moved = new Map<number, MediaListEntry>();
+        for (const e of old.lists.flatMap((g) => g.entries)) {
+          if (!mediaIds.has(e.mediaId) || moved.has(e.mediaId)) continue;
+          if (target.entries.some((t) => t.mediaId === e.mediaId)) continue;
+          moved.set(e.mediaId, applyInput(e, input, now));
+        }
+        if (moved.size) target.entries = [...moved.values(), ...target.entries];
       }
       return { ...old, lists };
     });
@@ -141,7 +144,7 @@ export function useListMutations(userId: number, mediaType: MediaType) {
   const patchCache = (input: SaveEntryInput) =>
     patchCacheMany(new Set([input.mediaId]), input);
 
-  const save = useMutation({
+  const saveMutation = useMutation({
     mutationFn: (input: SaveEntryInput) => saveListEntry(input),
     onMutate: async (input) => {
       await qc.cancelQueries({ queryKey: key });
@@ -185,7 +188,8 @@ export function useListMutations(userId: number, mediaType: MediaType) {
           : receiptText(input, ctx.before, ctx.title),
         action: {
           label: t("receipt.undo"),
-          run: () => save.mutate(undo),
+          // Raw, not through the fill: the undo restores a recorded state, and refilling would overwrite it with totals.
+          run: () => saveMutation.mutate(undo),
         },
       });
     },
@@ -196,25 +200,57 @@ export function useListMutations(userId: number, mediaType: MediaType) {
         kind: "error",
         text: t("receipt.failed", { title: ctx?.title ?? "" }).trim(),
         detail: t("receipt.failedDetail"),
-        action: { label: t("common.retry"), run: () => save.mutate(input) },
+        action: { label: t("common.retry"), run: () => saveMutation.mutate(input) },
       });
     },
   });
 
+  // Filled at the door, before the optimistic patch moves the entry whose media and status the fill reads.
+  const fill = useCallback(
+    (input: SaveEntryInput): SaveEntryInput => {
+      const cached = findEntry(qc.getQueryData<ListResult>(["mediaList", mediaType, userId]), input.mediaId);
+      return withCompletion(input, cached?.media, mediaType, cached?.status);
+    },
+    [qc, mediaType, userId],
+  );
+  const { mutate: sendSave, mutateAsync: sendSaveAsync } = saveMutation;
+  const mutateSave = useCallback((input: SaveEntryInput) => sendSave(fill(input)), [sendSave, fill]);
+  const mutateSaveAsync = useCallback(
+    (input: SaveEntryInput) => sendSaveAsync(fill(input)),
+    [sendSaveAsync, fill],
+  );
+  /** The mutation with a move into COMPLETED carrying the cached totals, so the patch, receipt and Undo all see them. */
+  const save = { ...saveMutation, mutate: mutateSave, mutateAsync: mutateSaveAsync };
+
   /** One patch across a selection as a single mutation; per-entry mutations fanned out and their rollbacks fought. */
   const bulkSave = useMutation({
-    mutationFn: ({
+    mutationFn: async ({
       entries,
       patch,
     }: {
       entries: MediaListEntry[];
       /** What `UpdateMediaListEntries` takes across a selection; `notes` is left out because tags are serialized into it. */
       patch: BulkPatch;
-    }) => bulkSaveEntries(entries, patch),
+    }) => {
+      let done = 0;
+      // One request per distinct total when completing; a later group failing still reports the landed ones.
+      for (const group of splitBulkPatch(entries, patch, mediaType)) {
+        try {
+          done += await bulkSaveEntries(group.entries, group.patch);
+        } catch (err) {
+          if (done === 0) throw err;
+          const landed = err instanceof BulkSaveError ? err.updated : 0;
+          throw new BulkSaveError(err instanceof Error ? err.message : String(err), done + landed);
+        }
+      }
+      return done;
+    },
     onMutate: async ({ entries, patch }) => {
       await qc.cancelQueries({ queryKey: key });
       const previous = qc.getQueryData<ListResult>(key);
-      patchCacheMany(new Set(entries.map((e) => e.mediaId)), patch);
+      for (const group of splitBulkPatch(entries, patch, mediaType)) {
+        patchCacheMany(new Set(group.entries.map((e) => e.mediaId)), group.patch);
+      }
       return { previous, count: entries.length };
     },
     onSuccess: (_res, _vars, ctx) => {

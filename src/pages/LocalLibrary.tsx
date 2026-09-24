@@ -27,6 +27,7 @@ import { displayTitle, type Media, type MediaListEntry } from "@/api/types";
 import { missingIds } from "@/lib/chunk";
 import { fuzzyScore, prepareDoc, prepareQuery } from "@/lib/fuzzy";
 import { loadDefaultAddStatus } from "@/lib/defaultAddStatus";
+import { withCompletion } from "@/lib/completion";
 import {
   clearLibraryMatch,
   getLibraryStatus,
@@ -370,8 +371,9 @@ function LibraryView({ userId }: { userId: number }) {
   const addToList = useCallback(
     async (media: Media) => {
       try {
+        // A first add, so a default of Completed arrives with the totals rather than at zero.
         await saveListEntry(
-          { mediaId: media.id, status: loadDefaultAddStatus() },
+          withCompletion({ mediaId: media.id, status: loadDefaultAddStatus() }, media, "ANIME", null),
           media,
         );
         // The invalidate moves the row; `useListMutations` patches existing entries and a first add has none.

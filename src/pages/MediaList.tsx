@@ -28,7 +28,6 @@ import { FilteredNotice } from "@/components/FilteredNotice";
 import { fetchMediaList, flushQueue } from "@/api/anilist";
 import {
   displayTitle,
-  maxProgress,
   STATUS_ORDER,
   type MediaListEntry,
   type MediaListStatus,
@@ -68,7 +67,7 @@ import { loadViewMode, saveViewMode, type ViewMode } from "@/lib/viewMode";
 import { usePhoneShell } from "@/hooks/usePhoneShell";
 import { BulkBar } from "@/components/list/BulkBar";
 import { canIncrement } from "@/components/list/shared";
-import { completePatch } from "@/lib/actions";
+import { COMPLETION_CONFIRM_REQUESTS, splitBulkPatch } from "@/lib/completion";
 
 type SortKey = "updated" | "title" | "score" | "progress";
 type SortDir = "asc" | "desc";
@@ -155,6 +154,9 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
   // Which list columns fit, measured off the scroll container: a fixed grid track overflows instead of shrinking.
   const tier = useRowTier(scrollRef, type === "MANGA");
   const navigate = useNavigate();
+  const profileMode = useAuth((s) => s.mode);
+  // The request count of a bulk completion waiting on a yes; null while nothing is asking.
+  const [confirmComplete, setConfirmComplete] = useState<number | null>(null);
 
   // Clear the selection whenever the pool it refers to changes.
   useEffect(() => setSelected(new Set()), [tab]);
@@ -399,7 +401,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
   );
 
   const complete = useCallback(
-    (entry: MediaListEntry) => quickSave(entry, completePatch(maxProgress(entry.media))),
+    (entry: MediaListEntry) => quickSave(entry, { status: "COMPLETED" }),
     [quickSave],
   );
 
@@ -546,7 +548,15 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
   // One mutation for the whole selection, not one per entry (useListMutations.bulkSave).
   const bulkPatch = (patch: BulkPatch) =>
     bulkSave.mutate({ entries: selectedEntries, patch });
-  const bulkStatus = (status: MediaListStatus) => bulkPatch({ status });
+  const bulkStatus = (status: MediaListStatus) => {
+    // Local mode writes SQLite, so only an AniList completion has a request count worth asking about.
+    const requests =
+      status === "COMPLETED" && profileMode === "anilist"
+        ? splitBulkPatch(selectedEntries, { status }, type).length
+        : 1;
+    if (requests > COMPLETION_CONFIRM_REQUESTS) setConfirmComplete(requests);
+    else bulkPatch({ status });
+  };
   const bulkScore = (score: number) => bulkPatch({ score });
   const bulkProgress = (progress: number) => bulkPatch({ progress });
   const bulkRepeat = (repeat: number) => bulkPatch({ repeat });
@@ -896,6 +906,24 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
               setRemoving(null);
             }}
             onCancel={() => setRemoving(null)}
+          />
+        )}
+      </Presence>
+
+      <Presence value={confirmComplete}>
+        {(requests, leaving) => (
+          <ConfirmDialog
+            leaving={leaving}
+            title={t("bulk.completeTitle", { count: selectedEntries.length })}
+            names={selectedEntries.slice(0, 3).map((e) => displayTitle(e.media.title))}
+            extra={Math.max(0, selectedEntries.length - 3)}
+            note={t("bulk.completeRequests", { n: requests })}
+            confirmLabel={t("bulk.completeConfirm")}
+            onConfirm={() => {
+              bulkPatch({ status: "COMPLETED" });
+              setConfirmComplete(null);
+            }}
+            onCancel={() => setConfirmComplete(null)}
           />
         )}
       </Presence>

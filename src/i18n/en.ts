@@ -712,6 +712,10 @@ export const en = {
     setStatus: "Set status …",
     setScore: "Set score …",
     done: "Done",
+    completeTitle: "Complete {{count}} titles?",
+    completeRequests:
+      "Their episode and chapter counts differ, so this takes {{n}} requests to AniList instead of one, from the same per-minute budget syncing and scrobbling use.",
+    completeConfirm: "Complete all",
   },
   palette: {
     placeholder: "Jump to a page or title …",

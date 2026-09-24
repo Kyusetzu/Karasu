@@ -715,6 +715,10 @@ export const de: typeof en = {
     setStatus: "Status setzen …",
     setScore: "Bewertung setzen …",
     done: "Fertig",
+    completeTitle: "{{count}} Titel abschließen?",
+    completeRequests:
+      "Ihre Episoden- und Kapitelzahlen unterscheiden sich, daher braucht das {{n}} Anfragen an AniList statt einer, aus demselben Minutenbudget wie Sync und Scrobbling.",
+    completeConfirm: "Alle abschließen",
   },
   palette: {
     placeholder: "Zu Seite oder Titel springen …",

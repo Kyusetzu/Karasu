@@ -82,6 +82,10 @@ export function headline(
     "repeat",
     "notes",
   ] as const;
+  // Completing is the point of the save, and the totals it fills are its consequence rather than its headline.
+  if (input.status === "COMPLETED" && before.status !== "COMPLETED") {
+    return { field: "status", value: input.status };
+  }
   for (const field of order) {
     const next = input[field];
     if (next === undefined || next === before[field]) continue;

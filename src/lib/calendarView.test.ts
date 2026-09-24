@@ -36,7 +36,8 @@ describe("the stored view", () => {
   const original = globalThis.localStorage;
   afterEach(() => {
     store.clear();
-    Object.defineProperty(globalThis, "localStorage", { value: original, configurable: true });
+    // Writable as well: `defineProperty` defaults it to false, and a later file in the shared node graph assigns to it.
+    Object.defineProperty(globalThis, "localStorage", { value: original, configurable: true, writable: true });
   });
 
   it("round-trips and falls back on a stray value", () => {

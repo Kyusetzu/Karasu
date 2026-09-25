@@ -82,6 +82,7 @@ export default function MediaCard({
       actions={
         hasProfile && (
           <>
+            {/* Below two circles' width a cover keeps one, the entry's own state rather than the editor. */}
             <IconButton
               variant="onCover"
               size="sm"
@@ -89,6 +90,7 @@ export default function MediaCard({
               onClick={() => setEditing(true)}
               aria-label={t("common.edit")}
               title={t("common.edit")}
+              className="@max-cover-pair:hidden"
             >
               <Pencil className="size-3.5" />
             </IconButton>

@@ -87,7 +87,7 @@ export const GridCard = memo(function GridCard({
         // Suppressed in select mode; keep `group-focus-within`, or Tab lands on fully transparent buttons.
         !selectMode && (
           <div className="flex gap-1.5 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100">
-            {/* Below two circles' width a cover keeps one, and edit is the one the context menu also offers. */}
+            {/* Below two circles' width a cover keeps one, the quick write rather than the way into the editor. */}
             <IconButton
               variant="onCover"
               size="sm"

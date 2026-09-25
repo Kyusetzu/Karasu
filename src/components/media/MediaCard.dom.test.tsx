@@ -70,6 +70,14 @@ describe("MediaCard in the account-free profile", () => {
     expect(screen.getByTitle("status.ANIME.CURRENT")).toBeInTheDocument();
   });
 
+  it("gives up edit, never the status or the quick add, on a cover too narrow for two circles", async () => {
+    const { queryClient } = renderWithProviders(<MediaCard media={media({ id: 999 })} />);
+    queryClient.setQueryData(["mediaList", "ANIME", 0], localList());
+    await screen.findByRole("button", { name: "media.addDefault" });
+    expect(screen.getByRole("button", { name: "common.edit" })).toHaveClass("@max-cover-pair:hidden");
+    expect(screen.getByRole("button", { name: "media.addDefault" })).not.toHaveClass("@max-cover-pair:hidden");
+  });
+
   /** A title genuinely absent must still offer the quick add. */
   it("still offers the quick add for a title that is not on the local list", async () => {
     const { queryClient } = renderWithProviders(

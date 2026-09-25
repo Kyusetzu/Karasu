@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 49e2b04 -->
+<!-- generated-through: 0713ed1 -->
 
 ### Fixed
 
@@ -103,6 +103,7 @@ tag time is then optional rather than load-bearing.
 - Opening the notifications dropdown or sheet over the notifications page no longer reloads every page or clears its unread marks, and the pull-to-sync pill fades out where it stood.
 - Narrow grid covers keep the complete button when it fits and never clip a quick action, and the selection box no longer draws a second focus ring.
 - The score label over the chosen bar is readable in the light theme, and the tag field shows keyboard focus.
+- Covers in search and the season pages no longer clip a quick action when they are narrow.
 
 ### Added
 

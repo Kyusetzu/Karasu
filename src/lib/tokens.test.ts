@@ -46,6 +46,13 @@ describe("token blocks", () => {
     expect([...light.keys()].filter((k) => !known.has(k))).toEqual([]);
   });
 
+  it("writes every themed colour as hex, the one form the contrast checks can measure", () => {
+    for (const block of [base, light, hcDark, hcLight]) {
+      const bad = [...block].filter(([k, v]) => THEMED.test(k) && !/^#[0-9a-f]{6}$/i.test(v)).map(([k]) => k);
+      expect(bad).toEqual([]);
+    }
+  });
+
   it("gives every root value the theme does not write at runtime a light twin", () => {
     expect([...root.keys()].filter((k) => !RUNTIME.has(k) && !light.has(k))).toEqual([]);
   });

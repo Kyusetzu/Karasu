@@ -102,7 +102,7 @@
   /* Score stars only. */
   --color-gold: #fcd34d;
   /* A label on a gold fill: near-black on the bright gold, white on the light theme's dark one. */
-  --color-gold-ink: rgb(4 5 8);
+  --color-gold-ink: #040508;
   /* Destructive actions, failure states. */
   --color-danger: #f0787f;
   /* "Mark complete" — only ever a glyph on the scrim over cover art. */

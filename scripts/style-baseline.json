@@ -265,9 +265,8 @@
     "icon-size": 1
   },
   "src/pages/settings/shared.tsx": {
-    "colour-foreign": 3,
+    "colour-foreign": 2,
     "icon-size": 1,
-    "shadow-size": 2,
-    "transition-broad": 2
+    "shadow-size": 2
   }
 }

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { AlertTriangle, Globe } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { hexToHsv, hsvToHex, type Hsv } from "@/lib/contrast";
+import { Switch } from "@/components/ui/switch";
 
 /** The controls every settings pane shares; none is a `components/ui` primitive, since each knows the pane. */
 
@@ -104,26 +105,7 @@ export function Toggle({
         <span className="block text-sm text-ink-100">{label}</span>
         {hint && <span className="block text-xs text-ink-600">{hint}</span>}
       </span>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        disabled={disabled}
-        onClick={() => onChange(!checked)}
-        className={cn(
-          "relative h-4.75 w-8.5 shrink-0 rounded-full transition-colors",
-          checked ? "bg-accent-600" : "bg-surface-700",
-          disabled && "pointer-events-none",
-        )}
-      >
-        <span
-          className={cn(
-            "absolute top-[.0625rem] size-4.25 rounded-full transition-all",
-            // White holds on the accent fill in both themes, but only the inverting ink reads on the off track.
-            checked ? "left-4 bg-white" : "left-[.0625rem] bg-ink-100",
-          )}
-        />
-      </button>
+      <Switch checked={checked} disabled={disabled} onChange={onChange} />
     </label>
   );
 }

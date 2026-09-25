@@ -325,6 +325,7 @@ no row here, add the primitive first.
 | an action | `Button` (`default`, `secondary`, `outline`, `ghost`, `danger`, `dangerGhost`) |
 | an icon-only action | `IconButton`, always with `aria-label` |
 | one value of several | `Pill` |
+| on or off | `Switch`, which is `role="switch"` and never a checkbox |
 | one lens of two or three | `Segmented` |
 | the list's status strip | `StatusTabs` |
 | a raised panel | `Card`, `CardTitle` |
@@ -347,7 +348,7 @@ no row here, add the primitive first.
 The foundation phase adds, each replacing the hand-built copies it lists in
 the plan:
 
-- `switch`, `chip` and `badge`, `disclosure`, `menu-item`;
+- `chip` and `badge`, `disclosure`, `menu-item`;
 - `sheet` (one sheet with swipe to dismiss);
 - `field` and `search-field`, and card variants.
 

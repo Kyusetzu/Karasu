@@ -343,8 +343,6 @@ export const en = {
     heroAiredOpen: "{{n}} aired",
     heroEpisodes: "{{n}} episodes",
     heroLabel: "This season's most popular anime",
-    heroPrev: "Previous title",
-    heroNext: "Next title",
     birthdays: "Birthdays today",
     birthdayCharacter: "Favourite character",
     birthdayStaff: "Favourite staff",

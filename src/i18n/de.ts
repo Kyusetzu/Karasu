@@ -345,8 +345,6 @@ export const de: typeof en = {
     heroAiredOpen: "{{n}} ausgestrahlt",
     heroEpisodes: "{{n}} Episoden",
     heroLabel: "Beliebteste Anime dieser Saison",
-    heroPrev: "Vorheriger Titel",
-    heroNext: "Nächster Titel",
     birthdays: "Geburtstage heute",
     birthdayCharacter: "Lieblingscharakter",
     birthdayStaff: "Lieblings-Staff",

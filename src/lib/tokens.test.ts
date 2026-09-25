@@ -186,7 +186,7 @@ describe("the focus ring on a clipping frame", () => {
 
   it("draws what the global ring draws, so a cover's focus reads like any other control's", () => {
     const global = ring(css, "  :focus-visible {");
-    const own = ring(frame, "&:has(> :focus-visible) {");
+    const own = ring(frame, "&:has(> [data-fills-frame]:focus-visible) {");
     for (const property of ["outline:", "outline-offset:"]) {
       const value = (text: string) => new RegExp(`${property}\\s*([^;]+);`).exec(text)?.[1];
       expect(value(own), property).toBe(value(global));
@@ -194,7 +194,8 @@ describe("the focus ring on a clipping frame", () => {
   });
 
   it("thickens in high contrast and takes the system highlight in forced colours, as the global ring does", () => {
-    expect(frame).toMatch(/:root\[data-contrast="more"\] &:has\(> :focus-visible\) \{\s*outline-width: 3px;/);
-    expect(frame).toMatch(/@media \(forced-colors: active\) \{\s*&:has\(> :focus-visible\) \{\s*outline: 3px solid Highlight;/);
+    const own = String.raw`&:has\(> \[data-fills-frame\]:focus-visible\)`;
+    expect(frame).toMatch(new RegExp(String.raw`:root\[data-contrast="more"\] ${own} \{\s*outline-width: 3px;`));
+    expect(frame).toMatch(new RegExp(String.raw`@media \(forced-colors: active\) \{\s*${own} \{\s*outline: 3px solid Highlight;`));
   });
 });

@@ -5,6 +5,7 @@ import { entry, media } from "@/test/fixtures";
 import { checkA11y } from "@/test/a11y";
 import { PhoneRow } from "./PhoneRow";
 import { ListRow } from "./ListRow";
+import { GridCard } from "./GridCard";
 
 /** The two row views the phone draws and the table's text variant, graded by axe and driven through their controls. */
 
@@ -135,5 +136,47 @@ describe("ListRow, text variant", () => {
     expect(onQuickSave).toHaveBeenCalledWith(expect.objectContaining({ mediaId: 1 }), {
       status: "COMPLETED",
     });
+  });
+});
+
+function gridCard(over: Partial<Parameters<typeof GridCard>[0]> = {}) {
+  return (
+    <GridCard
+      entry={entry()}
+      unit="episodes"
+      blurred={false}
+      onPlusOne={noop}
+      onComplete={noop}
+      onEdit={noop}
+      selectMode={false}
+      selected={false}
+      focused={false}
+      onToggleSelect={noop}
+      {...over}
+    />
+  );
+}
+
+/** The cover's frame clips, so what the ring and the quick actions do at its edges is a contract of its own. */
+describe("GridCard", () => {
+  it("rings the frame for the control that fills it, and never for the selection box", () => {
+    const browsing = renderWithProviders(gridCard());
+    expect(browsing.container.querySelector("a[data-fills-frame]")).toBeInTheDocument();
+    browsing.unmount();
+    renderWithProviders(gridCard({ selectMode: true }));
+    expect(screen.getByRole("button", { name: "bulk.select" })).toHaveAttribute("data-fills-frame");
+    expect(screen.getByRole("checkbox")).not.toHaveAttribute("data-fills-frame");
+  });
+
+  it("gives up complete on a narrow cover only when it would be the third circle", () => {
+    const three = renderWithProviders(gridCard());
+    expect(screen.getByRole("button", { name: "common.complete" })).toHaveClass("@max-cover-actions:hidden");
+    expect(screen.getByRole("button", { name: "common.edit" })).toHaveClass("@max-cover-pair:hidden");
+    three.unmount();
+    // At its last episode but not completed: no +1, so edit and complete are the pair and complete stays.
+    renderWithProviders(gridCard({ entry: entry({ progress: 26 }) }));
+    expect(screen.queryByRole("button", { name: "common.plusOne" })).toBeNull();
+    expect(screen.getByRole("button", { name: "common.complete" })).not.toHaveClass("@max-cover-actions:hidden");
+    expect(screen.getByRole("button", { name: "common.edit" })).toHaveClass("not-pointer-coarse:@max-cover-pair:hidden");
   });
 });

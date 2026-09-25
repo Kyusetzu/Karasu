@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: e7ce5d9 -->
+<!-- generated-through: ff4b0c8 -->
 
 ### Fixed
 
@@ -101,6 +101,7 @@ tag time is then optional rather than load-bearing.
 - Notification links need one back press, the notifications page keeps its loaded pages and unread marks when the titlebar bell opens over it, and its header fits a phone.
 - A keyboard focus ring is visible on grid covers again, the complete button no longer overflows narrow covers, and the list view's score header is no longer cut off in German.
 - Opening the notifications dropdown or sheet over the notifications page no longer reloads every page or clears its unread marks, and the pull-to-sync pill fades out where it stood.
+- Narrow grid covers keep the complete button when it fits and never clip a quick action, and the selection box no longer draws a second focus ring.
 
 ### Added
 

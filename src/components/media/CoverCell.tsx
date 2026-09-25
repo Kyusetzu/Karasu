@@ -98,12 +98,13 @@ export function CoverCell({
             type="button"
             onClick={onCoverClick}
             aria-label={coverLabel}
+            data-fills-frame
             className="block h-full w-full"
           >
             {art}
           </button>
         ) : (
-          <Link to={to} className="block h-full">
+          <Link to={to} data-fills-frame className="block h-full">
             {art}
           </Link>
         )}
@@ -118,6 +119,7 @@ export function CoverCell({
           <button
             type="button"
             aria-label={revealLabel ?? t("settings.blurReveal")}
+            data-fills-frame
             onClick={(e) => {
               // The cover is a link; revealing must not also navigate.
               e.preventDefault();

@@ -39,6 +39,8 @@
   --tracking-eyebrow: 0.12em;
   /* The narrowest cover that still holds three quick-action circles in a row. */
   --container-cover-actions: 7.5rem;
+  /* The narrowest cover that still holds two of them; below it a cover keeps one. */
+  --container-cover-pair: 4.75rem;
   /* The Japanese sub-lockup beside a screen title, opened a little so its kana do not crowd. */
   --tracking-lockup: 0.04em;
   /* The titlebar's wordmark, spaced as a brand mark rather than a label. */
@@ -648,17 +650,17 @@ nav a {
   grid-template-columns: repeat(var(--cover-cols, 8), minmax(0, 1fr));
 }
 
-/* The ring for a control inside a clipping frame, drawn on the frame, since the control's own outline is cut by the clip. */
+/* The ring for a control that fills a clipping frame, drawn on the frame, since the clip cuts the control's own outline. */
 @utility focus-frame {
-  &:has(> :focus-visible) {
+  &:has(> [data-fills-frame]:focus-visible) {
     outline: 2px solid var(--color-accent-500);
     outline-offset: 2px;
   }
-  :root[data-contrast="more"] &:has(> :focus-visible) {
+  :root[data-contrast="more"] &:has(> [data-fills-frame]:focus-visible) {
     outline-width: 3px;
   }
   @media (forced-colors: active) {
-    &:has(> :focus-visible) {
+    &:has(> [data-fills-frame]:focus-visible) {
       outline: 3px solid Highlight;
     }
   }

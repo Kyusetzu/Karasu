@@ -266,7 +266,7 @@ function NotFound() {
         <p className="mt-2 break-all text-xs text-ink-600">{pathname}</p>
         <Link
           to="/"
-          className="mt-5 inline-block rounded-control bg-accent-500 px-4 py-2 text-sm font-medium text-accent-ink"
+          className="mt-5 inline-block rounded-control border tint-fill tint-accent px-4 py-2 text-sm font-medium text-ink-100"
         >
           {t("notFound.home")}
         </Link>

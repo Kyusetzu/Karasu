@@ -91,9 +91,9 @@ export default function SeasonPicker({
                 type="button"
                 onClick={() => onPick({ season, year: y })}
                 className={cn(
-                  "min-w-12 flex-1 rounded-inner py-1 text-xs tabular-nums transition-surface",
+                  "min-w-12 flex-1 rounded-inner border border-transparent py-1 text-xs tabular-nums transition-surface",
                   y === year
-                    ? "bg-accent-500 text-accent-ink"
+                    ? "tint-fill tint-accent text-ink-100"
                     : "text-ink-500 hover:bg-surface-850 hover:text-ink-100",
                 )}
               >

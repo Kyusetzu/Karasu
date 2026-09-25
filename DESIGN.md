@@ -582,3 +582,14 @@ maintainer picks. A pure restyle that moves nothing does not. The rules:
   High contrast drops the tint from the fill and keeps the rim and the dot.
   The status button's progress reads in `ink-300`, since `ink-500` fell to
   4.4:1 on the paused tint under the pointer.
+- **2026-09-25:** The main buttons and the chosen chips, chosen from three
+  directions (all tinted, two tiers with a solid confirm in dialogs, a
+  refined solid), and all tinted won. `Button`'s default, the chosen
+  `Pill`, the chosen season year and the not-found link take the accent
+  as a tint with the page's ink, as the status and the +1 do. A pill that
+  stands for a status takes its `tint`: the status dot on every choice and
+  the status tint once chosen, never the accent, so the edit dialog and a
+  profile's lists read like the quick editor. High contrast doubles the
+  rim, since the fill loses its tint there, and rims the accent in its
+  text shade. Checkboxes, switches and count badges stay solid: their fill
+  is the statement.

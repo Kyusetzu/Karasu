@@ -189,6 +189,14 @@ describe("the tint fill", () => {
       }
     });
 
+    it(`keeps a main button's label readable on the accent tint for every preset and extreme, in ${theme}`, () => {
+      for (const { a500 } of accents) {
+        for (const share of panel) {
+          expect(contrastRatio(colour(theme, "ink-100"), mix(surface, a500, share)), `${a500} at ${share}`).toBeGreaterThanOrEqual(4.5);
+        }
+      }
+    });
+
     it(`keeps the +1 glyph at 3:1 on its own accent tint for every preset and extreme, in ${theme}`, () => {
       for (const { a400, a500 } of accents) {
         for (const share of panel) {
@@ -198,9 +206,15 @@ describe("the tint fill", () => {
     });
   }
 
-  it("drops the tint from the fill in high contrast, so the ink keeps the 7:1 the panel gives it", () => {
+  it("drops the tint from the fill in high contrast and doubles the rim, so the ink keeps 7:1 and the choice still shows", () => {
     const fill = block("@utility tint-fill {");
-    expect(fill).toMatch(/:root\[data-contrast="more"\] & \{\s*background-color: var\(--color-surface-900\);\s*border-color: var\(--tint\);/);
+    expect(fill).toMatch(
+      /:root\[data-contrast="more"\] & \{\s*background-color: var\(--color-surface-900\);\s*border-color: var\(--tint\);\s*box-shadow: inset 0 0 0 1px var\(--tint\);/,
+    );
+  });
+
+  it("rims the accent in its text shade in high contrast, the one already held to 7:1 on the page", () => {
+    expect(block("@utility tint-accent {")).toMatch(/:root\[data-contrast="more"\] & \{\s*--tint: var\(--color-accent-400\);/);
   });
 
   it("keeps a cover control's tinted glyph at 4.5:1 on its tinted near-black, for every tint", () => {

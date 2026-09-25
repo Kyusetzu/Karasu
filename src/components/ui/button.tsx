@@ -8,8 +8,8 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        // accent-500 is the accent *as a fill*; 600 is its pressed-in shade.
-        default: "bg-accent-500 text-accent-ink hover:bg-accent-600",
+        // The accent as a tint, as the status and +1 carry theirs, so a page's main action leads without shouting.
+        default: "border tint-fill tint-accent text-ink-100",
         secondary: "bg-surface-800 text-ink-100 hover:bg-surface-700",
         outline:
           "border border-surface-700 text-ink-300 hover:bg-surface-850 hover:text-ink-100",

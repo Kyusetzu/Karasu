@@ -21,6 +21,7 @@ import { TitleLockup } from "@/components/media/TitleLockup";
 import { Pill } from "@/components/ui/pill";
 import { Shimmer } from "@/components/Skeleton";
 import { EmptyState, PerchRule } from "@/components/EmptyState";
+import { statusColorVar } from "@/lib/statusColors";
 
 /** Another user's list, read-only through `CoverCell` rather than `GridCard`, with scores in the owner's format. */
 export function UserLists({ user }: { user: UserProfile }) {
@@ -97,7 +98,7 @@ export function UserLists({ user }: { user: UserProfile }) {
         ))}
         <span className="mx-1 h-4 w-px bg-surface-700" />
         {STATUS_ORDER.map((s) => (
-          <Pill key={s} active={status === s} onClick={() => setStatus(s)}>
+          <Pill key={s} active={status === s} tint={statusColorVar(s)} onClick={() => setStatus(s)}>
             {t(`status.${type}.${s}`)}
             <span className="ml-1 tabular-nums text-ink-600">
               {byStatus.get(s)?.length ?? 0}

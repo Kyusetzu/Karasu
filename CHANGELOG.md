@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: fa48497 -->
+<!-- generated-through: 01abd3c -->
 
 ### Fixed
 
@@ -168,6 +168,7 @@ tag time is then optional rather than load-bearing.
 - the collapsed sidebar names its icons in tooltips, and its avatar is round again.
 - Open the empty palette on what was used lately, beside the main shortcuts (1.25.22.712).
 - The status button and the +1 buttons carry their colour as a tint instead of a solid fill.
+- Main buttons and chosen chips carry the accent as a tint, and status choices show their own colour everywhere.
 
 ### Removed
 

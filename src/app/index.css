@@ -682,6 +682,7 @@ nav a {
   :root[data-contrast="more"] & {
     background-color: var(--color-surface-900);
     border-color: var(--tint);
+    box-shadow: inset 0 0 0 1px var(--tint);
   }
   :root[data-contrast="more"] &:hover {
     background-color: var(--color-surface-850);
@@ -695,9 +696,12 @@ nav a {
   color: color-mix(in srgb, var(--tint) 45%, var(--color-on-cover-edge));
 }
 
-/* The accent as the tint, for the +1 buttons. */
+/* The accent as the tint; high contrast takes the text shade, lifted to 7:1, since the fill shade is too dark for a rim. */
 @utility tint-accent {
   --tint: var(--color-accent-500);
+  :root[data-contrast="more"] & {
+    --tint: var(--color-accent-400);
+  }
 }
 
 /* The light a raised panel catches along its top; it composes over a background colour and sets none. */

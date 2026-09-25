@@ -25,6 +25,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { parseNotes, serializeNotes } from "@/lib/tags";
 import { loadDefaultAddStatus } from "@/lib/defaultAddStatus";
 import { chooseStatus, openingFields, type FillMemo } from "@/lib/completion";
+import { statusColorVar } from "@/lib/statusColors";
 
 export interface EditableMedia {
   id: number;
@@ -211,6 +212,7 @@ export default function EntryEditModal({
               <Pill
                 key={s}
                 active={status === s}
+                tint={statusColorVar(s)}
                 onClick={() => pickStatus(s)}
               >
                 {t(`status.${media.type}.${s}`)}

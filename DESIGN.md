@@ -329,6 +329,7 @@ no row here, add the primitive first.
 | an action | `Button` (`default`, `secondary`, `outline`, `ghost`, `danger`, `dangerGhost`) |
 | an icon-only action | `IconButton`, always with `aria-label` |
 | a control's name beside it, where the label cannot show | `Tooltip`, on hover and keyboard focus; visual only, so the control keeps its `aria-label`. A rail of them sits in one `TooltipProvider`, which opens the next at once |
+| a key or a key combination | `Kbd`, a cap. The reference sheet lays a combination out one cap per key with `KeyCombo`; a hint in passing, at the end of a field or in the palette's shortcut column, is one `quiet` cap for the whole combination. The keys come from `lib/shortcuts`, which both read |
 | one value of several | `Pill` |
 | on or off | `Switch`, which is `role="switch"` and never a checkbox |
 | a fact about something (genre, tag, category, state) | `Chip` with a tone (`neutral`, `muted`, `accent`, `gold`, `success`, `danger`) and a size (`xs`, `sm`, `md`); a link spells `chipClass` |

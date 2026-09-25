@@ -26,6 +26,10 @@ import { useActionRunner } from "@/hooks/useActionRunner";
 import { useManualSync } from "@/hooks/useManualSync";
 import { useScoreFormat } from "@/stores/auth";
 import { isTauri } from "@/api/anilist";
+import { loadRecent, pushRecent, saveRecent } from "@/lib/paletteRecent";
+import { PALETTE_SHORTCUTS, shortcutKeys } from "@/lib/shortcuts";
+import { useShortcutLabels } from "@/components/shell/shortcutLabels";
+import { Kbd } from "@/components/ui/kbd";
 
 interface Item {
   id: string;
@@ -79,6 +83,8 @@ export default function CommandPalette() {
   useBackClose(open, () => setOpen(false));
   const [query, setQuery] = useState("");
   const [sel, setSel] = useState(0);
+  const [recent, setRecent] = useState<string[]>([]);
+  const keyLabels = useShortcutLabels();
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -105,6 +111,7 @@ export default function CommandPalette() {
     if (open) {
       setQuery("");
       setSel(0);
+      setRecent(loadRecent());
       setTimeout(() => inputRef.current?.focus(), 0);
     }
   }, [open]);
@@ -176,10 +183,19 @@ export default function CommandPalette() {
       path: n.path,
     }));
     if (!q) {
-      return [
-        { key: "palette.groupActions", items: commands },
-        { key: "palette.groupGoTo", items: navItems },
-      ].filter((g) => g.items.length > 0);
+      // Resolved against what is available now, so a remembered command that cannot run here is left out.
+      const known = new Map([...commands, ...navItems].map((item) => [item.id, item]));
+      // One row per label: the search command and the search screen read the same, and twice looks like a fault.
+      const labels = new Set<string>();
+      const again = recent.flatMap((id) => {
+        const item = known.get(id);
+        if (!item || labels.has(item.label)) return [];
+        labels.add(item.label);
+        return [item];
+      });
+      if (again.length > 0) return [{ key: "palette.groupRecent", items: again }];
+      // Nothing used yet: the commands alone, since every screen is a word away and the sidebar lists them anyway.
+      return [{ key: "palette.groupActions", items: commands }].filter((g) => g.items.length > 0);
     }
     const pq = prepareQuery(q);
     // Ranked within each group; the stable sort keeps equal scores in cache-insertion order.
@@ -204,7 +220,10 @@ export default function CommandPalette() {
       { key: "palette.groupActions", items: verbs },
       { key: "palette.groupGoTo", items: nav },
     ].filter((g) => g.items.length > 0);
-  }, [query, entries, t, android, commands]);
+  }, [query, entries, t, android, commands, recent]);
+
+  // A reference for a keyboard, so a phone never shows it; the width decides only whether it sits beside or below.
+  const showKeys = query.trim() === "" && !android;
 
   // One flat order for the keyboard, so ↑↓ crosses group boundaries the way the eye does.
   const results = useMemo(() => groups.flatMap((g) => g.items), [groups]);
@@ -221,6 +240,7 @@ export default function CommandPalette() {
 
   const go = (item: Item | undefined) => {
     if (!item) return;
+    saveRecent(pushRecent(recent, item.id));
     if (item.run) item.run();
     else navigate(item.path);
     setOpen(false);
@@ -274,63 +294,82 @@ export default function CommandPalette() {
             aria-label={t("palette.placeholder")}
             className="h-12 flex-1 bg-transparent text-sm text-ink-100 placeholder:text-ink-600 focus:outline-none"
           />
-          <kbd className="shrink-0 rounded-inner border border-surface-700 bg-surface-850 px-1.5 py-0.5 font-brand text-2xs font-semibold text-ink-600">
-            ESC
-          </kbd>
+          <Kbd quiet>ESC</Kbd>
         </div>
 
-        <div id="palette-results" role="listbox" className="max-h-96 overflow-y-auto p-1.5">
-          {results.length === 0 ? (
-            <div role="option" aria-selected={false} aria-disabled className="px-2.5 py-3 text-sm text-ink-600">
-              {t("palette.empty")}
-            </div>
-          ) : (
-            // A listbox may hold groups and options only, so each group is named by a roleless label, not a heading.
-            groups.map((group) => (
-              <div key={group.key} role="group" aria-labelledby={`palette-group-${group.key}`}>
-                <MenuGroupLabel id={`palette-group-${group.key}`} role="none">
-                  {t(group.key)}
-                </MenuGroupLabel>
-                <ul role="none">
-                  {group.items.map((item) => {
-                    const i = results.indexOf(item);
-                    return (
-                      <li key={item.id} ref={rowRef(i)} role="none">
-                        <button
-                          id={`palette-item-${i}`}
-                          role="option"
-                          aria-selected={i === sel}
-                          // Out of the tab order, so the caret never leaves the field and the drawn cursor is the only one.
-                          tabIndex={-1}
-                          data-highlighted={i === sel || undefined}
-                          onMouseEnter={() => setSel(i)}
-                          onClick={() => go(item)}
-                          className={menuRowClass({ managed: true })}
-                        >
-                          <MenuRowBody
-                            lead={
-                              item.cover !== undefined && (
-                                <span className="h-8 w-5.5 shrink-0 overflow-hidden rounded-inner bg-surface-800">
-                                  {item.cover && <img src={item.cover} alt="" className="size-full object-cover" />}
-                                </span>
-                              )
-                            }
-                            trailing={item.sub && <MenuRowNote>{item.sub}</MenuRowNote>}
-                          >
-                            <span className="block truncate">{item.label}</span>
-                            {item.native && (
-                              <span className="block truncate font-brand-jp text-2xs text-ink-600">
-                                {item.native}
-                              </span>
-                            )}
-                          </MenuRowBody>
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
+        {/* Two columns only while nothing is typed; a query needs the whole width for titles. */}
+        <div className={cn(showKeys && "grid sm:grid-cols-2")}>
+          <div id="palette-results" role="listbox" className="max-h-96 min-w-0 overflow-y-auto p-1.5">
+            {results.length === 0 ? (
+              <div role="option" aria-selected={false} aria-disabled className="px-2.5 py-3 text-sm text-ink-600">
+                {t("palette.empty")}
               </div>
-            ))
+            ) : (
+              // A listbox may hold groups and options only, so each group is named by a roleless label, not a heading.
+              groups.map((group) => (
+                <div key={group.key} role="group" aria-labelledby={`palette-group-${group.key}`}>
+                  <MenuGroupLabel id={`palette-group-${group.key}`} role="none">
+                    {t(group.key)}
+                  </MenuGroupLabel>
+                  <ul role="none">
+                    {group.items.map((item) => {
+                      const i = results.indexOf(item);
+                      return (
+                        <li key={item.id} ref={rowRef(i)} role="none">
+                          <button
+                            id={`palette-item-${i}`}
+                            role="option"
+                            aria-selected={i === sel}
+                            // Out of the tab order, so the caret never leaves the field and the drawn cursor is the only one.
+                            tabIndex={-1}
+                            data-highlighted={i === sel || undefined}
+                            onMouseEnter={() => setSel(i)}
+                            onClick={() => go(item)}
+                            className={menuRowClass({ managed: true })}
+                          >
+                            <MenuRowBody
+                              lead={
+                                item.cover !== undefined && (
+                                  <span className="h-8 w-5.5 shrink-0 overflow-hidden rounded-inner bg-surface-800">
+                                    {item.cover && <img src={item.cover} alt="" className="size-full object-cover" />}
+                                  </span>
+                                )
+                              }
+                              trailing={item.sub && <MenuRowNote>{item.sub}</MenuRowNote>}
+                            >
+                              <span className="block truncate">{item.label}</span>
+                              {item.native && (
+                                <span className="block truncate font-brand-jp text-2xs text-ink-600">
+                                  {item.native}
+                                </span>
+                              )}
+                            </MenuRowBody>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ))
+            )}
+          </div>
+          {showKeys && (
+            // Outside the listbox, which may hold options only; a reference to read, not a row to pick.
+            <section
+              aria-labelledby="palette-keys"
+              className="flex min-w-0 flex-col border-t border-hair p-1.5 sm:border-l sm:border-t-0"
+            >
+              <MenuGroupLabel id="palette-keys">{t("palette.groupShortcuts")}</MenuGroupLabel>
+              <ul>
+                {PALETTE_SHORTCUTS.map((id) => (
+                  <li key={id} className="flex min-h-9 items-center justify-between gap-3 px-2.5 text-ui text-ink-300">
+                    <span className="min-w-0 truncate">{keyLabels.inPalette(id)}</span>
+                    <Kbd quiet>{shortcutKeys(id).join(" ")}</Kbd>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-auto px-2.5 pb-1 pt-3 text-2xs text-ink-600">{t("palette.typeHint")}</p>
+            </section>
           )}
         </div>
 

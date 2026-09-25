@@ -71,6 +71,16 @@ export const SCREENS = [
     },
   },
   { id: "d13-palette-leer", w: 1232, h: 800, route: "/list", act: (p) => p.keyboard.press("Control+k") },
+  {
+    id: "d14-palette-zuletzt",
+    w: 1232,
+    h: 800,
+    route: "/list",
+    act: async (p) => {
+      await p.evaluate(() => localStorage.setItem("karasu-palette-recent", JSON.stringify(["/calendar", "command:sync", "/stats"])));
+      await p.keyboard.press("Control+k");
+    },
+  },
   { id: "d12-glocke", w: 1232, h: 800, route: "/list", act: (p) => p.getByRole("button", { name: "Benachrichtigungen" }).first().click() },
   {
     id: "p8-glocke",

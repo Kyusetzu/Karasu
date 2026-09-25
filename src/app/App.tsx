@@ -239,7 +239,7 @@ function SkipLink() {
         e.preventDefault();
         document.getElementById("main")?.focus();
       }}
-      className="sr-only rounded-lg bg-accent-500 px-3 py-2 text-sm font-medium text-accent-ink focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-[200]"
+      className="sr-only rounded-control bg-accent-500 px-3 py-2 text-sm font-medium text-accent-ink focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-skip"
     >
       {t("common.skipToContent")}
     </a>
@@ -260,7 +260,7 @@ function NotFound() {
         <p className="mt-2 break-all text-xs text-ink-600">{pathname}</p>
         <Link
           to="/"
-          className="mt-5 inline-block rounded-lg bg-accent-500 px-4 py-2 text-sm font-medium text-accent-ink"
+          className="mt-5 inline-block rounded-control bg-accent-500 px-4 py-2 text-sm font-medium text-accent-ink"
         >
           {t("notFound.home")}
         </Link>
@@ -282,7 +282,7 @@ function PlaybackError() {
 
   if (!error) return null;
   return (
-    <div className="pointer-events-auto flex w-88 max-w-full items-start gap-3 rounded-lg border border-surface-700 bg-surface-850 px-4 py-3 shadow-xl">
+    <div className="pointer-events-auto flex w-88 max-w-full items-start gap-3 rounded-control border border-surface-700 bg-surface-850 px-4 py-3 shadow-xl">
       <span className="text-sm text-ink-300">{error}</span>
       <button
         onClick={clearError}

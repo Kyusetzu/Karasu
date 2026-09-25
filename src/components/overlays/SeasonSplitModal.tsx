@@ -129,7 +129,7 @@ export function SeasonSplitModal({
       onClick={() => setSelected(c)}
       aria-pressed={selected?.mediaId === c.mediaId}
       className={cn(
-        "flex w-full items-center gap-2.5 rounded-lg border px-2.5 py-2 text-left transition-surface",
+        "flex w-full items-center gap-2.5 rounded-control border px-2.5 py-2 text-left transition-surface",
         selected?.mediaId === c.mediaId
           ? "border-accent-500 bg-accent-500/10"
           : "border-surface-800 hover:border-surface-600",
@@ -150,7 +150,7 @@ export function SeasonSplitModal({
         </span>
       </span>
       {c.fromRules && (
-        <span className="shrink-0 rounded-md border border-accent-600 px-1.5 py-0.5 text-2xs text-accent-400">
+        <span className="shrink-0 rounded-inner border border-accent-600 px-1.5 py-0.5 text-2xs text-accent-400">
           {t("library.splitRuleHint")}
         </span>
       )}
@@ -179,7 +179,7 @@ export function SeasonSplitModal({
           <p className="text-xs font-medium text-ink-300">{t("library.splitCandidates")}</p>
           <div className="mt-1.5 space-y-1.5">
             {sequels.isLoading ? (
-              <Shimmer className="h-16 w-full rounded-lg" />
+              <Shimmer className="h-16 w-full rounded-control" />
             ) : candidates.length ? (
               candidates.map(row)
             ) : (
@@ -207,7 +207,7 @@ export function SeasonSplitModal({
         </div>
 
         {preview && selected && (
-          <div className="rounded-lg border border-surface-800 bg-surface-950 px-3 py-2 text-xs tabular-nums text-ink-300">
+          <div className="rounded-control border border-surface-800 bg-surface-950 px-3 py-2 text-xs tabular-nums text-ink-300">
             {preview.shown.map((p) => (
               <p key={p.disk} className="flex items-center gap-1.5">
                 {t("library.ep", { n: p.disk })}

@@ -33,7 +33,7 @@ export default function Activity() {
     <div className="mx-auto max-w-2xl px-8 pb-12 pt-6">
       <BackButton />
       <div className="mt-4">
-        {query.isLoading && <Shimmer className="h-28 w-full rounded-xl" />}
+        {query.isLoading && <Shimmer className="h-28 w-full rounded-panel" />}
         {!query.isLoading && filtered && (
           <div className="py-10 text-center">
             <p className="text-sm text-ink-300">{t("detail.filtered")}</p>

@@ -24,7 +24,7 @@ export function DigestRow({
     <Link
       to={`/media/${media.id}`}
       className={cn(
-        "flex items-center gap-2.5 rounded-[.625rem] px-2.5 py-2 transition-surface hover:bg-surface-900",
+        "flex items-center gap-2.5 rounded-cover px-2.5 py-2 transition-surface hover:bg-surface-900",
         dim && "opacity-55 hover:opacity-100",
       )}
     >

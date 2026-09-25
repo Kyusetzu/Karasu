@@ -28,7 +28,7 @@ export function FilterSelect({
   return (
     <div
       className={cn(
-        "relative flex h-8.5 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg",
+        "relative flex h-8.5 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-control",
         "border border-surface-800 bg-surface-900 px-2.5 transition-surface",
         "focus-within:border-accent-500 hover:bg-surface-850",
         className,

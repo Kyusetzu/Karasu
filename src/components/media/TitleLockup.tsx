@@ -25,7 +25,7 @@ export function TitleLockup({
     <div className={cn("min-w-0", className)}>
       <p
         className={cn(
-          dense ? "dense-text-lg font-medium" : "text-[.8125rem] font-medium",
+          dense ? "dense-text-lg font-medium" : "text-ui font-medium",
           tone === "muted"
             ? "text-ink-300 group-hover:text-ink-100"
             : "text-ink-100",

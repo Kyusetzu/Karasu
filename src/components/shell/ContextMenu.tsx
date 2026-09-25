@@ -159,7 +159,7 @@ export default function ContextMenu({
 
   const rowClass = (action: Action, active: boolean) =>
     cn(
-      "flex h-7.5 w-full items-center gap-2.5 rounded-md px-2.5 text-left text-[.78125rem] transition-surface",
+      "flex h-7.5 w-full items-center gap-2.5 rounded-inner px-2.5 text-left text-[.78125rem] transition-surface",
       action.danger
         ? "text-danger hover:bg-danger/10"
         : "text-ink-300 hover:bg-surface-800 hover:text-ink-100",
@@ -167,7 +167,7 @@ export default function ContextMenu({
     );
 
   const panel =
-    "overflow-hidden rounded-lg border border-hair bg-surface-850 p-1.25 shadow-2xl panel-wash";
+    "overflow-hidden rounded-control border border-hair bg-surface-850 p-1.25 shadow-float panel-wash";
 
   return (
     <div
@@ -181,7 +181,7 @@ export default function ContextMenu({
         role="menu"
         aria-label={t("ctx.menuLabel")}
         className={cn(
-          "fixed z-[100] w-55",
+          "fixed z-popover w-55",
           panel,
           origin,
           leaving ? "animate-pop-out" : "animate-pop-in",
@@ -225,7 +225,7 @@ export default function ContextMenu({
         <div
           role="menu"
           aria-label={label(actions[openSub], mediaType)}
-          className={cn("fixed z-[100] w-55", panel, "animate-pop-in")}
+          className={cn("fixed z-popover w-55", panel, "animate-pop-in")}
           style={{ left: subLeft, top: subTop(openSub) }}
         >
           {sub.map((leaf, i) => (

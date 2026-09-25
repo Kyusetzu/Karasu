@@ -243,7 +243,7 @@ export function ListMoreMenu({
 }
 
 const toolClass = cn(
-  "relative inline-flex h-8.5 shrink-0 items-center gap-1.5 rounded-lg border border-surface-700 bg-surface-900 text-xs font-medium text-ink-300 transition-surface",
+  "relative inline-flex h-8.5 shrink-0 items-center gap-1.5 rounded-control border border-surface-700 bg-surface-900 text-xs font-medium text-ink-300 transition-surface",
   "hover:border-surface-600 hover:bg-surface-850 hover:text-ink-100",
   "focus-visible:outline-2 focus-visible:outline-accent-500",
   "aria-expanded:border-accent-500 aria-expanded:bg-surface-850 aria-expanded:text-ink-100",
@@ -314,7 +314,7 @@ function SearchBox({
   return (
     <div
       className={cn(
-        "flex h-8.5 items-center gap-2 rounded-lg border border-surface-700 bg-surface-900 px-2.5 transition-surface",
+        "flex h-8.5 items-center gap-2 rounded-control border border-surface-700 bg-surface-900 px-2.5 transition-surface",
         "focus-within:border-accent-500",
         value && "border-accent-500/60",
         className,
@@ -337,10 +337,10 @@ function SearchBox({
         placeholder={t("list.filterPlaceholder")}
         aria-label={t("list.searchLabel")}
         aria-keyshortcuts={hint ? "Control+F" : undefined}
-        className="h-full min-w-0 flex-1 bg-transparent text-[.8125rem] text-ink-100 placeholder:text-ink-600 focus:outline-none [&::-webkit-search-cancel-button]:hidden"
+        className="h-full min-w-0 flex-1 bg-transparent text-ui text-ink-100 placeholder:text-ink-600 focus:outline-none [&::-webkit-search-cancel-button]:hidden"
       />
       {count && (
-        <span role="status" className="shrink-0 rounded-md bg-surface-800 px-1.5 py-0.5 text-2xs tabular-nums text-ink-300">
+        <span role="status" className="shrink-0 rounded-inner bg-surface-800 px-1.5 py-0.5 text-2xs tabular-nums text-ink-300">
           {count}
         </span>
       )}
@@ -354,7 +354,7 @@ function SearchBox({
             inputRef.current?.focus();
           }}
           aria-label={t("common.clear")}
-          className="-mr-1 grid size-6 shrink-0 place-items-center rounded-md text-ink-500 transition-surface hover:bg-surface-800 hover:text-ink-100"
+          className="-mr-1 grid size-6 shrink-0 place-items-center rounded-inner text-ink-500 transition-surface hover:bg-surface-800 hover:text-ink-100"
         >
           <X aria-hidden className="size-3.5" />
         </button>
@@ -386,7 +386,7 @@ function Choice({
   return (
     <label
       className={cn(
-        "flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-[.8125rem] transition-surface",
+        "flex cursor-pointer items-center gap-2 rounded-control px-2.5 py-2 text-ui transition-surface",
         "has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent-500",
         checked ? "bg-surface-850 text-ink-100" : "text-ink-300 hover:bg-surface-850/60 hover:text-ink-100",
         className,
@@ -408,7 +408,7 @@ function SortPanel({ view, onDraft }: { view: ListView; onDraft: (patch: ViewPat
   return (
     <div className="space-y-3">
       <fieldset>
-        <legend className="mb-1.5 text-2xs font-semibold uppercase tracking-[.1em] text-ink-500">
+        <legend className="mb-1.5 text-2xs font-semibold uppercase tracking-eyebrow text-ink-500">
           {t("list.sortTitle")}
         </legend>
         {SORT_KEYS.map((key) => (
@@ -426,7 +426,7 @@ function SortPanel({ view, onDraft }: { view: ListView; onDraft: (patch: ViewPat
       </fieldset>
       <fieldset className="border-t border-surface-800 pt-3">
         <legend className="sr-only">{t("list.direction")}</legend>
-        <div className="grid grid-cols-2 gap-1 rounded-lg border border-surface-800 p-0.5">
+        <div className="grid grid-cols-2 gap-1 rounded-control border border-surface-800 p-0.5">
           {dirs.map(({ value, label, icon: Icon }) => (
             <Choice
               key={value}
@@ -458,7 +458,7 @@ function PanelSection({
   return (
     <section aria-labelledby={id}>
       <div className="mb-1.5 flex items-center justify-between gap-2">
-        <h3 id={id} className="text-2xs font-semibold uppercase tracking-[.1em] text-ink-500">
+        <h3 id={id} className="text-2xs font-semibold uppercase tracking-eyebrow text-ink-500">
           {title}
         </h3>
         {aside}
@@ -538,7 +538,7 @@ function FilterPanel({
         {tags.length > 0 && (
           <PanelSection title={t("tags.label")}>
             {tags.length > TAG_SEARCH_MIN && (
-              <div className="mb-2 flex h-8 items-center gap-2 rounded-lg border border-surface-700 px-2.5 focus-within:border-accent-500">
+              <div className="mb-2 flex h-8 items-center gap-2 rounded-control border border-surface-700 px-2.5 focus-within:border-accent-500">
                 <Search aria-hidden className="size-3.5 shrink-0 text-ink-600" />
                 <input
                   type="search"
@@ -601,7 +601,7 @@ function PresetList({
               <button
                 type="button"
                 onClick={() => closeThen(() => onApplyPreset(p.name))}
-                className="flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left text-[.8125rem] text-ink-300 transition-surface hover:bg-surface-850 hover:text-ink-100 focus-visible:outline-2 focus-visible:outline-accent-500"
+                className="flex w-full items-center gap-3 rounded-control px-2.5 py-2 text-left text-ui text-ink-300 transition-surface hover:bg-surface-850 hover:text-ink-100 focus-visible:outline-2 focus-visible:outline-accent-500"
               >
                 <span className="min-w-0 flex-1 truncate">{p.name}</span>
                 {STATUS_ORDER.includes(p.tab as MediaListStatus) && (
@@ -714,7 +714,7 @@ function FilterChips({
       <button
         type="button"
         onClick={() => onChange(CLEAR_FILTERS)}
-        className="ml-1 shrink-0 whitespace-nowrap rounded-md px-1 text-2xs font-medium text-accent-400 hover:text-accent-500 focus-visible:outline-2 focus-visible:outline-accent-500"
+        className="ml-1 shrink-0 whitespace-nowrap rounded-inner px-1 text-2xs font-medium text-accent-400 hover:text-accent-500 focus-visible:outline-2 focus-visible:outline-accent-500"
       >
         {t("list.resetFilters")}
       </button>

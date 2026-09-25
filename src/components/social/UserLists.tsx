@@ -107,7 +107,7 @@ export function UserLists({ user }: { user: UserProfile }) {
       </div>
 
       {match && match.shared > 0 && (
-        <div className="rounded-lg border border-surface-800 bg-surface-900 px-3 py-2 text-xs text-ink-300">
+        <div className="rounded-control border border-surface-800 bg-surface-900 px-3 py-2 text-xs text-ink-300">
           <span className="font-medium text-ink-100">
             {match.pearson !== null
               ? t("social.affinity", { pct: Math.round(match.pearson * 100) })
@@ -127,7 +127,7 @@ export function UserLists({ user }: { user: UserProfile }) {
         </div>
       )}
 
-      {q.isLoading && <Shimmer className="h-40 w-full rounded-xl" />}
+      {q.isLoading && <Shimmer className="h-40 w-full rounded-panel" />}
       {q.error != null && (
         <p className="text-sm text-danger">
           {t("common.error", { message: String(q.error) })}

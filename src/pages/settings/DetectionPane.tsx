@@ -284,7 +284,7 @@ export function MediaSessionSection() {
           {sessions?.map((s, i) => (
             <div
               key={`${s.appId}-${i}`}
-              className="rounded-lg bg-surface-850 p-2 text-xs"
+              className="rounded-control bg-surface-850 p-2 text-xs"
             >
               <p className="break-all font-medium text-ink-100">{s.appId}</p>
               <dl className="mt-1 grid grid-cols-[5rem_1fr] gap-x-2 gap-y-0.5 text-ink-500">
@@ -351,7 +351,7 @@ export function DetectionCorrectionsSection() {
         {rows.map((row) => (
           <li
             key={`${row.mediaType}-${row.season}-${row.title}`}
-            className="flex items-center gap-3 rounded-lg bg-surface-900 px-3 py-2"
+            className="flex items-center gap-3 rounded-control bg-surface-900 px-3 py-2"
           >
             <span className="min-w-0 flex-1">
               <Link
@@ -612,7 +612,7 @@ export function JellyfinSection() {
                     setUrl(s.address);
                     setFound(null);
                   }}
-                  className="flex w-full flex-wrap items-center justify-between gap-x-3 rounded-lg border border-surface-800 bg-surface-900 px-3 py-2 text-left text-sm transition-surface hover:border-surface-600"
+                  className="flex w-full flex-wrap items-center justify-between gap-x-3 rounded-control border border-surface-800 bg-surface-900 px-3 py-2 text-left text-sm transition-surface hover:border-surface-600"
                 >
                   <span className="font-medium text-ink-300">{s.name || s.address}</span>
                   <span className="text-xs text-ink-500">
@@ -832,7 +832,7 @@ function SessionList({
         <div
           key={`${s.device}-${s.user}-${i}`}
           className={cn(
-            "rounded-lg border px-3 py-2 text-sm",
+            "rounded-control border px-3 py-2 text-sm",
             s.matched
               ? "border-success/40 bg-success/10"
               : "border-surface-800 bg-surface-900",

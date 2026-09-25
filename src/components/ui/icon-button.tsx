@@ -24,7 +24,7 @@ const iconButtonVariants = cva(
         xs: "size-7",
       },
       /** Keep the radius here only; a `rounded-*` on `size` too lets stylesheet order decide and `round` does nothing. */
-      round: { true: "rounded-full", false: "rounded-md" },
+      round: { true: "rounded-full", false: "rounded-inner" },
     },
     defaultVariants: { variant: "ghost", size: "control", round: false },
   },

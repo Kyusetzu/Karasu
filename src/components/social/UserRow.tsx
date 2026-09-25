@@ -12,7 +12,7 @@ export function UserRow({ user }: { user: SocialUser }) {
   const badgeKey = relationBadgeKey(relation);
 
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-surface-800 bg-surface-900 p-3 transition-surface hover:border-surface-700">
+    <div className="flex items-center gap-3 rounded-panel border border-surface-800 bg-surface-900 p-3 transition-surface hover:border-surface-700">
       <Link
         to={`/user/${encodeURIComponent(user.name)}`}
         className="min-w-0 flex-1"

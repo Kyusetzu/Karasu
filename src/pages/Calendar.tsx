@@ -196,7 +196,7 @@ export default function Calendar() {
         <div className="flex items-center gap-2.5">
           <div className="flex items-baseline gap-2.5">
             <h1 className="text-2xl font-bold">{t("calendar.title")}</h1>
-            <span className="font-brand-jp text-[.8125rem] tracking-[.04em] text-ink-600">
+            <span className="font-brand-jp text-ui tracking-[.04em] text-ink-600">
               放送カレンダー
             </span>
           </div>
@@ -279,7 +279,7 @@ export default function Calendar() {
         ) : loading ? (
           <div className={cn("gap-2", view === "week" ? "grid grid-cols-7" : "flex flex-col")} aria-hidden="true">
             {days.map((day, i) => (
-              <Shimmer key={day} className={cn("rounded-xl", view === "week" ? "h-72" : "h-16")} index={i} />
+              <Shimmer key={day} className={cn("rounded-panel", view === "week" ? "h-72" : "h-16")} index={i} />
             ))}
           </div>
         ) : slots.length === 0 ? (
@@ -350,7 +350,7 @@ function DaySection({
           {date.toLocaleDateString(i18n.language, { day: "numeric", month: "short" })}
         </span>
         {isToday && (
-          <span className="dense-text uppercase tracking-[.1em] text-accent-400">{t("calendar.today")}</span>
+          <span className="dense-text uppercase tracking-eyebrow text-accent-400">{t("calendar.today")}</span>
         )}
         <span className="section-rule" />
       </header>
@@ -407,11 +407,11 @@ function CalendarTile({ slot, state }: { slot: Slot; state: ReleaseState }) {
       to={`/media/${slot.media.id}`}
       title={title}
       className={cn(
-        "group flex flex-col gap-1.5 rounded-lg transition-surface",
+        "group flex flex-col gap-1.5 rounded-control transition-surface",
         released && "opacity-55 hover:opacity-100",
       )}
     >
-      <div className="relative aspect-[2/3] w-full overflow-hidden rounded-lg bg-surface-800">
+      <div className="relative aspect-[2/3] w-full overflow-hidden rounded-control bg-surface-800">
         <img
           src={slot.media.coverImage.large ?? ""}
           alt=""
@@ -468,7 +468,7 @@ function DayColumn({
         (isToday ? ` · ${t("calendar.today")}` : "")
       }
       className={cn(
-        "flex min-h-72 flex-col rounded-xl border p-1.5",
+        "flex min-h-72 flex-col rounded-panel border p-1.5",
         isToday
           ? "border-accent-600/50 bg-accent-500/[.07]"
           : "border-surface-800 bg-surface-900/40",
@@ -477,7 +477,7 @@ function DayColumn({
       <header className="flex items-baseline justify-between gap-1 px-1 pb-1.5 pt-0.5">
         <span
           className={cn(
-            "text-2xs font-semibold uppercase tracking-[.1em]",
+            "text-2xs font-semibold uppercase tracking-eyebrow",
             isToday ? "text-accent-400" : "text-ink-600",
           )}
         >
@@ -512,7 +512,7 @@ function CalendarCard({ slot, state }: { slot: Slot; state: ReleaseState }) {
       to={`/media/${slot.media.id}`}
       title={title}
       className={cn(
-        "flex gap-1.5 rounded-lg bg-surface-900 p-1.5 transition-surface hover:bg-surface-850",
+        "flex gap-1.5 rounded-control bg-surface-900 p-1.5 transition-surface hover:bg-surface-850",
         released && "opacity-55 hover:opacity-100",
       )}
     >

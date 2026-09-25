@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 export function MetaLine({ data, studios, className }: { data: MediaDetail; studios: string[]; className?: string }) {
   const { t } = useTranslation();
   return (
-    <div className={cn("flex flex-wrap items-center gap-x-3 gap-y-1 text-[.8125rem] text-ink-300", className)}>
+    <div className={cn("flex flex-wrap items-center gap-x-3 gap-y-1 text-ui text-ink-300", className)}>
       {data.averageScore !== null && (
         <span className="flex items-center gap-1 text-gold">
           <Star className="size-3.5" fill="currentColor" /> {data.averageScore}%
@@ -53,7 +53,7 @@ export function GenreChips({ genres, className }: { genres: string[]; className?
       {genres.map((g) => (
         <span
           key={g}
-          className="rounded-[.625rem] border border-surface-800 bg-surface-850 px-2 py-0.5 text-2xs text-ink-300"
+          className="rounded-cover border border-surface-800 bg-surface-850 px-2 py-0.5 text-2xs text-ink-300"
         >
           {g}
         </span>
@@ -95,7 +95,7 @@ export function NextEpisode({ data, bar = false, className }: { data: MediaDetai
     return (
       <div
         className={cn(
-          "flex items-center gap-2 rounded-lg border border-accent-500/30 bg-accent-500/10 px-3 py-2 text-sm",
+          "flex items-center gap-2 rounded-control border border-accent-500/30 bg-accent-500/10 px-3 py-2 text-sm",
           className,
         )}
       >

@@ -38,7 +38,7 @@ export function UserComments({
     return (
       <div className="space-y-2" aria-hidden="true">
         {[0, 1, 2, 3].map((i) => (
-          <Shimmer key={i} className="h-16 w-full rounded-xl" index={i} />
+          <Shimmer key={i} className="h-16 w-full rounded-panel" index={i} />
         ))}
       </div>
     );
@@ -101,7 +101,7 @@ export function UserComments({
           key={c.id}
           // The comment's own anchor, resolved by the thread page; a comment with no thread lands on the forum index.
           to={c.thread ? `/thread/${c.thread.id}?comment=${c.id}` : "/forum"}
-          className="block animate-rise-in rounded-xl border border-surface-800 p-3 transition-surface hover:border-surface-700 hover:bg-surface-900"
+          className="block animate-rise-in rounded-panel border border-surface-800 p-3 transition-surface hover:border-surface-700 hover:bg-surface-900"
           style={{ animationDelay: `${staggerDelay(i)}ms` }}
         >
           <div className="flex items-center gap-2">

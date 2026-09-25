@@ -763,7 +763,7 @@ export default function Wrapped() {
               <select
                 value={year ?? ""}
                 onChange={(e) => setYear(Number(e.target.value))}
-                className="h-9 rounded-lg border border-surface-700 bg-surface-900 px-2 text-sm focus:border-accent-500 focus:outline-none"
+                className="h-9 rounded-control border border-surface-700 bg-surface-900 px-2 text-sm focus:border-accent-500 focus:outline-none"
               >
                 {years.map((y) => (
                   <option key={y} value={y}>
@@ -846,7 +846,7 @@ export default function Wrapped() {
       ) : (
         <canvas
           ref={canvasRef}
-          className="w-full max-w-2xl rounded-2xl border border-surface-800 shadow-xl"
+          className="w-full max-w-2xl rounded-sheet border border-surface-800 shadow-xl"
         />
       )}
     </div>

@@ -57,14 +57,14 @@ export default function ActionSheet({
       // Kept while leaving, so a keypress on the last frame cannot reach the list behind the sheet.
       data-overlay
       className={cn(
-        "fixed inset-0 z-[100]",
+        "fixed inset-0 z-popover",
         leaving ? "animate-fade-out" : "animate-fade-in",
       )}
     >
       <button
         type="button"
         aria-label={t("window.close")}
-        className="absolute inset-0 bg-[rgba(4,5,8,.55)]"
+        className="absolute inset-0 bg-scrim"
         onClick={onClose}
       />
       <div
@@ -76,7 +76,7 @@ export default function ActionSheet({
           "absolute inset-x-2 bottom-[calc(var(--shell-bottom,0px)+0.5rem)] max-h-[70vh] overflow-y-auto",
           // The sheet rises under a finger still held down, and Chromium's own long press would otherwise select its title.
           "select-none",
-          "rounded-2xl border border-surface-700 bg-surface-900 p-2 shadow-[0_1rem_3rem_rgba(0,0,0,.6)]",
+          "rounded-sheet border border-surface-700 bg-surface-900 p-2 shadow-sheet",
           leaving ? "animate-rise-out" : "animate-rise-in",
         )}
       >
@@ -84,7 +84,7 @@ export default function ActionSheet({
           <button
             type="button"
             onClick={() => setDrilled(null)}
-            className="flex min-h-11 w-full items-center gap-2.5 rounded-lg px-2 text-left text-sm text-ink-300 transition-surface hover:bg-surface-850"
+            className="flex min-h-11 w-full items-center gap-2.5 rounded-control px-2 text-left text-sm text-ink-300 transition-surface hover:bg-surface-850"
           >
             <ChevronLeft className="size-4 shrink-0" />
             <span className="truncate">{label(drilled, mediaType)}</span>
@@ -114,7 +114,7 @@ export default function ActionSheet({
                 onClick={() => (submenu ? setDrilled(action) : onRun(action))}
                 className={cn(
                   // A comfortable touch target, not a scaled-down menu row.
-                  "flex min-h-11 items-center gap-3 rounded-lg px-2 text-left text-sm transition-surface",
+                  "flex min-h-11 items-center gap-3 rounded-control px-2 text-left text-sm transition-surface",
                   divides && "mt-1 border-t border-surface-800 pt-1.5",
                   action.danger
                     ? "text-danger hover:bg-danger/10"

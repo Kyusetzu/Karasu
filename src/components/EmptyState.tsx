@@ -61,7 +61,7 @@ export function TickMarks({ count = 7 }: { count?: number }) {
 /** A dashed 2:3 cover that never got filled, holding the mark. */
 export function CoverOutline() {
   return (
-    <div className="grid h-30 w-20 place-items-center rounded-lg border border-dashed border-surface-700">
+    <div className="grid h-30 w-20 place-items-center rounded-control border border-dashed border-surface-700">
       {/* Barely alive, as nothing else here competes; not on PerchRule's bird, whose `land` owns the same transform. */}
       <KarasuMark className="animate-idle-float size-13 opacity-80" />
     </div>
@@ -75,7 +75,7 @@ export function FolderStack() {
       {[-7, 3, 0].map((angle, i) => (
         <span
           key={angle}
-          className="absolute left-1/2 h-15 w-22 -translate-x-1/2 rounded-md border border-dashed border-surface-700"
+          className="absolute left-1/2 h-15 w-22 -translate-x-1/2 rounded-inner border border-dashed border-surface-700"
           style={{ top: `${i * 0.75}rem`, transform: `translateX(-50%) rotate(${angle}deg)` }}
         />
       ))}

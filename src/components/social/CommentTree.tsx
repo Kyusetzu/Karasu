@@ -50,7 +50,7 @@ export function CommentTree({
           key={c.id}
           ref={c.id === highlightId ? highlightRef : undefined}
           className={cn(
-            "rounded-xl border border-surface-800 bg-surface-900 p-3",
+            "rounded-panel border border-surface-800 bg-surface-900 p-3",
             // A reply is indented and quieter, so the two levels read apart without a connector line.
             c.depth === 1 && "ml-6 border-surface-850 bg-surface-950",
             c.id === highlightId && "border-accent-500/70 ring-1 ring-accent-500/30",
@@ -98,7 +98,7 @@ export function CommentTree({
                 onClick={() => onLike(c)}
                 aria-pressed={c.isLiked}
                 className={cn(
-                  "flex items-center gap-1 rounded-md px-1.5 py-0.5 text-2xs transition-surface hover:bg-surface-850",
+                  "flex items-center gap-1 rounded-inner px-1.5 py-0.5 text-2xs transition-surface hover:bg-surface-850",
                   c.isLiked ? "text-danger" : "text-ink-600 hover:text-ink-300",
                 )}
               >
@@ -109,7 +109,7 @@ export function CommentTree({
             {onReply && (
               <button
                 onClick={() => onReply(c)}
-                className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-2xs text-ink-600 transition-surface hover:bg-surface-850 hover:text-ink-300"
+                className="flex items-center gap-1 rounded-inner px-1.5 py-0.5 text-2xs text-ink-600 transition-surface hover:bg-surface-850 hover:text-ink-300"
               >
                 <Reply className="size-2.75" />
                 {t("social.reply")}

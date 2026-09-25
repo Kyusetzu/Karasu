@@ -120,7 +120,7 @@ export default function MatchPicker({
     <div
       data-overlay
       className={cn(
-        "fixed inset-0 z-[110] grid place-items-center bg-[rgba(4,5,8,.55)] p-4",
+        "fixed inset-0 z-alert grid place-items-center bg-scrim p-4",
         leaving ? "animate-fade-out" : "animate-fade-in",
       )}
       onMouseDown={(e) =>
@@ -133,7 +133,7 @@ export default function MatchPicker({
         aria-modal="true"
         aria-labelledby={titleId}
         className={cn(
-          "flex max-h-[80vh] w-[34rem] max-w-full flex-col rounded-xl border border-hair bg-surface-900 shadow-2xl panel-wash",
+          "flex max-h-[80vh] w-[34rem] max-w-full flex-col rounded-panel border border-hair bg-surface-900 shadow-float panel-wash",
           leaving ? "animate-settle-out" : "animate-spring-in",
         )}
       >
@@ -190,7 +190,7 @@ export default function MatchPicker({
         <div className="min-h-0 flex-1 overflow-y-auto p-2">
           {suggestions.length > 0 && (
             <div className="mb-2">
-              <p className="px-3 pb-1 pt-1 text-2xs font-semibold uppercase tracking-[.1em] text-ink-600">
+              <p className="px-3 pb-1 pt-1 text-2xs font-semibold uppercase tracking-eyebrow text-ink-600">
                 {t("library.laterSeasons")}
               </p>
               <ul className="space-y-0.5">
@@ -282,7 +282,7 @@ function ResultRow({
       type="button"
       onClick={onPick}
       className={cn(
-        "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors",
+        "flex w-full items-center gap-3 rounded-control px-3 py-2 text-left transition-colors",
         isCurrent ? "bg-accent-500/12" : "hover:bg-surface-800",
       )}
     >

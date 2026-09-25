@@ -155,7 +155,7 @@ export function AccountSection() {
       <CardTitle>{t("settings.connectTitle")}</CardTitle>
       <div className="mt-4 space-y-4 text-sm text-ink-300">
         {!canLogin && (
-          <div className="space-y-2 rounded-lg bg-surface-850 p-3">
+          <div className="space-y-2 rounded-control bg-surface-850 p-3">
             {/* Rust owns the callback port; this block only renders once
                 `info` has answered, so the URL is always present here. */}
             <p>{t("settings.stepClientId", { url: info?.callbackUrl ?? "" })}</p>
@@ -240,7 +240,7 @@ export function AccountSection() {
         </div>
       </div>
       {(error ?? login.error) && (
-        <p className="mt-4 rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">
+        <p className="mt-4 rounded-control bg-danger/10 px-3 py-2 text-sm text-danger">
           {error ?? login.error}
         </p>
       )}

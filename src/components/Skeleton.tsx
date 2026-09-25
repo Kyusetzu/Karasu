@@ -15,7 +15,7 @@ export function Shimmer({
 }) {
   return (
     <div
-      className={cn("shimmer-fill rounded-md", className)}
+      className={cn("shimmer-fill rounded-inner", className)}
       // The phase offset lives in lib/motion beside the other stagger vocabulary, so the two rhythms stay together.
       style={{ animationDelay: `${skeletonDelay(index)}ms` }}
     />
@@ -28,7 +28,7 @@ export function CoverGridSkeleton({ count = 12 }: { count?: number }) {
     <div className="media-grid gap-x-4 gap-y-6" aria-hidden="true">
       {Array.from({ length: count }, (_, i) => (
         <div key={i}>
-          <Shimmer index={i} className="aspect-2/3 w-full rounded-lg" />
+          <Shimmer index={i} className="aspect-2/3 w-full rounded-control" />
           {/* Widths come from the index, not `Math.random`: a re-render must not reshuffle them. */}
           <Shimmer index={i} className={cn("mt-2 h-2.5", TITLE_W[i % TITLE_W.length])} />
           <Shimmer index={i} className={cn("mt-1.5 h-2", META_W[i % META_W.length])} />
@@ -56,14 +56,14 @@ export function DetailSkeleton() {
       <Shimmer index={0} className="h-64 w-full rounded-none" />
       <div className="relative mx-auto max-w-4xl px-8 pb-10 2xl:max-w-none">
         <div className="-mt-14 flex gap-6">
-          <Shimmer index={1} className="h-57 w-38 shrink-0 rounded-[.625rem]" />
+          <Shimmer index={1} className="h-57 w-38 shrink-0 rounded-cover" />
           <div className="min-w-0 flex-1 pt-16">
             <Shimmer index={2} className="h-6 w-2/3" />
             <Shimmer index={3} className="mt-2 h-4 w-2/5" />
             <Shimmer index={4} className="mt-3.5 h-3 w-1/2" />
             <div className="mt-4 flex gap-2">
-              <Shimmer index={5} className="h-8 w-28 rounded-md" />
-              <Shimmer index={6} className="h-8 w-24 rounded-md" />
+              <Shimmer index={5} className="h-8 w-28 rounded-inner" />
+              <Shimmer index={6} className="h-8 w-24 rounded-inner" />
             </div>
           </div>
         </div>

@@ -80,7 +80,7 @@ import { RichText } from "@/components/RichText";
 import { ScoreColumns, StatusBar } from "@/components/stats/panels";
 
 /** The phone's square actions, the height of the status button beside them. */
-const SQUARE = "size-11 rounded-xl border border-surface-700 bg-surface-900 text-ink-300 hover:border-surface-600 hover:text-ink-100";
+const SQUARE = "size-11 rounded-panel border border-surface-700 bg-surface-900 text-ink-300 hover:border-surface-600 hover:text-ink-100";
 
 export default function AnimeDetail() {
   const { t } = useTranslation();
@@ -210,7 +210,7 @@ export default function AnimeDetail() {
               alt=""
               style={{ viewTransitionName: "karasu-hero" }}
               className={cn(
-                "h-57 w-38 rounded-[.625rem] border border-surface-700 object-cover shadow-[0_1.25rem_2.5rem_rgba(0,0,0,.65)]",
+                "h-57 w-38 rounded-cover border border-surface-700 object-cover shadow-[0_1.25rem_2.5rem_rgba(0,0,0,.65)]",
                 veiled && "blur-xl",
               )}
             />
@@ -218,7 +218,7 @@ export default function AnimeDetail() {
               <button
                 onClick={() => setRevealed(true)}
                 aria-label={title}
-                className="absolute inset-0 grid place-items-center rounded-[.625rem] bg-surface-950/45 text-2xs font-semibold text-ink-100 transition hover:bg-surface-950/30"
+                className="absolute inset-0 grid place-items-center rounded-cover bg-surface-950/45 text-2xs font-semibold text-ink-100 transition hover:bg-surface-950/30"
               >
                 <span className="rounded-full bg-surface-900/90 px-2.5 py-1">
                   {t("settings.blurReveal")}
@@ -231,7 +231,7 @@ export default function AnimeDetail() {
                 type="button"
                 onClick={() => setCoverOpen(true)}
                 aria-label={t("detail.viewCover")}
-                className="absolute inset-0 cursor-zoom-in rounded-[.625rem] focus-visible:outline-2 focus-visible:outline-accent-500"
+                className="absolute inset-0 cursor-zoom-in rounded-cover focus-visible:outline-2 focus-visible:outline-accent-500"
               />
             )}
           </div>
@@ -269,7 +269,7 @@ export default function AnimeDetail() {
                   {canEdit &&
                     (localPending ? (
                       // Not "Add to list" before the local list has answered whether the title is on it.
-                      <Shimmer className="h-11 flex-1 rounded-xl" />
+                      <Shimmer className="h-11 flex-1 rounded-panel" />
                     ) : (
                       <StatusMenu
                         media={data}
@@ -306,7 +306,7 @@ export default function AnimeDetail() {
                   )}
                 </div>
                 {canPlay && (
-                  <Button className="h-11 w-full rounded-xl" onClick={() => play(data.id)} title={t("common.playNext")}>
+                  <Button className="h-11 w-full rounded-panel" onClick={() => play(data.id)} title={t("common.playNext")}>
                     <Play className="size-3.75" fill="currentColor" />
                     {t("common.playNext")}
                   </Button>
@@ -381,7 +381,7 @@ export default function AnimeDetail() {
               <Card>
                 <CardTitle>{t("detail.description")}</CardTitle>
                 {/* Elements, not dangerouslySetInnerHTML: lib/anilistHtml parses to nodes so no __html string ever exists. */}
-                <p className="mt-3 max-w-176 text-[.8125rem] leading-[1.75] text-pretty text-ink-300">
+                <p className="mt-3 max-w-176 text-ui leading-[1.75] text-pretty text-ink-300">
                   <RichText nodes={parseAniListHtml(data.description)} />
                 </p>
               </Card>
@@ -404,7 +404,7 @@ export default function AnimeDetail() {
                 <button
                   onClick={() => openUrl(trailerUrl(data.trailer!))}
                   aria-label={t("detail.trailerPlay")}
-                  className="group mt-3 grid aspect-video w-full max-w-md place-items-center overflow-hidden rounded-lg bg-surface-800 transition-surface hover:bg-surface-700"
+                  className="group mt-3 grid aspect-video w-full max-w-md place-items-center overflow-hidden rounded-control bg-surface-800 transition-surface hover:bg-surface-700"
                 >
                   <span className="grid h-12 w-12 place-items-center rounded-full bg-surface-950/70 transition-surface group-hover:bg-surface-950">
                     <Play fill="currentColor" className="size-5 text-ink-100" />
@@ -454,7 +454,7 @@ export default function AnimeDetail() {
                       src={e.node.coverImage.large ?? ""}
                       alt=""
                       loading="lazy"
-                      className="aspect-[2/3] w-full rounded-lg object-cover transition-transform group-hover:-translate-y-1"
+                      className="aspect-[2/3] w-full rounded-control object-cover transition-transform group-hover:-translate-y-1"
                     />
                     <p className="mt-1 text-xs text-accent-400">
                       {t(`relation.${e.relationType}`, {
@@ -500,7 +500,7 @@ function EpisodesSection({ mediaId }: { mediaId: number }) {
       </button>
       {open && (
         <div className="mt-3">
-          {episodes.isLoading && <Shimmer className="h-24 w-full rounded-lg" />}
+          {episodes.isLoading && <Shimmer className="h-24 w-full rounded-control" />}
           {episodes.error != null && (
             <p className="text-sm text-danger">
               {t("common.error", { message: String(episodes.error) })}
@@ -520,7 +520,7 @@ function EpisodesSection({ mediaId }: { mediaId: number }) {
                   title={ep.site ?? undefined}
                 >
                   {/* Same policy as the trailer: these thumbnails live on CDNs the CSP does not allow, so no img. */}
-                  <div className="grid aspect-video w-full place-items-center overflow-hidden rounded-lg bg-surface-800 transition-surface group-hover:bg-surface-700">
+                  <div className="grid aspect-video w-full place-items-center overflow-hidden rounded-control bg-surface-800 transition-surface group-hover:bg-surface-700">
                     <Play className="size-5 text-ink-600" />
                   </div>
                   <p className="mt-1 line-clamp-2 text-xs text-ink-300">{ep.title}</p>
@@ -579,7 +579,7 @@ function CastSection({ mediaId }: { mediaId: number }) {
       </button>
       {open && (
         <div className="mt-3 space-y-5">
-          {cast.isLoading && <Shimmer className="h-24 w-full rounded-lg" />}
+          {cast.isLoading && <Shimmer className="h-24 w-full rounded-control" />}
           {cast.error != null && (
             <p className="text-sm text-danger">
               {t("common.error", { message: String(cast.error) })}
@@ -587,7 +587,7 @@ function CastSection({ mediaId }: { mediaId: number }) {
           )}
           {characters.length > 0 && (
             <div>
-              <p className="text-2xs font-semibold uppercase tracking-[.1em] text-ink-600">
+              <p className="text-2xs font-semibold uppercase tracking-eyebrow text-ink-600">
                 {t("detail.castCharacters")}
               </p>
               <div className="mt-2 grid gap-2 sm:grid-cols-2">
@@ -596,7 +596,7 @@ function CastSection({ mediaId }: { mediaId: number }) {
                   return (
                     <div
                       key={c.node.id}
-                      className="flex items-center justify-between gap-3 rounded-lg bg-surface-900 p-2"
+                      className="flex items-center justify-between gap-3 rounded-control bg-surface-900 p-2"
                     >
                       <Link
                         to={`/character/${c.node.id}`}
@@ -631,7 +631,7 @@ function CastSection({ mediaId }: { mediaId: number }) {
           )}
           {staff.length > 0 && (
             <div>
-              <p className="text-2xs font-semibold uppercase tracking-[.1em] text-ink-600">
+              <p className="text-2xs font-semibold uppercase tracking-eyebrow text-ink-600">
                 {t("detail.castStaff")}
               </p>
               <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -639,7 +639,7 @@ function CastSection({ mediaId }: { mediaId: number }) {
                   <Link
                     key={`${s.node.id}-${i}`}
                     to={`/staff/${s.node.id}`}
-                    className="flex min-w-0 items-center gap-2.5 rounded-lg bg-surface-900 p-2 transition-surface hover:text-accent-400"
+                    className="flex min-w-0 items-center gap-2.5 rounded-control bg-surface-900 p-2 transition-surface hover:text-accent-400"
                   >
                     <Avatar src={s.node.image.medium} name={s.node.name.full ?? "?"} />
                     <span className="min-w-0">
@@ -734,7 +734,7 @@ function ReviewsSection({ mediaId }: { mediaId: number }) {
       </button>
       {open && (
         <div className="mt-3 space-y-3">
-          {revs.isLoading && <Shimmer className="h-24 w-full rounded-lg" />}
+          {revs.isLoading && <Shimmer className="h-24 w-full rounded-control" />}
           {revs.error != null && (
             <p className="text-sm text-danger">
               {t("common.error", { message: String(revs.error) })}
@@ -809,7 +809,7 @@ function ReviewCard({
   const down = r.userRating === "DOWN_VOTE";
 
   return (
-    <div className="rounded-lg bg-surface-900 p-3">
+    <div className="rounded-control bg-surface-900 p-3">
       <div className="flex items-center justify-between gap-3">
         <Link to={`/user/${encodeURIComponent(r.user?.name ?? "")}`} className="min-w-0">
           <UserLockup
@@ -917,7 +917,7 @@ function TrendSection({ mediaId }: { mediaId: number }) {
       </button>
       {open && (
         <div className="mt-3">
-          {trends.isLoading && <Shimmer className="h-24 w-full rounded-lg" />}
+          {trends.isLoading && <Shimmer className="h-24 w-full rounded-control" />}
           {trends.error != null && (
             <p className="text-sm text-danger">
               {t("common.error", { message: String(trends.error) })}
@@ -976,7 +976,7 @@ function CommunitySection({ data }: { data: MediaDetail }) {
           {rankings.map((r, i) => (
             <span
               key={i}
-              className="flex items-center gap-1.5 rounded-md border border-gold/40 bg-gold/10 px-2 py-1 text-xs text-gold"
+              className="flex items-center gap-1.5 rounded-inner border border-gold/40 bg-gold/10 px-2 py-1 text-xs text-gold"
             >
               <Trophy className="size-3" />
               {rankLabel(r)}
@@ -1129,7 +1129,7 @@ function AlternativeTitles({ data }: { data: MediaDetail }) {
                 {synonyms.map((s) => (
                   <span
                     key={s}
-                    className="rounded-md bg-surface-800 px-2 py-0.5 text-xs"
+                    className="rounded-inner bg-surface-800 px-2 py-0.5 text-xs"
                   >
                     {s}
                   </span>
@@ -1192,7 +1192,7 @@ function LinkList({ links }: { links: ExternalLinkData[] }) {
           <button
             key={l.id}
             onClick={() => openUrl(l.url)}
-            className="flex items-center gap-1.5 rounded-lg border border-surface-700 bg-surface-850 px-3 py-1.5 text-xs text-ink-300 transition-colors hover:border-surface-600 hover:text-ink-100"
+            className="flex items-center gap-1.5 rounded-control border border-surface-700 bg-surface-850 px-3 py-1.5 text-xs text-ink-300 transition-colors hover:border-surface-600 hover:text-ink-100"
           >
             <span
               className="h-2 w-2 shrink-0 rounded-full"

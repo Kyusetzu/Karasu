@@ -149,7 +149,7 @@ export function AppearanceSection() {
             }}
             onBlur={() => setColsDraft(null)}
             aria-label={t("settings.coverCols")}
-            className="h-8 w-16 rounded-lg border border-surface-700 bg-surface-900 px-2 text-right text-sm tabular-nums text-ink-100 focus:border-accent-500 focus:outline-none"
+            className="h-8 w-16 rounded-control border border-surface-700 bg-surface-900 px-2 text-right text-sm tabular-nums text-ink-100 focus:border-accent-500 focus:outline-none"
           />
         </Row>
         {/* One example row at the chosen count, so the number becomes a picture before the pane closes. */}
@@ -260,7 +260,7 @@ export function AppearanceSection() {
                   type="button"
                   onClick={() => setEditingStatus(editingStatus === status ? null : status)}
                   aria-expanded={editingStatus === status}
-                  className="flex flex-1 items-center gap-2.5 rounded-md py-0.5 text-left text-sm text-ink-300 transition-surface hover:text-ink-100"
+                  className="flex flex-1 items-center gap-2.5 rounded-inner py-0.5 text-left text-sm text-ink-300 transition-surface hover:text-ink-100"
                 >
                   <span
                     className="size-4 shrink-0 rounded-full"

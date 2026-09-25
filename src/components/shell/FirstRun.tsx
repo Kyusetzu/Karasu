@@ -67,7 +67,7 @@ export default function FirstRun() {
           <ol className="mt-8 space-y-3">
             {steps.map((step, i) => (
               <li key={i} className="flex items-start gap-3 text-xs text-ink-500">
-                <span className="grid size-6 shrink-0 place-items-center rounded-md border border-surface-700 text-2xs font-semibold tabular-nums text-ink-300">
+                <span className="grid size-6 shrink-0 place-items-center rounded-inner border border-surface-700 text-2xs font-semibold tabular-nums text-ink-300">
                   {i + 1}
                 </span>
                 <span className="pt-1 leading-relaxed">{step}</span>

@@ -40,8 +40,8 @@ export function ActivityFeed({
     return (
       <div className="space-y-2" aria-hidden="true">
         {[0, 1, 2, 3].map((i) => (
-          <div key={i} className="flex gap-3 rounded-xl border border-surface-800 p-3">
-            <Shimmer className="aspect-2/3 w-11 rounded-md" index={i} />
+          <div key={i} className="flex gap-3 rounded-panel border border-surface-800 p-3">
+            <Shimmer className="aspect-2/3 w-11 rounded-inner" index={i} />
             <div className="flex-1 space-y-2">
               <Shimmer className="h-3 w-28 rounded" index={i} />
               <Shimmer className="h-3 w-full rounded" index={i + 1} />

@@ -58,7 +58,7 @@ export default function SeasonPicker({
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex items-center gap-2 rounded-lg px-2 py-1 transition-surface hover:bg-surface-850"
+        className="flex items-center gap-2 rounded-control px-2 py-1 transition-surface hover:bg-surface-850"
       >
         <span className="text-lg font-semibold text-ink-100">
           {t(`season.${season}`)} {year}
@@ -79,7 +79,7 @@ export default function SeasonPicker({
         <div
           data-overlay
           className={cn(
-            "absolute left-0 top-full z-10 mt-1.5 w-64 origin-top-left rounded-xl border border-hair bg-surface-900 p-3 shadow-xl panel-wash",
+            "absolute left-0 top-full z-10 mt-1.5 w-64 origin-top-left rounded-panel border border-hair bg-surface-900 p-3 shadow-xl panel-wash",
             panel.leaving ? "animate-pop-out" : "animate-pop-in",
           )}
         >
@@ -91,7 +91,7 @@ export default function SeasonPicker({
                 type="button"
                 onClick={() => onPick({ season, year: y })}
                 className={cn(
-                  "min-w-12 flex-1 rounded-md py-1 text-xs tabular-nums transition-surface",
+                  "min-w-12 flex-1 rounded-inner py-1 text-xs tabular-nums transition-surface",
                   y === year
                     ? "bg-accent-500 text-accent-ink"
                     : "text-ink-500 hover:bg-surface-850 hover:text-ink-100",
@@ -111,7 +111,7 @@ export default function SeasonPicker({
                   setOpen(false);
                 }}
                 className={cn(
-                  "rounded-lg py-2 text-xs font-medium transition-surface",
+                  "rounded-control py-2 text-xs font-medium transition-surface",
                   s === season
                     ? "bg-surface-850 text-ink-100"
                     : "text-ink-500 hover:bg-surface-850 hover:text-ink-100",

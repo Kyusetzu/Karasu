@@ -63,7 +63,7 @@ export default function RandomPickModal({
               <img
                 src={picked.media.coverImage.large ?? ""}
                 alt=""
-                className="h-40 w-28 shrink-0 rounded-lg object-cover"
+                className="h-40 w-28 shrink-0 rounded-control object-cover"
               />
             </Link>
             <div className="flex min-w-0 flex-1 flex-col">

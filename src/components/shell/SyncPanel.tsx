@@ -144,7 +144,7 @@ export default function SyncPanel({
         >
           <span
             className={cn(
-              "mt-0.5 grid size-5.5 shrink-0 place-items-center rounded-md",
+              "mt-0.5 grid size-5.5 shrink-0 place-items-center rounded-inner",
               edit.kind === "delete"
                 ? "bg-danger/14 text-danger"
                 : "bg-accent-500/14 text-accent-400",
@@ -157,7 +157,7 @@ export default function SyncPanel({
             )}
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-[.8125rem] font-medium text-ink-100">
+            <span className="block truncate text-ui font-medium text-ink-100">
               {/* An unparsed payload is still a row, because the count here has to agree with the pending badge. */}
               {title ??
                 (edit.subject == null
@@ -185,7 +185,7 @@ export default function SyncPanel({
         aria-label={label}
         aria-expanded={open}
         aria-haspopup="dialog"
-        className="w-full rounded-lg text-left transition-surface hover:bg-surface-900"
+        className="w-full rounded-control text-left transition-surface hover:bg-surface-900"
       >
         {children}
       </button>
@@ -197,7 +197,7 @@ export default function SyncPanel({
           // Owns the keyboard while up, exit included; not a focus trap, because trapping Tab in a popover is wrong.
           data-overlay
           className={cn(
-            "absolute bottom-full left-0 z-50 mb-1 w-76 origin-bottom-left overflow-hidden rounded-xl border border-hair bg-surface-900 shadow-2xl panel-wash",
+            "absolute bottom-full left-0 z-50 mb-1 w-76 origin-bottom-left overflow-hidden rounded-panel border border-hair bg-surface-900 shadow-float panel-wash",
             panel.leaving ? "animate-pop-out" : "animate-spring-in",
           )}
         >

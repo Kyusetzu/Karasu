@@ -42,7 +42,7 @@ import SyncPanel from "./SyncPanel";
 
 /** The rail is the state change: `useRailMarker` slides one marker between items rather than each growing its own. */
 const itemClass =
-  "relative flex items-center gap-2.75 rounded-lg px-2.5 py-1.75 transition-surface";
+  "relative flex items-center gap-2.75 rounded-control px-2.5 py-1.75 transition-surface";
 
 /** Icon-only: the gap and the left padding have nothing left to separate. */
 const collapsedItemClass = "justify-center gap-0 px-0";
@@ -81,7 +81,7 @@ function useRailMarker(deps: unknown[]) {
   return { navRef, top };
 }
 
-const labelClass = "text-[.8125rem] font-medium tracking-[.005em]";
+const labelClass = "text-ui font-medium tracking-[.005em]";
 
 export interface NavItem {
   to: string;
@@ -247,7 +247,7 @@ function Account({
           <NavLink
             to={`/user/${encodeURIComponent(viewer.name)}`}
             aria-label={name}
-            className="rounded-lg transition-surface hover:bg-surface-900"
+            className="rounded-control transition-surface hover:bg-surface-900"
           >
             {body}
           </NavLink>
@@ -260,7 +260,7 @@ function Account({
             <span
               title={sync.text}
               className={cn(
-                "grid size-6 place-items-center rounded-md",
+                "grid size-6 place-items-center rounded-inner",
                 sync.accent ? "text-accent-400" : "text-ink-600",
               )}
             >
@@ -293,7 +293,7 @@ function Account({
       {viewer ? (
         <NavLink
           to={`/user/${encodeURIComponent(viewer.name)}`}
-          className="-mx-1 block rounded-lg px-1 py-0.5 transition-surface hover:bg-surface-900"
+          className="-mx-1 block rounded-control px-1 py-0.5 transition-surface hover:bg-surface-900"
         >
           {lockup}
         </NavLink>

@@ -39,7 +39,7 @@ export function FavouriteButton({
       title={blocked ? t("detail.favouriteBlocked") : undefined}
       className={cn(
         "flex items-center gap-1.5 border transition-surface",
-        square ? "size-11 shrink-0 justify-center rounded-xl bg-surface-900" : "rounded-lg px-2.5 py-1.5 text-xs",
+        square ? "size-11 shrink-0 justify-center rounded-panel bg-surface-900" : "rounded-control px-2.5 py-1.5 text-xs",
         blocked
           ? "cursor-not-allowed border-surface-800 text-ink-600 opacity-55"
           : on

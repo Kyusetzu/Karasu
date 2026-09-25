@@ -108,7 +108,7 @@ export default function KeyboardSheet() {
 
 function Cap({ children }: { children: string }) {
   return (
-    <kbd className="grid h-5.5 min-w-5.5 place-items-center rounded-md border border-surface-700 bg-surface-850 px-1.5 font-brand text-2xs font-semibold text-ink-300">
+    <kbd className="grid h-5.5 min-w-5.5 place-items-center rounded-inner border border-surface-700 bg-surface-850 px-1.5 font-brand text-2xs font-semibold text-ink-300">
       {children}
     </kbd>
   );

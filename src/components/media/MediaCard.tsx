@@ -68,7 +68,7 @@ export default function MediaCard({
     <CoverCell
       to={`/media/${media.id}`}
       // The roving cursor is not real DOM focus, so the ring is drawn rather than inherited from `:focus-visible`.
-      className={focused ? "rounded-[.625rem] ring-2 ring-accent-500" : undefined}
+      className={focused ? "rounded-cover ring-2 ring-accent-500" : undefined}
       cover={media.coverImage.large}
       // Null when the title is not on the list, so an unlisted title has no ring rather than a grey one.
       statusRing={entry ? statusColorVar(entry.status) : null}

@@ -67,8 +67,8 @@ function OfflineEntry({
         {t("detail.offlineCached")}
       </p>
 
-      <div className="flex gap-4 rounded-xl border border-hair bg-surface-900 p-4">
-        <div className="h-32 w-22 shrink-0 overflow-hidden rounded-lg bg-surface-800">
+      <div className="flex gap-4 rounded-panel border border-hair bg-surface-900 p-4">
+        <div className="h-32 w-22 shrink-0 overflow-hidden rounded-control bg-surface-800">
           {entry.media.coverImage?.large && (
             <img
               src={entry.media.coverImage.large}

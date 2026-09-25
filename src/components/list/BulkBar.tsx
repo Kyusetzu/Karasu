@@ -47,7 +47,7 @@ export function BulkBar({
   return (
     // The now-playing card's inset-well substance: reading as a different material announces it without a colour shout.
     <div className="inset-well well-edge relative mx-8 mb-5 flex animate-rise-in flex-wrap items-center gap-2.5 overflow-hidden rounded-[.875rem] px-4.5 py-3">
-      <span className="text-[.8125rem] font-semibold tabular-nums text-ink-100">
+      <span className="text-ui font-semibold tabular-nums text-ink-100">
         {t("bulk.selected", { count })}
       </span>
       <span className="h-4 w-px bg-surface-700" />

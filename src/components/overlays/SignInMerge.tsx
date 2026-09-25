@@ -218,7 +218,7 @@ export default function SignInMerge() {
                   {t(`merge.strategy.${s}`)}
                 </label>
               ))}
-              <ul className="max-h-32 overflow-y-auto rounded-lg bg-surface-850 p-2 text-xs text-ink-500">
+              <ul className="max-h-32 overflow-y-auto rounded-control bg-surface-850 p-2 text-xs text-ink-500">
                 {conflicts.map((r) => (
                   <li key={r.mediaId} className="truncate">
                     {displayTitle(r.media.title)}

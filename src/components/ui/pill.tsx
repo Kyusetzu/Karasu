@@ -11,7 +11,7 @@ export const Pill = forwardRef<
     type="button"
     aria-pressed={active}
     className={cn(
-      "inline-flex h-7.5 items-center justify-center gap-1.5 rounded-lg px-3 text-xs font-medium transition-surface",
+      "inline-flex h-7.5 items-center justify-center gap-1.5 rounded-control px-3 text-xs font-medium transition-surface",
       "focus-visible:outline-2 focus-visible:outline-accent-500 disabled:pointer-events-none disabled:opacity-50",
       active
         ? "bg-accent-500 text-accent-ink"

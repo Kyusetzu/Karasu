@@ -64,7 +64,7 @@ function Blocks({ nodes }: { nodes: MdNode[] }) {
             return (
               <pre
                 key={i}
-                className="overflow-x-auto rounded-lg bg-surface-850 p-3 font-mono text-xs text-ink-300"
+                className="overflow-x-auto rounded-control bg-surface-850 p-3 font-mono text-xs text-ink-300"
               >
                 {n.text}
               </pre>

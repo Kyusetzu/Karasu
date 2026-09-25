@@ -184,7 +184,7 @@ export default function Franchise() {
             {...pan.handlers}
             className={cn(
               // `touch-none`, or Chromium reclaims a touch drag with a pointercancel mid-gesture and the pan stutters dead.
-              "relative min-h-0 min-w-0 flex-1 select-none touch-none overflow-hidden rounded-xl border border-hair bg-surface-900",
+              "relative min-h-0 min-w-0 flex-1 select-none touch-none overflow-hidden rounded-panel border border-hair bg-surface-900",
               pan.dragging ? "cursor-grabbing" : "cursor-grab",
             )}
             style={{
@@ -274,7 +274,7 @@ export default function Franchise() {
               })}
             </div>
 
-            <div className="absolute bottom-3 right-3 flex items-center gap-1 rounded-lg border border-hair bg-surface-850/90 p-1">
+            <div className="absolute bottom-3 right-3 flex items-center gap-1 rounded-control border border-hair bg-surface-850/90 p-1">
               <IconButton
                 size="xs"
                 aria-label={t("franchise.zoomOut")}
@@ -286,7 +286,7 @@ export default function Franchise() {
                 type="button"
                 onClick={recenter}
                 title={t("franchise.resetView")}
-                className="min-w-11 rounded-md px-1 py-0.5 text-2xs tabular-nums text-ink-500 transition-surface hover:bg-surface-800 hover:text-ink-100"
+                className="min-w-11 rounded-inner px-1 py-0.5 text-2xs tabular-nums text-ink-500 transition-surface hover:bg-surface-800 hover:text-ink-100"
               >
                 {Math.round(pan.zoom * 100)}%
               </button>
@@ -300,7 +300,7 @@ export default function Franchise() {
             </div>
 
             {data.truncated && (
-              <p className="absolute left-3 top-3 rounded-md border border-hair bg-surface-850/90 px-2 py-1 text-2xs text-ink-600">
+              <p className="absolute left-3 top-3 rounded-inner border border-hair bg-surface-850/90 px-2 py-1 text-2xs text-ink-600">
                 {t("franchise.truncated")}
               </p>
             )}
@@ -426,7 +426,7 @@ function GraphNode({
           )}
           {done !== null && (
             <span
-              className="absolute inset-x-0 bottom-0 block bg-[rgba(4,5,8,.55)]"
+              className="absolute inset-x-0 bottom-0 block bg-scrim"
               style={{ height: ".1875em" }}
             >
               <span
@@ -449,7 +449,7 @@ function GraphNode({
           {title}
         </p>
         {branch.relation && (
-          <p className="text-center text-[.5625em] uppercase tracking-[.1em] text-ink-600">
+          <p className="text-center text-[.5625em] uppercase tracking-eyebrow text-ink-600">
             {t(`relation.${branch.relation}`, { defaultValue: branch.relation })}
           </p>
         )}
@@ -491,7 +491,7 @@ function Rail({
 
   if (!node) {
     return (
-      <aside className="w-full shrink-0 rounded-xl border border-hair bg-surface-900 p-4 xl:w-60">
+      <aside className="w-full shrink-0 rounded-panel border border-hair bg-surface-900 p-4 xl:w-60">
         <p className="text-xs text-ink-600">{t("franchise.selectHint")}</p>
       </aside>
     );
@@ -504,17 +504,17 @@ function Rail({
     // Keyed on the node so the pane re-runs `settle` when the selection moves; below `xl` it sits under the canvas.
     <aside
       key={node.id}
-      className="max-h-64 w-full shrink-0 animate-settle overflow-y-auto rounded-xl border border-hair bg-surface-900 p-4 panel-wash xl:max-h-none xl:w-60"
+      className="max-h-64 w-full shrink-0 animate-settle overflow-y-auto rounded-panel border border-hair bg-surface-900 p-4 panel-wash xl:max-h-none xl:w-60"
     >
       {node.coverImage.large && (
         <img
           src={node.coverImage.large}
           alt=""
-          className="mb-3 hidden aspect-2/3 w-full rounded-lg object-cover xl:block"
+          className="mb-3 hidden aspect-2/3 w-full rounded-control object-cover xl:block"
         />
       )}
       {relation && (
-        <p className="text-2xs uppercase tracking-[.1em] text-accent-400">
+        <p className="text-2xs uppercase tracking-eyebrow text-accent-400">
           {t(`relation.${relation}`, { defaultValue: relation })}
         </p>
       )}
@@ -639,7 +639,7 @@ function Legend({ type }: { type: MediaType }) {
       {open && (
         <ul
           id={id}
-          className="grid grid-cols-2 gap-x-3 gap-y-1 rounded-lg border border-hair bg-surface-850/90 px-2.5 py-2 text-2xs text-ink-500 backdrop-blur-sm"
+          className="grid grid-cols-2 gap-x-3 gap-y-1 rounded-control border border-hair bg-surface-850/90 px-2.5 py-2 text-2xs text-ink-500 backdrop-blur-sm"
         >
           {LEGEND.map((status) => (
             <li key={status ?? "none"} className={cn("flex items-center gap-1.5", !status && "col-span-2")}>
@@ -655,7 +655,7 @@ function Legend({ type }: { type: MediaType }) {
         onClick={toggle}
         aria-expanded={open}
         aria-controls={open ? id : undefined}
-        className="inline-flex h-9.5 items-center gap-1.5 rounded-lg border border-hair bg-surface-850/90 px-2.5 text-2xs font-semibold uppercase tracking-[.1em] text-ink-300 backdrop-blur-sm transition-surface hover:text-ink-100"
+        className="inline-flex h-9.5 items-center gap-1.5 rounded-control border border-hair bg-surface-850/90 px-2.5 text-2xs font-semibold uppercase tracking-eyebrow text-ink-300 backdrop-blur-sm transition-surface hover:text-ink-100"
       >
         {!open &&
           (["CURRENT", "COMPLETED", "PLANNING"] as const).map((s) => (

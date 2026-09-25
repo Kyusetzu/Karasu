@@ -15,7 +15,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
       <input
         ref={ref}
         className={cn(
-          "h-9 w-full rounded-lg border border-surface-700 bg-surface-900 px-3 text-sm text-ink-100",
+          "h-9 w-full rounded-control border border-surface-700 bg-surface-900 px-3 text-sm text-ink-100",
           "placeholder:text-ink-600 focus:border-accent-500 focus:outline-none",
           // Room for the button, so a long value does not slide under it.
           onClear && "pr-8",
@@ -37,7 +37,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             // The field owns the focus; taking it on mousedown would blur the caret and fire `onBlur` commit handlers.
             onMouseDown={(e) => e.preventDefault()}
             onClick={onClear}
-            className="absolute right-1 top-1/2 grid size-6 -translate-y-1/2 place-items-center rounded-md text-ink-600 transition-surface hover:bg-surface-800 hover:text-ink-100"
+            className="absolute right-1 top-1/2 grid size-6 -translate-y-1/2 place-items-center rounded-inner text-ink-600 transition-surface hover:bg-surface-800 hover:text-ink-100"
           >
             <X className="size-3.25" />
             <span className="sr-only">{clearLabel}</span>

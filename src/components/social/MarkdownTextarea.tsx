@@ -187,7 +187,7 @@ export function MarkdownTextarea({
   const previewPanel = (
     <div
       className={cn(
-        "overflow-y-auto rounded-lg border border-surface-800 bg-surface-950 p-3",
+        "overflow-y-auto rounded-control border border-surface-800 bg-surface-950 p-3",
         preview === "side" ? "min-h-44" : "min-h-20",
       )}
     >
@@ -215,7 +215,7 @@ export function MarkdownTextarea({
       // Hidden, not unmounted, under the preview: `htmlFor` still resolves and the draft keeps its undo history.
       hidden={previewing}
       className={cn(
-        "w-full resize-y rounded-lg border border-surface-700 bg-surface-950 text-ink-100 placeholder:text-ink-600 focus:border-accent-500 focus:outline-none",
+        "w-full resize-y rounded-control border border-surface-700 bg-surface-950 text-ink-100 placeholder:text-ink-600 focus:border-accent-500 focus:outline-none",
         compact ? "min-h-8 flex-1 px-2 py-1.5 text-xs" : "px-3 py-2 text-sm",
         textareaClassName,
       )}

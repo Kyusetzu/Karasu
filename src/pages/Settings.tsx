@@ -187,7 +187,7 @@ export default function Settings() {
                   type="button"
                   onClick={() => setParams({ pane: p.id })}
                   className={cn(
-                    "flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm transition-surface",
+                    "flex w-full items-center gap-3 rounded-panel px-3 py-3 text-left text-sm transition-surface",
                     danger
                       ? "text-danger/85 hover:bg-danger/10"
                       : "text-ink-100 hover:bg-surface-850",
@@ -233,7 +233,7 @@ export default function Settings() {
               aria-current={p.id === active ? "page" : undefined}
               onClick={() => setParams(p.id === "account" ? {} : { pane: p.id })}
               className={cn(
-                "flex items-center gap-2.5 rounded-lg px-2.5 py-1.75 text-left text-[.8125rem] transition-surface",
+                "flex items-center gap-2.5 rounded-control px-2.5 py-1.75 text-left text-ui transition-surface",
                 p.id === active
                   ? danger
                     ? "bg-danger/12 text-danger"

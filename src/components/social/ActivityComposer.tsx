@@ -34,7 +34,7 @@ export function ActivityComposer() {
         e.preventDefault();
         submit();
       }}
-      className="panel-wash panel-top rounded-xl border border-surface-800 bg-surface-900 p-3"
+      className="panel-wash panel-top rounded-panel border border-surface-800 bg-surface-900 p-3"
     >
       <MarkdownTextarea
         value={text}

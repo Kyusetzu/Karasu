@@ -126,10 +126,10 @@ The default accent is `#4b3fc7`.
 | `cover-scrim` | the deterministic backdrop at the foot of arbitrary cover art |
 | `ink-halo` | a black ring round light text on artwork |
 
-**The canonical raised panel** is `Card`: `panel-wash panel-top rounded-xl border
-border-surface-800 bg-surface-900`. **The canonical floating surface**
-(popover, menu, sheet) is `rounded-xl border border-hair bg-surface-900
-panel-wash` plus the overlay shadow.
+**The canonical raised panel** is `Card`: `panel-wash panel-top rounded-panel
+border border-surface-800 bg-surface-900`. **The canonical floating surface**
+(popover, menu) is `rounded-panel border border-hair bg-surface-900
+panel-wash shadow-float`.
 
 ### Type
 
@@ -142,26 +142,29 @@ panel-wash` plus the overlay shadow.
 
 | Step | Use |
 |---|---|
-| `text-2xs` (10 px) | labels (`uppercase tracking-wide text-ink-600`), badges, counts |
+| `text-2xs` (10 px) | labels (`uppercase tracking-eyebrow text-ink-600`), badges, counts |
 | `text-xs` (12 px) | dense rows, secondary lines, chips |
+| `text-ui` (13 px) | the shell's panels, toolbars and dense titles |
 | `text-sm` (14 px) | body, controls |
 | `text-base` (16 px) | card titles |
 | `text-2xl font-bold` | page titles |
 
-The 13 px step that 28 call sites spell `text-[.8125rem]` is a missing token.
-It is named in the foundation phase and until then is not added anywhere new.
+`tracking-eyebrow` is the one letter spacing for small uppercase labels.
 
 ### Radius
 
-| Radius | Role |
-|---|---|
-| `rounded-lg` | controls: buttons, fields, pills |
-| `rounded-md` | the inner segment of a segmented track, icon buttons |
-| `rounded-xl` | panels and floating surfaces |
-| `rounded-full` | avatars, dots, round icon buttons |
+A radius is named by what it rounds, never by its size. A retune then moves
+every control, panel or sheet at once, and the style audit refuses the size
+names (`rounded`, `rounded-lg` …).
 
-Cover art currently uses five radii. It gets one role token in the foundation
-phase.
+| Role | Today | For |
+|---|---|---|
+| `rounded-inner` | 6 px | a segment inside a track, icon buttons, small chips |
+| `rounded-control` | 8 px | buttons, fields, pills, list rows |
+| `rounded-panel` | 12 px | cards, popovers, menus, dialogs |
+| `rounded-sheet` | 16 px | the phone's bottom sheets |
+| `rounded-cover` | 10 px | cover art |
+| `rounded-full` | — | avatars, dots, round icon buttons |
 
 ### Icons
 
@@ -173,12 +176,22 @@ states. Eight other sizes are in use today, and they converge on these four.
 
 - Flat content sits on its surface step.
 - Raised panels add the catch-light and the wash, not a shadow.
-- Floating surfaces take `shadow-2xl`.
-- The modal scrim is near-black at 55 % (`rgba(4,5,8,.55)`) in both themes.
-  It is currently written as a literal in eight files; the foundation phase
-  names it.
-- z-index has no scale yet. The foundation phase adds one:
-  sticky < popover < overlay < modal < toast < palette < system.
+- Floating surfaces take `shadow-float`, and the phone's sheets
+  `shadow-sheet`. The style audit refuses the size names (`shadow`,
+  `shadow-xl` …).
+- The dim behind a dialog or a sheet is `bg-scrim`, near-black at 55 % in
+  both themes.
+- Chips over cover art still spell their near-black with seven different
+  alphas. They converge when the cover area is restyled.
+- Layers:
+  - Tailwind's plain `z-10`, `z-30` and `z-50` cover sticky headers, the
+    detection window and dialogs.
+  - `z-popover` (100) covers menus, popovers and the action sheet.
+  - `z-alert` (110) covers the confirm dialog and the match picker.
+  - `z-skip` (200) covers the skip link.
+  - A dialog opened from a popover or a menu replaces that surface as it
+    opens (`Popover`'s `closeThen`, the action host's overlay), which is why
+    `Modal` can sit below them.
 
 ### Motion
 

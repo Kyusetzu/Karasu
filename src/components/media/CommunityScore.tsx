@@ -60,7 +60,7 @@ export function CommunityScore({
               const next = Math.max(0, Math.min(max, raw));
               if (next !== value) onChange(next);
             }}
-            className="h-9 w-20 rounded-lg border border-surface-700 bg-surface-950 px-2 text-right text-lg font-bold tabular-nums text-gold focus:border-accent-500 focus:outline-none [&::-webkit-inner-spin-button]:appearance-none"
+            className="h-9 w-20 rounded-control border border-surface-700 bg-surface-950 px-2 text-right text-lg font-bold tabular-nums text-gold focus:border-accent-500 focus:outline-none [&::-webkit-inner-spin-button]:appearance-none"
           />
         ) : (
           <span className="leading-none" aria-hidden>
@@ -87,7 +87,7 @@ export function CommunityScore({
               className="group relative flex h-full items-end focus-visible:outline-2 focus-visible:outline-accent-500"
             >
               {mine && (
-                <span className="absolute -top-1 left-1/2 -translate-x-1/2 rounded-md bg-gold px-1.5 py-0.5 text-xs font-bold leading-none text-[#0d1117]">
+                <span className="absolute -top-1 left-1/2 -translate-x-1/2 rounded-inner bg-gold px-1.5 py-0.5 text-xs font-bold leading-none text-[#0d1117]">
                   {label(b.value)}
                 </span>
               )}

@@ -92,7 +92,7 @@ export function MultiFilterSelect({
         aria-expanded={open}
         aria-label={label}
         className={cn(
-          "flex h-8.5 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg",
+          "flex h-8.5 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-control",
           "border border-surface-800 bg-surface-900 px-2.5 transition-surface",
           "hover:bg-surface-850 focus-visible:border-accent-500",
           !isEmpty(value) && "border-accent-500/60",
@@ -118,7 +118,7 @@ export function MultiFilterSelect({
           data-overlay
           className={cn(
             "absolute left-0 top-full z-50 mt-1 w-64 origin-top-left overflow-hidden",
-            "rounded-xl border border-hair bg-surface-900 shadow-2xl panel-wash",
+            "rounded-panel border border-hair bg-surface-900 shadow-float panel-wash",
             panel.leaving ? "animate-pop-out" : "animate-pop-in",
           )}
         >
@@ -163,7 +163,7 @@ export function MultiFilterSelect({
                     aria-pressed={state !== "off"}
                     onClick={() => onChange(cycle(value, option))}
                     className={cn(
-                      "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-surface",
+                      "flex w-full items-center gap-2 rounded-inner px-2 py-1.5 text-left text-xs transition-surface",
                       state === "off" && "text-ink-300 hover:bg-surface-850",
                       state === "include" && "bg-accent-500/12 text-accent-400",
                       state === "exclude" && "bg-danger/12 text-danger",

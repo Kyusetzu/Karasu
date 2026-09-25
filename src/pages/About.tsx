@@ -173,7 +173,7 @@ function DiagnosticsSection() {
 
       {/* The actual facts, so the user can see what they are about to paste before they paste it. */}
       {report && (
-        <pre className="mt-3 max-h-56 overflow-auto rounded-lg bg-surface-850 p-2.5 font-mono text-2xs leading-relaxed text-ink-500">
+        <pre className="mt-3 max-h-56 overflow-auto rounded-control bg-surface-850 p-2.5 font-mono text-2xs leading-relaxed text-ink-500">
           {report}
         </pre>
       )}

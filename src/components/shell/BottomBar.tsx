@@ -42,7 +42,7 @@ function sheetGroups(android: boolean): { label: string; items: NavItem[] }[] {
 }
 
 const slotClass =
-  "flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-lg py-1.5 text-[.625rem] font-medium transition-surface";
+  "flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-control py-1.5 text-[.625rem] font-medium transition-surface";
 
 export default function BottomBar() {
   const { t } = useTranslation();
@@ -84,7 +84,7 @@ export default function BottomBar() {
           <button
             type="button"
             aria-label={t("window.close")}
-            className="absolute inset-0 bg-[rgba(4,5,8,.55)]"
+            className="absolute inset-0 bg-scrim"
             onClick={() => setMoreOpen(false)}
           />
           <div
@@ -93,7 +93,7 @@ export default function BottomBar() {
             aria-label={t("nav.more")}
             className={cn(
               // max-h plus scroll: a short phone must never push the top rows under the status bar.
-              "absolute inset-x-2 bottom-16 max-h-[70vh] overflow-y-auto rounded-2xl border border-surface-700 bg-surface-900 p-3 shadow-[0_1rem_3rem_rgba(0,0,0,.6)]",
+              "absolute inset-x-2 bottom-16 max-h-[70vh] overflow-y-auto rounded-sheet border border-surface-700 bg-surface-900 p-3 shadow-sheet",
               sheet.leaving ? "animate-rise-out" : "animate-rise-in",
             )}
           >
@@ -120,7 +120,7 @@ export default function BottomBar() {
                 setMoreOpen(false);
                 openPalette();
               }}
-              className="mb-2 flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-sm text-ink-300 transition-surface hover:bg-surface-850 hover:text-ink-100"
+              className="mb-2 flex w-full items-center gap-2.5 rounded-control px-2 py-2 text-sm text-ink-300 transition-surface hover:bg-surface-850 hover:text-ink-100"
             >
               <Command className="size-4.5 shrink-0" />
               <span>{t("ctx.palette")}</span>
@@ -139,7 +139,7 @@ export default function BottomBar() {
                       onClick={() => setMoreOpen(false)}
                       className={({ isActive }) =>
                         cn(
-                          "flex items-center gap-2.5 rounded-lg px-2 py-2 text-sm transition-surface",
+                          "flex items-center gap-2.5 rounded-control px-2 py-2 text-sm transition-surface",
                           isActive
                             ? "bg-surface-800 text-accent-400"
                             : "text-ink-300 hover:bg-surface-850 hover:text-ink-100",

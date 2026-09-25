@@ -89,7 +89,7 @@ export function RankedRow({
   const href = entryHref(entry, category);
   // Only the wrapping element changes, so a non-navigable category keeps exactly the layout it had.
   const row = (
-    <div className="flex items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-surface-900">
+    <div className="flex items-center gap-3 rounded-control px-2 py-1.5 hover:bg-surface-900">
       <span className="w-5 shrink-0 text-right text-xs tabular-nums text-ink-600">
         {rank}
       </span>

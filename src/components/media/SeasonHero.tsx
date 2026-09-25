@@ -94,7 +94,7 @@ export default function SeasonHero() {
   usePointerSwipe({ surface: card, content: track, enabled: swipeable, onStep: step });
 
   // No skeleton once there is nothing to show; the Overview simply starts at its first section.
-  if (isLoading) return <Shimmer className="h-48 md:h-72 w-full rounded-2xl" />;
+  if (isLoading) return <Shimmer className="h-48 md:h-72 w-full rounded-sheet" />;
   if (items.length === 0) return null;
 
   const current = items[Math.min(at, items.length - 1)];
@@ -105,7 +105,7 @@ export default function SeasonHero() {
         ref={card}
         onPointerDown={() => setHeld(true)}
         onTouchStart={() => setHeld(true)}
-        className="relative h-48 md:h-72 select-none overflow-hidden rounded-2xl bg-surface-900"
+        className="relative h-48 md:h-72 select-none overflow-hidden rounded-sheet bg-surface-900"
       >
         {/* Everything that follows a swipe; the card around it stays put and clips it. */}
         <div ref={track} className="absolute inset-0">

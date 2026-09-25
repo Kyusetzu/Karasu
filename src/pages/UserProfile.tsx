@@ -302,7 +302,7 @@ function Favourites({ user }: { user: UserProfileData }) {
                   title={displayTitle(m.title)}
                   className="group w-24 shrink-0"
                 >
-                  <div className="aspect-2/3 overflow-hidden rounded-lg bg-surface-850">
+                  <div className="aspect-2/3 overflow-hidden rounded-control bg-surface-850">
                     {m.coverImage?.large && (
                       <img
                         src={m.coverImage.large}
@@ -361,7 +361,7 @@ function Favourites({ user }: { user: UserProfileData }) {
               <Link
                 key={s.id}
                 to={`/studio/${s.id}`}
-                className="rounded-lg border border-surface-700 px-2.5 py-1.5 text-xs text-ink-300 transition-surface hover:border-surface-600 hover:text-ink-100"
+                className="rounded-control border border-surface-700 px-2.5 py-1.5 text-xs text-ink-300 transition-surface hover:border-surface-600 hover:text-ink-100"
               >
                 {s.name}
               </Link>

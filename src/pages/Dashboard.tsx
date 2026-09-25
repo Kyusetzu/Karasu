@@ -140,7 +140,7 @@ function DashboardSkeleton() {
         {Array.from({ length: 4 }, (_, i) => (
           <div
             key={i}
-            className="rounded-xl border border-hair bg-surface-900 px-4 py-3 panel-wash"
+            className="rounded-panel border border-hair bg-surface-900 px-4 py-3 panel-wash"
           >
             <Shimmer index={i} className="h-5 w-16" />
             <Shimmer index={i} className="mt-2 h-2 w-20" />
@@ -341,7 +341,7 @@ function Birthdays({ userId, settled }: { userId: number; settled: boolean }) {
           <Link
             key={`${p.kind}-${p.id}`}
             to={`/${p.kind}/${p.id}`}
-            className="flex items-center gap-2.5 rounded-lg bg-surface-900 py-2 pl-2 pr-4 transition-surface hover:bg-surface-850"
+            className="flex items-center gap-2.5 rounded-control bg-surface-900 py-2 pl-2 pr-4 transition-surface hover:bg-surface-850"
           >
             <Avatar src={p.image?.medium} name={p.name.full ?? "?"} size="md" />
             <span className="min-w-0">
@@ -410,7 +410,7 @@ function Stats({ entries }: { entries: MediaListEntry[] }) {
         {items.map((item) => (
           <div
             key={item.label}
-            className="panel-wash panel-top rounded-xl border border-surface-800 bg-surface-900 px-4 py-3.5"
+            className="panel-wash panel-top rounded-panel border border-surface-800 bg-surface-900 px-4 py-3.5"
           >
             <p className="text-2xl font-bold tabular-nums text-ink-100">
               {item.value}

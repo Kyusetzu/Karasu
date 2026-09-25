@@ -25,7 +25,7 @@ export function Tabs<T extends string>({
           key={o.value}
           onClick={() => onChange(o.value)}
           className={cn(
-            "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
+            "rounded-control px-3 py-1.5 text-sm font-medium transition-colors",
             value === o.value
               ? "bg-accent-600 text-accent-ink"
               : "text-ink-500 hover:bg-surface-800 hover:text-ink-100",

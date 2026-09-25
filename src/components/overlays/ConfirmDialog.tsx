@@ -47,7 +47,7 @@ export default function ConfirmDialog({
     <div
       data-overlay
       className={cn(
-        "fixed inset-0 z-[110] grid place-items-center bg-[rgba(4,5,8,.55)] p-4",
+        "fixed inset-0 z-alert grid place-items-center bg-scrim p-4",
         leaving ? "animate-fade-out" : "animate-fade-in",
       )}
       onMouseDown={(e) =>
@@ -61,12 +61,12 @@ export default function ConfirmDialog({
         aria-modal="true"
         aria-labelledby={titleId}
         className={cn(
-          "w-96 rounded-xl border border-hair bg-surface-900 p-5 shadow-2xl panel-wash",
+          "w-96 rounded-panel border border-hair bg-surface-900 p-5 shadow-float panel-wash",
           leaving ? "animate-settle-out" : "animate-spring-in",
         )}
       >
         <div className="flex items-start gap-3">
-          <span className="grid size-7 shrink-0 place-items-center rounded-md bg-danger/16 text-danger">
+          <span className="grid size-7 shrink-0 place-items-center rounded-inner bg-danger/16 text-danger">
             <AlertTriangle className="size-4" />
           </span>
           <div className="min-w-0">

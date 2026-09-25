@@ -7,7 +7,7 @@ export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
     <div
       className={cn(
         // No `overflow-hidden`: the catch-light fades out before the corners, and clipping would only cut off contents.
-        "panel-wash panel-top rounded-xl border border-surface-800 bg-surface-900 p-5",
+        "panel-wash panel-top rounded-panel border border-surface-800 bg-surface-900 p-5",
         className,
       )}
       {...props}

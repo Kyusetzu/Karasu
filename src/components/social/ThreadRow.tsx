@@ -12,7 +12,7 @@ export function ThreadRow({ thread }: { thread: ThreadSummary }) {
   return (
     <Link
       to={`/thread/${thread.id}`}
-      className="block rounded-xl border border-surface-800 bg-surface-900 p-3 transition-surface hover:border-surface-700"
+      className="block rounded-panel border border-surface-800 bg-surface-900 p-3 transition-surface hover:border-surface-700"
     >
       <div className="flex items-start gap-2">
         {thread.isSticky && <Pin className="mt-0.5 size-3 shrink-0 text-accent-400" />}

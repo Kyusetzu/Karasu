@@ -72,7 +72,7 @@ export default function CoverViewer({
             alt={alt}
             draggable={false}
             className={cn(
-              "max-h-full max-w-full rounded-lg object-contain shadow-[0_1.5rem_4rem_rgba(0,0,0,.8)]",
+              "max-h-full max-w-full rounded-control object-contain shadow-[0_1.5rem_4rem_rgba(0,0,0,.8)]",
               leaving ? "animate-settle-out" : "animate-spring-in",
             )}
           />

@@ -21,7 +21,9 @@ const TOKENS = join(ROOT, "src", "app", "index.css");
 
 /** What each rule holds the code to; the key is what the baseline and the allowlist name. */
 export const RULES = {
-  "radius-arbitrary": "a bracketed radius; use a radius step",
+  "radius-arbitrary": "a bracketed radius; use a radius role",
+  "radius-size": "a radius by size (rounded, -md, -lg, -xl …); use a role: inner, control, panel, sheet, cover",
+  "shadow-size": "a shadow by size (shadow, -lg, -xl …); use a role: float, sheet",
   "text-size-arbitrary": "a bracketed font size; use a type step",
   "tracking-arbitrary": "a bracketed letter spacing",
   "colour-arbitrary": "a hex, rgb or hsl colour in a class; use a token",
@@ -81,6 +83,8 @@ export function tokenRules(token, path, colours) {
   const u = utilityOf(token);
   const hits = [];
   if (/^rounded(?:-[a-z]{1,2})?-\[/.test(u)) hits.push("radius-arbitrary");
+  if (/^rounded(?:-[trblxyse]{1,2})?(?:-(?:xs|sm|md|lg|xl|2xl|3xl|4xl))?$/.test(u)) hits.push("radius-size");
+  if (/^shadow(?:-(?:2xs|xs|sm|md|lg|xl|2xl))?$/.test(u)) hits.push("shadow-size");
   if (/^text-\[/.test(u) && !COLOUR_VALUE.test(u.slice(5)) && !/^text-\[var\(--color/.test(u)) hits.push("text-size-arbitrary");
   if (/^tracking-\[/.test(u)) hits.push("tracking-arbitrary");
   if (/^z-\[/.test(u)) hits.push("z-arbitrary");
@@ -324,11 +328,12 @@ function writeBaseline(counts) {
 
 const FIXTURES = [
   { text: `<div className="rounded-[.625rem] text-[.8125rem] tracking-[.1em]" />`, want: ["radius-arbitrary", "text-size-arbitrary", "tracking-arbitrary"] },
+  { text: `<div className="rounded rounded-lg md:rounded-t-xl rounded-control rounded-full rounded-none shadow shadow-2xl shadow-float" />`, want: ["radius-size", "radius-size", "radius-size", "shadow-size", "shadow-size"] },
   { text: `<div className="text-ink-200 hover:border-surface-500 text-ink-300 bg-accent-ink" />`, want: ["colour-undefined", "colour-undefined"] },
   { text: `<div className="text-white bg-black/55 text-rose-400 bg-transparent text-sm" />`, want: ["colour-foreign", "colour-foreign", "colour-foreign"] },
   { text: `<div className="bg-[rgba(4,5,8,.55)] hover:bg-[#b3232c] text-[#0d1117]" />`, want: ["colour-arbitrary", "colour-arbitrary", "colour-arbitrary"] },
   { text: `<div className="transition-colors transition transition-surface transition-transform" />`, want: ["transition-broad", "transition-broad"] },
-  { text: `<div className="z-[110] shadow-[0_1rem_3rem_rgba(0,0,0,.6)] duration-[900ms] shadow-2xl z-50" />`, want: ["motion-arbitrary", "shadow-arbitrary", "z-arbitrary"] },
+  { text: `<div className="z-[110] shadow-[0_1rem_3rem_rgba(0,0,0,.6)] duration-[900ms] shadow-float z-50" />`, want: ["motion-arbitrary", "shadow-arbitrary", "z-arbitrary"] },
   { text: `<span className="animate-spin" />`, want: ["spin-outside-spinner"] },
   { text: `<input className="focus:outline-none" />`, want: ["outline-removed"] },
   { text: `<input className={cn("focus:outline-none", "focus:border-accent-500")} />`, want: [] },

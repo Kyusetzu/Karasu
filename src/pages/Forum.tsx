@@ -74,7 +74,7 @@ export default function Forum() {
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-baseline gap-2.5">
             <h1 className="text-2xl font-bold">{t("forum.title")}</h1>
-            <span className="font-brand-jp text-[.8125rem] tracking-[.04em] text-ink-600">
+            <span className="font-brand-jp text-ui tracking-[.04em] text-ink-600">
               掲示板
             </span>
           </div>

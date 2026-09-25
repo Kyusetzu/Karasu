@@ -631,7 +631,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
             <h1 className="text-2xl font-bold text-ink-100">
               {type === "ANIME" ? t("list.animeTitle") : t("list.mangaTitle")}
             </h1>
-            <span className="font-brand-jp text-[.8125rem] tracking-[.04em] text-ink-600">
+            <span className="font-brand-jp text-ui tracking-[.04em] text-ink-600">
               {type === "ANIME" ? t("list.animeNative") : t("list.mangaNative")}
             </span>
           </div>
@@ -783,7 +783,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
             )}
           />
         ) : phone ? (
-          <div className="overflow-hidden rounded-xl border border-surface-800">
+          <div className="overflow-hidden rounded-panel border border-surface-800">
             <VirtualGrid
               key={`phone-${layout}`}
               items={entries}
@@ -812,7 +812,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
             />
           </div>
         ) : (
-          <div className="overflow-hidden rounded-xl border border-surface-800">
+          <div className="overflow-hidden rounded-panel border border-surface-800">
             <ListHeader tier={tier} selectMode={selectMode} mediaType={type} cover={layout !== "text"} />
             {/* Keep one entry per row: two side by side made useColumnCount report 2, so the down arrow moved by two. */}
             <VirtualGrid

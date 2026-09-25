@@ -56,7 +56,7 @@ export function QuickEditor({
                 aria-pressed={current}
                 onClick={() => onStatus(s)}
                 className={cn(
-                  "flex h-10 min-w-0 items-center gap-2 rounded-lg px-2.5 text-left text-xs font-medium transition-surface",
+                  "flex h-10 min-w-0 items-center gap-2 rounded-control px-2.5 text-left text-xs font-medium transition-surface",
                   "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent-500",
                   !current && "border border-surface-700 text-ink-300 hover:border-surface-600 hover:text-ink-100",
                 )}
@@ -126,11 +126,11 @@ function Progress({ media, value, onCommit }: { media: MediaDetail; value: numbe
           disabled={value <= 0}
           // From the last commit, not the prop: a typed count committed by this same press's blur is the base.
           onClick={() => commit(Math.max(0, committed.current - 1))}
-          className="size-11 rounded-xl border border-surface-700 bg-surface-900 text-ink-100"
+          className="size-11 rounded-panel border border-surface-700 bg-surface-900 text-ink-100"
         >
           <Minus className="size-4" />
         </IconButton>
-        <div className="flex h-11 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl border border-surface-700 bg-surface-950 focus-within:border-accent-500">
+        <div className="flex h-11 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-panel border border-surface-700 bg-surface-950 focus-within:border-accent-500">
           <NumberInput
             id={id}
             value={typed}
@@ -147,7 +147,7 @@ function Progress({ media, value, onCommit }: { media: MediaDetail; value: numbe
           variant="accent"
           disabled={total !== null && value >= total}
           onClick={() => commit(total !== null ? Math.min(total, committed.current + 1) : committed.current + 1)}
-          className="size-11 rounded-xl"
+          className="size-11 rounded-panel"
         >
           <Plus className="size-4" />
         </IconButton>
@@ -168,7 +168,7 @@ function More({ media, entry, onSave }: { media: MediaDetail; entry: QuickEntry;
   const manga = media.type === "MANGA";
 
   return (
-    <div className="rounded-lg border border-surface-800">
+    <div className="rounded-control border border-surface-800">
       <button
         type="button"
         aria-expanded={open}
@@ -209,7 +209,7 @@ function More({ media, entry, onSave }: { media: MediaDetail; entry: QuickEntry;
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
               placeholder={t("entry.notesPlaceholder")}
-              className="w-full resize-y rounded-lg border border-surface-700 bg-surface-900 px-2 py-1.5 text-sm focus:border-accent-500 focus:outline-none"
+              className="w-full resize-y rounded-control border border-surface-700 bg-surface-900 px-2 py-1.5 text-sm focus:border-accent-500 focus:outline-none"
             />
           </label>
           <Button className="w-full" onClick={() => onSave({ repeat, notes: serializeNotes(notes, tags) })}>

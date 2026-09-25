@@ -127,7 +127,7 @@ function LikeButton({
       aria-pressed={isLiked}
       aria-label={isLiked ? t("social.unlike") : t("social.like")}
       className={cn(
-        "flex items-center gap-1 rounded-md px-1.5 py-0.5 text-2xs transition-surface hover:bg-surface-850",
+        "flex items-center gap-1 rounded-inner px-1.5 py-0.5 text-2xs transition-surface hover:bg-surface-850",
         isLiked ? "text-danger" : "text-ink-600 hover:text-ink-300",
       )}
     >
@@ -248,7 +248,7 @@ export function ActivityCard({
   const when = relTimeFromSeconds(item.createdAt, i18n.language, t("notif.now"));
 
   return (
-    <article className="flex gap-3 rounded-xl border border-surface-800 bg-surface-900 p-3">
+    <article className="flex gap-3 rounded-panel border border-surface-800 bg-surface-900 p-3">
       {item.kind === "list" && item.media?.coverImage?.large && (
         <Link
           to={`/media/${item.media.id}`}
@@ -260,7 +260,7 @@ export function ActivityCard({
             alt=""
             loading="lazy"
             decoding="async"
-            className="aspect-2/3 w-full rounded-md object-cover"
+            className="aspect-2/3 w-full rounded-inner object-cover"
           />
         </Link>
       )}
@@ -330,7 +330,7 @@ export function ActivityCard({
             onClick={() => setRepliesOpen((v) => !v)}
             aria-expanded={repliesOpen}
             className={cn(
-              "flex items-center gap-1 rounded-md px-1.5 py-0.5 text-2xs transition-surface hover:bg-surface-850",
+              "flex items-center gap-1 rounded-inner px-1.5 py-0.5 text-2xs transition-surface hover:bg-surface-850",
               repliesOpen ? "text-ink-300" : "text-ink-600 hover:text-ink-300",
             )}
           >

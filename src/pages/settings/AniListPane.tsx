@@ -158,7 +158,7 @@ export function AniListProfileSection() {
 
       <div className="mt-4 space-y-3">
         {isLoading || !options ? (
-          <Shimmer className="h-24 w-full rounded-lg" />
+          <Shimmer className="h-24 w-full rounded-control" />
         ) : (
           <>
             <Row
@@ -368,7 +368,7 @@ export function AniListListOptionsSection() {
       <CardTitle>{t("settings.alListOptions")}</CardTitle>
       <div className="mt-3 space-y-3">
         {isLoading || !mlo ? (
-          <Shimmer className="h-16 w-full rounded-lg" />
+          <Shimmer className="h-16 w-full rounded-control" />
         ) : (
           <>
             <Row
@@ -405,7 +405,7 @@ export function AniListListOptionsSection() {
             </Row>
 
             {/* Read-only on purpose: `customLists` is a full replacement with no undo, so never send it (`lib/anilistUserFields`). */}
-            <div className="rounded-lg border border-surface-800 bg-surface-950 p-3">
+            <div className="rounded-control border border-surface-800 bg-surface-950 p-3">
               <p className="text-xs font-medium text-ink-300">
                 {t("settings.alCustomLists")}
               </p>
@@ -484,7 +484,7 @@ export function AniListNotificationsSection() {
 
       {open && (
         <div className="mt-4 space-y-1">
-          {q.isLoading && <Shimmer className="h-40 w-full rounded-lg" />}
+          {q.isLoading && <Shimmer className="h-40 w-full rounded-control" />}
           {q.error && (
             <p className="text-sm text-danger">
               {t("common.error", { message: String(q.error) })}

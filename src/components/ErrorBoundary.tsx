@@ -52,7 +52,7 @@ class ErrorBoundaryInner extends Component<Props, State> {
             {t("error.hint")}
           </p>
           {/* The message itself: "something went wrong" is not reportable, and this is the only place the user reads it. */}
-          <p className="mt-3 break-words rounded-lg bg-surface-900 p-2 text-left font-mono text-2xs text-ink-500">
+          <p className="mt-3 break-words rounded-control bg-surface-900 p-2 text-left font-mono text-2xs text-ink-500">
             {String(error.message || error)}
           </p>
           <div className="mt-5 flex flex-wrap justify-center gap-2">

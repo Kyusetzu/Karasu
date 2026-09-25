@@ -7,7 +7,7 @@ import { hexToHsv, hsvToHex, type Hsv } from "@/lib/contrast";
 
 /** The one select skin, so the four of them cannot drift apart. */
 export const SELECT =
-  "h-9 rounded-lg border border-surface-700 bg-surface-900 px-2 text-sm focus:border-accent-500 focus:outline-none";
+  "h-9 rounded-control border border-surface-700 bg-surface-900 px-2 text-sm focus:border-accent-500 focus:outline-none";
 
 /** A label-and-hint on the left, a control on the right; `items-center` because a select is taller than a line. */
 export function Row({
@@ -53,7 +53,7 @@ export function NeedsAccount({
   children: ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-dashed border-surface-700 p-5">
+    <div className="rounded-panel border border-dashed border-surface-700 p-5">
       <p className="text-sm font-medium text-ink-300">{title}</p>
       <p className="mt-1.5 text-sm leading-relaxed text-ink-500">{children}</p>
     </div>
@@ -69,7 +69,7 @@ export function DangerNote({
   children: ReactNode;
 }) {
   return (
-    <div className="flex items-start gap-3 rounded-xl border border-danger/35 bg-danger/8 p-4">
+    <div className="flex items-start gap-3 rounded-panel border border-danger/35 bg-danger/8 p-4">
       <AlertTriangle className="mt-0.5 size-4 shrink-0 text-danger" />
       <div className="min-w-0">
         <p className="text-sm font-medium text-danger">{title}</p>
@@ -180,7 +180,7 @@ export function ColorPicker({
   };
 
   return (
-    <div className="space-y-2 rounded-lg border border-surface-700 bg-surface-900 p-3">
+    <div className="space-y-2 rounded-control border border-surface-700 bg-surface-900 p-3">
       <div
         ref={svRef}
         onPointerDown={(e) =>
@@ -191,7 +191,7 @@ export function ColorPicker({
             v: 100 - clamp01((y - rect.top) / rect.height) * 100,
           }))
         }
-        className="relative h-28 w-full touch-none rounded-md"
+        className="relative h-28 w-full touch-none rounded-inner"
         style={{
           background: `linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, hsl(${hsv.h}, 100%, 50%))`,
         }}
@@ -234,7 +234,7 @@ export function ColorPicker({
         }}
         spellCheck={false}
         maxLength={7}
-        className="w-full rounded-md border border-surface-700 bg-surface-850 px-2 py-1 font-mono text-xs uppercase focus:border-accent-500 focus:outline-none"
+        className="w-full rounded-inner border border-surface-700 bg-surface-850 px-2 py-1 font-mono text-xs uppercase focus:border-accent-500 focus:outline-none"
       />
     </div>
   );

@@ -30,7 +30,7 @@ function Badge({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-2xs font-medium",
+        "inline-flex items-center gap-1 rounded-inner border px-1.5 py-0.5 text-2xs font-medium",
         tone === "accent" && "border-accent-600 text-accent-400",
         tone === "gold" && "border-gold/40 text-gold",
         tone === "muted" && "border-surface-700 text-ink-500",

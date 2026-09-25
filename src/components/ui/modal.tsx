@@ -44,7 +44,7 @@ export function Modal({
       // Kept while leaving, so a keypress mid-exit cannot act on the list behind a dialog the user can still see.
       data-overlay
       className={cn(
-        "fixed inset-0 z-50 grid place-items-center bg-[rgba(4,5,8,.55)] p-4",
+        "fixed inset-0 z-50 grid place-items-center bg-scrim p-4",
         leaving ? "animate-fade-out" : "animate-fade-in",
       )}
       onMouseDown={(e) =>
@@ -58,7 +58,7 @@ export function Modal({
         aria-modal="true"
         aria-labelledby={titleId}
         className={cn(
-          "w-full max-w-md rounded-xl border border-hair bg-surface-900 p-5 shadow-2xl panel-wash",
+          "w-full max-w-md rounded-panel border border-hair bg-surface-900 p-5 shadow-float panel-wash",
           leaving ? "animate-settle-out" : "animate-spring-in",
           className,
         )}

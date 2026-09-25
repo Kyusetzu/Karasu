@@ -27,7 +27,7 @@ export function Segmented<T extends string>({
       role="radiogroup"
       aria-label={ariaLabel}
       className={cn(
-        "inline-flex shrink-0 rounded-lg border border-surface-800 p-0.5",
+        "inline-flex shrink-0 rounded-control border border-surface-800 p-0.5",
         className,
       )}
     >
@@ -43,7 +43,7 @@ export function Segmented<T extends string>({
             aria-label={segment.title}
             onClick={() => onChange(segment.value)}
             className={cn(
-              "grid h-7.5 min-w-7.5 place-items-center rounded-md px-2.5 text-xs font-medium transition-surface",
+              "grid h-7.5 min-w-7.5 place-items-center rounded-inner px-2.5 text-xs font-medium transition-surface",
               "focus-visible:outline-2 focus-visible:outline-accent-500",
               active
                 ? "bg-surface-800 text-ink-100"

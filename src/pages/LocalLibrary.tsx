@@ -425,7 +425,7 @@ function LibraryView({ userId }: { userId: number }) {
           <h1 className="text-[1.375rem] font-bold tracking-[-.015em] text-ink-100">
             {t("library.title")}
           </h1>
-          <span className="font-brand-jp text-[.8125rem] tracking-[.04em] text-ink-600">
+          <span className="font-brand-jp text-ui tracking-[.04em] text-ink-600">
             ライブラリ
           </span>
           <Button
@@ -441,7 +441,7 @@ function LibraryView({ userId }: { userId: number }) {
         </div>
 
         {/* The folder and what the last scan made of it, or the screen never says where the files came from. */}
-        <div className="mt-3.5 flex max-w-176 items-center gap-2.5 rounded-lg border border-surface-800 bg-surface-900 px-3 py-2.25">
+        <div className="mt-3.5 flex max-w-176 items-center gap-2.5 rounded-control border border-surface-800 bg-surface-900 px-3 py-2.25">
           <FolderOpen className="size-3.75 shrink-0 text-ink-500" />
           <span className="min-w-0 flex-1 truncate text-xs tabular-nums text-ink-300">
             {status?.path ?? t("library.noFolder")}
@@ -617,7 +617,7 @@ function DetectedOffList({
             ? `r:${item.row.lib.mediaId}`
             : `s:${item.group.title}:${item.group.season}`
         }
-        className="overflow-hidden rounded-xl border border-hair"
+        className="overflow-hidden rounded-panel border border-hair"
         renderItem={(item, _i, isLast) =>
           item.kind === "row" ? (
             <LibraryRow
@@ -671,7 +671,7 @@ function SuggestionRow({
         !last && "border-b border-surface-950",
       )}
     >
-      <div className="dense-row-cover shrink-0 overflow-hidden rounded-md bg-surface-800 opacity-60">
+      <div className="dense-row-cover shrink-0 overflow-hidden rounded-inner bg-surface-800 opacity-60">
         {media?.coverImage.large && (
           <img
             src={media.coverImage.large}
@@ -777,7 +777,7 @@ function Unplaced({
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
               placeholder={t("library.filterUnplaced")}
-              className="h-7 w-full rounded-md border border-surface-800 bg-surface-900 pl-7 pr-6 text-2xs text-ink-100 placeholder:text-ink-600 focus:border-accent-500 focus:outline-none"
+              className="h-7 w-full rounded-inner border border-surface-800 bg-surface-900 pl-7 pr-6 text-2xs text-ink-100 placeholder:text-ink-600 focus:border-accent-500 focus:outline-none"
             />
             {/* Hand-rolled rather than `IconButton`, whose smallest size would be the whole field. */}
             {filter && (
@@ -796,7 +796,7 @@ function Unplaced({
       </div>
 
       {matching.length === 0 && (
-        <p className="rounded-xl border border-hair px-3.5 py-4 text-center text-xs text-ink-600">
+        <p className="rounded-panel border border-hair px-3.5 py-4 text-center text-xs text-ink-600">
           {t("library.noUnplacedMatch")}
         </p>
       )}
@@ -805,7 +805,7 @@ function Unplaced({
         scrollRef={scrollRef}
         estimateRowHeight={ROW_HEIGHT[density]}
         getKey={(group) => `${group.title}:${group.season}`}
-        className="overflow-hidden rounded-xl border border-hair"
+        className="overflow-hidden rounded-panel border border-hair"
         renderItem={(group, _i, isLast) => (
           <div
             className={cn(
@@ -813,7 +813,7 @@ function Unplaced({
               !isLast && "border-b border-surface-950",
             )}
           >
-            <span className="dense-row-cover grid shrink-0 place-items-center rounded-md bg-surface-800 text-ink-600">
+            <span className="dense-row-cover grid shrink-0 place-items-center rounded-inner bg-surface-800 text-ink-600">
               <HelpCircle className="size-4" />
             </span>
             <span className="min-w-0 flex-1">
@@ -897,7 +897,7 @@ function Group({
         scrollRef={scrollRef}
         estimateRowHeight={ROW_HEIGHT[density]}
         getKey={(row) => row.lib.mediaId}
-        className="overflow-hidden rounded-xl border border-hair"
+        className="overflow-hidden rounded-panel border border-hair"
         renderItem={(row, _i, isLast) => (
           <LibraryRow
             row={row}
@@ -960,7 +960,7 @@ function LibraryRow({
     >
       <div className="flex items-center gap-3.5 px-3.5 py-2">
         <Link to={`/media/${lib.mediaId}`} className="shrink-0">
-          <div className="dense-row-cover overflow-hidden rounded-md bg-surface-800">
+          <div className="dense-row-cover overflow-hidden rounded-inner bg-surface-800">
             {media.coverImage.large && (
               <img
                 src={media.coverImage.large}
@@ -996,7 +996,7 @@ function LibraryRow({
             type="button"
             onClick={() => onAdd(media)}
             title={t("library.notOnListHint")}
-            className="shrink-0 rounded-md border border-surface-700 px-2 py-1 text-2xs text-ink-500 transition-surface hover:border-accent-500 hover:text-accent-400"
+            className="shrink-0 rounded-inner border border-surface-700 px-2 py-1 text-2xs text-ink-500 transition-surface hover:border-accent-500 hover:text-accent-400"
           >
             {t("library.addToList")}
           </button>
@@ -1006,7 +1006,7 @@ function LibraryRow({
           type="button"
           onClick={() => onToggle(lib.mediaId)}
           aria-expanded={open}
-          className="flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-2xs tabular-nums text-ink-600 transition-surface hover:bg-surface-800 hover:text-ink-300"
+          className="flex shrink-0 items-center gap-1 rounded-inner px-1.5 py-1 text-2xs tabular-nums text-ink-600 transition-surface hover:bg-surface-800 hover:text-ink-300"
         >
           {t("library.fileCount", { n: lib.files.length })}
           <ChevronDown className={cn("size-3 transition-transform", open && "rotate-180")} />
@@ -1025,7 +1025,7 @@ function LibraryRow({
               })
             }
             title={t("library.overflowHint")}
-            className="shrink-0 rounded-md border border-gold/40 bg-gold/10 px-1.5 py-1 text-2xs tabular-nums text-gold transition-surface hover:bg-gold/20"
+            className="shrink-0 rounded-inner border border-gold/40 bg-gold/10 px-1.5 py-1 text-2xs tabular-nums text-gold transition-surface hover:bg-gold/20"
           >
             {t("library.overflowChip", {
               files: lib.episodes.length,
@@ -1047,7 +1047,7 @@ function LibraryRow({
             }
             title={t("library.correctHint", { title: source.title })}
             className={cn(
-              "group/match w-24 shrink-0 rounded-md px-1.5 py-1 text-right text-xs transition-surface hover:bg-surface-800",
+              "group/match w-24 shrink-0 rounded-inner px-1.5 py-1 text-right text-xs transition-surface hover:bg-surface-800",
               lib.manual ? "text-accent-400" : exact ? "text-ink-500" : "text-gold",
             )}
           >
@@ -1107,7 +1107,7 @@ function LibraryRow({
                 title={fileName(file.path)}
                 aria-label={t("library.playEpisode", { n: file.episode })}
                 className={cn(
-                  "flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium tabular-nums transition-surface",
+                  "flex items-center gap-1 rounded-inner px-2 py-1 text-xs font-medium tabular-nums transition-surface",
                   watched
                     ? "bg-surface-800 text-ink-500 hover:text-ink-100"
                     : "bg-accent-600/15 text-accent-400 hover:bg-accent-600/30",

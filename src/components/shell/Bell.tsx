@@ -397,7 +397,7 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
       >
         <span
           className={cn(
-            "mt-0.5 grid size-6 shrink-0 place-items-center rounded-md",
+            "mt-0.5 grid size-6 shrink-0 place-items-center rounded-inner",
             KIND_TINT[n.kind] ?? DEFAULT_TINT,
           )}
         >
@@ -405,7 +405,7 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
         </span>
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-2">
-            <span className="truncate text-[.8125rem] font-medium text-ink-100">
+            <span className="truncate text-ui font-medium text-ink-100">
               {n.title}
             </span>
             {!n.read && <span className="size-1.5 shrink-0 rounded-full bg-accent-500" />}
@@ -434,7 +434,7 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
       <>
         <span
           className={cn(
-            "mt-0.5 grid size-6 shrink-0 place-items-center rounded-md",
+            "mt-0.5 grid size-6 shrink-0 place-items-center rounded-inner",
             SITE_TINT[row.kind],
           )}
         >
@@ -450,12 +450,12 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
                   e.stopPropagation();
                   setOpen(false);
                 }}
-                className="truncate text-[.8125rem] font-medium text-ink-100 hover:underline"
+                className="truncate text-ui font-medium text-ink-100 hover:underline"
               >
                 {row.title}
               </Link>
             ) : (
-              <span className="truncate text-[.8125rem] font-medium text-ink-100">
+              <span className="truncate text-ui font-medium text-ink-100">
                 {row.title}
               </span>
             )}
@@ -542,7 +542,7 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
             g.unread && "bg-[rgba(255,255,255,.018)]",
           )}
         >
-          <span className={cn("mt-0.5 grid size-6 shrink-0 place-items-center rounded-md", tint)}>
+          <span className={cn("mt-0.5 grid size-6 shrink-0 place-items-center rounded-inner", tint)}>
             <Icon className="size-3.25" />
           </span>
           <span className="min-w-0 flex-1">
@@ -554,12 +554,12 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
                     e.stopPropagation();
                     setOpen(false);
                   }}
-                  className="truncate text-[.8125rem] font-medium text-ink-100 hover:underline"
+                  className="truncate text-ui font-medium text-ink-100 hover:underline"
                 >
                   {lead}
                 </Link>
               ) : (
-                <span className="truncate text-[.8125rem] font-medium text-ink-100">{lead}</span>
+                <span className="truncate text-ui font-medium text-ink-100">{lead}</span>
               )}
               <span className="rounded bg-surface-800 px-1 text-2xs tabular-nums text-ink-300">
                 {label.n}
@@ -600,7 +600,7 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
         className={cn(
           "relative transition-surface",
           barSlot
-            ? "flex h-full min-w-11 flex-col items-center justify-center rounded-lg px-2 text-ink-500 hover:text-ink-100"
+            ? "flex h-full min-w-11 flex-col items-center justify-center rounded-control px-2 text-ink-500 hover:text-ink-100"
             : "grid h-9 w-11 place-items-center text-ink-500 hover:bg-surface-850 hover:text-ink-100",
         )}
         aria-label={t("notif.title")}
@@ -622,8 +622,8 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
           className={cn(
             // Under the titlebar bell on desktop; a sheet above the phone shell's bottom bar, `fixed` to escape the bar's box.
             barSlot
-              ? "fixed inset-x-2 bottom-[calc(var(--shell-bottom,0px)+0.5rem)] z-50 origin-bottom overflow-hidden rounded-xl border border-hair bg-surface-900 shadow-2xl panel-wash"
-              : "absolute right-0 top-full z-50 mt-1 w-88 origin-top-right overflow-hidden rounded-xl border border-hair bg-surface-900 shadow-2xl panel-wash",
+              ? "fixed inset-x-2 bottom-[calc(var(--shell-bottom,0px)+0.5rem)] z-50 origin-bottom overflow-hidden rounded-panel border border-hair bg-surface-900 shadow-float panel-wash"
+              : "absolute right-0 top-full z-50 mt-1 w-88 origin-top-right overflow-hidden rounded-panel border border-hair bg-surface-900 shadow-float panel-wash",
             panel.leaving ? "animate-pop-out" : "animate-spring-in",
           )}
         >
@@ -657,8 +657,8 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
             )}
             {anilist && site.isLoading && groups.length === 0 && (
               <div className="space-y-2 p-3">
-                <Shimmer className="h-10 w-full rounded-lg" />
-                <Shimmer className="h-10 w-full rounded-lg" />
+                <Shimmer className="h-10 w-full rounded-control" />
+                <Shimmer className="h-10 w-full rounded-control" />
               </div>
             )}
             {!loadError && !site.isLoading && groups.length === 0 && (

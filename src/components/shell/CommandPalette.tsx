@@ -243,14 +243,14 @@ export default function CommandPalette() {
     <div
       data-overlay
       className={cn(
-        "fixed inset-0 z-50 flex items-start justify-center bg-[rgba(4,5,8,.55)] px-4 pb-4 pt-22",
+        "fixed inset-0 z-50 flex items-start justify-center bg-scrim px-4 pb-4 pt-22",
         presence.leaving ? "animate-fade-out" : "animate-fade-in",
       )}
       onMouseDown={() => setOpen(false)}
     >
       <div
         className={cn(
-          "w-full max-w-136 overflow-hidden rounded-xl border border-hair bg-surface-900 shadow-2xl panel-wash",
+          "w-full max-w-136 overflow-hidden rounded-panel border border-hair bg-surface-900 shadow-float panel-wash",
           presence.leaving ? "animate-settle-out" : "animate-spring-in",
         )}
         onMouseDown={(e) => e.stopPropagation()}

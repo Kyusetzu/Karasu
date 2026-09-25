@@ -172,7 +172,7 @@ export default function DetectionSurface({
           <KindIcon playing={playing} className="size-4" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[.8125rem] font-semibold text-ink-100">
+          <p className="truncate text-ui font-semibold text-ink-100">
             {titleNode}
             {labelText && <span className="font-medium text-ink-500"> · {labelText}</span>}
           </p>
@@ -188,7 +188,7 @@ export default function DetectionSurface({
     <div className="relative">
       <div className="flex gap-3">
         <div className="relative h-21 w-14 shrink-0">
-          <div className="h-full w-full overflow-hidden rounded-md bg-surface-800">
+          <div className="h-full w-full overflow-hidden rounded-inner bg-surface-800">
             {cover ? (
               <DecodedImage
                 src={cover}

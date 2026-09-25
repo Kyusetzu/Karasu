@@ -203,7 +203,7 @@ function Panel({
         style={{ width, translate: shift ? `${shift}px 0` : undefined }}
         className={cn(
           "absolute top-full z-50 mt-2 max-h-[min(70vh,34rem)] max-w-[calc(100vw-2rem)] overflow-y-auto outline-none",
-          "rounded-xl border border-hair bg-surface-900 p-4 text-left shadow-2xl panel-wash",
+          "rounded-panel border border-hair bg-surface-900 p-4 text-left shadow-float panel-wash",
           align === "end" ? "right-0" : "left-0",
           leaving ? "animate-pop-out" : "animate-pop-in",
         )}
@@ -215,11 +215,11 @@ function Panel({
 
   return (
     // Kept while leaving, so a keypress on the last frame cannot reach the list behind the sheet.
-    <div data-overlay className={cn("fixed inset-0 z-[100]", leaving ? "animate-fade-out" : "animate-fade-in")}>
+    <div data-overlay className={cn("fixed inset-0 z-popover", leaving ? "animate-fade-out" : "animate-fade-in")}>
       <button
         type="button"
         aria-label={t("window.close")}
-        className="absolute inset-0 bg-[rgba(4,5,8,.55)]"
+        className="absolute inset-0 bg-scrim"
         onClick={onClose}
       />
       <div
@@ -232,7 +232,7 @@ function Panel({
         className={cn(
           // Clears the bottom bar and the gesture area; `max-h` plus scroll so a long panel never hides its top.
           "absolute inset-x-2 bottom-[calc(var(--shell-bottom,0px)+0.5rem)] max-h-[75vh] overflow-y-auto outline-none",
-          "rounded-2xl border border-surface-700 bg-surface-900 p-4 shadow-[0_1rem_3rem_rgba(0,0,0,.6)]",
+          "rounded-sheet border border-surface-700 bg-surface-900 p-4 shadow-sheet",
           leaving ? "animate-rise-out" : "animate-rise-in",
         )}
       >

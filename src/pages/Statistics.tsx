@@ -263,7 +263,7 @@ function StatisticsContent({
           {/* The same lockup the two list screens use: title, then its Japanese form a shade back. */}
           <div className="flex items-baseline gap-2.5">
             <h1 className="text-xl font-bold">{t("stats.title")}</h1>
-            <span className="font-brand-jp text-[.8125rem] tracking-[.04em] text-ink-600">
+            <span className="font-brand-jp text-ui tracking-[.04em] text-ink-600">
               統計
             </span>
           </div>
@@ -903,7 +903,7 @@ function OverviewCharts({
               {/* The outer ring's key, so its formats are readable without hovering. */}
               {formatsInBreakdown.length > 0 && (
                 <div>
-                  <p className="mb-1.5 text-2xs uppercase tracking-[.1em] text-ink-600">
+                  <p className="mb-1.5 text-2xs uppercase tracking-eyebrow text-ink-600">
                     {t("stats.outerRing")}
                   </p>
                   <div className="flex flex-wrap gap-x-3 gap-y-1">

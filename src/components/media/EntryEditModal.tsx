@@ -359,7 +359,7 @@ export default function EntryEditModal({
             onChange={(e) => setNotes(e.target.value)}
             rows={3}
             placeholder={t("entry.notesPlaceholder")}
-            className="w-full resize-y rounded-lg border border-surface-700 bg-surface-900 px-2 py-1.5 text-sm focus:border-accent-500 focus:outline-none"
+            className="w-full resize-y rounded-control border border-surface-700 bg-surface-900 px-2 py-1.5 text-sm focus:border-accent-500 focus:outline-none"
           />
         </label>
         <div className="flex items-center justify-between pt-2">

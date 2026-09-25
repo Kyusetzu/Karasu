@@ -414,7 +414,7 @@ export default function Thread() {
       <div className="mx-auto max-w-3xl space-y-3 px-8 pt-7" aria-hidden="true">
         <Shimmer className="h-6 w-2/3 rounded" />
         <Shimmer className="h-3 w-40 rounded" index={1} />
-        <Shimmer className="h-24 w-full rounded-xl" index={2} />
+        <Shimmer className="h-24 w-full rounded-panel" index={2} />
       </div>
     );
   }
@@ -496,7 +496,7 @@ export default function Thread() {
             onClick={() => like.mutate({ id: data.id, type: "THREAD" })}
             aria-pressed={data.isLiked === true}
             className={cn(
-              "flex items-center gap-1 rounded-md px-1.5 py-0.5 transition-surface hover:bg-surface-850",
+              "flex items-center gap-1 rounded-inner px-1.5 py-0.5 transition-surface hover:bg-surface-850",
               data.isLiked ? "text-danger" : "hover:text-ink-300",
             )}
           >
@@ -545,7 +545,7 @@ export default function Thread() {
       </header>
 
       {data.body && (
-        <div className="mt-5 rounded-xl border border-surface-800 bg-surface-900 p-4">
+        <div className="mt-5 rounded-panel border border-surface-800 bg-surface-900 p-4">
           <Markdown source={data.body} siteUrl={data.siteUrl ?? undefined} />
         </div>
       )}
@@ -615,8 +615,8 @@ export default function Thread() {
           <>
             {newest.isPending ? (
               <div className="space-y-3">
-                <Shimmer className="h-16 w-full rounded-xl" />
-                <Shimmer className="h-16 w-full rounded-xl" />
+                <Shimmer className="h-16 w-full rounded-panel" />
+                <Shimmer className="h-16 w-full rounded-panel" />
               </div>
             ) : newest.error ? (
               <p className="text-sm text-danger">
@@ -626,7 +626,7 @@ export default function Thread() {
               <>
                 {/* Say so whenever the cap decided what arrived: "tree" brings a conversation, "capped" misses the newest. */}
                 {newest.data && newest.data.via !== "page" && (
-                  <p className="mb-3 rounded-lg border border-gold/30 bg-gold/8 px-3 py-2 text-2xs leading-relaxed text-ink-300">
+                  <p className="mb-3 rounded-control border border-gold/30 bg-gold/8 px-3 py-2 text-2xs leading-relaxed text-ink-300">
                     {newest.data.via === "comment"
                       ? t(
                           anchor && !anchor.exact
@@ -663,7 +663,7 @@ export default function Thread() {
           </>
         ) : (
           <>
-            {comments.isLoading && <Shimmer className="h-16 w-full rounded-xl" />}
+            {comments.isLoading && <Shimmer className="h-16 w-full rounded-panel" />}
             {!comments.isLoading && flat.length === 0 && (
               <p className="text-sm text-ink-600">{t("social.noComments")}</p>
             )}

@@ -182,7 +182,7 @@ export function FavouritesModal({
         <Tabs options={options} value={kind} onChange={setKind} />
 
         {q.data?.truncated && (
-          <p className="rounded-lg border border-gold/40 bg-gold/10 px-3 py-2 text-xs text-gold">
+          <p className="rounded-control border border-gold/40 bg-gold/10 px-3 py-2 text-xs text-gold">
             {t("social.favTooMany")}
           </p>
         )}
@@ -190,7 +190,7 @@ export function FavouritesModal({
         {q.isLoading || !drafts ? (
           <div className="space-y-1.5" aria-hidden="true">
             {[0, 1, 2, 3].map((i) => (
-              <Shimmer key={i} className="h-10 w-full rounded-lg" index={i} />
+              <Shimmer key={i} className="h-10 w-full rounded-control" index={i} />
             ))}
           </div>
         ) : rows.length === 0 ? (
@@ -200,7 +200,7 @@ export function FavouritesModal({
             {rows.map((row, i) => (
               <li
                 key={row.id}
-                className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 hover:bg-surface-900"
+                className="flex items-center gap-2.5 rounded-control px-2 py-1.5 hover:bg-surface-900"
               >
                 <span className="w-5 shrink-0 text-right text-xs tabular-nums text-ink-600">
                   {i + 1}

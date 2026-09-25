@@ -93,7 +93,7 @@ export default function Person({ kind }: { kind: Kind }) {
     return (
       <div className="mx-auto max-w-4xl px-8 pt-7" aria-hidden="true">
         <div className="flex gap-5">
-          <Shimmer className="h-48 w-32 rounded-xl" />
+          <Shimmer className="h-48 w-32 rounded-panel" />
           <div className="flex-1 space-y-2 pt-2">
             <Shimmer className="h-7 w-56 rounded" index={1} />
             <Shimmer className="h-3 w-40 rounded" index={2} />
@@ -154,7 +154,7 @@ export default function Person({ kind }: { kind: Kind }) {
       <BackButton className="mb-4" />
       <header className="flex flex-wrap gap-5">
         {!su && (
-          <div className="w-32 shrink-0 overflow-hidden rounded-xl bg-surface-850">
+          <div className="w-32 shrink-0 overflow-hidden rounded-panel bg-surface-850">
             {image ? (
               <img src={image} alt="" className="aspect-2/3 w-full object-cover" />
             ) : (
@@ -235,7 +235,7 @@ export default function Person({ kind }: { kind: Kind }) {
           <Markdown
             source={description}
             siteUrl={data.siteUrl ?? undefined}
-            className="text-[.8125rem] leading-[1.75] text-pretty"
+            className="text-ui leading-[1.75] text-pretty"
           />
         </div>
       )}

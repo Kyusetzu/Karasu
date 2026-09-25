@@ -28,7 +28,7 @@ export function MediaStrip({ edges }: { edges: PersonMediaEdge[] }) {
             className="group w-24 shrink-0 animate-rise-in"
             style={{ animationDelay: `${staggerDelay(i)}ms` }}
           >
-            <div className="aspect-2/3 overflow-hidden rounded-lg bg-surface-850">
+            <div className="aspect-2/3 overflow-hidden rounded-control bg-surface-850">
               {e.node.coverImage?.large && (
                 <img
                   src={e.node.coverImage.large}

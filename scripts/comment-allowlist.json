@@ -78,5 +78,10 @@
     "file": "scripts/style-audit.mjs",
     "startsWith": "Holds the class vocabulary to DESIGN.md",
     "reason": "usage block: one invocation per line"
+  },
+  {
+    "file": "scripts/bundle-budget.mjs",
+    "startsWith": "Measures the production bundle gzipped",
+    "reason": "usage block: one invocation per line"
   }
 ]

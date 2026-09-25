@@ -259,6 +259,8 @@ scripts/             bump-version.mjs (every commit), anilist-query.mjs
                      "Comments: one line each"), style-audit.mjs with
                      style-baseline.json and style-allowlist.json (the class
                      vocabulary's ratchet, see "Design language"),
+                     bundle-budget.mjs and bundle-budget.json (the gzipped
+                     bundle against its budget, a push-gate phase),
                      verify.mjs (the gate, see
                      "The commit loop"), toml-check.mjs (taplo over the
                      TOML files, one per stdin — see the same section),
@@ -664,7 +666,13 @@ with the same one-line-per-phase output. After the gate's own phases it runs
 the cheap, independent checks at once — **knip** (unused files, exports and
 dependencies, `knip.json`), **versions** (`bump-version --check`, the five
 version files agree), the **site**'s typecheck and **site tokens** freshness,
-**npm audit** at `high` over the production graph — then the three cargo tools
+**npm audit** at `high` over the production graph, the **bundle budget**
+(`scripts/bundle-budget.mjs`: a fresh `vite build`, then four gzipped figures —
+what the window waits for, the stylesheet, the largest lazy chunk, all the
+script — against `scripts/bundle-budget.json`, each 3 % over the larger of the
+two build targets' measurement; on 2026-09-25 the Windows target read 315.8,
+15.2, 24.7 and 425.0 KiB, and a raise names its reason in the commit) — then
+the three cargo tools
 one after another because they share the target directory's lock: **clippy**
 with warnings denied, **cargo deny** (advisories, licences, bans, sources
 against `deny.toml`), **machete** (dependencies nothing uses). Then the two

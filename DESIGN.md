@@ -274,7 +274,7 @@ the plan:
 Each library below is either in the bundle or approved for it. A new one needs
 four things before it lands:
 
-- a measured size;
+- a measured size, and the headroom in `scripts/bundle-budget.json` it spends;
 - a reason no token or primitive covers;
 - a row here;
 - a line in THIRD-PARTY-NOTICES.md.

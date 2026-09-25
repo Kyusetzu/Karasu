@@ -3,7 +3,8 @@
 //
 //   node scripts/verify.mjs              the commit gate; one line per phase, the full log only for a phase that failed
 //   node scripts/verify.mjs --full       the push gate: the commit gate, then clippy, cargo-deny, knip, machete, the
-//                                        version files, the site, the Android check, a release build, a clean tree
+//                                        version files, the site, the bundle budget, the Android check, a release
+//                                        build, a clean tree
 //   node scripts/verify.mjs --frontend   typecheck, audits, lints and vitest only
 //   node scripts/verify.mjs --rust       cargo test only
 //   node scripts/verify.mjs --verbose    every phase's output as it runs, as the tools print it themselves
@@ -139,6 +140,8 @@ const summarizeBuild = (out) => {
   const head = bundles ? `${bundles} bundle(s)` : "no bundle line found";
   return warnings.length ? `${head} · ${warnings.length} compiler warning(s):\n      ${warnings.join("\n      ")}` : head;
 };
+/** The budget's one line: each figure against its limit, or which one went over. */
+const summarizeBudget = (out) => lines(strip(out)).at(-1)?.replace(/^bundle-budget: /, "") ?? "";
 const summarizeTree = (out) => (strip(out) ? `${lines(strip(out)).length} uncommitted path(s)` : "clean");
 const summarizeAudit2 = (out) => {
   const m = /found (\d+) vulnerabilit/.exec(out);
@@ -211,6 +214,7 @@ await Promise.all([
   run("site", node, [SITE_TSC, "--noEmit"], () => "typecheck clean", { cwd: path.join(ROOT, "site") }),
   run("site tokens", node, ["scripts/sync-tokens.mjs", "--check"], summarizeSite, { cwd: path.join(ROOT, "site") }),
   run("npm audit", node, [NPM, "audit", "--audit-level=high", "--omit=dev"], summarizeAudit2),
+  run("bundle budget", node, ["scripts/bundle-budget.mjs"], summarizeBudget),
 ]);
 // The three cargo tools share the target directory's lock, so they run one after another.
 await run("clippy", "cargo", ["clippy", ...MANIFEST, "--all-targets", "--", "-D", "warnings"], summarizeClippy);

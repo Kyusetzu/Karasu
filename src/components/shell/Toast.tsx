@@ -41,7 +41,7 @@ export default function Toast() {
           error
             ? "bg-danger/15 text-danger"
             : info
-              ? "bg-surface-800 text-ink-400"
+              ? "bg-surface-800 text-ink-300"
               : "bg-accent-500/15 text-accent-400",
         )}
       >

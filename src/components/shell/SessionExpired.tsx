@@ -20,7 +20,7 @@ export default function SessionExpired() {
       className="flex items-center gap-3 border-b border-danger/35 bg-danger/10 px-4 py-2"
     >
       <KeyRound aria-hidden className="size-4 shrink-0 text-danger" />
-      <p className="min-w-0 flex-1 text-xs text-ink-200">
+      <p className="min-w-0 flex-1 text-xs text-ink-100">
         <span className="font-medium text-danger">{t("auth.expiredTitle")}</span>{" "}
         {t("auth.expiredBody")}
       </p>

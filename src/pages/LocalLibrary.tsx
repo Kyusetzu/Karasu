@@ -777,7 +777,7 @@ function Unplaced({
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
               placeholder={t("library.filterUnplaced")}
-              className="h-7 w-full rounded-md border border-surface-800 bg-surface-900 pl-7 pr-6 text-2xs text-ink-200 placeholder:text-ink-600 focus:border-accent-500 focus:outline-none"
+              className="h-7 w-full rounded-md border border-surface-800 bg-surface-900 pl-7 pr-6 text-2xs text-ink-100 placeholder:text-ink-600 focus:border-accent-500 focus:outline-none"
             />
             {/* Hand-rolled rather than `IconButton`, whose smallest size would be the whole field. */}
             {filter && (

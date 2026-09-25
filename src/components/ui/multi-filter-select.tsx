@@ -105,7 +105,7 @@ export function MultiFilterSelect({
           {summary ? summary.first : placeholder}
         </span>
         {summary && summary.extra > 0 && (
-          <span className="rounded bg-surface-800 px-1 text-2xs tabular-nums text-ink-400">
+          <span className="rounded bg-surface-800 px-1 text-2xs tabular-nums text-ink-300">
             +{summary.extra}
           </span>
         )}
@@ -164,8 +164,8 @@ export function MultiFilterSelect({
                     onClick={() => onChange(cycle(value, option))}
                     className={cn(
                       "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-surface",
-                      state === "off" && "text-ink-400 hover:bg-surface-850",
-                      state === "include" && "bg-accent-500/12 text-accent-300",
+                      state === "off" && "text-ink-300 hover:bg-surface-850",
+                      state === "include" && "bg-accent-500/12 text-accent-400",
                       state === "exclude" && "bg-danger/12 text-danger",
                     )}
                   >

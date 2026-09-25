@@ -106,7 +106,7 @@ export function UserComments({
         >
           <div className="flex items-center gap-2">
             <MessageSquare className="size-3.5 shrink-0 text-ink-600" />
-            <span className="min-w-0 truncate text-sm font-medium text-ink-200">
+            <span className="min-w-0 truncate text-sm font-medium text-ink-100">
               {c.thread?.title ?? t("social.untitledThread")}
             </span>
             <span className="ml-auto flex shrink-0 items-center gap-3 text-2xs text-ink-600">

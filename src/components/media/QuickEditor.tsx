@@ -126,7 +126,7 @@ function Progress({ media, value, onCommit }: { media: MediaDetail; value: numbe
           disabled={value <= 0}
           // From the last commit, not the prop: a typed count committed by this same press's blur is the base.
           onClick={() => commit(Math.max(0, committed.current - 1))}
-          className="size-11 rounded-xl border border-surface-700 bg-surface-900 text-ink-200"
+          className="size-11 rounded-xl border border-surface-700 bg-surface-900 text-ink-100"
         >
           <Minus className="size-4" />
         </IconButton>

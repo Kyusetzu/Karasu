@@ -655,7 +655,7 @@ function Legend({ type }: { type: MediaType }) {
         onClick={toggle}
         aria-expanded={open}
         aria-controls={open ? id : undefined}
-        className="inline-flex h-9.5 items-center gap-1.5 rounded-lg border border-hair bg-surface-850/90 px-2.5 text-2xs font-semibold uppercase tracking-[.1em] text-ink-400 backdrop-blur-sm transition-surface hover:text-ink-100"
+        className="inline-flex h-9.5 items-center gap-1.5 rounded-lg border border-hair bg-surface-850/90 px-2.5 text-2xs font-semibold uppercase tracking-[.1em] text-ink-300 backdrop-blur-sm transition-surface hover:text-ink-100"
       >
         {!open &&
           (["CURRENT", "COMPLETED", "PLANNING"] as const).map((s) => (

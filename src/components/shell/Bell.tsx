@@ -561,7 +561,7 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
               ) : (
                 <span className="truncate text-[.8125rem] font-medium text-ink-100">{lead}</span>
               )}
-              <span className="rounded bg-surface-800 px-1 text-2xs tabular-nums text-ink-400">
+              <span className="rounded bg-surface-800 px-1 text-2xs tabular-nums text-ink-300">
                 {label.n}
               </span>
               {g.unread && <span className="size-1.5 shrink-0 rounded-full bg-accent-500" />}
@@ -600,7 +600,7 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
         className={cn(
           "relative transition-surface",
           barSlot
-            ? "flex h-full min-w-11 flex-col items-center justify-center rounded-lg px-2 text-ink-500 hover:text-ink-200"
+            ? "flex h-full min-w-11 flex-col items-center justify-center rounded-lg px-2 text-ink-500 hover:text-ink-100"
             : "grid h-9 w-11 place-items-center text-ink-500 hover:bg-surface-850 hover:text-ink-100",
         )}
         aria-label={t("notif.title")}

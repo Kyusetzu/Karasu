@@ -190,7 +190,7 @@ export default function Settings() {
                     "flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm transition-surface",
                     danger
                       ? "text-danger/85 hover:bg-danger/10"
-                      : "text-ink-200 hover:bg-surface-850",
+                      : "text-ink-100 hover:bg-surface-850",
                   )}
                 >
                   <Icon className="size-4.5 shrink-0" />

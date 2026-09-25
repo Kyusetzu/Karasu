@@ -211,7 +211,7 @@ export default function DetectionSurface({
           {native && <p className="truncate font-brand-jp text-2xs text-ink-600">{native}</p>}
           {(labelText || playing.episodeTitle) && (
             <p className="truncate text-xs text-ink-300">
-              {labelText && <span className="font-medium tabular-nums text-ink-200">{labelText}</span>}
+              {labelText && <span className="font-medium tabular-nums text-ink-100">{labelText}</span>}
               {labelText && playing.episodeTitle && " · "}
               {playing.episodeTitle}
             </p>

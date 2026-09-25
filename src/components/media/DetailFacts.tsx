@@ -101,7 +101,7 @@ export function NextEpisode({ data, bar = false, className }: { data: MediaDetai
       >
         <CalendarClock aria-hidden className="size-4 shrink-0 text-accent-400" />
         <span className="min-w-0 flex-1 text-ink-100">{t("detail.nextEpisode", { n: next.episode, date })}</span>
-        {left && <span className="shrink-0 text-xs text-ink-400">{left}</span>}
+        {left && <span className="shrink-0 text-xs text-ink-500">{left}</span>}
       </div>
     );
   }

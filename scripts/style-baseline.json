@@ -49,12 +49,10 @@
     "radius-arbitrary": 2
   },
   "src/components/media/DetailFacts.tsx": {
-    "colour-undefined": 1,
     "radius-arbitrary": 1,
     "text-size-arbitrary": 1
   },
   "src/components/media/DetectionSurface.tsx": {
-    "colour-undefined": 1,
     "icon-size": 1,
     "text-size-arbitrary": 2
   },
@@ -68,18 +66,12 @@
     "icon-size": 1,
     "radius-arbitrary": 1
   },
-  "src/components/media/QuickEditor.tsx": {
-    "colour-undefined": 1
-  },
   "src/components/media/RecommendedSection.tsx": {
     "icon-size": 1
   },
   "src/components/media/SeasonHero.tsx": {
     "colour-foreign": 8,
     "tracking-arbitrary": 1
-  },
-  "src/components/media/StatusMenu.tsx": {
-    "colour-undefined": 2
   },
   "src/components/media/TagEditor.tsx": {
     "icon-size": 1,
@@ -115,13 +107,11 @@
   },
   "src/components/shell/ActionSheet.tsx": {
     "colour-arbitrary": 1,
-    "colour-undefined": 1,
     "shadow-arbitrary": 1,
     "z-arbitrary": 1
   },
   "src/components/shell/Bell.tsx": {
     "colour-arbitrary": 3,
-    "colour-undefined": 2,
     "icon-size": 7,
     "radius-arbitrary": 1,
     "text-size-arbitrary": 6,
@@ -129,7 +119,6 @@
   },
   "src/components/shell/BottomBar.tsx": {
     "colour-arbitrary": 1,
-    "colour-undefined": 8,
     "icon-size": 1,
     "radius-arbitrary": 1,
     "shadow-arbitrary": 1,
@@ -163,9 +152,6 @@
     "spin-outside-spinner": 1,
     "tracking-arbitrary": 1
   },
-  "src/components/shell/SessionExpired.tsx": {
-    "colour-undefined": 1
-  },
   "src/components/shell/Sidebar.tsx": {
     "icon-size": 8,
     "radius-arbitrary": 1,
@@ -186,7 +172,6 @@
     "tracking-arbitrary": 1
   },
   "src/components/shell/Toast.tsx": {
-    "colour-undefined": 1,
     "icon-size": 3,
     "text-size-arbitrary": 1
   },
@@ -203,7 +188,6 @@
     "icon-size": 5
   },
   "src/components/social/UserComments.tsx": {
-    "colour-undefined": 1,
     "icon-size": 1
   },
   "src/components/stats/AreaChart.tsx": {
@@ -243,7 +227,6 @@
     "colour-arbitrary": 1
   },
   "src/components/ui/multi-filter-select.tsx": {
-    "colour-undefined": 3,
     "icon-size": 5,
     "outline-removed": 1,
     "text-size-arbitrary": 1,
@@ -276,7 +259,6 @@
     "tracking-arbitrary": 1
   },
   "src/pages/AnimeDetail.tsx": {
-    "colour-undefined": 1,
     "icon-size": 9,
     "radius-arbitrary": 3,
     "shadow-arbitrary": 1,
@@ -285,7 +267,6 @@
     "transition-broad": 2
   },
   "src/pages/Calendar.tsx": {
-    "colour-undefined": 2,
     "icon-size": 4,
     "radius-arbitrary": 1,
     "text-size-arbitrary": 1,
@@ -302,13 +283,11 @@
   },
   "src/pages/Franchise.tsx": {
     "colour-arbitrary": 1,
-    "colour-undefined": 1,
     "radius-arbitrary": 3,
     "text-size-arbitrary": 4,
     "tracking-arbitrary": 5
   },
   "src/pages/LocalLibrary.tsx": {
-    "colour-undefined": 1,
     "icon-size": 9,
     "spin-outside-spinner": 1,
     "text-size-arbitrary": 5,
@@ -332,7 +311,6 @@
     "icon-size": 2
   },
   "src/pages/Settings.tsx": {
-    "colour-undefined": 1,
     "icon-size": 2,
     "text-size-arbitrary": 2,
     "tracking-arbitrary": 1

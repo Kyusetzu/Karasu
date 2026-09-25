@@ -218,7 +218,7 @@ export default function AnimeDetail() {
               <button
                 onClick={() => setRevealed(true)}
                 aria-label={title}
-                className="absolute inset-0 grid place-items-center rounded-[.625rem] bg-surface-950/45 text-2xs font-semibold text-ink-200 transition hover:bg-surface-950/30"
+                className="absolute inset-0 grid place-items-center rounded-[.625rem] bg-surface-950/45 text-2xs font-semibold text-ink-100 transition hover:bg-surface-950/30"
               >
                 <span className="rounded-full bg-surface-900/90 px-2.5 py-1">
                   {t("settings.blurReveal")}

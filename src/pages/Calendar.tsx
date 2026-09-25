@@ -428,7 +428,7 @@ function CalendarTile({ slot, state }: { slot: Slot; state: ReleaseState }) {
           </span>
         </p>
       </div>
-      <p className="dense-text-lg line-clamp-2 px-0.5 font-medium leading-snug text-ink-200">{title}</p>
+      <p className="dense-text-lg line-clamp-2 px-0.5 font-medium leading-snug text-ink-100">{title}</p>
     </Link>
   );
 }
@@ -535,7 +535,7 @@ function CalendarCard({ slot, state }: { slot: Slot; state: ReleaseState }) {
             <StateMarker slot={slot} state={state} />
           </span>
         </p>
-        <p className="dense-text mt-0.5 line-clamp-2 leading-tight text-ink-200">
+        <p className="dense-text mt-0.5 line-clamp-2 leading-tight text-ink-100">
           {title}
         </p>
       </div>

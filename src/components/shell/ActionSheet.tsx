@@ -84,7 +84,7 @@ export default function ActionSheet({
           <button
             type="button"
             onClick={() => setDrilled(null)}
-            className="flex min-h-11 w-full items-center gap-2.5 rounded-lg px-2 text-left text-sm text-ink-400 transition-surface hover:bg-surface-850"
+            className="flex min-h-11 w-full items-center gap-2.5 rounded-lg px-2 text-left text-sm text-ink-300 transition-surface hover:bg-surface-850"
           >
             <ChevronLeft className="size-4 shrink-0" />
             <span className="truncate">{label(drilled, mediaType)}</span>

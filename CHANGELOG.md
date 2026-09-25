@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: c2c8312 -->
+<!-- generated-through: b8da22e -->
 
 ### Fixed
 
@@ -93,6 +93,7 @@ tag time is then optional rather than load-bearing.
 - A saved preset now remembers the custom list it was filtered to.
 - The franchise page no longer scrolls sideways on a phone, and its legend names every status.
 - Episode, chapter, volume and rewatch fields no longer keep a 0 you cannot delete, and an emptied field saves as 0.
+- Text in the phone's More sheet, the bell, the filter menus and the calendar uses its intended colour instead of inheriting the one above it.
 
 ### Added
 

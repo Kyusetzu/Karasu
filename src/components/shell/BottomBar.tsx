@@ -108,7 +108,7 @@ export default function BottomBar() {
                   type="button"
                   aria-label={t("window.close")}
                   onClick={() => setMoreOpen(false)}
-                  className="rounded p-1 text-ink-500 transition-surface hover:text-ink-200"
+                  className="rounded p-1 text-ink-500 transition-surface hover:text-ink-100"
                 >
                   <X className="size-4" />
                 </button>
@@ -120,14 +120,14 @@ export default function BottomBar() {
                 setMoreOpen(false);
                 openPalette();
               }}
-              className="mb-2 flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-sm text-ink-400 transition-surface hover:bg-surface-850 hover:text-ink-200"
+              className="mb-2 flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-sm text-ink-300 transition-surface hover:bg-surface-850 hover:text-ink-100"
             >
               <Command className="size-4.5 shrink-0" />
               <span>{t("ctx.palette")}</span>
             </button>
             {sheetGroups(android).map((g) => (
               <div key={g.label} className="mb-2 last:mb-0">
-                <p className="px-1 pb-1 text-[.625rem] font-medium uppercase tracking-wide text-ink-700">
+                <p className="px-1 pb-1 text-[.625rem] font-medium uppercase tracking-wide text-ink-600">
                   {t(g.label)}
                 </p>
                 {/* One destination per row, not a tile grid: labels get their full width and the whole row is the touch target. */}
@@ -142,7 +142,7 @@ export default function BottomBar() {
                           "flex items-center gap-2.5 rounded-lg px-2 py-2 text-sm transition-surface",
                           isActive
                             ? "bg-surface-800 text-accent-400"
-                            : "text-ink-400 hover:bg-surface-850 hover:text-ink-200",
+                            : "text-ink-300 hover:bg-surface-850 hover:text-ink-100",
                         )
                       }
                     >
@@ -199,7 +199,7 @@ export default function BottomBar() {
               cn(
                 slotClass,
                 // No `useRailMarker` on purpose: it means nothing on a horizontal bar; active state is the accent ink.
-                isActive ? "text-accent-400" : "text-ink-500 hover:text-ink-200",
+                isActive ? "text-accent-400" : "text-ink-500 hover:text-ink-100",
               )
             }
           >
@@ -218,7 +218,7 @@ export default function BottomBar() {
               ? "text-ink-100"
               : inSheet
                 ? "text-accent-400"
-                : "text-ink-500 hover:text-ink-200",
+                : "text-ink-500 hover:text-ink-100",
           )}
         >
           <span className="relative">

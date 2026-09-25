@@ -111,7 +111,7 @@ export function StatusMenu({
             "flex min-w-0 items-center justify-between gap-2 font-semibold transition-surface",
             sheet ? "h-11 w-full rounded-xl px-3.5 text-sm" : "h-9 rounded-lg px-3.5 text-sm",
             "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 disabled:opacity-60",
-            !entry && "border border-dashed border-surface-600 text-ink-200 hover:border-surface-500",
+            !entry && "border border-dashed border-surface-600 text-ink-100 hover:border-ink-600",
           )}
           style={
             entry

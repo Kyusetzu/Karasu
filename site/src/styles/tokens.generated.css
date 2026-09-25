@@ -1,4 +1,4 @@
-/* GENERATED from src/app/index.css (sha256 fd05c2b8309b) by site/scripts/sync-tokens.mjs
+/* GENERATED from src/app/index.css (sha256 ae669db1f042) by site/scripts/sync-tokens.mjs
    — do not edit. Re-run `npm run sync` after changing the source; `npm run check`
    fails while this file is stale. CLAUDE.md, "The website". */
 /* `static` because Tailwind tree-shakes tokens no utility references, leaving a `var()`-only token undefined in dark. */
@@ -597,6 +597,29 @@
     width: max(100%, 2.75rem);
     height: max(100%, 2.75rem);
     translate: -50% -50%;
+  }
+}
+
+/* A disclosure's panel grows from no height to its content's; `data-leaving` shrinks it back while usePresence holds it. */
+@utility disclosure-panel {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition-property: grid-template-rows, opacity;
+  transition-duration: var(--duration-expressive);
+  transition-timing-function: var(--ease-out-expo);
+  @starting-style {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+  &[data-leaving] {
+    grid-template-rows: 0fr;
+    opacity: 0;
+    transition-duration: var(--duration-exit);
+    transition-timing-function: var(--ease-exit);
+  }
+  &[data-instant] {
+    transition: none;
   }
 }
 

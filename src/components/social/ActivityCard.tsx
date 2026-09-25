@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Link } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -16,6 +16,7 @@ import { isTauri } from "@/api/anilist";
 import { activityReplies, type LikeableType } from "@/api/social";
 import { UserLockup } from "@/components/ui/user-lockup";
 import { Button } from "@/components/ui/button";
+import { DisclosurePanel } from "@/components/ui/disclosure";
 import { Shimmer } from "@/components/Skeleton";
 import { Markdown } from "./Markdown";
 import { MarkdownTextarea } from "./MarkdownTextarea";
@@ -240,6 +241,7 @@ export function ActivityCard({
 }) {
   const { t, i18n } = useTranslation();
   const [repliesOpen, setRepliesOpen] = useState(openReplies);
+  const repliesId = useId();
   const viewer = useAuth((s) => s.viewer);
   const self = viewer !== null && viewer.id === item.user.id;
   // Pinning is a donator feature, so the toggle is offered only where it can succeed; see `lib/donator`.
@@ -329,6 +331,7 @@ export function ActivityCard({
           <button
             onClick={() => setRepliesOpen((v) => !v)}
             aria-expanded={repliesOpen}
+            aria-controls={repliesId}
             className={cn(
               "flex items-center gap-1 rounded-inner px-1.5 py-0.5 text-2xs transition-surface hover:bg-surface-850",
               repliesOpen ? "text-ink-300" : "text-ink-600 hover:text-ink-300",
@@ -340,7 +343,9 @@ export function ActivityCard({
         </div>
 
         {/* One request per expansion, never eagerly, or every row pays for replies nobody opened. */}
-        {repliesOpen && <ActivityReplies activityId={item.id} />}
+        <DisclosurePanel open={repliesOpen} id={repliesId}>
+          <ActivityReplies activityId={item.id} />
+        </DisclosurePanel>
       </div>
     </article>
   );

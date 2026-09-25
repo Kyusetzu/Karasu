@@ -333,6 +333,7 @@ no row here, add the primitive first.
 | a text field | `Input`; a count is `NumberInput` |
 | a native choice | `FilterSelect`, `MultiFilterSelect` |
 | an anchored panel or phone sheet | `Popover` (`dropdown` or `sheet`) |
+| a section that folds open | `Disclosure`; a custom trigger pairs with `DisclosurePanel`; never in a virtual row, whose remount would replay the growth |
 | a dialog | `Modal` |
 | keeping an overlay alive through its exit | `Presence`, `PresenceIf` |
 | a wait with no shape | `Loader`; a known shape is `Skeleton` |
@@ -348,7 +349,7 @@ no row here, add the primitive first.
 The foundation phase adds, each replacing the hand-built copies it lists in
 the plan:
 
-- `chip` and `badge`, `disclosure`, `menu-item`;
+- `chip` and `badge`, `menu-item`;
 - `sheet` (one sheet with swipe to dismiss);
 - `field` and `search-field`, and card variants.
 

@@ -2,11 +2,12 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { ChevronRight, ExternalLink } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { getNotifSchedule, isTauri, setNotifSchedule } from "@/api/anilist";
 import { notificationOptions, userProfile } from "@/api/social";
 import { Card, CardTitle } from "@/components/ui/card";
+import { Disclosure } from "@/components/ui/disclosure";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Shimmer } from "@/components/Skeleton";
@@ -463,53 +464,44 @@ export function AniListNotificationsSection() {
 
   return (
     <Card>
-      <button
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        className="flex w-full items-center justify-between gap-2 text-left"
-      >
-        <span>
-          <CardTitle>{t("settings.alNotifications")}</CardTitle>
-          <span className="mt-1 block text-xs text-ink-600">
-            {t("settings.alNotificationsHint")}
+      <Disclosure
+        summary={
+          <span>
+            <CardTitle>{t("settings.alNotifications")}</CardTitle>
+            <span className="mt-1 block text-xs text-ink-600">
+              {t("settings.alNotificationsHint")}
+            </span>
           </span>
-        </span>
-        <ChevronRight
-          className={cn(
-            "size-4 shrink-0 text-ink-500 transition-transform",
-            open && "rotate-90",
-          )}
-        />
-      </button>
-
-      {open && (
-        <div className="mt-4 space-y-1">
-          {q.isLoading && <Shimmer className="h-40 w-full rounded-control" />}
-          {q.error && (
-            <p className="text-sm text-danger">
-              {t("common.error", { message: String(q.error) })}
-            </p>
-          )}
-          {!q.isLoading &&
-            !q.error &&
-            NOTIFICATION_TYPES.map((type) => (
-              <Toggle
-                key={type}
-                checked={current.get(type) ?? true}
-                disabled={save.isPending || q.isFetching}
-                onChange={(v) =>
-                  save.mutate({
-                    // The whole array, every time.
-                    notificationOptions: mergeNotificationOptions(q.data, {
-                      [type]: v,
-                    } as Partial<Record<NotificationTypeName, boolean>>),
-                  })
-                }
-                label={notificationLabel(type, t)}
-              />
-            ))}
-        </div>
-      )}
+        }
+        open={open}
+        onOpenChange={setOpen}
+        panelClassName="mt-4 space-y-1"
+      >
+        {q.isLoading && <Shimmer className="h-40 w-full rounded-control" />}
+        {q.error && (
+          <p className="text-sm text-danger">
+            {t("common.error", { message: String(q.error) })}
+          </p>
+        )}
+        {!q.isLoading &&
+          !q.error &&
+          NOTIFICATION_TYPES.map((type) => (
+            <Toggle
+              key={type}
+              checked={current.get(type) ?? true}
+              disabled={save.isPending || q.isFetching}
+              onChange={(v) =>
+                save.mutate({
+                  // The whole array, every time.
+                  notificationOptions: mergeNotificationOptions(q.data, {
+                    [type]: v,
+                  } as Partial<Record<NotificationTypeName, boolean>>),
+                })
+              }
+              label={notificationLabel(type, t)}
+            />
+          ))}
+      </Disclosure>
     </Card>
   );
 }

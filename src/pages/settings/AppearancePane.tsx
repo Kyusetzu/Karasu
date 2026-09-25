@@ -1,10 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Palette } from "lucide-react";
 import * as api from "@/api/anilist";
 import { UI_ZOOM_STEPS } from "@/lib/uiZoom";
 import { isAndroid, usePlatform } from "@/stores/platform";
 import { Card, CardTitle } from "@/components/ui/card";
+import { DisclosurePanel } from "@/components/ui/disclosure";
+import { usePresentValue } from "@/hooks/usePresence";
 import { cn } from "@/lib/utils";
 import { ACCENT_PRESETS } from "@/lib/designTokens";
 import { CONTRAST_MODES, type ContrastMode } from "@/lib/contrast";
@@ -33,6 +35,9 @@ export function AppearanceSection() {
   const [showCustomAccent, setShowCustomAccent] = useState(false);
   // One picker at a time; the swatch itself is the affordance, as with the accent's Palette toggle.
   const [editingStatus, setEditingStatus] = useState<MediaListStatus | null>(null);
+  // The picker keeps its last status through the fold's exit, so it closes showing what it showed.
+  const pickerStatus = usePresentValue(editingStatus).value;
+  const pickerId = useId();
   // The covers field's text while editing: keep the draft, a bound number was uneditable on Android.
   const [colsDraft, setColsDraft] = useState<string | null>(null);
   const themeMode = useTheme((s) => s.mode);
@@ -238,6 +243,7 @@ export function AppearanceSection() {
                 type="button"
                 onClick={() => setShowCustomAccent((v) => !v)}
                 aria-expanded={showCustomAccent}
+                aria-controls={`${pickerId}-accent`}
                 className={cn(
                   "grid size-6 place-items-center rounded-full border border-surface-600 transition",
                   showCustomAccent && "border-accent-500 text-accent-400",
@@ -249,9 +255,9 @@ export function AppearanceSection() {
               </button>
             </div>
           </div>
-          {showCustomAccent && (
+          <DisclosurePanel open={showCustomAccent} id={`${pickerId}-accent`}>
             <ColorPicker value={accent} onChange={setAccent} />
-          )}
+          </DisclosurePanel>
         </div>
 
         {/* Labelled swatches, unlike the accent row: picking one means nothing without knowing the status. */}
@@ -278,6 +284,7 @@ export function AppearanceSection() {
                   type="button"
                   onClick={() => setEditingStatus(editingStatus === status ? null : status)}
                   aria-expanded={editingStatus === status}
+                  aria-controls={`${pickerId}-status`}
                   className="flex flex-1 items-center gap-2.5 rounded-inner py-0.5 text-left text-sm text-ink-300 transition-surface hover:text-ink-100"
                 >
                   <span
@@ -296,12 +303,14 @@ export function AppearanceSection() {
               </div>
             ))}
           </div>
-          {editingStatus && (
-            <ColorPicker
-              value={statusColors[editingStatus]}
-              onChange={(hex) => setStatusColor(editingStatus, hex)}
-            />
-          )}
+          <DisclosurePanel open={editingStatus != null} id={`${pickerId}-status`}>
+            {pickerStatus && (
+              <ColorPicker
+                value={statusColors[pickerStatus]}
+                onChange={(hex) => setStatusColor(pickerStatus, hex)}
+              />
+            )}
+          </DisclosurePanel>
         </div>
       </div>
     </Card>

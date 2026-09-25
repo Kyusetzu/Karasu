@@ -748,6 +748,29 @@ html[data-swapping] *::after {
   }
 }
 
+/* A disclosure's panel grows from no height to its content's; `data-leaving` shrinks it back while usePresence holds it. */
+@utility disclosure-panel {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition-property: grid-template-rows, opacity;
+  transition-duration: var(--duration-expressive);
+  transition-timing-function: var(--ease-out-expo);
+  @starting-style {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+  &[data-leaving] {
+    grid-template-rows: 0fr;
+    opacity: 0;
+    transition-duration: var(--duration-exit);
+    transition-timing-function: var(--ease-exit);
+  }
+  &[data-instant] {
+    transition: none;
+  }
+}
+
 /* Reduced motion, CSS only: a hair above zero so `transitionend` still fires, and delays go too or a stagger is a wait. */
 @media (prefers-reduced-motion: reduce) {
   :root {

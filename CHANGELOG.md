@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 9c851a4 -->
+<!-- generated-through: ee3496d -->
 
 ### Fixed
 
@@ -143,6 +143,7 @@ tag time is then optional rather than load-bearing.
 - A calmer, sharper look: neutral hairlines, tighter corners, headings and labels in the Karasu typeface, and sheets and dialogs that arrive on a soft spring.
 - Every control shows the same focus ring when reached by keyboard, controls sink slightly while pressed, and small buttons are easier to tap on a touch screen.
 - Settings switches keep a readable thumb on pale accents and show their edge in high contrast.
+- Expandable sections open and close with a short height animation instead of jumping.
 ## 1.0.0 — 2026-09-05
 
 Karasu 1.0.0 is the first tagged release: a desktop and Android tracker built

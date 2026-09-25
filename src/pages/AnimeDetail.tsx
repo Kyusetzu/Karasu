@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router";
 import {
   useInfiniteQuery,
@@ -13,7 +13,6 @@ import { mediaUrl } from "@/lib/anilistUrl";
 import { isAndroid, usePlatform } from "@/stores/platform";
 import { OfflineDetail } from "@/components/media/OfflineDetail";
 import {
-  ChevronRight,
   ExternalLink,
   Share2,
   Play,
@@ -70,6 +69,7 @@ import { BannerImage } from "@/components/media/BannerImage";
 import { BANNER_RATIO } from "@/lib/bannerFit";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
+import { Disclosure, DisclosurePanel } from "@/components/ui/disclosure";
 import { parseAniListHtml } from "@/lib/anilistHtml";
 import { FavouriteButton } from "@/components/media/FavouriteButton";
 import { GenreChips, MetaLine, NextEpisode, TimeLeft } from "@/components/media/DetailFacts";
@@ -488,48 +488,41 @@ function EpisodesSection({ mediaId }: { mediaId: number }) {
 
   return (
     <Card>
-      <button
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        className="flex w-full items-center justify-between gap-2 text-left"
+      <Disclosure
+        summary={<CardTitle>{t("detail.episodes")}</CardTitle>}
+        open={open}
+        onOpenChange={setOpen}
+        panelClassName="mt-3"
       >
-        <CardTitle>{t("detail.episodes")}</CardTitle>
-        <ChevronRight
-          className={cn("size-4 shrink-0 text-ink-500 transition-transform", open && "rotate-90")}
-        />
-      </button>
-      {open && (
-        <div className="mt-3">
-          {episodes.isLoading && <Shimmer className="h-24 w-full rounded-control" />}
-          {episodes.error != null && (
-            <p className="text-sm text-danger">
-              {t("common.error", { message: String(episodes.error) })}
-            </p>
-          )}
-          {episodes.data && episodes.data.length === 0 && (
-            <p className="text-xs text-ink-600">{t("detail.episodesNone")}</p>
-          )}
-          {episodes.data && episodes.data.length > 0 && (
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-3">
-              {episodes.data.map((ep, i) => (
-                <button
-                  key={i}
-                  onClick={() => ep.url && openUrl(ep.url)}
-                  disabled={!ep.url}
-                  className="group block text-left"
-                  title={ep.site ?? undefined}
-                >
-                  {/* Same policy as the trailer: these thumbnails live on CDNs the CSP does not allow, so no img. */}
-                  <div className="grid aspect-video w-full place-items-center overflow-hidden rounded-control bg-surface-800 transition-surface group-hover:bg-surface-700">
-                    <Play className="size-5 text-ink-600" />
-                  </div>
-                  <p className="mt-1 line-clamp-2 text-xs text-ink-300">{ep.title}</p>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+        {episodes.isLoading && <Shimmer className="h-24 w-full rounded-control" />}
+        {episodes.error != null && (
+          <p className="text-sm text-danger">
+            {t("common.error", { message: String(episodes.error) })}
+          </p>
+        )}
+        {episodes.data && episodes.data.length === 0 && (
+          <p className="text-xs text-ink-600">{t("detail.episodesNone")}</p>
+        )}
+        {episodes.data && episodes.data.length > 0 && (
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-3">
+            {episodes.data.map((ep, i) => (
+              <button
+                key={i}
+                onClick={() => ep.url && openUrl(ep.url)}
+                disabled={!ep.url}
+                className="group block text-left"
+                title={ep.site ?? undefined}
+              >
+                {/* Same policy as the trailer: these thumbnails live on CDNs the CSP does not allow, so no img. */}
+                <div className="grid aspect-video w-full place-items-center overflow-hidden rounded-control bg-surface-800 transition-surface group-hover:bg-surface-700">
+                  <Play className="size-5 text-ink-600" />
+                </div>
+                <p className="mt-1 line-clamp-2 text-xs text-ink-300">{ep.title}</p>
+              </button>
+            ))}
+          </div>
+        )}
+      </Disclosure>
     </Card>
   );
 }
@@ -567,104 +560,97 @@ function CastSection({ mediaId }: { mediaId: number }) {
 
   return (
     <Card>
-      <button
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        className="flex w-full items-center justify-between gap-2 text-left"
+      <Disclosure
+        summary={<CardTitle>{t("detail.cast")}</CardTitle>}
+        open={open}
+        onOpenChange={setOpen}
+        panelClassName="mt-3 space-y-5"
       >
-        <CardTitle>{t("detail.cast")}</CardTitle>
-        <ChevronRight
-          className={cn("size-4 shrink-0 text-ink-500 transition-transform", open && "rotate-90")}
-        />
-      </button>
-      {open && (
-        <div className="mt-3 space-y-5">
-          {cast.isLoading && <Shimmer className="h-24 w-full rounded-control" />}
-          {cast.error != null && (
-            <p className="text-sm text-danger">
-              {t("common.error", { message: String(cast.error) })}
+        {cast.isLoading && <Shimmer className="h-24 w-full rounded-control" />}
+        {cast.error != null && (
+          <p className="text-sm text-danger">
+            {t("common.error", { message: String(cast.error) })}
+          </p>
+        )}
+        {characters.length > 0 && (
+          <div>
+            <p className="text-2xs font-semibold uppercase tracking-eyebrow text-ink-600">
+              {t("detail.castCharacters")}
             </p>
-          )}
-          {characters.length > 0 && (
-            <div>
-              <p className="text-2xs font-semibold uppercase tracking-eyebrow text-ink-600">
-                {t("detail.castCharacters")}
-              </p>
-              <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                {characters.map((c) => {
-                  const va = c.voiceActors[0];
-                  return (
-                    <div
-                      key={c.node.id}
-                      className="flex items-center justify-between gap-3 rounded-control bg-surface-900 p-2"
-                    >
-                      <Link
-                        to={`/character/${c.node.id}`}
-                        className="flex min-w-0 items-center gap-2.5 transition-surface hover:text-accent-400"
-                      >
-                        <Avatar src={c.node.image.medium} name={c.node.name.full ?? "?"} />
-                        <span className="min-w-0">
-                          <span className="block truncate text-xs text-ink-100">
-                            {c.node.name.full}
-                          </span>
-                          <span className="block text-2xs text-ink-600">
-                            {characterRole(c.role, t)}
-                          </span>
-                        </span>
-                      </Link>
-                      {va && (
-                        <Link
-                          to={`/staff/${va.id}`}
-                          className="flex min-w-0 shrink-0 items-center gap-2.5 transition-surface hover:text-accent-400"
-                        >
-                          <span className="block max-w-28 truncate text-right text-xs text-ink-300">
-                            {va.name.full}
-                          </span>
-                          <Avatar src={va.image.medium} name={va.name.full ?? "?"} />
-                        </Link>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-          {staff.length > 0 && (
-            <div>
-              <p className="text-2xs font-semibold uppercase tracking-eyebrow text-ink-600">
-                {t("detail.castStaff")}
-              </p>
-              <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {staff.map((s, i) => (
-                  <Link
-                    key={`${s.node.id}-${i}`}
-                    to={`/staff/${s.node.id}`}
-                    className="flex min-w-0 items-center gap-2.5 rounded-control bg-surface-900 p-2 transition-surface hover:text-accent-400"
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              {characters.map((c) => {
+                const va = c.voiceActors[0];
+                return (
+                  <div
+                    key={c.node.id}
+                    className="flex items-center justify-between gap-3 rounded-control bg-surface-900 p-2"
                   >
-                    <Avatar src={s.node.image.medium} name={s.node.name.full ?? "?"} />
-                    <span className="min-w-0">
-                      <span className="block truncate text-xs text-ink-100">
-                        {s.node.name.full}
+                    <Link
+                      to={`/character/${c.node.id}`}
+                      className="flex min-w-0 items-center gap-2.5 transition-surface hover:text-accent-400"
+                    >
+                      <Avatar src={c.node.image.medium} name={c.node.name.full ?? "?"} />
+                      <span className="min-w-0">
+                        <span className="block truncate text-xs text-ink-100">
+                          {c.node.name.full}
+                        </span>
+                        <span className="block text-2xs text-ink-600">
+                          {characterRole(c.role, t)}
+                        </span>
                       </span>
-                      <span className="block truncate text-2xs text-ink-600">{s.role}</span>
-                    </span>
-                  </Link>
-                ))}
-              </div>
+                    </Link>
+                    {va && (
+                      <Link
+                        to={`/staff/${va.id}`}
+                        className="flex min-w-0 shrink-0 items-center gap-2.5 transition-surface hover:text-accent-400"
+                      >
+                        <span className="block max-w-28 truncate text-right text-xs text-ink-300">
+                          {va.name.full}
+                        </span>
+                        <Avatar src={va.image.medium} name={va.name.full ?? "?"} />
+                      </Link>
+                    )}
+                  </div>
+                );
+              })}
             </div>
-          )}
-          {cast.hasNextPage && (
-            <Button
-              variant="outline"
-              size="control"
-              onClick={() => cast.fetchNextPage()}
-              disabled={cast.isFetchingNextPage}
-            >
-              {t("social.loadMorePlain")}
-            </Button>
-          )}
-        </div>
-      )}
+          </div>
+        )}
+        {staff.length > 0 && (
+          <div>
+            <p className="text-2xs font-semibold uppercase tracking-eyebrow text-ink-600">
+              {t("detail.castStaff")}
+            </p>
+            <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {staff.map((s, i) => (
+                <Link
+                  key={`${s.node.id}-${i}`}
+                  to={`/staff/${s.node.id}`}
+                  className="flex min-w-0 items-center gap-2.5 rounded-control bg-surface-900 p-2 transition-surface hover:text-accent-400"
+                >
+                  <Avatar src={s.node.image.medium} name={s.node.name.full ?? "?"} />
+                  <span className="min-w-0">
+                    <span className="block truncate text-xs text-ink-100">
+                      {s.node.name.full}
+                    </span>
+                    <span className="block truncate text-2xs text-ink-600">{s.role}</span>
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+        {cast.hasNextPage && (
+          <Button
+            variant="outline"
+            size="control"
+            onClick={() => cast.fetchNextPage()}
+            disabled={cast.isFetchingNextPage}
+          >
+            {t("social.loadMorePlain")}
+          </Button>
+        )}
+      </Disclosure>
     </Card>
   );
 }
@@ -722,60 +708,53 @@ function ReviewsSection({ mediaId }: { mediaId: number }) {
 
   return (
     <Card>
-      <button
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        className="flex w-full items-center justify-between gap-2 text-left"
+      <Disclosure
+        summary={<CardTitle>{t("detail.reviews")}</CardTitle>}
+        open={open}
+        onOpenChange={setOpen}
+        panelClassName="mt-3 space-y-3"
       >
-        <CardTitle>{t("detail.reviews")}</CardTitle>
-        <ChevronRight
-          className={cn("size-4 shrink-0 text-ink-500 transition-transform", open && "rotate-90")}
-        />
-      </button>
-      {open && (
-        <div className="mt-3 space-y-3">
-          {revs.isLoading && <Shimmer className="h-24 w-full rounded-control" />}
-          {revs.error != null && (
-            <p className="text-sm text-danger">
-              {t("common.error", { message: String(revs.error) })}
-            </p>
+        {revs.isLoading && <Shimmer className="h-24 w-full rounded-control" />}
+        {revs.error != null && (
+          <p className="text-sm text-danger">
+            {t("common.error", { message: String(revs.error) })}
+          </p>
+        )}
+        {revs.data && rows.length === 0 && (
+          <p className="text-xs text-ink-600">{t("detail.reviewsNone")}</p>
+        )}
+        {rows.map((r) => (
+          <ReviewCard
+            key={r.id}
+            review={r}
+            canVote={canWrite}
+            votePending={vote.isPending}
+            onVote={(rating) => vote.mutate({ id: r.id, rating })}
+          />
+        ))}
+        <div className="flex items-center gap-2">
+          {revs.hasNextPage && (
+            <Button
+              variant="outline"
+              size="control"
+              onClick={() => revs.fetchNextPage()}
+              disabled={revs.isFetchingNextPage}
+            >
+              {t("social.loadMorePlain")}
+            </Button>
           )}
-          {revs.data && rows.length === 0 && (
-            <p className="text-xs text-ink-600">{t("detail.reviewsNone")}</p>
+          {canWrite && (
+            <Button
+              variant="outline"
+              size="control"
+              onClick={() => compose.mutate()}
+              disabled={compose.isPending}
+            >
+              {t("review.write")}
+            </Button>
           )}
-          {rows.map((r) => (
-            <ReviewCard
-              key={r.id}
-              review={r}
-              canVote={canWrite}
-              votePending={vote.isPending}
-              onVote={(rating) => vote.mutate({ id: r.id, rating })}
-            />
-          ))}
-          <div className="flex items-center gap-2">
-            {revs.hasNextPage && (
-              <Button
-                variant="outline"
-                size="control"
-                onClick={() => revs.fetchNextPage()}
-                disabled={revs.isFetchingNextPage}
-              >
-                {t("social.loadMorePlain")}
-              </Button>
-            )}
-            {canWrite && (
-              <Button
-                variant="outline"
-                size="control"
-                onClick={() => compose.mutate()}
-                disabled={compose.isPending}
-              >
-                {t("review.write")}
-              </Button>
-            )}
-          </div>
         </div>
-      )}
+      </Disclosure>
       {/* Presence, not PresenceIf: the boolean variant would hand the child a nulled existing for the length of the exit. */}
       <Presence value={composer}>
         {(c, leaving) => (
@@ -805,6 +784,7 @@ function ReviewCard({
 }) {
   const { t, i18n } = useTranslation();
   const [expanded, setExpanded] = useState(false);
+  const bodyId = useId();
   const up = r.userRating === "UP_VOTE";
   const down = r.userRating === "DOWN_VOTE";
 
@@ -835,17 +815,16 @@ function ReviewCard({
       <button
         onClick={() => setExpanded((v) => !v)}
         aria-expanded={expanded}
+        aria-controls={bodyId}
         className="mt-2 block w-full text-left text-sm text-ink-100 transition-surface hover:text-accent-400"
       >
         {r.summary}
       </button>
 
-      {expanded && (
-        <div className="mt-2 border-t border-hair pt-2">
-          {/* siteUrl backs the parser's truncation notice, so "read the rest" has somewhere to go. */}
-          <Markdown source={r.body} siteUrl={r.siteUrl ?? undefined} />
-        </div>
-      )}
+      <DisclosurePanel open={expanded} id={bodyId} className="mt-2 border-t border-hair pt-2">
+        {/* siteUrl backs the parser's truncation notice, so "read the rest" has somewhere to go. */}
+        <Markdown source={r.body} siteUrl={r.siteUrl ?? undefined} />
+      </DisclosurePanel>
 
       <div className="mt-2 flex items-center gap-1.5">
         <span className="mr-1 text-2xs text-ink-600">
@@ -905,35 +884,28 @@ function TrendSection({ mediaId }: { mediaId: number }) {
 
   return (
     <Card>
-      <button
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        className="flex w-full items-center justify-between gap-2 text-left"
+      <Disclosure
+        summary={<CardTitle>{t("detail.trend")}</CardTitle>}
+        open={open}
+        onOpenChange={setOpen}
+        panelClassName="mt-3"
       >
-        <CardTitle>{t("detail.trend")}</CardTitle>
-        <ChevronRight
-          className={cn("size-4 shrink-0 text-ink-500 transition-transform", open && "rotate-90")}
-        />
-      </button>
-      {open && (
-        <div className="mt-3">
-          {trends.isLoading && <Shimmer className="h-24 w-full rounded-control" />}
-          {trends.error != null && (
-            <p className="text-sm text-danger">
-              {t("common.error", { message: String(trends.error) })}
-            </p>
-          )}
-          {trends.data &&
-            (points.length < 2 ? (
-              <p className="text-xs text-ink-600">{t("detail.trendNone")}</p>
-            ) : (
-              <>
-                <p className="mb-2 text-2xs text-ink-600">{t("detail.trendHint")}</p>
-                <AreaChart data={points} />
-              </>
-            ))}
-        </div>
-      )}
+        {trends.isLoading && <Shimmer className="h-24 w-full rounded-control" />}
+        {trends.error != null && (
+          <p className="text-sm text-danger">
+            {t("common.error", { message: String(trends.error) })}
+          </p>
+        )}
+        {trends.data &&
+          (points.length < 2 ? (
+            <p className="text-xs text-ink-600">{t("detail.trendNone")}</p>
+          ) : (
+            <>
+              <p className="mb-2 text-2xs text-ink-600">{t("detail.trendHint")}</p>
+              <AreaChart data={points} />
+            </>
+          ))}
+      </Disclosure>
     </Card>
   );
 }

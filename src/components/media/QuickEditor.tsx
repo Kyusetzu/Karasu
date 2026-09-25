@@ -1,9 +1,10 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ChevronDown, Minus, Plus } from "lucide-react";
+import { Minus, Plus } from "lucide-react";
 import type { MediaDetail } from "@/api/queries";
 import { maxProgress, STATUS_ORDER, type MediaListStatus, type SaveEntryInput } from "@/api/types";
 import { Button } from "@/components/ui/button";
+import { Disclosure } from "@/components/ui/disclosure";
 import { IconButton } from "@/components/ui/icon-button";
 import { NumberInput } from "@/components/ui/number-input";
 import TagEditor from "@/components/media/TagEditor";
@@ -160,7 +161,6 @@ function Progress({ media, value, onCommit }: { media: MediaDetail; value: numbe
 function More({ media, entry, onSave }: { media: MediaDetail; entry: QuickEntry; onSave: (patch: EntryPatch) => void }) {
   const { t } = useTranslation();
   const id = useId();
-  const [open, setOpen] = useState(false);
   const parsed = parseNotes(entry.notes);
   const [repeat, setRepeat] = useState(entry.repeat);
   const [notes, setNotes] = useState(parsed.notes);
@@ -169,54 +169,46 @@ function More({ media, entry, onSave }: { media: MediaDetail; entry: QuickEntry;
 
   return (
     <div className="rounded-control border border-hair">
-      <button
-        type="button"
-        aria-expanded={open}
-        aria-controls={id}
-        onClick={() => setOpen(!open)}
-        className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left text-sm text-ink-300 transition-surface hover:text-ink-100"
+      <Disclosure
+        summary={manga ? t("detail.moreManga") : t("detail.moreAnime")}
+        className="px-3 py-2.5 text-sm text-ink-300 transition-surface hover:text-ink-100"
+        panelClassName="space-y-3 border-t border-hair p-3"
       >
-        {manga ? t("detail.moreManga") : t("detail.moreAnime")}
-        <ChevronDown aria-hidden className={cn("size-4 text-ink-500 transition-transform", open && "rotate-180")} />
-      </button>
-      {open && (
-        <div id={id} className="space-y-3 border-t border-hair p-3">
-          <label className="block text-sm">
-            <span className="mb-1 block text-ink-500">{manga ? t("entry.rereads") : t("entry.rewatches")}</span>
-            <span className="flex items-center gap-1.5">
-              <NumberInput value={repeat} onChange={setRepeat} className="w-20" />
-              <Button
-                variant="secondary"
-                size="icon"
-                aria-label={t("entry.addRepeat")}
-                title={t("entry.addRepeat")}
-                onClick={() => setRepeat((r) => r + 1)}
-              >
-                +1
-              </Button>
-            </span>
-          </label>
-          <div className="text-sm">
-            <span id={`${id}-tags`} className="mb-1 block text-ink-500">
-              {t("tags.label")}
-            </span>
-            <TagEditor tags={tags} onChange={setTags} labelledBy={`${id}-tags`} />
-          </div>
-          <label className="block text-sm">
-            <span className="mb-1 block text-ink-500">{t("entry.notes")}</span>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={3}
-              placeholder={t("entry.notesPlaceholder")}
-              className="w-full resize-y rounded-control border border-surface-700 bg-surface-900 px-2 py-1.5 text-sm focus:border-accent-500 focus:outline-none"
-            />
-          </label>
-          <Button className="w-full" onClick={() => onSave({ repeat, notes: serializeNotes(notes, tags) })}>
-            {t("common.save")}
-          </Button>
+        <label className="block text-sm">
+          <span className="mb-1 block text-ink-500">{manga ? t("entry.rereads") : t("entry.rewatches")}</span>
+          <span className="flex items-center gap-1.5">
+            <NumberInput value={repeat} onChange={setRepeat} className="w-20" />
+            <Button
+              variant="secondary"
+              size="icon"
+              aria-label={t("entry.addRepeat")}
+              title={t("entry.addRepeat")}
+              onClick={() => setRepeat((r) => r + 1)}
+            >
+              +1
+            </Button>
+          </span>
+        </label>
+        <div className="text-sm">
+          <span id={`${id}-tags`} className="mb-1 block text-ink-500">
+            {t("tags.label")}
+          </span>
+          <TagEditor tags={tags} onChange={setTags} labelledBy={`${id}-tags`} />
         </div>
-      )}
+        <label className="block text-sm">
+          <span className="mb-1 block text-ink-500">{t("entry.notes")}</span>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={3}
+            placeholder={t("entry.notesPlaceholder")}
+            className="w-full resize-y rounded-control border border-surface-700 bg-surface-900 px-2 py-1.5 text-sm focus:border-accent-500 focus:outline-none"
+          />
+        </label>
+        <Button className="w-full" onClick={() => onSave({ repeat, notes: serializeNotes(notes, tags) })}>
+          {t("common.save")}
+        </Button>
+      </Disclosure>
     </div>
   );
 }

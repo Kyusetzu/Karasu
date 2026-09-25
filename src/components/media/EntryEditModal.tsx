@@ -22,6 +22,7 @@ import { ScoreBars } from "@/components/ui/score-bars";
 import TagEditor from "@/components/media/TagEditor";
 import { parseNotes, serializeNotes } from "@/lib/tags";
 import { loadDefaultAddStatus } from "@/lib/defaultAddStatus";
+import { chooseStatus, openingFields, type FillMemo } from "@/lib/completion";
 
 export interface EditableMedia {
   id: number;
@@ -137,11 +138,19 @@ export default function EntryEditModal({
   const { t } = useTranslation();
   const mode = useAuth((s) => s.mode);
   const initial = parseNotes(entry?.notes);
-  const [status, setStatus] = useState<MediaListStatus>(
-    entry?.status ?? loadDefaultAddStatus(),
+  // Read once: a first add opens as if its default pill was picked, so a default of Completed starts on the totals.
+  const [opening] = useState(() =>
+    openingFields(
+      entry ? { status: entry.status, progress: entry.progress, volumes: entry.progressVolumes ?? 0 } : null,
+      loadDefaultAddStatus(),
+      media,
+      media.type,
+    ),
   );
-  const [progress, setProgress] = useState(entry?.progress ?? 0);
-  const [volumes, setVolumes] = useState(entry?.progressVolumes ?? 0);
+  const [status, setStatus] = useState<MediaListStatus>(opening.fields.status);
+  const [progress, setProgress] = useState(opening.fields.progress);
+  const [volumes, setVolumes] = useState(opening.fields.volumes);
+  const [fillMemo, setFillMemo] = useState<FillMemo | null>(opening.memo);
   const [score, setScore] = useState(entry?.score ?? 0);
   const [repeat, setRepeat] = useState(entry?.repeat ?? 0);
   const [notes, setNotes] = useState(initial.notes);
@@ -180,6 +189,15 @@ export default function EntryEditModal({
   const rewatchLabel =
     media.type === "MANGA" ? t("entry.rereads") : t("entry.rewatches");
 
+  /** Completed shows the totals it will write, so the saved numbers are the ones on screen. */
+  const pickStatus = (next: MediaListStatus) => {
+    const picked = chooseStatus({ status, progress, volumes }, fillMemo, next, media, media.type);
+    setStatus(picked.fields.status);
+    setProgress(picked.fields.progress);
+    setVolumes(picked.fields.volumes);
+    setFillMemo(picked.memo);
+  };
+
   return (
     <Modal title={displayTitle(media.title)} onClose={onClose} leaving={leaving}>
       <div className="space-y-4">
@@ -191,7 +209,7 @@ export default function EntryEditModal({
               <Pill
                 key={s}
                 active={status === s}
-                onClick={() => setStatus(s)}
+                onClick={() => pickStatus(s)}
               >
                 {t(`status.${media.type}.${s}`)}
               </Pill>

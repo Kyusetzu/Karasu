@@ -15,6 +15,7 @@ import { followRelation, relationBadgeKey } from "@/lib/follows";
 import { donatorLabel } from "@/lib/donator";
 import { toDisplayScale } from "@/lib/score";
 import { cn } from "@/lib/utils";
+import { BannerImage } from "@/components/media/BannerImage";
 
 /** A quiet outlined chip — donator, moderator, "follows you". */
 function Badge({
@@ -63,12 +64,9 @@ export function ProfileHeader({ user }: { user: UserProfile }) {
       {/* The banner is the only user image loaded directly; `Markdown` covers the rest with chips. */}
       {user.bannerImage && (
         <div className="absolute inset-x-0 top-0 h-32 overflow-hidden">
-          <img
-            src={user.bannerImage}
-            alt=""
-            className="size-full object-cover opacity-40"
-          />
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent to-surface-950" />
+          {/* Dimmed as before, since the name sits on it, but contained now rather than cropped to the strip. */}
+          <BannerImage src={user.bannerImage} opacity={0.4} />
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent from-40% to-surface-950" />
         </div>
       )}
 

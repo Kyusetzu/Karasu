@@ -10,11 +10,11 @@ vi.mock("@/hooks/useManualSync", () => ({
   useManualSync: () => ({ sync: hooks.sync, syncing: false, available: hooks.available }),
 }));
 
-/** jsdom implements no `TouchEvent`, and the hook only ever reads `touches[0].clientY`, so this is the whole surface. */
+/** jsdom implements no `TouchEvent`, and the hook reads only `touches[0]`'s coordinates, so this is the whole surface. */
 function touch(type: string, y: number, count = 1): Event {
   const event = new Event(type, { bubbles: true, cancelable: true });
   Object.defineProperty(event, "touches", {
-    value: Array.from({ length: count }, () => ({ clientY: y })),
+    value: Array.from({ length: count }, () => ({ clientY: y, clientX: 0 })),
   });
   return event;
 }
@@ -123,6 +123,21 @@ describe("usePullToSync", () => {
     document.body.appendChild(overlay);
     drag(scroller(0), FAR);
     expect(phase()).toBe("idle");
+    expect(hooks.sync).not.toHaveBeenCalled();
+  });
+
+  /** The franchise canvas: a page that never scrolls, holding a surface that pans on the same downward drag. */
+  it("leaves a surface that handles its own drags alone", () => {
+    mount();
+    const page = emptyScroller();
+    const canvas = document.createElement("div");
+    canvas.style.touchAction = "none";
+    page.appendChild(canvas);
+    drag(canvas, FAR);
+    expect(phase()).toBe("idle");
+    act(() => {
+      canvas.dispatchEvent(touch("touchend", FAR, 0));
+    });
     expect(hooks.sync).not.toHaveBeenCalled();
   });
 

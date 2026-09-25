@@ -9,18 +9,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
-import {
-  Bookmark,
-  CheckSquare,
-  ArrowDownWideNarrow,
-  ArrowUpNarrowWide,
-  CloudOff,
-  Dices,
-  LayoutGrid,
-  List as ListIcon,
-  RefreshCw,
-  Search as SearchIcon,
-} from "lucide-react";
+import { CheckSquare, CloudOff, RefreshCw } from "lucide-react";
 import { useAuth } from "@/stores/auth";
 import { useContentFilter } from "@/stores/contentFilter";
 import { blockReason, shouldBlur } from "@/lib/contentFilter";
@@ -28,7 +17,6 @@ import { FilteredNotice } from "@/components/FilteredNotice";
 import { fetchMediaList, flushQueue } from "@/api/anilist";
 import {
   displayTitle,
-  maxProgress,
   STATUS_ORDER,
   type MediaListEntry,
   type MediaListStatus,
@@ -43,18 +31,16 @@ import { nextFocus, ownsKeyboard, type Move } from "@/lib/roving";
 import RandomPickModal from "@/components/overlays/RandomPickModal";
 import PresetModal from "@/components/overlays/PresetModal";
 import { loadPresets, savePresets, type Preset } from "@/lib/presets";
-import { formatLabel, MEDIA_FORMATS, ORIGINS, originLabel } from "@/lib/format";
+import { formatLabel, ORIGINS, originLabel } from "@/lib/format";
 import { customListNames } from "@/lib/customLists";
 import { collectTags, tagsOf } from "@/lib/tags";
 import { searchTitles } from "@/lib/search";
 import { fuzzyScore, prepareDoc, prepareQuery, type FuzzyDoc } from "@/lib/fuzzy";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
-import { Segmented } from "@/components/ui/segmented";
-import { FilterSelect } from "@/components/ui/filter-select";
 import { StatusTabs } from "@/components/ui/status-tabs";
 import { CoverOutline, EmptyState, StruckQuery } from "@/components/EmptyState";
-import { Input } from "@/components/ui/input";
+import { ListMoreMenu, ListToolbar } from "@/components/list/ListToolbar";
 import { cn } from "@/lib/utils";
 import { Presence, PresenceIf } from "@/components/ui/presence";
 import { VirtualGrid } from "@/components/list/VirtualGrid";
@@ -62,26 +48,28 @@ import { GridCard } from "@/components/list/GridCard";
 import { ListRow, type RowPatch } from "@/components/list/ListRow";
 import type { BulkPatch } from "@/api/anilist";
 import { ListHeader } from "@/components/list/ListHeader";
-import { ROW_HEIGHT_PX } from "@/components/list/columns";
+import { ROW_HEIGHT_PX, TEXT_ROW_HEIGHT_PX } from "@/components/list/columns";
+import { PHONE_ROW_PX, PhoneRow } from "@/components/list/PhoneRow";
 import { useRowTier } from "@/hooks/useRowTier";
 import { loadViewMode, saveViewMode, type ViewMode } from "@/lib/viewMode";
 import { usePhoneShell } from "@/hooks/usePhoneShell";
 import { BulkBar } from "@/components/list/BulkBar";
 import { canIncrement } from "@/components/list/shared";
-import { completePatch } from "@/lib/actions";
-
-type SortKey = "updated" | "title" | "score" | "progress";
-type SortDir = "asc" | "desc";
-
-const SORT_KEYS: SortKey[] = ["updated", "title", "score", "progress"];
-
-/** What each key means with no direction chosen, so a bare URL keeps its meaning; the toggle flips from this. */
-const SORT_DEFAULT_DIR: Record<SortKey, SortDir> = {
-  updated: "desc",
-  title: "asc",
-  score: "desc",
-  progress: "desc",
-};
+import { COMPLETION_CONFIRM_REQUESTS, splitBulkPatch } from "@/lib/completion";
+import { adjacentTab } from "@/lib/navSwipe";
+import { useTabSwipe } from "@/hooks/useTabSwipe";
+import { afterBackSettles } from "@/hooks/useBackClose";
+import {
+  CLEAR_FILTERS,
+  mergeView,
+  parseListView,
+  SORT_DEFAULT_DIR,
+  writeViewParams,
+  type SortKey,
+  type ViewPatch,
+} from "@/lib/listFilters";
+import { statusColorVar } from "@/lib/statusColors";
+import { isAndroid, usePlatform } from "@/stores/platform";
 
 // One collator, since localeCompare builds a fresh one per call; default options keep the ordering it gave.
 const COLLATOR = new Intl.Collator();
@@ -115,33 +103,39 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
   const { t } = useTranslation();
   // The view lives in the URL, so back from a detail page restores it and a sidebar click starts clean.
   const [params, setParams] = useSearchParams();
-  const rawTab = params.get("tab");
-  const tab: MediaListStatus = STATUS_ORDER.includes(rawTab as MediaListStatus)
-    ? (rawTab as MediaListStatus)
-    : "CURRENT";
-  const rawSort = params.get("sort");
-  const sort: SortKey = SORT_KEYS.includes(rawSort as SortKey)
-    ? (rawSort as SortKey)
-    : "updated";
-  const rawDir = params.get("dir");
-  const dir: SortDir =
-    rawDir === "asc" || rawDir === "desc" ? rawDir : SORT_DEFAULT_DIR[sort];
-  const tagFilter = params.get("tag") ?? "";
-  const formats = MEDIA_FORMATS[type];
-  const rawFormat = params.get("format") ?? "";
-  const formatFilter = (formats as readonly string[]).includes(rawFormat) ? rawFormat : "";
-  const rawCountry = params.get("country") ?? "";
-  // Origin is a manga question, so the param is simply ignored on an anime list.
-  const countryFilter =
-    type === "MANGA" && (ORIGINS as readonly string[]).includes(rawCountry) ? rawCountry : "";
-  const listFilter = params.get("list") ?? "";
+  // Read by the debounce at fire time, since its closure holds the params of the render that armed it.
+  const paramsRef = useRef(params);
+  paramsRef.current = params;
+  // What an open panel has chosen but not yet written: the list draws it now, the URL gets it on close.
+  const [draft, setDraft] = useState<ViewPatch>({});
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+  const view = useMemo(() => mergeView(parseListView(params, type), draft), [params, type, draft]);
+  const {
+    tab,
+    sort,
+    dir,
+    tag: tagFilter,
+    format: formatFilter,
+    country: countryFilter,
+    list: listFilter,
+  } = view;
   // The text filter alone keeps local state and mirrors into ?q= on a debounce, not a replaceState per keystroke.
   const [filter, setFilter] = useState(() => params.get("q") ?? "");
-  // Remembered per media type, since the screen remounts on every navigation.
-  const [gridChoice, setGrid] = useState(() => loadViewMode(type) === "grid");
-  /** Phones always get cards, since the row table's fixed tracks overflow there; the stored preference stays. */
+  // Remembered per media type, since the screen remounts on every navigation; all three exist on the phone too.
+  const [layout, setLayout] = useState<ViewMode>(() => loadViewMode(type));
+  /** The table's fixed tracks overflow a phone, so the two row views draw `PhoneRow` there instead. */
   const phone = usePhoneShell();
-  const grid = phone || gridChoice;
+  // Platform, not width: a narrowed desktop window still has the keyboard the search hint names.
+  const android = isAndroid(usePlatform((s) => s.info));
+  const searchRef = useRef<HTMLInputElement>(null);
+  const changeLayout = useCallback(
+    (mode: ViewMode) => {
+      setLayout(mode);
+      saveViewMode(type, mode);
+    },
+    [type],
+  );
   const [editing, setEditing] = useState<MediaListEntry | null>(null);
   const [showRandom, setShowRandom] = useState(false);
   const [presets, setPresets] = useState<Preset[]>(() => loadPresets(type));
@@ -152,12 +146,21 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
   const [columns, setColumns] = useState(1);
   const [removing, setRemoving] = useState<MediaListEntry | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   // Which list columns fit, measured off the scroll container: a fixed grid track overflows instead of shrinking.
-  const tier = useRowTier(scrollRef, type === "MANGA");
+  const tier = useRowTier(scrollRef, type === "MANGA", layout !== "text");
   const navigate = useNavigate();
+  const profileMode = useAuth((s) => s.mode);
+  // The request count of a bulk completion waiting on a yes; null while nothing is asking.
+  const [confirmComplete, setConfirmComplete] = useState<number | null>(null);
 
   // Clear the selection whenever the pool it refers to changes.
   useEffect(() => setSelected(new Set()), [tab]);
+
+  // A tab is another list, so it opens at its top rather than wherever the last one was left.
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+  }, [tab]);
 
   const toggleSelect = useCallback((mediaId: number) => {
     setSelected((prev) => {
@@ -168,51 +171,51 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
     });
   }, []);
 
-  /** The one writer for the URL view; separate setParams calls read stale snapshots and clobber each other. */
+  // Patches waiting for the overlays' history entries to unwind, merged in call order into one write.
+  const queued = useRef<{ patch: ViewPatch; draft: boolean } | null>(null);
+  // A write still waiting when the page goes would resolve against this route and replace the next page's URL.
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
+
+  /** The one writer for the URL view; it waits out any overlay's entry, which a `replace` would overwrite. */
   const setView = useCallback(
-    (
-      patch: Partial<{
-        tab: MediaListStatus;
-        filter: string;
-        tagFilter: string;
-        sort: SortKey;
-        /** Explicit direction, or "" for the sort key's own default. */
-        dir: string;
-        format: string;
-        country: string;
-        list: string;
-      }>,
-    ) => {
-      setParams(
-        (prev) => {
-          const p = new URLSearchParams(prev);
-          const write = (key: string, value: string, def: string) =>
-            value === def ? p.delete(key) : p.set(key, value);
-          if (patch.tab !== undefined) write("tab", patch.tab, "CURRENT");
-          if (patch.sort !== undefined) write("sort", patch.sort, "updated");
-          if (patch.dir !== undefined) write("dir", patch.dir, "");
-          if (patch.tagFilter !== undefined) write("tag", patch.tagFilter, "");
-          if (patch.format !== undefined) write("format", patch.format, "");
-          if (patch.country !== undefined) write("country", patch.country, "");
-          if (patch.list !== undefined) write("list", patch.list, "");
-          if (patch.filter !== undefined) write("q", patch.filter.trim(), "");
-          return p;
-        },
-        { replace: true },
-      );
+    (patch: ViewPatch, fromDraft = false) => {
+      if (queued.current) {
+        queued.current = { patch: { ...queued.current.patch, ...patch }, draft: queued.current.draft || fromDraft };
+        return;
+      }
+      queued.current = { patch, draft: fromDraft };
+      afterBackSettles(() => {
+        const next = queued.current;
+        queued.current = null;
+        if (!next || !alive.current) return;
+        setParams((prev) => writeViewParams(prev, next.patch), { replace: true });
+        // In the same batch as the write, so the list never draws the old URL between draft and commit.
+        if (next.draft) setDraft({});
+      });
     },
     [setParams],
   );
 
+  const editDraft = useCallback((patch: ViewPatch) => setDraft((d) => ({ ...d, ...patch })), []);
+  const commitDraft = useCallback(() => {
+    if (Object.keys(draftRef.current).length > 0) setView(draftRef.current, true);
+  }, [setView]);
+
+  const flushQuery = useCallback(() => {
+    if (filter.trim() !== (paramsRef.current.get("q") ?? "")) setView({ q: filter });
+  }, [filter, setView]);
+
   // Mirror the text filter into ?q= on the same debounce the other searches use, one write when typing settles.
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (filter.trim() !== (params.get("q") ?? "")) setView({ filter });
-    }, 500);
+    const timer = setTimeout(flushQuery, 500);
     return () => clearTimeout(timer);
-    // `params` is deliberately not a dependency: it changes on the write this effect just made.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter, setView]);
+  }, [flushQuery]);
 
   const applyPreset = (name: string) => {
     const p = presets.find((x) => x.name === name);
@@ -221,12 +224,13 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
     // `?? ""` on the newer fields: presets saved before they existed must clear the filters they never captured.
     setView({
       tab: p.tab as MediaListStatus,
-      filter: p.filter,
+      q: p.filter,
       sort: p.sort as SortKey,
-      dir: p.dir ?? "",
-      tagFilter: p.tagFilter ?? "",
+      dir: p.dir === "asc" || p.dir === "desc" ? p.dir : "",
+      tag: p.tagFilter ?? "",
       format: p.format ?? "",
       country: p.country ?? "",
+      list: p.list ?? "",
     });
   };
 
@@ -239,10 +243,11 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
         filter,
         sort,
         // The raw param, so a preset saved on the default direction keeps following the key's default.
-        dir: rawDir ?? "",
+        dir: view.rawDir,
         tagFilter,
         format: formatFilter,
         country: countryFilter,
+        list: listFilter,
       },
     ];
     setPresets(next);
@@ -260,6 +265,24 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
     queryFn: () => fetchMediaList(userId, type),
   });
   const { save, bulkSave, remove, bulkRemove } = useListMutations(userId, type);
+
+  // The phone's sideways swipe walks the tabs in their row order and stops at both ends, never wrapping round.
+  const canStepTab = useCallback((step: 1 | -1) => adjacentTab(STATUS_ORDER, tab, step) !== null, [tab]);
+  const stepTab = useCallback(
+    (step: 1 | -1) => {
+      const next = adjacentTab(STATUS_ORDER, tab, step);
+      if (next) setView({ tab: next });
+    },
+    [tab, setView],
+  );
+  useTabSwipe({
+    surface: rootRef,
+    content: scrollRef,
+    // Off while selecting, since a tab change clears the selection, and until the list has mounted to swipe.
+    enabled: phone && !selectMode && !isLoading && !error,
+    canStep: canStepTab,
+    onStep: stepTab,
+  });
 
   const level = useContentFilter((s) => s.level);
   // Read here, not in the memoized rows: a store subscription there would re-render every card on any store move.
@@ -302,7 +325,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
   // A tag that no longer exists anywhere must not keep the list empty.
   useEffect(() => {
     if (tagFilter && !allTags.some((x) => x.toLowerCase() === tagFilter.toLowerCase()))
-      setView({ tagFilter: "" });
+      setView({ tag: "" });
   }, [allTags, tagFilter, setView]);
 
   // Same for a custom list deleted on anilist.co since the URL was minted.
@@ -399,7 +422,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
   );
 
   const complete = useCallback(
-    (entry: MediaListEntry) => quickSave(entry, completePatch(maxProgress(entry.media))),
+    (entry: MediaListEntry) => quickSave(entry, { status: "COMPLETED" }),
     [quickSave],
   );
 
@@ -514,10 +537,25 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
     // Deliberately no dependency array: a missed entry would leave the keys acting on a stale list, and a rebind is cheap.
   });
 
+  // Ctrl+F finds in this list rather than the page; bound apart from the key group, which stands down on an empty list.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey || e.key.toLowerCase() !== "f") return;
+      if (document.querySelector("[data-overlay]")) return;
+      const field = searchRef.current;
+      if (!field) return;
+      e.preventDefault();
+      field.focus();
+      field.select();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   // A filter or tab change re-pools the entries, so an old index would name a different title.
   useEffect(
     () => setFocus(null),
-    [tab, deferredFilter, tagFilter, formatFilter, countryFilter, listFilter, sort],
+    [tab, deferredFilter, tagFilter, formatFilter, countryFilter, listFilter, sort, dir],
   );
 
   const unit = type === "ANIME" ? t("common.episodes") : t("common.chapters");
@@ -546,7 +584,15 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
   // One mutation for the whole selection, not one per entry (useListMutations.bulkSave).
   const bulkPatch = (patch: BulkPatch) =>
     bulkSave.mutate({ entries: selectedEntries, patch });
-  const bulkStatus = (status: MediaListStatus) => bulkPatch({ status });
+  const bulkStatus = (status: MediaListStatus) => {
+    // Local mode writes SQLite, so only an AniList completion has a request count worth asking about.
+    const requests =
+      status === "COMPLETED" && profileMode === "anilist"
+        ? splitBulkPatch(selectedEntries, { status }, type).length
+        : 1;
+    if (requests > COMPLETION_CONFIRM_REQUESTS) setConfirmComplete(requests);
+    else bulkPatch({ status });
+  };
   const bulkScore = (score: number) => bulkPatch({ score });
   const bulkProgress = (progress: number) => bulkPatch({ progress });
   const bulkRepeat = (repeat: number) => bulkPatch({ repeat });
@@ -557,7 +603,8 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
     setSelected(new Set());
   };
   return (
-    <div className="flex h-full flex-col">
+    // Clipped sideways, so the list following a swipe never gives the page a horizontal scroll.
+    <div ref={rootRef} className="flex h-full flex-col overflow-x-clip">
       {(data?.fromCache || (data?.pending ?? 0) > 0) && (
         <div className="flex items-center gap-3 border-b border-surface-800 bg-gold/10 px-8 py-2 text-xs text-gold">
           <CloudOff className="size-3.5" />
@@ -578,9 +625,9 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
         </div>
       )}
 
-      <div className="border-b border-surface-800 px-8 pb-3.5 pt-6">
+      <div className="border-b border-surface-800 px-8 pt-6">
         <div className="flex items-center justify-between gap-4">
-          <div className="flex items-baseline gap-2.5">
+          <div className="flex min-w-0 items-baseline gap-2.5">
             <h1 className="text-2xl font-bold text-ink-100">
               {type === "ANIME" ? t("list.animeTitle") : t("list.mangaTitle")}
             </h1>
@@ -598,8 +645,18 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
               <CheckSquare className="size-3.75" />
               {t("bulk.select")}
             </Button>
-            {/* The phone shell syncs by pulling the list down, so the corner button would be a second spelling of it. */}
-            {!phone && (
+            {/* The phone syncs by pulling the list down, so its corner holds what its toolbar has no room for. */}
+            {phone ? (
+              <ListMoreMenu
+                type={type}
+                presets={presets}
+                onApplyPreset={applyPreset}
+                onManagePresets={() => setShowPresetSave(true)}
+                onRandom={() => setShowRandom(true)}
+                layout={layout}
+                onLayout={changeLayout}
+              />
+            ) : (
               <IconButton
                 variant="ghost"
                 onClick={() => refetch()}
@@ -614,136 +671,45 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
           </div>
         </div>
 
+        {/* Over the header's border, so the active tab's line replaces that stretch of it. */}
         <StatusTabs
-          className="mt-4"
+          className="-mb-px mt-4"
+          label={t("list.statusTabs")}
           value={tab}
           onChange={(v) => setView({ tab: v })}
           tabs={STATUS_ORDER.map((status) => ({
             value: status,
             label: t(`status.${type}.${status}`),
             count: byStatus.get(status)?.length ?? 0,
+            color: statusColorVar(status),
           }))}
         />
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 px-8 py-3.5">
-          <div className="relative max-w-68 flex-[1_1_11rem]">
-            <SearchIcon
-              className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-ink-600"
-            />
-            <Input
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              placeholder={t("list.filterPlaceholder")}
-              onClear={() => setFilter("")}
-              clearLabel={t("common.clear")}
-              className="h-8.5 pl-8"
-            />
-          </div>
-          <FilterSelect
-            label={t("list.sortLabel")}
-            value={sort}
-            // Changing the key clears the direction: "score, descending" was a choice about scores, not titles.
-            onChange={(v) => setView({ sort: v as SortKey, dir: "" })}
-            options={SORT_KEYS.map((k) => ({ value: k, label: t(`sort.${k}`) }))}
-          />
-          <IconButton
-            variant="ghost"
-            onClick={() => {
-              const next: SortDir = dir === "asc" ? "desc" : "asc";
-              setView({ dir: next === SORT_DEFAULT_DIR[sort] ? "" : next });
-            }}
-            aria-label={t(dir === "asc" ? "list.sortAsc" : "list.sortDesc")}
-            title={t(dir === "asc" ? "list.sortAsc" : "list.sortDesc")}
-          >
-            {dir === "asc" ? (
-              <ArrowUpNarrowWide className="size-4" />
-            ) : (
-              <ArrowDownWideNarrow className="size-4" />
-            )}
-          </IconButton>
-          <FilterSelect
-            label={t("list.formatLabel")}
-            value={formatFilter}
-            onChange={(v) => setView({ format: v })}
-            placeholder={t("list.allFormats")}
-            options={formats.map((f) => ({ value: f, label: formatLabel(f, t) }))}
-          />
-          {type === "MANGA" && (
-            <FilterSelect
-              label={t("list.originLabel")}
-              value={countryFilter}
-              onChange={(v) => setView({ country: v })}
-              placeholder={t("list.allOrigins")}
-              options={ORIGINS.map((c) => ({ value: c, label: originLabel(c, t) }))}
-            />
-          )}
-          {listNames.length > 0 && (
-            <FilterSelect
-              label={t("list.listLabel")}
-              value={listFilter}
-              onChange={(v) => setView({ list: v })}
-              placeholder={t("list.allLists")}
-              options={listNames.map((n) => ({ value: n, label: n }))}
-            />
-          )}
-          {allTags.length > 0 && (
-            <FilterSelect
-              label={t("list.tagLabel")}
-              value={tagFilter}
-              onChange={(v) => setView({ tagFilter: v })}
-              placeholder={t("tags.allTags")}
-              options={allTags.map((tag) => ({ value: tag, label: tag }))}
-            />
-          )}
-          {presets.length > 0 && (
-            <FilterSelect
-              label={t("list.presetLabel")}
-              value=""
-              onChange={(v) => v && applyPreset(v)}
-              placeholder={t("presets.apply")}
-              options={presets.map((p) => ({ value: p.name, label: p.name }))}
-            />
-          )}
-          <IconButton
-            variant="surface"
-            onClick={() => setShowPresetSave(true)}
-            aria-label={t("presets.save")}
-            title={t("presets.save")}
-          >
-            <Bookmark className="size-4" />
-          </IconButton>
-          <IconButton
-            variant="surface"
-            onClick={() => setShowRandom(true)}
-            aria-label={t("random.pick")}
-            title={t("random.pick")}
-          >
-            <Dices className="size-4" />
-          </IconButton>
-          {!phone && (
-          <Segmented
-            className="ml-auto"
-            aria-label={t("list.view")}
-            value={grid ? "grid" : "rows"}
-            onChange={(v) => {
-              setGrid(v === "grid");
-              saveViewMode(type, v as ViewMode);
-            }}
-            segments={[
-              {
-                value: "grid",
-                title: t("list.gridView"),
-                label: <LayoutGrid className="size-3.75" />,
-              },
-              {
-                value: "rows",
-                title: t("list.listView"),
-                label: <ListIcon className="size-3.75" />,
-              },
-            ]}
-          />
-          )}
+      <div className="px-8 py-3">
+        <ListToolbar
+          type={type}
+          view={view}
+          query={filter}
+          onQuery={setFilter}
+          searchRef={searchRef}
+          shown={entries.length}
+          total={byStatus.get(tab)?.length ?? 0}
+          listNames={listNames}
+          tags={allTags}
+          presets={presets}
+          onApplyPreset={applyPreset}
+          onManagePresets={() => setShowPresetSave(true)}
+          onRandom={() => setShowRandom(true)}
+          layout={layout}
+          onLayout={changeLayout}
+          onDraft={editDraft}
+          onChange={setView}
+          onPanelOpen={flushQuery}
+          onPanelClosed={commitDraft}
+          phone={phone}
+          touch={android}
+        />
       </div>
 
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-8 pb-12 pt-1">
@@ -751,15 +717,23 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
         <FilteredNotice adult={hiddenAdult} suggestive={hiddenSuggestive} className="mb-2" />
         {entries.length === 0 ? (
           // Two different nothings: an empty tab is a fact about the list, a search that matched none is about the query.
-          filter || tagFilter || formatFilter || countryFilter || listFilter ? (
+          (byStatus.get(tab)?.length ?? 0) === 0 ? (
+            <EmptyState
+              visual={<CoverOutline />}
+              title={t("list.emptyTab", {
+                status: t(`status.${type}.${tab}`),
+              })}
+              hint={t("list.emptyTabHint")}
+            />
+          ) : (
             <EmptyState
               visual={
                 <StruckQuery
                   query={
-                    filter ||
+                    filter.trim() ||
                     tagFilter ||
                     formatLabel(formatFilter, t) ||
-                    countryFilter ||
+                    (countryFilter && originLabel(countryFilter as (typeof ORIGINS)[number], t)) ||
                     listFilter
                   }
                 />
@@ -773,24 +747,18 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
                   size="control"
                   onClick={() => {
                     setFilter("");
-                    setView({ filter: "", tagFilter: "", format: "", country: "", list: "" });
+                    setView({ ...CLEAR_FILTERS, q: "" });
                   }}
                 >
                   {t("list.clearFilter")}
                 </Button>
               }
             />
-          ) : (
-            <EmptyState
-              visual={<CoverOutline />}
-              title={t("list.emptyTab", {
-                status: t(`status.${type}.${tab}`),
-              })}
-              hint={t("list.emptyTabHint")}
-            />
           )
-        ) : grid ? (
+        ) : layout === "grid" ? (
           <VirtualGrid
+            // Keyed on the view and the shell, so no row height measured for one layout is reused by another.
+            key={`grid-${phone}`}
             items={entries}
             scrollRef={scrollRef}
             gridClassName="media-grid gap-x-4"
@@ -814,16 +782,46 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
               />
             )}
           />
+        ) : phone ? (
+          <div className="overflow-hidden rounded-xl border border-surface-800">
+            <VirtualGrid
+              key={`phone-${layout}`}
+              items={entries}
+              scrollRef={scrollRef}
+              // One bounded track: an `auto` one grows to a nowrap title and pushes the buttons out of the row.
+              gridClassName="grid grid-cols-1"
+              rowGap={0}
+              estimateRowHeight={layout === "text" ? PHONE_ROW_PX.text : PHONE_ROW_PX.thumbs}
+              focusIndex={focus}
+              onColumns={setColumns}
+              renderItem={(entry, i) => (
+                <PhoneRow
+                  key={entry.id}
+                  entry={entry}
+                  variant={layout === "text" ? "text" : "thumbs"}
+                  unit={unit}
+                  focused={i === focus}
+                  blurred={shouldBlur(entry.media, level, blurAdult)}
+                  onPlusOne={plusOne}
+                  onEdit={startEdit}
+                  selectMode={selectMode}
+                  selected={selected.has(entry.mediaId)}
+                  onToggleSelect={toggleSelect}
+                />
+              )}
+            />
+          </div>
         ) : (
           <div className="overflow-hidden rounded-xl border border-surface-800">
-            <ListHeader tier={tier} selectMode={selectMode} mediaType={type} />
+            <ListHeader tier={tier} selectMode={selectMode} mediaType={type} cover={layout !== "text"} />
             {/* Keep one entry per row: two side by side made useColumnCount report 2, so the down arrow moved by two. */}
             <VirtualGrid
+              key={`table-${layout}`}
               items={entries}
               scrollRef={scrollRef}
               gridClassName="grid"
               rowGap={0}
-              estimateRowHeight={ROW_HEIGHT_PX}
+              estimateRowHeight={layout === "text" ? TEXT_ROW_HEIGHT_PX : ROW_HEIGHT_PX}
               focusIndex={focus}
               onColumns={setColumns}
               renderItem={(entry, i) => (
@@ -831,6 +829,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
                   key={entry.id}
                   entry={entry}
                   tier={tier}
+                  variant={layout === "text" ? "text" : "thumbs"}
                   focused={i === focus}
                   blurred={shouldBlur(entry.media, level, blurAdult)}
                   onQuickSave={quickSave}
@@ -849,7 +848,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
       {selectMode && (
         <BulkBar
           type={type}
-          count={selected.size}
+          count={selectedEntries.length}
           onStatus={bulkStatus}
           onScore={bulkScore}
           onProgress={bulkProgress}
@@ -896,6 +895,24 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
               setRemoving(null);
             }}
             onCancel={() => setRemoving(null)}
+          />
+        )}
+      </Presence>
+
+      <Presence value={confirmComplete}>
+        {(requests, leaving) => (
+          <ConfirmDialog
+            leaving={leaving}
+            title={t("bulk.completeTitle", { count: selectedEntries.length })}
+            names={selectedEntries.slice(0, 3).map((e) => displayTitle(e.media.title))}
+            extra={Math.max(0, selectedEntries.length - 3)}
+            note={t("bulk.completeRequests", { n: requests })}
+            confirmLabel={t("bulk.completeConfirm")}
+            onConfirm={() => {
+              bulkPatch({ status: "COMPLETED" });
+              setConfirmComplete(null);
+            }}
+            onCancel={() => setConfirmComplete(null)}
           />
         )}
       </Presence>

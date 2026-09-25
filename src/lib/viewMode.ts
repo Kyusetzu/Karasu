@@ -1,6 +1,7 @@
 /** Which view each list screen was left in, in localStorage per media type because anime and manga are different habits. */
 
-export type ViewMode = "grid" | "rows";
+/** Gallery, thumbnail rows, and the text-only list; the stored words predate the names and stay for old settings. */
+export type ViewMode = "grid" | "rows" | "text";
 
 const KEY = "karasu-list-view";
 
@@ -8,7 +9,7 @@ const KEY = "karasu-list-view";
 export const DEFAULT_VIEW: ViewMode = "grid";
 
 function isViewMode(value: unknown): value is ViewMode {
-  return value === "grid" || value === "rows";
+  return value === "grid" || value === "rows" || value === "text";
 }
 
 type Store = Record<string, ViewMode>;

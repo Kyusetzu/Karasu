@@ -6,6 +6,7 @@ import { tick } from "@/lib/haptics";
 import {
   PULL_IDLE,
   isScrollableStyle,
+  ownsGestures,
   scrollsByStyle,
   pullBegin,
   pullEnd,
@@ -13,7 +14,7 @@ import {
   type PullState,
 } from "@/lib/pullToSync";
 
-/** Touch events, not pointer events: `html` carries `touch-action: pan-y`, so Chromium cancels the pointer once it scrolls. */
+/** Touch events, not pointer events: `html` carries `touch-action: pan-x pan-y`, so Chromium cancels a scrolling pointer. */
 
 /** The element that actually scrolls under the finger — `#main` on most routes, a page's own div on the rest. */
 function scrollerOf(node: EventTarget | null): HTMLElement | null {
@@ -22,6 +23,8 @@ function scrollerOf(node: EventTarget | null): HTMLElement | null {
   let declared: HTMLElement | null = null;
   while (el) {
     const style = getComputedStyle(el);
+    // A pan-and-zoom canvas sits inside a page that never scrolls, so it would otherwise always read as at the top.
+    if (ownsGestures(style.touchAction)) return null;
     if (isScrollableStyle(style.overflowY, el.scrollHeight, el.clientHeight)) return el;
     if (!declared && scrollsByStyle(style.overflowY)) declared = el;
     el = el.parentElement;
@@ -71,6 +74,7 @@ export function usePullToSync(): {
       apply(
         pullBegin({
           y: touch.clientY,
+          x: touch.clientX,
           scrollTop: el.scrollTop,
           touches: e.touches.length,
           syncing: isSyncing(),
@@ -82,8 +86,11 @@ export function usePullToSync(): {
       const el = scroller.current;
       const touch = e.touches[0];
       if (!el || !touch || live.current.phase === "idle") return;
+      // A long press can open its sheet while the finger is still down, and a pull behind a sheet must not sync.
+      if (document.querySelector("[data-overlay]")) return apply(PULL_IDLE);
       const next = pullMove(live.current, {
         y: touch.clientY,
+        x: touch.clientX,
         scrollTop: el.scrollTop,
         touches: e.touches.length,
         syncing: isSyncing(),

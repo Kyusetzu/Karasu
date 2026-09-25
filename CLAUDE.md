@@ -52,7 +52,9 @@ src/
                      and tauri.ts is `unwrap`, the one seam over it — see
                      "The bindings are generated"
   components/
-    ui/              primitives with no app knowledge (kebab-case files)
+    ui/              primitives with no app knowledge (kebab-case files);
+                     popover is the anchored dropdown / phone sheet the list
+                     toolbar's panels open in
     shell/           the window frame and global machinery — titlebar, sidebar,
                      bottom bar, back button, bell, command palette, keyboard
                      sheet, global keys, toast, first run, session expired, the
@@ -65,7 +67,8 @@ src/
     overlays/        modal flows (confirm, preset, random pick, sign-in merge,
                      profile edit, match picker, favourites, new thread,
                      season split, cover viewer, review composer)
-    list/            the parts MediaList draws (virtual grid, rows, bulk bar)
+    list/            the parts MediaList draws (the header's ListToolbar and
+                     the phone's ListMoreMenu, virtual grid, rows, bulk bar)
                      plus VirtualRows, the flat-list twin of VirtualGrid — the
                      local library runs several of them in one scroller, so
                      each measures its own `scrollMargin`
@@ -1682,7 +1685,14 @@ four or five places, made by careful code, because nothing said it once.
   overlay, a single popstate listener, a one-shot swallow when closing by
   other means — is `lib/backStack`, pure and tested; Escape and backdrop
   closing must keep working on their own, because the back path is additive
-  and the tests assume net-zero history entries either way.
+  and the tests assume net-zero history entries either way. **A URL `replace`
+  must never land while an overlay's entry is current** — React Router
+  overwrites the marker, the stack no longer recognises it, and the next back
+  press undoes the write. `afterBackSettles` (the stack's `whenSettled`) runs a
+  callback once no overlay holds an entry and no unwind is due; `MediaList`'s
+  `setView` goes through it and merges what queues up in call order, and the
+  toolbar's panels edit a draft the list draws at once and `setView` writes on
+  close. `Popover`'s `closeThen` is the same wait for anything a panel opens.
 - **Local text matching goes through `lib/fuzzy`.** Exact > substring >
   word-prefix > trigram containment, scored per title — per-title docs are
   what make a query structurally unable to match across two adjacent names
@@ -1792,12 +1802,18 @@ them away without re-measuring.
 - **`reqwest` enables `gzip` and deliberately not `brotli`.** AniList prefers
   `br` when offered both, and `br` measured *larger* than gzip on the list
   payload.
-- **The status-tab underline is row-aware.** `status-tabs.tsx` measures which
-  wrapped row the active tab sits on: the `+14` offset is calibrated to the
-  consumer's own bottom padding and is only right on the last row — applied
-  from row one it struck through the second row's labels. A ResizeObserver
-  covers the container re-wraps a window listener cannot see (the sidebar
-  collapse).
+- **The status tabs never wrap.** `status-tabs.tsx` is one row that scrolls
+  sideways (hidden scrollbar, an edge fade only while it overflows, the wheel
+  mapped to `scrollLeft`), and the underline is measured against that inner
+  `w-max` row, not the page. The wrapping version needed a `+14` offset
+  calibrated to the consumer's bottom padding and correct on the last row
+  only — it struck through the second row's labels — and it cost the phone two
+  header rows. Do not bring the wrap back; a narrow window scrolls the strip,
+  and the active tab is scrolled into view on every change, a swipe's included.
+  The underline takes the active tab's `color` (the status colour from
+  `MediaList`, the accent without one) and carries `data-keep-colors`, so High
+  Contrast keeps it. A touch on an overflowing strip scrolls it rather than
+  switching tabs, because `useTabSwipe` leaves sideways-scrolling elements alone.
 - **The cover progress line is a border, not a bar.** A straight strip inside
   the cover's `rounded-lg` clip had its ends eaten by the corner circles; the
   line is a `border-b` on an inset-0 overlay revealed by `clip-path`, so it

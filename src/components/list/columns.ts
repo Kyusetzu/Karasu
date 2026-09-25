@@ -69,6 +69,13 @@ export interface RowShape {
   selectMode: boolean;
   /** Manga tracks volumes as a second axis; anime has no such column. */
   manga: boolean;
+  /** False for the text-only list, whose cover track collapses to 0px so the track count never changes. */
+  cover?: boolean;
+}
+
+/** The cover track's width for a shape; absent means the thumbnail rows, which always had one. */
+function coverPx(shape: RowShape): number {
+  return shape.cover === false ? 0 : COLUMN_PX.cover;
 }
 
 /** The width of every fixed track for a shape — what has to fit. */
@@ -78,7 +85,7 @@ export function fixedWidth(shape: RowShape): number {
     shows(shape.tier, col) && (col !== "volumes" || shape.manga) ? px : 0;
   return (
     (shape.selectMode ? 24 : 0) +
-    c.cover +
+    coverPx(shape) +
     c.score +
     c.progress +
     c.actions +
@@ -102,7 +109,7 @@ export function templateColumns(shape: RowShape): string {
     shows(shape.tier, col) && (col !== "volumes" || shape.manga) ? px : 0;
   return [
     shape.selectMode ? 24 : 0,
-    c.cover,
+    coverPx(shape),
     null, // the title, flexible
     on("status", c.status),
     c.score,
@@ -118,12 +125,18 @@ export function templateColumns(shape: RowShape): string {
 }
 
 /** The widest tier whose tracks fit in `available` px, measured rather than taken from a viewport breakpoint. */
-export function tierForWidth(available: number, manga: boolean): Tier {
+export function tierForWidth(available: number, manga: boolean, cover = true): Tier {
   for (const tier of ["full", "mid"] as const) {
-    if (available >= minRowWidth({ tier, selectMode: true, manga })) return tier;
+    if (available >= minRowWidth({ tier, selectMode: true, manga, cover })) return tier;
   }
   return "compact";
 }
 
 /** Row height: the cover at 2:3 plus the vertical padding. */
 export const ROW_HEIGHT_PX = Math.round(COLUMN_PX.cover * 1.5) + 16;
+
+/** The text list's controls: one step down from the thumbnail rows' `h-8`, the same as their `xs` icon buttons. */
+export const TEXT_CELL_PX = 28;
+
+/** Text row height: the tallest cell, a control, plus `py-1`; no cover sets it any more. */
+export const TEXT_ROW_HEIGHT_PX = TEXT_CELL_PX + 8;

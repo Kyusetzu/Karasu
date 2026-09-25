@@ -8,6 +8,7 @@ import { isTauri } from "@/api/anilist";
 import { currentSeason, seasonHero, type HeroMedia } from "@/api/queries";
 import { displayTitle } from "@/api/types";
 import { DecodedImage } from "@/components/media/DecodedImage";
+import { BannerImage } from "@/components/media/BannerImage";
 import { Shimmer } from "@/components/Skeleton";
 import { adultQueryArg, isBlocked, shouldBlur } from "@/lib/contentFilter";
 import { useContentFilter } from "@/stores/contentFilter";
@@ -87,10 +88,10 @@ export default function SeasonHero() {
           ) : null,
         )}
 
-        {/* `from-surface-950` matches the page, so the image reads as the page rather than as a card on it. */}
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-surface-950 via-surface-950/55 to-transparent" />
+        {/* Only under the text and dark in both themes, so the banner stays whole and the haloed text stays legible. */}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/60 to-transparent" />
 
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 p-5">
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 p-5 ink-halo">
           <p className="text-2xs font-semibold uppercase tracking-[.14em] text-accent-400">
             {t(`season.${season}`)} {year} · {t("dashboard.heroKicker")}
           </p>
@@ -98,12 +99,12 @@ export default function SeasonHero() {
           <h2 className="mt-1 max-w-3xl">
             <Link
               to={`/media/${current.id}`}
-              className="pointer-events-auto text-2xl font-bold leading-tight text-ink-100 drop-shadow-[0_2px_12px_rgba(0,0,0,.75)] hover:underline"
+              className="pointer-events-auto text-2xl font-bold leading-tight text-white hover:underline"
             >
               {displayTitle(current.title)}
             </Link>
           </h2>
-          <p className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-2xs text-ink-400">
+          <p className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-2xs text-white/85">
             {current.format && <span>{formatLabel(current.format, t)}</span>}
             {current.episodes != null && (
               <span>{t("common.progressEpisodes", { n: current.episodes, total: current.episodes })}</span>
@@ -160,7 +161,7 @@ export default function SeasonHero() {
   );
 }
 
-/** One title's artwork; the cover fallback is a poster stretched wide, so it is blurred and dimmed into a backdrop. */
+/** One title's artwork: the banner whole over a blur of itself, or the cover as a dimmed wash when there is none. */
 function Slide({
   media,
   active,
@@ -183,17 +184,18 @@ function Slide({
         active ? "opacity-100" : "pointer-events-none opacity-0",
       )}
     >
-      {(banner ?? fallback) && (
-        <DecodedImage
-          src={banner ?? fallback ?? undefined}
-          className={cn(
-            "h-full w-full object-cover",
-            // Only a real banner needs veiling, and harder than the backdrop blur, since it is the picture rather than a wash.
-            !banner && "scale-110 blur-lg",
-            veiled && banner && "scale-110 blur-2xl",
-          )}
-          loadedOpacity={banner ? 1 : 0.55}
-        />
+      {banner ? (
+        // Top-anchored: on a phone the banner is a strip, and the title below it then sits on the fill, not the picture.
+        <BannerImage src={banner} veiled={veiled} anchor="top" />
+      ) : (
+        fallback && (
+          // A poster is not a banner, so it stays a blurred wash rather than a contained portrait beside the text.
+          <DecodedImage
+            src={fallback}
+            className="h-full w-full scale-110 object-cover blur-lg"
+            loadedOpacity={0.55}
+          />
+        )
       )}
     </Link>
   );

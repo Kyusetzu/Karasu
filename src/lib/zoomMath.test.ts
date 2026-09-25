@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pinchUpdate, zoomAboutPoint, type Point, type ZoomView } from "./zoomMath";
+import { centerOn, pinchUpdate, zoomAboutPoint, type Point, type ZoomView } from "./zoomMath";
 
 /** Where a content point c renders on screen under view v. */
 const toScreen = (v: ZoomView, c: Point): Point => ({
@@ -66,5 +66,17 @@ describe("pinchUpdate", () => {
     const after = pinchUpdate(v, prev, next, 0.4, 4);
     expect(after.zoom).toBe(4);
     expect(toScreen(after, under).x).toBeCloseTo(120);
+  });
+});
+
+describe("centerOn", () => {
+  it("puts the content point in the middle of the viewport", () => {
+    const box = { width: 390, height: 520 };
+    const point = { x: 150, y: 700 };
+    for (const zoom of [0.5, 1, 1.4]) {
+      const v = centerOn(point, box, zoom);
+      expect(v.zoom).toBe(zoom);
+      expect(toScreen(v, point)).toEqual({ x: 195, y: 260 });
+    }
   });
 });

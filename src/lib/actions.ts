@@ -182,14 +182,6 @@ export function canIncrementVolumes(entry: EntryFacts): boolean {
   return canAdvance(entry.progressVolumes, entry.maxVolumes);
 }
 
-/** What "completed" writes; an unknown run length sets no progress at all, rather than rewriting the current number. */
-export function completePatch(max: number | null): {
-  status: MediaListStatus;
-  progress?: number;
-} {
-  return { status: "COMPLETED", ...(max !== null ? { progress: max } : {}) };
-}
-
 const act = (id: ActionId, group: ActionGroup, extra: Partial<Action> = {}): Action => ({
   id,
   group,

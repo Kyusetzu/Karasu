@@ -4,6 +4,7 @@ import ActionHost from "./ActionHost";
 import { renderWithProviders, signIn, signOut } from "@/test/render";
 import { useNowPlaying } from "@/stores/nowPlaying";
 import { entry, listResult, media } from "@/test/fixtures";
+import type { ListResult } from "@/api/types";
 
 const saveListEntry = vi.hoisted(() => vi.fn(() => Promise.resolve({ queued: false })));
 vi.mock("@/api/anilist", async (importOriginal) => ({
@@ -103,6 +104,26 @@ describe("ActionHost long press", () => {
         expect.objectContaining({ mediaId: 1, progress: 4 }),
       ),
     );
+  });
+
+  /** A status change says nothing about episodes, so the finale comes from the cached media. */
+  it("fills the final episode when the sheet moves an entry to completed", async () => {
+    const queryClient = mount();
+    press(card());
+    hold();
+    vi.useRealTimers();
+    fireEvent.pointerUp(window);
+    fireEvent.click(screen.getByRole("button", { name: "actions.changeStatus" }));
+    fireEvent.click(screen.getByRole("button", { name: "status.ANIME.COMPLETED" }));
+    await vi.waitFor(() =>
+      expect(saveListEntry).toHaveBeenCalledWith(
+        expect.objectContaining({ mediaId: 1, status: "COMPLETED", progress: 26 }),
+      ),
+    );
+    // The seeded list has no Completed group; the optimistic patch must mint one rather than drop the entry.
+    const cached = queryClient.getQueriesData<ListResult>({ queryKey: ["mediaList"] })[0][1];
+    const moved = cached?.lists.flatMap((g) => g.entries).find((e) => e.mediaId === 1);
+    expect(moved).toMatchObject({ status: "COMPLETED", progress: 26 });
   });
 
   it("is a scroll, not a press, once the finger moves past the slop", () => {

@@ -527,6 +527,20 @@ nav a {
   background-image: linear-gradient(to top, rgba(4, 5, 8, 0.92), transparent);
 }
 
+/* A black ring round light text on artwork; not `text-*`, or tailwind-merge reads it as a colour and drops one. */
+@utility ink-halo {
+  text-shadow:
+    -1px -1px 0 #000,
+    0 -1px 0 #000,
+    1px -1px 0 #000,
+    1px 0 0 #000,
+    1px 1px 0 #000,
+    0 1px 0 #000,
+    -1px 1px 0 #000,
+    -1px 0 0 #000,
+    0 0 3px rgba(0, 0, 0, 0.6);
+}
+
 /* The rule trailing a section heading, faded out so stacked sections do not read as a form. */
 @utility section-rule {
   flex: 1;

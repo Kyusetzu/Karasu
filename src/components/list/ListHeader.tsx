@@ -7,10 +7,13 @@ export function ListHeader({
   tier,
   selectMode,
   mediaType,
+  cover = true,
 }: {
   tier: Tier;
   selectMode: boolean;
   mediaType: MediaType;
+  /** False over the text list, so the header's tracks match its collapsed cover column. */
+  cover?: boolean;
 }) {
   const { t } = useTranslation();
   const manga = mediaType === "MANGA";
@@ -18,7 +21,7 @@ export function ListHeader({
   return (
     <div
       className="sticky top-0 z-10 grid items-end gap-x-2.5 border-b border-surface-800 bg-surface-950/95 px-3.5 pb-1.5 pt-1 text-2xs uppercase tracking-[.08em] text-ink-600 backdrop-blur"
-      style={{ gridTemplateColumns: templateColumns({ tier, selectMode, manga }) }}
+      style={{ gridTemplateColumns: templateColumns({ tier, selectMode, manga, cover }) }}
     >
       <span />
       <span />

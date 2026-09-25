@@ -107,6 +107,19 @@ describe("headline", () => {
   it("is null when nothing changed", () => {
     expect(headline({ mediaId: 1, progress: 13 }, before)).toBeNull();
   });
+
+  /** The totals are what "completed" implies, so the receipt names the status move rather than the final episode. */
+  it("leads with a move to completed over the progress it filled", () => {
+    expect(
+      headline({ mediaId: 1, progress: 24, status: "COMPLETED" }, before),
+    ).toEqual({ field: "status", value: "COMPLETED" });
+  });
+
+  it("goes back to progress once the entry was already completed", () => {
+    expect(
+      headline({ mediaId: 1, progress: 24, status: "COMPLETED" }, { ...before, status: "COMPLETED" }),
+    ).toEqual({ field: "progress", value: 24 });
+  });
 });
 
 describe("inverse, for the fields it cannot reverse", () => {

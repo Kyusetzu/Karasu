@@ -113,4 +113,79 @@ describe("createBackStack", () => {
     h.back();
     expect(stack.onPopState()).toBe("passthrough");
   });
+
+  /** A filter chosen in a panel is written after the panel's entry is gone, or the router overwrites its marker. */
+  it("runs a settled callback only after the swallowed popstate of a close", () => {
+    const { h, index } = fakeHistory();
+    const stack = createBackStack(h);
+    const release = stack.register(vi.fn());
+    const write = vi.fn();
+    release();
+    stack.whenSettled(write);
+    expect(write).not.toHaveBeenCalled();
+    expect(index()).toBe(0);
+    expect(stack.onPopState()).toBe("swallowed");
+    expect(write).toHaveBeenCalledTimes(1);
+  });
+
+  it("runs a settled callback at once when nothing is unwinding", () => {
+    const { h } = fakeHistory();
+    const stack = createBackStack(h);
+    const write = vi.fn();
+    stack.whenSettled(write);
+    expect(write).toHaveBeenCalledTimes(1);
+  });
+
+  it("runs at once after a back-gesture close, whose entry the gesture already popped", () => {
+    const { h } = fakeHistory();
+    const stack = createBackStack(h);
+    const release = stack.register(vi.fn());
+    h.back();
+    expect(stack.onPopState()).toBe("closed");
+    release();
+    const write = vi.fn();
+    stack.whenSettled(write);
+    expect(write).toHaveBeenCalledTimes(1);
+  });
+
+  /** Any open overlay's entry is the current one, so a write waits until the last of them has unwound. */
+  it("waits while any overlay is still open", () => {
+    const { h } = fakeHistory();
+    const stack = createBackStack(h);
+    const outer = stack.register(vi.fn());
+    const inner = stack.register(vi.fn());
+    inner();
+    const write = vi.fn();
+    stack.whenSettled(write);
+    expect(stack.onPopState()).toBe("swallowed");
+    expect(write).not.toHaveBeenCalled();
+    outer();
+    expect(write).not.toHaveBeenCalled();
+    expect(stack.onPopState()).toBe("swallowed");
+    expect(write).toHaveBeenCalledTimes(1);
+  });
+
+  it("runs a waiting callback when the back gesture closes the last overlay", () => {
+    const { h } = fakeHistory();
+    const stack = createBackStack(h);
+    stack.register(vi.fn());
+    const write = vi.fn();
+    stack.whenSettled(write);
+    expect(write).not.toHaveBeenCalled();
+    h.back();
+    expect(stack.onPopState()).toBe("closed");
+    expect(write).toHaveBeenCalledTimes(1);
+  });
+
+  it("runs waiting callbacks in the order they were queued", () => {
+    const { h } = fakeHistory();
+    const stack = createBackStack(h);
+    const release = stack.register(vi.fn());
+    const order: number[] = [];
+    stack.whenSettled(() => order.push(1));
+    stack.whenSettled(() => order.push(2));
+    release();
+    stack.onPopState();
+    expect(order).toEqual([1, 2]);
+  });
 });

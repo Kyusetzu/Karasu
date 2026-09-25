@@ -20,6 +20,11 @@ export function createBackStack(h: HistoryLike) {
   const stack: Entry[] = [];
   let nextToken = 1;
   let swallow = 0;
+  const settled: (() => void)[] = [];
+  const isSettled = () => swallow === 0 && stack.length === 0;
+  const flush = () => {
+    while (isSettled() && settled.length > 0) settled.shift()!();
+  };
 
   return {
     /** Called when an overlay opens; the returned release is a no-op after a back-close, so cleanup may call it anyway. */
@@ -35,18 +40,27 @@ export function createBackStack(h: HistoryLike) {
           swallow++;
           h.back();
         }
+        flush();
       };
+    },
+
+    /** Runs `fn` once no overlay holds an entry and no unwind is due, so a URL `replace` cannot overwrite one. */
+    whenSettled(fn: () => void): void {
+      if (isSettled()) fn();
+      else settled.push(fn);
     },
 
     /** The single popstate listener feeds every event through here. */
     onPopState(): "closed" | "swallowed" | "passthrough" {
       if (swallow > 0) {
         swallow--;
+        flush();
         return "swallowed";
       }
       const top = stack.pop();
       if (top) {
         top.close();
+        flush();
         return "closed";
       }
       return "passthrough";

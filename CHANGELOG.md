@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 9a0b061 -->
+<!-- generated-through: b6b148d -->
 
 ### Fixed
 
@@ -131,6 +131,7 @@ tag time is then optional rather than load-bearing.
 - The now-playing card is a small floating window with the cover, season and episode, the episode's name and the AniList details; on desktop it can be dragged anywhere and resized, and remembers both.
 - The now-playing window's update, skip and fix-match buttons sit in its header.
 - Banners on title pages, profiles and the season hero are shown whole instead of cropped, with a blurred fill around them, and the hero's text has a black outline.
+- The anime and manga list header is rebuilt: single-row status tabs in their status colours, and one toolbar with search, sort, filter and preset panels, removable filter chips, and a More menu on the phone.
 ## 1.0.0 — 2026-09-05
 
 Karasu 1.0.0 is the first tagged release: a desktop and Android tracker built

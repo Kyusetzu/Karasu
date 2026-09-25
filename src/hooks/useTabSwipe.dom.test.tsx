@@ -21,6 +21,9 @@ function Probe({ initial = "CURRENT", enabled = true }: { initial?: MediaListSta
   return (
     <div ref={surface} data-testid="surface">
       <output data-testid="tab">{tab}</output>
+      <div data-testid="strip" style={{ overflowX: "auto" }}>
+        <span data-testid="strip-tab">tab</span>
+      </div>
       <div ref={content} data-testid="content">
         <div data-testid="row">row</div>
         <input data-testid="field" />
@@ -117,6 +120,23 @@ describe("useTabSwipe", () => {
     render(<Probe enabled={false} />);
     swipe(screen.getByTestId("row"), -160, 0);
     expect(tab()).toBe("CURRENT");
+  });
+
+  /** The status strip scrolls sideways on a phone; a drag along it reads the rest of the row, not the next list. */
+  it("leaves a sideways drag on a strip that overflows to the strip", () => {
+    render(<Probe />);
+    const strip = screen.getByTestId("strip");
+    Object.defineProperty(strip, "scrollWidth", { value: 800 });
+    Object.defineProperty(strip, "clientWidth", { value: 300 });
+    const move = swipe(screen.getByTestId("strip-tab"), -160, 0);
+    expect(tab()).toBe("CURRENT");
+    expect(move.defaultPrevented).toBe(false);
+  });
+
+  it("swipes across a strip that fits, since there is nothing of it to scroll", () => {
+    render(<Probe />);
+    swipe(screen.getByTestId("strip-tab"), -160, 0);
+    expect(tab()).toBe("REPEATING");
   });
 
   it("puts the list back where it was when the swipe falls short", () => {

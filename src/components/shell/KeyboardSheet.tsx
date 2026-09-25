@@ -43,6 +43,7 @@ export default function KeyboardSheet() {
     {
       title: t("keys.inList"),
       rows: [
+        { label: t("keys.findInList"), keys: ["Ctrl", "F"] },
         { label: t("keys.move"), keys: ["←", "↑", "↓", "→"] },
         { label: t("keys.open"), keys: ["↵"] },
         { label: t("keys.plusOne"), keys: ["Space"] },

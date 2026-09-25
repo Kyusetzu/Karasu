@@ -20,3 +20,8 @@ export function useBackClose(open: boolean, onClose: () => void) {
     return ensure().register(() => closeRef.current());
   }, [open]);
 }
+
+/** Defers `fn` until no overlay holds a history entry, open or unwinding; a `replace` before that would overwrite one. */
+export function afterBackSettles(fn: () => void): void {
+  ensure().whenSettled(fn);
+}

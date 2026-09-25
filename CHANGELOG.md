@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 54c5850 -->
+<!-- generated-through: e7956de -->
 
 ### Fixed
 
@@ -98,6 +98,7 @@ tag time is then optional rather than load-bearing.
 - high contrast marks the focused text field, and Escape in a dialog's search empties it before closing anything.
 - Collapsing or expanding the sidebar from the keyboard keeps the focus on the toggle, and the collapsed rail's names switch without overlapping.
 - The floating detection window is readable in the light theme again, and the shell's banners animate in and out.
+- Notification links need one back press, the notifications page keeps its loaded pages and unread marks when the titlebar bell opens over it, and its header fits a phone.
 
 ### Added
 

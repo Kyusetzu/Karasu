@@ -1,14 +1,20 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { useLocation } from "react-router";
+import { Route, Routes, useLocation } from "react-router";
 import type { AppNotification } from "@/api/anilist";
 import type { SiteNotifPage } from "@/api/social";
 import type { SiteNotifRow } from "@/lib/siteNotifications";
 import { renderWithProviders, signIn, signOut, useLocalProfile } from "@/test/render";
 import { checkA11y } from "@/test/a11y";
 
-const data = vi.hoisted(() => ({ local: [] as AppNotification[], site: [] as SiteNotifRow[] }));
+const data = vi.hoisted(() => ({
+  local: [] as AppNotification[],
+  site: [] as SiteNotifRow[],
+  // A second AniList page, offered behind "Load more" when set.
+  more: [] as SiteNotifRow[],
+  count: 0,
+}));
 
 vi.mock("@/api/anilist", async (orig) => ({
   ...(await orig<typeof import("@/api/anilist")>()),
@@ -20,11 +26,11 @@ vi.mock("@/api/anilist", async (orig) => ({
 
 vi.mock("@/api/social", async (orig) => ({
   ...(await orig<typeof import("@/api/social")>()),
-  siteNotifCount: vi.fn(async () => 0),
+  siteNotifCount: vi.fn(async () => data.count),
   siteNotifications: vi.fn(
-    async (): Promise<SiteNotifPage> => ({
-      pageInfo: { total: data.site.length, currentPage: 1, lastPage: 1, hasNextPage: false },
-      rows: data.site,
+    async (page: number): Promise<SiteNotifPage> => ({
+      pageInfo: { total: 0, currentPage: page, lastPage: 2, hasNextPage: page === 1 && data.more.length > 0 },
+      rows: page === 1 ? data.site : data.more,
     }),
   ),
 }));
@@ -32,6 +38,7 @@ vi.mock("@/api/social", async (orig) => ({
 import Bell from "./Bell";
 import BottomBar from "./BottomBar";
 import Notifications from "@/pages/Notifications";
+import { siteNotifications } from "@/api/social";
 
 const HOUR = 60 * 60 * 1000;
 
@@ -67,6 +74,9 @@ function Where() {
 afterEach(() => {
   data.local = [];
   data.site = [];
+  data.more = [];
+  data.count = 0;
+  vi.mocked(siteNotifications).mockClear();
   signOut();
 });
 
@@ -131,5 +141,66 @@ describe("notifications", () => {
     renderWithProviders(<Notifications />);
     expect(await screen.findByText("Local 1")).toBeInTheDocument();
     expect(screen.queryByRole("radiogroup")).toBeNull();
+  });
+
+  it("leaves the page's loaded pages alone when the titlebar glance opens and closes over it", async () => {
+    const user = userEvent.setup({ delay: null });
+    signIn();
+    data.site = [follow(7, "Hoshi")];
+    data.more = [follow(8, "Mikan")];
+    renderWithProviders(
+      <>
+        <Bell />
+        <Notifications />
+      </>,
+    );
+    expect(await screen.findByText("Hoshi")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "social.loadMorePlain" }));
+    expect(await screen.findByText("Mikan")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "notif.title" }));
+    await screen.findByRole("dialog", { name: "notif.title" });
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "notif.title" })).toBeNull());
+    // Both pages still drawn, and nothing re-requested: one fetch per page, however many surfaces looked.
+    expect(screen.getByText("Mikan")).toBeInTheDocument();
+    expect(vi.mocked(siteNotifications)).toHaveBeenCalledTimes(2);
+  });
+
+  it("carries AniList's unread marks from the glance onto the page it leads to", async () => {
+    const user = userEvent.setup({ delay: null });
+    signIn();
+    data.count = 1;
+    data.site = [follow(7, "Hoshi")];
+    renderWithProviders(
+      <>
+        <Bell />
+        <Routes>
+          <Route path="/notifications" element={<Notifications />} />
+          <Route path="*" element={null} />
+        </Routes>
+      </>,
+    );
+    // The badge's count has to be known before the glance's first page spends it.
+    await waitFor(() => expect(screen.getByRole("button", { name: "notif.title" })).toHaveTextContent("1"));
+    await user.click(screen.getByRole("button", { name: "notif.title" }));
+    const panel = await screen.findByRole("dialog", { name: "notif.title" });
+    const unreadClass = "bg-surface-850/60";
+    expect((await within(panel).findByText("Hoshi")).closest("button")).toHaveClass(unreadClass);
+    await user.click(within(panel).getByRole("button", { name: "notif.all" }));
+    const page = await screen.findByRole("heading", { level: 1, name: "notif.title" });
+    const row = within(page.closest("div.mx-auto") as HTMLElement).getByText("Hoshi").closest("button");
+    expect(row).toHaveClass(unreadClass);
+  });
+
+  it("offers no AniList paging while the filter shows only Karasu's own", async () => {
+    const user = userEvent.setup({ delay: null });
+    signIn();
+    data.local = [local(1, HOUR)];
+    data.site = [follow(7, "Hoshi")];
+    data.more = [follow(8, "Mikan")];
+    renderWithProviders(<Notifications />);
+    expect(await screen.findByRole("button", { name: "social.loadMorePlain" })).toBeInTheDocument();
+    await user.click(screen.getByRole("radio", { name: "Karasu" }));
+    expect(screen.queryByRole("button", { name: "social.loadMorePlain" })).toBeNull();
   });
 });

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Popover } from "./popover";
 
@@ -186,5 +186,31 @@ describe("Popover", () => {
     expect(panel).toHaveAttribute("data-overlay");
     await user.click(document.querySelector<HTMLElement>(".sheet-backdrop")!);
     await waitFor(() => expect(dialog()).toBeNull());
+  });
+
+  it("runs a closeThen that arrives after the panel shut, and never again on a later close", async () => {
+    const user = userEvent.setup({ delay: null });
+    const then = vi.fn();
+    const api: { closeThen?: (fn: () => void) => void } = {};
+    render(
+      <Popover label="Sort" variant="dropdown" renderTrigger={(props) => <button type="button" {...props}>Sort</button>}>
+        {({ closeThen }) => {
+          api.closeThen = closeThen;
+          return <span>body</span>;
+        }}
+      </Popover>,
+    );
+    await user.click(trigger());
+    await waitFor(() => expect(dialog()).not.toBeNull());
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(dialog()).toBeNull());
+    // A caller that awaited something while the panel was shut from outside still gets its action.
+    act(() => api.closeThen?.(then));
+    await waitFor(() => expect(then).toHaveBeenCalledTimes(1));
+    await user.click(trigger());
+    await waitFor(() => expect(dialog()).not.toBeNull());
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(dialog()).toBeNull());
+    expect(then).toHaveBeenCalledTimes(1);
   });
 });

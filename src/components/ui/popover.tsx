@@ -73,8 +73,15 @@ export function Popover({
     if (then) afterBackSettles(then);
   }, [open]);
 
+  const openNow = useRef(open);
+  openNow.current = open;
   const close = useCallback(() => setOpen(false), []);
   const closeThen = useCallback((fn: () => void) => {
+    // Already shut, by Escape or an outside press while the caller awaited: run it, or it would wait for the next close.
+    if (!openNow.current) {
+      afterBackSettles(fn);
+      return;
+    }
     pending.current = fn;
     // Before the panel unmounts, so a dialog opened by `fn` records the trigger as the place to return to.
     triggerRef.current?.focus();

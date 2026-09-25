@@ -83,6 +83,7 @@ export const SCREENS = [
   },
   { id: "d12-glocke", w: 1232, h: 800, route: "/list", act: (p) => p.getByRole("button", { name: "Benachrichtigungen" }).first().click() },
   { id: "d15-benachrichtigungen", w: 1232, h: 800, route: "/notifications" },
+  { id: "p11-benachrichtigungen", w: 405, h: 860, phone: true, route: "/notifications" },
   { id: "d16-erster-start", w: 1232, h: 800, route: "/", out: true },
   { id: "p9-erster-start", w: 405, h: 860, phone: true, route: "/", out: true },
   { id: "d17-erkennung", w: 1232, h: 800, route: "/list", playing: true },

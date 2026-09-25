@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
-import { useInfiniteQuery, useQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
+import { useInfiniteQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { listen } from "@tauri-apps/api/event";
 import {
   apkInstall,
@@ -14,7 +14,7 @@ import {
   markNotificationRead,
   type AppNotification,
 } from "@/api/anilist";
-import { siteNotifications, siteNotifCount, type SiteNotifPage } from "@/api/social";
+import { siteNotifications, type SiteNotifPage } from "@/api/social";
 import { buildGroups, unify, type NotifGroup, type NotifSource } from "@/lib/notifGroups";
 import type { SiteNotifRow } from "@/lib/siteNotifications";
 import { isBlocked } from "@/lib/contentFilter";
@@ -25,6 +25,12 @@ import { showToast } from "@/stores/toast";
 
 /** How a surface steps aside before a row navigates: the dropdown and the sheet close first, the page just goes. */
 export type Leave = (go: () => void) => void;
+
+/** A page of AniList's rows; the first also carries how many of its rows were new when it spent AniList's count. */
+type SitePage = SiteNotifPage & { unseen: number };
+
+/** Surfaces showing the stream right now; the loaded pages are trimmed only when the last of them goes. */
+let activeSurfaces = 0;
 
 /** The bell's one stream, for whichever surface shows it; `active` is that surface being open or mounted. */
 export function useNotifications({ active, source = "all" }: { active: boolean; source?: NotifSource }) {
@@ -40,8 +46,8 @@ export function useNotifications({ active, source = "all" }: { active: boolean; 
   const [loadError, setLoadError] = useState<string | null>(null);
   // Which grouped rows are unfolded; reset on every open so a fresh glance starts collapsed.
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  // How many site rows wear the unread dot: a snapshot taken at open, before the page-1 fetch resets the count.
-  const [siteUnseen, setSiteUnseen] = useState(0);
+  const countKey = useMemo(() => ["social", "notifCount", viewerId], [viewerId]);
+  const siteKey = useMemo(() => ["social", "siteNotifs", viewerId], [viewerId]);
 
   const load = useCallback(() => {
     if (!isTauri) return;
@@ -64,40 +70,38 @@ export function useNotifications({ active, source = "all" }: { active: boolean; 
     };
   }, [load]);
 
-  // Feeds the always-visible badge; keep the interval, or staleTime freezes it since nothing else touches this key.
-  const count = useQuery({
-    queryKey: ["social", "notifCount", viewerId],
-    queryFn: siteNotifCount,
-    enabled: isTauri && anilist,
-    staleTime: 60_000,
-    refetchInterval: 10 * 60_000,
-  });
-
-  // Page 1's `reset` is AniList's mark-seen, so the count is zeroed here; cancel first or a stale in-flight read wins.
+  // Page 1's `reset` is AniList's mark-seen, so the count it spends is kept on the page, where every surface reads it.
   const site = useInfiniteQuery({
-    queryKey: ["social", "siteNotifs", viewerId],
-    queryFn: async ({ pageParam }) => {
+    queryKey: siteKey,
+    queryFn: async ({ pageParam }): Promise<SitePage> => {
       const reset = pageParam === 1;
+      const unseen = reset ? (qc.getQueryData<number>(countKey) ?? 0) : 0;
       const page = await siteNotifications(pageParam, reset);
       if (reset) {
-        await qc.cancelQueries({ queryKey: ["social", "notifCount", viewerId] });
-        qc.setQueryData(["social", "notifCount", viewerId], 0);
+        // Cancel first, or a stale in-flight read of the count lands after the zero.
+        await qc.cancelQueries({ queryKey: countKey });
+        qc.setQueryData(countKey, 0);
       }
-      return page;
+      return { ...page, unseen };
     },
     initialPageParam: 1,
     getNextPageParam: (last, all) => (last.pageInfo.hasNextPage ? all.length + 1 : undefined),
     enabled: isTauri && active && anilist,
     staleTime: 60_000,
+    // More than one page means another surface is reading them, and a refetch here would re-request every one.
+    refetchOnMount: (query) => (query.state.data?.pages.length ?? 0) <= 1,
   });
 
-  // Trim retained pages as the surface goes, so a reopen refetches one page; keep `updatedAt` or the trim postpones it.
+  // Trim retained pages once the last surface goes, so a reopen fetches one page; keep `updatedAt` or the trim postpones it.
   useEffect(() => {
     if (!active) return;
+    activeSurfaces += 1;
     return () => {
-      const updatedAt = qc.getQueryState(["social", "siteNotifs", viewerId])?.dataUpdatedAt;
-      qc.setQueryData<InfiniteData<SiteNotifPage>>(
-        ["social", "siteNotifs", viewerId],
+      activeSurfaces -= 1;
+      if (activeSurfaces > 0) return;
+      const updatedAt = qc.getQueryState(siteKey)?.dataUpdatedAt;
+      qc.setQueryData<InfiniteData<SitePage>>(
+        siteKey,
         (old) =>
           old && old.pages.length > 1
             ? { pages: old.pages.slice(0, 1), pageParams: old.pageParams.slice(0, 1) }
@@ -105,20 +109,17 @@ export function useNotifications({ active, source = "all" }: { active: boolean; 
         { updatedAt },
       );
     };
-  }, [active, qc, viewerId]);
+  }, [active, qc, siteKey]);
 
-  // On the rising edge of `active`: snapshot the unseen count before page 1 zeroes it, collapse, refetch the count.
+  // A fresh glance starts collapsed.
   const wasActive = useRef(false);
   useEffect(() => {
     const rising = active && !wasActive.current;
     wasActive.current = active;
-    if (!rising) return;
-    setExpanded(new Set());
-    if (!anilist) return;
-    setSiteUnseen(count.data ?? 0);
-    void qc.invalidateQueries({ queryKey: ["social", "notifCount", viewerId] });
-  }, [active, anilist, count.data, qc, viewerId]);
+    if (rising) setExpanded(new Set());
+  }, [active]);
 
+  const siteUnseen = anilist ? (site.data?.pages[0]?.unseen ?? 0) : 0;
   const unread = items.filter((n) => !n.read).length + siteUnseen;
 
   const readOne = async (n: AppNotification) => {
@@ -135,7 +136,9 @@ export function useNotifications({ active, source = "all" }: { active: boolean; 
     }
     await markAllNotificationsRead().catch(() => {});
     // The AniList half was already marked seen server-side by the page-1 reset; what remains is the dots.
-    setSiteUnseen(0);
+    qc.setQueryData<InfiniteData<SitePage>>(siteKey, (old) =>
+      old ? { ...old, pages: old.pages.map((p, i) => (i === 0 ? { ...p, unseen: 0 } : p)) } : old,
+    );
     load();
   };
 
@@ -165,29 +168,32 @@ export function useNotifications({ active, source = "all" }: { active: boolean; 
     leave(() => navigate(target));
   };
 
+  // Tapping an update row installs it; `download` first, because a restart empties the in-memory pending update.
+  const runUpdate = async () => {
+    // Android: a verified APK opens the installer right here; anything short of that is About's to explain.
+    if (android) {
+      const state = await apkUpdateState().catch(() => null);
+      if (state?.status === "ready" && !state.needsInstallPermission) {
+        await apkInstall().catch((e) => showToast({ kind: "error", text: t("common.error", { message: String(e) }) }));
+      } else {
+        navigate("/about");
+      }
+      return;
+    }
+    try {
+      await downloadPendingUpdate();
+      await installPendingUpdate();
+    } catch (e) {
+      showToast({ kind: "error", text: t("common.error", { message: String(e) }) });
+    }
+  };
+
   // Local twin of `openSite`, never disabled: a Karasu row can always mark itself read, and navigation is the extra.
-  const openLocal = async (n: AppNotification, leave: Leave) => {
-    await readOne(n);
-    // Tapping an update row installs it; `download` first, because a restart empties the in-memory pending update.
+  const openLocal = (n: AppNotification, leave: Leave) => {
+    // Leaves at once and marks read beside it, so a surface closed during the write cannot strand the navigation.
+    void readOne(n);
     if (n.kind === "update") {
-      // Android: a verified APK opens the installer right here; anything short of that is About's to explain.
-      if (android) {
-        const state = await apkUpdateState().catch(() => null);
-        if (state?.status === "ready" && !state.needsInstallPermission) {
-          leave(() => {});
-          await apkInstall().catch((e) => showToast({ kind: "error", text: t("common.error", { message: String(e) }) }));
-          return;
-        }
-        leave(() => navigate("/about"));
-        return;
-      }
-      leave(() => {});
-      try {
-        await downloadPendingUpdate();
-        await installPendingUpdate();
-      } catch (e) {
-        showToast({ kind: "error", text: t("common.error", { message: String(e) }) });
-      }
+      leave(() => void runUpdate());
       return;
     }
     const mediaId = n.mediaId;
@@ -213,6 +219,8 @@ export function useNotifications({ active, source = "all" }: { active: boolean; 
 
   return {
     anilist,
+    // Whether AniList's half is in view, which the filter can take away even when an account is signed in.
+    showsSite: anilist && source !== "karasu",
     groups,
     unread,
     loadError,

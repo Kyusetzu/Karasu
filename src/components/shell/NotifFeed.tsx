@@ -1,6 +1,6 @@
 import { Fragment } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, useNavigate } from "react-router";
+import { Link, useLocation, useNavigate } from "react-router";
 import {
   Bell as BellIcon,
   CalendarClock,
@@ -187,6 +187,7 @@ export function NotifFeed({
 }) {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const rowTime = (atMs: number) => relTime(atMs, i18n.language, t("notif.now"));
   const groups = limit === undefined ? n.groups : n.groups.slice(0, limit);
 
@@ -197,11 +198,15 @@ export function NotifFeed({
   const profileLink = (to: string, text: string) => (
     <Link
       to={to}
+      // Navigates itself, so the view-transition hook leaves it alone rather than pushing the profile a second time.
+      data-own-navigation
       // Through `leave`, so the surface's back entry has unwound before the profile's is pushed.
       onClick={(e) => {
         e.stopPropagation();
         e.preventDefault();
-        leave(() => navigate(to));
+        leave(() => {
+          if (to !== pathname) navigate(to);
+        });
       }}
       className="truncate text-ui font-medium text-ink-100 hover:underline"
     >
@@ -343,16 +348,16 @@ export function NotifFeed({
       {n.loadError && (
         <p className="px-3 py-4 text-center text-sm text-danger">{t("common.error", { message: n.loadError })}</p>
       )}
-      {n.site.error != null && (
+      {n.showsSite && n.site.error != null && (
         <p className="px-3 py-4 text-xs text-danger">{t("common.error", { message: String(n.site.error) })}</p>
       )}
-      {n.anilist && n.site.isLoading && groups.length === 0 && (
+      {n.showsSite && n.site.isLoading && groups.length === 0 && (
         <div className="space-y-2 p-3">
           <Shimmer className="h-10 w-full rounded-control" />
           <Shimmer className="h-10 w-full rounded-control" />
         </div>
       )}
-      {!n.loadError && !n.site.isLoading && groups.length === 0 && (
+      {!n.loadError && !(n.showsSite && n.site.isLoading) && groups.length === 0 && (
         <EmptyState visual={<TickMarks />} title={emptyTitle ?? t("notif.empty")} className="py-6" />
       )}
       {groups.length > 0 &&
@@ -364,7 +369,7 @@ export function NotifFeed({
               </Fragment>
             ))
           : list(groups))}
-      {more && n.anilist && n.site.hasNextPage && (
+      {more && n.showsSite && n.site.hasNextPage && (
         <div className="border-t border-hair p-2">
           <Button
             variant="ghost"

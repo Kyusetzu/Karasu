@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import { Bell as BellIcon, CheckCheck } from "lucide-react";
 import { isTauri } from "@/api/anilist";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +18,7 @@ const GLANCE = 3;
 export default function Bell() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
   const n = useNotifications({ active: open });
   // The one number on the bell, computed once and shared with the phone shell's More button by query key.
@@ -66,7 +67,7 @@ export default function Bell() {
             <NotifFeed n={n} leave={api.closeThen} limit={GLANCE} />
           </div>
           <div className="shrink-0 border-t border-hair p-1.5">
-            <Button variant="ghost" size="sm" className="w-full" onClick={() => api.closeThen(() => navigate("/notifications"))}>
+            <Button variant="ghost" size="sm" className="w-full" onClick={() => (pathname === "/notifications" ? api.close() : api.closeThen(() => navigate("/notifications")))}>
               {t("notif.all")}
             </Button>
           </div>

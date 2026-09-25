@@ -19,16 +19,17 @@ export default function Notifications() {
 
   return (
     <div className="mx-auto max-w-3xl px-8 pb-12 pt-7">
-      <header className="flex items-center gap-4">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-baseline gap-2.5">
+      {/* Wraps rather than squeezes: at phone width the long German title takes the row and the button moves below. */}
+      <header className="flex flex-wrap items-center gap-x-4 gap-y-3">
+        <div className="min-w-0 flex-1 basis-64">
+          <div className="flex flex-wrap items-baseline gap-x-2.5">
             <h1 className="text-title font-bold">{t("notif.title")}</h1>
             {/* The Japanese sub-lockup every other screen header carries. */}
-            <span className="font-brand-jp text-ui tracking-lockup text-ink-600">お知らせ</span>
+            <span className="whitespace-nowrap font-brand-jp text-ui tracking-lockup text-ink-600">お知らせ</span>
           </div>
           <p className="mt-0.5 text-xs text-ink-600">{t("notif.pageHint")}</p>
         </div>
-        <Button variant="secondary" size="sm" onClick={() => void n.readAll()}>
+        <Button variant="secondary" size="sm" className="shrink-0" onClick={() => void n.readAll()}>
           <CheckCheck className="size-3.5" /> {t("notif.markAll")}
         </Button>
       </header>

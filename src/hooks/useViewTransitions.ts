@@ -25,6 +25,8 @@ export function useViewTransitions() {
       // In-app routes only; under the hash router anything not `#/…` is an external link the opener handles.
       if (!anchor || !href?.startsWith("#/")) return;
       if (anchor.target && anchor.target !== "_self") return;
+      // A link that closes its overlay before it navigates does the navigating itself; taking it over would push twice.
+      if (anchor.hasAttribute("data-own-navigation")) return;
 
       const to = href.slice(1);
       if (to === `${location.hash.slice(1) || "/"}`) return;

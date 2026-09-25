@@ -9,6 +9,7 @@ import { IconButton } from "@/components/ui/icon-button";
 import { NumberInput } from "@/components/ui/number-input";
 import TagEditor from "@/components/media/TagEditor";
 import { CommunityScore } from "@/components/media/CommunityScore";
+import { Textarea } from "@/components/ui/textarea";
 import { readableInk, UI_INK } from "@/lib/contrast";
 import { statusColorVar } from "@/lib/statusColors";
 import { parseNotes, serializeNotes } from "@/lib/tags";
@@ -197,12 +198,11 @@ function More({ media, entry, onSave }: { media: MediaDetail; entry: QuickEntry;
         </div>
         <label className="block text-sm">
           <span className="mb-1 block text-ink-500">{t("entry.notes")}</span>
-          <textarea
+          <Textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             rows={3}
             placeholder={t("entry.notesPlaceholder")}
-            className="w-full resize-y rounded-control border border-surface-700 bg-surface-900 px-2 py-1.5 text-sm focus:border-accent-500 focus:outline-none"
           />
         </label>
         <Button className="w-full" onClick={() => onSave({ repeat, notes: serializeNotes(notes, tags) })}>

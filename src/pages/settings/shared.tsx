@@ -6,10 +6,6 @@ import { Switch } from "@/components/ui/switch";
 
 /** The controls every settings pane shares; none is a `components/ui` primitive, since each knows the pane. */
 
-/** The one select skin, so the four of them cannot drift apart. */
-export const SELECT =
-  "h-9 rounded-control border border-surface-700 bg-surface-900 px-2 text-sm focus:border-accent-500 focus:outline-none";
-
 /** A label-and-hint on the left, a control on the right; `items-center` because a select is taller than a line. */
 export function Row({
   label,

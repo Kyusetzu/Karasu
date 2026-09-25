@@ -336,9 +336,10 @@ no row here, add the primitive first.
 | a page's sections, or the list's statuses | `StatusTabs`, one row that scrolls rather than wraps |
 | a raised panel | `Card`, `CardTitle` |
 | an Overview section heading | `SectionHeader` |
-| a text field | `Input`; a count is `NumberInput` |
+| a text field | `Input`; a count is `NumberInput`; several lines are `Textarea`, and a post is `MarkdownTextarea` |
+| a labelled control in a form | `Field`: the label above, the control, then a hint or, while there is one, the error; without `htmlFor` it names its children as a group |
 | a search | `SearchField`: `sm` in a panel, `md` in a toolbar, `lg` where the search is the page, `inset` as a panel's own top edge; `markFilled` where a query is a filter in force, `busy` while a request is out, `trailing` for a count or a shortcut. Escape empties it and stops there; `blurOnEscape` adds the find bar's second press |
-| a native choice | `FilterSelect`, `MultiFilterSelect` |
+| a native choice | `Select` in a form or a setting; `FilterSelect` and `MultiFilterSelect` in a filter bar |
 | a menu of actions, at an element or at the pointer | `Menu` with `MenuPanel`, `MenuItem`, `SubMenu` and `MenuSeparator` |
 | a row of a sheet, a panel or a list of choices | `MenuRow`; a link, a radio's label or a Base UI item spells `menuRowClass` with `MenuRowBody`. `menu` size at the pointer and `panel` in a dropdown or a sheet, both 44 px under a coarse pointer, and `touch` for a sheet only a finger opens; `current` for the chosen row, `managed` where the keyboard's place is `data-highlighted`; `MenuGroupLabel` over a group, `MenuRowSeparator` between two |
 | an anchored panel, or its phone form | `Popover` (`dropdown` or `sheet`) |
@@ -358,7 +359,7 @@ no row here, add the primitive first.
 The foundation phase adds, each replacing the hand-built copies it lists in
 the plan:
 
-- `field` and a select skin, and card variants.
+- card variants.
 
 The menu row covers the context menu, the action sheet, the More sheet, the
 sort and preset panels and the palette. The rows that carry more than a
@@ -509,3 +510,9 @@ maintainer picks. A pure restyle that moves nothing does not. The rules:
   empties before it does anything else. The command palette keeps its own
   input, a combobox the palette owns. `Input` lost its clear button, which
   only the searches used.
+- **2026-09-25:** Forms share `Field`, `Select` and `Textarea`. The settings
+  panes' `SELECT` class, the Wrapped year picker's copy of it and the two
+  copies of the notes box became primitives; three settings fields that
+  wore the select's class became `Input`s; the forum, review and profile
+  dialogs label their fields through `Field`, whose error replaces the
+  hint rather than sitting under it.

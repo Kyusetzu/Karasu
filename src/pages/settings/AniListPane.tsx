@@ -12,7 +12,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Shimmer } from "@/components/Skeleton";
 import { showToast } from "@/stores/toast";
-import { ExternalNote, NeedsAccount, Row, SELECT, Toggle } from "./shared";
+import { ExternalNote, NeedsAccount, Row, Toggle } from "./shared";
+import { Select } from "@/components/ui/select";
 import {
   LIST_ACTIVITY_STATUSES,
   LOCAL_OVERRIDES,
@@ -26,7 +27,6 @@ import {
 import { useUpdateUser } from "@/hooks/useUpdateUser";
 import { useAuth } from "@/stores/auth";
 import { isAndroid, usePlatform } from "@/stores/platform";
-import { cn } from "@/lib/utils";
 import { notifScheduleFailure } from "@/lib/notifSchedule";
 import { Chip } from "@/components/ui/chip";
 
@@ -168,40 +168,38 @@ export function AniListProfileSection() {
               hint={t("settings.alTitleLanguageHint")}
               note={<OverrideNote field="titleLanguage" />}
             >
-              <select
+              <Select
                 value={options.titleLanguage ?? "ROMAJI"}
                 disabled={save.isPending}
                 onChange={(e) => save.mutate({ titleLanguage: e.target.value })}
-                className={SELECT}
               >
                 {TITLE_LANGUAGES.map((v) => (
                   <option key={v} value={v}>
                     {titleLanguageLabel(v, t)}
                   </option>
                 ))}
-              </select>
+              </Select>
             </Row>
 
             <Row
               label={t("settings.alStaffLanguage")}
               hint={t("settings.alStaffLanguageHint")}
             >
-              <select
+              <Select
                 value={options.staffNameLanguage ?? "ROMAJI_WESTERN"}
                 disabled={save.isPending}
                 onChange={(e) => save.mutate({ staffNameLanguage: e.target.value })}
-                className={SELECT}
               >
                 {STAFF_LANGUAGES.map((v) => (
                   <option key={v} value={v}>
                     {staffLanguageLabel(v, t)}
                   </option>
                 ))}
-              </select>
+              </Select>
             </Row>
 
             <Row label={t("settings.alTimezone")} hint={t("settings.alTimezoneHint")}>
-              <input
+              <Input
                 type="text"
                 defaultValue={options.timezone ?? ""}
                 placeholder="+01:00"
@@ -210,7 +208,7 @@ export function AniListProfileSection() {
                   const next = e.target.value.trim();
                   if (next !== (options.timezone ?? "")) save.mutate({ timezone: next });
                 }}
-                className={cn(SELECT, "w-24")}
+                className="w-24"
               />
             </Row>
 
@@ -218,7 +216,7 @@ export function AniListProfileSection() {
               label={t("settings.alMergeTime")}
               hint={t("settings.alMergeTimeHint")}
             >
-              <input
+              <Input
                 type="number"
                 min={0}
                 max={1440}
@@ -230,7 +228,7 @@ export function AniListProfileSection() {
                     save.mutate({ activityMergeTime: next });
                   }
                 }}
-                className={cn(SELECT, "w-20")}
+                className="w-20"
               />
             </Row>
 
@@ -272,7 +270,7 @@ export function AniListProfileSection() {
                   : t("settings.alDonatorBadgeLocked")
               }
             >
-              <input
+              <Input
                 type="text"
                 defaultValue={data?.donatorBadge ?? ""}
                 maxLength={24}
@@ -283,7 +281,7 @@ export function AniListProfileSection() {
                     save.mutate({ donatorBadge: next });
                   }
                 }}
-                className={cn(SELECT, "w-40")}
+                className="w-40"
               />
             </Row>
 
@@ -377,33 +375,31 @@ export function AniListListOptionsSection() {
               label={t("settings.alScoreFormat")}
               hint={t("settings.alScoreFormatHint")}
             >
-              <select
+              <Select
                 value={mlo.scoreFormat ?? "POINT_10"}
                 disabled={save.isPending}
                 onChange={(e) => save.mutate({ scoreFormat: e.target.value })}
-                className={SELECT}
               >
                 {SCORE_FORMATS.map((v) => (
                   <option key={v} value={v}>
                     {scoreFormatLabel(v, t)}
                   </option>
                 ))}
-              </select>
+              </Select>
             </Row>
 
             <Row label={t("settings.alRowOrder")} hint={t("settings.alRowOrderHint")}>
-              <select
+              <Select
                 value={mlo.rowOrder ?? "title"}
                 disabled={save.isPending}
                 onChange={(e) => save.mutate({ rowOrder: e.target.value })}
-                className={SELECT}
               >
                 {ROW_ORDERS.map((v) => (
                   <option key={v} value={v}>
                     {rowOrderLabel(v, t)}
                   </option>
                 ))}
-              </select>
+              </Select>
             </Row>
 
             {/* Read-only on purpose: `customLists` is a full replacement with no undo, so never send it (`lib/anilistUserFields`). */}
@@ -586,8 +582,7 @@ export function NotificationScheduleSection() {
       )}
       <div className="mt-3">
         <Row label={t("settings.notifScheduleLabel")}>
-          <select
-            className={SELECT}
+          <Select
             value={custom ? "custom" : String(minutes)}
             onChange={(e) => {
               const v = e.target.value;
@@ -607,7 +602,7 @@ export function NotificationScheduleSection() {
             <option value="30">{t("settings.notifSchedule30")}</option>
             <option value="60">{t("settings.notifSchedule60")}</option>
             <option value="custom">{t("settings.notifScheduleCustom")}</option>
-          </select>
+          </Select>
         </Row>
         {custom && (
           <Row label={t("settings.notifScheduleCustomLabel")}>

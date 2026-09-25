@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { MarkdownTextarea } from "@/components/social/MarkdownTextarea";
 import { useUpdateUser } from "@/hooks/useUpdateUser";
@@ -81,15 +82,10 @@ export function ProfileEditModal({
       }
     >
       <div className="space-y-4">
-        <div>
-          <label className="block text-xs font-medium text-ink-300" htmlFor="bio">
-            {t("social.bio")}
-          </label>
-          {/* Editor and preview side by side, so the markdown is learned rather
-              than guessed at. */}
+        <Field label={t("social.bio")} htmlFor="bio">
+          {/* Editor and preview side by side, so the markdown is learned rather than guessed at. */}
           <MarkdownTextarea
             id="bio"
-            className="mt-1.5"
             value={draft}
             onChange={setDraft}
             placeholder={t("social.bioPlaceholder")}
@@ -108,13 +104,14 @@ export function ProfileEditModal({
               </div>
             }
           />
-        </div>
+        </Field>
 
-        <div>
-          <span className="block text-xs font-medium text-ink-300">
-            {t("social.profileColor")}
-          </span>
-          <div className="mt-2 flex flex-wrap items-center gap-2">
+        <Field
+          label={t("social.profileColor")}
+          hint={t("social.profileColorHint")}
+          error={color.trim() && !normalColor ? t("social.colorInvalid") : undefined}
+        >
+          <div className="flex flex-wrap items-center gap-2">
             {PROFILE_COLORS.map((name) => (
               <button
                 key={name}
@@ -132,8 +129,7 @@ export function ProfileEditModal({
                 style={{ backgroundColor: PROFILE_COLOR_HEX[name] }}
               />
             ))}
-            {/* Hex is a supporter feature on AniList's side. Karasu offers the
-                field and lets AniList decide, rather than guessing at tiers. */}
+            {/* Hex is a supporter feature on AniList's side; Karasu offers the field and lets AniList decide. */}
             <Input
               value={hex}
               onChange={(e) => {
@@ -153,11 +149,7 @@ export function ProfileEditModal({
               />
             )}
           </div>
-          {color.trim() && !normalColor && (
-            <p className="mt-1 text-2xs text-danger">{t("social.colorInvalid")}</p>
-          )}
-          <p className="mt-1 text-2xs text-ink-600">{t("social.profileColorHint")}</p>
-        </div>
+        </Field>
       </div>
     </Modal>
   );

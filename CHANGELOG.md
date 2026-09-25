@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: d008e79 -->
+<!-- generated-through: 2f8cbc2 -->
 
 ### Fixed
 
@@ -153,6 +153,7 @@ tag time is then optional rather than load-bearing.
 - menus, sheets and panels share one row, with 44 px touch targets on the phone.
 - every dialog shares one frame; buttons stay in reach on short windows and the confirm fits a phone.
 - every search field looks and clears the same way.
+- form fields, choices and notes share one frame.
 ## 1.0.0 — 2026-09-05
 
 Karasu 1.0.0 is the first tagged release: a desktop and Android tracker built

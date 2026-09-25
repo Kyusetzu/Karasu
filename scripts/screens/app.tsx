@@ -197,8 +197,9 @@ mockIPC((cmd, args) => {
     case "get_library_episodes":
       return {};
     case "get_text_scale":
-    case "get_ui_zoom":
       return 1;
+    case "get_ui_zoom":
+      return 100;
     case "get_now_playing":
       return null;
     case "get_update_check_auto":

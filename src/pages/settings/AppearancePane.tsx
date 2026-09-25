@@ -24,7 +24,8 @@ import {
   SUPPORTED_LANGUAGES,
   type LanguageSetting,
 } from "@/i18n";
-import { ColorPicker, Row, SELECT, Toggle } from "./shared";
+import { ColorPicker, Row, Toggle } from "./shared";
+import { Select } from "@/components/ui/select";
 import { STATUS_COLOR_ORDER, isDefaultPalette } from "@/lib/statusColors";
 import type { MediaListStatus } from "@/api/types";
 const THEME_MODES: ThemeMode[] = ["system", "light", "dark"];
@@ -90,38 +91,35 @@ export function AppearanceSection() {
       <CardTitle>{t("settings.pane_appearance")}</CardTitle>
       <div className="mt-3 space-y-3">
         <Row label={t("settings.language")} hint={t("settings.languageHint")}>
-          <select
+          <Select
             value={lang}
             onChange={(e) => changeLanguage(e.target.value as LanguageSetting)}
-            className={SELECT}
           >
             {SUPPORTED_LANGUAGES.map((l) => (
               <option key={l.value} value={l.value}>
                 {l.label}
               </option>
             ))}
-          </select>
+          </Select>
         </Row>
 
         <Row label={t("settings.theme")}>
-          <select
+          <Select
             value={themeMode}
             onChange={(e) => setThemeMode(e.target.value as ThemeMode)}
-            className={SELECT}
           >
             {THEME_MODES.map((m) => (
               <option key={m} value={m}>
                 {t(`settings.theme_${m}`)}
               </option>
             ))}
-          </select>
+          </Select>
         </Row>
 
         <Row label={t("settings.contrast")} hint={t("settings.contrastHint")}>
-          <select
+          <Select
             value={contrast}
             onChange={(e) => setContrast(e.target.value as ContrastMode)}
-            className={SELECT}
             aria-label={t("settings.contrast")}
           >
             {CONTRAST_MODES.map((m) => (
@@ -129,15 +127,14 @@ export function AppearanceSection() {
                 {t(`settings.contrast_${m}`)}
               </option>
             ))}
-          </select>
+          </Select>
         </Row>
 
         {!android && zoom !== null && (
           <Row label={t("settings.uiZoom")} hint={t("settings.uiZoomHint")}>
-            <select
+            <Select
               value={zoom}
               onChange={(e) => changeZoom(Number(e.target.value))}
-              className={SELECT}
               aria-label={t("settings.uiZoom")}
             >
               {/* A stored value off the list is still shown, as its own option. */}
@@ -149,7 +146,7 @@ export function AppearanceSection() {
                   {p} %
                 </option>
               ))}
-            </select>
+            </Select>
           </Row>
         )}
 
@@ -187,10 +184,9 @@ export function AppearanceSection() {
         </div>
 
         <Row label={t("settings.density")} hint={t("settings.densityHint")}>
-          <select
+          <Select
             value={density}
             onChange={(e) => setDensity(e.target.value as Density)}
-            className={SELECT}
             aria-label={t("settings.density")}
           >
             {DENSITIES.map((d) => (
@@ -198,7 +194,7 @@ export function AppearanceSection() {
                 {t(`settings.density_${d}`)}
               </option>
             ))}
-          </select>
+          </Select>
         </Row>
 
         <Toggle

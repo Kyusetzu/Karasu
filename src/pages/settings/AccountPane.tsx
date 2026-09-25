@@ -8,7 +8,8 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { UserLockup } from "@/components/ui/user-lockup";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/stores/auth";
-import { Row, SELECT } from "./shared";
+import { Row } from "./shared";
+import { Select } from "@/components/ui/select";
 import { STATUS_ORDER, type MediaListStatus } from "@/api/types";
 import {
   loadDefaultAddStatus,
@@ -35,10 +36,9 @@ export function DefaultsSection() {
           label={t("settings.defaultAddStatus")}
           hint={t("settings.defaultAddStatusHint")}
         >
-          <select
+          <Select
             value={status}
             onChange={(e) => change(e.target.value as MediaListStatus)}
-            className={SELECT}
           >
             {STATUS_ORDER.map((s) => {
               const anime = t(`status.ANIME.${s}`);
@@ -50,7 +50,7 @@ export function DefaultsSection() {
                 </option>
               );
             })}
-          </select>
+          </Select>
         </Row>
       </div>
     </Card>

@@ -32,6 +32,7 @@ import { Button } from "@/components/ui/button";
 import { Loader } from "@/components/ui/loader";
 import { Pill } from "@/components/ui/pill";
 import { EmptyState, OutlineYear } from "@/components/EmptyState";
+import { Select } from "@/components/ui/select";
 import markUrl from "@/assets/karasu-mark.svg";
 import { toBase64 } from "@/lib/base64";
 
@@ -760,17 +761,17 @@ export default function Wrapped() {
               )}
             </div>
             {mode === "year" ? (
-              <select
+              <Select
                 value={year ?? ""}
                 onChange={(e) => setYear(Number(e.target.value))}
-                className="h-9 rounded-control border border-surface-700 bg-surface-900 px-2 text-sm focus:border-accent-500 focus:outline-none"
+                aria-label={t("wrapped.modeYear")}
               >
                 {years.map((y) => (
                   <option key={y} value={y}>
                     {y}
                   </option>
                 ))}
-              </select>
+              </Select>
             ) : (
               seasonPick && (
                 <SeasonPicker

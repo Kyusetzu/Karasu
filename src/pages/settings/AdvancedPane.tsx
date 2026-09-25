@@ -20,7 +20,8 @@ import { isAndroid, usePlatform } from "@/stores/platform";
 import { showToast } from "@/stores/toast";
 import type { ListResult, Media, MediaType } from "@/api/types";
 import { cn } from "@/lib/utils";
-import { NeedsAccount, Row, SELECT, Toggle } from "./shared";
+import { NeedsAccount, Row, Toggle } from "./shared";
+import { Select } from "@/components/ui/select";
 import { Trash2 } from "lucide-react";
 import { displayTitle, type QueuedEdit, type SyncStatus } from "@/api/types";
 import { isQueueField, queuedMediaId } from "@/lib/syncQueue";
@@ -127,14 +128,14 @@ export function RescaleSection() {
       <CardTitle>{t("settings.rescale")}</CardTitle>
       <p className="mt-2 text-sm text-ink-500">{t("settings.rescaleHint")}</p>
       <div className="mt-3 flex flex-wrap items-center gap-3">
-        <select
+        <Select
           value={type}
           onChange={(e) => setType(e.target.value as MediaType)}
-          className={SELECT}
+         
         >
           <option value="ANIME">{t("common.anime")}</option>
           <option value="MANGA">{t("common.manga")}</option>
-        </select>
+        </Select>
         <span className="flex items-center gap-1.5 text-sm text-ink-300">
           {range(fromMin, setFromMin)}–{range(fromMax, setFromMax)}
           <span className="mx-1 text-ink-600">→</span>
@@ -747,20 +748,19 @@ export function UpdatesSection() {
             label={t("settings.updateChannel")}
             hint={t("settings.updateChannelHint")}
           >
-            <select
+            <Select
               value={channel}
               onChange={(e) => {
                 const next = e.target.value as api.UpdateChannel;
                 setChannel(next);
                 api.setUpdateChannel(next);
               }}
-              className={SELECT}
             >
               <option value="stable">{t("settings.updateChannelStable")}</option>
               <option value="prerelease">
                 {t("settings.updateChannelPrerelease")}
               </option>
-            </select>
+            </Select>
           </Row>
         )}
 

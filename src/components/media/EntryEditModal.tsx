@@ -21,6 +21,7 @@ import { Modal } from "@/components/ui/modal";
 import { Pill } from "@/components/ui/pill";
 import { ScoreBars } from "@/components/ui/score-bars";
 import TagEditor from "@/components/media/TagEditor";
+import { Textarea } from "@/components/ui/textarea";
 import { parseNotes, serializeNotes } from "@/lib/tags";
 import { loadDefaultAddStatus } from "@/lib/defaultAddStatus";
 import { chooseStatus, openingFields, type FillMemo } from "@/lib/completion";
@@ -354,12 +355,11 @@ export default function EntryEditModal({
         </div>
         <label className="block text-sm">
           <span className="mb-1 block text-ink-500">{t("entry.notes")}</span>
-          <textarea
+          <Textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             rows={3}
             placeholder={t("entry.notesPlaceholder")}
-            className="w-full resize-y rounded-control border border-surface-700 bg-surface-900 px-2 py-1.5 text-sm focus:border-accent-500 focus:outline-none"
           />
         </label>
         <div className="flex items-center justify-between pt-2">

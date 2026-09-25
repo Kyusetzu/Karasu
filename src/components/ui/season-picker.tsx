@@ -89,6 +89,7 @@ export default function SeasonPicker({
               <button
                 key={y}
                 type="button"
+                aria-pressed={y === year}
                 onClick={() => onPick({ season, year: y })}
                 className={cn(
                   "min-w-12 flex-1 rounded-inner border border-transparent py-1 text-xs tabular-nums transition-surface",

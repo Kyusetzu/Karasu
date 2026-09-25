@@ -82,7 +82,7 @@ export default function MediaCard({
       actions={
         hasProfile && (
           <>
-            {/* Below two circles' width a cover keeps one, the entry's own state rather than the editor. */}
+            {/* Below two circles' width a cover keeps one control: the quick add for a new title, the editor for a listed one. */}
             <IconButton
               variant="onCover"
               size="sm"
@@ -90,14 +90,14 @@ export default function MediaCard({
               onClick={() => setEditing(true)}
               aria-label={t("common.edit")}
               title={t("common.edit")}
-              className="@max-cover-pair:hidden"
+              className={entry ? undefined : "@max-cover-pair:hidden"}
             >
               <Pencil className="size-3.5" />
             </IconButton>
             {entry ? (
               // Tinted by the ring's colour, so the badge and the border say the same thing.
               <span
-                className="grid size-7.5 place-items-center rounded-full border tint-fill-on-cover"
+                className="grid size-7.5 place-items-center rounded-full border tint-fill-on-cover @max-cover-pair:hidden"
                 style={{ "--tint": statusColorVar(entry.status) } as CSSProperties}
                 title={t(`status.${media.type}.${entry.status}`)}
               >

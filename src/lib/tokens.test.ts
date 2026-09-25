@@ -206,11 +206,26 @@ describe("the tint fill", () => {
     });
   }
 
-  it("drops the tint from the fill in high contrast and doubles the rim, so the ink keeps 7:1 and the choice still shows", () => {
+  it("draws the rim in ink in high contrast, where the raw tint fell under the 3:1 border obligation", () => {
+    const fill = block("@utility tint-fill {");
+    expect(fill).toMatch(/:root\[data-contrast="more"\] & \{\s*background-color: var\(--color-surface-900\);\s*border-color: var\(--color-ink-100\);/);
+    for (const theme of ["dark", "light"] as const) {
+      expect(contrastRatio(high(theme, "ink-100"), high(theme, "surface-900")), theme).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it("marks a chosen tint by a fill and a doubled rim in high contrast, and by the system highlight in forced colours", () => {
     const fill = block("@utility tint-fill {");
     expect(fill).toMatch(
-      /:root\[data-contrast="more"\] & \{\s*background-color: var\(--color-surface-900\);\s*border-color: var\(--tint\);\s*box-shadow: inset 0 0 0 1px var\(--tint\);/,
+      /:root\[data-contrast="more"\] &\[aria-pressed="true"\] \{\s*background-color: var\(--color-surface-800\);\s*box-shadow: inset 0 0 0 1px var\(--color-ink-100\);/,
     );
+    expect(fill).toMatch(/@media \(forced-colors: active\) \{\s*&\[aria-pressed="true"\] \{\s*forced-color-adjust: none;\s*background-color: Highlight;/);
+  });
+
+  it("keeps every hover of the tint behind a real pointer, so a tap on a phone does not leave it lit", () => {
+    const fill = block("@utility tint-fill {");
+    const bare = fill.split("\n").filter((line, i, all) => /&:hover/.test(line) && !/@media \(hover: hover\)/.test(all[i - 1] ?? ""));
+    expect(bare).toEqual([]);
   });
 
   it("rims the accent in its text shade in high contrast, the one already held to 7:1 on the page", () => {

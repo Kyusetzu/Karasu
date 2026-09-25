@@ -676,16 +676,31 @@ nav a {
 @utility tint-fill {
   background-color: color-mix(in srgb, var(--tint) 18%, var(--color-surface-900));
   border-color: color-mix(in srgb, var(--tint) 55%, transparent);
-  &:hover {
-    background-color: color-mix(in srgb, var(--tint) 26%, var(--color-surface-900));
+  @media (hover: hover) {
+    &:hover {
+      background-color: color-mix(in srgb, var(--tint) 26%, var(--color-surface-900));
+    }
   }
   :root[data-contrast="more"] & {
     background-color: var(--color-surface-900);
-    border-color: var(--tint);
-    box-shadow: inset 0 0 0 1px var(--tint);
+    border-color: var(--color-ink-100);
   }
-  :root[data-contrast="more"] &:hover {
-    background-color: var(--color-surface-850);
+  :root[data-contrast="more"] &[aria-pressed="true"] {
+    background-color: var(--color-surface-800);
+    box-shadow: inset 0 0 0 1px var(--color-ink-100);
+  }
+  @media (hover: hover) {
+    :root[data-contrast="more"] &:hover {
+      background-color: var(--color-surface-850);
+    }
+  }
+  @media (forced-colors: active) {
+    &[aria-pressed="true"] {
+      forced-color-adjust: none;
+      background-color: Highlight;
+      border-color: Highlight;
+      color: HighlightText;
+    }
   }
 }
 

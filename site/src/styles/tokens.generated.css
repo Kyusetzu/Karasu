@@ -1,4 +1,4 @@
-/* GENERATED from src/app/index.css (sha256 d5f520b34e17) by site/scripts/sync-tokens.mjs
+/* GENERATED from src/app/index.css (sha256 ed910a8ad0c5) by site/scripts/sync-tokens.mjs
    — do not edit. Re-run `npm run sync` after changing the source; `npm run check`
    fails while this file is stale. CLAUDE.md, "The website". */
 /* `static` because Tailwind tree-shakes tokens no utility references, leaving a `var()`-only token undefined in dark. */
@@ -535,16 +535,31 @@
 @utility tint-fill {
   background-color: color-mix(in srgb, var(--tint) 18%, var(--color-surface-900));
   border-color: color-mix(in srgb, var(--tint) 55%, transparent);
-  &:hover {
-    background-color: color-mix(in srgb, var(--tint) 26%, var(--color-surface-900));
+  @media (hover: hover) {
+    &:hover {
+      background-color: color-mix(in srgb, var(--tint) 26%, var(--color-surface-900));
+    }
   }
   :root[data-contrast="more"] & {
     background-color: var(--color-surface-900);
-    border-color: var(--tint);
-    box-shadow: inset 0 0 0 1px var(--tint);
+    border-color: var(--color-ink-100);
   }
-  :root[data-contrast="more"] &:hover {
-    background-color: var(--color-surface-850);
+  :root[data-contrast="more"] &[aria-pressed="true"] {
+    background-color: var(--color-surface-800);
+    box-shadow: inset 0 0 0 1px var(--color-ink-100);
+  }
+  @media (hover: hover) {
+    :root[data-contrast="more"] &:hover {
+      background-color: var(--color-surface-850);
+    }
+  }
+  @media (forced-colors: active) {
+    &[aria-pressed="true"] {
+      forced-color-adjust: none;
+      background-color: Highlight;
+      border-color: Highlight;
+      color: HighlightText;
+    }
   }
 }
 

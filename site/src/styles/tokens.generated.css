@@ -1,4 +1,4 @@
-/* GENERATED from src/app/index.css (sha256 33e7e56c7a11) by site/scripts/sync-tokens.mjs
+/* GENERATED from src/app/index.css (sha256 d658286f1d56) by site/scripts/sync-tokens.mjs
    — do not edit. Re-run `npm run sync` after changing the source; `npm run check`
    fails while this file is stale. CLAUDE.md, "The website". */
 /* `static` because Tailwind tree-shakes tokens no utility references, leaving a `var()`-only token undefined in dark. */
@@ -47,6 +47,10 @@
   --color-scrim: rgb(4 5 8 / 0.55);
   /* The dim behind a picture shown full screen, deep enough that the page gives way to it. */
   --color-scrim-deep: rgb(4 5 8 / 0.92);
+  /* The near-black that sits on arbitrary cover art; badges, scrims and controls there take it at the opacity each needs. */
+  --color-on-cover: rgb(4 5 8);
+  /* The light edge a control on cover art is drawn with, so it keeps a contrast floor on dark art. */
+  --color-on-cover-edge: rgb(255 255 255);
   /* The window's close button under the pointer: the caption bar's red in every theme, with its white glyph. */
   --color-window-close: #b3232c;
   --color-window-close-ink: #ffffff;

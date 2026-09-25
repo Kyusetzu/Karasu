@@ -11,7 +11,7 @@ const iconButtonVariants = cva(
         surface: "bg-surface-800 text-ink-300 hover:bg-surface-700 hover:text-ink-100",
         accent: "bg-accent-500 text-accent-ink hover:bg-accent-600",
         /** For the action circles that sit on cover art, where the fill has to be near-opaque over unknown artwork. */
-        onCover: "bg-[rgba(4,5,8,.86)] text-ink-300 border border-surface-700 hover:text-ink-100",
+        onCover: "bg-on-cover/86 text-ink-300 border border-surface-700 hover:text-ink-100",
         success: "text-success hover:bg-success/10",
         danger: "text-danger hover:bg-danger/10",
       },

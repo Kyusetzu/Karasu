@@ -19,7 +19,6 @@
     "icon-size": 6
   },
   "src/components/list/SelectBox.tsx": {
-    "colour-arbitrary": 2,
     "icon-size": 1,
     "radius-arbitrary": 1
   },
@@ -28,7 +27,6 @@
     "radius-arbitrary": 1
   },
   "src/components/media/CoverCell.tsx": {
-    "colour-arbitrary": 5,
     "icon-size": 1
   },
   "src/components/media/DetectionSurface.tsx": {
@@ -95,9 +93,6 @@
   "src/components/ui/filter-select.tsx": {
     "icon-size": 1,
     "tracking-arbitrary": 1
-  },
-  "src/components/ui/icon-button.tsx": {
-    "colour-arbitrary": 1
   },
   "src/components/ui/multi-filter-select.tsx": {
     "icon-size": 3,

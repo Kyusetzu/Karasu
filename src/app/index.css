@@ -71,6 +71,10 @@
   --color-scrim: rgb(4 5 8 / 0.55);
   /* The dim behind a picture shown full screen, deep enough that the page gives way to it. */
   --color-scrim-deep: rgb(4 5 8 / 0.92);
+  /* The near-black that sits on arbitrary cover art; badges, scrims and controls there take it at the opacity each needs. */
+  --color-on-cover: rgb(4 5 8);
+  /* The light edge a control on cover art is drawn with, so it keeps a contrast floor on dark art. */
+  --color-on-cover-edge: rgb(255 255 255);
   /* The window's close button under the pointer: the caption bar's red in every theme, with its white glyph. */
   --color-window-close: #b3232c;
   --color-window-close-ink: #ffffff;

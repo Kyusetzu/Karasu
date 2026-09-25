@@ -88,6 +88,11 @@ export const SCREENS = [
   { id: "p9-erster-start", w: 405, h: 860, phone: true, route: "/", out: true },
   { id: "d17-erkennung", w: 1232, h: 800, route: "/list", playing: true },
   { id: "p10-erkennung", w: 405, h: 860, phone: true, route: "/list", playing: true },
+  { id: "d19-auswahl", w: 1232, h: 800, route: "/list", act: async (p) => {
+    await p.getByRole("button", { name: "Auswählen" }).first().click();
+    await p.waitForTimeout(300);
+    await p.getByRole("checkbox").nth(1).click();
+  } },
   { id: "d18-sync", w: 1232, h: 800, route: "/list", act: (p) => p.getByRole("button", { name: "Details zur Synchronisierung" }).first().click() },
   {
     id: "p8-glocke",

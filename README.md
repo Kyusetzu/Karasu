@@ -200,7 +200,7 @@ Captures at 2× on the desktop and straight off the phone — the same set the
   manga, chapter +1 right on the card
 - **Franchise graph** — the whole franchise as a relation map (sequels, side
   stories, cross-medium sources/adaptations), each node coloured by your status,
-  pan and zoom, any branch foldable, double-click to open a title
+  pan and zoom, double-click to open a title
 
 **Activities**
 - **Profiles** — yours and anyone's: bio, banner, favourites, statistics and

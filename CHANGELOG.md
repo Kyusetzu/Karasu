@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 3025b75 -->
+<!-- generated-through: afbf32f -->
 
 ### Fixed
 
@@ -166,6 +166,10 @@ tag time is then optional rather than load-bearing.
 - quick loads no longer flash a skeleton.
 - the collapsed sidebar names its icons in tooltips, and its avatar is round again.
 - Open the empty palette on what was used lately, beside the main shortcuts (1.25.22.712).
+
+### Removed
+
+- Remove the franchise graph's branch folding (1.26.9.724).
 ## 1.0.0 — 2026-09-05
 
 Karasu 1.0.0 is the first tagged release: a desktop and Android tracker built

@@ -1027,8 +1027,6 @@ export const en = {
     zoomIn: "Zoom in",
     zoomOut: "Zoom out",
     resetView: "Reset the view",
-    collapse: "Collapse this branch",
-    expand: "Expand this branch",
     selectHint: "Pick a title to see what it is. Double-click opens its page.",
     editMissing: "Not on your list yet — open the title to add it.",
     yourProgress: "Your progress",

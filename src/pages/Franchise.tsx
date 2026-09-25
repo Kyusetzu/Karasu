@@ -63,7 +63,6 @@ export default function Franchise() {
     gcTime: 60 * 60 * 1000,
   });
 
-  const [collapsed, setCollapsed] = useState<ReadonlySet<number>>(() => new Set());
   const [selected, setSelected] = useState<number | null>(null);
   const [hovered, setHovered] = useState<number | null>(null);
   const [editing, setEditing] = useState<number | null>(null);
@@ -74,13 +73,12 @@ export default function Franchise() {
 
   // A new franchise is a new graph; a layout effect, so the rail has its content before the canvas is measured.
   useLayoutEffect(() => {
-    setCollapsed(new Set());
     setSelected(data?.rootId ?? null);
   }, [data?.rootId]);
 
   const layout = useMemo(
-    () => (data ? layoutFranchise(data.nodes, data.edges, data.rootId, collapsed) : null),
-    [data, collapsed],
+    () => (data ? layoutFranchise(data.nodes, data.edges, data.rootId) : null),
+    [data],
   );
 
   /** The title the user came from, in the middle of the canvas at the resting zoom, on either platform. */
@@ -115,14 +113,13 @@ export default function Franchise() {
       !data || !layout
         ? []
         : data.edges.filter(
-            (e) => layout.visible.has(e.from) && layout.visible.has(e.to),
+            (e) => layout.positions.has(e.from) && layout.positions.has(e.to),
           ),
     [data, layout],
   );
 
-  // Hover wins over selection; a folded-away node never gets `mouseleave`, so the hover is dropped once off screen.
-  const focus =
-    hovered !== null && layout?.visible.has(hovered) ? hovered : selected;
+  // Hover wins over selection.
+  const focus = hovered ?? selected;
   const connected = useMemo(() => {
     const set = new Set<number>();
     if (focus === null) return set;
@@ -133,24 +130,6 @@ export default function Franchise() {
     }
     return set;
   }, [focus, links]);
-
-  const toggle = (nodeId: number) => {
-    setCollapsed((prev) => {
-      const next = new Set(prev);
-      if (!next.delete(nodeId)) next.add(nodeId);
-      return next;
-    });
-    // Folding the selected node away makes the fold the new subject, or the rail describes a hidden node.
-    setSelected((cur) => {
-      if (cur === null || !layout) return cur;
-      let walk = layout.tree.get(cur)?.parent ?? null;
-      while (walk !== null) {
-        if (walk === nodeId) return nodeId;
-        walk = layout.tree.get(walk)?.parent ?? null;
-      }
-      return cur;
-    });
-  };
 
   const selectedNode = selected !== null ? byId.get(selected) : undefined;
 
@@ -244,7 +223,7 @@ export default function Franchise() {
                 })}
               </svg>
 
-              {[...layout.visible].map((nodeId) => {
+              {[...layout.positions.keys()].map((nodeId) => {
                 const node = byId.get(nodeId);
                 const spot = layout.positions.get(nodeId);
                 const branch = layout.tree.get(nodeId);
@@ -259,7 +238,6 @@ export default function Franchise() {
                     isRoot={nodeId === data.rootId}
                     isSelected={nodeId === selected}
                     dimmed={focus !== null && !connected.has(nodeId)}
-                    collapsed={collapsed.has(nodeId)}
                     onHover={setHovered}
                     onSelect={() => {
                       if (pan.dragged()) return;
@@ -269,8 +247,7 @@ export default function Franchise() {
                       if (pan.dragged()) return;
                       navigate(`/media/${nodeId}`);
                     }}
-                    onToggle={() => toggle(nodeId)}
-                  />
+                      />
                 );
               })}
             </div>
@@ -342,7 +319,7 @@ export default function Franchise() {
   );
 }
 
-/** One node: cover, status outline, progress, title, relation, collapse pill. */
+/** One node: cover, status outline, progress, title and relation. */
 function GraphNode({
   node,
   branch,
@@ -351,11 +328,9 @@ function GraphNode({
   isRoot,
   isSelected,
   dimmed,
-  collapsed,
   onHover,
   onSelect,
   onOpen,
-  onToggle,
 }: {
   node: FranchiseNode;
   branch: FranchiseTreeNode;
@@ -364,12 +339,10 @@ function GraphNode({
   isRoot: boolean;
   isSelected: boolean;
   dimmed: boolean;
-  collapsed: boolean;
   onHover: (id: number | null) => void;
   onSelect: () => void;
   /** Double-click: straight to the detail page, like a related cover. */
   onOpen: () => void;
-  onToggle: () => void;
 }) {
   const { t } = useTranslation();
   const color = colorOf(node.listStatus);
@@ -456,17 +429,6 @@ function GraphNode({
         )}
       </button>
 
-      {branch.children.length > 0 && (
-        <button
-          type="button"
-          onClick={onToggle}
-          aria-label={t(collapsed ? "franchise.expand" : "franchise.collapse")}
-          className="absolute left-1/2 grid -translate-x-1/2 place-items-center rounded-full border border-surface-700 bg-surface-850 text-[.5625em] tabular-nums text-ink-300 transition-surface hover:border-accent-500 hover:text-ink-100"
-          style={{ bottom: "-.625em", height: "1.25em", minWidth: "1.25em", padding: "0 .375em" }}
-        >
-          {collapsed ? `+${branch.descendants}` : "−"}
-        </button>
-      )}
     </div>
   );
 }

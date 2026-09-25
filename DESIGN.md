@@ -569,3 +569,7 @@ maintainer picks. A pure restyle that moves nothing does not. The rules:
   icon scale. The label over the chosen score bar takes a gold-ink token,
   white on the light theme's dark gold where near-black was unreadable,
   and the tag field shows its focus on its border.
+- **2026-09-25:** The franchise graph loses its fold. Three places for the
+  collapse button were mocked, since under the node it sat on the relation
+  line, and the maintainer chose none of them: the button and the folding
+  go, and every related title is always drawn.

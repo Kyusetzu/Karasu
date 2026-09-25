@@ -1033,8 +1033,6 @@ export const de: typeof en = {
     zoomIn: "Vergrößern",
     zoomOut: "Verkleinern",
     resetView: "Ansicht zurücksetzen",
-    collapse: "Diesen Zweig einklappen",
-    expand: "Diesen Zweig ausklappen",
     selectHint:
       "Wähle einen Titel, um zu sehen, was er ist. Doppelklick öffnet die Detailseite.",
     editMissing:

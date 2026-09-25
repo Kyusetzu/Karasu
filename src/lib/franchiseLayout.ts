@@ -17,16 +17,12 @@ export interface FranchiseTreeNode {
   children: number[];
   /** Relation carried by the edge this node was first reached through. */
   relation: string | null;
-  /** Size of the whole subtree beneath this node — what collapsing hides. */
-  descendants: number;
 }
 
 export interface FranchiseLayout {
   /** Top-left of each visible node's box, keyed by media id. */
   positions: Map<number, { x: number; y: number }>;
   tree: Map<number, FranchiseTreeNode>;
-  /** Ids actually laid out — excludes anything under a collapsed node. */
-  visible: Set<number>;
   width: number;
   height: number;
 }
@@ -36,7 +32,6 @@ export function layoutFranchise(
   nodes: FranchiseNode[],
   edges: FranchiseEdge[],
   rootId: number,
-  collapsed: ReadonlySet<number> = new Set(),
 ): FranchiseLayout {
   const adj = new Map<number, { to: number; relation: string }[]>();
   for (const n of nodes) adj.set(n.id, []);
@@ -56,7 +51,6 @@ export function layoutFranchise(
       depth: 0,
       children: [],
       relation: null,
-      descendants: 0,
     });
     roots.push(start);
     const queue = [start];
@@ -71,7 +65,6 @@ export function layoutFranchise(
           depth: node.depth + 1,
           children: [],
           relation,
-          descendants: 0,
         });
         node.children.push(to);
         queue.push(to);
@@ -83,21 +76,10 @@ export function layoutFranchise(
   if (nodes.some((n) => n.id === rootId)) walk(rootId);
   for (const n of nodes) walk(n.id);
 
-  // Subtree sizes, deepest first, so each parent sums children already counted.
-  const byDepth = [...tree.values()].sort((a, b) => b.depth - a.depth);
-  for (const node of byDepth) {
-    if (node.parent === null) continue;
-    const parent = tree.get(node.parent)!;
-    parent.descendants += node.descendants + 1;
-  }
-
   // Pre-order keeps a subtree contiguous within its column, so a branch reads as one block.
   const order: number[] = [];
-  const visible = new Set<number>();
   const descend = (id: number) => {
     order.push(id);
-    visible.add(id);
-    if (collapsed.has(id)) return;
     for (const child of tree.get(id)!.children) descend(child);
   };
   for (const id of roots) descend(id);
@@ -127,7 +109,6 @@ export function layoutFranchise(
   return {
     positions,
     tree,
-    visible,
     width: maxDepth * COL_STEP + NODE_W + PAD * 2,
     height: contentH + PAD * 2,
   };

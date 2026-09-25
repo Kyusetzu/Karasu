@@ -8,6 +8,8 @@ export interface Preset {
   tagFilter?: string;
   format?: string;
   country?: string;
+  /** A custom list's raw name; absent on presets saved before it was captured, which clear it like the others. */
+  list?: string;
   /** "" or absent means the sort key's own default direction. */
   dir?: string;
 }

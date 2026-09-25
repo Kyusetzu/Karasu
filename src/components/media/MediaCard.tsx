@@ -9,10 +9,11 @@ import { CoverCell, CoverMeta } from "@/components/media/CoverCell";
 import { saveListEntry } from "@/api/anilist";
 
 import { formatLabel } from "@/lib/format";
-import { displayTitle } from "@/api/types";
+import { displayTitle, type MediaListStatus } from "@/api/types";
 import { statusColorVar } from "@/lib/statusColors";
 import { useCachedEntry } from "@/hooks/useCachedEntry";
 import { loadDefaultAddStatus } from "@/lib/defaultAddStatus";
+import { withCompletion } from "@/lib/completion";
 import { shouldBlur } from "@/lib/contentFilter";
 import { useContentFilter } from "@/stores/contentFilter";
 import type { MediaWithListStatus } from "@/api/queries";
@@ -57,6 +58,9 @@ export default function MediaCard({
   /** Keep the local fallback: `mediaListEntry` is null in local mode, and the editor would write over the real entry. */
   const cached = useCachedEntry(0, media.type, media.id);
   const entry = media.mediaListEntry ?? cached ?? null;
+  // Filled before `mutate`, so the stub patched from the variables shows the totals the write carried.
+  const send = (input: EntrySaveInput | { mediaId: number; status: MediaListStatus }) =>
+    saveEntry.mutate(withCompletion(input, media, media.type, entry?.status ?? null));
   const level = useContentFilter((s) => s.level);
   const blurAdult = useContentFilter((s) => s.blurAdult);
 
@@ -104,7 +108,7 @@ export default function MediaCard({
                 size="sm"
                 round
                 onClick={() =>
-                  saveEntry.mutate({
+                  send({
                     mediaId: media.id,
                     status: loadDefaultAddStatus(),
                   })
@@ -142,7 +146,7 @@ export default function MediaCard({
             entry={entry}
             onClose={() => setEditing(false)}
             onSave={(input: EntrySaveInput) => {
-              saveEntry.mutate(input);
+              send(input);
               setEditing(false);
             }}
           />

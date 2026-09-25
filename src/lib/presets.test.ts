@@ -51,10 +51,11 @@ describe("presets", () => {
     expect(p.format).toBeUndefined();
     expect(p.country).toBeUndefined();
     expect(p.tagFilter).toBeUndefined();
+    expect(p.list).toBeUndefined();
   });
 
   it("round-trips the filter fields when present", () => {
-    const full: Preset = { ...preset, name: "Movies", format: "MOVIE", country: "", tagFilter: "gem" };
+    const full: Preset = { ...preset, name: "Movies", format: "MOVIE", country: "", tagFilter: "gem", list: "Favourites" };
     savePresets("ANIME", [full]);
     expect(loadPresets("ANIME")[0]).toEqual(full);
   });

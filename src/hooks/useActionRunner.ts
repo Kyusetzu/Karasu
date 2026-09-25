@@ -9,7 +9,7 @@ import { clearDetectionOverride, scrobbleCancel, scrobbleNow, useNowPlaying } fr
 import { loadDefaultAddStatus } from "@/lib/defaultAddStatus";
 import { copyText } from "@/lib/clipboard";
 import { mediaUrl } from "@/lib/anilistUrl";
-import { completePatch, type Action, type ActionTarget } from "@/lib/actions";
+import type { Action, ActionTarget } from "@/lib/actions";
 import type { MediaListEntry, MediaType } from "@/api/types";
 
 /** An action the runner cannot finish alone; the host renders the dialog, so nothing here has to hold overlay state. */
@@ -89,10 +89,8 @@ export function useActionRunner(): (input: ActionRunInput) => ActionEffect {
           return done;
         case "complete":
           if (target.kind === "entry") {
-            save(target.mediaType).mutate({
-              mediaId: target.mediaId,
-              ...completePatch(target.entry.max),
-            });
+            // The totals come from the list cache inside `useListMutations`, the one place every status write passes.
+            save(target.mediaType).mutate({ mediaId: target.mediaId, status: "COMPLETED" });
           }
           return done;
         case "setStatus":

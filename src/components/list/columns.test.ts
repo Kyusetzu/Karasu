@@ -6,6 +6,8 @@ import {
   minRowWidth,
   ROW_HEIGHT_PX,
   SCORE_SHOWS_STAR,
+  TEXT_CELL_PX,
+  TEXT_ROW_HEIGHT_PX,
   shows,
   templateColumns,
   tierForWidth,
@@ -97,6 +99,17 @@ describe("templateColumns", () => {
     expect([...counts]).toHaveLength(1);
   });
 
+  /** The text list shares the header and the widths, so its missing cover is a collapsed track, never a removed one. */
+  it("keeps the track count when the cover goes, and collapses its track to zero", () => {
+    for (const tier of TIERS) {
+      const withCover = templateColumns(shape({ tier }));
+      const text = templateColumns(shape({ tier, cover: false }));
+      expect(trackCount(text)).toBe(trackCount(withCover));
+      expect(text.split(" ")[1]).toBe("0px");
+      expect(withCover.split(" ")[1]).toBe(`${COLUMN_PX.cover}px`);
+    }
+  });
+
   /** A zero-width track rather than a removed one, or entering select mode would shift every other column sideways. */
   it("keeps the selection track present but collapsed when not selecting", () => {
     expect(templateColumns(shape({ selectMode: false }))).toMatch(/^0px /);
@@ -170,6 +183,24 @@ describe("tierForWidth", () => {
     }
   });
 
+  it("frees exactly the cover's width for the text list", () => {
+    for (const tier of TIERS) {
+      expect(fixedWidth(shape({ tier })) - fixedWidth(shape({ tier, cover: false }))).toBe(
+        COLUMN_PX.cover,
+      );
+    }
+  });
+
+  /** The same width can only hold more columns once the cover is gone, never fewer. */
+  it("never gives the text list a narrower tier than the thumbnail rows", () => {
+    const rank = { compact: 0, mid: 1, full: 2 } as const;
+    for (const manga of [false, true]) {
+      for (let w = 400; w <= 2600; w += 20) {
+        expect(rank[tierForWidth(w, manga, false)]).toBeGreaterThanOrEqual(rank[tierForWidth(w, manga)]);
+      }
+    }
+  });
+
   /** The floor a row has to survive: the window minimum less the sidebar and page padding, in select mode, on manga. */
   it("fits inside the smallest window the app allows", () => {
     const available = 940 - 208 - 64;
@@ -177,6 +208,18 @@ describe("tierForWidth", () => {
     expect(
       minRowWidth({ tier, selectMode: true, manga: true }),
     ).toBeLessThanOrEqual(available);
+    const text = tierForWidth(available, true, false);
+    expect(
+      minRowWidth({ tier: text, selectMode: true, manga: true, cover: false }),
+    ).toBeLessThanOrEqual(available);
+  });
+});
+
+describe("TEXT_ROW_HEIGHT_PX", () => {
+  /** The text list's estimate: its tallest cell is a control now, so it derives from that, not from a cover. */
+  it("is one control plus padding, under half a thumbnail row", () => {
+    expect(TEXT_ROW_HEIGHT_PX).toBe(TEXT_CELL_PX + 8);
+    expect(TEXT_ROW_HEIGHT_PX * 2).toBeLessThan(ROW_HEIGHT_PX);
   });
 });
 

@@ -161,11 +161,15 @@ export function usePanZoom(
 
   const reset = useCallback(() => commit(RESTING), [commit]);
 
+  /** Straight to a computed view, for a caller that knows where its content should rest. */
+  const jumpTo = useCallback((next: ZoomView) => commit(next), [commit]);
+
   return {
     ...view,
     dragging,
     dragged,
     reset,
+    jumpTo,
     zoomAt,
     zoomBy,
     handlers: {

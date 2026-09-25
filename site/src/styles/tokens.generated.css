@@ -1,4 +1,4 @@
-/* GENERATED from src/app/index.css (sha256 45a389ba66b2) by site/scripts/sync-tokens.mjs
+/* GENERATED from src/app/index.css (sha256 354718cd0aa6) by site/scripts/sync-tokens.mjs
    — do not edit. Re-run `npm run sync` after changing the source; `npm run check`
    fails while this file is stale. CLAUDE.md, "The website". */
 /* `static` because Tailwind tree-shakes tokens no utility references, leaving a `var()`-only token undefined in dark. */
@@ -428,6 +428,20 @@
 /* The gradient at the foot of every cover: art is arbitrary, so anything over it needs a deterministic backdrop. */
 @utility cover-scrim {
   background-image: linear-gradient(to top, rgba(4, 5, 8, 0.92), transparent);
+}
+
+/* A black ring round light text on artwork; not `text-*`, or tailwind-merge reads it as a colour and drops one. */
+@utility ink-halo {
+  text-shadow:
+    -1px -1px 0 #000,
+    0 -1px 0 #000,
+    1px -1px 0 #000,
+    1px 0 0 #000,
+    1px 1px 0 #000,
+    0 1px 0 #000,
+    -1px 1px 0 #000,
+    -1px 0 0 #000,
+    0 0 3px rgba(0, 0, 0, 0.6);
 }
 
 /* The rule trailing a section heading, faded out so stacked sections do not read as a form. */

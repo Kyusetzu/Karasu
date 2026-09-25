@@ -79,6 +79,7 @@ import BackButton from "@/components/shell/BackButton";
 import { DetailSkeleton, Shimmer } from "@/components/Skeleton";
 import { cn } from "@/lib/utils";
 import { DecodedImage } from "@/components/media/DecodedImage";
+import { BannerImage } from "@/components/media/BannerImage";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardTitle } from "@/components/ui/card";
@@ -86,6 +87,7 @@ import { Pill } from "@/components/ui/pill";
 import { ScoreBars } from "@/components/ui/score-bars";
 import TagEditor from "@/components/media/TagEditor";
 import { parseNotes, serializeNotes } from "@/lib/tags";
+import { chooseStatus, openingFields, withCompletion, type FillMemo } from "@/lib/completion";
 import { parseAniListHtml } from "@/lib/anilistHtml";
 import { FavouriteButton } from "@/components/media/FavouriteButton";
 import { RichText } from "@/components/RichText";
@@ -189,13 +191,7 @@ export default function AnimeDetail() {
       {/* Fixed-height banner slot even without a bannerImage: the cover overlaps its bottom edge by a fixed amount. */}
       <div className="relative h-64">
         {data.bannerImage ? (
-          <DecodedImage
-            src={data.bannerImage}
-            className={cn(
-              "h-full w-full object-cover",
-              veiled && "scale-110 blur-2xl",
-            )}
-          />
+          <BannerImage src={data.bannerImage} veiled={veiled} />
         ) : (
           coverSrc && (
             <DecodedImage
@@ -205,7 +201,8 @@ export default function AnimeDetail() {
             />
           )
         )}
-        <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-surface-950 to-transparent" />
+        {/* A short fade into the page, so the contained banner stays whole above it. */}
+        <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-surface-950 to-transparent" />
         {/* Anchored to the banner, not the centred column, or it drifts inward with the gutter on a wide display. */}
         <BackButton className="absolute left-6 top-4 z-10" />
       </div>
@@ -1279,10 +1276,18 @@ function ListEditor({
   const viewer = useAuth((s) => s.viewer);
   const mode = useAuth((s) => s.mode);
   const qc = useQueryClient();
-  const [status, setStatus] = useState<MediaListStatus>(
-    entry?.status ?? loadDefaultAddStatus(),
-  );
-  const [progress, setProgress] = useState(entry?.progress ?? 0);
+  // Totals only: this editor has no volume field, so the volume total is added on the way out, never shown.
+  const totals = { episodes: media.episodes, chapters: media.chapters };
+  const opening = () =>
+    openingFields(
+      entry ? { status: entry.status, progress: entry.progress, volumes: 0 } : null,
+      loadDefaultAddStatus(),
+      totals,
+      mediaType,
+    );
+  const [status, setStatus] = useState<MediaListStatus>(() => opening().fields.status);
+  const [progress, setProgress] = useState(() => opening().fields.progress);
+  const [fillMemo, setFillMemo] = useState<FillMemo | null>(() => opening().memo);
   const [score, setScore] = useState(entry?.score ?? 0);
   const [repeat, setRepeat] = useState(entry?.repeat ?? 0);
   const parsed = parseNotes(entry?.notes);
@@ -1291,26 +1296,36 @@ function ListEditor({
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    setStatus(entry?.status ?? loadDefaultAddStatus());
-    setProgress(entry?.progress ?? 0);
+    const open = opening();
+    setStatus(open.fields.status);
+    setProgress(open.fields.progress);
+    setFillMemo(open.memo);
     setScore(entry?.score ?? 0);
     setRepeat(entry?.repeat ?? 0);
     const p = parseNotes(entry?.notes);
     setNotes(p.notes);
     setTags(p.tags);
+    // `opening` reads the same entry and this title's totals, which cannot change while the page shows it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entry]);
 
   const save = useMutation({
     mutationFn: () =>
       saveListEntry(
-        {
-          mediaId,
-          status,
-          progress,
-          score,
-          repeat,
-          notes: serializeNotes(notes, tags),
-        },
+        // Progress is always sent, so the fill only adds manga's volume total, and only on the move into Completed.
+        withCompletion(
+          {
+            mediaId,
+            status,
+            progress,
+            score,
+            repeat,
+            notes: serializeNotes(notes, tags),
+          },
+          media,
+          mediaType,
+          entry?.status ?? null,
+        ),
         media,
       ),
     onSuccess: (res) => {
@@ -1330,6 +1345,13 @@ function ListEditor({
   if (!viewer && mode !== "local") return null;
   const max = maxTotal ?? 99999;
 
+  const pickStatus = (next: MediaListStatus) => {
+    const picked = chooseStatus({ status, progress, volumes: 0 }, fillMemo, next, totals, mediaType);
+    setStatus(picked.fields.status);
+    setProgress(picked.fields.progress);
+    setFillMemo(picked.memo);
+  };
+
   return (
     <Card>
       <CardTitle>
@@ -1340,7 +1362,7 @@ function ListEditor({
         <span className="mb-1.5 block text-ink-500">{t("common.status")}</span>
         <div className="flex flex-wrap gap-0.75">
           {STATUS_ORDER.map((s) => (
-            <Pill key={s} active={status === s} onClick={() => setStatus(s)}>
+            <Pill key={s} active={status === s} onClick={() => pickStatus(s)}>
               {t(`status.${mediaType}.${s}`)}
             </Pill>
           ))}

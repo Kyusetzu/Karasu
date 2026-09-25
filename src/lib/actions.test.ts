@@ -5,7 +5,6 @@ import {
   canAdvance,
   canIncrementFacts,
   canIncrementVolumes,
-  completePatch,
   canScrobbleCancel,
   canScrobbleNow,
   scoreLeaves,
@@ -69,18 +68,6 @@ describe("scoreLeaves", () => {
   it("has nothing to offer for the continuous formats, which belong in the editor", () => {
     expect(scoreLeaves("POINT_100")).toBeNull();
     expect(scoreLeaves("POINT_10_DECIMAL")).toBeNull();
-  });
-});
-
-describe("completePatch", () => {
-  /** The row button and the menu used to disagree here, which showed as a different receipt for the same action. */
-  it("sets the final episode where the run length is known", () => {
-    expect(completePatch(12)).toEqual({ status: "COMPLETED", progress: 12 });
-  });
-
-  it("writes no progress at all where it is unknown, rather than rewriting the current number", () => {
-    expect(completePatch(null)).toEqual({ status: "COMPLETED" });
-    expect("progress" in completePatch(null)).toBe(false);
   });
 });
 

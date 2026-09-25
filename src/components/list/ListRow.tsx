@@ -36,6 +36,7 @@ const CELL =
 export const ListRow = memo(function ListRow({
   entry,
   tier,
+  variant = "thumbs",
   blurred,
   onQuickSave,
   onComplete,
@@ -47,6 +48,8 @@ export const ListRow = memo(function ListRow({
 }: {
   entry: MediaListEntry;
   tier: Tier;
+  /** `text` is the compact list: the same controls on one line, with the cover track collapsed. */
+  variant?: "thumbs" | "text";
   /** Computed by the page, not read from the store here: a store subscription would re-render every memoized row. */
   blurred: boolean;
   onQuickSave: (entry: MediaListEntry, patch: RowPatch) => void;
@@ -60,6 +63,9 @@ export const ListRow = memo(function ListRow({
   const { t, i18n } = useTranslation();
   const { media } = entry;
   const manga = media.type === "MANGA";
+  const text = variant === "text";
+  // One step down in the text list, so every control and the icon buttons share one height.
+  const cell = cn(CELL, text && "h-7", "w-full");
   const max = maxProgress(media);
   const dropdown = max !== null && max <= PROGRESS_DROPDOWN_LIMIT;
   // Subscribe to the data, not `hasNext`: its identity never changes, so the row would never re-render after a scan.
@@ -121,12 +127,13 @@ export const ListRow = memo(function ListRow({
       data-media-title={displayTitle(media.title)}
       onClick={rowClick}
       className={cn(
-        "grid items-center gap-x-2.5 border-b border-surface-950 px-3.5 py-2 transition-surface",
+        "grid items-center gap-x-2.5 border-b border-surface-950 px-3.5 transition-surface",
+        text ? "py-1" : "py-2",
         selected ? "bg-accent-600/10" : "bg-surface-900 hover:bg-surface-850",
         focused && "outline-2 -outline-offset-2 outline-accent-500",
         selectMode && "cursor-pointer",
       )}
-      style={{ gridTemplateColumns: templateColumns({ tier, selectMode, manga }) }}
+      style={{ gridTemplateColumns: templateColumns({ tier, selectMode, manga, cover: !text }) }}
     >
       {/* A zero-width track when not selecting, so no column shifts sideways on entering select mode. */}
       <div className="overflow-hidden">
@@ -138,38 +145,61 @@ export const ListRow = memo(function ListRow({
         )}
       </div>
 
-      {/* The cover carries the hero transition into the detail page. */}
-      <Link
-        to={`/media/${media.id}`}
-        className="block"
-        onClick={(e) => selectMode && e.preventDefault()}
-        tabIndex={selectMode ? -1 : undefined}
-      >
-        {/* No reveal control, deliberately: at this size it would sit on the link it replaces, and the detail page has one. */}
-        <img
-          src={media.coverImage.large ?? ""}
-          alt=""
-          loading="lazy"
-          className={cn(
-            "aspect-[2/3] w-full rounded-md bg-surface-800 object-cover",
-            blurred && "blur-[6px]",
-          )}
-        />
-      </Link>
+      {/* The cover carries the hero transition into the detail page; the text list keeps an empty 0px track instead. */}
+      {text ? (
+        <span />
+      ) : (
+        <Link
+          to={`/media/${media.id}`}
+          className="block"
+          onClick={(e) => selectMode && e.preventDefault()}
+          tabIndex={selectMode ? -1 : undefined}
+        >
+          {/* No reveal control, deliberately: at this size it would sit on the link it replaces, and the detail page has one. */}
+          <img
+            src={media.coverImage.large ?? ""}
+            alt=""
+            loading="lazy"
+            className={cn(
+              "aspect-[2/3] w-full rounded-md bg-surface-800 object-cover",
+              blurred && "blur-[6px]",
+            )}
+          />
+        </Link>
+      )}
 
-      <Link
-        to={`/media/${media.id}`}
-        className="min-w-0"
-        onClick={(e) => selectMode && e.preventDefault()}
-        tabIndex={selectMode ? -1 : undefined}
-      >
-        <TitleLockup title={media.title} />
-        {secondary.length > 0 && (
-          <p className="mt-0.5 truncate text-2xs text-ink-600">
-            {secondary.join(" · ")}
-          </p>
-        )}
-      </Link>
+      {text ? (
+        // One line: the title keeps its whole width and the details beside it give way first, down to nothing.
+        <Link
+          to={`/media/${media.id}`}
+          className="flex min-w-0 items-baseline gap-2"
+          onClick={(e) => selectMode && e.preventDefault()}
+          tabIndex={selectMode ? -1 : undefined}
+        >
+          <span className="max-w-full shrink-0 truncate text-[.8125rem] font-medium text-ink-100">
+            {displayTitle(media.title)}
+          </span>
+          {secondary.length > 0 && (
+            <span className="min-w-0 flex-1 truncate text-2xs text-ink-600">
+              {secondary.join(" · ")}
+            </span>
+          )}
+        </Link>
+      ) : (
+        <Link
+          to={`/media/${media.id}`}
+          className="min-w-0"
+          onClick={(e) => selectMode && e.preventDefault()}
+          tabIndex={selectMode ? -1 : undefined}
+        >
+          <TitleLockup title={media.title} />
+          {secondary.length > 0 && (
+            <p className="mt-0.5 truncate text-2xs text-ink-600">
+              {secondary.join(" · ")}
+            </p>
+          )}
+        </Link>
+      )}
 
       {/* Status is the most-changed field, so a control rather than a label wherever there is room for one. */}
       <div className="overflow-hidden">
@@ -180,7 +210,7 @@ export const ListRow = memo(function ListRow({
               onQuickSave(entry, { status: e.target.value as MediaListStatus })
             }
             onClick={(e) => e.stopPropagation()}
-            className={cn(CELL, "w-full")}
+            className={cell}
             aria-label={t("common.status")}
             title={t("common.status")}
           >
@@ -196,7 +226,7 @@ export const ListRow = memo(function ListRow({
       <ScoreSelect
         value={entry.score}
         onChange={(score) => onQuickSave(entry, { score })}
-        className="w-full"
+        className={cn("w-full", text && "h-7")}
       />
 
       <div onClick={(e) => e.stopPropagation()}>
@@ -209,7 +239,7 @@ export const ListRow = memo(function ListRow({
             onPointerEnter={openProgress}
             onFocus={openProgress}
             onMouseDown={openProgress}
-            className={cn(CELL, "w-full")}
+            className={cell}
             aria-label={t("common.progress")}
             title={t("common.progress")}
           >
@@ -247,7 +277,7 @@ export const ListRow = memo(function ListRow({
             }
             onPointerEnter={() => setVolumesOpened(true)}
             onFocus={() => setVolumesOpened(true)}
-            className={cn(CELL, "w-full")}
+            className={cell}
             aria-label={t("common.volumes")}
             title={t("common.volumes")}
           >

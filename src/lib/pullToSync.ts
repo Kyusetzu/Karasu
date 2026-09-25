@@ -15,16 +15,18 @@ export interface PullState {
   offset: number;
   /** Where the finger was when tracking began. */
   startY: number;
+  startX: number;
 }
 
 export interface PullSample {
   y: number;
+  x: number;
   scrollTop: number;
   touches: number;
   syncing: boolean;
 }
 
-export const PULL_IDLE: PullState = { phase: "idle", offset: 0, startY: 0 };
+export const PULL_IDLE: PullState = { phase: "idle", offset: 0, startY: 0, startX: 0 };
 
 /** Asymptotic, so the pull gets heavier rather than ending at a wall, and the cap is reached only in the limit. */
 export function pullOffset(raw: number): number {
@@ -35,6 +37,11 @@ export function pullOffset(raw: number): number {
 /** Declared to scroll, whether or not it currently has anything to scroll. */
 export function scrollsByStyle(overflowY: string): boolean {
   return overflowY === "auto" || overflowY === "scroll";
+}
+
+/** A surface with `touch-action: none` handles its own drags, so a pull must never start on it. */
+export function ownsGestures(touchAction: string): boolean {
+  return touchAction === "none";
 }
 
 /** An overflow that scrolls and content that overflows it; anything else is a container the gesture must look past. */
@@ -49,7 +56,7 @@ export function isScrollableStyle(
 /** Tracking starts only at the very top, with one finger, and never while a sync is already running. */
 export function pullBegin(sample: PullSample): PullState {
   if (sample.syncing || sample.touches !== 1 || sample.scrollTop > 0) return PULL_IDLE;
-  return { phase: "tracking", offset: 0, startY: sample.y };
+  return { phase: "tracking", offset: 0, startY: sample.y, startX: sample.x };
 }
 
 /** Folds one move in; the gesture becomes ours only past the slop, downward, still at the top and still one finger. */
@@ -57,6 +64,9 @@ export function pullMove(state: PullState, sample: PullSample): PullState {
   if (state.phase === "idle") return state;
   if (sample.syncing || sample.touches !== 1 || sample.scrollTop > 0) return PULL_IDLE;
   const raw = sample.y - state.startY;
+  const dx = Number.isFinite(sample.x) ? Math.abs(sample.x - state.startX) : 0;
+  // Decided once, on the sample that leaves the slop: a sideways drag is a tab swipe and never becomes a pull.
+  if (state.phase === "tracking" && dx >= PULL_SLOP_PX && dx > Math.abs(raw)) return PULL_IDLE;
   if (raw < PULL_SLOP_PX) return { ...state, phase: "tracking", offset: 0 };
   const offset = pullOffset(raw - PULL_SLOP_PX);
   return { ...state, phase: offset >= PULL_TRIGGER_PX ? "ready" : "pulling", offset };

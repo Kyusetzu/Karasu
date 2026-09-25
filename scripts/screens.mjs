@@ -93,6 +93,7 @@ export const SCREENS = [
     await p.waitForTimeout(300);
     await p.getByRole("checkbox").nth(1).click();
   } },
+  { id: "d20-listenansicht", w: 1232, h: 800, route: "/list", act: (p) => p.getByRole("radio", { name: "Liste" }).first().click() },
   { id: "d18-sync", w: 1232, h: 800, route: "/list", act: (p) => p.getByRole("button", { name: "Details zur Synchronisierung" }).first().click() },
   {
     id: "p8-glocke",

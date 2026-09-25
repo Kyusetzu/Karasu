@@ -545,6 +545,7 @@ export const de: typeof en = {
     repo: "Quellcode",
   },
   list: {
+    colScore: "Wertung",
     colTitle: "Titel",
     colRepeat: "Wiederholt",
     colDates: "Begonnen / beendet",

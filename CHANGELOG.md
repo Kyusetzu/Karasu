@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: a9abd9f -->
+<!-- generated-through: fa917b5 -->
 
 ### Fixed
 
@@ -99,6 +99,7 @@ tag time is then optional rather than load-bearing.
 - Collapsing or expanding the sidebar from the keyboard keeps the focus on the toggle, and the collapsed rail's names switch without overlapping.
 - The floating detection window is readable in the light theme again, and the shell's banners animate in and out.
 - Notification links need one back press, the notifications page keeps its loaded pages and unread marks when the titlebar bell opens over it, and its header fits a phone.
+- A keyboard focus ring is visible on grid covers again, the complete button no longer overflows narrow covers, and the list view's score header is no longer cut off in German.
 
 ### Added
 

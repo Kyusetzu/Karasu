@@ -89,7 +89,7 @@ export function CoverCell({
     <div className={cn("group", className)} {...rest}>
       <div
         className={cn(
-          "relative aspect-[2/3] overflow-hidden rounded-control bg-surface-800",
+          "focus-frame @container relative aspect-[2/3] overflow-hidden rounded-control bg-surface-800",
           selected && "outline-2 outline-offset-2 outline-accent-500",
         )}
       >

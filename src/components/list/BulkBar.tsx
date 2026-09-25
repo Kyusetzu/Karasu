@@ -26,6 +26,7 @@ export function BulkBar({
   onDelete,
   onClear,
   names,
+  leaving = false,
 }: {
   type: MediaType;
   count: number;
@@ -38,6 +39,8 @@ export function BulkBar({
   onDelete: () => void;
   onClear: () => void;
   names: string[];
+  /** On its way out: plays the exit and takes no input. */
+  leaving?: boolean;
 }) {
   const { t } = useTranslation();
   const scoreFormat = useScoreFormat();
@@ -46,7 +49,13 @@ export function BulkBar({
 
   return (
     // The now-playing card's inset-well substance: reading as a different material announces it without a colour shout.
-    <div className="inset-well well-edge relative mx-8 mb-5 flex animate-rise-in flex-wrap items-center gap-2.5 overflow-hidden rounded-[.875rem] px-4.5 py-3">
+    <div
+      inert={leaving || undefined}
+      className={cn(
+        "inset-well well-edge relative mx-8 mb-5 flex flex-wrap items-center gap-2.5 overflow-hidden rounded-panel px-4.5 py-3",
+        leaving ? "animate-rise-out" : "animate-rise-in",
+      )}
+    >
       <span className="text-ui font-semibold tabular-nums text-ink-100">
         {t("bulk.selected", { count })}
       </span>

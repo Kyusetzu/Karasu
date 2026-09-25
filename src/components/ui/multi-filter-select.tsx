@@ -100,7 +100,7 @@ export function MultiFilterSelect({
           !isEmpty(value) && "border-accent-500/60",
         )}
       >
-        <span className="text-xs uppercase tracking-[.08em] text-ink-600">
+        <span className="text-2xs font-semibold uppercase text-ink-600">
           {label}
         </span>
         <span className="max-w-32 truncate text-xs text-ink-300">
@@ -109,7 +109,7 @@ export function MultiFilterSelect({
         {summary && summary.extra > 0 && (
           <Badge tone="neutral">+{summary.extra}</Badge>
         )}
-        <ChevronDown className="size-3 shrink-0 text-ink-600" />
+        <ChevronDown className="size-3.5 shrink-0 text-ink-600" />
       </button>
 
       {panel.mounted && (
@@ -159,12 +159,12 @@ export function MultiFilterSelect({
                     )}
                   >
                     <span className="grid size-3.5 shrink-0 place-items-center">
-                      {state === "include" && <Check className="size-3.25" />}
-                      {state === "exclude" && <Minus className="size-3.25" />}
+                      {state === "include" && <Check className="size-3.5" />}
+                      {state === "exclude" && <Minus className="size-3.5" />}
                     </span>
                     <span className="min-w-0 flex-1 truncate">{option}</span>
                     {state === "exclude" && (
-                      <span className="shrink-0 text-2xs uppercase tracking-[.08em]">
+                      <span className="shrink-0 text-2xs uppercase">
                         {t("search.excluded")}
                       </span>
                     )}

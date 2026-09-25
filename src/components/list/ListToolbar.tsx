@@ -111,7 +111,7 @@ export function ListToolbar(props: ListToolbarProps) {
       onClosed={props.onPanelClosed}
       renderTrigger={(p) => (
         <ToolTrigger p={p} name={t("list.sortButton", { key: sortName, dir: dirName })} iconOnly={phone}>
-          <ArrowUpDown aria-hidden className="size-3.75 shrink-0" />
+          <ArrowUpDown aria-hidden className="size-4 shrink-0" />
           {!phone && sortName}
           {!phone && <DirIcon aria-hidden className="size-3.25 text-ink-500" />}
         </ToolTrigger>
@@ -130,7 +130,7 @@ export function ListToolbar(props: ListToolbarProps) {
       onClosed={props.onPanelClosed}
       renderTrigger={(p) => (
         <ToolTrigger p={p} name={filterName} iconOnly={phone} active={chips.length > 0}>
-          <SlidersHorizontal aria-hidden className="size-3.75 shrink-0" />
+          <SlidersHorizontal aria-hidden className="size-4 shrink-0" />
           {!phone && t("list.filters")}
           {chips.length > 0 && (
             <Badge aria-hidden count={chips.length} floating={phone} className={phone ? "-right-1.5 -top-1.5" : undefined} />
@@ -165,9 +165,9 @@ export function ListToolbar(props: ListToolbarProps) {
             onClosed={props.onPanelClosed}
             renderTrigger={(p) => (
               <ToolTrigger p={p} name={t("presets.button")}>
-                <Bookmark aria-hidden className="size-3.75 shrink-0" />
+                <Bookmark aria-hidden className="size-4 shrink-0" />
                 {t("presets.button")}
-                <ChevronDown aria-hidden className="size-3.25 text-ink-500" />
+                <ChevronDown aria-hidden className="size-3.5 text-ink-500" />
               </ToolTrigger>
             )}
           >
@@ -180,7 +180,7 @@ export function ListToolbar(props: ListToolbarProps) {
             title={t("random.pick")}
             className={cn(toolClass, "w-8.5 justify-center")}
           >
-            <Dices aria-hidden className="size-3.75" />
+            <Dices aria-hidden className="size-4" />
           </button>
           <ViewSwitch className="ml-auto" layout={props.layout} onLayout={props.onLayout} />
         </div>
@@ -601,7 +601,7 @@ function ViewSwitch({
         {title}
       </span>
     ) : (
-      <Icon aria-hidden className="size-3.75" />
+      <Icon aria-hidden className="size-4" />
     ),
   });
   return (

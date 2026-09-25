@@ -37,6 +37,8 @@
   --text-ui: 0.8125rem;
   /* The one letter spacing for small uppercase labels. */
   --tracking-eyebrow: 0.12em;
+  /* The narrowest cover that still holds three quick-action circles in a row. */
+  --container-cover-actions: 7.5rem;
   /* The Japanese sub-lockup beside a screen title, opened a little so its kana do not crowd. */
   --tracking-lockup: 0.04em;
   /* The titlebar's wordmark, spaced as a brand mark rather than a label. */
@@ -644,6 +646,22 @@ nav a {
 @utility media-grid {
   display: grid;
   grid-template-columns: repeat(var(--cover-cols, 8), minmax(0, 1fr));
+}
+
+/* The ring for a control inside a clipping frame, drawn on the frame, since the control's own outline is cut by the clip. */
+@utility focus-frame {
+  &:has(> :focus-visible) {
+    outline: 2px solid var(--color-accent-500);
+    outline-offset: 2px;
+  }
+  :root[data-contrast="more"] &:has(> :focus-visible) {
+    outline-width: 3px;
+  }
+  @media (forced-colors: active) {
+    &:has(> :focus-visible) {
+      outline: 3px solid Highlight;
+    }
+  }
 }
 
 /* The light a raised panel catches along its top; it composes over a background colour and sets none. */

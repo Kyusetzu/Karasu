@@ -555,3 +555,10 @@ maintainer picks. A pure restyle that moves nothing does not. The rules:
   detection window's backdrop fades to the panel colour rather than the
   cover scrim's black, which had left its lower lines unreadable in the
   light theme.
+- **2026-09-25:** The lists' polish, shown as before and after and kept as
+  shown. The toolbar and the filter selects take the eyebrow and the icon
+  scale, the selection bar leaves the way it arrives, and the list view's
+  score column reads "Score" where the German "Bewertung" was cut. A cover
+  in the grid draws its focus ring on its frame, since the frame's clip had
+  cut the ring off the link inside it, and a cover too narrow for both
+  quick actions shows the one that fits rather than a clipped second.

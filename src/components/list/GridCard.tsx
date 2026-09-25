@@ -95,7 +95,7 @@ export const GridCard = memo(function GridCard({
               <Pencil className="size-3.5" />
             </IconButton>
             {entry.status !== "COMPLETED" && (
-              // Hidden on coarse pointers, where three always-visible circles overflow a phone cover and clip the edit button.
+              // Hidden where three circles overflow the cover and clip the edit button: a phone, or a narrow desktop cover.
               <IconButton
                 variant="onCover"
                 size="sm"
@@ -103,7 +103,7 @@ export const GridCard = memo(function GridCard({
                 onClick={() => onComplete(entry)}
                 aria-label={t("common.complete")}
                 title={t("common.complete")}
-                className="text-success pointer-coarse:hidden"
+                className="text-success pointer-coarse:hidden @max-cover-actions:hidden"
               >
                 <CheckCheck className="size-3.5" />
               </IconButton>

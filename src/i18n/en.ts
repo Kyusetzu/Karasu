@@ -543,6 +543,7 @@ export const en = {
     repo: "Source",
   },
   list: {
+    colScore: "Score",
     colTitle: "Title",
     colRepeat: "Repeats",
     colDates: "Started / finished",

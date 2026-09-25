@@ -175,3 +175,26 @@ describe("the skeleton's wait", () => {
     expect(rule).toMatch(/animation-delay:\s*var\(--shimmer-offset, 0ms\),\s*var\(--delay-skeleton\)/);
   });
 });
+
+describe("the focus ring on a clipping frame", () => {
+  const block = (start: string) => css.slice(css.indexOf(start), css.indexOf("\n}", css.indexOf(start)));
+  const frame = block("@utility focus-frame");
+  const ring = (text: string, selector: string) => {
+    const at = text.indexOf(selector);
+    return text.slice(at, text.indexOf("}", at));
+  };
+
+  it("draws what the global ring draws, so a cover's focus reads like any other control's", () => {
+    const global = ring(css, "  :focus-visible {");
+    const own = ring(frame, "&:has(> :focus-visible) {");
+    for (const property of ["outline:", "outline-offset:"]) {
+      const value = (text: string) => new RegExp(`${property}\\s*([^;]+);`).exec(text)?.[1];
+      expect(value(own), property).toBe(value(global));
+    }
+  });
+
+  it("thickens in high contrast and takes the system highlight in forced colours, as the global ring does", () => {
+    expect(frame).toMatch(/:root\[data-contrast="more"\] &:has\(> :focus-visible\) \{\s*outline-width: 3px;/);
+    expect(frame).toMatch(/@media \(forced-colors: active\) \{\s*&:has\(> :focus-visible\) \{\s*outline: 3px solid Highlight;/);
+  });
+});

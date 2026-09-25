@@ -620,7 +620,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
               refetch();
             }}
           >
-            <RefreshCw className="size-3.25" /> {t("list.syncNow")}
+            <RefreshCw className="size-3.5" /> {t("list.syncNow")}
           </Button>
         </div>
       )}
@@ -642,7 +642,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
               size="control"
               onClick={() => (selectMode ? exitSelect() : setSelectMode(true))}
             >
-              <CheckSquare className="size-3.75" />
+              <CheckSquare className="size-4" />
               {t("bulk.select")}
             </Button>
             {/* The phone syncs by pulling the list down, so its corner holds what its toolbar has no room for. */}
@@ -843,20 +843,24 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
         )}
       </div>
 
-      {selectMode && (
-        <BulkBar
-          type={type}
-          count={selectedEntries.length}
-          onStatus={bulkStatus}
-          onScore={bulkScore}
-          onProgress={bulkProgress}
-          onRepeat={bulkRepeat}
-          onPrivate={bulkPrivate}
-          onDelete={bulkDelete}
-          onClear={exitSelect}
-          names={selectedEntries.map((e) => displayTitle(e.media.title))}
-        />
-      )}
+      {/* Presence, so the bar sinks away still showing the selection it had rather than a count of nought. */}
+      <Presence value={selectMode ? selectedEntries : null}>
+        {(chosen, leaving) => (
+          <BulkBar
+            leaving={leaving}
+            type={type}
+            count={chosen.length}
+            onStatus={bulkStatus}
+            onScore={bulkScore}
+            onProgress={bulkProgress}
+            onRepeat={bulkRepeat}
+            onPrivate={bulkPrivate}
+            onDelete={bulkDelete}
+            onClear={exitSelect}
+            names={chosen.map((e) => displayTitle(e.media.title))}
+          />
+        )}
+      </Presence>
 
       {/* Presence rather than a bare conditional: the dialog keeps its entry while it animates away. */}
       <Presence value={editing}>

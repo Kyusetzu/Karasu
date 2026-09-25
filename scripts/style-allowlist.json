@@ -52,5 +52,11 @@
     "rule": "icon-size",
     "token": "size-3",
     "reason": "the maximise square is drawn a step under the minus beside it so the caption glyphs read at one weight"
+  },
+  {
+    "file": "src/components/media/CoverCell.tsx",
+    "rule": "icon-size",
+    "token": "size-2.5",
+    "reason": "the score badge's star sits in its 10 px figures and matches their height"
   }
 ]

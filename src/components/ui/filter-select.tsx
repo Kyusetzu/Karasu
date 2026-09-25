@@ -34,13 +34,13 @@ export function FilterSelect({
         className,
       )}
     >
-      <span className="text-xs uppercase tracking-[.08em] text-ink-600">
+      <span className="text-2xs font-semibold uppercase text-ink-600">
         {label}
       </span>
       <span className="max-w-32 truncate text-xs text-ink-300">
         {current?.label ?? placeholder}
       </span>
-      <ChevronDown className="size-3 shrink-0 text-ink-600" />
+      <ChevronDown className="size-3.5 shrink-0 text-ink-600" />
       <select
         value={value}
         aria-label={label}

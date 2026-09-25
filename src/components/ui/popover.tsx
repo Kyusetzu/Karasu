@@ -40,6 +40,7 @@ export function Popover({
   renderTrigger,
   onOpen,
   onClosed,
+  className,
   children,
 }: {
   label: string;
@@ -52,6 +53,8 @@ export function Popover({
   onOpen?: () => void;
   /** Runs as the panel closes, before any `closeThen` action; a URL write from here must wait on `afterBackSettles`. */
   onClosed?: () => void;
+  /** On the box around the trigger, for a trigger that has to grow with its row. */
+  className?: string;
   children: (api: PopoverApi) => ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -134,7 +137,7 @@ export function Popover({
   );
 
   return (
-    <div ref={boxRef} className="relative inline-flex shrink-0">
+    <div ref={boxRef} className={cn("relative inline-flex shrink-0", className)}>
       {renderTrigger({
         ref: triggerRef,
         onClick: toggle,

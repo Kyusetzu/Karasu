@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 9834dc1 -->
+<!-- generated-through: 8a85f1e -->
 
 ### Fixed
 
@@ -134,6 +134,7 @@ tag time is then optional rather than load-bearing.
 - The anime and manga list header is rebuilt: single-row status tabs in their status colours, and one toolbar with search, sort, filter and preset panels, removable filter chips, and a More menu on the phone.
 - Banners blend into their surroundings without hard edges, the title page's banner takes less room on the phone, and the Overview hero counts aired episodes for a running show.
 - Swipe the season hero instead of stepping it with arrows (1.22.2.675).
+- On the phone, the detail page puts every fact below the cover and lets you change the status from a button.
 ## 1.0.0 — 2026-09-05
 
 Karasu 1.0.0 is the first tagged release: a desktop and Android tracker built

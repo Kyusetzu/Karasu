@@ -14,7 +14,6 @@ import { isAndroid, usePlatform } from "@/stores/platform";
 import { OfflineDetail } from "@/components/media/OfflineDetail";
 import {
   ChevronRight,
-  Clock,
   ExternalLink,
   Share2,
   Play,
@@ -52,7 +51,6 @@ import { usePresence } from "@/hooks/usePresence";
 import { relTimeFromSeconds } from "@/lib/relTime";
 import { showToast } from "@/stores/toast";
 import {
-  countdown,
   formatLabel,
   fuzzyDate,
   mediaStatusLabel,
@@ -61,7 +59,6 @@ import {
 import { statusColorVar } from "@/lib/statusColors";
 import { readableInk, UI_INK } from "@/lib/contrast";
 import { useTheme } from "@/stores/theme";
-import { formatMinutes, remainingMinutes } from "@/lib/estimate";
 import { isTauri, saveListEntry } from "@/api/anilist";
 import {
   displayTitle,
@@ -91,12 +88,19 @@ import { parseNotes, serializeNotes } from "@/lib/tags";
 import { chooseStatus, openingFields, withCompletion, type FillMemo } from "@/lib/completion";
 import { parseAniListHtml } from "@/lib/anilistHtml";
 import { FavouriteButton } from "@/components/media/FavouriteButton";
+import { GenreChips, MetaLine, NextEpisode, TimeLeft } from "@/components/media/DetailFacts";
+import { StatusMenu } from "@/components/media/StatusMenu";
+import { IconButton } from "@/components/ui/icon-button";
+import { usePhoneShell } from "@/hooks/usePhoneShell";
+import { entryFromEcho } from "@/lib/listEcho";
 import { RichText } from "@/components/RichText";
 import { ScoreColumns, StatusBar } from "@/components/stats/panels";
 
+/** The phone's square actions, the height of the status button beside them. */
+const SQUARE = "size-11 rounded-xl border border-surface-700 bg-surface-900 text-ink-300 hover:border-surface-600 hover:text-ink-100";
 
 export default function AnimeDetail() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { id } = useParams();
   const mediaId = Number(id);
   // Subscribe to the data, not a store function: a function's identity never changes, so a scan would never re-render.
@@ -105,6 +109,8 @@ export default function AnimeDetail() {
   const level = useContentFilter((s) => s.level);
   const blurAdult = useContentFilter((s) => s.blurAdult);
   const profileMode = useAuth((s) => s.mode);
+  const viewer = useAuth((s) => s.viewer);
+  const phone = usePhoneShell();
   // The raw hexes, not the var(): readableInk needs a colour it can measure, and a CSS variable is opaque to it.
   const statusColors = useTheme((st) => st.statusColors);
   const [revealed, setRevealed] = useState(false);
@@ -176,9 +182,11 @@ export default function AnimeDetail() {
   const studioEdges = data.studios?.edges ?? [];
   const mainStudios = studioEdges.filter((e) => e.isMain).map((e) => e.node);
   const producers = studioEdges.filter((e) => !e.isMain).map((e) => e.node);
-  const untilNext = data.nextAiringEpisode
-    ? data.nextAiringEpisode.airingAt - Math.floor(Date.now() / 1000)
-    : 0;
+  // Files on disk past the entry's progress; Android has no library, so it never offers the button.
+  const canPlay =
+    data.type === "ANIME" && !!episodes?.some((e) => e > (data.mediaListEntry?.progress ?? 0));
+  // The same rule as the editor below: nothing to change without an account or a local list.
+  const canEdit = !!viewer || profileMode === "local";
 
   // AniList's relations connection takes no arguments, so an adult spin-off can only be dropped here, client-side.
   const relatedEdges = data.relations.edges.filter(
@@ -212,10 +220,10 @@ export default function AnimeDetail() {
       </div>
 
       <div className="relative mx-auto max-w-4xl px-8 pb-10 2xl:max-w-none">
-        {/* On the phone the cover starts where the banner ends; wider, it overlaps the banner as it always did. */}
-        <div className="-mt-11 flex gap-6 md:-mt-14">
+        {/* Floated on the phone, so a title longer than the cover carries on beneath it; wider, it overlaps the banner. */}
+        <div className={cn("-mt-11 md:-mt-14", phone ? "flow-root" : "flex gap-6")}>
           {/* The incoming half of the cover-to-hero morph; unconditional because this page shows exactly one cover. */}
-          <div className="relative h-57 w-38 shrink-0">
+          <div className={cn("relative h-57 w-38 shrink-0", phone && "float-left mb-2 mr-5")}>
             <img
               src={coverSrc}
               alt=""
@@ -254,7 +262,7 @@ export default function AnimeDetail() {
               onClose={() => setCoverOpen(false)}
             />
           )}
-          <div className="min-w-0 flex-1 pt-16">
+          <div className={cn("pt-16", !phone && "min-w-0 flex-1")}>
             <h1 className="text-[1.625rem] font-bold leading-tight text-ink-100">
               {title}
             </h1>
@@ -269,152 +277,125 @@ export default function AnimeDetail() {
                 <p className="text-sm text-ink-500">{data.title.romaji}</p>
               )
             )}
-            {/* Whether this is on your list, said beside the title and coloured from the same palette as the cover rings. */}
-            <p className="mt-2.5">
-              {entry ? (
-                <span
-                  className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-2xs font-semibold"
-                  style={{
-                    backgroundColor: statusColorVar(entry.status),
-                    // The palette is user-chosen, so readableInk picks whichever ink end has contrast against their hue.
-                    color: readableInk(
-                      statusColors[entry.status] ?? "#000000",
-                      UI_INK,
-                    ),
-                  }}
-                >
-                  {t(`status.${data.type}.${entry.status}`)}
-                  {progressLabel && <span className="opacity-80">{progressLabel}</span>}
-                </span>
-              ) : (
-                // undefined from useCachedEntry means not loaded yet as well as not listed, so say nothing until it resolves.
-                localPending ? null : (
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-surface-700 px-2.5 py-0.5 text-2xs text-ink-500">
-                    {t("detail.notOnList")}
-                  </span>
-                )
-              )}
-            </p>
-            <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[.8125rem] text-ink-300">
-              {data.averageScore !== null && (
-                <span className="flex items-center gap-1 text-gold">
-                  <Star className="size-3.5" fill="currentColor" /> {data.averageScore}%
-                </span>
-              )}
-              {data.format && <span>{formatLabel(data.format, t)}</span>}
-              {data.status && (
-                <span>{mediaStatusLabel(data.status, t)}</span>
-              )}
-              {data.episodes && (
-                <span>
-                  {data.episodes} {t("common.episodes")}
-                </span>
-              )}
-              {data.chapters && (
-                <span>
-                  {data.chapters} {t("common.chapters")}
-                </span>
-              )}
-              {data.volumes && (
-                <span>
-                  {data.volumes} {t("common.volumes")}
-                </span>
-              )}
-              {data.duration && (
-                <span>{t("detail.minutes", { n: data.duration })}</span>
-              )}
-              {data.seasonYear && (
-                <span>
-                  {data.season ? `${t(`season.${data.season}`)} ` : ""}
-                  {data.seasonYear}
-                </span>
-              )}
-              {mainStudios.length > 0 && (
-                <span className="text-ink-500">
-                  {mainStudios.map((s) => s.name).join(", ")}
-                </span>
-              )}
-            </div>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {data.genres.map((g) => (
-                <span
-                  key={g}
-                  className="rounded-[.625rem] border border-surface-800 bg-surface-850 px-2 py-0.5 text-2xs text-ink-300"
-                >
-                  {g}
-                </span>
-              ))}
-            </div>
-            {data.type === "ANIME" &&
-              (() => {
-                const remaining = remainingMinutes(
-                  data,
-                  data.mediaListEntry?.progress ?? 0,
-                );
-                return remaining !== null && remaining > 0 ? (
-                  <p className="mt-2 flex items-center gap-1.5 text-sm text-ink-300">
-                    <Clock className="size-3.5 text-ink-500" />
-                    {t("detail.timeLeft", {
-                      time: formatMinutes(remaining, t),
-                    })}
-                  </p>
-                ) : null;
-              })()}
-            {data.nextAiringEpisode && (
-              <p className="mt-2 text-sm text-accent-400">
-                {t("detail.nextEpisode", {
-                  n: data.nextAiringEpisode.episode,
-                  date: new Date(
-                    data.nextAiringEpisode.airingAt * 1000,
-                  ).toLocaleString(i18n.language, {
-                    weekday: "short",
-                    day: "2-digit",
-                    month: "2-digit",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  }),
-                })}
-                {/* > 0, not truthiness: countdown returns "" once past, and at exactly zero 0 && renders a literal 0. */}
-                {untilNext > 0 && (
-                  <span className="ml-2 text-ink-500">
-                    ({countdown(untilNext, t)})
-                  </span>
+            {phone ? (
+              // Below the cover whatever the title's length: a short title leaves air beside it, never a squeezed column.
+              <div className="clear-left space-y-2.5 pt-2.5">
+                <MetaLine data={data} studios={mainStudios.map((s) => s.name)} />
+                <GenreChips genres={data.genres} />
+                <NextEpisode data={data} bar />
+                <TimeLeft data={data} />
+                <div className="flex gap-2">
+                  {canEdit &&
+                    (localPending ? (
+                      // Not "Add to list" before the local list has answered whether the title is on it.
+                      <Shimmer className="h-11 flex-1 rounded-xl" />
+                    ) : (
+                      <StatusMenu
+                        media={data}
+                        entry={entry ?? null}
+                        progressLabel={progressLabel}
+                        className="min-w-0 flex-1"
+                      />
+                    ))}
+                  <FavouriteButton
+                    kind={data.type === "MANGA" ? "manga" : "anime"}
+                    id={data.id}
+                    isFavourite={data.isFavourite}
+                    blocked={data.isFavouriteBlocked}
+                    square
+                  />
+                  <IconButton
+                    onClick={() => openUrl(mediaUrl(data.type, data.id))}
+                    aria-label={t("detail.openOnAniList")}
+                    title={t("detail.openOnAniList")}
+                    className={SQUARE}
+                  >
+                    <ExternalLink className="size-4.5" />
+                  </IconButton>
+                  {android && (
+                    <IconButton
+                      onClick={() => void shareText(mediaUrl(data.type, data.id)).catch(() => {})}
+                      aria-label={t("ctx.share")}
+                      title={t("ctx.share")}
+                      className={SQUARE}
+                    >
+                      <Share2 className="size-4.5" />
+                    </IconButton>
+                  )}
+                </div>
+                {canPlay && (
+                  <Button className="h-11 w-full rounded-xl" onClick={() => play(data.id)} title={t("common.playNext")}>
+                    <Play className="size-3.75" fill="currentColor" />
+                    {t("common.playNext")}
+                  </Button>
                 )}
-              </p>
+              </div>
+            ) : (
+              <>
+                {/* Whether this is on your list, said beside the title and coloured from the same palette as the cover rings. */}
+                <p className="mt-2.5">
+                  {entry ? (
+                    <span
+                      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-2xs font-semibold"
+                      style={{
+                        backgroundColor: statusColorVar(entry.status),
+                        // The palette is user-chosen, so readableInk picks whichever ink end has contrast against their hue.
+                        color: readableInk(
+                          statusColors[entry.status] ?? "#000000",
+                          UI_INK,
+                        ),
+                      }}
+                    >
+                      {t(`status.${data.type}.${entry.status}`)}
+                      {progressLabel && <span className="opacity-80">{progressLabel}</span>}
+                    </span>
+                  ) : (
+                    // undefined from useCachedEntry means not loaded yet as well as not listed, so say nothing until it resolves.
+                    localPending ? null : (
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-surface-700 px-2.5 py-0.5 text-2xs text-ink-500">
+                        {t("detail.notOnList")}
+                      </span>
+                    )
+                  )}
+                </p>
+                <MetaLine data={data} studios={mainStudios.map((s) => s.name)} className="mt-2.5" />
+                <GenreChips genres={data.genres} className="mt-2" />
+                <TimeLeft data={data} className="mt-2" />
+                <NextEpisode data={data} className="mt-2" />
+                {canPlay && (
+                  <Button
+                    className="mt-3"
+                    onClick={() => play(data.id)}
+                    title={t("common.playNext")}
+                  >
+                    <Play className="size-3.75" fill="currentColor" />
+                    {t("common.playNext")}
+                  </Button>
+                )}
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <FavouriteButton
+                    kind={data.type === "MANGA" ? "manga" : "anime"}
+                    id={data.id}
+                    isFavourite={data.isFavourite}
+                    blocked={data.isFavouriteBlocked}
+                  />
+                  <button
+                    onClick={() => openUrl(mediaUrl(data.type, data.id))}
+                    className="flex items-center gap-1 text-xs text-ink-500 hover:text-accent-400"
+                  >
+                    {t("detail.openOnAniList")} <ExternalLink className="size-2.75" />
+                  </button>
+                  {android && (
+                    <button
+                      onClick={() => void shareText(mediaUrl(data.type, data.id)).catch(() => {})}
+                      className="flex items-center gap-1 text-xs text-ink-500 hover:text-accent-400"
+                    >
+                      {t("ctx.share")} <Share2 className="size-2.75" />
+                    </button>
+                  )}
+                </div>
+              </>
             )}
-            {data.type === "ANIME" &&
-              episodes?.some((e) => e > (data.mediaListEntry?.progress ?? 0)) && (
-                <Button
-                  className="mt-3"
-                  onClick={() => play(data.id)}
-                  title={t("common.playNext")}
-                >
-                  <Play className="size-3.75" fill="currentColor" />
-                  {t("common.playNext")}
-                </Button>
-              )}
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <FavouriteButton
-                kind={data.type === "MANGA" ? "manga" : "anime"}
-                id={data.id}
-                isFavourite={data.isFavourite}
-                blocked={data.isFavouriteBlocked}
-              />
-              <button
-                onClick={() => openUrl(mediaUrl(data.type, data.id))}
-                className="flex items-center gap-1 text-xs text-ink-500 hover:text-accent-400"
-              >
-                {t("detail.openOnAniList")} <ExternalLink className="size-2.75" />
-              </button>
-              {android && (
-                <button
-                  onClick={() => void shareText(mediaUrl(data.type, data.id)).catch(() => {})}
-                  className="flex items-center gap-1 text-xs text-ink-500 hover:text-accent-400"
-                >
-                  {t("ctx.share")} <Share2 className="size-2.75" />
-                </button>
-              )}
-            </div>
           </div>
         </div>
 
@@ -1339,9 +1320,10 @@ function ListEditor({
       // Scoped to this title's own collection; the other cannot have changed.
       qc.invalidateQueries({ queryKey: ["mediaList", media.type] });
       // The echo says exactly what changed, so patch the open page rather than refetch a detail we already hold.
-      if (res.entry) {
+      const next = entryFromEcho(res.entry);
+      if (next) {
         qc.setQueryData(["mediaDetail", mediaId], (old: MediaDetail | undefined) =>
-          old ? { ...old, mediaListEntry: res.entry as MediaDetail["mediaListEntry"] } : old,
+          old ? { ...old, mediaListEntry: next } : old,
         );
       }
     },

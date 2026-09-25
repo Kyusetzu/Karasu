@@ -1670,6 +1670,14 @@ four or five places, made by careful code, because nothing said it once.
   an 85 px banner in two thirds blur. The query container sits on a wrapper
   around the header, never on the page root: containment would make that root
   the containing block of every `fixed` overlay rendered inside it.
+- **The phone's detail header floats the cover.** The title and the native title flow beside it and
+  carry on beneath it when they are longer; every fact — the meta line, genres, the next episode, the
+  action row with the status button — sits below the cover whatever the title's length. Chosen by the
+  maintainer on 2026-09-25 over three rounds of mockups: a short title leaving air beside the cover beats
+  a narrow column that squeezes. `usePhoneShell` picks the layout, so the desktop header is untouched.
+  The status button (`StatusMenu`) writes through `useListMutations` for an existing entry and through
+  `saveListEntry` with the media object for a first add, because a new local entry is refused without it;
+  a save's echo reaches the page only through `lib/listEcho`, since the local echo names no status.
 - **Local text matching goes through `lib/fuzzy`.** Exact > substring >
   word-prefix > trigram containment, scored per title — per-title docs are
   what make a query structurally unable to match across two adjacent names

@@ -16,7 +16,7 @@ import {
   seasonalHistory,
 } from "@/lib/localStats";
 import { Card, CardTitle } from "@/components/ui/card";
-import { Tabs, type TabOption } from "@/components/ui/tabs";
+import { Segmented, type Segment } from "@/components/ui/segmented";
 import { Sunburst, ToneLegend, type Slice } from "@/components/stats/Charts";
 import { ScoreColumns, StatusBar, TileGrid } from "@/components/stats/panels";
 import { GradientBars } from "@/components/stats/GradientBars";
@@ -90,7 +90,7 @@ export default function LocalStatistics({
     [i18n.language],
   );
 
-  const typeOptions: TabOption<MediaType>[] = [
+  const typeOptions: Segment<MediaType>[] = [
     { value: "ANIME", label: t("nav.list") },
     { value: "MANGA", label: t("nav.manga") },
   ];
@@ -112,7 +112,7 @@ export default function LocalStatistics({
         </div>
       </header>
 
-      <Tabs options={typeOptions} value={type} onChange={onType} />
+      <Segmented aria-label={t("stats.mediaTypeLabel")} segments={typeOptions} value={type} onChange={onType} />
 
       {isLoading && <Loader label={t("common.loading")} />}
       {error && (

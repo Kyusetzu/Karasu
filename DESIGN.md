@@ -331,8 +331,8 @@ no row here, add the primitive first.
 | a fact about something (genre, tag, category, state) | `Chip` with a tone (`neutral`, `muted`, `accent`, `gold`, `success`, `danger`) and a size (`xs`, `sm`, `md`); a link spells `chipClass` |
 | a chip the user can take away | `RemovableChip`, the whole chip one button named by `removeLabel` |
 | a count or an unread dot | `Badge`; `floating` over an icon rings it in the page colour |
-| one lens of two or three | `Segmented` |
-| the list's status strip | `StatusTabs` |
+| one lens of two or three | `Segmented`, a radio group with one tab stop whose thumb slides to the choice |
+| a page's sections, or the list's statuses | `StatusTabs`, one row that scrolls rather than wraps |
 | a raised panel | `Card`, `CardTitle` |
 | an Overview section heading | `SectionHeader` |
 | a text field | `Input`; a count is `NumberInput` |
@@ -347,9 +347,6 @@ no row here, add the primitive first.
 | a score picker | `ScoreBars` |
 | a season picker | `SeasonPicker` |
 | a user's name and face | `UserLockup` |
-
-`ui/tabs.tsx` is legacy: no selected state for assistive technology, and
-`transition-colors`. `Segmented` replaces it in the foundation phase.
 
 The foundation phase adds, each replacing the hand-built copies it lists in
 the plan:

@@ -1,4 +1,4 @@
-/* GENERATED from src/app/index.css (sha256 ae669db1f042) by site/scripts/sync-tokens.mjs
+/* GENERATED from src/app/index.css (sha256 4f83087533b2) by site/scripts/sync-tokens.mjs
    — do not edit. Re-run `npm run sync` after changing the source; `npm run check`
    fails while this file is stale. CLAUDE.md, "The website". */
 /* `static` because Tailwind tree-shakes tokens no utility references, leaving a `var()`-only token undefined in dark. */
@@ -597,6 +597,13 @@
     width: max(100%, 2.75rem);
     height: max(100%, 2.75rem);
     translate: -50% -50%;
+  }
+}
+
+/* Draws an element's border in the border role under high contrast, where a tonal step alone would vanish. */
+@utility hc-edge {
+  :root[data-contrast="more"] & {
+    border-color: var(--color-surface-600);
   }
 }
 

@@ -178,9 +178,6 @@
     "text-size-arbitrary": 1,
     "tracking-arbitrary": 1
   },
-  "src/components/ui/tabs.tsx": {
-    "transition-broad": 1
-  },
   "src/pages/About.tsx": {
     "text-size-arbitrary": 1,
     "tracking-arbitrary": 1

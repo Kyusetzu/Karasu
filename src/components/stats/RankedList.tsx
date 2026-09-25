@@ -3,7 +3,7 @@ import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
 import { type StatEntry } from "@/api/queries";
 import type { MediaType } from "@/api/types";
-import { Tabs, type TabOption } from "@/components/ui/tabs";
+import { Segmented, type Segment } from "@/components/ui/segmented";
 import { Empty, type RankedCategory, type SortKey } from "./shared";
 
 /** AniList clamps `userStatistics` category lists server-side whatever `limit` says, so this is all of it, not a choice. */
@@ -39,7 +39,7 @@ export function RankedList({
   const max = Math.max(...shown.map(barValue), 1);
 
   const timeLabel = type === "ANIME" ? t("stats.sortByTime") : t("stats.sortByChapters");
-  const sortOptions: TabOption<SortKey>[] = [
+  const sortOptions: Segment<SortKey>[] = [
     { value: "count", label: t("stats.sortByCount") },
     { value: "time", label: timeLabel },
     { value: "score", label: t("stats.sortByScore") },
@@ -47,7 +47,7 @@ export function RankedList({
 
   return (
     <div className="space-y-3">
-      <Tabs options={sortOptions} value={sort} onChange={setSort} />
+      <Segmented aria-label={t("stats.sortLabel")} segments={sortOptions} value={sort} onChange={setSort} />
       {/* Self-contained rows, so a wide screen shows several per line instead of one very long bar. */}
       <div className="grid grid-cols-[repeat(auto-fit,minmax(22rem,1fr))] gap-1.5">
         {shown.map((e, i) => (

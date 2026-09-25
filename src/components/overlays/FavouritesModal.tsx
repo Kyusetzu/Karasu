@@ -15,7 +15,7 @@ import { displayTitle } from "@/api/types";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
-import { Tabs, type TabOption } from "@/components/ui/tabs";
+import { StatusTabs, type StatusTab } from "@/components/ui/status-tabs";
 import { Avatar } from "@/components/ui/user-lockup";
 import { Shimmer } from "@/components/Skeleton";
 import { showToast } from "@/stores/toast";
@@ -156,7 +156,7 @@ export function FavouritesModal({
   const move = (from: number, to: number) =>
     setDrafts((d) => (d ? { ...d, [kind]: moveItem(d[kind], from, to) } : d));
 
-  const options: TabOption<FavouriteKind>[] = KINDS.map((k) => ({
+  const options: StatusTab<FavouriteKind>[] = KINDS.map((k) => ({
     value: k,
     label:
       k === "anime"
@@ -179,7 +179,7 @@ export function FavouritesModal({
       className="max-w-xl"
     >
       <div className="space-y-3">
-        <Tabs options={options} value={kind} onChange={setKind} />
+        <StatusTabs label={t("social.favKindsLabel")} tabs={options} value={kind} onChange={setKind} />
 
         {q.data?.truncated && (
           <p className="rounded-control border border-gold/40 bg-gold/10 px-3 py-2 text-xs text-gold">

@@ -748,6 +748,13 @@ html[data-swapping] *::after {
   }
 }
 
+/* Draws an element's border in the border role under high contrast, where a tonal step alone would vanish. */
+@utility hc-edge {
+  :root[data-contrast="more"] & {
+    border-color: var(--color-surface-600);
+  }
+}
+
 /* A disclosure's panel grows from no height to its content's; `data-leaving` shrinks it back while usePresence holds it. */
 @utility disclosure-panel {
   display: grid;

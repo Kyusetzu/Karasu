@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: b567d15 -->
+<!-- generated-through: 7550e4b -->
 
 ### Fixed
 
@@ -145,6 +145,7 @@ tag time is then optional rather than load-bearing.
 - Settings switches keep a readable thumb on pale accents and show their edge in high contrast.
 - Expandable sections open and close with a short height animation instead of jumping.
 - Chips and counts share one look across the app: outlined labels and one badge shape.
+- View switches slide to the chosen option and follow the arrow keys; statistics sections use the list's tab strip.
 ## 1.0.0 — 2026-09-05
 
 Karasu 1.0.0 is the first tagged release: a desktop and Android tracker built

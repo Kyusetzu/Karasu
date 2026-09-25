@@ -25,7 +25,8 @@ import { Button } from "@/components/ui/button";
 import { Loader } from "@/components/ui/loader";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Avatar } from "@/components/ui/user-lockup";
-import { Tabs, type TabOption } from "@/components/ui/tabs";
+import { Segmented, type Segment } from "@/components/ui/segmented";
+import { StatusTabs, type StatusTab } from "@/components/ui/status-tabs";
 import {
   RadarChart,
   Sunburst,
@@ -243,11 +244,11 @@ function StatisticsContent({
   // One tab bar for both media types now, so switching type keeps the tab.
   const activeCategory = category;
 
-  const typeOptions: TabOption<MediaType>[] = [
+  const typeOptions: Segment<MediaType>[] = [
     { value: "ANIME", label: t("nav.list") },
     { value: "MANGA", label: t("nav.manga") },
   ];
-  const categoryOptions: TabOption<Category>[] = CATEGORIES.map((c) => ({
+  const categoryOptions: StatusTab<Category>[] = CATEGORIES.map((c) => ({
     value: c,
     label: t(`stats.${c}`),
   }));
@@ -283,9 +284,15 @@ function StatisticsContent({
       </header>
 
       <div className="space-y-3">
-        <Tabs options={typeOptions} value={type} onChange={(v) => setView({ type: v })} />
-        <Tabs
-          options={categoryOptions}
+        <Segmented
+          aria-label={t("stats.mediaTypeLabel")}
+          segments={typeOptions}
+          value={type}
+          onChange={(v) => setView({ type: v })}
+        />
+        <StatusTabs
+          label={t("stats.sectionsLabel")}
+          tabs={categoryOptions}
           value={activeCategory}
           onChange={(v) => setView({ category: v })}
         />

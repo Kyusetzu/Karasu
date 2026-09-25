@@ -9,6 +9,7 @@
 //   node scripts/verify.mjs --rust       cargo test only
 //   node scripts/verify.mjs --verbose    every phase's output as it runs, as the tools print it themselves
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
 import path from "node:path";
 
 const here = path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1"));
@@ -27,8 +28,11 @@ const KNIP = path.join(ROOT, "node_modules", "knip", "bin", "knip.js");
 const TAURI = path.join(ROOT, "node_modules", "@tauri-apps", "cli", "tauri.js");
 const SITE_TSC = path.join(ROOT, "site", "node_modules", "typescript", "bin", "tsc");
 const MANIFEST = ["--manifest-path", "src-tauri/Cargo.toml"];
-// npm itself, by its cli file beside node, for the same no-shim reason.
-const NPM = path.join(path.dirname(process.execPath), "node_modules", "npm", "bin", "npm-cli.js");
+// npm itself, by its cli file, for the same no-shim reason: beside node on Windows, under `lib/` of the prefix elsewhere.
+const NPM = [
+  path.join(path.dirname(process.execPath), "node_modules", "npm", "bin", "npm-cli.js"),
+  path.join(path.dirname(process.execPath), "..", "lib", "node_modules", "npm", "bin", "npm-cli.js"),
+].find((file) => existsSync(file)) ?? "npm-cli.js";
 
 const phases = [];
 

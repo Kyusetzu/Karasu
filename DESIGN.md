@@ -371,7 +371,7 @@ four things before it lands:
 | `lucide-react` | shipped | icons |
 | `class-variance-authority`, `clsx`, `tailwind-merge` | shipped | variant classes, `cn` |
 | `d3-array`, `d3-scale`, `d3-shape` | shipped | chart maths only; the renderer is ours |
-| `@base-ui/react` 1.8.0, pinned | shipped: `ui/menu` (the context menu), `ui/sheet` | menu and context menu (typeahead, safe submenu, long press), the one swipeable sheet, flip-aware dropdown positioning. Always controlled, so `useBackClose` and `data-overlay` keep working; wrapped under `ui/` only. The menu cost 40 KiB gzipped in the startup script, the drawer 12 more. Select and ScrollArea insert a `<style>` and stay unused |
+| `@base-ui/react` 1.8.0, pinned | shipped: `ui/menu` (the context menu), `ui/sheet`, the dropdown of `ui/popover` | menu and context menu (typeahead, safe submenu, long press), the one swipeable sheet, flip-aware dropdown positioning. Always controlled, so `useBackClose` and `data-overlay` keep working; wrapped under `ui/` only. The menu cost 40 KiB gzipped in the startup script, the drawer 12 more and the popover 2.5, since it shares Floating UI with the menu. Select and ScrollArea insert a `<style>` and stay unused |
 | `motion` (`LazyMotion` + `m`) | approved, not yet added | velocity after a swipe, sliding indicators, list enter and leave. `MotionConfig reducedMotion` fed from `lib/motion`. `AnimateView` and `animateView` are banned: they inject a `<style>` without a nonce |
 
 Considered and declined on 2026-09-25:

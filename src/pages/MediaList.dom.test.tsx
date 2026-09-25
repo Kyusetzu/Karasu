@@ -59,8 +59,7 @@ describe("MediaList header", () => {
     expect(within(chips()!).getByRole("button", { name: /format\.TV/ })).toBeInTheDocument();
     expect(window.location.search).toBe("");
     fireEvent.click(screen.getByRole("button", { name: "common.done" }));
-    await settle();
-    expect(window.location.search).toBe("?format=TV");
+    await waitFor(() => expect(window.location.search).toBe("?format=TV"));
     expect(onPanelEntry()).toBe(false);
     window.history.back();
     await waitFor(() => expect(window.location.pathname).toBe("/start"));
@@ -85,8 +84,9 @@ describe("MediaList header", () => {
     expect(search).toHaveFocus();
     fireEvent.click(screen.getByRole("button", { name: "list.filters" }));
     const panel = screen.getByRole("dialog", { name: "list.filters" });
+    await waitFor(() => expect(panel).toContainElement(document.activeElement as HTMLElement));
     fireEvent.keyDown(window, { key: "f", ctrlKey: true });
-    expect(panel.contains(document.activeElement)).toBe(true);
+    expect(panel).toContainElement(document.activeElement as HTMLElement);
   });
 
   /** An empty tab is a fact about the list; blaming the filter for it would send the user hunting for a cause. */

@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 017494a -->
+<!-- generated-through: d1c6232 -->
 
 ### Fixed
 
@@ -94,6 +94,7 @@ tag time is then optional rather than load-bearing.
 - The franchise page no longer scrolls sideways on a phone, and its legend names every status.
 - Episode, chapter, volume and rewatch fields no longer keep a 0 you cannot delete, and an emptied field saves as 0.
 - Text in the phone's More sheet, the bell, the filter menus and the calendar uses its intended colour instead of inheriting the one above it.
+- The status editor and the list's panels stay inside a short window instead of running off its bottom.
 
 ### Added
 

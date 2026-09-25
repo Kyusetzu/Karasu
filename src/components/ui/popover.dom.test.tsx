@@ -62,7 +62,7 @@ afterEach(async () => {
 });
 
 describe("Popover", () => {
-  it("opens from its trigger and says so", () => {
+  it("opens from its trigger and says so", async () => {
     render(<Probe />);
     expect(trigger()).toHaveAttribute("aria-expanded", "false");
     expect(trigger()).not.toHaveAttribute("aria-controls");
@@ -71,42 +71,57 @@ describe("Popover", () => {
     expect(panel).toBeInTheDocument();
     expect(trigger()).toHaveAttribute("aria-expanded", "true");
     expect(trigger()).toHaveAttribute("aria-controls", panel!.id);
-    expect(screen.getByRole("button", { name: "Sort done" })).toHaveFocus();
+    // jsdom has no layout for Base UI's tabbable check, so focus lands on the panel rather than its first control.
+    await waitFor(() => expect(panel).toContainElement(document.activeElement as HTMLElement));
     fireEvent.click(screen.getByRole("button", { name: "Sort done" }));
-    expect(dialog()).toBeNull();
+    await waitFor(() => expect(dialog()).toBeNull());
   });
 
-  it("closes on Escape and hands the keyboard back to the trigger", () => {
+  it("closes on Escape and hands the keyboard back to the trigger", async () => {
+    const user = userEvent.setup({ delay: null });
     render(<Probe />);
-    fireEvent.click(trigger());
-    fireEvent.keyDown(screen.getByRole("button", { name: "Sort done" }), { key: "Escape" });
-    expect(dialog()).toBeNull();
+    await user.click(trigger());
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(dialog()).toBeNull());
     expect(trigger()).toHaveFocus();
   });
 
-  it("closes on a press outside and stays open on one inside", () => {
+  it("closes on a press outside and stays open on one inside, but not on its own trigger's press", async () => {
+    const user = userEvent.setup({ delay: null });
     render(
       <>
         <Probe />
         <p>elsewhere</p>
       </>,
     );
-    fireEvent.click(trigger());
-    fireEvent.pointerDown(screen.getByRole("button", { name: "Sort apply" }));
+    await user.click(trigger());
+    await user.click(screen.getByRole("button", { name: "Sort apply" }).parentElement!);
     expect(dialog()).toBeInTheDocument();
-    fireEvent.pointerDown(screen.getByText("elsewhere"));
-    expect(dialog()).toBeNull();
+    await user.click(screen.getByText("elsewhere"));
+    await waitFor(() => expect(dialog()).toBeNull());
+    await user.click(trigger());
+    await user.click(trigger());
+    await waitFor(() => expect(dialog()).toBeNull());
+    expect(trigger()).toHaveAttribute("aria-expanded", "false");
   });
 
   /** A key pressed during the exit must not reach the list behind a panel that is still on screen. */
   it("keeps data-overlay while it animates out", async () => {
-    document.documentElement.removeAttribute("data-reduce-motion");
-    render(<Probe />);
-    fireEvent.click(trigger());
-    fireEvent.click(trigger());
-    expect(trigger()).toHaveAttribute("aria-expanded", "false");
-    expect(dialog()).toHaveAttribute("data-overlay");
-    await waitFor(() => expect(dialog()).toBeNull());
+    let finish = () => {};
+    const running = new Promise<void>((resolve) => (finish = resolve));
+    // jsdom runs no animations and has no getAnimations, so the exit is one that has not finished until the test says so.
+    Object.defineProperty(Element.prototype, "getAnimations", { configurable: true, value: () => [{ finished: running }] });
+    try {
+      render(<Probe />);
+      fireEvent.click(trigger());
+      fireEvent.click(trigger());
+      expect(trigger()).toHaveAttribute("aria-expanded", "false");
+      expect(dialog()).toHaveAttribute("data-overlay");
+      finish();
+      await waitFor(() => expect(dialog()).toBeNull());
+    } finally {
+      delete (Element.prototype as { getAnimations?: unknown }).getAnimations;
+    }
   });
 
   it("closes on the back gesture and reports it closed", async () => {

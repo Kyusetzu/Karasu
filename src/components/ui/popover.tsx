@@ -1,17 +1,6 @@
-import {
-  useCallback,
-  useEffect,
-  useId,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type KeyboardEvent,
-  type ReactNode,
-  type RefObject,
-} from "react";
-import { usePresence } from "@/hooks/usePresence";
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode, type RefObject } from "react";
+import { Popover as BasePopover } from "@base-ui/react/popover";
 import { afterBackSettles, useBackClose } from "@/hooks/useBackClose";
-import { useDialogFocus } from "@/hooks/useDialogFocus";
 import { Sheet } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 
@@ -57,10 +46,8 @@ export function Popover({
   children: (api: PopoverApi) => ReactNode;
 }) {
   const [open, setOpen] = useState(false);
-  const presence = usePresence(open);
   const id = useId();
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const boxRef = useRef<HTMLDivElement>(null);
   const pending = useRef<(() => void) | null>(null);
   const wasOpen = useRef(false);
   const closedRef = useRef(onClosed);
@@ -91,15 +78,17 @@ export function Popover({
     setOpen(false);
   }, []);
 
-  // The sheet has its own backdrop; the dropdown closes on a press anywhere outside the trigger and the panel.
+  // Closed on the press itself, before Base UI's click: a chip pressed outside must write after the panel, not before.
   useEffect(() => {
     if (!open || variant === "sheet") return;
     const onDown = (e: PointerEvent) => {
-      if (!boxRef.current?.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (triggerRef.current?.contains(target) || document.getElementById(id)?.contains(target)) return;
+      setOpen(false);
     };
     window.addEventListener("pointerdown", onDown);
     return () => window.removeEventListener("pointerdown", onDown);
-  }, [open, variant]);
+  }, [open, variant, id]);
 
   const openRef = useRef(onOpen);
   openRef.current = onOpen;
@@ -112,14 +101,6 @@ export function Popover({
     });
   };
 
-  // On the panel, bubbling: a dialog opened above it keeps its own Escape.
-  const onKeyDown = (e: KeyboardEvent) => {
-    if (e.key !== "Escape") return;
-    e.preventDefault();
-    triggerRef.current?.focus();
-    setOpen(false);
-  };
-
   const api: PopoverApi = { close, closeThen };
   const panel =
     variant === "sheet" ? (
@@ -127,80 +108,54 @@ export function Popover({
         {children(api)}
       </Sheet>
     ) : (
-      presence.mounted && (
-        <Panel id={id} label={label} align={align} width={width} leaving={presence.leaving} onKeyDown={onKeyDown}>
-          {children(api)}
-        </Panel>
-      )
+      <BasePopover.Root
+        open={open}
+        onOpenChange={(next, details) => {
+          // A press on the trigger is the trigger's own toggle, which would otherwise close and reopen the panel.
+          const target = details.event?.target;
+          if (details.reason === "outside-press" && target instanceof Node && triggerRef.current?.contains(target)) return;
+          if (!next) setOpen(false);
+        }}
+      >
+        <BasePopover.Portal>
+          <BasePopover.Positioner
+            anchor={triggerRef}
+            side="bottom"
+            align={align}
+            sideOffset={8}
+            collisionPadding={8}
+            className="z-50"
+          >
+            {/* Owns the keyboard while up, exit included, so a list shortcut cannot fire behind it. */}
+            <BasePopover.Popup
+              id={id}
+              aria-label={label}
+              data-overlay
+              finalFocus={triggerRef}
+              style={{ width }}
+              className={cn(
+                "max-h-[min(var(--available-height),34rem)] max-w-[calc(100vw-2rem)] overflow-y-auto outline-none",
+                "rounded-panel border border-hair bg-surface-900 p-4 text-left shadow-float panel-wash",
+                "origin-(--transform-origin) data-open:animate-pop-in data-closed:animate-pop-out",
+              )}
+            >
+              {children(api)}
+            </BasePopover.Popup>
+          </BasePopover.Positioner>
+        </BasePopover.Portal>
+      </BasePopover.Root>
     );
 
   return (
-    <div ref={boxRef} className={cn("relative inline-flex shrink-0", className)}>
+    <div className={cn("relative inline-flex shrink-0", className)}>
       {renderTrigger({
         ref: triggerRef,
         onClick: toggle,
         "aria-expanded": open,
         "aria-haspopup": "dialog",
-        "aria-controls": presence.mounted ? id : undefined,
+        "aria-controls": open ? id : undefined,
       })}
       {panel}
-    </div>
-  );
-}
-
-/** Mounted only while shown, so the focus hook runs once per opening and restores to the trigger on the way out. */
-function Panel({
-  id,
-  label,
-  align,
-  width,
-  leaving,
-  onKeyDown,
-  children,
-}: {
-  id: string;
-  label: string;
-  align: "start" | "end";
-  width: number;
-  leaving: boolean;
-  onKeyDown: (e: KeyboardEvent) => void;
-  children: ReactNode;
-}) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [shift, setShift] = useState(0);
-  useDialogFocus(ref, !leaving);
-
-  // A trigger near the window's edge would push its panel off screen; nudged back inside with a margin to spare.
-  useLayoutEffect(() => {
-    if (!ref.current) return;
-    const r = ref.current.getBoundingClientRect();
-    const edge = 8;
-    let dx = 0;
-    if (r.right > window.innerWidth - edge) dx = window.innerWidth - edge - r.right;
-    if (r.left + dx < edge) dx = edge - r.left;
-    setShift(dx);
-  }, []);
-
-  return (
-    <div
-      ref={ref}
-      id={id}
-      role="dialog"
-      aria-label={label}
-      data-overlay
-      // Focusable by script and click only, so a press on the panel's text keeps Escape reaching it.
-      tabIndex={-1}
-      onKeyDown={onKeyDown}
-      // `translate`, not `transform`, which the pop animation owns.
-      style={{ width, translate: shift ? `${shift}px 0` : undefined }}
-      className={cn(
-        "absolute top-full z-50 mt-2 max-h-[min(70vh,34rem)] max-w-[calc(100vw-2rem)] overflow-y-auto outline-none",
-        "rounded-panel border border-hair bg-surface-900 p-4 text-left shadow-float panel-wash",
-        align === "end" ? "right-0" : "left-0",
-        leaving ? "animate-pop-out" : "animate-pop-in",
-      )}
-    >
-      {children}
     </div>
   );
 }

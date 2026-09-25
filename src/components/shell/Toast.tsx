@@ -77,11 +77,11 @@ function ToastBody({ toast, onAction }: { toast: ToastData; onAction: () => void
         )}
       >
         {error ? (
-          <TriangleAlert className="size-3.75" />
+          <TriangleAlert className="size-4" />
         ) : info ? (
-          <CloudUpload className="size-3.75" />
+          <CloudUpload className="size-4" />
         ) : (
-          <Check className="size-3.75" strokeWidth={3} />
+          <Check className="size-4" strokeWidth={3} />
         )}
       </span>
 

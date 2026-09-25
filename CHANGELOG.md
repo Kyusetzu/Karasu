@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 3c347a6 -->
+<!-- generated-through: d16e3d0 -->
 
 ### Fixed
 
@@ -97,6 +97,7 @@ tag time is then optional rather than load-bearing.
 - The status editor and the list's panels stay inside a short window instead of running off its bottom.
 - high contrast marks the focused text field, and Escape in a dialog's search empties it before closing anything.
 - Collapsing or expanding the sidebar from the keyboard keeps the focus on the toggle, and the collapsed rail's names switch without overlapping.
+- The floating detection window is readable in the light theme again, and the shell's banners animate in and out.
 
 ### Added
 

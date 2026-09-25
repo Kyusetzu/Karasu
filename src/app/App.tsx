@@ -1,7 +1,10 @@
-import { lazy, Suspense, useEffect, useLayoutEffect, useRef } from "react";
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, Routes, Route, useLocation, useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
 import { X } from "lucide-react";
+import { IconButton } from "@/components/ui/icon-button";
+import { usePresence } from "@/hooks/usePresence";
+import { cn } from "@/lib/utils";
 import { useAuth } from "@/stores/auth";
 import { isAndroid, usePlatform } from "@/stores/platform";
 import { useNowPlaying } from "@/stores/nowPlaying";
@@ -283,17 +286,23 @@ function PlaybackError() {
     return () => clearTimeout(id);
   }, [error, clearError]);
 
-  if (!error) return null;
+  // The last message stays on the card while it leaves, since the store has already cleared it.
+  const [shown, setShown] = useState(error);
+  if (error && error !== shown) setShown(error);
+  const { mounted, leaving } = usePresence(!!error);
+  if (!mounted) return null;
   return (
-    <div className="pointer-events-auto flex w-88 max-w-full items-start gap-3 rounded-control border border-surface-700 bg-surface-850 px-4 py-3 shadow-float">
-      <span className="text-sm text-ink-300">{error}</span>
-      <button
-        onClick={clearError}
-        className="shrink-0 text-ink-500 hover:text-ink-100"
-        aria-label={t("common.dismiss")}
-      >
-        <X className="size-3.75" />
-      </button>
+    <div
+      role="alert"
+      className={cn(
+        "pointer-events-auto flex w-88 max-w-full origin-bottom-right items-start gap-3 rounded-control border border-surface-700 bg-surface-850 py-3 pl-4 pr-2 shadow-float",
+        leaving ? "animate-pop-out" : "animate-pop-in",
+      )}
+    >
+      <span className="min-w-0 flex-1 py-0.5 text-sm text-ink-300">{shown}</span>
+      <IconButton size="xs" onClick={clearError} aria-label={t("common.dismiss")} className="-my-1 shrink-0">
+        <X className="size-4" />
+      </IconButton>
     </div>
   );
 }

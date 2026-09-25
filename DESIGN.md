@@ -546,3 +546,12 @@ maintainer picks. A pure restyle that moves nothing does not. The rules:
   pointer. The empty palette shows only what was used recently, commands
   and screens and never a title, beside the main shortcuts; everything
   else answers typing.
+- **2026-09-25:** The shell's polish, shown as before and after and kept
+  as shown. Every floating panel, the detection window included, takes
+  the panel radius; every small uppercase label takes the one eyebrow
+  spacing; the sync panel's rows wear the bell's tile and glyph. The
+  expired-session banner grows in and collapses away, the playback error
+  pops in and out, and the pull indicator fades where it stands. The
+  detection window's backdrop fades to the panel colour rather than the
+  cover scrim's black, which had left its lower lines unreadable in the
+  light theme.

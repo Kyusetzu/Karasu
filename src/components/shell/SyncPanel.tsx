@@ -145,16 +145,16 @@ export default function SyncPanel({
         >
           <span
             className={cn(
-              "mt-0.5 grid size-5.5 shrink-0 place-items-center rounded-inner",
+              "mt-0.5 grid size-6 shrink-0 place-items-center rounded-inner",
               edit.kind === "delete"
                 ? "bg-danger/14 text-danger"
                 : "bg-accent-500/14 text-accent-400",
             )}
           >
             {edit.kind === "delete" ? (
-              <Trash2 className="size-3" />
+              <Trash2 className="size-3.5" />
             ) : (
-              <CloudUpload className="size-3" />
+              <CloudUpload className="size-3.5" />
             )}
           </span>
           <span className="min-w-0 flex-1">
@@ -203,7 +203,7 @@ export default function SyncPanel({
           )}
         >
           <div className="flex items-center justify-between border-b border-hair px-3 py-2">
-            <span className="text-2xs font-semibold uppercase tracking-[.14em] text-ink-600">
+            <span className="text-2xs font-semibold uppercase text-ink-600">
               {t("syncPanel.title")}
             </span>
             {phase && (
@@ -282,7 +282,7 @@ export default function SyncPanel({
 
               {/* The traffic, which is what moves the headroom while an idle app has nothing queued to list. */}
               <div className="border-t border-hair">
-                <h3 className="px-3 pb-1 pt-2 text-2xs font-semibold uppercase tracking-[.14em] text-ink-600">
+                <h3 className="px-3 pb-1 pt-2 text-2xs font-semibold uppercase text-ink-600">
                   {t("syncPanel.recent")}
                 </h3>
                 {data.recent.length === 0 ? (
@@ -330,7 +330,7 @@ export default function SyncPanel({
 
               {/* Who spent the budget since the app started; the recent list above only shows the last fifty. */}
               <div className="border-t border-hair">
-                <h3 className="px-3 pb-1 pt-2 text-2xs font-semibold uppercase tracking-[.14em] text-ink-600">
+                <h3 className="px-3 pb-1 pt-2 text-2xs font-semibold uppercase text-ink-600">
                   {t("syncPanel.sources")}
                 </h3>
                 {data.traffic.sources.length === 0 ? (

@@ -13,6 +13,7 @@ import { isPaletteSwipe } from "@/lib/navSwipe";
 import { Badge } from "@/components/ui/badge";
 import { MenuGroupLabel, MenuRow, MenuRowBody, menuRowClass } from "@/components/ui/menu-row";
 import { Sheet } from "@/components/ui/sheet";
+import { IconButton } from "@/components/ui/icon-button";
 
 /** The phone shell's four bar slots; everything else is behind a More sheet built from the sidebar's `GROUPS`. */
 const SLOTS = ["/", "/list", "/manga", "/search"];
@@ -71,30 +72,21 @@ export default function BottomBar() {
           <div className="flex items-center gap-1">
             {/* The bell lives in the sheet, since an unlabeled icon in the nav row read as decoration; More carries its count. */}
             {isTauri && (
-              <button
-                type="button"
+              <IconButton
                 aria-label={t("notif.title")}
                 // More steps aside first; the notifications sheet waits for its back entry to unwind before pushing its own.
                 onClick={() => {
                   setMoreOpen(false);
                   afterBackSettles(() => setNotifOpen(true));
                 }}
-                className="relative grid h-9 min-w-11 place-items-center rounded-control text-ink-500 transition-surface hover:text-ink-100"
               >
                 <BellIcon className="size-5" />
-                {badge > 0 && (
-                  <Badge count={badge} max={9} floating className="animate-idle-pulse right-1.5 top-0.5" />
-                )}
-              </button>
+                {badge > 0 && <Badge count={badge} max={9} floating className="animate-idle-pulse -right-0.5 -top-0.5" />}
+              </IconButton>
             )}
-            <button
-              type="button"
-              aria-label={t("window.close")}
-              onClick={() => setMoreOpen(false)}
-              className="rounded-inner p-1 text-ink-500 transition-surface hover:text-ink-100"
-            >
+            <IconButton aria-label={t("window.close")} onClick={() => setMoreOpen(false)}>
               <X className="size-4" />
-            </button>
+            </IconButton>
           </div>
         </div>
         <MenuRow

@@ -1,7 +1,4 @@
 {
-  "src/app/App.tsx": {
-    "icon-size": 1
-  },
   "src/components/EmptyState.tsx": {
     "text-size-arbitrary": 3
   },
@@ -65,23 +62,6 @@
   },
   "src/components/overlays/SignInMerge.tsx": {
     "colour-foreign": 1
-  },
-  "src/components/shell/DetectionPopup.tsx": {
-    "radius-arbitrary": 2,
-    "tracking-arbitrary": 1
-  },
-  "src/components/shell/FirstRun.tsx": {
-    "tracking-arbitrary": 1
-  },
-  "src/components/shell/SyncPanel.tsx": {
-    "icon-size": 3,
-    "tracking-arbitrary": 3
-  },
-  "src/components/shell/Titlebar.tsx": {
-    "icon-size": 1
-  },
-  "src/components/shell/Toast.tsx": {
-    "icon-size": 3
   },
   "src/components/social/ActivityCard.tsx": {
     "icon-size": 6

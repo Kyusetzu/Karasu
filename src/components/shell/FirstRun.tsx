@@ -39,7 +39,7 @@ export default function FirstRun() {
         {/* Phone: one centred column with the mark above the words, since the desktop gutter overflows a phone viewport. */}
         <div className="w-full max-w-120 px-6 py-8 md:w-auto md:shrink-0 md:px-0 md:py-8 md:pl-14 md:pr-8">
           <KarasuMark className="mb-6 w-20 md:hidden" />
-          <p className="text-2xs font-semibold uppercase tracking-[.18em] text-accent-400">
+          <p className="text-2xs font-semibold uppercase text-accent-400">
             {t("dashboard.welcomeTitle")}
           </p>
           <h1 className="mt-2 font-brand text-hero font-bold text-ink-100 md:text-hero-lg">

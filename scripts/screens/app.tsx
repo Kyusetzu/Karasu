@@ -9,6 +9,8 @@ const contrast = params.get("contrast") === "more";
 const android = params.get("android") === "1";
 // Signed out, so the overview shows the first-run screen instead of the lists.
 const signedOut = params.get("out") === "1";
+// A player running the first real title, so the detection window has something to show.
+const playing = params.get("playing") === "1";
 const route = params.get("route") ?? "/";
 const style = params.get("style") ?? "";
 const now = Math.floor(Date.now() / 1000);
@@ -217,7 +219,22 @@ mockIPC((cmd, args) => {
     case "get_ui_zoom":
       return 100;
     case "get_now_playing":
-      return null;
+      return playing
+        ? { process: "mpv.exe", streaming: false, mediaType: "ANIME", rawTitle: `[Grp] ${REAL[0].title} - 0${REAL[0].next}.mkv`, parsedTitle: REAL[0].title, season: 3, episode: REAL[0].next, sourceEpisode: REAL[0].next, mediaId: REAL[0].id, matchedTitle: REAL[0].title, overridden: false, progress: REAL[0].next - 1, totalEpisodes: REAL[0].episodes, episodeTitle: null }
+        : null;
+    // Two edits waiting and a quiet budget, so the sync panel draws its queue rows and its header.
+    case "sync_status":
+      return {
+        connected: true,
+        draining: false,
+        queued: [
+          { id: 1, kind: "save", subject: REAL[0].id, fields: ["progress"], queuedAt: now - 120 },
+          { id: 2, kind: "delete", subject: null, fields: [], queuedAt: now - 3600 },
+        ],
+        rate: { remaining: 27, limit: 30, observedAgoMs: 4000, throttledForMs: null, throttleKind: null },
+        recent: [],
+        traffic: { sources: [{ source: "list", total: 2 }, { source: "airing", total: 1 }], throttled: 0 },
+      };
     case "get_update_check_auto":
     case "get_blur_adult":
       return false;

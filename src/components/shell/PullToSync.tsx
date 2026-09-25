@@ -4,6 +4,8 @@ import { PULL_TRIGGER_PX } from "@/lib/pullToSync";
 import { prefersReducedMotion } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { Spinner } from "@/components/ui/spinner";
+import { usePresence } from "@/hooks/usePresence";
+import { useRef } from "react";
 
 /** The phone shell's pull indicator: it rides the finger down and turns accent once letting go would sync. */
 export default function PullToSync() {
@@ -12,10 +14,15 @@ export default function PullToSync() {
 
   const armed = state.phase === "ready";
   const pulling = state.phase === "pulling" || armed;
-  if (!available || (!pulling && !syncing)) return null;
+  const { mounted, leaving } = usePresence(available && (pulling || syncing));
+  // Where the pill last stood, so a release or a finished sync fades it out in place instead of snapping it to the top.
+  const lastOffset = useRef(0);
+  if (!mounted) return null;
 
   const reduced = prefersReducedMotion();
-  const offset = syncing ? PULL_TRIGGER_PX : state.offset;
+  const live = syncing ? PULL_TRIGGER_PX : state.offset;
+  if (!leaving) lastOffset.current = live;
+  const offset = leaving ? lastOffset.current : live;
   const label = syncing
     ? t("pull.syncing")
     : armed
@@ -33,6 +40,7 @@ export default function PullToSync() {
         className={cn(
           "mt-2 flex items-center gap-2 rounded-full border border-hair bg-surface-900 px-3 py-1.5 shadow-float panel-wash",
           armed || syncing ? "text-accent-400" : "text-ink-500",
+          leaving && "animate-fade-out",
         )}
       >
         <Spinner

@@ -40,5 +40,17 @@
     "rule": "text-size-arbitrary",
     "token": "text-[",
     "reason": "sets the em the chevron loader is drawn in, not a type size"
+  },
+  {
+    "file": "src/components/shell/SyncPanel.tsx",
+    "rule": "icon-size",
+    "token": "size-2.75",
+    "reason": "the throttled glyph sits in the header's 10 px status caption beside the spinner and matches its size"
+  },
+  {
+    "file": "src/components/shell/Titlebar.tsx",
+    "rule": "icon-size",
+    "token": "size-3",
+    "reason": "the maximise square is drawn a step under the minus beside it so the caption glyphs read at one weight"
   }
 ]

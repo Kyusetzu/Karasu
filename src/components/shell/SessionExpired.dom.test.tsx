@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { screen } from "@testing-library/react";
+import { act, screen, waitFor } from "@testing-library/react";
 import SessionExpired from "./SessionExpired";
 import { useAuth } from "@/stores/auth";
 import { renderWithProviders, signIn, signOut, useLocalProfile } from "@/test/render";
@@ -11,6 +11,17 @@ afterEach(signOut);
 const expire = () => useAuth.setState({ sessionExpired: true });
 
 describe("SessionExpired", () => {
+  it("collapses away once the session is fixed instead of vanishing, and takes no input while it goes", async () => {
+    signIn();
+    expire();
+    const { container } = renderWithProviders(<SessionExpired />);
+    act(() => useAuth.setState({ sessionExpired: false }));
+    const panel = container.firstElementChild;
+    expect(panel).toHaveAttribute("data-leaving");
+    expect(panel).toHaveAttribute("inert");
+    await waitFor(() => expect(container.firstChild).toBeNull());
+  });
+
   it("is absent while the session is fine", () => {
     signIn();
     const { container } = renderWithProviders(<SessionExpired />);

@@ -59,7 +59,18 @@ export const SCREENS = [
   { id: "d8-bestaetigen", w: 1232, h: 800, route: "/list", act: (p) => fromMenu(p, "Von der Liste entfernen") },
   { id: "d9-cover", w: 1232, h: 800, route: "/media/178789", act: (p) => p.getByRole("button", { name: "Cover im Vollbild ansehen" }).first().click() },
   { id: "d10-suchseite", w: 1232, h: 800, route: "/search", act: (p) => p.keyboard.type("Frieren") },
-  { id: "d11-leiste-zu", w: 1232, h: 800, route: "/list", act: (p) => p.getByRole("button", { name: "Seitenleiste einklappen" }).click() },
+  {
+    id: "d11-leiste-zu",
+    w: 1232,
+    h: 800,
+    route: "/list",
+    act: async (p) => {
+      await p.getByRole("button", { name: "Leiste einklappen" }).click();
+      await p.waitForTimeout(400);
+      await p.locator('nav a[href="#/calendar"]').first().hover();
+    },
+  },
+  { id: "d13-palette-leer", w: 1232, h: 800, route: "/list", act: (p) => p.keyboard.press("Control+k") },
   { id: "d12-glocke", w: 1232, h: 800, route: "/list", act: (p) => p.getByRole("button", { name: "Benachrichtigungen" }).first().click() },
   {
     id: "p8-glocke",

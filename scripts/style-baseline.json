@@ -88,11 +88,6 @@
   "src/components/shell/PullToSync.tsx": {
     "tracking-arbitrary": 1
   },
-  "src/components/shell/Sidebar.tsx": {
-    "icon-size": 7,
-    "radius-arbitrary": 1,
-    "tracking-arbitrary": 3
-  },
   "src/components/shell/SyncPanel.tsx": {
     "icon-size": 3,
     "tracking-arbitrary": 3

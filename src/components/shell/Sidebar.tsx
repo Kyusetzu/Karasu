@@ -4,6 +4,7 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  type ReactElement,
 } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
@@ -40,6 +41,7 @@ import { Avatar, UserLockup } from "@/components/ui/user-lockup";
 import SyncPanel from "./SyncPanel";
 import { Spinner } from "@/components/ui/spinner";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
 
 /** The rail is the state change: `useRailMarker` slides one marker between items rather than each growing its own. */
 const itemClass =
@@ -82,7 +84,12 @@ function useRailMarker(deps: unknown[]) {
   return { navRef, top };
 }
 
-const labelClass = "text-ui font-medium tracking-[.005em]";
+const labelClass = "min-w-0 truncate text-ui font-medium";
+
+/** Collapsed, a control's name moves into a tooltip beside it; expanded, the label says it and nothing is added. */
+function named(collapsed: boolean, label: string, control: ReactElement) {
+  return collapsed ? <Tooltip label={label}>{control}</Tooltip> : control;
+}
 
 export interface NavItem {
   to: string;
@@ -147,25 +154,24 @@ function Item({
   const { t } = useTranslation();
   const Icon = item.icon;
   const label = t(item.key);
-  return (
+  return named(
+    collapsed,
+    label,
     <NavLink
       to={item.to}
       end={item.end}
-      // The label is the accessible name, so collapsed it moves to `aria-label` and `title` rather than vanishing.
+      // The label is the accessible name, so collapsed it moves to `aria-label`, and the tooltip shows it to the eye.
       aria-label={collapsed ? label : undefined}
-      title={collapsed ? label : undefined}
       className={({ isActive }) =>
         cn(itemClass, stateClass(isActive), collapsed && collapsedItemClass)
       }
     >
-      <Icon className="size-4.25 shrink-0" />
+      <Icon className="size-4 shrink-0" />
       {!collapsed && <span className={labelClass}>{label}</span>}
       {!collapsed && count != null && (
-        <span className="ml-auto text-2xs font-medium tracking-[.02em] tabular-nums text-ink-600">
-          {count}
-        </span>
+        <span className="ml-auto text-2xs font-medium tabular-nums text-ink-600">{count}</span>
       )}
-    </NavLink>
+    </NavLink>,
   );
 }
 
@@ -235,7 +241,7 @@ function Account({
   // Collapsed, the sync line becomes a dot on the avatar, since "something is unsent" must not vanish with the labels.
   if (collapsed) {
     const body = (
-      <span className="relative block" title={`${name} — ${sync.text}`}>
+      <span className="relative block">
         <Avatar name={name} src={avatar} size="sm" />
         {sync.accent && (
           <Badge floating className="-right-0.5 -top-0.5 border-surface-900" />
@@ -243,18 +249,21 @@ function Account({
       </span>
     );
     return (
-      <div className="mx-2.5 mb-2 flex flex-col items-center gap-1.5 border-b border-hair pb-3 pt-2">
-        {viewer ? (
-          <NavLink
-            to={`/user/${encodeURIComponent(viewer.name)}`}
-            aria-label={name}
-            className="rounded-control transition-surface hover:bg-surface-900"
-          >
-            {body}
-          </NavLink>
-        ) : (
-          body
-        )}
+      // No side margin of its own: the column is already inset, and a second inset left the avatar narrower than itself.
+      <div className="mb-2 flex flex-col items-center gap-1.5 border-b border-hair pb-3 pt-2">
+        <Tooltip label={`${name} · ${sync.text}`}>
+          {viewer ? (
+            <NavLink
+              to={`/user/${encodeURIComponent(viewer.name)}`}
+              aria-label={name}
+              className="rounded-control transition-surface hover:bg-surface-900"
+            >
+              {body}
+            </NavLink>
+          ) : (
+            body
+          )}
+        </Tooltip>
         {/* The panel survives the collapse; it is the only way to read what the dot above is warning about. */}
         {!local && (
           <SyncPanel label={t("syncPanel.open")} className="w-auto">
@@ -270,7 +279,7 @@ function Account({
                   {pending > 9 ? "9+" : pending}
                 </span>
               ) : (
-                <CloudUpload className="size-3.25" />
+                <CloudUpload className="size-3.5" />
               )}
             </span>
           </SyncPanel>
@@ -343,6 +352,7 @@ export default function Sidebar() {
   };
 
   return (
+    <TooltipProvider>
     <nav
       ref={navRef}
       className={cn(
@@ -356,7 +366,7 @@ export default function Sidebar() {
       {top !== null && (
         <span
           aria-hidden="true"
-          className="absolute left-0 z-10 h-4.5 w-0.75 -translate-y-1/2 rounded-r-[.125rem] bg-accent-500 transition-[top] duration-(--duration-expressive) ease-(--ease-out-expo)"
+          className="absolute left-0 z-10 h-4.5 w-0.75 -translate-y-1/2 rounded-r-full bg-accent-500 transition-[top] duration-(--duration-expressive) ease-(--ease-out-expo)"
           style={{ top }}
         />
       )}
@@ -370,7 +380,7 @@ export default function Sidebar() {
             ) : (
               <div
                 className={cn(
-                  "px-2.5 pb-1.75 text-2xs font-semibold uppercase tracking-[.16em] text-ink-600",
+                  "px-2.5 pb-1.75 text-2xs font-semibold uppercase tracking-eyebrow text-ink-600",
                   // The first label sits under the titlebar's own breathing room; the later ones open the gap themselves.
                   i === 0 ? "pt-1.5" : "pt-3.75",
                 )}
@@ -392,83 +402,95 @@ export default function Sidebar() {
 
       <div className="flex flex-col gap-px px-2.5">
         {/* Causes a sync where the chip below only reports one; signed-in only, since a local list has nothing to sync. */}
-        {manualSync.available && (
-          <button
-            type="button"
-            onClick={() => void manualSync.sync()}
-            disabled={manualSync.syncing}
-            aria-label={collapsed ? t("sync.button") : undefined}
-            title={collapsed ? t("sync.button") : undefined}
-            className={cn(
-              itemClass,
-              stateClass(false),
-              collapsed && collapsedItemClass,
-              "disabled:opacity-60",
-            )}
-          >
-            <Spinner spinning={manualSync.syncing} className="size-4.25 shrink-0" />
-            {!collapsed && <span className={labelClass}>{t("sync.button")}</span>}
-          </button>
-        )}
+        {manualSync.available &&
+          named(
+            collapsed,
+            t("sync.button"),
+            <button
+              type="button"
+              onClick={() => void manualSync.sync()}
+              disabled={manualSync.syncing}
+              aria-label={collapsed ? t("sync.button") : undefined}
+              className={cn(
+                itemClass,
+                stateClass(false),
+                collapsed && collapsedItemClass,
+                "disabled:opacity-60",
+              )}
+            >
+              <Spinner spinning={manualSync.syncing} className="size-4 shrink-0" />
+              {!collapsed && <span className={labelClass}>{t("sync.button")}</span>}
+            </button>,
+          )}
         <Account pending={pending} syncedAt={syncedAt} collapsed={collapsed} />
         {/* Linking AniList is the one action a local profile cannot reach elsewhere in one click. */}
-        {mode === "local" && (
+        {mode === "local" &&
+          named(
+            collapsed,
+            t("nav.linkAccount"),
+            <button
+              type="button"
+              onClick={linkAccount}
+              aria-label={collapsed ? t("nav.linkAccount") : undefined}
+              className={cn(
+                itemClass,
+                stateClass(false),
+                collapsed && collapsedItemClass,
+                "text-accent-400",
+              )}
+            >
+              <LogIn className="size-4 shrink-0" />
+              {!collapsed && <span className={labelClass}>{t("nav.linkAccount")}</span>}
+            </button>,
+          )}
+        {named(
+          collapsed,
+          t("nav.about"),
+          <NavLink
+            to="/about"
+            aria-label={collapsed ? t("nav.about") : undefined}
+            className={({ isActive }) =>
+              cn(itemClass, stateClass(isActive), collapsed && collapsedItemClass)
+            }
+          >
+            <Info className="size-4 shrink-0" />
+            {!collapsed && <span className={labelClass}>{t("nav.about")}</span>}
+          </NavLink>,
+        )}
+        {named(
+          collapsed,
+          t("nav.settings"),
+          <NavLink
+            to="/settings"
+            aria-label={collapsed ? t("nav.settings") : undefined}
+            className={({ isActive }) =>
+              cn(itemClass, stateClass(isActive), collapsed && collapsedItemClass)
+            }
+          >
+            <Settings className="size-4 shrink-0" />
+            {!collapsed && <span className={labelClass}>{t("nav.settings")}</span>}
+          </NavLink>,
+        )}
+        {/* Last, and below the navigation on purpose: it changes the shape of the rail rather than going anywhere. */}
+        {named(
+          collapsed,
+          t("nav.expandSidebar"),
           <button
             type="button"
-            onClick={linkAccount}
-            aria-label={collapsed ? t("nav.linkAccount") : undefined}
-            title={collapsed ? t("nav.linkAccount") : undefined}
-            className={cn(
-              itemClass,
-              stateClass(false),
-              collapsed && collapsedItemClass,
-              "text-accent-400",
-            )}
+            onClick={toggleCollapsed}
+            aria-label={t(collapsed ? "nav.expandSidebar" : "nav.collapseSidebar")}
+            className={cn(itemClass, stateClass(false), collapsed && collapsedItemClass)}
           >
-            <LogIn className="size-4.25 shrink-0" />
-            {!collapsed && <span className={labelClass}>{t("nav.linkAccount")}</span>}
-          </button>
+            {collapsed ? (
+              <PanelLeftOpen className="size-4 shrink-0" />
+            ) : (
+              <PanelLeftClose className="size-4 shrink-0" />
+            )}
+            {!collapsed && <span className={labelClass}>{t("nav.collapseSidebar")}</span>}
+          </button>,
         )}
-        <NavLink
-          to="/about"
-          aria-label={collapsed ? t("nav.about") : undefined}
-          title={collapsed ? t("nav.about") : undefined}
-          className={({ isActive }) =>
-            cn(itemClass, stateClass(isActive), collapsed && collapsedItemClass)
-          }
-        >
-          <Info className="size-4.25 shrink-0" />
-          {!collapsed && <span className={labelClass}>{t("nav.about")}</span>}
-        </NavLink>
-        <NavLink
-          to="/settings"
-          aria-label={collapsed ? t("nav.settings") : undefined}
-          title={collapsed ? t("nav.settings") : undefined}
-          className={({ isActive }) =>
-            cn(itemClass, stateClass(isActive), collapsed && collapsedItemClass)
-          }
-        >
-          <Settings className="size-4.25 shrink-0" />
-          {!collapsed && <span className={labelClass}>{t("nav.settings")}</span>}
-        </NavLink>
-        {/* Last, and below the navigation on purpose: it changes the shape of the rail rather than going anywhere. */}
-        <button
-          type="button"
-          onClick={toggleCollapsed}
-          aria-label={t(collapsed ? "nav.expandSidebar" : "nav.collapseSidebar")}
-          title={t(collapsed ? "nav.expandSidebar" : "nav.collapseSidebar")}
-          className={cn(itemClass, stateClass(false), collapsed && collapsedItemClass)}
-        >
-          {collapsed ? (
-            <PanelLeftOpen className="size-4.25 shrink-0" />
-          ) : (
-            <PanelLeftClose className="size-4.25 shrink-0" />
-          )}
-          {!collapsed && (
-            <span className={labelClass}>{t("nav.collapseSidebar")}</span>
-          )}
-        </button>
       </div>
     </nav>
+    </TooltipProvider>
   );
 }

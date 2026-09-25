@@ -18,6 +18,7 @@ import { UserLockup } from "@/components/ui/user-lockup";
 import { Button } from "@/components/ui/button";
 import { DisclosurePanel } from "@/components/ui/disclosure";
 import { Shimmer } from "@/components/Skeleton";
+import { cardClass } from "@/components/ui/card";
 import { Markdown } from "./Markdown";
 import { MarkdownTextarea } from "./MarkdownTextarea";
 import { relTimeFromSeconds } from "@/lib/relTime";
@@ -250,7 +251,7 @@ export function ActivityCard({
   const when = relTimeFromSeconds(item.createdAt, i18n.language, t("notif.now"));
 
   return (
-    <article className="flex gap-3 rounded-panel border border-hair bg-surface-900 p-3">
+    <article className={cn(cardClass("flat"), "flex gap-3 p-3")}>
       {item.kind === "list" && item.media?.coverImage?.large && (
         <Link
           to={`/media/${item.media.id}`}

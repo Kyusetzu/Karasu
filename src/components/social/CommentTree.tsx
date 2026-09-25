@@ -5,6 +5,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { CornerDownRight, ExternalLink, Heart, Reply } from "lucide-react";
 import type { FlatComment } from "@/lib/comments";
 import { UserLockup } from "@/components/ui/user-lockup";
+import { cardClass } from "@/components/ui/card";
 import { Markdown } from "./Markdown";
 import { relTimeFromSeconds } from "@/lib/relTime";
 import { prefersReducedMotion } from "@/lib/motion";
@@ -50,9 +51,10 @@ export function CommentTree({
           key={c.id}
           ref={c.id === highlightId ? highlightRef : undefined}
           className={cn(
-            "rounded-panel border border-hair bg-surface-900 p-3",
+            cardClass(c.depth === 1 ? "sunken" : "flat"),
+            "rounded-panel p-3",
             // A reply is indented and quieter, so the two levels read apart without a connector line.
-            c.depth === 1 && "ml-6 border-surface-850 bg-surface-950",
+            c.depth === 1 && "ml-6 border-surface-850",
             c.id === highlightId && "border-accent-500/70 ring-1 ring-accent-500/30",
           )}
         >

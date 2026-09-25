@@ -28,6 +28,7 @@ import { EmptyState, PerchRule } from "@/components/EmptyState";
 import { Button } from "@/components/ui/button";
 import { Loader } from "@/components/ui/loader";
 import { IconButton } from "@/components/ui/icon-button";
+import { cardClass } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { statusColorVar } from "@/lib/statusColors";
 import { loadLegendOpen, saveLegendOpen } from "@/lib/franchiseLegend";
@@ -491,7 +492,7 @@ function Rail({
 
   if (!node) {
     return (
-      <aside className="w-full shrink-0 rounded-panel border border-hair bg-surface-900 p-4 xl:w-60">
+      <aside className={cn(cardClass("raised"), "w-full shrink-0 p-4 xl:w-60")}>
         <p className="text-xs text-ink-600">{t("franchise.selectHint")}</p>
       </aside>
     );
@@ -504,7 +505,7 @@ function Rail({
     // Keyed on the node so the pane re-runs `settle` when the selection moves; below `xl` it sits under the canvas.
     <aside
       key={node.id}
-      className="max-h-64 w-full shrink-0 animate-settle overflow-y-auto rounded-panel border border-hair bg-surface-900 p-4 panel-wash xl:max-h-none xl:w-60"
+      className={cn(cardClass("raised"), "max-h-64 w-full shrink-0 animate-settle overflow-y-auto p-4 xl:max-h-none xl:w-60")}
     >
       {node.coverImage.large && (
         <img

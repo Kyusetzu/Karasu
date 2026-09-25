@@ -2,9 +2,11 @@ import { useTranslation } from "react-i18next";
 import { WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/EmptyState";
+import { cardClass } from "@/components/ui/card";
 import { displayTitle } from "@/api/types";
 import { useCachedMedia } from "@/hooks/useCachedMedia";
 import { useListMutations } from "@/hooks/useListMutations";
+import { cn } from "@/lib/utils";
 
 
 /** The detail page offline: the cached list entry with a working +1, or a plain retry; never a faked page shape. */
@@ -67,7 +69,7 @@ function OfflineEntry({
         {t("detail.offlineCached")}
       </p>
 
-      <div className="flex gap-4 rounded-panel border border-hair bg-surface-900 p-4">
+      <div className={cn(cardClass("flat"), "flex gap-4 p-4")}>
         <div className="h-32 w-22 shrink-0 overflow-hidden rounded-control bg-surface-800">
           {entry.media.coverImage?.large && (
             <img

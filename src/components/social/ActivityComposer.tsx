@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cardClass } from "@/components/ui/card";
 import { MarkdownTextarea } from "./MarkdownTextarea";
 import { charsLeft, POST_MAX, validatePost } from "@/lib/composer";
 import { useActivityPost } from "@/hooks/useActivityPost";
@@ -34,7 +35,7 @@ export function ActivityComposer() {
         e.preventDefault();
         submit();
       }}
-      className="panel-wash panel-top rounded-panel border border-hair bg-surface-900 p-3"
+      className={cn(cardClass("raised"), "p-3")}
     >
       <MarkdownTextarea
         value={text}

@@ -15,6 +15,7 @@ import { SearchField } from "@/components/ui/search-field";
 import { Shimmer } from "@/components/Skeleton";
 import { cn } from "@/lib/utils";
 import { Chip } from "@/components/ui/chip";
+import { cardClass } from "@/components/ui/card";
 
 /** The season-split confirmation; the relations hint is pre-selected but never applied on its own (always ask). */
 
@@ -221,7 +222,7 @@ export function SeasonSplitModal({
         </div>
 
         {preview && selected && (
-          <div className="rounded-control border border-hair bg-surface-950 px-3 py-2 text-xs tabular-nums text-ink-300">
+          <div className={cn(cardClass("sunken"), "px-3 py-2 text-xs tabular-nums text-ink-300")}>
             {preview.shown.map((p) => (
               <p key={p.disk} className="flex items-center gap-1.5">
                 {t("library.ep", { n: p.disk })}

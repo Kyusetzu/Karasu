@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
+import { cardClass } from "@/components/ui/card";
 import { Markdown } from "./Markdown";
 import { cn } from "@/lib/utils";
 import {
@@ -187,7 +188,8 @@ export function MarkdownTextarea({
   const previewPanel = (
     <div
       className={cn(
-        "overflow-y-auto rounded-control border border-hair bg-surface-950 p-3",
+        cardClass("sunken"),
+        "overflow-y-auto p-3",
         preview === "side" ? "min-h-44" : "min-h-20",
       )}
     >

@@ -4,6 +4,8 @@ import { Heart, Lock, MessageSquare, Pin, Eye } from "lucide-react";
 import type { ThreadSummary } from "@/api/social";
 import { relTimeFromSeconds } from "@/lib/relTime";
 import { Chip } from "@/components/ui/chip";
+import { cardClass } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 /** One thread in a list: the title, who is talking, and how busy it is. */
 export function ThreadRow({ thread }: { thread: ThreadSummary }) {
@@ -13,7 +15,7 @@ export function ThreadRow({ thread }: { thread: ThreadSummary }) {
   return (
     <Link
       to={`/thread/${thread.id}`}
-      className="block rounded-panel border border-hair bg-surface-900 p-3 transition-surface hover:border-surface-700"
+      className={cn(cardClass("flat", { interactive: true }), "block p-3")}
     >
       <div className="flex items-start gap-2">
         {thread.isSticky && <Pin className="mt-0.5 size-3 shrink-0 text-accent-400" />}

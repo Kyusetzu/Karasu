@@ -2,8 +2,10 @@ import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
 import type { SocialUser } from "@/api/social";
 import { UserLockup } from "@/components/ui/user-lockup";
+import { cardClass } from "@/components/ui/card";
 import { FollowButton } from "./FollowButton";
 import { followRelation, relationBadgeKey } from "@/lib/follows";
+import { cn } from "@/lib/utils";
 
 /** One person in a list; no bio line, because `FOLLOWERS_QUERY` does not ask for one and a page of bios is a heavy payload. */
 export function UserRow({ user }: { user: SocialUser }) {
@@ -12,7 +14,7 @@ export function UserRow({ user }: { user: SocialUser }) {
   const badgeKey = relationBadgeKey(relation);
 
   return (
-    <div className="flex items-center gap-3 rounded-panel border border-hair bg-surface-900 p-3 transition-surface hover:border-surface-700">
+    <div className={cn(cardClass("flat", { interactive: true }), "flex items-center gap-3 p-3")}>
       <Link
         to={`/user/${encodeURIComponent(user.name)}`}
         className="min-w-0 flex-1"

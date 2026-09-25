@@ -334,7 +334,8 @@ no row here, add the primitive first.
 | a count or an unread dot | `Badge`; `floating` over an icon rings it in the page colour |
 | one lens of two or three | `Segmented`, a radio group with one tab stop whose thumb slides to the choice |
 | a page's sections, or the list's statuses | `StatusTabs`, one row that scrolls rather than wraps |
-| a raised panel | `Card`, `CardTitle` |
+| a panel | `Card`: `raised` by default (the wash and the catch-light), `flat` for a bordered row or block, `sunken` for a well inside either; `interactive` borders it on hover, and a card that must be a link, a form or an article spells `cardClass`. `CardTitle` heads a raised one |
+| a titled page section | a `<section>` headed by `SectionHeader`; it has no chrome of its own |
 | an Overview section heading | `SectionHeader` |
 | a text field | `Input`; a count is `NumberInput`; several lines are `Textarea`, and a post is `MarkdownTextarea` |
 | a labelled control in a form | `Field`: the label above, the control, then a hint or, while there is one, the error; without `htmlFor` it names its children as a group |
@@ -356,16 +357,17 @@ no row here, add the primitive first.
 | a season picker | `SeasonPicker` |
 | a user's name and face | `UserLockup` |
 
-The foundation phase adds, each replacing the hand-built copies it lists in
-the plan:
-
-- card variants.
-
 The menu row covers the context menu, the action sheet, the More sheet, the
 sort and preset panels and the palette. The rows that carry more than a
 label move to it with their areas: the bell's and the sync panel's feed
 rows, the phone's settings list, the tri-state filter options, and the
 season split's cover rows.
+
+The cards cover the Overview's tiles, the composer, the franchise pane,
+the feed's and the forum's rows, the offline entry and three wells. Four
+shapes move with their areas instead: the borderless code and log wells
+on `surface-850`, the tiles nested inside a card on the card's own fill,
+the tinted notices, and the frames around the virtual lists.
 
 ## Libraries
 
@@ -516,3 +518,7 @@ maintainer picks. A pure restyle that moves nothing does not. The rules:
   wore the select's class became `Input`s; the forum, review and profile
   dialogs label their fields through `Field`, whose error replaces the
   hint rather than sitting under it.
+- **2026-09-25:** `Card` has three variants. A skeleton now wears the frame
+  of the card it stands in for, and the franchise pane is raised whether a
+  title is picked or not; before, the empty pane was flat and the filled
+  one raised without the catch-light.

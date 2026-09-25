@@ -34,6 +34,7 @@ import {
 } from "@/components/Skeleton";
 import SeasonHero from "@/components/media/SeasonHero";
 import RecommendedSection from "@/components/media/RecommendedSection";
+import { Card } from "@/components/ui/card";
 
 export default function Dashboard() {
   const viewer = useAuth((s) => s.viewer);
@@ -138,13 +139,10 @@ function DashboardSkeleton() {
       {/* Real frame, shimmering value only, so the row is already the right height when the numbers land. */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {Array.from({ length: 4 }, (_, i) => (
-          <div
-            key={i}
-            className="rounded-panel border border-hair bg-surface-900 px-4 py-3 panel-wash"
-          >
+          <Card key={i} className="px-4 py-3.5">
             <Shimmer index={i} className="h-5 w-16" />
             <Shimmer index={i} className="mt-2 h-2 w-20" />
-          </div>
+          </Card>
         ))}
       </div>
       {Array.from({ length: 2 }, (_, section) => (
@@ -408,17 +406,14 @@ function Stats({ entries }: { entries: MediaListEntry[] }) {
       <SectionHeader icon={BarChart3} title={t("dashboard.stats")} />
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {items.map((item) => (
-          <div
-            key={item.label}
-            className="panel-wash panel-top rounded-panel border border-hair bg-surface-900 px-4 py-3.5"
-          >
+          <Card key={item.label} className="px-4 py-3.5">
             <p className="text-2xl font-bold tabular-nums text-ink-100">
               {item.value}
             </p>
             <p className="mt-0.5 text-2xs font-medium uppercase tracking-[.13em] text-ink-600">
               {item.label}
             </p>
-          </div>
+          </Card>
         ))}
       </div>
     </section>

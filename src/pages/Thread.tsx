@@ -55,6 +55,7 @@ import { showToast } from "@/stores/toast";
 import { useSocialActions } from "@/hooks/useSocialActions";
 import { cn } from "@/lib/utils";
 import { Chip, chipClass } from "@/components/ui/chip";
+import { Card } from "@/components/ui/card";
 
 /** The tree route has no pageInfo; keep hasNextPage false so no "Load more" appears under a conversation. */
 const EMPTY_PAGE_INFO = { total: 0, currentPage: 1, lastPage: 1, hasNextPage: false };
@@ -543,9 +544,9 @@ export default function Thread() {
       </header>
 
       {data.body && (
-        <div className="mt-5 rounded-panel border border-hair bg-surface-900 p-4">
+        <Card variant="flat" className="mt-5">
           <Markdown source={data.body} siteUrl={data.siteUrl ?? undefined} />
-        </div>
+        </Card>
       )}
 
       <section className="mt-6">

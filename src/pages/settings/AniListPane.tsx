@@ -6,7 +6,8 @@ import { ExternalLink } from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { getNotifSchedule, isTauri, setNotifSchedule } from "@/api/anilist";
 import { notificationOptions, userProfile } from "@/api/social";
-import { Card, CardTitle } from "@/components/ui/card";
+import { Card, CardTitle, cardClass } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import { Disclosure } from "@/components/ui/disclosure";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -403,7 +404,7 @@ export function AniListListOptionsSection() {
             </Row>
 
             {/* Read-only on purpose: `customLists` is a full replacement with no undo, so never send it (`lib/anilistUserFields`). */}
-            <div className="rounded-control border border-hair bg-surface-950 p-3">
+            <div className={cn(cardClass("sunken"), "p-3")}>
               <p className="text-xs font-medium text-ink-300">
                 {t("settings.alCustomLists")}
               </p>

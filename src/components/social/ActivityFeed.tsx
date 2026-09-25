@@ -5,12 +5,14 @@ import { activities, type ActivityPage } from "@/api/social";
 import { Button } from "@/components/ui/button";
 import { EmptyState, PerchRule } from "@/components/EmptyState";
 import { Shimmer } from "@/components/Skeleton";
+import { cardClass } from "@/components/ui/card";
 import { normalizeActivity, type FeedItem } from "@/lib/activity";
 import { nextPageParam } from "@/lib/paging";
 import { isBlocked } from "@/lib/contentFilter";
 import { useContentFilter } from "@/stores/contentFilter";
 import { staggerDelay } from "@/lib/motion";
 import { ActivityCard } from "./ActivityCard";
+import { cn } from "@/lib/utils";
 
 /** Activity feed paged by a button, never a scroll; no remaining count, because `pageInfo.total` is a capped sentinel. */
 export function ActivityFeed({
@@ -40,7 +42,7 @@ export function ActivityFeed({
     return (
       <div className="space-y-2" aria-hidden="true">
         {[0, 1, 2, 3].map((i) => (
-          <div key={i} className="flex gap-3 rounded-panel border border-hair p-3">
+          <div key={i} className={cn(cardClass("flat"), "flex gap-3 p-3")}>
             <Shimmer className="aspect-2/3 w-11 rounded-inner" index={i} />
             <div className="flex-1 space-y-2">
               <Shimmer className="h-3 w-28 rounded-inner" index={i} />

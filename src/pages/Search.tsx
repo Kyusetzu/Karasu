@@ -51,6 +51,7 @@ import { cn } from "@/lib/utils";
 import { EmptyState, PerchRule, StruckQuery } from "@/components/EmptyState";
 import { Pill } from "@/components/ui/pill";
 import { UserList } from "@/components/social/UserList";
+import { cardClass } from "@/components/ui/card";
 
 /** What the search is looking for; the scope pills grew from two mediums to people and entities. */
 type Scope = MediaType | "USERS" | "CHARACTERS" | "STAFF" | "STUDIOS";
@@ -641,7 +642,7 @@ function EntityResultList({
 /** `UserRow`'s frame without the follow button — the whole row is the link. */
 function EntityRow({ to, name, src }: { to: string; name: string; src?: string }) {
   return (
-    <div className="flex items-center gap-3 rounded-panel border border-hair bg-surface-900 p-3 transition-surface hover:border-surface-700">
+    <div className={cn(cardClass("flat", { interactive: true }), "flex items-center gap-3 p-3")}>
       <Link to={to} className="min-w-0 flex-1">
         <UserLockup name={name} src={src} size="md" titleAttr nameClassName="text-sm" />
       </Link>

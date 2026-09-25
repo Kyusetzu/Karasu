@@ -629,9 +629,9 @@ bump with nothing to describe is a mistake or a double-run. `--force` overrides
 that, `--print` just reports the current version.
 
 **`npm run verify`** is `scripts/verify.mjs`, the whole gate and what CI runs,
-so the two cannot drift. Typecheck, the comment audit and the style audit go
-first and stop the run on a failure; then vitest and `cargo test` run at the
-same time. Every
+so the two cannot drift. Typecheck, the comment audit, the style audit and the
+site tokens' freshness go first and stop the run on a failure; then vitest and
+`cargo test` run at the same time. Every
 phase is captured, and a green run prints one line per phase — counts, seconds,
 any compiler warning — and nothing else, which is the point: the loop runs
 many times a day and its output is read by an agent. A failed phase prints its
@@ -668,7 +668,7 @@ commit gate, and then everything else the repository can check, in one run
 with the same one-line-per-phase output. After the gate's own phases it runs
 the cheap, independent checks at once — **knip** (unused files, exports and
 dependencies, `knip.json`), **versions** (`bump-version --check`, the five
-version files agree), the **site**'s typecheck and **site tokens** freshness,
+version files agree), the **site**'s typecheck,
 **npm audit** at `high` over the production graph, the **bundle budget**
 (`scripts/bundle-budget.mjs`: a fresh `vite build`, then four gzipped figures —
 what the window waits for, the stylesheet, the largest lazy chunk, all the

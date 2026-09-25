@@ -187,6 +187,8 @@ if (wantFrontend) {
   if (!(await run("typecheck", node, [TSC, "--noEmit"], summarizeTsc)).ok) report();
   if (!(await run("comment audit", node, ["scripts/comment-audit.mjs", "--check"], summarizeAudit)).ok) report();
   if (!(await run("style audit", node, ["scripts/style-audit.mjs", "--check"], summarizeStyle)).ok) report();
+  // In the commit gate, not only before a push: an index.css change without its site sync is this commit's mistake.
+  if (!(await run("site tokens", node, ["scripts/sync-tokens.mjs", "--check"], summarizeSite, { cwd: path.join(ROOT, "site") })).ok) report();
   if (!(await run("typos", "typos", ["--format", "brief"], summarizeTypos, { optional: "cargo install typos-cli" })).ok) report();
   if (!(await run("toml", node, ["scripts/toml-check.mjs"], summarizeToml)).ok) report();
   if (!(await run("oxlint", node, [OXLINT, "--deny-warnings"], summarizeLint)).ok) report();
@@ -216,7 +218,6 @@ await Promise.all([
   run("knip", node, [KNIP], summarizeKnip),
   run("versions", node, ["scripts/bump-version.mjs", "--check"], summarizeVersions),
   run("site", node, [SITE_TSC, "--noEmit"], () => "typecheck clean", { cwd: path.join(ROOT, "site") }),
-  run("site tokens", node, ["scripts/sync-tokens.mjs", "--check"], summarizeSite, { cwd: path.join(ROOT, "site") }),
   run("npm audit", node, [NPM, "audit", "--audit-level=high", "--omit=dev"], summarizeAudit2),
   run("bundle budget", node, ["scripts/bundle-budget.mjs"], summarizeBudget),
 ]);

@@ -45,7 +45,7 @@ export default function PullToSync() {
               : { transform: `rotate(${(offset / PULL_TRIGGER_PX) * 180}deg)` }
           }
         />
-        <span className="text-2xs font-medium tracking-[.03em]">{label}</span>
+        <span className="text-2xs font-medium tracking-caption">{label}</span>
       </div>
     </div>
   );

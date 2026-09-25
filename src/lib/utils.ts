@@ -5,10 +5,10 @@ import { extendTailwindMerge } from "tailwind-merge";
 const twMerge = extendTailwindMerge({
   extend: {
     theme: {
-      text: ["ui", "title"],
+      text: ["ui", "title", "hero", "hero-lg"],
       radius: ["inner", "control", "panel", "sheet", "cover"],
       shadow: ["float", "sheet"],
-      tracking: ["eyebrow", "lockup"],
+      tracking: ["eyebrow", "lockup", "wordmark", "caption"],
     },
     classGroups: {
       z: [{ z: ["popover", "alert", "skip"] }],

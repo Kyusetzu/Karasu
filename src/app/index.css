@@ -39,9 +39,20 @@
   --tracking-eyebrow: 0.12em;
   /* The Japanese sub-lockup beside a screen title, opened a little so its kana do not crowd. */
   --tracking-lockup: 0.04em;
+  /* The titlebar's wordmark, spaced as a brand mark rather than a label. */
+  --tracking-wordmark: 0.2em;
+  /* Small sentence-case captions on floating chrome, opened a hair to stay legible at that size. */
+  --tracking-caption: 0.03em;
   /* Page titles, a step above text-2xl, in the brand face. */
   --text-title: 1.875rem;
   --text-title--line-height: 1.2;
+  /* The first-run greeting, set larger than a page title and tight, with a wider step for the desktop. */
+  --text-hero: 1.75rem;
+  --text-hero--line-height: 1.12;
+  --text-hero--letter-spacing: -0.03em;
+  --text-hero-lg: 2.25rem;
+  --text-hero-lg--line-height: 1.12;
+  --text-hero-lg--letter-spacing: -0.03em;
   /* Bold a touch lighter than 700, which the variable UI faces render exactly and a static face rounds up. */
   --font-weight-bold: 650;
 
@@ -60,6 +71,9 @@
   --color-scrim: rgb(4 5 8 / 0.55);
   /* The dim behind a picture shown full screen, deep enough that the page gives way to it. */
   --color-scrim-deep: rgb(4 5 8 / 0.92);
+  /* The window's close button under the pointer: the caption bar's red in every theme, with its white glyph. */
+  --color-window-close: #b3232c;
+  --color-window-close-ink: #ffffff;
 
   --color-surface-950: #0b0d12;
   --color-surface-900: #12141a;

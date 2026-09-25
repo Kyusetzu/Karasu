@@ -83,6 +83,8 @@ export const SCREENS = [
   },
   { id: "d12-glocke", w: 1232, h: 800, route: "/list", act: (p) => p.getByRole("button", { name: "Benachrichtigungen" }).first().click() },
   { id: "d15-benachrichtigungen", w: 1232, h: 800, route: "/notifications" },
+  { id: "d16-erster-start", w: 1232, h: 800, route: "/", out: true },
+  { id: "p9-erster-start", w: 405, h: 860, phone: true, route: "/", out: true },
   {
     id: "p8-glocke",
     w: 405,
@@ -187,7 +189,7 @@ async function launch() {
 
 const urlFor = (s, style, theme, still) => {
   const [mode, contrast] = theme.startsWith("hc-") ? [theme.slice(3), "more"] : [theme, ""];
-  const q = new URLSearchParams({ style, theme: mode, contrast, android: s.phone ? "1" : "", route: s.route, lang: flag("--lang", "de"), still: still ? "1" : "" });
+  const q = new URLSearchParams({ style, theme: mode, contrast, android: s.phone ? "1" : "", out: s.out ? "1" : "", route: s.route, lang: flag("--lang", "de"), still: still ? "1" : "" });
   return `${BASE}?${q}`;
 };
 

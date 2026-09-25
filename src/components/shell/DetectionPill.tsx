@@ -39,7 +39,7 @@ export default function DetectionPill() {
           current ? "bg-accent-500" : "bg-ink-600",
         )}
       />
-      <span className="truncate text-2xs font-medium tracking-[.03em] text-ink-500">
+      <span className="truncate text-2xs font-medium tracking-caption text-ink-500">
         {current ? parts.join(" · ") : t("nowPlaying.idle")}
       </span>
     </div>

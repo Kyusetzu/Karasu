@@ -7,6 +7,8 @@ const params = new URLSearchParams(location.search);
 const theme = params.get("theme") ?? "dark";
 const contrast = params.get("contrast") === "more";
 const android = params.get("android") === "1";
+// Signed out, so the overview shows the first-run screen instead of the lists.
+const signedOut = params.get("out") === "1";
 const route = params.get("route") ?? "/";
 const style = params.get("style") ?? "";
 const now = Math.floor(Date.now() / 1000);
@@ -190,7 +192,9 @@ mockIPC((cmd, args) => {
     case "plugin:event|listen":
       return 1;
     case "anilist_session":
-      return viewer;
+      return signedOut ? null : viewer;
+    case "get_profile_mode":
+      return signedOut ? "none" : "anilist";
     case "platform_info":
       return { os: android ? "android" : "windows", appImage: false };
     case "fetch_media_list":

@@ -238,6 +238,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
       tagFilter: p.tagFilter ?? "",
       format: p.format ?? "",
       country: p.country ?? "",
+      list: p.list ?? "",
     });
   };
 
@@ -254,6 +255,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
         tagFilter,
         format: formatFilter,
         country: countryFilter,
+        list: listFilter,
       },
     ];
     setPresets(next);

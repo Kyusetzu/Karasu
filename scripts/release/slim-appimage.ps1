@@ -1,4 +1,4 @@
-<# Takes the libwayland-client linuxdeploy bundles back out of the AppImage, because newer Mesa cannot use it. #>
+<# Takes the libraries the host's Mesa also loads back out of the AppImage, and makes the GTK hook's X11 overridable. #>
 
 $ErrorActionPreference = "Stop"
 $PSNativeCommandUseErrorActionPreference = $true
@@ -17,8 +17,17 @@ if (-not $appimage) {
     throw "No .AppImage found in $bundleDir"
 }
 
-# Only the client: every GTK host has its own, while libwayland-server, also bundled, is absent from some hosts.
-$drop = @("libwayland-client.so*")
+# Bundled, loaded by the host's Mesa or its X11/Wayland siblings, and present on every host CLAUDE.md names.
+$drop = @(
+    "libwayland-client.so.0*", "libwayland-cursor.so.0*", "libwayland-egl.so.1*", "libxkbcommon.so.0*",
+    "libxcb-randr.so.0*", "libxcb-render.so.0*", "libxcb-shm.so.0*", "libXau.so.6*", "libXdmcp.so.6*",
+    "libXext.so.6*", "libzstd.so.1*", "libelf.so.1*", "libffi.so.8*", "liblzma.so.5*"
+)
+
+# The im-wayland module bundled with GTK dereferences a null display when GDK runs on X11.
+$hookName = "linuxdeploy-plugin-gtk.sh"
+$backendLine = 'export GDK_BACKEND="${GDK_BACKEND:-x11}"'
+$imLine = '[ "${GDK_BACKEND%%,*}" = wayland ] || case "$GTK_IM_MODULE" in wayland*) unset GTK_IM_MODULE;; esac'
 
 # Pinned by digest; the tool is only a packer, the runtime comes from Tauri's own file below.
 $toolUrl = "https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage"
@@ -32,14 +41,31 @@ try {
     & $appimage.FullName --appimage-extract | Out-Null
 
     $lib = Join-Path $work "squashfs-root/usr/lib"
-    $found = @(Get-ChildItem -Path $lib -Recurse -Include $drop)
-    if ($found.Count -eq 0) {
-        throw "libwayland-client is not in the AppImage; linuxdeploy changed, re-check tauri-apps/tauri#15976"
+    # Every pattern must match, so a linuxdeploy that stops bundling one fails here instead of leaving a stale list.
+    $found = foreach ($pattern in $drop) {
+        $hits = @(Get-ChildItem -Path $lib -Recurse -Filter $pattern)
+        if ($hits.Count -eq 0) {
+            throw "$pattern is not in the AppImage; linuxdeploy changed, re-check the AppImage notes in CLAUDE.md"
+        }
+        $hits
     }
     foreach ($f in $found) {
         Write-Host "removing $($f.Name)"
         Remove-Item -Force $f.FullName
     }
+
+    $hook = Join-Path $work "squashfs-root/apprun-hooks/$hookName"
+    if (-not (Test-Path $hook)) {
+        throw "The AppImage carries no $hookName; the GTK plugin changed"
+    }
+    $text = [System.IO.File]::ReadAllText($hook)
+    $forced = [regex]::Matches($text, '(?m)^export GDK_BACKEND=x11\b[^\n]*$')
+    if ($forced.Count -ne 1) {
+        throw "$hookName forces GDK_BACKEND=x11 $($forced.Count) times, expected once; the GTK plugin changed"
+    }
+    # Spliced rather than -replace, because ${...} is a substitution token in a .NET replacement string.
+    $text = $text.Remove($forced[0].Index, $forced[0].Length).Insert($forced[0].Index, "$backendLine`n$imLine")
+    [System.IO.File]::WriteAllText($hook, $text, [System.Text.UTF8Encoding]::new($false))
 
     # The ELF runtime is everything before the squashfs, so the repacked file boots exactly as Tauri's did.
     $offset = [int](& $appimage.FullName --appimage-offset)
@@ -74,12 +100,19 @@ try {
     Move-Item -Force $slim $appimage.FullName
     chmod +x $appimage.FullName
 
-    # Proves the repacked file opens and the library stayed out.
+    # Proves the repacked file opens, the libraries stayed out and the hook carries both lines once.
     Remove-Item -Recurse -Force (Join-Path $work "squashfs-root")
     & $appimage.FullName --appimage-extract | Out-Null
-    $left = @(Get-ChildItem -Path $lib -Recurse -Include $drop)
+    $left = @(foreach ($pattern in $drop) { Get-ChildItem -Path $lib -Recurse -Filter $pattern })
     if ($left.Count -ne 0) {
         throw "The repacked AppImage still carries: $($left.Name -join ', ')"
+    }
+    $repacked = [System.IO.File]::ReadAllText($hook)
+    foreach ($line in @($backendLine, $imLine)) {
+        $count = ([regex]::Matches($repacked, "(?m)^$([regex]::Escape($line))$")).Count
+        if ($count -ne 1) {
+            throw "The repacked $hookName carries '$line' $count times, expected once"
+        }
     }
 } finally {
     Pop-Location
@@ -104,4 +137,4 @@ if (Test-Path $sig) {
     }
 }
 
-Write-Output "slimmed $($appimage.Name): $($found.Count) library file(s) removed$(if (Test-Path $sig) { ', re-signed' })"
+Write-Output "slimmed $($appimage.Name): $(@($found).Count) library file(s) removed, GDK_BACKEND overridable$(if (Test-Path $sig) { ', re-signed' })"

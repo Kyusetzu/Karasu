@@ -62,7 +62,7 @@ export const PLATFORMS: Platform[] = [
     id: "linux",
     name: "Linux",
     tier: "experimental",
-    install: "An AppImage for x86_64 that updates itself, or a .deb and an .rpm for the package manager. All three need webkit2gtk-4.1 on the system (Ubuntu 22.04+, Debian 12+, Fedora, Arch).",
+    install: "An AppImage for x86_64 that updates itself, or a .deb and an .rpm for the package manager. The AppImage carries its own WebKitGTK; the packages use the system's webkit2gtk-4.1 (Ubuntu 22.04+, Debian 12+, Fedora, Arch).",
     download: { label: "Download the AppImage", href: release.assets.linux },
     secondary: { label: "SHA256SUMS.txt", href: release.assets.sums },
     extra: [

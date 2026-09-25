@@ -135,12 +135,18 @@ jobs:
         run: npx tauri build --config '{"bundle":{"createUpdaterArtifacts":true}}'
 
       # Before the rename and the manifest: the script repacks the AppImage, so it re-signs it with the same key.
-      - name: Take libwayland-client back out of the AppImage
+      - name: Leave the display libraries to the host in the AppImage
         shell: pwsh
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: ./scripts/release/slim-appimage.ps1
+
+      # Blocking: a Linux build that does not stay up on Fedora 44 or Ubuntu 26.04 is not worth shipping or merging.
+      - name: Smoke-test the AppImage on Fedora 44 and Ubuntu 26.04
+        shell: pwsh
+        timeout-minutes: 12
+        run: ./scripts/release/smoke-appimage.ps1
 
       # Confirm what the updater artifacts are called before trusting latest.json's linux-x86_64 url.
       - name: List bundle output

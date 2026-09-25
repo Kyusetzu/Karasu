@@ -13,6 +13,7 @@ import { Shimmer } from "@/components/Skeleton";
 import { adultQueryArg, isBlocked, shouldBlur } from "@/lib/contentFilter";
 import { useContentFilter } from "@/stores/contentFilter";
 import { formatLabel } from "@/lib/format";
+import { heroEpisodes } from "@/lib/heroEpisodes";
 import { cn } from "@/lib/utils";
 
 /** How long each title holds before the next fades in. */
@@ -91,12 +92,13 @@ export default function SeasonHero() {
         {/* Only under the text and dark in both themes, so the banner stays whole and the haloed text stays legible. */}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/60 to-transparent" />
 
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 p-5 ink-halo">
-          <p className="text-2xs font-semibold uppercase tracking-[.14em] text-accent-400">
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 p-5">
+          {/* A plate, not an outline, which eats letters this small; a block box, since only one can trim to the caps. */}
+          <p className="inline-block rounded-full bg-black/55 px-2 py-1.5 text-2xs font-semibold uppercase leading-none tracking-[.14em] text-accent-400 backdrop-blur-sm [text-box:trim-both_cap_alphabetic]">
             {t(`season.${season}`)} {year} · {t("dashboard.heroKicker")}
           </p>
           {/* The link is the title and the whole image is a second one, so a click anywhere on the hero works. */}
-          <h2 className="mt-1 max-w-3xl">
+          <h2 className="mt-1.5 max-w-3xl ink-halo">
             <Link
               to={`/media/${current.id}`}
               className="pointer-events-auto text-2xl font-bold leading-tight text-white hover:underline"
@@ -104,11 +106,9 @@ export default function SeasonHero() {
               {displayTitle(current.title)}
             </Link>
           </h2>
-          <p className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-2xs text-white/85">
+          <p className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-2xs text-white/85 ink-halo">
             {current.format && <span>{formatLabel(current.format, t)}</span>}
-            {current.episodes != null && (
-              <span>{t("common.progressEpisodes", { n: current.episodes, total: current.episodes })}</span>
-            )}
+            <EpisodeLine media={current} />
             {current.averageScore != null && (
               <span className="text-gold">{current.averageScore}%</span>
             )}
@@ -159,6 +159,22 @@ export default function SeasonHero() {
       )}
     </section>
   );
+}
+
+/** Aired against total for a running show, the total otherwise; `heroEpisodes` decides, this only says it. */
+function EpisodeLine({ media }: { media: HeroMedia }) {
+  const { t } = useTranslation();
+  const line = heroEpisodes(media);
+  switch (line?.key) {
+    case "aired":
+      return <span>{t("dashboard.heroAired", { n: line.n, total: line.total })}</span>;
+    case "airedOpen":
+      return <span>{t("dashboard.heroAiredOpen", { n: line.n })}</span>;
+    case "total":
+      return <span>{t("dashboard.heroEpisodes", { n: line.n })}</span>;
+    default:
+      return null;
+  }
 }
 
 /** One title's artwork: the banner whole over a blur of itself, or the cover as a dimmed wash when there is none. */

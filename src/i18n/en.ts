@@ -339,6 +339,9 @@ export const en = {
   },
   dashboard: {
     heroKicker: "Most popular",
+    heroAired: "{{n}} / {{total}} aired",
+    heroAiredOpen: "{{n}} aired",
+    heroEpisodes: "{{n}} episodes",
     heroLabel: "This season's most popular anime",
     heroPrev: "Previous title",
     heroNext: "Next title",

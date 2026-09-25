@@ -25,7 +25,9 @@ const media = (id: number, romaji: string, over: Partial<HeroMedia> = {}): HeroM
   bannerImage: `https://s4.anilist.co/banner/${id}.jpg`,
   coverImage: { extraLarge: null, large: null },
   format: "TV",
+  status: "FINISHED",
   episodes: 12,
+  nextAiringEpisode: null,
   averageScore: 80,
   genres: [],
   isAdult: false,
@@ -49,6 +51,21 @@ describe("SeasonHero", () => {
     const link = await screen.findByRole("link", { name: "Frieren" });
     // `renderWithProviders` uses a MemoryRouter, so no hash prefix here.
     expect(link).toHaveAttribute("href", "/media/1");
+  });
+
+  /** A running show counts what has aired; the same total twice read as a finished season. */
+  it("counts a running show's aired episodes against its total", async () => {
+    hero.mockResolvedValue([
+      media(1, "Mushoku", { status: "RELEASING", episodes: 14, nextAiringEpisode: { episode: 14 } }),
+    ]);
+    renderWithProviders(<SeasonHero />);
+    expect(await screen.findByText('dashboard.heroAired:{"n":13,"total":14}')).toBeInTheDocument();
+  });
+
+  it("gives a finished show its total", async () => {
+    hero.mockResolvedValue([media(1, "Tanya")]);
+    renderWithProviders(<SeasonHero />);
+    expect(await screen.findByText('dashboard.heroEpisodes:{"n":12}')).toBeInTheDocument();
   });
 
   /** Nothing is a better hero than a broken one. */

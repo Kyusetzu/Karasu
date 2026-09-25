@@ -200,7 +200,9 @@ query ($season: MediaSeason!, $year: Int!, $isAdult: Boolean) {
       bannerImage
       coverImage { extraLarge large }
       format
+      status
       episodes
+      nextAiringEpisode { episode }
       averageScore
       genres
       isAdult
@@ -216,7 +218,9 @@ export interface HeroMedia {
   bannerImage: string | null;
   coverImage: { extraLarge: string | null; large: string | null };
   format: string | null;
+  status: string | null;
   episodes: number | null;
+  nextAiringEpisode: { episode: number } | null;
   averageScore: number | null;
   genres: string[] | null;
   isAdult: boolean | null;

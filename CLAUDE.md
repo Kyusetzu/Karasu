@@ -91,7 +91,7 @@ src/
                      useBackClose, useNotifBadge, useDialogFocus,
                      useGridRoving, useSyncStatus, useManualSync,
                      usePullToSync, useActionRunner, useCachedMedia,
-                     useDetectionMedia, useDetectionDrag)
+                     useDetectionMedia, useDetectionDrag, useElementSize)
   i18n/              index.ts (setup) + en.ts + de.ts; `de: typeof en` enforces
                      key parity across the two files
   lib/               pure logic + its *.test.ts — the place testable code goes
@@ -1656,6 +1656,20 @@ four or five places, made by careful code, because nothing said it once.
   `setView` goes through it and merges what queues up in call order, and the
   toolbar's panels edit a draft the list draws at once and `setView` writes on
   close. `Popover`'s `closeThen` is the same wait for anything a panel opens.
+- **A banner is shown whole, and its own edges fill the rest.** AniList banners
+  are a fixed strip: of Summer 2026's 36, 34 measured exactly 1900 × 400
+  (4.75 : 1) on 2026-09-25, the others 3.33 and 2.22. `BannerImage` contains
+  the picture (`lib/bannerFit` places it), feathers each edge that meets a gap,
+  and fills the gap with the picture's outermost rows or columns stretched and
+  blurred, so the colours carry on and nothing repeats. Two fills were tried
+  and dropped: a blurred centre crop (its colours did not continue the edge,
+  which drew a hard seam top and bottom) and a mirrored copy (it repeats a face
+  or an eye as a ghost). The detail header follows the width below the desktop
+  cap — `min(16rem, 100cqw / 4.75 + 5.5rem)`, a 44 px band above for the back
+  button and one below for the cover — because a fixed 256 px showed a phone
+  an 85 px banner in two thirds blur. The query container sits on a wrapper
+  around the header, never on the page root: containment would make that root
+  the containing block of every `fixed` overlay rendered inside it.
 - **Local text matching goes through `lib/fuzzy`.** Exact > substring >
   word-prefix > trigram containment, scored per title — per-title docs are
   what make a query structurally unable to match across two adjacent names

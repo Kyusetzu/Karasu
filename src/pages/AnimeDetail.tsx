@@ -80,6 +80,7 @@ import { DetailSkeleton, Shimmer } from "@/components/Skeleton";
 import { cn } from "@/lib/utils";
 import { DecodedImage } from "@/components/media/DecodedImage";
 import { BannerImage } from "@/components/media/BannerImage";
+import { BANNER_RATIO } from "@/lib/bannerFit";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardTitle } from "@/components/ui/card";
@@ -188,27 +189,31 @@ export default function AnimeDetail() {
 
   return (
     <div>
-      {/* Fixed-height banner slot even without a bannerImage: the cover overlaps its bottom edge by a fixed amount. */}
-      <div className="relative h-64">
-        {data.bannerImage ? (
-          <BannerImage src={data.bannerImage} veiled={veiled} />
-        ) : (
-          coverSrc && (
-            <DecodedImage
-              src={coverSrc}
-              className="h-full w-full scale-110 object-cover blur-2xl"
-              loadedOpacity={0.4}
-            />
-          )
-        )}
-        {/* A short fade into the page, so the contained banner stays whole above it. */}
-        <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-surface-950 to-transparent" />
-        {/* Anchored to the banner, not the centred column, or it drifts inward with the gutter on a wide display. */}
-        <BackButton className="absolute left-6 top-4 z-10" />
+      {/* The query container sits here, not on the page, since containment would pin the page's fixed overlays to it. */}
+      <div className="@container">
+        {/* A standard banner plus a band for the back button above and the cover below, capped at the desktop height. */}
+        <div className="relative" style={{ height: `min(16rem, calc(100cqw / ${BANNER_RATIO} + 5.5rem))` }}>
+          {data.bannerImage ? (
+            <BannerImage src={data.bannerImage} veiled={veiled} />
+          ) : (
+            coverSrc && (
+              <DecodedImage
+                src={coverSrc}
+                className="h-full w-full scale-110 object-cover blur-2xl"
+                loadedOpacity={0.4}
+              />
+            )
+          )}
+          {/* A short fade into the page, so the contained banner stays whole above it. */}
+          <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-surface-950 to-transparent" />
+          {/* Anchored to the banner, not the centred column, or it drifts inward with the gutter on a wide display. */}
+          <BackButton className="absolute left-6 top-3 z-10" />
+        </div>
       </div>
 
       <div className="relative mx-auto max-w-4xl px-8 pb-10 2xl:max-w-none">
-        <div className="-mt-14 flex gap-6">
+        {/* On the phone the cover starts where the banner ends; wider, it overlaps the banner as it always did. */}
+        <div className="-mt-11 flex gap-6 md:-mt-14">
           {/* The incoming half of the cover-to-hero morph; unconditional because this page shows exactly one cover. */}
           <div className="relative h-57 w-38 shrink-0">
             <img

@@ -341,6 +341,9 @@ export const de: typeof en = {
   },
   dashboard: {
     heroKicker: "Beliebteste",
+    heroAired: "{{n}} / {{total}} ausgestrahlt",
+    heroAiredOpen: "{{n}} ausgestrahlt",
+    heroEpisodes: "{{n}} Episoden",
     heroLabel: "Beliebteste Anime dieser Saison",
     heroPrev: "Vorheriger Titel",
     heroNext: "Nächster Titel",

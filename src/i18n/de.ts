@@ -20,7 +20,7 @@ export const de: typeof en = {
     stats: "Statistik",
     wrapped: "Wrapped",
     library: "Lokale Bibliothek",
-    linkAccount: "AniList-Konto verknüpfen",
+    linkAccount: "AniList verknüpfen",
     collapseSidebar: "Leiste einklappen",
     expandSidebar: "Leiste ausklappen",
     about: "Über",

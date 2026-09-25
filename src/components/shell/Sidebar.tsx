@@ -86,9 +86,14 @@ function useRailMarker(deps: unknown[]) {
 
 const labelClass = "min-w-0 truncate text-ui font-medium";
 
-/** Collapsed, a control's name moves into a tooltip beside it; expanded, the label says it and nothing is added. */
+/** Collapsed, a control's name moves into a tooltip beside it; expanded, the label says it and the tooltip stands down. */
 function named(collapsed: boolean, label: string, control: ReactElement) {
-  return collapsed ? <Tooltip label={label}>{control}</Tooltip> : control;
+  // Always wrapped: swapping the wrapper in and out would remount the control and drop the focus of the collapse toggle.
+  return (
+    <Tooltip label={label} disabled={!collapsed}>
+      {control}
+    </Tooltip>
+  );
 }
 
 export interface NavItem {

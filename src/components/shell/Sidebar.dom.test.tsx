@@ -30,6 +30,20 @@ describe("Sidebar", () => {
     expect(profile.closest("div.flex-col")).not.toHaveClass("mx-2.5");
   });
 
+  it("keeps the focus on the collapse toggle when it is pressed from the keyboard, both ways", async () => {
+    const user = userEvent.setup({ delay: null });
+    signIn();
+    renderWithProviders(<Sidebar />);
+    const toggle = screen.getByRole("button", { name: "nav.collapseSidebar" });
+    toggle.focus();
+    await user.keyboard("{Enter}");
+    const expand = screen.getByRole("button", { name: "nav.expandSidebar" });
+    expect(expand).toBe(toggle);
+    expect(expand).toHaveFocus();
+    await user.keyboard("{Enter}");
+    expect(screen.getByRole("button", { name: "nav.collapseSidebar" })).toHaveFocus();
+  });
+
   it("adds no tooltip while the labels are showing", async () => {
     const user = userEvent.setup({ delay: null });
     signIn();

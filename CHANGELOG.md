@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 8ded6b6 -->
+<!-- generated-through: 098a948 -->
 
 ### Fixed
 
@@ -96,6 +96,7 @@ tag time is then optional rather than load-bearing.
 - Text in the phone's More sheet, the bell, the filter menus and the calendar uses its intended colour instead of inheriting the one above it.
 - The status editor and the list's panels stay inside a short window instead of running off its bottom.
 - high contrast marks the focused text field, and Escape in a dialog's search empties it before closing anything.
+- Collapsing or expanding the sidebar from the keyboard keeps the focus on the toggle, and the collapsed rail's names switch without overlapping.
 
 ### Added
 

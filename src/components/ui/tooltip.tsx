@@ -10,19 +10,22 @@ export function TooltipProvider({ children }: { children: ReactNode }) {
 export function Tooltip({
   label,
   side = "right",
+  disabled = false,
   children,
 }: {
   label: string;
   side?: "top" | "right" | "bottom" | "left";
+  /** Off without unwrapping, so a control that only sometimes needs its name is never remounted and keeps its focus. */
+  disabled?: boolean;
   /** The control it names; it must take a ref and carry its own accessible name. */
   children: ReactElement;
 }) {
   return (
-    <BaseTooltip.Root>
+    <BaseTooltip.Root disabled={disabled}>
       <BaseTooltip.Trigger render={children} />
       <BaseTooltip.Portal>
         <BaseTooltip.Positioner side={side} sideOffset={10} collisionPadding={8} className="z-popover">
-          <BaseTooltip.Popup className="origin-(--transform-origin) whitespace-nowrap rounded-control border border-hair bg-surface-900 px-2.5 py-1.5 text-xs font-medium text-ink-100 shadow-float data-open:animate-pop-in data-closed:animate-pop-out">
+          <BaseTooltip.Popup className="origin-(--transform-origin) whitespace-nowrap rounded-control border border-hair bg-surface-900 px-2.5 py-1.5 text-xs font-medium text-ink-100 shadow-float data-open:not-data-instant:animate-pop-in data-closed:not-data-instant:animate-pop-out">
             {label}
           </BaseTooltip.Popup>
         </BaseTooltip.Positioner>

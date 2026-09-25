@@ -338,7 +338,8 @@ no row here, add the primitive first.
 | a text field | `Input`; a count is `NumberInput` |
 | a native choice | `FilterSelect`, `MultiFilterSelect` |
 | a menu of actions, at an element or at the pointer | `Menu` with `MenuPanel`, `MenuItem`, `SubMenu` and `MenuSeparator` |
-| an anchored panel or phone sheet | `Popover` (`dropdown` or `sheet`) |
+| an anchored panel, or its phone form | `Popover` (`dropdown` or `sheet`) |
+| a modal sheet from the bottom | `Sheet`, on Base UI's drawer: swipe, dim, Escape and back all close it |
 | a section that folds open | `Disclosure`; a custom trigger pairs with `DisclosurePanel`; never in a virtual row, whose remount would replay the growth |
 | a dialog | `Modal` |
 | keeping an overlay alive through its exit | `Presence`, `PresenceIf` |
@@ -353,7 +354,6 @@ The foundation phase adds, each replacing the hand-built copies it lists in
 the plan:
 
 - one row shared by the sheets and the menus;
-- `sheet` (one sheet with swipe to dismiss);
 - `field` and `search-field`, and card variants.
 
 ## Libraries
@@ -371,7 +371,7 @@ four things before it lands:
 | `lucide-react` | shipped | icons |
 | `class-variance-authority`, `clsx`, `tailwind-merge` | shipped | variant classes, `cn` |
 | `d3-array`, `d3-scale`, `d3-shape` | shipped | chart maths only; the renderer is ours |
-| `@base-ui/react` 1.8.0, pinned | shipped: `ui/menu` (the context menu) | menu and context menu (typeahead, safe submenu, long press), the one swipeable sheet, flip-aware dropdown positioning. Always controlled, so `useBackClose` and `data-overlay` keep working; wrapped under `ui/` only. The menu cost 40 KiB gzipped in the startup script. Select and ScrollArea insert a `<style>` and stay unused |
+| `@base-ui/react` 1.8.0, pinned | shipped: `ui/menu` (the context menu), `ui/sheet` | menu and context menu (typeahead, safe submenu, long press), the one swipeable sheet, flip-aware dropdown positioning. Always controlled, so `useBackClose` and `data-overlay` keep working; wrapped under `ui/` only. The menu cost 40 KiB gzipped in the startup script, the drawer 12 more. Select and ScrollArea insert a `<style>` and stay unused |
 | `motion` (`LazyMotion` + `m`) | approved, not yet added | velocity after a swipe, sliding indicators, list enter and leave. `MotionConfig reducedMotion` fed from `lib/motion`. `AnimateView` and `animateView` are banned: they inject a `<style>` without a nonce |
 
 Considered and declined on 2026-09-25:

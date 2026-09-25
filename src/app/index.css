@@ -748,6 +748,39 @@ html[data-swapping] *::after {
   }
 }
 
+/* A sheet rises on a spring and follows a finger; at rest it has no translate, so a fixed child still uses the screen. */
+@utility sheet-popup {
+  transition: translate 440ms var(--ease-spring-soft);
+  &[data-swiping] {
+    translate: 0 var(--drawer-swipe-movement-y, 0px);
+    transition-duration: 0ms;
+  }
+  &[data-starting-style],
+  &[data-ending-style] {
+    translate: 0 calc(100% + var(--shell-bottom, 0px) + 1rem);
+  }
+  &[data-ending-style] {
+    transition-duration: calc(var(--duration-exit) * var(--drawer-swipe-strength, 1));
+    transition-timing-function: var(--ease-exit);
+  }
+}
+
+/* The dim behind a sheet thins as the sheet is swiped away, and fades with it otherwise. */
+@utility sheet-backdrop {
+  opacity: calc(1 - var(--drawer-swipe-progress, 0));
+  transition: opacity var(--duration-expressive) var(--ease-karasu);
+  &[data-swiping] {
+    transition-duration: 0ms;
+  }
+  &[data-starting-style],
+  &[data-ending-style] {
+    opacity: 0;
+  }
+  &[data-ending-style] {
+    transition-duration: var(--duration-exit);
+  }
+}
+
 /* Draws an element's border in the border role under high contrast, where a tonal step alone would vanish. */
 @utility hc-edge {
   :root[data-contrast="more"] & {

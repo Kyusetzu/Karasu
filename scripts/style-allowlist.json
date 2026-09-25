@@ -18,6 +18,12 @@
     "reason": "Base UI focuses the popup on open and marks the focused row data-highlighted, whose fill is the focus style"
   },
   {
+    "file": "src/components/ui/sheet.tsx",
+    "rule": "outline-removed",
+    "token": "outline-none",
+    "reason": "the sheet is a container Base UI focuses by script when nothing inside is tabbable, so Tab starts inside it"
+  },
+  {
     "file": "src/components/shell/CommandPalette.tsx",
     "rule": "outline-removed",
     "token": "focus:outline-none",

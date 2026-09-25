@@ -1,17 +1,15 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { NavLink, useLocation } from "react-router";
 import { useTranslation } from "react-i18next";
 import { Command, Info, LayoutGrid, RefreshCw, Settings, X } from "lucide-react";
 import { GROUPS, visibleGroups, type NavItem } from "@/components/shell/Sidebar";
-import { usePresence } from "@/hooks/usePresence";
-import { useDialogFocus } from "@/hooks/useDialogFocus";
-import { useBackClose } from "@/hooks/useBackClose";
 import { cn } from "@/lib/utils";
 import { isAndroid, usePlatform } from "@/stores/platform";
 import Bell from "@/components/shell/Bell";
 import { useNotifBadge } from "@/hooks/useNotifBadge";
 import { isPaletteSwipe } from "@/lib/navSwipe";
 import { Badge } from "@/components/ui/badge";
+import { Sheet } from "@/components/ui/sheet";
 
 /** The phone shell's four bar slots; everything else is behind a More sheet built from the sidebar's `GROUPS`. */
 const SLOTS = ["/", "/list", "/manga", "/search"];
@@ -49,17 +47,6 @@ export default function BottomBar() {
   const { t } = useTranslation();
   const android = isAndroid(usePlatform((s) => s.info));
   const [moreOpen, setMoreOpen] = useState(false);
-  useBackClose(moreOpen, () => setMoreOpen(false));
-  const sheet = usePresence(moreOpen);
-  const sheetRef = useRef<HTMLDivElement>(null);
-  // `data-overlay` silences every screen-level key handler, so the sheet must supply Escape and the focus trap itself.
-  useDialogFocus(sheetRef, moreOpen && !sheet.leaving);
-  useEffect(() => {
-    if (!moreOpen) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setMoreOpen(false);
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [moreOpen]);
   const { pathname } = useLocation();
   const badge = useNotifBadge();
   // The bar is the gesture surface, so the swipe is recognised here rather than over a reserved strip of the page.
@@ -74,89 +61,64 @@ export default function BottomBar() {
 
   return (
     <>
-      {sheet.mounted && (
-        <div
-          data-overlay
-          className={cn(
-            "fixed inset-0 z-40",
-            sheet.leaving ? "animate-fade-out" : "animate-fade-in",
-          )}
-        >
-          <button
-            type="button"
-            aria-label={t("window.close")}
-            className="absolute inset-0 bg-scrim"
-            onClick={() => setMoreOpen(false)}
-          />
-          <div
-            ref={sheetRef}
-            role="dialog"
-            aria-label={t("nav.more")}
-            className={cn(
-              // max-h plus scroll: a short phone must never push the top rows under the status bar.
-              "absolute inset-x-2 bottom-16 max-h-[70vh] overflow-y-auto rounded-sheet border border-surface-700 bg-surface-900 p-3 shadow-sheet",
-              sheet.leaving ? "animate-rise-out" : "animate-rise-in",
-            )}
-          >
-            <div className="mb-1 flex items-center justify-between px-1">
-              <span className="text-2xs font-semibold uppercase tracking-wide text-ink-600">
-                {t("nav.more")}
-              </span>
-              <div className="flex items-center gap-1">
-                {/* The bell lives in the sheet, since an unlabeled icon in the nav row read as decoration; More carries its count. */}
-                <Bell barSlot />
-                <button
-                  type="button"
-                  aria-label={t("window.close")}
-                  onClick={() => setMoreOpen(false)}
-                  className="rounded-inner p-1 text-ink-500 transition-surface hover:text-ink-100"
-                >
-                  <X className="size-4" />
-                </button>
-              </div>
-            </div>
+      <Sheet open={moreOpen} label={t("nav.more")} onClose={() => setMoreOpen(false)}>
+        <div className="mb-1 flex items-center justify-between px-1">
+          <span className="text-2xs font-semibold uppercase tracking-wide text-ink-600">
+            {t("nav.more")}
+          </span>
+          <div className="flex items-center gap-1">
+            {/* The bell lives in the sheet, since an unlabeled icon in the nav row read as decoration; More carries its count. */}
+            <Bell barSlot />
             <button
               type="button"
-              onClick={() => {
-                setMoreOpen(false);
-                openPalette();
-              }}
-              className="mb-2 flex w-full items-center gap-2.5 rounded-control px-2 py-2 text-sm text-ink-300 transition-surface hover:bg-surface-850 hover:text-ink-100"
+              aria-label={t("window.close")}
+              onClick={() => setMoreOpen(false)}
+              className="rounded-inner p-1 text-ink-500 transition-surface hover:text-ink-100"
             >
-              <Command className="size-4.5 shrink-0" />
-              <span>{t("ctx.palette")}</span>
+              <X className="size-4" />
             </button>
-            {sheetGroups(android).map((g) => (
-              <div key={g.label} className="mb-2 last:mb-0">
-                <p className="px-1 pb-1 text-2xs font-medium uppercase tracking-wide text-ink-600">
-                  {t(g.label)}
-                </p>
-                {/* One destination per row, not a tile grid: labels get their full width and the whole row is the touch target. */}
-                <div className="flex flex-col gap-0.5">
-                  {g.items.map((item) => (
-                    <NavLink
-                      key={item.to}
-                      to={item.to}
-                      onClick={() => setMoreOpen(false)}
-                      className={({ isActive }) =>
-                        cn(
-                          "flex items-center gap-2.5 rounded-control px-2 py-2 text-sm transition-surface",
-                          isActive
-                            ? "bg-surface-800 text-accent-400"
-                            : "text-ink-300 hover:bg-surface-850 hover:text-ink-100",
-                        )
-                      }
-                    >
-                      <item.icon className="size-4.5 shrink-0" />
-                      <span>{t(item.key)}</span>
-                    </NavLink>
-                  ))}
-                </div>
-              </div>
-            ))}
           </div>
         </div>
-      )}
+        <button
+          type="button"
+          onClick={() => {
+            setMoreOpen(false);
+            openPalette();
+          }}
+          className="mb-2 flex w-full items-center gap-2.5 rounded-control px-2 py-2 text-sm text-ink-300 transition-surface hover:bg-surface-850 hover:text-ink-100"
+        >
+          <Command className="size-4.5 shrink-0" />
+          <span>{t("ctx.palette")}</span>
+        </button>
+        {sheetGroups(android).map((g) => (
+          <div key={g.label} className="mb-2 last:mb-0">
+            <p className="px-1 pb-1 text-2xs font-medium uppercase tracking-wide text-ink-600">
+              {t(g.label)}
+            </p>
+            {/* One destination per row, not a tile grid: labels get their full width and the whole row is the touch target. */}
+            <div className="flex flex-col gap-0.5">
+              {g.items.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  onClick={() => setMoreOpen(false)}
+                  className={({ isActive }) =>
+                    cn(
+                      "flex items-center gap-2.5 rounded-control px-2 py-2 text-sm transition-surface",
+                      isActive
+                        ? "bg-surface-800 text-accent-400"
+                        : "text-ink-300 hover:bg-surface-850 hover:text-ink-100",
+                    )
+                  }
+                >
+                  <item.icon className="size-4.5 shrink-0" />
+                  <span>{t(item.key)}</span>
+                </NavLink>
+              ))}
+            </div>
+          </div>
+        ))}
+      </Sheet>
 
       {/* The primary navigation landmark, named as such and like no other landmark, since screen readers list them by label. */}
       <nav

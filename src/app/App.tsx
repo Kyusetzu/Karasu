@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef } from "react";
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef } from "react";
 import { Link, Routes, Route, useLocation, useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
 import { X } from "lucide-react";
@@ -150,12 +150,13 @@ export default function App() {
     });
   }, []);
 
+  // One variable for what bottom-anchored floaters must clear, on the root so an overlay portalled to the body sees it.
+  useLayoutEffect(() => {
+    document.documentElement.style.setProperty("--shell-bottom", phone ? "3.5rem" : "0px");
+  }, [phone]);
+
   return (
-    <div
-      className="flex h-full flex-col"
-      // One variable for what bottom-anchored floaters must clear, so nothing anchoring there needs its own width check.
-      style={{ "--shell-bottom": phone ? "3.5rem" : "0px" } as React.CSSProperties}
-    >
+    <div className="flex h-full flex-col">
       <PresenceReporter />
       <CommandPalette />
       <KeyboardSheet />

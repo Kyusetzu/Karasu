@@ -9,11 +9,10 @@ import {
   type ReactNode,
   type RefObject,
 } from "react";
-import { createPortal } from "react-dom";
-import { useTranslation } from "react-i18next";
 import { usePresence } from "@/hooks/usePresence";
 import { afterBackSettles, useBackClose } from "@/hooks/useBackClose";
 import { useDialogFocus } from "@/hooks/useDialogFocus";
+import { Sheet } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 
 /** What the trigger must carry: the toggle, its state for assistive tech, and the ref focus returns to. */
@@ -67,7 +66,8 @@ export function Popover({
   const closedRef = useRef(onClosed);
   closedRef.current = onClosed;
 
-  useBackClose(open, () => setOpen(false));
+  // The sheet registers its own back entry through `Sheet`; the dropdown's is here.
+  useBackClose(open && variant === "dropdown", () => setOpen(false));
 
   // After `useBackClose`'s cleanup has queued its unwinding `back()`, so a `closeThen` action waits for that popstate.
   useEffect(() => {
@@ -121,20 +121,18 @@ export function Popover({
   };
 
   const api: PopoverApi = { close, closeThen };
-  const panel = presence.mounted && (
-    <Panel
-      id={id}
-      label={label}
-      variant={variant}
-      align={align}
-      width={width}
-      leaving={presence.leaving}
-      onKeyDown={onKeyDown}
-      onClose={close}
-    >
-      {children(api)}
-    </Panel>
-  );
+  const panel =
+    variant === "sheet" ? (
+      <Sheet open={open} id={id} label={label} onClose={close} className="p-4">
+        {children(api)}
+      </Sheet>
+    ) : (
+      presence.mounted && (
+        <Panel id={id} label={label} align={align} width={width} leaving={presence.leaving} onKeyDown={onKeyDown}>
+          {children(api)}
+        </Panel>
+      )
+    );
 
   return (
     <div ref={boxRef} className={cn("relative inline-flex shrink-0", className)}>
@@ -145,7 +143,7 @@ export function Popover({
         "aria-haspopup": "dialog",
         "aria-controls": presence.mounted ? id : undefined,
       })}
-      {variant === "sheet" && panel ? createPortal(panel, document.body) : panel}
+      {panel}
     </div>
   );
 }
@@ -154,91 +152,55 @@ export function Popover({
 function Panel({
   id,
   label,
-  variant,
   align,
   width,
   leaving,
   onKeyDown,
-  onClose,
   children,
 }: {
   id: string;
   label: string;
-  variant: "dropdown" | "sheet";
   align: "start" | "end";
   width: number;
   leaving: boolean;
   onKeyDown: (e: KeyboardEvent) => void;
-  onClose: () => void;
   children: ReactNode;
 }) {
-  const { t } = useTranslation();
   const ref = useRef<HTMLDivElement>(null);
   const [shift, setShift] = useState(0);
   useDialogFocus(ref, !leaving);
 
   // A trigger near the window's edge would push its panel off screen; nudged back inside with a margin to spare.
   useLayoutEffect(() => {
-    if (variant !== "dropdown" || !ref.current) return;
+    if (!ref.current) return;
     const r = ref.current.getBoundingClientRect();
     const edge = 8;
     let dx = 0;
     if (r.right > window.innerWidth - edge) dx = window.innerWidth - edge - r.right;
     if (r.left + dx < edge) dx = edge - r.left;
     setShift(dx);
-  }, [variant]);
-
-  if (variant === "dropdown") {
-    return (
-      <div
-        ref={ref}
-        id={id}
-        role="dialog"
-        aria-label={label}
-        data-overlay
-        // Focusable by script and click only, so a press on the panel's text keeps Escape reaching it.
-        tabIndex={-1}
-        onKeyDown={onKeyDown}
-        // `translate`, not `transform`, which the pop animation owns.
-        style={{ width, translate: shift ? `${shift}px 0` : undefined }}
-        className={cn(
-          "absolute top-full z-50 mt-2 max-h-[min(70vh,34rem)] max-w-[calc(100vw-2rem)] overflow-y-auto outline-none",
-          "rounded-panel border border-hair bg-surface-900 p-4 text-left shadow-float panel-wash",
-          align === "end" ? "right-0" : "left-0",
-          leaving ? "animate-pop-out" : "animate-pop-in",
-        )}
-      >
-        {children}
-      </div>
-    );
-  }
+  }, []);
 
   return (
-    // Kept while leaving, so a keypress on the last frame cannot reach the list behind the sheet.
-    <div data-overlay className={cn("fixed inset-0 z-popover", leaving ? "animate-fade-out" : "animate-fade-in")}>
-      <button
-        type="button"
-        aria-label={t("window.close")}
-        className="absolute inset-0 bg-scrim"
-        onClick={onClose}
-      />
-      <div
-        ref={ref}
-        id={id}
-        role="dialog"
-        aria-label={label}
-        tabIndex={-1}
-        onKeyDown={onKeyDown}
-        className={cn(
-          // Clears the bottom bar and the gesture area; `max-h` plus scroll so a long panel never hides its top.
-          "absolute inset-x-2 bottom-[calc(var(--shell-bottom,0px)+0.5rem)] max-h-[75vh] overflow-y-auto outline-none",
-          "rounded-sheet border border-surface-700 bg-surface-900 p-4 shadow-sheet",
-          leaving ? "animate-rise-out" : "animate-rise-in",
-        )}
-      >
-        <div aria-hidden className="mx-auto mb-3 h-1 w-10 rounded-full bg-surface-700" />
-        {children}
-      </div>
+    <div
+      ref={ref}
+      id={id}
+      role="dialog"
+      aria-label={label}
+      data-overlay
+      // Focusable by script and click only, so a press on the panel's text keeps Escape reaching it.
+      tabIndex={-1}
+      onKeyDown={onKeyDown}
+      // `translate`, not `transform`, which the pop animation owns.
+      style={{ width, translate: shift ? `${shift}px 0` : undefined }}
+      className={cn(
+        "absolute top-full z-50 mt-2 max-h-[min(70vh,34rem)] max-w-[calc(100vw-2rem)] overflow-y-auto outline-none",
+        "rounded-panel border border-hair bg-surface-900 p-4 text-left shadow-float panel-wash",
+        align === "end" ? "right-0" : "left-0",
+        leaving ? "animate-pop-out" : "animate-pop-in",
+      )}
+    >
+      {children}
     </div>
   );
 }

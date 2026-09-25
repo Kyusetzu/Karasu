@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { Popover } from "./popover";
 
 /** The panel primitive the list toolbar builds on: who opens it, what closes it, and what it leaves in history. */
@@ -160,14 +161,15 @@ describe("Popover", () => {
     await waitFor(() => expect(dialog("Filter")).toBeNull());
   });
 
-  it("draws the sheet at the body with a backdrop that closes it", () => {
+  it("draws the sheet at the body with a backdrop that closes it", async () => {
+    const user = userEvent.setup({ delay: null });
     const { container } = render(<Probe variant="sheet" />);
-    fireEvent.click(trigger());
+    await user.click(trigger());
     const panel = dialog();
     expect(panel).toBeInTheDocument();
     expect(container.contains(panel)).toBe(false);
-    expect(panel!.closest("[data-overlay]")).not.toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "window.close" }));
-    expect(dialog()).toBeNull();
+    expect(panel).toHaveAttribute("data-overlay");
+    await user.click(document.querySelector<HTMLElement>(".sheet-backdrop")!);
+    await waitFor(() => expect(dialog()).toBeNull());
   });
 });

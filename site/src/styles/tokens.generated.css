@@ -1,4 +1,4 @@
-/* GENERATED from src/app/index.css (sha256 4f83087533b2) by site/scripts/sync-tokens.mjs
+/* GENERATED from src/app/index.css (sha256 5c44e35cc1e9) by site/scripts/sync-tokens.mjs
    — do not edit. Re-run `npm run sync` after changing the source; `npm run check`
    fails while this file is stale. CLAUDE.md, "The website". */
 /* `static` because Tailwind tree-shakes tokens no utility references, leaving a `var()`-only token undefined in dark. */
@@ -597,6 +597,39 @@
     width: max(100%, 2.75rem);
     height: max(100%, 2.75rem);
     translate: -50% -50%;
+  }
+}
+
+/* A sheet rises on a spring and follows a finger; at rest it has no translate, so a fixed child still uses the screen. */
+@utility sheet-popup {
+  transition: translate 440ms var(--ease-spring-soft);
+  &[data-swiping] {
+    translate: 0 var(--drawer-swipe-movement-y, 0px);
+    transition-duration: 0ms;
+  }
+  &[data-starting-style],
+  &[data-ending-style] {
+    translate: 0 calc(100% + var(--shell-bottom, 0px) + 1rem);
+  }
+  &[data-ending-style] {
+    transition-duration: calc(var(--duration-exit) * var(--drawer-swipe-strength, 1));
+    transition-timing-function: var(--ease-exit);
+  }
+}
+
+/* The dim behind a sheet thins as the sheet is swiped away, and fades with it otherwise. */
+@utility sheet-backdrop {
+  opacity: calc(1 - var(--drawer-swipe-progress, 0));
+  transition: opacity var(--duration-expressive) var(--ease-karasu);
+  &[data-swiping] {
+    transition-duration: 0ms;
+  }
+  &[data-starting-style],
+  &[data-ending-style] {
+    opacity: 0;
+  }
+  &[data-ending-style] {
+    transition-duration: var(--duration-exit);
   }
 }
 

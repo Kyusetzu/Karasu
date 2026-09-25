@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { ArrowRight, Search as SearchIcon } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { searchMedia, sequelsOf, type SequelCandidate } from "@/api/queries";
 import type { Overflow } from "@/api/library";
 import { isTauri } from "@/api/anilist";
@@ -11,7 +11,7 @@ import { isBlocked } from "@/lib/contentFilter";
 import { useContentFilter } from "@/stores/contentFilter";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { SearchField } from "@/components/ui/search-field";
 import { Shimmer } from "@/components/Skeleton";
 import { cn } from "@/lib/utils";
 import { Chip } from "@/components/ui/chip";
@@ -207,17 +207,14 @@ export function SeasonSplitModal({
 
         <div>
           <p className="text-xs font-medium text-ink-300">{t("library.splitSearch")}</p>
-          <div className="relative mt-1.5">
-            <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-ink-600" />
-            <Input
-              value={term}
-              onChange={(e) => setTerm(e.target.value)}
-              onClear={() => setTerm("")}
-              clearLabel={t("common.clear")}
-              placeholder={t("library.splitSearchPlaceholder")}
-              className="h-9 pl-8"
-            />
-          </div>
+          <SearchField
+            value={term}
+            onChange={setTerm}
+            label={t("library.splitSearch")}
+            clearLabel={t("common.clear")}
+            placeholder={t("library.splitSearchPlaceholder")}
+            className="mt-1.5"
+          />
           {searchChoices.length > 0 && (
             <div className="mt-1.5 space-y-1.5">{searchChoices.map(row)}</div>
           )}

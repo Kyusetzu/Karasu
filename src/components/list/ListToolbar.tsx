@@ -15,10 +15,8 @@ import {
   List as ListIcon,
   ListChecks,
   Plus,
-  Search,
   SlidersHorizontal,
   Tag,
-  X,
 } from "lucide-react";
 import { STATUS_ORDER, type MediaListStatus, type MediaType } from "@/api/types";
 import { Popover, type PopoverTriggerProps } from "@/components/ui/popover";
@@ -27,6 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { RemovableChip } from "@/components/ui/chip";
 import { Segmented, type Segment } from "@/components/ui/segmented";
 import { MenuRow, MenuRowBody, MenuRowNote, menuRowClass } from "@/components/ui/menu-row";
+import { SearchField } from "@/components/ui/search-field";
 import { Button } from "@/components/ui/button";
 import { formatLabel, MEDIA_FORMATS, ORIGINS, originLabel } from "@/lib/format";
 import { fuzzyScore, prepareDoc, prepareQuery } from "@/lib/fuzzy";
@@ -303,60 +302,32 @@ function SearchBox({
 }) {
   const { t } = useTranslation();
   return (
-    <div
-      className={cn(
-        "flex h-8.5 items-center gap-2 rounded-control border border-surface-700 bg-surface-900 px-2.5 transition-surface",
-        "focus-within:border-accent-500",
-        value && "border-accent-500/60",
-        className,
-      )}
-    >
-      <Search aria-hidden className="size-3.75 shrink-0 text-ink-600" />
-      <input
-        ref={inputRef}
-        type="search"
-        enterKeyHint="search"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        // Escape empties a filled field first and only then lets go of it, the way a browser's find bar does.
-        onKeyDown={(e) => {
-          if (e.key !== "Escape") return;
-          e.preventDefault();
-          if (value) onChange("");
-          else e.currentTarget.blur();
-        }}
-        placeholder={t("list.filterPlaceholder")}
-        aria-label={t("list.searchLabel")}
-        aria-keyshortcuts={hint ? "Control+F" : undefined}
-        className="h-full min-w-0 flex-1 bg-transparent text-ui text-ink-100 placeholder:text-ink-600 focus:outline-none [&::-webkit-search-cancel-button]:hidden"
-      />
-      {count && (
-        <span role="status" className="shrink-0 rounded-inner bg-surface-800 px-1.5 py-0.5 text-2xs tabular-nums text-ink-300">
-          {count}
-        </span>
-      )}
-      {value ? (
-        <button
-          type="button"
-          // The field keeps the caret; taking focus on mousedown would blur it first.
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => {
-            onChange("");
-            inputRef.current?.focus();
-          }}
-          aria-label={t("common.clear")}
-          className="-mr-1 grid size-6 shrink-0 place-items-center rounded-inner text-ink-500 transition-surface hover:bg-surface-800 hover:text-ink-100"
-        >
-          <X aria-hidden className="size-3.5" />
-        </button>
-      ) : (
-        hint && (
-          <kbd aria-hidden className="shrink-0 rounded-inner border border-surface-700 px-1.5 py-px font-sans text-2xs text-ink-600">
-            Ctrl F
-          </kbd>
-        )
-      )}
-    </div>
+    <SearchField
+      value={value}
+      onChange={onChange}
+      inputRef={inputRef}
+      label={t("list.searchLabel")}
+      clearLabel={t("common.clear")}
+      placeholder={t("list.filterPlaceholder")}
+      aria-keyshortcuts={hint ? "Control+F" : undefined}
+      markFilled
+      blurOnEscape
+      className={className}
+      trailing={
+        <>
+          {count && (
+            <span role="status" className="shrink-0 rounded-inner bg-surface-800 px-1.5 py-0.5 text-2xs tabular-nums text-ink-300">
+              {count}
+            </span>
+          )}
+          {!value && hint && (
+            <kbd aria-hidden className="shrink-0 rounded-inner border border-surface-700 px-1.5 py-px font-sans text-2xs text-ink-600">
+              Ctrl F
+            </kbd>
+          )}
+        </>
+      }
+    />
   );
 }
 
@@ -528,17 +499,15 @@ function FilterPanel({
         {tags.length > 0 && (
           <PanelSection title={t("tags.label")}>
             {tags.length > TAG_SEARCH_MIN && (
-              <div className="mb-2 flex h-8 items-center gap-2 rounded-control border border-surface-700 px-2.5 focus-within:border-accent-500">
-                <Search aria-hidden className="size-3.5 shrink-0 text-ink-600" />
-                <input
-                  type="search"
-                  value={term}
-                  onChange={(e) => setTerm(e.target.value)}
-                  placeholder={t("list.filterTags")}
-                  aria-label={t("list.filterTags")}
-                  className="h-full min-w-0 flex-1 bg-transparent text-xs text-ink-100 placeholder:text-ink-600 focus:outline-none [&::-webkit-search-cancel-button]:hidden"
-                />
-              </div>
+              <SearchField
+                size="sm"
+                value={term}
+                onChange={setTerm}
+                label={t("list.filterTags")}
+                clearLabel={t("common.clear")}
+                placeholder={t("list.filterTags")}
+                className="mb-2"
+              />
             )}
             <PillGroup label={t("tags.label")}>
               {shownTags.map((tag) => (

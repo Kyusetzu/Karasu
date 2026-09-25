@@ -10,16 +10,7 @@ import { VirtualRows } from "@/components/list/VirtualRows";
 import { Link } from "react-router";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import {
-  Check,
-  ChevronDown,
-  FolderOpen,
-  HelpCircle,
-  Play,
-  Search,
-  Wand2,
-  X,
-} from "lucide-react";
+import { Check, ChevronDown, FolderOpen, HelpCircle, Play, Wand2 } from "lucide-react";
 import { fetchMediaList, isTauri, saveListEntry } from "@/api/anilist";
 import { mediaByIds } from "@/api/queries";
 import { displayTitle, type Media, type MediaListEntry } from "@/api/types";
@@ -55,6 +46,7 @@ import { EmptyState, FolderStack } from "@/components/EmptyState";
 import { cn } from "@/lib/utils";
 import { useTheme, type Density } from "@/stores/theme";
 import { Spinner } from "@/components/ui/spinner";
+import { SearchField } from "@/components/ui/search-field";
 
 /** Above this the match was exact: a test for `best_match_prepared`'s equality branch, not a tolerance. */
 const EXACT = 0.999;
@@ -771,27 +763,15 @@ function Unplaced({
           {t("library.unplaced", { n: groups.length })}
         </p>
         {groups.length > 5 && (
-          <div className="relative ml-auto w-56">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3 -translate-y-1/2 text-ink-600" />
-            <input
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              placeholder={t("library.filterUnplaced")}
-              className="h-7 w-full rounded-inner border border-hair bg-surface-900 pl-7 pr-6 text-2xs text-ink-100 placeholder:text-ink-600 focus:border-accent-500 focus:outline-none"
-            />
-            {/* Hand-rolled rather than `IconButton`, whose smallest size would be the whole field. */}
-            {filter && (
-              <button
-                type="button"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => setFilter("")}
-                className="absolute right-1 top-1/2 grid size-4.5 -translate-y-1/2 place-items-center rounded-inner text-ink-600 transition-surface hover:bg-surface-800 hover:text-ink-100"
-              >
-                <X className="size-2.75" />
-                <span className="sr-only">{t("common.clear")}</span>
-              </button>
-            )}
-          </div>
+          <SearchField
+            size="sm"
+            value={filter}
+            onChange={setFilter}
+            label={t("library.filterUnplaced")}
+            clearLabel={t("common.clear")}
+            placeholder={t("library.filterUnplaced")}
+            className="ml-auto w-56"
+          />
         )}
       </div>
 

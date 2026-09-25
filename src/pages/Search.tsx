@@ -5,7 +5,7 @@ import { useGridRoving } from "@/hooks/useGridRoving";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { backendErrorText } from "@/lib/backendError";
-import { Search as SearchIcon } from "lucide-react";
+
 import {
   browseMedia,
   genreTagCollections,
@@ -34,7 +34,7 @@ import {
   originLabel,
   sourceLabel,
 } from "@/lib/format";
-import { Input } from "@/components/ui/input";
+import { SearchField } from "@/components/ui/search-field";
 import { UserLockup } from "@/components/ui/user-lockup";
 import { Button } from "@/components/ui/button";
 import { FilterSelect } from "@/components/ui/filter-select";
@@ -255,20 +255,16 @@ export default function Search() {
       <div className="px-8 pt-6">
         <h1 className="text-title font-bold">{t("search.title")}</h1>
         <div className="mt-4 max-w-176">
-          <div className="relative max-w-136">
-            <SearchIcon
-              className="pointer-events-none absolute left-3 top-1/2 size-3.75 -translate-y-1/2 text-ink-600"
-            />
-            <Input
-              autoFocus
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder={t("search.placeholder")}
-              onClear={() => setInput("")}
-              clearLabel={t("common.clear")}
-              className="h-11 pl-9"
-            />
-          </div>
+          <SearchField
+            size="lg"
+            autoFocus
+            value={input}
+            onChange={setInput}
+            label={t("search.placeholder")}
+            clearLabel={t("common.clear")}
+            placeholder={t("search.placeholder")}
+            className="max-w-136"
+          />
           {/* Chips scroll on phone and wrap on desktop; the divider is grouped with them so it cannot orphan onto its own line. */}
           <div
             className={cn(

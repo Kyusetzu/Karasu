@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { Loader2, Search, X } from "lucide-react";
+import { X } from "lucide-react";
 import { searchMedia, sequelsOf } from "@/api/queries";
 import { displayTitle, type MediaTitle } from "@/api/types";
 import { useContentFilter } from "@/stores/contentFilter";
@@ -11,8 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MenuGroupLabel, MenuRow } from "@/components/ui/menu-row";
 import { Modal } from "@/components/ui/modal";
+import { SearchField } from "@/components/ui/search-field";
 import { cn } from "@/lib/utils";
-import { Spinner } from "@/components/ui/spinner";
 
 /** Picks the title a pile of files belongs to, searching all of AniList because the matcher only ever sees the list. */
 export default function MatchPicker({
@@ -135,28 +135,15 @@ export default function MatchPicker({
       }
     >
       <div className="shrink-0 border-b border-hair px-5 pb-4 pt-3">
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-ink-600" />
-          <Input
-            ref={box}
-            value={term}
-            onChange={(e) => setTerm(e.target.value)}
-            onClear={() => setTerm("")}
-            clearLabel={t("common.clear")}
-            placeholder={t("library.searchAniList")}
-            className="pl-8"
-          />
-          {isFetching && (
-            <Spinner
-              icon={Loader2}
-              className={cn(
-                "absolute top-1/2 size-3.5 -translate-y-1/2 text-ink-600",
-                // Left of the clear button whenever there is one.
-                term ? "right-8" : "right-2.5",
-              )}
-            />
-          )}
-        </div>
+        <SearchField
+          value={term}
+          onChange={setTerm}
+          inputRef={box}
+          busy={isFetching}
+          label={t("library.searchAniList")}
+          clearLabel={t("common.clear")}
+          placeholder={t("library.searchAniList")}
+        />
         {/* Only where an episode number is on the table; a library correction settles a whole title. */}
         {detectedEpisode != null && (
           <div className="mt-2 flex items-center gap-2">

@@ -337,6 +337,7 @@ no row here, add the primitive first.
 | a raised panel | `Card`, `CardTitle` |
 | an Overview section heading | `SectionHeader` |
 | a text field | `Input`; a count is `NumberInput` |
+| a search | `SearchField`: `sm` in a panel, `md` in a toolbar, `lg` where the search is the page, `inset` as a panel's own top edge; `markFilled` where a query is a filter in force, `busy` while a request is out, `trailing` for a count or a shortcut. Escape empties it and stops there; `blurOnEscape` adds the find bar's second press |
 | a native choice | `FilterSelect`, `MultiFilterSelect` |
 | a menu of actions, at an element or at the pointer | `Menu` with `MenuPanel`, `MenuItem`, `SubMenu` and `MenuSeparator` |
 | a row of a sheet, a panel or a list of choices | `MenuRow`; a link, a radio's label or a Base UI item spells `menuRowClass` with `MenuRowBody`. `menu` size at the pointer and `panel` in a dropdown or a sheet, both 44 px under a coarse pointer, and `touch` for a sheet only a finger opens; `current` for the chosen row, `managed` where the keyboard's place is `data-highlighted`; `MenuGroupLabel` over a group, `MenuRowSeparator` between two |
@@ -357,7 +358,7 @@ no row here, add the primitive first.
 The foundation phase adds, each replacing the hand-built copies it lists in
 the plan:
 
-- `field` and `search-field`, and card variants.
+- `field` and a select skin, and card variants.
 
 The menu row covers the context menu, the action sheet, the More sheet, the
 sort and preset panels and the palette. The rows that carry more than a
@@ -501,3 +502,10 @@ maintainer picks. A pure restyle that moves nothing does not. The rules:
   where the confirm used to focus the destructive one. Escape closes only
   the dialog holding focus, so a menu or a confirm inside a dialog closes
   alone.
+- **2026-09-25:** One search field. Nine were built four ways at seven
+  heights, with four clear buttons. They share `SearchField` now, which is
+  the list's own field grown into a primitive: a searchbox with its name,
+  a clear button that keeps the caret and hands it back, and Escape that
+  empties before it does anything else. The command palette keeps its own
+  input, a combobox the palette owns. `Input` lost its clear button, which
+  only the searches used.

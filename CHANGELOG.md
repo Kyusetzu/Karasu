@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: bfe162f -->
+<!-- generated-through: 80c89b6 -->
 
 ### Fixed
 
@@ -152,6 +152,7 @@ tag time is then optional rather than load-bearing.
 - Receipts can be flicked away, stay put while hovered or focused, and give an Undo seven seconds.
 - menus, sheets and panels share one row, with 44 px touch targets on the phone.
 - every dialog shares one frame; buttons stay in reach on short windows and the confirm fits a phone.
+- every search field looks and clears the same way.
 ## 1.0.0 — 2026-09-05
 
 Karasu 1.0.0 is the first tagged release: a desktop and Android tracker built

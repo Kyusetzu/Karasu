@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Check, ChevronDown, Minus, Search, X } from "lucide-react";
+import { Check, ChevronDown, Minus } from "lucide-react";
+import { SearchField } from "@/components/ui/search-field";
 import { cn } from "@/lib/utils";
 import { fuzzyScore, prepareDoc, prepareQuery } from "@/lib/fuzzy";
 import {
@@ -122,29 +123,18 @@ export function MultiFilterSelect({
           )}
         >
           {searchable && (
-            <div className="relative border-b border-hair">
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.25 -translate-y-1/2 text-ink-600" />
-              <input
-                autoFocus
-                value={term}
-                onChange={(e) => setTerm(e.target.value)}
-                placeholder={t("search.filterOptions")}
-                aria-label={t("search.filterOptions")}
-                className="h-9 w-full bg-transparent pl-8 pr-8 text-xs text-ink-100 placeholder:text-ink-600 focus:outline-none"
-              />
-              {/* Clears the search term only; the footer's Clear owns the selection, and conflating the two makes one a trap. */}
-              {term && (
-                <button
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => setTerm("")}
-                  className="absolute right-1.5 top-1/2 grid size-5 -translate-y-1/2 place-items-center rounded-inner text-ink-600 transition-surface hover:bg-surface-800 hover:text-ink-100"
-                >
-                  <X className="size-3" />
-                  <span className="sr-only">{t("common.clear")}</span>
-                </button>
-              )}
-            </div>
+            <SearchField
+              size="sm"
+              inset
+              autoFocus
+              value={term}
+              onChange={setTerm}
+              label={t("search.filterOptions")}
+              clearLabel={t("common.clear")}
+              placeholder={t("search.filterOptions")}
+              // Clears the search term only; the footer's Clear owns the selection, and conflating the two makes one a trap.
+              className="h-9 border-b border-hair px-2.5"
+            />
           )}
           <ul className="max-h-72 overflow-y-auto p-1">
             {shown.length === 0 && (

@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
-import { PenSquare, Search as SearchIcon } from "lucide-react";
+import { PenSquare } from "lucide-react";
 import { forumThreads, THREAD_CATEGORIES } from "@/api/social";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { SearchField } from "@/components/ui/search-field";
 import { Pill } from "@/components/ui/pill";
 import { PresenceIf } from "@/components/ui/presence";
 import { ThreadList } from "@/components/social/ThreadList";
@@ -100,18 +100,16 @@ export default function Forum() {
         </div>
 
         {lens === "search" && (
-          <div className="relative mt-3 max-w-136">
-            <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-3.75 -translate-y-1/2 text-ink-600" />
-            <Input
-              autoFocus
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder={t("forum.searchPlaceholder")}
-              onClear={() => setInput("")}
-              clearLabel={t("common.clear")}
-              className="h-10 pl-9"
-            />
-          </div>
+          <SearchField
+            size="lg"
+            autoFocus
+            value={input}
+            onChange={setInput}
+            label={t("forum.searchPlaceholder")}
+            clearLabel={t("common.clear")}
+            placeholder={t("forum.searchPlaceholder")}
+            className="mt-3 max-w-136"
+          />
         )}
 
         {lens === "browse" && (

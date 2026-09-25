@@ -163,6 +163,12 @@ It is named in the foundation phase and until then is not added anywhere new.
 Cover art currently uses five radii. It gets one role token in the foundation
 phase.
 
+### Icons
+
+Icons are lucide at four sizes: `size-3.5` (14 px) beside small text, `size-4`
+(16 px) in controls, `size-5` (20 px) in the shell, `size-8` (32 px) in empty
+states. Eight other sizes are in use today, and they converge on these four.
+
 ### Elevation and layers
 
 - Flat content sits on its surface step.
@@ -297,6 +303,15 @@ Considered and declined on 2026-09-25:
 - **GSAP.** Licence terms beside an MIT project, and an imperative timeline
   model.
 - **React Spring.** Nothing Motion lacks.
+
+## Enforcement
+
+`scripts/style-audit.mjs` runs in `npm run verify` and holds every app file to
+the vocabulary above. Today's drift is frozen in `scripts/style-baseline.json`.
+A count may fall, and must be lowered with `--tighten` in the same commit, but
+it never rises. A reasoned permanent exception goes into
+`scripts/style-allowlist.json`. `node scripts/style-audit.mjs --stats` shows
+where the drift is.
 
 ## Mockups before arrangement changes
 

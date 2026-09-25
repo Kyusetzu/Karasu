@@ -104,6 +104,8 @@ const summarizeBindings = (out) => {
   const m = /^(\d+)\s+(\d+)\s/.exec(strip(out));
   return m ? `regenerated, +${m[1]} -${m[2]} lines to commit` : "unchanged";
 };
+/** The style audit's closing line: `clean (N files, M baselined)`, or what rose. */
+const summarizeStyle = (out) => lines(strip(out)).at(-1)?.replace(/^style-audit: /, "") ?? "";
 const summarizeAudit = (out) => {
   const last = strip(out).split("\n").at(-1)?.replace(/^comment-audit: /, "") ?? "";
   const files = /in (\d+) file\(s\)/.exec(last)?.[1];
@@ -177,6 +179,7 @@ if (wantFrontend) {
   // Cheap and first: a type error stops the run before either suite spends its time.
   if (!(await run("typecheck", node, [TSC, "--noEmit"], summarizeTsc)).ok) report();
   if (!(await run("comment audit", node, ["scripts/comment-audit.mjs", "--check"], summarizeAudit)).ok) report();
+  if (!(await run("style audit", node, ["scripts/style-audit.mjs", "--check"], summarizeStyle)).ok) report();
   if (!(await run("typos", "typos", ["--format", "brief"], summarizeTypos, { optional: "cargo install typos-cli" })).ok) report();
   if (!(await run("toml", node, ["scripts/toml-check.mjs"], summarizeToml)).ok) report();
   if (!(await run("oxlint", node, [OXLINT, "--deny-warnings"], summarizeLint)).ok) report();

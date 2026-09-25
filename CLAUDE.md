@@ -256,7 +256,10 @@ scripts/             bump-version.mjs (every commit), anilist-query.mjs
                      comment-lexer.mjs and comment-allowlist.json (the
                      one-line-comment rule: the gate, the comment-only proof,
                      the shared scanner and the allowed exceptions — see
-                     "Comments: one line each"), verify.mjs (the gate, see
+                     "Comments: one line each"), style-audit.mjs with
+                     style-baseline.json and style-allowlist.json (the class
+                     vocabulary's ratchet, see "Design language"),
+                     verify.mjs (the gate, see
                      "The commit loop"), toml-check.mjs (taplo over the
                      TOML files, one per stdin — see the same section),
                      mutants.mjs (cargo-mutants in a copy tauri-build can
@@ -621,8 +624,9 @@ bump with nothing to describe is a mistake or a double-run. `--force` overrides
 that, `--print` just reports the current version.
 
 **`npm run verify`** is `scripts/verify.mjs`, the whole gate and what CI runs,
-so the two cannot drift. Typecheck and the comment audit go first and stop the
-run on a failure; then vitest and `cargo test` run at the same time. Every
+so the two cannot drift. Typecheck, the comment audit and the style audit go
+first and stop the run on a failure; then vitest and `cargo test` run at the
+same time. Every
 phase is captured, and a green run prints one line per phase — counts, seconds,
 any compiler warning — and nothing else, which is the point: the loop runs
 many times a day and its output is read by an agent. A failed phase prints its
@@ -1608,6 +1612,25 @@ shape, the libraries approved and declined, and the dated decision log. The
 conventions below that touch styling (accent, motion registers, exits, banners)
 stay here as rules; DESIGN.md says what they add up to. A change to how a screen
 is *arranged* gets three mockups before code, and the choice goes into that log.
+
+**`scripts/style-audit.mjs` is the vocabulary's gate**, the comment audit's twin
+and the third phase of `npm run verify`. It parses every app `.ts`/`.tsx` with
+`oxc-parser` (the parser knip already carried, now a direct dev dependency,
+because TypeScript 7 no longer ships a JS compiler API) and counts, per file and
+rule, what DESIGN.md calls drift: bracketed radii, sizes, tracking, z-index,
+shadows and motion values; hex and rgb in a class; a shade the theme does not
+define (read from `index.css`'s `--color-*` names, so `ink-200` is caught and
+renders nothing); Tailwind's own palette; broad transitions; `animate-spin`
+outside the spinner; `outline-none` with no focus style beside it or on a
+`focus-within:` wrapper; a class cut at a template `${}`; icons off the
+14/16/20/32 scale; and Base UI or Motion imported outside their wrappers.
+`scripts/style-baseline.json` is a ratchet, not a licence: `--check` fails when
+a count rises above it *and* when it falls below, so the commit that removes
+drift also runs `--tighten` and the room cannot be spent again. `--record`
+rewrites it outright and is for a deliberate raise, which the diff then shows.
+`scripts/style-allowlist.json` holds the permanent exceptions, each with its
+reason, and an entry nothing matches fails the check. Recorded on 2026-09-25:
+380 findings in 91 of 281 files, half a second a run.
 
 ## Conventions
 

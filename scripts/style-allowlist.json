@@ -1,0 +1,26 @@
+[
+  {
+    "file": "src/app/App.tsx",
+    "rule": "outline-removed",
+    "token": "outline-none",
+    "reason": "<main tabIndex=-1> is the skip link's target; focus lands there by script, never by Tab"
+  },
+  {
+    "file": "src/components/ui/popover.tsx",
+    "rule": "outline-removed",
+    "token": "outline-none",
+    "reason": "both panels are tabIndex=-1 containers that take focus by script so Tab starts inside them"
+  },
+  {
+    "file": "src/components/shell/CommandPalette.tsx",
+    "rule": "outline-removed",
+    "token": "focus:outline-none",
+    "reason": "the palette's field is its only control and holds focus for as long as it is open; the caret shows it"
+  },
+  {
+    "file": "src/components/ui/loader.tsx",
+    "rule": "text-size-arbitrary",
+    "token": "text-[",
+    "reason": "sets the em the chevron loader is drawn in, not a type size"
+  }
+]

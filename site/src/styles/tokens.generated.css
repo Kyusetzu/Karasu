@@ -1,4 +1,4 @@
-/* GENERATED from src/app/index.css (sha256 a33e108ccd15) by site/scripts/sync-tokens.mjs
+/* GENERATED from src/app/index.css (sha256 fd05c2b8309b) by site/scripts/sync-tokens.mjs
    — do not edit. Re-run `npm run sync` after changing the source; `npm run check`
    fails while this file is stale. CLAUDE.md, "The website". */
 /* `static` because Tailwind tree-shakes tokens no utility references, leaving a `var()`-only token undefined in dark. */
@@ -573,15 +573,38 @@
   }
 }
 
-/* Transitions only what the theme swaps; prefer it over `transition-colors`, which also animates `color`. */
+/* Transitions only what the theme swaps, plus the press; prefer it over `transition-colors`, which animates `color`. */
 @utility transition-surface {
-  transition-property: background-color, border-color, box-shadow, opacity;
+  transition-property: background-color, border-color, box-shadow, opacity, scale;
   transition-duration: var(--default-transition-duration);
   transition-timing-function: var(--default-transition-timing-function);
 }
 
+/* A pressed control sinks a little; reduced motion sets the scale back to 1, so the press is felt as colour only. */
+@utility press {
+  &:active:not(:disabled) {
+    scale: var(--press-scale, 0.97);
+  }
+}
+
+/* A small control keeps its look but answers taps across at least 44 px; used behind the `coarse` variant. */
+@utility hit-area {
+  &::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: max(100%, 2.75rem);
+    height: max(100%, 2.75rem);
+    translate: -50% -50%;
+  }
+}
+
 /* Reduced motion, CSS only: a hair above zero so `transitionend` still fires, and delays go too or a stagger is a wait. */
 @media (prefers-reduced-motion: reduce) {
+  :root {
+    --press-scale: 1;
+  }
   *,
   *::before,
   *::after {
@@ -592,6 +615,10 @@
     transition-delay: 0ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+html[data-reduce-motion] {
+  --press-scale: 1;
 }
 
 html[data-reduce-motion] *,

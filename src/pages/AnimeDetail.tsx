@@ -79,7 +79,7 @@ import { DecodedImage } from "@/components/media/DecodedImage";
 import { BannerImage } from "@/components/media/BannerImage";
 import { BANNER_RATIO } from "@/lib/bannerFit";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { NumberInput } from "@/components/ui/number-input";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Pill } from "@/components/ui/pill";
 import { ScoreBars } from "@/components/ui/score-bars";
@@ -1360,16 +1360,7 @@ function ListEditor({
           <span className="mb-1 block text-ink-500">
             {t("common.progress")}
           </span>
-          <Input
-            type="number"
-            min={0}
-            max={max}
-            value={progress}
-            onChange={(e) =>
-              setProgress(Math.max(0, Math.min(max, Number(e.target.value))))
-            }
-            className="w-24"
-          />
+          <NumberInput max={max} value={progress} onChange={setProgress} className="w-24" />
         </label>
         <div className="text-sm">
           <span className="mb-1.5 block text-ink-500">{t("common.score")}</span>
@@ -1380,13 +1371,7 @@ function ListEditor({
             {mediaType === "MANGA" ? t("entry.rereads") : t("entry.rewatches")}
           </span>
           <div className="flex items-center gap-1.5">
-            <Input
-              type="number"
-              min={0}
-              value={repeat}
-              onChange={(e) => setRepeat(Math.max(0, Number(e.target.value)))}
-              className="w-20"
-            />
+            <NumberInput value={repeat} onChange={setRepeat} className="w-20" />
             <Button
               variant="secondary"
               size="icon"

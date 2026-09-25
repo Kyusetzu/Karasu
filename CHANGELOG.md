@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 8ac2e3b -->
+<!-- generated-through: 684d8e2 -->
 
 ### Fixed
 
@@ -92,6 +92,7 @@ tag time is then optional rather than load-bearing.
 - Panning the franchise view on Android no longer triggers a sync, and the view opens centred on the title it was opened from.
 - A saved preset now remembers the custom list it was filtered to.
 - The franchise page no longer scrolls sideways on a phone, and its legend names every status.
+- Episode, chapter, volume and rewatch fields no longer keep a 0 you cannot delete, and an emptied field saves as 0.
 
 ### Added
 

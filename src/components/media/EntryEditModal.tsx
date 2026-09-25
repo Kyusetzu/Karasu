@@ -16,6 +16,7 @@ import { useAdvancedCategories, useAuth } from "@/stores/auth";
 import { AdvancedScoreFields } from "@/components/media/AdvancedScoreFields";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { NumberInput } from "@/components/ui/number-input";
 import { Modal } from "@/components/ui/modal";
 import { Pill } from "@/components/ui/pill";
 import { ScoreBars } from "@/components/ui/score-bars";
@@ -226,32 +227,14 @@ export default function EntryEditModal({
                     ? t("list.progressMax", { max })
                     : t("common.progress")}
               </span>
-              <Input
-                type="number"
-                min={0}
-                max={max}
-                value={progress}
-                onChange={(e) =>
-                  setProgress(Math.max(0, Math.min(max, Number(e.target.value))))
-                }
-              />
+              <NumberInput max={max} value={progress} onChange={setProgress} />
             </label>
             {isManga && (
               <label className="block text-sm">
                 <span className="mb-1 block text-ink-500">
                   {t("common.volumes")}
                 </span>
-                <Input
-                  type="number"
-                  min={0}
-                  max={maxVolumes}
-                  value={volumes}
-                  onChange={(e) =>
-                    setVolumes(
-                      Math.max(0, Math.min(maxVolumes, Number(e.target.value))),
-                    )
-                  }
-                />
+                <NumberInput max={maxVolumes} value={volumes} onChange={setVolumes} />
               </label>
             )}
           </div>
@@ -276,13 +259,7 @@ export default function EntryEditModal({
         <label className="block text-sm">
           <span className="mb-1 block text-ink-500">{rewatchLabel}</span>
           <div className="flex items-center gap-2">
-            <Input
-              type="number"
-              min={0}
-              value={repeat}
-              onChange={(e) => setRepeat(Math.max(0, Number(e.target.value)))}
-              className="w-24"
-            />
+            <NumberInput value={repeat} onChange={setRepeat} className="w-24" />
             <Button
               type="button"
               variant="secondary"

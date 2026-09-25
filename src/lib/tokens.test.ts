@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import css from "@/app/index.css?raw";
-import { accentShades, contrastRatio } from "@/lib/contrast";
+import { accentShades, contrastRatio, mix } from "@/lib/contrast";
 import { ACCENT_PRESETS, customProperties } from "@/lib/designTokens";
+import { DEFAULT_STATUS_COLORS } from "@/lib/statusColors";
 
 /** DESIGN.md's contrast obligations and the token blocks' parity, read from the stylesheet the app ships. */
 
@@ -155,6 +156,61 @@ describe("high contrast", () => {
       }
     });
   }
+});
+
+describe("the tint fill", () => {
+  const block = (start: string) => css.slice(css.indexOf(start), css.indexOf("\n}", css.indexOf(start)));
+  const shares = (text: string, over: string) =>
+    [...text.matchAll(new RegExp(String.raw`var\(--tint\) (\d+)%, var\(--color-${over}\)`, "g"))].map((m) => Number(m[1]) / 100);
+  const panel = shares(block("@utility tint-fill {"), "surface-900");
+  const cover = block("@utility tint-fill-on-cover {");
+  const [coverFill] = shares(cover, "on-cover");
+  const [coverGlyph] = shares(cover, "on-cover-edge");
+
+  it("reads the shares it grades from the utilities themselves", () => {
+    expect(panel.length).toBe(2);
+    expect(coverFill).toBeGreaterThan(0);
+    expect(coverGlyph).toBeGreaterThan(0);
+  });
+
+  for (const theme of ["dark", "light"] as const) {
+    const page = colour(theme, "surface-950");
+    const surface = colour(theme, "surface-900");
+    const accents = [...ACCENT_PRESETS, ...EXTREMES].map((hex) => accentShades(hex, { light: theme === "light", surface950: page, surface900: surface }));
+
+    it(`keeps the status button's label and progress readable on every status tint, resting and hovered, in ${theme}`, () => {
+      for (const tint of Object.values(DEFAULT_STATUS_COLORS)) {
+        for (const share of panel) {
+          const fill = mix(surface, tint, share);
+          for (const ink of ["ink-100", "ink-300"]) {
+            expect(contrastRatio(colour(theme, ink), fill), `${ink} on ${tint} at ${share}`).toBeGreaterThanOrEqual(4.5);
+          }
+        }
+      }
+    });
+
+    it(`keeps the +1 glyph at 3:1 on its own accent tint for every preset and extreme, in ${theme}`, () => {
+      for (const { a400, a500 } of accents) {
+        for (const share of panel) {
+          expect(contrastRatio(a400, mix(surface, a500, share)), `${a500} at ${share}`).toBeGreaterThanOrEqual(3);
+        }
+      }
+    });
+  }
+
+  it("drops the tint from the fill in high contrast, so the ink keeps the 7:1 the panel gives it", () => {
+    const fill = block("@utility tint-fill {");
+    expect(fill).toMatch(/:root\[data-contrast="more"\] & \{\s*background-color: var\(--color-surface-900\);\s*border-color: var\(--tint\);/);
+  });
+
+  it("keeps a cover control's tinted glyph at 4.5:1 on its tinted near-black, for every tint", () => {
+    const base = colour("dark", "on-cover");
+    const edge = colour("dark", "on-cover-edge");
+    const accents = [...ACCENT_PRESETS, ...EXTREMES].map((hex) => accentShades(hex, { light: false, surface950: base, surface900: base }).a500);
+    for (const tint of [...Object.values(DEFAULT_STATUS_COLORS), ...accents]) {
+      expect(contrastRatio(mix(edge, tint, coverGlyph), mix(base, tint, coverFill)), tint).toBeGreaterThanOrEqual(4.5);
+    }
+  });
 });
 
 describe("the frame around the stylesheet", () => {

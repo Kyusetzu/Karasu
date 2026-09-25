@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import { Link } from "react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -95,13 +95,13 @@ export default function MediaCard({
               <Pencil className="size-3.5" />
             </IconButton>
             {entry ? (
-              // Tinted to match the ring, so the badge and the border say the same thing.
+              // Tinted by the ring's colour, so the badge and the border say the same thing.
               <span
-                className="grid size-7.5 place-items-center rounded-full text-surface-950"
-                style={{ background: statusColorVar(entry.status) }}
+                className="grid size-7.5 place-items-center rounded-full border tint-fill-on-cover"
+                style={{ "--tint": statusColorVar(entry.status) } as CSSProperties}
                 title={t(`status.${media.type}.${entry.status}`)}
               >
-                <Check className="size-3.75" />
+                <Check className="size-3.5" />
               </span>
             ) : (
               // The neutral circle: adding to Planning is not the same weight as a +1, and the accent is reserved for that.

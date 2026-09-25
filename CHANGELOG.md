@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: a6237e7 -->
+<!-- generated-through: e9fc4d0 -->
 
 ### Fixed
 
@@ -167,6 +167,7 @@ tag time is then optional rather than load-bearing.
 - quick loads no longer flash a skeleton.
 - the collapsed sidebar names its icons in tooltips, and its avatar is round again.
 - Open the empty palette on what was used lately, beside the main shortcuts (1.25.22.712).
+- The status button and the +1 buttons carry their colour as a tint instead of a solid fill.
 
 ### Removed
 

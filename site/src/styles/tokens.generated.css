@@ -1,4 +1,4 @@
-/* GENERATED from src/app/index.css (sha256 992497852e3a) by site/scripts/sync-tokens.mjs
+/* GENERATED from src/app/index.css (sha256 e511d29e6f32) by site/scripts/sync-tokens.mjs
    — do not edit. Re-run `npm run sync` after changing the source; `npm run check`
    fails while this file is stale. CLAUDE.md, "The website". */
 /* `static` because Tailwind tree-shakes tokens no utility references, leaving a `var()`-only token undefined in dark. */
@@ -55,9 +55,9 @@
   /* The dim behind a picture shown full screen, deep enough that the page gives way to it. */
   --color-scrim-deep: rgb(4 5 8 / 0.92);
   /* The near-black that sits on arbitrary cover art; badges, scrims and controls there take it at the opacity each needs. */
-  --color-on-cover: rgb(4 5 8);
+  --color-on-cover: #040508;
   /* The light edge a control on cover art is drawn with, so it keeps a contrast floor on dark art. */
-  --color-on-cover-edge: rgb(255 255 255);
+  --color-on-cover-edge: #ffffff;
   /* The window's close button under the pointer: the caption bar's red in every theme, with its white glyph. */
   --color-window-close: #b3232c;
   --color-window-close-ink: #ffffff;
@@ -529,6 +529,34 @@
       outline: 3px solid Highlight;
     }
   }
+}
+
+/* A control that carries a colour as a tint: `--tint` mixed into the panel as the fill, and at half strength as the rim. */
+@utility tint-fill {
+  background-color: color-mix(in srgb, var(--tint) 18%, var(--color-surface-900));
+  border-color: color-mix(in srgb, var(--tint) 55%, transparent);
+  &:hover {
+    background-color: color-mix(in srgb, var(--tint) 26%, var(--color-surface-900));
+  }
+  :root[data-contrast="more"] & {
+    background-color: var(--color-surface-900);
+    border-color: var(--tint);
+  }
+  :root[data-contrast="more"] &:hover {
+    background-color: var(--color-surface-850);
+  }
+}
+
+/* The same tint over cover art, on the near-black every cover control sits on, with a glyph lifted toward white. */
+@utility tint-fill-on-cover {
+  background-color: color-mix(in srgb, var(--tint) 24%, var(--color-on-cover));
+  border-color: color-mix(in srgb, var(--tint) 65%, transparent);
+  color: color-mix(in srgb, var(--tint) 45%, var(--color-on-cover-edge));
+}
+
+/* The accent as the tint, for the +1 buttons. */
+@utility tint-accent {
+  --tint: var(--color-accent-500);
 }
 
 /* The light a raised panel catches along its top; it composes over a background colour and sets none. */

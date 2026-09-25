@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { ChevronDown, Plus } from "lucide-react";
@@ -8,12 +9,10 @@ import { QuickEditor, type EntryPatch, type QuickEntry } from "@/components/medi
 import { Popover } from "@/components/ui/popover";
 import { useListMutations } from "@/hooks/useListMutations";
 import { withCompletion } from "@/lib/completion";
-import { readableInk, UI_INK } from "@/lib/contrast";
 import { entryFromEcho } from "@/lib/listEcho";
 import { statusColorVar } from "@/lib/statusColors";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/stores/auth";
-import { useTheme } from "@/stores/theme";
 import { showToast } from "@/stores/toast";
 
 /** The detail page's entry as one control: the button says where the title sits, and opens the quick editor. */
@@ -36,8 +35,6 @@ export function StatusMenu({
   const { t } = useTranslation();
   const qc = useQueryClient();
   const userId = useAuth((s) => s.viewer?.id) ?? 0;
-  // The raw hexes, not the var(): readableInk needs a colour it can measure, and a CSS variable is opaque to it.
-  const statusColors = useTheme((s) => s.statusColors);
   const { save } = useListMutations(userId, media.type);
   const key = ["mediaDetail", media.id];
   const title = displayTitle(media.title);
@@ -112,25 +109,23 @@ export function StatusMenu({
             sheet ? "h-11 w-full rounded-panel px-3.5 text-sm" : "h-9 rounded-control px-3.5 text-sm",
             "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 disabled:opacity-60",
             !entry && "border border-dashed border-surface-600 text-ink-100 hover:border-ink-600",
+            // The status as a tint with its dot, so the colour says which list and the ink stays the page's own.
+            entry && "border tint-fill text-ink-100",
           )}
-          style={
-            entry
-              ? {
-                  backgroundColor: statusColorVar(entry.status),
-                  // The palette is user-chosen, so readableInk picks whichever ink end has contrast against their hue.
-                  color: readableInk(statusColors[entry.status] ?? "#000000", UI_INK),
-                }
-              : undefined
-          }
+          style={entry ? ({ "--tint": statusColorVar(entry.status) } as CSSProperties) : undefined}
         >
-          <span className="flex min-w-0 items-center gap-1.5">
-            {!entry && <Plus aria-hidden className="size-4 shrink-0" />}
+          <span className="flex min-w-0 items-center gap-2">
+            {entry ? (
+              <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ backgroundColor: statusColorVar(entry.status) }} />
+            ) : (
+              <Plus aria-hidden className="size-4 shrink-0" />
+            )}
             <span className="truncate">
               {entry ? t(`status.${media.type}.${entry.status}`) : t("detail.addToList")}
             </span>
-            {entry && progressLabel && <span className="shrink-0 font-medium opacity-75">{progressLabel}</span>}
+            {entry && progressLabel && <span className="shrink-0 font-medium tabular-nums text-ink-300">{progressLabel}</span>}
           </span>
-          <ChevronDown aria-hidden className="size-4 shrink-0 opacity-80" />
+          <ChevronDown aria-hidden className="size-4 shrink-0 text-ink-500" />
         </button>
       )}
     >

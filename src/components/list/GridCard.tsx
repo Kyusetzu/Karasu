@@ -118,7 +118,7 @@ export const GridCard = memo(function GridCard({
             )}
             {plusOne && (
               <IconButton
-                variant="accent"
+                variant="accentOnCover"
                 size="sm"
                 round
                 onClick={() => onPlusOne(entry)}

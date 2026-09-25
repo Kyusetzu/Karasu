@@ -84,6 +84,7 @@ export const SCREENS = [
   { id: "d12-glocke", w: 1232, h: 800, route: "/list", act: (p) => p.getByRole("button", { name: "Benachrichtigungen" }).first().click() },
   { id: "d15-benachrichtigungen", w: 1232, h: 800, route: "/notifications" },
   { id: "d21-detail", w: 1232, h: 800, route: "/media/178789" },
+  { id: "d25-raster-hover", w: 1232, h: 800, route: "/list", act: (p) => p.locator("[data-media-id]").nth(1).hover() },
   { id: "d22-detail-unten", w: 1232, h: 800, route: "/media/178789", act: (p) => p.evaluate(() => document.getElementById("main")?.scrollTo(0, 1e6)) },
   { id: "d23-franchise", w: 1232, h: 800, route: "/franchise/178789" },
   { id: "p12-franchise", w: 405, h: 860, phone: true, route: "/franchise/178789" },

@@ -573,3 +573,12 @@ maintainer picks. A pure restyle that moves nothing does not. The rules:
   collapse button were mocked, since under the node it sat on the relation
   line, and the maintainer chose none of them: the button and the folding
   go, and every related title is always drawn.
+- **2026-09-25:** The status button and the +1 buttons, chosen from three
+  directions (tinted, neutral with a dot, a refined solid). A status or the
+  +1 carries its colour as a tint: `tint-fill` mixes `--tint` into the
+  panel with a rim at half strength and keeps the page's own ink, the
+  status adding its dot; over cover art `tint-fill-on-cover` puts the same
+  tint on the cover controls' near-black with a glyph lifted toward white.
+  High contrast drops the tint from the fill and keeps the rim and the dot.
+  The status button's progress reads in `ink-300`, since `ink-500` fell to
+  4.4:1 on the paused tint under the pointer.

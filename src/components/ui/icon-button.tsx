@@ -9,9 +9,12 @@ const iconButtonVariants = cva(
       variant: {
         ghost: "text-ink-500 hover:bg-surface-850 hover:text-ink-100",
         surface: "bg-surface-800 text-ink-300 hover:bg-surface-700 hover:text-ink-100",
-        accent: "bg-accent-500 text-accent-ink hover:bg-accent-600",
+        /** The +1: the accent as a tint rather than a fill, so the most-used button is the easiest one to find, not the loudest. */
+        accent: "border tint-fill tint-accent text-accent-400",
+        /** The +1 over cover art: the same tint on the cover controls' near-black, which reads on any artwork. */
+        accentOnCover: "border tint-fill-on-cover tint-accent",
         /** For the action circles that sit on cover art, where the fill has to be near-opaque over unknown artwork. */
-        onCover: "bg-on-cover/86 text-ink-300 border border-surface-700 hover:text-ink-100",
+        onCover: "bg-on-cover/86 text-on-cover-edge/80 border border-surface-700 hover:text-on-cover-edge",
         success: "text-success hover:bg-success/10",
         danger: "text-danger hover:bg-danger/10",
       },

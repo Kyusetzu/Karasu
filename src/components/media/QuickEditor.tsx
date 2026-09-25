@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { Minus, Plus } from "lucide-react";
 import type { MediaDetail } from "@/api/queries";
@@ -10,11 +10,9 @@ import { NumberInput } from "@/components/ui/number-input";
 import TagEditor from "@/components/media/TagEditor";
 import { CommunityScore } from "@/components/media/CommunityScore";
 import { Textarea } from "@/components/ui/textarea";
-import { readableInk, UI_INK } from "@/lib/contrast";
 import { statusColorVar } from "@/lib/statusColors";
 import { parseNotes, serializeNotes } from "@/lib/tags";
 import { cn } from "@/lib/utils";
-import { useTheme } from "@/stores/theme";
 
 /** The fields of an entry the quick editor reads; the detail stub and a cached list entry both carry them. */
 export interface QuickEntry {
@@ -41,8 +39,6 @@ export function QuickEditor({
   onWrite: (patch: EntryPatch) => void;
 }) {
   const { t } = useTranslation();
-  // The raw hexes, not the var(): readableInk needs a colour it can measure, and a CSS variable is opaque to it.
-  const statusColors = useTheme((s) => s.statusColors);
 
   return (
     <div className="space-y-4">
@@ -60,17 +56,12 @@ export function QuickEditor({
                 className={cn(
                   "flex h-10 min-w-0 items-center gap-2 rounded-control px-2.5 text-left text-xs font-medium transition-surface",
                   "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent-500",
-                  !current && "border border-surface-700 text-ink-300 hover:border-surface-600 hover:text-ink-100",
+                  "border",
+                  current ? "tint-fill text-ink-100" : "border-surface-700 text-ink-300 hover:border-surface-600 hover:text-ink-100",
                 )}
-                style={
-                  current
-                    ? { backgroundColor: statusColorVar(s), color: readableInk(statusColors[s] ?? "#000000", UI_INK) }
-                    : undefined
-                }
+                style={current ? ({ "--tint": statusColorVar(s) } as CSSProperties) : undefined}
               >
-                {!current && (
-                  <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ backgroundColor: statusColorVar(s) }} />
-                )}
+                <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ backgroundColor: statusColorVar(s) }} />
                 <span className="truncate">{t(`status.${media.type}.${s}`)}</span>
               </button>
             );

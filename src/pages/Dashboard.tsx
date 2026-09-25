@@ -453,7 +453,7 @@ const ContinueCard = memo(function ContinueCard({
         // Always visible, not hover-only: the most-used action in the app must not cost a hover every time.
         canPlus && (
           <IconButton
-            variant="accent"
+            variant="accentOnCover"
             size="sm"
             round
             onClick={() => onPlusOne(entry)}
@@ -462,7 +462,6 @@ const ContinueCard = memo(function ContinueCard({
               type === "ANIME" ? "dashboard.markWatched" : "dashboard.markRead",
               { n: entry.progress + 1 },
             )}
-            className="shadow-[0_.25rem_.75rem_rgba(0,0,0,.5)]"
           >
             <Plus className="size-4" />
           </IconButton>

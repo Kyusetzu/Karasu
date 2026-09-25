@@ -788,6 +788,19 @@ html[data-swapping] *::after {
   }
 }
 
+/* A row's highlight and its chosen state are tonal steps, which high contrast also rings in the border role. */
+@utility menu-row-edge {
+  :root[data-contrast="more"] &:is(:hover, [data-highlighted], [aria-current="page"], [data-current]) {
+    box-shadow: inset 0 0 0 1px var(--color-surface-600);
+  }
+}
+/* The same for a list that keeps its own cursor, where a resting pointer would draw a second one. */
+@utility menu-row-edge-managed {
+  :root[data-contrast="more"] &:is([data-highlighted], [aria-current="page"], [data-current]) {
+    box-shadow: inset 0 0 0 1px var(--color-surface-600);
+  }
+}
+
 /* A disclosure's panel grows from no height to its content's; `data-leaving` shrinks it back while usePresence holds it. */
 @utility disclosure-panel {
   display: grid;

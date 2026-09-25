@@ -53,7 +53,20 @@ export const SCREENS = [
   { id: "p3-editor", w: 405, h: 860, phone: true, route: "/media/178789", act: (p) => statusButton(p).click() },
   { id: "p4-mehr", w: 405, h: 860, phone: true, route: "/", act: (p) => p.getByText("Mehr", { exact: true }).last().click() },
   { id: "p5-einstellungen", w: 405, h: 860, phone: true, route: "/settings" },
+  { id: "d6-sortierung", w: 1232, h: 800, route: "/list", act: (p) => p.locator('[aria-label^="Sortierung"], [aria-label^="Sort:"]').first().click() },
+  { id: "p6-aktionen", w: 405, h: 860, phone: true, route: "/list", act: (p) => longPress(p, p.locator("[data-media-id]").nth(1)) },
 ];
+
+/** A held finger, sent as raw touch events: Playwright's own tap lifts at once, and the sheet needs the press. */
+async function longPress(page, target) {
+  const box = await target.boundingBox();
+  // The upper part of a card, clear of the quick buttons along the cover's foot.
+  const point = { x: box.x + box.width / 2, y: box.y + box.height / 4 };
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [point] });
+  await page.waitForTimeout(650);
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+}
 
 /** The three titles the mock opens on, whose real banner and cover are cached on first use; they are never committed. */
 const ART = [178789, 135865, 103303];

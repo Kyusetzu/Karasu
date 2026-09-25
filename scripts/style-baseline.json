@@ -79,13 +79,6 @@
     "icon-size": 7,
     "tracking-arbitrary": 1
   },
-  "src/components/shell/BottomBar.tsx": {
-    "icon-size": 1
-  },
-  "src/components/shell/CommandPalette.tsx": {
-    "radius-arbitrary": 1,
-    "tracking-arbitrary": 1
-  },
   "src/components/shell/DetectionPill.tsx": {
     "tracking-arbitrary": 1
   },

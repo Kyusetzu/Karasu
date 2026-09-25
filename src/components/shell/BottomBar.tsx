@@ -9,6 +9,7 @@ import Bell from "@/components/shell/Bell";
 import { useNotifBadge } from "@/hooks/useNotifBadge";
 import { isPaletteSwipe } from "@/lib/navSwipe";
 import { Badge } from "@/components/ui/badge";
+import { MenuGroupLabel, MenuRow, MenuRowBody, menuRowClass } from "@/components/ui/menu-row";
 import { Sheet } from "@/components/ui/sheet";
 
 /** The phone shell's four bar slots; everything else is behind a More sheet built from the sidebar's `GROUPS`. */
@@ -62,10 +63,8 @@ export default function BottomBar() {
   return (
     <>
       <Sheet open={moreOpen} label={t("nav.more")} onClose={() => setMoreOpen(false)}>
-        <div className="mb-1 flex items-center justify-between px-1">
-          <span className="text-2xs font-semibold uppercase tracking-wide text-ink-600">
-            {t("nav.more")}
-          </span>
+        <div className="mb-1 flex items-center justify-between">
+          <MenuGroupLabel className="pt-0">{t("nav.more")}</MenuGroupLabel>
           <div className="flex items-center gap-1">
             {/* The bell lives in the sheet, since an unlabeled icon in the nav row read as decoration; More carries its count. */}
             <Bell barSlot />
@@ -79,22 +78,19 @@ export default function BottomBar() {
             </button>
           </div>
         </div>
-        <button
-          type="button"
+        <MenuRow
+          icon={Command}
           onClick={() => {
             setMoreOpen(false);
             openPalette();
           }}
-          className="mb-2 flex w-full items-center gap-2.5 rounded-control px-2 py-2 text-sm text-ink-300 transition-surface hover:bg-surface-850 hover:text-ink-100"
+          className="mb-2"
         >
-          <Command className="size-4.5 shrink-0" />
-          <span>{t("ctx.palette")}</span>
-        </button>
+          {t("ctx.palette")}
+        </MenuRow>
         {sheetGroups(android).map((g) => (
           <div key={g.label} className="mb-2 last:mb-0">
-            <p className="px-1 pb-1 text-2xs font-medium uppercase tracking-wide text-ink-600">
-              {t(g.label)}
-            </p>
+            <MenuGroupLabel>{t(g.label)}</MenuGroupLabel>
             {/* One destination per row, not a tile grid: labels get their full width and the whole row is the touch target. */}
             <div className="flex flex-col gap-0.5">
               {g.items.map((item) => (
@@ -102,17 +98,13 @@ export default function BottomBar() {
                   key={item.to}
                   to={item.to}
                   onClick={() => setMoreOpen(false)}
-                  className={({ isActive }) =>
-                    cn(
-                      "flex items-center gap-2.5 rounded-control px-2 py-2 text-sm transition-surface",
-                      isActive
-                        ? "bg-surface-800 text-accent-400"
-                        : "text-ink-300 hover:bg-surface-850 hover:text-ink-100",
-                    )
-                  }
+                  className={({ isActive }) => menuRowClass({ current: isActive })}
                 >
-                  <item.icon className="size-4.5 shrink-0" />
-                  <span>{t(item.key)}</span>
+                  {({ isActive }) => (
+                    <MenuRowBody icon={item.icon} current={isActive}>
+                      {t(item.key)}
+                    </MenuRowBody>
+                  )}
                 </NavLink>
               ))}
             </div>

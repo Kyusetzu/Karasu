@@ -25,7 +25,8 @@ import { Popover, type PopoverTriggerProps } from "@/components/ui/popover";
 import { Pill } from "@/components/ui/pill";
 import { Badge } from "@/components/ui/badge";
 import { RemovableChip } from "@/components/ui/chip";
-import { Segmented } from "@/components/ui/segmented";
+import { Segmented, type Segment } from "@/components/ui/segmented";
+import { MenuRow, MenuRowBody, MenuRowNote, menuRowClass } from "@/components/ui/menu-row";
 import { Button } from "@/components/ui/button";
 import { formatLabel, MEDIA_FORMATS, ORIGINS, originLabel } from "@/lib/format";
 import { fuzzyScore, prepareDoc, prepareQuery } from "@/lib/fuzzy";
@@ -365,25 +366,24 @@ function Choice({
   checked,
   onSelect,
   children,
-  className,
 }: {
   name: string;
   checked: boolean;
   onSelect: () => void;
   children: ReactNode;
-  className?: string;
 }) {
   return (
     <label
+      data-current={checked || undefined}
       className={cn(
-        "flex cursor-pointer items-center gap-2 rounded-control px-2.5 py-2 text-ui transition-surface",
-        "has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent-500",
-        checked ? "bg-surface-850 text-ink-100" : "text-ink-300 hover:bg-surface-850/60 hover:text-ink-100",
-        className,
+        menuRowClass({ current: checked }),
+        "cursor-pointer has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent-500",
       )}
     >
       <input type="radio" name={name} checked={checked} onChange={onSelect} className="sr-only" />
-      {children}
+      <MenuRowBody current={checked} trailing={checked && <Check aria-hidden className="size-4 shrink-0 text-accent-400" />}>
+        {children}
+      </MenuRowBody>
     </label>
   );
 }
@@ -391,13 +391,13 @@ function Choice({
 function SortPanel({ view, onDraft }: { view: ListView; onDraft: (patch: ViewPatch) => void }) {
   const { t } = useTranslation();
   const id = useId();
-  const dirs: { value: SortDir; label: string; icon: typeof ArrowUp }[] = [
-    { value: "desc", label: t("list.descending"), icon: ArrowDown },
-    { value: "asc", label: t("list.ascending"), icon: ArrowUp },
+  const dirs: Segment<SortDir>[] = [
+    { value: "desc", label: <DirLabel icon={ArrowDown} text={t("list.descending")} /> },
+    { value: "asc", label: <DirLabel icon={ArrowUp} text={t("list.ascending")} /> },
   ];
   return (
     <div className="space-y-3">
-      <fieldset>
+      <fieldset className="flex flex-col gap-0.5">
         <legend className="mb-1.5 text-2xs font-semibold uppercase tracking-eyebrow text-ink-500">
           {t("list.sortTitle")}
         </legend>
@@ -409,29 +409,29 @@ function SortPanel({ view, onDraft }: { view: ListView; onDraft: (patch: ViewPat
             // A new key starts from its own direction: "score, ascending" was a choice about scores, not titles.
             onSelect={() => onDraft(sortPatch(key, SORT_DEFAULT_DIR[key]))}
           >
-            <span className="flex-1">{t(`sort.${key}`)}</span>
-            {view.sort === key && <Check aria-hidden className="size-4 text-accent-400" />}
+            {t(`sort.${key}`)}
           </Choice>
         ))}
       </fieldset>
-      <fieldset className="border-t border-hair pt-3">
-        <legend className="sr-only">{t("list.direction")}</legend>
-        <div className="grid grid-cols-2 gap-1 rounded-control border border-hair p-0.5">
-          {dirs.map(({ value, label, icon: Icon }) => (
-            <Choice
-              key={value}
-              name={`${id}-dir`}
-              checked={view.dir === value}
-              onSelect={() => onDraft(sortPatch(view.sort, value))}
-              className="justify-center py-1.5 text-xs"
-            >
-              <Icon aria-hidden className="size-3.5" />
-              {label}
-            </Choice>
-          ))}
-        </div>
-      </fieldset>
+      <div className="border-t border-hair pt-3">
+        <Segmented
+          segments={dirs}
+          value={view.dir}
+          onChange={(dir) => onDraft(sortPatch(view.sort, dir))}
+          aria-label={t("list.direction")}
+          className="flex w-full [&>button]:flex-1"
+        />
+      </div>
     </div>
+  );
+}
+
+function DirLabel({ icon: Icon, text }: { icon: typeof ArrowUp; text: string }) {
+  return (
+    <span className="flex items-center gap-1.5">
+      <Icon aria-hidden className="size-3.5" />
+      {text}
+    </span>
   );
 }
 
@@ -588,31 +588,25 @@ function PresetList({
         <ul className="space-y-0.5">
           {presets.map((p) => (
             <li key={p.name}>
-              <button
-                type="button"
+              <MenuRow
                 onClick={() => closeThen(() => onApplyPreset(p.name))}
-                className="flex w-full items-center gap-3 rounded-control px-2.5 py-2 text-left text-ui text-ink-300 transition-surface hover:bg-surface-850 hover:text-ink-100 focus-visible:outline-2 focus-visible:outline-accent-500"
+                trailing={
+                  STATUS_ORDER.includes(p.tab as MediaListStatus) && (
+                    <MenuRowNote>{t(`status.${type}.${p.tab}`)}</MenuRowNote>
+                  )
+                }
               >
-                <span className="min-w-0 flex-1 truncate">{p.name}</span>
-                {STATUS_ORDER.includes(p.tab as MediaListStatus) && (
-                  <span className="shrink-0 text-2xs text-ink-600">{t(`status.${type}.${p.tab}`)}</span>
-                )}
-              </button>
+                {p.name}
+              </MenuRow>
             </li>
           ))}
         </ul>
       ) : (
         <p className="px-1 text-xs leading-relaxed text-ink-500">{t("presets.empty")}</p>
       )}
-      <Button
-        variant="ghost"
-        size="sm"
-        className="mt-2 h-auto min-h-8 w-full justify-start py-1.5 text-left"
-        onClick={() => closeThen(onManagePresets)}
-      >
-        <Plus aria-hidden className="size-3.5" />
+      <MenuRow icon={Plus} onClick={() => closeThen(onManagePresets)} className="mt-2">
         {t("presets.save")}
-      </Button>
+      </MenuRow>
     </div>
   );
 }

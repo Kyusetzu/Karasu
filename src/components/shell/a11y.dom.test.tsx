@@ -97,6 +97,8 @@ describe("the shell passes axe", () => {
       });
     });
     expect(screen.getByRole("combobox", { name: "palette.placeholder" })).toBeInTheDocument();
+    // The combobox keeps the caret; an option Tab could reach would be a second, unhighlighted cursor.
+    for (const option of screen.getAllByRole("option")) expect(option).toHaveAttribute("tabindex", "-1");
   });
 
   it("KeyboardSheet, open", async () => {

@@ -14,6 +14,7 @@ import {
   prepareQuery,
   type FuzzyDoc,
 } from "@/lib/fuzzy";
+import { MenuGroupLabel, MenuRowBody, MenuRowNote, menuRowClass } from "@/components/ui/menu-row";
 import { cn } from "@/lib/utils";
 import { isAndroid, usePlatform } from "@/stores/platform";
 import { ANDROID_HIDDEN_ROUTES } from "@/components/shell/Sidebar";
@@ -278,22 +279,18 @@ export default function CommandPalette() {
           </kbd>
         </div>
 
-        <div id="palette-results" role="listbox" className="max-h-96 overflow-y-auto py-1">
+        <div id="palette-results" role="listbox" className="max-h-96 overflow-y-auto p-1.5">
           {results.length === 0 ? (
-            <div role="option" aria-selected={false} aria-disabled className="px-4 py-3 text-sm text-ink-600">
+            <div role="option" aria-selected={false} aria-disabled className="px-2.5 py-3 text-sm text-ink-600">
               {t("palette.empty")}
             </div>
           ) : (
             // A listbox may hold groups and options only, so each group is named by a roleless label, not a heading.
             groups.map((group) => (
               <div key={group.key} role="group" aria-labelledby={`palette-group-${group.key}`}>
-                <div
-                  id={`palette-group-${group.key}`}
-                  role="none"
-                  className="px-3.5 pb-1 pt-2 text-2xs font-semibold uppercase tracking-[.14em] text-ink-600"
-                >
+                <MenuGroupLabel id={`palette-group-${group.key}`} role="none">
                   {t(group.key)}
-                </div>
+                </MenuGroupLabel>
                 <ul role="none">
                   {group.items.map((item) => {
                     const i = results.indexOf(item);
@@ -303,39 +300,30 @@ export default function CommandPalette() {
                           id={`palette-item-${i}`}
                           role="option"
                           aria-selected={i === sel}
+                          // Out of the tab order, so the caret never leaves the field and the drawn cursor is the only one.
+                          tabIndex={-1}
+                          data-highlighted={i === sel || undefined}
                           onMouseEnter={() => setSel(i)}
                           onClick={() => go(item)}
-                          className={cn(
-                            "flex w-full items-center gap-2.5 px-3.5 py-1.5 text-left text-sm transition-surface",
-                            i === sel
-                              ? "bg-surface-850 text-ink-100"
-                              : "text-ink-300",
-                          )}
+                          className={menuRowClass({ managed: true })}
                         >
-                          {item.cover !== undefined && (
-                            <span className="h-8 w-5.5 shrink-0 overflow-hidden rounded-[.1875rem] bg-surface-800">
-                              {item.cover && (
-                                <img
-                                  src={item.cover}
-                                  alt=""
-                                  className="size-full object-cover"
-                                />
-                              )}
-                            </span>
-                          )}
-                          <span className="min-w-0 flex-1">
+                          <MenuRowBody
+                            lead={
+                              item.cover !== undefined && (
+                                <span className="h-8 w-5.5 shrink-0 overflow-hidden rounded-inner bg-surface-800">
+                                  {item.cover && <img src={item.cover} alt="" className="size-full object-cover" />}
+                                </span>
+                              )
+                            }
+                            trailing={item.sub && <MenuRowNote>{item.sub}</MenuRowNote>}
+                          >
                             <span className="block truncate">{item.label}</span>
                             {item.native && (
                               <span className="block truncate font-brand-jp text-2xs text-ink-600">
                                 {item.native}
                               </span>
                             )}
-                          </span>
-                          {item.sub && (
-                            <span className="shrink-0 text-2xs text-ink-600">
-                              {item.sub}
-                            </span>
-                          )}
+                          </MenuRowBody>
                         </button>
                       </li>
                     );

@@ -1650,8 +1650,8 @@ reason, and an entry nothing matches fails the check. Recorded on 2026-09-25:
 
 **`scripts/screens.mjs` shows the real app, and it is how a UI change is
 proven.** It serves `scripts/screens/` (the whole `App`, shell included, over
-`mockIPC` answers and fixture lists) and drives Chromium: `shoot` renders ten
-named screens (five desktop, five phone) per style and theme, `board` lays them
+`mockIPC` answers and fixture lists) and drives Chromium: `shoot` renders twelve
+named screens (six desktop, six phone) per style and theme, `board` lays them
 out for the maintainer, `clip` records motion side by side, and `hash` takes
 still frames at a fixed clock with motion off. Two `hash` runs agree, so an
 unchanged hash is the proof that a mechanical refactor moved no pixel. The

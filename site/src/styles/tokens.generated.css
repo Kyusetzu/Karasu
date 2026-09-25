@@ -1,4 +1,4 @@
-/* GENERATED from src/app/index.css (sha256 5c44e35cc1e9) by site/scripts/sync-tokens.mjs
+/* GENERATED from src/app/index.css (sha256 918207fbc6cc) by site/scripts/sync-tokens.mjs
    — do not edit. Re-run `npm run sync` after changing the source; `npm run check`
    fails while this file is stale. CLAUDE.md, "The website". */
 /* `static` because Tailwind tree-shakes tokens no utility references, leaving a `var()`-only token undefined in dark. */
@@ -637,6 +637,20 @@
 @utility hc-edge {
   :root[data-contrast="more"] & {
     border-color: var(--color-surface-600);
+  }
+}
+
+/* A row's highlight and its chosen state are tonal steps, which high contrast also rings in the border role. */
+@utility menu-row-edge {
+  :root[data-contrast="more"] &:is(:hover, [data-highlighted], [aria-current="page"], [data-current]) {
+    box-shadow: inset 0 0 0 1px var(--color-surface-600);
+  }
+}
+
+/* The same for a list that keeps its own cursor, where a resting pointer would draw a second one. */
+@utility menu-row-edge-managed {
+  :root[data-contrast="more"] &:is([data-highlighted], [aria-current="page"], [data-current]) {
+    box-shadow: inset 0 0 0 1px var(--color-surface-600);
   }
 }
 

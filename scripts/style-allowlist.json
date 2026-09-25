@@ -18,6 +18,12 @@
     "reason": "Base UI focuses the popup on open and marks the focused row data-highlighted, whose fill is the focus style"
   },
   {
+    "file": "src/components/ui/menu-row.tsx",
+    "rule": "outline-removed",
+    "token": "outline-none",
+    "reason": "only a managed row drops the ring: Base UI or a combobox marks the keyboard's place data-highlighted, whose fill is the focus style"
+  },
+  {
     "file": "src/components/ui/sheet.tsx",
     "rule": "outline-removed",
     "token": "outline-none",

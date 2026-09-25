@@ -338,6 +338,7 @@ no row here, add the primitive first.
 | a text field | `Input`; a count is `NumberInput` |
 | a native choice | `FilterSelect`, `MultiFilterSelect` |
 | a menu of actions, at an element or at the pointer | `Menu` with `MenuPanel`, `MenuItem`, `SubMenu` and `MenuSeparator` |
+| a row of a sheet, a panel or a list of choices | `MenuRow`; a link, a radio's label or a Base UI item spells `menuRowClass` with `MenuRowBody`. `menu` size at the pointer and `panel` in a dropdown or a sheet, both 44 px under a coarse pointer, and `touch` for a sheet only a finger opens; `current` for the chosen row, `managed` where the keyboard's place is `data-highlighted`; `MenuGroupLabel` over a group, `MenuRowSeparator` between two |
 | an anchored panel, or its phone form | `Popover` (`dropdown` or `sheet`) |
 | a modal sheet from the bottom | `Sheet`, on Base UI's drawer: swipe, dim, Escape and back all close it |
 | a section that folds open | `Disclosure`; a custom trigger pairs with `DisclosurePanel`; never in a virtual row, whose remount would replay the growth |
@@ -355,8 +356,13 @@ no row here, add the primitive first.
 The foundation phase adds, each replacing the hand-built copies it lists in
 the plan:
 
-- one row shared by the sheets and the menus;
 - `field` and `search-field`, and card variants.
+
+The menu row covers the context menu, the action sheet, the More sheet, the
+sort and preset panels and the palette. The rows that carry more than a
+label move to it with their areas: the bell's and the sync panel's feed
+rows, the phone's settings list, the tri-state filter options, and the
+cover rows of the match picker and the season split.
 
 ## Libraries
 
@@ -479,3 +485,10 @@ maintainer picks. A pure restyle that moves nothing does not. The rules:
   startup script), the maintainer chose both in the startup script, with the
   budget raised by what each one measures when it lands. Icons and hand-built
   buttons stay with the area passes rather than one sweep.
+- **2026-09-25:** One row for every menu, sheet and panel. A hover is the
+  app's usual `surface-850` step. The chosen row and a managed highlight take
+  `surface-800`, because there the fill is the only sign of where the
+  keyboard is. High contrast rings both in the border role. The rows of the
+  More sheet and the preset and sort panels were 36 px on the phone and are
+  44 px under a finger now, like the action sheet's; the sort direction is a
+  `Segmented`, which it always looked like.

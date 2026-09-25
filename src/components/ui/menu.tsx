@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
 import { Menu as BaseMenu } from "@base-ui/react/menu";
 import { ContextMenu as BaseContextMenu } from "@base-ui/react/context-menu";
-import { ChevronRight, type LucideIcon } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useBackClose } from "@/hooks/useBackClose";
+import { MenuRowBody, menuRowClass, menuSeparatorClass } from "@/components/ui/menu-row";
 import { cn } from "@/lib/utils";
 
 /** Where a menu opens: an element, or a point such as the pointer of a right-click. */
@@ -10,9 +11,6 @@ export type MenuAnchor = Element | { x: number; y: number };
 
 const PANEL =
   "w-55 rounded-panel border border-hair bg-surface-900 p-1.25 shadow-float panel-wash outline-none origin-(--transform-origin) data-open:animate-pop-in data-closed:animate-pop-out";
-
-const ROW =
-  "flex h-7.5 w-full cursor-default items-center gap-2.5 rounded-inner px-2.5 text-left text-ui outline-none transition-surface select-none";
 
 /** A point as the zero-size box Floating UI positions against, so a menu can open where the pointer was. */
 function toAnchor(anchor: MenuAnchor) {
@@ -84,7 +82,7 @@ export function MenuPanel({
 
 /** One row of a menu; `label` is what typing a letter matches when the row's text is not plain. */
 export function MenuItem({
-  icon: Icon,
+  icon,
   danger = false,
   label,
   onSelect,
@@ -101,31 +99,23 @@ export function MenuItem({
       label={label}
       closeOnClick={false}
       onClick={onSelect}
-      className={cn(
-        ROW,
-        danger
-          ? "text-danger data-highlighted:bg-danger/10"
-          : "text-ink-300 data-highlighted:bg-surface-800 data-highlighted:text-ink-100",
-      )}
+      className={cn(menuRowClass({ size: "menu", danger, managed: true }), "cursor-default")}
     >
-      {Icon && (
-        <span className="grid size-4 shrink-0 place-items-center text-ink-500">
-          <Icon aria-hidden className="size-3.5" />
-        </span>
-      )}
-      <span className="min-w-0 flex-1 truncate">{children}</span>
+      <MenuRowBody size="menu" icon={icon} danger={danger}>
+        {children}
+      </MenuRowBody>
     </BaseMenu.Item>
   );
 }
 
 /** A rule between two groups of rows. */
 export function MenuSeparator() {
-  return <BaseMenu.Separator className="-mx-1.25 my-1 border-t border-hair" />;
+  return <BaseMenu.Separator className={cn("-mx-1.25", menuSeparatorClass)} />;
 }
 
 /** A row that opens a second panel beside the first, with the pointer's safe path to it handled by Base UI. */
 export function SubMenu({
-  icon: Icon,
+  icon,
   title,
   children,
 }: {
@@ -136,15 +126,11 @@ export function SubMenu({
   return (
     <BaseMenu.SubmenuRoot>
       <BaseMenu.SubmenuTrigger
-        className={cn(ROW, "text-ink-300 data-highlighted:bg-surface-800 data-highlighted:text-ink-100 data-popup-open:bg-surface-800")}
+        className={cn(menuRowClass({ size: "menu", managed: true }), "cursor-default data-popup-open:bg-surface-800")}
       >
-        {Icon && (
-          <span className="grid size-4 shrink-0 place-items-center text-ink-500">
-            <Icon aria-hidden className="size-3.5" />
-          </span>
-        )}
-        <span className="min-w-0 flex-1 truncate">{title}</span>
-        <ChevronRight aria-hidden className="size-3.5 shrink-0 text-ink-600" />
+        <MenuRowBody size="menu" icon={icon} chevron>
+          {title}
+        </MenuRowBody>
       </BaseMenu.SubmenuTrigger>
       <BaseMenu.Portal>
         <BaseMenu.Positioner collisionPadding={8} positionMethod="fixed" className="z-popover">

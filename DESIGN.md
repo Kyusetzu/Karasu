@@ -529,3 +529,11 @@ maintainer picks. A pure restyle that moves nothing does not. The rules:
   Reduced motion shows it at once, as it collapses every delay. The empty
   states that show a plain glyph take it through `EmptyState`'s `icon`, at
   the 32 px step, where the blocked profile drew a 20 px one in a disc.
+- **2026-09-25:** The bell and the More sheet, chosen from three mockups
+  each, and the bell mixed across them. On the desktop the bell is
+  compact plus a page: the dropdown shows the latest three and leads to a
+  notifications page with a filter for all, Karasu's own and AniList's.
+  On the phone it is a tall sheet of its own, grouped into today and
+  earlier, which the More sheet gives way to; the panel that lay over the
+  open More sheet goes. The More sheet stays a list, one destination per
+  row, over a two-column list and a tile grid.

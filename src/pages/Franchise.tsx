@@ -505,63 +505,66 @@ function Rail({
     // Keyed on the node so the pane re-runs `settle` when the selection moves; below `xl` it sits under the canvas.
     <aside
       key={node.id}
-      className={cn(cardClass("raised"), "max-h-64 w-full shrink-0 animate-settle overflow-y-auto p-4 xl:max-h-none xl:w-60")}
+      className={cn(cardClass("raised"), "flex max-h-64 w-full shrink-0 animate-settle flex-col xl:max-h-none xl:w-60")}
     >
-      {node.coverImage.large && (
-        <img
-          src={node.coverImage.large}
-          alt=""
-          className="mb-3 hidden aspect-2/3 w-full rounded-control object-cover xl:block"
-        />
-      )}
-      {relation && (
-        <p className="text-2xs uppercase tracking-eyebrow text-accent-400">
-          {t(`relation.${relation}`, { defaultValue: relation })}
-        </p>
-      )}
-      <p className="mt-0.5 text-sm font-semibold leading-snug text-ink-100">{latin}</p>
-      {native && <p className="font-brand-jp text-xs text-ink-600">{native}</p>}
-
-      <p className="mt-3 flex items-center gap-1.5 text-xs text-ink-300">
-        <span
-          className="size-2 rounded-full"
-          style={{ background: colorOf(node.listStatus) }}
-        />
-        {node.listStatus
-          ? t(`status.${node.type}.${node.listStatus}`)
-          : t("franchise.notOnList")}
-      </p>
-
-      <dl className="mt-3 space-y-1.5 text-2xs">
-        <Row label={t("detail.format")}>
-          {[
-            node.type === "MANGA" ? t("common.manga") : t("common.anime"),
-            formatLabel(node.format, t),
-          ]
-            .filter(Boolean)
-            .join(" · ")}
-        </Row>
-        <Row label={t("franchise.yourProgress")}>
-          {node.progress === null
-            ? "—"
-            : `${node.progress} / ${node.total ?? "?"}`}
-        </Row>
-        <Row label={t("franchise.connects")}>{connects}</Row>
-      </dl>
-
-      <div className="mt-4 space-y-2">
-        <Button size="control" className="w-full" onClick={onOpen}>
-          {t("franchise.openDetail")}
-        </Button>
-        {entry ? (
-          <Button variant="outline" size="control" className="w-full" onClick={onEdit}>
-            {t("franchise.editEntry")}
-          </Button>
-        ) : (
-          <Button variant="outline" size="control" className="w-full" onClick={onOpen}>
-            {t("franchise.addToList")}
-          </Button>
+      {/* The scroll lives inside the card, so the card's top catch-light stays put while the contents move. */}
+      <div className="min-h-0 flex-1 overflow-y-auto p-4">
+        {node.coverImage.large && (
+          <img
+            src={node.coverImage.large}
+            alt=""
+            className="mb-3 hidden aspect-2/3 w-full rounded-control object-cover xl:block"
+          />
         )}
+        {relation && (
+          <p className="text-2xs uppercase tracking-eyebrow text-accent-400">
+            {t(`relation.${relation}`, { defaultValue: relation })}
+          </p>
+        )}
+        <p className="mt-0.5 text-sm font-semibold leading-snug text-ink-100">{latin}</p>
+        {native && <p className="font-brand-jp text-xs text-ink-600">{native}</p>}
+
+        <p className="mt-3 flex items-center gap-1.5 text-xs text-ink-300">
+          <span
+            className="size-2 rounded-full"
+            style={{ background: colorOf(node.listStatus) }}
+          />
+          {node.listStatus
+            ? t(`status.${node.type}.${node.listStatus}`)
+            : t("franchise.notOnList")}
+        </p>
+
+        <dl className="mt-3 space-y-1.5 text-2xs">
+          <Row label={t("detail.format")}>
+            {[
+              node.type === "MANGA" ? t("common.manga") : t("common.anime"),
+              formatLabel(node.format, t),
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          </Row>
+          <Row label={t("franchise.yourProgress")}>
+            {node.progress === null
+              ? "—"
+              : `${node.progress} / ${node.total ?? "?"}`}
+          </Row>
+          <Row label={t("franchise.connects")}>{connects}</Row>
+        </dl>
+
+        <div className="mt-4 space-y-2">
+          <Button size="control" className="w-full" onClick={onOpen}>
+            {t("franchise.openDetail")}
+          </Button>
+          {entry ? (
+            <Button variant="outline" size="control" className="w-full" onClick={onEdit}>
+              {t("franchise.editEntry")}
+            </Button>
+          ) : (
+            <Button variant="outline" size="control" className="w-full" onClick={onOpen}>
+              {t("franchise.addToList")}
+            </Button>
+          )}
+        </div>
       </div>
     </aside>
   );

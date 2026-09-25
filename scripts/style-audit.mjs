@@ -49,7 +49,7 @@ const SPINNER = "src/components/ui/spinner.tsx";
 /** The one module each library may be imported from; everything else goes through it. */
 const LIBRARY_HOMES = [
   { test: (m) => m === "@base-ui/react" || m.startsWith("@base-ui/react/"), home: (p) => p.startsWith("src/components/ui/") },
-  { test: (m) => m === "motion" || m.startsWith("motion/") || m === "framer-motion", home: (p) => p === "src/app/motion.tsx" },
+  { test: (m) => m === "motion" || m.startsWith("motion/") || m === "framer-motion", home: (p) => p === "src/app/motion.tsx" || p === "src/app/motionFeatures.ts" },
 ];
 
 const COLOUR_PREFIX =

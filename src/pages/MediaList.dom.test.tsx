@@ -33,7 +33,6 @@ function page(url: string) {
 }
 
 /** Past every pending history traversal; jsdom delivers a `back()` a task later, as a browser does. */
-const settle = () => new Promise((resolve) => setTimeout(resolve, 30));
 const onPanelEntry = () => (window.history.state as { karasuBack?: number } | null)?.karasuBack !== undefined;
 const chips = () => screen.queryByRole("group", { name: "list.activeFilters" });
 
@@ -72,8 +71,7 @@ describe("MediaList header", () => {
     const chip = within(chips()!).getByRole("button", { name: /format\.TV/ });
     fireEvent.pointerDown(chip);
     fireEvent.click(chip);
-    await settle();
-    expect(chips()).toBeNull();
+    await waitFor(() => expect(chips()).toBeNull());
     expect(window.location.search).toBe("");
   });
 

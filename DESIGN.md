@@ -341,6 +341,8 @@ no row here, add the primitive first.
 | an anchored panel, or its phone form | `Popover` (`dropdown` or `sheet`) |
 | a modal sheet from the bottom | `Sheet`, on Base UI's drawer: swipe, dim, Escape and back all close it |
 | a section that folds open | `Disclosure`; a custom trigger pairs with `DisclosurePanel`; never in a virtual row, whose remount would replay the growth |
+| a write receipt | `showToast`; one at a time, held while hovered or focused, longer with an action |
+| anything moved by Motion | `m` and `MotionPresence` from `app/motion.tsx`, the only place `motion` is imported |
 | a dialog | `Modal` |
 | keeping an overlay alive through its exit | `Presence`, `PresenceIf` |
 | a wait with no shape | `Loader`; a known shape is `Skeleton` |
@@ -372,7 +374,7 @@ four things before it lands:
 | `class-variance-authority`, `clsx`, `tailwind-merge` | shipped | variant classes, `cn` |
 | `d3-array`, `d3-scale`, `d3-shape` | shipped | chart maths only; the renderer is ours |
 | `@base-ui/react` 1.8.0, pinned | shipped: `ui/menu` (the context menu), `ui/sheet`, the dropdown of `ui/popover` | menu and context menu (typeahead, safe submenu, long press), the one swipeable sheet, flip-aware dropdown positioning. Always controlled, so `useBackClose` and `data-overlay` keep working; wrapped under `ui/` only. The menu cost 40 KiB gzipped in the startup script, the drawer 12 more and the popover 2.5, since it shares Floating UI with the menu. Select and ScrollArea insert a `<style>` and stay unused |
-| `motion` (`LazyMotion` + `m`) | approved, not yet added | velocity after a swipe, sliding indicators, list enter and leave. `MotionConfig reducedMotion` fed from `lib/motion`. `AnimateView` and `animateView` are banned: they inject a `<style>` without a nonce |
+| `motion` 13.4.4, pinned (`LazyMotion` + `m`) | shipped: `app/motion.tsx`, first in the toast | velocity after a swipe, sliding indicators, list enter and leave. `MotionConfig reducedMotion` follows the app's switch and the system's. `AnimateView`, `animateView` and `AnimatePresence`'s `popLayout` are banned: they inject a `<style>` without a nonce, which is why `MotionPresence` offers only `sync` and `wait`. 17 KiB gzipped in the startup script, and the full feature set, drag and layout included, is a 27 KiB chunk loaded after the first paint |
 
 Considered and declined on 2026-09-25:
 

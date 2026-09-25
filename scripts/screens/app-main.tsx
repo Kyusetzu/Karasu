@@ -2,6 +2,7 @@ import { createRoot } from "react-dom/client";
 import { HashRouter } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import App from "@/app/App";
+import { MotionProvider } from "@/app/motion";
 import { useTheme } from "@/stores/theme";
 import { useToast } from "@/stores/toast";
 import { initLanguage, setLanguageSetting } from "@/i18n";
@@ -20,7 +21,9 @@ const qc = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, g
 createRoot(document.getElementById("root")!).render(
   <QueryClientProvider client={qc}>
     <HashRouter>
-      <App />
+      <MotionProvider>
+        <App />
+      </MotionProvider>
     </HashRouter>
   </QueryClientProvider>,
 );

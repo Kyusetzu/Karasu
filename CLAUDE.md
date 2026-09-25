@@ -45,7 +45,8 @@ and in the browser and scrobbles your AniList progress automatically.
 
 ```
 src/
-  app/               App.tsx, main.tsx, index.css — the entry, and only the entry
+  app/               App.tsx, main.tsx, index.css — the entry — plus motion.tsx
+                     and motionFeatures.ts, the one door to Motion
   api/               AniList GraphQL client, queries, types, franchise, library,
                      social (the whole profile/follow/forum surface);
                      bindings.ts is GENERATED from the Rust command signatures
@@ -673,9 +674,9 @@ version files agree), the **site**'s typecheck,
 (`scripts/bundle-budget.mjs`: a fresh `vite build`, then four gzipped figures —
 what the window waits for, the stylesheet, the largest lazy chunk, all the
 script — against `scripts/bundle-budget.json`, each 3 % over the larger of the
-two build targets' measurement; on 2026-09-25, with Base UI's menu and
-drawer in, the Linux target read 372.1, 16.3, 24.8 and 481.3 KiB, and a raise
-names its reason in the commit) — then
+two build targets' measurement; on 2026-09-25, with Base UI and Motion in,
+the Linux target read 391.5, 16.3, 27.3 and 528.0 KiB, and a raise names its
+reason in the commit) — then
 the three cargo tools
 one after another because they share the target directory's lock: **clippy**
 with warnings denied, **cargo deny** (advisories, licences, bans, sources

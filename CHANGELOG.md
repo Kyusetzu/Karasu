@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: d1c6232 -->
+<!-- generated-through: 988feed -->
 
 ### Fixed
 
@@ -149,6 +149,7 @@ tag time is then optional rather than load-bearing.
 - View switches slide to the chosen option and follow the arrow keys; statistics sections use the list's tab strip.
 - The right-click menu finds entries by typing, keeps its submenu open on the way to it, and stays on screen at any edge.
 - Bottom sheets on the phone can be swiped away and sit above the bottom bar.
+- Receipts can be flicked away, stay put while hovered or focused, and give an Undo seven seconds.
 ## 1.0.0 — 2026-09-05
 
 Karasu 1.0.0 is the first tagged release: a desktop and Android tracker built

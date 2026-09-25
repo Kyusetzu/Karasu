@@ -4,16 +4,16 @@
     "date": "2026-09-25",
     "target": "safari15, the Linux and Android build, which is the larger since Base UI",
     "bytes": {
-      "initialJs": 381032,
-      "initialCss": 16656,
-      "largestLazy": 25425,
-      "totalJs": 492852
+      "initialJs": 400855,
+      "initialCss": 16669,
+      "largestLazy": 27920,
+      "totalJs": 540679
     }
   },
   "budget": {
-    "initialJs": 393216,
+    "initialJs": 413696,
     "initialCss": 17408,
-    "largestLazy": 26624,
-    "totalJs": 507904
+    "largestLazy": 29696,
+    "totalJs": 557056
   }
 }

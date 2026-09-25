@@ -110,6 +110,8 @@ production dependencies:
 | zustand, i18next, react-i18next | MIT |
 | tailwindcss, @tailwindcss/vite, tailwind-merge, clsx | MIT |
 | @base-ui/react, with @base-ui/utils, @floating-ui/react-dom and reselect | MIT |
+| motion, with framer-motion, motion-dom and motion-utils | MIT |
+| tslib, which motion needs | 0BSD |
 | class-variance-authority | Apache-2.0 |
 | d3-array, d3-scale, d3-shape, lucide-react | ISC |
 | @tauri-apps/api, @tauri-apps/plugin-opener, @tauri-apps/plugin-deep-link, @tauri-apps/plugin-clipboard-manager, @tauri-apps/plugin-haptics | MIT or Apache-2.0 |
@@ -117,7 +119,7 @@ production dependencies:
 | @fontsource/sn-pro | OFL-1.1 |
 | @fontsource/kosugi-maru | Apache-2.0 |
 
-Across the whole installed tree the spread is MIT (121), ISC (15), Apache-2.0
+Across the whole installed tree the spread is MIT (125), ISC (15), Apache-2.0
 (8), and single-digit counts of MIT-0, BSD-2-Clause, BSD-3-Clause, MPL-2.0,
 BlueOak-1.0.0 and CC0-1.0.
 

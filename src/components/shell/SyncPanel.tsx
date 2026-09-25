@@ -3,7 +3,7 @@ import { Loader } from "@/components/ui/loader";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { CloudUpload, Hourglass, RefreshCw, Trash2 } from "lucide-react";
+import { CloudUpload, Hourglass, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { displayTitle, type ListResult, type QueuedEdit } from "@/api/types";
 import { cn } from "@/lib/utils";
@@ -19,6 +19,7 @@ import { usePresence } from "@/hooks/usePresence";
 import { useBackClose } from "@/hooks/useBackClose";
 import { useSyncStatus } from "@/hooks/useSyncStatus";
 import { useManualSync } from "@/hooks/useManualSync";
+import { Spinner } from "@/components/ui/spinner";
 
 /** A literal `t()` per field, so `i18nKeys.test.ts` sees every key; the names are AniList's mutation arguments. */
 export function fieldLabel(field: QueueField, t: (k: string) => string): string {
@@ -212,7 +213,7 @@ export default function SyncPanel({
                   phase === "idle" ? "text-ink-500" : "text-accent-400",
                 )}
               >
-                {phase === "draining" && <RefreshCw className="size-2.75 animate-spin" />}
+                {phase === "draining" && <Spinner className="size-2.75" />}
                 {phase === "throttled" && <Hourglass className="size-2.75" />}
                 {phaseLabel(phase, t)}
               </span>

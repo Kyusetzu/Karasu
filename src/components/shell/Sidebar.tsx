@@ -23,7 +23,6 @@ import {
   HardDrive,
   Info,
   LogIn,
-  RefreshCw,
   Settings,
   Users,
   MessagesSquare,
@@ -39,6 +38,7 @@ import { useManualSync } from "@/hooks/useManualSync";
 import { useShortViewport } from "@/hooks/useShortViewport";
 import { Avatar, UserLockup } from "@/components/ui/user-lockup";
 import SyncPanel from "./SyncPanel";
+import { Spinner } from "@/components/ui/spinner";
 
 /** The rail is the state change: `useRailMarker` slides one marker between items rather than each growing its own. */
 const itemClass =
@@ -405,12 +405,7 @@ export default function Sidebar() {
               "disabled:opacity-60",
             )}
           >
-            <RefreshCw
-              className={cn(
-                "size-4.25 shrink-0",
-                manualSync.syncing && "animate-spin",
-              )}
-            />
+            <Spinner spinning={manualSync.syncing} className="size-4.25 shrink-0" />
             {!collapsed && <span className={labelClass}>{t("sync.button")}</span>}
           </button>
         )}

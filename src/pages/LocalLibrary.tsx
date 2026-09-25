@@ -16,7 +16,6 @@ import {
   FolderOpen,
   HelpCircle,
   Play,
-  RefreshCw,
   Search,
   Wand2,
   X,
@@ -55,6 +54,7 @@ import { Presence } from "@/components/ui/presence";
 import { EmptyState, FolderStack } from "@/components/EmptyState";
 import { cn } from "@/lib/utils";
 import { useTheme, type Density } from "@/stores/theme";
+import { Spinner } from "@/components/ui/spinner";
 
 /** Above this the match was exact: a test for `best_match_prepared`'s equality branch, not a tolerance. */
 const EXACT = 0.999;
@@ -435,7 +435,7 @@ function LibraryView({ userId }: { userId: number }) {
             onClick={rescan}
             disabled={scanning}
           >
-            <RefreshCw className={cn("size-3.5", scanning && "animate-spin")} />
+            <Spinner spinning={scanning} className="size-3.5" />
             {scanning ? t("settings.libraryScanning") : t("settings.libraryScan")}
           </Button>
         </div>

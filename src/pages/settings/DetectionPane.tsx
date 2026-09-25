@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
-import { ChevronRight, RefreshCw, Search, X } from "lucide-react";
+import { ChevronRight, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { Input } from "@/components/ui/input";
@@ -40,6 +40,7 @@ import { ExternalNote, Row, Toggle } from "./shared";
 import { anilistCoversAiring } from "@/lib/airingCoverage";
 import { backendErrorText } from "@/lib/backendError";
 import { commands, unwrap } from "@/api/tauri";
+import { Spinner } from "@/components/ui/spinner";
 export function ScrobbleSection() {
   const { t } = useTranslation();
   const [settings, setSettings] = useState<ScrobbleSettings | null>(null);
@@ -268,7 +269,7 @@ export function MediaSessionSection() {
             onClick={refresh}
             disabled={busy}
           >
-            <RefreshCw className={cn("size-3.5", busy && "animate-spin")} />{" "}
+            <Spinner spinning={busy} className="size-3.5" />{" "}
             {t("settings.refreshDebug")}
           </Button>
           {error && (
@@ -706,7 +707,7 @@ export function JellyfinSection() {
                 {t("common.save")}
               </Button>
               <Button onClick={test} disabled={busy}>
-                <RefreshCw className={cn("size-4", busy && "animate-spin")} />{" "}
+                <Spinner spinning={busy} className="size-4" />{" "}
                 {t("settings.jellyfinTest")}
               </Button>
               <Button variant="secondary" onClick={signOut}>

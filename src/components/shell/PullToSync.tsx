@@ -1,9 +1,9 @@
 import { useTranslation } from "react-i18next";
-import { RefreshCw } from "lucide-react";
 import { usePullToSync } from "@/hooks/usePullToSync";
 import { PULL_TRIGGER_PX } from "@/lib/pullToSync";
 import { prefersReducedMotion } from "@/lib/motion";
 import { cn } from "@/lib/utils";
+import { Spinner } from "@/components/ui/spinner";
 
 /** The phone shell's pull indicator: it rides the finger down and turns accent once letting go would sync. */
 export default function PullToSync() {
@@ -35,8 +35,9 @@ export default function PullToSync() {
           armed || syncing ? "text-accent-400" : "text-ink-500",
         )}
       >
-        <RefreshCw
-          className={cn("size-3.5", syncing && "animate-spin")}
+        <Spinner
+          spinning={syncing}
+          className="size-3.5"
           // The arrow turns with the pull, so the distance left to the threshold is legible without a label.
           style={
             reduced || syncing

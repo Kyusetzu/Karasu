@@ -335,6 +335,7 @@ no row here, add the primitive first.
 | a dialog | `Modal` |
 | keeping an overlay alive through its exit | `Presence`, `PresenceIf` |
 | a wait with no shape | `Loader`; a known shape is `Skeleton` |
+| a busy icon (sync, refresh, install) | `Spinner` with `spinning`, the only place `animate-spin` may appear |
 | nothing to show | `EmptyState` |
 | a score picker | `ScoreBars` |
 | a season picker | `SeasonPicker` |
@@ -346,7 +347,7 @@ no row here, add the primitive first.
 The foundation phase adds, each replacing the hand-built copies it lists in
 the plan:
 
-- `spinner`, `switch`, `chip` and `badge`, `disclosure`, `menu-item`;
+- `switch`, `chip` and `badge`, `disclosure`, `menu-item`;
 - `sheet` (one sheet with swipe to dismiss);
 - `field` and `search-field`, and card variants.
 

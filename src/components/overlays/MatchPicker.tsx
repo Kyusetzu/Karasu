@@ -12,6 +12,7 @@ import { useDialogFocus } from "@/hooks/useDialogFocus";
 import { useBackClose } from "@/hooks/useBackClose";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { Spinner } from "@/components/ui/spinner";
 
 /** Picks the title a pile of files belongs to, searching all of AniList because the matcher only ever sees the list. */
 export default function MatchPicker({
@@ -160,9 +161,10 @@ export default function MatchPicker({
               className="pl-8"
             />
             {isFetching && (
-              <Loader2
+              <Spinner
+                icon={Loader2}
                 className={cn(
-                  "absolute top-1/2 size-3.5 -translate-y-1/2 animate-spin text-ink-600",
+                  "absolute top-1/2 size-3.5 -translate-y-1/2 text-ink-600",
                   // Left of the clear button whenever there is one.
                   term ? "right-8" : "right-2.5",
                 )}

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { ChevronRight, FolderOpen, RefreshCw } from "lucide-react";
+import { ChevronRight, FolderOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -29,6 +29,7 @@ import { IconButton } from "@/components/ui/icon-button";
 import { Presence } from "@/components/ui/presence";
 import ConfirmDialog from "@/components/overlays/ConfirmDialog";
 import { commands, unwrap } from "@/api/tauri";
+import { Spinner } from "@/components/ui/spinner";
 interface DatabaseInfo {
   path: string;
   bytes: number;
@@ -156,7 +157,7 @@ export function RescaleSection() {
         onClick={apply}
       >
         {applying ? (
-          <RefreshCw className="size-3.5 animate-spin" />
+          <Spinner className="size-3.5" />
         ) : null}
         {t("settings.rescaleApply")}
       </Button>
@@ -856,7 +857,7 @@ export function LogSection() {
                   onClick={refresh}
                   disabled={busy}
                 >
-                  <RefreshCw className={cn("size-3.5", busy && "animate-spin")} />
+                  <Spinner spinning={busy} className="size-3.5" />
                   {t("settings.refreshDebug")}
                 </Button>
               </div>
@@ -997,7 +998,7 @@ export function QueueSection() {
       )}
       <div className="mt-3">
         <Button onClick={() => void runSync()} disabled={manual.syncing || !manual.available}>
-          <RefreshCw className={cn("size-4", manual.syncing && "animate-spin")} />{" "}
+          <Spinner spinning={manual.syncing} className="size-4" />{" "}
           {manual.syncing ? t("settings.queueFlushing") : t("settings.queueFlush")}
         </Button>
       </div>

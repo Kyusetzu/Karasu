@@ -2,16 +2,16 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
-import { FolderOpen, RefreshCw, X } from "lucide-react";
+import { FolderOpen, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { Card, CardTitle } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
 import { useLibrary } from "@/stores/library";
 import { mediaByIds } from "@/api/queries";
 import { displayTitle } from "@/api/types";
 import * as api from "@/api/anilist";
 import * as library from "@/api/library";
+import { Spinner } from "@/components/ui/spinner";
 export function LibrarySection() {
   const { t } = useTranslation();
   const refreshLibrary = useLibrary((s) => s.refresh);
@@ -70,7 +70,7 @@ export function LibrarySection() {
         </Button>
         {path && (
           <Button onClick={scan} disabled={scanning}>
-            <RefreshCw className={cn("size-4", scanning && "animate-spin")} />{" "}
+            <Spinner spinning={scanning} className="size-4" />{" "}
             {scanning ? t("settings.libraryScanning") : t("settings.libraryScan")}
           </Button>
         )}

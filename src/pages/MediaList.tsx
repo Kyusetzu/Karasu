@@ -41,7 +41,6 @@ import { IconButton } from "@/components/ui/icon-button";
 import { StatusTabs } from "@/components/ui/status-tabs";
 import { CoverOutline, EmptyState, StruckQuery } from "@/components/EmptyState";
 import { ListMoreMenu, ListToolbar } from "@/components/list/ListToolbar";
-import { cn } from "@/lib/utils";
 import { Presence, PresenceIf } from "@/components/ui/presence";
 import { VirtualGrid } from "@/components/list/VirtualGrid";
 import { GridCard } from "@/components/list/GridCard";
@@ -70,6 +69,7 @@ import {
 } from "@/lib/listFilters";
 import { statusColorVar } from "@/lib/statusColors";
 import { isAndroid, usePlatform } from "@/stores/platform";
+import { Spinner } from "@/components/ui/spinner";
 
 // One collator, since localeCompare builds a fresh one per call; default options keep the ordering it gave.
 const COLLATOR = new Intl.Collator();
@@ -663,9 +663,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
                 disabled={isRefetching}
                 aria-label={t("common.reload")}
               >
-                <RefreshCw
-                  className={cn("size-4", isRefetching && "animate-spin")}
-                />
+                <Spinner spinning={isRefetching} className="size-4" />
               </IconButton>
             )}
           </div>

@@ -1675,9 +1675,16 @@ four or five places, made by careful code, because nothing said it once.
   action row with the status button — sits below the cover whatever the title's length. Chosen by the
   maintainer on 2026-09-25 over three rounds of mockups: a short title leaving air beside the cover beats
   a narrow column that squeezes. `usePhoneShell` picks the layout, so the desktop header is untouched.
-  The status button (`StatusMenu`) writes through `useListMutations` for an existing entry and through
-  `saveListEntry` with the media object for a first add, because a new local entry is refused without it;
-  a save's echo reaches the page only through `lib/listEcho`, since the local echo names no status.
+  The status button (`StatusMenu`) is the page's whole entry editor, on the phone in the action row
+  over a sheet and on the desktop under the title over a dropdown; there is no editor card any more.
+  `QuickEditor` saves status, progress steps and the score as they are touched (receipts and Undo come
+  from `useListMutations`), a typed count when its field is left or the sheet closes on it, and
+  rewatches, tags and notes together behind "More". The score is `CommunityScore`: AniList's own
+  histogram from `DETAIL_QUERY` (no extra request) as the bars, folded onto the account's format by
+  `lib/scoreDistribution`, with the community mean marked beneath. A first add goes through
+  `saveListEntry` with the media object, because a new local entry is refused without it; a save's echo
+  reaches the page only through `lib/listEcho`, since the local echo names no status. Count fields
+  everywhere are `ui/number-input`: an emptied field reports 0 and a stored 0 shows as the placeholder.
 - **Local text matching goes through `lib/fuzzy`.** Exact > substring >
   word-prefix > trigram containment, scored per title — per-title docs are
   what make a query structurally unable to match across two adjacent names

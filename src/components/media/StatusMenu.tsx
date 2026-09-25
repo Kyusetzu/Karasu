@@ -1,9 +1,10 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { Check, ChevronDown, Plus } from "lucide-react";
+import { ChevronDown, Plus } from "lucide-react";
 import { saveListEntry } from "@/api/anilist";
 import type { MediaDetail } from "@/api/queries";
-import { displayTitle, STATUS_ORDER, type MediaListStatus, type SaveEntryInput } from "@/api/types";
+import { displayTitle, type MediaListStatus, type SaveEntryInput } from "@/api/types";
+import { QuickEditor, type EntryPatch, type QuickEntry } from "@/components/media/QuickEditor";
 import { Popover } from "@/components/ui/popover";
 import { useListMutations } from "@/hooks/useListMutations";
 import { withCompletion } from "@/lib/completion";
@@ -15,17 +16,20 @@ import { useAuth } from "@/stores/auth";
 import { useTheme } from "@/stores/theme";
 import { showToast } from "@/stores/toast";
 
-/** The detail page's status as a control: it says where the title sits, and opens the six statuses to move it. */
+/** The detail page's entry as one control: the button says where the title sits, and opens the quick editor. */
 export function StatusMenu({
   media,
   entry,
   progressLabel,
+  variant,
   className,
 }: {
   media: MediaDetail;
   /** Null when the title is not on the list, and the button offers to add it. */
-  entry: { status: MediaListStatus } | null;
+  entry: QuickEntry | null;
   progressLabel: string | null;
+  /** The phone's wide button over a sheet, or the desktop's compact one over a dropdown. */
+  variant: "sheet" | "dropdown";
   /** On the popover's box, which is the row's flex item; the button fills it. */
   className?: string;
 }) {
@@ -57,15 +61,23 @@ export function StatusMenu({
       showToast({ kind: "error", text: t("receipt.failed", { title }), detail: t("receipt.failedDetail") }),
   });
 
-  const move = (from: MediaListStatus, status: MediaListStatus) => {
-    const input = withCompletion<SaveEntryInput>({ mediaId: media.id, status }, media, media.type, from);
+  const write = (patch: EntryPatch) => {
+    if (!entry) return;
+    const input = withCompletion<SaveEntryInput>({ mediaId: media.id, ...patch }, media, media.type, entry.status);
     const before = qc.getQueryData<MediaDetail>(key);
     const stub = before?.mediaListEntry;
-    // Moved at once like the list's own copy, so the button and the list never disagree while the write is out.
+    // Shown at once like the list's own copy, so the page and the list never disagree while the write is out.
     if (before && stub) {
       qc.setQueryData<MediaDetail>(key, {
         ...before,
-        mediaListEntry: { ...stub, status, progress: input.progress ?? stub.progress },
+        mediaListEntry: {
+          ...stub,
+          status: input.status ?? stub.status,
+          progress: input.progress ?? stub.progress,
+          score: input.score ?? stub.score,
+          repeat: input.repeat ?? stub.repeat,
+          notes: input.notes ?? stub.notes,
+        },
       });
     }
     // The hook owns the receipt, Undo and the error toast; this only keeps the page's copy in step.
@@ -79,13 +91,15 @@ export function StatusMenu({
 
   const choose = (status: MediaListStatus) => {
     if (!entry) add.mutate(status);
-    else if (entry.status !== status) move(entry.status, status);
+    else if (entry.status !== status) write({ status });
   };
 
+  const sheet = variant === "sheet";
   return (
     <Popover
-      label={t("actions.changeStatus")}
-      variant="sheet"
+      label={t("detail.myEntry")}
+      variant={variant}
+      width={380}
       className={className}
       renderTrigger={(p) => (
         <button
@@ -94,7 +108,8 @@ export function StatusMenu({
           disabled={add.isPending}
           title={t("actions.changeStatus")}
           className={cn(
-            "flex h-11 w-full min-w-0 items-center justify-between gap-2 rounded-xl px-3.5 text-sm font-semibold transition-surface",
+            "flex min-w-0 items-center justify-between gap-2 font-semibold transition-surface",
+            sheet ? "h-11 w-full rounded-xl px-3.5 text-sm" : "h-9 rounded-lg px-3.5 text-sm",
             "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 disabled:opacity-60",
             !entry && "border border-dashed border-surface-600 text-ink-200 hover:border-surface-500",
           )}
@@ -119,33 +134,7 @@ export function StatusMenu({
         </button>
       )}
     >
-      {({ close }) => (
-        <div className="space-y-0.5">
-          {STATUS_ORDER.map((s) => {
-            const current = entry?.status === s;
-            return (
-              <button
-                key={s}
-                type="button"
-                aria-pressed={current}
-                onClick={() => {
-                  close();
-                  choose(s);
-                }}
-                className={cn(
-                  "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-left text-sm transition-surface",
-                  "focus-visible:outline-2 focus-visible:outline-accent-500",
-                  current ? "bg-surface-850 text-ink-100" : "text-ink-300 hover:bg-surface-850/60 hover:text-ink-100",
-                )}
-              >
-                <span aria-hidden className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: statusColorVar(s) }} />
-                <span className="flex-1">{t(`status.${media.type}.${s}`)}</span>
-                {current && <Check aria-hidden className="size-4 text-accent-400" />}
-              </button>
-            );
-          })}
-        </div>
-      )}
+      {() => <QuickEditor media={media} entry={entry} onStatus={choose} onWrite={write} />}
     </Popover>
   );
 }

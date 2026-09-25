@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router";
 import {
   useInfiniteQuery,
@@ -45,7 +45,6 @@ import { Avatar, UserLockup } from "@/components/ui/user-lockup";
 import { Markdown } from "@/components/social/Markdown";
 import { ReviewComposerModal } from "@/components/overlays/ReviewComposerModal";
 import CoverViewer from "@/components/overlays/CoverViewer";
-import { loadDefaultAddStatus } from "@/lib/defaultAddStatus";
 import { Presence } from "@/components/ui/presence";
 import { usePresence } from "@/hooks/usePresence";
 import { relTimeFromSeconds } from "@/lib/relTime";
@@ -56,17 +55,8 @@ import {
   mediaStatusLabel,
   sourceLabel,
 } from "@/lib/format";
-import { statusColorVar } from "@/lib/statusColors";
-import { readableInk, UI_INK } from "@/lib/contrast";
-import { useTheme } from "@/stores/theme";
-import { isTauri, saveListEntry } from "@/api/anilist";
-import {
-  displayTitle,
-  maxProgress,
-  STATUS_ORDER,
-  type MediaListStatus,
-  type MediaType,
-} from "@/api/types";
+import { isTauri } from "@/api/anilist";
+import { displayTitle } from "@/api/types";
 import { useAuth } from "@/stores/auth";
 import { useCachedEntry } from "@/hooks/useCachedEntry";
 import { useLibrary } from "@/stores/library";
@@ -79,20 +69,13 @@ import { DecodedImage } from "@/components/media/DecodedImage";
 import { BannerImage } from "@/components/media/BannerImage";
 import { BANNER_RATIO } from "@/lib/bannerFit";
 import { Button } from "@/components/ui/button";
-import { NumberInput } from "@/components/ui/number-input";
 import { Card, CardTitle } from "@/components/ui/card";
-import { Pill } from "@/components/ui/pill";
-import { ScoreBars } from "@/components/ui/score-bars";
-import TagEditor from "@/components/media/TagEditor";
-import { parseNotes, serializeNotes } from "@/lib/tags";
-import { chooseStatus, openingFields, withCompletion, type FillMemo } from "@/lib/completion";
 import { parseAniListHtml } from "@/lib/anilistHtml";
 import { FavouriteButton } from "@/components/media/FavouriteButton";
 import { GenreChips, MetaLine, NextEpisode, TimeLeft } from "@/components/media/DetailFacts";
 import { StatusMenu } from "@/components/media/StatusMenu";
 import { IconButton } from "@/components/ui/icon-button";
 import { usePhoneShell } from "@/hooks/usePhoneShell";
-import { entryFromEcho } from "@/lib/listEcho";
 import { RichText } from "@/components/RichText";
 import { ScoreColumns, StatusBar } from "@/components/stats/panels";
 
@@ -111,8 +94,6 @@ export default function AnimeDetail() {
   const profileMode = useAuth((s) => s.mode);
   const viewer = useAuth((s) => s.viewer);
   const phone = usePhoneShell();
-  // The raw hexes, not the var(): readableInk needs a colour it can measure, and a CSS variable is opaque to it.
-  const statusColors = useTheme((st) => st.statusColors);
   const [revealed, setRevealed] = useState(false);
   const [coverOpen, setCoverOpen] = useState(false);
   const coverViewer = usePresence(coverOpen);
@@ -294,6 +275,7 @@ export default function AnimeDetail() {
                         media={data}
                         entry={entry ?? null}
                         progressLabel={progressLabel}
+                        variant="sheet"
                         className="min-w-0 flex-1"
                       />
                     ))}
@@ -332,32 +314,25 @@ export default function AnimeDetail() {
               </div>
             ) : (
               <>
-                {/* Whether this is on your list, said beside the title and coloured from the same palette as the cover rings. */}
-                <p className="mt-2.5">
-                  {entry ? (
-                    <span
-                      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-2xs font-semibold"
-                      style={{
-                        backgroundColor: statusColorVar(entry.status),
-                        // The palette is user-chosen, so readableInk picks whichever ink end has contrast against their hue.
-                        color: readableInk(
-                          statusColors[entry.status] ?? "#000000",
-                          UI_INK,
-                        ),
-                      }}
-                    >
-                      {t(`status.${data.type}.${entry.status}`)}
-                      {progressLabel && <span className="opacity-80">{progressLabel}</span>}
+                {canEdit ? (
+                  // undefined from useCachedEntry means not loaded yet as well as not listed, so offer nothing until it resolves.
+                  !localPending && (
+                    <StatusMenu
+                      media={data}
+                      entry={entry ?? null}
+                      progressLabel={progressLabel}
+                      variant="dropdown"
+                      className="mt-2.5"
+                    />
+                  )
+                ) : (
+                  // Without an account there is no list to change, so the title only says it is not on one.
+                  <p className="mt-2.5">
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-surface-700 px-2.5 py-0.5 text-2xs text-ink-500">
+                      {t("detail.notOnList")}
                     </span>
-                  ) : (
-                    // undefined from useCachedEntry means not loaded yet as well as not listed, so say nothing until it resolves.
-                    localPending ? null : (
-                      <span className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-surface-700 px-2.5 py-0.5 text-2xs text-ink-500">
-                        {t("detail.notOnList")}
-                      </span>
-                    )
-                  )}
-                </p>
+                  </p>
+                )}
                 <MetaLine data={data} studios={mainStudios.map((s) => s.name)} className="mt-2.5" />
                 <GenreChips genres={data.genres} className="mt-2" />
                 <TimeLeft data={data} className="mt-2" />
@@ -402,13 +377,6 @@ export default function AnimeDetail() {
         {/* Prose left at a reading measure, metadata right taking the slack, since everything in it wraps and fills. */}
         <div className="mt-6 grid gap-6 2xl:grid-cols-[minmax(0,48rem)_minmax(0,1fr)] 2xl:items-start">
           <div className="min-w-0 space-y-6">
-            <ListEditor
-              media={data}
-              mediaType={data.type}
-              max={maxProgress(data)}
-              entry={entry ?? null}
-            />
-
             {data.description && (
               <Card>
                 <CardTitle>{t("detail.description")}</CardTitle>
@@ -1239,177 +1207,3 @@ function LinkList({ links }: { links: ExternalLinkData[] }) {
   );
 }
 
-function ListEditor({
-  media,
-  mediaType,
-  max: maxTotal,
-  entry,
-}: {
-  media: MediaDetail;
-  mediaType: MediaType;
-  max: number | null;
-  entry: {
-    id: number;
-    status: MediaListStatus;
-    progress: number;
-    score: number;
-    repeat: number;
-    notes: string | null;
-  } | null;
-}) {
-  const { t } = useTranslation();
-  const mediaId = media.id;
-  const viewer = useAuth((s) => s.viewer);
-  const mode = useAuth((s) => s.mode);
-  const qc = useQueryClient();
-  // Totals only: this editor has no volume field, so the volume total is added on the way out, never shown.
-  const totals = { episodes: media.episodes, chapters: media.chapters };
-  const opening = () =>
-    openingFields(
-      entry ? { status: entry.status, progress: entry.progress, volumes: 0 } : null,
-      loadDefaultAddStatus(),
-      totals,
-      mediaType,
-    );
-  const [status, setStatus] = useState<MediaListStatus>(() => opening().fields.status);
-  const [progress, setProgress] = useState(() => opening().fields.progress);
-  const [fillMemo, setFillMemo] = useState<FillMemo | null>(() => opening().memo);
-  const [score, setScore] = useState(entry?.score ?? 0);
-  const [repeat, setRepeat] = useState(entry?.repeat ?? 0);
-  const parsed = parseNotes(entry?.notes);
-  const [notes, setNotes] = useState(parsed.notes);
-  const [tags, setTags] = useState(parsed.tags);
-  const [saved, setSaved] = useState(false);
-
-  useEffect(() => {
-    const open = opening();
-    setStatus(open.fields.status);
-    setProgress(open.fields.progress);
-    setFillMemo(open.memo);
-    setScore(entry?.score ?? 0);
-    setRepeat(entry?.repeat ?? 0);
-    const p = parseNotes(entry?.notes);
-    setNotes(p.notes);
-    setTags(p.tags);
-    // `opening` reads the same entry and this title's totals, which cannot change while the page shows it.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entry]);
-
-  const save = useMutation({
-    mutationFn: () =>
-      saveListEntry(
-        // Progress is always sent, so the fill only adds manga's volume total, and only on the move into Completed.
-        withCompletion(
-          {
-            mediaId,
-            status,
-            progress,
-            score,
-            repeat,
-            notes: serializeNotes(notes, tags),
-          },
-          media,
-          mediaType,
-          entry?.status ?? null,
-        ),
-        media,
-      ),
-    onSuccess: (res) => {
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
-      // Scoped to this title's own collection; the other cannot have changed.
-      qc.invalidateQueries({ queryKey: ["mediaList", media.type] });
-      // The echo says exactly what changed, so patch the open page rather than refetch a detail we already hold.
-      const next = entryFromEcho(res.entry);
-      if (next) {
-        qc.setQueryData(["mediaDetail", mediaId], (old: MediaDetail | undefined) =>
-          old ? { ...old, mediaListEntry: next } : old,
-        );
-      }
-    },
-  });
-
-  if (!viewer && mode !== "local") return null;
-  const max = maxTotal ?? 99999;
-
-  const pickStatus = (next: MediaListStatus) => {
-    const picked = chooseStatus({ status, progress, volumes: 0 }, fillMemo, next, totals, mediaType);
-    setStatus(picked.fields.status);
-    setProgress(picked.fields.progress);
-    setFillMemo(picked.memo);
-  };
-
-  return (
-    <Card>
-      <CardTitle>
-        {entry ? t("detail.myEntry") : t("detail.addToList")}
-      </CardTitle>
-      {/* Same six pills as the modal: this is the panel people live in, so the two must not disagree on status. */}
-      <div className="mt-3 text-sm">
-        <span className="mb-1.5 block text-ink-500">{t("common.status")}</span>
-        <div className="flex flex-wrap gap-0.75">
-          {STATUS_ORDER.map((s) => (
-            <Pill key={s} active={status === s} onClick={() => pickStatus(s)}>
-              {t(`status.${mediaType}.${s}`)}
-            </Pill>
-          ))}
-        </div>
-      </div>
-      <div className="mt-4 flex flex-wrap items-end gap-3">
-        <label className="text-sm">
-          <span className="mb-1 block text-ink-500">
-            {t("common.progress")}
-          </span>
-          <NumberInput max={max} value={progress} onChange={setProgress} className="w-24" />
-        </label>
-        <div className="text-sm">
-          <span className="mb-1.5 block text-ink-500">{t("common.score")}</span>
-          <ScoreBars value={score} onChange={setScore} />
-        </div>
-        <label className="text-sm">
-          <span className="mb-1 block text-ink-500">
-            {mediaType === "MANGA" ? t("entry.rereads") : t("entry.rewatches")}
-          </span>
-          <div className="flex items-center gap-1.5">
-            <NumberInput value={repeat} onChange={setRepeat} className="w-20" />
-            <Button
-              variant="secondary"
-              size="icon"
-              aria-label={t("entry.addRepeat")}
-              title={t("entry.addRepeat")}
-              onClick={() => setRepeat((r) => r + 1)}
-            >
-              +1
-            </Button>
-          </div>
-        </label>
-        <Button onClick={() => save.mutate()} disabled={save.isPending}>
-          {saved
-            ? t("common.saved")
-            : entry
-              ? t("common.save")
-              : t("common.add")}
-        </Button>
-        {save.error && (
-          <p className="text-sm text-danger">{String(save.error)}</p>
-        )}
-      </div>
-      <div className="mt-3">
-        <span id="detail-tags-label" className="mb-1 block text-sm text-ink-500">
-          {t("tags.label")}
-        </span>
-        <TagEditor tags={tags} onChange={setTags} labelledBy="detail-tags-label" />
-      </div>
-      <label className="mt-3 block text-sm">
-        <span className="mb-1 block text-ink-500">{t("entry.notes")}</span>
-        <textarea
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          rows={3}
-          placeholder={t("entry.notesPlaceholder")}
-          className="w-full resize-y rounded-lg border border-surface-700 bg-surface-900 px-2 py-1.5 text-sm focus:border-accent-500 focus:outline-none"
-        />
-      </label>
-    </Card>
-  );
-}

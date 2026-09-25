@@ -673,8 +673,9 @@ version files agree), the **site**'s typecheck,
 (`scripts/bundle-budget.mjs`: a fresh `vite build`, then four gzipped figures —
 what the window waits for, the stylesheet, the largest lazy chunk, all the
 script — against `scripts/bundle-budget.json`, each 3 % over the larger of the
-two build targets' measurement; on 2026-09-25 the Windows target read 315.8,
-15.2, 24.7 and 425.0 KiB, and a raise names its reason in the commit) — then
+two build targets' measurement; on 2026-09-25, with Base UI's menu in, the
+Linux target read 360.1, 16.1, 24.8 and 469.3 KiB, and a raise names its
+reason in the commit) — then
 the three cargo tools
 one after another because they share the target directory's lock: **clippy**
 with warnings denied, **cargo deny** (advisories, licences, bans, sources

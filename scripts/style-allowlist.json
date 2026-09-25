@@ -12,6 +12,12 @@
     "reason": "both panels are tabIndex=-1 containers that take focus by script so Tab starts inside them"
   },
   {
+    "file": "src/components/ui/menu.tsx",
+    "rule": "outline-removed",
+    "token": "outline-none",
+    "reason": "Base UI focuses the popup on open and marks the focused row data-highlighted, whose fill is the focus style"
+  },
+  {
     "file": "src/components/shell/CommandPalette.tsx",
     "rule": "outline-removed",
     "token": "focus:outline-none",

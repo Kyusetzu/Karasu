@@ -86,9 +86,6 @@
     "radius-arbitrary": 1,
     "tracking-arbitrary": 1
   },
-  "src/components/shell/ContextMenu.tsx": {
-    "text-size-arbitrary": 1
-  },
   "src/components/shell/DetectionPill.tsx": {
     "tracking-arbitrary": 1
   },

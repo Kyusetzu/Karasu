@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, fireEvent, screen } from "@testing-library/react";
+import { cleanup, act, fireEvent, screen } from "@testing-library/react";
 import ActionHost from "./ActionHost";
 import { renderWithProviders, signIn, signOut } from "@/test/render";
 import { useNowPlaying } from "@/stores/nowPlaying";
@@ -48,6 +48,8 @@ afterEach(() => {
   vi.useRealTimers();
   saveListEntry.mockClear();
   signOut();
+  // React unmounts first, so a portal that removes its own node on unmount still finds it there.
+  cleanup();
   document.body.innerHTML = "";
 });
 

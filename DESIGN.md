@@ -337,6 +337,7 @@ no row here, add the primitive first.
 | an Overview section heading | `SectionHeader` |
 | a text field | `Input`; a count is `NumberInput` |
 | a native choice | `FilterSelect`, `MultiFilterSelect` |
+| a menu of actions, at an element or at the pointer | `Menu` with `MenuPanel`, `MenuItem`, `SubMenu` and `MenuSeparator` |
 | an anchored panel or phone sheet | `Popover` (`dropdown` or `sheet`) |
 | a section that folds open | `Disclosure`; a custom trigger pairs with `DisclosurePanel`; never in a virtual row, whose remount would replay the growth |
 | a dialog | `Modal` |
@@ -351,7 +352,7 @@ no row here, add the primitive first.
 The foundation phase adds, each replacing the hand-built copies it lists in
 the plan:
 
-- `menu-item`;
+- one row shared by the sheets and the menus;
 - `sheet` (one sheet with swipe to dismiss);
 - `field` and `search-field`, and card variants.
 
@@ -370,7 +371,7 @@ four things before it lands:
 | `lucide-react` | shipped | icons |
 | `class-variance-authority`, `clsx`, `tailwind-merge` | shipped | variant classes, `cn` |
 | `d3-array`, `d3-scale`, `d3-shape` | shipped | chart maths only; the renderer is ours |
-| `@base-ui/react` | approved, not yet added | menu and context menu (typeahead, safe submenu, long press), the one swipeable sheet, flip-aware dropdown positioning. Always controlled, so `useBackClose` and `data-overlay` keep working; wrapped under `ui/` only |
+| `@base-ui/react` 1.8.0, pinned | shipped: `ui/menu` (the context menu) | menu and context menu (typeahead, safe submenu, long press), the one swipeable sheet, flip-aware dropdown positioning. Always controlled, so `useBackClose` and `data-overlay` keep working; wrapped under `ui/` only. The menu cost 40 KiB gzipped in the startup script. Select and ScrollArea insert a `<style>` and stay unused |
 | `motion` (`LazyMotion` + `m`) | approved, not yet added | velocity after a swipe, sliding indicators, list enter and leave. `MotionConfig reducedMotion` fed from `lib/motion`. `AnimateView` and `animateView` are banned: they inject a `<style>` without a nonce |
 
 Considered and declined on 2026-09-25:
@@ -461,3 +462,18 @@ maintainer picks. A pure restyle that moves nothing does not. The rules:
   - **The boards** compare today, the three directions and the chosen mix
     across ten screens, in dark, light and both high-contrast themes. They
     were rendered by the screenshot harness from the real app.
+- **2026-09-25:** Base UI and Motion were measured before they were added.
+  The estimate had been a few kilobytes; the build said otherwise.
+
+  | Added to the startup script, gzipped | KiB |
+  |---|---|
+  | Base UI menu and context menu | 43 |
+  | Base UI popover | 34 |
+  | Base UI drawer | 22 |
+  | all four together, sharing Floating UI | 49 |
+  | Motion's `LazyMotion`, `m` and `AnimatePresence`, features loaded later | 16 |
+
+  Offered three ways (no library, Base UI loaded on first use, both in the
+  startup script), the maintainer chose both in the startup script, with the
+  budget raised by what each one measures when it lands. Icons and hand-built
+  buttons stay with the area passes rather than one sweep.

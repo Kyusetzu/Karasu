@@ -2,18 +2,18 @@
   "rule": "Each budget is 3 % over the larger of the two build targets' measurement, rounded up to a KiB; raising one needs its reason in the commit.",
   "measured": {
     "date": "2026-09-25",
-    "target": "chrome105, the Windows build, which is the larger",
+    "target": "safari15, the Linux and Android build, which is the larger since Base UI",
     "bytes": {
-      "initialJs": 323394,
-      "initialCss": 15529,
-      "largestLazy": 25266,
-      "totalJs": 435225
+      "initialJs": 368756,
+      "initialCss": 16466,
+      "largestLazy": 25425,
+      "totalJs": 480576
     }
   },
   "budget": {
-    "initialJs": 333824,
-    "initialCss": 16384,
+    "initialJs": 379904,
+    "initialCss": 17408,
     "largestLazy": 26624,
-    "totalJs": 448512
+    "totalJs": 495616
   }
 }

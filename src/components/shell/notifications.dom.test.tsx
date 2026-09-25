@@ -37,6 +37,7 @@ vi.mock("@/api/social", async (orig) => ({
 
 import Bell from "./Bell";
 import BottomBar from "./BottomBar";
+import NotifSheet from "./NotifSheet";
 import Notifications from "@/pages/Notifications";
 import { siteNotifications } from "@/api/social";
 
@@ -67,6 +68,12 @@ const follow = (id: number, name: string): SiteNotifRow => ({
   media: null,
 });
 
+/** Moves the clock past the feed's staleTime, so only a guard, and not freshness, can keep a surface from refetching. */
+function aMinuteLater(): void {
+  const real = Date.now;
+  vi.spyOn(Date, "now").mockImplementation(() => real.call(Date) + 61_000);
+}
+
 function Where() {
   return <output data-testid="where">{useLocation().pathname}</output>;
 }
@@ -77,6 +84,7 @@ afterEach(() => {
   data.more = [];
   data.count = 0;
   vi.mocked(siteNotifications).mockClear();
+  vi.restoreAllMocks();
   signOut();
 });
 
@@ -190,6 +198,76 @@ describe("notifications", () => {
     const page = await screen.findByRole("heading", { level: 1, name: "notif.title" });
     const row = within(page.closest("div.mx-auto") as HTMLElement).getByText("Hoshi").closest("button");
     expect(row).toHaveClass(unreadClass);
+  });
+
+  it("opens the glance and the phone sheet over a page a minute old without re-requesting its pages", async () => {
+    const user = userEvent.setup({ delay: null });
+    signIn();
+    data.site = [follow(7, "Hoshi")];
+    data.more = [follow(8, "Mikan")];
+    const shell = (sheetOpen: boolean) => (
+      <>
+        <Bell />
+        <NotifSheet open={sheetOpen} onClose={() => {}} />
+        <Notifications />
+      </>
+    );
+    const { rerender } = renderWithProviders(shell(false));
+    expect(await screen.findByText("Hoshi")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "social.loadMorePlain" }));
+    expect(await screen.findByText("Mikan")).toBeInTheDocument();
+    aMinuteLater();
+    await user.click(screen.getByRole("button", { name: "notif.title" }));
+    await screen.findByRole("dialog", { name: "notif.title" });
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "notif.title" })).toBeNull());
+    rerender(shell(true));
+    const sheet = await screen.findByRole("dialog", { name: "notif.title" });
+    expect(within(sheet).getByText("Mikan")).toBeInTheDocument();
+    expect(vi.mocked(siteNotifications)).toHaveBeenCalledTimes(2);
+  });
+
+  it("still fetches afresh when the glance opens a minute later over nothing else", async () => {
+    const user = userEvent.setup({ delay: null });
+    signIn();
+    data.site = [follow(7, "Hoshi")];
+    renderWithProviders(<Bell />);
+    await user.click(screen.getByRole("button", { name: "notif.title" }));
+    expect(await screen.findByText("Hoshi")).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "notif.title" })).toBeNull());
+    aMinuteLater();
+    await user.click(screen.getByRole("button", { name: "notif.title" }));
+    await waitFor(() => expect(vi.mocked(siteNotifications)).toHaveBeenCalledTimes(2));
+  });
+
+  it("keeps the page's AniList unread marks when the glance opens over it a minute later", async () => {
+    const user = userEvent.setup({ delay: null });
+    signIn();
+    data.count = 1;
+    data.site = [follow(7, "Hoshi")];
+    renderWithProviders(
+      <>
+        <Bell />
+        <Routes>
+          <Route path="/notifications" element={<Notifications />} />
+          <Route path="*" element={null} />
+        </Routes>
+      </>,
+    );
+    await waitFor(() => expect(screen.getByRole("button", { name: "notif.title" })).toHaveTextContent("1"));
+    await user.click(screen.getByRole("button", { name: "notif.title" }));
+    const panel = await screen.findByRole("dialog", { name: "notif.title" });
+    await within(panel).findByText("Hoshi");
+    await user.click(within(panel).getByRole("button", { name: "notif.all" }));
+    const page = await screen.findByRole("heading", { level: 1, name: "notif.title" });
+    const pageRow = () => within(page.closest("div.mx-auto") as HTMLElement).getByText("Hoshi").closest("button");
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "notif.title" })).toBeNull());
+    aMinuteLater();
+    await user.click(screen.getByRole("button", { name: "notif.title" }));
+    await screen.findByRole("dialog", { name: "notif.title" });
+    expect(pageRow()).toHaveClass("bg-surface-850/60");
+    expect(vi.mocked(siteNotifications)).toHaveBeenCalledTimes(1);
   });
 
   it("offers no AniList paging while the filter shows only Karasu's own", async () => {

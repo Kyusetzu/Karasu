@@ -70,6 +70,11 @@ export function useNotifications({ active, source = "all" }: { active: boolean; 
     };
   }, [load]);
 
+  // This surface's own place in `activeSurfaces`, so it can tell another surface's reading from its own.
+  const counted = useRef(false);
+  // Opening over another surface reads the pages it holds; a refetch would re-request each and spend the count.
+  const othersActive = activeSurfaces - (counted.current ? 1 : 0) > 0;
+
   // Page 1's `reset` is AniList's mark-seen, so the count it spends is kept on the page, where every surface reads it.
   const site = useInfiniteQuery({
     queryKey: siteKey,
@@ -87,17 +92,17 @@ export function useNotifications({ active, source = "all" }: { active: boolean; 
     initialPageParam: 1,
     getNextPageParam: (last, all) => (last.pageInfo.hasNextPage ? all.length + 1 : undefined),
     enabled: isTauri && active && anilist,
-    staleTime: 60_000,
-    // More than one page means another surface is reading them, and a refetch here would re-request every one.
-    refetchOnMount: (query) => (query.state.data?.pages.length ?? 0) <= 1,
+    staleTime: othersActive ? Infinity : 60_000,
   });
 
   // Trim retained pages once the last surface goes, so a reopen fetches one page; keep `updatedAt` or the trim postpones it.
   useEffect(() => {
     if (!active) return;
     activeSurfaces += 1;
+    counted.current = true;
     return () => {
       activeSurfaces -= 1;
+      counted.current = false;
       if (activeSurfaces > 0) return;
       const updatedAt = qc.getQueryState(siteKey)?.dataUpdatedAt;
       qc.setQueryData<InfiniteData<SitePage>>(

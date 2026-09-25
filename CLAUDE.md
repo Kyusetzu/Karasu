@@ -1598,6 +1598,17 @@ four or five places, made by careful code, because nothing said it once.
   `package.json` and `COMMIT_NUMBER` makes every install re-download its own
   update forever.
 
+## Design language
+
+`DESIGN.md` at the root is the brief for how Karasu looks and moves, and it
+outranks any design skill, library default or mockup: the principles ("dark,
+dense, quiet"), the token vocabulary and what each step is for, the contrast
+obligations every theme must meet, the primitive to use for each recurring
+shape, the libraries approved and declined, and the dated decision log. The
+conventions below that touch styling (accent, motion registers, exits, banners)
+stay here as rules; DESIGN.md says what they add up to. A change to how a screen
+is *arranged* gets three mockups before code, and the choice goes into that log.
+
 ## Conventions
 
 - **One commit per feature.** The maintainer commits per feature; keep changes

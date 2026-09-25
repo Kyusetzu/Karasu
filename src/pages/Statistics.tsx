@@ -264,7 +264,7 @@ function StatisticsContent({
           {/* The same lockup the two list screens use: title, then its Japanese form a shade back. */}
           <div className="flex items-baseline gap-2.5">
             <h1 className="text-xl font-bold">{t("stats.title")}</h1>
-            <span className="font-brand-jp text-ui tracking-[.04em] text-ink-600">
+            <span className="font-brand-jp text-ui tracking-lockup text-ink-600">
               統計
             </span>
           </div>

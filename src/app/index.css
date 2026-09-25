@@ -37,6 +37,8 @@
   --text-ui: 0.8125rem;
   /* The one letter spacing for small uppercase labels. */
   --tracking-eyebrow: 0.12em;
+  /* The Japanese sub-lockup beside a screen title, opened a little so its kana do not crowd. */
+  --tracking-lockup: 0.04em;
   /* Page titles, a step above text-2xl, in the brand face. */
   --text-title: 1.875rem;
   --text-title--line-height: 1.2;

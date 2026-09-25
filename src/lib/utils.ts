@@ -8,7 +8,7 @@ const twMerge = extendTailwindMerge({
       text: ["ui", "title"],
       radius: ["inner", "control", "panel", "sheet", "cover"],
       shadow: ["float", "sheet"],
-      tracking: ["eyebrow"],
+      tracking: ["eyebrow", "lockup"],
     },
     classGroups: {
       z: [{ z: ["popover", "alert", "skip"] }],

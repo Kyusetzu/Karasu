@@ -196,7 +196,7 @@ export default function Calendar() {
         <div className="flex items-center gap-2.5">
           <div className="flex items-baseline gap-2.5">
             <h1 className="text-title font-bold">{t("calendar.title")}</h1>
-            <span className="font-brand-jp text-ui tracking-[.04em] text-ink-600">
+            <span className="font-brand-jp text-ui tracking-lockup text-ink-600">
               放送カレンダー
             </span>
           </div>

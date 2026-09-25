@@ -168,7 +168,7 @@ export default function Person({ kind }: { kind: Kind }) {
         <div className="min-w-0 flex-1">
           <h1 className="text-title font-bold text-ink-100">{name}</h1>
           {native && (
-            <p className="font-brand-jp text-sm tracking-[.04em] text-ink-600">{native}</p>
+            <p className="font-brand-jp text-sm tracking-lockup text-ink-600">{native}</p>
           )}
 
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-600">

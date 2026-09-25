@@ -1,4 +1,4 @@
-/* GENERATED from src/app/index.css (sha256 94ca0f0087a7) by site/scripts/sync-tokens.mjs
+/* GENERATED from src/app/index.css (sha256 3f018ac04061) by site/scripts/sync-tokens.mjs
    — do not edit. Re-run `npm run sync` after changing the source; `npm run check`
    fails while this file is stale. CLAUDE.md, "The website". */
 /* `static` because Tailwind tree-shakes tokens no utility references, leaving a `var()`-only token undefined in dark. */
@@ -13,6 +13,8 @@
   --text-ui: 0.8125rem;
   /* The one letter spacing for small uppercase labels. */
   --tracking-eyebrow: 0.12em;
+  /* The Japanese sub-lockup beside a screen title, opened a little so its kana do not crowd. */
+  --tracking-lockup: 0.04em;
   /* Page titles, a step above text-2xl, in the brand face. */
   --text-title: 1.875rem;
   --text-title--line-height: 1.2;

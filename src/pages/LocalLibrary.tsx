@@ -417,7 +417,7 @@ function LibraryView({ userId }: { userId: number }) {
           <h1 className="text-[1.375rem] font-bold tracking-[-.015em] text-ink-100">
             {t("library.title")}
           </h1>
-          <span className="font-brand-jp text-ui tracking-[.04em] text-ink-600">
+          <span className="font-brand-jp text-ui tracking-lockup text-ink-600">
             ライブラリ
           </span>
           <Button

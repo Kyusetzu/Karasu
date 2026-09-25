@@ -631,7 +631,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
             <h1 className="text-title font-bold text-ink-100">
               {type === "ANIME" ? t("list.animeTitle") : t("list.mangaTitle")}
             </h1>
-            <span className="font-brand-jp text-ui tracking-[.04em] text-ink-600">
+            <span className="font-brand-jp text-ui tracking-lockup text-ink-600">
               {type === "ANIME" ? t("list.animeNative") : t("list.mangaNative")}
             </span>
           </div>

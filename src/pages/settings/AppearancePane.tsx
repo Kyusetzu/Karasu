@@ -6,8 +6,8 @@ import { UI_ZOOM_STEPS } from "@/lib/uiZoom";
 import { isAndroid, usePlatform } from "@/stores/platform";
 import { Card, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { ACCENT_PRESETS } from "@/lib/designTokens";
 import {
-  ACCENT_PRESETS,
   COVER_COLS_MAX,
   COVER_COLS_MIN,
   DENSITIES,

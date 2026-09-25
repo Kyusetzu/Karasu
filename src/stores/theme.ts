@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { accentShades } from "@/lib/contrast";
+import { DEFAULT_ACCENT } from "@/lib/designTokens";
 import type { MediaListStatus } from "@/api/types";
 import {
   STATUS_COLOR_ORDER,
@@ -15,20 +16,6 @@ export type ThemeMode = "system" | "light" | "dark";
 export type Density = "compact" | "comfortable" | "spacious";
 export const DENSITIES: readonly Density[] = ["compact", "comfortable", "spacious"];
 const isDensity = (v: unknown): v is Density => (DENSITIES as readonly unknown[]).includes(v);
-
-/** Default accent + a few quick-pick swatches alongside the colour picker. */
-export const DEFAULT_ACCENT = "#4b3fc7";
-export const ACCENT_PRESETS = [
-  "#4b3fc7", // deep indigo — matches the logo's violet
-  "#6c7fff", // indigo
-  "#3b93e6", // blue
-  "#46a5b3", // feather sheen
-  "#34c78a", // emerald
-  "#e8d48a", // pale straw
-  "#f56c92", // rose
-  "#ffab2e", // amber
-  "#a56cff", // violet
-];
 
 /** Covers per row, the grid's one token; the default is UA-keyed because this store boots before `platform_info`. */
 export const COVER_COLS_MIN = 1;

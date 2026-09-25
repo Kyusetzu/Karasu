@@ -62,6 +62,8 @@ export default defineConfig(async ({ command, mode }) => ({
           environment: "node",
           // Pure modules with no DOM to reset between files; sharing one module graph cuts the project to a quarter.
           isolate: false,
+          // Vitest blanks every stylesheet, `?raw` included; the token tests read this one as text.
+          css: { include: [/src\/app\/index\.css/] },
         },
       },
       {

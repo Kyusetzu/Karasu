@@ -233,6 +233,21 @@ preset and for extreme custom accents:
 A status colour the user picks below 3 : 1 against the panel gets a warning,
 never a refusal.
 
+`src/lib/tokens.test.ts` reads these values out of `index.css` and asserts the
+standard rows for text in both themes. It also checks accent text against the
+page, for every preset and for the extremes. Two rows fall short today. The
+test names the presets that fail them exactly, so a new shortfall fails the
+test, and so does a fix that leaves its entry in the list. The contrast phase
+empties the list:
+
+- `accent-ink` on the fill reads 3.9 : 1 for the feather-sheen and rose
+  presets in light.
+- The default accent's fill stands 2.5 : 1 off the dark panel, and pale
+  accents stand under 3 : 1 off the light one.
+
+The same file keeps the token blocks in step, so a themed colour or root value
+without a light twin fails.
+
 ## Primitives
 
 `src/components/ui/` holds the primitives; `EmptyState` and `Skeleton` sit

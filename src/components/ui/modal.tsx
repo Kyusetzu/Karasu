@@ -67,8 +67,8 @@ export function Modal({
   const hasBody = children != null && children !== false;
   // One hook here covers every dialog in the app, because they all render through this component.
   useDialogFocus(panel, !leaving);
-  // Back closes it only when anything may; a dialog that may not holds no history entry to spend.
-  useBackClose(live, onClose);
+  // The entry stays while it may not be closed, so back is absorbed rather than falling through to the page behind.
+  useBackClose(!leaving, () => dismissable && onClose());
 
   useEffect(() => {
     // Nothing to close once leaving; Escape during the exit would fire the parent's handler a second time.

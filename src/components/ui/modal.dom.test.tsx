@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { checkA11y } from "@/test/a11y";
 import { Modal } from "./modal";
@@ -74,6 +74,29 @@ describe("Modal", () => {
     expect(screen.queryByRole("button", { name: "window.close" })).toBeNull();
     await user.keyboard("{Escape}");
     fireEvent.mouseDown(container.querySelector("[data-overlay]")!);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("keeps its back entry while it may not be left, so back does nothing rather than leave the page", () => {
+    const onClose = vi.fn();
+    const { rerender } = render(
+      <Modal title="Merging" onClose={onClose}>
+        <p>Working</p>
+      </Modal>,
+    );
+    const back = vi.spyOn(window.history, "back");
+    rerender(
+      <Modal title="Merging" onClose={onClose} dismissable={false}>
+        <p>Working</p>
+      </Modal>,
+    );
+    // Giving the entry up would unwind it with a back of its own.
+    expect(back).not.toHaveBeenCalled();
+    back.mockRestore();
+    expect(window.history.state).toEqual({ karasuBack: expect.any(Number) });
+    act(() => {
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
     expect(onClose).not.toHaveBeenCalled();
   });
 

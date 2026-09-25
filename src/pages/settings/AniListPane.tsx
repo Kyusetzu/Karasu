@@ -28,6 +28,7 @@ import { useAuth } from "@/stores/auth";
 import { isAndroid, usePlatform } from "@/stores/platform";
 import { cn } from "@/lib/utils";
 import { notifScheduleFailure } from "@/lib/notifSchedule";
+import { Chip } from "@/components/ui/chip";
 
 /** AniList's own account settings, served from the profile's cache entry; bio and colour stay in the profile editor. */
 
@@ -418,12 +419,9 @@ export function AniListListOptionsSection() {
                   ...(mlo.animeList?.customLists ?? []),
                   ...(mlo.mangaList?.customLists ?? []),
                 ].map((name, i) => (
-                  <span
-                    key={`${name}-${i}`}
-                    className="rounded-inner border border-surface-700 px-1.5 py-0.5 text-2xs text-ink-500"
-                  >
+                  <Chip key={`${name}-${i}`} tone="muted" size="xs">
                     {name}
-                  </span>
+                  </Chip>
                 ))}
                 {!(mlo.animeList?.customLists ?? []).length &&
                   !(mlo.mangaList?.customLists ?? []).length && (

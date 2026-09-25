@@ -1,7 +1,7 @@
 import { useId, useState, type KeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
-import { X } from "lucide-react";
 import { MAX_TAGS, normalizeTags } from "@/lib/tags";
+import { RemovableChip } from "@/components/ui/chip";
 
 /** Chip-based tag editor; never wrap it in a `<label>`, or a stray click deletes the first chip (use `labelledBy`). */
 export default function TagEditor({
@@ -45,20 +45,9 @@ export default function TagEditor({
   return (
     <div className="flex flex-wrap items-center gap-1.5 rounded-control border border-surface-700 bg-surface-900 px-2 py-1.5">
       {tags.map((tag) => (
-        <span
-          key={tag}
-          className="flex items-center gap-1 rounded-full bg-accent-600/20 px-2 py-0.5 text-xs text-accent-400"
-        >
+        <RemovableChip key={tag} size="sm" removeLabel={t("tags.remove", { tag })} onRemove={() => remove(tag)}>
           {tag}
-          <button
-            type="button"
-            onClick={() => remove(tag)}
-            className="text-accent-400/70 hover:text-accent-400"
-            aria-label={t("tags.remove", { tag })}
-          >
-            <X className="size-2.75" />
-          </button>
-        </span>
+        </RemovableChip>
       ))}
       {tags.length < MAX_TAGS && (
         <>

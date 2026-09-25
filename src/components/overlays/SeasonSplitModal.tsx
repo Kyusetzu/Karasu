@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Shimmer } from "@/components/Skeleton";
 import { cn } from "@/lib/utils";
+import { Chip } from "@/components/ui/chip";
 
 /** The season-split confirmation; the relations hint is pre-selected but never applied on its own (always ask). */
 
@@ -150,9 +151,9 @@ export function SeasonSplitModal({
         </span>
       </span>
       {c.fromRules && (
-        <span className="shrink-0 rounded-inner border border-accent-600 px-1.5 py-0.5 text-2xs text-accent-400">
+        <Chip tone="accent" size="xs">
           {t("library.splitRuleHint")}
-        </span>
+        </Chip>
       )}
     </button>
   );

@@ -54,6 +54,7 @@ import { useAuth } from "@/stores/auth";
 import { showToast } from "@/stores/toast";
 import { useSocialActions } from "@/hooks/useSocialActions";
 import { cn } from "@/lib/utils";
+import { Chip, chipClass } from "@/components/ui/chip";
 
 /** The tree route has no pageInfo; keep hasNextPage false so no "Load more" appears under a conversation. */
 const EMPTY_PAGE_INFO = { total: 0, currentPage: 1, lastPage: 1, hasNextPage: false };
@@ -519,12 +520,9 @@ export default function Thread() {
         {data.categories && data.categories.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1">
             {data.categories.map((c) => (
-              <span
-                key={c.id}
-                className="rounded-inner border border-surface-700 px-1.5 py-0.5 text-2xs text-ink-600"
-              >
+              <Chip key={c.id} tone="muted" size="xs">
                 {c.name}
-              </span>
+              </Chip>
             ))}
           </div>
         )}
@@ -535,9 +533,9 @@ export default function Thread() {
               <Link
                 key={m.id}
                 to={`/media/${m.id}`}
-                className="rounded-inner border border-accent-600 px-1.5 py-0.5 text-2xs text-accent-400 hover:underline"
+                className={cn(chipClass("accent", "xs"), "hover:underline")}
               >
-                {displayTitle(m.title)}
+                <span className="truncate">{displayTitle(m.title)}</span>
               </Link>
             ))}
           </div>

@@ -12,6 +12,7 @@ import {
 } from "@/lib/multiFilter";
 import { usePresence } from "@/hooks/usePresence";
 import { useBackClose } from "@/hooks/useBackClose";
+import { Badge } from "./badge";
 
 /** `FilterSelect`'s tri-state sibling, built from buttons because a native `<select>` cannot express a "not". */
 export function MultiFilterSelect({
@@ -105,9 +106,7 @@ export function MultiFilterSelect({
           {summary ? summary.first : placeholder}
         </span>
         {summary && summary.extra > 0 && (
-          <span className="rounded-inner bg-surface-800 px-1 text-2xs tabular-nums text-ink-300">
-            +{summary.extra}
-          </span>
+          <Badge tone="neutral">+{summary.extra}</Badge>
         )}
         <ChevronDown className="size-3 shrink-0 text-ink-600" />
       </button>

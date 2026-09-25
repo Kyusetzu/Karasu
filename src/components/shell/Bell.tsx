@@ -52,6 +52,7 @@ import {
   type NotifGroup,
   type UnifiedNotif,
 } from "@/lib/notifGroups";
+import { Badge } from "@/components/ui/badge";
 
 const KIND_ICON: Record<string, typeof BellIcon> = {
   airing: CalendarClock,
@@ -408,7 +409,7 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
             <span className="truncate text-ui font-medium text-ink-100">
               {n.title}
             </span>
-            {!n.read && <span className="size-1.5 shrink-0 rounded-full bg-accent-500" />}
+            {!n.read && <Badge />}
           </span>
           <span className="mt-0.5 block text-xs text-ink-500">{n.body}</span>
           <span className="mt-0.5 block text-2xs text-ink-600">{rowTime(n.createdMs)}</span>
@@ -459,7 +460,7 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
                 {row.title}
               </span>
             )}
-            {isUnread && <span className="size-1.5 shrink-0 rounded-full bg-accent-500" />}
+            {isUnread && <Badge />}
           </span>
           <span className="mt-0.5 block text-xs text-ink-500">{siteVerb(row, t)}</span>
           {row.detail && (
@@ -561,10 +562,8 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
               ) : (
                 <span className="truncate text-ui font-medium text-ink-100">{lead}</span>
               )}
-              <span className="rounded-inner bg-surface-800 px-1 text-2xs tabular-nums text-ink-300">
-                {label.n}
-              </span>
-              {g.unread && <span className="size-1.5 shrink-0 rounded-full bg-accent-500" />}
+              <Badge tone="neutral" count={label.n} />
+              {g.unread && <Badge />}
             </span>
             <span className="mt-0.5 block text-xs text-ink-500">{groupVerb(label, t)}</span>
             <span className="mt-0.5 block text-2xs text-ink-600">{rowTime(g.atMs)}</span>
@@ -608,10 +607,8 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
       >
         <BellIcon className={barSlot ? "size-5" : "size-3.75"} />
         {badge > 0 && (
-          // Keep the `s950` ring, or the badge and bell glyph merge at this size; the pulse stops once read.
-          <span className="animate-idle-pulse absolute right-1.5 top-1.5 grid h-3.25 min-w-3.25 place-items-center rounded-[.4375rem] border border-surface-950 bg-accent-500 px-1 text-2xs font-semibold text-accent-ink">
-            {badge > 9 ? "9+" : badge}
-          </span>
+          // The floating ring keeps the badge and the bell glyph apart at this size; the pulse stops once read.
+          <Badge count={badge} max={9} floating className="animate-idle-pulse right-1.5 top-1.5" />
         )}
       </button>
 

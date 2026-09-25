@@ -185,8 +185,10 @@ states. Eight other sizes are in use today, and they converge on these four.
   `shadow-xl` …).
 - The dim behind a dialog or a sheet is `bg-scrim`, near-black at 55 % in
   both themes.
-- Chips over cover art still spell their near-black with seven different
-  alphas. They converge when the cover area is restyled.
+- Chips are outlined on a clear ground, so coloured text keeps the contrast
+  it was derived against on any surface. Chips over cover art still spell
+  their near-black with seven different alphas. They converge when the
+  cover area is restyled.
 - Layers:
   - Tailwind's plain `z-10`, `z-30` and `z-50` cover sticky headers, the
     detection window and dialogs.
@@ -326,6 +328,9 @@ no row here, add the primitive first.
 | an icon-only action | `IconButton`, always with `aria-label` |
 | one value of several | `Pill` |
 | on or off | `Switch`, which is `role="switch"` and never a checkbox |
+| a fact about something (genre, tag, category, state) | `Chip` with a tone (`neutral`, `muted`, `accent`, `gold`, `success`, `danger`) and a size (`xs`, `sm`, `md`); a link spells `chipClass` |
+| a chip the user can take away | `RemovableChip`, the whole chip one button named by `removeLabel` |
+| a count or an unread dot | `Badge`; `floating` over an icon rings it in the page colour |
 | one lens of two or three | `Segmented` |
 | the list's status strip | `StatusTabs` |
 | a raised panel | `Card`, `CardTitle` |
@@ -349,7 +354,7 @@ no row here, add the primitive first.
 The foundation phase adds, each replacing the hand-built copies it lists in
 the plan:
 
-- `chip` and `badge`, `menu-item`;
+- `menu-item`;
 - `sheet` (one sheet with swipe to dismiss);
 - `field` and `search-field`, and card variants.
 

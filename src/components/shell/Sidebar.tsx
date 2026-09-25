@@ -39,6 +39,7 @@ import { useShortViewport } from "@/hooks/useShortViewport";
 import { Avatar, UserLockup } from "@/components/ui/user-lockup";
 import SyncPanel from "./SyncPanel";
 import { Spinner } from "@/components/ui/spinner";
+import { Badge } from "@/components/ui/badge";
 
 /** The rail is the state change: `useRailMarker` slides one marker between items rather than each growing its own. */
 const itemClass =
@@ -237,7 +238,7 @@ function Account({
       <span className="relative block" title={`${name} — ${sync.text}`}>
         <Avatar name={name} src={avatar} size="sm" />
         {sync.accent && (
-          <span className="absolute -right-0.5 -top-0.5 size-2 rounded-full border border-surface-900 bg-accent-500" />
+          <Badge floating className="-right-0.5 -top-0.5 border-surface-900" />
         )}
       </span>
     );

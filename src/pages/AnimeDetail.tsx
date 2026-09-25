@@ -69,6 +69,7 @@ import { BannerImage } from "@/components/media/BannerImage";
 import { BANNER_RATIO } from "@/lib/bannerFit";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
+import { Chip } from "@/components/ui/chip";
 import { Disclosure, DisclosurePanel } from "@/components/ui/disclosure";
 import { parseAniListHtml } from "@/lib/anilistHtml";
 import { FavouriteButton } from "@/components/media/FavouriteButton";
@@ -328,9 +329,9 @@ export default function AnimeDetail() {
                 ) : (
                   // Without an account there is no list to change, so the title only says it is not on one.
                   <p className="mt-2.5">
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-surface-700 px-2.5 py-0.5 text-2xs text-ink-500">
+                    <Chip tone="muted" size="xs" className="border-dashed">
                       {t("detail.notOnList")}
-                    </span>
+                    </Chip>
                   </p>
                 )}
                 <MetaLine data={data} studios={mainStudios.map((s) => s.name)} className="mt-2.5" />
@@ -946,13 +947,9 @@ function CommunitySection({ data }: { data: MediaDetail }) {
       {rankings.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {rankings.map((r, i) => (
-            <span
-              key={i}
-              className="flex items-center gap-1.5 rounded-inner border border-gold/40 bg-gold/10 px-2 py-1 text-xs text-gold"
-            >
-              <Trophy className="size-3" />
+            <Chip key={i} tone="gold" icon={Trophy}>
               {rankLabel(r)}
-            </span>
+            </Chip>
           ))}
         </div>
       )}
@@ -1130,15 +1127,10 @@ function TagList({ tags }: { tags: MediaTag[] }) {
       <CardTitle>{t("detail.tags")}</CardTitle>
       <div className="mt-3 flex flex-wrap gap-1.5">
         {shown.map((tg) => (
-          <span
-            key={tg.name}
-            className="flex items-center gap-1.5 rounded-full bg-surface-800 px-2.5 py-0.5 text-xs text-ink-300"
-          >
+          <Chip key={tg.name}>
             {tg.name}
-            {tg.rank !== null && (
-              <span className="text-ink-600">{tg.rank}%</span>
-            )}
-          </span>
+            {tg.rank !== null && <span className="ml-1.5 text-ink-600">{tg.rank}%</span>}
+          </Chip>
         ))}
       </div>
       {spoilers.length > 0 && !showSpoilers && (

@@ -41,6 +41,7 @@ import { anilistCoversAiring } from "@/lib/airingCoverage";
 import { backendErrorText } from "@/lib/backendError";
 import { commands, unwrap } from "@/api/tauri";
 import { Spinner } from "@/components/ui/spinner";
+import { Chip } from "@/components/ui/chip";
 export function ScrobbleSection() {
   const { t } = useTranslation();
   const [settings, setSettings] = useState<ScrobbleSettings | null>(null);
@@ -852,19 +853,13 @@ function SessionList({
             )}
             {/* The other Karasus on this account and their age, the numbers the write-order rule judges by. */}
             {s.karasu === "desktop" && (
-              <span className="rounded-full bg-accent-500/15 px-2 py-0.5 text-xs text-accent-400">
-                {t("settings.jellyfinKarasuDesktop")}
-              </span>
+              <Chip tone="accent">{t("settings.jellyfinKarasuDesktop")}</Chip>
             )}
             {s.karasu === "mobile" && (
-              <span className="rounded-full bg-accent-500/15 px-2 py-0.5 text-xs text-accent-400">
-                {t("settings.jellyfinKarasuMobile")}
-              </span>
+              <Chip tone="accent">{t("settings.jellyfinKarasuMobile")}</Chip>
             )}
             {s.matched && (
-              <span className="rounded-full bg-success/20 px-2 py-0.5 text-xs text-success">
-                {t("settings.jellyfinMatched")}
-              </span>
+              <Chip tone="success">{t("settings.jellyfinMatched")}</Chip>
             )}
           </p>
           <p className="mt-0.5 text-xs text-ink-500">

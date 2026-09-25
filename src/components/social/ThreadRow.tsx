@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Heart, Lock, MessageSquare, Pin, Eye } from "lucide-react";
 import type { ThreadSummary } from "@/api/social";
 import { relTimeFromSeconds } from "@/lib/relTime";
+import { Chip } from "@/components/ui/chip";
 
 /** One thread in a list: the title, who is talking, and how busy it is. */
 export function ThreadRow({ thread }: { thread: ThreadSummary }) {
@@ -25,12 +26,9 @@ export function ThreadRow({ thread }: { thread: ThreadSummary }) {
       {thread.categories && thread.categories.length > 0 && (
         <div className="mt-1.5 flex flex-wrap gap-1">
           {thread.categories.map((c) => (
-            <span
-              key={c.id}
-              className="rounded-inner border border-surface-700 px-1.5 py-0.5 text-2xs text-ink-600"
-            >
+            <Chip key={c.id} tone="muted" size="xs">
               {c.name}
-            </span>
+            </Chip>
           ))}
         </div>
       )}

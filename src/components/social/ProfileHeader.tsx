@@ -16,31 +16,7 @@ import { donatorLabel } from "@/lib/donator";
 import { toDisplayScale } from "@/lib/score";
 import { cn } from "@/lib/utils";
 import { BannerImage } from "@/components/media/BannerImage";
-
-/** A quiet outlined chip — donator, moderator, "follows you". */
-function Badge({
-  icon,
-  children,
-  tone = "muted",
-}: {
-  icon?: React.ReactNode;
-  children: React.ReactNode;
-  tone?: "muted" | "accent" | "gold";
-}) {
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1 rounded-inner border px-1.5 py-0.5 text-2xs font-medium",
-        tone === "accent" && "border-accent-600 text-accent-400",
-        tone === "gold" && "border-gold/40 text-gold",
-        tone === "muted" && "border-surface-700 text-ink-500",
-      )}
-    >
-      {icon}
-      {children}
-    </span>
-  );
-}
+import { Chip } from "@/components/ui/chip";
 
 /** `meanScore` arrives hundred-point and is shown ten-point on purpose: someone else's mean, on the neutral scale. */
 function meanText(score: number | undefined | null): string | null {
@@ -77,20 +53,22 @@ export function ProfileHeader({ user }: { user: UserProfile }) {
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="truncate text-title font-bold text-ink-100">{user.name}</h1>
               {badgeKey && (
-                <Badge tone="accent">
+                <Chip tone="accent" size="xs">
                   {badgeKey === "social.badgeMutual"
                     ? t("social.badgeMutual")
                     : t("social.badgeFollowsYou")}
-                </Badge>
+                </Chip>
               )}
               {/* `donatorLabel`, not `donatorBadge`: AniList returns the badge string for everyone (lib/donator.ts). */}
               {donator && (
-                <Badge tone="gold" icon={<Heart className="size-2.5" />}>
+                <Chip tone="gold" size="xs" icon={Heart}>
                   {donator}
-                </Badge>
+                </Chip>
               )}
               {user.moderatorRoles && user.moderatorRoles.length > 0 && (
-                <Badge icon={<Shield className="size-2.5" />}>{t("social.moderator")}</Badge>
+                <Chip tone="muted" size="xs" icon={Shield}>
+                  {t("social.moderator")}
+                </Chip>
               )}
             </div>
 

@@ -48,6 +48,7 @@ import { DangerNote } from "./settings/shared";
 import { usePhoneShell } from "@/hooks/usePhoneShell";
 import { isAndroid, usePlatform } from "@/stores/platform";
 import { Button } from "@/components/ui/button";
+import { Chip } from "@/components/ui/chip";
 
 /** The panes, keyed by URL parameter so deep links land; keep the ids, since renaming one breaks every deep link. */
 const PANES = [
@@ -125,9 +126,9 @@ function DesktopOnly({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation();
   return (
     <div aria-disabled className="relative">
-      <span className="absolute right-0 top-0 z-10 rounded-full bg-surface-800 px-2 py-0.5 text-2xs font-medium text-ink-500">
+      <Chip tone="muted" size="xs" className="absolute right-0 top-0 z-10 bg-surface-900">
         {t("settings.desktopOnly")}
-      </span>
+      </Chip>
       <div className="pointer-events-none select-none opacity-45">{children}</div>
     </div>
   );

@@ -4,6 +4,7 @@ import type { MediaDetail } from "@/api/queries";
 import { countdown, formatLabel, mediaStatusLabel } from "@/lib/format";
 import { formatMinutes, remainingMinutes } from "@/lib/estimate";
 import { cn } from "@/lib/utils";
+import { Chip } from "@/components/ui/chip";
 
 /** The detail header's facts as parts, so the desktop column and the phone's full-width block say the same things. */
 
@@ -51,12 +52,9 @@ export function GenreChips({ genres, className }: { genres: string[]; className?
   return (
     <div className={cn("flex flex-wrap gap-1.5", className)}>
       {genres.map((g) => (
-        <span
-          key={g}
-          className="rounded-cover border border-hair bg-surface-850 px-2 py-0.5 text-2xs text-ink-300"
-        >
+        <Chip key={g} size="xs">
           {g}
-        </span>
+        </Chip>
       ))}
     </div>
   );

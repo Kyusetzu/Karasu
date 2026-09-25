@@ -11,6 +11,7 @@ import { isAndroid, usePlatform } from "@/stores/platform";
 import Bell from "@/components/shell/Bell";
 import { useNotifBadge } from "@/hooks/useNotifBadge";
 import { isPaletteSwipe } from "@/lib/navSwipe";
+import { Badge } from "@/components/ui/badge";
 
 /** The phone shell's four bar slots; everything else is behind a More sheet built from the sidebar's `GROUPS`. */
 const SLOTS = ["/", "/list", "/manga", "/search"];
@@ -224,9 +225,7 @@ export default function BottomBar() {
           <span className="relative">
             <LayoutGrid className="size-5" />
             {badge > 0 && (
-              <span className="absolute -right-2.5 -top-1.5 grid h-3.5 min-w-3.5 place-items-center rounded-[.4375rem] border border-surface-950 bg-accent-500 px-1 text-2xs font-semibold tabular-nums text-accent-ink">
-                {badge > 9 ? "9+" : badge}
-              </span>
+              <Badge count={badge} max={9} floating className="-right-2.5 -top-1.5" />
             )}
           </span>
           <span className="truncate">{t("nav.more")}</span>

@@ -23,6 +23,8 @@ import {
 import { STATUS_ORDER, type MediaListStatus, type MediaType } from "@/api/types";
 import { Popover, type PopoverTriggerProps } from "@/components/ui/popover";
 import { Pill } from "@/components/ui/pill";
+import { Badge } from "@/components/ui/badge";
+import { RemovableChip } from "@/components/ui/chip";
 import { Segmented } from "@/components/ui/segmented";
 import { Button } from "@/components/ui/button";
 import { formatLabel, MEDIA_FORMATS, ORIGINS, originLabel } from "@/lib/format";
@@ -130,7 +132,9 @@ export function ListToolbar(props: ListToolbarProps) {
         <ToolTrigger p={p} name={filterName} iconOnly={phone} active={chips.length > 0}>
           <SlidersHorizontal aria-hidden className="size-3.75 shrink-0" />
           {!phone && t("list.filters")}
-          {chips.length > 0 && <Badge floating={phone}>{chips.length}</Badge>}
+          {chips.length > 0 && (
+            <Badge aria-hidden count={chips.length} floating={phone} className={phone ? "-right-1.5 -top-1.5" : undefined} />
+          )}
         </ToolTrigger>
       )}
     >
@@ -277,20 +281,6 @@ function ToolTrigger({
     >
       {children}
     </button>
-  );
-}
-
-function Badge({ floating, children }: { floating: boolean; children: ReactNode }) {
-  return (
-    <span
-      aria-hidden
-      className={cn(
-        "grid h-4 min-w-4 place-items-center rounded-full bg-accent-500 px-1 text-2xs font-semibold tabular-nums text-accent-ink",
-        floating && "absolute -right-1.5 -top-1.5",
-      )}
-    >
-      {children}
-    </span>
   );
 }
 
@@ -697,18 +687,14 @@ function FilterChips({
       {chips.map((chip) => {
         const name = chipName(chip, t);
         return (
-          <button
+          <RemovableChip
             key={chip.key}
-            type="button"
-            onClick={() => onChange({ [chip.key]: "" })}
-            aria-label={t("list.removeFilter", { name })}
-            className="inline-flex h-6.5 shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-accent-500/50 bg-accent-500/10 pl-2.5 pr-1.5 text-2xs font-medium text-ink-100 transition-surface hover:bg-accent-500/20 focus-visible:outline-2 focus-visible:outline-accent-500"
+            icon={chip.key === "tag" ? Tag : chip.key === "list" ? ListChecks : undefined}
+            removeLabel={t("list.removeFilter", { name })}
+            onRemove={() => onChange({ [chip.key]: "" })}
           >
-            {chip.key === "tag" && <Tag aria-hidden className="size-3 text-ink-500" />}
-            {chip.key === "list" && <ListChecks aria-hidden className="size-3 text-ink-500" />}
             {name}
-            <X aria-hidden className="size-3 text-ink-500" />
-          </button>
+          </RemovableChip>
         );
       })}
       <button

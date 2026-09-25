@@ -208,7 +208,7 @@ export default function ContextMenu({
               onClick={() => (submenu ? (setSubFocus(0), setOpenSub(i)) : onRun(action))}
               className={cn(
                 rowClass(action, focus === i && !sub),
-                dividesAt(actions, i) && "mt-1 border-t border-surface-800 pt-1.5",
+                dividesAt(actions, i) && "mt-1 border-t border-hair pt-1.5",
               )}
             >
               <span className="grid size-4 shrink-0 place-items-center text-ink-500">

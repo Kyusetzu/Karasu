@@ -95,10 +95,10 @@ export default function Person({ kind }: { kind: Kind }) {
         <div className="flex gap-5">
           <Shimmer className="h-48 w-32 rounded-panel" />
           <div className="flex-1 space-y-2 pt-2">
-            <Shimmer className="h-7 w-56 rounded" index={1} />
-            <Shimmer className="h-3 w-40 rounded" index={2} />
-            <Shimmer className="mt-4 h-3 w-full rounded" index={3} />
-            <Shimmer className="h-3 w-4/5 rounded" index={4} />
+            <Shimmer className="h-7 w-56 rounded-inner" index={1} />
+            <Shimmer className="h-3 w-40 rounded-inner" index={2} />
+            <Shimmer className="mt-4 h-3 w-full rounded-inner" index={3} />
+            <Shimmer className="h-3 w-4/5 rounded-inner" index={4} />
           </div>
         </div>
       </div>
@@ -166,7 +166,7 @@ export default function Person({ kind }: { kind: Kind }) {
         )}
 
         <div className="min-w-0 flex-1">
-          <h1 className="text-2xl font-bold text-ink-100">{name}</h1>
+          <h1 className="text-title font-bold text-ink-100">{name}</h1>
           {native && (
             <p className="font-brand-jp text-sm tracking-[.04em] text-ink-600">{native}</p>
           )}

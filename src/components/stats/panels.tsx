@@ -141,10 +141,10 @@ export function DistributionCard({
         {data.map((d) => (
           <div key={d.label} className="flex items-center gap-2 text-xs">
             <span className="w-16 shrink-0 truncate text-ink-500">{d.label}</span>
-            <div className="h-3 flex-1 overflow-hidden rounded bg-surface-800">
+            <div className="h-3 flex-1 overflow-hidden rounded-inner bg-surface-800">
               <div
                 // Switching ANIME/MANGA re-measures the bars rather than cutting to the new lengths.
-                className="h-full rounded bg-accent-500 transition-[width] duration-(--duration-expressive) ease-out-expo"
+                className="h-full rounded-inner bg-accent-500 transition-[width] duration-(--duration-expressive) ease-out-expo"
                 style={{ width: `${(d.count / max) * 100}%` }}
               />
             </div>

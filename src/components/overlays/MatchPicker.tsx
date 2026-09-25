@@ -291,10 +291,10 @@ function ResultRow({
           src={media.coverImage.large}
           alt=""
           loading="lazy"
-          className="h-12 w-8 shrink-0 rounded object-cover"
+          className="h-12 w-8 shrink-0 rounded-inner object-cover"
         />
       ) : (
-        <span className="h-12 w-8 shrink-0 rounded bg-surface-800" />
+        <span className="h-12 w-8 shrink-0 rounded-inner bg-surface-800" />
       )}
       <span className="min-w-0 flex-1">
         <span className="block truncate text-xs text-ink-300">

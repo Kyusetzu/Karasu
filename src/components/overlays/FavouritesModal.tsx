@@ -206,7 +206,7 @@ export function FavouritesModal({
                   {i + 1}
                 </span>
                 {row.cover ? (
-                  <div className="h-10 w-7 shrink-0 overflow-hidden rounded bg-surface-850">
+                  <div className="h-10 w-7 shrink-0 overflow-hidden rounded-inner bg-surface-850">
                     {row.image && (
                       <img
                         src={row.image}
@@ -255,7 +255,7 @@ export function FavouritesModal({
           </ul>
         )}
 
-        <div className="flex items-center justify-end gap-2 border-t border-surface-800 pt-3">
+        <div className="flex items-center justify-end gap-2 border-t border-hair pt-3">
           <Button variant="ghost" size="sm" onClick={onClose}>
             {t("common.done")}
           </Button>

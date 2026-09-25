@@ -273,7 +273,7 @@ export default function CommandPalette() {
             aria-label={t("palette.placeholder")}
             className="h-12 flex-1 bg-transparent text-sm text-ink-100 placeholder:text-ink-600 focus:outline-none"
           />
-          <kbd className="shrink-0 rounded border border-surface-700 bg-surface-850 px-1.5 py-0.5 font-brand text-2xs font-semibold text-ink-600">
+          <kbd className="shrink-0 rounded-inner border border-surface-700 bg-surface-850 px-1.5 py-0.5 font-brand text-2xs font-semibold text-ink-600">
             ESC
           </kbd>
         </div>
@@ -290,7 +290,7 @@ export default function CommandPalette() {
                 <div
                   id={`palette-group-${group.key}`}
                   role="none"
-                  className="px-3.5 pb-1 pt-2 text-[.5625rem] font-semibold uppercase tracking-[.14em] text-ink-600"
+                  className="px-3.5 pb-1 pt-2 text-2xs font-semibold uppercase tracking-[.14em] text-ink-600"
                 >
                   {t(group.key)}
                 </div>

@@ -232,7 +232,7 @@ export function AniListProfileSection() {
               />
             </Row>
 
-            <div className="border-t border-surface-800 pt-3">
+            <div className="border-t border-hair pt-3">
               <Toggle
                 checked={options.displayAdultContent === true}
                 disabled={save.isPending}
@@ -286,7 +286,7 @@ export function AniListProfileSection() {
             </Row>
 
             {/* Per-status activity muting; `mergeListActivity` sends the whole array, so one flip cannot reset the rest. */}
-            <div className="border-t border-surface-800 pt-3">
+            <div className="border-t border-hair pt-3">
               <p className="text-sm text-ink-100">{t("settings.alListActivity")}</p>
               <p className="mt-0.5 text-xs text-ink-600">{t("settings.alListActivityHint")}</p>
               <div className="mt-2 space-y-1">
@@ -314,7 +314,7 @@ export function AniListProfileSection() {
         {/* Stated rather than hidden: the API has no mutation for these, so no client can offer them. */}
         <ExternalNote>{t("settings.alNoUpload")}</ExternalNote>
 
-        <div className="flex flex-wrap gap-2 border-t border-surface-800 pt-3">
+        <div className="flex flex-wrap gap-2 border-t border-hair pt-3">
           <Link to={`/user/${encodeURIComponent(viewer.name)}`}>
             <Button variant="secondary" size="sm">
               {t("settings.alEditBio")}
@@ -405,7 +405,7 @@ export function AniListListOptionsSection() {
             </Row>
 
             {/* Read-only on purpose: `customLists` is a full replacement with no undo, so never send it (`lib/anilistUserFields`). */}
-            <div className="rounded-control border border-surface-800 bg-surface-950 p-3">
+            <div className="rounded-control border border-hair bg-surface-950 p-3">
               <p className="text-xs font-medium text-ink-300">
                 {t("settings.alCustomLists")}
               </p>
@@ -419,7 +419,7 @@ export function AniListListOptionsSection() {
                 ].map((name, i) => (
                   <span
                     key={`${name}-${i}`}
-                    className="rounded border border-surface-700 px-1.5 py-0.5 text-2xs text-ink-500"
+                    className="rounded-inner border border-surface-700 px-1.5 py-0.5 text-2xs text-ink-500"
                   >
                     {name}
                   </span>

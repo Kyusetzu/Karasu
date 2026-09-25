@@ -12,7 +12,7 @@ export function ThreadRow({ thread }: { thread: ThreadSummary }) {
   return (
     <Link
       to={`/thread/${thread.id}`}
-      className="block rounded-panel border border-surface-800 bg-surface-900 p-3 transition-surface hover:border-surface-700"
+      className="block rounded-panel border border-hair bg-surface-900 p-3 transition-surface hover:border-surface-700"
     >
       <div className="flex items-start gap-2">
         {thread.isSticky && <Pin className="mt-0.5 size-3 shrink-0 text-accent-400" />}
@@ -27,7 +27,7 @@ export function ThreadRow({ thread }: { thread: ThreadSummary }) {
           {thread.categories.map((c) => (
             <span
               key={c.id}
-              className="rounded border border-surface-700 px-1.5 py-0.5 text-2xs text-ink-600"
+              className="rounded-inner border border-surface-700 px-1.5 py-0.5 text-2xs text-ink-600"
             >
               {c.name}
             </span>

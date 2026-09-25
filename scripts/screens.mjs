@@ -42,8 +42,8 @@ export const SCREENS = [
     h: 800,
     route: "/list",
     act: async (p) => {
-      const receipt = { kind: "success", text: "Frieren: Beyond Journey's End auf 8 gesetzt", action: { label: "Rückgängig", run: () => {} } };
-      await p.evaluate((t) => window.__toast.getState().show(t), receipt);
+      const text = "Frieren: Beyond Journey's End auf 8 gesetzt";
+      await p.evaluate((t) => window.__toast.getState().show({ kind: "success", text: t, action: { label: "Rückgängig", run: () => {} } }), text);
       await p.keyboard.press("Control+k");
       await p.keyboard.type("stat");
     },

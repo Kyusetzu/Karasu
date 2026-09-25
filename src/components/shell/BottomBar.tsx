@@ -42,7 +42,7 @@ function sheetGroups(android: boolean): { label: string; items: NavItem[] }[] {
 }
 
 const slotClass =
-  "flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-control py-1.5 text-[.625rem] font-medium transition-surface";
+  "flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-control py-1.5 text-2xs font-medium transition-surface";
 
 export default function BottomBar() {
   const { t } = useTranslation();
@@ -108,7 +108,7 @@ export default function BottomBar() {
                   type="button"
                   aria-label={t("window.close")}
                   onClick={() => setMoreOpen(false)}
-                  className="rounded p-1 text-ink-500 transition-surface hover:text-ink-100"
+                  className="rounded-inner p-1 text-ink-500 transition-surface hover:text-ink-100"
                 >
                   <X className="size-4" />
                 </button>
@@ -127,7 +127,7 @@ export default function BottomBar() {
             </button>
             {sheetGroups(android).map((g) => (
               <div key={g.label} className="mb-2 last:mb-0">
-                <p className="px-1 pb-1 text-[.625rem] font-medium uppercase tracking-wide text-ink-600">
+                <p className="px-1 pb-1 text-2xs font-medium uppercase tracking-wide text-ink-600">
                   {t(g.label)}
                 </p>
                 {/* One destination per row, not a tile grid: labels get their full width and the whole row is the touch target. */}
@@ -224,7 +224,7 @@ export default function BottomBar() {
           <span className="relative">
             <LayoutGrid className="size-5" />
             {badge > 0 && (
-              <span className="absolute -right-2.5 -top-1.5 grid h-3.5 min-w-3.5 place-items-center rounded-[.4375rem] border border-surface-950 bg-accent-500 px-1 text-[.5625rem] font-semibold tabular-nums text-accent-ink">
+              <span className="absolute -right-2.5 -top-1.5 grid h-3.5 min-w-3.5 place-items-center rounded-[.4375rem] border border-surface-950 bg-accent-500 px-1 text-2xs font-semibold tabular-nums text-accent-ink">
                 {badge > 9 ? "9+" : badge}
               </span>
             )}

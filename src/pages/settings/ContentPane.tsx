@@ -55,7 +55,7 @@ export function ContentSection() {
           <p className="text-xs text-ink-600">{t("settings.contentNote")}</p>
           {/* Separate from the slider on purpose: the slider decides what is
               shown at all, this decides how it arrives. See `shouldBlur`. */}
-          <div className="border-t border-surface-800 pt-3">
+          <div className="border-t border-hair pt-3">
             <Toggle
               checked={blurAdult}
               onChange={(v) => void setBlurAdult(v)}

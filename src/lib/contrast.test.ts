@@ -180,13 +180,10 @@ describe("accentShades", () => {
     expect(straw.w1).not.toBe(straw.w2);
   });
 
-  it("emits hair as a usable rgba string, denser in light theme", () => {
-    expect(accentShades("#4b3fc7").hair).toMatch(
-      /^rgba\(\d+, \d+, \d+, 0\.11\)$/,
-    );
-    expect(accentShades("#4b3fc7", { light: true }).hair).toMatch(
-      /^rgba\(\d+, \d+, \d+, 0\.16\)$/,
-    );
+  it("emits hair as a neutral rgba line that no accent tints", () => {
+    expect(accentShades("#4b3fc7").hair).toBe("rgba(255, 255, 255, 0.075)");
+    expect(accentShades("#f56c92").hair).toBe("rgba(255, 255, 255, 0.075)");
+    expect(accentShades("#4b3fc7", { light: true }).hair).toBe("rgba(16, 20, 30, 0.1)");
   });
 });
 

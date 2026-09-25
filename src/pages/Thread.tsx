@@ -412,8 +412,8 @@ export default function Thread() {
   if (th.isLoading) {
     return (
       <div className="mx-auto max-w-3xl space-y-3 px-8 pt-7" aria-hidden="true">
-        <Shimmer className="h-6 w-2/3 rounded" />
-        <Shimmer className="h-3 w-40 rounded" index={1} />
+        <Shimmer className="h-6 w-2/3 rounded-inner" />
+        <Shimmer className="h-3 w-40 rounded-inner" index={1} />
         <Shimmer className="h-24 w-full rounded-panel" index={2} />
       </div>
     );
@@ -521,7 +521,7 @@ export default function Thread() {
             {data.categories.map((c) => (
               <span
                 key={c.id}
-                className="rounded border border-surface-700 px-1.5 py-0.5 text-2xs text-ink-600"
+                className="rounded-inner border border-surface-700 px-1.5 py-0.5 text-2xs text-ink-600"
               >
                 {c.name}
               </span>
@@ -535,7 +535,7 @@ export default function Thread() {
               <Link
                 key={m.id}
                 to={`/media/${m.id}`}
-                className="rounded border border-accent-600 px-1.5 py-0.5 text-2xs text-accent-400 hover:underline"
+                className="rounded-inner border border-accent-600 px-1.5 py-0.5 text-2xs text-accent-400 hover:underline"
               >
                 {displayTitle(m.title)}
               </Link>
@@ -545,7 +545,7 @@ export default function Thread() {
       </header>
 
       {data.body && (
-        <div className="mt-5 rounded-panel border border-surface-800 bg-surface-900 p-4">
+        <div className="mt-5 rounded-panel border border-hair bg-surface-900 p-4">
           <Markdown source={data.body} siteUrl={data.siteUrl ?? undefined} />
         </div>
       )}

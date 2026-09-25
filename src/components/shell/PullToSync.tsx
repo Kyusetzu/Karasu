@@ -31,7 +31,7 @@ export default function PullToSync() {
       <div
         role="status"
         className={cn(
-          "mt-2 flex items-center gap-2 rounded-full border border-hair bg-surface-900 px-3 py-1.5 shadow-xl panel-wash",
+          "mt-2 flex items-center gap-2 rounded-full border border-hair bg-surface-900 px-3 py-1.5 shadow-float panel-wash",
           armed || syncing ? "text-accent-400" : "text-ink-500",
         )}
       >

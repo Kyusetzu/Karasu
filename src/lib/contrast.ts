@@ -98,7 +98,7 @@ export interface AccentShades {
   w1: string;
   /** Warmer companion sheen, as a triplet. */
   w2: string;
-  /** Hairline border colour, already an `rgba()` string. */
+  /** Hairline border colour, a neutral `rgba()` string; the accent no longer tints it. */
   hair: string;
 }
 
@@ -142,7 +142,7 @@ export function accentShades(
     rgb: rgbTriplet(a500),
     w1,
     w2: rgbTriplet(hueRotate(base, 46, 0.45)),
-    hair: `rgba(${w1}, ${light ? 0.16 : 0.11})`,
+    hair: light ? "rgba(16, 20, 30, 0.1)" : "rgba(255, 255, 255, 0.075)",
   };
 }
 

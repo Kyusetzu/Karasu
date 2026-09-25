@@ -841,7 +841,7 @@ function ReviewCard({
       </button>
 
       {expanded && (
-        <div className="mt-2 border-t border-surface-800 pt-2">
+        <div className="mt-2 border-t border-hair pt-2">
           {/* siteUrl backs the parser's truncation notice, so "read the rest" has somewhere to go. */}
           <Markdown source={r.body} siteUrl={r.siteUrl ?? undefined} />
         </div>
@@ -859,7 +859,7 @@ function ReviewCard({
               aria-pressed={up}
               title={t("review.voteUp")}
               className={cn(
-                "rounded p-1 transition-surface hover:bg-surface-800",
+                "rounded-inner p-1 transition-surface hover:bg-surface-800",
                 up ? "text-success" : "text-ink-600",
               )}
             >
@@ -871,7 +871,7 @@ function ReviewCard({
               aria-pressed={down}
               title={t("review.voteDown")}
               className={cn(
-                "rounded p-1 transition-surface hover:bg-surface-800",
+                "rounded-inner p-1 transition-surface hover:bg-surface-800",
                 down ? "text-danger" : "text-ink-600",
               )}
             >

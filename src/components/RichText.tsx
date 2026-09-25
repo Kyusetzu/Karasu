@@ -77,7 +77,7 @@ function InlineImage({
     return (
       <span
         style={style}
-        className="my-1 inline-block max-w-full overflow-hidden rounded-control border border-surface-800 align-middle"
+        className="my-1 inline-block max-w-full overflow-hidden rounded-control border border-hair align-middle"
       >
         <img src={src} alt="" loading="lazy" className="max-h-80 w-full object-contain" />
       </span>
@@ -91,7 +91,7 @@ function InlineImage({
       title={href}
       style={style}
       // Keep this inline-level: `~~~centered~~~` is `text-align: center`, which does nothing to a block box.
-      className="my-1 inline-block max-w-full overflow-hidden rounded-control border border-surface-800 align-middle"
+      className="my-1 inline-block max-w-full overflow-hidden rounded-control border border-hair align-middle"
     >
       {/* Bios embed huge GIFs; capped rather than scaled to the column so a small image is not blown up blurry. */}
       <img
@@ -148,9 +148,9 @@ export function Spoiler({ children, block = false }: { children: ReactNode; bloc
   const [shown, setShown] = useState(false);
   if (shown) {
     return block ? (
-      <div className="space-y-2 rounded-control border border-surface-800 bg-surface-900/60 p-2">{children}</div>
+      <div className="space-y-2 rounded-control border border-hair bg-surface-900/60 p-2">{children}</div>
     ) : (
-      <span className="rounded bg-surface-800 px-1">{children}</span>
+      <span className="rounded-inner bg-surface-800 px-1">{children}</span>
     );
   }
   return (
@@ -164,7 +164,7 @@ export function Spoiler({ children, block = false }: { children: ReactNode; bloc
       className={
         block
           ? "flex w-full items-center gap-1.5 rounded-control border border-surface-700 bg-surface-800 px-2.5 py-1.5 text-left text-xs text-ink-500 transition-surface hover:text-ink-300"
-          : "rounded bg-surface-700 px-1.5 text-xs text-ink-500 transition-surface hover:text-ink-300"
+          : "rounded-inner bg-surface-700 px-1.5 text-xs text-ink-500 transition-surface hover:text-ink-300"
       }
     >
       {t("social.mdSpoiler")}
@@ -204,7 +204,7 @@ export function RichText({ nodes }: { nodes: MdInline[] }) {
             return (
               <code
                 key={i}
-                className="rounded bg-surface-850 px-1 py-0.5 font-mono text-[.8125em]"
+                className="rounded-inner bg-surface-850 px-1 py-0.5 font-mono text-[.8125em]"
               >
                 {n.text}
               </code>

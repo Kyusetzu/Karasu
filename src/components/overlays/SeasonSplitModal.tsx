@@ -132,10 +132,10 @@ export function SeasonSplitModal({
         "flex w-full items-center gap-2.5 rounded-control border px-2.5 py-2 text-left transition-surface",
         selected?.mediaId === c.mediaId
           ? "border-accent-500 bg-accent-500/10"
-          : "border-surface-800 hover:border-surface-600",
+          : "border-hair hover:border-surface-600",
       )}
     >
-      <div className="h-12 w-8 shrink-0 overflow-hidden rounded bg-surface-850">
+      <div className="h-12 w-8 shrink-0 overflow-hidden rounded-inner bg-surface-850">
         {c.cover && <img src={c.cover} alt="" loading="lazy" className="size-full object-cover" />}
       </div>
       <span className="min-w-0 flex-1">
@@ -207,7 +207,7 @@ export function SeasonSplitModal({
         </div>
 
         {preview && selected && (
-          <div className="rounded-control border border-surface-800 bg-surface-950 px-3 py-2 text-xs tabular-nums text-ink-300">
+          <div className="rounded-control border border-hair bg-surface-950 px-3 py-2 text-xs tabular-nums text-ink-300">
             {preview.shown.map((p) => (
               <p key={p.disk} className="flex items-center gap-1.5">
                 {t("library.ep", { n: p.disk })}
@@ -228,7 +228,7 @@ export function SeasonSplitModal({
 
         {error && <p className="text-xs text-danger">{error}</p>}
 
-        <div className="flex items-center justify-end gap-2 border-t border-surface-800 pt-3">
+        <div className="flex items-center justify-end gap-2 border-t border-hair pt-3">
           <Button variant="ghost" size="sm" onClick={onClose}>
             {t("common.cancel")}
           </Button>

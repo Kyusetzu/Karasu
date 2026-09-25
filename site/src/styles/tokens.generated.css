@@ -1,4 +1,4 @@
-/* GENERATED from src/app/index.css (sha256 5bff310ffd77) by site/scripts/sync-tokens.mjs
+/* GENERATED from src/app/index.css (sha256 a57b59805f92) by site/scripts/sync-tokens.mjs
    — do not edit. Re-run `npm run sync` after changing the source; `npm run check`
    fails while this file is stale. CLAUDE.md, "The website". */
 /* `static` because Tailwind tree-shakes tokens no utility references, leaving a `var()`-only token undefined in dark. */
@@ -12,34 +12,39 @@
   /* The 13 px step between xs and sm that dense rows and the shell's panels read in. */
   --text-ui: 0.8125rem;
   /* The one letter spacing for small uppercase labels. */
-  --tracking-eyebrow: 0.1em;
+  --tracking-eyebrow: 0.12em;
+  /* Page titles, a step above text-2xl, in the brand face. */
+  --text-title: 1.875rem;
+  --text-title--line-height: 1.2;
+  /* Bold a touch lighter than 700, which the variable UI faces render exactly and a static face rounds up. */
+  --font-weight-bold: 650;
 
   /* Radius by role, not by size, so retuning a role moves every control, panel or sheet at once. */
-  --radius-inner: 0.375rem;
-  --radius-control: 0.5rem;
-  --radius-panel: 0.75rem;
+  --radius-inner: 0.25rem;
+  --radius-control: 0.375rem;
+  --radius-panel: 0.625rem;
   --radius-sheet: 1rem;
-  --radius-cover: 0.625rem;
+  --radius-cover: 0.375rem;
 
-  /* Elevation for what floats over the page: menus and dialogs, then the phone's sheets. */
-  --shadow-float: 0 25px 50px -12px rgb(0 0 0 / 0.25);
-  --shadow-sheet: 0 1rem 3rem rgba(0, 0, 0, 0.6);
+  /* The one shadow, for what floats over the page; sheets share it, and the colours follow the theme. */
+  --shadow-float: 0 18px 40px -14px var(--float-shadow), 0 0 0 1px var(--float-edge);
+  --shadow-sheet: 0 18px 40px -14px var(--float-shadow), 0 0 0 1px var(--float-edge);
 
   /* The dim behind a dialog or a sheet, near-black in both themes so what is behind recedes the same way. */
   --color-scrim: rgb(4 5 8 / 0.55);
 
   --color-surface-950: #0b0d12;
-  --color-surface-900: #11141b;
-  --color-surface-850: #161a23;
-  --color-surface-800: #1c212c;
-  --color-surface-700: #262c3a;
-  --color-surface-600: #333b4d;
+  --color-surface-900: #12141a;
+  --color-surface-850: #181c22;
+  --color-surface-800: #1f232b;
+  --color-surface-700: #2a2f39;
+  --color-surface-600: #353b47;
 
   /* The bottom two steps clear AA contrast on the darkest surface they ever sit on; do not darken them. */
-  --color-ink-100: #eef1f6;
-  --color-ink-300: #c3cbd9;
-  --color-ink-500: #98a1b2;
-  --color-ink-600: #7f8899;
+  --color-ink-100: #f0f2f5;
+  --color-ink-300: #c8ccd6;
+  --color-ink-500: #9da3af;
+  --color-ink-600: #868c99;
 
   /* Score stars only. */
   --color-gold: #fcd34d;
@@ -77,6 +82,9 @@
   /* Leaving should be quicker than arriving: a dialog that lingers on the way out feels unresponsive. */
   --ease-exit: cubic-bezier(0.4, 0, 1, 1);
 
+  /* Arrivals land on a soft spring; this cubic stands in where `linear()` is not understood, see the @supports block. */
+  --ease-spring-soft: cubic-bezier(0.34, 1.42, 0.64, 1);
+
   /* Two expressive durations, so feature motion does not each pick its own. */
   --duration-expressive: 280ms;
   --duration-exit: 120ms;
@@ -84,8 +92,8 @@
   /* A bird landing on a branch — down from above, no bounce; these consume the ease tokens so retuning one retunes all. */
   --animate-settle: settle 150ms var(--ease-karasu);
   /* Things that arrive from the bottom edge: toasts, the bulk bar. */
-  --animate-rise-in: riseIn 160ms var(--ease-karasu);
-  --animate-pop-in: popIn 120ms var(--ease-karasu);
+  --animate-rise-in: riseIn 440ms var(--ease-spring-soft);
+  --animate-pop-in: popIn 340ms var(--ease-spring-soft);
   --animate-fade-in: fadeIn 120ms linear;
   /* The progress counter acknowledging a +1. */
   --animate-tick: tick 180ms var(--ease-karasu);
@@ -101,7 +109,7 @@
   --animate-pop-out: popOut var(--duration-exit) var(--ease-exit) forwards;
   --animate-fade-out: fadeOut var(--duration-exit) linear forwards;
   /* The dialog arrival: scales up past 1 and settles. */
-  --animate-spring-in: springIn var(--duration-expressive) var(--ease-spring);
+  --animate-spring-in: springIn 480ms var(--ease-spring-soft);
   /* A success landing — the scrobble confirmation. */
   --animate-land: land 420ms var(--ease-out-expo);
 
@@ -358,10 +366,17 @@
   --accent-rgb: 75, 63, 199;
   --w1: 63, 114, 199;
   --w2: 179, 63, 199;
-  --hair: rgba(63, 114, 199, 0.11);
+  --hair: rgba(255, 255, 255, 0.075);
 
   /* The 1px catch-light along the top of a raised panel, which the light theme inverts to a faint shadow line. */
-  --catch-light: rgba(255, 255, 255, 0.09);
+  --catch-light: rgba(255, 255, 255, 0.12);
+
+  /* The light a raised panel catches at its top edge; depth comes from tone steps, not from a tint. */
+  --wash-top: rgba(255, 255, 255, 0.025);
+
+  /* The float shadow's colour and its hairline ring, dark in both themes but far lighter on a white page. */
+  --float-shadow: rgb(0 0 0 / 0.65);
+  --float-edge: rgb(255 255 255 / 0.04);
 
   /* The shadow cast into an inset well; a token because black at this alpha is a bruise on a white page. */
   --well-shadow: rgba(0, 0, 0, 0.55);
@@ -369,17 +384,17 @@
 
 /* Light theme: override the surface/ink tokens; accent is set at runtime. */
 :root[data-theme="light"] {
-  --color-surface-950: #f4f6f9;
+  --color-surface-950: #f4f6f8;
   --color-surface-900: #ffffff;
-  --color-surface-850: #eef1f5;
-  --color-surface-800: #e4e8ee;
-  --color-surface-700: #d2d8e2;
-  --color-surface-600: #b6bece;
+  --color-surface-850: #eef0f4;
+  --color-surface-800: #e5e8ed;
+  --color-surface-700: #d5d9e1;
+  --color-surface-600: #b8beca;
 
-  --color-ink-100: #1a1e27;
-  --color-ink-300: #333b48;
-  --color-ink-500: #464e5d;
-  --color-ink-600: #5f6879;
+  --color-ink-100: #1a1e26;
+  --color-ink-300: #343944;
+  --color-ink-500: #494e5b;
+  --color-ink-600: #616876;
 
   /* Gold, danger and success are used as text, so the same hues are pulled down to read on white. */
   --color-gold: #8a6207;
@@ -393,6 +408,9 @@
   --scrim: 244, 246, 249;
   --catch-light: rgba(11, 13, 18, 0.07);
   --well-shadow: rgba(11, 13, 18, 0.14);
+  --wash-top: transparent;
+  --float-shadow: rgb(16 20 30 / 0.22);
+  --float-edge: rgb(16 20 30 / 0.05);
 
   color-scheme: light;
 }
@@ -437,23 +455,9 @@
   grid-template-columns: repeat(var(--cover-cols, 8), minmax(0, 1fr));
 }
 
-/* The iridescent wash, two sheens rotated off the accent's hue; it composes over a background colour and sets none. */
+/* The light a raised panel catches along its top; it composes over a background colour and sets none. */
 @utility panel-wash {
-  background-image: linear-gradient(
-    140deg,
-    rgba(var(--w1), 0.07),
-    rgba(var(--w2), 0.03) 60%,
-    transparent
-  );
-}
-
-/* The sidebar's own wash, one hue and steeper, so a tall narrow column reads as light falling in rather than a stripe. */
-@utility rail-wash {
-  background-image: linear-gradient(
-    160deg,
-    rgba(var(--w1), 0.05),
-    transparent 42%
-  );
+  background-image: linear-gradient(180deg, var(--wash-top), transparent 45%);
 }
 
 /* The gradient at the foot of every cover: art is arbitrary, so anything over it needs a deterministic backdrop. */
@@ -509,13 +513,14 @@
     background: linear-gradient(
       90deg,
       transparent,
-      var(--catch-light),
+      var(--catch-light) 20%,
+      var(--catch-light) 80%,
       transparent
     );
   }
 }
 
-/* Hairline borders, tinted with the cooler sheen rather than a flat grey. */
+/* Hairline borders, a neutral line the theme and the contrast setting retune in one place. */
 @utility border-hair {
   border-color: var(--hair);
 }
@@ -606,7 +611,7 @@ html[data-reduce-motion] *::after {
 /* The softer request gets the softer answer: keep the palette, sharpen the hairlines the design deliberately keeps quiet. */
 @media (prefers-contrast: more) {
   :root {
-    --hair: rgba(63, 114, 199, 0.34);
+    --hair: rgba(128, 136, 150, 0.6);
   }
   *:focus-visible {
     outline-width: 3px;
@@ -647,7 +652,7 @@ html[data-reduce-motion] *::after {
   --accent-rgb: 75, 63, 199;
   --w1: 63, 114, 199;
   --w2: 179, 63, 199;
-  --hair: rgba(63, 114, 199, 0.11);
+  --hair: rgba(255, 255, 255, 0.075);
 }
 
 :root[data-theme="light"] {
@@ -658,5 +663,5 @@ html[data-reduce-motion] *::after {
   --accent-rgb: 75, 63, 199;
   --w1: 63, 114, 199;
   --w2: 179, 63, 199;
-  --hair: rgba(63, 114, 199, 0.16);
+  --hair: rgba(16, 20, 30, 0.1);
 }

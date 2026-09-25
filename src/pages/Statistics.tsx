@@ -92,7 +92,7 @@ export default function Statistics() {
     return (
       <div className="grid h-full place-items-center p-8">
         <div className="max-w-md text-center">
-          <h1 className="text-2xl font-bold">{t("stats.title")}</h1>
+          <h1 className="text-title font-bold">{t("stats.title")}</h1>
           <p className="mt-3 text-sm leading-relaxed text-ink-500">
             {t("stats.signInText")}
           </p>

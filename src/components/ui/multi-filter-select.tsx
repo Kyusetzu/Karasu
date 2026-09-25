@@ -93,19 +93,19 @@ export function MultiFilterSelect({
         aria-label={label}
         className={cn(
           "flex h-8.5 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-control",
-          "border border-surface-800 bg-surface-900 px-2.5 transition-surface",
+          "border border-hair bg-surface-900 px-2.5 transition-surface",
           "hover:bg-surface-850 focus-visible:border-accent-500",
           !isEmpty(value) && "border-accent-500/60",
         )}
       >
-        <span className="text-[.6875rem] uppercase tracking-[.08em] text-ink-600">
+        <span className="text-xs uppercase tracking-[.08em] text-ink-600">
           {label}
         </span>
         <span className="max-w-32 truncate text-xs text-ink-300">
           {summary ? summary.first : placeholder}
         </span>
         {summary && summary.extra > 0 && (
-          <span className="rounded bg-surface-800 px-1 text-2xs tabular-nums text-ink-300">
+          <span className="rounded-inner bg-surface-800 px-1 text-2xs tabular-nums text-ink-300">
             +{summary.extra}
           </span>
         )}
@@ -139,7 +139,7 @@ export function MultiFilterSelect({
                   type="button"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => setTerm("")}
-                  className="absolute right-1.5 top-1/2 grid size-5 -translate-y-1/2 place-items-center rounded text-ink-600 transition-surface hover:bg-surface-800 hover:text-ink-100"
+                  className="absolute right-1.5 top-1/2 grid size-5 -translate-y-1/2 place-items-center rounded-inner text-ink-600 transition-surface hover:bg-surface-800 hover:text-ink-100"
                 >
                   <X className="size-3" />
                   <span className="sr-only">{t("common.clear")}</span>

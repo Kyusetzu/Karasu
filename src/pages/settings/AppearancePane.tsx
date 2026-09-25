@@ -159,7 +159,7 @@ export function AppearanceSection() {
           style={{ gridTemplateColumns: `repeat(${coverCols}, minmax(0, 1fr))` }}
         >
           {Array.from({ length: coverCols }, (_, i) => (
-            <div key={i} className="aspect-[2/3] rounded bg-surface-800" />
+            <div key={i} className="aspect-[2/3] rounded-inner bg-surface-800" />
           ))}
         </div>
 
@@ -237,7 +237,7 @@ export function AppearanceSection() {
         </div>
 
         {/* Labelled swatches, unlike the accent row: picking one means nothing without knowing the status. */}
-        <div className="space-y-2 border-t border-surface-800 pt-3">
+        <div className="space-y-2 border-t border-hair pt-3">
           <div className="flex items-center justify-between gap-4">
             <span className="block text-sm text-ink-100">
               {t("settings.statusColors")}

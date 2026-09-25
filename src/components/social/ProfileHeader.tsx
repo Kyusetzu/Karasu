@@ -75,7 +75,7 @@ export function ProfileHeader({ user }: { user: UserProfile }) {
           <Avatar src={user.avatar?.large} name={user.name} size="2xl" />
           <div className="min-w-0 flex-1 pb-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="truncate text-2xl font-bold text-ink-100">{user.name}</h1>
+              <h1 className="truncate text-title font-bold text-ink-100">{user.name}</h1>
               {badgeKey && (
                 <Badge tone="accent">
                   {badgeKey === "social.badgeMutual"

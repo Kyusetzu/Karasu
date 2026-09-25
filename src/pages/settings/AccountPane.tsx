@@ -190,7 +190,7 @@ export function AccountSection() {
         {login.waiting && (
           <p className="text-xs text-accent-400">{t("settings.loginWaiting")}</p>
         )}
-        <div className="border-t border-surface-800 pt-3">
+        <div className="border-t border-hair pt-3">
           {mode === "local" ? (
             <p className="text-xs text-ink-500">{t("settings.localActive")}</p>
           ) : (

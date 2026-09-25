@@ -285,7 +285,7 @@ function Badge({ floating, children }: { floating: boolean; children: ReactNode 
     <span
       aria-hidden
       className={cn(
-        "grid h-4 min-w-4 place-items-center rounded-full bg-accent-500 px-1 text-[.625rem] font-semibold tabular-nums text-accent-ink",
+        "grid h-4 min-w-4 place-items-center rounded-full bg-accent-500 px-1 text-2xs font-semibold tabular-nums text-accent-ink",
         floating && "absolute -right-1.5 -top-1.5",
       )}
     >
@@ -360,7 +360,7 @@ function SearchBox({
         </button>
       ) : (
         hint && (
-          <kbd aria-hidden className="shrink-0 rounded border border-surface-700 px-1.5 py-px font-sans text-2xs text-ink-600">
+          <kbd aria-hidden className="shrink-0 rounded-inner border border-surface-700 px-1.5 py-px font-sans text-2xs text-ink-600">
             Ctrl F
           </kbd>
         )
@@ -424,9 +424,9 @@ function SortPanel({ view, onDraft }: { view: ListView; onDraft: (patch: ViewPat
           </Choice>
         ))}
       </fieldset>
-      <fieldset className="border-t border-surface-800 pt-3">
+      <fieldset className="border-t border-hair pt-3">
         <legend className="sr-only">{t("list.direction")}</legend>
-        <div className="grid grid-cols-2 gap-1 rounded-control border border-surface-800 p-0.5">
+        <div className="grid grid-cols-2 gap-1 rounded-control border border-hair p-0.5">
           {dirs.map(({ value, label, icon: Icon }) => (
             <Choice
               key={value}
@@ -561,7 +561,7 @@ function FilterPanel({
           </PanelSection>
         )}
       </div>
-      <div className="mt-4 flex items-center gap-3 border-t border-surface-800 pt-3">
+      <div className="mt-4 flex items-center gap-3 border-t border-hair pt-3">
         <Button
           variant="ghost"
           size="sm"

@@ -561,7 +561,7 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
               ) : (
                 <span className="truncate text-ui font-medium text-ink-100">{lead}</span>
               )}
-              <span className="rounded bg-surface-800 px-1 text-2xs tabular-nums text-ink-300">
+              <span className="rounded-inner bg-surface-800 px-1 text-2xs tabular-nums text-ink-300">
                 {label.n}
               </span>
               {g.unread && <span className="size-1.5 shrink-0 rounded-full bg-accent-500" />}
@@ -582,7 +582,7 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
           )}
         </div>
         {isOpen && (
-          <ul className="border-l border-surface-800 pl-2 ml-5.5">
+          <ul className="border-l border-hair pl-2 ml-5.5">
             {g.items.map((m) => (
               <li key={m.key}>{renderItem(m)}</li>
             ))}
@@ -609,7 +609,7 @@ export default function Bell({ barSlot = false }: { barSlot?: boolean }) {
         <BellIcon className={barSlot ? "size-5" : "size-3.75"} />
         {badge > 0 && (
           // Keep the `s950` ring, or the badge and bell glyph merge at this size; the pulse stops once read.
-          <span className="animate-idle-pulse absolute right-1.5 top-1.5 grid h-3.25 min-w-3.25 place-items-center rounded-[.4375rem] border border-surface-950 bg-accent-500 px-1 text-[.5625rem] font-semibold text-accent-ink">
+          <span className="animate-idle-pulse absolute right-1.5 top-1.5 grid h-3.25 min-w-3.25 place-items-center rounded-[.4375rem] border border-surface-950 bg-accent-500 px-1 text-2xs font-semibold text-accent-ink">
             {badge > 9 ? "9+" : badge}
           </span>
         )}

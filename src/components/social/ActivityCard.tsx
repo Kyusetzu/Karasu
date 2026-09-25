@@ -158,8 +158,8 @@ function ActivityReplies({ activityId }: { activityId: number }) {
   };
 
   return (
-    <div className="mt-3 space-y-2 border-l-2 border-surface-800 pl-3">
-      {q.isLoading && <Shimmer className="h-3 w-32 rounded" />}
+    <div className="mt-3 space-y-2 border-l-2 border-hair pl-3">
+      {q.isLoading && <Shimmer className="h-3 w-32 rounded-inner" />}
       {/* A failed fetch says nothing about the thread, so it must not fall through to "no replies yet". */}
       {q.error && (
         <p className="text-2xs text-danger">{t("social.repliesFailed")}</p>
@@ -248,7 +248,7 @@ export function ActivityCard({
   const when = relTimeFromSeconds(item.createdAt, i18n.language, t("notif.now"));
 
   return (
-    <article className="flex gap-3 rounded-panel border border-surface-800 bg-surface-900 p-3">
+    <article className="flex gap-3 rounded-panel border border-hair bg-surface-900 p-3">
       {item.kind === "list" && item.media?.coverImage?.large && (
         <Link
           to={`/media/${item.media.id}`}

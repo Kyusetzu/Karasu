@@ -70,7 +70,7 @@ function Blocks({ nodes }: { nodes: MdNode[] }) {
               </pre>
             );
           case "hr":
-            return <hr key={i} className="border-surface-800" />;
+            return <hr key={i} className="border-hair" />;
           case "center":
             // `text-align`, not flex; a flex row swallows `<br>` and glues image chips onto the text line above.
             return (

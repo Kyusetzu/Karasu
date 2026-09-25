@@ -410,7 +410,7 @@ function Stats({ entries }: { entries: MediaListEntry[] }) {
         {items.map((item) => (
           <div
             key={item.label}
-            className="panel-wash panel-top rounded-panel border border-surface-800 bg-surface-900 px-4 py-3.5"
+            className="panel-wash panel-top rounded-panel border border-hair bg-surface-900 px-4 py-3.5"
           >
             <p className="text-2xl font-bold tabular-nums text-ink-100">
               {item.value}

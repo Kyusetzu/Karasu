@@ -832,7 +832,7 @@ export function LogSection() {
           hint={t("settings.logDebugHint")}
         />
 
-        <div className="border-t border-surface-800 pt-3">
+        <div className="border-t border-hair pt-3">
           <button
             onClick={() => {
               const next = !open;

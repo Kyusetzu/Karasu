@@ -117,7 +117,7 @@ export function NewThreadModal({
           />
         </div>
 
-        <div className="flex items-center justify-end gap-2 border-t border-surface-800 pt-3">
+        <div className="flex items-center justify-end gap-2 border-t border-hair pt-3">
           <Button variant="ghost" size="sm" onClick={onClose}>
             {t("common.cancel")}
           </Button>

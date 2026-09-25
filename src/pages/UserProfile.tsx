@@ -170,7 +170,7 @@ function Tabbed({ user }: { user: UserProfileData }) {
       {/* Scrolls rather than wraps: six tabs do not fit a phone, and the strip may scroll sideways where the page must not. */}
       <div
         role="tablist"
-        className="flex gap-1 overflow-x-auto border-b border-surface-800"
+        className="flex gap-1 overflow-x-auto border-b border-hair"
       >
         {TABS.map((id) => {
           const active = id === tab;
@@ -390,19 +390,19 @@ function ProfileSkeleton() {
       <div className="flex items-end gap-5">
         <Shimmer className="size-20 rounded-full" />
         <div className="flex-1 space-y-2 pb-1">
-          <Shimmer className="h-7 w-48 rounded" index={1} />
-          <Shimmer className="h-3 w-64 rounded" index={2} />
+          <Shimmer className="h-7 w-48 rounded-inner" index={1} />
+          <Shimmer className="h-3 w-64 rounded-inner" index={2} />
         </div>
       </div>
       <div className="mt-5 space-y-2">
         {[0, 1, 2].map((i) => (
-          <Shimmer key={i} className={cn("h-3 rounded", i === 2 ? "w-1/2" : "w-full")} index={i + 3} />
+          <Shimmer key={i} className={cn("h-3 rounded-inner", i === 2 ? "w-1/2" : "w-full")} index={i + 3} />
         ))}
       </div>
       {/* Widths are literal class strings because Tailwind never emits an interpolated `w-${n}`. */}
-      <div className="mt-7 flex gap-4 border-b border-surface-800 pb-2">
+      <div className="mt-7 flex gap-4 border-b border-hair pb-2">
         {["w-16", "w-20", "w-20"].map((w, i) => (
-          <Shimmer key={i} className={cn("h-3 rounded", w)} index={i} />
+          <Shimmer key={i} className={cn("h-3 rounded-inner", w)} index={i} />
         ))}
       </div>
     </div>

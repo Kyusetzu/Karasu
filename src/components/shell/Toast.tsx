@@ -32,7 +32,7 @@ export default function Toast() {
         // Keep -translate-x-1/2 as the centring; the exit animates opacity and a nested transform, never this one.
         "-translate-x-1/2",
         shown.leaving ? "animate-fade-out" : "animate-rise-in",
-        "rounded-panel border border-surface-800 bg-surface-900 py-2.5 pl-3 pr-2.5 shadow-float",
+        "rounded-panel border border-hair bg-surface-900 py-2.5 pl-3 pr-2.5 shadow-float",
       )}
     >
       <span

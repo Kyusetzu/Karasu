@@ -242,7 +242,7 @@ function Account({
       </span>
     );
     return (
-      <div className="mx-2.5 mb-2 flex flex-col items-center gap-1.5 border-b border-surface-800 pb-3 pt-2">
+      <div className="mx-2.5 mb-2 flex flex-col items-center gap-1.5 border-b border-hair pb-3 pt-2">
         {viewer ? (
           <NavLink
             to={`/user/${encodeURIComponent(viewer.name)}`}
@@ -288,7 +288,7 @@ function Account({
   );
 
   return (
-    <div className="mx-2.5 mb-2 border-b border-surface-800 pb-3 pt-2">
+    <div className="mx-2.5 mb-2 border-b border-hair pb-3 pt-2">
       {/* Only a link with an AniList account behind it; the local profile has no AniList page and would 404. */}
       {viewer ? (
         <NavLink
@@ -345,7 +345,7 @@ export default function Sidebar() {
     <nav
       ref={navRef}
       className={cn(
-        "rail-wash relative flex shrink-0 flex-col border-r border-hair bg-surface-900 pb-2.5 pt-3",
+        "relative flex shrink-0 flex-col border-r border-hair bg-surface-900 pb-2.5 pt-3",
         // Surface motion: the plain utility inherits `--ease-karasu` and the reduce-motion rules kill it for free.
         "transition-[width]",
         collapsed ? "w-14" : "w-52",
@@ -365,11 +365,11 @@ export default function Sidebar() {
           <div key={group.label} className="contents">
             {/* Collapsed, a rule keeps the grouping the headings carried; the first group needs none since nothing precedes it. */}
             {collapsed ? (
-              i > 0 && <div className="mx-2 my-2 border-t border-surface-800" />
+              i > 0 && <div className="mx-2 my-2 border-t border-hair" />
             ) : (
               <div
                 className={cn(
-                  "px-2.5 pb-1.75 text-[.5625rem] font-semibold uppercase tracking-[.16em] text-ink-600",
+                  "px-2.5 pb-1.75 text-2xs font-semibold uppercase tracking-[.16em] text-ink-600",
                   // The first label sits under the titlebar's own breathing room; the later ones open the gap themselves.
                   i === 0 ? "pt-1.5" : "pt-3.75",
                 )}

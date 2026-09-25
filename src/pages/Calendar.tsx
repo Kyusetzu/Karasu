@@ -195,7 +195,7 @@ export default function Calendar() {
       <div className="px-8 pt-6">
         <div className="flex items-center gap-2.5">
           <div className="flex items-baseline gap-2.5">
-            <h1 className="text-2xl font-bold">{t("calendar.title")}</h1>
+            <h1 className="text-title font-bold">{t("calendar.title")}</h1>
             <span className="font-brand-jp text-ui tracking-[.04em] text-ink-600">
               放送カレンダー
             </span>
@@ -471,7 +471,7 @@ function DayColumn({
         "flex min-h-72 flex-col rounded-panel border p-1.5",
         isToday
           ? "border-accent-600/50 bg-accent-500/[.07]"
-          : "border-surface-800 bg-surface-900/40",
+          : "border-hair bg-surface-900/40",
       )}
     >
       <header className="flex items-baseline justify-between gap-1 px-1 pb-1.5 pt-0.5">

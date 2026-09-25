@@ -51,10 +51,10 @@ export function UserList({
         {[0, 1, 2, 3, 4, 5].map((i) => (
           <div
             key={i}
-            className="flex items-center gap-3 rounded-panel border border-surface-800 p-3"
+            className="flex items-center gap-3 rounded-panel border border-hair p-3"
           >
             <Shimmer className="size-9 rounded-full" index={i} />
-            <Shimmer className="h-3 w-32 rounded" index={i} />
+            <Shimmer className="h-3 w-32 rounded-inner" index={i} />
           </div>
         ))}
       </div>

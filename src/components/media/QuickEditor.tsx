@@ -168,7 +168,7 @@ function More({ media, entry, onSave }: { media: MediaDetail; entry: QuickEntry;
   const manga = media.type === "MANGA";
 
   return (
-    <div className="rounded-control border border-surface-800">
+    <div className="rounded-control border border-hair">
       <button
         type="button"
         aria-expanded={open}
@@ -180,7 +180,7 @@ function More({ media, entry, onSave }: { media: MediaDetail; entry: QuickEntry;
         <ChevronDown aria-hidden className={cn("size-4 text-ink-500 transition-transform", open && "rotate-180")} />
       </button>
       {open && (
-        <div id={id} className="space-y-3 border-t border-surface-800 p-3">
+        <div id={id} className="space-y-3 border-t border-hair p-3">
           <label className="block text-sm">
             <span className="mb-1 block text-ink-500">{manga ? t("entry.rereads") : t("entry.rewatches")}</span>
             <span className="flex items-center gap-1.5">

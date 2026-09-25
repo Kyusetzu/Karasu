@@ -53,7 +53,7 @@ export function GenreChips({ genres, className }: { genres: string[]; className?
       {genres.map((g) => (
         <span
           key={g}
-          className="rounded-cover border border-surface-800 bg-surface-850 px-2 py-0.5 text-2xs text-ink-300"
+          className="rounded-cover border border-hair bg-surface-850 px-2 py-0.5 text-2xs text-ink-300"
         >
           {g}
         </span>

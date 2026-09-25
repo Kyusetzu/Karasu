@@ -163,7 +163,7 @@ function RecVote({ rec }: { rec: ScoredRecommendation }) {
       aria-label={label}
       title={label}
       className={cn(
-        "rounded p-0.5 transition-surface hover:text-ink-100",
+        "rounded-inner p-0.5 transition-surface hover:text-ink-100",
         vote === rating ? "text-accent-400" : "text-ink-600",
       )}
     >

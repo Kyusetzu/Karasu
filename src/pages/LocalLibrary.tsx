@@ -441,7 +441,7 @@ function LibraryView({ userId }: { userId: number }) {
         </div>
 
         {/* The folder and what the last scan made of it, or the screen never says where the files came from. */}
-        <div className="mt-3.5 flex max-w-176 items-center gap-2.5 rounded-control border border-surface-800 bg-surface-900 px-3 py-2.25">
+        <div className="mt-3.5 flex max-w-176 items-center gap-2.5 rounded-control border border-hair bg-surface-900 px-3 py-2.25">
           <FolderOpen className="size-3.75 shrink-0 text-ink-500" />
           <span className="min-w-0 flex-1 truncate text-xs tabular-nums text-ink-300">
             {status?.path ?? t("library.noFolder")}
@@ -602,7 +602,7 @@ function DetectedOffList({
 
   return (
     <section className="pt-6">
-      <p className="mb-1 text-[.6875rem] font-medium uppercase tracking-[.12em] text-ink-600">
+      <p className="mb-1 text-xs font-medium uppercase tracking-[.12em] text-ink-600">
         {t("library.detectedOffList")}
       </p>
       <p className="mb-3 text-2xs text-ink-600">
@@ -766,7 +766,7 @@ function Unplaced({
   return (
     <section className="pt-6">
       <div className="mb-3 flex items-center gap-3">
-        <p className="flex items-center gap-1.5 text-[.6875rem] font-medium uppercase tracking-[.12em] text-ink-600">
+        <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-[.12em] text-ink-600">
           <HelpCircle className="size-3.25" />
           {t("library.unplaced", { n: groups.length })}
         </p>
@@ -777,7 +777,7 @@ function Unplaced({
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
               placeholder={t("library.filterUnplaced")}
-              className="h-7 w-full rounded-inner border border-surface-800 bg-surface-900 pl-7 pr-6 text-2xs text-ink-100 placeholder:text-ink-600 focus:border-accent-500 focus:outline-none"
+              className="h-7 w-full rounded-inner border border-hair bg-surface-900 pl-7 pr-6 text-2xs text-ink-100 placeholder:text-ink-600 focus:border-accent-500 focus:outline-none"
             />
             {/* Hand-rolled rather than `IconButton`, whose smallest size would be the whole field. */}
             {filter && (
@@ -785,7 +785,7 @@ function Unplaced({
                 type="button"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => setFilter("")}
-                className="absolute right-1 top-1/2 grid size-4.5 -translate-y-1/2 place-items-center rounded text-ink-600 transition-surface hover:bg-surface-800 hover:text-ink-100"
+                className="absolute right-1 top-1/2 grid size-4.5 -translate-y-1/2 place-items-center rounded-inner text-ink-600 transition-surface hover:bg-surface-800 hover:text-ink-100"
               >
                 <X className="size-2.75" />
                 <span className="sr-only">{t("common.clear")}</span>
@@ -889,7 +889,7 @@ function Group({
   if (rows.length === 0) return null;
   return (
     <section className="pt-4">
-      <p className="mb-3 text-[.6875rem] font-medium uppercase tracking-[.12em] text-ink-600">
+      <p className="mb-3 text-xs font-medium uppercase tracking-[.12em] text-ink-600">
         {label}
       </p>
       <VirtualRows

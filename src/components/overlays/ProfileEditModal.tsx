@@ -142,7 +142,7 @@ export function ProfileEditModal({
           <p className="mt-1 text-2xs text-ink-600">{t("social.profileColorHint")}</p>
         </div>
 
-        <div className="flex items-center justify-between gap-2 border-t border-surface-800 pt-3">
+        <div className="flex items-center justify-between gap-2 border-t border-hair pt-3">
           {/* Cross-link, so no field lives in two places and each says where the
               others are. */}
           <Link

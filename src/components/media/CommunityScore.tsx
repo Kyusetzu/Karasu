@@ -103,7 +103,7 @@ export function CommunityScore({
         })}
       </div>
 
-      <div className="mt-1 grid gap-1 border-t border-surface-800 pt-1 text-center text-2xs tabular-nums text-ink-500" style={columns} aria-hidden>
+      <div className="mt-1 grid gap-1 border-t border-hair pt-1 text-center text-2xs tabular-nums text-ink-500" style={columns} aria-hidden>
         {bars.map((b, i) => (
           <span key={b.value} className={cn(i === at && "font-semibold text-gold")}>
             {label(b.value)}

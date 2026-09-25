@@ -67,16 +67,16 @@ pure white, a hex literal or an arbitrary `[…]` value in a class is drift.
 
 | Token | Dark | Light | Role |
 |---|---|---|---|
-| `surface-950` | `#0b0d12` | `#f4f6f9` | the page |
-| `surface-900` | `#11141b` | `#ffffff` | a panel |
-| `surface-850` | `#161a23` | `#eef1f5` | hover on a panel |
-| `surface-800` | `#1c212c` | `#e4e8ee` | a control, a panel's border |
-| `surface-700` | `#262c3a` | `#d2d8e2` | pressed, a control's border |
-| `surface-600` | `#333b4d` | `#b6bece` | a hovered control's border, scrollbar hover |
-| `ink-100` | `#eef1f6` | `#1a1e27` | primary text |
-| `ink-300` | `#c3cbd9` | `#333b48` | secondary text |
-| `ink-500` | `#98a1b2` | `#464e5d` | muted text |
-| `ink-600` | `#7f8899` | `#5f6879` | labels, placeholders |
+| `surface-950` | `#0b0d12` | `#f4f6f8` | the page |
+| `surface-900` | `#12141a` | `#ffffff` | a panel |
+| `surface-850` | `#181c22` | `#eef0f4` | hover on a panel |
+| `surface-800` | `#1f232b` | `#e5e8ed` | a control's fill |
+| `surface-700` | `#2a2f39` | `#d5d9e1` | pressed, a control's border |
+| `surface-600` | `#353b47` | `#b8beca` | a hovered control's border, scrollbar hover |
+| `ink-100` | `#f0f2f5` | `#1a1e26` | primary text |
+| `ink-300` | `#c8ccd6` | `#343944` | secondary text |
+| `ink-500` | `#9da3af` | `#494e5b` | muted text |
+| `ink-600` | `#868c99` | `#616876` | labels, placeholders |
 
 The scale has **only these steps**. The theme does not define `ink-200`,
 `ink-400`, `ink-700` or `surface-500`, so Tailwind emits nothing for them and
@@ -106,7 +106,7 @@ are deliberately not the accent, so a status never reads as a selection.
 - `accent-ink`: text on the fill, the better of the two ink ends by measured
   ratio.
 - `--w1` and `--w2`: the two sheens rotated off the hue, which the washes use.
-- `--hair`: the tinted hairline.
+- `--hair`: the hairline, neutral since the 2026 overhaul.
 
 The values in `@theme` are first-frame fallbacks, not the colours a user sees.
 The default accent is `#4b3fc7`.
@@ -115,19 +115,18 @@ The default accent is `#4b3fc7`.
 
 | Utility | What it is |
 |---|---|
-| `panel-wash` | the iridescent wash on a raised panel; two sheens off the accent |
+| `panel-wash` | the light a raised panel catches along its top; none in light |
 | `panel-top` | the 1 px catch-light along a raised panel's top edge |
-| `border-hair` | the accent-tinted hairline on floating surfaces |
+| `border-hair` | the neutral hairline round panels and floating surfaces |
 | `section-rule` | the rule after a section heading, fading out so sections do not read as a form |
 | `inset-well` | cut into the page, for a card that arrives unprompted |
 | `well-edge` | the accent stripe down an inset well's left edge |
-| `rail-wash` | the sidebar's steeper, single-hue wash |
 | `avatar-wash` | a picture-less avatar that still reads as an object |
 | `cover-scrim` | the deterministic backdrop at the foot of arbitrary cover art |
 | `ink-halo` | a black ring round light text on artwork |
 
 **The canonical raised panel** is `Card`: `panel-wash panel-top rounded-panel
-border border-surface-800 bg-surface-900`. **The canonical floating surface**
+border border-hair bg-surface-900`. **The canonical floating surface**
 (popover, menu) is `rounded-panel border border-hair bg-surface-900
 panel-wash shadow-float`.
 
@@ -147,7 +146,12 @@ panel-wash shadow-float`.
 | `text-ui` (13 px) | the shell's panels, toolbars and dense titles |
 | `text-sm` (14 px) | body, controls |
 | `text-base` (16 px) | card titles |
-| `text-2xl font-bold` | page titles |
+| `text-title` (30 px) | page titles |
+
+Headings (`h1` to `h3`) and every `uppercase` label are set in SN Pro at its
+one weight by element, in unlayered rules in `index.css`, so no weight or
+tracking utility can pull one back to the system face. A heading that shows
+a Japanese title carries `font-brand-jp` and keeps it. `font-bold` is 650.
 
 `tracking-eyebrow` is the one letter spacing for small uppercase labels.
 
@@ -157,13 +161,13 @@ A radius is named by what it rounds, never by its size. A retune then moves
 every control, panel or sheet at once, and the style audit refuses the size
 names (`rounded`, `rounded-lg` …).
 
-| Role | Today | For |
+| Role | Size | For |
 |---|---|---|
-| `rounded-inner` | 6 px | a segment inside a track, icon buttons, small chips |
-| `rounded-control` | 8 px | buttons, fields, pills, list rows |
-| `rounded-panel` | 12 px | cards, popovers, menus, dialogs |
+| `rounded-inner` | 4 px | a segment inside a track, icon buttons, small chips |
+| `rounded-control` | 6 px | buttons, fields, pills, list rows |
+| `rounded-panel` | 10 px | cards, popovers, menus, dialogs |
 | `rounded-sheet` | 16 px | the phone's bottom sheets |
-| `rounded-cover` | 10 px | cover art |
+| `rounded-cover` | 6 px | cover art |
 | `rounded-full` | — | avatars, dots, round icon buttons |
 
 ### Icons
@@ -210,10 +214,10 @@ states. Eight other sizes are in use today, and they converge on these four.
 | Token | Motion |
 |---|---|
 | `settle` | down from above, no bounce; the bird landing |
-| `rise-in` | up from the bottom edge: toasts, the bulk bar |
-| `pop-in` | scale from .97: menus, popovers |
+| `rise-in` | up from the bottom edge on the soft spring: sheets, toasts, the bulk bar |
+| `pop-in` | scale from .97 on the soft spring: menus, popovers |
 | `fade-in` | opacity only |
-| `spring-in` | dialogs, which overshoot and settle |
+| `spring-in` | dialogs, on the soft spring: a slight overshoot that settles |
 | `land` | a success arriving, the scrobble confirmation |
 | `tick` | a counter acknowledging +1 |
 | `*-out` | each entry's exit, quicker than the entry, on `--ease-exit` |

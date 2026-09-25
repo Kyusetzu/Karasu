@@ -187,7 +187,7 @@ export function MarkdownTextarea({
   const previewPanel = (
     <div
       className={cn(
-        "overflow-y-auto rounded-control border border-surface-800 bg-surface-950 p-3",
+        "overflow-y-auto rounded-control border border-hair bg-surface-950 p-3",
         preview === "side" ? "min-h-44" : "min-h-20",
       )}
     >

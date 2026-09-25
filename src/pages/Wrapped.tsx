@@ -743,7 +743,7 @@ export default function Wrapped() {
   return (
     <div className="mx-auto max-w-4xl p-8 3xl:max-w-5xl">
       <div className="mb-4 flex flex-wrap items-center gap-3">
-        <h1 className="flex items-center gap-2 text-2xl font-bold">
+        <h1 className="flex items-center gap-2 text-title font-bold">
           <Sparkles className="size-5 text-accent-400" /> {t("wrapped.title")}
         </h1>
         {years.length > 0 && (
@@ -846,7 +846,7 @@ export default function Wrapped() {
       ) : (
         <canvas
           ref={canvasRef}
-          className="w-full max-w-2xl rounded-sheet border border-surface-800 shadow-xl"
+          className="w-full max-w-2xl rounded-sheet border border-hair shadow-float"
         />
       )}
     </div>

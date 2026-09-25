@@ -253,7 +253,7 @@ export default function Search() {
   return (
     <div className="flex h-full flex-col">
       <div className="px-8 pt-6">
-        <h1 className="text-2xl font-bold">{t("search.title")}</h1>
+        <h1 className="text-title font-bold">{t("search.title")}</h1>
         <div className="mt-4 max-w-176">
           <div className="relative max-w-136">
             <SearchIcon
@@ -645,7 +645,7 @@ function EntityResultList({
 /** `UserRow`'s frame without the follow button — the whole row is the link. */
 function EntityRow({ to, name, src }: { to: string; name: string; src?: string }) {
   return (
-    <div className="flex items-center gap-3 rounded-panel border border-surface-800 bg-surface-900 p-3 transition-surface hover:border-surface-700">
+    <div className="flex items-center gap-3 rounded-panel border border-hair bg-surface-900 p-3 transition-surface hover:border-surface-700">
       <Link to={to} className="min-w-0 flex-1">
         <UserLockup name={name} src={src} size="md" titleAttr nameClassName="text-sm" />
       </Link>

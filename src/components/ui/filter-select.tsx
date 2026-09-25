@@ -29,12 +29,12 @@ export function FilterSelect({
     <div
       className={cn(
         "relative flex h-8.5 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-control",
-        "border border-surface-800 bg-surface-900 px-2.5 transition-surface",
+        "border border-hair bg-surface-900 px-2.5 transition-surface",
         "focus-within:border-accent-500 hover:bg-surface-850",
         className,
       )}
     >
-      <span className="text-[.6875rem] uppercase tracking-[.08em] text-ink-600">
+      <span className="text-xs uppercase tracking-[.08em] text-ink-600">
         {label}
       </span>
       <span className="max-w-32 truncate text-xs text-ink-300">

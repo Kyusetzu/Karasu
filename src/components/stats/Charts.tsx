@@ -144,7 +144,7 @@ function ArcValue({
       x={at.x}
       y={at.y + 3}
       textAnchor="middle"
-      className={`${tone} pointer-events-none text-[.6875rem] font-medium tabular-nums`}
+      className={`${tone} pointer-events-none text-xs font-medium tabular-nums`}
     >
       {value}
     </text>
@@ -257,7 +257,7 @@ export function RadarChart({
               x={at.x}
               y={at.y}
               textAnchor="middle"
-              className="fill-ink-500 text-[.5625rem]"
+              className="fill-ink-500 text-2xs"
             >
               {axis.label.length > 12 ? `${axis.label.slice(0, 11)}…` : axis.label}
             </text>
@@ -266,7 +266,7 @@ export function RadarChart({
               x={at.x}
               y={at.y + 9}
               textAnchor="middle"
-              className="fill-ink-300 text-[.5625rem] font-medium tabular-nums"
+              className="fill-ink-300 text-2xs font-medium tabular-nums"
             >
               {axis.value}
             </text>
@@ -328,14 +328,14 @@ export function Treemap({
                 <text
                   x={r.x + 7}
                   y={r.y + 17}
-                  className={`${onAccent(i)} text-[.625rem] font-medium`}
+                  className={`${onAccent(i)} text-2xs font-medium`}
                 >
                   {label.length > fits ? `${label.slice(0, Math.max(1, fits))}…` : label}
                 </text>
                 <text
                   x={r.x + 7}
                   y={r.y + 30}
-                  className={`${onAccent(i)} text-[.625rem] tabular-nums`}
+                  className={`${onAccent(i)} text-2xs tabular-nums`}
                 >
                   {items[i].value}
                 </text>
@@ -347,7 +347,7 @@ export function Treemap({
                 x={r.x + r.w / 2}
                 y={r.y + r.h / 2 + 3}
                 textAnchor="middle"
-                className={`${onAccent(i)} text-[.5625rem] tabular-nums`}
+                className={`${onAccent(i)} text-2xs tabular-nums`}
               >
                 {items[i].value}
               </text>

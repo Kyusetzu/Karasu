@@ -125,7 +125,7 @@ function DesktopOnly({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation();
   return (
     <div aria-disabled className="relative">
-      <span className="absolute right-0 top-0 z-10 rounded-full bg-surface-800 px-2 py-0.5 text-[.625rem] font-medium text-ink-500">
+      <span className="absolute right-0 top-0 z-10 rounded-full bg-surface-800 px-2 py-0.5 text-2xs font-medium text-ink-500">
         {t("settings.desktopOnly")}
       </span>
       <div className="pointer-events-none select-none opacity-45">{children}</div>

@@ -1,14 +1,12 @@
 {
   "src/app/App.tsx": {
-    "icon-size": 1,
-    "shadow-size": 1
+    "icon-size": 1
   },
   "src/components/EmptyState.tsx": {
     "text-size-arbitrary": 3
   },
   "src/components/RichText.tsx": {
     "icon-size": 2,
-    "radius-size": 3,
     "text-size-arbitrary": 1
   },
   "src/components/Skeleton.tsx": {
@@ -21,9 +19,7 @@
     "tracking-arbitrary": 1
   },
   "src/components/list/ListToolbar.tsx": {
-    "icon-size": 10,
-    "radius-size": 1,
-    "text-size-arbitrary": 1
+    "icon-size": 10
   },
   "src/components/list/SelectBox.tsx": {
     "colour-arbitrary": 2,
@@ -52,8 +48,7 @@
     "icon-size": 1
   },
   "src/components/media/RecommendedSection.tsx": {
-    "icon-size": 1,
-    "radius-size": 1
+    "icon-size": 1
   },
   "src/components/media/SeasonHero.tsx": {
     "colour-foreign": 8,
@@ -68,11 +63,7 @@
     "icon-size": 1,
     "shadow-arbitrary": 1
   },
-  "src/components/overlays/FavouritesModal.tsx": {
-    "radius-size": 1
-  },
   "src/components/overlays/MatchPicker.tsx": {
-    "radius-size": 2,
     "spin-outside-spinner": 1,
     "transition-broad": 1
   },
@@ -80,33 +71,23 @@
     "icon-size": 1
   },
   "src/components/overlays/SeasonSplitModal.tsx": {
-    "icon-size": 2,
-    "radius-size": 1
+    "icon-size": 2
   },
   "src/components/overlays/SignInMerge.tsx": {
     "colour-foreign": 1
-  },
-  "src/components/shell/BackButton.tsx": {
-    "shadow-size": 1
   },
   "src/components/shell/Bell.tsx": {
     "colour-arbitrary": 3,
     "icon-size": 7,
     "radius-arbitrary": 1,
-    "radius-size": 1,
-    "text-size-arbitrary": 1,
     "tracking-arbitrary": 1
   },
   "src/components/shell/BottomBar.tsx": {
     "icon-size": 1,
-    "radius-arbitrary": 1,
-    "radius-size": 1,
-    "text-size-arbitrary": 3
+    "radius-arbitrary": 1
   },
   "src/components/shell/CommandPalette.tsx": {
     "radius-arbitrary": 1,
-    "radius-size": 1,
-    "text-size-arbitrary": 1,
     "tracking-arbitrary": 1
   },
   "src/components/shell/ContextMenu.tsx": {
@@ -127,7 +108,6 @@
     "tracking-arbitrary": 1
   },
   "src/components/shell/PullToSync.tsx": {
-    "shadow-size": 1,
     "spin-outside-spinner": 1,
     "tracking-arbitrary": 1
   },
@@ -135,13 +115,11 @@
     "icon-size": 8,
     "radius-arbitrary": 1,
     "spin-outside-spinner": 1,
-    "text-size-arbitrary": 1,
     "tracking-arbitrary": 3
   },
   "src/components/shell/SyncPanel.tsx": {
     "icon-size": 4,
     "spin-outside-spinner": 1,
-    "text-size-arbitrary": 2,
     "tracking-arbitrary": 3
   },
   "src/components/shell/Titlebar.tsx": {
@@ -154,11 +132,7 @@
     "icon-size": 3
   },
   "src/components/social/ActivityCard.tsx": {
-    "icon-size": 6,
-    "radius-size": 1
-  },
-  "src/components/social/ActivityFeed.tsx": {
-    "radius-size": 2
+    "icon-size": 6
   },
   "src/components/social/CommentTree.tsx": {
     "icon-size": 4
@@ -167,25 +141,17 @@
     "icon-size": 4
   },
   "src/components/social/ThreadRow.tsx": {
-    "icon-size": 5,
-    "radius-size": 1
+    "icon-size": 5
   },
   "src/components/social/UserComments.tsx": {
     "icon-size": 1
   },
-  "src/components/social/UserList.tsx": {
-    "radius-size": 1
-  },
-  "src/components/stats/AreaChart.tsx": {
-    "text-size-arbitrary": 2
-  },
   "src/components/stats/Charts.tsx": {
     "radius-arbitrary": 1,
-    "text-size-arbitrary": 8
+    "text-size-arbitrary": 2
   },
   "src/components/stats/DayHeatmap.tsx": {
-    "radius-arbitrary": 3,
-    "text-size-arbitrary": 2
+    "radius-arbitrary": 3
   },
   "src/components/stats/Heatmap.tsx": {
     "radius-arbitrary": 1
@@ -193,17 +159,12 @@
   "src/components/stats/LocalStatistics.tsx": {
     "tracking-arbitrary": 1
   },
-  "src/components/stats/RankedList.tsx": {
-    "radius-size": 2
-  },
   "src/components/stats/panels.tsx": {
     "radius-arbitrary": 2,
-    "radius-size": 2,
     "tracking-arbitrary": 1
   },
   "src/components/ui/filter-select.tsx": {
     "icon-size": 1,
-    "text-size-arbitrary": 1,
     "tracking-arbitrary": 1
   },
   "src/components/ui/icon-button.tsx": {
@@ -215,15 +176,10 @@
   "src/components/ui/multi-filter-select.tsx": {
     "icon-size": 5,
     "outline-removed": 1,
-    "radius-size": 2,
-    "text-size-arbitrary": 1,
     "tracking-arbitrary": 2
   },
   "src/components/ui/score-bars.tsx": {
     "radius-arbitrary": 2
-  },
-  "src/components/ui/season-picker.tsx": {
-    "shadow-size": 1
   },
   "src/components/ui/section-header.tsx": {
     "text-size-arbitrary": 1,
@@ -232,9 +188,6 @@
   "src/components/ui/tabs.tsx": {
     "transition-broad": 1
   },
-  "src/components/ui/user-lockup.tsx": {
-    "text-size-arbitrary": 1
-  },
   "src/pages/About.tsx": {
     "spin-outside-spinner": 5,
     "text-size-arbitrary": 1,
@@ -242,7 +195,6 @@
   },
   "src/pages/AnimeDetail.tsx": {
     "icon-size": 9,
-    "radius-size": 2,
     "shadow-arbitrary": 1,
     "text-size-arbitrary": 2,
     "transition-broad": 2
@@ -267,9 +219,8 @@
   },
   "src/pages/LocalLibrary.tsx": {
     "icon-size": 9,
-    "radius-size": 1,
     "spin-outside-spinner": 1,
-    "text-size-arbitrary": 4,
+    "text-size-arbitrary": 1,
     "tracking-arbitrary": 5
   },
   "src/pages/MediaList.tsx": {
@@ -279,7 +230,6 @@
   },
   "src/pages/Person.tsx": {
     "icon-size": 2,
-    "radius-size": 4,
     "tracking-arbitrary": 1
   },
   "src/pages/Search.tsx": {
@@ -290,7 +240,6 @@
   },
   "src/pages/Settings.tsx": {
     "icon-size": 2,
-    "text-size-arbitrary": 1,
     "tracking-arbitrary": 1
   },
   "src/pages/Social.tsx": {
@@ -301,14 +250,9 @@
     "tracking-arbitrary": 1
   },
   "src/pages/Thread.tsx": {
-    "icon-size": 4,
-    "radius-size": 4
-  },
-  "src/pages/UserProfile.tsx": {
-    "radius-size": 4
+    "icon-size": 4
   },
   "src/pages/Wrapped.tsx": {
-    "shadow-size": 1,
     "tracking-arbitrary": 1
   },
   "src/pages/settings/AccountPane.tsx": {
@@ -318,12 +262,10 @@
     "spin-outside-spinner": 3
   },
   "src/pages/settings/AniListPane.tsx": {
-    "icon-size": 1,
-    "radius-size": 1
+    "icon-size": 1
   },
   "src/pages/settings/AppearancePane.tsx": {
     "icon-size": 1,
-    "radius-size": 1,
     "transition-broad": 2
   },
   "src/pages/settings/ContentPane.tsx": {

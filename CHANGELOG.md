@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 81eecbe -->
+<!-- generated-through: f96c1df -->
 
 ### Fixed
 
@@ -139,6 +139,7 @@ tag time is then optional rather than load-bearing.
 - Swipe the season hero instead of stepping it with arrows (1.22.2.675).
 - On the phone, the detail page puts every fact below the cover and lets you change the status from a button.
 - The detail page edits your entry from the status button, and the score bars show how everyone else scored the title.
+- A calmer, sharper look: neutral hairlines, tighter corners, headings and labels in the Karasu typeface, and sheets and dialogs that arrive on a soft spring.
 ## 1.0.0 — 2026-09-05
 
 Karasu 1.0.0 is the first tagged release: a desktop and Android tracker built

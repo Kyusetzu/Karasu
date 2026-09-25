@@ -112,9 +112,9 @@ export function RankedRow({
             {entry.count}× · {metricText}
           </span>
         </div>
-        <div className="mt-1 h-2 overflow-hidden rounded bg-surface-800">
+        <div className="mt-1 h-2 overflow-hidden rounded-inner bg-surface-800">
           <div
-            className="h-full rounded bg-accent-500"
+            className="h-full rounded-inner bg-accent-500"
             style={{ width: `${barPct}%` }}
           />
         </div>

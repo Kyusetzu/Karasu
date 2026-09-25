@@ -41,7 +41,7 @@ export function FavouriteButton({
         "flex items-center gap-1.5 border transition-surface",
         square ? "size-11 shrink-0 justify-center rounded-panel bg-surface-900" : "rounded-control px-2.5 py-1.5 text-xs",
         blocked
-          ? "cursor-not-allowed border-surface-800 text-ink-600 opacity-55"
+          ? "cursor-not-allowed border-hair text-ink-600 opacity-55"
           : on
             ? "border-danger/50 text-danger hover:bg-danger/10"
             : "border-surface-700 text-ink-500 hover:border-surface-600 hover:text-ink-300",

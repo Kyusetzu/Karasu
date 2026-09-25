@@ -253,7 +253,7 @@ function NotFound() {
   return (
     <div className="grid h-full place-items-center p-8">
       <div className="max-w-md text-center">
-        <h1 className="text-2xl font-bold">{t("notFound.title")}</h1>
+        <h1 className="text-title font-bold">{t("notFound.title")}</h1>
         <p className="mt-3 text-sm leading-relaxed text-ink-500">
           {t("notFound.body")}
         </p>
@@ -282,7 +282,7 @@ function PlaybackError() {
 
   if (!error) return null;
   return (
-    <div className="pointer-events-auto flex w-88 max-w-full items-start gap-3 rounded-control border border-surface-700 bg-surface-850 px-4 py-3 shadow-xl">
+    <div className="pointer-events-auto flex w-88 max-w-full items-start gap-3 rounded-control border border-surface-700 bg-surface-850 px-4 py-3 shadow-float">
       <span className="text-sm text-ink-300">{error}</span>
       <button
         onClick={clearError}

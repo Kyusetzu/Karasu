@@ -612,7 +612,7 @@ export function JellyfinSection() {
                     setUrl(s.address);
                     setFound(null);
                   }}
-                  className="flex w-full flex-wrap items-center justify-between gap-x-3 rounded-control border border-surface-800 bg-surface-900 px-3 py-2 text-left text-sm transition-surface hover:border-surface-600"
+                  className="flex w-full flex-wrap items-center justify-between gap-x-3 rounded-control border border-hair bg-surface-900 px-3 py-2 text-left text-sm transition-surface hover:border-surface-600"
                 >
                   <span className="font-medium text-ink-300">{s.name || s.address}</span>
                   <span className="text-xs text-ink-500">
@@ -781,7 +781,7 @@ function JellyfinBackgroundRows() {
   };
 
   return (
-    <div className="mt-3 space-y-3 border-t border-surface-800 pt-3">
+    <div className="mt-3 space-y-3 border-t border-hair pt-3">
       <Toggle
         checked={state.enabled}
         onChange={toggle}
@@ -835,7 +835,7 @@ function SessionList({
             "rounded-control border px-3 py-2 text-sm",
             s.matched
               ? "border-success/40 bg-success/10"
-              : "border-surface-800 bg-surface-900",
+              : "border-hair bg-surface-900",
           )}
         >
           <p className="flex flex-wrap items-center gap-x-2">

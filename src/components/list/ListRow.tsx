@@ -30,7 +30,7 @@ export type RowPatch = {
 };
 
 const CELL =
-  "h-8 rounded-inner border border-surface-800 bg-surface-900 px-2 text-xs tabular-nums text-ink-300 transition-surface focus:border-accent-500 focus:outline-none";
+  "h-8 rounded-inner border border-hair bg-surface-900 px-2 text-xs tabular-nums text-ink-300 transition-surface focus:border-accent-500 focus:outline-none";
 
 /** One entry in detail, memoized like `GridCard`; the tracks come from `columns.ts`, never a `w-*` class here. */
 export const ListRow = memo(function ListRow({

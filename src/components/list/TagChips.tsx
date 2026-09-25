@@ -19,7 +19,7 @@ export function TagChips({
       {tags.slice(0, max).map((tag) => (
         <span
           key={tag}
-          className="rounded-cover border border-surface-800 bg-surface-850 px-1.25 py-px text-2xs text-accent-400"
+          className="rounded-cover border border-hair bg-surface-850 px-1.25 py-px text-2xs text-accent-400"
         >
           {tag}
         </span>

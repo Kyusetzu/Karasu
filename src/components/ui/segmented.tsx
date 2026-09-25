@@ -27,7 +27,7 @@ export function Segmented<T extends string>({
       role="radiogroup"
       aria-label={ariaLabel}
       className={cn(
-        "inline-flex shrink-0 rounded-control border border-surface-800 p-0.5",
+        "inline-flex shrink-0 rounded-control border border-hair p-0.5",
         className,
       )}
     >

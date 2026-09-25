@@ -606,7 +606,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
     // Clipped sideways, so the list following a swipe never gives the page a horizontal scroll.
     <div ref={rootRef} className="flex h-full flex-col overflow-x-clip">
       {(data?.fromCache || (data?.pending ?? 0) > 0) && (
-        <div className="flex items-center gap-3 border-b border-surface-800 bg-gold/10 px-8 py-2 text-xs text-gold">
+        <div className="flex items-center gap-3 border-b border-hair bg-gold/10 px-8 py-2 text-xs text-gold">
           <CloudOff className="size-3.5" />
           {data?.fromCache
             ? t("list.offline")
@@ -625,10 +625,10 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
         </div>
       )}
 
-      <div className="border-b border-surface-800 px-8 pt-6">
+      <div className="border-b border-hair px-8 pt-6">
         <div className="flex items-center justify-between gap-4">
           <div className="flex min-w-0 items-baseline gap-2.5">
-            <h1 className="text-2xl font-bold text-ink-100">
+            <h1 className="text-title font-bold text-ink-100">
               {type === "ANIME" ? t("list.animeTitle") : t("list.mangaTitle")}
             </h1>
             <span className="font-brand-jp text-ui tracking-[.04em] text-ink-600">
@@ -783,7 +783,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
             )}
           />
         ) : phone ? (
-          <div className="overflow-hidden rounded-panel border border-surface-800">
+          <div className="overflow-hidden rounded-panel border border-hair">
             <VirtualGrid
               key={`phone-${layout}`}
               items={entries}
@@ -812,7 +812,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
             />
           </div>
         ) : (
-          <div className="overflow-hidden rounded-panel border border-surface-800">
+          <div className="overflow-hidden rounded-panel border border-hair">
             <ListHeader tier={tier} selectMode={selectMode} mediaType={type} cover={layout !== "text"} />
             {/* Keep one entry per row: two side by side made useColumnCount report 2, so the down arrow moved by two. */}
             <VirtualGrid

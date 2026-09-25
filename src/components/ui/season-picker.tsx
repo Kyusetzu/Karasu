@@ -79,7 +79,7 @@ export default function SeasonPicker({
         <div
           data-overlay
           className={cn(
-            "absolute left-0 top-full z-10 mt-1.5 w-64 origin-top-left rounded-panel border border-hair bg-surface-900 p-3 shadow-xl panel-wash",
+            "absolute left-0 top-full z-10 mt-1.5 w-64 origin-top-left rounded-panel border border-hair bg-surface-900 p-3 shadow-float panel-wash",
             panel.leaving ? "animate-pop-out" : "animate-pop-in",
           )}
         >

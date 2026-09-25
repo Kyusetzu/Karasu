@@ -115,7 +115,7 @@ export default function ActionSheet({
                 className={cn(
                   // A comfortable touch target, not a scaled-down menu row.
                   "flex min-h-11 items-center gap-3 rounded-control px-2 text-left text-sm transition-surface",
-                  divides && "mt-1 border-t border-surface-800 pt-1.5",
+                  divides && "mt-1 border-t border-hair pt-1.5",
                   action.danger
                     ? "text-danger hover:bg-danger/10"
                     : "text-ink-300 hover:bg-surface-850 hover:text-ink-100",

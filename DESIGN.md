@@ -562,3 +562,10 @@ maintainer picks. A pure restyle that moves nothing does not. The rules:
   in the grid draws its focus ring on its frame, since the frame's clip had
   cut the ring off the link inside it, and a cover too narrow for both
   quick actions shows the one that fits rather than a clipped second.
+- **2026-09-25:** The detail page and its editor, shown as before and after
+  and kept as shown. The title takes a heading step of its own on the type
+  scale and the native title the body step, the cover floats on the one
+  float shadow, and the action row's icons and the links' glyphs take the
+  icon scale. The label over the chosen score bar takes a gold-ink token,
+  white on the light theme's dark gold where near-black was unreadable,
+  and the tag field shows its focus on its border.

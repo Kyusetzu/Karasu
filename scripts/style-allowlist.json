@@ -58,5 +58,23 @@
     "rule": "icon-size",
     "token": "size-2.5",
     "reason": "the score badge's star sits in its 10 px figures and matches their height"
+  },
+  {
+    "file": "src/pages/Franchise.tsx",
+    "rule": "radius-arbitrary",
+    "token": "rounded-[.375em]",
+    "reason": "a franchise node is laid out in em so the whole graph scales with the text size; its cover radius and labels follow"
+  },
+  {
+    "file": "src/pages/Franchise.tsx",
+    "rule": "text-size-arbitrary",
+    "token": "text-[.5625em]",
+    "reason": "a franchise node is laid out in em so the whole graph scales with the text size; its cover radius and labels follow"
+  },
+  {
+    "file": "src/pages/Franchise.tsx",
+    "rule": "text-size-arbitrary",
+    "token": "text-[.6875em]",
+    "reason": "a franchise node is laid out in em so the whole graph scales with the text size; its cover radius and labels follow"
   }
 ]

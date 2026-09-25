@@ -161,7 +161,7 @@ export default function Franchise() {
         <BackButton />
         <h1 className="shrink-0 text-lg font-semibold text-ink-100">{t("franchise.title")}</h1>
         {data && (
-          <span className="truncate text-2xs uppercase tracking-[.09em] text-ink-600">
+          <span className="truncate text-2xs uppercase tracking-eyebrow text-ink-600">
             {t("franchise.related", { count: data.nodes.length })}
           </span>
         )}
@@ -421,7 +421,7 @@ function GraphNode({
               className="size-full object-cover"
             />
           ) : (
-            <span className="grid size-full place-items-center text-[.5625em] uppercase tracking-[.12em] text-ink-600">
+            <span className="grid size-full place-items-center text-[.5625em] uppercase tracking-eyebrow text-ink-600">
               {t("franchise.noCover")}
             </span>
           )}
@@ -647,7 +647,7 @@ function Legend({ type }: { type: MediaType }) {
         >
           {LEGEND.map((status) => (
             <li key={status ?? "none"} className={cn("flex items-center gap-1.5", !status && "col-span-2")}>
-              <span className="size-2.5 shrink-0 rounded-[.1875rem]" style={{ border: outline(status) }} />
+              <span className="size-2.5 shrink-0 rounded-inner" style={{ border: outline(status) }} />
               {/* Resolved on the root's type, or a pinned ANIME legend reads "Watching" over nodes that say "Reading". */}
               {status ? t(`status.${type}.${status}`) : t("franchise.notOnList")}
             </li>
@@ -663,7 +663,7 @@ function Legend({ type }: { type: MediaType }) {
       >
         {!open &&
           (["CURRENT", "COMPLETED", "PLANNING"] as const).map((s) => (
-            <span key={s} aria-hidden className="size-2.5 rounded-[.1875rem]" style={{ border: outline(s) }} />
+            <span key={s} aria-hidden className="size-2.5 rounded-inner" style={{ border: outline(s) }} />
           ))}
         {t("franchise.legend")}
         {open ? <ChevronDown aria-hidden className="size-3.5" /> : <ChevronUp aria-hidden className="size-3.5" />}

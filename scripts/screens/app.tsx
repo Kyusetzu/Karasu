@@ -149,13 +149,47 @@ function detail(id: number) {
     stats: { scoreDistribution: [36, 27, 56, 100, 189, 294, 684, 926, 944, 522].map((amount, k) => ({ score: (k + 1) * 10, amount })), statusDistribution: null },
     studios: { edges: [{ isMain: true, node: { id: 1, name: r.studio } }] },
     tags: [],
-    externalLinks: [],
+    externalLinks: [
+      { id: 1, site: "Crunchyroll", url: "https://www.crunchyroll.com", type: "STREAMING", color: "#F88A36" },
+      { id: 2, site: "Official Site", url: "https://example.org", type: "INFO", color: null },
+      { id: 3, site: "Twitter", url: "https://x.com", type: "SOCIAL", color: "#1D9BF0" },
+    ],
     mediaListEntry: { id: 5000 + index, status: "CURRENT", progress: 8, score: 8, repeat: 0, notes: null },
     relations: { edges: [] },
     characters: { edges: [] },
     staff: { edges: [] },
     recommendations: { nodes: [] },
   };
+}
+
+/** A small franchise around the first title: two earlier seasons, a side story and the source, some on the list. */
+function franchise() {
+  const node = (id: number, i: number, title: string, format: string, status: string | null, progress = 0) => ({
+    id,
+    type: format === "NOVEL" ? "MANGA" : "ANIME",
+    title: { romaji: title, english: title, native: null },
+    coverImage: { large: id === REAL[0].id ? media(0, false).coverImage.large : cover(i) },
+    format,
+    episodes: format === "NOVEL" ? null : 12,
+    chapters: null,
+    isAdult: false,
+    genres: [],
+    mediaListEntry: status ? { status, progress } : null,
+  });
+  const root = node(REAL[0].id, 0, REAL[0].title, "TV", "CURRENT", 8);
+  const s2 = node(1101, 5, "Mushoku Tensei: Jobless Reincarnation Season 2", "TV", "COMPLETED", 12);
+  const s1 = node(1102, 6, "Mushoku Tensei: Jobless Reincarnation", "TV", "COMPLETED", 12);
+  const ova = node(1103, 7, "Mushoku Tensei: Eris the Goblin Slayer", "OVA", "PLANNING");
+  const novel = node(1104, 8, "Mushoku Tensei (Light Novel)", "NOVEL", null);
+  const edge = (relationType: string, n: ReturnType<typeof node>) => ({ relationType, node: n });
+  const withRelations = (n: ReturnType<typeof node>, edges: ReturnType<typeof edge>[]) => ({ ...n, relations: { edges } });
+  return [
+    withRelations(root, [edge("PREQUEL", s2), edge("SOURCE", novel)]),
+    withRelations(s2, [edge("PREQUEL", s1), edge("SEQUEL", root), edge("SIDE_STORY", ova)]),
+    withRelations(s1, [edge("SEQUEL", s2)]),
+    withRelations(ova, [edge("PARENT", s2)]),
+    withRelations(novel, [edge("ADAPTATION", root)]),
+  ];
 }
 
 /** Answers a passthrough query by the root field it asks for; anything else gets an empty but well-formed page. */
@@ -177,6 +211,10 @@ function answerQuery(query: string, variables: Record<string, unknown> | null) {
       { __typename: "ThreadCommentReplyNotification", id: 905, createdAt: now - 260_000, commentId: 1, user: user(13, "Tsubame"), thread: { id: 44, title: "Frühjahr 2026: eure Favoriten" } },
     ];
     return { Page: { pageInfo: { hasNextPage: true, total: 5, currentPage: 1, lastPage: 2 }, notifications } };
+  }
+  if (/relations \{ edges \{ relationType node/.test(q) && /id_in/.test(q)) {
+    const ids = new Set((variables?.ids as number[]) ?? []);
+    return { Page: { media: franchise().filter((m) => ids.has(m.id)) } };
   }
   if (/\bPage\b/.test(q)) {
     const page = { media: Array.from({ length: 8 }, (_, i) => media(i, false)), recommendations: [], users: [], activities: [], threads: [], notifications: [], airingSchedules: [], characters: [], staff: [] };

@@ -1,4 +1,4 @@
-/* GENERATED from src/app/index.css (sha256 7f8d51bd6395) by site/scripts/sync-tokens.mjs
+/* GENERATED from src/app/index.css (sha256 c2224e8caec7) by site/scripts/sync-tokens.mjs
    — do not edit. Re-run `npm run sync` after changing the source; `npm run check`
    fails while this file is stale. CLAUDE.md, "The website". */
 /* `static` because Tailwind tree-shakes tokens no utility references, leaving a `var()`-only token undefined in dark. */
@@ -26,6 +26,9 @@
   /* Page titles, a step above text-2xl, in the brand face. */
   --text-title: 1.875rem;
   --text-title--line-height: 1.2;
+  /* A title's own heading on its detail page, a step under a screen title so a long name wraps a line sooner. */
+  --text-heading: 1.625rem;
+  --text-heading--line-height: 1.25;
   /* The first-run greeting, set larger than a page title and tight, with a wider step for the desktop. */
   --text-hero: 1.75rem;
   --text-hero--line-height: 1.12;
@@ -74,6 +77,8 @@
 
   /* Score stars only. */
   --color-gold: #fcd34d;
+  /* A label on a gold fill: near-black on the bright gold, white on the light theme's dark one. */
+  --color-gold-ink: rgb(4 5 8);
   /* Destructive actions, failure states. */
   --color-danger: #f0787f;
   /* "Mark complete" — only ever a glyph on the scrim over cover art. */
@@ -430,6 +435,7 @@
 
   /* Gold, danger and success are used as text, so the same hues are pulled down to read on white. */
   --color-gold: #8a6207;
+  --color-gold-ink: #ffffff;
   --color-danger: #b3232c;
   --color-success: #0d7a54;
 

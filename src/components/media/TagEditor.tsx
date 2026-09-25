@@ -43,7 +43,7 @@ export default function TagEditor({
   );
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5 rounded-control border border-surface-700 bg-surface-900 px-2 py-1.5">
+    <div className="field-shell flex flex-wrap items-center gap-1.5 rounded-control border border-surface-700 bg-surface-900 px-2 py-1.5 transition-surface focus-within:border-accent-500">
       {tags.map((tag) => (
         <RemovableChip key={tag} size="sm" removeLabel={t("tags.remove", { tag })} onRemove={() => remove(tag)}>
           {tag}

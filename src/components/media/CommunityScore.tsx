@@ -87,13 +87,13 @@ export function CommunityScore({
               className="group relative flex h-full items-end focus-visible:outline-2 focus-visible:outline-accent-500"
             >
               {mine && (
-                <span className="absolute -top-1 left-1/2 -translate-x-1/2 rounded-inner bg-gold px-1.5 py-0.5 text-xs font-bold leading-none text-[#0d1117]">
+                <span className="absolute -top-1 left-1/2 -translate-x-1/2 rounded-inner bg-gold px-1.5 py-0.5 text-xs font-bold leading-none text-gold-ink">
                   {label(b.value)}
                 </span>
               )}
               <span
                 className={cn(
-                  "w-full rounded-t-[.3rem] transition-[height,background-color]",
+                  "w-full rounded-t-inner transition-[height,background-color]",
                   mine ? "bg-gold" : i < at ? "bg-gold/55" : "bg-surface-700 group-hover:bg-surface-600",
                 )}
                 style={{ height: `${height}%` }}

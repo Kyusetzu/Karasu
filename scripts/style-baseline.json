@@ -9,19 +9,12 @@
   "src/components/Skeleton.tsx": {
     "radius-size": 1
   },
-  "src/components/media/CommunityScore.tsx": {
-    "colour-arbitrary": 1,
-    "radius-arbitrary": 1
-  },
   "src/components/media/DetectionSurface.tsx": {
     "icon-size": 1,
     "text-size-arbitrary": 1
   },
   "src/components/media/DigestRow.tsx": {
     "radius-arbitrary": 1
-  },
-  "src/components/media/FavouriteButton.tsx": {
-    "icon-size": 1
   },
   "src/components/media/MediaCard.tsx": {
     "icon-size": 1
@@ -32,9 +25,6 @@
   "src/components/media/SeasonHero.tsx": {
     "colour-foreign": 8,
     "tracking-arbitrary": 1
-  },
-  "src/components/media/TagEditor.tsx": {
-    "outline-removed": 1
   },
   "src/components/overlays/RandomPickModal.tsx": {
     "icon-size": 1
@@ -85,12 +75,6 @@
     "text-size-arbitrary": 1,
     "tracking-arbitrary": 1
   },
-  "src/pages/AnimeDetail.tsx": {
-    "icon-size": 8,
-    "shadow-arbitrary": 1,
-    "text-size-arbitrary": 2,
-    "transition-broad": 2
-  },
   "src/pages/Calendar.tsx": {
     "icon-size": 4,
     "radius-arbitrary": 1
@@ -101,11 +85,6 @@
   },
   "src/pages/Forum.tsx": {
     "icon-size": 1
-  },
-  "src/pages/Franchise.tsx": {
-    "radius-arbitrary": 3,
-    "text-size-arbitrary": 4,
-    "tracking-arbitrary": 2
   },
   "src/pages/LocalLibrary.tsx": {
     "icon-size": 7,

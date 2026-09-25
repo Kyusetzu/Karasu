@@ -93,6 +93,10 @@ describe("contrast obligations", () => {
       expect(short).toEqual(SHORT.inkOnFill[theme]);
     });
 
+    it(`reads the label on a gold fill at 4.5:1 in ${theme}`, () => {
+      expect(contrastRatio(colour(theme, "gold-ink"), colour(theme, "gold"))).toBeGreaterThanOrEqual(4.5);
+    });
+
     it(`keeps the accent fill 3:1 off the panel in ${theme}, the known shortfalls aside`, () => {
       const short = ACCENT_PRESETS.filter((hex) => contrastRatio(shades(hex).a500, colour(theme, "surface-900")) < 3);
       expect(short).toEqual(SHORT.fillOffPanel[theme]);
@@ -122,6 +126,10 @@ describe("high contrast", () => {
       for (const [ink, surface] of pairs) {
         expect(contrastRatio(high(theme, ink), high(theme, surface)), `${ink} on ${surface}`).toBeGreaterThanOrEqual(7);
       }
+    });
+
+    it(`reads the label on a gold fill at 7:1, in ${theme}`, () => {
+      expect(contrastRatio(high(theme, "gold-ink"), high(theme, "gold"))).toBeGreaterThanOrEqual(7);
     });
 
     it(`draws the border role at 3:1 against a panel and the page, in ${theme}`, () => {

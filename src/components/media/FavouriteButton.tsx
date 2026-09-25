@@ -47,7 +47,7 @@ export function FavouriteButton({
             : "border-surface-700 text-ink-500 hover:border-surface-600 hover:text-ink-300",
       )}
     >
-      <Heart className={cn(square ? "size-4.5" : "size-3.5", on && "fill-current")} />
+      <Heart className={cn(square ? "size-5" : "size-3.5", on && "fill-current")} />
       {!square && (on ? t("detail.favourited") : t("detail.favourite"))}
     </button>
   );

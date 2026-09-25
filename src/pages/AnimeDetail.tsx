@@ -211,7 +211,7 @@ export default function AnimeDetail() {
               alt=""
               style={{ viewTransitionName: "karasu-hero" }}
               className={cn(
-                "h-57 w-38 rounded-cover border border-surface-700 object-cover shadow-[0_1.25rem_2.5rem_rgba(0,0,0,.65)]",
+                "h-57 w-38 rounded-cover border border-surface-700 object-cover shadow-float",
                 veiled && "blur-xl",
               )}
             />
@@ -219,7 +219,7 @@ export default function AnimeDetail() {
               <button
                 onClick={() => setRevealed(true)}
                 aria-label={title}
-                className="absolute inset-0 grid place-items-center rounded-cover bg-surface-950/45 text-2xs font-semibold text-ink-100 transition hover:bg-surface-950/30"
+                className="absolute inset-0 grid place-items-center rounded-cover bg-surface-950/45 text-2xs font-semibold text-ink-100 transition-surface hover:bg-surface-950/30"
               >
                 <span className="rounded-full bg-surface-900/90 px-2.5 py-1">
                   {t("settings.blurReveal")}
@@ -245,12 +245,12 @@ export default function AnimeDetail() {
             />
           )}
           <div className={cn("pt-16", !phone && "min-w-0 flex-1")}>
-            <h1 className="text-[1.625rem] font-bold leading-tight text-ink-100">
+            <h1 className="text-heading font-bold text-ink-100">
               {title}
             </h1>
             {/* Native first, romaji only as a fallback: the Japanese face is part of the app's identity. */}
             {data.title.native && data.title.native !== title ? (
-              <p className="font-brand-jp text-[1.0625rem] text-ink-500">
+              <p className="font-brand-jp text-base text-ink-500">
                 {data.title.native}
               </p>
             ) : (
@@ -293,7 +293,7 @@ export default function AnimeDetail() {
                     title={t("detail.openOnAniList")}
                     className={SQUARE}
                   >
-                    <ExternalLink className="size-4.5" />
+                    <ExternalLink className="size-5" />
                   </IconButton>
                   {android && (
                     <IconButton
@@ -302,13 +302,13 @@ export default function AnimeDetail() {
                       title={t("ctx.share")}
                       className={SQUARE}
                     >
-                      <Share2 className="size-4.5" />
+                      <Share2 className="size-5" />
                     </IconButton>
                   )}
                 </div>
                 {canPlay && (
                   <Button className="h-11 w-full rounded-panel" onClick={() => play(data.id)} title={t("common.playNext")}>
-                    <Play className="size-3.75" fill="currentColor" />
+                    <Play className="size-4" fill="currentColor" />
                     {t("common.playNext")}
                   </Button>
                 )}
@@ -344,7 +344,7 @@ export default function AnimeDetail() {
                     onClick={() => play(data.id)}
                     title={t("common.playNext")}
                   >
-                    <Play className="size-3.75" fill="currentColor" />
+                    <Play className="size-4" fill="currentColor" />
                     {t("common.playNext")}
                   </Button>
                 )}
@@ -359,14 +359,14 @@ export default function AnimeDetail() {
                     onClick={() => openUrl(mediaUrl(data.type, data.id))}
                     className="flex items-center gap-1 text-xs text-ink-500 hover:text-accent-400"
                   >
-                    {t("detail.openOnAniList")} <ExternalLink className="size-2.75" />
+                    {t("detail.openOnAniList")} <ExternalLink className="size-3.5" />
                   </button>
                   {android && (
                     <button
                       onClick={() => void shareText(mediaUrl(data.type, data.id)).catch(() => {})}
                       className="flex items-center gap-1 text-xs text-ink-500 hover:text-accent-400"
                     >
-                      {t("ctx.share")} <Share2 className="size-2.75" />
+                      {t("ctx.share")} <Share2 className="size-3.5" />
                     </button>
                   )}
                 </div>
@@ -807,7 +807,7 @@ function ReviewCard({
         </Link>
         {r.score != null && (
           <span className="flex shrink-0 items-center gap-1 text-xs tabular-nums text-ink-300">
-            <Star className="size-3 text-gold" fill="currentColor" />
+            <Star className="size-3.5 text-gold" fill="currentColor" />
             {t("detail.reviewScore", { n: r.score })}
           </span>
         )}
@@ -1156,14 +1156,14 @@ function LinkList({ links }: { links: ExternalLinkData[] }) {
           <button
             key={l.id}
             onClick={() => openUrl(l.url)}
-            className="flex items-center gap-1.5 rounded-control border border-surface-700 bg-surface-850 px-3 py-1.5 text-xs text-ink-300 transition-colors hover:border-surface-600 hover:text-ink-100"
+            className="flex items-center gap-1.5 rounded-control border border-surface-700 bg-surface-850 px-3 py-1.5 text-xs text-ink-300 transition-surface hover:border-surface-600 hover:text-ink-100"
           >
             <span
               className="h-2 w-2 shrink-0 rounded-full"
-              style={{ backgroundColor: l.color ?? "#64748b" }}
+              style={{ backgroundColor: l.color ?? "var(--color-ink-600)" }}
             />
             {l.site}
-            <ExternalLink className="size-2.5 text-ink-600" />
+            <ExternalLink className="size-3.5 text-ink-600" />
           </button>
         ))}
       </div>

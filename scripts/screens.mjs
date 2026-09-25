@@ -83,6 +83,17 @@ export const SCREENS = [
   },
   { id: "d12-glocke", w: 1232, h: 800, route: "/list", act: (p) => p.getByRole("button", { name: "Benachrichtigungen" }).first().click() },
   { id: "d15-benachrichtigungen", w: 1232, h: 800, route: "/notifications" },
+  { id: "d21-detail", w: 1232, h: 800, route: "/media/178789" },
+  { id: "d22-detail-unten", w: 1232, h: 800, route: "/media/178789", act: (p) => p.evaluate(() => document.getElementById("main")?.scrollTo(0, 1e6)) },
+  { id: "d23-franchise", w: 1232, h: 800, route: "/franchise/178789" },
+  { id: "p12-franchise", w: 405, h: 860, phone: true, route: "/franchise/178789" },
+  { id: "p13-editor-mehr", w: 405, h: 860, phone: true, route: "/media/178789", act: async (p) => {
+    await statusButton(p).click();
+    await p.waitForTimeout(400);
+    await p.getByRole("button", { name: /^Mehr ·/ }).last().click();
+    await p.waitForTimeout(300);
+    await p.locator("input[list]").last().focus();
+  } },
   { id: "p11-benachrichtigungen", w: 405, h: 860, phone: true, route: "/notifications" },
   { id: "d16-erster-start", w: 1232, h: 800, route: "/", out: true },
   { id: "p9-erster-start", w: 405, h: 860, phone: true, route: "/", out: true },

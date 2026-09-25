@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 989f31e -->
+<!-- generated-through: f3f5d1d -->
 
 ### Fixed
 
@@ -102,6 +102,7 @@ tag time is then optional rather than load-bearing.
 - A keyboard focus ring is visible on grid covers again, the complete button no longer overflows narrow covers, and the list view's score header is no longer cut off in German.
 - Opening the notifications dropdown or sheet over the notifications page no longer reloads every page or clears its unread marks, and the pull-to-sync pill fades out where it stood.
 - Narrow grid covers keep the complete button when it fits and never clip a quick action, and the selection box no longer draws a second focus ring.
+- The score label over the chosen bar is readable in the light theme, and the tag field shows keyboard focus.
 
 ### Added
 

@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 66d8c0f -->
+<!-- generated-through: a7127b7 -->
 
 ### Fixed
 
@@ -115,6 +115,7 @@ tag time is then optional rather than load-bearing.
 - Setting a title to Completed now fills in the final episode or chapter (and the volume count for manga) wherever the status changes.
 - A third, text-only list view beside the gallery and thumbnails, and all three views on the phone, laid out for its width.
 - On the phone, swipe left or right on the anime and manga lists to move between the status tabs.
+- A contrast setting under Appearance: System, Standard or High, where High lifts text, the accent and every border to at least 7:1 in both themes.
 
 ### Changed
 

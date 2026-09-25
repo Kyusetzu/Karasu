@@ -438,6 +438,45 @@
   color-scheme: dark;
 }
 
+/* High contrast, dark: the setting's palette; `surface-600` becomes the border role, at 8:1 against a panel. */
+:root[data-contrast="more"] {
+  --color-surface-950: #050608;
+  --color-surface-900: #090b0f;
+  --color-surface-850: #111419;
+  --color-surface-800: #191c22;
+  --color-surface-700: #2a2e36;
+  --color-surface-600: #a0a5af;
+
+  --color-ink-100: #ffffff;
+  --color-ink-300: #edf0f6;
+  --color-ink-500: #dce0e6;
+  --color-ink-600: #cdd1d9;
+
+  --wash-top: transparent;
+  --catch-light: transparent;
+  --float-shadow: transparent;
+  --float-edge: var(--color-surface-600);
+}
+
+/* High contrast, light: the same roles on white, and the semantic colours pulled down to 7:1 as text. */
+:root[data-contrast="more"][data-theme="light"] {
+  --color-surface-950: #ffffff;
+  --color-surface-900: #ffffff;
+  --color-surface-850: #eff2f7;
+  --color-surface-800: #e3e6ed;
+  --color-surface-700: #cdd1da;
+  --color-surface-600: #494d56;
+
+  --color-ink-100: #050608;
+  --color-ink-300: #14161b;
+  --color-ink-500: #23252b;
+  --color-ink-600: #30333a;
+
+  --color-gold: #6e4700;
+  --color-danger: #a2061d;
+  --color-success: #005b38;
+}
+
 /* Deliberately no viewport-based font-size: the OS display scale already applies, and a clamp on top scales the app twice. */
 html,
 body,
@@ -760,14 +799,22 @@ html[data-reduce-motion] ::view-transition-new(*) {
   }
 }
 
-/* The softer request gets the softer answer: keep the palette, sharpen the hairlines the design deliberately keeps quiet. */
-@media (prefers-contrast: more) {
-  :root {
-    --hair: rgba(128, 136, 150, 0.6);
-  }
-  *:focus-visible {
-    outline-width: 3px;
-  }
+/* High contrast draws every control's edge in the border role, since `surface-700` is also a fill there. */
+:root[data-contrast="more"] .border-surface-700 {
+  border-color: var(--color-surface-600);
+}
+/* Glass is a blur of whatever is behind it, which no contrast ratio can promise; high contrast makes it solid. */
+:root[data-contrast="more"] [class*="backdrop-blur"] {
+  backdrop-filter: none;
+  background-color: var(--color-surface-900);
+}
+:root[data-contrast="more"] .section-rule {
+  background-image: none;
+  background-color: var(--color-surface-600);
+}
+:root[data-contrast="more"] *:focus-visible {
+  outline-width: 3px;
+  outline-offset: 2px;
 }
 
 /* Scrollbars */

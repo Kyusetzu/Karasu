@@ -1700,6 +1700,13 @@ shape, and the question that follows them.
   Appearance toggle is disabled with a hint where the answer is `None`. On
   the rig on 2026-09-20 the switch painted Windows' `#0078d4` and came back
   to the saved colour; Linux and Android are compile-checked only.
+  Contrast is its own setting beside the theme (`karasu-contrast`: system,
+  standard, high; `lib/contrast` `resolveContrast`): high sets
+  `data-contrast="more"`, which swaps the palette in `index.css`, and passes
+  `contrast: "high"` to `accentShades`, which lifts the accent to 7:1. Never
+  key a high-contrast rule on `@media (prefers-contrast)` in the app — that
+  would override a user who chose Standard; the site, which has no setting,
+  gets the media query from the token sync.
 - **Overlays carry `data-overlay`.** Screen-level key handlers check for it and
   stand down, so a dialog owns the keyboard instead of the list behind it acting
   on the same press. `GlobalKeys` honours it too.

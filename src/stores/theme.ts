@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { accentShades } from "@/lib/contrast";
+import { accentShades, resolveContrast, CONTRAST_MODES, type ContrastMode } from "@/lib/contrast";
 import { DEFAULT_ACCENT } from "@/lib/designTokens";
 import type { MediaListStatus } from "@/api/types";
 import {
@@ -37,6 +37,7 @@ const REDUCE_MOTION_KEY = "karasu-reduce-motion";
 /** Not `karasu-density`, which held the old s/m/l cover setting and would read back as a stray value. */
 const UI_DENSITY_KEY = "karasu-ui-density";
 const STATUS_COLORS_KEY = "karasu-status-colors";
+const CONTRAST_KEY = "karasu-contrast";
 
 /** Kills every transition for one frame; keep both reflows and the timeout, or var() colours hold the old value. */
 function suspendTransitions(html: HTMLElement): void {
@@ -65,6 +66,10 @@ function systemDark(): boolean {
   return window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? true;
 }
 
+function systemMoreContrast(): boolean {
+  return window.matchMedia?.("(prefers-contrast: more)").matches ?? false;
+}
+
 /** Writes the theme and the accent's derived ramp to the root; the theme goes first because the derivation reads it. */
 function apply(
   mode: ThemeMode,
@@ -73,11 +78,16 @@ function apply(
   reduceMotion: boolean,
   statusColors: StatusPalette,
   density: Density,
+  contrastMode: ContrastMode,
 ): void {
   const dark = mode === "dark" || (mode === "system" && systemDark());
+  const contrast = resolveContrast(contrastMode, systemMoreContrast());
   const html = document.documentElement;
   suspendTransitions(html);
   html.dataset.theme = dark ? "dark" : "light";
+  // index.css swaps in the high-contrast palette on this attribute, in either theme.
+  if (contrast === "high") html.dataset.contrast = "more";
+  else delete html.dataset.contrast;
   html.toggleAttribute("data-reduce-motion", reduceMotion);
   html.style.setProperty("--cover-cols", String(clampCols(coverCols)));
   // The dense screens read their sizes from the tokens index.css keys on this attribute.
@@ -86,6 +96,7 @@ function apply(
   const base = isHex(accent) ? accent : DEFAULT_ACCENT;
   const { a400, a500, a600, ink, rgb, w1, w2, hair } = accentShades(base, {
     light: !dark,
+    contrast,
   });
   const root = html.style;
   root.setProperty("--color-accent-400", a400);
@@ -118,7 +129,10 @@ interface ThemeState {
   density: Density;
   /** One colour per list status — see `lib/statusColors`. */
   statusColors: StatusPalette;
+  /** "system" follows the OS's contrast request; "high" is the high-contrast palette in either theme. */
+  contrast: ContrastMode;
   setMode: (mode: ThemeMode) => void;
+  setContrast: (contrast: ContrastMode) => void;
   setAccent: (accent: string) => void;
   setAccentSource: (source: AccentSource) => void;
   /** Re-reads the OS accent; the shell calls it on focus, since Windows lets the colour change while the app runs. */
@@ -173,6 +187,12 @@ const storedDensity = (): Density => {
   return isDensity(raw) ? raw : "compact";
 };
 
+/** Validated like the mode, so a stale value lands on "system" rather than on a level nobody chose. */
+const storedContrast = (): ContrastMode => {
+  const saved = localStorage.getItem(CONTRAST_KEY);
+  return (CONTRAST_MODES as readonly string[]).includes(saved ?? "") ? (saved as ContrastMode) : "system";
+};
+
 const storedStatusColors = (): StatusPalette => {
   try {
     return normalizeStatusColors(JSON.parse(localStorage.getItem(STATUS_COLORS_KEY) ?? "null"));
@@ -184,8 +204,8 @@ const storedStatusColors = (): StatusPalette => {
 export const useTheme = create<ThemeState>((set, get) => {
   /** Writes whatever the store currently holds, so no call site repeats the argument list. */
   const flush = () => {
-    const { mode, accent, accentSource, systemAccent, coverCols, reduceMotion, statusColors, density } = get();
-    apply(mode, effectiveAccent(accentSource, accent, systemAccent), coverCols, reduceMotion, statusColors, density);
+    const { mode, accent, accentSource, systemAccent, coverCols, reduceMotion, statusColors, density, contrast } = get();
+    apply(mode, effectiveAccent(accentSource, accent, systemAccent), coverCols, reduceMotion, statusColors, density, contrast);
   };
 
   /** The palette's own writer, JSON rather than `commit`; the `try` because private-mode storage throws on write. */
@@ -217,8 +237,10 @@ export const useTheme = create<ThemeState>((set, get) => {
     reduceMotion: localStorage.getItem(REDUCE_MOTION_KEY) === "true",
     density: storedDensity(),
     statusColors: storedStatusColors(),
+    contrast: storedContrast(),
 
     setMode: (mode) => commit(MODE_KEY, "mode", mode),
+    setContrast: (contrast) => commit(CONTRAST_KEY, "contrast", contrast),
     setAccent: (accent) => commit(ACCENT_KEY, "accent", accent),
     setAccentSource: (source) => commit(ACCENT_SOURCE_KEY, "accentSource", source),
     refreshSystemAccent: async () => {
@@ -261,6 +283,12 @@ export const useTheme = create<ThemeState>((set, get) => {
         .matchMedia?.("(prefers-color-scheme: dark)")
         .addEventListener("change", () => {
           if (get().mode === "system") flush();
+        });
+      // And the OS contrast request while the contrast setting follows it.
+      window
+        .matchMedia?.("(prefers-contrast: more)")
+        .addEventListener("change", () => {
+          if (get().contrast === "system") flush();
         });
     },
   };

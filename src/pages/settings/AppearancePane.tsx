@@ -7,6 +7,7 @@ import { isAndroid, usePlatform } from "@/stores/platform";
 import { Card, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { ACCENT_PRESETS } from "@/lib/designTokens";
+import { CONTRAST_MODES, type ContrastMode } from "@/lib/contrast";
 import {
   COVER_COLS_MAX,
   COVER_COLS_MIN,
@@ -43,6 +44,8 @@ export function AppearanceSection() {
   const setDensity = useTheme((s) => s.setDensity);
   const setReduceMotion = useTheme((s) => s.setReduceMotion);
   const setThemeMode = useTheme((s) => s.setMode);
+  const contrast = useTheme((s) => s.contrast);
+  const setContrast = useTheme((s) => s.setContrast);
   const setAccent = useTheme((s) => s.setAccent);
   const accentSource = useTheme((s) => s.accentSource);
   const systemAccent = useTheme((s) => s.systemAccent);
@@ -104,6 +107,21 @@ export function AppearanceSection() {
             {THEME_MODES.map((m) => (
               <option key={m} value={m}>
                 {t(`settings.theme_${m}`)}
+              </option>
+            ))}
+          </select>
+        </Row>
+
+        <Row label={t("settings.contrast")} hint={t("settings.contrastHint")}>
+          <select
+            value={contrast}
+            onChange={(e) => setContrast(e.target.value as ContrastMode)}
+            className={SELECT}
+            aria-label={t("settings.contrast")}
+          >
+            {CONTRAST_MODES.map((m) => (
+              <option key={m} value={m}>
+                {t(`settings.contrast_${m}`)}
               </option>
             ))}
           </select>

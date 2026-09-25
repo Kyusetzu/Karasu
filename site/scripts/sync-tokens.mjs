@@ -30,7 +30,7 @@ const REPO = path.resolve(SITE, "..");
 const SOURCE = path.join(REPO, "src", "app", "index.css");
 const CONTRAST = path.join(REPO, "src", "lib", "contrast.ts");
 const OUT = path.join(SITE, "src", "styles", "tokens.generated.css");
-const DEFAULT_ACCENT = "#4b3fc7"; // src/stores/theme.ts DEFAULT_ACCENT
+const DEFAULT_ACCENT = "#4b3fc7"; // src/lib/designTokens.ts DEFAULT_ACCENT
 
 const args = new Set(process.argv.slice(2));
 
@@ -108,8 +108,17 @@ function taken(head, body = "") {
   if (head.startsWith("html[data-reduce-motion]")) return true;
   if (head === "@media (forced-colors: active)") return true;
   if (head === "@media (prefers-contrast: more)") return true;
+  // The app's high-contrast setting, dark half only: the site stays dark and answers the OS request instead.
+  if (head.startsWith(':root[data-contrast="more"]') && !head.includes("data-theme")) return true;
   if (head.startsWith("*::-webkit-scrollbar")) return true;
   return false;
+}
+
+/** Rewrites a block keyed on the app's contrast attribute into the media query a page without the setting has. */
+function forSite(s) {
+  if (!s.head.startsWith(':root[data-contrast="more"]')) return s;
+  const inner = s.body.replace(':root[data-contrast="more"]', ":root").replace(/^/gm, "  ");
+  return { ...s, body: `@media (prefers-contrast: more) {\n${inner}\n}` };
 }
 
 function fileUrl(p) {
@@ -131,8 +140,9 @@ async function accentBlocks() {
     ].join("\n");
   const dark = accentShades(DEFAULT_ACCENT, { light: false });
   const light = accentShades(DEFAULT_ACCENT, { light: true });
+  const high = accentShades(DEFAULT_ACCENT, { light: false, contrast: "high" });
   return [
-    `/* The default accent (${DEFAULT_ACCENT}, src/stores/theme.ts) as the theme store`,
+    `/* The default accent (${DEFAULT_ACCENT}, src/lib/designTokens.ts) as the theme store`,
     `   writes it at runtime — computed through src/lib/contrast.ts at sync time,`,
     `   never typed by hand. The @theme fallbacks above are not these colours. */`,
     `:root {`,
@@ -142,6 +152,12 @@ async function accentBlocks() {
     `:root[data-theme="light"] {`,
     render(light),
     `}`,
+    ``,
+    `@media (prefers-contrast: more) {`,
+    `  :root {`,
+    render(high).replace(/^/gm, "  "),
+    `  }`,
+    `}`,
   ].join("\n");
 }
 
@@ -149,7 +165,7 @@ async function generate() {
   const css = readFileSync(SOURCE, "utf8").replace(/\r\n/g, "\n");
   const digest = createHash("sha256").update(css).digest("hex").slice(0, 12);
   const parts = statements(css);
-  const kept = parts.filter((s) => taken(s.head, s.body));
+  const kept = parts.filter((s) => taken(s.head, s.body)).map(forSite);
   const header = [
     `/* GENERATED from src/app/index.css (sha256 ${digest}) by site/scripts/sync-tokens.mjs`,
     `   — do not edit. Re-run \`npm run sync\` after changing the source; \`npm run check\``,

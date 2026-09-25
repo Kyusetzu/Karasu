@@ -222,8 +222,8 @@ mockIPC((cmd, args) => {
 const html = document.documentElement;
 html.setAttribute("data-theme", theme);
 if (style) html.setAttribute("data-dir", style);
-if (contrast) html.setAttribute("data-contrast", "more");
 localStorage.setItem("karasu-theme", theme);
+localStorage.setItem("karasu-contrast", contrast ? "high" : "standard");
 localStorage.setItem("karasu-reduce-motion", params.get("still") === "1" ? "true" : "false");
 localStorage.setItem("karasu-cover-cols", android ? "4" : "8");
 location.hash = route;

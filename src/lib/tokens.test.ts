@@ -18,6 +18,8 @@ const blocks = customProperties(css);
 const base = blocks.get("@theme static")!;
 const root = blocks.get(":root")!;
 const light = blocks.get(':root[data-theme="light"]')!;
+const hcDark = blocks.get(':root[data-contrast="more"]')!;
+const hcLight = blocks.get(':root[data-contrast="more"][data-theme="light"]')!;
 
 /** A theme's colour by token name: the light block over the base, as the cascade resolves it. */
 const colour = (theme: "dark" | "light", name: string): string =>
@@ -94,6 +96,48 @@ describe("contrast obligations", () => {
     it(`keeps the accent fill 3:1 off the panel in ${theme}, the known shortfalls aside`, () => {
       const short = ACCENT_PRESETS.filter((hex) => contrastRatio(shades(hex).a500, colour(theme, "surface-900")) < 3);
       expect(short).toEqual(SHORT.fillOffPanel[theme]);
+    });
+  }
+});
+
+/** A high-contrast colour: the setting's own block over the theme's, as the cascade resolves it. */
+const high = (theme: "dark" | "light", name: string): string =>
+  (theme === "light" ? hcLight.get(`--color-${name}`) : undefined) ?? hcDark.get(`--color-${name}`) ?? colour(theme, name);
+
+describe("high contrast", () => {
+  it("gives both high-contrast blocks every surface and ink, and the light one its own semantic colours", () => {
+    const steps = [...base.keys()].filter((k) => /^--color-(surface|ink)-/.test(k));
+    expect(steps.filter((k) => !hcDark.has(k))).toEqual([]);
+    expect(steps.filter((k) => !hcLight.has(k))).toEqual([]);
+    expect(["--color-gold", "--color-danger", "--color-success"].filter((k) => !hcLight.has(k))).toEqual([]);
+  });
+
+  for (const theme of ["dark", "light"] as const) {
+    it(`reads every ink at 7:1 on the surfaces it sits on, in ${theme}`, () => {
+      const pairs = [
+        ...["ink-100", "ink-300"].flatMap((i) => ["surface-950", "surface-900", "surface-850", "surface-800"].map((s) => [i, s])),
+        ...["ink-500", "ink-600"].flatMap((i) => ["surface-950", "surface-900"].map((s) => [i, s])),
+        ...["gold", "danger", "success"].map((i) => [i, "surface-900"]),
+      ];
+      for (const [ink, surface] of pairs) {
+        expect(contrastRatio(high(theme, ink), high(theme, surface)), `${ink} on ${surface}`).toBeGreaterThanOrEqual(7);
+      }
+    });
+
+    it(`draws the border role at 3:1 against a panel and the page, in ${theme}`, () => {
+      for (const surface of ["surface-950", "surface-900", "surface-850"]) {
+        expect(contrastRatio(high(theme, "surface-600"), high(theme, surface)), surface).toBeGreaterThanOrEqual(3);
+      }
+    });
+
+    it(`lifts accent text and the fill's label to 7:1 for every preset and extreme, in ${theme}`, () => {
+      const page = high(theme, "surface-950");
+      const panel = high(theme, "surface-900");
+      for (const hex of [...ACCENT_PRESETS, ...EXTREMES]) {
+        const s = accentShades(hex, { light: theme === "light", contrast: "high", surface950: page, surface900: panel });
+        expect(contrastRatio(s.a400, page), `${hex} text`).toBeGreaterThanOrEqual(7);
+        expect(contrastRatio(s.ink, s.a500), `${hex} label`).toBeGreaterThanOrEqual(7);
+      }
     });
   }
 });

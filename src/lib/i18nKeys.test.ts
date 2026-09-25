@@ -30,6 +30,7 @@ const DYNAMIC_PREFIXES = [
   "sort.",
   "merge.strategy.",
   "settings.theme_",
+  "settings.contrast_",
   "settings.density_",
   "settings.contentLevel_",
   "settings.contentHint_",

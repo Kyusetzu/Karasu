@@ -1661,6 +1661,12 @@ export const de: typeof en = {
     theme_system: "System",
     theme_light: "Hell",
     theme_dark: "Dunkel",
+    contrast: "Kontrast",
+    contrastHint:
+      "Hoch hebt Text, Akzent und alle Ränder auf mindestens 7:1 an und schaltet Schimmer, Schatten und Glas ab, in Dunkel wie in Hell. System folgt der Kontrasteinstellung deines Betriebssystems.",
+    contrast_system: "System",
+    contrast_standard: "Standard",
+    contrast_high: "Hoch",
     accent: "Akzentfarbe",
     statusColors: "Farben der Listenstatus",
     statusColorsHint:

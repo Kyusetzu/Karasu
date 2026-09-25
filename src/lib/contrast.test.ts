@@ -9,6 +9,7 @@ import {
   parseHex,
   readableInk,
   relativeLuminance,
+  resolveContrast,
   rgbTriplet,
   UI_INK,
 } from "./contrast";
@@ -209,5 +210,30 @@ describe("hexToHsv / hsvToHex", () => {
     const rotated = hsvToHex({ ...hsv, h: (hsv.h + 90) % 360 });
     expect(hexToHsv(rotated).s).toBeCloseTo(hsv.s, 0);
     expect(hexToHsv(rotated).v).toBeCloseTo(hsv.v, 0);
+  });
+});
+
+describe("contrast", () => {
+  it("follows the OS only while the setting says system", () => {
+    expect(resolveContrast("system", true)).toBe("high");
+    expect(resolveContrast("system", false)).toBe("standard");
+    expect(resolveContrast("standard", true)).toBe("standard");
+    expect(resolveContrast("high", false)).toBe("high");
+  });
+
+  it("lifts accent text and the fill's label to 7:1 in high contrast, in both themes", () => {
+    for (const light of [false, true]) {
+      const page = light ? "#ffffff" : "#050608";
+      for (const hex of ["#4b3fc7", "#46a5b3", "#f56c92", "#e8d48a", "#808080", "#0000ff", "#ffff00"]) {
+        const s = accentShades(hex, { light, contrast: "high" });
+        expect(contrastRatio(s.a400, page), `${hex} text`).toBeGreaterThanOrEqual(7);
+        expect(contrastRatio(s.ink, s.a500), `${hex} label`).toBeGreaterThanOrEqual(7);
+      }
+    }
+  });
+
+  it("makes the hairline the strong border in high contrast and leaves the standard ramp alone", () => {
+    expect(accentShades("#4b3fc7", { contrast: "high" }).hair).toBe("var(--color-surface-600)");
+    expect(accentShades("#4b3fc7", { contrast: "standard" })).toEqual(accentShades("#4b3fc7"));
   });
 });

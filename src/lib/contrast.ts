@@ -111,38 +111,59 @@ export interface AccentContext {
   surface900?: string;
   /** Inks to choose between for text on the fill. Defaults to the UI pair. */
   ink?: InkPair;
+  /** High contrast lifts accent text and the fill's ink to 7:1 and makes the hairline the strong border. */
+  contrast?: ContrastLevel;
+}
+
+/** What the Appearance setting stores: follow the OS, or hold one level whatever the OS says. */
+export type ContrastMode = "system" | "standard" | "high";
+export type ContrastLevel = "standard" | "high";
+export const CONTRAST_MODES: readonly ContrastMode[] = ["system", "standard", "high"];
+
+/** The level a mode resolves to; the OS's `prefers-contrast: more` answers only for "system". */
+export function resolveContrast(mode: ContrastMode, osPrefersMore: boolean): ContrastLevel {
+  if (mode === "system") return osPrefersMore ? "high" : "standard";
+  return mode;
 }
 
 /** Derives every accent-dependent value from the one colour picked; keep all of it computed so any hue is safe. */
 export function accentShades(
   base: string,
-  { light = false, surface950, surface900, ink = UI_INK }: AccentContext = {},
+  { light = false, surface950, surface900, ink = UI_INK, contrast = "standard" }: AccentContext = {},
 ): AccentShades {
+  const high = contrast === "high";
   const toward = light ? "#000000" : "#ffffff";
-  const page = surface950 ?? (light ? "#f4f6f9" : "#0b0d12");
-  const panel = surface900 ?? (light ? "#ffffff" : "#11141b");
+  const page = surface950 ?? (high ? (light ? "#ffffff" : "#050608") : light ? "#f4f6f8" : "#0b0d12");
+  const panel = surface900 ?? (high ? (light ? "#ffffff" : "#090b0f") : light ? "#ffffff" : "#12141a");
+  const textTarget = high ? 7 : 4.5;
 
   // Accent-as-text: step away from the page until it is readable; keep the bound, or an unreachable base spins here.
   let a400 = mix(base, toward, 0.2);
-  for (let i = 0; i < 20 && contrastRatio(a400, page) < 4.5; i++) {
+  for (let i = 0; i < 30 && contrastRatio(a400, page) < textTarget; i++) {
     a400 = mix(a400, toward, 0.12);
   }
 
   // Accent-as-fill: only light theme needs help, where a pale accent would be a white square on a white panel.
-  const a500 =
+  let a500 =
     light && contrastRatio(base, panel) < 3 ? mix(base, "#000000", 0.22) : base;
+  const fillInk = readableInk(a500, high ? PURE_INK : ink);
+  // High contrast moves the fill away from its ink instead, until the label on it reaches 7:1.
+  const away = contrastRatio(fillInk, "#000000") > contrastRatio(fillInk, "#ffffff") ? "#000000" : "#ffffff";
+  if (high) {
+    for (let i = 0; i < 30 && contrastRatio(a500, fillInk) < 7; i++) a500 = mix(a500, away, 0.08);
+  }
 
   const w1 = rgbTriplet(hueRotate(base, -28, 0.45));
 
   return {
     a400,
     a500,
-    a600: mix(a500, "#000000", 0.16),
-    ink: readableInk(a500, ink),
+    a600: mix(a500, high ? away : "#000000", 0.16),
+    ink: fillInk,
     rgb: rgbTriplet(a500),
     w1,
     w2: rgbTriplet(hueRotate(base, 46, 0.45)),
-    hair: light ? "rgba(16, 20, 30, 0.1)" : "rgba(255, 255, 255, 0.075)",
+    hair: high ? "var(--color-surface-600)" : light ? "rgba(16, 20, 30, 0.1)" : "rgba(255, 255, 255, 0.075)",
   };
 }
 

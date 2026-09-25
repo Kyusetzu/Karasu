@@ -1649,6 +1649,12 @@ export const en = {
     theme_system: "System",
     theme_light: "Light",
     theme_dark: "Dark",
+    contrast: "Contrast",
+    contrastHint:
+      "High lifts text, the accent and every border to at least 7:1 and turns off washes, shadows and glass, in dark and in light. System follows your operating system's contrast setting.",
+    contrast_system: "System",
+    contrast_standard: "Standard",
+    contrast_high: "High",
     accent: "Accent color",
     statusColors: "List status colours",
     statusColorsHint:

@@ -265,6 +265,39 @@ empties the list:
 The same file keeps the token blocks in step, so a themed colour or root value
 without a light twin fails.
 
+### The contrast setting
+
+Settings › Appearance › Contrast offers three choices:
+
+- **System** (the default) follows the OS's `prefers-contrast: more`.
+- **Standard** holds the standard palette.
+- **High** holds the high-contrast palette, in dark and in light.
+
+When the result is high, the theme store sets `data-contrast="more"` on
+`<html>`, and `index.css` changes these things:
+
+- It swaps in the high-contrast palette from the decision log.
+- It makes `surface-600` the border role and redraws `border-surface-700`
+  with it.
+- It turns off washes, the catch-light, the float shadow's blur and glass.
+- It thickens the focus ring.
+
+`accentShades(…, { contrast: "high" })` pushes accent text to 7 : 1 on the
+page and the fill away from its ink until the label reads at 7 : 1.
+`tokens.test.ts` asserts every one of these, for every preset and the
+extreme accents.
+
+Windows' forced colours stay separate: the OS replaces the palette, and
+`index.css` only keeps the data colours.
+
+The website stays dark. The token sync rewrites the dark high-contrast
+blocks into `@media (prefers-contrast: more)`, so the site answers the OS
+request directly.
+
+**Known gap:** grey data fills stand under 3 : 1 in high-contrast light, and
+the score histogram's upper bars are one of them. They get the border role
+when their area is restyled.
+
 ## Primitives
 
 `src/components/ui/` holds the primitives; `EmptyState` and `Skeleton` sit

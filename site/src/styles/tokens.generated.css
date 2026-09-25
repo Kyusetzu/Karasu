@@ -1,4 +1,4 @@
-/* GENERATED from src/app/index.css (sha256 a57b59805f92) by site/scripts/sync-tokens.mjs
+/* GENERATED from src/app/index.css (sha256 a33e108ccd15) by site/scripts/sync-tokens.mjs
    — do not edit. Re-run `npm run sync` after changing the source; `npm run check`
    fails while this file is stale. CLAUDE.md, "The website". */
 /* `static` because Tailwind tree-shakes tokens no utility references, leaving a `var()`-only token undefined in dark. */
@@ -419,6 +419,28 @@
   color-scheme: dark;
 }
 
+/* High contrast, dark: the setting's palette; `surface-600` becomes the border role, at 8:1 against a panel. */
+@media (prefers-contrast: more) {
+  :root {
+    --color-surface-950: #050608;
+    --color-surface-900: #090b0f;
+    --color-surface-850: #111419;
+    --color-surface-800: #191c22;
+    --color-surface-700: #2a2e36;
+    --color-surface-600: #a0a5af;
+  
+    --color-ink-100: #ffffff;
+    --color-ink-300: #edf0f6;
+    --color-ink-500: #dce0e6;
+    --color-ink-600: #cdd1d9;
+  
+    --wash-top: transparent;
+    --catch-light: transparent;
+    --float-shadow: transparent;
+    --float-edge: var(--color-surface-600);
+  }
+}
+
 /* Text at the density's small size; the calendar's time and episode line, a digest's note. */
 @utility dense-text {
   font-size: var(--dense-text);
@@ -608,13 +630,32 @@ html[data-reduce-motion] *::after {
   }
 }
 
-/* The softer request gets the softer answer: keep the palette, sharpen the hairlines the design deliberately keeps quiet. */
+/* High contrast draws every control's edge in the border role, since `surface-700` is also a fill there. */
 @media (prefers-contrast: more) {
-  :root {
-    --hair: rgba(128, 136, 150, 0.6);
+  :root .border-surface-700 {
+    border-color: var(--color-surface-600);
   }
-  *:focus-visible {
+}
+
+/* Glass is a blur of whatever is behind it, which no contrast ratio can promise; high contrast makes it solid. */
+@media (prefers-contrast: more) {
+  :root [class*="backdrop-blur"] {
+    backdrop-filter: none;
+    background-color: var(--color-surface-900);
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root .section-rule {
+    background-image: none;
+    background-color: var(--color-surface-600);
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root *:focus-visible {
     outline-width: 3px;
+    outline-offset: 2px;
   }
 }
 
@@ -641,7 +682,7 @@ html[data-reduce-motion] *::after {
   background: transparent;
 }
 
-/* The default accent (#4b3fc7, src/stores/theme.ts) as the theme store
+/* The default accent (#4b3fc7, src/lib/designTokens.ts) as the theme store
    writes it at runtime — computed through src/lib/contrast.ts at sync time,
    never typed by hand. The @theme fallbacks above are not these colours. */
 :root {
@@ -664,4 +705,17 @@ html[data-reduce-motion] *::after {
   --w1: 63, 114, 199;
   --w2: 179, 63, 199;
   --hair: rgba(16, 20, 30, 0.1);
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --color-accent-400: #9c95e0;
+    --color-accent-500: #4b3fc7;
+    --color-accent-600: #3f35a7;
+    --color-accent-ink: #ffffff;
+    --accent-rgb: 75, 63, 199;
+    --w1: 63, 114, 199;
+    --w2: 179, 63, 199;
+    --hair: var(--color-surface-600);
+  }
 }

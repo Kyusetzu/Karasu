@@ -261,6 +261,9 @@ scripts/             bump-version.mjs (every commit), anilist-query.mjs
                      vocabulary's ratchet, see "Design language"),
                      bundle-budget.mjs and bundle-budget.json (the gzipped
                      bundle against its budget, a push-gate phase),
+                     screens.mjs with screens/ (the real app over a mocked
+                     backend in Chromium: shots, boards, clips and pixel
+                     hashes, see "Design language"),
                      verify.mjs (the gate, see
                      "The commit loop"), toml-check.mjs (taplo over the
                      TOML files, one per stdin — see the same section),
@@ -1397,6 +1400,9 @@ review checkpoints are in `site/README.md`.
   `dist/assets/index-*.css` was byte-identical to the baseline with the line
   and 71 bytes larger without it. Re-run that diff whenever the line, the
   import or Tailwind moves; the header of `index.css` carries the numbers.
+  `@source not "../../scripts";` sits beside it since 2026-09-25, when the
+  style audit's fixtures started naming classes: the emitted CSS lost 254
+  bytes, five classes named only in `scripts/`, and nothing the app uses.
 - **Tokens are generated, never copied.** `site/src/styles/tokens.generated.css`
   is written by `node site/scripts/sync-tokens.mjs` from the `@theme`,
   `@keyframes`, `@utility`, `:root` and `[data-theme]` blocks of
@@ -1639,6 +1645,20 @@ rewrites it outright and is for a deliberate raise, which the diff then shows.
 `scripts/style-allowlist.json` holds the permanent exceptions, each with its
 reason, and an entry nothing matches fails the check. Recorded on 2026-09-25:
 380 findings in 91 of 281 files, half a second a run.
+
+**`scripts/screens.mjs` shows the real app, and it is how a UI change is
+proven.** It serves `scripts/screens/` (the whole `App`, shell included, over
+`mockIPC` answers and fixture lists) and drives Chromium: `shoot` renders ten
+named screens (five desktop, five phone) per style and theme, `board` lays them
+out for the maintainer, `clip` records motion side by side, and `hash` takes
+still frames at a fixed clock with motion off. Two `hash` runs agree, so an
+unchanged hash is the proof that a mechanical refactor moved no pixel. The
+banners and covers of three real titles are fetched from AniList into
+`scripts/screens/.cache/` on first use and never committed; the stand-in faces
+are Roboto for Android and Open Sans for Segoe UI, which Linux lacks. The
+project skill `.claude/skills/karasu-mockups` holds the procedure the
+maintainer expects: three mockups before an arrangement changes, the boards'
+shape, and the question that follows them.
 
 ## Conventions
 

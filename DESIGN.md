@@ -356,3 +356,37 @@ maintainer picks. A pure restyle that moves nothing does not. The rules:
   - The website stays dark and follows the tokens and `prefers-contrast`.
   - Directions first, then area by area, with three mockups wherever the
     arrangement changes.
+- **2026-09-25:** The direction is chosen from three rendered on the real app,
+  "Sharpened", "Depth" and "Line". The maintainer picked a mix of them:
+  - **Base: Sharpened.**
+    - Neutral hairlines instead of the tinted one.
+    - Tighter corners, per role: inner 4, control 6, panel 10, sheet 16,
+      cover 6 px.
+    - One shadow, only for what floats. Depth comes from tone steps and the
+      catch-light, and the panel wash only lights the top edge.
+  - **Motion: the soft spring from Depth.** Dialogs, sheets and menus arrive on
+    a `linear()` spring with a slight settle, and leaving stays quick.
+  - **Type: the brand face from Line.** Page titles, headings and the small
+    uppercase labels are set in SN Pro at its one weight. Page titles are
+    30 px.
+  - **The palette**, even steps in OKLCH:
+
+    | Token | Dark | Light | High contrast dark | High contrast light |
+    |---|---|---|---|---|
+    | surface-950 | `#0b0d12` | `#f4f6f8` | `#050608` | `#ffffff` |
+    | surface-900 | `#12141a` | `#ffffff` | `#090b0f` | `#ffffff` |
+    | surface-850 | `#181c22` | `#eef0f4` | `#111419` | `#eff2f7` |
+    | surface-800 | `#1f232b` | `#e5e8ed` | `#191c22` | `#e3e6ed` |
+    | surface-700 | `#2a2f39` | `#d5d9e1` | `#2a2e36` | `#cdd1da` |
+    | surface-600 | `#353b47` | `#b8beca` | `#a0a5af` | `#494d56` |
+    | ink-100 | `#f0f2f5` | `#1a1e26` | `#ffffff` | `#050608` |
+    | ink-300 | `#c8ccd6` | `#343944` | `#edf0f6` | `#14161b` |
+    | ink-500 | `#9da3af` | `#494e5b` | `#dce0e6` | `#23252b` |
+    | ink-600 | `#868c99` | `#616876` | `#cdd1d9` | `#30333a` |
+
+    In high contrast, `surface-600` is the border role, at 8 : 1 against the
+    panel. The accent text and the fill's ink are pushed to 7 : 1. Washes,
+    shadows and glass are off.
+  - **The boards** compare today, the three directions and the chosen mix
+    across ten screens, in dark, light and both high-contrast themes. They
+    were rendered by the screenshot harness from the real app.

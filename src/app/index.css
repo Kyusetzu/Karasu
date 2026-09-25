@@ -1,6 +1,7 @@
-/* Only a negated `@source`, keeping the site out of the app's Tailwind scan; a positive list silently drops every utility. */
+/* Only negated `@source`s, keeping the site and the scripts out of the scan; a positive list silently drops every utility. */
 @import "tailwindcss";
 @source not "../../site";
+@source not "../../scripts";
 
 /* Hand-written, never the @fontsource stylesheets: those ship a woff fallback no WebView ever fetches, on every update. */
 @font-face {

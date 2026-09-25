@@ -1,4 +1,4 @@
-/* GENERATED from src/app/index.css (sha256 354718cd0aa6) by site/scripts/sync-tokens.mjs
+/* GENERATED from src/app/index.css (sha256 339118f00e66) by site/scripts/sync-tokens.mjs
    — do not edit. Re-run `npm run sync` after changing the source; `npm run check`
    fails while this file is stale. CLAUDE.md, "The website". */
 /* `static` because Tailwind tree-shakes tokens no utility references, leaving a `var()`-only token undefined in dark. */

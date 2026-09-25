@@ -1,7 +1,7 @@
 {
   "name": "karasu",
   "private": true,
-  "version": "1.22.12",
+  "version": "1.22.13",
   "type": "module",
   "author": "Kyu",
   "license": "MIT",
@@ -85,6 +85,7 @@
     "knip": "^6.37.0",
     "oxc-parser": "^0.150.0",
     "oxlint": "^1.85.0",
+    "playwright-core": "^1.63.0",
     "react-scan": "^0.5.7",
     "rollup-plugin-visualizer": "^7.1.1",
     "typescript": "~7.0.2",

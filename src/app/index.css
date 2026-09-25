@@ -917,6 +917,11 @@ html[data-reduce-motion] ::view-transition-new(*) {
 :root[data-contrast="more"] .border-surface-700 {
   border-color: var(--color-surface-600);
 }
+/* A field shows focus with its border, so the rule above must not pin that border to the border role while it has it. */
+:root[data-contrast="more"] .border-surface-700:is(input, select, textarea):focus,
+:root[data-contrast="more"] .field-shell:focus-within {
+  border-color: var(--color-accent-500);
+}
 /* Glass is a blur of whatever is behind it, which no contrast ratio can promise; high contrast makes it solid. */
 :root[data-contrast="more"] [class*="backdrop-blur"] {
   backdrop-filter: none;

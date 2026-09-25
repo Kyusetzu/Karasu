@@ -54,12 +54,13 @@ export function SearchField({
   const s = SIZES[size];
   const own = useRef<HTMLInputElement>(null);
   const field = inputRef ?? own;
-  // Escape empties a filled field and stops there, so a dialog around it stays open until the next press.
+  // Escape empties a filled field and stops there, so a dialog or panel around it stays open until the next press.
   const onKey = (e: KeyboardEvent<HTMLInputElement>) => {
     onKeyDown?.(e);
     if (e.defaultPrevented || e.key !== "Escape") return;
     if (value) {
       e.preventDefault();
+      e.stopPropagation();
       onChange("");
     } else if (blurOnEscape) {
       e.preventDefault();
@@ -73,7 +74,7 @@ export function SearchField({
         s.shell,
         inset
           ? "bg-transparent focus-within:bg-surface-850"
-          : "rounded-control border border-surface-700 bg-surface-900 focus-within:border-accent-500",
+          : "field-shell rounded-control border border-surface-700 bg-surface-900 focus-within:border-accent-500",
         !inset && markFilled && value && "border-accent-500/60",
         className,
       )}

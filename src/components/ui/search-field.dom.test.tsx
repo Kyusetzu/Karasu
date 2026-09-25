@@ -3,6 +3,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { checkA11y } from "@/test/a11y";
+import { Modal } from "./modal";
 import { SearchField } from "./search-field";
 
 function Controlled(props: Partial<Parameters<typeof SearchField>[0]>) {
@@ -44,11 +45,29 @@ describe("SearchField", () => {
     await user.keyboard("{Escape}");
     expect(box).toHaveValue("");
     expect(box).toHaveFocus();
-    expect(onWindow.mock.calls[0][0].defaultPrevented).toBe(true);
+    expect(onWindow).not.toHaveBeenCalled();
     // Empty, the press is not the field's: it reaches whatever is around it untouched.
     await user.keyboard("{Escape}");
-    expect(onWindow.mock.calls[1][0].defaultPrevented).toBe(false);
+    expect(onWindow).toHaveBeenCalledOnce();
+    expect(onWindow.mock.calls[0][0].defaultPrevented).toBe(false);
     window.removeEventListener("keydown", onWindow);
+  });
+
+  it("leaves the dialog around it open on the Escape that empties it, and lets the next one close it", async () => {
+    const user = userEvent.setup({ delay: null });
+    const onClose = vi.fn();
+    render(
+      <Modal title="Pick a title" onClose={onClose}>
+        <Controlled value="frieren" autoFocus />
+      </Modal>,
+    );
+    const box = screen.getByRole("searchbox", { name: "Search" });
+    box.focus();
+    await user.keyboard("{Escape}");
+    expect(box).toHaveValue("");
+    expect(onClose).not.toHaveBeenCalled();
+    await user.keyboard("{Escape}");
+    expect(onClose).toHaveBeenCalledOnce();
   });
 
   it("lets go of an empty field on a second Escape where the find bar's habit is asked for", async () => {

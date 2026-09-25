@@ -74,7 +74,8 @@ export function Modal({
     // Nothing to close once leaving; Escape during the exit would fire the parent's handler a second time.
     if (!live) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
+      // A control that answered the press itself, such as a search field emptying, has spent it.
+      if (e.key !== "Escape" || e.defaultPrevented) return;
       // Only the overlay holding focus answers, so Escape in a dialog over a dialog, or a menu in one, closes one thing.
       const owner = (document.activeElement as HTMLElement | null)?.closest?.("[data-overlay]");
       if (owner && owner !== scrim.current) return;

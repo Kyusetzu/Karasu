@@ -504,7 +504,7 @@ maintainer picks. A pure restyle that moves nothing does not. The rules:
   the dialog holding focus, so a menu or a confirm inside a dialog closes
   alone.
 - **2026-09-25:** One search field. Nine were built four ways at seven
-  heights, with four clear buttons. They share `SearchField` now, which is
+  heights, with four clear buttons. Eight share `SearchField` now, which is
   the list's own field grown into a primitive: a searchbox with its name,
   a clear button that keeps the caret and hands it back, and Escape that
   empties before it does anything else. The command palette keeps its own

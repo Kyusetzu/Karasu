@@ -123,6 +123,7 @@ export function MultiFilterSelect({
           )}
         >
           {searchable && (
+            // Its clear empties the search only; the footer's Clear owns the selection, and conflating the two makes one a trap.
             <SearchField
               size="sm"
               inset
@@ -132,7 +133,6 @@ export function MultiFilterSelect({
               label={t("search.filterOptions")}
               clearLabel={t("common.clear")}
               placeholder={t("search.filterOptions")}
-              // Clears the search term only; the footer's Clear owns the selection, and conflating the two makes one a trap.
               className="h-9 border-b border-hair px-2.5"
             />
           )}

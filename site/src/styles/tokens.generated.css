@@ -1,4 +1,4 @@
-/* GENERATED from src/app/index.css (sha256 b192ab3a9785) by site/scripts/sync-tokens.mjs
+/* GENERATED from src/app/index.css (sha256 511039a71abc) by site/scripts/sync-tokens.mjs
    — do not edit. Re-run `npm run sync` after changing the source; `npm run check`
    fails while this file is stale. CLAUDE.md, "The website". */
 /* `static` because Tailwind tree-shakes tokens no utility references, leaving a `var()`-only token undefined in dark. */
@@ -740,6 +740,14 @@ html[data-reduce-motion] *::after {
 @media (prefers-contrast: more) {
   :root .border-surface-700 {
     border-color: var(--color-surface-600);
+  }
+}
+
+/* A field shows focus with its border, so the rule above must not pin that border to the border role while it has it. */
+@media (prefers-contrast: more) {
+  :root .border-surface-700:is(input, select, textarea):focus,
+  :root[data-contrast="more"] .field-shell:focus-within {
+    border-color: var(--color-accent-500);
   }
 }
 

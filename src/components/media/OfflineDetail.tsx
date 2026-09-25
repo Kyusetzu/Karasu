@@ -24,7 +24,7 @@ export function OfflineDetail({
     return (
       <div className="p-8">
         <EmptyState
-          visual={<WifiOff className="size-8 text-ink-600" />}
+          icon={WifiOff}
           title={t("detail.offlineTitle")}
           hint={t("detail.offlineHint")}
           actions={

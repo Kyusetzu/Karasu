@@ -109,11 +109,7 @@ export default function UserProfile() {
     return (
       <div className="px-8 pt-7">
         <EmptyState
-          visual={
-            <span className="grid size-12 place-items-center rounded-full bg-surface-800">
-              <Ban className="size-5 text-ink-600" />
-            </span>
-          }
+          icon={Ban}
           title={t("social.blocked", { name: user.name })}
           hint={t("social.blockedHint")}
         />

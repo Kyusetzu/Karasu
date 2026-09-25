@@ -1,15 +1,19 @@
 import type { ReactNode } from "react";
+import type { LucideIcon } from "lucide-react";
 import KarasuMark from "@/components/KarasuMark";
 import { cn } from "@/lib/utils";
 
 /** An empty surface, said out loud; each visual differs on purpose, and only here does the corvid show itself. */
 export function EmptyState({
+  icon: Icon,
   visual,
   title,
   hint,
   actions,
   className,
 }: {
+  /** A plain glyph at the empty-state size, for a state no drawn visual below fits. */
+  icon?: LucideIcon;
   visual?: ReactNode;
   title: string;
   hint?: ReactNode;
@@ -18,7 +22,7 @@ export function EmptyState({
 }) {
   return (
     <div className={cn("flex flex-col items-center py-10 text-center", className)}>
-      {visual}
+      {Icon ? <Icon aria-hidden className="size-8 text-ink-600" /> : visual}
       <p className="mt-4 text-[.9375rem] font-medium text-ink-300">{title}</p>
       {hint && (
         <p className="mt-1 max-w-80 text-2xs leading-relaxed text-ink-600">

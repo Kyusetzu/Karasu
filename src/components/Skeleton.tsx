@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { skeletonDelay } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
@@ -17,7 +18,7 @@ export function Shimmer({
     <div
       className={cn("shimmer-fill rounded-inner", className)}
       // The phase offset lives in lib/motion beside the other stagger vocabulary, so the two rhythms stay together.
-      style={{ animationDelay: `${skeletonDelay(index)}ms` }}
+      style={{ "--shimmer-offset": `${skeletonDelay(index)}ms` } as CSSProperties}
     />
   );
 }

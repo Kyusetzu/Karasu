@@ -114,6 +114,8 @@
   /* Two expressive durations, so feature motion does not each pick its own. */
   --duration-expressive: 280ms;
   --duration-exit: 120ms;
+  /* A wait shorter than this never shows a skeleton, so a quick load does not flash one. */
+  --delay-skeleton: 250ms;
 
   /* A bird landing on a branch — down from above, no bounce; these consume the ease tokens so retuning one retunes all. */
   --animate-settle: settle 150ms var(--ease-karasu);
@@ -349,7 +351,11 @@
     var(--color-surface-800) 34%
   );
   background-size: 200% 100%;
-  animation: var(--animate-shimmer);
+  /* The sweep, offset per cell, then a fade that keeps the cell hidden until `--delay-skeleton` has passed. */
+  animation:
+    var(--animate-shimmer),
+    fadeIn 160ms linear var(--delay-skeleton) backwards;
+  animation-delay: var(--shimmer-offset, 0ms), var(--delay-skeleton);
 }
 
 /* The chevron loader, in em so it scales; `forwards` is load-bearing, or reduced motion leaves it invisible. */

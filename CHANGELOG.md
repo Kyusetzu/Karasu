@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: aa586ca -->
+<!-- generated-through: 487bc8a -->
 
 ### Fixed
 
@@ -155,6 +155,7 @@ tag time is then optional rather than load-bearing.
 - every dialog shares one frame; buttons stay in reach on short windows and the confirm fits a phone.
 - every search field looks and clears the same way.
 - form fields, choices and notes share one frame.
+- quick loads no longer flash a skeleton.
 ## 1.0.0 — 2026-09-05
 
 Karasu 1.0.0 is the first tagged release: a desktop and Android tracker built

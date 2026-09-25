@@ -225,6 +225,7 @@ states. Eight other sizes are in use today, and they converge on these four.
 | `tick` | a counter acknowledging +1 |
 | `*-out` | each entry's exit, quicker than the entry, on `--ease-exit` |
 | `idle-glow`, `idle-float`, `idle-pulse` | ambient; three consumers, the budget is full |
+| `shimmer` | a skeleton's sweep, which holds back for `--delay-skeleton` before it fades in, so a quick load never shows one |
 
 **Rules.**
 
@@ -350,9 +351,9 @@ no row here, add the primitive first.
 | anything moved by Motion | `m` and `MotionPresence` from `app/motion.tsx`, the only place `motion` is imported |
 | a dialog | `Modal`: `size` from `sm` to `2xl`, `description` and `icon` in the header, `footer` pinned under a body that scrolls; `alert` for a question that interrupts (`alertdialog`, over other dialogs, answered by its buttons with the harmless one first); `bare` for a full-screen view such as the cover; `dismissable={false}` while something runs that must not be left half done. Escape closes only the dialog holding focus |
 | keeping an overlay alive through its exit | `Presence`, `PresenceIf` |
-| a wait with no shape | `Loader`; a known shape is `Skeleton` |
+| a wait with no shape | `Loader`; a known shape is `Skeleton`, built from `Shimmer`, which a quick load never shows |
 | a busy icon (sync, refresh, install) | `Spinner` with `spinning`, the only place `animate-spin` may appear |
-| nothing to show | `EmptyState` |
+| nothing to show | `EmptyState`, with a drawn `visual` or, where none fits, `icon` for a plain glyph at 32 px |
 | a score picker | `ScoreBars` |
 | a season picker | `SeasonPicker` |
 | a user's name and face | `UserLockup` |
@@ -522,3 +523,9 @@ maintainer picks. A pure restyle that moves nothing does not. The rules:
   of the card it stands in for, and the franchise pane is raised whether a
   title is picked or not; before, the empty pane was flat and the filled
   one raised without the catch-light.
+- **2026-09-25:** A skeleton waits a quarter of a second before it fades
+  in, in CSS alone, so a load that answers from the cache in that time goes
+  straight from nothing to the content instead of flashing grey bars.
+  Reduced motion shows it at once, as it collapses every delay. The empty
+  states that show a plain glyph take it through `EmptyState`'s `icon`, at
+  the 32 px step, where the blocked profile drew a 20 px one in a disc.

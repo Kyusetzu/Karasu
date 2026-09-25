@@ -164,3 +164,14 @@ describe("the frame around the stylesheet", () => {
     expect(directive("script-src")).not.toMatch(/'unsafe-(inline|eval)'/);
   });
 });
+
+describe("the skeleton's wait", () => {
+  const rule = css.slice(css.indexOf("@utility shimmer-fill"), css.indexOf("}", css.indexOf("@utility shimmer-fill")));
+
+  it("keeps a cell hidden until --delay-skeleton has passed, then fades it in", () => {
+    expect(css).toMatch(/--delay-skeleton:\s*\d+ms;/);
+    expect(rule).toContain("fadeIn");
+    expect(rule).toContain("backwards");
+    expect(rule).toMatch(/animation-delay:\s*var\(--shimmer-offset, 0ms\),\s*var\(--delay-skeleton\)/);
+  });
+});

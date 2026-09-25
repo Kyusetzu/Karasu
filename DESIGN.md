@@ -232,6 +232,22 @@ states. Eight other sizes are in use today, and they converge on these four.
 - Reduced motion is the OS setting *or* the app's own toggle. Both collapse
   every animation and transition in CSS.
 
+### Interaction
+
+- **Focus.** Everything a keyboard reaches shows one ring: 2 px of
+  `accent-500`, 2 px out. It comes from `@layer base`, so a primitive that
+  draws its own ring, or a field that marks focus with its border, still
+  wins. High contrast makes the ring 3 px. Grid cells draw their ring
+  themselves, because the roving cursor is not real focus.
+- **Press.** `press` sinks a control to 97 % while it is held.
+  `transition-surface` carries the scale, and reduced motion sets it back
+  to 100 %. `Button`, `IconButton`, `Pill` and `Segmented` carry it.
+- **Touch.** `coarse:` is a pointer variant, `(pointer: coarse)`, never a
+  width. A narrowed desktop window keeps mouse-sized targets, and a tablet
+  at desktop width gets finger-sized ones. `coarse:hit-area` gives a small
+  control a 44 px tap area without changing how it looks; the same four
+  primitives carry it.
+
 ## Contrast obligations
 
 Every pair below must hold in every theme and contrast mode, for every accent

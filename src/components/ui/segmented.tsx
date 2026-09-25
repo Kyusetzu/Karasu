@@ -43,7 +43,7 @@ export function Segmented<T extends string>({
             aria-label={segment.title}
             onClick={() => onChange(segment.value)}
             className={cn(
-              "grid h-7.5 min-w-7.5 place-items-center rounded-inner px-2.5 text-xs font-medium transition-surface",
+              "relative press coarse:hit-area grid h-7.5 min-w-7.5 place-items-center rounded-inner px-2.5 text-xs font-medium transition-surface",
               "focus-visible:outline-2 focus-visible:outline-accent-500",
               active
                 ? "bg-surface-800 text-ink-100"

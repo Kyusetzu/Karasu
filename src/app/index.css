@@ -3,6 +3,9 @@
 @source not "../../site";
 @source not "../../scripts";
 
+/* A touch screen, by its pointer rather than its width: a narrowed desktop window keeps mouse-sized targets. */
+@custom-variant coarse (@media (pointer: coarse));
+
 /* Hand-written, never the @fontsource stylesheets: those ship a woff fallback no WebView ever fetches, on every update. */
 @font-face {
   font-family: "SN Pro";
@@ -574,6 +577,12 @@ h3:not(.font-brand-jp) {
 
 /* Real colours on selects, or preflight's transparent one opens a white popup; in `@layer base` so utilities still win. */
 @layer base {
+  /* One ring for everything a keyboard reaches; a primitive that draws its own, or opts out, wins as a utility. */
+  :focus-visible {
+    outline: 2px solid var(--color-accent-500);
+    outline-offset: 2px;
+  }
+
   select {
     background-color: var(--color-surface-900);
     color: var(--color-ink-100);
@@ -712,15 +721,38 @@ html[data-swapping] *::after {
   transition: none !important;
 }
 
-/* Transitions only what the theme swaps; prefer it over `transition-colors`, which also animates `color`. */
+/* Transitions only what the theme swaps, plus the press; prefer it over `transition-colors`, which animates `color`. */
 @utility transition-surface {
-  transition-property: background-color, border-color, box-shadow, opacity;
+  transition-property: background-color, border-color, box-shadow, opacity, scale;
   transition-duration: var(--default-transition-duration);
   transition-timing-function: var(--default-transition-timing-function);
 }
 
+/* A pressed control sinks a little; reduced motion sets the scale back to 1, so the press is felt as colour only. */
+@utility press {
+  &:active:not(:disabled) {
+    scale: var(--press-scale, 0.97);
+  }
+}
+
+/* A small control keeps its look but answers taps across at least 44 px; used behind the `coarse` variant. */
+@utility hit-area {
+  &::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: max(100%, 2.75rem);
+    height: max(100%, 2.75rem);
+    translate: -50% -50%;
+  }
+}
+
 /* Reduced motion, CSS only: a hair above zero so `transitionend` still fires, and delays go too or a stagger is a wait. */
 @media (prefers-reduced-motion: reduce) {
+  :root {
+    --press-scale: 1;
+  }
   *,
   *::before,
   *::after {
@@ -731,6 +763,10 @@ html[data-swapping] *::after {
     transition-delay: 0ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+html[data-reduce-motion] {
+  --press-scale: 1;
 }
 
 html[data-reduce-motion] *,

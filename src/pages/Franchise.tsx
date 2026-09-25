@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { Minus, Plus } from "lucide-react";
+import { ChevronDown, ChevronUp, Minus, Plus } from "lucide-react";
 import { loadFranchise, type FranchiseNode } from "@/api/franchise";
 import { useContentFilter } from "@/stores/contentFilter";
 import { useAuth } from "@/stores/auth";
@@ -20,7 +20,7 @@ import { BUTTON_STEP, usePanZoom } from "@/hooks/usePanZoom";
 import { centerOn } from "@/lib/zoomMath";
 import { useCachedEntry } from "@/hooks/useCachedEntry";
 import { useListMutations } from "@/hooks/useListMutations";
-import { displayTitle, type MediaListStatus } from "@/api/types";
+import { displayTitle, STATUS_ORDER, type MediaListStatus, type MediaType } from "@/api/types";
 import BackButton from "@/components/shell/BackButton";
 import EntryEditModal from "@/components/media/EntryEditModal";
 import { Presence } from "@/components/ui/presence";
@@ -30,6 +30,7 @@ import { Loader } from "@/components/ui/loader";
 import { IconButton } from "@/components/ui/icon-button";
 import { cn } from "@/lib/utils";
 import { statusColorVar } from "@/lib/statusColors";
+import { loadLegendOpen, saveLegendOpen } from "@/lib/franchiseLegend";
 
 /** List status → node outline, from `lib/statusColors` so cover rings and this graph never disagree. */
 const colorOf = statusColorVar;
@@ -38,13 +39,8 @@ const colorOf = statusColorVar;
 const outline = (status: MediaListStatus | null) =>
   `2px ${status ? "solid" : "dashed"} ${colorOf(status)}`;
 
-/** The four the legend names — the other two share their colour. */
-const LEGEND: (MediaListStatus | null)[] = [
-  "CURRENT",
-  "COMPLETED",
-  "PLANNING",
-  null,
-];
+/** Every status has its own colour in the user's palette, so the key names all six and the untracked dashed ring. */
+const LEGEND: (MediaListStatus | null)[] = [...STATUS_ORDER, null];
 
 export default function Franchise() {
   const { t } = useTranslation();
@@ -158,30 +154,17 @@ export default function Franchise() {
   const selectedNode = selected !== null ? byId.get(selected) : undefined;
 
   return (
-    <div className="flex h-full flex-col gap-4 p-6">
-      <header className="flex items-center gap-3">
+    // The phone's gutter like every other page: at 360 px the header only fits beside a 1 rem edge.
+    <div className="flex h-full flex-col gap-4 p-4 md:p-6">
+      <header className="flex min-w-0 items-center gap-3">
         <BackButton />
-        <h1 className="text-lg font-semibold text-ink-100">{t("franchise.title")}</h1>
+        <h1 className="shrink-0 text-lg font-semibold text-ink-100">{t("franchise.title")}</h1>
         {data && (
-          <span className="text-2xs uppercase tracking-[.09em] text-ink-600">
+          <span className="truncate text-2xs uppercase tracking-[.09em] text-ink-600">
             {t("franchise.related", { count: data.nodes.length })}
           </span>
         )}
         <span className="section-rule" />
-        <div className="flex shrink-0 items-center gap-3 text-2xs text-ink-500">
-          {LEGEND.map((status) => (
-            <span key={status ?? "none"} className="flex items-center gap-1.5">
-              <span
-                className="size-2.5 rounded-[.1875rem]"
-                style={{ border: outline(status) }}
-              />
-              {/* Resolved on the root's type, or a pinned ANIME legend reads "Watching" over nodes that say "Reading". */}
-              {status
-                ? t(`status.${legendType}.${status}`)
-                : t("franchise.notOnList")}
-            </span>
-          ))}
-        </div>
       </header>
 
       {isLoading && <Loader label={t("common.loading")} />}
@@ -321,6 +304,8 @@ export default function Franchise() {
                 {t("franchise.truncated")}
               </p>
             )}
+
+            <Legend type={legendType} />
           </div>
 
           <Rail
@@ -632,5 +617,53 @@ function EntryEditor({
         onClose();
       }}
     />
+  );
+}
+
+/** The colour key, folded into a chip in the graph's corner until asked for; the choice is remembered per machine. */
+function Legend({ type }: { type: MediaType }) {
+  const { t } = useTranslation();
+  const id = useId();
+  const [open, setOpen] = useState(loadLegendOpen);
+  const toggle = () => {
+    saveLegendOpen(!open);
+    setOpen(!open);
+  };
+  return (
+    // A control on the canvas, not a handle for it: a press here must not start a pan.
+    <div
+      onPointerDown={(e) => e.stopPropagation()}
+      className="absolute bottom-3 left-3 flex max-w-[calc(100%-1.5rem)] flex-col items-start gap-2"
+    >
+      {/* Above the chip rather than beside it, so the open key never runs under the zoom controls on a phone. */}
+      {open && (
+        <ul
+          id={id}
+          className="grid grid-cols-2 gap-x-3 gap-y-1 rounded-lg border border-hair bg-surface-850/90 px-2.5 py-2 text-2xs text-ink-500 backdrop-blur-sm"
+        >
+          {LEGEND.map((status) => (
+            <li key={status ?? "none"} className={cn("flex items-center gap-1.5", !status && "col-span-2")}>
+              <span className="size-2.5 shrink-0 rounded-[.1875rem]" style={{ border: outline(status) }} />
+              {/* Resolved on the root's type, or a pinned ANIME legend reads "Watching" over nodes that say "Reading". */}
+              {status ? t(`status.${type}.${status}`) : t("franchise.notOnList")}
+            </li>
+          ))}
+        </ul>
+      )}
+      <button
+        type="button"
+        onClick={toggle}
+        aria-expanded={open}
+        aria-controls={open ? id : undefined}
+        className="inline-flex h-9.5 items-center gap-1.5 rounded-lg border border-hair bg-surface-850/90 px-2.5 text-2xs font-semibold uppercase tracking-[.1em] text-ink-400 backdrop-blur-sm transition-surface hover:text-ink-100"
+      >
+        {!open &&
+          (["CURRENT", "COMPLETED", "PLANNING"] as const).map((s) => (
+            <span key={s} aria-hidden className="size-2.5 rounded-[.1875rem]" style={{ border: outline(s) }} />
+          ))}
+        {t("franchise.legend")}
+        {open ? <ChevronDown aria-hidden className="size-3.5" /> : <ChevronUp aria-hidden className="size-3.5" />}
+      </button>
+    </div>
   );
 }

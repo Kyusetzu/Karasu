@@ -1004,6 +1004,7 @@ export const de: typeof en = {
     none: "Keine verwandten Titel gefunden.",
     truncated: "Großes Franchise — es werden nur die nächsten Beziehungen gezeigt.",
     notOnList: "Nicht auf deiner Liste",
+    legend: "Legende",
     related: "{{count}} verwandte Titel",
     noCover: "TBA",
     zoomIn: "Vergrößern",

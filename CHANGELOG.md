@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 8a85f1e -->
+<!-- generated-through: e94f831 -->
 
 ### Fixed
 
@@ -91,6 +91,7 @@ tag time is then optional rather than load-bearing.
 - The Linux AppImage no longer opens a black window with EGL_BAD_PARAMETER on Fedora 44, Ubuntu 26.04 and other systems with Mesa 26.
 - Panning the franchise view on Android no longer triggers a sync, and the view opens centred on the title it was opened from.
 - A saved preset now remembers the custom list it was filtered to.
+- The franchise page no longer scrolls sideways on a phone, and its legend names every status.
 
 ### Added
 

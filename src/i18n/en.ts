@@ -998,6 +998,7 @@ export const en = {
     none: "No related titles found.",
     truncated: "Large franchise — showing the closest relations only.",
     notOnList: "Not on your list",
+    legend: "Legend",
     related: "{{count}} related titles",
     noCover: "TBA",
     zoomIn: "Zoom in",

@@ -1,4 +1,4 @@
-/* GENERATED from src/app/index.css (sha256 918207fbc6cc) by site/scripts/sync-tokens.mjs
+/* GENERATED from src/app/index.css (sha256 b192ab3a9785) by site/scripts/sync-tokens.mjs
    — do not edit. Re-run `npm run sync` after changing the source; `npm run check`
    fails while this file is stale. CLAUDE.md, "The website". */
 /* `static` because Tailwind tree-shakes tokens no utility references, leaving a `var()`-only token undefined in dark. */
@@ -32,6 +32,8 @@
 
   /* The dim behind a dialog or a sheet, near-black in both themes so what is behind recedes the same way. */
   --color-scrim: rgb(4 5 8 / 0.55);
+  /* The dim behind a picture shown full screen, deep enough that the page gives way to it. */
+  --color-scrim-deep: rgb(4 5 8 / 0.92);
 
   --color-surface-950: #0b0d12;
   --color-surface-900: #12141a;

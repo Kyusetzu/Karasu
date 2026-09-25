@@ -57,14 +57,6 @@
   "src/components/media/TagEditor.tsx": {
     "outline-removed": 1
   },
-  "src/components/overlays/CoverViewer.tsx": {
-    "colour-arbitrary": 1,
-    "icon-size": 1,
-    "shadow-arbitrary": 1
-  },
-  "src/components/overlays/MatchPicker.tsx": {
-    "transition-broad": 1
-  },
   "src/components/overlays/RandomPickModal.tsx": {
     "icon-size": 1
   },

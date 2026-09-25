@@ -1,10 +1,7 @@
-import { useEffect, useId, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useDialogFocus } from "@/hooks/useDialogFocus";
-import { useBackClose } from "@/hooks/useBackClose";
-import { cn } from "@/lib/utils";
+import { Modal } from "@/components/ui/modal";
 
 /** Guards a destructive action by naming what will be destroyed, which is what makes the extra click worth asking for. */
 export default function ConfirmDialog({
@@ -30,76 +27,45 @@ export default function ConfirmDialog({
   leaving?: boolean;
 }) {
   const { t } = useTranslation();
-  const panel = useRef<HTMLDivElement>(null);
-  const titleId = useId();
-  // Not routed through `Modal` (its own layout), so it takes the same hooks directly rather than going without.
-  useDialogFocus(panel, !leaving);
-  useBackClose(!leaving, onCancel);
-
-  useEffect(() => {
-    if (leaving) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onCancel();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onCancel, leaving]);
-
   return (
-    <div
-      data-overlay
-      className={cn(
-        "fixed inset-0 z-alert grid place-items-center bg-scrim p-4",
-        leaving ? "animate-fade-out" : "animate-fade-in",
-      )}
-      onMouseDown={(e) =>
-        !leaving && e.target === e.currentTarget && onCancel()
+    <Modal
+      alert
+      size="sm"
+      title={title}
+      onClose={onCancel}
+      leaving={leaving}
+      icon={
+        <span className="grid size-7 shrink-0 place-items-center rounded-inner bg-danger/16 text-danger">
+          <AlertTriangle aria-hidden className="size-4" />
+        </span>
       }
-    >
-      <div
-        ref={panel}
-        // `alertdialog` rather than `dialog`: the role tells a screen reader to interrupt rather than wait its turn.
-        role="alertdialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        className={cn(
-          "w-96 rounded-panel border border-hair bg-surface-900 p-5 shadow-float panel-wash",
-          leaving ? "animate-settle-out" : "animate-spring-in",
-        )}
-      >
-        <div className="flex items-start gap-3">
-          <span className="grid size-7 shrink-0 place-items-center rounded-inner bg-danger/16 text-danger">
-            <AlertTriangle className="size-4" />
-          </span>
-          <div className="min-w-0">
-            <h2 id={titleId} className="text-sm font-semibold text-ink-100">
-              {title}
-            </h2>
-            {names.length > 0 && (
-              <ul className="mt-2 space-y-0.5 text-xs text-ink-500">
-                {names.map((name) => (
-                  <li key={name} className="truncate">
-                    {name}
-                  </li>
-                ))}
-                {!!extra && extra > 0 && (
-                  <li className="text-ink-600">{t("confirm.andMore", { n: extra })}</li>
-                )}
-              </ul>
-            )}
-            {note && (
-              <p className="mt-2 text-2xs leading-relaxed text-ink-600">{note}</p>
-            )}
-          </div>
-        </div>
-
-        <div className="mt-5 flex justify-end gap-2">
+      // Cancel comes first and takes the focus, so a stray Enter keeps what is there.
+      footer={
+        <>
           <Button variant="outline" size="control" onClick={onCancel}>
             {t("common.cancel")}
           </Button>
-          <Button variant="danger" size="control" onClick={onConfirm} autoFocus>
+          <Button variant="danger" size="control" onClick={onConfirm}>
             {confirmLabel}
           </Button>
+        </>
+      }
+    >
+      {(names.length > 0 || note) && (
+        <div className="pl-10">
+          {names.length > 0 && (
+            <ul className="space-y-0.5 text-xs text-ink-500">
+              {names.map((name) => (
+                <li key={name} className="truncate">
+                  {name}
+                </li>
+              ))}
+              {!!extra && extra > 0 && <li className="text-ink-600">{t("confirm.andMore", { n: extra })}</li>}
+            </ul>
+          )}
+          {note && <p className="mt-2 text-2xs leading-relaxed text-ink-600">{note}</p>}
         </div>
-      </div>
-    </div>
+      )}
+    </Modal>
   );
 }

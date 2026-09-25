@@ -193,7 +193,8 @@ states. Eight other sizes are in use today, and they converge on these four.
   - Tailwind's plain `z-10`, `z-30` and `z-50` cover sticky headers, the
     detection window and dialogs.
   - `z-popover` (100) covers menus, popovers and the action sheet.
-  - `z-alert` (110) covers the confirm dialog and the match picker.
+  - `z-alert` (110) covers an alert (`Modal`'s `alert`), so a confirm
+    stands over any other dialog.
   - `z-skip` (200) covers the skip link.
   - A dialog opened from a popover or a menu replaces that surface as it
     opens (`Popover`'s `closeThen`, the action host's overlay), which is why
@@ -344,7 +345,7 @@ no row here, add the primitive first.
 | a section that folds open | `Disclosure`; a custom trigger pairs with `DisclosurePanel`; never in a virtual row, whose remount would replay the growth |
 | a write receipt | `showToast`; one at a time, held while hovered or focused, longer with an action |
 | anything moved by Motion | `m` and `MotionPresence` from `app/motion.tsx`, the only place `motion` is imported |
-| a dialog | `Modal` |
+| a dialog | `Modal`: `size` from `sm` to `2xl`, `description` and `icon` in the header, `footer` pinned under a body that scrolls; `alert` for a question that interrupts (`alertdialog`, over other dialogs, answered by its buttons with the harmless one first); `bare` for a full-screen view such as the cover; `dismissable={false}` while something runs that must not be left half done. Escape closes only the dialog holding focus |
 | keeping an overlay alive through its exit | `Presence`, `PresenceIf` |
 | a wait with no shape | `Loader`; a known shape is `Skeleton` |
 | a busy icon (sync, refresh, install) | `Spinner` with `spinning`, the only place `animate-spin` may appear |
@@ -362,7 +363,7 @@ The menu row covers the context menu, the action sheet, the More sheet, the
 sort and preset panels and the palette. The rows that carry more than a
 label move to it with their areas: the bell's and the sync panel's feed
 rows, the phone's settings list, the tri-state filter options, and the
-cover rows of the match picker and the season split.
+season split's cover rows.
 
 ## Libraries
 
@@ -492,3 +493,11 @@ maintainer picks. A pure restyle that moves nothing does not. The rules:
   More sheet and the preset and sort panels were 36 px on the phone and are
   44 px under a finger now, like the action sheet's; the sort direction is a
   `Segmented`, which it always looked like.
+- **2026-09-25:** One dialog. The confirm, the match picker and the cover
+  viewer stopped copying the modal's scrim, focus, Escape and back code and
+  became `Modal` with `alert`, a footer and `bare`. A dialog's buttons sit
+  in a footer pinned under a body that scrolls, so a tall form on a short
+  window keeps them in reach. An alert's harmless answer takes the focus,
+  where the confirm used to focus the destructive one. Escape closes only
+  the dialog holding focus, so a menu or a confirm inside a dialog closes
+  alone.

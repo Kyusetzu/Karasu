@@ -55,7 +55,28 @@ export const SCREENS = [
   { id: "p5-einstellungen", w: 405, h: 860, phone: true, route: "/settings" },
   { id: "d6-sortierung", w: 1232, h: 800, route: "/list", act: (p) => p.locator('[aria-label^="Sortierung"], [aria-label^="Sort:"]').first().click() },
   { id: "p6-aktionen", w: 405, h: 860, phone: true, route: "/list", act: (p) => longPress(p, p.locator("[data-media-id]").nth(1)) },
+  { id: "d7-bearbeiten", w: 1232, h: 800, route: "/list", act: (p) => fromMenu(p, "Bearbeiten") },
+  { id: "d8-bestaetigen", w: 1232, h: 800, route: "/list", act: (p) => fromMenu(p, "Von der Liste entfernen") },
+  { id: "d9-cover", w: 1232, h: 800, route: "/media/178789", act: (p) => p.getByRole("button", { name: "Cover im Vollbild ansehen" }).first().click() },
+  {
+    id: "p7-bestaetigen",
+    w: 405,
+    h: 860,
+    phone: true,
+    route: "/list",
+    act: async (p) => {
+      await longPress(p, p.locator("[data-media-id]").nth(1));
+      await p.waitForTimeout(700);
+      await p.getByRole("button", { name: "Von der Liste entfernen" }).click();
+    },
+  },
 ];
+
+/** Right-clicks a card and picks a row of its menu, for the dialogs an action opens. */
+async function fromMenu(page, row) {
+  await page.locator("[data-media-id]").nth(2).click({ button: "right" });
+  await page.getByRole("menuitem", { name: row }).click();
+}
 
 /** A held finger, sent as raw touch events: Playwright's own tap lifts at once, and the sheet needs the press. */
 async function longPress(page, target) {

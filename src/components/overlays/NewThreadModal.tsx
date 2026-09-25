@@ -61,7 +61,22 @@ export function NewThreadModal({
     });
 
   return (
-    <Modal title={t("forum.newThread")} onClose={onClose} leaving={leaving} className="max-w-2xl">
+    <Modal
+      title={t("forum.newThread")}
+      onClose={onClose}
+      leaving={leaving}
+      size="2xl"
+      footer={
+        <>
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            {t("common.cancel")}
+          </Button>
+          <Button size="sm" onClick={submit} disabled={!check.ok || create.isPending}>
+            {create.isPending ? t("forum.creating") : t("forum.create")}
+          </Button>
+        </>
+      }
+    >
       <div className="space-y-4">
         <div>
           <label className="block text-xs font-medium text-ink-300" htmlFor="thread-title">
@@ -115,15 +130,6 @@ export function NewThreadModal({
               )
             }
           />
-        </div>
-
-        <div className="flex items-center justify-end gap-2 border-t border-hair pt-3">
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            {t("common.cancel")}
-          </Button>
-          <Button size="sm" onClick={submit} disabled={!check.ok || create.isPending}>
-            {create.isPending ? t("forum.creating") : t("forum.create")}
-          </Button>
         </div>
       </div>
     </Modal>

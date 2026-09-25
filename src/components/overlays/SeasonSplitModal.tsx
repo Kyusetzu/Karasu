@@ -163,7 +163,23 @@ export function SeasonSplitModal({
       title={t("library.splitTitle")}
       onClose={onClose}
       leaving={leaving}
-      className="max-w-lg"
+      size="lg"
+      footer={
+        <>
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            {t("common.cancel")}
+          </Button>
+          <Button
+            size="sm"
+            disabled={!selected || pending}
+            onClick={() =>
+              selected && onConfirm(selected.mediaId, selected.dstStart, selected.label)
+            }
+          >
+            {pending ? t("library.splitApplying") : t("library.splitConfirm")}
+          </Button>
+        </>
+      }
     >
       <div className="space-y-4">
         <p className="text-sm text-ink-300">
@@ -228,21 +244,6 @@ export function SeasonSplitModal({
         )}
 
         {error && <p className="text-xs text-danger">{error}</p>}
-
-        <div className="flex items-center justify-end gap-2 border-t border-hair pt-3">
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            {t("common.cancel")}
-          </Button>
-          <Button
-            size="sm"
-            disabled={!selected || pending}
-            onClick={() =>
-              selected && onConfirm(selected.mediaId, selected.dstStart, selected.label)
-            }
-          >
-            {pending ? t("library.splitApplying") : t("library.splitConfirm")}
-          </Button>
-        </div>
       </div>
     </Modal>
   );

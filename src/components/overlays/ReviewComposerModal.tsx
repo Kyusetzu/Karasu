@@ -101,7 +101,17 @@ export function ReviewComposerModal({
       title={t(existing ? "review.editTitle" : "review.writeTitle")}
       onClose={onClose}
       leaving={leaving}
-      className="max-w-2xl"
+      size="2xl"
+      footer={
+        <>
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            {t("common.cancel")}
+          </Button>
+          <Button size="sm" onClick={submit} disabled={!check.ok || save.isPending}>
+            {save.isPending ? t("review.publishing") : t("review.publish")}
+          </Button>
+        </>
+      }
     >
       <div className="space-y-4">
         <div>
@@ -174,15 +184,6 @@ export function ReviewComposerModal({
         {!check.ok && check.reason !== undefined && (summary.length > 0 || bodyLen > 0) && (
           <p className="text-2xs text-gold">{reasonText(check.reason, t, bodyLen)}</p>
         )}
-
-        <div className="flex items-center justify-end gap-2 border-t border-hair pt-3">
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            {t("common.cancel")}
-          </Button>
-          <Button size="sm" onClick={submit} disabled={!check.ok || save.isPending}>
-            {save.isPending ? t("review.publishing") : t("review.publish")}
-          </Button>
-        </div>
       </div>
     </Modal>
   );

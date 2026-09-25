@@ -56,6 +56,8 @@
 
   /* The dim behind a dialog or a sheet, near-black in both themes so what is behind recedes the same way. */
   --color-scrim: rgb(4 5 8 / 0.55);
+  /* The dim behind a picture shown full screen, deep enough that the page gives way to it. */
+  --color-scrim-deep: rgb(4 5 8 / 0.92);
 
   --color-surface-950: #0b0d12;
   --color-surface-900: #12141a;

@@ -162,7 +162,9 @@ export default function SignInMerge() {
     <Modal
       title={t("merge.title")}
       leaving={held.leaving}
-      onClose={phase === "running" ? () => {} : close}
+      onClose={close}
+      // A half-done merge left behind would be worse than either answer, so nothing closes it while it runs.
+      dismissable={phase !== "running"}
     >
       {phase === "blocked" ? (
         <div className="space-y-4">

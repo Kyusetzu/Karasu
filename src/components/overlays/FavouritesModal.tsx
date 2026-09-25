@@ -176,7 +176,22 @@ export function FavouritesModal({
       title={t("social.editFavourites")}
       onClose={onClose}
       leaving={leaving}
-      className="max-w-xl"
+      size="xl"
+      footer={
+        <>
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            {t("common.done")}
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => save.mutate()}
+            disabled={!dirty || save.isPending || q.data?.truncated === true}
+            className={cn(save.isPending && "opacity-70")}
+          >
+            {save.isPending ? t("social.saving") : t("social.favSaveOrder")}
+          </Button>
+        </>
+      }
     >
       <div className="space-y-3">
         <StatusTabs label={t("social.favKindsLabel")} tabs={options} value={kind} onChange={setKind} />
@@ -254,20 +269,6 @@ export function FavouritesModal({
             ))}
           </ul>
         )}
-
-        <div className="flex items-center justify-end gap-2 border-t border-hair pt-3">
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            {t("common.done")}
-          </Button>
-          <Button
-            size="sm"
-            onClick={() => save.mutate()}
-            disabled={!dirty || save.isPending || q.data?.truncated === true}
-            className={cn(save.isPending && "opacity-70")}
-          >
-            {save.isPending ? t("social.saving") : t("social.favSaveOrder")}
-          </Button>
-        </div>
       </div>
     </Modal>
   );

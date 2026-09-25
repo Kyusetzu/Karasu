@@ -61,7 +61,24 @@ export function ProfileEditModal({
       title={t("social.editProfile")}
       onClose={onClose}
       leaving={leaving}
-      className="max-w-2xl"
+      size="2xl"
+      footer={
+        <>
+          {/* Cross-link, so no field lives in two places and each says where the others are. */}
+          <Link
+            to="/settings?pane=anilist"
+            className="mr-auto text-xs text-accent-400 hover:underline"
+          >
+            {t("social.otherAccountSettings")}
+          </Link>
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            {t("common.cancel")}
+          </Button>
+          <Button size="sm" onClick={submit} disabled={!dirty || tooLong || save.isPending}>
+            {save.isPending ? t("social.saving") : t("common.save")}
+          </Button>
+        </>
+      }
     >
       <div className="space-y-4">
         <div>
@@ -140,25 +157,6 @@ export function ProfileEditModal({
             <p className="mt-1 text-2xs text-danger">{t("social.colorInvalid")}</p>
           )}
           <p className="mt-1 text-2xs text-ink-600">{t("social.profileColorHint")}</p>
-        </div>
-
-        <div className="flex items-center justify-between gap-2 border-t border-hair pt-3">
-          {/* Cross-link, so no field lives in two places and each says where the
-              others are. */}
-          <Link
-            to="/settings?pane=anilist"
-            className="text-xs text-accent-400 hover:underline"
-          >
-            {t("social.otherAccountSettings")}
-          </Link>
-          <div className="flex gap-2">
-            <Button variant="ghost" size="sm" onClick={onClose}>
-              {t("common.cancel")}
-            </Button>
-            <Button size="sm" onClick={submit} disabled={!dirty || tooLong || save.isPending}>
-              {save.isPending ? t("social.saving") : t("common.save")}
-            </Button>
-          </div>
         </div>
       </div>
     </Modal>

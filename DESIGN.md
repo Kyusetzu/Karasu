@@ -346,8 +346,8 @@ no row here, add the primitive first.
 | a native choice | `Select` in a form or a setting; `FilterSelect` and `MultiFilterSelect` in a filter bar |
 | a menu of actions, at an element or at the pointer | `Menu` with `MenuPanel`, `MenuItem`, `SubMenu` and `MenuSeparator` |
 | a row of a sheet, a panel or a list of choices | `MenuRow`; a link, a radio's label or a Base UI item spells `menuRowClass` with `MenuRowBody`. `menu` size at the pointer and `panel` in a dropdown or a sheet, both 44 px under a coarse pointer, and `touch` for a sheet only a finger opens; `current` for the chosen row, `managed` where the keyboard's place is `data-highlighted`; `MenuGroupLabel` over a group, `MenuRowSeparator` between two |
-| an anchored panel, or its phone form | `Popover` (`dropdown` or `sheet`) |
-| a modal sheet from the bottom | `Sheet`, on Base UI's drawer: swipe, dim, Escape and back all close it |
+| an anchored panel, or its phone form | `Popover` (`dropdown` or `sheet`); `panelClassName` for content that draws its own edges, as the bell's rows do |
+| a modal sheet from the bottom | `Sheet`, on Base UI's drawer: swipe, dim, Escape and back all close it; `tall` reaches to just under the top whatever it holds, for a list that is read rather than picked from |
 | a section that folds open | `Disclosure`; a custom trigger pairs with `DisclosurePanel`; never in a virtual row, whose remount would replay the growth |
 | a write receipt | `showToast`; one at a time, held while hovered or focused, longer with an action |
 | anything moved by Motion | `m` and `MotionPresence` from `app/motion.tsx`, the only place `motion` is imported |

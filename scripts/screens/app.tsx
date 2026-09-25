@@ -162,6 +162,18 @@ function answerQuery(query: string, variables: Record<string, unknown> | null) {
     const airing = REAL.map((r, i) => ({ id: 70 + i, episode: r.next, airingAt: now + 3600 * (5 + i * 20), timeUntilAiring: 3600 * (5 + i * 20), mediaId: r.id, media: media(i, false) }));
     return { Page: { pageInfo: { hasNextPage: false, total: 3 }, airingSchedules: airing } };
   }
+  // The bell's AniList half: a run of likes that groups, a follow, an episode from yesterday and an older thread reply.
+  if (/resetNotificationCount/.test(q)) {
+    const user = (id: number, name: string) => ({ id, name });
+    const notifications = [
+      { __typename: "ActivityLikeNotification", id: 901, createdAt: now - 600, activityId: 5001, user: user(11, "Mikan") },
+      { __typename: "ActivityLikeNotification", id: 902, createdAt: now - 1500, activityId: 5002, user: user(11, "Mikan") },
+      { __typename: "FollowingNotification", id: 903, createdAt: now - 7200, user: user(12, "Hoshi") },
+      { __typename: "AiringNotification", id: 904, createdAt: now - 100_000, episode: REAL[1].next - 1, media: { id: REAL[1].id, title: { romaji: REAL[1].title, english: REAL[1].title, native: null }, isAdult: false, genres: [] } },
+      { __typename: "ThreadCommentReplyNotification", id: 905, createdAt: now - 260_000, commentId: 1, user: user(13, "Tsubame"), thread: { id: 44, title: "Frühjahr 2026: eure Favoriten" } },
+    ];
+    return { Page: { pageInfo: { hasNextPage: true, total: 5, currentPage: 1, lastPage: 2 }, notifications } };
+  }
   if (/\bPage\b/.test(q)) {
     const page = { media: Array.from({ length: 8 }, (_, i) => media(i, false)), recommendations: [], users: [], activities: [], threads: [], notifications: [], airingSchedules: [], characters: [], staff: [] };
     return { Page: { pageInfo: { hasNextPage: false, total: 8, currentPage: 1, lastPage: 1 }, ...page } };

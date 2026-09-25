@@ -55,6 +55,7 @@ const NAV: { path: string; key: string }[] = [
   { path: "/seasonal", key: "nav.seasonal" },
   { path: "/calendar", key: "nav.calendar" },
   { path: "/social", key: "nav.social" },
+  { path: "/notifications", key: "notif.title" },
   { path: "/forum", key: "nav.forum" },
   { path: "/stats", key: "nav.stats" },
   { path: "/wrapped", key: "nav.wrapped" },

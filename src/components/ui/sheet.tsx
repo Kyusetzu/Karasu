@@ -13,6 +13,7 @@ export function Sheet({
   onClose,
   label,
   initialFocus,
+  tall = false,
   className,
   children,
 }: {
@@ -24,6 +25,8 @@ export function Sheet({
   label: string;
   /** Where focus lands on open; by default the first control in the sheet. */
   initialFocus?: RefObject<HTMLElement | null>;
+  /** Reaches to just under the top of the screen whatever it holds, for a list that is read rather than picked from. */
+  tall?: boolean;
   className?: string;
   children: ReactNode;
 }) {
@@ -50,6 +53,7 @@ export function Sheet({
               // Clears the bottom bar and the gesture area; `max-h` plus scroll so a long sheet never hides its top.
               "sheet-popup pointer-events-auto absolute inset-x-2 bottom-[calc(var(--shell-bottom,0px)+0.5rem)] max-h-[75vh] overflow-y-auto",
               "rounded-sheet border border-surface-700 bg-surface-900 p-3 shadow-sheet outline-none select-none",
+              tall && "top-12 max-h-none",
               className,
             )}
           >

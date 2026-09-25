@@ -1,11 +1,13 @@
 import { useRef, useState } from "react";
 import { NavLink, useLocation } from "react-router";
 import { useTranslation } from "react-i18next";
-import { Command, Info, LayoutGrid, RefreshCw, Settings, X } from "lucide-react";
+import { Bell as BellIcon, Command, Info, LayoutGrid, RefreshCw, Settings, X } from "lucide-react";
 import { GROUPS, visibleGroups, type NavItem } from "@/components/shell/Sidebar";
 import { cn } from "@/lib/utils";
 import { isAndroid, usePlatform } from "@/stores/platform";
-import Bell from "@/components/shell/Bell";
+import NotifSheet from "@/components/shell/NotifSheet";
+import { afterBackSettles } from "@/hooks/useBackClose";
+import { isTauri } from "@/api/anilist";
 import { useNotifBadge } from "@/hooks/useNotifBadge";
 import { isPaletteSwipe } from "@/lib/navSwipe";
 import { Badge } from "@/components/ui/badge";
@@ -48,6 +50,7 @@ export default function BottomBar() {
   const { t } = useTranslation();
   const android = isAndroid(usePlatform((s) => s.info));
   const [moreOpen, setMoreOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
   const { pathname } = useLocation();
   const badge = useNotifBadge();
   // The bar is the gesture surface, so the swipe is recognised here rather than over a reserved strip of the page.
@@ -67,7 +70,23 @@ export default function BottomBar() {
           <MenuGroupLabel className="pt-0">{t("nav.more")}</MenuGroupLabel>
           <div className="flex items-center gap-1">
             {/* The bell lives in the sheet, since an unlabeled icon in the nav row read as decoration; More carries its count. */}
-            <Bell barSlot />
+            {isTauri && (
+              <button
+                type="button"
+                aria-label={t("notif.title")}
+                // More steps aside first; the notifications sheet waits for its back entry to unwind before pushing its own.
+                onClick={() => {
+                  setMoreOpen(false);
+                  afterBackSettles(() => setNotifOpen(true));
+                }}
+                className="relative grid h-9 min-w-11 place-items-center rounded-control text-ink-500 transition-surface hover:text-ink-100"
+              >
+                <BellIcon className="size-5" />
+                {badge > 0 && (
+                  <Badge count={badge} max={9} floating className="animate-idle-pulse right-1.5 top-0.5" />
+                )}
+              </button>
+            )}
             <button
               type="button"
               aria-label={t("window.close")}
@@ -111,6 +130,7 @@ export default function BottomBar() {
           </div>
         ))}
       </Sheet>
+      <NotifSheet open={notifOpen} onClose={() => setNotifOpen(false)} />
 
       {/* The primary navigation landmark, named as such and like no other landmark, since screen readers list them by label. */}
       <nav

@@ -57,7 +57,9 @@ src/
                      popover is the anchored dropdown / phone sheet the list
                      toolbar's panels open in
     shell/           the window frame and global machinery — titlebar, sidebar,
-                     bottom bar, back button, bell, command palette, keyboard
+                     bottom bar, back button, bell (the titlebar's glance, the
+                     phone's NotifSheet and the NotifFeed rows both share with
+                     the notifications page), command palette, keyboard
                      sheet, global keys, toast, first run, session expired, the
                      sync panel, the pull-to-sync indicator, the detection pill
                      and the floating detection window, and the action host,
@@ -89,7 +91,8 @@ src/
                      useAniListLogin, useFollow, useSocialActions,
                      useFavourite, useActivityPost, useUpdateUser,
                      usePhoneShell, useShortViewport, useElementWidth,
-                     useBackClose, useNotifBadge, useDialogFocus,
+                     useBackClose, useNotifBadge, useNotifications,
+                     useDialogFocus,
                      useGridRoving, useSyncStatus, useManualSync,
                      usePullToSync, useActionRunner, useCachedMedia,
                      useDetectionMedia, useDetectionDrag, useElementSize)
@@ -1779,6 +1782,11 @@ shape, and the question that follows them.
   already covers; site unread is a snapshot of the count taken before the
   page-1 mark-seen reset, an honest approximation and labelled as one. An
   activity row's press opens the activity; the actor's name is its own link.
+  `useNotifications` holds all of it once for the three surfaces — the
+  titlebar's dropdown (the newest three), the phone's tall sheet and
+  `/notifications` — and today/earlier (`sectionByDay`) is presentation too.
+  A row that navigates goes through the surface's `leave`, so an overlay's
+  back entry has unwound before the destination's is pushed.
 - **A thread can land on one comment.** `/thread/:id?comment=<id>` rides the
   same uncapped `ThreadComment(id:)` tree route as the newest-jump — one
   request at any thread size, including comments past the 5,000-entry paging

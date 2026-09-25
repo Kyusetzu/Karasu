@@ -29,6 +29,7 @@ export function Popover({
   onOpen,
   onClosed,
   className,
+  panelClassName,
   children,
 }: {
   label: string;
@@ -43,6 +44,8 @@ export function Popover({
   onClosed?: () => void;
   /** On the box around the trigger, for a trigger that has to grow with its row. */
   className?: string;
+  /** On the panel itself, for content that draws its own edges, such as rows that run to the border. */
+  panelClassName?: string;
   children: (api: PopoverApi) => ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -104,7 +107,7 @@ export function Popover({
   const api: PopoverApi = { close, closeThen };
   const panel =
     variant === "sheet" ? (
-      <Sheet open={open} id={id} label={label} onClose={close} className="p-4">
+      <Sheet open={open} id={id} label={label} onClose={close} className={cn("p-4", panelClassName)}>
         {children(api)}
       </Sheet>
     ) : (
@@ -137,6 +140,7 @@ export function Popover({
                 "max-h-[min(var(--available-height),34rem)] max-w-[calc(100vw-2rem)] overflow-y-auto outline-none",
                 "rounded-panel border border-hair bg-surface-900 p-4 text-left shadow-float panel-wash",
                 "origin-(--transform-origin) data-open:animate-pop-in data-closed:animate-pop-out",
+                panelClassName,
               )}
             >
               {children(api)}

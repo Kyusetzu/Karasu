@@ -1,0 +1,228 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router";
+import { useInfiniteQuery, useQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
+import { listen } from "@tauri-apps/api/event";
+import {
+  apkInstall,
+  apkUpdateState,
+  downloadPendingUpdate,
+  getNotifications,
+  installPendingUpdate,
+  isTauri,
+  markAllNotificationsRead,
+  markNotificationRead,
+  type AppNotification,
+} from "@/api/anilist";
+import { siteNotifications, siteNotifCount, type SiteNotifPage } from "@/api/social";
+import { buildGroups, unify, type NotifGroup, type NotifSource } from "@/lib/notifGroups";
+import type { SiteNotifRow } from "@/lib/siteNotifications";
+import { isBlocked } from "@/lib/contentFilter";
+import { useAuth } from "@/stores/auth";
+import { useContentFilter } from "@/stores/contentFilter";
+import { isAndroid, usePlatform } from "@/stores/platform";
+import { showToast } from "@/stores/toast";
+
+/** How a surface steps aside before a row navigates: the dropdown and the sheet close first, the page just goes. */
+export type Leave = (go: () => void) => void;
+
+/** The bell's one stream, for whichever surface shows it; `active` is that surface being open or mounted. */
+export function useNotifications({ active, source = "all" }: { active: boolean; source?: NotifSource }) {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const qc = useQueryClient();
+  const android = isAndroid(usePlatform((s) => s.info));
+  const mode = useAuth((s) => s.mode);
+  // Part of both AniList query keys, or a sign-out and sign-in within a staleTime shows the old account's badge.
+  const viewerId = useAuth((s) => s.viewer?.id ?? null);
+  const anilist = mode === "anilist";
+  const [items, setItems] = useState<AppNotification[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  // Which grouped rows are unfolded; reset on every open so a fresh glance starts collapsed.
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  // How many site rows wear the unread dot: a snapshot taken at open, before the page-1 fetch resets the count.
+  const [siteUnseen, setSiteUnseen] = useState(0);
+
+  const load = useCallback(() => {
+    if (!isTauri) return;
+    // Report the failure; a swallowed one renders the empty state, which reads as all caught up.
+    getNotifications()
+      .then((rows) => {
+        setItems(rows);
+        setLoadError(null);
+      })
+      .catch((e) => setLoadError(String(e)));
+  }, []);
+
+  // Keep the guard; outside Tauri `listen` throws during mount and the ErrorBoundary blanks the whole window.
+  useEffect(() => {
+    if (!isTauri) return;
+    load();
+    const un = listen("notifications-changed", () => load());
+    return () => {
+      un.then((f) => f());
+    };
+  }, [load]);
+
+  // Feeds the always-visible badge; keep the interval, or staleTime freezes it since nothing else touches this key.
+  const count = useQuery({
+    queryKey: ["social", "notifCount", viewerId],
+    queryFn: siteNotifCount,
+    enabled: isTauri && anilist,
+    staleTime: 60_000,
+    refetchInterval: 10 * 60_000,
+  });
+
+  // Page 1's `reset` is AniList's mark-seen, so the count is zeroed here; cancel first or a stale in-flight read wins.
+  const site = useInfiniteQuery({
+    queryKey: ["social", "siteNotifs", viewerId],
+    queryFn: async ({ pageParam }) => {
+      const reset = pageParam === 1;
+      const page = await siteNotifications(pageParam, reset);
+      if (reset) {
+        await qc.cancelQueries({ queryKey: ["social", "notifCount", viewerId] });
+        qc.setQueryData(["social", "notifCount", viewerId], 0);
+      }
+      return page;
+    },
+    initialPageParam: 1,
+    getNextPageParam: (last, all) => (last.pageInfo.hasNextPage ? all.length + 1 : undefined),
+    enabled: isTauri && active && anilist,
+    staleTime: 60_000,
+  });
+
+  // Trim retained pages as the surface goes, so a reopen refetches one page; keep `updatedAt` or the trim postpones it.
+  useEffect(() => {
+    if (!active) return;
+    return () => {
+      const updatedAt = qc.getQueryState(["social", "siteNotifs", viewerId])?.dataUpdatedAt;
+      qc.setQueryData<InfiniteData<SiteNotifPage>>(
+        ["social", "siteNotifs", viewerId],
+        (old) =>
+          old && old.pages.length > 1
+            ? { pages: old.pages.slice(0, 1), pageParams: old.pageParams.slice(0, 1) }
+            : undefined,
+        { updatedAt },
+      );
+    };
+  }, [active, qc, viewerId]);
+
+  // On the rising edge of `active`: snapshot the unseen count before page 1 zeroes it, collapse, refetch the count.
+  const wasActive = useRef(false);
+  useEffect(() => {
+    const rising = active && !wasActive.current;
+    wasActive.current = active;
+    if (!rising) return;
+    setExpanded(new Set());
+    if (!anilist) return;
+    setSiteUnseen(count.data ?? 0);
+    void qc.invalidateQueries({ queryKey: ["social", "notifCount", viewerId] });
+  }, [active, anilist, count.data, qc, viewerId]);
+
+  const unread = items.filter((n) => !n.read).length + siteUnseen;
+
+  const readOne = async (n: AppNotification) => {
+    if (n.read) return;
+    await markNotificationRead(n.id).catch(() => {});
+    load();
+  };
+
+  const readAll = async () => {
+    // Always offered, so a badge the panel cannot explain still has a way out; an empty press says so.
+    if (unread === 0) {
+      showToast({ kind: "info", text: t("notif.nothingToMark") });
+      return;
+    }
+    await markAllNotificationsRead().catch(() => {});
+    // The AniList half was already marked seen server-side by the page-1 reset; what remains is the dots.
+    setSiteUnseen(0);
+    load();
+  };
+
+  // Filtered once before grouping: a row about a blocked title is dropped, since the row itself names the title.
+  const level = useContentFilter((s) => s.level);
+  const siteRows = useMemo(
+    () => (site.data?.pages ?? []).flatMap((p) => p.rows).filter((r) => !isBlocked(r.media, level)),
+    [site.data, level],
+  );
+
+  // One stream, grouped in presentation only: recomputed over the loaded set, so a group may grow as older pages land.
+  const groups = useMemo(
+    () =>
+      buildGroups(
+        unify(
+          source === "anilist" ? [] : items,
+          anilist && source !== "karasu" ? siteRows : [],
+          siteUnseen,
+        ),
+      ),
+    [items, anilist, siteRows, siteUnseen, source],
+  );
+
+  const openSite = (row: SiteNotifRow, leave: Leave) => {
+    const target = row.target;
+    if (!target) return;
+    leave(() => navigate(target));
+  };
+
+  // Local twin of `openSite`, never disabled: a Karasu row can always mark itself read, and navigation is the extra.
+  const openLocal = async (n: AppNotification, leave: Leave) => {
+    await readOne(n);
+    // Tapping an update row installs it; `download` first, because a restart empties the in-memory pending update.
+    if (n.kind === "update") {
+      // Android: a verified APK opens the installer right here; anything short of that is About's to explain.
+      if (android) {
+        const state = await apkUpdateState().catch(() => null);
+        if (state?.status === "ready" && !state.needsInstallPermission) {
+          leave(() => {});
+          await apkInstall().catch((e) => showToast({ kind: "error", text: t("common.error", { message: String(e) }) }));
+          return;
+        }
+        leave(() => navigate("/about"));
+        return;
+      }
+      leave(() => {});
+      try {
+        await downloadPendingUpdate();
+        await installPendingUpdate();
+      } catch (e) {
+        showToast({ kind: "error", text: t("common.error", { message: String(e) }) });
+      }
+      return;
+    }
+    const mediaId = n.mediaId;
+    if (mediaId == null) return;
+    leave(() => navigate(`/media/${mediaId}`));
+  };
+
+  // An airing group has one destination, so it goes there; an actor group's members differ, so it unfolds.
+  const openGroup = (g: NotifGroup, leave: Leave) => {
+    if (g.label?.kind === "airing") {
+      for (const m of g.items) if (m.local) void readOne(m.local);
+      const mediaId = g.items.find((m) => m.mediaId != null)?.mediaId;
+      if (mediaId != null) leave(() => navigate(`/media/${mediaId}`));
+      return;
+    }
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(g.key)) next.delete(g.key);
+      else next.add(g.key);
+      return next;
+    });
+  };
+
+  return {
+    anilist,
+    groups,
+    unread,
+    loadError,
+    site,
+    expanded,
+    readAll,
+    openLocal,
+    openSite,
+    openGroup,
+  };
+}
+
+export type Notifications = ReturnType<typeof useNotifications>;

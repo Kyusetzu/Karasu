@@ -8,7 +8,7 @@ use tauri::State;
 use super::*;
 
 /// Monotonic commit counter, the fourth version segment, bumped by one on every commit.
-pub const COMMIT_NUMBER: u32 = 714;
+pub const COMMIT_NUMBER: u32 = 715;
 
 /// The full four-part display version; the semver core comes from the crate version.
 pub fn app_version_string() -> String {

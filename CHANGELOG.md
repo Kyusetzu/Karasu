@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 1dfa6cc -->
+<!-- generated-through: db3c7ae -->
 
 ### Fixed
 
@@ -89,6 +89,7 @@ tag time is then optional rather than load-bearing.
 - The command palette's result groups are announced as groups, and its input has a name.
 - F5, Ctrl+F and Ctrl+P no longer reach the browser engine under the app on desktop; copying works the same on Linux as on Windows.
 - The Linux AppImage no longer opens a black window with EGL_BAD_PARAMETER on Fedora 44, Ubuntu 26.04 and other systems with Mesa 26.
+- the Linux AppImage no longer crashes shortly after opening on Fedora 44 and other systems with Mesa 26, and GDK_BACKEND=wayland now opts it into native Wayland.
 
 ### Added
 

@@ -363,20 +363,26 @@ with no UAC prompt and nothing written outside your own profile.
 > Linux ships three ways: an **AppImage** — one file for Ubuntu, Debian and
 > Arch alike, and the one the in-app updater replaces — plus a **`.deb`** and an
 > **`.rpm`** for the package manager, which update with the next release rather
-> than in-app. All are built on Ubuntu 22.04, so they need **glibc ≥ 2.35**, and
-> expect **webkit2gtk-4.1** on the system (`libwebkit2gtk-4.1-0` on
-> Ubuntu/Debian, `webkit2gtk4.1` on Fedora, `webkit2gtk-4.1` on Arch); that one
-> is not bundled. A tray icon needs a
+> than in-app. All are built on Ubuntu 22.04, so they need **glibc ≥ 2.35**.
+> The AppImage carries its own WebKitGTK and GTK and takes only the display
+> libraries (Mesa, X11, Wayland) from the system; the `.deb` and `.rpm` use the
+> system's **webkit2gtk-4.1** (`libwebkit2gtk-4.1-0` on Ubuntu/Debian,
+> `webkit2gtk4.1` on Fedora) and pull it in as a dependency. A tray icon needs a
 > StatusNotifier host — on GNOME, the AppIndicator extension — and without one
 > Karasu still runs, but closing the window quits instead of hiding it.
 >
-> An AppImage up to 1.19.1.664 shows a black window on systems with Mesa 26
-> (Fedora 44, Ubuntu 26.04) and prints `Could not create default EGL display:
-> EGL_BAD_PARAMETER`: it bundled a `libwayland-client` too old for that Mesa.
-> Later builds leave it to the system. For an older file,
-> `LD_PRELOAD=/usr/lib64/libwayland-client.so.0 ./Karasu_*.AppImage` works around
-> it (`/usr/lib/x86_64-linux-gnu/` on Debian and Ubuntu), or take the `.rpm` or
-> `.deb`.
+> On systems with Mesa 26 (Fedora 44, Ubuntu 26.04) an AppImage up to
+> 1.19.1.664 shows a black window and prints `Could not create default EGL
+> display: EGL_BAD_PARAMETER`, and 1.19.2.665 can crash with a segmentation
+> fault shortly after opening. Both come from libraries the AppImage bundled
+> from Ubuntu 22.04; later builds leave the display libraries to the system and
+> keep GTK's Wayland input-method module out of an X11 session. For an older file,
+> take the `.rpm` or `.deb`, or download the current AppImage by hand, since
+> the in-app updater cannot run in an app that does not start.
+>
+> The AppImage runs through XWayland by default. `GDK_BACKEND=wayland
+> ./Karasu_*.AppImage` opts into native Wayland, and `GDK_BACKEND=x11` is the way
+> back if a globally set `GDK_BACKEND=wayland,…` misbehaves.
 >
 > Android ships as two APKs — take `Karasu_<version>_arm64.apk`, and fall
 > back to `_universal` only if your device refuses it (releases carry it;

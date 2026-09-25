@@ -143,9 +143,15 @@ jobs:
           NO_STRIP: true
 
       # The same repack the release runs, so a pull request finds a broken one first; no key here, so no re-sign.
-      - name: Take libwayland-client back out of the AppImage
+      - name: Leave the display libraries to the host in the AppImage
         shell: pwsh
         run: ./scripts/release/slim-appimage.ps1
+
+      # Blocking: a Linux build that does not stay up on Fedora 44 or Ubuntu 26.04 is not worth shipping or merging.
+      - name: Smoke-test the AppImage on Fedora 44 and Ubuntu 26.04
+        shell: pwsh
+        timeout-minutes: 12
+        run: ./scripts/release/smoke-appimage.ps1
 
       # The tray library is dlopen'd and invisible to linuxdeploy; warn only, since the app survives a missing tray.
       - name: Check the AppImage carries the tray library

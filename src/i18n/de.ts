@@ -371,6 +371,7 @@ export const de: typeof en = {
     fullCalendar: "Ganzer Kalender →",
     showAll: "Alle anzeigen →",
     episodeCount: "{{count}} Episoden",
+    episodeCountOne: "1 Episode",
     voteUp: "Gute Empfehlung",
     voteDown: "Schlechte Empfehlung",
     voteFailed: "Die Stimme wurde nicht gespeichert",

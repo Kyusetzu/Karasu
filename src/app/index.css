@@ -711,6 +711,13 @@ nav a {
   color: color-mix(in srgb, var(--tint) 45%, var(--color-on-cover-edge));
 }
 
+/* A ring drawn inside a control that fills a clipping frame edge to edge; the high-contrast rules keep it inside too. */
+@utility focus-inset {
+  &:focus-visible {
+    outline-offset: -2px;
+  }
+}
+
 /* The accent as the tint; high contrast takes the text shade, lifted to 7:1, since the fill shade is too dark for a rim. */
 @utility tint-accent {
   --tint: var(--color-accent-500);
@@ -994,6 +1001,9 @@ html[data-reduce-motion] ::view-transition-new(*) {
     outline: 3px solid Highlight;
     outline-offset: 2px;
   }
+  .focus-inset:focus-visible {
+    outline-offset: -3px;
+  }
   /* A filled control keeps its edge when its fill is taken away. */
   button,
   [role="button"],
@@ -1033,6 +1043,9 @@ html[data-reduce-motion] ::view-transition-new(*) {
 :root[data-contrast="more"] *:focus-visible {
   outline-width: 3px;
   outline-offset: 2px;
+}
+:root[data-contrast="more"] .focus-inset:focus-visible {
+  outline-offset: -3px;
 }
 
 /* Scrollbars */

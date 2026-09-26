@@ -369,6 +369,7 @@ export const en = {
     fullCalendar: "Full calendar →",
     showAll: "Show all →",
     episodeCount: "{{count}} episodes",
+    episodeCountOne: "1 episode",
     voteUp: "Good recommendation",
     voteDown: "Bad recommendation",
     voteFailed: "The vote wasn't saved",

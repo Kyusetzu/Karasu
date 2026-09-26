@@ -242,6 +242,13 @@ describe("the tint fill", () => {
   });
 });
 
+describe("focus inside a clipping frame", () => {
+  it("draws the inset ring inside the control in high contrast and forced colours too, where the ring is thicker", () => {
+    expect(css).toMatch(/:root\[data-contrast="more"\] \.focus-inset:focus-visible \{\s*outline-offset: -3px;/);
+    expect(css).toMatch(/@media \(forced-colors: active\) \{[^@]*\.focus-inset:focus-visible \{\s*outline-offset: -3px;/);
+  });
+});
+
 describe("the frame around the stylesheet", () => {
   const html = OUTSIDE["/index.html"];
   const conf = JSON.parse(OUTSIDE["/src-tauri/tauri.conf.json"]) as {

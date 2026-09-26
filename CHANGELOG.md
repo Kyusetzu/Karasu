@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 3123bd3 -->
+<!-- generated-through: 37332c0 -->
 
 ### Fixed
 
@@ -105,6 +105,7 @@ tag time is then optional rather than load-bearing.
 - The score label over the chosen bar is readable in the light theme, and the tag field shows keyboard focus.
 - Covers in search and the season pages no longer clip a quick action when they are narrow.
 - In high contrast and Windows' contrast themes the chosen status and chip stand out by more than colour, and a tapped +1 no longer stays highlighted on a phone.
+- The overview no longer jumps while it loads, keeps airing soon full width on a quiet week, and shows the keyboard ring on its panel rows.
 
 ### Added
 

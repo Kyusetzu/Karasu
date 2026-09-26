@@ -98,9 +98,9 @@ function DashboardContent({ userId }: { userId: number }) {
   return (
     <div className="space-y-9 px-8 pb-12 pt-7">
       {/* The figures sit under the banner, where the eye lands first; the hero needs no list, the figures do. */}
-      <div className="space-y-4">
+      <div className="space-y-4 empty:hidden">
         <SeasonHero />
-        {ready && <Stats entries={allAnime} />}
+        {isLoading ? <StatsSkeleton /> : ready && <Stats entries={allAnime} />}
       </div>
 
       {isLoading ? (
@@ -117,7 +117,8 @@ function DashboardContent({ userId }: { userId: number }) {
       ) : (
         <>
           <ContinueStrip type="ANIME" entries={allAnime} save={save} />
-          <div className="grid items-start gap-x-8 gap-y-9 lg:grid-cols-2">
+          {/* Columns by flow, so the one panel left on a week with nothing airing takes the whole row. */}
+          <div className="grid items-start gap-x-8 gap-y-9 lg:grid-flow-col lg:auto-cols-fr">
             <WeeklyDigest entries={allAnime} />
             <AiringSoon entries={allAnime} />
           </div>
@@ -141,28 +142,62 @@ function DashboardContent({ userId }: { userId: number }) {
   );
 }
 
-/** Stand-in while the list loads, shaped like the real layout so nothing jumps; unlabelled on purpose. */
-function DashboardSkeleton() {
+/** Stand-in for the figures, in their slot under the banner: the real frame, so the row is already its height. */
+function StatsSkeleton() {
   return (
-    <div className="space-y-9" aria-hidden="true">
-      {/* Real frame, shimmering value only, so the row is already the right height when the numbers land. */}
-      <div className="grid grid-cols-2 overflow-hidden rounded-panel border border-hair bg-surface-900 sm:grid-cols-4">
-        {Array.from({ length: 4 }, (_, i) => (
-          <div key={i} className={cn("flex flex-col items-center gap-1 px-3 py-2.5", statCellRule(i))}>
-            <Shimmer index={i} className="size-7 shrink-0 rounded-full" />
-            <div className="flex h-5.5 items-center">
+    <div
+      aria-hidden="true"
+      className="grid grid-cols-2 overflow-hidden rounded-panel border border-hair bg-surface-900 sm:grid-cols-4"
+    >
+      {Array.from({ length: 4 }, (_, i) => (
+        <div key={i} className={cn("flex flex-col items-center gap-1 px-3 py-2.5", statCellRule(i))}>
+          <Shimmer index={i} className="size-7 shrink-0 rounded-full" />
+          <div>
+            <div className="flex h-5.5 items-center justify-center">
               <Shimmer index={i} className="h-4 w-12" />
             </div>
-            <div className="flex h-3.5 items-center">
+            <div className="flex h-3.5 items-center justify-center">
               <Shimmer index={i} className="h-2 w-16" />
             </div>
           </div>
-        ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Stand-in for what follows the figures while the list loads, shaped like it so nothing jumps; unlabelled on purpose. */
+function DashboardSkeleton() {
+  const coverCols = useTheme((s) => s.coverCols);
+  return (
+    <div className="space-y-9" aria-hidden="true">
+      <div className="space-y-4">
+        <HeaderSkeleton />
+        <CoverGridSkeleton count={coverCols} />
       </div>
-      {Array.from({ length: 2 }, (_, section) => (
-        <div key={section} className="space-y-4">
-          <HeaderSkeleton index={section * 3} />
-          <CoverGridSkeleton count={6} />
+      <div className="grid items-start gap-x-8 gap-y-9 lg:grid-flow-col lg:auto-cols-fr">
+        <PanelSkeleton index={3} />
+        <PanelSkeleton index={6} />
+      </div>
+    </div>
+  );
+}
+
+/** A list panel that has not arrived: its frame, heading line and three rows at their real heights. */
+function PanelSkeleton({ index }: { index: number }) {
+  return (
+    <div className="overflow-hidden rounded-panel border border-hair bg-surface-900">
+      <div className="flex h-11 items-center gap-2.5 border-b border-hair px-4">
+        <Shimmer index={index} className="size-4 rounded-inner" />
+        <Shimmer index={index} className="h-3.5 w-28" />
+      </div>
+      {Array.from({ length: 3 }, (_, i) => (
+        <div key={i} className="flex items-center gap-3 border-hair px-4 py-2.5 not-first:border-t">
+          <Shimmer index={index + i} className="h-11 w-8 shrink-0 rounded-inner" />
+          <div className="flex-1 space-y-1.5">
+            <Shimmer index={index + i} className="h-3 w-2/3" />
+            <Shimmer index={index + i} className="h-2 w-1/3" />
+          </div>
         </div>
       ))}
     </div>
@@ -205,24 +240,26 @@ function ContinueStrip({
   const measured = useColumnCount(grid, coverCols);
   const perRow = measured > 1 ? measured : coverCols;
   const more = watching.length > perRow;
+  // The list has no tab for both, so the link opens rewatching only when every title the row left out is a rewatch.
+  const rest = watching.slice(perRow).every((e) => e.status === "REPEATING") ? "?tab=REPEATING" : "";
 
   // Anime keeps its empty state as the screen's anchor; a manga one would be noise for anime-only users.
   if (type === "MANGA" && watching.length === 0) return null;
+
+  const title = t(type === "ANIME" ? "dashboard.continueWatching" : "dashboard.continueReading");
 
   return (
     <section>
       <SectionHeader
         icon={type === "ANIME" ? Play : BookOpen}
-        title={t(
-          type === "ANIME"
-            ? "dashboard.continueWatching"
-            : "dashboard.continueReading",
-        )}
+        title={title}
         meta={more ? String(watching.length) : undefined}
         action={
           more && (
-            <Link to={type === "ANIME" ? "/list" : "/manga"} className="text-xs text-accent-400 hover:underline">
+            <Link to={`${type === "ANIME" ? "/list" : "/manga"}${rest}`} className="text-xs text-accent-400 hover:underline">
               {t("dashboard.showAll")}
+              {/* Two strips carry the same link text, so each names its section for a screen reader. */}
+              <span className="sr-only"> ({title})</span>
             </Link>
           )
         }
@@ -303,7 +340,7 @@ function WeeklyDigest({ entries }: { entries: MediaListEntry[] }) {
     <ListPanel
       icon={CalendarDays}
       title={t("dashboard.thisWeek")}
-      meta={t("dashboard.episodeCount", { count: thisWeek.length })}
+      meta={t(thisWeek.length === 1 ? "dashboard.episodeCountOne" : "dashboard.episodeCount", { count: thisWeek.length })}
       footer={
         // The digest is the teaser; the calendar is the real thing, with other weeks and everything airing.
         <Link to="/calendar" className="text-xs text-accent-400 hover:underline">
@@ -367,7 +404,7 @@ function PanelRow({
   return (
     <Link
       to={`/media/${media.id}`}
-      className="flex items-center gap-3 px-4 py-2.5 transition-surface hover:bg-surface-850"
+      className="flex items-center gap-3 px-4 py-2.5 transition-surface hover:bg-surface-850 focus-inset"
     >
       <img src={media.coverImage.large ?? ""} alt="" loading="lazy" className="h-11 w-8 shrink-0 rounded-inner object-cover" />
       <div className="min-w-0 flex-1">

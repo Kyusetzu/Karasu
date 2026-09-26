@@ -1,5 +1,6 @@
 import KarasuMark from "@/components/KarasuMark";
 import { Button } from "@/components/ui/button";
+import { Eyebrow } from "@/components/Section";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Pill } from "@/components/ui/pill";
 
@@ -33,14 +34,6 @@ function Swatch({ cls, label, value }: { cls: string; label: string; value?: str
       <span className="text-2xs text-ink-500">{label}</span>
       {value && <span className="text-2xs tabular-nums text-ink-600">{value}</span>}
     </div>
-  );
-}
-
-function Eyebrow({ children }: { children: string }) {
-  return (
-    <p className="font-brand text-2xs font-semibold uppercase tracking-[.18em] text-accent-400">
-      {children}
-    </p>
   );
 }
 
@@ -159,7 +152,7 @@ export function Sample() {
               <div className="h-1 w-2/3 rounded-full bg-accent-500" />
             </div>
           </div>
-          <div className="flex flex-col justify-between rounded-xl border border-hair bg-surface-900 p-5">
+          <div className="flex flex-col justify-between rounded-panel border border-hair bg-surface-900 p-5">
             <div className="flex items-center gap-2">
               <span className="size-1.5 animate-blip rounded-full bg-accent-500" />
               <span className="text-2xs font-medium tracking-[.03em] text-ink-500">

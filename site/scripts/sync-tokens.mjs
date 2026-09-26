@@ -10,7 +10,14 @@
  * takes the blocks that *are* the design language (the `@theme`, every
  * `@keyframes` and `@utility`, the `:root` vars, both theme blocks, the
  * reduced-motion, forced-colours and scrollbar rules), leaves the rest, and
- * appends the default accent evaluated through the app's own function.
+ * appends the default accent evaluated through the app's own function, in its
+ * dark, light and high-contrast forms.
+ *
+ * The app keys high contrast on `:root[data-contrast="more"]`, a setting the
+ * site does not have. The dark half of those rules is taken and rewritten into
+ * `@media (prefers-contrast: more)`, top-level and nested alike, so the site
+ * answers the OS request instead; a selector list the rewrite cannot keep
+ * exact stops the sync rather than widening a rule.
  *
  *   node scripts/sync-tokens.mjs            write the file
  *   node scripts/sync-tokens.mjs --check    exit 1 if the committed file is stale
@@ -107,7 +114,6 @@ function taken(head, body = "") {
   if (head === "@media (prefers-reduced-motion: reduce)") return true;
   if (head.startsWith("html[data-reduce-motion]")) return true;
   if (head === "@media (forced-colors: active)") return true;
-  if (head === "@media (prefers-contrast: more)") return true;
   // The app's high-contrast setting, dark half only: the site stays dark and answers the OS request instead.
   if (head.startsWith(':root[data-contrast="more"]') && !head.includes("data-theme")) return true;
   if (head.startsWith("*::-webkit-scrollbar")) return true;

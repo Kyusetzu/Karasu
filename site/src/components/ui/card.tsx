@@ -4,10 +4,9 @@ import type { HTMLAttributes } from "react";
 import { cn } from "@/lib/cn";
 
 /**
- * A raised panel: the surface fill, the iridescent wash and the 1px catch-light
- * along the top edge. The wash is what makes overlapping panels read as
- * feathers rather than stacked grey cards — see `panel-wash` in the generated
- * tokens.
+ * A raised panel: the surface fill, the neutral wash of light along its top and
+ * the 1px catch-light on the edge — see `panel-wash` and `panel-top` in the
+ * generated tokens.
  */
 export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (

@@ -145,7 +145,7 @@ export function CoverCell({
         )}
 
         {score != null && (
-          <span className="absolute left-2 top-2 flex items-center gap-1 rounded-cover bg-on-cover/93 px-1.5 py-0.5 text-2xs font-semibold text-gold">
+          <span className="absolute left-2 top-2 flex items-center gap-1 rounded-cover bg-on-cover/93 px-1.5 py-0.5 text-2xs font-semibold text-on-cover-gold">
             <Star className="size-2.5" fill="currentColor" />
             {score}
           </span>

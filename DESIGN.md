@@ -613,3 +613,13 @@ maintainer picks. A pure restyle that moves nothing does not. The rules:
   labels of different widths, so the maintainer kept the glyph above and
   took the tightest stack that still reads — a smaller glyph circle, the
   number one step down, and closer spacing — on both shells.
+- **2026-09-26:** The hero reads the same in every theme. Its frame is the
+  cover near-black, since the art's feathered edges faded into the light
+  theme's white page as a grey band; the kicker is a neutral near-black
+  plate the art shows through a little, with only its text lifted toward
+  the accent (`tint-label-on-cover`) — a first, fully tinted plate was
+  judged too coloured; and the score over cover art, there and on every
+  cover's badge, is one bright gold in every theme (`on-cover-gold`),
+  where the light theme's text gold went dark on dark. In high contrast,
+  glass over cover art turns solid in that near-black, not the page's
+  panel colour, which had left the carousel's white dots on white.

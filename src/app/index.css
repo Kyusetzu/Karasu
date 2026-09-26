@@ -82,6 +82,8 @@
   --color-on-cover: #040508;
   /* The light edge a control on cover art is drawn with, so it keeps a contrast floor on dark art. */
   --color-on-cover-edge: #ffffff;
+  /* Score stars on cover art: the bright gold in every theme, since the ground under them is always near-black. */
+  --color-on-cover-gold: #fcd34d;
   /* The window's close button under the pointer: the caption bar's red in every theme, with its white glyph. */
   --color-window-close: #b3232c;
   --color-window-close-ink: #ffffff;
@@ -711,6 +713,12 @@ nav a {
   color: color-mix(in srgb, var(--tint) 45%, var(--color-on-cover-edge));
 }
 
+/* A label on cover art: a near-black plate the art shows through a little, its text the tint lifted toward white. */
+@utility tint-label-on-cover {
+  background-color: color-mix(in srgb, var(--color-on-cover) 85%, transparent);
+  color: color-mix(in srgb, var(--tint) 35%, var(--color-on-cover-edge));
+}
+
 /* A ring drawn inside a control that fills a clipping frame edge to edge; the high-contrast rules keep it inside too. */
 @utility focus-inset {
   &:focus-visible {
@@ -1035,6 +1043,10 @@ html[data-reduce-motion] ::view-transition-new(*) {
 :root[data-contrast="more"] [class*="backdrop-blur"] {
   backdrop-filter: none;
   background-color: var(--color-surface-900);
+}
+/* Glass over cover art turns solid in the art's own near-black, since the page's panel is white in the light theme. */
+:root[data-contrast="more"] [class*="backdrop-blur"][class*="on-cover"] {
+  background-color: var(--color-on-cover);
 }
 :root[data-contrast="more"] .section-rule {
   background-image: none;

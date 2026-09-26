@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 4660812 -->
+<!-- generated-through: 18f3848 -->
 
 ### Fixed
 
@@ -106,6 +106,7 @@ tag time is then optional rather than load-bearing.
 - Covers in search and the season pages no longer clip a quick action when they are narrow.
 - In high contrast and Windows' contrast themes the chosen status and chip stand out by more than colour, and a tapped +1 no longer stays highlighted on a phone.
 - The overview no longer jumps while it loads, keeps airing soon full width on a quiet week, and shows the keyboard ring on its panel rows.
+- The overview's banner and the score badges on covers stay readable in the light theme and in high contrast.
 
 ### Added
 

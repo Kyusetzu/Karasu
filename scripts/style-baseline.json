@@ -19,10 +19,6 @@
   "src/components/media/RecommendedSection.tsx": {
     "icon-size": 1
   },
-  "src/components/media/SeasonHero.tsx": {
-    "colour-foreign": 8,
-    "tracking-arbitrary": 1
-  },
   "src/components/overlays/RandomPickModal.tsx": {
     "icon-size": 1
   },

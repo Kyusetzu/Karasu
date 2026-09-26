@@ -1,4 +1,4 @@
-/* GENERATED from src/app/index.css (sha256 4c612aaec2c2) by site/scripts/sync-tokens.mjs
+/* GENERATED from src/app/index.css (sha256 4d47c6d38166) by site/scripts/sync-tokens.mjs
    — do not edit. Re-run `npm run sync` after changing the source; `npm run check`
    fails while this file is stale. CLAUDE.md, "The website". */
 /* `static` because Tailwind tree-shakes tokens no utility references, leaving a `var()`-only token undefined in dark. */
@@ -58,6 +58,8 @@
   --color-on-cover: #040508;
   /* The light edge a control on cover art is drawn with, so it keeps a contrast floor on dark art. */
   --color-on-cover-edge: #ffffff;
+  /* Score stars on cover art: the bright gold in every theme, since the ground under them is always near-black. */
+  --color-on-cover-gold: #fcd34d;
   /* The window's close button under the pointer: the caption bar's red in every theme, with its white glyph. */
   --color-window-close: #b3232c;
   --color-window-close-ink: #ffffff;
@@ -570,6 +572,12 @@
   color: color-mix(in srgb, var(--tint) 45%, var(--color-on-cover-edge));
 }
 
+/* A label on cover art: a near-black plate the art shows through a little, its text the tint lifted toward white. */
+@utility tint-label-on-cover {
+  background-color: color-mix(in srgb, var(--color-on-cover) 85%, transparent);
+  color: color-mix(in srgb, var(--tint) 35%, var(--color-on-cover-edge));
+}
+
 /* A ring drawn inside a control that fills a clipping frame edge to edge; the high-contrast rules keep it inside too. */
 @utility focus-inset {
   &:focus-visible {
@@ -865,6 +873,13 @@ html[data-reduce-motion] *::after {
   :root [class*="backdrop-blur"] {
     backdrop-filter: none;
     background-color: var(--color-surface-900);
+  }
+}
+
+/* Glass over cover art turns solid in the art's own near-black, since the page's panel is white in the light theme. */
+@media (prefers-contrast: more) {
+  :root [class*="backdrop-blur"][class*="on-cover"] {
+    background-color: var(--color-on-cover);
   }
 }
 

@@ -232,12 +232,51 @@ describe("the tint fill", () => {
     expect(block("@utility tint-accent {")).toMatch(/:root\[data-contrast="more"\] & \{\s*--tint: var\(--color-accent-400\);/);
   });
 
-  it("keeps a cover control's tinted glyph at 4.5:1 on its tinted near-black, for every tint", () => {
-    const base = colour("dark", "on-cover");
-    const edge = colour("dark", "on-cover-edge");
-    const accents = [...ACCENT_PRESETS, ...EXTREMES].map((hex) => accentShades(hex, { light: false, surface950: base, surface900: base }).a500);
-    for (const tint of [...Object.values(DEFAULT_STATUS_COLORS), ...accents]) {
-      expect(contrastRatio(mix(edge, tint, coverGlyph), mix(base, tint, coverFill)), tint).toBeGreaterThanOrEqual(4.5);
+  // The accent tint is the theme's own shade, the fill shade in standard contrast and the text shade in high.
+  for (const theme of ["dark", "light"] as const) {
+    for (const contrast of ["standard", "high"] as const) {
+      it(`keeps a cover control's tinted glyph at 4.5:1 on its tinted near-black, for every tint, in ${theme} ${contrast}`, () => {
+        const base = colour("dark", "on-cover");
+        const edge = colour("dark", "on-cover-edge");
+        const read = contrast === "high" ? high : colour;
+        const accents = [...ACCENT_PRESETS, ...EXTREMES].map((hex) => {
+          const s = accentShades(hex, { light: theme === "light", contrast, surface950: read(theme, "surface-950"), surface900: read(theme, "surface-900") });
+          return contrast === "high" ? s.a400 : s.a500;
+        });
+        for (const tint of [...Object.values(DEFAULT_STATUS_COLORS), ...accents]) {
+          expect(contrastRatio(mix(edge, tint, coverGlyph), mix(base, tint, coverFill)), tint).toBeGreaterThanOrEqual(4.5);
+        }
+      });
+    }
+  }
+});
+
+describe("cover art", () => {
+  it("keeps the gold over cover art one bright value in every theme, at 7:1 on the near-black it sits on", () => {
+    for (const block of [light, hcDark, hcLight]) expect(block.has("--color-on-cover-gold")).toBe(false);
+    expect(contrastRatio(colour("dark", "on-cover-gold"), colour("dark", "on-cover"))).toBeGreaterThanOrEqual(7);
+  });
+
+  it("turns glass over cover art solid near-black in high contrast, not the page's panel colour", () => {
+    expect(css).toMatch(
+      /:root\[data-contrast="more"\] \[class\*="backdrop-blur"\]\[class\*="on-cover"\] \{\s*background-color: var\(--color-on-cover\);/,
+    );
+  });
+
+  it("keeps a tinted label on cover art at 4.5:1 over white art, for every accent in every theme and contrast", () => {
+    const label = css.slice(css.indexOf("@utility tint-label-on-cover {"), css.indexOf("\n}", css.indexOf("@utility tint-label-on-cover {")));
+    const plate = Number(/var\(--color-on-cover\) (\d+)%, transparent/.exec(label)![1]) / 100;
+    const glyph = Number(/var\(--tint\) (\d+)%, var\(--color-on-cover-edge\)/.exec(label)![1]) / 100;
+    const ground = mix("#ffffff", colour("dark", "on-cover"), plate);
+    for (const theme of ["dark", "light"] as const) {
+      for (const contrast of ["standard", "high"] as const) {
+        const read = contrast === "high" ? high : colour;
+        for (const hex of [...ACCENT_PRESETS, ...EXTREMES]) {
+          const s = accentShades(hex, { light: theme === "light", contrast, surface950: read(theme, "surface-950"), surface900: read(theme, "surface-900") });
+          const tint = contrast === "high" ? s.a400 : s.a500;
+          expect(contrastRatio(mix(colour("dark", "on-cover-edge"), tint, glyph), ground), `${hex} ${theme} ${contrast}`).toBeGreaterThanOrEqual(4.5);
+        }
+      }
     }
   });
 });

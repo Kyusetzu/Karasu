@@ -608,3 +608,8 @@ maintainer picks. A pure restyle that moves nothing does not. The rules:
   inside the frame, a hairline between rows and when as a one-line chip.
   The section header keeps its title whole and lets the meta line give
   way, where the title used to lose to it ("Die…" on a phone).
+  A third round asked for the figures to be more compact: the glyph beside
+  the number put each unit off centre on the phone, where two columns hold
+  labels of different widths, so the maintainer kept the glyph above and
+  took the tightest stack that still reads — a smaller glyph circle, the
+  number one step down, and closer spacing — on both shells.

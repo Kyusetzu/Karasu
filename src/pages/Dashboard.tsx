@@ -148,10 +148,14 @@ function DashboardSkeleton() {
       {/* Real frame, shimmering value only, so the row is already the right height when the numbers land. */}
       <div className="grid grid-cols-2 overflow-hidden rounded-panel border border-hair bg-surface-900 sm:grid-cols-4">
         {Array.from({ length: 4 }, (_, i) => (
-          <div key={i} className={cn("flex flex-col items-center gap-2 px-3 py-4", statCellRule(i))}>
-            <Shimmer index={i} className="size-8 rounded-full" />
-            <Shimmer index={i} className="h-5 w-14" />
-            <Shimmer index={i} className="h-2 w-16" />
+          <div key={i} className={cn("flex flex-col items-center gap-1 px-3 py-2.5", statCellRule(i))}>
+            <Shimmer index={i} className="size-7 shrink-0 rounded-full" />
+            <div className="flex h-5.5 items-center">
+              <Shimmer index={i} className="h-4 w-12" />
+            </div>
+            <div className="flex h-3.5 items-center">
+              <Shimmer index={i} className="h-2 w-16" />
+            </div>
           </div>
         ))}
       </div>
@@ -477,12 +481,14 @@ function Stats({ entries }: { entries: MediaListEntry[] }) {
       className="grid grid-cols-2 overflow-hidden rounded-panel border border-hair bg-surface-900 panel-wash sm:grid-cols-4"
     >
       {items.map((item, i) => (
-        <div key={item.label} className={cn("flex flex-col items-center gap-1.5 px-3 py-4 text-center", statCellRule(i))}>
-          <span className="grid size-8 place-items-center rounded-full border tint-fill tint-accent text-accent-400">
-            <item.icon aria-hidden className="size-4" />
+        <div key={item.label} className={cn("flex flex-col items-center gap-1 px-3 py-2.5 text-center", statCellRule(i))}>
+          <span className="grid size-7 shrink-0 place-items-center rounded-full border tint-fill tint-accent text-accent-400">
+            <item.icon aria-hidden className="size-3.5" />
           </span>
-          <p className="text-2xl font-bold leading-none tabular-nums text-ink-100">{item.value}</p>
-          <p className="text-2xs uppercase tracking-eyebrow text-ink-600">{item.label}</p>
+          <div className="w-full min-w-0">
+            <p className="text-lg font-bold leading-tight tabular-nums text-ink-100">{item.value}</p>
+            <p className="truncate text-2xs uppercase tracking-eyebrow text-ink-600">{item.label}</p>
+          </div>
         </div>
       ))}
     </section>

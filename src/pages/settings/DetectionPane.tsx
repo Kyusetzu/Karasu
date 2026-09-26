@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { Input } from "@/components/ui/input";
 import { Card, CardTitle } from "@/components/ui/card";
+import { Field } from "@/components/ui/field";
 import { DisclosurePanel } from "@/components/ui/disclosure";
 import { cn } from "@/lib/utils";
 import * as api from "@/api/anilist";
@@ -506,8 +507,10 @@ export function JellyfinSection() {
   const [signingIn, setSigningIn] = useState(false);
   const [sessions, setSessions] = useState<JellyfinTest | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [finding, setFinding] = useState(false);
   const [found, setFound] = useState<DiscoveredServer[] | null>(null);
+  const fieldId = useId();
 
   useEffect(() => {
     if (!api.isTauri) return;
@@ -565,13 +568,13 @@ export function JellyfinSection() {
   };
 
   const save = async () => {
-    setError(null);
+    setSaveError(null);
     setSessions(null);
     try {
       await setJellyfinSettings(url, device, externalUrl);
       setSettings(await getJellyfinSettings());
     } catch (e) {
-      setError(backendErrorText(e, t));
+      setSaveError(backendErrorText(e, t));
     }
   };
 
@@ -588,159 +591,165 @@ export function JellyfinSection() {
     }
   };
 
+  const externalCurrent = settings.externalUrl !== "" && settings.externalUrl === externalUrl.trim();
+
   return (
     <Card>
       <CardTitle>{t("settings.jellyfin")}</CardTitle>
       <p className="mt-2 text-sm text-ink-500">{t("settings.jellyfinHint")}</p>
-      <div className="mt-3 space-y-2">
-        {/* Jellyfin's own discovery: the servers on this network, one click each, so no address is typed. */}
-        {!settings.connected && (
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <Button variant="secondary" size="sm" onClick={find} disabled={finding}>
-              <Search className={cn("size-4", finding && "animate-pulse")} />{" "}
-              {finding ? t("settings.jellyfinFinding") : t("settings.jellyfinFind")}
-            </Button>
-            <span className="text-xs text-ink-600">{t("settings.jellyfinFindHint")}</span>
-          </div>
-        )}
-        {!settings.connected &&
-          found &&
-          (found.length === 0 ? (
-            <p className="text-sm text-ink-500">{t("settings.jellyfinFoundNone")}</p>
-          ) : (
-            <div className="space-y-1.5">
-              {found.map((s) => (
-                <button
-                  key={s.address}
-                  type="button"
-                  onClick={() => {
-                    setUrl(s.address);
-                    setFound(null);
-                  }}
-                  className="flex w-full flex-wrap items-center justify-between gap-x-3 rounded-control border border-hair bg-surface-900 px-3 py-2 text-left text-sm transition-surface hover:border-surface-600"
-                >
-                  <span className="font-medium text-ink-300">{s.name || s.address}</span>
-                  <span className="text-xs text-ink-500">
-                    {s.address}
-                    {s.version ? ` · v${s.version}` : ""}
-                  </span>
-                </button>
-              ))}
-            </div>
-          ))}
-        <Input
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          placeholder={t("settings.jellyfinUrlPlaceholder")}
-          disabled={settings.connected}
-        />
 
+      {/* The connection leads: the sign-in while there is none, then one status line with the two things it can do. */}
+      <div className="mt-4 rounded-control border border-hair bg-surface-950 p-3">
         {settings.connected ? (
-          <p className="text-sm text-success">
-            {settings.serverName
-              ? t("settings.jellyfinSignedInOn", {
-                  name: settings.userName || "?",
-                  server: settings.serverName,
-                })
-              : t("settings.jellyfinSignedIn", {
-                  name: settings.userName || "?",
-                })}
-          </p>
-        ) : (
-          <>
-            <Input
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder={t("settings.jellyfinUsernamePlaceholder")}
-              autoComplete="off"
-            />
-            <Input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder={t("settings.jellyfinPasswordPlaceholder")}
-              autoComplete="off"
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !signingIn) void signIn();
-              }}
-            />
-          </>
-        )}
-
-        {/* Placeholder only, never this machine's name as the value: that pins the filter to this PC. */}
-        <Input
-          value={device}
-          onChange={(e) => setDevice(e.target.value)}
-          placeholder={t("settings.jellyfinDeviceAny")}
-        />
-
-        {/* The fallback address, editable while signed in; the status and the plain-http warning are the backend's word. */}
-        <div>
-          <label className="block text-xs font-medium text-ink-300" htmlFor="jellyfin-external">
-            {t("settings.jellyfinExternalUrl")}
-          </label>
-          <Input
-            id="jellyfin-external"
-            value={externalUrl}
-            onChange={(e) => setExternalUrl(e.target.value)}
-            placeholder={t("settings.jellyfinExternalPlaceholder")}
-            className="mt-1"
-          />
-          <p className="mt-1 text-xs text-ink-600">{t("settings.jellyfinExternalHint")}</p>
-          {settings.externalUrl && settings.externalUrl === externalUrl.trim() && (
-            <p
-              className={cn(
-                "mt-1 text-xs",
-                settings.externalVerified ? "text-success" : "text-ink-500",
-              )}
-            >
-              {settings.externalVerified
-                ? t("settings.jellyfinExternalVerified")
-                : t("settings.jellyfinExternalUnverified")}
-            </p>
-          )}
-          {settings.externalPlainHttp && settings.externalUrl === externalUrl.trim() && (
-            <p className="mt-1 text-xs text-gold">{t("settings.jellyfinExternalPlainHttp")}</p>
-          )}
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          {settings.connected ? (
-            <>
-              <Button variant="secondary" onClick={save}>
-                {t("common.save")}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="flex items-center gap-2 text-sm font-medium text-ink-100">
+                <span aria-hidden className="size-2 shrink-0 rounded-full bg-success" />
+                {t("settings.jellyfinConnectedTo", { server: settings.serverName || settings.url })}
+              </p>
+              <p className="mt-0.5 truncate text-xs text-ink-500">
+                {t("settings.jellyfinSignedIn", { name: settings.userName || "?" })}
+                {settings.serverName && ` · ${settings.url}`}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" onClick={test} disabled={busy}>
+                <Spinner spinning={busy} className="size-3.5" /> {t("settings.jellyfinTest")}
               </Button>
-              <Button onClick={test} disabled={busy}>
-                <Spinner spinning={busy} className="size-4" />{" "}
-                {t("settings.jellyfinTest")}
-              </Button>
-              <Button variant="secondary" onClick={signOut}>
+              <Button size="sm" variant="secondary" onClick={signOut}>
                 {t("settings.jellyfinSignOut")}
               </Button>
-            </>
-          ) : (
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {/* Jellyfin's own discovery: the servers on this network, one click each, so no address is typed. */}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <Button variant="secondary" size="sm" onClick={find} disabled={finding}>
+                <Search className={cn("size-4", finding && "animate-pulse")} />{" "}
+                {finding ? t("settings.jellyfinFinding") : t("settings.jellyfinFind")}
+              </Button>
+              <span className="text-xs text-ink-600">{t("settings.jellyfinFindHint")}</span>
+            </div>
+            {found &&
+              (found.length === 0 ? (
+                <p className="text-sm text-ink-500">{t("settings.jellyfinFoundNone")}</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {found.map((s) => (
+                    <button
+                      key={s.address}
+                      type="button"
+                      onClick={() => {
+                        setUrl(s.address);
+                        setFound(null);
+                      }}
+                      className="flex w-full flex-wrap items-center justify-between gap-x-3 rounded-control border border-hair bg-surface-900 px-3 py-2 text-left text-sm transition-surface hover:border-surface-600"
+                    >
+                      <span className="font-medium text-ink-300">{s.name || s.address}</span>
+                      <span className="text-xs text-ink-500">
+                        {s.address}
+                        {s.version ? ` · v${s.version}` : ""}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ))}
+            <Field label={t("settings.jellyfinUrl")} htmlFor={`${fieldId}-url`}>
+              <Input
+                id={`${fieldId}-url`}
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder={t("settings.jellyfinUrlPlaceholder")}
+              />
+            </Field>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label={t("settings.jellyfinUsername")} htmlFor={`${fieldId}-user`}>
+                <Input
+                  id={`${fieldId}-user`}
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  autoComplete="off"
+                />
+              </Field>
+              <Field label={t("settings.jellyfinPassword")} htmlFor={`${fieldId}-password`}>
+                <Input
+                  id={`${fieldId}-password`}
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="off"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !signingIn) void signIn();
+                  }}
+                />
+              </Field>
+            </div>
             <Button onClick={signIn} disabled={signingIn || url.trim() === ""}>
-              {signingIn
-                ? t("settings.jellyfinSigningIn")
-                : t("settings.jellyfinSignIn")}
+              {signingIn ? t("settings.jellyfinSigningIn") : t("settings.jellyfinSignIn")}
             </Button>
-          )}
-        </div>
+            <p className="text-xs text-ink-600">{t("settings.jellyfinAccountHelp")}</p>
+          </div>
+        )}
+        {error && <p className="mt-3 text-sm text-danger">{error}</p>}
       </div>
-      <p className="mt-2 text-xs text-ink-600">
-        {t("settings.jellyfinAccountHelp")}
-      </p>
-      <p className="mt-1 text-xs text-ink-600">
-        {t("settings.jellyfinDeviceHelp")}
-      </p>
-      {settings.connected && <JellyfinBackgroundRows />}
       {sessions && (
         <SessionList
           sessions={sessions.sessions}
           via={sessions.base === "external" ? sessions.url : null}
         />
       )}
-      {error && <p className="mt-2 text-sm text-danger">{error}</p>}
+
+      <div className="mt-4 space-y-4">
+        {/* Placeholder only, never this machine's name as the value: that pins the filter to this PC. */}
+        <Field
+          label={t("settings.jellyfinDevice")}
+          htmlFor={`${fieldId}-device`}
+          hint={<span className="text-xs">{t("settings.jellyfinDeviceHelp")}</span>}
+        >
+          <Input
+            id={`${fieldId}-device`}
+            value={device}
+            onChange={(e) => setDevice(e.target.value)}
+            placeholder={t("settings.jellyfinDeviceAny")}
+          />
+        </Field>
+        {/* The fallback address, editable while signed in; the status and the plain-http warning are the backend's word. */}
+        <Field
+          label={t("settings.jellyfinExternalUrl")}
+          htmlFor={`${fieldId}-external`}
+          hint={
+            <span className="block space-y-1 text-xs">
+              <span className="block">{t("settings.jellyfinExternalHint")}</span>
+              {externalCurrent && (
+                <span className={cn("block", settings.externalVerified ? "text-success" : "text-ink-500")}>
+                  {settings.externalVerified
+                    ? t("settings.jellyfinExternalVerified")
+                    : t("settings.jellyfinExternalUnverified")}
+                </span>
+              )}
+              {settings.externalPlainHttp && externalCurrent && (
+                <span className="block text-gold">{t("settings.jellyfinExternalPlainHttp")}</span>
+              )}
+            </span>
+          }
+        >
+          <Input
+            id={`${fieldId}-external`}
+            value={externalUrl}
+            onChange={(e) => setExternalUrl(e.target.value)}
+            placeholder={t("settings.jellyfinExternalPlaceholder")}
+          />
+        </Field>
+        {/* Signing in stores both fields itself, so saving them separately only matters once there is a connection. */}
+        {settings.connected && (
+          <Button variant="secondary" onClick={save}>
+            {t("common.save")}
+          </Button>
+        )}
+        {saveError && <p className="text-sm text-danger">{saveError}</p>}
+      </div>
+      {settings.connected && <JellyfinBackgroundRows />}
     </Card>
   );
 }

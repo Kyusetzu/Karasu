@@ -1518,15 +1518,18 @@ export const de: typeof en = {
     jellyfin: "Jellyfin-Server",
     jellyfinHint:
       "Optional. Frag deinen Server direkt, statt aus einem Fenstertitel zu raten — er meldet Serie und Folge exakt.",
+    jellyfinUrl: "Server-Adresse",
     jellyfinUrlPlaceholder: "http://192.168.1.10:8096",
-    jellyfinUsernamePlaceholder: "Jellyfin-Benutzername",
-    jellyfinPasswordPlaceholder: "Passwort",
+    jellyfinUsername: "Benutzername",
+    jellyfinPassword: "Passwort",
+    jellyfinConnectedTo: "Verbunden mit {{server}}",
     jellyfinSignIn: "Anmelden",
     jellyfinSigningIn: "Anmeldung läuft…",
     jellyfinSignOut: "Abmelden",
     jellyfinSignedIn: "Angemeldet als {{name}}",
     jellyfinAccountHelp:
       "Jedes Jellyfin-Konto funktioniert — Administratorrechte sind nicht nötig. Dein Passwort wird nur einmal zur Anmeldung verwendet und nie gespeichert; behalten wird lediglich der Zugriffstoken des Servers, im Anmeldeinformationsspeicher deines Systems. Da Karasu sich als du anmeldet, meldet der Server nur deine eigene Wiedergabe.",
+    jellyfinDevice: "Gerät (optional)",
     jellyfinDeviceAny: "Beliebiges Gerät",
     jellyfinDeviceHelp:
       "Leer gelassen zählt jedes Gerät, auf dem du abspielst — Desktop, Browser, Handy oder TV. Trag eines ein, um nur dieses zu verfolgen; „Verbindung testen“ zeigt, wie deine Geräte tatsächlich heißen.",
@@ -1564,7 +1567,6 @@ export const de: typeof en = {
       "Fragt im lokalen Netz, welche Jellyfin-Server antworten. Über VPN oder von unterwegs antwortet keiner.",
     jellyfinFoundNone: "Kein Server hat geantwortet. Gib die Adresse von Hand ein.",
     jellyfinFindFailed: "Suche fehlgeschlagen ({{message}})",
-    jellyfinSignedInOn: "Angemeldet als {{name}} auf {{server}}",
     jellyfinExternalUrl: "Externe Adresse (optional)",
     jellyfinExternalPlaceholder: "https://jellyfin.example.org",
     jellyfinExternalHint:

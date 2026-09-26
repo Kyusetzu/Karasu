@@ -6,7 +6,7 @@ import { Switch } from "@/components/ui/switch";
 
 /** The controls every settings pane shares; none is a `components/ui` primitive, since each knows the pane. */
 
-/** A label-and-hint on the left, a control on the right; `items-center` because a select is taller than a line. */
+/** A label-and-hint beside its control; below the phone breakpoint the control drops beneath it at the card's width. */
 export function Row({
   label,
   hint,
@@ -20,7 +20,7 @@ export function Row({
   children: ReactNode;
 }) {
   return (
-    <label className="flex items-center justify-between gap-4 py-1 text-sm">
+    <label className="flex items-center justify-between gap-4 py-1 text-sm max-md:flex-col max-md:items-stretch max-md:gap-2 max-md:*:w-full">
       <span>
         <span className="block text-ink-100">{label}</span>
         {hint && <span className="block text-xs text-ink-600">{hint}</span>}

@@ -30,6 +30,11 @@ const flag = (name, fallback) => {
 const list = (name, fallback) => flag(name, fallback).split(",");
 
 /** Each screen: a route, a viewport, and what to do before the picture; the ids name the files. */
+const toCard = (title) => (p) =>
+  p.evaluate((t) => {
+    const heading = [...document.querySelectorAll("h2, h3")].find((h) => h.textContent?.trim() === t);
+    (heading?.closest(".rounded-panel") ?? heading)?.scrollIntoView({ block: "start" });
+  }, title);
 const statusButton = (p) => p.locator('[title="Status ändern"], [title="Change status"]').first();
 export const SCREENS = [
   { id: "d1-uebersicht", w: 1232, h: 800, route: "/" },
@@ -65,6 +70,12 @@ export const SCREENS = [
   { id: "p21-erkennung-lang", w: 405, h: 3600, phone: true, route: "/settings?pane=detection" },
   { id: "p22-daten-lang", w: 405, h: 3000, phone: true, route: "/settings?pane=data" },
   { id: "p23-erweitert-lang", w: 405, h: 2400, phone: true, route: "/settings?pane=advanced" },
+  { id: "p24-konto-anilist", w: 405, h: 1300, phone: true, route: "/settings?pane=account", act: toCard("Kontoeinstellungen") },
+  { id: "p25-jellyfin", w: 405, h: 1800, phone: true, route: "/settings?pane=detection", act: toCard("Jellyfin-Server") },
+  { id: "p26-jellyfin-aus", w: 405, h: 1500, phone: true, route: "/settings?pane=detection", mock: "jellyfin-out", act: toCard("Jellyfin-Server") },
+  { id: "p27-backups", w: 405, h: 800, phone: true, route: "/settings?pane=data", act: toCard("Backups") },
+  { id: "d39-jellyfin", w: 1232, h: 1100, route: "/settings?pane=detection", act: toCard("Jellyfin-Server") },
+  { id: "d40-jellyfin-aus", w: 1232, h: 1000, route: "/settings?pane=detection", mock: "jellyfin-out", act: toCard("Jellyfin-Server") },
   { id: "d6-sortierung", w: 1232, h: 800, route: "/list", act: (p) => p.locator('[aria-label^="Sortierung"], [aria-label^="Sort:"]').first().click() },
   { id: "p6-aktionen", w: 405, h: 860, phone: true, route: "/list", act: (p) => longPress(p, p.locator("[data-media-id]").nth(1)) },
   { id: "d7-bearbeiten", w: 1232, h: 800, route: "/list", act: (p) => fromMenu(p, "Bearbeiten") },
@@ -234,7 +245,7 @@ async function launch() {
 
 const urlFor = (s, style, theme, still) => {
   const [mode, contrast] = theme.startsWith("hc-") ? [theme.slice(3), "more"] : [theme, ""];
-  const q = new URLSearchParams({ style, theme: mode, contrast, android: s.phone ? "1" : "", out: s.out ? "1" : "", playing: s.playing ? "1" : "", route: s.route, lang: flag("--lang", "de"), still: still ? "1" : "" });
+  const q = new URLSearchParams({ style, theme: mode, contrast, android: s.phone ? "1" : "", out: s.out ? "1" : "", playing: s.playing ? "1" : "", mock: s.mock ?? "", route: s.route, lang: flag("--lang", "de"), still: still ? "1" : "" });
   return `${BASE}?${q}`;
 };
 

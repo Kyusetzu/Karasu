@@ -1507,15 +1507,18 @@ export const en = {
     jellyfin: "Jellyfin server",
     jellyfinHint:
       "Optional. Ask your server directly instead of guessing from a window title — it reports the series and episode exactly.",
+    jellyfinUrl: "Server address",
     jellyfinUrlPlaceholder: "http://192.168.1.10:8096",
-    jellyfinUsernamePlaceholder: "Jellyfin username",
-    jellyfinPasswordPlaceholder: "Password",
+    jellyfinUsername: "Username",
+    jellyfinPassword: "Password",
+    jellyfinConnectedTo: "Connected to {{server}}",
     jellyfinSignIn: "Sign in",
     jellyfinSigningIn: "Signing in…",
     jellyfinSignOut: "Sign out",
     jellyfinSignedIn: "Signed in as {{name}}",
     jellyfinAccountHelp:
       "Any Jellyfin account works — no administrator rights needed. Your password is used once to sign in and is never saved; only the access token the server returns is kept, in your system's credential store. Because Karasu signs in as you, the server only ever reports your own playback.",
+    jellyfinDevice: "Device (optional)",
     jellyfinDeviceAny: "Any device",
     jellyfinDeviceHelp:
       "Left empty, every device you play on counts — desktop, browser, phone or TV. Name one to track only that device; Test connection shows what each of yours is actually called.",
@@ -1553,7 +1556,6 @@ export const en = {
       "Asks the local network which Jellyfin servers answer. On a VPN or away from home, none will.",
     jellyfinFoundNone: "No server answered. Type the address by hand.",
     jellyfinFindFailed: "Search failed ({{message}})",
-    jellyfinSignedInOn: "Signed in as {{name}} on {{server}}",
     jellyfinExternalUrl: "External address (optional)",
     jellyfinExternalPlaceholder: "https://jellyfin.example.org",
     jellyfinExternalHint:

@@ -648,3 +648,14 @@ maintainer picks. A pure restyle that moves nothing does not. The rules:
   "Account" ("Konto"): the sign-in first, then "In Karasu" and "Kept on
   AniList" as group headings, so it reads at a glance what another client
   sees too; an old link to the AniList pane lands there.
+- **2026-09-26:** Two more settings arrangements, three mockups each. On
+  the phone a row whose control is a field, a select or a button stacks:
+  the label and its hint across the card, the control beneath at the full
+  width, so no hint is squeezed into a column beside a wide select; a
+  switch stays on the right, and the desktop keeps label and control side
+  by side. The Jellyfin card leads with its connection: signed out, a
+  well holding the server search, the address and the sign-in with its
+  explanation; signed in, a status line naming the server and the account
+  with Test and Sign out beside it. Beneath, the device filter and the
+  external address are labelled fields with their explanations as hints,
+  and Save stores just those two.

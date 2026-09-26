@@ -11,6 +11,8 @@ const android = params.get("android") === "1";
 const signedOut = params.get("out") === "1";
 // A player running the first real title, so the detection window has something to show.
 const playing = params.get("playing") === "1";
+/** A named alternative state for one mocked command, such as `jellyfin-out` for a server not yet signed in to. */
+const mock = params.get("mock") ?? "";
 const route = params.get("route") ?? "/";
 const style = params.get("style") ?? "";
 const now = Math.floor(Date.now() / 1000);
@@ -221,6 +223,29 @@ function answerQuery(query: string, variables: Record<string, unknown> | null) {
     return { Page: { pageInfo: { hasNextPage: false, total: 8, currentPage: 1, lastPage: 1 }, ...page } };
   }
   if (/\bViewer\b/.test(q)) return { Viewer: { ...viewer, unreadNotificationCount: 3 } };
+  // The signed-in account's own profile, so the AniList cards in Settings draw their fields rather than a skeleton.
+  if (/\bUser\s*\(/.test(q)) {
+    const list = { customLists: ["Rewatch"], splitCompletedSectionByFormat: false };
+    return {
+      User: {
+        ...viewer,
+        about: "",
+        bannerImage: null,
+        donatorBadge: "",
+        moderatorRoles: null,
+        createdAt: now - 3 * 365 * 86_400,
+        updatedAt: now - 86_400,
+        isFollowing: false,
+        isFollower: false,
+        isBlocked: false,
+        previousNames: [],
+        options: { titleLanguage: "ROMAJI", displayAdultContent: false, airingNotifications: true, profileColor: "purple", timezone: "+02:00", activityMergeTime: 30, staffNameLanguage: "ROMAJI_WESTERN", restrictMessagesToFollowing: false, disabledListActivity: [] },
+        mediaListOptions: { scoreFormat: "POINT_10", rowOrder: "score", animeList: list, mangaList: list },
+        statistics: { anime: { count: 36, meanScore: 78, minutesWatched: 42_000, episodesWatched: 1_700 }, manga: { count: 36, meanScore: 80, chaptersRead: 3_100, volumesRead: 210 } },
+        favourites: { anime: { nodes: [] }, manga: { nodes: [] }, characters: { nodes: [] }, staff: { nodes: [] }, studios: { nodes: [] } },
+      },
+    };
+  }
   return {};
 }
 
@@ -293,11 +318,11 @@ mockIPC((cmd, args) => {
       return { enabled: true, months: 3 };
     case "get_jellyfin_settings":
       return {
-        url: "http://192.168.1.20:8096",
-        connected: true,
+        url: mock === "jellyfin-out" ? "" : "http://192.168.1.20:8096",
+        connected: mock !== "jellyfin-out",
         userName: "kyu",
         serverName: "Wohnzimmer",
-        device: "KYU-PC",
+        device: mock === "jellyfin-out" ? "" : "KYU-PC",
         localDevice: "KYU-PC",
         externalUrl: "",
         externalVerified: null,

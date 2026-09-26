@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 3805e78 -->
+<!-- generated-through: 2f8461c -->
 
 ### Fixed
 
@@ -182,6 +182,7 @@ tag time is then optional rather than load-bearing.
 - The calendar steps weeks from a bar of its own and shows a quiet stretch of days as one line.
 - On a phone the calendar's week bar holds only the arrows and the range.
 - Settings has one Account pane for Karasu and AniList, groups Appearance into three cards with previews of each theme, and lists on a phone what each pane holds.
+- On a phone, settings with a field or a menu stack the control under its description, and the Jellyfin card starts with the connection — sign-in or a "Connected to …" line — with every field labelled.
 
 ### Removed
 

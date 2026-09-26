@@ -1,5 +1,5 @@
 {
-  "rule": "Each budget is 3 % over the larger of the two build targets' measurement, rounded up to a KiB; raising one needs its reason in the commit.",
+  "rule": "Each budget was set 3 % over the larger of the two build targets' measurement when it was last raised, rounded up to a KiB; measured is the latest reading, and raising a budget needs its reason in the commit.",
   "measured": {
     "date": "2026-09-26",
     "target": "safari15, the Linux and Android build, which is the larger since Base UI",

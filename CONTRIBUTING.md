@@ -62,7 +62,9 @@ npm run verify
 
 Typecheck, then the one-line-comment audit (`scripts/comment-audit.mjs
 --check` — every comment in a code file is one physical line, see
-"Comments: one line each" in `CLAUDE.md`), then the frontend tests and the
+"Comments: one line each" in `CLAUDE.md`), the style audit against
+`DESIGN.md`'s vocabulary (`scripts/style-audit.mjs --check`) and the site
+tokens' freshness, then typos, taplo and oxlint, then the frontend tests and the
 Rust tests side by side, with a timing table at the end (`npm run
 verify:frontend` and `verify:rust` are the halves). This is the whole gate
 and exactly what CI runs, so the two cannot drift. **Run it bare and read the
@@ -74,7 +76,7 @@ npm run verify:full
 ```
 
 Before a push: the gate above, then knip, the version files, the site's
-typecheck and tokens, `npm audit`, clippy, cargo-deny, cargo-machete, the
+typecheck, `npm audit`, the bundle budget, clippy, cargo-deny, cargo-machete, the
 Android cargo check and a real `tauri build`, ending with a clean-tree check so
 nothing uncommitted rides along. About a minute and a half, most of it the
 bundle. `git config core.hooksPath .githooks` once on your clone makes git run

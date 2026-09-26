@@ -6,9 +6,10 @@ measurements that justify them.
 
 **This file wins.** A design skill, a library's defaults or a mockup may disagree
 with it. When that happens, either follow this file or change it first in its own
-commit and say why. Tokens live in `src/app/index.css` and nowhere else. The
-website receives them through `site/scripts/sync-tokens.mjs` and never copies
-them.
+commit and say why. The app's tokens live in `src/app/index.css` alone. The
+website receives them through `site/scripts/sync-tokens.mjs` and never copies or
+redefines one; its own `@theme` may add page-only steps the app has no use for
+(the fluid type, the device corner, the screenshot shadow, the stage ground).
 
 ## Principles
 
@@ -86,10 +87,12 @@ such a class silently renders the inherited colour.
 
 - `gold`: scores only.
 - `danger`: destructive actions and failure states.
-- `success`: the complete glyph over cover art.
-- `graph-completed` and `graph-none`: franchise node outlines.
+- `success`: done and rising, a watched mark or an upward trend. Over cover
+  art `on-cover-success` stands in for it.
+- `graph-none`: a mark or a node with no status.
 
-Each has a light-theme twin that is darker, because in light these are text.
+Each has a light-theme twin. The first three are darker there, because in light
+they are text; `graph-none` is lighter, because its dark grey would read heavy.
 
 The six **status colours** (`status-current` … `status-planning`) are defaults
 that the user can override. Read them through `lib/statusColors`. The defaults
@@ -136,8 +139,8 @@ panel-wash shadow-float`.
 - `font-brand` is SN Pro, for the wordmark and display.
 - `font-brand-jp` is Kosugi Maru, for `title.native`. Its subset cannot be
   trimmed; CLAUDE.md says why.
-- Only weight 400 of the two brand faces ships, so a bold brand heading is
-  synthesised by the engine.
+- Only weight 400 of the two brand faces ships. Headings `h1` to `h3` render
+  at 400 by rule, so a weight utility on one does nothing and is not written.
 
 | Step | Use |
 |---|---|
@@ -146,6 +149,8 @@ panel-wash shadow-float`.
 | `text-ui` (13 px) | the shell's panels, toolbars and dense titles |
 | `text-sm` (14 px) | body, controls |
 | `text-base` (16 px) | card titles |
+| `text-heading` (26 px) | a title's own heading on its detail page |
+| `text-hero`, `text-hero-lg` (28 / 36 px) | the first-run greeting |
 | `text-title` (30 px) | page titles |
 
 Headings (`h1` to `h3`) and every `uppercase` label are set in SN Pro at its
@@ -163,7 +168,7 @@ names (`rounded`, `rounded-lg` …).
 
 | Role | Size | For |
 |---|---|---|
-| `rounded-inner` | 4 px | a segment inside a track, icon buttons, small chips |
+| `rounded-inner` | 4 px | a segment inside a track, icon buttons, small chips, small cover thumbnails |
 | `rounded-control` | 6 px | buttons, fields, pills, list rows |
 | `rounded-panel` | 10 px | cards, popovers, menus, dialogs |
 | `rounded-sheet` | 16 px | the phone's bottom sheets |
@@ -187,13 +192,16 @@ states. The style audit holds every icon to these four.
 - The dim behind a dialog or a sheet is `bg-scrim`, near-black at 55 % in
   both themes.
 - Chips are outlined on a clear ground, so coloured text keeps the contrast
-  it was derived against on any surface. Chips over cover art still spell
-  their near-black with seven different alphas. They converge when the
-  cover area is restyled.
+  it was derived against on any surface. Over cover art they take
+  `on-cover` at an alpha tuned to what each one covers; the 86 % plate
+  under text is pinned by a test.
 - Layers:
-  - Tailwind's plain `z-10`, `z-30` and `z-50` cover sticky headers, the
-    detection window and dialogs.
-  - `z-popover` (100) covers menus, popovers and the action sheet.
+  - Tailwind's plain `z-5` (the titlebar over the page), `z-10`, `z-20` (a
+    grid card's quick buttons), `z-30` and `z-50` cover sticky headers, the
+    detection window, dialogs, a popover's desktop dropdown and the other
+    anchored panels.
+  - `z-popover` (100) covers menus, tooltips and every sheet (the action
+    sheet, a popover's phone form).
   - `z-alert` (110) covers an alert (`Modal`'s `alert`), so a confirm
     stands over any other dialog.
   - `z-skip` (200) covers the skip link.
@@ -210,7 +218,7 @@ states. The style audit holds every icon to these four.
   `transition-colors`: animating `color` holds the old value across a theme
   swap.
 - *Feature* motion: a dialog arriving, a scrobble landing, a chart drawing. It
-  may use `--ease-spring`, `--ease-out-expo` and `--duration-expressive`.
+  may use `--ease-spring-soft`, `--ease-out-expo` and `--duration-expressive`.
   Reach for the first register unless there is a reason.
 
 **Vocabulary.**
@@ -218,7 +226,7 @@ states. The style audit holds every icon to these four.
 | Token | Motion |
 |---|---|
 | `settle` | down from above, no bounce; the bird landing |
-| `rise-in` | up from the bottom edge on the soft spring: sheets, toasts, the bulk bar |
+| `rise-in` | up from the bottom edge on the soft spring: the bulk bar, the detection window, rows added to a feed or a list; sheets rise through `sheet-popup` and the toast through Motion |
 | `pop-in` | scale from .97 on the soft spring: menus, popovers |
 | `fade-in` | opacity only |
 | `spring-in` | dialogs, on the soft spring: a slight overshoot that settles |
@@ -230,7 +238,11 @@ states. The style audit holds every icon to these four.
 
 **Rules.**
 
-- Exits go through `usePresence`, because React unmounts before CSS can animate.
+- React unmounts before CSS can animate, so an exit goes through `usePresence`
+  for a hand-rolled node, through `MotionPresence` for a Motion-driven one, or
+  through Base UI's `data-closed` / `data-ending-style` inside the `ui/`
+  wrappers. Never through `transition-behavior: allow-discrete`, which WebKit
+  lacks for overlays.
 - Motion that CSS cannot see must ask `lib/motion` first: a View Transition,
   a scroll handler, a WAAPI call or a timer.
 - Staggers use `staggerDelay`, which collapses the delay too.
@@ -246,11 +258,12 @@ states. The style audit holds every icon to these four.
   themselves, because the roving cursor is not real focus.
 - **Press.** `press` sinks a control to 97 % while it is held.
   `transition-surface` carries the scale, and reduced motion sets it back
-  to 100 %. `Button`, `IconButton`, `Pill` and `Segmented` carry it.
+  to 100 %. `Button`, `IconButton`, `Pill`, `Segmented`, `Switch` and
+  `RemovableChip` carry it.
 - **Touch.** `coarse:` is a pointer variant, `(pointer: coarse)`, never a
   width. A narrowed desktop window keeps mouse-sized targets, and a tablet
   at desktop width gets finger-sized ones. `coarse:hit-area` gives a small
-  control a 44 px tap area without changing how it looks; the same four
+  control a 44 px tap area without changing how it looks; the same six
   primitives carry it.
 
 ## Contrast obligations
@@ -355,7 +368,7 @@ no row here, add the primitive first.
 | a modal sheet from the bottom | `Sheet`, on Base UI's drawer: swipe, dim, Escape and back all close it; `tall` reaches to just under the top whatever it holds, for a list that is read rather than picked from |
 | a section that folds open | `Disclosure`; a custom trigger pairs with `DisclosurePanel`; never in a virtual row, whose remount would replay the growth |
 | a write receipt | `showToast`; one at a time, held while hovered or focused, longer with an action |
-| anything moved by Motion | `m` and `MotionPresence` from `app/motion.tsx`, the only place `motion` is imported |
+| anything moved by Motion | `m` and `MotionPresence` from `app/motion.tsx`, which with its lazy feature set `app/motionFeatures.ts` is the only place `motion` is imported |
 | a dialog | `Modal`: `size` from `sm` to `2xl`, `description` and `icon` in the header, `footer` pinned under a body that scrolls; `alert` for a question that interrupts (`alertdialog`, over other dialogs, answered by its buttons with the harmless one first); `bare` for a full-screen view such as the cover; `dismissable={false}` while something runs that must not be left half done. Escape closes only the dialog holding focus |
 | keeping an overlay alive through its exit | `Presence`, `PresenceIf` |
 | a wait with no shape | `Loader`; a known shape is `Skeleton`, built from `Shimmer`, which a quick load never shows |
@@ -366,10 +379,12 @@ no row here, add the primitive first.
 | a user's name and face | `UserLockup` |
 
 The menu row covers the context menu, the action sheet, the More sheet, the
-sort and preset panels and the palette. The rows that carry more than a
-label move to it with their areas: the bell's and the sync panel's feed
-rows, the phone's settings list, the tri-state filter options, and the
-season split's cover rows.
+sort and preset panels, the palette and the match picker. The rows that
+carry more than a label keep a shape of their own: the bell's and the sync
+panel's feed rows share the bell's tile, and the phone's settings list has
+its own rows (both in the decision log). The tri-state filter options and
+the season split's cover rows are still their own and move to it when those
+areas are next restyled.
 
 The cards cover the Overview's tiles, the composer, the franchise pane,
 the feed's and the forum's rows, the offline entry and three wells. Four
@@ -392,8 +407,8 @@ four things before it lands:
 | `lucide-react` | shipped | icons |
 | `class-variance-authority`, `clsx`, `tailwind-merge` | shipped | variant classes, `cn` |
 | `d3-array`, `d3-scale`, `d3-shape` | shipped | chart maths only; the renderer is ours |
-| `@base-ui/react` 1.8.0, pinned | shipped: `ui/menu` (the context menu), `ui/sheet`, the dropdown of `ui/popover`, `ui/tooltip` | menu and context menu (typeahead, safe submenu, long press), the one swipeable sheet, flip-aware dropdown positioning. Always controlled, so `useBackClose` and `data-overlay` keep working; wrapped under `ui/` only. The menu cost 40 KiB gzipped in the startup script, the drawer 12 more and the popover 2.5, since it shares Floating UI with the menu. Select and ScrollArea insert a `<style>` and stay unused |
-| `motion` 13.4.4, pinned (`LazyMotion` + `m`) | shipped: `app/motion.tsx`, first in the toast | velocity after a swipe, sliding indicators, list enter and leave. `MotionConfig reducedMotion` follows the app's switch and the system's. `AnimateView`, `animateView` and `AnimatePresence`'s `popLayout` are banned: they inject a `<style>` without a nonce, which is why `MotionPresence` offers only `sync` and `wait`. 17 KiB gzipped in the startup script, and the full feature set, drag and layout included, is a 27 KiB chunk loaded after the first paint |
+| `@base-ui/react` 1.8.0, pinned | shipped: `ui/menu` (the context menu), `ui/sheet`, the dropdown of `ui/popover`, `ui/tooltip` | menu and context menu (typeahead, safe submenu, long press), the one swipeable sheet, flip-aware dropdown positioning. Always controlled, so `useBackClose` and `data-overlay` keep working; wrapped under `ui/` only. The menu cost 40 KiB gzipped in the startup script, the drawer 12 more and the popover 2.5, since it shares Floating UI with the menu. Select and ScrollArea insert a `<style>` and stay unused, for the reason the Motion row gives |
+| `motion` 13.4.4, pinned (`LazyMotion` + `m`) | shipped: `app/motion.tsx`, first in the toast | velocity after a swipe, sliding indicators, list enter and leave. `MotionConfig reducedMotion` follows the app's switch and the system's. `AnimateView`, `animateView` and `AnimatePresence`'s `popLayout` are banned: they inject a `<style>` without a nonce, which the CSP lets through only while `index.html` carries no inline style for Tauri to hash, a condition `tokens.test.ts` guards and the app must not lean on. That is why `MotionPresence` offers only `sync` and `wait`. 17 KiB gzipped in the startup script, and the full feature set, drag and layout included, is a 27 KiB chunk loaded after the first paint |
 
 Considered and declined on 2026-09-25:
 

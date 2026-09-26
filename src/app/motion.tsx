@@ -15,7 +15,7 @@ export function MotionProvider({ children }: { children: ReactNode }) {
   );
 }
 
-/** AnimatePresence without `popLayout`, whose measuring `<style>` carries no nonce and is refused by the CSP. */
+/** AnimatePresence without `popLayout`, whose `<style>` has no nonce and passes only while `index.html` holds none. */
 export function MotionPresence({
   mode = "sync",
   initial,

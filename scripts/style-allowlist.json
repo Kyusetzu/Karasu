@@ -9,7 +9,7 @@
     "file": "src/components/ui/popover.tsx",
     "rule": "outline-removed",
     "token": "outline-none",
-    "reason": "both panels are tabIndex=-1 containers that take focus by script so Tab starts inside them"
+    "reason": "the dropdown is a container Base UI focuses when it opens by a press and holds nothing tabbable, so Tab starts inside it"
   },
   {
     "file": "src/components/ui/menu.tsx",

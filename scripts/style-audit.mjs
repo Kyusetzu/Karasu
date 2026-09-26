@@ -22,7 +22,7 @@ const TOKENS = join(ROOT, "src", "app", "index.css");
 /** What each rule holds the code to; the key is what the baseline and the allowlist name. */
 export const RULES = {
   "radius-arbitrary": "a bracketed radius; use a radius role",
-  "radius-size": "a radius by size (rounded, -md, -lg, -xl …); use a role: inner, control, panel, sheet, cover",
+  "radius-size": "a radius by size (rounded, -md, -lg, -xl …); use a role: inner, control, panel, sheet, cover, mark",
   "shadow-size": "a shadow by size (shadow, -lg, -xl …); use a role: float, sheet",
   "text-size-arbitrary": "a bracketed font size; use a type step",
   "tracking-arbitrary": "a bracketed letter spacing",
@@ -376,7 +376,8 @@ function main() {
   const counts = countsOf(findings);
   const baseline = readJson(BASELINE, {});
   const scanned = new Set(files);
-  const staleAllow = allowlist.filter((e) => !used.has(e) && scanned.has(e.file));
+  // A whole-tree run also names an entry whose file is gone; a --files run can only speak for the files it read.
+  const staleAllow = allowlist.filter((e) => !used.has(e) && (at === -1 || scanned.has(e.file)));
 
   if (has("--record") || has("--tighten")) {
     if (at !== -1) {

@@ -15,7 +15,7 @@ The maintainer's standing rule: **every change to how a screen is arranged gets 
 node scripts/screens.mjs shoot --only d3-detail,p3-editor --styles ,a,b,c --themes dark,light,hc-dark,hc-light
 node scripts/screens.mjs board scripts/screens/.out/boards/<spec>.json
 node scripts/screens.mjs clip --styles ,a,b,c
-node scripts/screens.mjs hash --out before.json && node scripts/screens.mjs hash --compare before.json
+node scripts/screens.mjs hash --out scripts/screens/.out/before.json && node scripts/screens.mjs hash --compare scripts/screens/.out/before.json
 ```
 
 - Viewports: desktop 1232 × 800, phone 405 × 860 with `android=1`, both at 2× pixel ratio.

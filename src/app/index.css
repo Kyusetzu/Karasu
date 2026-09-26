@@ -121,8 +121,7 @@
   --color-danger: #f0787f;
   /* Done and rising: a watched mark, an upward trend; over cover art `on-cover-success` stands in for it. */
   --color-success: #6ee7b7;
-  /* Franchise-graph node outlines that aren't status- or accent-driven. */
-  --color-graph-completed: #5ec98a;
+  /* A mark or a node with no status. */
   --color-graph-none: #3a3f4d;
 
   /* List-status defaults, overwritten at runtime by `stores/theme`; here so a cover ring paints on the first frame. */
@@ -144,14 +143,12 @@
   --default-transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
   --ease-karasu: cubic-bezier(0.2, 0, 0, 1);
 
-  /* Overshoots slightly and settles back — the wingbeat, not a bounce — and only for things that arrive, never leave. */
-  --ease-spring: cubic-bezier(0.34, 1.42, 0.64, 1);
   /* Long decelerating tail, no overshoot: for motion the eye follows, like a hero settling or a chart drawing itself. */
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
   /* Leaving should be quicker than arriving: a dialog that lingers on the way out feels unresponsive. */
   --ease-exit: cubic-bezier(0.4, 0, 1, 1);
 
-  /* Arrivals land on a soft spring; this cubic stands in where `linear()` is not understood, see the @supports block. */
+  /* Arrivals overshoot a little and settle, never a bounce; this cubic stands in where `linear()` is not understood. */
   --ease-spring-soft: cubic-bezier(0.34, 1.42, 0.64, 1);
 
   /* Two expressive durations, so feature motion does not each pick its own. */
@@ -162,7 +159,7 @@
 
   /* A bird landing on a branch — down from above, no bounce; these consume the ease tokens so retuning one retunes all. */
   --animate-settle: settle 150ms var(--ease-karasu);
-  /* Things that arrive from the bottom edge: toasts, the bulk bar. */
+  /* Things that arrive from the bottom edge: the bulk bar, the detection window, rows added to a list. */
   --animate-rise-in: riseIn 440ms var(--ease-spring-soft);
   --animate-pop-in: popIn 340ms var(--ease-spring-soft);
   --animate-fade-in: fadeIn 120ms linear;
@@ -290,7 +287,7 @@
   }
 }
 
-/* Arrives past its size and settles; `--ease-spring` supplies the overshoot, the keyframes only say where it starts. */
+/* Arrives past its size and settles; `--ease-spring-soft` supplies the overshoot, the keyframes only say where it starts. */
 @keyframes springIn {
   from {
     opacity: 0;
@@ -475,8 +472,7 @@
   --color-danger: #b3232c;
   --color-success: #0d7a54;
 
-  /* The graph outlines invert for the same reason: the dark green vanishes on a light panel and the muted grey turns heavy. */
-  --color-graph-completed: #0d7a54;
+  /* The no-status grey inverts for the same reason: the dark one would read heavy on a light panel. */
   --color-graph-none: #aab2c2;
 
   --scrim: 244, 246, 249;

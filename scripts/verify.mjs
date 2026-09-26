@@ -3,8 +3,8 @@
 //
 //   node scripts/verify.mjs              the commit gate; one line per phase, the full log only for a phase that failed
 //   node scripts/verify.mjs --full       the push gate: the commit gate, then clippy, cargo-deny, knip, machete, the
-//                                        version files, the site, the bundle budget, the Android check, a release
-//                                        build, a clean tree
+//                                        version files, the site, npm audit, the bundle budget, the Android check,
+//                                        a release build, a clean tree
 //   node scripts/verify.mjs --frontend   typecheck, audits, lints and vitest only
 //   node scripts/verify.mjs --rust       cargo test only
 //   node scripts/verify.mjs --verbose    every phase's output as it runs, as the tools print it themselves

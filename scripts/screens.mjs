@@ -4,8 +4,8 @@
 //   node scripts/screens.mjs shoot [--only d3-detail,p1-liste] [--styles ,a,b] [--themes dark,light,hc-dark,hc-light]
 //   node scripts/screens.mjs board scripts/screens/.out/boards/spec.json
 //   node scripts/screens.mjs clip [--styles ,a]           one webm per style, then all of them side by side
-//   node scripts/screens.mjs hash [--out before.json]      still frames at a fixed clock, one sha256 per screen
-//   node scripts/screens.mjs hash --compare before.json    exit 1 when any screen's pixels changed
+//   node scripts/screens.mjs hash [--out scripts/screens/.out/before.json]   still frames at a fixed clock, one sha256 each
+//   node scripts/screens.mjs hash --compare scripts/screens/.out/before.json exit 1 when any screen's pixels changed
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
@@ -403,7 +403,7 @@ async function clip() {
   console.log(`screens: clips in ${path.relative(ROOT, out)}`);
 }
 
-/** Lays shots out in a labelled grid from a spec: title, subtitle, columns, rows of `{ img, caption, width }`, notes. */
+/** A labelled grid from a spec: name, title, subtitle, columns, cellWidth, rows of `{ label, cells }`, notes. */
 async function board() {
   const spec = JSON.parse(readFileSync(rest[0], "utf8"));
   const out = path.join(OUT, "boards");

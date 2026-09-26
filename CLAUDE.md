@@ -95,7 +95,8 @@ src/
                      useDialogFocus,
                      useGridRoving, useSyncStatus, useManualSync,
                      usePullToSync, useActionRunner, useCachedMedia,
-                     useDetectionMedia, useDetectionDrag, useElementSize)
+                     useDetectionMedia, useDetectionDrag, useElementSize,
+                     usePointerSwipe, useTabSwipe)
   i18n/              index.ts (setup) + en.ts + de.ts; `de: typeof en` enforces
                      key parity across the two files
   lib/               pure logic + its *.test.ts — the place testable code goes
@@ -677,10 +678,10 @@ version files agree), the **site**'s typecheck,
 **npm audit** at `high` over the production graph, the **bundle budget**
 (`scripts/bundle-budget.mjs`: a fresh `vite build`, then four gzipped figures —
 what the window waits for, the stylesheet, the largest lazy chunk, all the
-script — against `scripts/bundle-budget.json`, each 3 % over the larger of the
-two build targets' measurement; on 2026-09-25, with Base UI and Motion in,
-the Linux target read 391.5, 16.3, 27.3 and 528.0 KiB, and a raise names its
-reason in the commit) — then
+script — against `scripts/bundle-budget.json`, each set 3 % over the larger of
+the two build targets' measurement when it was last raised; on 2026-09-26 the
+Linux target read 400.4, 17.1, 27.3 and 537.7 KiB against budgets of 404, 18,
+29 and 544, and a raise names its reason in the commit) — then
 the three cargo tools
 one after another because they share the target directory's lock: **clippy**
 with warnings denied, **cargo deny** (advisories, licences, bans, sources
@@ -1414,7 +1415,12 @@ review checkpoints are in `site/README.md`.
   `@keyframes`, `@utility`, `:root` and `[data-theme]` blocks of
   `src/app/index.css`, plus the default accent evaluated through
   `src/lib/contrast.ts` — the `@theme` fallbacks are not the colours a user
-  sees. Changing any of those blocks means re-running the sync in the same
+  sees. The app's high-contrast rules, keyed on `data-contrast="more"`, come
+  across as `@media (prefers-contrast: more)`, nested ones included, and a
+  selector list the rewrite cannot keep exact stops the sync. The site may add
+  page-only steps in its own `@theme` (fluid type, the device corner, the
+  screenshot shadow) but never redefines an app token. Changing any of those
+  blocks means re-running the sync in the same
   commit; the site's `check` fails when the file is stale, and `pages.yml`
   watches `index.css` so drift fails in the open.
 - **The UI primitives under `site/src/components/ui` are copies, on purpose.**
@@ -1638,7 +1644,8 @@ and the third phase of `npm run verify`. It parses every app `.ts`/`.tsx` with
 `oxc-parser` (the parser knip already carried, now a direct dev dependency,
 because TypeScript 7 no longer ships a JS compiler API) and counts, per file and
 rule, what DESIGN.md calls drift: bracketed radii, sizes, tracking, z-index,
-shadows and motion values; hex and rgb in a class; a shade the theme does not
+shadows and motion values; radii and shadows named by size rather than by
+role; hex and rgb in a class; a shade the theme does not
 define (read from `index.css`'s `--color-*` names, so `ink-200` is caught and
 renders nothing); Tailwind's own palette; broad transitions; `animate-spin`
 outside the spinner; `outline-none` with no focus style beside it or on a
@@ -1655,8 +1662,9 @@ fails the gate outright. Half a second a run.
 
 **`scripts/screens.mjs` shows the real app, and it is how a UI change is
 proven.** It serves `scripts/screens/` (the whole `App`, shell included, over
-`mockIPC` answers and fixture lists) and drives Chromium: `shoot` renders twelve
-named screens (six desktop, six phone) per style and theme, `board` lays them
+`mockIPC` answers and fixture lists) and drives Chromium: `shoot` renders every
+screen in its `SCREENS` table (or the `--only` subset) per style and theme, and a
+screen may name a `mock` the fixtures branch on, `board` lays them
 out for the maintainer, `clip` records motion side by side, and `hash` takes
 still frames at a fixed clock with motion off. Two `hash` runs agree, so an
 unchanged hash is the proof that a mechanical refactor moved no pixel. The
@@ -1823,16 +1831,19 @@ shape, and the question that follows them.
   a component maps through a literal switch, which is the shape `receiptText` in
   `useListMutations` established.
 - **Two motion registers, and the default is the quiet one.** *Surface* motion —
-  hover, focus, background and border — stays on the 140ms `--ease-karasu` that
-  every plain `transition-*` utility already inherits. *Feature* motion, for the
-  few moments worth noticing (a dialog arriving, a scrobble landing, a chart
-  drawing), may use `--ease-spring`, `--ease-out-expo` and
-  `--duration-expressive`. Reach for the first unless there is a reason;
-  springs everywhere is how an app starts feeling slow.
-- **Exit animations go through `usePresence`.** React unmounts before CSS can
-  animate, so `{open && <Modal/>}` can only ever have an entrance. The hook
-  holds the node for the exit and reports `leaving`; keep emitting
-  `data-overlay` while it does.
+  hover, focus, background and border — stays on `transition-surface` and the
+  140ms `--ease-karasu`; `transition-colors`, `transition-all` and a bare
+  `transition` fail the style audit. *Feature* motion, for the few moments
+  worth noticing (a dialog arriving, a scrobble landing, a chart drawing), may
+  use `--ease-spring-soft`, `--ease-out-expo` and `--duration-expressive`.
+  Reach for the first unless there is a reason; springs everywhere is how an
+  app starts feeling slow.
+- **Exit animations go through `usePresence`, or through the wrapper's own
+  exit.** React unmounts before CSS can animate, so `{open && <Modal/>}` can
+  only ever have an entrance. The hook holds the node for the exit and reports
+  `leaving`; keep emitting `data-overlay` while it does. What Base UI draws
+  (menus, the popover, the tooltip, sheets) exits through its own
+  `data-closed` / `data-ending-style`, and the toast through `MotionPresence`.
 - **Motion that CSS cannot see must ask `lib/motion.ts`.** The reduce-motion
   rules in `index.css` are `!important` overrides on animation and transition
   properties — they do nothing to a View Transition, a scroll handler, a WAAPI
@@ -1888,9 +1899,10 @@ them away without re-measuring.
   Contrast keeps it. A touch on an overflowing strip scrolls it rather than
   switching tabs, because `useTabSwipe` leaves sideways-scrolling elements alone.
 - **The cover progress line is a border, not a bar.** A straight strip inside
-  the cover's `rounded-lg` clip had its ends eaten by the corner circles; the
-  line is a `border-b` on an inset-0 overlay revealed by `clip-path`, so it
-  bends into the frame's own corners and a +1 still animates the growth.
+  the cover's rounded clip (`rounded-cover`) had its ends eaten by the corner
+  circles; the line is a `border-b` on an inset-0 overlay revealed by
+  `clip-path`, so it bends into the frame's own corners and a +1 still
+  animates the growth.
 - **`min-w-0`, not `shrink-0`, on a row's trailing text block.** `DigestRow`'s
   right side was pinned at max-content by `shrink-0`, and one long German note
   handed the whole page a sideways scroll (`<main>`'s `overflow-y-auto`

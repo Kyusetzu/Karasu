@@ -119,65 +119,91 @@ const CONTRAST_ROOT = ':root[data-contrast="more"]';
 /** Rewrites a block keyed on the app's contrast attribute into the media query a page without the setting has. */
 function forSite(s) {
   if (!s.head.startsWith(CONTRAST_ROOT)) return { ...s, body: nestedContrast(s.body, s.head) };
-  keyedList(s.head, "the top level");
+  const plain = masked(s.body);
+  keyedList(s.body, plain, 0, plain.indexOf("{"), "the top level");
   const inner = s.body.replaceAll(CONTRAST_ROOT, ":root").replace(/^/gm, "  ");
   return { ...s, body: `@media (prefers-contrast: more) {\n${inner}\n}` };
 }
 
-/** A selector list split at its top-level commas, so `:is(a, b)` stays one selector. */
-function selectors(prelude) {
-  const out = [];
-  let depth = 0;
-  let from = 0;
-  for (let k = 0; k < prelude.length; k++) {
-    const c = prelude[k];
-    if (c === "(" || c === "[") depth++;
-    else if (c === ")" || c === "]") depth--;
-    else if (c === "," && depth === 0) {
-      out.push(prelude.slice(from, k).trim());
-      from = k + 1;
+/**
+ * The text with the parts that are not CSS structure neutralised, index for
+ * index: a comment becomes spaces, and a brace, bracket, parenthesis, comma
+ * or semicolon inside a string (escapes honoured) becomes an underscore. A
+ * scan of the result sees rules and selectors only; the original supplies
+ * the text at the same positions.
+ */
+function masked(text) {
+  const structural = /[{}()[\];,]/;
+  let out = "";
+  let quote = null;
+  for (let k = 0; k < text.length; k++) {
+    const c = text[k];
+    if (quote) {
+      if (c === "\\" && k + 1 < text.length) {
+        out += c + (structural.test(text[k + 1]) ? "_" : text[k + 1]);
+        k++;
+      } else {
+        if (c === quote) quote = null;
+        out += structural.test(c) ? "_" : c;
+      }
+    } else if (text.startsWith("/*", k)) {
+      const end = text.indexOf("*/", k + 2);
+      const stop = end === -1 ? text.length : end + 2;
+      out += text.slice(k, stop).replace(/[^\n]/g, " ");
+      k = stop - 1;
+    } else if (c === "\\" && k + 1 < text.length) {
+      out += c + text[k + 1];
+      k++;
+    } else {
+      if (c === '"' || c === "'") quote = c;
+      out += c;
     }
   }
-  out.push(prelude.slice(from).trim());
   return out;
 }
 
 /**
- * The list's selectors with the contrast root taken off, or a thrown error
- * when only some of them carry it: moving such a rule under the media query
- * would take its other selectors with it, and a sync that stops is better
- * than a stylesheet that silently changes meaning.
+ * The selectors of the list at [from, to) with the contrast root taken off,
+ * split at the masked text's top-level commas so `:is(a, b)`, a comment and
+ * a string keep their commas. Throws when only some selectors carry the
+ * root: moving such a rule under the media query would take the others with
+ * it, and a sync that stops is better than a stylesheet that silently
+ * changes meaning.
  */
-function keyedList(prelude, where) {
-  const list = selectors(prelude);
-  if (list.every((p) => p.startsWith(CONTRAST_ROOT))) {
-    return list.map((p) => p.slice(CONTRAST_ROOT.length).trim() || ":root");
+function keyedList(text, plain, from, to, where) {
+  const parts = [];
+  let depth = 0;
+  let start = from;
+  for (let k = from; k <= to; k++) {
+    const c = plain[k];
+    if (c === "(" || c === "[") depth++;
+    else if (c === ")" || c === "]") depth--;
+    else if (k === to || (c === "," && depth === 0)) {
+      parts.push([start, k]);
+      start = k + 1;
+    }
   }
-  throw new Error(
-    `sync-tokens: cannot move "${prelude.trim()}" (in ${where}) under prefers-contrast — ` +
-      `split the rule so every selector in it starts with ${CONTRAST_ROOT}`,
-  );
+  const out = [];
+  for (const [a, b] of parts) {
+    const lead = plain.slice(a, b).search(/\S/);
+    const at = a + lead;
+    if (lead === -1 || !plain.startsWith(CONTRAST_ROOT, at)) {
+      throw new Error(
+        `sync-tokens: cannot move "${text.slice(from, to).trim()}" (in ${where}) under prefers-contrast — ` +
+          `split the rule so every selector in it starts with ${CONTRAST_ROOT}`,
+      );
+    }
+    out.push(text.slice(at + CONTRAST_ROOT.length, b).trim() || ":root");
+  }
+  return out;
 }
 
-/** Where the brace opened at `open` closes, skipping comments and strings. */
-function matchingBrace(text, open) {
+/** Where the brace opened at `open` closes, in masked text. */
+function matchingBrace(plain, open) {
   let depth = 0;
-  for (let k = open; k < text.length; k++) {
-    if (text.startsWith("/*", k)) {
-      const end = text.indexOf("*/", k + 2);
-      if (end === -1) break;
-      k = end + 1;
-      continue;
-    }
-    const c = text[k];
-    if (c === '"' || c === "'") {
-      const end = text.indexOf(c, k + 1);
-      if (end === -1) break;
-      k = end;
-      continue;
-    }
-    if (c === "{") depth++;
-    else if (c === "}" && --depth === 0) return k;
+  for (let k = open; k < plain.length; k++) {
+    if (plain[k] === "{") depth++;
+    else if (plain[k] === "}" && --depth === 0) return k;
   }
   throw new Error("sync-tokens: unbalanced braces in the source stylesheet");
 }
@@ -185,42 +211,29 @@ function matchingBrace(text, open) {
 /**
  * The same for a rule nested inside another block — a utility's
  * `:root[data-contrast="more"] & { … }` — which the page answers as
- * `@media (prefers-contrast: more) { & { … } }` in the same place. Only a
- * rule's selector is read: comments and strings are stepped over, so a
- * comment that quotes the selector is copied as it stands.
+ * `@media (prefers-contrast: more) { & { … } }` in the same place. The scan
+ * reads the masked text, so a comment or a string that quotes the selector
+ * is copied as it stands.
  */
 function nestedContrast(body, where) {
+  const plain = masked(body);
   let out = "";
   let emitted = 0;
   let prelude = 0;
-  for (let j = 0; j < body.length; j++) {
-    if (body.startsWith("/*", j)) {
-      const end = body.indexOf("*/", j + 2);
-      if (end === -1) throw new Error(`sync-tokens: an unterminated comment in ${where}`);
-      j = end + 1;
-      prelude = j + 1;
-      continue;
-    }
-    const c = body[j];
-    if (c === '"' || c === "'") {
-      const end = body.indexOf(c, j + 1);
-      if (end === -1) throw new Error(`sync-tokens: an unterminated string in ${where}`);
-      j = end;
-      continue;
-    }
+  for (let j = 0; j < plain.length; j++) {
+    const c = plain[j];
     if (c === ";" || c === "}") {
       prelude = j + 1;
       continue;
     }
     if (c !== "{") continue;
-    const text = body.slice(prelude, j);
-    if (!text.includes(CONTRAST_ROOT)) {
+    if (!plain.slice(prelude, j).includes(CONTRAST_ROOT)) {
       prelude = j + 1;
       continue;
     }
-    const list = keyedList(text, where);
-    const close = matchingBrace(body, j);
-    const first = prelude + (text.length - text.trimStart().length);
+    const list = keyedList(body, plain, prelude, j, where);
+    const close = matchingBrace(plain, j);
+    const first = prelude + plain.slice(prelude, j).search(/\S/);
     const indent = /^[ \t]*/.exec(body.slice(body.lastIndexOf("\n", first) + 1))[0];
     const inner = body.slice(j + 1, close).replace(/\n/g, "\n  ");
     out += `${body.slice(emitted, first)}@media (prefers-contrast: more) {\n${indent}  ${list.join(`,\n${indent}  `)} {${inner}}\n${indent}}`;

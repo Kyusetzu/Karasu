@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 
 /**
  * Feathers, drifting down behind the page. A fixed canvas under the content
@@ -12,7 +12,8 @@ import { useEffect, useRef } from "react";
  * so a frame costs a few dozen `drawImage`s.
  *
  * Reduced motion draws one still scatter and stops. High contrast draws
- * nothing: the stylesheet hides the canvas there, so the loop never starts.
+ * nothing: the stylesheet hides the canvas there, so the loop stops, and
+ * starts again if the preference is turned off while the page is open.
  * A hidden tab pauses the loop. Nothing here is interactive for assistive technology: `aria-hidden`,
  * `pointer-events: none`, and the listeners sit on the window.
  */
@@ -152,13 +153,29 @@ function makeSprite(shape: (typeof SHAPES)[number], vane: string, rachis: string
   return c;
 }
 
+const MORE_CONTRAST = "(prefers-contrast: more)";
+
+/** The OS's request for more contrast, live; the server render has no preference to read. */
+function useMoreContrast(): boolean {
+  return useSyncExternalStore(
+    (change) => {
+      const query = matchMedia(MORE_CONTRAST);
+      query.addEventListener("change", change);
+      return () => query.removeEventListener("change", change);
+    },
+    () => matchMedia(MORE_CONTRAST).matches,
+    () => false,
+  );
+}
+
 export function Feathers() {
   const ref = useRef<HTMLCanvasElement>(null);
+  const moreContrast = useMoreContrast();
 
   useEffect(() => {
     const canvas = ref.current;
     if (!canvas) return;
-    if (matchMedia("(prefers-contrast: more)").matches) return;
+    if (moreContrast) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -334,7 +351,7 @@ export function Feathers() {
       document.removeEventListener("pointerleave", onLeave);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, []);
+  }, [moreContrast]);
 
   return <canvas ref={ref} className="feathers" aria-hidden="true" />;
 }

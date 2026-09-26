@@ -93,7 +93,7 @@ export default function Statistics() {
     return (
       <div className="grid h-full place-items-center p-8">
         <div className="max-w-md text-center">
-          <h1 className="text-title font-bold">{t("stats.title")}</h1>
+          <h1 className="text-title">{t("stats.title")}</h1>
           <p className="mt-3 text-sm leading-relaxed text-ink-500">
             {t("stats.signInText")}
           </p>
@@ -263,7 +263,7 @@ function StatisticsContent({
         <div className="min-w-0 flex-1">
           {/* The same lockup the two list screens use: title, then its Japanese form a shade back. */}
           <div className="flex items-baseline gap-2.5">
-            <h1 className="text-xl font-bold">{t("stats.title")}</h1>
+            <h1 className="text-xl">{t("stats.title")}</h1>
             <span className="font-brand-jp text-ui tracking-lockup text-ink-600">
               統計
             </span>

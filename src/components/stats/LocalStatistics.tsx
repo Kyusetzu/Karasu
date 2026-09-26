@@ -103,7 +103,7 @@ export default function LocalStatistics({
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline gap-2.5">
-            <h1 className="text-xl font-bold">{t("stats.title")}</h1>
+            <h1 className="text-xl">{t("stats.title")}</h1>
             <span className="font-brand-jp text-ui tracking-lockup text-ink-600">
               統計
             </span>

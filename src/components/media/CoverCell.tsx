@@ -89,7 +89,7 @@ export function CoverCell({
     <div className={cn("group", className)} {...rest}>
       <div
         className={cn(
-          "focus-frame @container relative aspect-[2/3] overflow-hidden rounded-control bg-surface-800",
+          "focus-frame @container relative aspect-[2/3] overflow-hidden rounded-cover bg-surface-800",
           selected && "outline-2 outline-offset-2 outline-accent-500",
         )}
       >
@@ -139,13 +139,13 @@ export function CoverCell({
         {statusRing && (
           <span
             aria-hidden
-            className="pointer-events-none absolute inset-0 rounded-control"
+            className="pointer-events-none absolute inset-0 rounded-cover"
             style={{ boxShadow: `inset 0 0 0 2px ${statusRing}` }}
           />
         )}
 
         {score != null && (
-          <span className="absolute left-2 top-2 flex items-center gap-1 rounded-cover bg-on-cover/93 px-1.5 py-0.5 text-2xs font-semibold text-on-cover-gold">
+          <span className="absolute left-2 top-2 flex items-center gap-1 rounded-control bg-on-cover/93 px-1.5 py-0.5 text-2xs font-semibold text-on-cover-gold">
             <Star className="size-2.5" fill="currentColor" />
             {score}
           </span>
@@ -153,7 +153,7 @@ export function CoverCell({
 
         {/* Matched to the score badge on purpose; a translucent badge has no contrast floor on arbitrary art. */}
         {adult && (
-          <span className="absolute right-2 top-2 rounded-cover bg-on-cover/93 px-1.5 py-0.5 text-2xs font-semibold text-on-cover-danger">
+          <span className="absolute right-2 top-2 rounded-control bg-on-cover/93 px-1.5 py-0.5 text-2xs font-semibold text-on-cover-danger">
             18+
           </span>
         )}
@@ -167,9 +167,9 @@ export function CoverCell({
         {progress && (
           // A border revealed by clip-path, not a bar: a straight strip inside the rounded clip loses its ends to the corners.
           <div aria-hidden className="pointer-events-none absolute inset-0">
-            <div className="absolute inset-0 rounded-control border-b-[3px] border-on-cover/60" />
+            <div className="absolute inset-0 rounded-cover border-b-[3px] border-on-cover/60" />
             <div
-              className="absolute inset-0 rounded-control border-b-[3px] border-accent-500 transition-[clip-path] duration-(--duration-expressive) ease-(--ease-out-expo)"
+              className="absolute inset-0 rounded-cover border-b-[3px] border-accent-500 transition-[clip-path] duration-(--duration-expressive) ease-(--ease-out-expo)"
               style={{ clipPath: `inset(0 ${100 - pct}% 0 0)` }}
             />
           </div>

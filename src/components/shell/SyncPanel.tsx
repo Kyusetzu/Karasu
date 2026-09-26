@@ -282,7 +282,7 @@ export default function SyncPanel({
 
               {/* The traffic, which is what moves the headroom while an idle app has nothing queued to list. */}
               <div className="border-t border-hair">
-                <h3 className="px-3 pb-1 pt-2 text-2xs font-semibold uppercase text-ink-600">
+                <h3 className="px-3 pb-1 pt-2 text-2xs uppercase text-ink-600">
                   {t("syncPanel.recent")}
                 </h3>
                 {data.recent.length === 0 ? (
@@ -330,7 +330,7 @@ export default function SyncPanel({
 
               {/* Who spent the budget since the app started; the recent list above only shows the last fifty. */}
               <div className="border-t border-hair">
-                <h3 className="px-3 pb-1 pt-2 text-2xs font-semibold uppercase text-ink-600">
+                <h3 className="px-3 pb-1 pt-2 text-2xs uppercase text-ink-600">
                   {t("syncPanel.sources")}
                 </h3>
                 {data.traffic.sources.length === 0 ? (

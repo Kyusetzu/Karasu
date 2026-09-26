@@ -414,7 +414,7 @@ function LibraryView({ userId }: { userId: number }) {
     <div className="flex h-full flex-col">
       <div className="flex-none px-8 pb-4 pt-7">
         <div className="flex flex-wrap items-baseline gap-3">
-          <h1 className="text-title font-bold text-ink-100">
+          <h1 className="text-title text-ink-100">
             {t("library.title")}
           </h1>
           <span className="font-brand-jp text-ui tracking-lockup text-ink-600">

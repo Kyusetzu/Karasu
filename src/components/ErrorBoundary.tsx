@@ -45,7 +45,7 @@ class ErrorBoundaryInner extends Component<Props, State> {
           <span className="mx-auto grid size-11 place-items-center rounded-full bg-danger/15 text-danger">
             <TriangleAlert className="size-5" />
           </span>
-          <h1 className="mt-4 text-base font-semibold text-ink-100">
+          <h1 className="mt-4 text-base text-ink-100">
             {t("error.title")}
           </h1>
           <p className="mt-2 text-sm leading-relaxed text-ink-500">

@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 3f72403 -->
+<!-- generated-through: 6a201b1 -->
 
 ### Fixed
 
@@ -118,6 +118,7 @@ tag time is then optional rather than load-bearing.
 - Character and staff pages show roles and genders in your language, and the local library's title matches the other pages.
 - On a narrow phone the statistics page no longer scrolls sideways, and the legend beside the ring moves beneath it rather than cutting its labels short.
 - The Android widgets' title shows Karasu's accent and their footer is readable against the widget.
+- The colour picker's hex field and the log's level column are monospace again, and the About wordmark has its wide spacing back.
 
 ### Added
 

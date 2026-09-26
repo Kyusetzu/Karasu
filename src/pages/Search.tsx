@@ -254,7 +254,7 @@ export default function Search() {
   return (
     <div className="flex h-full flex-col">
       <div className="px-8 pt-6">
-        <h1 className="text-title font-bold">{t("search.title")}</h1>
+        <h1 className="text-title">{t("search.title")}</h1>
         <div className="mt-4 max-w-176">
           <SearchField
             size="lg"

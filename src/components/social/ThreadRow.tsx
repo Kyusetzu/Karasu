@@ -20,7 +20,7 @@ export function ThreadRow({ thread }: { thread: ThreadSummary }) {
       <div className="flex items-start gap-2">
         {thread.isSticky && <Pin className="mt-0.5 size-3.5 shrink-0 text-accent-400" />}
         {thread.isLocked && <Lock className="mt-0.5 size-3.5 shrink-0 text-ink-600" />}
-        <h3 className="min-w-0 flex-1 text-sm font-medium text-ink-100">
+        <h3 className="min-w-0 flex-1 text-sm text-ink-100">
           {thread.title ?? t("social.untitledThread")}
         </h3>
       </div>

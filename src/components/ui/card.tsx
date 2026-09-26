@@ -39,5 +39,5 @@ export function CardTitle({
   ...props
 }: HTMLAttributes<HTMLHeadingElement>) {
   const Tag = useContext(CardHeadingLevel) === 3 ? "h3" : "h2";
-  return <Tag className={cn("text-base font-semibold text-ink-100", className)} {...props} />;
+  return <Tag className={cn("text-base text-ink-100", className)} {...props} />;
 }

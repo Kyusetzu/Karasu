@@ -144,7 +144,7 @@ function groupVerb(label: GroupLabel, t: (k: string, o?: Record<string, unknown>
 
 const rowClass = (unread: boolean) =>
   cn(
-    "flex w-full items-start gap-2.5 px-3 py-2.5 text-left transition-surface hover:bg-surface-850",
+    "flex w-full items-start gap-2.5 px-3 py-2.5 text-left transition-surface hover:bg-surface-850 focus-inset",
     unread && "bg-surface-850/60",
   );
 

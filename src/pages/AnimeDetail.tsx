@@ -246,7 +246,7 @@ export default function AnimeDetail() {
             />
           )}
           <div className={cn("pt-16", !phone && "min-w-0 flex-1")}>
-            <h1 className="text-heading font-bold text-ink-100">
+            <h1 className="text-heading text-ink-100">
               {title}
             </h1>
             {/* Native first, romaji only as a fallback: the Japanese face is part of the app's identity. */}

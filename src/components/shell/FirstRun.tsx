@@ -42,7 +42,7 @@ export default function FirstRun() {
           <p className="text-2xs font-semibold uppercase text-accent-400">
             {t("dashboard.welcomeTitle")}
           </p>
-          <h1 className="mt-2 font-brand text-hero font-bold text-ink-100 md:text-hero-lg">
+          <h1 className="mt-2 font-brand text-hero text-ink-100 md:text-hero-lg">
             {t("firstRun.headline")}
           </h1>
           <p className="mt-3 text-sm leading-relaxed text-ink-500">

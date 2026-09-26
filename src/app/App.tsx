@@ -259,7 +259,7 @@ function NotFound() {
   return (
     <div className="grid h-full place-items-center p-8">
       <div className="max-w-md text-center">
-        <h1 className="text-title font-bold">{t("notFound.title")}</h1>
+        <h1 className="text-title">{t("notFound.title")}</h1>
         <p className="mt-3 text-sm leading-relaxed text-ink-500">
           {t("notFound.body")}
         </p>

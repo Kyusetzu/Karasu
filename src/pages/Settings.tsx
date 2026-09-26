@@ -216,7 +216,7 @@ export default function Settings() {
     if (listShown) {
       return (
         <div className="space-y-4 p-4">
-          <h1 className="px-1 pt-2 text-title font-bold">{t("settings.title")}</h1>
+          <h1 className="px-1 pt-2 text-title">{t("settings.title")}</h1>
           {/* One line of what each pane holds, so the list answers where a setting is before a pane is opened. */}
           <div className="overflow-hidden rounded-panel border border-hair bg-surface-900 [&>*+*]:border-t [&>*+*]:border-hair">
             {panes.map((p) => {
@@ -268,7 +268,7 @@ export default function Settings() {
   return (
     <div className="flex h-full min-h-0">
       <nav className="flex w-48 shrink-0 flex-col gap-0.5 border-r border-hair p-3">
-        <h1 className="px-2.5 pb-2 pt-1 text-2xs font-semibold uppercase tracking-eyebrow text-ink-600">
+        <h1 className="px-2.5 pb-2 pt-1 text-2xs uppercase tracking-eyebrow text-ink-600">
           {t("settings.title")}
         </h1>
         {panes.map((p) => {

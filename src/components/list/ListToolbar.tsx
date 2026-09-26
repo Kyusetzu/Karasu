@@ -419,7 +419,7 @@ function PanelSection({
   return (
     <section aria-labelledby={id}>
       <div className="mb-1.5 flex items-center justify-between gap-2">
-        <h3 id={id} className="text-2xs font-semibold uppercase tracking-eyebrow text-ink-500">
+        <h3 id={id} className="text-2xs uppercase tracking-eyebrow text-ink-500">
           {title}
         </h3>
         {aside}

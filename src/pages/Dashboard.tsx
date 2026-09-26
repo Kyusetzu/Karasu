@@ -382,7 +382,7 @@ function ListPanel({
     <section className="flex min-w-0 flex-col overflow-hidden rounded-panel border border-hair bg-surface-900 panel-wash">
       <header className="flex items-center gap-2.5 border-b border-hair px-4 py-3">
         <Icon className="size-4 shrink-0 text-accent-400" />
-        <h2 className="shrink-0 text-sm font-semibold text-ink-100">{title}</h2>
+        <h2 className="shrink-0 text-sm text-ink-100">{title}</h2>
         {meta && <span className="ml-auto min-w-0 truncate text-2xs uppercase tracking-eyebrow text-ink-600">{meta}</span>}
       </header>
       <div className="[&>*+*]:border-t [&>*+*]:border-hair">{children}</div>

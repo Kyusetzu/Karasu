@@ -124,7 +124,7 @@ export function Modal({
             <div className="flex shrink-0 items-center gap-3 px-5 pt-5">
               {icon}
               <div className="min-w-0 flex-1">
-                <h2 id={titleId} className="text-base font-semibold text-ink-100">
+                <h2 id={titleId} className="text-base text-ink-100">
                   {title}
                 </h2>
                 {description && <div className="mt-0.5 truncate text-2xs text-ink-600">{description}</div>}

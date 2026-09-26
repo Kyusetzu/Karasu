@@ -23,7 +23,7 @@ export default function Notifications() {
       <header className="flex flex-wrap items-center gap-x-4 gap-y-3">
         <div className="min-w-0 flex-1 basis-64">
           <div className="flex flex-wrap items-baseline gap-x-2.5">
-            <h1 className="text-title font-bold">{t("notif.title")}</h1>
+            <h1 className="text-title">{t("notif.title")}</h1>
             {/* The Japanese sub-lockup every other screen header carries. */}
             <span className="whitespace-nowrap font-brand-jp text-ui tracking-lockup text-ink-600">お知らせ</span>
           </div>

@@ -37,7 +37,7 @@ export default function KeyboardSheet() {
       <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
         {SHORTCUT_SCOPES.map((scope) => (
           <section key={scope}>
-            <h3 className="text-2xs font-semibold uppercase tracking-eyebrow text-ink-600">{labels.scope(scope)}</h3>
+            <h3 className="text-2xs uppercase tracking-eyebrow text-ink-600">{labels.scope(scope)}</h3>
             <div className="mt-2 space-y-1.5">
               {shortcutsIn(scope).map((s) => (
                 <div key={s.id} className="flex items-center justify-between gap-4 text-xs text-ink-300">

@@ -81,7 +81,7 @@ function OfflineEntry({
         </div>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <h1 className="text-lg font-semibold text-ink-100">
+          <h1 className="text-lg text-ink-100">
             {displayTitle(entry.media.title)}
           </h1>
           <p className="mt-1 text-sm tabular-nums text-ink-500">

@@ -511,6 +511,7 @@
   --catch-light: transparent;
   --float-shadow: transparent;
   --float-edge: var(--color-surface-600);
+  --well-shadow: transparent;
 }
 
 /* High contrast, light: the same roles on white, and the semantic colours pulled down to 7:1 as text. */
@@ -615,7 +616,7 @@ h3:not(.font-brand-jp) {
   font-family: var(--font-brand);
   font-weight: 400;
 }
-.uppercase {
+.uppercase:not(.font-mono, .font-mono *, .tracking-wordmark) {
   font-family: var(--font-brand);
   letter-spacing: var(--tracking-eyebrow);
 }

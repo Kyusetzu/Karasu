@@ -6,9 +6,9 @@ import { ExternalAnchor, RichText, Spoiler } from "@/components/RichText";
 /** Block AniList markdown from the parser's tree, never `dangerouslySetInnerHTML`; the site's renderer is the oracle. */
 
 const HEADING_SIZE = [
-  "text-lg font-semibold",
-  "text-base font-semibold",
-  "text-sm font-semibold",
+  "text-lg",
+  "text-base",
+  "text-sm",
   "text-sm font-medium",
   "text-xs font-medium",
   "text-xs font-medium",

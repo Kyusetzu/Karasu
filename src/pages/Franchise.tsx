@@ -138,7 +138,7 @@ export default function Franchise() {
     <div className="flex h-full flex-col gap-4 p-4 md:p-6">
       <header className="flex min-w-0 items-center gap-3">
         <BackButton />
-        <h1 className="shrink-0 text-lg font-semibold text-ink-100">{t("franchise.title")}</h1>
+        <h1 className="shrink-0 text-lg text-ink-100">{t("franchise.title")}</h1>
         {data && (
           <span className="truncate text-2xs uppercase tracking-eyebrow text-ink-600">
             {t("franchise.related", { count: data.nodes.length })}
@@ -400,7 +400,7 @@ function GraphNode({
           )}
           {done !== null && (
             <span
-              className="absolute inset-x-0 bottom-0 block bg-scrim"
+              className="absolute inset-x-0 bottom-0 block bg-on-cover/55"
               style={{ height: ".1875em" }}
             >
               <span

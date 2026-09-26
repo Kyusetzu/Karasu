@@ -212,7 +212,7 @@ export default function Calendar() {
       <div className="px-8 pt-6">
         <div className="flex items-center gap-2.5">
           <div className="flex min-w-0 items-baseline gap-2.5">
-            <h1 className="text-title font-bold">{t("calendar.title")}</h1>
+            <h1 className="text-title">{t("calendar.title")}</h1>
             {/* Hidden on a phone, whose one row belongs to the title and the export. */}
             <span className="hidden whitespace-nowrap font-brand-jp text-ui tracking-lockup text-ink-600 sm:inline">
               放送カレンダー

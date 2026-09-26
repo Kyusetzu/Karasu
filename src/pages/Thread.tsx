@@ -461,7 +461,7 @@ export default function Thread() {
       <header>
         <div className="flex items-start gap-2">
           {data.isLocked && <Lock className="mt-1.5 size-4 shrink-0 text-ink-600" />}
-          <h1 className="min-w-0 flex-1 text-xl font-bold text-ink-100">
+          <h1 className="min-w-0 flex-1 text-xl text-ink-100">
             {data.title ?? t("social.untitledThread")}
           </h1>
           <Button

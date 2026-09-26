@@ -130,7 +130,7 @@ function Progress({ media, value, onCommit }: { media: MediaDetail; value: numbe
         >
           <Minus className="size-4" />
         </IconButton>
-        <div className="flex h-11 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-panel border border-surface-700 bg-surface-950 focus-within:border-accent-500">
+        <div className="flex h-11 min-w-0 flex-1 items-center justify-center gap-1.5 field-shell rounded-panel border border-surface-700 bg-surface-950 focus-within:border-accent-500">
           <NumberInput
             id={id}
             value={typed}

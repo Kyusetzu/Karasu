@@ -122,7 +122,7 @@ export function ProfileHeader({ user }: { user: UserProfile }) {
             <div className="flex items-end gap-4">
               <Avatar src={user.avatar?.large} name={user.name} size="xl" />
               <div className="min-w-0 flex-1 pb-1">
-                <h1 className="break-words text-2xl font-bold text-ink-100">{user.name}</h1>
+                <h1 className="break-words text-2xl text-ink-100">{user.name}</h1>
                 {hasBadges && <div className="mt-1 flex flex-wrap items-center gap-1.5">{badges}</div>}
               </div>
             </div>
@@ -135,7 +135,7 @@ export function ProfileHeader({ user }: { user: UserProfile }) {
             <Avatar src={user.avatar?.large} name={user.name} size="2xl" />
             <div className="min-w-0 flex-1 pb-1">
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="truncate text-title font-bold text-ink-100">{user.name}</h1>
+                <h1 className="truncate text-title text-ink-100">{user.name}</h1>
                 {badges}
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-600">{facts}</div>

@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
-import { Check, ChevronLeft, ChevronRight, Circle, Download } from "lucide-react";
+import { CalendarCheck, Check, ChevronLeft, ChevronRight, Circle, Download } from "lucide-react";
 import { airingWeek, type AiringSlot } from "@/api/queries";
 import { fetchMediaList, isTauri, saveText } from "@/api/anilist";
 import { buildIcs } from "@/lib/ical";
@@ -250,39 +250,47 @@ export default function Calendar() {
             segments={viewSegments}
           />
           {/* One bar for the week, the full width on a phone so both arrows are an easy reach for a thumb. */}
-          <div className="flex w-full items-center gap-2 sm:ml-auto sm:w-auto">
-            <div className="flex flex-1 items-center rounded-control border border-hair bg-surface-900 p-0.5 sm:flex-none">
-              <Button
-                variant="ghost"
-                size="iconControl"
-                onClick={() => setView({ week: addDays(week, -7) })}
-                aria-label={t("calendar.prevWeek")}
-              >
-                <ChevronLeft className="size-4" />
-              </Button>
-              <span aria-live="polite" className="flex-1 whitespace-nowrap px-2 text-center text-sm tabular-nums text-ink-300">
-                {weekLabel}
-              </span>
-              <Button
-                variant="ghost"
-                size="iconControl"
-                onClick={() => setView({ week: addDays(week, 7) })}
-                aria-label={t("calendar.nextWeek")}
-              >
-                <ChevronRight className="size-4" />
-              </Button>
-            </div>
+          <div className="flex w-full items-center rounded-control border border-hair bg-surface-900 p-0.5 sm:ml-auto sm:w-auto">
+            <Button
+              variant="ghost"
+              size="iconControl"
+              onClick={() => setView({ week: addDays(week, -7) })}
+              aria-label={t("calendar.prevWeek")}
+            >
+              <ChevronLeft className="size-4" />
+            </Button>
+            <span aria-live="polite" className="flex-1 whitespace-nowrap px-2 text-center text-sm tabular-nums text-ink-300">
+              {weekLabel}
+            </span>
+            {/* Inside the bar, before the arrow: appearing outside it would slide the arrow under a second press. */}
             {week !== currentWeek && (
-              <Button variant="ghost" size="sm" onClick={() => setView({ week: currentWeek })}>
-                {t("calendar.thisWeek")}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setView({ week: currentWeek })}
+                aria-label={t("calendar.thisWeek")}
+                title={t("calendar.thisWeek")}
+                className="shrink-0 whitespace-nowrap max-sm:px-2"
+              >
+                {/* A glyph on a narrow phone, where the words would squeeze the week's range out of the bar. */}
+                <CalendarCheck aria-hidden className="size-4 sm:hidden" />
+                <span className="hidden sm:inline">{t("calendar.thisWeek")}</span>
               </Button>
             )}
+            <Button
+              variant="ghost"
+              size="iconControl"
+              onClick={() => setView({ week: addDays(week, 7) })}
+              aria-label={t("calendar.nextWeek")}
+            >
+              <ChevronRight className="size-4" />
+            </Button>
           </div>
         </div>
       </div>
 
-      {/* The week grid only draws where its seven columns fit, so this scrolls vertically alone. */}
-      <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto px-8 py-6">
+      {/* The week grid draws only where its columns fit; the stable gutter keeps the scrollbar from flipping that. */}
+      <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto px-8 py-6 [scrollbar-gutter:stable]">
         {error ? (
           <p className="text-sm text-danger">{t("common.error", { message: String(error) })}</p>
         ) : loading ? (

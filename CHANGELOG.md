@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: d2b812b -->
+<!-- generated-through: 0429af8 -->
 
 ### Fixed
 
@@ -109,6 +109,7 @@ tag time is then optional rather than load-bearing.
 - The overview's banner and the score badges on covers stay readable in the light theme and in high contrast.
 - The 18+ badge, the complete button and the reveal label on covers are readable in the light theme.
 - The search page no longer starts its second row of chips with a stray divider.
+- A second press on the calendar's next-week arrow no longer jumps back to this week, and the week grid no longer flickers near its width threshold.
 
 ### Added
 

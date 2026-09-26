@@ -78,10 +78,6 @@
   "src/pages/Person.tsx": {
     "icon-size": 2
   },
-  "src/pages/Settings.tsx": {
-    "icon-size": 2,
-    "tracking-arbitrary": 1
-  },
   "src/pages/Statistics.tsx": {
     "icon-size": 1
   },

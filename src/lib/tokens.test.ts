@@ -251,6 +251,17 @@ describe("the tint fill", () => {
   }
 });
 
+describe("the theme picker's miniatures", () => {
+  it("draws each theme in its own page, panel and ink, whichever theme is showing", () => {
+    for (const block of [light, hcDark, hcLight]) expect([...block.keys()].filter((k) => k.startsWith("--color-preview-"))).toEqual([]);
+    for (const theme of ["dark", "light"] as const) {
+      expect(colour("dark", `preview-${theme}-page`), theme).toBe(colour(theme, theme === "dark" ? "surface-950" : "surface-850"));
+      expect(colour("dark", `preview-${theme}-panel`), theme).toBe(colour(theme, theme === "dark" ? "surface-850" : "surface-900"));
+      expect(colour("dark", `preview-${theme}-ink`), theme).toBe(colour(theme, "ink-100"));
+    }
+  });
+});
+
 describe("cover art", () => {
   // The lightest plate a coloured mark sits on is the action circle's, and white art is the worst case under it.
   it("keeps each colour over cover art one bright value in every theme, at 4.5:1 on the lightest plate over white", () => {

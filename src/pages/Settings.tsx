@@ -5,7 +5,6 @@ import {
   AlertTriangle,
   Database,
   FolderOpen,
-  Globe,
   Monitor,
   Palette,
   Radar,
@@ -19,7 +18,6 @@ import {
   AniListListOptionsSection,
   AniListNotificationsSection,
   AniListProfileSection,
-  AniListSignedOutNote,
   NotificationScheduleSection,
 } from "./settings/AniListPane";
 import { AppearanceSection } from "./settings/AppearancePane";
@@ -44,7 +42,8 @@ import {
   SystemSection,
   UpdatesSection,
 } from "./settings/AdvancedPane";
-import { DangerNote } from "./settings/shared";
+import { DangerNote, GroupLabel } from "./settings/shared";
+import { useAuth } from "@/stores/auth";
 import { usePhoneShell } from "@/hooks/usePhoneShell";
 import { isAndroid, usePlatform } from "@/stores/platform";
 import { Button } from "@/components/ui/button";
@@ -52,18 +51,19 @@ import { Chip } from "@/components/ui/chip";
 
 /** The panes, keyed by URL parameter so deep links land; keep the ids, since renaming one breaks every deep link. */
 const PANES = [
-  { id: "account", icon: User, sections: [AccountSection, DefaultsSection] },
-  // Right after the account: these are that account's own settings, and some are ones Karasu overrides.
+  // The sign-in, then what Karasu keeps and what lives on the AniList account, so it is clear what another client sees.
   {
-    id: "anilist",
-    icon: Globe,
+    id: "account",
+    icon: User,
     sections: [
-      // The only one that renders signed out; the rest hide themselves, which left this pane blank.
-      AniListSignedOutNote,
+      AccountSection,
+      KarasuGroup,
+      DefaultsSection,
+      NotificationScheduleSection,
+      AniListGroup,
       AniListProfileSection,
       AniListListOptionsSection,
       AniListNotificationsSection,
-      NotificationScheduleSection,
     ],
   },
   // Content joins Appearance instead of its own pane; it answers the same question, what do I see.
@@ -111,9 +111,9 @@ const _panesAreComplete: _EveryPaneIsRendered = true;
 const ANDROID_HIDDEN_PANES: ReadonlySet<PaneId> = new Set(["library", "desktop"] as const);
 /** Sections Android hides, by component identity so a rename breaks the build instead of un-hiding one. */
 const ANDROID_HIDDEN_SECTIONS: ReadonlySet<unknown> = new Set([PortableSection]);
-/** Sections Android shows elsewhere: the desktop pane is hidden there, but the updater has its channel and switch. */
-const ANDROID_EXTRA_SECTIONS: Partial<Record<PaneId, readonly (() => React.JSX.Element)[]>> = {
-  account: [UpdatesSection],
+/** Sections Android shows elsewhere, after an anchor: the desktop pane is hidden there, but the updater is Karasu's. */
+const ANDROID_EXTRA_SECTIONS: Partial<Record<PaneId, { after: unknown; sections: readonly (() => React.JSX.Element)[] }>> = {
+  account: { after: NotificationScheduleSection, sections: [UpdatesSection] },
 };
 
 /** Greyed on Android, not hidden; keep ScrobbleSection out, since the scrobbler runs there and reads its switches. */
@@ -134,6 +134,19 @@ function DesktopOnly({ children }: { children: React.ReactNode }) {
   );
 }
 
+function KarasuGroup() {
+  const { t } = useTranslation();
+  return <GroupLabel>{t("settings.groupKarasu")}</GroupLabel>;
+}
+
+/** Signed out, the AniList cards hide themselves, so their heading goes with them. */
+function AniListGroup() {
+  const { t } = useTranslation();
+  const viewer = useAuth((s) => s.viewer);
+  if (!viewer) return null;
+  return <GroupLabel>{t("settings.groupAniList")}</GroupLabel>;
+}
+
 function AdvancedWarning() {
   const { t } = useTranslation();
   return <DangerNote title={t("settings.dangerTitle")}>{t("settings.dangerBody")}</DangerNote>;
@@ -151,14 +164,18 @@ export default function Settings() {
   const panes = android ? PANES.filter((p) => !ANDROID_HIDDEN_PANES.has(p.id)) : PANES;
   // A deep link can name a pane Android hides; falling back beats rendering a blank one.
   const pane = panes.find((p) => p.id === active) ?? panes[0];
+  const extra = android ? ANDROID_EXTRA_SECTIONS[pane.id] : undefined;
+  const withExtra: readonly (typeof pane.sections)[number][] = extra
+    ? pane.sections.flatMap((S) => (S === extra.after ? [S, ...extra.sections] : [S]))
+    : pane.sections;
   const sections = android
-    ? [...pane.sections, ...(ANDROID_EXTRA_SECTIONS[pane.id] ?? [])]
+    ? withExtra
         .filter((S) => !ANDROID_HIDDEN_SECTIONS.has(S))
         // The working sections above the greyed desktop ones.
         .sort(
           (a, b) => Number(ANDROID_DESKTOP_ONLY.has(a)) - Number(ANDROID_DESKTOP_ONLY.has(b)),
         )
-    : pane.sections;
+    : withExtra;
   // The badge is platform-keyed in both layouts; an Android tablet at desktop width still has no SMTC.
   const wrap = (Section: (typeof sections)[number], i: number) =>
     android && ANDROID_DESKTOP_ONLY.has(Section) ? (
@@ -174,11 +191,10 @@ export default function Settings() {
     const listShown = rawPane === null || !panes.some((p) => p.id === active);
     if (listShown) {
       return (
-        <div className="p-4">
-          <h1 className="px-1 pb-3 pt-1 text-sm font-semibold text-ink-100">
-            {t("settings.title")}
-          </h1>
-          <div className="space-y-0.5">
+        <div className="space-y-4 p-4">
+          <h1 className="px-1 pt-2 text-title font-bold">{t("settings.title")}</h1>
+          {/* One line of what each pane holds, so the list answers where a setting is before a pane is opened. */}
+          <div className="overflow-hidden rounded-panel border border-hair bg-surface-900 [&>*+*]:border-t [&>*+*]:border-hair">
             {panes.map((p) => {
               const Icon = p.icon;
               const danger = "danger" in p && p.danger;
@@ -187,16 +203,23 @@ export default function Settings() {
                   key={p.id}
                   type="button"
                   onClick={() => setParams({ pane: p.id })}
-                  className={cn(
-                    "flex w-full items-center gap-3 rounded-panel px-3 py-3 text-left text-sm transition-surface",
-                    danger
-                      ? "text-danger/85 hover:bg-danger/10"
-                      : "text-ink-100 hover:bg-surface-850",
-                  )}
+                  className="flex w-full items-center gap-3 px-3.5 py-3 text-left transition-surface hover:bg-surface-850 focus-inset"
                 >
-                  <Icon className="size-4.5 shrink-0" />
-                  <span className="flex-1">{t(`settings.pane_${p.id}`)}</span>
-                  {danger && <AlertTriangle aria-hidden className="size-3.5 shrink-0" />}
+                  <span
+                    className={cn(
+                      "grid size-9 shrink-0 place-items-center rounded-full border tint-fill",
+                      danger ? "tint-danger text-danger" : "tint-accent text-accent-400",
+                    )}
+                  >
+                    <Icon className="size-4" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className={cn("block text-sm font-medium", danger ? "text-danger" : "text-ink-100")}>
+                      {t(`settings.pane_${p.id}`)}
+                    </span>
+                    <span className="block truncate text-xs text-ink-600">{t(`settings.paneHint_${p.id}`)}</span>
+                  </span>
+                  {danger && <AlertTriangle aria-hidden className="size-3.5 shrink-0 text-danger" />}
                   <ChevronRight className="size-4 shrink-0 text-ink-600" />
                 </button>
               );
@@ -207,8 +230,8 @@ export default function Settings() {
     }
     return (
       <div key={active} className="animate-settle">
-        <div className="mx-auto max-w-2xl space-y-6 p-4">
-          <Button variant="ghost" size="sm" onClick={() => setParams({})}>
+        <div className="mx-auto flex max-w-2xl flex-col gap-6 p-4">
+          <Button variant="ghost" size="sm" className="self-start" onClick={() => setParams({})}>
             <ChevronLeft className="size-4" />
             {t("settings.title")}
           </Button>
@@ -221,7 +244,7 @@ export default function Settings() {
   return (
     <div className="flex h-full min-h-0">
       <nav className="flex w-48 shrink-0 flex-col gap-0.5 border-r border-hair p-3">
-        <h1 className="px-2.5 pb-2 pt-1 text-2xs font-semibold uppercase tracking-[.16em] text-ink-600">
+        <h1 className="px-2.5 pb-2 pt-1 text-2xs font-semibold uppercase tracking-eyebrow text-ink-600">
           {t("settings.title")}
         </h1>
         {panes.map((p) => {
@@ -247,7 +270,7 @@ export default function Settings() {
               <Icon className="size-4 shrink-0" />
               <span className="flex-1">{t(`settings.pane_${p.id}`)}</span>
               {/* Only a flag here; explaining is the job of the pane's own note. */}
-              {danger && <AlertTriangle aria-hidden className="size-3.25 shrink-0" />}
+              {danger && <AlertTriangle aria-hidden className="size-3.5 shrink-0" />}
             </button>
           );
         })}
@@ -255,7 +278,7 @@ export default function Settings() {
 
       {/* Keyed on the pane so switching replays `settle`; a swap in place looks like the page not reacting. */}
       <div key={active} className="min-w-0 flex-1 animate-settle overflow-y-auto">
-        <div className="mx-auto max-w-2xl space-y-6 p-8">{sections.map(wrap)}</div>
+        <div className="mx-auto flex max-w-2xl flex-col gap-6 p-8">{sections.map(wrap)}</div>
       </div>
     </div>
   );

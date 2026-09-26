@@ -248,6 +248,8 @@ mockIPC((cmd, args) => {
         { id: 1, kind: "airing", title: REAL[0].title, body: "Folge 9 ist erschienen", createdMs: Date.now() - 3_600_000, mediaId: REAL[0].id, read: false },
         { id: 2, kind: "sequel", title: REAL[2].title, body: "Eine Fortsetzung ist angekündigt", createdMs: Date.now() - 86_400_000, mediaId: REAL[2].id, read: true },
       ];
+    case "anilist_auth_info":
+      return { hasBuiltinClientId: true, customClientId: null, callbackUrl: "http://127.0.0.1:53682/callback" };
     case "app_version":
       return "screens";
     case "get_library_episodes":

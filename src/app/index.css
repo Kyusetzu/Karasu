@@ -88,6 +88,13 @@
   --color-on-cover-danger: #f0787f;
   /* The complete glyph on cover art: the bright green in every theme, since the circle under it is near-black. */
   --color-on-cover-success: #6ee7b7;
+  /* The theme picker's miniatures: each theme's page, panel and ink, held in every theme so both can be drawn at once. */
+  --color-preview-dark-page: #0b0d12;
+  --color-preview-dark-panel: #181c22;
+  --color-preview-dark-ink: #f0f2f5;
+  --color-preview-light-page: #eef0f4;
+  --color-preview-light-panel: #ffffff;
+  --color-preview-light-ink: #1a1e26;
   /* The window's close button under the pointer: the caption bar's red in every theme, with its white glyph. */
   --color-window-close: #b3232c;
   --color-window-close-ink: #ffffff;
@@ -715,6 +722,11 @@ nav a {
   background-color: color-mix(in srgb, var(--tint) 24%, var(--color-on-cover));
   border-color: color-mix(in srgb, var(--tint) 65%, transparent);
   color: color-mix(in srgb, var(--tint) 45%, var(--color-on-cover-edge));
+}
+
+/* The danger colour as the tint, for a control that leads somewhere risky rather than doing something destructive. */
+@utility tint-danger {
+  --tint: var(--color-danger);
 }
 
 /* A label on cover art: a near-black plate the art shows through a little, its text the tint lifted toward white. */

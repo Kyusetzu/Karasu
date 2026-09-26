@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Shimmer } from "@/components/Skeleton";
 import { showToast } from "@/stores/toast";
-import { ExternalNote, NeedsAccount, Row, Toggle } from "./shared";
+import { ExternalNote, Row, Toggle } from "./shared";
 import { Select } from "@/components/ui/select";
 import {
   LIST_ACTIVITY_STATUSES,
@@ -130,19 +130,6 @@ function useViewerSettings() {
     retry: false,
   });
   return { viewer, ...q };
-}
-
-/** The pane's answer without an account; the sections below return null, which read as a crash. */
-export function AniListSignedOutNote() {
-  const { t } = useTranslation();
-  const viewer = useAuth((s) => s.viewer);
-
-  if (viewer) return null;
-  return (
-    <NeedsAccount title={t("settings.alSignedOut")}>
-      {t("settings.alSignedOutHint")}
-    </NeedsAccount>
-  );
 }
 
 export function AniListProfileSection() {

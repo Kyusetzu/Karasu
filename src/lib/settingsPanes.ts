@@ -3,7 +3,6 @@
 /** In nav order. `pages/Settings.tsx` renders one entry per id, in this order. */
 export const PANE_IDS = [
   "account",
-  "anilist",
   "appearance",
   "detection",
   "library",
@@ -18,6 +17,7 @@ export type PaneId = (typeof PANE_IDS)[number];
 export const PANE_ALIASES: Record<string, PaneId> = {
   content: "appearance",
   integrations: "desktop",
+  anilist: "account",
 };
 
 /** Account is the default: it is the first pane and needs no parameter. */

@@ -99,8 +99,9 @@ src/
   i18n/              index.ts (setup) + en.ts + de.ts; `de: typeof en` enforces
                      key parity across the two files
   lib/               pure logic + its *.test.ts — the place testable code goes
-  pages/             one per route; settings/ holds the pane files — the eight
-                     pane ids live in `lib/settingsPanes.ts`, and the desktop
+  pages/             one per route; settings/ holds the pane files — the seven
+                     pane ids live in `lib/settingsPanes.ts` (the account pane
+                     holds the AniList one's sections too), and the desktop
                      and data panes are sections exported from AdvancedPane
   stores/            Zustand stores (auth, theme, library, nowPlaying, …)
   assets/            karasu-mark.svg, the one asset the bundle inlines

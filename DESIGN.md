@@ -638,3 +638,13 @@ maintainer picks. A pure restyle that moves nothing does not. The rules:
   "This week" sits inside the bar before the next arrow, so neither arrow
   moves under a second press; the phone leaves it out, at the
   maintainer's word, and steps back with the arrow.
+- **2026-09-26:** Settings, chosen from three mockups each. Appearance is
+  three cards by what a setting changes — colour, size and density,
+  language and motion — with the theme as three miniatures of the window
+  (the system one split corner to corner) over native radios, and the
+  contrast as a segmented switch beneath them. On the phone the pane list
+  is one card of rows, each an accent-tinted glyph, the pane's name and a
+  line of what it holds. The account and AniList panes became one,
+  "Account" ("Konto"): the sign-in first, then "In Karasu" and "Kept on
+  AniList" as group headings, so it reads at a glance what another client
+  sees too; an old link to the AniList pane lands there.

@@ -48,13 +48,20 @@ const DYNAMIC_KEYS = [
   "stats.people",
   // `PANES` in `pages/Settings.tsx`, via `t(`settings.pane_${p.id}`)`; listed so a missing pane label fails here.
   "settings.pane_account",
-  "settings.pane_anilist",
   "settings.pane_appearance",
   "settings.pane_detection",
   "settings.pane_library",
   "settings.pane_desktop",
   "settings.pane_data",
   "settings.pane_advanced",
+  // The phone's pane list, via `t(`settings.paneHint_${p.id}`)`, one line of what each pane holds.
+  "settings.paneHint_account",
+  "settings.paneHint_appearance",
+  "settings.paneHint_detection",
+  "settings.paneHint_library",
+  "settings.paneHint_desktop",
+  "settings.paneHint_data",
+  "settings.paneHint_advanced",
 ];
 
 // `@/i18n` reads `navigator` and `localStorage` on import, so both are shimmed before the dynamic import.

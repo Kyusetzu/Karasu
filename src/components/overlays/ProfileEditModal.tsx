@@ -67,7 +67,7 @@ export function ProfileEditModal({
         <>
           {/* Cross-link, so no field lives in two places and each says where the others are. */}
           <Link
-            to="/settings?pane=anilist"
+            to="/settings?pane=account"
             className="mr-auto text-xs text-accent-400 hover:underline"
           >
             {t("social.otherAccountSettings")}

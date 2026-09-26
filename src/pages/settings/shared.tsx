@@ -31,6 +31,11 @@ export function Row({
   );
 }
 
+/** Heads a run of a pane's cards by where they are kept, pulled close to the first card it heads. */
+export function GroupLabel({ children }: { children: ReactNode }) {
+  return <h2 className="-mb-3 px-1 pt-3 text-2xs font-semibold uppercase tracking-eyebrow text-ink-600">{children}</h2>;
+}
+
 /** Marks a row that changes the AniList account rather than Karasu; gold is the app's caveat colour. */
 export function ExternalNote({ children }: { children: ReactNode }) {
   return (

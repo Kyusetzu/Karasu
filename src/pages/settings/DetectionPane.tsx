@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
 import { ChevronRight, Search, X } from "lucide-react";
@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { Input } from "@/components/ui/input";
 import { Card, CardTitle } from "@/components/ui/card";
+import { DisclosurePanel } from "@/components/ui/disclosure";
 import { cn } from "@/lib/utils";
 import * as api from "@/api/anilist";
 import {
@@ -222,6 +223,7 @@ export function ScrobbleSection() {
 export function MediaSessionSection() {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+  const panelId = useId();
   const [sessions, setSessions] = useState<MediaSession[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -252,66 +254,67 @@ export function MediaSessionSection() {
       <button
         type="button"
         onClick={toggle}
+        aria-expanded={open}
+        aria-controls={panelId}
         className="mt-3 flex items-center gap-1 text-xs text-ink-500 hover:text-ink-300"
       >
         <ChevronRight
+          aria-hidden
           className={cn("size-3.5 transition-transform", open && "rotate-90")}
         />
         {t("settings.detectionDebug")}
       </button>
-      {open && (
-        <div className="mt-2 space-y-2">
-          <p className="text-xs text-ink-600">
-            {t("settings.detectionDebugHint")}
+      <DisclosurePanel open={open} id={panelId} className="mt-2 space-y-2">
+        <p className="text-xs text-ink-600">
+          {t("settings.detectionDebugHint")}
+        </p>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={refresh}
+          disabled={busy}
+        >
+          <Spinner spinning={busy} className="size-3.5" />{" "}
+          {t("settings.refreshDebug")}
+        </Button>
+        {error && (
+          <p className="text-xs text-danger">
+            {t("settings.detectionDebugFailed", { message: error })}
           </p>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={refresh}
-            disabled={busy}
+        )}
+        {!error && sessions?.length === 0 && (
+          <p className="text-xs text-ink-600">
+            {t("settings.detectionDebugEmpty")}
+          </p>
+        )}
+        {sessions?.map((s, i) => (
+          <div
+            key={`${s.appId}-${i}`}
+            className="rounded-control bg-surface-850 p-2 text-xs"
           >
-            <Spinner spinning={busy} className="size-3.5" />{" "}
-            {t("settings.refreshDebug")}
-          </Button>
-          {error && (
-            <p className="text-xs text-danger">
-              {t("settings.detectionDebugFailed", { message: error })}
-            </p>
-          )}
-          {!error && sessions?.length === 0 && (
-            <p className="text-xs text-ink-600">
-              {t("settings.detectionDebugEmpty")}
-            </p>
-          )}
-          {sessions?.map((s, i) => (
-            <div
-              key={`${s.appId}-${i}`}
-              className="rounded-control bg-surface-850 p-2 text-xs"
-            >
-              <p className="break-all font-medium text-ink-100">{s.appId}</p>
-              <dl className="mt-1 grid grid-cols-[5rem_1fr] gap-x-2 gap-y-0.5 text-ink-500">
-                <dt>title</dt>
-                <dd className="break-all text-ink-300">{s.title || "—"}</dd>
-                <dt>artist</dt>
-                <dd className="break-all text-ink-300">{s.artist || "—"}</dd>
-                <dt>album</dt>
-                <dd className="break-all text-ink-300">{s.album || "—"}</dd>
-                <dt>type</dt>
-                <dd className="text-ink-300">{s.playbackType}</dd>
-                <dt>status</dt>
-                <dd className="text-ink-300">{s.status}</dd>
-                {/* MPRIS only; rendered when present so the Windows diagnostic looks exactly as it did. */}
-                {s.url && (
-                  <>
-                    <dt>url</dt>
-                    <dd className="break-all text-ink-300">{s.url}</dd>
-                  </>
-                )}
-              </dl>
-            </div>
-          ))}
-        </div>
-      )}
+            <p className="break-all font-medium text-ink-100">{s.appId}</p>
+            <dl className="mt-1 grid grid-cols-[5rem_1fr] gap-x-2 gap-y-0.5 text-ink-500">
+              <dt>title</dt>
+              <dd className="break-all text-ink-300">{s.title || "—"}</dd>
+              <dt>artist</dt>
+              <dd className="break-all text-ink-300">{s.artist || "—"}</dd>
+              <dt>album</dt>
+              <dd className="break-all text-ink-300">{s.album || "—"}</dd>
+              <dt>type</dt>
+              <dd className="text-ink-300">{s.playbackType}</dd>
+              <dt>status</dt>
+              <dd className="text-ink-300">{s.status}</dd>
+              {/* MPRIS only; rendered when present so the Windows diagnostic looks exactly as it did. */}
+              {s.url && (
+                <>
+                  <dt>url</dt>
+                  <dd className="break-all text-ink-300">{s.url}</dd>
+                </>
+              )}
+            </dl>
+          </div>
+        ))}
+      </DisclosurePanel>
     </Card>
   );
 }
@@ -792,9 +795,9 @@ function JellyfinBackgroundRows() {
       />
       <Row label={t("settings.jellyfinBattery")} hint={t("settings.jellyfinBatteryHint")}>
         {state.batteryExempt ? (
-          <span className="text-sm text-success">{t("settings.jellyfinBatteryAllowed")}</span>
+          <span className="shrink-0 text-sm text-success">{t("settings.jellyfinBatteryAllowed")}</span>
         ) : (
-          <Button variant="secondary" size="sm" onClick={ask}>
+          <Button variant="secondary" size="sm" className="shrink-0" onClick={ask}>
             {t("settings.jellyfinBatteryAllow")}
           </Button>
         )}

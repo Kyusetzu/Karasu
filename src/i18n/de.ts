@@ -1340,6 +1340,11 @@ export const de: typeof en = {
     rescalePreview:
       "{{affected}} Bewertungen würden sich ändern ({{untouched}} unberührt) — kostet {{requests}} Anfrage(n).",
     rescaleNoList: "Öffne zuerst einmal die Liste, damit es etwas zum Umskalieren gibt.",
+    rescaleList: "Welche Liste",
+    rescaleFromMin: "Bisheriger Bereich, unterster Wert",
+    rescaleFromMax: "Bisheriger Bereich, oberster Wert",
+    rescaleToMin: "Neuer Bereich, unterster Wert",
+    rescaleToMax: "Neuer Bereich, oberster Wert",
     rescaleApply: "Umskalieren",
     rescaleDone: "{{n}} Bewertungen umskaliert.",
     rescaleFailed: "Das Umskalieren wurde nicht abgeschlossen",

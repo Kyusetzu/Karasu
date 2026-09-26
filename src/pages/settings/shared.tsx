@@ -102,7 +102,8 @@ export function Toggle({
         disabled ? "cursor-not-allowed opacity-55" : "cursor-pointer",
       )}
     >
-      <span>
+      {/* May shrink and break a path mid-word, so a long hint can never push the switch out of the card. */}
+      <span className="min-w-0 break-words">
         <span className="block text-sm text-ink-100">{label}</span>
         {hint && <span className="block text-xs text-ink-600">{hint}</span>}
       </span>

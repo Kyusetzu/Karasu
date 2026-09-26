@@ -1329,6 +1329,11 @@ export const en = {
     rescalePreview:
       "{{affected}} scores would change ({{untouched}} untouched) — costs {{requests}} request(s).",
     rescaleNoList: "Open the list once first, so there is something to rescale.",
+    rescaleList: "Which list",
+    rescaleFromMin: "Current range, lowest",
+    rescaleFromMax: "Current range, highest",
+    rescaleToMin: "New range, lowest",
+    rescaleToMax: "New range, highest",
     rescaleApply: "Rescale",
     rescaleDone: "{{n}} scores rescaled.",
     rescaleFailed: "The rescale did not finish",

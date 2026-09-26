@@ -127,7 +127,8 @@ function DesktopOnly({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation();
   return (
     <div aria-disabled className="relative">
-      <Chip tone="muted" size="xs" className="absolute right-0 top-0 z-10 bg-surface-900">
+      {/* Inside the card's padding, centred on its title line, so it reads as the title's caveat rather than a tab. */}
+      <Chip tone="muted" size="xs" className="absolute right-5 top-6 z-10">
         {t("settings.desktopOnly")}
       </Chip>
       <div className="pointer-events-none select-none opacity-45">{children}</div>

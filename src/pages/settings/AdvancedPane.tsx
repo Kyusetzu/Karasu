@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { ChevronRight, FolderOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
+import { DisclosurePanel } from "@/components/ui/disclosure";
 import { Input } from "@/components/ui/input";
 import * as api from "@/api/anilist";
 import { getLogDebug, getLogs, setLogDebug, type LogEntry } from "@/api/diagnostics";
@@ -111,6 +112,7 @@ export function RescaleSection() {
   const range = (
     value: number,
     set: (n: number) => void,
+    label: string,
   ) => (
     <Input
       type="number"
@@ -119,6 +121,7 @@ export function RescaleSection() {
       step={scale.step}
       value={value}
       onChange={(e) => set(Number(e.target.value))}
+      aria-label={label}
       className="w-20"
     />
   );
@@ -131,15 +134,20 @@ export function RescaleSection() {
         <Select
           value={type}
           onChange={(e) => setType(e.target.value as MediaType)}
-         
+          aria-label={t("settings.rescaleList")}
         >
           <option value="ANIME">{t("common.anime")}</option>
           <option value="MANGA">{t("common.manga")}</option>
         </Select>
-        <span className="flex items-center gap-1.5 text-sm text-ink-300">
-          {range(fromMin, setFromMin)}–{range(fromMax, setFromMax)}
-          <span className="mx-1 text-ink-600">→</span>
-          {range(toMin, setToMin)}–{range(toMax, setToMax)}
+        {/* Each range holds together, so a narrow card breaks the row at the arrow rather than inside a range. */}
+        <span className="flex flex-wrap items-center gap-x-1.5 gap-y-3 text-sm text-ink-300">
+          <span className="flex items-center gap-1.5">
+            {range(fromMin, setFromMin, t("settings.rescaleFromMin"))}–{range(fromMax, setFromMax, t("settings.rescaleFromMax"))}
+          </span>
+          <span aria-hidden className="mx-1 text-ink-600">→</span>
+          <span className="flex items-center gap-1.5">
+            {range(toMin, setToMin, t("settings.rescaleToMin"))}–{range(toMax, setToMax, t("settings.rescaleToMax"))}
+          </span>
         </span>
       </div>
       <p className="mt-2 text-xs text-ink-600">
@@ -564,6 +572,7 @@ export function BackupSection() {
           <Button
             variant="secondary"
             size="sm"
+            className="shrink-0"
             onClick={async () => {
               await unwrap(commands.openBackupDir()).catch((e) => setError(String(e)));
             }}
@@ -785,6 +794,7 @@ export function UpdatesSection() {
 export function LogSection() {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+  const panelId = useId();
   const [entries, setEntries] = useState<LogEntry[] | null>(null);
   const [debug, setDebug] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -823,7 +833,7 @@ export function LogSection() {
   return (
     <Card>
       <CardTitle>{t("settings.log")}</CardTitle>
-      <p className="mt-1 text-2xs text-ink-600">{t("settings.logHint")}</p>
+      <p className="mt-2 text-sm text-ink-500">{t("settings.logHint")}</p>
 
       <div className="mt-3 space-y-3">
         <Toggle
@@ -835,67 +845,69 @@ export function LogSection() {
 
         <div className="border-t border-hair pt-3">
           <button
+            type="button"
             onClick={() => {
               const next = !open;
               setOpen(next);
               if (next && entries === null) refresh();
             }}
-            className="flex w-full items-center gap-1.5 text-left text-sm text-ink-300"
+            aria-expanded={open}
+            aria-controls={panelId}
+            className="flex w-full items-center gap-1.5 text-left text-sm text-ink-300 hover:text-ink-100"
           >
             <ChevronRight
+              aria-hidden
               className={cn("size-3.5 transition-transform", open && "rotate-90")}
             />
             {t("settings.logShow")}
           </button>
 
-          {open && (
-            <>
-              <div className="mt-2 flex items-center gap-2">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={refresh}
-                  disabled={busy}
-                >
-                  <Spinner spinning={busy} className="size-3.5" />
-                  {t("settings.refreshDebug")}
-                </Button>
+          <DisclosurePanel open={open} id={panelId}>
+            <div className="mt-2 flex items-center gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={refresh}
+                disabled={busy}
+              >
+                <Spinner spinning={busy} className="size-3.5" />
+                {t("settings.refreshDebug")}
+              </Button>
+            </div>
+
+            {error && <p className="mt-2 text-sm text-danger">{error}</p>}
+
+            {!error && entries !== null && entries.length === 0 && (
+              <p className="mt-2 text-xs text-ink-600">{t("settings.logEmpty")}</p>
+            )}
+
+            {!error && entries !== null && entries.length > 0 && (
+              <div className="mt-2 max-h-96 space-y-0.5 overflow-y-auto rounded-control bg-surface-850 p-2 font-mono text-2xs">
+                {entries.map((e, i) => (
+                  <div key={i} className="flex gap-2">
+                    <span className="shrink-0 text-ink-600">
+                      {new Date(e.ms).toLocaleTimeString()}
+                    </span>
+                    <span
+                      className={cn(
+                        "w-10 shrink-0 uppercase",
+                        e.level === "error" && "text-danger",
+                        e.level === "warn" && "text-gold",
+                        e.level === "info" && "text-ink-500",
+                        e.level === "debug" && "text-ink-600",
+                      )}
+                    >
+                      {e.level}
+                    </span>
+                    <span className="shrink-0 text-accent-400">{e.target}</span>
+                    <span className="min-w-0 break-all text-ink-300">
+                      {e.message}
+                    </span>
+                  </div>
+                ))}
               </div>
-
-              {error && <p className="mt-2 text-sm text-danger">{error}</p>}
-
-              {!error && entries !== null && entries.length === 0 && (
-                <p className="mt-2 text-xs text-ink-600">{t("settings.logEmpty")}</p>
-              )}
-
-              {!error && entries !== null && entries.length > 0 && (
-                <div className="mt-2 max-h-96 space-y-0.5 overflow-y-auto rounded-control bg-surface-850 p-2 font-mono text-2xs">
-                  {entries.map((e, i) => (
-                    <div key={i} className="flex gap-2">
-                      <span className="shrink-0 text-ink-600">
-                        {new Date(e.ms).toLocaleTimeString()}
-                      </span>
-                      <span
-                        className={cn(
-                          "w-10 shrink-0 uppercase",
-                          e.level === "error" && "text-danger",
-                          e.level === "warn" && "text-gold",
-                          e.level === "info" && "text-ink-500",
-                          e.level === "debug" && "text-ink-600",
-                        )}
-                      >
-                        {e.level}
-                      </span>
-                      <span className="shrink-0 text-accent-400">{e.target}</span>
-                      <span className="min-w-0 break-all text-ink-300">
-                        {e.message}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </>
-          )}
+            )}
+          </DisclosurePanel>
         </div>
       </div>
     </Card>

@@ -269,7 +269,7 @@ mockIPC((cmd, args) => {
         draining: false,
         queued: [
           { id: 1, kind: "save", subject: REAL[0].id, fields: ["progress"], queuedAt: now - 120 },
-          { id: 2, kind: "delete", subject: null, fields: [], queuedAt: now - 3600 },
+          { id: 2, kind: "delete", subject: REAL[1].id, fields: [], queuedAt: now - 3600 },
         ],
         rate: { remaining: 27, limit: 30, observedAgoMs: 4000, throttledForMs: null, throttleKind: null },
         recent: [],
@@ -280,6 +280,55 @@ mockIPC((cmd, args) => {
       return false;
     case "local_all_entries":
       return [];
+    // The rest of Settings, filled in so each pane draws its populated state rather than its empty one.
+    case "get_scrobble_settings":
+      return { enabled: true, confirm: true, delayMin: 0, gapAuto: false };
+    case "get_airing_notify":
+    case "get_sequel_notify":
+    case "get_media_detection":
+      return true;
+    case "get_close_to_tray":
+      return { enabled: true, tray: true };
+    case "get_stale_settings":
+      return { enabled: true, months: 3 };
+    case "get_jellyfin_settings":
+      return {
+        url: "http://192.168.1.20:8096",
+        connected: true,
+        userName: "kyu",
+        serverName: "Wohnzimmer",
+        device: "KYU-PC",
+        localDevice: "KYU-PC",
+        externalUrl: "",
+        externalVerified: null,
+        externalPlainHttp: false,
+      };
+    case "get_jellyfin_background":
+      return { enabled: android, supported: android, batteryExempt: android ? false : null };
+    case "list_detection_overrides":
+      return [{ title: "Sousou no Frieren", season: 2, mediaType: "ANIME", mediaId: REAL[0].id, displayTitle: REAL[0].title, episodeOffset: 0 }];
+    case "get_mpv_ipc":
+      return { enabled: false, path: "\\\\.\\pipe\\mpvsocket", defaultPath: "\\\\.\\pipe\\mpvsocket", launchPath: "" };
+    case "get_autostart":
+    case "get_apk_download_metered":
+    case "get_log_debug":
+      return false;
+    case "get_notif_schedule":
+      return 30;
+    case "get_global_hotkey":
+      return "Ctrl+Shift+K";
+    case "get_update_channel":
+      return "stable";
+    case "get_discord_settings":
+      return { enabled: true, appId: "", hasBuiltinAppId: true };
+    case "get_backup_settings":
+      return { enabled: true, keep: 7, dir: "C:\\Users\\kyu\\AppData\\Roaming\\dev.kyu.karasu\\backups" };
+    case "get_library_path":
+      return "D:\\Anime";
+    case "list_library_redirects":
+      return [{ title: "Sousou no Frieren", season: -1, epFrom: 29, epTo: 38, mediaId: REAL[0].id, dstStart: 1 }];
+    case "get_portable_status":
+      return { portable: false, dir: "C:\\Users\\kyu\\AppData\\Roaming\\dev.kyu.karasu", other: null };
     case "get_content_filter":
       return "off";
     case "save_list_entry":

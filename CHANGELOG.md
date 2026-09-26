@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: ed8701a -->
+<!-- generated-through: 1fb4b2a -->
 
 ### Fixed
 
@@ -111,6 +111,7 @@ tag time is then optional rather than load-bearing.
 - The search page no longer starts its second row of chips with a stray divider.
 - A second press on the calendar's next-week arrow no longer jumps back to this week, and the week grid no longer flickers near its width threshold.
 - Settings cards under "In Karasu" and "Kept on AniList" are now announced one level below their group, the phone's pane list names what the Android account and advanced panes really hold, and the chosen theme stays marked in Windows high contrast.
+- On a phone no settings control runs past its card any more, buttons keep their label on one line, and the log, media-session and manual-token sections fold open smoothly and tell a screen reader whether they are open.
 
 ### Added
 

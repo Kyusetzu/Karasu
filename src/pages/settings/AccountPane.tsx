@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { ChevronRight, ExternalLink, LogIn, LogOut, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardTitle } from "@/components/ui/card";
+import { DisclosurePanel } from "@/components/ui/disclosure";
 import { UserLockup } from "@/components/ui/user-lockup";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/stores/auth";
@@ -66,6 +67,7 @@ export function AccountSection() {
   const [token, setToken] = useState("");
   const [busy, setBusy] = useState(false);
   const [showManual, setShowManual] = useState(false);
+  const manualId = useId();
   const [error, setError] = useState<string | null>(null);
   const login = useAniListLogin();
 
@@ -211,14 +213,17 @@ export function AccountSection() {
           <button
             type="button"
             onClick={() => setShowManual((v) => !v)}
+            aria-expanded={showManual}
+            aria-controls={manualId}
             className="flex items-center gap-1 text-xs text-ink-500 hover:text-ink-300"
           >
             <ChevronRight
+              aria-hidden
               className={cn("size-3.5 transition-transform", showManual && "rotate-90")}
             />
             {t("settings.manualFallback")}
           </button>
-          {showManual && (
+          <DisclosurePanel open={showManual} id={manualId}>
             <div className="mt-2 space-y-2">
               <p className="text-xs text-ink-500">{t("settings.manualHint")}</p>
               <Button variant="secondary" size="sm" onClick={() => void openManual()}>
@@ -236,7 +241,7 @@ export function AccountSection() {
                 </Button>
               </div>
             </div>
-          )}
+          </DisclosurePanel>
         </div>
       </div>
       {(error ?? login.error) && (

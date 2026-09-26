@@ -262,9 +262,9 @@ Captures at 2× on the desktop and straight off the phone — the same set the
 - **Portable mode** — keep everything in a folder next to the executable
 
 **Personalisation**
-- Light / dark themes and a full **accent colour picker** — every shade, the
-  panel washes and the readable ink on top are derived from the one colour you
-  pick, so nothing is hardcoded
+- Light / dark themes and a full **accent colour picker** — every shade and
+  the readable ink on top are derived from the one colour you pick, so nothing
+  is hardcoded
 - **Covers per row** as a typed number, 1–40, previewed live as you type —
   and a **reduce motion** switch
 - **Interface size** — zooms the whole window in eight steps from 75% to 200%,
@@ -273,8 +273,7 @@ Captures at 2× on the desktop and straight off the phone — the same set the
   across the room. On a short window the sidebar collapses to its icon rail
   by itself, so nothing drops off the bottom
 - **Density** — compact, comfortable or spacious for the screens that crowd:
-  the calendar, the local library and the digests. Everything else keeps its
-  size
+  the calendar and the local library. Everything else keeps its size
 - A **content filter** for adult and suggestive titles, with a disclosure
   line wherever it hides something — explicit (18+) and suggestive (Ecchi)
   counted separately, linking straight to the setting
@@ -432,7 +431,7 @@ npm run tauri build              # release build (NSIS on Windows; AppImage, deb
 npx tauri android build --apk    # Android release APK
 
 npm run verify       # the commit gate: typecheck, audits and lints, then vitest and cargo test together
-npm run verify:full  # the push gate: the commit gate plus knip, clippy, cargo-deny, machete, the site, the Android check, a bundle
+npm run verify:full  # the push gate: the commit gate plus knip, clippy, cargo-deny, machete, the site, the bundle budget, the Android check, a bundle
 npm run lint         # oxlint: react-hooks, a11y, imports, vitest rules; part of verify
 npm run typecheck    # TypeScript alone
 npm test             # frontend unit tests (vitest) alone; test:watch, test:node, test:dom, test:changed narrow it

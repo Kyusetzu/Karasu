@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 34703a7 -->
+<!-- generated-through: 85367cf -->
 
 ### Fixed
 
@@ -120,6 +120,7 @@ tag time is then optional rather than load-bearing.
 - The Android widgets' title shows Karasu's accent and their footer is readable against the widget.
 - The colour picker's hex field and the log's level column are monospace again, and the About wordmark has its wide spacing back.
 - Adding a title from its page keeps keyboard focus, a hover-opened status choice no longer opens on its own after another panel closes, and a status colour picked to match an old default survives a restart.
+- Settings describe the editor's instant save, the Detection pane and the density setting as they now behave.
 
 ### Added
 

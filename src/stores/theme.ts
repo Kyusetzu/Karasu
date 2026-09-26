@@ -13,7 +13,7 @@ import {
 
 export type ThemeMode = "system" | "light" | "dark";
 
-/** How much the dense screens (calendar, local library, digests) spread out; "compact" is the look they always had. */
+/** How much the dense screens (calendar, local library) spread out; "compact" is the look they always had. */
 export type Density = "compact" | "comfortable" | "spacious";
 export const DENSITIES: readonly Density[] = ["compact", "comfortable", "spacious"];
 const isDensity = (v: unknown): v is Density => (DENSITIES as readonly unknown[]).includes(v);

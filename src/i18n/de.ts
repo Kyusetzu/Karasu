@@ -175,6 +175,7 @@ export const de: typeof en = {
   },
   composer: {
     toolbar: "Formatierung",
+    more: "Weitere Formatierungen",
     bold: "Fett",
     italic: "Kursiv",
     strike: "Durchgestrichen",
@@ -656,6 +657,8 @@ export const de: typeof en = {
     lensSearch: "Suche",
     lensSubscribed: "Abonniert",
     allCategories: "Alle",
+    category: "Kategorie",
+    categoryAll: "Kategorie: Alle",
     searchPlaceholder: "Thread-Titel suchen …",
     searchPrompt: "Zwei Zeichen genügen.",
     noThreads: "Hier gibt es keine Threads.",

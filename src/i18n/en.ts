@@ -173,6 +173,7 @@ export const en = {
   },
   composer: {
     toolbar: "Formatting",
+    more: "More formatting",
     bold: "Bold",
     italic: "Italic",
     strike: "Strikethrough",
@@ -654,6 +655,8 @@ export const en = {
     lensSearch: "Search",
     lensSubscribed: "Subscribed",
     allCategories: "All",
+    category: "Category",
+    categoryAll: "Category: all",
     searchPlaceholder: "Search thread titles …",
     searchPrompt: "Two characters is enough to start.",
     noThreads: "No threads here.",

@@ -133,7 +133,7 @@ const viewer = {
 
 // The social surface: three people the viewer follows, a feed of both activity kinds, a thread with nested replies.
 const person = (id: number, name: string, i: number) => ({ id, name, avatar: { medium: cover(i) }, isFollowing: id !== 1, isFollower: id === 11 });
-const PEOPLE = [person(11, "Mikan", 5), person(12, "Hoshi", 6), person(13, "Tsubame", 7), { ...person(1, "Kyusetzu", 4), isFollowing: false }];
+const PEOPLE = [person(11, "Mikan", 5), person(12, "Hoshi", 6), person(13, "TsubameNoYume", 7), { ...person(1, "Kyusetzu", 4), isFollowing: false }];
 const socialMedia = (i: number) => {
   const m = media(i, false);
   return { id: m.id, type: "ANIME", title: m.title, coverImage: { large: m.coverImage.large }, format: "TV", isAdult: false, genres: [] };
@@ -317,11 +317,15 @@ function answerQuery(query: string, variables: Record<string, unknown> | null) {
   // The signed-in account's own profile, so the AniList cards in Settings draw their fields rather than a skeleton.
   if (/\bUser\s*\(/.test(q)) {
     const list = { customLists: ["Rewatch"], splitCompletedSectionByFormat: false };
+    // Someone else's profile by name draws the full header: banner, bio, favourites and a follow button.
+    const other = PEOPLE.find((u) => u.id !== 1 && u.name === variables?.name);
+    const favourites = { nodes: other ? [0, 1, 2, 3].map(socialMedia) : [] };
     return {
       User: {
         ...viewer,
-        about: "",
-        bannerImage: null,
+        ...(other ? { ...other, siteUrl: `https://anilist.co/user/${other.name}`, avatar: { large: other.avatar.medium } } : {}),
+        about: other ? "Schaut zu viel und liest zu wenig. **Frieren** ist Pflicht, ~!das Finale!~ auch." : "",
+        bannerImage: other ? asset(REAL[0].id, "banner") ?? banner(0) : null,
         donatorBadge: "",
         moderatorRoles: null,
         createdAt: now - 3 * 365 * 86_400,
@@ -333,7 +337,7 @@ function answerQuery(query: string, variables: Record<string, unknown> | null) {
         options: { titleLanguage: "ROMAJI", displayAdultContent: false, airingNotifications: true, profileColor: "purple", timezone: "+02:00", activityMergeTime: 30, staffNameLanguage: "ROMAJI_WESTERN", restrictMessagesToFollowing: false, disabledListActivity: [] },
         mediaListOptions: { scoreFormat: "POINT_10", rowOrder: "score", animeList: list, mangaList: list },
         statistics: { anime: { count: 36, meanScore: 78, minutesWatched: 42_000, episodesWatched: 1_700 }, manga: { count: 36, meanScore: 80, chaptersRead: 3_100, volumesRead: 210 } },
-        favourites: { anime: { nodes: [] }, manga: { nodes: [] }, characters: { nodes: [] }, staff: { nodes: [] }, studios: { nodes: [] } },
+        favourites: { anime: favourites, manga: { nodes: [] }, characters: { nodes: [] }, staff: { nodes: [] }, studios: { nodes: [] } },
       },
     };
   }

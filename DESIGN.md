@@ -659,3 +659,12 @@ maintainer picks. A pure restyle that moves nothing does not. The rules:
   with Test and Sign out beside it. Beneath, the device filter and the
   external address are labelled fields with their explanations as hints,
   and Save stores just those two.
+- **2026-09-26:** Three social arrangements on the phone, three mockups
+  each; the desktop keeps its own. A profile's header stacks: the avatar
+  beside the whole name and its badges, the counts and the AniList link
+  under them, then Follow or Edit profile across the width, so no name is
+  cut short and the button sits under the thumb. The forum's categories
+  become one select, "Category: all", instead of six rows of chips, the
+  lenses above it staying chips. The composer's toolbar keeps one row: the
+  six marks used most (bold, italic, strike, spoiler, link, image), a
+  "More" menu holding the rest, and Preview at the end.

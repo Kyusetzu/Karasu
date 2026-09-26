@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ReactNode, RefObject } from "react";
 import { Menu as BaseMenu } from "@base-ui/react/menu";
 import { ContextMenu as BaseContextMenu } from "@base-ui/react/context-menu";
 import type { LucideIcon } from "lucide-react";
@@ -50,12 +50,15 @@ export function MenuPanel({
   label,
   side = "bottom",
   align = "start",
+  finalFocus,
   className,
   children,
 }: {
   anchor: MenuAnchor;
   /** The menu's accessible name. */
   label: string;
+  /** Where focus lands once the menu closes, when that is not the element that opened it. */
+  finalFocus?: RefObject<HTMLElement | null>;
   side?: "top" | "bottom" | "inline-start" | "inline-end";
   align?: "start" | "center" | "end";
   className?: string;
@@ -72,7 +75,7 @@ export function MenuPanel({
         className="z-popover"
       >
         {/* Owns the keyboard while up, exit included, so a list shortcut cannot fire behind it. */}
-        <BaseMenu.Popup data-overlay aria-label={label} className={cn(PANEL, className)}>
+        <BaseMenu.Popup data-overlay aria-label={label} finalFocus={finalFocus} className={cn(PANEL, className)}>
           {children}
         </BaseMenu.Popup>
       </BaseMenu.Positioner>

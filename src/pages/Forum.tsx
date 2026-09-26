@@ -6,6 +6,8 @@ import { forumThreads, THREAD_CATEGORIES } from "@/api/social";
 import { Button } from "@/components/ui/button";
 import { SearchField } from "@/components/ui/search-field";
 import { Pill } from "@/components/ui/pill";
+import { Select } from "@/components/ui/select";
+import { usePhoneShell } from "@/hooks/usePhoneShell";
 import { PresenceIf } from "@/components/ui/presence";
 import { ThreadList } from "@/components/social/ThreadList";
 import { NewThreadModal } from "@/components/overlays/NewThreadModal";
@@ -26,6 +28,7 @@ export default function Forum() {
   const { t } = useTranslation();
   const [params, setParams] = useSearchParams();
   const mode = useAuth((s) => s.mode);
+  const phone = usePhoneShell();
 
   const lens: Lens = isLens(params.get("lens")) ? (params.get("lens") as Lens) : "browse";
   const categoryId = Number(params.get("cat")) || undefined;
@@ -112,7 +115,23 @@ export default function Forum() {
           />
         )}
 
-        {lens === "browse" && (
+        {/* A phone has no room for a chip per category, so there they fold into one native select. */}
+        {lens === "browse" && phone && (
+          <Select
+            aria-label={t("forum.category")}
+            value={categoryId ?? ""}
+            onChange={(e) => setCategory(e.target.value ? Number(e.target.value) : undefined)}
+            className="mt-3 w-full"
+          >
+            <option value="">{t("forum.categoryAll")}</option>
+            {THREAD_CATEGORIES.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </Select>
+        )}
+        {lens === "browse" && !phone && (
           <div className="mt-3 flex flex-wrap gap-1.5">
             <Pill active={categoryId === undefined} onClick={() => setCategory(undefined)}>
               {t("forum.allCategories")}

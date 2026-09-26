@@ -21,6 +21,7 @@ import {
   Link,
   List,
   ListOrdered,
+  MoreHorizontal,
   Strikethrough,
   TextQuote,
   type LucideIcon,
@@ -28,6 +29,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { cardClass } from "@/components/ui/card";
+import { Menu, MenuItem, MenuPanel } from "@/components/ui/menu";
+import { Presence } from "@/components/ui/presence";
+import { usePhoneShell } from "@/hooks/usePhoneShell";
 import { Markdown } from "./Markdown";
 import { cn } from "@/lib/utils";
 import {
@@ -97,6 +101,8 @@ export function MarkdownTextarea({
   const pending = useRef<{ start: number; end: number } | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [active, setActive] = useState(false);
+  const [moreAnchor, setMoreAnchor] = useState<HTMLElement | null>(null);
+  const phone = usePhoneShell();
 
   // The selection an edit asked for, applied once the new value has landed.
   useLayoutEffect(() => {
@@ -181,6 +187,8 @@ export function MarkdownTextarea({
   };
 
   const compact = variant === "compact";
+  // On a phone the full row wraps, so the marks used most stay in it and the rest move into a menu.
+  const folded = phone && !compact;
   const previewing = preview === "toggle" && showPreview;
   const source = previewSource ?? value;
   const toolbarShown = !compact || active || value.length > 0;
@@ -233,7 +241,7 @@ export function MarkdownTextarea({
           className="flex flex-wrap items-center gap-0.5"
         >
           {tools
-            .filter((tool) => !compact || tool.compact)
+            .filter((tool) => (!compact && !folded) || tool.compact)
             .map((tool) => (
               <IconButton
                 key={tool.key}
@@ -249,6 +257,21 @@ export function MarkdownTextarea({
                 <tool.icon className="size-3.5" />
               </IconButton>
             ))}
+          {folded && (
+            <IconButton
+              size="xs"
+              variant="ghost"
+              aria-label={t("composer.more")}
+              title={t("composer.more")}
+              aria-haspopup="menu"
+              aria-expanded={moreAnchor !== null}
+              disabled={disabled || previewing}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={(e) => setMoreAnchor(e.currentTarget)}
+            >
+              <MoreHorizontal className="size-3.5" />
+            </IconButton>
+          )}
           {preview === "toggle" && (
             <Button
               type="button"
@@ -264,6 +287,29 @@ export function MarkdownTextarea({
           )}
         </div>
       )}
+
+      <Presence value={moreAnchor}>
+        {(anchor, leaving) => (
+          <Menu open={!leaving} onClose={() => setMoreAnchor(null)}>
+            <MenuPanel anchor={anchor} label={t("composer.more")} finalFocus={ref}>
+              {tools
+                .filter((tool) => !tool.compact)
+                .map((tool) => (
+                  <MenuItem
+                    key={tool.key}
+                    icon={tool.icon}
+                    onSelect={() => {
+                      setMoreAnchor(null);
+                      apply(tool.edit);
+                    }}
+                  >
+                    {tool.label}
+                  </MenuItem>
+                ))}
+            </MenuPanel>
+          </Menu>
+        )}
+      </Presence>
 
       {compact ? (
         <div className="flex items-start gap-2">

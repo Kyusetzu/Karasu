@@ -16,6 +16,7 @@ import { donatorLabel } from "@/lib/donator";
 import { toDisplayScale } from "@/lib/score";
 import { cn } from "@/lib/utils";
 import { BannerImage } from "@/components/media/BannerImage";
+import { usePhoneShell } from "@/hooks/usePhoneShell";
 import { Chip } from "@/components/ui/chip";
 
 /** `meanScore` arrives hundred-point and is shown ten-point on purpose: someone else's mean, on the neutral scale. */
@@ -34,6 +35,74 @@ export function ProfileHeader({ user }: { user: UserProfile }) {
   const [editing, setEditing] = useState(false);
   const anime = user.statistics?.anime;
   const manga = user.statistics?.manga;
+  const phone = usePhoneShell();
+  const moderator = (user.moderatorRoles?.length ?? 0) > 0;
+  const hasBadges = Boolean(badgeKey || donator) || moderator;
+
+  const badges = (
+    <>
+      {badgeKey && (
+        <Chip tone="accent" size="xs">
+          {badgeKey === "social.badgeMutual" ? t("social.badgeMutual") : t("social.badgeFollowsYou")}
+        </Chip>
+      )}
+      {/* `donatorLabel`, not `donatorBadge`: AniList returns the badge string for everyone (lib/donator.ts). */}
+      {donator && (
+        <Chip tone="gold" size="xs" icon={Heart}>
+          {donator}
+        </Chip>
+      )}
+      {moderator && (
+        <Chip tone="muted" size="xs" icon={Shield}>
+          {t("social.moderator")}
+        </Chip>
+      )}
+    </>
+  );
+
+  const facts = (
+    <>
+      {anime && anime.count > 0 && (
+        <span>
+          {t("social.animeCount", { n: anime.count })}
+          {meanText(anime.meanScore) && ` · ${meanText(anime.meanScore)}`}
+        </span>
+      )}
+      {manga && manga.count > 0 && (
+        <span>
+          {t("social.mangaCount", { n: manga.count })}
+          {meanText(manga.meanScore) && ` · ${meanText(manga.meanScore)}`}
+        </span>
+      )}
+      <button
+        onClick={() => void openUrl(user.siteUrl)}
+        className="flex items-center gap-1 text-accent-400 hover:underline"
+      >
+        {t("social.openOnAniList")} <ExternalLink className="size-3.5" />
+      </button>
+    </>
+  );
+
+  // A profile reached by an old link should say it was renamed rather than look like a different person.
+  const previousNames = user.previousNames.length > 0 && (
+    <p className="mt-1 flex items-center gap-1 text-2xs text-ink-600">
+      <Sparkles className="size-3.5" />
+      {t("social.previouslyKnownAs", {
+        names: user.previousNames
+          .map((p) => p.name)
+          .filter(Boolean)
+          .join(", "),
+      })}
+    </p>
+  );
+
+  const action = self ? (
+    <Button variant="secondary" size="control" onClick={() => setEditing(true)}>
+      <Pencil className="size-3.5" /> {t("social.editProfile")}
+    </Button>
+  ) : (
+    <FollowButton userId={user.id} name={user.name} flags={user} size="control" />
+  );
 
   return (
     <header className="relative">
@@ -47,79 +116,34 @@ export function ProfileHeader({ user }: { user: UserProfile }) {
       )}
 
       <div className={cn("relative px-8", user.bannerImage ? "pt-16" : "pt-7")}>
-        <div className="flex items-end gap-5">
-          <Avatar src={user.avatar?.large} name={user.name} size="2xl" />
-          <div className="min-w-0 flex-1 pb-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="truncate text-title font-bold text-ink-100">{user.name}</h1>
-              {badgeKey && (
-                <Chip tone="accent" size="xs">
-                  {badgeKey === "social.badgeMutual"
-                    ? t("social.badgeMutual")
-                    : t("social.badgeFollowsYou")}
-                </Chip>
-              )}
-              {/* `donatorLabel`, not `donatorBadge`: AniList returns the badge string for everyone (lib/donator.ts). */}
-              {donator && (
-                <Chip tone="gold" size="xs" icon={Heart}>
-                  {donator}
-                </Chip>
-              )}
-              {user.moderatorRoles && user.moderatorRoles.length > 0 && (
-                <Chip tone="muted" size="xs" icon={Shield}>
-                  {t("social.moderator")}
-                </Chip>
-              )}
+        {phone ? (
+          // Stacked on a phone: the whole name beside the avatar, then the facts, then the one action across the width.
+          <>
+            <div className="flex items-end gap-4">
+              <Avatar src={user.avatar?.large} name={user.name} size="xl" />
+              <div className="min-w-0 flex-1 pb-1">
+                <h1 className="break-words text-2xl font-bold text-ink-100">{user.name}</h1>
+                {hasBadges && <div className="mt-1 flex flex-wrap items-center gap-1.5">{badges}</div>}
+              </div>
             </div>
-
-            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-600">
-              {anime && anime.count > 0 && (
-                <span>
-                  {t("social.animeCount", { n: anime.count })}
-                  {meanText(anime.meanScore) && ` · ${meanText(anime.meanScore)}`}
-                </span>
-              )}
-              {manga && manga.count > 0 && (
-                <span>
-                  {t("social.mangaCount", { n: manga.count })}
-                  {meanText(manga.meanScore) && ` · ${meanText(manga.meanScore)}`}
-                </span>
-              )}
-              <button
-                onClick={() => void openUrl(user.siteUrl)}
-                className="flex items-center gap-1 text-accent-400 hover:underline"
-              >
-                {t("social.openOnAniList")} <ExternalLink className="size-2.75" />
-              </button>
+            <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-600">{facts}</div>
+            {previousNames}
+            <div className="mt-3 [&>*]:w-full">{action}</div>
+          </>
+        ) : (
+          <div className="flex items-end gap-5">
+            <Avatar src={user.avatar?.large} name={user.name} size="2xl" />
+            <div className="min-w-0 flex-1 pb-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="truncate text-title font-bold text-ink-100">{user.name}</h1>
+                {badges}
+              </div>
+              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-600">{facts}</div>
+              {previousNames}
             </div>
-
-            {/* A profile reached by an old link should say it was renamed rather than look like a different person. */}
-            {user.previousNames.length > 0 && (
-              <p className="mt-1 flex items-center gap-1 text-2xs text-ink-600">
-                <Sparkles className="size-2.5" />
-                {t("social.previouslyKnownAs", {
-                  names: user.previousNames
-                    .map((p) => p.name)
-                    .filter(Boolean)
-                    .join(", "),
-                })}
-              </p>
-            )}
+            {action}
           </div>
-
-          {self ? (
-            <Button variant="secondary" size="control" onClick={() => setEditing(true)}>
-              <Pencil className="size-3.5" /> {t("social.editProfile")}
-            </Button>
-          ) : (
-            <FollowButton
-              userId={user.id}
-              name={user.name}
-              flags={user}
-              size="control"
-            />
-          )}
-        </div>
+        )}
 
         {user.about && (
           <Markdown

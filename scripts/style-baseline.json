@@ -34,9 +34,6 @@
   "src/components/social/CommentTree.tsx": {
     "icon-size": 4
   },
-  "src/components/social/ProfileHeader.tsx": {
-    "icon-size": 2
-  },
   "src/components/social/ThreadRow.tsx": {
     "icon-size": 5
   },

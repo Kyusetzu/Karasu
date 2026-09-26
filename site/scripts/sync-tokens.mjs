@@ -193,7 +193,9 @@ function keyedList(text, plain, from, to, where) {
           `split the rule so every selector in it starts with ${CONTRAST_ROOT}`,
       );
     }
-    out.push(text.slice(at + CONTRAST_ROOT.length, b).trim() || ":root");
+    // Emptiness is read on the masked text, so a root followed by nothing but a comment still becomes `:root`.
+    const rest = at + CONTRAST_ROOT.length;
+    out.push(plain.slice(rest, b).trim() ? text.slice(rest, b).trim() : ":root");
   }
   return out;
 }

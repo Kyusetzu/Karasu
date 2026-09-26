@@ -175,7 +175,8 @@ export function Feathers() {
   useEffect(() => {
     const canvas = ref.current;
     if (!canvas) return;
-    if (moreContrast) return;
+    // The live query as well, because hydration renders with the server's answer before the store catches up.
+    if (moreContrast || matchMedia(MORE_CONTRAST).matches) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;

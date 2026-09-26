@@ -118,35 +118,117 @@ const CONTRAST_ROOT = ':root[data-contrast="more"]';
 
 /** Rewrites a block keyed on the app's contrast attribute into the media query a page without the setting has. */
 function forSite(s) {
-  if (!s.head.startsWith(CONTRAST_ROOT)) return { ...s, body: nestedContrast(s.body) };
+  if (!s.head.startsWith(CONTRAST_ROOT)) return { ...s, body: nestedContrast(s.body, s.head) };
+  keyedList(s.head, "the top level");
   const inner = s.body.replaceAll(CONTRAST_ROOT, ":root").replace(/^/gm, "  ");
   return { ...s, body: `@media (prefers-contrast: more) {\n${inner}\n}` };
+}
+
+/** A selector list split at its top-level commas, so `:is(a, b)` stays one selector. */
+function selectors(prelude) {
+  const out = [];
+  let depth = 0;
+  let from = 0;
+  for (let k = 0; k < prelude.length; k++) {
+    const c = prelude[k];
+    if (c === "(" || c === "[") depth++;
+    else if (c === ")" || c === "]") depth--;
+    else if (c === "," && depth === 0) {
+      out.push(prelude.slice(from, k).trim());
+      from = k + 1;
+    }
+  }
+  out.push(prelude.slice(from).trim());
+  return out;
+}
+
+/**
+ * The list's selectors with the contrast root taken off, or a thrown error
+ * when only some of them carry it: moving such a rule under the media query
+ * would take its other selectors with it, and a sync that stops is better
+ * than a stylesheet that silently changes meaning.
+ */
+function keyedList(prelude, where) {
+  const list = selectors(prelude);
+  if (list.every((p) => p.startsWith(CONTRAST_ROOT))) {
+    return list.map((p) => p.slice(CONTRAST_ROOT.length).trim() || ":root");
+  }
+  throw new Error(
+    `sync-tokens: cannot move "${prelude.trim()}" (in ${where}) under prefers-contrast — ` +
+      `split the rule so every selector in it starts with ${CONTRAST_ROOT}`,
+  );
+}
+
+/** Where the brace opened at `open` closes, skipping comments and strings. */
+function matchingBrace(text, open) {
+  let depth = 0;
+  for (let k = open; k < text.length; k++) {
+    if (text.startsWith("/*", k)) {
+      const end = text.indexOf("*/", k + 2);
+      if (end === -1) break;
+      k = end + 1;
+      continue;
+    }
+    const c = text[k];
+    if (c === '"' || c === "'") {
+      const end = text.indexOf(c, k + 1);
+      if (end === -1) break;
+      k = end;
+      continue;
+    }
+    if (c === "{") depth++;
+    else if (c === "}" && --depth === 0) return k;
+  }
+  throw new Error("sync-tokens: unbalanced braces in the source stylesheet");
 }
 
 /**
  * The same for a rule nested inside another block — a utility's
  * `:root[data-contrast="more"] & { … }` — which the page answers as
- * `@media (prefers-contrast: more) { & { … } }` in the same place.
+ * `@media (prefers-contrast: more) { & { … } }` in the same place. Only a
+ * rule's selector is read: comments and strings are stepped over, so a
+ * comment that quotes the selector is copied as it stands.
  */
-function nestedContrast(body) {
-  const marker = `${CONTRAST_ROOT} `;
+function nestedContrast(body, where) {
   let out = "";
-  let i = 0;
-  for (;;) {
-    const at = body.indexOf(marker, i);
-    if (at === -1) return out + body.slice(i);
-    const open = body.indexOf("{", at);
-    let close = open;
-    for (let depth = 0; close < body.length; close++) {
-      if (body[close] === "{") depth++;
-      else if (body[close] === "}" && --depth === 0) break;
+  let emitted = 0;
+  let prelude = 0;
+  for (let j = 0; j < body.length; j++) {
+    if (body.startsWith("/*", j)) {
+      const end = body.indexOf("*/", j + 2);
+      if (end === -1) throw new Error(`sync-tokens: an unterminated comment in ${where}`);
+      j = end + 1;
+      prelude = j + 1;
+      continue;
     }
-    const indent = body.slice(body.lastIndexOf("\n", at) + 1, at);
-    const selector = body.slice(at + marker.length, open).trim();
-    const inner = body.slice(open + 1, close).replace(/\n/g, "\n  ");
-    out += `${body.slice(i, at)}@media (prefers-contrast: more) {\n${indent}  ${selector} {${inner}}\n${indent}}`;
-    i = close + 1;
+    const c = body[j];
+    if (c === '"' || c === "'") {
+      const end = body.indexOf(c, j + 1);
+      if (end === -1) throw new Error(`sync-tokens: an unterminated string in ${where}`);
+      j = end;
+      continue;
+    }
+    if (c === ";" || c === "}") {
+      prelude = j + 1;
+      continue;
+    }
+    if (c !== "{") continue;
+    const text = body.slice(prelude, j);
+    if (!text.includes(CONTRAST_ROOT)) {
+      prelude = j + 1;
+      continue;
+    }
+    const list = keyedList(text, where);
+    const close = matchingBrace(body, j);
+    const first = prelude + (text.length - text.trimStart().length);
+    const indent = /^[ \t]*/.exec(body.slice(body.lastIndexOf("\n", first) + 1))[0];
+    const inner = body.slice(j + 1, close).replace(/\n/g, "\n  ");
+    out += `${body.slice(emitted, first)}@media (prefers-contrast: more) {\n${indent}  ${list.join(`,\n${indent}  `)} {${inner}}\n${indent}}`;
+    emitted = close + 1;
+    j = close;
+    prelude = close + 1;
   }
+  return out + body.slice(emitted);
 }
 
 function fileUrl(p) {

@@ -11,8 +11,9 @@ import { useEffect, useRef } from "react";
  * Three feather shapes in two tones are drawn once into sprites and stamped,
  * so a frame costs a few dozen `drawImage`s.
  *
- * Reduced motion draws one still scatter and stops. A hidden tab pauses the
- * loop. Nothing here is interactive for assistive technology: `aria-hidden`,
+ * Reduced motion draws one still scatter and stops. High contrast draws
+ * nothing: the stylesheet hides the canvas there, so the loop never starts.
+ * A hidden tab pauses the loop. Nothing here is interactive for assistive technology: `aria-hidden`,
  * `pointer-events: none`, and the listeners sit on the window.
  */
 
@@ -157,6 +158,7 @@ export function Feathers() {
   useEffect(() => {
     const canvas = ref.current;
     if (!canvas) return;
+    if (matchMedia("(prefers-contrast: more)").matches) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;

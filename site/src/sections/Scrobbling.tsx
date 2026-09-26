@@ -2,7 +2,7 @@ import { CloudUpload, Hash, Play, Radar, ScanSearch, SlidersHorizontal } from "l
 import { FlowDiagram } from "@/components/FlowDiagram";
 import { Screenshot } from "@/components/Screenshot";
 import { shot } from "@/content/screenshots";
-import { Reveal, Section } from "@/components/Section";
+import { Eyebrow, Reveal, Section } from "@/components/Section";
 import { Card, CardTitle } from "@/components/ui/card";
 import { staggerDelay } from "@/lib/motion";
 
@@ -62,7 +62,7 @@ export function Scrobbling() {
         {RULES.map((r, i) => (
           <Reveal key={r.title} delay={staggerDelay(i)}>
             <Card className="h-full">
-              <CardTitle className="text-[.9375rem]">{r.title}</CardTitle>
+              <CardTitle className="text-body">{r.title}</CardTitle>
               <p className="mt-2 text-sm leading-relaxed text-ink-500">{r.text}</p>
             </Card>
           </Reveal>
@@ -70,7 +70,7 @@ export function Scrobbling() {
       </div>
 
       <Reveal className="mt-14">
-        <p className="text-2xs font-semibold uppercase tracking-[.16em] text-ink-600">What it recognises</p>
+        <Eyebrow tone="muted">What it recognises</Eyebrow>
         <dl className="mt-4 grid gap-x-8 gap-y-4 sm:grid-cols-2 lg:grid-cols-[repeat(5,auto)]">
           {Object.entries(SOURCES).map(([group, items]) => (
             <div key={group}>
@@ -79,7 +79,7 @@ export function Scrobbling() {
                 {items.map((s) => (
                   <span
                     key={s}
-                    className="rounded-[.625rem] border border-surface-800 bg-surface-850 px-2 py-0.5 text-2xs text-ink-300"
+                    className="rounded-inner border border-surface-700 px-2 py-0.5 text-2xs text-ink-300"
                   >
                     {s}
                   </span>

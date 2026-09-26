@@ -20,14 +20,15 @@ export function ListHeader({
 
   return (
     <div
-      className="sticky top-0 z-10 grid items-end gap-x-2.5 border-b border-surface-800 bg-surface-950/95 px-3.5 pb-1.5 pt-1 text-2xs uppercase tracking-[.08em] text-ink-600 backdrop-blur"
+      className="sticky top-0 z-10 grid items-end gap-x-2.5 border-b border-hair bg-surface-950/95 px-3.5 pb-1.5 pt-1 text-2xs uppercase text-ink-600 backdrop-blur"
       style={{ gridTemplateColumns: templateColumns({ tier, selectMode, manga, cover }) }}
     >
       <span />
       <span />
       <span className="truncate">{t("list.colTitle")}</span>
       <span className="truncate">{shows(tier, "status") ? t("common.status") : ""}</span>
-      <span className="truncate">{t("common.score")}</span>
+      {/* Its own short word: the score column is sized for a figure, and the general label ran past it in German. */}
+      <span className="truncate">{t("list.colScore")}</span>
       <span className="truncate">
         {manga ? t("common.chapters") : t("common.episodes")}
       </span>

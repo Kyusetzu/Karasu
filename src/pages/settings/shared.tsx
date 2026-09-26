@@ -2,14 +2,11 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { AlertTriangle, Globe } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { hexToHsv, hsvToHex, type Hsv } from "@/lib/contrast";
+import { Switch } from "@/components/ui/switch";
 
 /** The controls every settings pane shares; none is a `components/ui` primitive, since each knows the pane. */
 
-/** The one select skin, so the four of them cannot drift apart. */
-export const SELECT =
-  "h-9 rounded-lg border border-surface-700 bg-surface-900 px-2 text-sm focus:border-accent-500 focus:outline-none";
-
-/** A label-and-hint on the left, a control on the right; `items-center` because a select is taller than a line. */
+/** A label-and-hint beside its control; below the phone breakpoint the control drops beneath it at the card's width. */
 export function Row({
   label,
   hint,
@@ -23,7 +20,7 @@ export function Row({
   children: ReactNode;
 }) {
   return (
-    <label className="flex items-center justify-between gap-4 py-1 text-sm">
+    <label className="flex items-center justify-between gap-4 py-1 text-sm max-md:flex-col max-md:items-stretch max-md:gap-2 max-md:*:w-full">
       <span>
         <span className="block text-ink-100">{label}</span>
         {hint && <span className="block text-xs text-ink-600">{hint}</span>}
@@ -34,11 +31,16 @@ export function Row({
   );
 }
 
+/** Heads a run of a pane's cards by where they are kept, pulled close to the first card it heads. */
+export function GroupLabel({ children }: { children: ReactNode }) {
+  return <h2 className="-mb-3 px-1 pt-3 text-2xs uppercase tracking-eyebrow text-ink-600">{children}</h2>;
+}
+
 /** Marks a row that changes the AniList account rather than Karasu; gold is the app's caveat colour. */
 export function ExternalNote({ children }: { children: ReactNode }) {
   return (
     <span className="mt-1 flex items-start gap-1.5 text-xs text-gold">
-      <Globe className="mt-px size-3 shrink-0" />
+      <Globe className="mt-px size-3.5 shrink-0" />
       <span>{children}</span>
     </span>
   );
@@ -53,7 +55,7 @@ export function NeedsAccount({
   children: ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-dashed border-surface-700 p-5">
+    <div className="rounded-panel border border-dashed border-surface-700 p-5">
       <p className="text-sm font-medium text-ink-300">{title}</p>
       <p className="mt-1.5 text-sm leading-relaxed text-ink-500">{children}</p>
     </div>
@@ -69,7 +71,7 @@ export function DangerNote({
   children: ReactNode;
 }) {
   return (
-    <div className="flex items-start gap-3 rounded-xl border border-danger/35 bg-danger/8 p-4">
+    <div className="flex items-start gap-3 rounded-panel border border-danger/35 bg-danger/8 p-4">
       <AlertTriangle className="mt-0.5 size-4 shrink-0 text-danger" />
       <div className="min-w-0">
         <p className="text-sm font-medium text-danger">{title}</p>
@@ -100,30 +102,12 @@ export function Toggle({
         disabled ? "cursor-not-allowed opacity-55" : "cursor-pointer",
       )}
     >
-      <span>
+      {/* May shrink and break a path mid-word, so a long hint can never push the switch out of the card. */}
+      <span className="min-w-0 break-words">
         <span className="block text-sm text-ink-100">{label}</span>
         {hint && <span className="block text-xs text-ink-600">{hint}</span>}
       </span>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        disabled={disabled}
-        onClick={() => onChange(!checked)}
-        className={cn(
-          "relative h-4.75 w-8.5 shrink-0 rounded-full transition-colors",
-          checked ? "bg-accent-600" : "bg-surface-700",
-          disabled && "pointer-events-none",
-        )}
-      >
-        <span
-          className={cn(
-            "absolute top-[.0625rem] size-4.25 rounded-full transition-all",
-            // White holds on the accent fill in both themes, but only the inverting ink reads on the off track.
-            checked ? "left-4 bg-white" : "left-[.0625rem] bg-ink-100",
-          )}
-        />
-      </button>
+      <Switch checked={checked} disabled={disabled} onChange={onChange} />
     </label>
   );
 }
@@ -180,7 +164,7 @@ export function ColorPicker({
   };
 
   return (
-    <div className="space-y-2 rounded-lg border border-surface-700 bg-surface-900 p-3">
+    <div className="space-y-2 rounded-control border border-surface-700 bg-surface-900 p-3">
       <div
         ref={svRef}
         onPointerDown={(e) =>
@@ -191,13 +175,13 @@ export function ColorPicker({
             v: 100 - clamp01((y - rect.top) / rect.height) * 100,
           }))
         }
-        className="relative h-28 w-full touch-none rounded-md"
+        className="relative h-28 w-full touch-none rounded-inner"
         style={{
           background: `linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, hsl(${hsv.h}, 100%, 50%))`,
         }}
       >
         <div
-          className="pointer-events-none absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow"
+          className="pointer-events-none absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-on-cover-edge ring-1 ring-on-cover/40"
           style={{ left: `${hsv.s}%`, top: `${100 - hsv.v}%` }}
         />
       </div>
@@ -219,7 +203,7 @@ export function ColorPicker({
         }}
       >
         <div
-          className="pointer-events-none absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow"
+          className="pointer-events-none absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-on-cover-edge ring-1 ring-on-cover/40"
           style={{ left: `${(hsv.h / 360) * 100}%` }}
         />
       </div>
@@ -234,7 +218,7 @@ export function ColorPicker({
         }}
         spellCheck={false}
         maxLength={7}
-        className="w-full rounded-md border border-surface-700 bg-surface-850 px-2 py-1 font-mono text-xs uppercase focus:border-accent-500 focus:outline-none"
+        className="w-full rounded-inner border border-surface-700 bg-surface-850 px-2 py-1 font-mono text-xs uppercase focus:border-accent-500 focus:outline-none"
       />
     </div>
   );

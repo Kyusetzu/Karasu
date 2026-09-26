@@ -44,7 +44,7 @@ export function ThreadList({
     return (
       <div className="space-y-2" aria-hidden="true">
         {[0, 1, 2, 3].map((i) => (
-          <Shimmer key={i} className="h-20 w-full rounded-xl" index={i} />
+          <Shimmer key={i} className="h-20 w-full rounded-panel" index={i} />
         ))}
       </div>
     );

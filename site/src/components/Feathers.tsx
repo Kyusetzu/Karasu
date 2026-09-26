@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 
 /**
  * Feathers, drifting down behind the page. A fixed canvas under the content
@@ -11,8 +11,10 @@ import { useEffect, useRef } from "react";
  * Three feather shapes in two tones are drawn once into sprites and stamped,
  * so a frame costs a few dozen `drawImage`s.
  *
- * Reduced motion draws one still scatter and stops. A hidden tab pauses the
- * loop. Nothing here is interactive for assistive technology: `aria-hidden`,
+ * Reduced motion draws one still scatter and stops. High contrast draws
+ * nothing: the stylesheet hides the canvas there, so the loop stops, and
+ * starts again if the preference is turned off while the page is open.
+ * A hidden tab pauses the loop. Nothing here is interactive for assistive technology: `aria-hidden`,
  * `pointer-events: none`, and the listeners sit on the window.
  */
 
@@ -38,9 +40,44 @@ const SPRITE_W = 120;
 const SPRITE_H = 48;
 /** Drawn at this many CSS px wide at `size = 1`. */
 const BASE_W = 60;
-/** Two violets below the accent — the flock is a shade of the ground, not a highlight on it. */
-const TONES = ["#2f2890", "#211c6b"] as const;
-const RACHIS_TONE = "#5f57bd";
+/**
+ * The flock's colours, as lightness and a saturation factor on the page's
+ * accent: two vanes below it — the flock is a shade of the ground, not a
+ * highlight on it — and a softer shaft above. For the default accent these
+ * are the violets it was first drawn in (#2f2890, #211c6b, #5f57bd), each
+ * channel within two steps.
+ */
+const VANES = [
+  { l: 0.36, s: 1.03 },
+  { l: 0.265, s: 1.07 },
+] as const;
+const RACHIS = { l: 0.54, s: 0.8 };
+/** The default accent's hue and saturation, for a page whose `--accent-rgb` cannot be read. */
+const FALLBACK_HS = [245.3, 0.548] as const;
+
+/** Hue in degrees and saturation 0–1 of an "r, g, b" triplet, the shape `--accent-rgb` holds. */
+function hueSat(triplet: string): readonly [number, number] {
+  const [r, g, b] = triplet.split(",").map((n) => Number(n) / 255);
+  if (![r, g, b].every((n) => Number.isFinite(n))) return FALLBACK_HS;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const d = max - min;
+  if (d === 0) return [0, 0];
+  const l = (max + min) / 2;
+  const s = d / (1 - Math.abs(2 * l - 1));
+  const h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return [(h * 60 + 360) % 360, s];
+}
+
+function tone([h, s]: readonly [number, number], part: { l: number; s: number }): string {
+  return `hsl(${h.toFixed(1)} ${(Math.min(1, s * part.s) * 100).toFixed(1)}% ${(part.l * 100).toFixed(1)}%)`;
+}
+
+/** The vane tones and the shaft's, read from the accent the page is drawn in. */
+function featherTones() {
+  const hs = hueSat(getComputedStyle(document.documentElement).getPropertyValue("--accent-rgb"));
+  return { vanes: VANES.map((v) => tone(hs, v)), rachis: tone(hs, RACHIS) };
+}
 
 const POINTER_RADIUS = 170;
 const TAP_RADIUS = 260;
@@ -98,7 +135,7 @@ function makeFeather(w: number, yMin: number, yMax: number): Feather {
   };
 }
 
-function makeSprite(shape: (typeof SHAPES)[number], tone: string, dpr: number): HTMLCanvasElement | null {
+function makeSprite(shape: (typeof SHAPES)[number], vane: string, rachis: string, dpr: number): HTMLCanvasElement | null {
   const scale = (BASE_W / SPRITE_W) * dpr * 1.2;
   const c = document.createElement("canvas");
   c.width = Math.ceil(SPRITE_W * scale);
@@ -106,9 +143,9 @@ function makeSprite(shape: (typeof SHAPES)[number], tone: string, dpr: number): 
   const ctx = c.getContext("2d");
   if (!ctx) return null;
   ctx.setTransform(scale, 0, 0, scale, 0, 0);
-  ctx.fillStyle = tone;
+  ctx.fillStyle = vane;
   ctx.fill(new Path2D(shape.vane));
-  ctx.strokeStyle = RACHIS_TONE;
+  ctx.strokeStyle = rachis;
   ctx.lineWidth = 1.4;
   ctx.lineCap = "round";
   ctx.globalAlpha = 0.7;
@@ -116,19 +153,38 @@ function makeSprite(shape: (typeof SHAPES)[number], tone: string, dpr: number): 
   return c;
 }
 
+const MORE_CONTRAST = "(prefers-contrast: more)";
+
+/** The OS's request for more contrast, live; the server render has no preference to read. */
+function useMoreContrast(): boolean {
+  return useSyncExternalStore(
+    (change) => {
+      const query = matchMedia(MORE_CONTRAST);
+      query.addEventListener("change", change);
+      return () => query.removeEventListener("change", change);
+    },
+    () => matchMedia(MORE_CONTRAST).matches,
+    () => false,
+  );
+}
+
 export function Feathers() {
   const ref = useRef<HTMLCanvasElement>(null);
+  const moreContrast = useMoreContrast();
 
   useEffect(() => {
     const canvas = ref.current;
     if (!canvas) return;
+    // The live query as well, because hydration renders with the server's answer before the store catches up.
+    if (moreContrast || matchMedia(MORE_CONTRAST).matches) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
     const dpr = Math.min(devicePixelRatio || 1, 2);
 
     // sprites[shape][tone]
-    const sprites = SHAPES.map((s) => TONES.map((t) => makeSprite(s, t, dpr)));
+    const tones = featherTones();
+    const sprites = SHAPES.map((s) => tones.vanes.map((t) => makeSprite(s, t, tones.rachis, dpr)));
     if (sprites.some((row) => row.some((s) => !s))) return;
 
     let w = 0;
@@ -296,7 +352,7 @@ export function Feathers() {
       document.removeEventListener("pointerleave", onLeave);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, []);
+  }, [moreContrast]);
 
   return <canvas ref={ref} className="feathers" aria-hidden="true" />;
 }

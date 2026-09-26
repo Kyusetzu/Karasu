@@ -22,7 +22,7 @@ export function Statistics() {
         <ul className="space-y-5 lg:order-1">
           {POINTS.map(([title, text]) => (
             <li key={title}>
-              <p className="font-brand text-[.9375rem] font-semibold text-ink-100">{title}</p>
+              <p className="font-brand text-body font-semibold text-ink-100">{title}</p>
               <p className="mt-1 text-sm leading-relaxed text-ink-500">{text}</p>
             </li>
           ))}

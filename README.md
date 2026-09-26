@@ -200,7 +200,7 @@ Captures at 2× on the desktop and straight off the phone — the same set the
   manga, chapter +1 right on the card
 - **Franchise graph** — the whole franchise as a relation map (sequels, side
   stories, cross-medium sources/adaptations), each node coloured by your status,
-  pan and zoom, any branch foldable, double-click to open a title
+  pan and zoom, double-click to open a title
 
 **Activities**
 - **Profiles** — yours and anyone's: bio, banner, favourites, statistics and
@@ -262,9 +262,9 @@ Captures at 2× on the desktop and straight off the phone — the same set the
 - **Portable mode** — keep everything in a folder next to the executable
 
 **Personalisation**
-- Light / dark themes and a full **accent colour picker** — every shade, the
-  panel washes and the readable ink on top are derived from the one colour you
-  pick, so nothing is hardcoded
+- Light / dark themes and a full **accent colour picker** — every shade and
+  the readable ink on top are derived from the one colour you pick, so nothing
+  is hardcoded
 - **Covers per row** as a typed number, 1–40, previewed live as you type —
   and a **reduce motion** switch
 - **Interface size** — zooms the whole window in eight steps from 75% to 200%,
@@ -273,8 +273,7 @@ Captures at 2× on the desktop and straight off the phone — the same set the
   across the room. On a short window the sidebar collapses to its icon rail
   by itself, so nothing drops off the bottom
 - **Density** — compact, comfortable or spacious for the screens that crowd:
-  the calendar, the local library and the digests. Everything else keeps its
-  size
+  the calendar and the local library. Everything else keeps its size
 - A **content filter** for adult and suggestive titles, with a disclosure
   line wherever it hides something — explicit (18+) and suggestive (Ecchi)
   counted separately, linking straight to the setting
@@ -282,13 +281,13 @@ Captures at 2× on the desktop and straight off the phone — the same set the
   command palette on <kbd>Ctrl</kbd>+<kbd>K</kbd>, <kbd>/</kbd> to search,
   <kbd>Ctrl</kbd>+<kbd>1</kbd>–<kbd>3</kbd> between screens, and arrows,
   <kbd>Space</kbd>, <kbd>E</kbd> and <kbd>C</kbd> inside a list
-- **Settings in eight panes** — account, AniList account, appearance,
-  detection, library, desktop, import & export, and a marked-dangerous
-  advanced pane. The AniList pane edits your *account's* settings in place —
-  title language, score format, activity posting, AniList's own notification
-  toggles — so they apply on anilist.co and in every client at once. On
-  Android the library and desktop panes are hidden, because nothing behind
-  them exists there
+- **Settings in seven panes** — account, appearance, detection, library,
+  desktop, import & export, and a marked-dangerous advanced pane. The account
+  pane holds both halves: what stays in Karasu, and, under *Kept on AniList*,
+  your *account's* own settings edited in place — title language, score
+  format, activity posting, AniList's own notification toggles — so they
+  apply on anilist.co and in every client at once. On Android the library
+  and desktop panes are hidden, because nothing behind them exists there
 - **One interaction model, three presentations**: right-click on a title
   opens a context menu, a long press on the phone opens the same actions as
   a bottom sheet, and the command palette lists them too — update progress,
@@ -438,7 +437,7 @@ npm run tauri build              # release build (NSIS on Windows; AppImage, deb
 npx tauri android build --apk    # Android release APK
 
 npm run verify       # the commit gate: typecheck, audits and lints, then vitest and cargo test together
-npm run verify:full  # the push gate: the commit gate plus knip, clippy, cargo-deny, machete, the site, the Android check, a bundle
+npm run verify:full  # the push gate: the commit gate plus knip, clippy, cargo-deny, machete, the site, the bundle budget, the Android check, a bundle
 npm run lint         # oxlint: react-hooks, a11y, imports, vitest rules; part of verify
 npm run typecheck    # TypeScript alone
 npm test             # frontend unit tests (vitest) alone; test:watch, test:node, test:dom, test:changed narrow it

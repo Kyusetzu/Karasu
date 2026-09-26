@@ -8,12 +8,12 @@ import { cn } from "@/lib/cn";
 export const buttonVariants = cva(
   // `transition-surface`, not `transition-colors`: the latter animates `color`,
   // which makes the browser hold the old value across a theme swap.
-  "inline-flex items-center justify-center gap-2 rounded-lg text-sm font-medium transition-surface disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-accent-500",
+  "relative press coarse:hit-area inline-flex items-center justify-center gap-2 rounded-control text-sm font-medium transition-surface disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-accent-500",
   {
     variants: {
       variant: {
-        // accent-500 is the accent *as a fill*; 600 is its pressed-in shade.
-        default: "bg-accent-500 text-accent-ink hover:bg-accent-600",
+        // The accent as a tint, as the app's main action carries it, so the call to action leads without shouting.
+        default: "border tint-fill tint-accent text-ink-100",
         secondary: "bg-surface-800 text-ink-100 hover:bg-surface-700",
         outline:
           "border border-surface-700 text-ink-300 hover:bg-surface-850 hover:text-ink-100",
@@ -21,7 +21,7 @@ export const buttonVariants = cva(
       },
       size: {
         default: "h-9 px-4",
-        lg: "h-11 px-5 text-[.9375rem]",
+        lg: "h-11 px-5 text-body",
         sm: "h-8 px-3 text-xs",
         icon: "h-9 w-9",
       },

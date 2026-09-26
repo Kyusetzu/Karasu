@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { Minus, Plus } from "lucide-react";
+import { ChevronDown, ChevronUp, Minus, Plus } from "lucide-react";
 import { loadFranchise, type FranchiseNode } from "@/api/franchise";
 import { useContentFilter } from "@/stores/contentFilter";
 import { useAuth } from "@/stores/auth";
@@ -20,7 +20,7 @@ import { BUTTON_STEP, usePanZoom } from "@/hooks/usePanZoom";
 import { centerOn } from "@/lib/zoomMath";
 import { useCachedEntry } from "@/hooks/useCachedEntry";
 import { useListMutations } from "@/hooks/useListMutations";
-import { displayTitle, type MediaListStatus } from "@/api/types";
+import { displayTitle, STATUS_ORDER, type MediaListStatus, type MediaType } from "@/api/types";
 import BackButton from "@/components/shell/BackButton";
 import EntryEditModal from "@/components/media/EntryEditModal";
 import { Presence } from "@/components/ui/presence";
@@ -28,8 +28,10 @@ import { EmptyState, PerchRule } from "@/components/EmptyState";
 import { Button } from "@/components/ui/button";
 import { Loader } from "@/components/ui/loader";
 import { IconButton } from "@/components/ui/icon-button";
+import { cardClass } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { statusColorVar } from "@/lib/statusColors";
+import { loadLegendOpen, saveLegendOpen } from "@/lib/franchiseLegend";
 
 /** List status → node outline, from `lib/statusColors` so cover rings and this graph never disagree. */
 const colorOf = statusColorVar;
@@ -38,13 +40,8 @@ const colorOf = statusColorVar;
 const outline = (status: MediaListStatus | null) =>
   `2px ${status ? "solid" : "dashed"} ${colorOf(status)}`;
 
-/** The four the legend names — the other two share their colour. */
-const LEGEND: (MediaListStatus | null)[] = [
-  "CURRENT",
-  "COMPLETED",
-  "PLANNING",
-  null,
-];
+/** Every status has its own colour in the user's palette, so the key names all six and the untracked dashed ring. */
+const LEGEND: (MediaListStatus | null)[] = [...STATUS_ORDER, null];
 
 export default function Franchise() {
   const { t } = useTranslation();
@@ -66,7 +63,6 @@ export default function Franchise() {
     gcTime: 60 * 60 * 1000,
   });
 
-  const [collapsed, setCollapsed] = useState<ReadonlySet<number>>(() => new Set());
   const [selected, setSelected] = useState<number | null>(null);
   const [hovered, setHovered] = useState<number | null>(null);
   const [editing, setEditing] = useState<number | null>(null);
@@ -77,13 +73,12 @@ export default function Franchise() {
 
   // A new franchise is a new graph; a layout effect, so the rail has its content before the canvas is measured.
   useLayoutEffect(() => {
-    setCollapsed(new Set());
     setSelected(data?.rootId ?? null);
   }, [data?.rootId]);
 
   const layout = useMemo(
-    () => (data ? layoutFranchise(data.nodes, data.edges, data.rootId, collapsed) : null),
-    [data, collapsed],
+    () => (data ? layoutFranchise(data.nodes, data.edges, data.rootId) : null),
+    [data],
   );
 
   /** The title the user came from, in the middle of the canvas at the resting zoom, on either platform. */
@@ -118,14 +113,13 @@ export default function Franchise() {
       !data || !layout
         ? []
         : data.edges.filter(
-            (e) => layout.visible.has(e.from) && layout.visible.has(e.to),
+            (e) => layout.positions.has(e.from) && layout.positions.has(e.to),
           ),
     [data, layout],
   );
 
-  // Hover wins over selection; a folded-away node never gets `mouseleave`, so the hover is dropped once off screen.
-  const focus =
-    hovered !== null && layout?.visible.has(hovered) ? hovered : selected;
+  // Hover wins over selection.
+  const focus = hovered ?? selected;
   const connected = useMemo(() => {
     const set = new Set<number>();
     if (focus === null) return set;
@@ -137,51 +131,20 @@ export default function Franchise() {
     return set;
   }, [focus, links]);
 
-  const toggle = (nodeId: number) => {
-    setCollapsed((prev) => {
-      const next = new Set(prev);
-      if (!next.delete(nodeId)) next.add(nodeId);
-      return next;
-    });
-    // Folding the selected node away makes the fold the new subject, or the rail describes a hidden node.
-    setSelected((cur) => {
-      if (cur === null || !layout) return cur;
-      let walk = layout.tree.get(cur)?.parent ?? null;
-      while (walk !== null) {
-        if (walk === nodeId) return nodeId;
-        walk = layout.tree.get(walk)?.parent ?? null;
-      }
-      return cur;
-    });
-  };
-
   const selectedNode = selected !== null ? byId.get(selected) : undefined;
 
   return (
-    <div className="flex h-full flex-col gap-4 p-6">
-      <header className="flex items-center gap-3">
+    // The phone's gutter like every other page: at 360 px the header only fits beside a 1 rem edge.
+    <div className="flex h-full flex-col gap-4 p-4 md:p-6">
+      <header className="flex min-w-0 items-center gap-3">
         <BackButton />
-        <h1 className="text-lg font-semibold text-ink-100">{t("franchise.title")}</h1>
+        <h1 className="shrink-0 text-lg text-ink-100">{t("franchise.title")}</h1>
         {data && (
-          <span className="text-2xs uppercase tracking-[.09em] text-ink-600">
+          <span className="truncate text-2xs uppercase tracking-eyebrow text-ink-600">
             {t("franchise.related", { count: data.nodes.length })}
           </span>
         )}
         <span className="section-rule" />
-        <div className="flex shrink-0 items-center gap-3 text-2xs text-ink-500">
-          {LEGEND.map((status) => (
-            <span key={status ?? "none"} className="flex items-center gap-1.5">
-              <span
-                className="size-2.5 rounded-[.1875rem]"
-                style={{ border: outline(status) }}
-              />
-              {/* Resolved on the root's type, or a pinned ANIME legend reads "Watching" over nodes that say "Reading". */}
-              {status
-                ? t(`status.${legendType}.${status}`)
-                : t("franchise.notOnList")}
-            </span>
-          ))}
-        </div>
       </header>
 
       {isLoading && <Loader label={t("common.loading")} />}
@@ -201,7 +164,7 @@ export default function Franchise() {
             {...pan.handlers}
             className={cn(
               // `touch-none`, or Chromium reclaims a touch drag with a pointercancel mid-gesture and the pan stutters dead.
-              "relative min-h-0 min-w-0 flex-1 select-none touch-none overflow-hidden rounded-xl border border-hair bg-surface-900",
+              "relative min-h-0 min-w-0 flex-1 select-none touch-none overflow-hidden rounded-panel border border-hair bg-surface-900",
               pan.dragging ? "cursor-grabbing" : "cursor-grab",
             )}
             style={{
@@ -260,7 +223,7 @@ export default function Franchise() {
                 })}
               </svg>
 
-              {[...layout.visible].map((nodeId) => {
+              {[...layout.positions.keys()].map((nodeId) => {
                 const node = byId.get(nodeId);
                 const spot = layout.positions.get(nodeId);
                 const branch = layout.tree.get(nodeId);
@@ -275,7 +238,6 @@ export default function Franchise() {
                     isRoot={nodeId === data.rootId}
                     isSelected={nodeId === selected}
                     dimmed={focus !== null && !connected.has(nodeId)}
-                    collapsed={collapsed.has(nodeId)}
                     onHover={setHovered}
                     onSelect={() => {
                       if (pan.dragged()) return;
@@ -285,13 +247,12 @@ export default function Franchise() {
                       if (pan.dragged()) return;
                       navigate(`/media/${nodeId}`);
                     }}
-                    onToggle={() => toggle(nodeId)}
-                  />
+                      />
                 );
               })}
             </div>
 
-            <div className="absolute bottom-3 right-3 flex items-center gap-1 rounded-lg border border-hair bg-surface-850/90 p-1">
+            <div className="absolute bottom-3 right-3 flex items-center gap-1 rounded-control border border-hair bg-surface-850/90 p-1">
               <IconButton
                 size="xs"
                 aria-label={t("franchise.zoomOut")}
@@ -303,7 +264,7 @@ export default function Franchise() {
                 type="button"
                 onClick={recenter}
                 title={t("franchise.resetView")}
-                className="min-w-11 rounded-md px-1 py-0.5 text-2xs tabular-nums text-ink-500 transition-surface hover:bg-surface-800 hover:text-ink-100"
+                className="min-w-11 rounded-inner px-1 py-0.5 text-2xs tabular-nums text-ink-500 transition-surface hover:bg-surface-800 hover:text-ink-100"
               >
                 {Math.round(pan.zoom * 100)}%
               </button>
@@ -317,10 +278,12 @@ export default function Franchise() {
             </div>
 
             {data.truncated && (
-              <p className="absolute left-3 top-3 rounded-md border border-hair bg-surface-850/90 px-2 py-1 text-2xs text-ink-600">
+              <p className="absolute left-3 top-3 rounded-inner border border-hair bg-surface-850/90 px-2 py-1 text-2xs text-ink-600">
                 {t("franchise.truncated")}
               </p>
             )}
+
+            <Legend type={legendType} />
           </div>
 
           <Rail
@@ -356,7 +319,7 @@ export default function Franchise() {
   );
 }
 
-/** One node: cover, status outline, progress, title, relation, collapse pill. */
+/** One node: cover, status outline, progress, title and relation. */
 function GraphNode({
   node,
   branch,
@@ -365,11 +328,9 @@ function GraphNode({
   isRoot,
   isSelected,
   dimmed,
-  collapsed,
   onHover,
   onSelect,
   onOpen,
-  onToggle,
 }: {
   node: FranchiseNode;
   branch: FranchiseTreeNode;
@@ -378,12 +339,10 @@ function GraphNode({
   isRoot: boolean;
   isSelected: boolean;
   dimmed: boolean;
-  collapsed: boolean;
   onHover: (id: number | null) => void;
   onSelect: () => void;
   /** Double-click: straight to the detail page, like a related cover. */
   onOpen: () => void;
-  onToggle: () => void;
 }) {
   const { t } = useTranslation();
   const color = colorOf(node.listStatus);
@@ -435,13 +394,13 @@ function GraphNode({
               className="size-full object-cover"
             />
           ) : (
-            <span className="grid size-full place-items-center text-[.5625em] uppercase tracking-[.12em] text-ink-600">
+            <span className="grid size-full place-items-center text-[.5625em] uppercase tracking-eyebrow text-ink-600">
               {t("franchise.noCover")}
             </span>
           )}
           {done !== null && (
             <span
-              className="absolute inset-x-0 bottom-0 block bg-[rgba(4,5,8,.55)]"
+              className="absolute inset-x-0 bottom-0 block bg-on-cover/55"
               style={{ height: ".1875em" }}
             >
               <span
@@ -464,23 +423,12 @@ function GraphNode({
           {title}
         </p>
         {branch.relation && (
-          <p className="text-center text-[.5625em] uppercase tracking-[.1em] text-ink-600">
+          <p className="text-center text-[.5625em] uppercase tracking-eyebrow text-ink-600">
             {t(`relation.${branch.relation}`, { defaultValue: branch.relation })}
           </p>
         )}
       </button>
 
-      {branch.children.length > 0 && (
-        <button
-          type="button"
-          onClick={onToggle}
-          aria-label={t(collapsed ? "franchise.expand" : "franchise.collapse")}
-          className="absolute left-1/2 grid -translate-x-1/2 place-items-center rounded-full border border-surface-700 bg-surface-850 text-[.5625em] tabular-nums text-ink-300 transition-surface hover:border-accent-500 hover:text-ink-100"
-          style={{ bottom: "-.625em", height: "1.25em", minWidth: "1.25em", padding: "0 .375em" }}
-        >
-          {collapsed ? `+${branch.descendants}` : "−"}
-        </button>
-      )}
     </div>
   );
 }
@@ -506,7 +454,7 @@ function Rail({
 
   if (!node) {
     return (
-      <aside className="w-full shrink-0 rounded-xl border border-hair bg-surface-900 p-4 xl:w-60">
+      <aside className={cn(cardClass("raised"), "w-full shrink-0 p-4 xl:w-60")}>
         <p className="text-xs text-ink-600">{t("franchise.selectHint")}</p>
       </aside>
     );
@@ -519,63 +467,66 @@ function Rail({
     // Keyed on the node so the pane re-runs `settle` when the selection moves; below `xl` it sits under the canvas.
     <aside
       key={node.id}
-      className="max-h-64 w-full shrink-0 animate-settle overflow-y-auto rounded-xl border border-hair bg-surface-900 p-4 panel-wash xl:max-h-none xl:w-60"
+      className={cn(cardClass("raised"), "flex max-h-64 w-full shrink-0 animate-settle flex-col xl:max-h-none xl:w-60")}
     >
-      {node.coverImage.large && (
-        <img
-          src={node.coverImage.large}
-          alt=""
-          className="mb-3 hidden aspect-2/3 w-full rounded-lg object-cover xl:block"
-        />
-      )}
-      {relation && (
-        <p className="text-2xs uppercase tracking-[.1em] text-accent-400">
-          {t(`relation.${relation}`, { defaultValue: relation })}
-        </p>
-      )}
-      <p className="mt-0.5 text-sm font-semibold leading-snug text-ink-100">{latin}</p>
-      {native && <p className="font-brand-jp text-xs text-ink-600">{native}</p>}
-
-      <p className="mt-3 flex items-center gap-1.5 text-xs text-ink-300">
-        <span
-          className="size-2 rounded-full"
-          style={{ background: colorOf(node.listStatus) }}
-        />
-        {node.listStatus
-          ? t(`status.${node.type}.${node.listStatus}`)
-          : t("franchise.notOnList")}
-      </p>
-
-      <dl className="mt-3 space-y-1.5 text-2xs">
-        <Row label={t("detail.format")}>
-          {[
-            node.type === "MANGA" ? t("common.manga") : t("common.anime"),
-            formatLabel(node.format, t),
-          ]
-            .filter(Boolean)
-            .join(" · ")}
-        </Row>
-        <Row label={t("franchise.yourProgress")}>
-          {node.progress === null
-            ? "—"
-            : `${node.progress} / ${node.total ?? "?"}`}
-        </Row>
-        <Row label={t("franchise.connects")}>{connects}</Row>
-      </dl>
-
-      <div className="mt-4 space-y-2">
-        <Button size="control" className="w-full" onClick={onOpen}>
-          {t("franchise.openDetail")}
-        </Button>
-        {entry ? (
-          <Button variant="outline" size="control" className="w-full" onClick={onEdit}>
-            {t("franchise.editEntry")}
-          </Button>
-        ) : (
-          <Button variant="outline" size="control" className="w-full" onClick={onOpen}>
-            {t("franchise.addToList")}
-          </Button>
+      {/* The scroll lives inside the card, so the card's top catch-light stays put while the contents move. */}
+      <div className="min-h-0 flex-1 overflow-y-auto p-4">
+        {node.coverImage.large && (
+          <img
+            src={node.coverImage.large}
+            alt=""
+            className="mb-3 hidden aspect-2/3 w-full rounded-control object-cover xl:block"
+          />
         )}
+        {relation && (
+          <p className="text-2xs uppercase tracking-eyebrow text-accent-400">
+            {t(`relation.${relation}`, { defaultValue: relation })}
+          </p>
+        )}
+        <p className="mt-0.5 text-sm font-semibold leading-snug text-ink-100">{latin}</p>
+        {native && <p className="font-brand-jp text-xs text-ink-600">{native}</p>}
+
+        <p className="mt-3 flex items-center gap-1.5 text-xs text-ink-300">
+          <span
+            className="size-2 rounded-full"
+            style={{ background: colorOf(node.listStatus) }}
+          />
+          {node.listStatus
+            ? t(`status.${node.type}.${node.listStatus}`)
+            : t("franchise.notOnList")}
+        </p>
+
+        <dl className="mt-3 space-y-1.5 text-2xs">
+          <Row label={t("detail.format")}>
+            {[
+              node.type === "MANGA" ? t("common.manga") : t("common.anime"),
+              formatLabel(node.format, t),
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          </Row>
+          <Row label={t("franchise.yourProgress")}>
+            {node.progress === null
+              ? "—"
+              : `${node.progress} / ${node.total ?? "?"}`}
+          </Row>
+          <Row label={t("franchise.connects")}>{connects}</Row>
+        </dl>
+
+        <div className="mt-4 space-y-2">
+          <Button size="control" className="w-full" onClick={onOpen}>
+            {t("franchise.openDetail")}
+          </Button>
+          {entry ? (
+            <Button variant="outline" size="control" className="w-full" onClick={onEdit}>
+              {t("franchise.editEntry")}
+            </Button>
+          ) : (
+            <Button variant="outline" size="control" className="w-full" onClick={onOpen}>
+              {t("franchise.addToList")}
+            </Button>
+          )}
+        </div>
       </div>
     </aside>
   );
@@ -632,5 +583,53 @@ function EntryEditor({
         onClose();
       }}
     />
+  );
+}
+
+/** The colour key, folded into a chip in the graph's corner until asked for; the choice is remembered per machine. */
+function Legend({ type }: { type: MediaType }) {
+  const { t } = useTranslation();
+  const id = useId();
+  const [open, setOpen] = useState(loadLegendOpen);
+  const toggle = () => {
+    saveLegendOpen(!open);
+    setOpen(!open);
+  };
+  return (
+    // A control on the canvas, not a handle for it: a press here must not start a pan.
+    <div
+      onPointerDown={(e) => e.stopPropagation()}
+      className="absolute bottom-3 left-3 flex max-w-[calc(100%-1.5rem)] flex-col items-start gap-2"
+    >
+      {/* Above the chip rather than beside it, so the open key never runs under the zoom controls on a phone. */}
+      {open && (
+        <ul
+          id={id}
+          className="grid grid-cols-2 gap-x-3 gap-y-1 rounded-control border border-hair bg-surface-850/90 px-2.5 py-2 text-2xs text-ink-500 backdrop-blur-sm"
+        >
+          {LEGEND.map((status) => (
+            <li key={status ?? "none"} className={cn("flex items-center gap-1.5", !status && "col-span-2")}>
+              <span className="size-2.5 shrink-0 rounded-inner" style={{ border: outline(status) }} />
+              {/* Resolved on the root's type, or a pinned ANIME legend reads "Watching" over nodes that say "Reading". */}
+              {status ? t(`status.${type}.${status}`) : t("franchise.notOnList")}
+            </li>
+          ))}
+        </ul>
+      )}
+      <button
+        type="button"
+        onClick={toggle}
+        aria-expanded={open}
+        aria-controls={open ? id : undefined}
+        className="inline-flex h-9.5 items-center gap-1.5 rounded-control border border-hair bg-surface-850/90 px-2.5 text-2xs font-semibold uppercase tracking-eyebrow text-ink-300 backdrop-blur-sm transition-surface hover:text-ink-100"
+      >
+        {!open &&
+          (["CURRENT", "COMPLETED", "PLANNING"] as const).map((s) => (
+            <span key={s} aria-hidden className="size-2.5 rounded-inner" style={{ border: outline(s) }} />
+          ))}
+        {t("franchise.legend")}
+        {open ? <ChevronDown aria-hidden className="size-3.5" /> : <ChevronUp aria-hidden className="size-3.5" />}
+      </button>
+    </div>
   );
 }

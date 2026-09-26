@@ -186,7 +186,7 @@ describe("ListToolbar", () => {
     expect(screen.queryByRole("radiogroup", { name: "list.view" })).toBeNull();
     fireEvent.click(button(/^list\.filtersActive/));
     const panel = dialog("list.filters");
-    expect(panel.parentElement).toHaveAttribute("data-overlay");
+    expect(panel).toHaveAttribute("data-overlay");
   });
 
   describe("axe", () => {

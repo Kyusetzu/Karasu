@@ -113,7 +113,7 @@ export function Sunburst({ data, size = 260 }: { data: Slice[]; size?: number })
         x={c}
         y={c + 4}
         textAnchor="middle"
-        className="animate-fade-in fill-ink-300 text-[1.0625rem] font-semibold tabular-nums"
+        className="animate-fade-in fill-ink-300 text-base font-semibold tabular-nums"
       >
         {total}
       </text>
@@ -144,7 +144,7 @@ function ArcValue({
       x={at.x}
       y={at.y + 3}
       textAnchor="middle"
-      className={`${tone} pointer-events-none text-[.6875rem] font-medium tabular-nums`}
+      className={`${tone} pointer-events-none text-xs font-medium tabular-nums`}
     >
       {value}
     </text>
@@ -153,15 +153,18 @@ function ArcValue({
 
 /** A legend for whatever the sunburst or the stacked bar just drew. */
 export function ToneLegend({ items }: { items: { label: string; value: number }[] }) {
+  // One column that may shrink, since beside a ring the legend is narrow and a second column cut labels to a few letters.
   return (
-    <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+    <div className="grid grid-cols-1 gap-y-1.5">
       {items.map((item, i) => (
         <div key={item.label} className="flex items-center gap-2 text-xs">
           <span
-            className="size-2 shrink-0 rounded-[.125rem]"
+            className="size-2 shrink-0 rounded-mark"
             style={{ background: TONES[i % TONES.length] }}
           />
-          <span className="min-w-0 flex-1 truncate text-ink-500">{item.label}</span>
+          <span className="min-w-0 flex-1 truncate text-ink-500" title={item.label}>
+            {item.label}
+          </span>
           <span className="shrink-0 tabular-nums text-ink-300">{item.value}</span>
         </div>
       ))}
@@ -205,7 +208,7 @@ export function RadarChart({
           key={step}
           x={c + 3}
           y={c - r * step + 3}
-          className="fill-ink-600 text-[.4375rem] tabular-nums"
+          className="fill-ink-600 text-2xs tabular-nums"
         >
           {Math.round(max * step)}
         </text>
@@ -257,7 +260,7 @@ export function RadarChart({
               x={at.x}
               y={at.y}
               textAnchor="middle"
-              className="fill-ink-500 text-[.5625rem]"
+              className="fill-ink-500 text-2xs"
             >
               {axis.label.length > 12 ? `${axis.label.slice(0, 11)}…` : axis.label}
             </text>
@@ -266,7 +269,7 @@ export function RadarChart({
               x={at.x}
               y={at.y + 9}
               textAnchor="middle"
-              className="fill-ink-300 text-[.5625rem] font-medium tabular-nums"
+              className="fill-ink-300 text-2xs font-medium tabular-nums"
             >
               {axis.value}
             </text>
@@ -328,14 +331,14 @@ export function Treemap({
                 <text
                   x={r.x + 7}
                   y={r.y + 17}
-                  className={`${onAccent(i)} text-[.625rem] font-medium`}
+                  className={`${onAccent(i)} text-2xs font-medium`}
                 >
                   {label.length > fits ? `${label.slice(0, Math.max(1, fits))}…` : label}
                 </text>
                 <text
                   x={r.x + 7}
                   y={r.y + 30}
-                  className={`${onAccent(i)} text-[.625rem] tabular-nums`}
+                  className={`${onAccent(i)} text-2xs tabular-nums`}
                 >
                   {items[i].value}
                 </text>
@@ -347,7 +350,7 @@ export function Treemap({
                 x={r.x + r.w / 2}
                 y={r.y + r.h / 2 + 3}
                 textAnchor="middle"
-                className={`${onAccent(i)} text-[.5625rem] tabular-nums`}
+                className={`${onAccent(i)} text-2xs tabular-nums`}
               >
                 {items[i].value}
               </text>

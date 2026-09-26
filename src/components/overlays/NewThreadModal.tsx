@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { saveThread, THREAD_CATEGORIES } from "@/api/social";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Pill } from "@/components/ui/pill";
 import { MarkdownTextarea } from "@/components/social/MarkdownTextarea";
@@ -61,42 +62,46 @@ export function NewThreadModal({
     });
 
   return (
-    <Modal title={t("forum.newThread")} onClose={onClose} leaving={leaving} className="max-w-2xl">
+    <Modal
+      title={t("forum.newThread")}
+      onClose={onClose}
+      leaving={leaving}
+      size="2xl"
+      footer={
+        <>
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            {t("common.cancel")}
+          </Button>
+          <Button size="sm" onClick={submit} disabled={!check.ok || create.isPending}>
+            {create.isPending ? t("forum.creating") : t("forum.create")}
+          </Button>
+        </>
+      }
+    >
       <div className="space-y-4">
-        <div>
-          <label className="block text-xs font-medium text-ink-300" htmlFor="thread-title">
-            {t("forum.threadTitleLabel")}
-          </label>
+        <Field label={t("forum.threadTitleLabel")} htmlFor="thread-title">
           <Input
             id="thread-title"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder={t("forum.threadTitlePlaceholder")}
             maxLength={TITLE_MAX}
-            className="mt-1.5"
           />
-        </div>
+        </Field>
 
-        <div>
-          <span className="block text-xs font-medium text-ink-300">
-            {t("forum.categoriesLabel")}
-          </span>
-          <div className="mt-1.5 flex flex-wrap gap-1.5">
+        <Field label={t("forum.categoriesLabel")}>
+          <div className="flex flex-wrap gap-1.5">
             {THREAD_CATEGORIES.map((c) => (
               <Pill key={c.id} active={categories.has(c.id)} onClick={() => toggleCategory(c.id)}>
                 {c.name}
               </Pill>
             ))}
           </div>
-        </div>
+        </Field>
 
-        <div>
-          <label className="block text-xs font-medium text-ink-300" htmlFor="thread-body">
-            {t("forum.bodyLabel")}
-          </label>
+        <Field label={t("forum.bodyLabel")} htmlFor="thread-body">
           <MarkdownTextarea
             id="thread-body"
-            className="mt-1.5"
             value={body}
             onChange={setBody}
             onSubmit={submit}
@@ -115,16 +120,7 @@ export function NewThreadModal({
               )
             }
           />
-        </div>
-
-        <div className="flex items-center justify-end gap-2 border-t border-surface-800 pt-3">
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            {t("common.cancel")}
-          </Button>
-          <Button size="sm" onClick={submit} disabled={!check.ok || create.isPending}>
-            {create.isPending ? t("forum.creating") : t("forum.create")}
-          </Button>
-        </div>
+        </Field>
       </div>
     </Modal>
   );

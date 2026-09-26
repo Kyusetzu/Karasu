@@ -41,9 +41,9 @@ export default function Social() {
       <header className="flex items-center gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline gap-2.5">
-            <h1 className="text-2xl font-bold">{t("nav.social")}</h1>
+            <h1 className="text-title">{t("nav.social")}</h1>
             {/* The Japanese sub-lockup every other screen header carries. */}
-            <span className="font-brand-jp text-[.8125rem] tracking-[.04em] text-ink-600">
+            <span className="font-brand-jp text-ui tracking-lockup text-ink-600">
               みんな
             </span>
           </div>

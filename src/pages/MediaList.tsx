@@ -41,7 +41,6 @@ import { IconButton } from "@/components/ui/icon-button";
 import { StatusTabs } from "@/components/ui/status-tabs";
 import { CoverOutline, EmptyState, StruckQuery } from "@/components/EmptyState";
 import { ListMoreMenu, ListToolbar } from "@/components/list/ListToolbar";
-import { cn } from "@/lib/utils";
 import { Presence, PresenceIf } from "@/components/ui/presence";
 import { VirtualGrid } from "@/components/list/VirtualGrid";
 import { GridCard } from "@/components/list/GridCard";
@@ -70,6 +69,7 @@ import {
 } from "@/lib/listFilters";
 import { statusColorVar } from "@/lib/statusColors";
 import { isAndroid, usePlatform } from "@/stores/platform";
+import { Spinner } from "@/components/ui/spinner";
 
 // One collator, since localeCompare builds a fresh one per call; default options keep the ordering it gave.
 const COLLATOR = new Intl.Collator();
@@ -606,7 +606,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
     // Clipped sideways, so the list following a swipe never gives the page a horizontal scroll.
     <div ref={rootRef} className="flex h-full flex-col overflow-x-clip">
       {(data?.fromCache || (data?.pending ?? 0) > 0) && (
-        <div className="flex items-center gap-3 border-b border-surface-800 bg-gold/10 px-8 py-2 text-xs text-gold">
+        <div className="flex items-center gap-3 border-b border-hair bg-gold/10 px-8 py-2 text-xs text-gold">
           <CloudOff className="size-3.5" />
           {data?.fromCache
             ? t("list.offline")
@@ -620,18 +620,18 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
               refetch();
             }}
           >
-            <RefreshCw className="size-3.25" /> {t("list.syncNow")}
+            <RefreshCw className="size-3.5" /> {t("list.syncNow")}
           </Button>
         </div>
       )}
 
-      <div className="border-b border-surface-800 px-8 pt-6">
+      <div className="border-b border-hair px-8 pt-6">
         <div className="flex items-center justify-between gap-4">
           <div className="flex min-w-0 items-baseline gap-2.5">
-            <h1 className="text-2xl font-bold text-ink-100">
+            <h1 className="text-title text-ink-100">
               {type === "ANIME" ? t("list.animeTitle") : t("list.mangaTitle")}
             </h1>
-            <span className="font-brand-jp text-[.8125rem] tracking-[.04em] text-ink-600">
+            <span className="font-brand-jp text-ui tracking-lockup text-ink-600">
               {type === "ANIME" ? t("list.animeNative") : t("list.mangaNative")}
             </span>
           </div>
@@ -642,7 +642,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
               size="control"
               onClick={() => (selectMode ? exitSelect() : setSelectMode(true))}
             >
-              <CheckSquare className="size-3.75" />
+              <CheckSquare className="size-4" />
               {t("bulk.select")}
             </Button>
             {/* The phone syncs by pulling the list down, so its corner holds what its toolbar has no room for. */}
@@ -663,9 +663,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
                 disabled={isRefetching}
                 aria-label={t("common.reload")}
               >
-                <RefreshCw
-                  className={cn("size-4", isRefetching && "animate-spin")}
-                />
+                <Spinner spinning={isRefetching} className="size-4" />
               </IconButton>
             )}
           </div>
@@ -783,7 +781,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
             )}
           />
         ) : phone ? (
-          <div className="overflow-hidden rounded-xl border border-surface-800">
+          <div className="overflow-hidden rounded-panel border border-hair">
             <VirtualGrid
               key={`phone-${layout}`}
               items={entries}
@@ -812,7 +810,7 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
             />
           </div>
         ) : (
-          <div className="overflow-hidden rounded-xl border border-surface-800">
+          <div className="overflow-hidden rounded-panel border border-hair">
             <ListHeader tier={tier} selectMode={selectMode} mediaType={type} cover={layout !== "text"} />
             {/* Keep one entry per row: two side by side made useColumnCount report 2, so the down arrow moved by two. */}
             <VirtualGrid
@@ -845,20 +843,24 @@ function ListView({ userId, type }: { userId: number; type: MediaType }) {
         )}
       </div>
 
-      {selectMode && (
-        <BulkBar
-          type={type}
-          count={selectedEntries.length}
-          onStatus={bulkStatus}
-          onScore={bulkScore}
-          onProgress={bulkProgress}
-          onRepeat={bulkRepeat}
-          onPrivate={bulkPrivate}
-          onDelete={bulkDelete}
-          onClear={exitSelect}
-          names={selectedEntries.map((e) => displayTitle(e.media.title))}
-        />
-      )}
+      {/* Presence, so the bar sinks away still showing the selection it had rather than a count of nought. */}
+      <Presence value={selectMode ? selectedEntries : null}>
+        {(chosen, leaving) => (
+          <BulkBar
+            leaving={leaving}
+            type={type}
+            count={chosen.length}
+            onStatus={bulkStatus}
+            onScore={bulkScore}
+            onProgress={bulkProgress}
+            onRepeat={bulkRepeat}
+            onPrivate={bulkPrivate}
+            onDelete={bulkDelete}
+            onClear={exitSelect}
+            names={chosen.map((e) => displayTitle(e.media.title))}
+          />
+        )}
+      </Presence>
 
       {/* Presence rather than a bare conditional: the dialog keeps its entry while it animates away. */}
       <Presence value={editing}>

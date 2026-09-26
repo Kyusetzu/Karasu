@@ -38,7 +38,7 @@ export function UserComments({
     return (
       <div className="space-y-2" aria-hidden="true">
         {[0, 1, 2, 3].map((i) => (
-          <Shimmer key={i} className="h-16 w-full rounded-xl" index={i} />
+          <Shimmer key={i} className="h-16 w-full rounded-panel" index={i} />
         ))}
       </div>
     );
@@ -101,18 +101,18 @@ export function UserComments({
           key={c.id}
           // The comment's own anchor, resolved by the thread page; a comment with no thread lands on the forum index.
           to={c.thread ? `/thread/${c.thread.id}?comment=${c.id}` : "/forum"}
-          className="block animate-rise-in rounded-xl border border-surface-800 p-3 transition-surface hover:border-surface-700 hover:bg-surface-900"
+          className="block animate-rise-in rounded-panel border border-hair p-3 transition-surface hover:border-surface-700 hover:bg-surface-900"
           style={{ animationDelay: `${staggerDelay(i)}ms` }}
         >
           <div className="flex items-center gap-2">
             <MessageSquare className="size-3.5 shrink-0 text-ink-600" />
-            <span className="min-w-0 truncate text-sm font-medium text-ink-200">
+            <span className="min-w-0 truncate text-sm font-medium text-ink-100">
               {c.thread?.title ?? t("social.untitledThread")}
             </span>
             <span className="ml-auto flex shrink-0 items-center gap-3 text-2xs text-ink-600">
               {(c.likeCount ?? 0) > 0 && (
                 <span className="flex items-center gap-1">
-                  <Heart className="size-3" /> {c.likeCount}
+                  <Heart className="size-3.5" /> {c.likeCount}
                 </span>
               )}
               {c.createdAt != null && relTimeFromSeconds(c.createdAt, i18n.language, t("notif.now"))}

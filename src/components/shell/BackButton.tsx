@@ -15,7 +15,7 @@ export default function BackButton({ className }: { className?: string }) {
       size="sm"
       onClick={() => navigate(-1)}
       className={cn(
-        "gap-1.5 border border-surface-700 bg-surface-900/80 shadow-lg backdrop-blur-sm",
+        "gap-1.5 border border-surface-700 bg-surface-900/80 shadow-float backdrop-blur-sm",
         "hover:bg-surface-800",
         className,
       )}

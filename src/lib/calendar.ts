@@ -45,6 +45,25 @@ export function bucketByLocalDay<T extends { airingAt: number }>(
   return out;
 }
 
+/** A stretch of the stacked views: one day with its items, or a run of adjacent days with none. */
+export interface DayRun<T> {
+  quiet: boolean;
+  days: number[];
+  items: T[];
+}
+
+/** Folds each run of adjacent empty days into one quiet run, leaving `keep` (today) a day of its own either way. */
+export function foldQuietDays<T>(days: number[], buckets: T[][], keep?: number): DayRun<T>[] {
+  const out: DayRun<T>[] = [];
+  days.forEach((day, i) => {
+    const quiet = buckets[i].length === 0 && day !== keep;
+    const last = out[out.length - 1];
+    if (quiet && last?.quiet) last.days.push(day);
+    else out.push({ quiet, days: [day], items: buckets[i] });
+  });
+  return out;
+}
+
 /** An upcoming episode of a show on the list — the zero-request lens. */
 export interface ListAiring {
   mediaId: number;

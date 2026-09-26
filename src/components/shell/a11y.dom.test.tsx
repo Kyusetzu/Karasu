@@ -9,6 +9,7 @@ import Titlebar from "./Titlebar";
 import Sidebar from "./Sidebar";
 import CommandPalette from "./CommandPalette";
 import KeyboardSheet from "./KeyboardSheet";
+import NotifSheet from "./NotifSheet";
 import FirstRun from "./FirstRun";
 import SessionExpired from "./SessionExpired";
 import Toast from "./Toast";
@@ -97,6 +98,8 @@ describe("the shell passes axe", () => {
       });
     });
     expect(screen.getByRole("combobox", { name: "palette.placeholder" })).toBeInTheDocument();
+    // The combobox keeps the caret; an option Tab could reach would be a second, unhighlighted cursor.
+    for (const option of screen.getAllByRole("option")) expect(option).toHaveAttribute("tabindex", "-1");
   });
 
   it("KeyboardSheet, open", async () => {
@@ -104,6 +107,13 @@ describe("the shell passes axe", () => {
       fireEvent.keyDown(window, { key: "?" });
     });
     expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
+  it("NotifSheet, open", async () => {
+    signIn();
+    const r = renderWithProviders(<NotifSheet open onClose={noop} />);
+    await screen.findByRole("dialog", { name: "notif.title" });
+    expect(await checkA11y(r.baseElement)).toHaveNoViolations();
   });
 
   it("FirstRun", async () => {

@@ -8,6 +8,26 @@ const SETTLE_MS = 220;
 /** Where the next tab starts its slide from, on the side the finger came from. */
 const ENTER_PX = 48;
 
+/** Moves the content with the drag, springs it back, or after a step slides the next one in from the drag's side. */
+export function swipePainter(content: RefObject<HTMLElement | null>) {
+  const paint = (offset: number, ms: number) => {
+    const node = content.current;
+    if (!node) return;
+    node.style.transition = ms ? `transform ${ms}ms var(--ease-out-expo)` : "none";
+    node.style.transform = offset ? `translateX(${offset}px)` : "";
+  };
+  return {
+    paint,
+    settle: () => paint(0, motionDuration(SETTLE_MS)),
+    enter: (step: 1 | -1) => {
+      const ms = motionDuration(SETTLE_MS);
+      paint(ms ? step * ENTER_PX : 0, 0);
+      // A frame later, so the start position is painted before the slide to rest begins.
+      if (ms) requestAnimationFrame(() => paint(0, ms));
+    },
+  };
+}
+
 /** A field, a canvas that pans, or a row that scrolls sideways under the finger handles the drag itself. */
 function claimedSideways(target: EventTarget | null, surface: HTMLElement): boolean {
   const start = target instanceof HTMLElement ? target : null;
@@ -49,17 +69,12 @@ export function useTabSwipe({
     let last = { x: 0, y: 0 };
     let axis: "x" | "y" | null = null;
 
-    const paint = (offset: number, ms: number) => {
-      const node = content.current;
-      if (!node) return;
-      node.style.transition = ms ? `transform ${ms}ms var(--ease-out-expo)` : "none";
-      node.style.transform = offset ? `translateX(${offset}px)` : "";
-    };
+    const { paint, settle, enter } = swipePainter(content);
     const release = () => {
       const wasSwiping = start !== null && axis === "x";
       start = null;
       axis = null;
-      if (wasSwiping) paint(0, motionDuration(SETTLE_MS));
+      if (wasSwiping) settle();
     };
 
     const onStart = (e: TouchEvent) => {
@@ -97,12 +112,9 @@ export function useTabSwipe({
       const step = tabSwipe({ dx: last.x - start.x, dy: last.y - start.y, width: el.clientWidth });
       start = null;
       axis = null;
-      if (step === null || !latest.current.canStep(step)) return paint(0, motionDuration(SETTLE_MS));
+      if (step === null || !latest.current.canStep(step)) return settle();
       latest.current.onStep(step);
-      const ms = motionDuration(SETTLE_MS);
-      paint(ms ? step * ENTER_PX : 0, 0);
-      // A frame later, so the start position is painted before the slide to rest begins.
-      if (ms) requestAnimationFrame(() => paint(0, ms));
+      enter(step);
     };
 
     el.addEventListener("touchstart", onStart, { passive: true });

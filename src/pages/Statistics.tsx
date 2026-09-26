@@ -25,7 +25,8 @@ import { Button } from "@/components/ui/button";
 import { Loader } from "@/components/ui/loader";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Avatar } from "@/components/ui/user-lockup";
-import { Tabs, type TabOption } from "@/components/ui/tabs";
+import { Segmented, type Segment } from "@/components/ui/segmented";
+import { StatusTabs, type StatusTab } from "@/components/ui/status-tabs";
 import {
   RadarChart,
   Sunburst,
@@ -92,7 +93,7 @@ export default function Statistics() {
     return (
       <div className="grid h-full place-items-center p-8">
         <div className="max-w-md text-center">
-          <h1 className="text-2xl font-bold">{t("stats.title")}</h1>
+          <h1 className="text-title">{t("stats.title")}</h1>
           <p className="mt-3 text-sm leading-relaxed text-ink-500">
             {t("stats.signInText")}
           </p>
@@ -243,11 +244,11 @@ function StatisticsContent({
   // One tab bar for both media types now, so switching type keeps the tab.
   const activeCategory = category;
 
-  const typeOptions: TabOption<MediaType>[] = [
+  const typeOptions: Segment<MediaType>[] = [
     { value: "ANIME", label: t("nav.list") },
     { value: "MANGA", label: t("nav.manga") },
   ];
-  const categoryOptions: TabOption<Category>[] = CATEGORIES.map((c) => ({
+  const categoryOptions: StatusTab<Category>[] = CATEGORIES.map((c) => ({
     value: c,
     label: t(`stats.${c}`),
   }));
@@ -262,8 +263,8 @@ function StatisticsContent({
         <div className="min-w-0 flex-1">
           {/* The same lockup the two list screens use: title, then its Japanese form a shade back. */}
           <div className="flex items-baseline gap-2.5">
-            <h1 className="text-xl font-bold">{t("stats.title")}</h1>
-            <span className="font-brand-jp text-[.8125rem] tracking-[.04em] text-ink-600">
+            <h1 className="text-xl">{t("stats.title")}</h1>
+            <span className="font-brand-jp text-ui tracking-lockup text-ink-600">
               統計
             </span>
           </div>
@@ -272,7 +273,7 @@ function StatisticsContent({
             href={siteUrl}
             className="flex items-center gap-1 text-xs text-accent-400 hover:underline"
           >
-            {name} <ExternalLink className="size-2.75" />
+            {name} <ExternalLink className="size-3.5" />
           </ExternalAnchor>
         </div>
         <Link to="/wrapped">
@@ -283,9 +284,15 @@ function StatisticsContent({
       </header>
 
       <div className="space-y-3">
-        <Tabs options={typeOptions} value={type} onChange={(v) => setView({ type: v })} />
-        <Tabs
-          options={categoryOptions}
+        <Segmented
+          aria-label={t("stats.mediaTypeLabel")}
+          segments={typeOptions}
+          value={type}
+          onChange={(v) => setView({ type: v })}
+        />
+        <StatusTabs
+          label={t("stats.sectionsLabel")}
+          tabs={categoryOptions}
           value={activeCategory}
           onChange={(v) => setView({ category: v })}
         />
@@ -891,19 +898,19 @@ function OverviewCharts({
         <Card className="flex h-full flex-col">
           <CardTitle>{t("stats.breakdown")}</CardTitle>
           <p className="mt-1 text-2xs text-ink-600">{t("stats.breakdownHint")}</p>
-          {/* Chart beside its key; a square ring at full card width makes the panel as tall as the page is wide. */}
-          <div className="mt-3 flex flex-1 items-center gap-6">
+          {/* Chart beside its key, the key dropping beneath only where the card is too narrow to read it beside the ring. */}
+          <div className="mt-3 flex flex-1 flex-wrap items-center gap-6">
             <div className="w-40 shrink-0 sm:w-48">
               <Sunburst data={breakdown} />
             </div>
-            <div className="min-w-0 flex-1 space-y-3">
+            <div className="min-w-36 flex-1 space-y-3">
               <ToneLegend
                 items={breakdown.map((b) => ({ label: b.label, value: b.value }))}
               />
               {/* The outer ring's key, so its formats are readable without hovering. */}
               {formatsInBreakdown.length > 0 && (
                 <div>
-                  <p className="mb-1.5 text-2xs uppercase tracking-[.1em] text-ink-600">
+                  <p className="mb-1.5 text-2xs uppercase tracking-eyebrow text-ink-600">
                     {t("stats.outerRing")}
                   </p>
                   <div className="flex flex-wrap gap-x-3 gap-y-1">
@@ -925,10 +932,12 @@ function OverviewCharts({
       <DistributionCard
         title={t("stats.lengths")}
         data={lengths.map((d) => ({
-          label: t(
-            type === "ANIME" ? "stats.lengthBucketEp" : "stats.lengthBucketCh",
-            { range: d.length },
-          ),
+          label:
+            type !== "ANIME"
+              ? t("stats.lengthBucketCh", { range: d.length })
+              : d.length === "1"
+                ? t("stats.lengthBucketEpOne", { range: d.length })
+                : t("stats.lengthBucketEp", { range: d.length }),
           count: d.count,
         }))}
       />

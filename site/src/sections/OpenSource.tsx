@@ -1,5 +1,5 @@
 import { Bug, GitBranch, MessageCircle, ShieldCheck } from "lucide-react";
-import { Reveal, Section } from "@/components/Section";
+import { Eyebrow, Reveal, Section } from "@/components/Section";
 import { ButtonLink } from "@/components/ui/button";
 import { LINKS } from "@/site.config";
 
@@ -45,7 +45,7 @@ export function OpenSource() {
       </Reveal>
 
       <div id="technology" className="mt-16 scroll-mt-16">
-        <p className="text-2xs font-semibold uppercase tracking-[.16em] text-ink-600">Made with</p>
+        <Eyebrow tone="muted">Made with</Eyebrow>
         <dl className="mt-4 grid gap-x-8 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
           {STACK.map(([name, what]) => (
             <div key={name} className="border-t border-hair pt-3">

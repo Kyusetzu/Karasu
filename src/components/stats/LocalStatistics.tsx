@@ -16,7 +16,7 @@ import {
   seasonalHistory,
 } from "@/lib/localStats";
 import { Card, CardTitle } from "@/components/ui/card";
-import { Tabs, type TabOption } from "@/components/ui/tabs";
+import { Segmented, type Segment } from "@/components/ui/segmented";
 import { Sunburst, ToneLegend, type Slice } from "@/components/stats/Charts";
 import { ScoreColumns, StatusBar, TileGrid } from "@/components/stats/panels";
 import { GradientBars } from "@/components/stats/GradientBars";
@@ -90,7 +90,7 @@ export default function LocalStatistics({
     [i18n.language],
   );
 
-  const typeOptions: TabOption<MediaType>[] = [
+  const typeOptions: Segment<MediaType>[] = [
     { value: "ANIME", label: t("nav.list") },
     { value: "MANGA", label: t("nav.manga") },
   ];
@@ -103,8 +103,8 @@ export default function LocalStatistics({
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline gap-2.5">
-            <h1 className="text-xl font-bold">{t("stats.title")}</h1>
-            <span className="font-brand-jp text-[.8125rem] tracking-[.04em] text-ink-600">
+            <h1 className="text-xl">{t("stats.title")}</h1>
+            <span className="font-brand-jp text-ui tracking-lockup text-ink-600">
               統計
             </span>
           </div>
@@ -112,7 +112,7 @@ export default function LocalStatistics({
         </div>
       </header>
 
-      <Tabs options={typeOptions} value={type} onChange={onType} />
+      <Segmented aria-label={t("stats.mediaTypeLabel")} segments={typeOptions} value={type} onChange={onType} />
 
       {isLoading && <Loader label={t("common.loading")} />}
       {error && (
@@ -153,12 +153,12 @@ export default function LocalStatistics({
               <Card className="flex h-full flex-col">
                 <CardTitle>{t("stats.breakdown")}</CardTitle>
                 <p className="mt-1 text-2xs text-ink-600">{t("stats.breakdownHint")}</p>
-                {/* Chart beside its key: the ring is square, so a full-width one makes the card as tall as the page is wide. */}
-                <div className="mt-3 flex flex-1 items-center gap-6">
+                {/* Chart beside its key, the key dropping beneath only where the card is too narrow to read it beside the ring. */}
+                <div className="mt-3 flex flex-1 flex-wrap items-center gap-6">
                   <div className="w-40 shrink-0 sm:w-48">
                     <Sunburst data={breakdown} />
                   </div>
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-36 flex-1">
                     <ToneLegend
                       items={breakdown.map((b) => ({ label: b.label, value: b.value }))}
                     />

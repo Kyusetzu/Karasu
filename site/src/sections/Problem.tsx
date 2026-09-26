@@ -1,5 +1,5 @@
 import { Check, X } from "lucide-react";
-import { Reveal, Section } from "@/components/Section";
+import { Eyebrow, Reveal, Section } from "@/components/Section";
 import { staggerDelay } from "@/lib/motion";
 
 const CHORES = [
@@ -34,11 +34,11 @@ export function Problem() {
       lede="Tracking is five small steps you repeat for every episode and every chapter. Karasu turns them into none."
     >
       <div className="mt-12 grid gap-8 lg:grid-cols-2 lg:gap-12">
-        <Reveal className="inset-well rounded-[.875rem] p-6">
-          <p className="text-2xs font-semibold uppercase tracking-[.16em] text-ink-600">By hand</p>
+        <Reveal className="inset-well rounded-panel p-6">
+          <Eyebrow tone="muted">By hand</Eyebrow>
           <ol className="mt-4 space-y-3">
             {CHORES.map((c, i) => (
-              <li key={c} className="flex items-center gap-3 text-[.9375rem] text-ink-500">
+              <li key={c} className="flex items-center gap-3 text-body text-ink-500">
                 <span className="grid size-6 shrink-0 place-items-center rounded-full border border-surface-700 text-2xs tabular-nums text-ink-600">
                   {i + 1}
                 </span>
@@ -49,7 +49,7 @@ export function Problem() {
           </ol>
         </Reveal>
         <div>
-          <p className="text-2xs font-semibold uppercase tracking-[.16em] text-accent-400">With Karasu</p>
+          <Eyebrow>With Karasu</Eyebrow>
           <ul className="mt-4 space-y-5">
             {ANSWERS.map((a, i) => (
               <Reveal as="li" key={a.title} delay={staggerDelay(i)} className="flex gap-3">
@@ -57,7 +57,7 @@ export function Problem() {
                   <Check className="size-3.5" aria-hidden="true" />
                 </span>
                 <div>
-                  <p className="font-brand text-[.9375rem] font-semibold text-ink-100">{a.title}</p>
+                  <p className="font-brand text-body font-semibold text-ink-100">{a.title}</p>
                   <p className="mt-1 text-sm leading-relaxed text-ink-500">{a.text}</p>
                 </div>
               </Reveal>

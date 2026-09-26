@@ -14,7 +14,7 @@
         android:id="@+id/w_title"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:textColor="#8B9DFF"
+        android:textColor="#8077d7"
         android:textSize="11sp"
         android:textStyle="bold"
         android:letterSpacing="0.12"
@@ -34,7 +34,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp"
-        android:textColor="#6B7288"
+        android:textColor="#868c99"
         android:textSize="11sp"
         android:maxLines="1"
         android:visibility="gone" />

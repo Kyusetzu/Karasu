@@ -37,6 +37,9 @@ export interface NotifGroup {
   label: GroupLabel | null;
 }
 
+/** Which side of the stream a surface shows: everything, Karasu's own notices, or AniList's. */
+export type NotifSource = "all" | "karasu" | "anilist";
+
 /** Two days: an evening's like-spree groups, a months-later like does not. */
 const WINDOW_MS = 48 * 60 * 60 * 1000;
 
@@ -143,4 +146,19 @@ export function buildGroups(items: UnifiedNotif[]): NotifGroup[] {
     unread: b.items.some((n) => n.unread),
     label: labelFor(b.items),
   }));
+}
+
+/** The groups split at the viewer's local midnight, order kept; a section with nothing in it is left out. */
+export function sectionByDay(
+  groups: NotifGroup[],
+  nowMs: number,
+): { day: "today" | "earlier"; groups: NotifGroup[] }[] {
+  const midnight = new Date(nowMs);
+  midnight.setHours(0, 0, 0, 0);
+  const cut = midnight.getTime();
+  const sections: { day: "today" | "earlier"; groups: NotifGroup[] }[] = [
+    { day: "today", groups: groups.filter((g) => g.atMs >= cut) },
+    { day: "earlier", groups: groups.filter((g) => g.atMs < cut) },
+  ];
+  return sections.filter((s) => s.groups.length > 0);
 }

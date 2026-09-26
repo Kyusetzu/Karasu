@@ -21,6 +21,7 @@ describe("resolvePane", () => {
   it("sends a retired pane where its contents went", () => {
     expect(resolvePane("content")).toBe("appearance");
     expect(resolvePane("integrations")).toBe("desktop");
+    expect(resolvePane("anilist")).toBe("account");
   });
 
   /** An alias pointing at a pane that no longer exists is worse than none. */

@@ -5,6 +5,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { CornerDownRight, ExternalLink, Heart, Reply } from "lucide-react";
 import type { FlatComment } from "@/lib/comments";
 import { UserLockup } from "@/components/ui/user-lockup";
+import { cardClass } from "@/components/ui/card";
 import { Markdown } from "./Markdown";
 import { relTimeFromSeconds } from "@/lib/relTime";
 import { prefersReducedMotion } from "@/lib/motion";
@@ -50,16 +51,17 @@ export function CommentTree({
           key={c.id}
           ref={c.id === highlightId ? highlightRef : undefined}
           className={cn(
-            "rounded-xl border border-surface-800 bg-surface-900 p-3",
+            cardClass(c.depth === 1 ? "sunken" : "flat"),
+            "rounded-panel p-3",
             // A reply is indented and quieter, so the two levels read apart without a connector line.
-            c.depth === 1 && "ml-6 border-surface-850 bg-surface-950",
+            c.depth === 1 && "ml-6 border-surface-850",
             c.id === highlightId && "border-accent-500/70 ring-1 ring-accent-500/30",
           )}
         >
           <div className="flex items-start justify-between gap-2">
             <div className="flex min-w-0 items-center gap-1.5">
               {c.depth === 1 && (
-                <CornerDownRight className="size-3 shrink-0 text-ink-600" />
+                <CornerDownRight className="size-3.5 shrink-0 text-ink-600" />
               )}
               <Link
                 to={`/user/${encodeURIComponent(c.user?.name ?? "")}`}
@@ -85,7 +87,7 @@ export function CommentTree({
                 title={t("social.openOnAniList")}
                 className="shrink-0 text-ink-600 transition-surface hover:text-ink-300"
               >
-                <ExternalLink className="size-3" />
+                <ExternalLink className="size-3.5" />
               </button>
             )}
           </div>
@@ -98,20 +100,20 @@ export function CommentTree({
                 onClick={() => onLike(c)}
                 aria-pressed={c.isLiked}
                 className={cn(
-                  "flex items-center gap-1 rounded-md px-1.5 py-0.5 text-2xs transition-surface hover:bg-surface-850",
+                  "flex items-center gap-1 rounded-inner px-1.5 py-0.5 text-2xs transition-surface hover:bg-surface-850",
                   c.isLiked ? "text-danger" : "text-ink-600 hover:text-ink-300",
                 )}
               >
-                <Heart className={cn("size-2.75", c.isLiked && "fill-current")} />
+                <Heart className={cn("size-3.5", c.isLiked && "fill-current")} />
                 <span className="tabular-nums">{c.likeCount}</span>
               </button>
             )}
             {onReply && (
               <button
                 onClick={() => onReply(c)}
-                className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-2xs text-ink-600 transition-surface hover:bg-surface-850 hover:text-ink-300"
+                className="flex items-center gap-1 rounded-inner px-1.5 py-0.5 text-2xs text-ink-600 transition-surface hover:bg-surface-850 hover:text-ink-300"
               >
-                <Reply className="size-2.75" />
+                <Reply className="size-3.5" />
                 {t("social.reply")}
               </button>
             )}

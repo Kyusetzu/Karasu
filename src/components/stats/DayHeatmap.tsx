@@ -56,7 +56,7 @@ export function DayHeatmap({
             {dayLabels.map((d, i) => (
               <span
                 key={i}
-                className="flex h-3 items-center justify-end text-[.5625rem] leading-none text-ink-600"
+                className="flex h-3 items-center justify-end text-2xs leading-none text-ink-600"
               >
                 {i % 2 === 1 ? d : ""}
               </span>
@@ -74,7 +74,7 @@ export function DayHeatmap({
                 }}
               >
                 {/* The month band rides on its own column, so it stays aligned when the grid scrolls sideways. */}
-                <span className="h-3 overflow-visible whitespace-nowrap text-[.5625rem] leading-none text-ink-600">
+                <span className="h-3 overflow-visible whitespace-nowrap text-2xs leading-none text-ink-600">
                   {month !== undefined ? monthLabels[month] : ""}
                 </span>
                 {week.map((cell, di) => (
@@ -89,8 +89,8 @@ export function DayHeatmap({
                     }
                     className={
                       cell
-                        ? "size-3 rounded-[.1875rem] bg-surface-800"
-                        : "size-3 rounded-[.1875rem]"
+                        ? "size-3 rounded-mark bg-surface-800"
+                        : "size-3 rounded-mark"
                     }
                     style={
                       cell && cell.level > 0
@@ -114,7 +114,7 @@ export function DayHeatmap({
             <span
               key={a}
               data-keep-colors
-              className="size-3 rounded-[.1875rem]"
+              className="size-3 rounded-mark"
               style={{ background: `rgba(var(--accent-rgb), ${a})` }}
             />
           ))}

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import ActionSheet from "./ActionSheet";
 import type { Action } from "@/lib/actions";
 
@@ -73,13 +74,14 @@ describe("ActionSheet", () => {
     );
   });
 
-  it("steps out of a submenu on Escape before it closes", () => {
+  it("steps out of a submenu on Escape before it closes", async () => {
+    const user = userEvent.setup({ delay: null });
     const { onClose } = sheet();
-    fireEvent.click(screen.getByRole("button", { name: "actions.changeStatus" }));
-    fireEvent.keyDown(window, { key: "Escape" });
+    await user.click(screen.getByRole("button", { name: "actions.changeStatus" }));
+    await user.keyboard("{Escape}");
     expect(onClose).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "common.plusOne" })).toBeInTheDocument();
-    fireEvent.keyDown(window, { key: "Escape" });
+    await user.keyboard("{Escape}");
     expect(onClose).toHaveBeenCalled();
   });
 

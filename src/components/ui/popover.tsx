@@ -1,19 +1,7 @@
-import {
-  useCallback,
-  useEffect,
-  useId,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type KeyboardEvent,
-  type ReactNode,
-  type RefObject,
-} from "react";
-import { createPortal } from "react-dom";
-import { useTranslation } from "react-i18next";
-import { usePresence } from "@/hooks/usePresence";
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode, type RefObject } from "react";
+import { Popover as BasePopover } from "@base-ui/react/popover";
 import { afterBackSettles, useBackClose } from "@/hooks/useBackClose";
-import { useDialogFocus } from "@/hooks/useDialogFocus";
+import { Sheet } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 
 /** What the trigger must carry: the toggle, its state for assistive tech, and the ref focus returns to. */
@@ -31,6 +19,10 @@ export interface PopoverApi {
   closeThen: (fn: () => void) => void;
 }
 
+/** How long a resting mouse takes to open a hover dropdown, and how long it may stray before it closes. */
+const HOVER_OPEN_MS = 120;
+const HOVER_CLOSE_MS = 220;
+
 /** A dialog tied to a trigger: an anchored dropdown on the desktop, a bottom sheet on the phone; the caller picks. */
 export function Popover({
   label,
@@ -38,8 +30,12 @@ export function Popover({
   align = "start",
   width = 360,
   renderTrigger,
+  anchorRef,
+  openOnHover = false,
   onOpen,
   onClosed,
+  className,
+  panelClassName,
   children,
 }: {
   label: string;
@@ -48,23 +44,30 @@ export function Popover({
   /** The dropdown's width in px; the sheet always spans the screen. */
   width?: number;
   renderTrigger: (props: PopoverTriggerProps) => ReactNode;
+  /** What the dropdown lines up with and listens to for hover, when that is more than the trigger button. */
+  anchorRef?: RefObject<HTMLElement | null>;
+  /** Opens the dropdown under a resting mouse and closes it when the mouse leaves; touch and keys still press. */
+  openOnHover?: boolean;
   /** Runs before the panel's history entry is pushed, the last moment a caller may still write the URL itself. */
   onOpen?: () => void;
   /** Runs as the panel closes, before any `closeThen` action; a URL write from here must wait on `afterBackSettles`. */
   onClosed?: () => void;
+  /** On the box around the trigger, for a trigger that has to grow with its row. */
+  className?: string;
+  /** On the panel itself, for content that draws its own edges, such as rows that run to the border. */
+  panelClassName?: string;
   children: (api: PopoverApi) => ReactNode;
 }) {
   const [open, setOpen] = useState(false);
-  const presence = usePresence(open);
   const id = useId();
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const boxRef = useRef<HTMLDivElement>(null);
   const pending = useRef<(() => void) | null>(null);
   const wasOpen = useRef(false);
   const closedRef = useRef(onClosed);
   closedRef.current = onClosed;
 
-  useBackClose(open, () => setOpen(false));
+  // The sheet registers its own back entry through `Sheet`; the dropdown's is here.
+  useBackClose(open && variant === "dropdown", () => setOpen(false));
 
   // After `useBackClose`'s cleanup has queued its unwinding `back()`, so a `closeThen` action waits for that popstate.
   useEffect(() => {
@@ -80,162 +83,172 @@ export function Popover({
     if (then) afterBackSettles(then);
   }, [open]);
 
+  const openNow = useRef(open);
+  openNow.current = open;
   const close = useCallback(() => setOpen(false), []);
   const closeThen = useCallback((fn: () => void) => {
+    // Already shut, by Escape or an outside press while the caller awaited: run it, or it would wait for the next close.
+    if (!openNow.current) {
+      afterBackSettles(fn);
+      return;
+    }
     pending.current = fn;
     // Before the panel unmounts, so a dialog opened by `fn` records the trigger as the place to return to.
     triggerRef.current?.focus();
     setOpen(false);
   }, []);
 
-  // The sheet has its own backdrop; the dropdown closes on a press anywhere outside the trigger and the panel.
+  // Closed on the press itself, before Base UI's click: a chip pressed outside must write after the panel, not before.
   useEffect(() => {
     if (!open || variant === "sheet") return;
     const onDown = (e: PointerEvent) => {
-      if (!boxRef.current?.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (triggerRef.current?.contains(target) || document.getElementById(id)?.contains(target)) return;
+      setOpen(false);
     };
     window.addEventListener("pointerdown", onDown);
     return () => window.removeEventListener("pointerdown", onDown);
-  }, [open, variant]);
+  }, [open, variant, id]);
 
   const openRef = useRef(onOpen);
   openRef.current = onOpen;
-  const toggle = () => {
-    if (open) return setOpen(false);
+  // A hover-opened panel takes no focus and gives none back, and it closes when the mouse leaves; a press keeps it.
+  const openedBy = useRef<"press" | "hover">("press");
+  const hoverTimer = useRef(0);
+  // Whether a hover open still stands; leaving, a press or the hover being switched off withdraws it.
+  const hoverWanted = useRef(false);
+  const cancelHover = () => {
+    hoverWanted.current = false;
+    window.clearTimeout(hoverTimer.current);
+  };
+  const show = (by: "press" | "hover") => {
     // Deferred, so a sibling closed by this same press has unwound its entry before this one is pushed.
     afterBackSettles(() => {
+      if (by === "hover" && !hoverWanted.current) return;
+      openedBy.current = by;
       openRef.current?.();
       setOpen(true);
     });
   };
-
-  // On the panel, bubbling: a dialog opened above it keeps its own Escape.
-  const onKeyDown = (e: KeyboardEvent) => {
-    if (e.key !== "Escape") return;
-    e.preventDefault();
-    triggerRef.current?.focus();
-    setOpen(false);
+  const adopt = () => {
+    openedBy.current = "press";
+  };
+  const toggle = () => {
+    cancelHover();
+    // A press on a panel the mouse opened adopts it, rather than closing what the user just reached for.
+    if (open && openedBy.current === "hover") {
+      openedBy.current = "press";
+      return;
+    }
+    if (open) return setOpen(false);
+    show("press");
   };
 
+  const hovering = openOnHover && variant === "dropdown";
+  const hoverEnter = useRef((_e: PointerEvent) => {});
+  const hoverLeave = useRef((_e: PointerEvent) => {});
+  hoverEnter.current = (e) => {
+    if (e.pointerType !== "mouse") return;
+    cancelHover();
+    if (openNow.current) return;
+    hoverTimer.current = window.setTimeout(() => {
+      hoverWanted.current = true;
+      show("hover");
+    }, HOVER_OPEN_MS);
+  };
+  hoverLeave.current = (e) => {
+    if (e.pointerType !== "mouse") return;
+    cancelHover();
+    hoverTimer.current = window.setTimeout(() => {
+      if (openedBy.current === "hover") setOpen(false);
+    }, HOVER_CLOSE_MS);
+  };
+  const cancelRef = useRef(cancelHover);
+  cancelRef.current = cancelHover;
+  useEffect(() => {
+    const el = anchorRef?.current ?? triggerRef.current;
+    if (!hovering || !el) return;
+    const enter = (e: PointerEvent) => hoverEnter.current(e);
+    const leave = (e: PointerEvent) => hoverLeave.current(e);
+    // A press anywhere on the anchor decides for itself, so a hover open still counting down gives way to it.
+    const press = () => cancelRef.current();
+    el.addEventListener("pointerenter", enter);
+    el.addEventListener("pointerleave", leave);
+    el.addEventListener("pointerdown", press);
+    return () => {
+      el.removeEventListener("pointerenter", enter);
+      el.removeEventListener("pointerleave", leave);
+      el.removeEventListener("pointerdown", press);
+      cancelRef.current();
+    };
+  }, [hovering, anchorRef]);
+  // Switched off while a panel the mouse opened is up and untouched, it goes, since no leave will close it any more.
+  useEffect(() => {
+    if (!hovering && openNow.current && openedBy.current === "hover") setOpen(false);
+  }, [hovering]);
+
   const api: PopoverApi = { close, closeThen };
-  const panel = presence.mounted && (
-    <Panel
-      id={id}
-      label={label}
-      variant={variant}
-      align={align}
-      width={width}
-      leaving={presence.leaving}
-      onKeyDown={onKeyDown}
-      onClose={close}
-    >
-      {children(api)}
-    </Panel>
-  );
+  const panel =
+    variant === "sheet" ? (
+      <Sheet open={open} id={id} label={label} onClose={close} className={cn("p-4", panelClassName)}>
+        {children(api)}
+      </Sheet>
+    ) : (
+      <BasePopover.Root
+        open={open}
+        onOpenChange={(next, details) => {
+          // A press on the trigger is the trigger's own toggle, which would otherwise close and reopen the panel.
+          const target = details.event?.target;
+          if (details.reason === "outside-press" && target instanceof Node && triggerRef.current?.contains(target)) return;
+          if (!next) setOpen(false);
+        }}
+      >
+        <BasePopover.Portal>
+          <BasePopover.Positioner
+            anchor={anchorRef ?? triggerRef}
+            side="bottom"
+            align={align}
+            sideOffset={8}
+            collisionPadding={8}
+            className="z-50"
+          >
+            {/* Owns the keyboard while up, exit included, so a list shortcut cannot fire behind it. */}
+            <BasePopover.Popup
+              id={id}
+              aria-label={label}
+              data-overlay
+              initialFocus={() => openedBy.current === "press"}
+              finalFocus={() => (openedBy.current === "press" ? triggerRef.current : false)}
+              onPointerEnter={hovering ? (e) => hoverEnter.current(e.nativeEvent) : undefined}
+              onPointerLeave={hovering ? (e) => hoverLeave.current(e.nativeEvent) : undefined}
+              // Working inside a panel the mouse opened makes it the user's, so leaving no longer shuts it on them.
+              onPointerDown={adopt}
+              onFocus={adopt}
+              style={{ width }}
+              className={cn(
+                "max-h-[min(var(--available-height),34rem)] max-w-[calc(100vw-2rem)] overflow-y-auto outline-none",
+                "rounded-panel border border-hair bg-surface-900 p-4 text-left shadow-float panel-wash",
+                "origin-(--transform-origin) data-open:animate-pop-in data-closed:animate-pop-out",
+                panelClassName,
+              )}
+            >
+              {children(api)}
+            </BasePopover.Popup>
+          </BasePopover.Positioner>
+        </BasePopover.Portal>
+      </BasePopover.Root>
+    );
 
   return (
-    <div ref={boxRef} className="relative inline-flex shrink-0">
+    <div className={cn("relative inline-flex shrink-0", className)}>
       {renderTrigger({
         ref: triggerRef,
         onClick: toggle,
         "aria-expanded": open,
         "aria-haspopup": "dialog",
-        "aria-controls": presence.mounted ? id : undefined,
+        "aria-controls": open ? id : undefined,
       })}
-      {variant === "sheet" && panel ? createPortal(panel, document.body) : panel}
-    </div>
-  );
-}
-
-/** Mounted only while shown, so the focus hook runs once per opening and restores to the trigger on the way out. */
-function Panel({
-  id,
-  label,
-  variant,
-  align,
-  width,
-  leaving,
-  onKeyDown,
-  onClose,
-  children,
-}: {
-  id: string;
-  label: string;
-  variant: "dropdown" | "sheet";
-  align: "start" | "end";
-  width: number;
-  leaving: boolean;
-  onKeyDown: (e: KeyboardEvent) => void;
-  onClose: () => void;
-  children: ReactNode;
-}) {
-  const { t } = useTranslation();
-  const ref = useRef<HTMLDivElement>(null);
-  const [shift, setShift] = useState(0);
-  useDialogFocus(ref, !leaving);
-
-  // A trigger near the window's edge would push its panel off screen; nudged back inside with a margin to spare.
-  useLayoutEffect(() => {
-    if (variant !== "dropdown" || !ref.current) return;
-    const r = ref.current.getBoundingClientRect();
-    const edge = 8;
-    let dx = 0;
-    if (r.right > window.innerWidth - edge) dx = window.innerWidth - edge - r.right;
-    if (r.left + dx < edge) dx = edge - r.left;
-    setShift(dx);
-  }, [variant]);
-
-  if (variant === "dropdown") {
-    return (
-      <div
-        ref={ref}
-        id={id}
-        role="dialog"
-        aria-label={label}
-        data-overlay
-        // Focusable by script and click only, so a press on the panel's text keeps Escape reaching it.
-        tabIndex={-1}
-        onKeyDown={onKeyDown}
-        // `translate`, not `transform`, which the pop animation owns.
-        style={{ width, translate: shift ? `${shift}px 0` : undefined }}
-        className={cn(
-          "absolute top-full z-50 mt-2 max-h-[min(70vh,34rem)] max-w-[calc(100vw-2rem)] overflow-y-auto outline-none",
-          "rounded-xl border border-hair bg-surface-900 p-4 text-left shadow-2xl panel-wash",
-          align === "end" ? "right-0" : "left-0",
-          leaving ? "animate-pop-out" : "animate-pop-in",
-        )}
-      >
-        {children}
-      </div>
-    );
-  }
-
-  return (
-    // Kept while leaving, so a keypress on the last frame cannot reach the list behind the sheet.
-    <div data-overlay className={cn("fixed inset-0 z-[100]", leaving ? "animate-fade-out" : "animate-fade-in")}>
-      <button
-        type="button"
-        aria-label={t("window.close")}
-        className="absolute inset-0 bg-[rgba(4,5,8,.55)]"
-        onClick={onClose}
-      />
-      <div
-        ref={ref}
-        id={id}
-        role="dialog"
-        aria-label={label}
-        tabIndex={-1}
-        onKeyDown={onKeyDown}
-        className={cn(
-          // Clears the bottom bar and the gesture area; `max-h` plus scroll so a long panel never hides its top.
-          "absolute inset-x-2 bottom-[calc(var(--shell-bottom,0px)+0.5rem)] max-h-[75vh] overflow-y-auto outline-none",
-          "rounded-2xl border border-surface-700 bg-surface-900 p-4 shadow-[0_1rem_3rem_rgba(0,0,0,.6)]",
-          leaving ? "animate-rise-out" : "animate-rise-in",
-        )}
-      >
-        <div aria-hidden className="mx-auto mb-3 h-1 w-10 rounded-full bg-surface-700" />
-        {children}
-      </div>
+      {panel}
     </div>
   );
 }

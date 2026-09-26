@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Hand-written (restore from git after a wiped re-init). -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android">
-    <solid android:color="#0C0E14" />
+    <solid android:color="#0b0d12" />
     <corners android:radius="16dp" />
-    <stroke android:width="1dp" android:color="#1B2030" />
+    <stroke android:width="1dp" android:color="#1f232b" />
 </shape>

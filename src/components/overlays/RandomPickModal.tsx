@@ -63,7 +63,7 @@ export default function RandomPickModal({
               <img
                 src={picked.media.coverImage.large ?? ""}
                 alt=""
-                className="h-40 w-28 shrink-0 rounded-lg object-cover"
+                className="h-40 w-28 shrink-0 rounded-control object-cover"
               />
             </Link>
             <div className="flex min-w-0 flex-1 flex-col">
@@ -81,7 +81,7 @@ export default function RandomPickModal({
                   </Button>
                 </Link>
                 <Button variant="secondary" onClick={() => setNonce((n) => n + 1)}>
-                  <Dices className="size-3.75" /> {t("random.reroll")}
+                  <Dices className="size-4" /> {t("random.reroll")}
                 </Button>
               </div>
             </div>

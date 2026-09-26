@@ -17,7 +17,7 @@ function Item({ q, a, index }: { q: string; a: string; index: number }) {
           onClick={() => setOpen((v) => !v)}
           className="flex w-full items-center justify-between gap-4 py-4 text-left transition-surface hover:text-ink-100 focus-visible:outline-2 focus-visible:outline-accent-500"
         >
-          <span className="font-brand text-[.9375rem] font-semibold text-ink-100">
+          <span className="font-brand text-body font-semibold text-ink-100">
             <span className="mr-2 text-2xs tabular-nums text-ink-600">{String(index + 1).padStart(2, "0")}</span>
             {q}
           </span>

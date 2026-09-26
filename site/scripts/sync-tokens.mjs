@@ -10,7 +10,14 @@
  * takes the blocks that *are* the design language (the `@theme`, every
  * `@keyframes` and `@utility`, the `:root` vars, both theme blocks, the
  * reduced-motion, forced-colours and scrollbar rules), leaves the rest, and
- * appends the default accent evaluated through the app's own function.
+ * appends the default accent evaluated through the app's own function, in its
+ * dark, light and high-contrast forms.
+ *
+ * The app keys high contrast on `:root[data-contrast="more"]`, a setting the
+ * site does not have. The dark half of those rules is taken and rewritten into
+ * `@media (prefers-contrast: more)`, top-level and nested alike, so the site
+ * answers the OS request instead; a selector list the rewrite cannot keep
+ * exact stops the sync rather than widening a rule.
  *
  *   node scripts/sync-tokens.mjs            write the file
  *   node scripts/sync-tokens.mjs --check    exit 1 if the committed file is stale
@@ -30,7 +37,7 @@ const REPO = path.resolve(SITE, "..");
 const SOURCE = path.join(REPO, "src", "app", "index.css");
 const CONTRAST = path.join(REPO, "src", "lib", "contrast.ts");
 const OUT = path.join(SITE, "src", "styles", "tokens.generated.css");
-const DEFAULT_ACCENT = "#4b3fc7"; // src/stores/theme.ts DEFAULT_ACCENT
+const DEFAULT_ACCENT = "#4b3fc7"; // src/lib/designTokens.ts DEFAULT_ACCENT
 
 const args = new Set(process.argv.slice(2));
 
@@ -107,9 +114,142 @@ function taken(head, body = "") {
   if (head === "@media (prefers-reduced-motion: reduce)") return true;
   if (head.startsWith("html[data-reduce-motion]")) return true;
   if (head === "@media (forced-colors: active)") return true;
-  if (head === "@media (prefers-contrast: more)") return true;
+  // The app's high-contrast setting, dark half only: the site stays dark and answers the OS request instead.
+  if (head.startsWith(':root[data-contrast="more"]') && !head.includes("data-theme")) return true;
   if (head.startsWith("*::-webkit-scrollbar")) return true;
   return false;
+}
+
+const CONTRAST_ROOT = ':root[data-contrast="more"]';
+
+/** Rewrites a block keyed on the app's contrast attribute into the media query a page without the setting has. */
+function forSite(s) {
+  if (!s.head.startsWith(CONTRAST_ROOT)) return { ...s, body: nestedContrast(s.body, s.head) };
+  const plain = masked(s.body);
+  keyedList(s.body, plain, 0, plain.indexOf("{"), "the top level");
+  const inner = s.body.replaceAll(CONTRAST_ROOT, ":root").replace(/^/gm, "  ");
+  return { ...s, body: `@media (prefers-contrast: more) {\n${inner}\n}` };
+}
+
+/**
+ * The text with the parts that are not CSS structure neutralised, index for
+ * index: a comment becomes spaces, and a brace, bracket, parenthesis, comma
+ * or semicolon inside a string (escapes honoured) becomes an underscore. A
+ * scan of the result sees rules and selectors only; the original supplies
+ * the text at the same positions.
+ */
+function masked(text) {
+  const structural = /[{}()[\];,]/;
+  let out = "";
+  let quote = null;
+  for (let k = 0; k < text.length; k++) {
+    const c = text[k];
+    if (quote) {
+      if (c === "\\" && k + 1 < text.length) {
+        out += c + (structural.test(text[k + 1]) ? "_" : text[k + 1]);
+        k++;
+      } else {
+        if (c === quote) quote = null;
+        out += structural.test(c) ? "_" : c;
+      }
+    } else if (text.startsWith("/*", k)) {
+      const end = text.indexOf("*/", k + 2);
+      const stop = end === -1 ? text.length : end + 2;
+      out += text.slice(k, stop).replace(/[^\n]/g, " ");
+      k = stop - 1;
+    } else if (c === "\\" && k + 1 < text.length) {
+      out += c + text[k + 1];
+      k++;
+    } else {
+      if (c === '"' || c === "'") quote = c;
+      out += c;
+    }
+  }
+  return out;
+}
+
+/**
+ * The selectors of the list at [from, to) with the contrast root taken off,
+ * split at the masked text's top-level commas so `:is(a, b)`, a comment and
+ * a string keep their commas. Throws when only some selectors carry the
+ * root: moving such a rule under the media query would take the others with
+ * it, and a sync that stops is better than a stylesheet that silently
+ * changes meaning.
+ */
+function keyedList(text, plain, from, to, where) {
+  const parts = [];
+  let depth = 0;
+  let start = from;
+  for (let k = from; k <= to; k++) {
+    const c = plain[k];
+    if (c === "(" || c === "[") depth++;
+    else if (c === ")" || c === "]") depth--;
+    else if (k === to || (c === "," && depth === 0)) {
+      parts.push([start, k]);
+      start = k + 1;
+    }
+  }
+  const out = [];
+  for (const [a, b] of parts) {
+    const lead = plain.slice(a, b).search(/\S/);
+    const at = a + lead;
+    if (lead === -1 || !plain.startsWith(CONTRAST_ROOT, at)) {
+      throw new Error(
+        `sync-tokens: cannot move "${text.slice(from, to).trim()}" (in ${where}) under prefers-contrast — ` +
+          `split the rule so every selector in it starts with ${CONTRAST_ROOT}`,
+      );
+    }
+    // Emptiness is read on the masked text, so a root followed by nothing but a comment still becomes `:root`.
+    const rest = at + CONTRAST_ROOT.length;
+    out.push(plain.slice(rest, b).trim() ? text.slice(rest, b).trim() : ":root");
+  }
+  return out;
+}
+
+/** Where the brace opened at `open` closes, in masked text. */
+function matchingBrace(plain, open) {
+  let depth = 0;
+  for (let k = open; k < plain.length; k++) {
+    if (plain[k] === "{") depth++;
+    else if (plain[k] === "}" && --depth === 0) return k;
+  }
+  throw new Error("sync-tokens: unbalanced braces in the source stylesheet");
+}
+
+/**
+ * The same for a rule nested inside another block — a utility's
+ * `:root[data-contrast="more"] & { … }` — which the page answers as
+ * `@media (prefers-contrast: more) { & { … } }` in the same place. The scan
+ * reads the masked text, so a comment or a string that quotes the selector
+ * is copied as it stands.
+ */
+function nestedContrast(body, where) {
+  const plain = masked(body);
+  let out = "";
+  let emitted = 0;
+  let prelude = 0;
+  for (let j = 0; j < plain.length; j++) {
+    const c = plain[j];
+    if (c === ";" || c === "}") {
+      prelude = j + 1;
+      continue;
+    }
+    if (c !== "{") continue;
+    if (!plain.slice(prelude, j).includes(CONTRAST_ROOT)) {
+      prelude = j + 1;
+      continue;
+    }
+    const list = keyedList(body, plain, prelude, j, where);
+    const close = matchingBrace(plain, j);
+    const first = prelude + plain.slice(prelude, j).search(/\S/);
+    const indent = /^[ \t]*/.exec(body.slice(body.lastIndexOf("\n", first) + 1))[0];
+    const inner = body.slice(j + 1, close).replace(/\n/g, "\n  ");
+    out += `${body.slice(emitted, first)}@media (prefers-contrast: more) {\n${indent}  ${list.join(`,\n${indent}  `)} {${inner}}\n${indent}}`;
+    emitted = close + 1;
+    j = close;
+    prelude = close + 1;
+  }
+  return out + body.slice(emitted);
 }
 
 function fileUrl(p) {
@@ -131,8 +271,9 @@ async function accentBlocks() {
     ].join("\n");
   const dark = accentShades(DEFAULT_ACCENT, { light: false });
   const light = accentShades(DEFAULT_ACCENT, { light: true });
+  const high = accentShades(DEFAULT_ACCENT, { light: false, contrast: "high" });
   return [
-    `/* The default accent (${DEFAULT_ACCENT}, src/stores/theme.ts) as the theme store`,
+    `/* The default accent (${DEFAULT_ACCENT}, src/lib/designTokens.ts) as the theme store`,
     `   writes it at runtime — computed through src/lib/contrast.ts at sync time,`,
     `   never typed by hand. The @theme fallbacks above are not these colours. */`,
     `:root {`,
@@ -142,6 +283,12 @@ async function accentBlocks() {
     `:root[data-theme="light"] {`,
     render(light),
     `}`,
+    ``,
+    `@media (prefers-contrast: more) {`,
+    `  :root {`,
+    render(high).replace(/^/gm, "  "),
+    `  }`,
+    `}`,
   ].join("\n");
 }
 
@@ -149,7 +296,7 @@ async function generate() {
   const css = readFileSync(SOURCE, "utf8").replace(/\r\n/g, "\n");
   const digest = createHash("sha256").update(css).digest("hex").slice(0, 12);
   const parts = statements(css);
-  const kept = parts.filter((s) => taken(s.head, s.body));
+  const kept = parts.filter((s) => taken(s.head, s.body)).map(forSite);
   const header = [
     `/* GENERATED from src/app/index.css (sha256 ${digest}) by site/scripts/sync-tokens.mjs`,
     `   — do not edit. Re-run \`npm run sync\` after changing the source; \`npm run check\``,

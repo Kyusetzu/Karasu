@@ -65,3 +65,34 @@ export function swipeOffset(dx: number, hasNeighbour: boolean): number {
 export function isEdgeStart(x: number, width: number): boolean {
   return x < EDGE_GUARD_PX || x > width - EDGE_GUARD_PX;
 }
+
+/** How far a sideways trackpad scroll travels before it counts as one swipe. */
+export const WHEEL_STEP_PX = 60;
+/** A pause this long between wheel events ends a gesture, so a swipe's momentum tail cannot fire a second step. */
+export const WHEEL_QUIET_MS = 200;
+
+export interface WheelGesture {
+  /** The sideways distance scrolled so far, signed like `deltaX`: positive is toward the next item. */
+  sum: number;
+  /** When its last event arrived, in the event's own clock. */
+  at: number;
+  /** Whether it has stepped already; one gesture is one step however far it runs. */
+  fired: boolean;
+}
+
+/** One wheel event folded into the running gesture, plus the step it completes; a mostly vertical scroll is none. */
+export function wheelStep(
+  gesture: WheelGesture | null,
+  { dx, dy, t }: { dx: number; dy: number; t: number },
+): { gesture: WheelGesture | null; step: 1 | -1 | null } {
+  if (!Number.isFinite(dx) || !Number.isFinite(dy) || Math.abs(dx) <= Math.abs(dy)) {
+    return { gesture, step: null };
+  }
+  const fresh = !gesture || !(t - gesture.at <= WHEEL_QUIET_MS);
+  const sum = (fresh ? 0 : gesture.sum) + dx;
+  const fired = !fresh && gesture.fired;
+  if (!fired && Math.abs(sum) >= WHEEL_STEP_PX) {
+    return { gesture: { sum, at: t, fired: true }, step: sum > 0 ? 1 : -1 };
+  }
+  return { gesture: { sum, at: t, fired }, step: null };
+}

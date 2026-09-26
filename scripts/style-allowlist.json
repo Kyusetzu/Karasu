@@ -1,0 +1,104 @@
+[
+  {
+    "file": "src/app/App.tsx",
+    "rule": "outline-removed",
+    "token": "outline-none",
+    "reason": "<main tabIndex=-1> is the skip link's target; focus lands there by script, never by Tab"
+  },
+  {
+    "file": "src/components/ui/popover.tsx",
+    "rule": "outline-removed",
+    "token": "outline-none",
+    "reason": "the dropdown is a container Base UI focuses when it opens by a press and holds nothing tabbable, so Tab starts inside it"
+  },
+  {
+    "file": "src/components/ui/menu.tsx",
+    "rule": "outline-removed",
+    "token": "outline-none",
+    "reason": "Base UI focuses the popup on open and marks the focused row data-highlighted, whose fill is the focus style"
+  },
+  {
+    "file": "src/components/ui/menu-row.tsx",
+    "rule": "outline-removed",
+    "token": "outline-none",
+    "reason": "only a managed row drops the ring: Base UI or a combobox marks the keyboard's place data-highlighted, whose fill is the focus style"
+  },
+  {
+    "file": "src/components/ui/sheet.tsx",
+    "rule": "outline-removed",
+    "token": "outline-none",
+    "reason": "the sheet is a container Base UI focuses by script when nothing inside is tabbable, so Tab starts inside it"
+  },
+  {
+    "file": "src/components/shell/CommandPalette.tsx",
+    "rule": "outline-removed",
+    "token": "focus:outline-none",
+    "reason": "the palette's field is its only control and holds focus for as long as it is open; the caret shows it"
+  },
+  {
+    "file": "src/components/ui/loader.tsx",
+    "rule": "text-size-arbitrary",
+    "token": "text-[",
+    "reason": "sets the em the chevron loader is drawn in, not a type size"
+  },
+  {
+    "file": "src/components/shell/SyncPanel.tsx",
+    "rule": "icon-size",
+    "token": "size-2.75",
+    "reason": "the throttled glyph sits in the header's 10 px status caption beside the spinner and matches its size"
+  },
+  {
+    "file": "src/components/shell/Titlebar.tsx",
+    "rule": "icon-size",
+    "token": "size-3",
+    "reason": "the maximise square is drawn a step under the minus beside it so the caption glyphs read at one weight"
+  },
+  {
+    "file": "src/components/media/CoverCell.tsx",
+    "rule": "icon-size",
+    "token": "size-2.5",
+    "reason": "the score badge's star sits in its 10 px figures and matches their height"
+  },
+  {
+    "file": "src/pages/Franchise.tsx",
+    "rule": "radius-arbitrary",
+    "token": "rounded-[.375em]",
+    "reason": "a franchise node is laid out in em so the whole graph scales with the text size; its cover radius and labels follow"
+  },
+  {
+    "file": "src/pages/Franchise.tsx",
+    "rule": "text-size-arbitrary",
+    "token": "text-[.5625em]",
+    "reason": "a franchise node is laid out in em so the whole graph scales with the text size; its cover radius and labels follow"
+  },
+  {
+    "file": "src/pages/Franchise.tsx",
+    "rule": "text-size-arbitrary",
+    "token": "text-[.6875em]",
+    "reason": "a franchise node is laid out in em so the whole graph scales with the text size; its cover radius and labels follow"
+  },
+  {
+    "file": "src/pages/Calendar.tsx",
+    "rule": "icon-size",
+    "token": "size-2",
+    "reason": "the watched check and the owed episode's ring sit inside the 14 px status dot and are drawn at the dot's scale"
+  },
+  {
+    "file": "src/components/EmptyState.tsx",
+    "rule": "text-size-arbitrary",
+    "token": "text-[7rem]",
+    "reason": "a decorative numeral drawn as art behind an empty state, sized to the figure rather than to the type scale"
+  },
+  {
+    "file": "src/components/EmptyState.tsx",
+    "rule": "text-size-arbitrary",
+    "token": "text-[2.5rem]",
+    "reason": "the struck-through id of a missing page is a picture of the query, sized to the figure rather than to the type scale"
+  },
+  {
+    "file": "src/components/RichText.tsx",
+    "rule": "text-size-arbitrary",
+    "token": "text-[.8125em]",
+    "reason": "inline code sits inside text of any size, so it scales in em with its line rather than taking a fixed step"
+  }
+]

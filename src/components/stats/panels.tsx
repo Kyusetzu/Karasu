@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { Card, CardTitle } from "@/components/ui/card";
 import { TONES } from "@/components/stats/Charts";
 import { distributionColumns } from "@/lib/score";
@@ -38,7 +39,7 @@ export function ScoreColumns({
               <div className="relative min-h-32 w-full flex-1">
                 <div
                   className={cn(
-                    "absolute inset-x-0 bottom-0 rounded-t-[.1875rem]",
+                    "absolute inset-x-0 bottom-0 rounded-t-mark",
                     // The Wrapped poster's accent gradient as a column; the high scores carry the light.
                     step >= high
                       ? "bg-gradient-to-t from-accent-600 to-accent-400"
@@ -94,7 +95,7 @@ export function StatusBar({
           <div key={d.label} className="flex items-center gap-2 text-xs">
             <span
               data-keep-colors
-              className="size-2 shrink-0 rounded-[.125rem]"
+              className="size-2 shrink-0 rounded-mark"
               style={{ background: tone[i % tone.length] }}
             />
             <span className="min-w-0 flex-1 truncate text-ink-500">{d.label}</span>
@@ -117,7 +118,7 @@ export function TileGrid({ tiles }: { tiles: { label: string; value: string }[] 
             className="absolute left-0 top-0 h-0.5 w-9 rounded-full bg-gradient-to-r from-accent-500 to-accent-400/25"
           />
           <p className="text-2xl font-bold tabular-nums text-ink-100">{tile.value}</p>
-          <p className="mt-0.5 text-2xs uppercase tracking-[.08em] text-ink-600">{tile.label}</p>
+          <p className="mt-0.5 text-2xs uppercase tracking-eyebrow text-ink-600">{tile.label}</p>
         </div>
       ))}
     </div>
@@ -136,22 +137,20 @@ export function DistributionCard({
   return (
     <Card className="flex h-full flex-col">
       <CardTitle>{title}</CardTitle>
-      {/* `justify-around` rather than a fixed stack, so a taller grid row spreads the rows through the slack. */}
-      <div className="mt-3 flex flex-1 flex-col justify-around gap-1.5">
+      {/* The label column takes its longest label, capped; `content-around` spreads the rows through a taller card. */}
+      <div className="mt-3 grid flex-1 grid-cols-[auto_minmax(0,1fr)_auto] content-around items-center gap-x-2 gap-y-1.5 text-xs">
         {data.map((d) => (
-          <div key={d.label} className="flex items-center gap-2 text-xs">
-            <span className="w-16 shrink-0 truncate text-ink-500">{d.label}</span>
-            <div className="h-3 flex-1 overflow-hidden rounded bg-surface-800">
+          <Fragment key={d.label}>
+            <span className="max-w-32 truncate text-ink-500">{d.label}</span>
+            <div className="h-3 overflow-hidden rounded-inner bg-surface-800">
               <div
                 // Switching ANIME/MANGA re-measures the bars rather than cutting to the new lengths.
-                className="h-full rounded bg-accent-500 transition-[width] duration-(--duration-expressive) ease-out-expo"
+                className="h-full rounded-inner bg-accent-500 transition-[width] duration-(--duration-expressive) ease-out-expo"
                 style={{ width: `${(d.count / max) * 100}%` }}
               />
             </div>
-            <span className="w-8 shrink-0 text-right tabular-nums text-ink-500">
-              {d.count}
-            </span>
-          </div>
+            <span className="min-w-8 text-right tabular-nums text-ink-500">{d.count}</span>
+          </Fragment>
         ))}
       </div>
     </Card>

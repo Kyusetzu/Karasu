@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { loadPresets, savePresets, type Preset } from "./presets";
 
-// Minimal in-memory localStorage so these pure helpers run under node.
+// Defined, not assigned: the node project shares globals, and another file may leave the property read-only.
 beforeEach(() => {
   const store = new Map<string, string>();
-  globalThis.localStorage = {
+  const storage = {
     getItem: (k: string) => store.get(k) ?? null,
     setItem: (k: string, v: string) => void store.set(k, v),
     removeItem: (k: string) => void store.delete(k),
@@ -12,6 +12,7 @@ beforeEach(() => {
     key: () => null,
     length: 0,
   } as Storage;
+  Object.defineProperty(globalThis, "localStorage", { value: storage, configurable: true, writable: true });
 });
 
 const preset: Preset = { name: "Airing", tab: "CURRENT", filter: "", sort: "updated" };

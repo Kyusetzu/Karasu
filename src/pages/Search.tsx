@@ -5,7 +5,7 @@ import { useGridRoving } from "@/hooks/useGridRoving";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { backendErrorText } from "@/lib/backendError";
-import { Search as SearchIcon } from "lucide-react";
+
 import {
   browseMedia,
   genreTagCollections,
@@ -34,7 +34,7 @@ import {
   originLabel,
   sourceLabel,
 } from "@/lib/format";
-import { Input } from "@/components/ui/input";
+import { SearchField } from "@/components/ui/search-field";
 import { UserLockup } from "@/components/ui/user-lockup";
 import { Button } from "@/components/ui/button";
 import { FilterSelect } from "@/components/ui/filter-select";
@@ -51,6 +51,7 @@ import { cn } from "@/lib/utils";
 import { EmptyState, PerchRule, StruckQuery } from "@/components/EmptyState";
 import { Pill } from "@/components/ui/pill";
 import { UserList } from "@/components/social/UserList";
+import { cardClass } from "@/components/ui/card";
 
 /** What the search is looking for; the scope pills grew from two mediums to people and entities. */
 type Scope = MediaType | "USERS" | "CHARACTERS" | "STAFF" | "STUDIOS";
@@ -253,23 +254,19 @@ export default function Search() {
   return (
     <div className="flex h-full flex-col">
       <div className="px-8 pt-6">
-        <h1 className="text-2xl font-bold">{t("search.title")}</h1>
+        <h1 className="text-title">{t("search.title")}</h1>
         <div className="mt-4 max-w-176">
-          <div className="relative max-w-136">
-            <SearchIcon
-              className="pointer-events-none absolute left-3 top-1/2 size-3.75 -translate-y-1/2 text-ink-600"
-            />
-            <Input
-              autoFocus
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder={t("search.placeholder")}
-              onClear={() => setInput("")}
-              clearLabel={t("common.clear")}
-              className="h-11 pl-9"
-            />
-          </div>
-          {/* Chips scroll on phone and wrap on desktop; the divider is grouped with them so it cannot orphan onto its own line. */}
+          <SearchField
+            size="lg"
+            autoFocus
+            value={input}
+            onChange={setInput}
+            label={t("search.placeholder")}
+            clearLabel={t("common.clear")}
+            placeholder={t("search.placeholder")}
+            className="max-w-136"
+          />
+          {/* Chips scroll in one row on a phone, behind a divider; a desktop gives the browse chips a row of their own. */}
           <div
             className={cn(
               "mt-2.5 flex items-center gap-1.5",
@@ -299,8 +296,8 @@ export default function Search() {
               </Pill>
             ))}
             {isMediaScope(scope) && (
-              <span className="flex shrink-0 items-center gap-1.5">
-                <span className="mx-1 h-4 w-px bg-surface-700" />
+              <span className={cn("flex shrink-0 items-center gap-1.5", !phone && "basis-full")}>
+                {phone && <span className="mx-1 h-4 w-px bg-surface-700" />}
                 {BROWSE_CHIPS.map((chip) => (
                   <Pill
                     key={chip.key}
@@ -645,7 +642,7 @@ function EntityResultList({
 /** `UserRow`'s frame without the follow button — the whole row is the link. */
 function EntityRow({ to, name, src }: { to: string; name: string; src?: string }) {
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-surface-800 bg-surface-900 p-3 transition-surface hover:border-surface-700">
+    <div className={cn(cardClass("flat", { interactive: true }), "flex items-center gap-3 p-3")}>
       <Link to={to} className="min-w-0 flex-1">
         <UserLockup name={name} src={src} size="md" titleAttr nameClassName="text-sm" />
       </Link>

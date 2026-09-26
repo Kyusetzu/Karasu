@@ -1,4 +1,4 @@
-/* GENERATED from src/app/index.css (sha256 354718cd0aa6) by site/scripts/sync-tokens.mjs
+/* GENERATED from src/app/index.css (sha256 0f3469fdddb2) by site/scripts/sync-tokens.mjs
    — do not edit. Re-run `npm run sync` after changing the source; `npm run check`
    fails while this file is stale. CLAUDE.md, "The website". */
 /* `static` because Tailwind tree-shakes tokens no utility references, leaving a `var()`-only token undefined in dark. */
@@ -9,35 +9,102 @@
   /* Smaller than text-xs for badges and chips, so those stop reaching for arbitrary px values that don't scale. */
   --text-2xs: 0.625rem;
   --text-2xs--line-height: 1.4;
+  /* The 13 px step between xs and sm that dense rows and the shell's panels read in. */
+  --text-ui: 0.8125rem;
+  /* The one letter spacing for small uppercase labels. */
+  --tracking-eyebrow: 0.12em;
+  /* The narrowest cover that still holds three quick-action circles in a row. */
+  --container-cover-actions: 7.5rem;
+  /* The narrowest cover that still holds two of them; below it a cover keeps one. */
+  --container-cover-pair: 4.75rem;
+  /* The Japanese sub-lockup beside a screen title, opened a little so its kana do not crowd. */
+  --tracking-lockup: 0.04em;
+  /* The titlebar's wordmark, spaced as a brand mark rather than a label. */
+  --tracking-wordmark: 0.2em;
+  /* Small sentence-case captions on floating chrome, opened a hair to stay legible at that size. */
+  --tracking-caption: 0.03em;
+  /* Page titles, a step above text-2xl, in the brand face. */
+  --text-title: 1.875rem;
+  --text-title--line-height: 1.2;
+  /* A title's own heading on its detail page, a step under a screen title so a long name wraps a line sooner. */
+  --text-heading: 1.625rem;
+  --text-heading--line-height: 1.25;
+  /* The first-run greeting, set larger than a page title and tight, with a wider step for the desktop. */
+  --text-hero: 1.75rem;
+  --text-hero--line-height: 1.12;
+  --text-hero--letter-spacing: -0.03em;
+  --text-hero-lg: 2.25rem;
+  --text-hero-lg--line-height: 1.12;
+  --text-hero-lg--letter-spacing: -0.03em;
+  /* Bold a touch lighter than 700, which the variable UI faces render exactly and a static face rounds up. */
+  --font-weight-bold: 650;
+
+  /* Radius by role, not by size, so retuning a role moves every control, panel or sheet at once. */
+  --radius-inner: 0.25rem;
+  --radius-control: 0.375rem;
+  --radius-panel: 0.625rem;
+  --radius-sheet: 1rem;
+  --radius-cover: 0.375rem;
+  --radius-mark: 0.125rem;
+
+  /* The one shadow, for what floats over the page; sheets share it, and the colours follow the theme. */
+  --shadow-float: 0 18px 40px -14px var(--float-shadow), 0 0 0 1px var(--float-edge);
+  --shadow-sheet: 0 18px 40px -14px var(--float-shadow), 0 0 0 1px var(--float-edge);
+
+  /* The dim behind a dialog or a sheet, near-black in both themes so what is behind recedes the same way. */
+  --color-scrim: rgb(4 5 8 / 0.55);
+  /* The dim behind a picture shown full screen, deep enough that the page gives way to it. */
+  --color-scrim-deep: rgb(4 5 8 / 0.92);
+  /* The near-black that sits on arbitrary cover art; badges, scrims and controls there take it at the opacity each needs. */
+  --color-on-cover: #040508;
+  /* The light edge a control on cover art is drawn with, so it keeps a contrast floor on dark art. */
+  --color-on-cover-edge: #ffffff;
+  /* Score stars on cover art: the bright gold in every theme, since the ground under them is always near-black. */
+  --color-on-cover-gold: #fcd34d;
+  /* The 18+ mark on cover art: the soft red in every theme, since the ground under it is always near-black. */
+  --color-on-cover-danger: #f0787f;
+  /* The complete glyph on cover art: the bright green in every theme, since the circle under it is near-black. */
+  --color-on-cover-success: #6ee7b7;
+  /* The theme picker's miniatures: each theme's page, panel and ink, held in every theme so both can be drawn at once. */
+  --color-preview-dark-page: #0b0d12;
+  --color-preview-dark-panel: #181c22;
+  --color-preview-dark-ink: #f0f2f5;
+  --color-preview-light-page: #eef0f4;
+  --color-preview-light-panel: #ffffff;
+  --color-preview-light-ink: #1a1e26;
+  /* The window's close button under the pointer: the caption bar's red in every theme, with its white glyph. */
+  --color-window-close: #b3232c;
+  --color-window-close-ink: #ffffff;
 
   --color-surface-950: #0b0d12;
-  --color-surface-900: #11141b;
-  --color-surface-850: #161a23;
-  --color-surface-800: #1c212c;
-  --color-surface-700: #262c3a;
-  --color-surface-600: #333b4d;
+  --color-surface-900: #12141a;
+  --color-surface-850: #181c22;
+  --color-surface-800: #1f232b;
+  --color-surface-700: #2a2f39;
+  --color-surface-600: #353b47;
 
   /* The bottom two steps clear AA contrast on the darkest surface they ever sit on; do not darken them. */
-  --color-ink-100: #eef1f6;
-  --color-ink-300: #c3cbd9;
-  --color-ink-500: #98a1b2;
-  --color-ink-600: #7f8899;
+  --color-ink-100: #f0f2f5;
+  --color-ink-300: #c8ccd6;
+  --color-ink-500: #9da3af;
+  --color-ink-600: #868c99;
 
   /* Score stars only. */
   --color-gold: #fcd34d;
+  /* A label on a gold fill: near-black on the bright gold, white on the light theme's dark one. */
+  --color-gold-ink: #040508;
   /* Destructive actions, failure states. */
   --color-danger: #f0787f;
-  /* "Mark complete" — only ever a glyph on the scrim over cover art. */
+  /* Done and rising: a watched mark, an upward trend; over cover art `on-cover-success` stands in for it. */
   --color-success: #6ee7b7;
-  /* Franchise-graph node outlines that aren't status- or accent-driven. */
-  --color-graph-completed: #5ec98a;
+  /* A mark or a node with no status. */
   --color-graph-none: #3a3f4d;
 
   /* List-status defaults, overwritten at runtime by `stores/theme`; here so a cover ring paints on the first frame. */
-  --color-status-current: #3fb950;
+  --color-status-current: #2f9e47;
   --color-status-repeating: #1a7f37;
   --color-status-completed: #4b8dd6;
-  --color-status-paused: #d9a13b;
+  --color-status-paused: #b87a14;
   --color-status-dropped: #d1495b;
   --color-status-planning: #6b7280;
 
@@ -52,22 +119,25 @@
   --default-transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
   --ease-karasu: cubic-bezier(0.2, 0, 0, 1);
 
-  /* Overshoots slightly and settles back — the wingbeat, not a bounce — and only for things that arrive, never leave. */
-  --ease-spring: cubic-bezier(0.34, 1.42, 0.64, 1);
   /* Long decelerating tail, no overshoot: for motion the eye follows, like a hero settling or a chart drawing itself. */
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
   /* Leaving should be quicker than arriving: a dialog that lingers on the way out feels unresponsive. */
   --ease-exit: cubic-bezier(0.4, 0, 1, 1);
 
+  /* Arrivals overshoot a little and settle, never a bounce; this cubic stands in where `linear()` is not understood. */
+  --ease-spring-soft: cubic-bezier(0.34, 1.42, 0.64, 1);
+
   /* Two expressive durations, so feature motion does not each pick its own. */
   --duration-expressive: 280ms;
   --duration-exit: 120ms;
+  /* A wait shorter than this never shows a skeleton, so a quick load does not flash one. */
+  --delay-skeleton: 250ms;
 
   /* A bird landing on a branch — down from above, no bounce; these consume the ease tokens so retuning one retunes all. */
   --animate-settle: settle 150ms var(--ease-karasu);
-  /* Things that arrive from the bottom edge: toasts, the bulk bar. */
-  --animate-rise-in: riseIn 160ms var(--ease-karasu);
-  --animate-pop-in: popIn 120ms var(--ease-karasu);
+  /* Things that arrive from the bottom edge: the bulk bar, the detection window, rows added to a list. */
+  --animate-rise-in: riseIn 440ms var(--ease-spring-soft);
+  --animate-pop-in: popIn 340ms var(--ease-spring-soft);
   --animate-fade-in: fadeIn 120ms linear;
   /* The progress counter acknowledging a +1. */
   --animate-tick: tick 180ms var(--ease-karasu);
@@ -83,7 +153,7 @@
   --animate-pop-out: popOut var(--duration-exit) var(--ease-exit) forwards;
   --animate-fade-out: fadeOut var(--duration-exit) linear forwards;
   /* The dialog arrival: scales up past 1 and settles. */
-  --animate-spring-in: springIn var(--duration-expressive) var(--ease-spring);
+  --animate-spring-in: springIn 480ms var(--ease-spring-soft);
   /* A success landing — the scrobble confirmation. */
   --animate-land: land 420ms var(--ease-out-expo);
 
@@ -193,7 +263,7 @@
   }
 }
 
-/* Arrives past its size and settles; `--ease-spring` supplies the overshoot, the keyframes only say where it starts. */
+/* Arrives past its size and settles; `--ease-spring-soft` supplies the overshoot, the keyframes only say where it starts. */
 @keyframes springIn {
   from {
     opacity: 0;
@@ -277,6 +347,19 @@
   animation: chartIn 320ms var(--ease-out-expo) backwards;
 }
 
+/* Named layers for the stacks that need them; the plain z-10/30/50 steps stay Tailwind's own. */
+@utility z-popover {
+  z-index: 100;
+}
+
+@utility z-alert {
+  z-index: 110;
+}
+
+@utility z-skip {
+  z-index: 200;
+}
+
 /* The one skeleton fill: a sweep, not a pulse, angled so a column of cells reads as one surface being lit. */
 @utility shimmer-fill {
   background-image: linear-gradient(
@@ -286,7 +369,11 @@
     var(--color-surface-800) 34%
   );
   background-size: 200% 100%;
-  animation: var(--animate-shimmer);
+  /* The sweep, offset per cell, then a fade that keeps the cell hidden until `--delay-skeleton` has passed. */
+  animation:
+    var(--animate-shimmer),
+    fadeIn 160ms linear var(--delay-skeleton) backwards;
+  animation-delay: var(--shimmer-offset, 0ms), var(--delay-skeleton);
 }
 
 /* The chevron loader, in em so it scales; `forwards` is load-bearing, or reduced motion leaves it invisible. */
@@ -327,10 +414,17 @@
   --accent-rgb: 75, 63, 199;
   --w1: 63, 114, 199;
   --w2: 179, 63, 199;
-  --hair: rgba(63, 114, 199, 0.11);
+  --hair: rgba(255, 255, 255, 0.075);
 
   /* The 1px catch-light along the top of a raised panel, which the light theme inverts to a faint shadow line. */
-  --catch-light: rgba(255, 255, 255, 0.09);
+  --catch-light: rgba(255, 255, 255, 0.12);
+
+  /* The light a raised panel catches at its top edge; depth comes from tone steps, not from a tint. */
+  --wash-top: rgba(255, 255, 255, 0.025);
+
+  /* The float shadow's colour and its hairline ring, dark in both themes but far lighter on a white page. */
+  --float-shadow: rgb(0 0 0 / 0.65);
+  --float-edge: rgb(255 255 255 / 0.04);
 
   /* The shadow cast into an inset well; a token because black at this alpha is a bruise on a white page. */
   --well-shadow: rgba(0, 0, 0, 0.55);
@@ -338,36 +432,62 @@
 
 /* Light theme: override the surface/ink tokens; accent is set at runtime. */
 :root[data-theme="light"] {
-  --color-surface-950: #f4f6f9;
+  --color-surface-950: #f4f6f8;
   --color-surface-900: #ffffff;
-  --color-surface-850: #eef1f5;
-  --color-surface-800: #e4e8ee;
-  --color-surface-700: #d2d8e2;
-  --color-surface-600: #b6bece;
+  --color-surface-850: #eef0f4;
+  --color-surface-800: #e5e8ed;
+  --color-surface-700: #d5d9e1;
+  --color-surface-600: #b8beca;
 
-  --color-ink-100: #1a1e27;
-  --color-ink-300: #333b48;
-  --color-ink-500: #464e5d;
-  --color-ink-600: #5f6879;
+  --color-ink-100: #1a1e26;
+  --color-ink-300: #343944;
+  --color-ink-500: #494e5b;
+  --color-ink-600: #616876;
 
   /* Gold, danger and success are used as text, so the same hues are pulled down to read on white. */
   --color-gold: #8a6207;
+  --color-gold-ink: #ffffff;
   --color-danger: #b3232c;
   --color-success: #0d7a54;
 
-  /* The graph outlines invert for the same reason: the dark green vanishes on a light panel and the muted grey turns heavy. */
-  --color-graph-completed: #0d7a54;
+  /* The no-status grey inverts for the same reason: the dark one would read heavy on a light panel. */
   --color-graph-none: #aab2c2;
 
   --scrim: 244, 246, 249;
   --catch-light: rgba(11, 13, 18, 0.07);
   --well-shadow: rgba(11, 13, 18, 0.14);
+  --wash-top: transparent;
+  --float-shadow: rgb(16 20 30 / 0.22);
+  --float-edge: rgb(16 20 30 / 0.05);
 
   color-scheme: light;
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
+}
+
+/* High contrast, dark: the setting's palette; `surface-600` becomes the border role, at 8:1 against a panel. */
+@media (prefers-contrast: more) {
+  :root {
+    --color-surface-950: #050608;
+    --color-surface-900: #090b0f;
+    --color-surface-850: #111419;
+    --color-surface-800: #191c22;
+    --color-surface-700: #2a2e36;
+    --color-surface-600: #a0a5af;
+  
+    --color-ink-100: #ffffff;
+    --color-ink-300: #edf0f6;
+    --color-ink-500: #dce0e6;
+    --color-ink-600: #cdd1d9;
+  
+    --wash-top: transparent;
+    --catch-light: transparent;
+    --float-shadow: transparent;
+    --float-edge: var(--color-surface-600);
+    --well-shadow: transparent;
+  }
 }
 
 /* Text at the density's small size; the calendar's time and episode line, a digest's note. */
@@ -406,23 +526,100 @@
   grid-template-columns: repeat(var(--cover-cols, 8), minmax(0, 1fr));
 }
 
-/* The iridescent wash, two sheens rotated off the accent's hue; it composes over a background colour and sets none. */
-@utility panel-wash {
-  background-image: linear-gradient(
-    140deg,
-    rgba(var(--w1), 0.07),
-    rgba(var(--w2), 0.03) 60%,
-    transparent
-  );
+/* The ring for a control that fills a clipping frame, drawn on the frame, since the clip cuts the control's own outline. */
+@utility focus-frame {
+  &:has(> [data-fills-frame]:focus-visible) {
+    outline: 2px solid var(--color-accent-500);
+    outline-offset: 2px;
+  }
+  @media (prefers-contrast: more) {
+    &:has(> [data-fills-frame]:focus-visible) {
+      outline-width: 3px;
+    }
+  }
+  @media (forced-colors: active) {
+    &:has(> [data-fills-frame]:focus-visible) {
+      outline: 3px solid Highlight;
+    }
+  }
 }
 
-/* The sidebar's own wash, one hue and steeper, so a tall narrow column reads as light falling in rather than a stripe. */
-@utility rail-wash {
-  background-image: linear-gradient(
-    160deg,
-    rgba(var(--w1), 0.05),
-    transparent 42%
-  );
+/* A control that carries a colour as a tint: `--tint` mixed into the panel as the fill, and at half strength as the rim. */
+@utility tint-fill {
+  background-color: color-mix(in srgb, var(--tint) 18%, var(--color-surface-900));
+  border-color: color-mix(in srgb, var(--tint) 55%, transparent);
+  @media (hover: hover) {
+    &:hover {
+      background-color: color-mix(in srgb, var(--tint) 26%, var(--color-surface-900));
+    }
+  }
+  @media (prefers-contrast: more) {
+    & {
+      background-color: var(--color-surface-900);
+      border-color: var(--color-ink-100);
+    }
+  }
+  @media (prefers-contrast: more) {
+    &[aria-pressed="true"] {
+      background-color: var(--color-surface-800);
+      box-shadow: inset 0 0 0 1px var(--color-ink-100);
+    }
+  }
+  @media (hover: hover) {
+    @media (prefers-contrast: more) {
+      &:hover {
+        background-color: var(--color-surface-850);
+      }
+    }
+  }
+  @media (forced-colors: active) {
+    &[aria-pressed="true"] {
+      forced-color-adjust: none;
+      background-color: Highlight;
+      border-color: Highlight;
+      color: HighlightText;
+    }
+  }
+}
+
+/* The same tint over cover art, on the near-black every cover control sits on, with a glyph lifted toward white. */
+@utility tint-fill-on-cover {
+  background-color: color-mix(in srgb, var(--tint) 24%, var(--color-on-cover));
+  border-color: color-mix(in srgb, var(--tint) 65%, transparent);
+  color: color-mix(in srgb, var(--tint) 45%, var(--color-on-cover-edge));
+}
+
+/* The danger colour as the tint, for a control that leads somewhere risky rather than doing something destructive. */
+@utility tint-danger {
+  --tint: var(--color-danger);
+}
+
+/* A label on cover art: a near-black plate the art shows through a little, its text the tint lifted toward white. */
+@utility tint-label-on-cover {
+  background-color: color-mix(in srgb, var(--color-on-cover) 85%, transparent);
+  color: color-mix(in srgb, var(--tint) 35%, var(--color-on-cover-edge));
+}
+
+/* A ring drawn inside a control that fills a clipping frame edge to edge; the high-contrast rules keep it inside too. */
+@utility focus-inset {
+  &:focus-visible {
+    outline-offset: -2px;
+  }
+}
+
+/* The accent as the tint; high contrast takes the text shade, lifted to 7:1, since the fill shade is too dark for a rim. */
+@utility tint-accent {
+  --tint: var(--color-accent-500);
+  @media (prefers-contrast: more) {
+    & {
+      --tint: var(--color-accent-400);
+    }
+  }
+}
+
+/* The light a raised panel catches along its top; it composes over a background colour and sets none. */
+@utility panel-wash {
+  background-image: linear-gradient(180deg, var(--wash-top), transparent 45%);
 }
 
 /* The gradient at the foot of every cover: art is arbitrary, so anything over it needs a deterministic backdrop. */
@@ -478,13 +675,14 @@
     background: linear-gradient(
       90deg,
       transparent,
-      var(--catch-light),
+      var(--catch-light) 20%,
+      var(--catch-light) 80%,
       transparent
     );
   }
 }
 
-/* Hairline borders, tinted with the cooler sheen rather than a flat grey. */
+/* Hairline borders, a neutral line the theme and the contrast setting retune in one place. */
 @utility border-hair {
   border-color: var(--hair);
 }
@@ -515,15 +713,121 @@
   }
 }
 
-/* Transitions only what the theme swaps; prefer it over `transition-colors`, which also animates `color`. */
+/* Transitions only what the theme swaps, plus the press; prefer it over `transition-colors`, which animates `color`. */
 @utility transition-surface {
-  transition-property: background-color, border-color, box-shadow, opacity;
+  transition-property: background-color, border-color, box-shadow, opacity, scale;
   transition-duration: var(--default-transition-duration);
   transition-timing-function: var(--default-transition-timing-function);
 }
 
+/* A pressed control sinks a little; reduced motion sets the scale back to 1, so the press is felt as colour only. */
+@utility press {
+  &:active:not(:disabled) {
+    scale: var(--press-scale, 0.97);
+  }
+}
+
+/* A small control keeps its look but answers taps across at least 44 px; used behind the `coarse` variant. */
+@utility hit-area {
+  &::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: max(100%, 2.75rem);
+    height: max(100%, 2.75rem);
+    translate: -50% -50%;
+  }
+}
+
+/* A sheet rises on a spring and follows a finger; at rest it has no translate, so a fixed child still uses the screen. */
+@utility sheet-popup {
+  transition: translate 440ms var(--ease-spring-soft);
+  &[data-swiping] {
+    translate: 0 var(--drawer-swipe-movement-y, 0px);
+    transition-duration: 0ms;
+  }
+  &[data-starting-style],
+  &[data-ending-style] {
+    translate: 0 calc(100% + var(--shell-bottom, 0px) + 1rem);
+  }
+  &[data-ending-style] {
+    transition-duration: calc(var(--duration-exit) * var(--drawer-swipe-strength, 1));
+    transition-timing-function: var(--ease-exit);
+  }
+}
+
+/* The dim behind a sheet thins as the sheet is swiped away, and fades with it otherwise. */
+@utility sheet-backdrop {
+  opacity: calc(1 - var(--drawer-swipe-progress, 0));
+  transition: opacity var(--duration-expressive) var(--ease-karasu);
+  &[data-swiping] {
+    transition-duration: 0ms;
+  }
+  &[data-starting-style],
+  &[data-ending-style] {
+    opacity: 0;
+  }
+  &[data-ending-style] {
+    transition-duration: var(--duration-exit);
+  }
+}
+
+/* Draws an element's border in the border role under high contrast, where a tonal step alone would vanish. */
+@utility hc-edge {
+  @media (prefers-contrast: more) {
+    & {
+      border-color: var(--color-surface-600);
+    }
+  }
+}
+
+/* A row's highlight and its chosen state are tonal steps, which high contrast also rings in the border role. */
+@utility menu-row-edge {
+  @media (prefers-contrast: more) {
+    &:is(:hover, [data-highlighted], [aria-current="page"], [data-current]) {
+      box-shadow: inset 0 0 0 1px var(--color-surface-600);
+    }
+  }
+}
+
+/* The same for a list that keeps its own cursor, where a resting pointer would draw a second one. */
+@utility menu-row-edge-managed {
+  @media (prefers-contrast: more) {
+    &:is([data-highlighted], [aria-current="page"], [data-current]) {
+      box-shadow: inset 0 0 0 1px var(--color-surface-600);
+    }
+  }
+}
+
+/* A disclosure's panel grows from no height to its content's; `data-leaving` shrinks it back while usePresence holds it. */
+@utility disclosure-panel {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition-property: grid-template-rows, opacity;
+  transition-duration: var(--duration-expressive);
+  transition-timing-function: var(--ease-out-expo);
+  @starting-style {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+  &[data-leaving] {
+    grid-template-rows: 0fr;
+    opacity: 0;
+    transition-duration: var(--duration-exit);
+    transition-timing-function: var(--ease-exit);
+  }
+  &[data-instant] {
+    transition: none;
+  }
+}
+
 /* Reduced motion, CSS only: a hair above zero so `transitionend` still fires, and delays go too or a stagger is a wait. */
 @media (prefers-reduced-motion: reduce) {
+  :root {
+    --press-scale: 1;
+  }
   *,
   *::before,
   *::after {
@@ -534,6 +838,10 @@
     transition-delay: 0ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+html[data-reduce-motion] {
+  --press-scale: 1;
 }
 
 html[data-reduce-motion] *,
@@ -554,6 +862,9 @@ html[data-reduce-motion] *::after {
     outline: 3px solid Highlight;
     outline-offset: 2px;
   }
+  .focus-inset:focus-visible {
+    outline-offset: -3px;
+  }
   /* A filled control keeps its edge when its fill is taken away. */
   button,
   [role="button"],
@@ -572,13 +883,53 @@ html[data-reduce-motion] *::after {
   }
 }
 
-/* The softer request gets the softer answer: keep the palette, sharpen the hairlines the design deliberately keeps quiet. */
+/* High contrast draws every control's edge in the border role, since `surface-700` is also a fill there. */
 @media (prefers-contrast: more) {
-  :root {
-    --hair: rgba(63, 114, 199, 0.34);
+  :root .border-surface-700 {
+    border-color: var(--color-surface-600);
   }
-  *:focus-visible {
+}
+
+/* A field shows focus with its border, so the rule above must not pin that border to the border role while it has it. */
+@media (prefers-contrast: more) {
+  :root .border-surface-700:is(input, select, textarea):focus,
+  :root .field-shell:focus-within {
+    border-color: var(--color-accent-500);
+  }
+}
+
+/* Glass is a blur of whatever is behind it, which no contrast ratio can promise; high contrast makes it solid. */
+@media (prefers-contrast: more) {
+  :root [class*="backdrop-blur"] {
+    backdrop-filter: none;
+    background-color: var(--color-surface-900);
+  }
+}
+
+/* Glass over cover art turns solid in the art's own near-black, since the page's panel is white in the light theme. */
+@media (prefers-contrast: more) {
+  :root [class*="backdrop-blur"][class*="on-cover"] {
+    background-color: var(--color-on-cover);
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root .section-rule {
+    background-image: none;
+    background-color: var(--color-surface-600);
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root *:focus-visible {
     outline-width: 3px;
+    outline-offset: 2px;
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root .focus-inset:focus-visible {
+    outline-offset: -3px;
   }
 }
 
@@ -605,7 +956,7 @@ html[data-reduce-motion] *::after {
   background: transparent;
 }
 
-/* The default accent (#4b3fc7, src/stores/theme.ts) as the theme store
+/* The default accent (#4b3fc7, src/lib/designTokens.ts) as the theme store
    writes it at runtime — computed through src/lib/contrast.ts at sync time,
    never typed by hand. The @theme fallbacks above are not these colours. */
 :root {
@@ -616,7 +967,7 @@ html[data-reduce-motion] *::after {
   --accent-rgb: 75, 63, 199;
   --w1: 63, 114, 199;
   --w2: 179, 63, 199;
-  --hair: rgba(63, 114, 199, 0.11);
+  --hair: rgba(255, 255, 255, 0.075);
 }
 
 :root[data-theme="light"] {
@@ -627,5 +978,18 @@ html[data-reduce-motion] *::after {
   --accent-rgb: 75, 63, 199;
   --w1: 63, 114, 199;
   --w2: 179, 63, 199;
-  --hair: rgba(63, 114, 199, 0.16);
+  --hair: rgba(16, 20, 30, 0.1);
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --color-accent-400: #9c95e0;
+    --color-accent-500: #4b3fc7;
+    --color-accent-600: #3f35a7;
+    --color-accent-ink: #ffffff;
+    --accent-rgb: 75, 63, 199;
+    --w1: 63, 114, 199;
+    --w2: 179, 63, 199;
+    --hair: var(--color-surface-600);
+  }
 }

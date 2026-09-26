@@ -71,7 +71,7 @@ export function ScoreSelect({
         aria-label={t("common.score")}
         title={t("common.score")}
         className={cn(
-          "h-8 rounded-md border border-surface-800 bg-surface-900 px-2 text-xs tabular-nums text-gold transition-surface focus:border-accent-500 focus:outline-none",
+          "h-8 rounded-inner border border-hair bg-surface-900 px-2 text-xs tabular-nums text-gold transition-surface focus:border-accent-500 focus:outline-none",
           "[&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
           className,
         )}
@@ -85,7 +85,7 @@ export function ScoreSelect({
       onChange={(e) => onChange(Number(e.target.value))}
       onClick={(e) => e.stopPropagation()}
       className={cn(
-        "h-8 rounded-md border border-surface-800 bg-surface-900 px-2 text-xs tabular-nums text-gold transition-surface focus:border-accent-500 focus:outline-none disabled:opacity-50",
+        "h-8 rounded-inner border border-hair bg-surface-900 px-2 text-xs tabular-nums text-gold transition-surface focus:border-accent-500 focus:outline-none disabled:opacity-50",
         className,
       )}
       aria-label={t("common.score")}

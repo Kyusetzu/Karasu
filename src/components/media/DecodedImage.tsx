@@ -15,7 +15,10 @@ export function DecodedImage({
     <img
       alt=""
       {...rest}
-      onLoad={() => setReady(true)}
+      onLoad={(e) => {
+        setReady(true);
+        rest.onLoad?.(e);
+      }}
       onError={() => setReady(true)}
       style={{
         opacity: ready ? loadedOpacity : 0,

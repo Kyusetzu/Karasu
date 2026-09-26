@@ -45,7 +45,8 @@ and in the browser and scrobbles your AniList progress automatically.
 
 ```
 src/
-  app/               App.tsx, main.tsx, index.css — the entry, and only the entry
+  app/               App.tsx, main.tsx, index.css — the entry — plus motion.tsx
+                     and motionFeatures.ts, the one door to Motion
   api/               AniList GraphQL client, queries, types, franchise, library,
                      social (the whole profile/follow/forum surface);
                      bindings.ts is GENERATED from the Rust command signatures
@@ -56,7 +57,9 @@ src/
                      popover is the anchored dropdown / phone sheet the list
                      toolbar's panels open in
     shell/           the window frame and global machinery — titlebar, sidebar,
-                     bottom bar, back button, bell, command palette, keyboard
+                     bottom bar, back button, bell (the titlebar's glance, the
+                     phone's NotifSheet and the NotifFeed rows both share with
+                     the notifications page), command palette, keyboard
                      sheet, global keys, toast, first run, session expired, the
                      sync panel, the pull-to-sync indicator, the detection pill
                      and the floating detection window, and the action host,
@@ -88,15 +91,18 @@ src/
                      useAniListLogin, useFollow, useSocialActions,
                      useFavourite, useActivityPost, useUpdateUser,
                      usePhoneShell, useShortViewport, useElementWidth,
-                     useBackClose, useNotifBadge, useDialogFocus,
+                     useBackClose, useNotifBadge, useNotifications,
+                     useDialogFocus,
                      useGridRoving, useSyncStatus, useManualSync,
                      usePullToSync, useActionRunner, useCachedMedia,
-                     useDetectionMedia, useDetectionDrag)
+                     useDetectionMedia, useDetectionDrag, useElementSize,
+                     usePointerSwipe, useTabSwipe)
   i18n/              index.ts (setup) + en.ts + de.ts; `de: typeof en` enforces
                      key parity across the two files
   lib/               pure logic + its *.test.ts — the place testable code goes
-  pages/             one per route; settings/ holds the pane files — the eight
-                     pane ids live in `lib/settingsPanes.ts`, and the desktop
+  pages/             one per route; settings/ holds the pane files — the seven
+                     pane ids live in `lib/settingsPanes.ts` (the account pane
+                     holds the AniList one's sections too), and the desktop
                      and data panes are sections exported from AdvancedPane
   stores/            Zustand stores (auth, theme, library, nowPlaying, …)
   assets/            karasu-mark.svg, the one asset the bundle inlines
@@ -256,7 +262,15 @@ scripts/             bump-version.mjs (every commit), anilist-query.mjs
                      comment-lexer.mjs and comment-allowlist.json (the
                      one-line-comment rule: the gate, the comment-only proof,
                      the shared scanner and the allowed exceptions — see
-                     "Comments: one line each"), verify.mjs (the gate, see
+                     "Comments: one line each"), style-audit.mjs with
+                     style-baseline.json and style-allowlist.json (the class
+                     vocabulary's ratchet, see "Design language"),
+                     bundle-budget.mjs and bundle-budget.json (the gzipped
+                     bundle against its budget, a push-gate phase),
+                     screens.mjs with screens/ (the real app over a mocked
+                     backend in Chromium: shots, boards, clips and pixel
+                     hashes, see "Design language"),
+                     verify.mjs (the gate, see
                      "The commit loop"), toml-check.mjs (taplo over the
                      TOML files, one per stdin — see the same section),
                      mutants.mjs (cargo-mutants in a copy tauri-build can
@@ -622,8 +636,9 @@ bump with nothing to describe is a mistake or a double-run. `--force` overrides
 that, `--print` just reports the current version.
 
 **`npm run verify`** is `scripts/verify.mjs`, the whole gate and what CI runs,
-so the two cannot drift. Typecheck and the comment audit go first and stop the
-run on a failure; then vitest and `cargo test` run at the same time. Every
+so the two cannot drift. Typecheck, the comment audit, the style audit and the
+site tokens' freshness go first and stop the run on a failure; then vitest and
+`cargo test` run at the same time. Every
 phase is captured, and a green run prints one line per phase — counts, seconds,
 any compiler warning — and nothing else, which is the point: the loop runs
 many times a day and its output is read by an agent. A failed phase prints its
@@ -660,8 +675,15 @@ commit gate, and then everything else the repository can check, in one run
 with the same one-line-per-phase output. After the gate's own phases it runs
 the cheap, independent checks at once — **knip** (unused files, exports and
 dependencies, `knip.json`), **versions** (`bump-version --check`, the five
-version files agree), the **site**'s typecheck and **site tokens** freshness,
-**npm audit** at `high` over the production graph — then the three cargo tools
+version files agree), the **site**'s typecheck,
+**npm audit** at `high` over the production graph, the **bundle budget**
+(`scripts/bundle-budget.mjs`: a fresh `vite build`, then four gzipped figures —
+what the window waits for, the stylesheet, the largest lazy chunk, all the
+script — against `scripts/bundle-budget.json`, each set 3 % over the larger of
+the two build targets' measurement when it was last raised; on 2026-09-26 the
+Linux target read 400.4, 17.1, 27.3 and 537.7 KiB against budgets of 404, 18,
+29 and 544, and a raise names its reason in the commit) — then
+the three cargo tools
 one after another because they share the target directory's lock: **clippy**
 with warnings denied, **cargo deny** (advisories, licences, bans, sources
 against `deny.toml`), **machete** (dependencies nothing uses). Then the two
@@ -1422,12 +1444,20 @@ review checkpoints are in `site/README.md`.
   `dist/assets/index-*.css` was byte-identical to the baseline with the line
   and 71 bytes larger without it. Re-run that diff whenever the line, the
   import or Tailwind moves; the header of `index.css` carries the numbers.
+  `@source not "../../scripts";` sits beside it since 2026-09-25, when the
+  style audit's fixtures started naming classes: the emitted CSS lost 254
+  bytes, five classes named only in `scripts/`, and nothing the app uses.
 - **Tokens are generated, never copied.** `site/src/styles/tokens.generated.css`
   is written by `node site/scripts/sync-tokens.mjs` from the `@theme`,
   `@keyframes`, `@utility`, `:root` and `[data-theme]` blocks of
   `src/app/index.css`, plus the default accent evaluated through
   `src/lib/contrast.ts` — the `@theme` fallbacks are not the colours a user
-  sees. Changing any of those blocks means re-running the sync in the same
+  sees. The app's high-contrast rules, keyed on `data-contrast="more"`, come
+  across as `@media (prefers-contrast: more)`, nested ones included, and a
+  selector list the rewrite cannot keep exact stops the sync. The site may add
+  page-only steps in its own `@theme` (fluid type, the device corner, the
+  screenshot shadow) but never redefines an app token. Changing any of those
+  blocks means re-running the sync in the same
   commit; the site's `check` fails when the file is stale, and `pages.yml`
   watches `index.css` so drift fails in the open.
 - **The UI primitives under `site/src/components/ui` are copies, on purpose.**
@@ -1635,6 +1665,53 @@ four or five places, made by careful code, because nothing said it once.
   `package.json` and `COMMIT_NUMBER` makes every install re-download its own
   update forever.
 
+## Design language
+
+`DESIGN.md` at the root is the brief for how Karasu looks and moves, and it
+outranks any design skill, library default or mockup: the principles ("dark,
+dense, quiet"), the token vocabulary and what each step is for, the contrast
+obligations every theme must meet, the primitive to use for each recurring
+shape, the libraries approved and declined, and the dated decision log. The
+conventions below that touch styling (accent, motion registers, exits, banners)
+stay here as rules; DESIGN.md says what they add up to. A change to how a screen
+is *arranged* gets three mockups before code, and the choice goes into that log.
+
+**`scripts/style-audit.mjs` is the vocabulary's gate**, the comment audit's twin
+and the third phase of `npm run verify`. It parses every app `.ts`/`.tsx` with
+`oxc-parser` (the parser knip already carried, now a direct dev dependency,
+because TypeScript 7 no longer ships a JS compiler API) and counts, per file and
+rule, what DESIGN.md calls drift: bracketed radii, sizes, tracking, z-index,
+shadows and motion values; radii and shadows named by size rather than by
+role; hex and rgb in a class; a shade the theme does not
+define (read from `index.css`'s `--color-*` names, so `ink-200` is caught and
+renders nothing); Tailwind's own palette; broad transitions; `animate-spin`
+outside the spinner; `outline-none` with no focus style beside it or on a
+`focus-within:` wrapper; a class cut at a template `${}`; icons off the
+14/16/20/32 scale; and Base UI or Motion imported outside their wrappers.
+`scripts/style-baseline.json` is a ratchet, not a licence: `--check` fails when
+a count rises above it *and* when it falls below, so the commit that removes
+drift also runs `--tighten` and the room cannot be spent again. `--record`
+rewrites it outright and is for a deliberate raise, which the diff then shows.
+`scripts/style-allowlist.json` holds the permanent exceptions, each with its
+reason, and an entry nothing matches fails the check. Recorded on 2026-09-25:
+380 findings in 91 of 281 files; emptied on 2026-09-26, so every finding now
+fails the gate outright. Half a second a run.
+
+**`scripts/screens.mjs` shows the real app, and it is how a UI change is
+proven.** It serves `scripts/screens/` (the whole `App`, shell included, over
+`mockIPC` answers and fixture lists) and drives Chromium: `shoot` renders every
+screen in its `SCREENS` table (or the `--only` subset) per style and theme, and a
+screen may name a `mock` the fixtures branch on, `board` lays them
+out for the maintainer, `clip` records motion side by side, and `hash` takes
+still frames at a fixed clock with motion off. Two `hash` runs agree, so an
+unchanged hash is the proof that a mechanical refactor moved no pixel. The
+banners and covers of three real titles are fetched from AniList into
+`scripts/screens/.cache/` on first use and never committed; the stand-in faces
+are Roboto for Android and Open Sans for Segoe UI, which Linux lacks. The
+project skill `.claude/skills/karasu-mockups` holds the procedure the
+maintainer expects: three mockups before an arrangement changes, the boards'
+shape, and the question that follows them.
+
 ## Conventions
 
 - **One commit per feature.** The maintainer commits per feature; keep changes
@@ -1675,6 +1752,13 @@ four or five places, made by careful code, because nothing said it once.
   Appearance toggle is disabled with a hint where the answer is `None`. On
   the rig on 2026-09-20 the switch painted Windows' `#0078d4` and came back
   to the saved colour; Linux and Android are compile-checked only.
+  Contrast is its own setting beside the theme (`karasu-contrast`: system,
+  standard, high; `lib/contrast` `resolveContrast`): high sets
+  `data-contrast="more"`, which swaps the palette in `index.css`, and passes
+  `contrast: "high"` to `accentShades`, which lifts the accent to 7:1. Never
+  key a high-contrast rule on `@media (prefers-contrast)` in the app — that
+  would override a user who chose Standard; the site, which has no setting,
+  gets the media query from the token sync.
 - **Overlays carry `data-overlay`.** Screen-level key handlers check for it and
   stand down, so a dialog owns the keyboard instead of the list behind it acting
   on the same press. `GlobalKeys` honours it too.
@@ -1693,6 +1777,35 @@ four or five places, made by careful code, because nothing said it once.
   `setView` goes through it and merges what queues up in call order, and the
   toolbar's panels edit a draft the list draws at once and `setView` writes on
   close. `Popover`'s `closeThen` is the same wait for anything a panel opens.
+- **A banner is shown whole, and its own edges fill the rest.** AniList banners
+  are a fixed strip: of Summer 2026's 36, 34 measured exactly 1900 × 400
+  (4.75 : 1) on 2026-09-25, the others 3.33 and 2.22. `BannerImage` contains
+  the picture (`lib/bannerFit` places it), feathers each edge that meets a gap,
+  and fills the gap with the picture's outermost rows or columns stretched and
+  blurred, so the colours carry on and nothing repeats. Two fills were tried
+  and dropped: a blurred centre crop (its colours did not continue the edge,
+  which drew a hard seam top and bottom) and a mirrored copy (it repeats a face
+  or an eye as a ghost). The detail header follows the width below the desktop
+  cap — `min(16rem, 100cqw / 4.75 + 5.5rem)`, a 44 px band above for the back
+  button and one below for the cover — because a fixed 256 px showed a phone
+  an 85 px banner in two thirds blur. The query container sits on a wrapper
+  around the header, never on the page root: containment would make that root
+  the containing block of every `fixed` overlay rendered inside it.
+- **The phone's detail header floats the cover.** The title and the native title flow beside it and
+  carry on beneath it when they are longer; every fact — the meta line, genres, the next episode, the
+  action row with the status button — sits below the cover whatever the title's length. Chosen by the
+  maintainer on 2026-09-25 over three rounds of mockups: a short title leaving air beside the cover beats
+  a narrow column that squeezes. `usePhoneShell` picks the layout, so the desktop header is untouched.
+  The status button (`StatusMenu`) is the page's whole entry editor, on the phone in the action row
+  over a sheet and on the desktop under the title over a dropdown; there is no editor card any more.
+  `QuickEditor` saves status, progress steps and the score as they are touched (receipts and Undo come
+  from `useListMutations`), a typed count when its field is left or the sheet closes on it, and
+  rewatches, tags and notes together behind "More". The score is `CommunityScore`: AniList's own
+  histogram from `DETAIL_QUERY` (no extra request) as the bars, folded onto the account's format by
+  `lib/scoreDistribution`, with the community mean marked beneath. A first add goes through
+  `saveListEntry` with the media object, because a new local entry is refused without it; a save's echo
+  reaches the page only through `lib/listEcho`, since the local echo names no status. Count fields
+  everywhere are `ui/number-input`: an emptied field reports 0 and a stored 0 shows as the placeholder.
 - **Local text matching goes through `lib/fuzzy`.** Exact > substring >
   word-prefix > trigram containment, scored per title — per-title docs are
   what make a query structurally unable to match across two adjacent names
@@ -1716,6 +1829,11 @@ four or five places, made by careful code, because nothing said it once.
   already covers; site unread is a snapshot of the count taken before the
   page-1 mark-seen reset, an honest approximation and labelled as one. An
   activity row's press opens the activity; the actor's name is its own link.
+  `useNotifications` holds all of it once for the three surfaces — the
+  titlebar's dropdown (the newest three), the phone's tall sheet and
+  `/notifications` — and today/earlier (`sectionByDay`) is presentation too.
+  A row that navigates goes through the surface's `leave`, so an overlay's
+  back entry has unwound before the destination's is pushed.
 - **A thread can land on one comment.** `/thread/:id?comment=<id>` rides the
   same uncapped `ThreadComment(id:)` tree route as the newest-jump — one
   request at any thread size, including comments past the 5,000-entry paging
@@ -1750,16 +1868,19 @@ four or five places, made by careful code, because nothing said it once.
   a component maps through a literal switch, which is the shape `receiptText` in
   `useListMutations` established.
 - **Two motion registers, and the default is the quiet one.** *Surface* motion —
-  hover, focus, background and border — stays on the 140ms `--ease-karasu` that
-  every plain `transition-*` utility already inherits. *Feature* motion, for the
-  few moments worth noticing (a dialog arriving, a scrobble landing, a chart
-  drawing), may use `--ease-spring`, `--ease-out-expo` and
-  `--duration-expressive`. Reach for the first unless there is a reason;
-  springs everywhere is how an app starts feeling slow.
-- **Exit animations go through `usePresence`.** React unmounts before CSS can
-  animate, so `{open && <Modal/>}` can only ever have an entrance. The hook
-  holds the node for the exit and reports `leaving`; keep emitting
-  `data-overlay` while it does.
+  hover, focus, background and border — stays on `transition-surface` and the
+  140ms `--ease-karasu`; `transition-colors`, `transition-all` and a bare
+  `transition` fail the style audit. *Feature* motion, for the few moments
+  worth noticing (a dialog arriving, a scrobble landing, a chart drawing), may
+  use `--ease-spring-soft`, `--ease-out-expo` and `--duration-expressive`.
+  Reach for the first unless there is a reason; springs everywhere is how an
+  app starts feeling slow.
+- **Exit animations go through `usePresence`, or through the wrapper's own
+  exit.** React unmounts before CSS can animate, so `{open && <Modal/>}` can
+  only ever have an entrance. The hook holds the node for the exit and reports
+  `leaving`; keep emitting `data-overlay` while it does. What Base UI draws
+  (menus, the popover, the tooltip, sheets) exits through its own
+  `data-closed` / `data-ending-style`, and the toast through `MotionPresence`.
 - **Motion that CSS cannot see must ask `lib/motion.ts`.** The reduce-motion
   rules in `index.css` are `!important` overrides on animation and transition
   properties — they do nothing to a View Transition, a scroll handler, a WAAPI
@@ -1815,9 +1936,10 @@ them away without re-measuring.
   Contrast keeps it. A touch on an overflowing strip scrolls it rather than
   switching tabs, because `useTabSwipe` leaves sideways-scrolling elements alone.
 - **The cover progress line is a border, not a bar.** A straight strip inside
-  the cover's `rounded-lg` clip had its ends eaten by the corner circles; the
-  line is a `border-b` on an inset-0 overlay revealed by `clip-path`, so it
-  bends into the frame's own corners and a +1 still animates the growth.
+  the cover's rounded clip (`rounded-cover`) had its ends eaten by the corner
+  circles; the line is a `border-b` on an inset-0 overlay revealed by
+  `clip-path`, so it bends into the frame's own corners and a +1 still
+  animates the growth.
 - **`min-w-0`, not `shrink-0`, on a row's trailing text block.** `DigestRow`'s
   right side was pinned at max-content by `shrink-0`, and one long German note
   handed the whole page a sideways scroll (`<main>`'s `overflow-y-auto`

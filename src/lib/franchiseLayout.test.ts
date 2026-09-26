@@ -61,7 +61,7 @@ describe("layoutFranchise", () => {
   });
 
   it("makes a node unreachable from the root a root of its own", () => {
-    const { tree, positions, visible } = layoutFranchise(
+    const { tree, positions } = layoutFranchise(
       [node(1), node(99)],
       [],
       1,
@@ -69,14 +69,6 @@ describe("layoutFranchise", () => {
     expect(tree.get(99)!.parent).toBe(null);
     expect(tree.get(99)!.depth).toBe(0);
     expect(positions.has(99)).toBe(true);
-    expect(visible.has(99)).toBe(true);
-  });
-
-  it("counts the whole subtree beneath a node, not just its children", () => {
-    const { tree } = fanLayout();
-    expect(tree.get(1)!.descendants).toBe(5);
-    expect(tree.get(2)!.descendants).toBe(1);
-    expect(tree.get(5)!.descendants).toBe(0);
   });
 
   it("places depth in columns and keeps a subtree contiguous", () => {
@@ -92,31 +84,13 @@ describe("layoutFranchise", () => {
     expect(rows[1]).toBeLessThan(rows[2]);
   });
 
-  it("hides a collapsed node's subtree but keeps the node itself", () => {
-    const { visible, positions } = fanLayout(new Set([2]));
-    expect(visible.has(2)).toBe(true);
-    expect(visible.has(5)).toBe(false);
-    expect(positions.has(5)).toBe(false);
-  });
-
-  it("closes ranks when a branch collapses instead of leaving a hole", () => {
+  it("centres a shorter column against the tallest one", () => {
     // Depth 2 holds 5 and 6, so 6 sits in the second row of a column centred against the three-row depth-1 column.
-    const before = fanLayout().positions.get(6)!.y;
-    expect(before).toBe(PAD + (3 * ROW_STEP - 2 * ROW_STEP) / 2 + ROW_STEP);
-    // With 5 gone, 6 is the only node left at that depth and re-centres.
-    const after = fanLayout(new Set([2])).positions.get(6)!.y;
-    expect(after).toBe(PAD + (3 * ROW_STEP - ROW_STEP) / 2);
-    expect(after).toBeLessThan(before);
-  });
-
-  it("narrows the canvas when the deepest column collapses away", () => {
-    const full = fanLayout();
-    const trimmed = fanLayout(new Set([2, 3]));
-    expect(trimmed.width).toBeLessThan(full.width);
+    expect(fanLayout().positions.get(6)!.y).toBe(PAD + (3 * ROW_STEP - 2 * ROW_STEP) / 2 + ROW_STEP);
   });
 });
 
-function fanLayout(collapsed?: ReadonlySet<number>) {
+function fanLayout() {
   const { nodes, edges } = fan();
-  return layoutFranchise(nodes, edges, 1, collapsed);
+  return layoutFranchise(nodes, edges, 1);
 }

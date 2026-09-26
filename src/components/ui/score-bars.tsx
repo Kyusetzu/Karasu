@@ -46,7 +46,7 @@ export function ScoreBars({
               onChange(Math.max(0, Math.min(max, Math.round(raw * factor) / factor)));
             }}
             aria-label={t("common.score")}
-            className="h-8 w-24 rounded-md border border-surface-700 bg-surface-950 px-2 text-sm tabular-nums text-gold focus:border-accent-500 focus:outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            className="h-8 w-24 rounded-inner border border-surface-700 bg-surface-950 px-2 text-sm tabular-nums text-gold focus:border-accent-500 focus:outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
           />
           <span className="text-xs text-ink-600">/ {max}</span>
         </div>
@@ -73,7 +73,7 @@ export function ScoreBars({
               aria-pressed={filled}
               title={label}
               className={cn(
-                "flex items-end justify-center rounded-[.25rem] border transition-surface",
+                "flex items-end justify-center rounded-inner border transition-surface",
                 smiley ? "h-9 w-9" : "h-8 w-5.5",
                 filled
                   ? "border-surface-700 bg-surface-850"
@@ -92,7 +92,7 @@ export function ScoreBars({
               ) : (
                 <span
                   className={cn(
-                    "w-full rounded-[.1875rem] transition-[height]",
+                    "w-full rounded-mark transition-[height]",
                     filled ? "bg-gold" : "bg-surface-700",
                   )}
                   style={{ height: `${fillFor(i, options.length)}%` }}

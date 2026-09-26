@@ -11,6 +11,7 @@ import { displayTitle, type Media, type MediaListEntry } from "@/api/types";
 import {
   addDays,
   bucketByLocalDay,
+  foldQuietDays,
   fromList,
   fromSchedule,
   releaseState,
@@ -189,62 +190,41 @@ export default function Calendar() {
     { value: "agenda" as const, label: t("calendar.viewAgenda") },
   ];
   const now = nowSec();
+  const exportIcs = () =>
+    saveText(
+      buildIcs(
+        slots.map((s) => ({
+          uid: `karasu-${s.media.id}-ep${s.episode}@karasu`,
+          start: s.airingAt,
+          durationMin: 25,
+          summary: `${displayTitle(s.media.title)} — ${t("calendar.ep", { n: s.episode })}`,
+        })),
+        // Unix *seconds*, like every timestamp in the file.
+        Math.floor(Date.now() / 1000),
+      ),
+      `karasu-airing-${week}.ics`,
+      "iCalendar",
+      "ics",
+    );
 
   return (
     <div className="flex h-full flex-col">
       <div className="px-8 pt-6">
         <div className="flex items-center gap-2.5">
-          <div className="flex items-baseline gap-2.5">
-            <h1 className="text-2xl font-bold">{t("calendar.title")}</h1>
-            <span className="font-brand-jp text-[.8125rem] tracking-[.04em] text-ink-600">
+          <div className="flex min-w-0 items-baseline gap-2.5">
+            <h1 className="text-title">{t("calendar.title")}</h1>
+            {/* Hidden on a phone, whose one row belongs to the title and the export. */}
+            <span className="hidden whitespace-nowrap font-brand-jp text-ui tracking-lockup text-ink-600 sm:inline">
               放送カレンダー
             </span>
           </div>
           <span className="section-rule" />
-          <span className="text-sm tabular-nums text-ink-500">{weekLabel}</span>
-          <Button
-            variant="ghost"
-            size="iconControl"
-            onClick={() => setView({ week: addDays(week, -7) })}
-            aria-label={t("calendar.prevWeek")}
-          >
-            <ChevronLeft className="size-4.5" />
-          </Button>
-          {week !== currentWeek && (
-            <Button variant="ghost" size="sm" onClick={() => setView({ week: currentWeek })}>
-              {t("calendar.thisWeek")}
-            </Button>
-          )}
-          <Button
-            variant="ghost"
-            size="iconControl"
-            onClick={() => setView({ week: addDays(week, 7) })}
-            aria-label={t("calendar.nextWeek")}
-          >
-            <ChevronRight className="size-4.5" />
-          </Button>
           {/* The export is the slots the grid draws, with stable UIDs so a re-export updates instead of duplicating. */}
           {slots.length > 0 && (
             <IconButton
               variant="ghost"
               size="control"
-              onClick={() =>
-                void saveText(
-                  buildIcs(
-                    slots.map((s) => ({
-                      uid: `karasu-${s.media.id}-ep${s.episode}@karasu`,
-                      start: s.airingAt,
-                      durationMin: 25,
-                      summary: `${displayTitle(s.media.title)} — ${t("calendar.ep", { n: s.episode })}`,
-                    })),
-                    // Unix *seconds*, like every timestamp in the file.
-                    Math.floor(Date.now() / 1000),
-                  ),
-                  `karasu-airing-${week}.ics`,
-                  "iCalendar",
-                  "ics",
-                )
-              }
+              onClick={() => void exportIcs()}
               aria-label={t("calendar.exportIcs")}
               title={t("calendar.exportIcs")}
             >
@@ -269,17 +249,50 @@ export default function Calendar() {
             onChange={chooseView}
             segments={viewSegments}
           />
+          {/* One bar for the week, the full width on a phone so both arrows are an easy reach for a thumb. */}
+          <div className="flex w-full items-center rounded-control border border-hair bg-surface-900 p-0.5 sm:ml-auto sm:w-auto">
+            <Button
+              variant="ghost"
+              size="iconControl"
+              onClick={() => setView({ week: addDays(week, -7) })}
+              aria-label={t("calendar.prevWeek")}
+            >
+              <ChevronLeft className="size-4" />
+            </Button>
+            <span aria-live="polite" className="flex-1 whitespace-nowrap px-2 text-center text-sm tabular-nums text-ink-300">
+              {weekLabel}
+            </span>
+            {/* Inside the bar, before the arrow, so appearing cannot slide the arrow under a second press; not on a phone. */}
+            {week !== currentWeek && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setView({ week: currentWeek })}
+                className="shrink-0 whitespace-nowrap max-sm:hidden"
+              >
+                {t("calendar.thisWeek")}
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="iconControl"
+              onClick={() => setView({ week: addDays(week, 7) })}
+              aria-label={t("calendar.nextWeek")}
+            >
+              <ChevronRight className="size-4" />
+            </Button>
+          </div>
         </div>
       </div>
 
-      {/* The week grid only draws where its seven columns fit, so this scrolls vertically alone. */}
-      <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto px-8 py-6">
+      {/* The week grid draws only where its columns fit; the stable gutter keeps the scrollbar from flipping that. */}
+      <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto px-8 py-6 [scrollbar-gutter:stable]">
         {error ? (
           <p className="text-sm text-danger">{t("common.error", { message: String(error) })}</p>
         ) : loading ? (
           <div className={cn("gap-2", view === "week" ? "grid grid-cols-7" : "flex flex-col")} aria-hidden="true">
             {days.map((day, i) => (
-              <Shimmer key={day} className={cn("rounded-xl", view === "week" ? "h-72" : "h-16")} index={i} />
+              <Shimmer key={day} className={cn("rounded-panel", view === "week" ? "h-72" : "h-16")} index={i} />
             ))}
           </div>
         ) : slots.length === 0 ? (
@@ -301,17 +314,22 @@ export default function Calendar() {
             ))}
           </div>
         ) : (
+          // A run of days with nothing airing is one quiet line; the week grid keeps its columns, which are the dates.
           <div className="flex flex-col gap-5">
-            {days.map((day, i) => (
-              <DaySection
-                key={day}
-                day={day}
-                isToday={day === todayMidnight}
-                slots={buckets[i]}
-                now={now}
-                tiles={view === "tiles"}
-              />
-            ))}
+            {foldQuietDays(days, buckets, todayMidnight).map((run) =>
+              run.quiet ? (
+                <QuietDays key={run.days[0]} days={run.days} />
+              ) : (
+                <DaySection
+                  key={run.days[0]}
+                  day={run.days[0]}
+                  isToday={run.days[0] === todayMidnight}
+                  slots={run.items}
+                  now={now}
+                  tiles={view === "tiles"}
+                />
+              ),
+            )}
           </div>
         )}
       </div>
@@ -319,7 +337,24 @@ export default function Calendar() {
   );
 }
 
-/** A day of the stacked views: a dated header, then tiles or rows; an empty day says so in one muted line. */
+/** Adjacent days with nothing airing, as one muted line naming the first and last of them. */
+function QuietDays({ days }: { days: number[] }) {
+  const { t, i18n } = useTranslation();
+  const weekday = (day: number) => new Date(day * 1000).toLocaleDateString(i18n.language, { weekday: "long" });
+  const first = days[0];
+  const last = days[days.length - 1];
+  return (
+    <p className="dense-text flex items-baseline gap-2 text-ink-600">
+      <span className="font-semibold text-ink-500">
+        {first === last ? weekday(first) : `${weekday(first)} – ${weekday(last)}`}
+      </span>
+      <span>· {t("calendar.emptyDay")}</span>
+      <span className="section-rule self-center" />
+    </p>
+  );
+}
+
+/** A day of the stacked views: a dated header, then tiles or rows; an empty today says so in one muted line. */
 function DaySection({
   day,
   isToday,
@@ -350,7 +385,7 @@ function DaySection({
           {date.toLocaleDateString(i18n.language, { day: "numeric", month: "short" })}
         </span>
         {isToday && (
-          <span className="dense-text uppercase tracking-[.1em] text-accent-400">{t("calendar.today")}</span>
+          <span className="dense-text uppercase tracking-eyebrow text-accent-400">{t("calendar.today")}</span>
         )}
         <span className="section-rule" />
       </header>
@@ -407,11 +442,11 @@ function CalendarTile({ slot, state }: { slot: Slot; state: ReleaseState }) {
       to={`/media/${slot.media.id}`}
       title={title}
       className={cn(
-        "group flex flex-col gap-1.5 rounded-lg transition-surface",
+        "group flex flex-col gap-1.5 rounded-control transition-surface",
         released && "opacity-55 hover:opacity-100",
       )}
     >
-      <div className="relative aspect-[2/3] w-full overflow-hidden rounded-lg bg-surface-800">
+      <div className="relative aspect-[2/3] w-full overflow-hidden rounded-control bg-surface-800">
         <img
           src={slot.media.coverImage.large ?? ""}
           alt=""
@@ -428,7 +463,7 @@ function CalendarTile({ slot, state }: { slot: Slot; state: ReleaseState }) {
           </span>
         </p>
       </div>
-      <p className="dense-text-lg line-clamp-2 px-0.5 font-medium leading-snug text-ink-200">{title}</p>
+      <p className="dense-text-lg line-clamp-2 px-0.5 font-medium leading-snug text-ink-100">{title}</p>
     </Link>
   );
 }
@@ -468,16 +503,16 @@ function DayColumn({
         (isToday ? ` · ${t("calendar.today")}` : "")
       }
       className={cn(
-        "flex min-h-72 flex-col rounded-xl border p-1.5",
+        "flex min-h-72 flex-col rounded-panel border p-1.5",
         isToday
           ? "border-accent-600/50 bg-accent-500/[.07]"
-          : "border-surface-800 bg-surface-900/40",
+          : "border-hair bg-surface-900/40",
       )}
     >
       <header className="flex items-baseline justify-between gap-1 px-1 pb-1.5 pt-0.5">
         <span
           className={cn(
-            "text-2xs font-semibold uppercase tracking-[.1em]",
+            "text-2xs font-semibold uppercase tracking-eyebrow",
             isToday ? "text-accent-400" : "text-ink-600",
           )}
         >
@@ -512,7 +547,7 @@ function CalendarCard({ slot, state }: { slot: Slot; state: ReleaseState }) {
       to={`/media/${slot.media.id}`}
       title={title}
       className={cn(
-        "flex gap-1.5 rounded-lg bg-surface-900 p-1.5 transition-surface hover:bg-surface-850",
+        "flex gap-1.5 rounded-control bg-surface-900 p-1.5 transition-surface hover:bg-surface-850",
         released && "opacity-55 hover:opacity-100",
       )}
     >
@@ -520,7 +555,7 @@ function CalendarCard({ slot, state }: { slot: Slot; state: ReleaseState }) {
         src={slot.media.coverImage.large ?? ""}
         alt=""
         loading="lazy"
-        className="dense-cover shrink-0 rounded-[.25rem] object-cover"
+        className="dense-cover shrink-0 rounded-inner object-cover"
       />
       <div className="min-w-0 flex-1">
         <p className="dense-text flex items-center gap-1 leading-tight">
@@ -535,7 +570,7 @@ function CalendarCard({ slot, state }: { slot: Slot; state: ReleaseState }) {
             <StateMarker slot={slot} state={state} />
           </span>
         </p>
-        <p className="dense-text mt-0.5 line-clamp-2 leading-tight text-ink-200">
+        <p className="dense-text mt-0.5 line-clamp-2 leading-tight text-ink-100">
           {title}
         </p>
       </div>

@@ -2,9 +2,11 @@ import { useTranslation } from "react-i18next";
 import { WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/EmptyState";
+import { cardClass } from "@/components/ui/card";
 import { displayTitle } from "@/api/types";
 import { useCachedMedia } from "@/hooks/useCachedMedia";
 import { useListMutations } from "@/hooks/useListMutations";
+import { cn } from "@/lib/utils";
 
 
 /** The detail page offline: the cached list entry with a working +1, or a plain retry; never a faked page shape. */
@@ -22,7 +24,7 @@ export function OfflineDetail({
     return (
       <div className="p-8">
         <EmptyState
-          visual={<WifiOff className="size-8 text-ink-600" />}
+          icon={WifiOff}
           title={t("detail.offlineTitle")}
           hint={t("detail.offlineHint")}
           actions={
@@ -67,8 +69,8 @@ function OfflineEntry({
         {t("detail.offlineCached")}
       </p>
 
-      <div className="flex gap-4 rounded-xl border border-hair bg-surface-900 p-4">
-        <div className="h-32 w-22 shrink-0 overflow-hidden rounded-lg bg-surface-800">
+      <div className={cn(cardClass("flat"), "flex gap-4 p-4")}>
+        <div className="h-32 w-22 shrink-0 overflow-hidden rounded-control bg-surface-800">
           {entry.media.coverImage?.large && (
             <img
               src={entry.media.coverImage.large}
@@ -79,7 +81,7 @@ function OfflineEntry({
         </div>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <h1 className="text-lg font-semibold text-ink-100">
+          <h1 className="text-lg text-ink-100">
             {displayTitle(entry.media.title)}
           </h1>
           <p className="mt-1 text-sm tabular-nums text-ink-500">

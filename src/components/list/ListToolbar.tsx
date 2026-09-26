@@ -15,15 +15,17 @@ import {
   List as ListIcon,
   ListChecks,
   Plus,
-  Search,
   SlidersHorizontal,
   Tag,
-  X,
 } from "lucide-react";
 import { STATUS_ORDER, type MediaListStatus, type MediaType } from "@/api/types";
 import { Popover, type PopoverTriggerProps } from "@/components/ui/popover";
 import { Pill } from "@/components/ui/pill";
-import { Segmented } from "@/components/ui/segmented";
+import { Badge } from "@/components/ui/badge";
+import { RemovableChip } from "@/components/ui/chip";
+import { Segmented, type Segment } from "@/components/ui/segmented";
+import { MenuRow, MenuRowBody, MenuRowNote, menuRowClass } from "@/components/ui/menu-row";
+import { SearchField } from "@/components/ui/search-field";
 import { Button } from "@/components/ui/button";
 import { formatLabel, MEDIA_FORMATS, ORIGINS, originLabel } from "@/lib/format";
 import { fuzzyScore, prepareDoc, prepareQuery } from "@/lib/fuzzy";
@@ -109,7 +111,7 @@ export function ListToolbar(props: ListToolbarProps) {
       onClosed={props.onPanelClosed}
       renderTrigger={(p) => (
         <ToolTrigger p={p} name={t("list.sortButton", { key: sortName, dir: dirName })} iconOnly={phone}>
-          <ArrowUpDown aria-hidden className="size-3.75 shrink-0" />
+          <ArrowUpDown aria-hidden className="size-4 shrink-0" />
           {!phone && sortName}
           {!phone && <DirIcon aria-hidden className="size-3.25 text-ink-500" />}
         </ToolTrigger>
@@ -128,9 +130,11 @@ export function ListToolbar(props: ListToolbarProps) {
       onClosed={props.onPanelClosed}
       renderTrigger={(p) => (
         <ToolTrigger p={p} name={filterName} iconOnly={phone} active={chips.length > 0}>
-          <SlidersHorizontal aria-hidden className="size-3.75 shrink-0" />
+          <SlidersHorizontal aria-hidden className="size-4 shrink-0" />
           {!phone && t("list.filters")}
-          {chips.length > 0 && <Badge floating={phone}>{chips.length}</Badge>}
+          {chips.length > 0 && (
+            <Badge aria-hidden count={chips.length} floating={phone} className={phone ? "-right-1.5 -top-1.5" : undefined} />
+          )}
         </ToolTrigger>
       )}
     >
@@ -161,9 +165,9 @@ export function ListToolbar(props: ListToolbarProps) {
             onClosed={props.onPanelClosed}
             renderTrigger={(p) => (
               <ToolTrigger p={p} name={t("presets.button")}>
-                <Bookmark aria-hidden className="size-3.75 shrink-0" />
+                <Bookmark aria-hidden className="size-4 shrink-0" />
                 {t("presets.button")}
-                <ChevronDown aria-hidden className="size-3.25 text-ink-500" />
+                <ChevronDown aria-hidden className="size-3.5 text-ink-500" />
               </ToolTrigger>
             )}
           >
@@ -176,7 +180,7 @@ export function ListToolbar(props: ListToolbarProps) {
             title={t("random.pick")}
             className={cn(toolClass, "w-8.5 justify-center")}
           >
-            <Dices aria-hidden className="size-3.75" />
+            <Dices aria-hidden className="size-4" />
           </button>
           <ViewSwitch className="ml-auto" layout={props.layout} onLayout={props.onLayout} />
         </div>
@@ -243,7 +247,7 @@ export function ListMoreMenu({
 }
 
 const toolClass = cn(
-  "relative inline-flex h-8.5 shrink-0 items-center gap-1.5 rounded-lg border border-surface-700 bg-surface-900 text-xs font-medium text-ink-300 transition-surface",
+  "relative inline-flex h-8.5 shrink-0 items-center gap-1.5 rounded-control border border-surface-700 bg-surface-900 text-xs font-medium text-ink-300 transition-surface",
   "hover:border-surface-600 hover:bg-surface-850 hover:text-ink-100",
   "focus-visible:outline-2 focus-visible:outline-accent-500",
   "aria-expanded:border-accent-500 aria-expanded:bg-surface-850 aria-expanded:text-ink-100",
@@ -280,20 +284,6 @@ function ToolTrigger({
   );
 }
 
-function Badge({ floating, children }: { floating: boolean; children: ReactNode }) {
-  return (
-    <span
-      aria-hidden
-      className={cn(
-        "grid h-4 min-w-4 place-items-center rounded-full bg-accent-500 px-1 text-[.625rem] font-semibold tabular-nums text-accent-ink",
-        floating && "absolute -right-1.5 -top-1.5",
-      )}
-    >
-      {children}
-    </span>
-  );
-}
-
 /** The list search, with the match count inside it so narrowing never adds a row. */
 function SearchBox({
   value,
@@ -312,60 +302,32 @@ function SearchBox({
 }) {
   const { t } = useTranslation();
   return (
-    <div
-      className={cn(
-        "flex h-8.5 items-center gap-2 rounded-lg border border-surface-700 bg-surface-900 px-2.5 transition-surface",
-        "focus-within:border-accent-500",
-        value && "border-accent-500/60",
-        className,
-      )}
-    >
-      <Search aria-hidden className="size-3.75 shrink-0 text-ink-600" />
-      <input
-        ref={inputRef}
-        type="search"
-        enterKeyHint="search"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        // Escape empties a filled field first and only then lets go of it, the way a browser's find bar does.
-        onKeyDown={(e) => {
-          if (e.key !== "Escape") return;
-          e.preventDefault();
-          if (value) onChange("");
-          else e.currentTarget.blur();
-        }}
-        placeholder={t("list.filterPlaceholder")}
-        aria-label={t("list.searchLabel")}
-        aria-keyshortcuts={hint ? "Control+F" : undefined}
-        className="h-full min-w-0 flex-1 bg-transparent text-[.8125rem] text-ink-100 placeholder:text-ink-600 focus:outline-none [&::-webkit-search-cancel-button]:hidden"
-      />
-      {count && (
-        <span role="status" className="shrink-0 rounded-md bg-surface-800 px-1.5 py-0.5 text-2xs tabular-nums text-ink-300">
-          {count}
-        </span>
-      )}
-      {value ? (
-        <button
-          type="button"
-          // The field keeps the caret; taking focus on mousedown would blur it first.
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => {
-            onChange("");
-            inputRef.current?.focus();
-          }}
-          aria-label={t("common.clear")}
-          className="-mr-1 grid size-6 shrink-0 place-items-center rounded-md text-ink-500 transition-surface hover:bg-surface-800 hover:text-ink-100"
-        >
-          <X aria-hidden className="size-3.5" />
-        </button>
-      ) : (
-        hint && (
-          <kbd aria-hidden className="shrink-0 rounded border border-surface-700 px-1.5 py-px font-sans text-2xs text-ink-600">
-            Ctrl F
-          </kbd>
-        )
-      )}
-    </div>
+    <SearchField
+      value={value}
+      onChange={onChange}
+      inputRef={inputRef}
+      label={t("list.searchLabel")}
+      clearLabel={t("common.clear")}
+      placeholder={t("list.filterPlaceholder")}
+      aria-keyshortcuts={hint ? "Control+F" : undefined}
+      markFilled
+      blurOnEscape
+      className={className}
+      trailing={
+        <>
+          {count && (
+            <span role="status" className="shrink-0 rounded-inner bg-surface-800 px-1.5 py-0.5 text-2xs tabular-nums text-ink-300">
+              {count}
+            </span>
+          )}
+          {!value && hint && (
+            <kbd aria-hidden className="shrink-0 rounded-inner border border-surface-700 px-1.5 py-px font-sans text-2xs text-ink-600">
+              Ctrl F
+            </kbd>
+          )}
+        </>
+      }
+    />
   );
 }
 
@@ -375,25 +337,24 @@ function Choice({
   checked,
   onSelect,
   children,
-  className,
 }: {
   name: string;
   checked: boolean;
   onSelect: () => void;
   children: ReactNode;
-  className?: string;
 }) {
   return (
     <label
+      data-current={checked || undefined}
       className={cn(
-        "flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-[.8125rem] transition-surface",
-        "has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent-500",
-        checked ? "bg-surface-850 text-ink-100" : "text-ink-300 hover:bg-surface-850/60 hover:text-ink-100",
-        className,
+        menuRowClass({ current: checked }),
+        "cursor-pointer has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent-500",
       )}
     >
       <input type="radio" name={name} checked={checked} onChange={onSelect} className="sr-only" />
-      {children}
+      <MenuRowBody current={checked} trailing={checked && <Check aria-hidden className="size-4 shrink-0 text-accent-400" />}>
+        {children}
+      </MenuRowBody>
     </label>
   );
 }
@@ -401,14 +362,14 @@ function Choice({
 function SortPanel({ view, onDraft }: { view: ListView; onDraft: (patch: ViewPatch) => void }) {
   const { t } = useTranslation();
   const id = useId();
-  const dirs: { value: SortDir; label: string; icon: typeof ArrowUp }[] = [
-    { value: "desc", label: t("list.descending"), icon: ArrowDown },
-    { value: "asc", label: t("list.ascending"), icon: ArrowUp },
+  const dirs: Segment<SortDir>[] = [
+    { value: "desc", label: <DirLabel icon={ArrowDown} text={t("list.descending")} /> },
+    { value: "asc", label: <DirLabel icon={ArrowUp} text={t("list.ascending")} /> },
   ];
   return (
     <div className="space-y-3">
-      <fieldset>
-        <legend className="mb-1.5 text-2xs font-semibold uppercase tracking-[.1em] text-ink-500">
+      <fieldset className="flex flex-col gap-0.5">
+        <legend className="mb-1.5 text-2xs font-semibold uppercase tracking-eyebrow text-ink-500">
           {t("list.sortTitle")}
         </legend>
         {SORT_KEYS.map((key) => (
@@ -419,29 +380,29 @@ function SortPanel({ view, onDraft }: { view: ListView; onDraft: (patch: ViewPat
             // A new key starts from its own direction: "score, ascending" was a choice about scores, not titles.
             onSelect={() => onDraft(sortPatch(key, SORT_DEFAULT_DIR[key]))}
           >
-            <span className="flex-1">{t(`sort.${key}`)}</span>
-            {view.sort === key && <Check aria-hidden className="size-4 text-accent-400" />}
+            {t(`sort.${key}`)}
           </Choice>
         ))}
       </fieldset>
-      <fieldset className="border-t border-surface-800 pt-3">
-        <legend className="sr-only">{t("list.direction")}</legend>
-        <div className="grid grid-cols-2 gap-1 rounded-lg border border-surface-800 p-0.5">
-          {dirs.map(({ value, label, icon: Icon }) => (
-            <Choice
-              key={value}
-              name={`${id}-dir`}
-              checked={view.dir === value}
-              onSelect={() => onDraft(sortPatch(view.sort, value))}
-              className="justify-center py-1.5 text-xs"
-            >
-              <Icon aria-hidden className="size-3.5" />
-              {label}
-            </Choice>
-          ))}
-        </div>
-      </fieldset>
+      <div className="border-t border-hair pt-3">
+        <Segmented
+          segments={dirs}
+          value={view.dir}
+          onChange={(dir) => onDraft(sortPatch(view.sort, dir))}
+          aria-label={t("list.direction")}
+          className="flex w-full [&>button]:flex-1"
+        />
+      </div>
     </div>
+  );
+}
+
+function DirLabel({ icon: Icon, text }: { icon: typeof ArrowUp; text: string }) {
+  return (
+    <span className="flex items-center gap-1.5">
+      <Icon aria-hidden className="size-3.5" />
+      {text}
+    </span>
   );
 }
 
@@ -458,7 +419,7 @@ function PanelSection({
   return (
     <section aria-labelledby={id}>
       <div className="mb-1.5 flex items-center justify-between gap-2">
-        <h3 id={id} className="text-2xs font-semibold uppercase tracking-[.1em] text-ink-500">
+        <h3 id={id} className="text-2xs uppercase tracking-eyebrow text-ink-500">
           {title}
         </h3>
         {aside}
@@ -538,17 +499,15 @@ function FilterPanel({
         {tags.length > 0 && (
           <PanelSection title={t("tags.label")}>
             {tags.length > TAG_SEARCH_MIN && (
-              <div className="mb-2 flex h-8 items-center gap-2 rounded-lg border border-surface-700 px-2.5 focus-within:border-accent-500">
-                <Search aria-hidden className="size-3.5 shrink-0 text-ink-600" />
-                <input
-                  type="search"
-                  value={term}
-                  onChange={(e) => setTerm(e.target.value)}
-                  placeholder={t("list.filterTags")}
-                  aria-label={t("list.filterTags")}
-                  className="h-full min-w-0 flex-1 bg-transparent text-xs text-ink-100 placeholder:text-ink-600 focus:outline-none [&::-webkit-search-cancel-button]:hidden"
-                />
-              </div>
+              <SearchField
+                size="sm"
+                value={term}
+                onChange={setTerm}
+                label={t("list.filterTags")}
+                clearLabel={t("common.clear")}
+                placeholder={t("list.filterTags")}
+                className="mb-2"
+              />
             )}
             <PillGroup label={t("tags.label")}>
               {shownTags.map((tag) => (
@@ -561,7 +520,7 @@ function FilterPanel({
           </PanelSection>
         )}
       </div>
-      <div className="mt-4 flex items-center gap-3 border-t border-surface-800 pt-3">
+      <div className="mt-4 flex items-center gap-3 border-t border-hair pt-3">
         <Button
           variant="ghost"
           size="sm"
@@ -598,31 +557,25 @@ function PresetList({
         <ul className="space-y-0.5">
           {presets.map((p) => (
             <li key={p.name}>
-              <button
-                type="button"
+              <MenuRow
                 onClick={() => closeThen(() => onApplyPreset(p.name))}
-                className="flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left text-[.8125rem] text-ink-300 transition-surface hover:bg-surface-850 hover:text-ink-100 focus-visible:outline-2 focus-visible:outline-accent-500"
+                trailing={
+                  STATUS_ORDER.includes(p.tab as MediaListStatus) && (
+                    <MenuRowNote>{t(`status.${type}.${p.tab}`)}</MenuRowNote>
+                  )
+                }
               >
-                <span className="min-w-0 flex-1 truncate">{p.name}</span>
-                {STATUS_ORDER.includes(p.tab as MediaListStatus) && (
-                  <span className="shrink-0 text-2xs text-ink-600">{t(`status.${type}.${p.tab}`)}</span>
-                )}
-              </button>
+                {p.name}
+              </MenuRow>
             </li>
           ))}
         </ul>
       ) : (
         <p className="px-1 text-xs leading-relaxed text-ink-500">{t("presets.empty")}</p>
       )}
-      <Button
-        variant="ghost"
-        size="sm"
-        className="mt-2 h-auto min-h-8 w-full justify-start py-1.5 text-left"
-        onClick={() => closeThen(onManagePresets)}
-      >
-        <Plus aria-hidden className="size-3.5" />
+      <MenuRow icon={Plus} onClick={() => closeThen(onManagePresets)} className="mt-2">
         {t("presets.save")}
-      </Button>
+      </MenuRow>
     </div>
   );
 }
@@ -648,7 +601,7 @@ function ViewSwitch({
         {title}
       </span>
     ) : (
-      <Icon aria-hidden className="size-3.75" />
+      <Icon aria-hidden className="size-4" />
     ),
   });
   return (
@@ -697,24 +650,20 @@ function FilterChips({
       {chips.map((chip) => {
         const name = chipName(chip, t);
         return (
-          <button
+          <RemovableChip
             key={chip.key}
-            type="button"
-            onClick={() => onChange({ [chip.key]: "" })}
-            aria-label={t("list.removeFilter", { name })}
-            className="inline-flex h-6.5 shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-accent-500/50 bg-accent-500/10 pl-2.5 pr-1.5 text-2xs font-medium text-ink-100 transition-surface hover:bg-accent-500/20 focus-visible:outline-2 focus-visible:outline-accent-500"
+            icon={chip.key === "tag" ? Tag : chip.key === "list" ? ListChecks : undefined}
+            removeLabel={t("list.removeFilter", { name })}
+            onRemove={() => onChange({ [chip.key]: "" })}
           >
-            {chip.key === "tag" && <Tag aria-hidden className="size-3 text-ink-500" />}
-            {chip.key === "list" && <ListChecks aria-hidden className="size-3 text-ink-500" />}
             {name}
-            <X aria-hidden className="size-3 text-ink-500" />
-          </button>
+          </RemovableChip>
         );
       })}
       <button
         type="button"
         onClick={() => onChange(CLEAR_FILTERS)}
-        className="ml-1 shrink-0 whitespace-nowrap rounded-md px-1 text-2xs font-medium text-accent-400 hover:text-accent-500 focus-visible:outline-2 focus-visible:outline-accent-500"
+        className="ml-1 shrink-0 whitespace-nowrap rounded-inner px-1 text-2xs font-medium text-accent-400 hover:text-accent-500 focus-visible:outline-2 focus-visible:outline-accent-500"
       >
         {t("list.resetFilters")}
       </button>

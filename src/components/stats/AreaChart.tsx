@@ -63,7 +63,7 @@ export function AreaChart({
             x={p.x}
             y={p.y - 7}
             textAnchor="middle"
-            className="fill-ink-300 text-[.5625rem] font-medium tabular-nums"
+            className="fill-ink-300 text-2xs font-medium tabular-nums"
           >
             {data[i].value}
           </text>
@@ -71,7 +71,7 @@ export function AreaChart({
             x={p.x}
             y={height - 6}
             textAnchor="middle"
-            className="fill-ink-600 text-[.5625rem] tabular-nums"
+            className="fill-ink-600 text-2xs tabular-nums"
           >
             {data[i].label}
           </text>

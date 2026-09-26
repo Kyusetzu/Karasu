@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Checks `VirtualRows` in a real Chromium, since jsdom has no layout and a unit test there passes vacuously.
 //
-//   node scripts/virtual-rows-check.mjs    needs playwright (npm i --no-save playwright, then restore package-lock.json)
+//   node scripts/virtual-rows-check.mjs    runs on the playwright-core the screens harness uses
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -52,7 +52,8 @@ process.on("exit", () => {
   vite.kill();
 });
 
-const { chromium } = await import("playwright");
+// The full package when someone installed it, else the core the screens harness already depends on.
+const { chromium } = await import("playwright").catch(() => import("playwright-core"));
 
 // Wait for the dev server rather than sleeping a fixed time.
 for (let i = 0; i < 60; i++) {

@@ -28,19 +28,19 @@ export function FilterSelect({
   return (
     <div
       className={cn(
-        "relative flex h-8.5 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg",
-        "border border-surface-800 bg-surface-900 px-2.5 transition-surface",
+        "relative flex h-8.5 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-control",
+        "border border-hair bg-surface-900 px-2.5 transition-surface",
         "focus-within:border-accent-500 hover:bg-surface-850",
         className,
       )}
     >
-      <span className="text-[.6875rem] uppercase tracking-[.08em] text-ink-600">
+      <span className="text-2xs font-semibold uppercase text-ink-600">
         {label}
       </span>
       <span className="max-w-32 truncate text-xs text-ink-300">
         {current?.label ?? placeholder}
       </span>
-      <ChevronDown className="size-3 shrink-0 text-ink-600" />
+      <ChevronDown className="size-3.5 shrink-0 text-ink-600" />
       <select
         value={value}
         aria-label={label}

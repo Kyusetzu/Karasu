@@ -1,15 +1,19 @@
 import type { ReactNode } from "react";
+import type { LucideIcon } from "lucide-react";
 import KarasuMark from "@/components/KarasuMark";
 import { cn } from "@/lib/utils";
 
 /** An empty surface, said out loud; each visual differs on purpose, and only here does the corvid show itself. */
 export function EmptyState({
+  icon: Icon,
   visual,
   title,
   hint,
   actions,
   className,
 }: {
+  /** A plain glyph at the empty-state size, for a state no drawn visual below fits. */
+  icon?: LucideIcon;
   visual?: ReactNode;
   title: string;
   hint?: ReactNode;
@@ -18,8 +22,8 @@ export function EmptyState({
 }) {
   return (
     <div className={cn("flex flex-col items-center py-10 text-center", className)}>
-      {visual}
-      <p className="mt-4 text-[.9375rem] font-medium text-ink-300">{title}</p>
+      {Icon ? <Icon aria-hidden className="size-8 text-ink-600" /> : visual}
+      <p className="mt-4 text-base font-medium text-ink-300">{title}</p>
       {hint && (
         <p className="mt-1 max-w-80 text-2xs leading-relaxed text-ink-600">
           {hint}
@@ -61,7 +65,7 @@ export function TickMarks({ count = 7 }: { count?: number }) {
 /** A dashed 2:3 cover that never got filled, holding the mark. */
 export function CoverOutline() {
   return (
-    <div className="grid h-30 w-20 place-items-center rounded-lg border border-dashed border-surface-700">
+    <div className="grid h-30 w-20 place-items-center rounded-control border border-dashed border-surface-700">
       {/* Barely alive, as nothing else here competes; not on PerchRule's bird, whose `land` owns the same transform. */}
       <KarasuMark className="animate-idle-float size-13 opacity-80" />
     </div>
@@ -75,7 +79,7 @@ export function FolderStack() {
       {[-7, 3, 0].map((angle, i) => (
         <span
           key={angle}
-          className="absolute left-1/2 h-15 w-22 -translate-x-1/2 rounded-md border border-dashed border-surface-700"
+          className="absolute left-1/2 h-15 w-22 -translate-x-1/2 rounded-inner border border-dashed border-surface-700"
           style={{ top: `${i * 0.75}rem`, transform: `translateX(-50%) rotate(${angle}deg)` }}
         />
       ))}

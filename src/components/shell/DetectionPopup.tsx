@@ -82,7 +82,7 @@ export default function DetectionPopup() {
       ref={card}
       // Not a dialog: it arrives unprompted, so it takes no focus and sets no `data-overlay`, and list keys keep working.
       className={cn(
-        "pointer-events-auto overflow-hidden rounded-[.875rem] border border-hair bg-surface-900 shadow-2xl panel-wash",
+        "pointer-events-auto overflow-hidden rounded-panel border border-hair bg-surface-900 shadow-float panel-wash",
         free ? "fixed z-30" : "relative w-88 max-w-full",
         shown.leaving ? "animate-rise-out" : "animate-rise-in",
       )}
@@ -104,13 +104,14 @@ export default function DetectionPopup() {
             className="h-full w-full scale-110 object-cover blur-2xl"
           />
           <div className="absolute inset-0 bg-surface-900/55" />
-          <div className="cover-scrim absolute inset-0" />
+          {/* Fades to the panel's own colour, not the cover scrim's black: the text here is ink, not white over art. */}
+          <div className="absolute inset-0 bg-linear-to-t from-surface-900 to-transparent" />
         </div>
       )}
       {scrobble.phase === "watching" && !shown.leaving && !compact && (
         <span
           aria-hidden
-          className="animate-idle-glow pointer-events-none absolute inset-0 rounded-[.875rem]"
+          className="animate-idle-glow pointer-events-none absolute inset-0 rounded-panel"
         />
       )}
       {!compact && (
@@ -124,7 +125,7 @@ export default function DetectionPopup() {
           )}
         >
           <span className="size-1.5 shrink-0 animate-blip rounded-full bg-accent-500" />
-          <p className="min-w-0 flex-1 truncate text-2xs font-medium uppercase tracking-[.09em] text-accent-400">
+          <p className="min-w-0 flex-1 truncate text-2xs font-medium uppercase text-accent-400">
             {heading}
           </p>
           <ScrobbleActions playing={playing} />

@@ -1,16 +1,17 @@
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { Loader2, Search, X } from "lucide-react";
+import { X } from "lucide-react";
 import { searchMedia, sequelsOf } from "@/api/queries";
 import { displayTitle, type MediaTitle } from "@/api/types";
 import { useContentFilter } from "@/stores/contentFilter";
 import { isBlocked } from "@/lib/contentFilter";
 import { formatLabel } from "@/lib/format";
 import { Button } from "@/components/ui/button";
-import { useDialogFocus } from "@/hooks/useDialogFocus";
-import { useBackClose } from "@/hooks/useBackClose";
 import { Input } from "@/components/ui/input";
+import { MenuGroupLabel, MenuRow } from "@/components/ui/menu-row";
+import { Modal } from "@/components/ui/modal";
+import { SearchField } from "@/components/ui/search-field";
 import { cn } from "@/lib/utils";
 
 /** Picks the title a pile of files belongs to, searching all of AniList because the matcher only ever sees the list. */
@@ -48,11 +49,6 @@ export default function MatchPicker({
   onCancel: () => void;
 }) {
   const { t } = useTranslation();
-  const panel = useRef<HTMLDivElement>(null);
-  const titleId = useId();
-  // The search field claims its own focus, which `useDialogFocus` leaves alone.
-  useDialogFocus(panel, !leaving);
-  useBackClose(!leaving, onCancel);
   const level = useContentFilter((s) => s.level);
   const [term, setTerm] = useState(parsedTitle);
   const [debounced, setDebounced] = useState(parsedTitle);
@@ -67,12 +63,7 @@ export default function MatchPicker({
     return Number.isFinite(n) && n > 0 ? n : undefined;
   })();
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onCancel();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onCancel]);
-
+  // The search field takes the caret over the dialog's first control, since typing is what the dialog is for.
   useEffect(() => box.current?.focus(), []);
 
   // Debounced: a request per keystroke would exhaust the AniList rate limit inside one title.
@@ -117,110 +108,67 @@ export default function MatchPicker({
   );
 
   return (
-    <div
-      data-overlay
-      className={cn(
-        "fixed inset-0 z-[110] grid place-items-center bg-[rgba(4,5,8,.55)] p-4",
-        leaving ? "animate-fade-out" : "animate-fade-in",
-      )}
-      onMouseDown={(e) =>
-        !leaving && e.target === e.currentTarget && onCancel()
+    <Modal
+      title={t("library.pickTitle")}
+      // The parsed title is the evidence for why this row looks wrong, so it stays on screen.
+      description={t("library.parsedAs", {
+        title: parsedTitle,
+        season: season > 0 ? ` · S${season}` : "",
+      })}
+      size="xl"
+      onClose={onCancel}
+      leaving={leaving}
+      bodyClassName="flex flex-col overflow-hidden p-0"
+      footer={
+        <>
+          {error && <span className="mr-auto min-w-0 flex-1 truncate text-2xs text-danger">{error}</span>}
+          {onClear && (
+            <Button variant="ghost" size="control" className={cn(!error && "mr-auto")} onClick={onClear}>
+              <X className="size-3.5" />
+              {t("library.clearMatch")}
+            </Button>
+          )}
+          <Button variant="outline" size="control" onClick={onCancel}>
+            {t("common.cancel")}
+          </Button>
+        </>
       }
     >
-      <div
-        ref={panel}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        className={cn(
-          "flex max-h-[80vh] w-[34rem] max-w-full flex-col rounded-xl border border-hair bg-surface-900 shadow-2xl panel-wash",
-          leaving ? "animate-settle-out" : "animate-spring-in",
-        )}
-      >
-        <div className="border-b border-hair p-5 pb-4">
-          <h2 id={titleId} className="text-sm font-semibold text-ink-100">
-            {t("library.pickTitle")}
-          </h2>
-          {/* The parsed title is the evidence for why this row looks wrong, so it stays on screen. */}
-          <p className="mt-1 truncate text-2xs text-ink-600">
-            {t("library.parsedAs", {
-              title: parsedTitle,
-              season: season > 0 ? ` · S${season}` : "",
-            })}
-          </p>
-          <div className="relative mt-3">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-ink-600" />
+      <div className="shrink-0 border-b border-hair px-5 pb-4 pt-3">
+        <SearchField
+          value={term}
+          onChange={setTerm}
+          inputRef={box}
+          busy={isFetching}
+          label={t("library.searchAniList")}
+          clearLabel={t("common.clear")}
+          placeholder={t("library.searchAniList")}
+        />
+        {/* Only where an episode number is on the table; a library correction settles a whole title. */}
+        {detectedEpisode != null && (
+          <div className="mt-2 flex items-center gap-2">
+            <label className="text-2xs text-ink-500" htmlFor="pick-episode">
+              {t("library.reallyEpisode", { n: detectedEpisode })}
+            </label>
             <Input
-              ref={box}
-              value={term}
-              onChange={(e) => setTerm(e.target.value)}
-              onClear={() => setTerm("")}
-              clearLabel={t("common.clear")}
-              placeholder={t("library.searchAniList")}
-              className="pl-8"
+              id="pick-episode"
+              type="number"
+              min={1}
+              value={episode}
+              onChange={(e) => setEpisode(e.target.value)}
+              className="h-7 w-20"
             />
-            {isFetching && (
-              <Loader2
-                className={cn(
-                  "absolute top-1/2 size-3.5 -translate-y-1/2 animate-spin text-ink-600",
-                  // Left of the clear button whenever there is one.
-                  term ? "right-8" : "right-2.5",
-                )}
-              />
-            )}
           </div>
-          {/* Only where an episode number is on the table; a library correction settles a whole title. */}
-          {detectedEpisode != null && (
-            <div className="mt-2 flex items-center gap-2">
-              <label className="text-2xs text-ink-500" htmlFor="pick-episode">
-                {t("library.reallyEpisode", { n: detectedEpisode })}
-              </label>
-              <Input
-                id="pick-episode"
-                type="number"
-                min={1}
-                value={episode}
-                onChange={(e) => setEpisode(e.target.value)}
-                className="h-7 w-20"
-              />
-            </div>
-          )}
-        </div>
+        )}
+      </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto p-2">
-          {suggestions.length > 0 && (
-            <div className="mb-2">
-              <p className="px-3 pb-1 pt-1 text-2xs font-semibold uppercase tracking-[.1em] text-ink-600">
-                {t("library.laterSeasons")}
-              </p>
-              <ul className="space-y-0.5">
-                {suggestions.map((media) => (
-                  <li key={`sequel-${media.id}`}>
-                    <ResultRow
-                      media={media}
-                      isCurrent={displayTitle(media.title) === current}
-                      onPick={() =>
-                        onPick(media.id, displayTitle(media.title), realEpisode)
-                      }
-                    />
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {results.length === 0 ? (
-            // A search that never reached AniList is not one that found nothing; asking for a retype spends the budget.
-            <p className="px-3 py-6 text-center text-xs text-ink-600">
-              {isError
-                ? t("library.searchFailed")
-                : debounced.length > 1 && !isFetching
-                  ? t("library.noResults")
-                  : t("library.typeToSearch")}
-            </p>
-          ) : (
+      <div className="min-h-0 flex-1 overflow-y-auto p-2">
+        {suggestions.length > 0 && (
+          <div className="mb-2">
+            <MenuGroupLabel>{t("library.laterSeasons")}</MenuGroupLabel>
             <ul className="space-y-0.5">
-              {results.map((media) => (
-                <li key={media.id}>
+              {suggestions.map((media) => (
+                <li key={`sequel-${media.id}`}>
                   <ResultRow
                     media={media}
                     isCurrent={displayTitle(media.title) === current}
@@ -231,29 +179,34 @@ export default function MatchPicker({
                 </li>
               ))}
             </ul>
-          )}
-        </div>
-
-        <div className="flex items-center justify-between gap-2 border-t border-hair p-4">
-          {error && (
-            <span className="mr-auto min-w-0 flex-1 truncate text-2xs text-danger">
-              {error}
-            </span>
-          )}
-          {onClear ? (
-            <Button variant="ghost" size="control" onClick={onClear}>
-              <X className="size-3.5" />
-              {t("library.clearMatch")}
-            </Button>
-          ) : (
-            <span />
-          )}
-          <Button variant="outline" size="control" onClick={onCancel}>
-            {t("common.cancel")}
-          </Button>
-        </div>
+          </div>
+        )}
+        {results.length === 0 ? (
+          // A search that never reached AniList is not one that found nothing; asking for a retype spends the budget.
+          <p className="px-3 py-6 text-center text-xs text-ink-600">
+            {isError
+              ? t("library.searchFailed")
+              : debounced.length > 1 && !isFetching
+                ? t("library.noResults")
+                : t("library.typeToSearch")}
+          </p>
+        ) : (
+          <ul className="space-y-0.5">
+            {results.map((media) => (
+              <li key={media.id}>
+                <ResultRow
+                  media={media}
+                  isCurrent={displayTitle(media.title) === current}
+                  onPick={() =>
+                    onPick(media.id, displayTitle(media.title), realEpisode)
+                  }
+                />
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -278,44 +231,29 @@ function ResultRow({
 }) {
   const { t } = useTranslation();
   return (
-    <button
-      type="button"
+    <MenuRow
+      current={isCurrent}
       onClick={onPick}
-      className={cn(
-        "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors",
-        isCurrent ? "bg-accent-500/12" : "hover:bg-surface-800",
-      )}
+      lead={
+        media.coverImage?.large ? (
+          <img src={media.coverImage.large} alt="" loading="lazy" className="h-12 w-8 shrink-0 rounded-inner object-cover" />
+        ) : (
+          <span className="h-12 w-8 shrink-0 rounded-inner bg-surface-800" />
+        )
+      }
+      trailing={isCurrent && <span className="shrink-0 text-2xs text-accent-400">{t("library.currentMatch")}</span>}
     >
-      {media.coverImage?.large ? (
-        <img
-          src={media.coverImage.large}
-          alt=""
-          loading="lazy"
-          className="h-12 w-8 shrink-0 rounded object-cover"
-        />
-      ) : (
-        <span className="h-12 w-8 shrink-0 rounded bg-surface-800" />
-      )}
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-xs text-ink-300">
-          {displayTitle(media.title)}
-        </span>
-        <span className="mt-0.5 block text-2xs text-ink-600">
-          {[
-            // `formatLabel`, not the raw enum: no AniList enum reaches the screen.
-            formatLabel(media.format, t),
-            media.seasonYear,
-            media.episodes ? t("library.epCount", { n: media.episodes }) : null,
-          ]
-            .filter(Boolean)
-            .join(" · ")}
-        </span>
+      <span className="block truncate">{displayTitle(media.title)}</span>
+      <span className="mt-0.5 block text-2xs text-ink-600">
+        {[
+          // `formatLabel`, not the raw enum: no AniList enum reaches the screen.
+          formatLabel(media.format, t),
+          media.seasonYear,
+          media.episodes ? t("library.epCount", { n: media.episodes }) : null,
+        ]
+          .filter(Boolean)
+          .join(" · ")}
       </span>
-      {isCurrent && (
-        <span className="shrink-0 text-2xs text-accent-400">
-          {t("library.currentMatch")}
-        </span>
-      )}
-    </button>
+    </MenuRow>
   );
 }

@@ -8,7 +8,6 @@ import {
   Code2,
   Mail,
   MessageCircle,
-  RefreshCw,
   AlertTriangle,
   CheckCircle2,
   Download,
@@ -40,8 +39,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import KarasuMark from "@/components/KarasuMark";
-import { cn } from "@/lib/utils";
 import { isAndroid, isLinux, usePlatform } from "@/stores/platform";
+import { Spinner } from "@/components/ui/spinner";
 
 const REPO_URL = "https://github.com/Kyusetzu/Karasu";
 const DISCORD_HANDLE = "Kyusetzu";
@@ -72,7 +71,7 @@ export default function About() {
       <div className="relative mx-auto max-w-136 px-8 py-12">
         <header className="flex flex-col items-center text-center">
           <KarasuMark className="size-28" />
-          <h1 className="mt-4 font-brand text-[2rem] font-bold uppercase leading-none tracking-[.22em] text-ink-100">
+          <h1 className="mt-4 font-brand text-title uppercase leading-none tracking-wordmark text-ink-100">
             Karasu
           </h1>
           {/* Katakana, not kanji: it is how the name is written everywhere else in the project. */}
@@ -173,7 +172,7 @@ function DiagnosticsSection() {
 
       {/* The actual facts, so the user can see what they are about to paste before they paste it. */}
       {report && (
-        <pre className="mt-3 max-h-56 overflow-auto rounded-lg bg-surface-850 p-2.5 font-mono text-2xs leading-relaxed text-ink-500">
+        <pre className="mt-3 max-h-56 overflow-auto rounded-control bg-surface-850 p-2.5 font-mono text-2xs leading-relaxed text-ink-500">
           {report}
         </pre>
       )}
@@ -186,7 +185,7 @@ function DiagnosticsSection() {
         <Button variant="secondary" onClick={save} disabled={saving}>
           {/* The spinning RefreshCw is the house busy idiom; a busy indicator is not a feature moment. */}
           {saving ? (
-            <RefreshCw className="size-3.5 animate-spin" />
+            <Spinner className="size-3.5" />
           ) : (
             <Download className="size-3.5" />
           )}
@@ -264,7 +263,7 @@ function ApkUpdatePanel({ tick }: { tick: number }) {
       {state.status === "downloading" && (
         <div>
           <p className="flex items-center gap-1.5 text-ink-500">
-            <RefreshCw className="size-4 animate-spin" />{" "}
+            <Spinner className="size-4" />{" "}
             {t("about.apkDownloading", { version: state.version, received: mb(state.received), total: mb(state.total) })}
           </p>
           <div className="mt-2 h-1 overflow-hidden rounded-full bg-surface-800">
@@ -387,13 +386,13 @@ function UpdateSection() {
       <CardTitle>{t("about.updates")}</CardTitle>
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <Button onClick={check} disabled={busy || downloading || !isTauri}>
-          <RefreshCw className={cn("size-4", busy && "animate-spin")} />{" "}
+          <Spinner spinning={busy} className="size-4" />{" "}
           {busy ? t("about.checking") : t("about.checkUpdates")}
         </Button>
 
         {downloading && (
           <span className="flex items-center gap-1.5 text-sm text-ink-500">
-            <RefreshCw className="size-4 animate-spin" /> {t("about.downloading")}
+            <Spinner className="size-4" /> {t("about.downloading")}
           </span>
         )}
 
@@ -403,7 +402,7 @@ function UpdateSection() {
             onClick={confirmInstall}
             disabled={installing}
           >
-            <RotateCw className={cn("size-4", installing && "animate-spin")} />{" "}
+            <Spinner icon={RotateCw} spinning={installing} className="size-4" />{" "}
             {installing ? t("about.installing") : t("about.restartUpdate")}
           </Button>
         )}

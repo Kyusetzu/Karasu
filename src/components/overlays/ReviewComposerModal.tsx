@@ -10,6 +10,7 @@ import {
 } from "@/lib/composer";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { MarkdownTextarea } from "@/components/social/MarkdownTextarea";
 import { showToast } from "@/stores/toast";
@@ -101,31 +102,33 @@ export function ReviewComposerModal({
       title={t(existing ? "review.editTitle" : "review.writeTitle")}
       onClose={onClose}
       leaving={leaving}
-      className="max-w-2xl"
+      size="2xl"
+      footer={
+        <>
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            {t("common.cancel")}
+          </Button>
+          <Button size="sm" onClick={submit} disabled={!check.ok || save.isPending}>
+            {save.isPending ? t("review.publishing") : t("review.publish")}
+          </Button>
+        </>
+      }
     >
       <div className="space-y-4">
-        <div>
-          <label className="block text-xs font-medium text-ink-300" htmlFor="review-summary">
-            {t("review.summaryLabel")}
-          </label>
+        <Field label={t("review.summaryLabel")} htmlFor="review-summary">
           <Input
             id="review-summary"
             value={summary}
             onChange={(e) => setSummary(e.target.value)}
             placeholder={t("review.summaryPlaceholder")}
             maxLength={REVIEW_SUMMARY_MAX}
-            className="mt-1.5"
           />
-        </div>
+        </Field>
 
-        <div>
-          {/* The textarea stays mounted under the preview, so the label's `htmlFor` always resolves. */}
-          <label className="block text-xs font-medium text-ink-300" htmlFor="review-body">
-            {t("review.bodyLabel")}
-          </label>
+        {/* The textarea stays mounted under the preview, so the label's `htmlFor` always resolves. */}
+        <Field label={t("review.bodyLabel")} htmlFor="review-body">
           <MarkdownTextarea
             id="review-body"
-            className="mt-1.5"
             value={body}
             onChange={setBody}
             onSubmit={submit}
@@ -145,7 +148,7 @@ export function ReviewComposerModal({
               </span>
             }
           />
-        </div>
+        </Field>
 
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
           <label className="flex items-center gap-2 text-xs font-medium text-ink-300">
@@ -174,15 +177,6 @@ export function ReviewComposerModal({
         {!check.ok && check.reason !== undefined && (summary.length > 0 || bodyLen > 0) && (
           <p className="text-2xs text-gold">{reasonText(check.reason, t, bodyLen)}</p>
         )}
-
-        <div className="flex items-center justify-end gap-2 border-t border-surface-800 pt-3">
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            {t("common.cancel")}
-          </Button>
-          <Button size="sm" onClick={submit} disabled={!check.ok || save.isPending}>
-            {save.isPending ? t("review.publishing") : t("review.publish")}
-          </Button>
-        </div>
       </div>
     </Modal>
   );

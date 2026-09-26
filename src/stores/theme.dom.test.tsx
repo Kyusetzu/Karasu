@@ -69,3 +69,37 @@ describe("useTheme's accent source", () => {
     expect(provider.mock.calls.length).toBe(calls + 1);
   });
 });
+
+describe("useTheme's contrast", () => {
+  afterEach(() => act(() => useTheme.getState().setContrast("system")));
+
+  it("marks the document for the high-contrast palette and clears the mark again", () => {
+    act(() => useTheme.getState().setContrast("high"));
+    expect(document.documentElement.dataset.contrast).toBe("more");
+    expect(localStorage.getItem("karasu-contrast")).toBe("high");
+    expect(document.documentElement.style.getPropertyValue("--hair")).toBe("var(--color-surface-600)");
+    act(() => useTheme.getState().setContrast("standard"));
+    expect(document.documentElement.dataset.contrast).toBeUndefined();
+  });
+
+  it("moves a mid-tone accent's fill until its label reads at 7:1", () => {
+    act(() => useTheme.getState().setAccent("#808080"));
+    act(() => useTheme.getState().setContrast("standard"));
+    const standard = root();
+    act(() => useTheme.getState().setContrast("high"));
+    expect(root()).not.toBe(standard);
+  });
+
+  it("follows the OS request only while set to system", () => {
+    const original = window.matchMedia;
+    window.matchMedia = ((query: string) => ({ ...original(query), matches: query === "(prefers-contrast: more)" })) as typeof window.matchMedia;
+    try {
+      act(() => useTheme.getState().setContrast("system"));
+      expect(document.documentElement.dataset.contrast).toBe("more");
+      act(() => useTheme.getState().setContrast("standard"));
+      expect(document.documentElement.dataset.contrast).toBeUndefined();
+    } finally {
+      window.matchMedia = original;
+    }
+  });
+});

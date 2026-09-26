@@ -16,7 +16,7 @@ const DISC: Record<AvatarSize, string> = {
 };
 
 const INITIAL_TEXT: Record<AvatarSize, string> = {
-  sm: "text-[.6875rem]",
+  sm: "text-xs",
   md: "text-xs",
   lg: "text-base",
   xl: "text-lg",

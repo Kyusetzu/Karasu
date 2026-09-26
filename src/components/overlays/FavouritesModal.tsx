@@ -15,7 +15,7 @@ import { displayTitle } from "@/api/types";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
-import { Tabs, type TabOption } from "@/components/ui/tabs";
+import { StatusTabs, type StatusTab } from "@/components/ui/status-tabs";
 import { Avatar } from "@/components/ui/user-lockup";
 import { Shimmer } from "@/components/Skeleton";
 import { showToast } from "@/stores/toast";
@@ -156,7 +156,7 @@ export function FavouritesModal({
   const move = (from: number, to: number) =>
     setDrafts((d) => (d ? { ...d, [kind]: moveItem(d[kind], from, to) } : d));
 
-  const options: TabOption<FavouriteKind>[] = KINDS.map((k) => ({
+  const options: StatusTab<FavouriteKind>[] = KINDS.map((k) => ({
     value: k,
     label:
       k === "anime"
@@ -176,13 +176,28 @@ export function FavouritesModal({
       title={t("social.editFavourites")}
       onClose={onClose}
       leaving={leaving}
-      className="max-w-xl"
+      size="xl"
+      footer={
+        <>
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            {t("common.done")}
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => save.mutate()}
+            disabled={!dirty || save.isPending || q.data?.truncated === true}
+            className={cn(save.isPending && "opacity-70")}
+          >
+            {save.isPending ? t("social.saving") : t("social.favSaveOrder")}
+          </Button>
+        </>
+      }
     >
       <div className="space-y-3">
-        <Tabs options={options} value={kind} onChange={setKind} />
+        <StatusTabs label={t("social.favKindsLabel")} tabs={options} value={kind} onChange={setKind} />
 
         {q.data?.truncated && (
-          <p className="rounded-lg border border-gold/40 bg-gold/10 px-3 py-2 text-xs text-gold">
+          <p className="rounded-control border border-gold/40 bg-gold/10 px-3 py-2 text-xs text-gold">
             {t("social.favTooMany")}
           </p>
         )}
@@ -190,7 +205,7 @@ export function FavouritesModal({
         {q.isLoading || !drafts ? (
           <div className="space-y-1.5" aria-hidden="true">
             {[0, 1, 2, 3].map((i) => (
-              <Shimmer key={i} className="h-10 w-full rounded-lg" index={i} />
+              <Shimmer key={i} className="h-10 w-full rounded-control" index={i} />
             ))}
           </div>
         ) : rows.length === 0 ? (
@@ -200,13 +215,13 @@ export function FavouritesModal({
             {rows.map((row, i) => (
               <li
                 key={row.id}
-                className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 hover:bg-surface-900"
+                className="flex items-center gap-2.5 rounded-control px-2 py-1.5 hover:bg-surface-900"
               >
                 <span className="w-5 shrink-0 text-right text-xs tabular-nums text-ink-600">
                   {i + 1}
                 </span>
                 {row.cover ? (
-                  <div className="h-10 w-7 shrink-0 overflow-hidden rounded bg-surface-850">
+                  <div className="h-10 w-7 shrink-0 overflow-hidden rounded-inner bg-surface-850">
                     {row.image && (
                       <img
                         src={row.image}
@@ -254,20 +269,6 @@ export function FavouritesModal({
             ))}
           </ul>
         )}
-
-        <div className="flex items-center justify-end gap-2 border-t border-surface-800 pt-3">
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            {t("common.done")}
-          </Button>
-          <Button
-            size="sm"
-            onClick={() => save.mutate()}
-            disabled={!dirty || save.isPending || q.data?.truncated === true}
-            className={cn(save.isPending && "opacity-70")}
-          >
-            {save.isPending ? t("social.saving") : t("social.favSaveOrder")}
-          </Button>
-        </div>
       </div>
     </Modal>
   );

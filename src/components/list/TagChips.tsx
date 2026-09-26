@@ -1,5 +1,6 @@
 import { tagsOf } from "@/lib/tags";
 import { cn } from "@/lib/utils";
+import { Chip } from "@/components/ui/chip";
 
 /** Read-only tag chips derived from an entry's notes (capped for layout). */
 export function TagChips({
@@ -17,12 +18,9 @@ export function TagChips({
   return (
     <div className={cn("mt-1 flex flex-wrap gap-1", className)}>
       {tags.slice(0, max).map((tag) => (
-        <span
-          key={tag}
-          className="rounded-[.625rem] border border-surface-800 bg-surface-850 px-1.25 py-px text-2xs text-accent-400"
-        >
+        <Chip key={tag} tone="accent" size="xs">
           {tag}
-        </span>
+        </Chip>
       ))}
       {tags.length > max && (
         <span className="text-2xs text-ink-600">+{tags.length - max}</span>

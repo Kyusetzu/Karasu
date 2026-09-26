@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { ArrowRight, Search as SearchIcon } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { searchMedia, sequelsOf, type SequelCandidate } from "@/api/queries";
 import type { Overflow } from "@/api/library";
 import { isTauri } from "@/api/anilist";
@@ -11,9 +11,11 @@ import { isBlocked } from "@/lib/contentFilter";
 import { useContentFilter } from "@/stores/contentFilter";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { SearchField } from "@/components/ui/search-field";
 import { Shimmer } from "@/components/Skeleton";
 import { cn } from "@/lib/utils";
+import { Chip } from "@/components/ui/chip";
+import { cardClass } from "@/components/ui/card";
 
 /** The season-split confirmation; the relations hint is pre-selected but never applied on its own (always ask). */
 
@@ -129,13 +131,13 @@ export function SeasonSplitModal({
       onClick={() => setSelected(c)}
       aria-pressed={selected?.mediaId === c.mediaId}
       className={cn(
-        "flex w-full items-center gap-2.5 rounded-lg border px-2.5 py-2 text-left transition-surface",
+        "flex w-full items-center gap-2.5 rounded-control border px-2.5 py-2 text-left transition-surface",
         selected?.mediaId === c.mediaId
           ? "border-accent-500 bg-accent-500/10"
-          : "border-surface-800 hover:border-surface-600",
+          : "border-hair hover:border-surface-600",
       )}
     >
-      <div className="h-12 w-8 shrink-0 overflow-hidden rounded bg-surface-850">
+      <div className="h-12 w-8 shrink-0 overflow-hidden rounded-inner bg-surface-850">
         {c.cover && <img src={c.cover} alt="" loading="lazy" className="size-full object-cover" />}
       </div>
       <span className="min-w-0 flex-1">
@@ -150,9 +152,9 @@ export function SeasonSplitModal({
         </span>
       </span>
       {c.fromRules && (
-        <span className="shrink-0 rounded-md border border-accent-600 px-1.5 py-0.5 text-2xs text-accent-400">
+        <Chip tone="accent" size="xs">
           {t("library.splitRuleHint")}
-        </span>
+        </Chip>
       )}
     </button>
   );
@@ -162,7 +164,23 @@ export function SeasonSplitModal({
       title={t("library.splitTitle")}
       onClose={onClose}
       leaving={leaving}
-      className="max-w-lg"
+      size="lg"
+      footer={
+        <>
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            {t("common.cancel")}
+          </Button>
+          <Button
+            size="sm"
+            disabled={!selected || pending}
+            onClick={() =>
+              selected && onConfirm(selected.mediaId, selected.dstStart, selected.label)
+            }
+          >
+            {pending ? t("library.splitApplying") : t("library.splitConfirm")}
+          </Button>
+        </>
+      }
     >
       <div className="space-y-4">
         <p className="text-sm text-ink-300">
@@ -179,7 +197,7 @@ export function SeasonSplitModal({
           <p className="text-xs font-medium text-ink-300">{t("library.splitCandidates")}</p>
           <div className="mt-1.5 space-y-1.5">
             {sequels.isLoading ? (
-              <Shimmer className="h-16 w-full rounded-lg" />
+              <Shimmer className="h-16 w-full rounded-control" />
             ) : candidates.length ? (
               candidates.map(row)
             ) : (
@@ -190,28 +208,25 @@ export function SeasonSplitModal({
 
         <div>
           <p className="text-xs font-medium text-ink-300">{t("library.splitSearch")}</p>
-          <div className="relative mt-1.5">
-            <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-ink-600" />
-            <Input
-              value={term}
-              onChange={(e) => setTerm(e.target.value)}
-              onClear={() => setTerm("")}
-              clearLabel={t("common.clear")}
-              placeholder={t("library.splitSearchPlaceholder")}
-              className="h-9 pl-8"
-            />
-          </div>
+          <SearchField
+            value={term}
+            onChange={setTerm}
+            label={t("library.splitSearch")}
+            clearLabel={t("common.clear")}
+            placeholder={t("library.splitSearchPlaceholder")}
+            className="mt-1.5"
+          />
           {searchChoices.length > 0 && (
             <div className="mt-1.5 space-y-1.5">{searchChoices.map(row)}</div>
           )}
         </div>
 
         {preview && selected && (
-          <div className="rounded-lg border border-surface-800 bg-surface-950 px-3 py-2 text-xs tabular-nums text-ink-300">
+          <div className={cn(cardClass("sunken"), "px-3 py-2 text-xs tabular-nums text-ink-300")}>
             {preview.shown.map((p) => (
               <p key={p.disk} className="flex items-center gap-1.5">
                 {t("library.ep", { n: p.disk })}
-                <ArrowRight className="size-3 text-ink-600" />
+                <ArrowRight className="size-3.5 text-ink-600" />
                 {t("library.splitBecomes", { n: p.renumbered, title: selected.label })}
               </p>
             ))}
@@ -219,7 +234,7 @@ export function SeasonSplitModal({
             {preview.last && (
               <p className="flex items-center gap-1.5">
                 {t("library.ep", { n: preview.last.disk })}
-                <ArrowRight className="size-3 text-ink-600" />
+                <ArrowRight className="size-3.5 text-ink-600" />
                 {t("library.splitBecomes", { n: preview.last.renumbered, title: selected.label })}
               </p>
             )}
@@ -227,21 +242,6 @@ export function SeasonSplitModal({
         )}
 
         {error && <p className="text-xs text-danger">{error}</p>}
-
-        <div className="flex items-center justify-end gap-2 border-t border-surface-800 pt-3">
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            {t("common.cancel")}
-          </Button>
-          <Button
-            size="sm"
-            disabled={!selected || pending}
-            onClick={() =>
-              selected && onConfirm(selected.mediaId, selected.dstStart, selected.label)
-            }
-          >
-            {pending ? t("library.splitApplying") : t("library.splitConfirm")}
-          </Button>
-        </div>
       </div>
     </Modal>
   );

@@ -22,6 +22,7 @@ import { isNotFound } from "@/lib/apiError";
 import { profileKey } from "@/lib/anilistUrl";
 import { Shimmer } from "@/components/Skeleton";
 import { SectionHeader } from "@/components/ui/section-header";
+import { StatusTabs } from "@/components/ui/status-tabs";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/user-lockup";
 import { PresenceIf } from "@/components/ui/presence";
@@ -109,11 +110,7 @@ export default function UserProfile() {
     return (
       <div className="px-8 pt-7">
         <EmptyState
-          visual={
-            <span className="grid size-12 place-items-center rounded-full bg-surface-800">
-              <Ban className="size-5 text-ink-600" />
-            </span>
-          }
+          icon={Ban}
           title={t("social.blocked", { name: user.name })}
           hint={t("social.blockedHint")}
         />
@@ -167,33 +164,23 @@ function Tabbed({ user }: { user: UserProfileData }) {
 
   return (
     <div className="mt-7 px-8">
-      {/* Scrolls rather than wraps: six tabs do not fit a phone, and the strip may scroll sideways where the page must not. */}
-      <div
-        role="tablist"
-        className="flex gap-1 overflow-x-auto border-b border-surface-800"
-      >
-        {TABS.map((id) => {
-          const active = id === tab;
-          return (
-            <button
-              key={id}
-              role="tab"
-              aria-selected={active}
-              onClick={() => {
-                // `replace` so a tab flick does not fill the back stack with steps to walk out of.
-                const next = new URLSearchParams(params);
-                if (id === "overview") next.delete("tab");
-                else next.set("tab", id);
-                setParams(next, { replace: true });
-              }}
-              className={cn(
-                "-mb-px shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm transition-surface",
-                active
-                  ? "border-accent-500 text-ink-100"
-                  : "border-transparent text-ink-600 hover:text-ink-300",
-              )}
-            >
-              {id === "overview"
+      {/* The list's own strip: it scrolls rather than wraps, fades at an edge with more beyond it, and takes arrow keys. */}
+      <div className="border-b border-hair">
+        <StatusTabs
+          className="-mb-px"
+          label={t("social.profileTabs")}
+          value={tab}
+          onChange={(id) => {
+            // `replace` so a tab flick does not fill the back stack with steps to walk out of.
+            const next = new URLSearchParams(params);
+            if (id === "overview") next.delete("tab");
+            else next.set("tab", id);
+            setParams(next, { replace: true });
+          }}
+          tabs={TABS.map((id) => ({
+            value: id,
+            label:
+              id === "overview"
                 ? t("social.tabOverview")
                 : id === "lists"
                   ? t("social.tabLists")
@@ -203,15 +190,10 @@ function Tabbed({ user }: { user: UserProfileData }) {
                       ? t("social.followers")
                       : id === "following"
                         ? t("social.tabFollowing")
-                        : t("social.tabForum")}
-              {tabCount[id] !== undefined && (
-                <span className="ml-1.5 text-xs tabular-nums text-ink-600">
-                  {tabCount[id]}
-                </span>
-              )}
-            </button>
-          );
-        })}
+                        : t("social.tabForum"),
+            count: tabCount[id],
+          }))}
+        />
       </div>
 
       {/* Keyed on the tab so the panel replays `animate-settle`, as the settings panes do. */}
@@ -302,7 +284,7 @@ function Favourites({ user }: { user: UserProfileData }) {
                   title={displayTitle(m.title)}
                   className="group w-24 shrink-0"
                 >
-                  <div className="aspect-2/3 overflow-hidden rounded-lg bg-surface-850">
+                  <div className="aspect-2/3 overflow-hidden rounded-control bg-surface-850">
                     {m.coverImage?.large && (
                       <img
                         src={m.coverImage.large}
@@ -361,7 +343,7 @@ function Favourites({ user }: { user: UserProfileData }) {
               <Link
                 key={s.id}
                 to={`/studio/${s.id}`}
-                className="rounded-lg border border-surface-700 px-2.5 py-1.5 text-xs text-ink-300 transition-surface hover:border-surface-600 hover:text-ink-100"
+                className="rounded-control border border-surface-700 px-2.5 py-1.5 text-xs text-ink-300 transition-surface hover:border-surface-600 hover:text-ink-100"
               >
                 {s.name}
               </Link>
@@ -390,19 +372,19 @@ function ProfileSkeleton() {
       <div className="flex items-end gap-5">
         <Shimmer className="size-20 rounded-full" />
         <div className="flex-1 space-y-2 pb-1">
-          <Shimmer className="h-7 w-48 rounded" index={1} />
-          <Shimmer className="h-3 w-64 rounded" index={2} />
+          <Shimmer className="h-7 w-48 rounded-inner" index={1} />
+          <Shimmer className="h-3 w-64 rounded-inner" index={2} />
         </div>
       </div>
       <div className="mt-5 space-y-2">
         {[0, 1, 2].map((i) => (
-          <Shimmer key={i} className={cn("h-3 rounded", i === 2 ? "w-1/2" : "w-full")} index={i + 3} />
+          <Shimmer key={i} className={cn("h-3 rounded-inner", i === 2 ? "w-1/2" : "w-full")} index={i + 3} />
         ))}
       </div>
       {/* Widths are literal class strings because Tailwind never emits an interpolated `w-${n}`. */}
-      <div className="mt-7 flex gap-4 border-b border-surface-800 pb-2">
+      <div className="mt-7 flex gap-4 border-b border-hair pb-2">
         {["w-16", "w-20", "w-20"].map((w, i) => (
-          <Shimmer key={i} className={cn("h-3 rounded", w)} index={i} />
+          <Shimmer key={i} className={cn("h-3 rounded-inner", w)} index={i} />
         ))}
       </div>
     </div>

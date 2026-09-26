@@ -73,5 +73,20 @@
     "file": "scripts/mutants.mjs",
     "startsWith": "Runs cargo-mutants over the files",
     "reason": "usage block: one invocation per line"
+  },
+  {
+    "file": "scripts/style-audit.mjs",
+    "startsWith": "Holds the class vocabulary to DESIGN.md",
+    "reason": "usage block: one invocation per line"
+  },
+  {
+    "file": "scripts/bundle-budget.mjs",
+    "startsWith": "Measures the production bundle gzipped",
+    "reason": "usage block: one invocation per line"
+  },
+  {
+    "file": "scripts/screens.mjs",
+    "startsWith": "Renders the real app, shell included, over a mocked backend",
+    "reason": "usage block: one invocation per line"
   }
 ]

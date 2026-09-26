@@ -42,4 +42,39 @@ describe("toast store", () => {
     vi.advanceTimersByTime(4100);
     expect(useToast.getState().toast?.text).toBe("Later");
   });
+
+  it("keeps a toast with an action up long enough to reach the button", () => {
+    showToast({ kind: "success", text: "Set to 8", action: { label: "Undo", run: () => {} } });
+    vi.advanceTimersByTime(6999);
+    expect(useToast.getState().toast).not.toBeNull();
+    vi.advanceTimersByTime(1);
+    expect(useToast.getState().toast).toBeNull();
+  });
+
+  it("stops the clock while paused and gives back what was left, with a floor", () => {
+    showToast({ kind: "success", text: "Saved" });
+    vi.advanceTimersByTime(4000);
+    useToast.getState().pause();
+    vi.advanceTimersByTime(60_000);
+    expect(useToast.getState().toast?.text).toBe("Saved");
+    useToast.getState().resume();
+    vi.advanceTimersByTime(1499);
+    expect(useToast.getState().toast).not.toBeNull();
+    vi.advanceTimersByTime(1);
+    expect(useToast.getState().toast).toBeNull();
+  });
+
+  it("resumes the time that was left when more than the floor remains, and ignores a stray resume", () => {
+    showToast({ kind: "success", text: "Saved" });
+    useToast.getState().resume();
+    vi.advanceTimersByTime(1000);
+    useToast.getState().pause();
+    useToast.getState().pause();
+    vi.advanceTimersByTime(10_000);
+    useToast.getState().resume();
+    vi.advanceTimersByTime(3199);
+    expect(useToast.getState().toast).not.toBeNull();
+    vi.advanceTimersByTime(1);
+    expect(useToast.getState().toast).toBeNull();
+  });
 });

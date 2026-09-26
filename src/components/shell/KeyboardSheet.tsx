@@ -2,12 +2,16 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Modal } from "@/components/ui/modal";
 import { usePresence } from "@/hooks/usePresence";
+import { KeyCombo } from "@/components/ui/kbd";
+import { SHORTCUT_SCOPES, shortcutsIn } from "@/lib/shortcuts";
+import { useShortcutLabels } from "@/components/shell/shortcutLabels";
 
 /** The shortcut reference on `?`; it lists what is wired and nothing else, or the reader stops trusting the sheet. */
 export default function KeyboardSheet() {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const sheet = usePresence(open);
+  const labels = useShortcutLabels();
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -23,51 +27,6 @@ export default function KeyboardSheet() {
   // The second `?` press should read as closing, not as a cut.
   if (!sheet.mounted) return null;
 
-  const groups: { title: string; rows: { label: string; keys: string[] }[] }[] = [
-    {
-      title: t("keys.global"),
-      rows: [
-        { label: t("keys.palette"), keys: ["Ctrl", "K"] },
-        { label: t("keys.reference"), keys: ["?"] },
-        { label: t("keys.search"), keys: ["/"] },
-        { label: t("keys.close"), keys: ["Esc"] },
-        { label: t("keys.overview"), keys: ["Ctrl", "1"] },
-        { label: t("keys.anime"), keys: ["Ctrl", "2"] },
-        { label: t("keys.manga"), keys: ["Ctrl", "3"] },
-        { label: t("keys.sync"), keys: ["Ctrl", "R"] },
-        { label: t("keys.zoomIn"), keys: ["Ctrl", "+"] },
-        { label: t("keys.zoomOut"), keys: ["Ctrl", "−"] },
-        { label: t("keys.zoomReset"), keys: ["Ctrl", "0"] },
-      ],
-    },
-    {
-      title: t("keys.inList"),
-      rows: [
-        { label: t("keys.findInList"), keys: ["Ctrl", "F"] },
-        { label: t("keys.move"), keys: ["←", "↑", "↓", "→"] },
-        { label: t("keys.open"), keys: ["↵"] },
-        { label: t("keys.plusOne"), keys: ["Space"] },
-        { label: t("keys.edit"), keys: ["E"] },
-        { label: t("keys.complete"), keys: ["C"] },
-        { label: t("keys.remove"), keys: ["Del"] },
-        { label: t("keys.selectMode"), keys: ["S"] },
-        { label: t("keys.selectAll"), keys: ["Ctrl", "A"] },
-        { label: t("keys.extend"), keys: ["Shift", "↑↓"] },
-      ],
-    },
-    {
-      // The markdown composers' own bindings — `MarkdownTextarea` wires them.
-      title: t("keys.inComposer"),
-      rows: [
-        { label: t("keys.bold"), keys: ["Ctrl", "B"] },
-        { label: t("keys.italic"), keys: ["Ctrl", "I"] },
-        { label: t("keys.strike"), keys: ["Ctrl", "Shift", "X"] },
-        { label: t("keys.spoiler"), keys: ["Ctrl", "Shift", "S"] },
-        { label: t("keys.send"), keys: ["Ctrl", "↵"] },
-      ],
-    },
-  ];
-
   return (
     <Modal
       leaving={sheet.leaving}
@@ -76,23 +35,14 @@ export default function KeyboardSheet() {
       className="max-w-152"
     >
       <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
-        {groups.map((group) => (
-          <section key={group.title}>
-            <h3 className="text-2xs uppercase tracking-[.12em] text-ink-600">
-              {group.title}
-            </h3>
+        {SHORTCUT_SCOPES.map((scope) => (
+          <section key={scope}>
+            <h3 className="text-2xs uppercase tracking-eyebrow text-ink-600">{labels.scope(scope)}</h3>
             <div className="mt-2 space-y-1.5">
-              {group.rows.map((row) => (
-                <div
-                  key={row.label}
-                  className="flex items-center justify-between gap-4 text-xs text-ink-300"
-                >
-                  <span className="min-w-0 truncate">{row.label}</span>
-                  <span className="flex shrink-0 items-center gap-1">
-                    {row.keys.map((key) => (
-                      <Cap key={key}>{key}</Cap>
-                    ))}
-                  </span>
+              {shortcutsIn(scope).map((s) => (
+                <div key={s.id} className="flex items-center justify-between gap-4 text-xs text-ink-300">
+                  <span className="min-w-0 truncate">{labels.label(s.id)}</span>
+                  <KeyCombo keys={s.keys} />
                 </div>
               ))}
             </div>
@@ -103,14 +53,6 @@ export default function KeyboardSheet() {
         {t("keys.footnote")}
       </p>
     </Modal>
-  );
-}
-
-function Cap({ children }: { children: string }) {
-  return (
-    <kbd className="grid h-5.5 min-w-5.5 place-items-center rounded-md border border-surface-700 bg-surface-850 px-1.5 font-brand text-2xs font-semibold text-ink-300">
-      {children}
-    </kbd>
   );
 }
 

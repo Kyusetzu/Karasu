@@ -3,7 +3,7 @@ import { Loader } from "@/components/ui/loader";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { CloudUpload, Hourglass, RefreshCw, Trash2 } from "lucide-react";
+import { CloudUpload, Hourglass, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { displayTitle, type ListResult, type QueuedEdit } from "@/api/types";
 import { cn } from "@/lib/utils";
@@ -19,6 +19,7 @@ import { usePresence } from "@/hooks/usePresence";
 import { useBackClose } from "@/hooks/useBackClose";
 import { useSyncStatus } from "@/hooks/useSyncStatus";
 import { useManualSync } from "@/hooks/useManualSync";
+import { Spinner } from "@/components/ui/spinner";
 
 /** A literal `t()` per field, so `i18nKeys.test.ts` sees every key; the names are AniList's mutation arguments. */
 export function fieldLabel(field: QueueField, t: (k: string) => string): string {
@@ -144,20 +145,20 @@ export default function SyncPanel({
         >
           <span
             className={cn(
-              "mt-0.5 grid size-5.5 shrink-0 place-items-center rounded-md",
+              "mt-0.5 grid size-6 shrink-0 place-items-center rounded-inner",
               edit.kind === "delete"
                 ? "bg-danger/14 text-danger"
                 : "bg-accent-500/14 text-accent-400",
             )}
           >
             {edit.kind === "delete" ? (
-              <Trash2 className="size-3" />
+              <Trash2 className="size-3.5" />
             ) : (
-              <CloudUpload className="size-3" />
+              <CloudUpload className="size-3.5" />
             )}
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-[.8125rem] font-medium text-ink-100">
+            <span className="block truncate text-ui font-medium text-ink-100">
               {/* An unparsed payload is still a row, because the count here has to agree with the pending badge. */}
               {title ??
                 (edit.subject == null
@@ -185,7 +186,7 @@ export default function SyncPanel({
         aria-label={label}
         aria-expanded={open}
         aria-haspopup="dialog"
-        className="w-full rounded-lg text-left transition-surface hover:bg-surface-900"
+        className="w-full rounded-control text-left transition-surface hover:bg-surface-900"
       >
         {children}
       </button>
@@ -197,12 +198,12 @@ export default function SyncPanel({
           // Owns the keyboard while up, exit included; not a focus trap, because trapping Tab in a popover is wrong.
           data-overlay
           className={cn(
-            "absolute bottom-full left-0 z-50 mb-1 w-76 origin-bottom-left overflow-hidden rounded-xl border border-hair bg-surface-900 shadow-2xl panel-wash",
+            "absolute bottom-full left-0 z-50 mb-1 w-76 origin-bottom-left overflow-hidden rounded-panel border border-hair bg-surface-900 shadow-float panel-wash",
             panel.leaving ? "animate-pop-out" : "animate-spring-in",
           )}
         >
           <div className="flex items-center justify-between border-b border-hair px-3 py-2">
-            <span className="text-2xs font-semibold uppercase tracking-[.14em] text-ink-600">
+            <span className="text-2xs font-semibold uppercase text-ink-600">
               {t("syncPanel.title")}
             </span>
             {phase && (
@@ -212,7 +213,7 @@ export default function SyncPanel({
                   phase === "idle" ? "text-ink-500" : "text-accent-400",
                 )}
               >
-                {phase === "draining" && <RefreshCw className="size-2.75 animate-spin" />}
+                {phase === "draining" && <Spinner className="size-2.75" />}
                 {phase === "throttled" && <Hourglass className="size-2.75" />}
                 {phaseLabel(phase, t)}
               </span>
@@ -281,7 +282,7 @@ export default function SyncPanel({
 
               {/* The traffic, which is what moves the headroom while an idle app has nothing queued to list. */}
               <div className="border-t border-hair">
-                <h3 className="px-3 pb-1 pt-2 text-[.5625rem] font-semibold uppercase tracking-[.14em] text-ink-600">
+                <h3 className="px-3 pb-1 pt-2 text-2xs uppercase text-ink-600">
                   {t("syncPanel.recent")}
                 </h3>
                 {data.recent.length === 0 ? (
@@ -329,7 +330,7 @@ export default function SyncPanel({
 
               {/* Who spent the budget since the app started; the recent list above only shows the last fifty. */}
               <div className="border-t border-hair">
-                <h3 className="px-3 pb-1 pt-2 text-[.5625rem] font-semibold uppercase tracking-[.14em] text-ink-600">
+                <h3 className="px-3 pb-1 pt-2 text-2xs uppercase text-ink-600">
                   {t("syncPanel.sources")}
                 </h3>
                 {data.traffic.sources.length === 0 ? (

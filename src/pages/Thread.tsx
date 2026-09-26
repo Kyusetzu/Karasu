@@ -54,6 +54,8 @@ import { useAuth } from "@/stores/auth";
 import { showToast } from "@/stores/toast";
 import { useSocialActions } from "@/hooks/useSocialActions";
 import { cn } from "@/lib/utils";
+import { Chip, chipClass } from "@/components/ui/chip";
+import { Card } from "@/components/ui/card";
 
 /** The tree route has no pageInfo; keep hasNextPage false so no "Load more" appears under a conversation. */
 const EMPTY_PAGE_INFO = { total: 0, currentPage: 1, lastPage: 1, hasNextPage: false };
@@ -412,9 +414,9 @@ export default function Thread() {
   if (th.isLoading) {
     return (
       <div className="mx-auto max-w-3xl space-y-3 px-8 pt-7" aria-hidden="true">
-        <Shimmer className="h-6 w-2/3 rounded" />
-        <Shimmer className="h-3 w-40 rounded" index={1} />
-        <Shimmer className="h-24 w-full rounded-xl" index={2} />
+        <Shimmer className="h-6 w-2/3 rounded-inner" />
+        <Shimmer className="h-3 w-40 rounded-inner" index={1} />
+        <Shimmer className="h-24 w-full rounded-panel" index={2} />
       </div>
     );
   }
@@ -459,7 +461,7 @@ export default function Thread() {
       <header>
         <div className="flex items-start gap-2">
           {data.isLocked && <Lock className="mt-1.5 size-4 shrink-0 text-ink-600" />}
-          <h1 className="min-w-0 flex-1 text-xl font-bold text-ink-100">
+          <h1 className="min-w-0 flex-1 text-xl text-ink-100">
             {data.title ?? t("social.untitledThread")}
           </h1>
           <Button
@@ -485,22 +487,22 @@ export default function Thread() {
             </Link>
           )}
           <span className="flex items-center gap-1">
-            <MessageSquare className="size-2.75" />
+            <MessageSquare className="size-3.5" />
             <span className="tabular-nums">{data.replyCount ?? 0}</span>
           </span>
           <span className="flex items-center gap-1">
-            <Eye className="size-2.75" />
+            <Eye className="size-3.5" />
             <span className="tabular-nums">{data.viewCount ?? 0}</span>
           </span>
           <button
             onClick={() => like.mutate({ id: data.id, type: "THREAD" })}
             aria-pressed={data.isLiked === true}
             className={cn(
-              "flex items-center gap-1 rounded-md px-1.5 py-0.5 transition-surface hover:bg-surface-850",
+              "flex items-center gap-1 rounded-inner px-1.5 py-0.5 transition-surface hover:bg-surface-850",
               data.isLiked ? "text-danger" : "hover:text-ink-300",
             )}
           >
-            <Heart className={cn("size-2.75", data.isLiked && "fill-current")} />
+            <Heart className={cn("size-3.5", data.isLiked && "fill-current")} />
             <span className="tabular-nums">{data.likeCount ?? 0}</span>
           </button>
           {data.createdAt && (
@@ -511,7 +513,7 @@ export default function Thread() {
               onClick={() => void openUrl(data.siteUrl!)}
               className="flex items-center gap-1 text-accent-400 hover:underline"
             >
-              {t("social.openOnAniList")} <ExternalLink className="size-2.75" />
+              {t("social.openOnAniList")} <ExternalLink className="size-3.5" />
             </button>
           )}
         </div>
@@ -519,12 +521,9 @@ export default function Thread() {
         {data.categories && data.categories.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1">
             {data.categories.map((c) => (
-              <span
-                key={c.id}
-                className="rounded border border-surface-700 px-1.5 py-0.5 text-2xs text-ink-600"
-              >
+              <Chip key={c.id} tone="muted" size="xs">
                 {c.name}
-              </span>
+              </Chip>
             ))}
           </div>
         )}
@@ -535,9 +534,9 @@ export default function Thread() {
               <Link
                 key={m.id}
                 to={`/media/${m.id}`}
-                className="rounded border border-accent-600 px-1.5 py-0.5 text-2xs text-accent-400 hover:underline"
+                className={cn(chipClass("accent", "xs"), "hover:underline")}
               >
-                {displayTitle(m.title)}
+                <span className="truncate">{displayTitle(m.title)}</span>
               </Link>
             ))}
           </div>
@@ -545,9 +544,9 @@ export default function Thread() {
       </header>
 
       {data.body && (
-        <div className="mt-5 rounded-xl border border-surface-800 bg-surface-900 p-4">
+        <Card variant="flat" className="mt-5">
           <Markdown source={data.body} siteUrl={data.siteUrl ?? undefined} />
-        </div>
+        </Card>
       )}
 
       <section className="mt-6">
@@ -615,8 +614,8 @@ export default function Thread() {
           <>
             {newest.isPending ? (
               <div className="space-y-3">
-                <Shimmer className="h-16 w-full rounded-xl" />
-                <Shimmer className="h-16 w-full rounded-xl" />
+                <Shimmer className="h-16 w-full rounded-panel" />
+                <Shimmer className="h-16 w-full rounded-panel" />
               </div>
             ) : newest.error ? (
               <p className="text-sm text-danger">
@@ -626,7 +625,7 @@ export default function Thread() {
               <>
                 {/* Say so whenever the cap decided what arrived: "tree" brings a conversation, "capped" misses the newest. */}
                 {newest.data && newest.data.via !== "page" && (
-                  <p className="mb-3 rounded-lg border border-gold/30 bg-gold/8 px-3 py-2 text-2xs leading-relaxed text-ink-300">
+                  <p className="mb-3 rounded-control border border-gold/30 bg-gold/8 px-3 py-2 text-2xs leading-relaxed text-ink-300">
                     {newest.data.via === "comment"
                       ? t(
                           anchor && !anchor.exact
@@ -663,7 +662,7 @@ export default function Thread() {
           </>
         ) : (
           <>
-            {comments.isLoading && <Shimmer className="h-16 w-full rounded-xl" />}
+            {comments.isLoading && <Shimmer className="h-16 w-full rounded-panel" />}
             {!comments.isLoading && flat.length === 0 && (
               <p className="text-sm text-ink-600">{t("social.noComments")}</p>
             )}

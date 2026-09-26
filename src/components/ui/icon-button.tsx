@@ -3,15 +3,18 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const iconButtonVariants = cva(
-  "grid shrink-0 place-items-center transition-surface focus-visible:outline-2 focus-visible:outline-accent-500 disabled:pointer-events-none disabled:opacity-40",
+  "relative press coarse:hit-area grid shrink-0 place-items-center transition-surface focus-visible:outline-2 focus-visible:outline-accent-500 disabled:pointer-events-none disabled:opacity-40",
   {
     variants: {
       variant: {
         ghost: "text-ink-500 hover:bg-surface-850 hover:text-ink-100",
         surface: "bg-surface-800 text-ink-300 hover:bg-surface-700 hover:text-ink-100",
-        accent: "bg-accent-500 text-accent-ink hover:bg-accent-600",
+        /** The +1: the accent as a tint rather than a fill, so the most-used button is the easiest one to find, not the loudest. */
+        accent: "border tint-fill tint-accent text-accent-400",
+        /** The +1 over cover art: the same tint on the cover controls' near-black, which reads on any artwork. */
+        accentOnCover: "border tint-fill-on-cover tint-accent",
         /** For the action circles that sit on cover art, where the fill has to be near-opaque over unknown artwork. */
-        onCover: "bg-[rgba(4,5,8,.86)] text-ink-300 border border-surface-700 hover:text-ink-100",
+        onCover: "bg-on-cover/86 text-on-cover-edge/80 border border-surface-700 hover:text-on-cover-edge",
         success: "text-success hover:bg-success/10",
         danger: "text-danger hover:bg-danger/10",
       },
@@ -24,7 +27,7 @@ const iconButtonVariants = cva(
         xs: "size-7",
       },
       /** Keep the radius here only; a `rounded-*` on `size` too lets stylesheet order decide and `round` does nothing. */
-      round: { true: "rounded-full", false: "rounded-md" },
+      round: { true: "rounded-full", false: "rounded-inner" },
     },
     defaultVariants: { variant: "ghost", size: "control", round: false },
   },

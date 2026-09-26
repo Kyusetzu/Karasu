@@ -98,7 +98,7 @@ export default function Seasonal() {
             onClick={() => setPeriod((p) => shift(p.season, p.year, -1))}
             aria-label={t("seasonal.prev")}
           >
-            <ChevronLeft className="size-4.5" />
+            <ChevronLeft className="size-4" />
           </Button>
           <Button
             variant="ghost"
@@ -106,7 +106,7 @@ export default function Seasonal() {
             onClick={() => setPeriod((p) => shift(p.season, p.year, 1))}
             aria-label={t("seasonal.next")}
           >
-            <ChevronRight className="size-4.5" />
+            <ChevronRight className="size-4" />
           </Button>
         </div>
       </div>

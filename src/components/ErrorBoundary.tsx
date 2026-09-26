@@ -45,14 +45,14 @@ class ErrorBoundaryInner extends Component<Props, State> {
           <span className="mx-auto grid size-11 place-items-center rounded-full bg-danger/15 text-danger">
             <TriangleAlert className="size-5" />
           </span>
-          <h1 className="mt-4 text-base font-semibold text-ink-100">
+          <h1 className="mt-4 text-base text-ink-100">
             {t("error.title")}
           </h1>
           <p className="mt-2 text-sm leading-relaxed text-ink-500">
             {t("error.hint")}
           </p>
           {/* The message itself: "something went wrong" is not reportable, and this is the only place the user reads it. */}
-          <p className="mt-3 break-words rounded-lg bg-surface-900 p-2 text-left font-mono text-2xs text-ink-500">
+          <p className="mt-3 break-words rounded-control bg-surface-900 p-2 text-left font-mono text-2xs text-ink-500">
             {String(error.message || error)}
           </p>
           <div className="mt-5 flex flex-wrap justify-center gap-2">

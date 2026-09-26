@@ -10,17 +10,7 @@ import { VirtualRows } from "@/components/list/VirtualRows";
 import { Link } from "react-router";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import {
-  Check,
-  ChevronDown,
-  FolderOpen,
-  HelpCircle,
-  Play,
-  RefreshCw,
-  Search,
-  Wand2,
-  X,
-} from "lucide-react";
+import { Check, ChevronDown, FolderOpen, HelpCircle, Play, Wand2 } from "lucide-react";
 import { fetchMediaList, isTauri, saveListEntry } from "@/api/anilist";
 import { mediaByIds } from "@/api/queries";
 import { displayTitle, type Media, type MediaListEntry } from "@/api/types";
@@ -55,6 +45,8 @@ import { Presence } from "@/components/ui/presence";
 import { EmptyState, FolderStack } from "@/components/EmptyState";
 import { cn } from "@/lib/utils";
 import { useTheme, type Density } from "@/stores/theme";
+import { Spinner } from "@/components/ui/spinner";
+import { SearchField } from "@/components/ui/search-field";
 
 /** Above this the match was exact: a test for `best_match_prepared`'s equality branch, not a tolerance. */
 const EXACT = 0.999;
@@ -422,10 +414,10 @@ function LibraryView({ userId }: { userId: number }) {
     <div className="flex h-full flex-col">
       <div className="flex-none px-8 pb-4 pt-7">
         <div className="flex flex-wrap items-baseline gap-3">
-          <h1 className="text-[1.375rem] font-bold tracking-[-.015em] text-ink-100">
+          <h1 className="text-title text-ink-100">
             {t("library.title")}
           </h1>
-          <span className="font-brand-jp text-[.8125rem] tracking-[.04em] text-ink-600">
+          <span className="font-brand-jp text-ui tracking-lockup text-ink-600">
             ライブラリ
           </span>
           <Button
@@ -435,14 +427,14 @@ function LibraryView({ userId }: { userId: number }) {
             onClick={rescan}
             disabled={scanning}
           >
-            <RefreshCw className={cn("size-3.5", scanning && "animate-spin")} />
+            <Spinner spinning={scanning} className="size-3.5" />
             {scanning ? t("settings.libraryScanning") : t("settings.libraryScan")}
           </Button>
         </div>
 
         {/* The folder and what the last scan made of it, or the screen never says where the files came from. */}
-        <div className="mt-3.5 flex max-w-176 items-center gap-2.5 rounded-lg border border-surface-800 bg-surface-900 px-3 py-2.25">
-          <FolderOpen className="size-3.75 shrink-0 text-ink-500" />
+        <div className="mt-3.5 flex max-w-176 items-center gap-2.5 rounded-control border border-hair bg-surface-900 px-3 py-2.25">
+          <FolderOpen className="size-4 shrink-0 text-ink-500" />
           <span className="min-w-0 flex-1 truncate text-xs tabular-nums text-ink-300">
             {status?.path ?? t("library.noFolder")}
           </span>
@@ -602,7 +594,7 @@ function DetectedOffList({
 
   return (
     <section className="pt-6">
-      <p className="mb-1 text-[.6875rem] font-medium uppercase tracking-[.12em] text-ink-600">
+      <p className="mb-1 text-xs font-medium uppercase tracking-eyebrow text-ink-600">
         {t("library.detectedOffList")}
       </p>
       <p className="mb-3 text-2xs text-ink-600">
@@ -617,7 +609,7 @@ function DetectedOffList({
             ? `r:${item.row.lib.mediaId}`
             : `s:${item.group.title}:${item.group.season}`
         }
-        className="overflow-hidden rounded-xl border border-hair"
+        className="overflow-hidden rounded-panel border border-hair"
         renderItem={(item, _i, isLast) =>
           item.kind === "row" ? (
             <LibraryRow
@@ -671,7 +663,7 @@ function SuggestionRow({
         !last && "border-b border-surface-950",
       )}
     >
-      <div className="dense-row-cover shrink-0 overflow-hidden rounded-md bg-surface-800 opacity-60">
+      <div className="dense-row-cover shrink-0 overflow-hidden rounded-inner bg-surface-800 opacity-60">
         {media?.coverImage.large && (
           <img
             src={media.coverImage.large}
@@ -719,7 +711,7 @@ function SuggestionRow({
         className="shrink-0"
         onClick={() => onConfirm(key, guess.mediaId)}
       >
-        <Check className="size-3" />
+        <Check className="size-3.5" />
         {t("library.confirm")}
       </Button>
     </div>
@@ -766,37 +758,25 @@ function Unplaced({
   return (
     <section className="pt-6">
       <div className="mb-3 flex items-center gap-3">
-        <p className="flex items-center gap-1.5 text-[.6875rem] font-medium uppercase tracking-[.12em] text-ink-600">
-          <HelpCircle className="size-3.25" />
+        <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-eyebrow text-ink-600">
+          <HelpCircle className="size-3.5" />
           {t("library.unplaced", { n: groups.length })}
         </p>
         {groups.length > 5 && (
-          <div className="relative ml-auto w-56">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3 -translate-y-1/2 text-ink-600" />
-            <input
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              placeholder={t("library.filterUnplaced")}
-              className="h-7 w-full rounded-md border border-surface-800 bg-surface-900 pl-7 pr-6 text-2xs text-ink-200 placeholder:text-ink-600 focus:border-accent-500 focus:outline-none"
-            />
-            {/* Hand-rolled rather than `IconButton`, whose smallest size would be the whole field. */}
-            {filter && (
-              <button
-                type="button"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => setFilter("")}
-                className="absolute right-1 top-1/2 grid size-4.5 -translate-y-1/2 place-items-center rounded text-ink-600 transition-surface hover:bg-surface-800 hover:text-ink-100"
-              >
-                <X className="size-2.75" />
-                <span className="sr-only">{t("common.clear")}</span>
-              </button>
-            )}
-          </div>
+          <SearchField
+            size="sm"
+            value={filter}
+            onChange={setFilter}
+            label={t("library.filterUnplaced")}
+            clearLabel={t("common.clear")}
+            placeholder={t("library.filterUnplaced")}
+            className="ml-auto w-56"
+          />
         )}
       </div>
 
       {matching.length === 0 && (
-        <p className="rounded-xl border border-hair px-3.5 py-4 text-center text-xs text-ink-600">
+        <p className="rounded-panel border border-hair px-3.5 py-4 text-center text-xs text-ink-600">
           {t("library.noUnplacedMatch")}
         </p>
       )}
@@ -805,7 +785,7 @@ function Unplaced({
         scrollRef={scrollRef}
         estimateRowHeight={ROW_HEIGHT[density]}
         getKey={(group) => `${group.title}:${group.season}`}
-        className="overflow-hidden rounded-xl border border-hair"
+        className="overflow-hidden rounded-panel border border-hair"
         renderItem={(group, _i, isLast) => (
           <div
             className={cn(
@@ -813,7 +793,7 @@ function Unplaced({
               !isLast && "border-b border-surface-950",
             )}
           >
-            <span className="dense-row-cover grid shrink-0 place-items-center rounded-md bg-surface-800 text-ink-600">
+            <span className="dense-row-cover grid shrink-0 place-items-center rounded-inner bg-surface-800 text-ink-600">
               <HelpCircle className="size-4" />
             </span>
             <span className="min-w-0 flex-1">
@@ -838,7 +818,7 @@ function Unplaced({
               className="shrink-0"
               onClick={() => onAssign({ title: group.title, season: group.season })}
             >
-              <Wand2 className="size-3" />
+              <Wand2 className="size-3.5" />
               {t("library.assign")}
             </Button>
           </div>
@@ -889,7 +869,7 @@ function Group({
   if (rows.length === 0) return null;
   return (
     <section className="pt-4">
-      <p className="mb-3 text-[.6875rem] font-medium uppercase tracking-[.12em] text-ink-600">
+      <p className="mb-3 text-xs font-medium uppercase tracking-eyebrow text-ink-600">
         {label}
       </p>
       <VirtualRows
@@ -897,7 +877,7 @@ function Group({
         scrollRef={scrollRef}
         estimateRowHeight={ROW_HEIGHT[density]}
         getKey={(row) => row.lib.mediaId}
-        className="overflow-hidden rounded-xl border border-hair"
+        className="overflow-hidden rounded-panel border border-hair"
         renderItem={(row, _i, isLast) => (
           <LibraryRow
             row={row}
@@ -960,7 +940,7 @@ function LibraryRow({
     >
       <div className="flex items-center gap-3.5 px-3.5 py-2">
         <Link to={`/media/${lib.mediaId}`} className="shrink-0">
-          <div className="dense-row-cover overflow-hidden rounded-md bg-surface-800">
+          <div className="dense-row-cover overflow-hidden rounded-inner bg-surface-800">
             {media.coverImage.large && (
               <img
                 src={media.coverImage.large}
@@ -996,7 +976,7 @@ function LibraryRow({
             type="button"
             onClick={() => onAdd(media)}
             title={t("library.notOnListHint")}
-            className="shrink-0 rounded-md border border-surface-700 px-2 py-1 text-2xs text-ink-500 transition-surface hover:border-accent-500 hover:text-accent-400"
+            className="shrink-0 rounded-inner border border-surface-700 px-2 py-1 text-2xs text-ink-500 transition-surface hover:border-accent-500 hover:text-accent-400"
           >
             {t("library.addToList")}
           </button>
@@ -1006,10 +986,10 @@ function LibraryRow({
           type="button"
           onClick={() => onToggle(lib.mediaId)}
           aria-expanded={open}
-          className="flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-2xs tabular-nums text-ink-600 transition-surface hover:bg-surface-800 hover:text-ink-300"
+          className="flex shrink-0 items-center gap-1 rounded-inner px-1.5 py-1 text-2xs tabular-nums text-ink-600 transition-surface hover:bg-surface-800 hover:text-ink-300"
         >
           {t("library.fileCount", { n: lib.files.length })}
-          <ChevronDown className={cn("size-3 transition-transform", open && "rotate-180")} />
+          <ChevronDown className={cn("size-3.5 transition-transform", open && "rotate-180")} />
         </button>
 
         {/* The folder holds more than the show; the user decides, so this chip only opens the split card. */}
@@ -1025,7 +1005,7 @@ function LibraryRow({
               })
             }
             title={t("library.overflowHint")}
-            className="shrink-0 rounded-md border border-gold/40 bg-gold/10 px-1.5 py-1 text-2xs tabular-nums text-gold transition-surface hover:bg-gold/20"
+            className="shrink-0 rounded-inner border border-gold/40 bg-gold/10 px-1.5 py-1 text-2xs tabular-nums text-gold transition-surface hover:bg-gold/20"
           >
             {t("library.overflowChip", {
               files: lib.episodes.length,
@@ -1047,7 +1027,7 @@ function LibraryRow({
             }
             title={t("library.correctHint", { title: source.title })}
             className={cn(
-              "group/match w-24 shrink-0 rounded-md px-1.5 py-1 text-right text-xs transition-surface hover:bg-surface-800",
+              "group/match w-24 shrink-0 rounded-inner px-1.5 py-1 text-right text-xs transition-surface hover:bg-surface-800",
               lib.manual ? "text-accent-400" : exact ? "text-ink-500" : "text-gold",
             )}
           >
@@ -1083,7 +1063,7 @@ function LibraryRow({
               className="shrink-0"
               onClick={() => playEpisode(lib.mediaId, next.episode)}
             >
-              <Play className="size-3" fill="currentColor" />
+              <Play className="size-3.5" fill="currentColor" />
               {t("library.play")}
             </Button>
           </>
@@ -1107,13 +1087,13 @@ function LibraryRow({
                 title={fileName(file.path)}
                 aria-label={t("library.playEpisode", { n: file.episode })}
                 className={cn(
-                  "flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium tabular-nums transition-surface",
+                  "flex items-center gap-1 rounded-inner px-2 py-1 text-xs font-medium tabular-nums transition-surface",
                   watched
                     ? "bg-surface-800 text-ink-500 hover:text-ink-100"
                     : "bg-accent-600/15 text-accent-400 hover:bg-accent-600/30",
                 )}
               >
-                <Play className="size-2.5" fill="currentColor" />
+                <Play className="size-3.5" fill="currentColor" />
                 {file.episode}
               </button>
             );

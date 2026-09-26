@@ -9,6 +9,7 @@ import { IconButton } from "@/components/ui/icon-button";
 import { TitleLockup } from "@/components/media/TitleLockup";
 import { CoverCell, CoverMeta } from "@/components/media/CoverCell";
 import { statusColorVar } from "@/lib/statusColors";
+import { cn } from "@/lib/utils";
 import { SelectBox } from "./SelectBox";
 import { TagChips } from "./TagChips";
 import { canIncrement } from "./shared";
@@ -42,6 +43,8 @@ export const GridCard = memo(function GridCard({
   const scoreFormat = useScoreFormat();
   const { media } = entry;
   const max = maxProgress(media);
+  const plusOne = canIncrement(entry);
+  const completable = entry.status !== "COMPLETED";
   return (
     <CoverCell
       to={`/media/${media.id}`}
@@ -84,6 +87,7 @@ export const GridCard = memo(function GridCard({
         // Suppressed in select mode; keep `group-focus-within`, or Tab lands on fully transparent buttons.
         !selectMode && (
           <div className="flex gap-1.5 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100">
+            {/* Below two circles' width a cover keeps one, the quick write rather than the way into the editor. */}
             <IconButton
               variant="onCover"
               size="sm"
@@ -91,11 +95,15 @@ export const GridCard = memo(function GridCard({
               onClick={() => onEdit(entry)}
               aria-label={t("common.edit")}
               title={t("common.edit")}
+              className={cn(
+                plusOne && "@max-cover-pair:hidden",
+                !plusOne && completable && "not-pointer-coarse:@max-cover-pair:hidden",
+              )}
             >
               <Pencil className="size-3.5" />
             </IconButton>
-            {entry.status !== "COMPLETED" && (
-              // Hidden on coarse pointers, where three always-visible circles overflow a phone cover and clip the edit button.
+            {completable && (
+              // Off on a phone, and wherever it would be the third circle on a cover too narrow for three.
               <IconButton
                 variant="onCover"
                 size="sm"
@@ -103,14 +111,14 @@ export const GridCard = memo(function GridCard({
                 onClick={() => onComplete(entry)}
                 aria-label={t("common.complete")}
                 title={t("common.complete")}
-                className="text-success pointer-coarse:hidden"
+                className={cn("text-on-cover-success pointer-coarse:hidden", plusOne && "@max-cover-actions:hidden")}
               >
                 <CheckCheck className="size-3.5" />
               </IconButton>
             )}
-            {canIncrement(entry) && (
+            {plusOne && (
               <IconButton
-                variant="accent"
+                variant="accentOnCover"
                 size="sm"
                 round
                 onClick={() => onPlusOne(entry)}

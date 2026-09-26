@@ -1,16 +1,19 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { NavLink, useLocation } from "react-router";
 import { useTranslation } from "react-i18next";
-import { Command, Info, LayoutGrid, RefreshCw, Settings, X } from "lucide-react";
+import { Bell as BellIcon, Command, Info, LayoutGrid, RefreshCw, Settings, X } from "lucide-react";
 import { GROUPS, visibleGroups, type NavItem } from "@/components/shell/Sidebar";
-import { usePresence } from "@/hooks/usePresence";
-import { useDialogFocus } from "@/hooks/useDialogFocus";
-import { useBackClose } from "@/hooks/useBackClose";
 import { cn } from "@/lib/utils";
 import { isAndroid, usePlatform } from "@/stores/platform";
-import Bell from "@/components/shell/Bell";
+import NotifSheet from "@/components/shell/NotifSheet";
+import { afterBackSettles } from "@/hooks/useBackClose";
+import { isTauri } from "@/api/anilist";
 import { useNotifBadge } from "@/hooks/useNotifBadge";
 import { isPaletteSwipe } from "@/lib/navSwipe";
+import { Badge } from "@/components/ui/badge";
+import { MenuGroupLabel, MenuRow, MenuRowBody, menuRowClass } from "@/components/ui/menu-row";
+import { Sheet } from "@/components/ui/sheet";
+import { IconButton } from "@/components/ui/icon-button";
 
 /** The phone shell's four bar slots; everything else is behind a More sheet built from the sidebar's `GROUPS`. */
 const SLOTS = ["/", "/list", "/manga", "/search"];
@@ -42,23 +45,13 @@ function sheetGroups(android: boolean): { label: string; items: NavItem[] }[] {
 }
 
 const slotClass =
-  "flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-lg py-1.5 text-[.625rem] font-medium transition-surface";
+  "flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-control py-1.5 text-2xs font-medium transition-surface";
 
 export default function BottomBar() {
   const { t } = useTranslation();
   const android = isAndroid(usePlatform((s) => s.info));
   const [moreOpen, setMoreOpen] = useState(false);
-  useBackClose(moreOpen, () => setMoreOpen(false));
-  const sheet = usePresence(moreOpen);
-  const sheetRef = useRef<HTMLDivElement>(null);
-  // `data-overlay` silences every screen-level key handler, so the sheet must supply Escape and the focus trap itself.
-  useDialogFocus(sheetRef, moreOpen && !sheet.leaving);
-  useEffect(() => {
-    if (!moreOpen) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setMoreOpen(false);
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [moreOpen]);
+  const [notifOpen, setNotifOpen] = useState(false);
   const { pathname } = useLocation();
   const badge = useNotifBadge();
   // The bar is the gesture surface, so the swipe is recognised here rather than over a reserved strip of the page.
@@ -73,89 +66,63 @@ export default function BottomBar() {
 
   return (
     <>
-      {sheet.mounted && (
-        <div
-          data-overlay
-          className={cn(
-            "fixed inset-0 z-40",
-            sheet.leaving ? "animate-fade-out" : "animate-fade-in",
-          )}
-        >
-          <button
-            type="button"
-            aria-label={t("window.close")}
-            className="absolute inset-0 bg-[rgba(4,5,8,.55)]"
-            onClick={() => setMoreOpen(false)}
-          />
-          <div
-            ref={sheetRef}
-            role="dialog"
-            aria-label={t("nav.more")}
-            className={cn(
-              // max-h plus scroll: a short phone must never push the top rows under the status bar.
-              "absolute inset-x-2 bottom-16 max-h-[70vh] overflow-y-auto rounded-2xl border border-surface-700 bg-surface-900 p-3 shadow-[0_1rem_3rem_rgba(0,0,0,.6)]",
-              sheet.leaving ? "animate-rise-out" : "animate-rise-in",
+      <Sheet open={moreOpen} label={t("nav.more")} onClose={() => setMoreOpen(false)}>
+        <div className="mb-1 flex items-center justify-between">
+          <MenuGroupLabel className="pt-0">{t("nav.more")}</MenuGroupLabel>
+          <div className="flex items-center gap-1">
+            {/* The bell lives in the sheet, since an unlabeled icon in the nav row read as decoration; More carries its count. */}
+            {isTauri && (
+              <IconButton
+                aria-label={t("notif.title")}
+                // More steps aside first; the notifications sheet waits for its back entry to unwind before pushing its own.
+                onClick={() => {
+                  setMoreOpen(false);
+                  afterBackSettles(() => setNotifOpen(true));
+                }}
+              >
+                <BellIcon className="size-5" />
+                {badge > 0 && <Badge count={badge} max={9} floating className="animate-idle-pulse -right-0.5 -top-0.5" />}
+              </IconButton>
             )}
-          >
-            <div className="mb-1 flex items-center justify-between px-1">
-              <span className="text-2xs font-semibold uppercase tracking-wide text-ink-600">
-                {t("nav.more")}
-              </span>
-              <div className="flex items-center gap-1">
-                {/* The bell lives in the sheet, since an unlabeled icon in the nav row read as decoration; More carries its count. */}
-                <Bell barSlot />
-                <button
-                  type="button"
-                  aria-label={t("window.close")}
-                  onClick={() => setMoreOpen(false)}
-                  className="rounded p-1 text-ink-500 transition-surface hover:text-ink-200"
-                >
-                  <X className="size-4" />
-                </button>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                setMoreOpen(false);
-                openPalette();
-              }}
-              className="mb-2 flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-sm text-ink-400 transition-surface hover:bg-surface-850 hover:text-ink-200"
-            >
-              <Command className="size-4.5 shrink-0" />
-              <span>{t("ctx.palette")}</span>
-            </button>
-            {sheetGroups(android).map((g) => (
-              <div key={g.label} className="mb-2 last:mb-0">
-                <p className="px-1 pb-1 text-[.625rem] font-medium uppercase tracking-wide text-ink-700">
-                  {t(g.label)}
-                </p>
-                {/* One destination per row, not a tile grid: labels get their full width and the whole row is the touch target. */}
-                <div className="flex flex-col gap-0.5">
-                  {g.items.map((item) => (
-                    <NavLink
-                      key={item.to}
-                      to={item.to}
-                      onClick={() => setMoreOpen(false)}
-                      className={({ isActive }) =>
-                        cn(
-                          "flex items-center gap-2.5 rounded-lg px-2 py-2 text-sm transition-surface",
-                          isActive
-                            ? "bg-surface-800 text-accent-400"
-                            : "text-ink-400 hover:bg-surface-850 hover:text-ink-200",
-                        )
-                      }
-                    >
-                      <item.icon className="size-4.5 shrink-0" />
-                      <span>{t(item.key)}</span>
-                    </NavLink>
-                  ))}
-                </div>
-              </div>
-            ))}
+            <IconButton aria-label={t("window.close")} onClick={() => setMoreOpen(false)}>
+              <X className="size-4" />
+            </IconButton>
           </div>
         </div>
-      )}
+        <MenuRow
+          icon={Command}
+          onClick={() => {
+            setMoreOpen(false);
+            openPalette();
+          }}
+          className="mb-2"
+        >
+          {t("ctx.palette")}
+        </MenuRow>
+        {sheetGroups(android).map((g) => (
+          <div key={g.label} className="mb-2 last:mb-0">
+            <MenuGroupLabel>{t(g.label)}</MenuGroupLabel>
+            {/* One destination per row, not a tile grid: labels get their full width and the whole row is the touch target. */}
+            <div className="flex flex-col gap-0.5">
+              {g.items.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  onClick={() => setMoreOpen(false)}
+                  className={({ isActive }) => menuRowClass({ current: isActive })}
+                >
+                  {({ isActive }) => (
+                    <MenuRowBody icon={item.icon} current={isActive}>
+                      {t(item.key)}
+                    </MenuRowBody>
+                  )}
+                </NavLink>
+              ))}
+            </div>
+          </div>
+        ))}
+      </Sheet>
+      <NotifSheet open={notifOpen} onClose={() => setNotifOpen(false)} />
 
       {/* The primary navigation landmark, named as such and like no other landmark, since screen readers list them by label. */}
       <nav
@@ -199,7 +166,7 @@ export default function BottomBar() {
               cn(
                 slotClass,
                 // No `useRailMarker` on purpose: it means nothing on a horizontal bar; active state is the accent ink.
-                isActive ? "text-accent-400" : "text-ink-500 hover:text-ink-200",
+                isActive ? "text-accent-400" : "text-ink-500 hover:text-ink-100",
               )
             }
           >
@@ -218,15 +185,13 @@ export default function BottomBar() {
               ? "text-ink-100"
               : inSheet
                 ? "text-accent-400"
-                : "text-ink-500 hover:text-ink-200",
+                : "text-ink-500 hover:text-ink-100",
           )}
         >
           <span className="relative">
             <LayoutGrid className="size-5" />
             {badge > 0 && (
-              <span className="absolute -right-2.5 -top-1.5 grid h-3.5 min-w-3.5 place-items-center rounded-[.4375rem] border border-surface-950 bg-accent-500 px-1 text-[.5625rem] font-semibold tabular-nums text-accent-ink">
-                {badge > 9 ? "9+" : badge}
-              </span>
+              <Badge count={badge} max={9} floating className="-right-2.5 -top-1.5" />
             )}
           </span>
           <span className="truncate">{t("nav.more")}</span>

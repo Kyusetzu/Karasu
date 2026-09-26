@@ -47,7 +47,7 @@ export default function PresetModal({
         </div>
 
         {presets.length > 0 && (
-          <ul className="divide-y divide-surface-800 rounded-lg border border-surface-800">
+          <ul className="divide-y divide-surface-800 rounded-control border border-hair">
             {presets.map((p) => (
               <li
                 key={p.name}

@@ -32,6 +32,7 @@ import { Button } from "@/components/ui/button";
 import { Loader } from "@/components/ui/loader";
 import { Pill } from "@/components/ui/pill";
 import { EmptyState, OutlineYear } from "@/components/EmptyState";
+import { Select } from "@/components/ui/select";
 import markUrl from "@/assets/karasu-mark.svg";
 import { toBase64 } from "@/lib/base64";
 
@@ -743,7 +744,7 @@ export default function Wrapped() {
   return (
     <div className="mx-auto max-w-4xl p-8 3xl:max-w-5xl">
       <div className="mb-4 flex flex-wrap items-center gap-3">
-        <h1 className="flex items-center gap-2 text-2xl font-bold">
+        <h1 className="flex items-center gap-2 text-title">
           <Sparkles className="size-5 text-accent-400" /> {t("wrapped.title")}
         </h1>
         {years.length > 0 && (
@@ -760,17 +761,17 @@ export default function Wrapped() {
               )}
             </div>
             {mode === "year" ? (
-              <select
+              <Select
                 value={year ?? ""}
                 onChange={(e) => setYear(Number(e.target.value))}
-                className="h-9 rounded-lg border border-surface-700 bg-surface-900 px-2 text-sm focus:border-accent-500 focus:outline-none"
+                aria-label={t("wrapped.modeYear")}
               >
                 {years.map((y) => (
                   <option key={y} value={y}>
                     {y}
                   </option>
                 ))}
-              </select>
+              </Select>
             ) : (
               seasonPick && (
                 <SeasonPicker
@@ -846,7 +847,7 @@ export default function Wrapped() {
       ) : (
         <canvas
           ref={canvasRef}
-          className="w-full max-w-2xl rounded-2xl border border-surface-800 shadow-xl"
+          className="w-full max-w-2xl rounded-sheet border border-hair shadow-float"
         />
       )}
     </div>
@@ -869,7 +870,7 @@ function ExportRow({
         phone ? "flex-nowrap overflow-x-auto pb-1" : "flex-wrap",
       )}
     >
-      <span className="w-14 shrink-0 text-2xs uppercase tracking-[.13em] text-ink-600">
+      <span className="w-14 shrink-0 text-2xs uppercase tracking-eyebrow text-ink-600">
         {label}
       </span>
       {children}

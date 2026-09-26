@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 575b58f -->
+<!-- generated-through: 731d47b -->
 
 ### Fixed
 
@@ -92,6 +92,37 @@ tag time is then optional rather than load-bearing.
 - The Linux AppImage no longer crashes shortly after opening on Fedora 44 and other systems with Mesa 26, and GDK_BACKEND=wayland now opts it into native Wayland.
 - Panning the franchise view on Android no longer triggers a sync, and the view opens centred on the title it was opened from.
 - A saved preset now remembers the custom list it was filtered to.
+- The franchise page no longer scrolls sideways on a phone, and its legend names every status.
+- Episode, chapter, volume and rewatch fields no longer keep a 0 you cannot delete, and an emptied field saves as 0.
+- Text in the phone's More sheet, the bell, the filter menus and the calendar uses its intended colour instead of inheriting the one above it.
+- The status editor and the list's panels stay inside a short window instead of running off its bottom.
+- high contrast marks the focused text field, and Escape in a dialog's search empties it before closing anything.
+- Collapsing or expanding the sidebar from the keyboard keeps the focus on the toggle, and the collapsed rail's names switch without overlapping.
+- The floating detection window is readable in the light theme again, and the shell's banners animate in and out.
+- Notification links need one back press, the notifications page keeps its loaded pages and unread marks when the titlebar bell opens over it, and its header fits a phone.
+- A keyboard focus ring is visible on grid covers again, the complete button no longer overflows narrow covers, and the list view's score header is no longer cut off in German.
+- Opening the notifications dropdown or sheet over the notifications page no longer reloads every page or clears its unread marks, and the pull-to-sync pill fades out where it stood.
+- Narrow grid covers keep the complete button when it fits and never clip a quick action, and the selection box no longer draws a second focus ring.
+- The score label over the chosen bar is readable in the light theme, and the tag field shows keyboard focus.
+- Covers in search and the season pages no longer clip a quick action when they are narrow.
+- In high contrast and Windows' contrast themes the chosen status and chip stand out by more than colour, and a tapped +1 no longer stays highlighted on a phone.
+- The overview no longer jumps while it loads, keeps airing soon full width on a quiet week, and shows the keyboard ring on its panel rows.
+- The overview's banner and the score badges on covers stay readable in the light theme and in high contrast.
+- The 18+ badge, the complete button and the reveal label on covers are readable in the light theme.
+- The search page no longer starts its second row of chips with a stray divider.
+- A second press on the calendar's next-week arrow no longer jumps back to this week, and the week grid no longer flickers near its width threshold.
+- Settings cards under "In Karasu" and "Kept on AniList" are now announced one level below their group, the phone's pane list names what the Android account and advanced panes really hold, and the chosen theme stays marked in Windows high contrast.
+- On a phone no settings control runs past its card any more, buttons keep their label on one line, and the log, media-session and manual-token sections fold open smoothly and tell a screen reader whether they are open.
+- The Jellyfin card no longer keeps an old error on screen after a later action succeeds, and on a narrow phone the "desktop only" label no longer covers a card's title.
+- A profile's tabs show that more lie past the edge and take the arrow keys, and on a phone the formatting More menu returns the focus where it came from and closes when the window widens.
+- Statistics shows every status in full beside the ring, the series-length labels are no longer cut off, and "1 episode" reads in the singular.
+- Character and staff pages show roles and genders in your language, and the local library's title matches the other pages.
+- On a narrow phone the statistics page no longer scrolls sideways, and the legend beside the ring moves beneath it rather than cutting its labels short.
+- The Android widgets' title shows Karasu's accent and their footer is readable against the widget.
+- The colour picker's hex field and the log's level column are monospace again, and the About wordmark has its wide spacing back.
+- Adding a title from its page keeps keyboard focus, a hover-opened status choice no longer opens on its own after another panel closes, and a status colour picked to match an old default survives a restart.
+- Settings describe the editor's instant save, the Detection pane and the density setting as they now behave.
+- Closing the status choice before an add lands keeps keyboard focus on the button, and a queued add no longer moves focus when the entry appears later.
 
 ### Added
 
@@ -113,6 +144,9 @@ tag time is then optional rather than load-bearing.
 - Setting a title to Completed now fills in the final episode or chapter (and the volume count for manga) wherever the status changes.
 - A third, text-only list view beside the gallery and thumbnails, and all three views on the phone, laid out for its width.
 - On the phone, swipe left or right on the anime and manga lists to move between the status tabs.
+- A contrast setting under Appearance: System, Standard or High, where High lifts text, the accent and every border to at least 7:1 in both themes.
+- Give the bell a titlebar glance, a notifications page and a phone sheet of its own (1.26.0.715).
+- Adding a title from its page uses your default status in one press, the chevron or a resting mouse offers the others, and a status colour too faint for the current theme is flagged in Appearance.
 
 ### Changed
 
@@ -133,6 +167,39 @@ tag time is then optional rather than load-bearing.
 - The now-playing window's update, skip and fix-match buttons sit in its header.
 - Banners on title pages, profiles and the season hero are shown whole instead of cropped, with a blurred fill around them, and the hero's text has a black outline.
 - The anime and manga list header is rebuilt: single-row status tabs in their status colours, and one toolbar with search, sort, filter and preset panels, removable filter chips, and a More menu on the phone.
+- Banners blend into their surroundings without hard edges, the title page's banner takes less room on the phone, and the Overview hero counts aired episodes for a running show.
+- Swipe the season hero instead of stepping it with arrows (1.22.2.675).
+- On the phone, the detail page puts every fact below the cover and lets you change the status from a button.
+- The detail page edits your entry from the status button, and the score bars show how everyone else scored the title.
+- A calmer, sharper look: neutral hairlines, tighter corners, headings and labels in the Karasu typeface, and sheets and dialogs that arrive on a soft spring.
+- Every control shows the same focus ring when reached by keyboard, controls sink slightly while pressed, and small buttons are easier to tap on a touch screen.
+- Settings switches keep a readable thumb on pale accents and show their edge in high contrast.
+- Expandable sections open and close with a short height animation instead of jumping.
+- Chips and counts share one look across the app: outlined labels and one badge shape.
+- View switches slide to the chosen option and follow the arrow keys; statistics sections use the list's tab strip.
+- The right-click menu finds entries by typing, keeps its submenu open on the way to it, and stays on screen at any edge.
+- Bottom sheets on the phone can be swiped away and sit above the bottom bar.
+- Receipts can be flicked away, stay put while hovered or focused, and give an Undo seven seconds.
+- menus, sheets and panels share one row, with 44 px touch targets on the phone.
+- every dialog shares one frame; buttons stay in reach on short windows and the confirm fits a phone.
+- every search field looks and clears the same way.
+- form fields, choices and notes share one frame.
+- quick loads no longer flash a skeleton.
+- the collapsed sidebar names its icons in tooltips, and its avatar is round again.
+- Open the empty palette on what was used lately, beside the main shortcuts (1.25.22.712).
+- The status button and the +1 buttons carry their colour as a tint instead of a solid fill.
+- Main buttons and chosen chips carry the accent as a tint, and status choices show their own colour everywhere.
+- The overview shows your figures under the banner, one row of what you are watching and reading, and this week beside airing soon.
+- The overview's four figures take less height and stay centred on the phone.
+- The calendar steps weeks from a bar of its own and shows a quiet stretch of days as one line.
+- On a phone the calendar's week bar holds only the arrows and the range.
+- Settings has one Account pane for Karasu and AniList, groups Appearance into three cards with previews of each theme, and lists on a phone what each pane holds.
+- On a phone, settings with a field or a menu stack the control under its description, and the Jellyfin card starts with the connection — sign-in or a "Connected to …" line — with every field labelled.
+- On a phone, a profile shows the whole name with Follow across the width, the forum's categories are one menu instead of rows of chips, and the formatting bar keeps to one row with a More menu for the rest.
+
+### Removed
+
+- Remove the franchise graph's branch folding (1.26.9.724).
 ## 1.0.0 — 2026-09-05
 
 Karasu 1.0.0 is the first tagged release: a desktop and Android tracker built

@@ -101,7 +101,7 @@ export const PhoneRow = memo(function PhoneRow({
             alt=""
             loading="lazy"
             className={cn(
-              "aspect-[2/3] h-16 shrink-0 rounded-md bg-surface-800 object-cover",
+              "aspect-[2/3] h-16 shrink-0 rounded-inner bg-surface-800 object-cover",
               blurred && "blur-[6px]",
             )}
           />
@@ -109,7 +109,7 @@ export const PhoneRow = memo(function PhoneRow({
         <span className="min-w-0 flex-1">
           <span
             className={cn(
-              "block text-[.8125rem] font-medium leading-snug text-ink-100",
+              "block text-ui font-medium leading-snug text-ink-100",
               thumbs ? "line-clamp-2" : "truncate",
             )}
           >

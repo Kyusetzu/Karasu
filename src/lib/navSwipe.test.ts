@@ -6,12 +6,16 @@ import {
   TAB_SWIPE_FRACTION,
   TAB_SWIPE_MIN_PX,
   TAB_SWIPE_SLOP_PX,
+  WHEEL_QUIET_MS,
+  WHEEL_STEP_PX,
   adjacentTab,
   isEdgeStart,
   isPaletteSwipe,
   swipeAxis,
   swipeOffset,
   tabSwipe,
+  wheelStep,
+  type WheelGesture,
 } from "@/lib/navSwipe";
 import { PULL_SLOP_PX } from "@/lib/pullToSync";
 
@@ -128,5 +132,48 @@ describe("isEdgeStart", () => {
     expect(isEdgeStart(EDGE_GUARD_PX - 1, 390)).toBe(true);
     expect(isEdgeStart(390 - EDGE_GUARD_PX + 1, 390)).toBe(true);
     expect(isEdgeStart(195, 390)).toBe(false);
+  });
+});
+
+describe("wheelStep", () => {
+  const run = (events: { dx: number; dy?: number; t: number }[]) => {
+    let gesture: WheelGesture | null = null;
+    const steps: (1 | -1)[] = [];
+    for (const e of events) {
+      const out = wheelStep(gesture, { dx: e.dx, dy: e.dy ?? 0, t: e.t });
+      gesture = out.gesture;
+      if (out.step) steps.push(out.step);
+    }
+    return steps;
+  };
+
+  it("steps forward once a sideways scroll has travelled far enough", () => {
+    expect(run([{ dx: 20, t: 0 }, { dx: 20, t: 16 }, { dx: WHEEL_STEP_PX - 40, t: 32 }])).toEqual([1]);
+  });
+
+  it("steps back on a scroll the other way", () => {
+    expect(run([{ dx: -WHEEL_STEP_PX, t: 0 }])).toEqual([-1]);
+  });
+
+  /** A trackpad keeps sending a decaying tail after the fingers lift; it belongs to the swipe that started it. */
+  it("fires once per gesture, however long its momentum runs", () => {
+    const tail = Array.from({ length: 40 }, (_, i) => ({ dx: 30, t: i * 16 }));
+    expect(run(tail)).toEqual([1]);
+  });
+
+  it("starts a new gesture after a quiet pause", () => {
+    expect(run([{ dx: WHEEL_STEP_PX, t: 0 }, { dx: WHEEL_STEP_PX, t: WHEEL_QUIET_MS + 1 }])).toEqual([1, 1]);
+  });
+
+  it("leaves a vertical scroll to the page", () => {
+    expect(run([{ dx: 50, dy: 80, t: 0 }, { dx: 50, dy: 80, t: 16 }])).toEqual([]);
+  });
+
+  it("does not count a short wobble as a swipe", () => {
+    expect(run([{ dx: 10, t: 0 }, { dx: -8, t: 16 }, { dx: 12, t: 32 }])).toEqual([]);
+  });
+
+  it("ignores a broken sample", () => {
+    expect(wheelStep(null, { dx: Number.NaN, dy: 0, t: 0 })).toEqual({ gesture: null, step: null });
   });
 });

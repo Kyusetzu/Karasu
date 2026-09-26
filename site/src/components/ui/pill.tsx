@@ -16,10 +16,10 @@ export const Pill = forwardRef<
     type="button"
     aria-pressed={active}
     className={cn(
-      "inline-flex h-7.5 items-center justify-center gap-1.5 rounded-lg px-3 text-xs font-medium transition-surface",
+      "relative press coarse:hit-area inline-flex h-7.5 items-center justify-center gap-1.5 rounded-control px-3 text-xs font-medium transition-surface",
       "focus-visible:outline-2 focus-visible:outline-accent-500 disabled:pointer-events-none disabled:opacity-50",
       active
-        ? "bg-accent-500 text-accent-ink"
+        ? "border tint-fill tint-accent text-ink-100"
         : "border border-surface-700 text-ink-300 hover:border-surface-600 hover:bg-surface-850 hover:text-ink-100",
       className,
     )}

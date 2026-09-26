@@ -176,9 +176,9 @@ export function StatusTabs<T extends string>({
                 onChange(tab.value);
               }}
               className={cn(
-                "flex items-center gap-1.5 whitespace-nowrap rounded-md px-1 pb-3 pt-1 text-[.8125rem] font-medium transition-surface",
+                "flex items-center gap-1.5 whitespace-nowrap rounded-inner px-1 pb-3 pt-1 text-ui font-medium transition-surface",
                 // Inset, because the strip clips anything drawn outside a tab.
-                "focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent-500",
+                "focus-inset",
                 active ? "text-ink-100" : "text-ink-500 hover:text-ink-300",
               )}
             >

@@ -6,9 +6,9 @@ import { ExternalAnchor, RichText, Spoiler } from "@/components/RichText";
 /** Block AniList markdown from the parser's tree, never `dangerouslySetInnerHTML`; the site's renderer is the oracle. */
 
 const HEADING_SIZE = [
-  "text-lg font-semibold",
-  "text-base font-semibold",
-  "text-sm font-semibold",
+  "text-lg",
+  "text-base",
+  "text-sm",
   "text-sm font-medium",
   "text-xs font-medium",
   "text-xs font-medium",
@@ -64,13 +64,13 @@ function Blocks({ nodes }: { nodes: MdNode[] }) {
             return (
               <pre
                 key={i}
-                className="overflow-x-auto rounded-lg bg-surface-850 p-3 font-mono text-xs text-ink-300"
+                className="overflow-x-auto rounded-control bg-surface-850 p-3 font-mono text-xs text-ink-300"
               >
                 {n.text}
               </pre>
             );
           case "hr":
-            return <hr key={i} className="border-surface-800" />;
+            return <hr key={i} className="border-hair" />;
           case "center":
             // `text-align`, not flex; a flex row swallows `<br>` and glues image chips onto the text line above.
             return (

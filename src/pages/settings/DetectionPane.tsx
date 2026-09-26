@@ -1,11 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
-import { ChevronRight, RefreshCw, Search, X } from "lucide-react";
+import { ChevronRight, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { Input } from "@/components/ui/input";
 import { Card, CardTitle } from "@/components/ui/card";
+import { Field } from "@/components/ui/field";
+import { DisclosurePanel } from "@/components/ui/disclosure";
 import { cn } from "@/lib/utils";
 import * as api from "@/api/anilist";
 import {
@@ -40,6 +42,8 @@ import { ExternalNote, Row, Toggle } from "./shared";
 import { anilistCoversAiring } from "@/lib/airingCoverage";
 import { backendErrorText } from "@/lib/backendError";
 import { commands, unwrap } from "@/api/tauri";
+import { Spinner } from "@/components/ui/spinner";
+import { Chip } from "@/components/ui/chip";
 export function ScrobbleSection() {
   const { t } = useTranslation();
   const [settings, setSettings] = useState<ScrobbleSettings | null>(null);
@@ -220,6 +224,7 @@ export function ScrobbleSection() {
 export function MediaSessionSection() {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+  const panelId = useId();
   const [sessions, setSessions] = useState<MediaSession[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -250,66 +255,67 @@ export function MediaSessionSection() {
       <button
         type="button"
         onClick={toggle}
+        aria-expanded={open}
+        aria-controls={panelId}
         className="mt-3 flex items-center gap-1 text-xs text-ink-500 hover:text-ink-300"
       >
         <ChevronRight
-          className={cn("size-3 transition-transform", open && "rotate-90")}
+          aria-hidden
+          className={cn("size-3.5 transition-transform", open && "rotate-90")}
         />
         {t("settings.detectionDebug")}
       </button>
-      {open && (
-        <div className="mt-2 space-y-2">
-          <p className="text-xs text-ink-600">
-            {t("settings.detectionDebugHint")}
+      <DisclosurePanel open={open} id={panelId} className="mt-2 space-y-2">
+        <p className="text-xs text-ink-600">
+          {t("settings.detectionDebugHint")}
+        </p>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={refresh}
+          disabled={busy}
+        >
+          <Spinner spinning={busy} className="size-3.5" />{" "}
+          {t("settings.refreshDebug")}
+        </Button>
+        {error && (
+          <p className="text-xs text-danger">
+            {t("settings.detectionDebugFailed", { message: error })}
           </p>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={refresh}
-            disabled={busy}
+        )}
+        {!error && sessions?.length === 0 && (
+          <p className="text-xs text-ink-600">
+            {t("settings.detectionDebugEmpty")}
+          </p>
+        )}
+        {sessions?.map((s, i) => (
+          <div
+            key={`${s.appId}-${i}`}
+            className="rounded-control bg-surface-850 p-2 text-xs"
           >
-            <RefreshCw className={cn("size-3.5", busy && "animate-spin")} />{" "}
-            {t("settings.refreshDebug")}
-          </Button>
-          {error && (
-            <p className="text-xs text-danger">
-              {t("settings.detectionDebugFailed", { message: error })}
-            </p>
-          )}
-          {!error && sessions?.length === 0 && (
-            <p className="text-xs text-ink-600">
-              {t("settings.detectionDebugEmpty")}
-            </p>
-          )}
-          {sessions?.map((s, i) => (
-            <div
-              key={`${s.appId}-${i}`}
-              className="rounded-lg bg-surface-850 p-2 text-xs"
-            >
-              <p className="break-all font-medium text-ink-100">{s.appId}</p>
-              <dl className="mt-1 grid grid-cols-[5rem_1fr] gap-x-2 gap-y-0.5 text-ink-500">
-                <dt>title</dt>
-                <dd className="break-all text-ink-300">{s.title || "—"}</dd>
-                <dt>artist</dt>
-                <dd className="break-all text-ink-300">{s.artist || "—"}</dd>
-                <dt>album</dt>
-                <dd className="break-all text-ink-300">{s.album || "—"}</dd>
-                <dt>type</dt>
-                <dd className="text-ink-300">{s.playbackType}</dd>
-                <dt>status</dt>
-                <dd className="text-ink-300">{s.status}</dd>
-                {/* MPRIS only; rendered when present so the Windows diagnostic looks exactly as it did. */}
-                {s.url && (
-                  <>
-                    <dt>url</dt>
-                    <dd className="break-all text-ink-300">{s.url}</dd>
-                  </>
-                )}
-              </dl>
-            </div>
-          ))}
-        </div>
-      )}
+            <p className="break-all font-medium text-ink-100">{s.appId}</p>
+            <dl className="mt-1 grid grid-cols-[5rem_1fr] gap-x-2 gap-y-0.5 text-ink-500">
+              <dt>title</dt>
+              <dd className="break-all text-ink-300">{s.title || "—"}</dd>
+              <dt>artist</dt>
+              <dd className="break-all text-ink-300">{s.artist || "—"}</dd>
+              <dt>album</dt>
+              <dd className="break-all text-ink-300">{s.album || "—"}</dd>
+              <dt>type</dt>
+              <dd className="text-ink-300">{s.playbackType}</dd>
+              <dt>status</dt>
+              <dd className="text-ink-300">{s.status}</dd>
+              {/* MPRIS only; rendered when present so the Windows diagnostic looks exactly as it did. */}
+              {s.url && (
+                <>
+                  <dt>url</dt>
+                  <dd className="break-all text-ink-300">{s.url}</dd>
+                </>
+              )}
+            </dl>
+          </div>
+        ))}
+      </DisclosurePanel>
     </Card>
   );
 }
@@ -351,7 +357,7 @@ export function DetectionCorrectionsSection() {
         {rows.map((row) => (
           <li
             key={`${row.mediaType}-${row.season}-${row.title}`}
-            className="flex items-center gap-3 rounded-lg bg-surface-900 px-3 py-2"
+            className="flex items-center gap-3 rounded-control bg-surface-900 px-3 py-2"
           >
             <span className="min-w-0 flex-1">
               <Link
@@ -501,8 +507,10 @@ export function JellyfinSection() {
   const [signingIn, setSigningIn] = useState(false);
   const [sessions, setSessions] = useState<JellyfinTest | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [finding, setFinding] = useState(false);
   const [found, setFound] = useState<DiscoveredServer[] | null>(null);
+  const fieldId = useId();
 
   useEffect(() => {
     if (!api.isTauri) return;
@@ -516,9 +524,15 @@ export function JellyfinSection() {
 
   if (!settings) return null;
 
+  // Every action starts from a clean slate, so an old message never sits beside the outcome of a newer one.
+  const clearErrors = () => {
+    setError(null);
+    setSaveError(null);
+  };
+
   const find = async () => {
     setFinding(true);
-    setError(null);
+    clearErrors();
     setFound(null);
     try {
       setFound(await discoverJellyfinServers());
@@ -531,7 +545,7 @@ export function JellyfinSection() {
 
   const signIn = async () => {
     setSigningIn(true);
-    setError(null);
+    clearErrors();
     setSessions(null);
     try {
       const next = await jellyfinSignIn(url, username, password);
@@ -539,18 +553,24 @@ export function JellyfinSection() {
       setPassword("");
       setUsername("");
       setSettings(next);
-      // Device and external URL are saved separately; persist them now so signing in cannot discard an edit.
+    } catch (e) {
+      setError(backendErrorText(e, t));
+      setSigningIn(false);
+      return;
+    }
+    // The sign-in held, so a failure storing the two fields below it is theirs and is reported under them.
+    try {
       await setJellyfinSettings(url, device, externalUrl);
       setSettings(await getJellyfinSettings());
     } catch (e) {
-      setError(backendErrorText(e, t));
+      setSaveError(backendErrorText(e, t));
     } finally {
       setSigningIn(false);
     }
   };
 
   const signOut = async () => {
-    setError(null);
+    clearErrors();
     setSessions(null);
     try {
       setSettings(await jellyfinSignOut());
@@ -560,19 +580,19 @@ export function JellyfinSection() {
   };
 
   const save = async () => {
-    setError(null);
+    clearErrors();
     setSessions(null);
     try {
       await setJellyfinSettings(url, device, externalUrl);
       setSettings(await getJellyfinSettings());
     } catch (e) {
-      setError(backendErrorText(e, t));
+      setSaveError(backendErrorText(e, t));
     }
   };
 
   const test = async () => {
     setBusy(true);
-    setError(null);
+    clearErrors();
     setSessions(null);
     try {
       setSessions(await testJellyfin());
@@ -583,159 +603,165 @@ export function JellyfinSection() {
     }
   };
 
+  const externalCurrent = settings.externalUrl !== "" && settings.externalUrl === externalUrl.trim();
+
   return (
     <Card>
       <CardTitle>{t("settings.jellyfin")}</CardTitle>
       <p className="mt-2 text-sm text-ink-500">{t("settings.jellyfinHint")}</p>
-      <div className="mt-3 space-y-2">
-        {/* Jellyfin's own discovery: the servers on this network, one click each, so no address is typed. */}
-        {!settings.connected && (
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <Button variant="secondary" size="sm" onClick={find} disabled={finding}>
-              <Search className={cn("size-4", finding && "animate-pulse")} />{" "}
-              {finding ? t("settings.jellyfinFinding") : t("settings.jellyfinFind")}
-            </Button>
-            <span className="text-xs text-ink-600">{t("settings.jellyfinFindHint")}</span>
-          </div>
-        )}
-        {!settings.connected &&
-          found &&
-          (found.length === 0 ? (
-            <p className="text-sm text-ink-500">{t("settings.jellyfinFoundNone")}</p>
-          ) : (
-            <div className="space-y-1.5">
-              {found.map((s) => (
-                <button
-                  key={s.address}
-                  type="button"
-                  onClick={() => {
-                    setUrl(s.address);
-                    setFound(null);
-                  }}
-                  className="flex w-full flex-wrap items-center justify-between gap-x-3 rounded-lg border border-surface-800 bg-surface-900 px-3 py-2 text-left text-sm transition-surface hover:border-surface-600"
-                >
-                  <span className="font-medium text-ink-300">{s.name || s.address}</span>
-                  <span className="text-xs text-ink-500">
-                    {s.address}
-                    {s.version ? ` · v${s.version}` : ""}
-                  </span>
-                </button>
-              ))}
-            </div>
-          ))}
-        <Input
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          placeholder={t("settings.jellyfinUrlPlaceholder")}
-          disabled={settings.connected}
-        />
 
+      {/* The connection leads: the sign-in while there is none, then one status line with the two things it can do. */}
+      <div className="mt-4 rounded-control border border-hair bg-surface-950 p-3">
         {settings.connected ? (
-          <p className="text-sm text-success">
-            {settings.serverName
-              ? t("settings.jellyfinSignedInOn", {
-                  name: settings.userName || "?",
-                  server: settings.serverName,
-                })
-              : t("settings.jellyfinSignedIn", {
-                  name: settings.userName || "?",
-                })}
-          </p>
-        ) : (
-          <>
-            <Input
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder={t("settings.jellyfinUsernamePlaceholder")}
-              autoComplete="off"
-            />
-            <Input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder={t("settings.jellyfinPasswordPlaceholder")}
-              autoComplete="off"
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !signingIn) void signIn();
-              }}
-            />
-          </>
-        )}
-
-        {/* Placeholder only, never this machine's name as the value: that pins the filter to this PC. */}
-        <Input
-          value={device}
-          onChange={(e) => setDevice(e.target.value)}
-          placeholder={t("settings.jellyfinDeviceAny")}
-        />
-
-        {/* The fallback address, editable while signed in; the status and the plain-http warning are the backend's word. */}
-        <div>
-          <label className="block text-xs font-medium text-ink-300" htmlFor="jellyfin-external">
-            {t("settings.jellyfinExternalUrl")}
-          </label>
-          <Input
-            id="jellyfin-external"
-            value={externalUrl}
-            onChange={(e) => setExternalUrl(e.target.value)}
-            placeholder={t("settings.jellyfinExternalPlaceholder")}
-            className="mt-1"
-          />
-          <p className="mt-1 text-xs text-ink-600">{t("settings.jellyfinExternalHint")}</p>
-          {settings.externalUrl && settings.externalUrl === externalUrl.trim() && (
-            <p
-              className={cn(
-                "mt-1 text-xs",
-                settings.externalVerified ? "text-success" : "text-ink-500",
-              )}
-            >
-              {settings.externalVerified
-                ? t("settings.jellyfinExternalVerified")
-                : t("settings.jellyfinExternalUnverified")}
-            </p>
-          )}
-          {settings.externalPlainHttp && settings.externalUrl === externalUrl.trim() && (
-            <p className="mt-1 text-xs text-gold">{t("settings.jellyfinExternalPlainHttp")}</p>
-          )}
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          {settings.connected ? (
-            <>
-              <Button variant="secondary" onClick={save}>
-                {t("common.save")}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="flex items-center gap-2 text-sm font-medium text-ink-100">
+                <span aria-hidden className="size-2 shrink-0 rounded-full bg-success" />
+                {t("settings.jellyfinConnectedTo", { server: settings.serverName || settings.url })}
+              </p>
+              <p className="mt-0.5 truncate text-xs text-ink-500">
+                {t("settings.jellyfinSignedIn", { name: settings.userName || "?" })}
+                {settings.serverName && ` · ${settings.url}`}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" onClick={test} disabled={busy}>
+                <Spinner spinning={busy} className="size-3.5" /> {t("settings.jellyfinTest")}
               </Button>
-              <Button onClick={test} disabled={busy}>
-                <RefreshCw className={cn("size-4", busy && "animate-spin")} />{" "}
-                {t("settings.jellyfinTest")}
-              </Button>
-              <Button variant="secondary" onClick={signOut}>
+              <Button size="sm" variant="secondary" onClick={signOut}>
                 {t("settings.jellyfinSignOut")}
               </Button>
-            </>
-          ) : (
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {/* Jellyfin's own discovery: the servers on this network, one click each, so no address is typed. */}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <Button variant="secondary" size="sm" onClick={find} disabled={finding}>
+                <Search className={cn("size-4", finding && "animate-pulse")} />{" "}
+                {finding ? t("settings.jellyfinFinding") : t("settings.jellyfinFind")}
+              </Button>
+              <span className="text-xs text-ink-600">{t("settings.jellyfinFindHint")}</span>
+            </div>
+            {found &&
+              (found.length === 0 ? (
+                <p className="text-sm text-ink-500">{t("settings.jellyfinFoundNone")}</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {found.map((s) => (
+                    <button
+                      key={s.address}
+                      type="button"
+                      onClick={() => {
+                        setUrl(s.address);
+                        setFound(null);
+                      }}
+                      className="flex w-full flex-wrap items-center justify-between gap-x-3 rounded-control border border-hair bg-surface-900 px-3 py-2 text-left text-sm transition-surface hover:border-surface-600"
+                    >
+                      <span className="font-medium text-ink-300">{s.name || s.address}</span>
+                      <span className="text-xs text-ink-500">
+                        {s.address}
+                        {s.version ? ` · v${s.version}` : ""}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ))}
+            <Field label={t("settings.jellyfinUrl")} htmlFor={`${fieldId}-url`}>
+              <Input
+                id={`${fieldId}-url`}
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder={t("settings.jellyfinUrlPlaceholder")}
+              />
+            </Field>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label={t("settings.jellyfinUsername")} htmlFor={`${fieldId}-user`}>
+                <Input
+                  id={`${fieldId}-user`}
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  autoComplete="off"
+                />
+              </Field>
+              <Field label={t("settings.jellyfinPassword")} htmlFor={`${fieldId}-password`}>
+                <Input
+                  id={`${fieldId}-password`}
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="off"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !signingIn) void signIn();
+                  }}
+                />
+              </Field>
+            </div>
             <Button onClick={signIn} disabled={signingIn || url.trim() === ""}>
-              {signingIn
-                ? t("settings.jellyfinSigningIn")
-                : t("settings.jellyfinSignIn")}
+              {signingIn ? t("settings.jellyfinSigningIn") : t("settings.jellyfinSignIn")}
             </Button>
-          )}
-        </div>
+            <p className="text-xs text-ink-600">{t("settings.jellyfinAccountHelp")}</p>
+          </div>
+        )}
+        {error && <p className="mt-3 text-sm text-danger">{error}</p>}
       </div>
-      <p className="mt-2 text-xs text-ink-600">
-        {t("settings.jellyfinAccountHelp")}
-      </p>
-      <p className="mt-1 text-xs text-ink-600">
-        {t("settings.jellyfinDeviceHelp")}
-      </p>
-      {settings.connected && <JellyfinBackgroundRows />}
       {sessions && (
         <SessionList
           sessions={sessions.sessions}
           via={sessions.base === "external" ? sessions.url : null}
         />
       )}
-      {error && <p className="mt-2 text-sm text-danger">{error}</p>}
+
+      <div className="mt-4 space-y-4">
+        {/* Placeholder only, never this machine's name as the value: that pins the filter to this PC. */}
+        <Field
+          label={t("settings.jellyfinDevice")}
+          htmlFor={`${fieldId}-device`}
+          hint={<span className="text-xs">{t("settings.jellyfinDeviceHelp")}</span>}
+        >
+          <Input
+            id={`${fieldId}-device`}
+            value={device}
+            onChange={(e) => setDevice(e.target.value)}
+            placeholder={t("settings.jellyfinDeviceAny")}
+          />
+        </Field>
+        {/* The fallback address, editable while signed in; the status and the plain-http warning are the backend's word. */}
+        <Field
+          label={t("settings.jellyfinExternalUrl")}
+          htmlFor={`${fieldId}-external`}
+          hint={
+            <span className="block space-y-1 text-xs">
+              <span className="block">{t("settings.jellyfinExternalHint")}</span>
+              {externalCurrent && (
+                <span className={cn("block", settings.externalVerified ? "text-success" : "text-ink-500")}>
+                  {settings.externalVerified
+                    ? t("settings.jellyfinExternalVerified")
+                    : t("settings.jellyfinExternalUnverified")}
+                </span>
+              )}
+              {settings.externalPlainHttp && externalCurrent && (
+                <span className="block text-gold">{t("settings.jellyfinExternalPlainHttp")}</span>
+              )}
+            </span>
+          }
+        >
+          <Input
+            id={`${fieldId}-external`}
+            value={externalUrl}
+            onChange={(e) => setExternalUrl(e.target.value)}
+            placeholder={t("settings.jellyfinExternalPlaceholder")}
+          />
+        </Field>
+        {/* Signing in stores both fields itself, so saving them separately only matters once there is a connection. */}
+        {settings.connected && (
+          <Button variant="secondary" onClick={save}>
+            {t("common.save")}
+          </Button>
+        )}
+        {saveError && <p className="text-sm text-danger">{saveError}</p>}
+      </div>
+      {settings.connected && <JellyfinBackgroundRows />}
     </Card>
   );
 }
@@ -781,7 +807,7 @@ function JellyfinBackgroundRows() {
   };
 
   return (
-    <div className="mt-3 space-y-3 border-t border-surface-800 pt-3">
+    <div className="mt-3 space-y-3 border-t border-hair pt-3">
       <Toggle
         checked={state.enabled}
         onChange={toggle}
@@ -790,9 +816,9 @@ function JellyfinBackgroundRows() {
       />
       <Row label={t("settings.jellyfinBattery")} hint={t("settings.jellyfinBatteryHint")}>
         {state.batteryExempt ? (
-          <span className="text-sm text-success">{t("settings.jellyfinBatteryAllowed")}</span>
+          <span className="shrink-0 text-sm text-success">{t("settings.jellyfinBatteryAllowed")}</span>
         ) : (
-          <Button variant="secondary" size="sm" onClick={ask}>
+          <Button variant="secondary" size="sm" className="shrink-0" onClick={ask}>
             {t("settings.jellyfinBatteryAllow")}
           </Button>
         )}
@@ -832,10 +858,10 @@ function SessionList({
         <div
           key={`${s.device}-${s.user}-${i}`}
           className={cn(
-            "rounded-lg border px-3 py-2 text-sm",
+            "rounded-control border px-3 py-2 text-sm",
             s.matched
               ? "border-success/40 bg-success/10"
-              : "border-surface-800 bg-surface-900",
+              : "border-hair bg-surface-900",
           )}
         >
           <p className="flex flex-wrap items-center gap-x-2">
@@ -851,19 +877,13 @@ function SessionList({
             )}
             {/* The other Karasus on this account and their age, the numbers the write-order rule judges by. */}
             {s.karasu === "desktop" && (
-              <span className="rounded-full bg-accent-500/15 px-2 py-0.5 text-xs text-accent-400">
-                {t("settings.jellyfinKarasuDesktop")}
-              </span>
+              <Chip tone="accent">{t("settings.jellyfinKarasuDesktop")}</Chip>
             )}
             {s.karasu === "mobile" && (
-              <span className="rounded-full bg-accent-500/15 px-2 py-0.5 text-xs text-accent-400">
-                {t("settings.jellyfinKarasuMobile")}
-              </span>
+              <Chip tone="accent">{t("settings.jellyfinKarasuMobile")}</Chip>
             )}
             {s.matched && (
-              <span className="rounded-full bg-success/20 px-2 py-0.5 text-xs text-success">
-                {t("settings.jellyfinMatched")}
-              </span>
+              <Chip tone="success">{t("settings.jellyfinMatched")}</Chip>
             )}
           </p>
           <p className="mt-0.5 text-xs text-ink-500">

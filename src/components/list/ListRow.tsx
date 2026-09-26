@@ -30,7 +30,7 @@ export type RowPatch = {
 };
 
 const CELL =
-  "h-8 rounded-md border border-surface-800 bg-surface-900 px-2 text-xs tabular-nums text-ink-300 transition-surface focus:border-accent-500 focus:outline-none";
+  "h-8 rounded-inner border border-hair bg-surface-900 px-2 text-xs tabular-nums text-ink-300 transition-surface focus:border-accent-500 focus:outline-none";
 
 /** One entry in detail, memoized like `GridCard`; the tracks come from `columns.ts`, never a `w-*` class here. */
 export const ListRow = memo(function ListRow({
@@ -161,7 +161,7 @@ export const ListRow = memo(function ListRow({
             alt=""
             loading="lazy"
             className={cn(
-              "aspect-[2/3] w-full rounded-md bg-surface-800 object-cover",
+              "aspect-[2/3] w-full rounded-inner bg-surface-800 object-cover",
               blurred && "blur-[6px]",
             )}
           />
@@ -176,7 +176,7 @@ export const ListRow = memo(function ListRow({
           onClick={(e) => selectMode && e.preventDefault()}
           tabIndex={selectMode ? -1 : undefined}
         >
-          <span className="max-w-full shrink-0 truncate text-[.8125rem] font-medium text-ink-100">
+          <span className="max-w-full shrink-0 truncate text-ui font-medium text-ink-100">
             {displayTitle(media.title)}
           </span>
           {secondary.length > 0 && (

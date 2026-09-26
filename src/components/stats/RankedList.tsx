@@ -3,7 +3,7 @@ import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
 import { type StatEntry } from "@/api/queries";
 import type { MediaType } from "@/api/types";
-import { Tabs, type TabOption } from "@/components/ui/tabs";
+import { Segmented, type Segment } from "@/components/ui/segmented";
 import { Empty, type RankedCategory, type SortKey } from "./shared";
 
 /** AniList clamps `userStatistics` category lists server-side whatever `limit` says, so this is all of it, not a choice. */
@@ -39,7 +39,7 @@ export function RankedList({
   const max = Math.max(...shown.map(barValue), 1);
 
   const timeLabel = type === "ANIME" ? t("stats.sortByTime") : t("stats.sortByChapters");
-  const sortOptions: TabOption<SortKey>[] = [
+  const sortOptions: Segment<SortKey>[] = [
     { value: "count", label: t("stats.sortByCount") },
     { value: "time", label: timeLabel },
     { value: "score", label: t("stats.sortByScore") },
@@ -47,7 +47,7 @@ export function RankedList({
 
   return (
     <div className="space-y-3">
-      <Tabs options={sortOptions} value={sort} onChange={setSort} />
+      <Segmented aria-label={t("stats.sortLabel")} segments={sortOptions} value={sort} onChange={setSort} />
       {/* Self-contained rows, so a wide screen shows several per line instead of one very long bar. */}
       <div className="grid grid-cols-[repeat(auto-fit,minmax(22rem,1fr))] gap-1.5">
         {shown.map((e, i) => (
@@ -89,7 +89,7 @@ export function RankedRow({
   const href = entryHref(entry, category);
   // Only the wrapping element changes, so a non-navigable category keeps exactly the layout it had.
   const row = (
-    <div className="flex items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-surface-900">
+    <div className="flex items-center gap-3 rounded-control px-2 py-1.5 hover:bg-surface-900">
       <span className="w-5 shrink-0 text-right text-xs tabular-nums text-ink-600">
         {rank}
       </span>
@@ -112,9 +112,9 @@ export function RankedRow({
             {entry.count}× · {metricText}
           </span>
         </div>
-        <div className="mt-1 h-2 overflow-hidden rounded bg-surface-800">
+        <div className="mt-1 h-2 overflow-hidden rounded-inner bg-surface-800">
           <div
-            className="h-full rounded bg-accent-500"
+            className="h-full rounded-inner bg-accent-500"
             style={{ width: `${barPct}%` }}
           />
         </div>

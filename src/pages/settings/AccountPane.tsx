@@ -1,14 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { ChevronRight, ExternalLink, LogIn, LogOut, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardTitle } from "@/components/ui/card";
+import { DisclosurePanel } from "@/components/ui/disclosure";
 import { UserLockup } from "@/components/ui/user-lockup";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/stores/auth";
-import { Row, SELECT } from "./shared";
+import { Row } from "./shared";
+import { Select } from "@/components/ui/select";
 import { STATUS_ORDER, type MediaListStatus } from "@/api/types";
 import {
   loadDefaultAddStatus,
@@ -35,10 +37,9 @@ export function DefaultsSection() {
           label={t("settings.defaultAddStatus")}
           hint={t("settings.defaultAddStatusHint")}
         >
-          <select
+          <Select
             value={status}
             onChange={(e) => change(e.target.value as MediaListStatus)}
-            className={SELECT}
           >
             {STATUS_ORDER.map((s) => {
               const anime = t(`status.ANIME.${s}`);
@@ -50,7 +51,7 @@ export function DefaultsSection() {
                 </option>
               );
             })}
-          </select>
+          </Select>
         </Row>
       </div>
     </Card>
@@ -66,6 +67,7 @@ export function AccountSection() {
   const [token, setToken] = useState("");
   const [busy, setBusy] = useState(false);
   const [showManual, setShowManual] = useState(false);
+  const manualId = useId();
   const [error, setError] = useState<string | null>(null);
   const login = useAniListLogin();
 
@@ -95,7 +97,7 @@ export function AccountSection() {
                 onClick={() => openUrl(viewer.siteUrl)}
                 className="flex items-center gap-1 text-xs text-accent-400 hover:underline"
               >
-                {t("settings.profileLink")} <ExternalLink className="size-3" />
+                {t("settings.profileLink")} <ExternalLink className="size-3.5" />
               </button>
             }
           />
@@ -155,7 +157,7 @@ export function AccountSection() {
       <CardTitle>{t("settings.connectTitle")}</CardTitle>
       <div className="mt-4 space-y-4 text-sm text-ink-300">
         {!canLogin && (
-          <div className="space-y-2 rounded-lg bg-surface-850 p-3">
+          <div className="space-y-2 rounded-control bg-surface-850 p-3">
             {/* Rust owns the callback port; this block only renders once
                 `info` has answered, so the URL is always present here. */}
             <p>{t("settings.stepClientId", { url: info?.callbackUrl ?? "" })}</p>
@@ -190,7 +192,7 @@ export function AccountSection() {
         {login.waiting && (
           <p className="text-xs text-accent-400">{t("settings.loginWaiting")}</p>
         )}
-        <div className="border-t border-surface-800 pt-3">
+        <div className="border-t border-hair pt-3">
           {mode === "local" ? (
             <p className="text-xs text-ink-500">{t("settings.localActive")}</p>
           ) : (
@@ -211,14 +213,17 @@ export function AccountSection() {
           <button
             type="button"
             onClick={() => setShowManual((v) => !v)}
+            aria-expanded={showManual}
+            aria-controls={manualId}
             className="flex items-center gap-1 text-xs text-ink-500 hover:text-ink-300"
           >
             <ChevronRight
-              className={cn("size-3 transition-transform", showManual && "rotate-90")}
+              aria-hidden
+              className={cn("size-3.5 transition-transform", showManual && "rotate-90")}
             />
             {t("settings.manualFallback")}
           </button>
-          {showManual && (
+          <DisclosurePanel open={showManual} id={manualId}>
             <div className="mt-2 space-y-2">
               <p className="text-xs text-ink-500">{t("settings.manualHint")}</p>
               <Button variant="secondary" size="sm" onClick={() => void openManual()}>
@@ -236,11 +241,11 @@ export function AccountSection() {
                 </Button>
               </div>
             </div>
-          )}
+          </DisclosurePanel>
         </div>
       </div>
       {(error ?? login.error) && (
-        <p className="mt-4 rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">
+        <p className="mt-4 rounded-control bg-danger/10 px-3 py-2 text-sm text-danger">
           {error ?? login.error}
         </p>
       )}

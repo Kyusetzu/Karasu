@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Link } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -16,7 +16,9 @@ import { isTauri } from "@/api/anilist";
 import { activityReplies, type LikeableType } from "@/api/social";
 import { UserLockup } from "@/components/ui/user-lockup";
 import { Button } from "@/components/ui/button";
+import { DisclosurePanel } from "@/components/ui/disclosure";
 import { Shimmer } from "@/components/Skeleton";
+import { cardClass } from "@/components/ui/card";
 import { Markdown } from "./Markdown";
 import { MarkdownTextarea } from "./MarkdownTextarea";
 import { relTimeFromSeconds } from "@/lib/relTime";
@@ -115,7 +117,7 @@ function LikeButton({
   if (mode !== "anilist") {
     return (
       <span className="flex items-center gap-1 px-1.5 py-0.5 text-2xs text-ink-600">
-        <Heart className="size-2.75" />
+        <Heart className="size-3.5" />
         <span className="tabular-nums">{likeCount}</span>
       </span>
     );
@@ -127,11 +129,11 @@ function LikeButton({
       aria-pressed={isLiked}
       aria-label={isLiked ? t("social.unlike") : t("social.like")}
       className={cn(
-        "flex items-center gap-1 rounded-md px-1.5 py-0.5 text-2xs transition-surface hover:bg-surface-850",
+        "flex items-center gap-1 rounded-inner px-1.5 py-0.5 text-2xs transition-surface hover:bg-surface-850",
         isLiked ? "text-danger" : "text-ink-600 hover:text-ink-300",
       )}
     >
-      <Heart className={cn("size-2.75", isLiked && "fill-current")} />
+      <Heart className={cn("size-3.5", isLiked && "fill-current")} />
       <span className="tabular-nums">{likeCount}</span>
     </button>
   );
@@ -158,8 +160,8 @@ function ActivityReplies({ activityId }: { activityId: number }) {
   };
 
   return (
-    <div className="mt-3 space-y-2 border-l-2 border-surface-800 pl-3">
-      {q.isLoading && <Shimmer className="h-3 w-32 rounded" />}
+    <div className="mt-3 space-y-2 border-l-2 border-hair pl-3">
+      {q.isLoading && <Shimmer className="h-3 w-32 rounded-inner" />}
       {/* A failed fetch says nothing about the thread, so it must not fall through to "no replies yet". */}
       {q.error && (
         <p className="text-2xs text-danger">{t("social.repliesFailed")}</p>
@@ -240,6 +242,7 @@ export function ActivityCard({
 }) {
   const { t, i18n } = useTranslation();
   const [repliesOpen, setRepliesOpen] = useState(openReplies);
+  const repliesId = useId();
   const viewer = useAuth((s) => s.viewer);
   const self = viewer !== null && viewer.id === item.user.id;
   // Pinning is a donator feature, so the toggle is offered only where it can succeed; see `lib/donator`.
@@ -248,7 +251,7 @@ export function ActivityCard({
   const when = relTimeFromSeconds(item.createdAt, i18n.language, t("notif.now"));
 
   return (
-    <article className="flex gap-3 rounded-xl border border-surface-800 bg-surface-900 p-3">
+    <article className={cn(cardClass("flat"), "flex gap-3 p-3")}>
       {item.kind === "list" && item.media?.coverImage?.large && (
         <Link
           to={`/media/${item.media.id}`}
@@ -260,7 +263,7 @@ export function ActivityCard({
             alt=""
             loading="lazy"
             decoding="async"
-            className="aspect-2/3 w-full rounded-md object-cover"
+            className="aspect-2/3 w-full rounded-inner object-cover"
           />
         </Link>
       )}
@@ -290,12 +293,12 @@ export function ActivityCard({
                   item.isPinned ? "text-accent-400" : "text-ink-600 hover:text-ink-300",
                 )}
               >
-                <Pin className={cn("size-3", item.isPinned && "fill-current")} />
+                <Pin className={cn("size-3.5", item.isPinned && "fill-current")} />
               </button>
             ) : (
               item.isPinned && (
                 <span title={t("social.pinned")} className="text-accent-400">
-                  <Pin className="size-3 fill-current" />
+                  <Pin className="size-3.5 fill-current" />
                 </span>
               )
             )}
@@ -305,7 +308,7 @@ export function ActivityCard({
               aria-label={t("social.openOnAniList")}
               className="text-ink-600 transition-surface hover:text-ink-300"
             >
-              <ExternalLink className="size-3" />
+              <ExternalLink className="size-3.5" />
             </button>
           </div>
         </div>
@@ -329,18 +332,21 @@ export function ActivityCard({
           <button
             onClick={() => setRepliesOpen((v) => !v)}
             aria-expanded={repliesOpen}
+            aria-controls={repliesId}
             className={cn(
-              "flex items-center gap-1 rounded-md px-1.5 py-0.5 text-2xs transition-surface hover:bg-surface-850",
+              "flex items-center gap-1 rounded-inner px-1.5 py-0.5 text-2xs transition-surface hover:bg-surface-850",
               repliesOpen ? "text-ink-300" : "text-ink-600 hover:text-ink-300",
             )}
           >
-            <MessageSquare className="size-2.75" />
+            <MessageSquare className="size-3.5" />
             <span className="tabular-nums">{item.replyCount}</span>
           </button>
         </div>
 
         {/* One request per expansion, never eagerly, or every row pays for replies nobody opened. */}
-        {repliesOpen && <ActivityReplies activityId={item.id} />}
+        <DisclosurePanel open={repliesOpen} id={repliesId}>
+          <ActivityReplies activityId={item.id} />
+        </DisclosurePanel>
       </div>
     </article>
   );

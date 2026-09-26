@@ -1,7 +1,10 @@
-import { lazy, Suspense, useEffect, useRef } from "react";
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, Routes, Route, useLocation, useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
 import { X } from "lucide-react";
+import { IconButton } from "@/components/ui/icon-button";
+import { usePresence } from "@/hooks/usePresence";
+import { cn } from "@/lib/utils";
 import { useAuth } from "@/stores/auth";
 import { isAndroid, usePlatform } from "@/stores/platform";
 import { useNowPlaying } from "@/stores/nowPlaying";
@@ -51,6 +54,7 @@ const Settings = lazy(() => import("@/pages/Settings"));
 const About = lazy(() => import("@/pages/About"));
 const UserProfile = lazy(() => import("@/pages/UserProfile"));
 const Social = lazy(() => import("@/pages/Social"));
+const Notifications = lazy(() => import("@/pages/Notifications"));
 const Thread = lazy(() => import("@/pages/Thread"));
 const Activity = lazy(() => import("@/pages/Activity"));
 const Forum = lazy(() => import("@/pages/Forum"));
@@ -150,12 +154,13 @@ export default function App() {
     });
   }, []);
 
+  // One variable for what bottom-anchored floaters must clear, on the root so an overlay portalled to the body sees it.
+  useLayoutEffect(() => {
+    document.documentElement.style.setProperty("--shell-bottom", phone ? "3.5rem" : "0px");
+  }, [phone]);
+
   return (
-    <div
-      className="flex h-full flex-col"
-      // One variable for what bottom-anchored floaters must clear, so nothing anchoring there needs its own width check.
-      style={{ "--shell-bottom": phone ? "3.5rem" : "0px" } as React.CSSProperties}
-    >
+    <div className="flex h-full flex-col">
       <PresenceReporter />
       <CommandPalette />
       <KeyboardSheet />
@@ -197,6 +202,7 @@ export default function App() {
                 <Route path="/media/:id" element={<AnimeDetail />} />
                 <Route path="/franchise/:id" element={<Franchise />} />
                 <Route path="/social" element={<Social />} />
+                <Route path="/notifications" element={<Notifications />} />
                 {/* By name, not id: that is what AniList's own URLs, an `@mention` and a pasted link all carry. */}
                 <Route path="/user/:name" element={<UserProfile />} />
                 <Route path="/forum" element={<Forum />} />
@@ -239,7 +245,7 @@ function SkipLink() {
         e.preventDefault();
         document.getElementById("main")?.focus();
       }}
-      className="sr-only rounded-lg bg-accent-500 px-3 py-2 text-sm font-medium text-accent-ink focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-[200]"
+      className="sr-only rounded-control bg-accent-500 px-3 py-2 text-sm font-medium text-accent-ink focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-skip"
     >
       {t("common.skipToContent")}
     </a>
@@ -253,14 +259,14 @@ function NotFound() {
   return (
     <div className="grid h-full place-items-center p-8">
       <div className="max-w-md text-center">
-        <h1 className="text-2xl font-bold">{t("notFound.title")}</h1>
+        <h1 className="text-title">{t("notFound.title")}</h1>
         <p className="mt-3 text-sm leading-relaxed text-ink-500">
           {t("notFound.body")}
         </p>
         <p className="mt-2 break-all text-xs text-ink-600">{pathname}</p>
         <Link
           to="/"
-          className="mt-5 inline-block rounded-lg bg-accent-500 px-4 py-2 text-sm font-medium text-accent-ink"
+          className="mt-5 inline-block rounded-control border tint-fill tint-accent px-4 py-2 text-sm font-medium text-ink-100"
         >
           {t("notFound.home")}
         </Link>
@@ -280,17 +286,23 @@ function PlaybackError() {
     return () => clearTimeout(id);
   }, [error, clearError]);
 
-  if (!error) return null;
+  // The last message stays on the card while it leaves, since the store has already cleared it.
+  const [shown, setShown] = useState(error);
+  if (error && error !== shown) setShown(error);
+  const { mounted, leaving } = usePresence(!!error);
+  if (!mounted) return null;
   return (
-    <div className="pointer-events-auto flex w-88 max-w-full items-start gap-3 rounded-lg border border-surface-700 bg-surface-850 px-4 py-3 shadow-xl">
-      <span className="text-sm text-ink-300">{error}</span>
-      <button
-        onClick={clearError}
-        className="shrink-0 text-ink-500 hover:text-ink-100"
-        aria-label={t("common.dismiss")}
-      >
-        <X className="size-3.75" />
-      </button>
+    <div
+      role="alert"
+      className={cn(
+        "pointer-events-auto flex w-88 max-w-full origin-bottom-right items-start gap-3 rounded-control border border-surface-700 bg-surface-850 py-3 pl-4 pr-2 shadow-float",
+        leaving ? "animate-pop-out" : "animate-pop-in",
+      )}
+    >
+      <span className="min-w-0 flex-1 py-0.5 text-sm text-ink-300">{shown}</span>
+      <IconButton size="xs" onClick={clearError} aria-label={t("common.dismiss")} className="-my-1 shrink-0">
+        <X className="size-4" />
+      </IconButton>
     </div>
   );
 }

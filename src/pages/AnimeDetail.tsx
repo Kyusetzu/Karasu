@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router";
 import {
   useInfiniteQuery,
@@ -13,8 +13,6 @@ import { mediaUrl } from "@/lib/anilistUrl";
 import { isAndroid, usePlatform } from "@/stores/platform";
 import { OfflineDetail } from "@/components/media/OfflineDetail";
 import {
-  ChevronRight,
-  Clock,
   ExternalLink,
   Share2,
   Play,
@@ -46,30 +44,18 @@ import { Avatar, UserLockup } from "@/components/ui/user-lockup";
 import { Markdown } from "@/components/social/Markdown";
 import { ReviewComposerModal } from "@/components/overlays/ReviewComposerModal";
 import CoverViewer from "@/components/overlays/CoverViewer";
-import { loadDefaultAddStatus } from "@/lib/defaultAddStatus";
 import { Presence } from "@/components/ui/presence";
 import { usePresence } from "@/hooks/usePresence";
 import { relTimeFromSeconds } from "@/lib/relTime";
 import { showToast } from "@/stores/toast";
 import {
-  countdown,
   formatLabel,
   fuzzyDate,
   mediaStatusLabel,
   sourceLabel,
 } from "@/lib/format";
-import { statusColorVar } from "@/lib/statusColors";
-import { readableInk, UI_INK } from "@/lib/contrast";
-import { useTheme } from "@/stores/theme";
-import { formatMinutes, remainingMinutes } from "@/lib/estimate";
-import { isTauri, saveListEntry } from "@/api/anilist";
-import {
-  displayTitle,
-  maxProgress,
-  STATUS_ORDER,
-  type MediaListStatus,
-  type MediaType,
-} from "@/api/types";
+import { isTauri } from "@/api/anilist";
+import { displayTitle } from "@/api/types";
 import { useAuth } from "@/stores/auth";
 import { useCachedEntry } from "@/hooks/useCachedEntry";
 import { useLibrary } from "@/stores/library";
@@ -78,24 +64,28 @@ import { isBlocked, shouldBlur } from "@/lib/contentFilter";
 import BackButton from "@/components/shell/BackButton";
 import { DetailSkeleton, Shimmer } from "@/components/Skeleton";
 import { cn } from "@/lib/utils";
+import { characterRoleLabel } from "@/components/media/roleLabel";
 import { DecodedImage } from "@/components/media/DecodedImage";
 import { BannerImage } from "@/components/media/BannerImage";
+import { BANNER_RATIO } from "@/lib/bannerFit";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardTitle } from "@/components/ui/card";
-import { Pill } from "@/components/ui/pill";
-import { ScoreBars } from "@/components/ui/score-bars";
-import TagEditor from "@/components/media/TagEditor";
-import { parseNotes, serializeNotes } from "@/lib/tags";
-import { chooseStatus, openingFields, withCompletion, type FillMemo } from "@/lib/completion";
+import { Chip } from "@/components/ui/chip";
+import { Disclosure, DisclosurePanel } from "@/components/ui/disclosure";
 import { parseAniListHtml } from "@/lib/anilistHtml";
 import { FavouriteButton } from "@/components/media/FavouriteButton";
+import { GenreChips, MetaLine, NextEpisode, TimeLeft } from "@/components/media/DetailFacts";
+import { StatusMenu } from "@/components/media/StatusMenu";
+import { IconButton } from "@/components/ui/icon-button";
+import { usePhoneShell } from "@/hooks/usePhoneShell";
 import { RichText } from "@/components/RichText";
 import { ScoreColumns, StatusBar } from "@/components/stats/panels";
 
+/** The phone's square actions, the height of the status button beside them. */
+const SQUARE = "size-11 rounded-panel border border-surface-700 bg-surface-900 text-ink-300 hover:border-surface-600 hover:text-ink-100";
 
 export default function AnimeDetail() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { id } = useParams();
   const mediaId = Number(id);
   // Subscribe to the data, not a store function: a function's identity never changes, so a scan would never re-render.
@@ -104,8 +94,8 @@ export default function AnimeDetail() {
   const level = useContentFilter((s) => s.level);
   const blurAdult = useContentFilter((s) => s.blurAdult);
   const profileMode = useAuth((s) => s.mode);
-  // The raw hexes, not the var(): readableInk needs a colour it can measure, and a CSS variable is opaque to it.
-  const statusColors = useTheme((st) => st.statusColors);
+  const viewer = useAuth((s) => s.viewer);
+  const phone = usePhoneShell();
   const [revealed, setRevealed] = useState(false);
   const [coverOpen, setCoverOpen] = useState(false);
   const coverViewer = usePresence(coverOpen);
@@ -175,9 +165,11 @@ export default function AnimeDetail() {
   const studioEdges = data.studios?.edges ?? [];
   const mainStudios = studioEdges.filter((e) => e.isMain).map((e) => e.node);
   const producers = studioEdges.filter((e) => !e.isMain).map((e) => e.node);
-  const untilNext = data.nextAiringEpisode
-    ? data.nextAiringEpisode.airingAt - Math.floor(Date.now() / 1000)
-    : 0;
+  // Files on disk past the entry's progress; Android has no library, so it never offers the button.
+  const canPlay =
+    data.type === "ANIME" && !!episodes?.some((e) => e > (data.mediaListEntry?.progress ?? 0));
+  // The same rule as the editor below: nothing to change without an account or a local list.
+  const canEdit = !!viewer || profileMode === "local";
 
   // AniList's relations connection takes no arguments, so an adult spin-off can only be dropped here, client-side.
   const relatedEdges = data.relations.edges.filter(
@@ -188,35 +180,39 @@ export default function AnimeDetail() {
 
   return (
     <div>
-      {/* Fixed-height banner slot even without a bannerImage: the cover overlaps its bottom edge by a fixed amount. */}
-      <div className="relative h-64">
-        {data.bannerImage ? (
-          <BannerImage src={data.bannerImage} veiled={veiled} />
-        ) : (
-          coverSrc && (
-            <DecodedImage
-              src={coverSrc}
-              className="h-full w-full scale-110 object-cover blur-2xl"
-              loadedOpacity={0.4}
-            />
-          )
-        )}
-        {/* A short fade into the page, so the contained banner stays whole above it. */}
-        <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-surface-950 to-transparent" />
-        {/* Anchored to the banner, not the centred column, or it drifts inward with the gutter on a wide display. */}
-        <BackButton className="absolute left-6 top-4 z-10" />
+      {/* The query container sits here, not on the page, since containment would pin the page's fixed overlays to it. */}
+      <div className="@container">
+        {/* A standard banner plus a band for the back button above and the cover below, capped at the desktop height. */}
+        <div className="relative" style={{ height: `min(16rem, calc(100cqw / ${BANNER_RATIO} + 5.5rem))` }}>
+          {data.bannerImage ? (
+            <BannerImage src={data.bannerImage} veiled={veiled} />
+          ) : (
+            coverSrc && (
+              <DecodedImage
+                src={coverSrc}
+                className="h-full w-full scale-110 object-cover blur-2xl"
+                loadedOpacity={0.4}
+              />
+            )
+          )}
+          {/* A short fade into the page, so the contained banner stays whole above it. */}
+          <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-surface-950 to-transparent" />
+          {/* Anchored to the banner, not the centred column, or it drifts inward with the gutter on a wide display. */}
+          <BackButton className="absolute left-6 top-3 z-10" />
+        </div>
       </div>
 
       <div className="relative mx-auto max-w-4xl px-8 pb-10 2xl:max-w-none">
-        <div className="-mt-14 flex gap-6">
+        {/* Floated on the phone, so a title longer than the cover carries on beneath it; wider, it overlaps the banner. */}
+        <div className={cn("-mt-11 md:-mt-14", phone ? "flow-root" : "flex gap-6")}>
           {/* The incoming half of the cover-to-hero morph; unconditional because this page shows exactly one cover. */}
-          <div className="relative h-57 w-38 shrink-0">
+          <div className={cn("relative h-57 w-38 shrink-0", phone && "float-left mb-2 mr-5")}>
             <img
               src={coverSrc}
               alt=""
               style={{ viewTransitionName: "karasu-hero" }}
               className={cn(
-                "h-57 w-38 rounded-[.625rem] border border-surface-700 object-cover shadow-[0_1.25rem_2.5rem_rgba(0,0,0,.65)]",
+                "h-57 w-38 rounded-cover border border-surface-700 object-cover shadow-float",
                 veiled && "blur-xl",
               )}
             />
@@ -224,7 +220,7 @@ export default function AnimeDetail() {
               <button
                 onClick={() => setRevealed(true)}
                 aria-label={title}
-                className="absolute inset-0 grid place-items-center rounded-[.625rem] bg-surface-950/45 text-2xs font-semibold text-ink-200 transition hover:bg-surface-950/30"
+                className="absolute inset-0 grid place-items-center rounded-cover bg-surface-950/45 text-2xs font-semibold text-ink-100 transition-surface hover:bg-surface-950/30"
               >
                 <span className="rounded-full bg-surface-900/90 px-2.5 py-1">
                   {t("settings.blurReveal")}
@@ -237,7 +233,7 @@ export default function AnimeDetail() {
                 type="button"
                 onClick={() => setCoverOpen(true)}
                 aria-label={t("detail.viewCover")}
-                className="absolute inset-0 cursor-zoom-in rounded-[.625rem] focus-visible:outline-2 focus-visible:outline-accent-500"
+                className="absolute inset-0 cursor-zoom-in rounded-cover focus-visible:outline-2 focus-visible:outline-accent-500"
               />
             )}
           </div>
@@ -249,13 +245,13 @@ export default function AnimeDetail() {
               onClose={() => setCoverOpen(false)}
             />
           )}
-          <div className="min-w-0 flex-1 pt-16">
-            <h1 className="text-[1.625rem] font-bold leading-tight text-ink-100">
+          <div className={cn("pt-16", !phone && "min-w-0 flex-1")}>
+            <h1 className="text-heading text-ink-100">
               {title}
             </h1>
             {/* Native first, romaji only as a fallback: the Japanese face is part of the app's identity. */}
             {data.title.native && data.title.native !== title ? (
-              <p className="font-brand-jp text-[1.0625rem] text-ink-500">
+              <p className="font-brand-jp text-base text-ink-500">
                 {data.title.native}
               </p>
             ) : (
@@ -264,170 +260,130 @@ export default function AnimeDetail() {
                 <p className="text-sm text-ink-500">{data.title.romaji}</p>
               )
             )}
-            {/* Whether this is on your list, said beside the title and coloured from the same palette as the cover rings. */}
-            <p className="mt-2.5">
-              {entry ? (
-                <span
-                  className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-2xs font-semibold"
-                  style={{
-                    backgroundColor: statusColorVar(entry.status),
-                    // The palette is user-chosen, so readableInk picks whichever ink end has contrast against their hue.
-                    color: readableInk(
-                      statusColors[entry.status] ?? "#000000",
-                      UI_INK,
-                    ),
-                  }}
-                >
-                  {t(`status.${data.type}.${entry.status}`)}
-                  {progressLabel && <span className="opacity-80">{progressLabel}</span>}
-                </span>
-              ) : (
-                // undefined from useCachedEntry means not loaded yet as well as not listed, so say nothing until it resolves.
-                localPending ? null : (
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-surface-700 px-2.5 py-0.5 text-2xs text-ink-500">
-                    {t("detail.notOnList")}
-                  </span>
-                )
-              )}
-            </p>
-            <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[.8125rem] text-ink-300">
-              {data.averageScore !== null && (
-                <span className="flex items-center gap-1 text-gold">
-                  <Star className="size-3.5" fill="currentColor" /> {data.averageScore}%
-                </span>
-              )}
-              {data.format && <span>{formatLabel(data.format, t)}</span>}
-              {data.status && (
-                <span>{mediaStatusLabel(data.status, t)}</span>
-              )}
-              {data.episodes && (
-                <span>
-                  {data.episodes} {t("common.episodes")}
-                </span>
-              )}
-              {data.chapters && (
-                <span>
-                  {data.chapters} {t("common.chapters")}
-                </span>
-              )}
-              {data.volumes && (
-                <span>
-                  {data.volumes} {t("common.volumes")}
-                </span>
-              )}
-              {data.duration && (
-                <span>{t("detail.minutes", { n: data.duration })}</span>
-              )}
-              {data.seasonYear && (
-                <span>
-                  {data.season ? `${t(`season.${data.season}`)} ` : ""}
-                  {data.seasonYear}
-                </span>
-              )}
-              {mainStudios.length > 0 && (
-                <span className="text-ink-500">
-                  {mainStudios.map((s) => s.name).join(", ")}
-                </span>
-              )}
-            </div>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {data.genres.map((g) => (
-                <span
-                  key={g}
-                  className="rounded-[.625rem] border border-surface-800 bg-surface-850 px-2 py-0.5 text-2xs text-ink-300"
-                >
-                  {g}
-                </span>
-              ))}
-            </div>
-            {data.type === "ANIME" &&
-              (() => {
-                const remaining = remainingMinutes(
-                  data,
-                  data.mediaListEntry?.progress ?? 0,
-                );
-                return remaining !== null && remaining > 0 ? (
-                  <p className="mt-2 flex items-center gap-1.5 text-sm text-ink-300">
-                    <Clock className="size-3.5 text-ink-500" />
-                    {t("detail.timeLeft", {
-                      time: formatMinutes(remaining, t),
-                    })}
-                  </p>
-                ) : null;
-              })()}
-            {data.nextAiringEpisode && (
-              <p className="mt-2 text-sm text-accent-400">
-                {t("detail.nextEpisode", {
-                  n: data.nextAiringEpisode.episode,
-                  date: new Date(
-                    data.nextAiringEpisode.airingAt * 1000,
-                  ).toLocaleString(i18n.language, {
-                    weekday: "short",
-                    day: "2-digit",
-                    month: "2-digit",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  }),
-                })}
-                {/* > 0, not truthiness: countdown returns "" once past, and at exactly zero 0 && renders a literal 0. */}
-                {untilNext > 0 && (
-                  <span className="ml-2 text-ink-500">
-                    ({countdown(untilNext, t)})
-                  </span>
+            {phone ? (
+              // Below the cover whatever the title's length: a short title leaves air beside it, never a squeezed column.
+              <div className="clear-left space-y-2.5 pt-2.5">
+                <MetaLine data={data} studios={mainStudios.map((s) => s.name)} />
+                <GenreChips genres={data.genres} />
+                <NextEpisode data={data} bar />
+                <TimeLeft data={data} />
+                <div className="flex gap-2">
+                  {canEdit &&
+                    (localPending ? (
+                      // Not "Add to list" before the local list has answered whether the title is on it.
+                      <Shimmer className="h-11 flex-1 rounded-panel" />
+                    ) : (
+                      <StatusMenu
+                        media={data}
+                        entry={entry ?? null}
+                        progressLabel={progressLabel}
+                        variant="sheet"
+                        className="min-w-0 flex-1"
+                      />
+                    ))}
+                  <FavouriteButton
+                    kind={data.type === "MANGA" ? "manga" : "anime"}
+                    id={data.id}
+                    isFavourite={data.isFavourite}
+                    blocked={data.isFavouriteBlocked}
+                    square
+                  />
+                  <IconButton
+                    onClick={() => openUrl(mediaUrl(data.type, data.id))}
+                    aria-label={t("detail.openOnAniList")}
+                    title={t("detail.openOnAniList")}
+                    className={SQUARE}
+                  >
+                    <ExternalLink className="size-5" />
+                  </IconButton>
+                  {android && (
+                    <IconButton
+                      onClick={() => void shareText(mediaUrl(data.type, data.id)).catch(() => {})}
+                      aria-label={t("ctx.share")}
+                      title={t("ctx.share")}
+                      className={SQUARE}
+                    >
+                      <Share2 className="size-5" />
+                    </IconButton>
+                  )}
+                </div>
+                {canPlay && (
+                  <Button className="h-11 w-full rounded-panel" onClick={() => play(data.id)} title={t("common.playNext")}>
+                    <Play className="size-4" fill="currentColor" />
+                    {t("common.playNext")}
+                  </Button>
                 )}
-              </p>
+              </div>
+            ) : (
+              <>
+                {canEdit ? (
+                  // undefined from useCachedEntry means not loaded yet as well as not listed, so offer nothing until it resolves.
+                  !localPending && (
+                    <StatusMenu
+                      media={data}
+                      entry={entry ?? null}
+                      progressLabel={progressLabel}
+                      variant="dropdown"
+                      className="mt-2.5"
+                    />
+                  )
+                ) : (
+                  // Without an account there is no list to change, so the title only says it is not on one.
+                  <p className="mt-2.5">
+                    <Chip tone="muted" size="xs" className="border-dashed">
+                      {t("detail.notOnList")}
+                    </Chip>
+                  </p>
+                )}
+                <MetaLine data={data} studios={mainStudios.map((s) => s.name)} className="mt-2.5" />
+                <GenreChips genres={data.genres} className="mt-2" />
+                <TimeLeft data={data} className="mt-2" />
+                <NextEpisode data={data} className="mt-2" />
+                {canPlay && (
+                  <Button
+                    className="mt-3"
+                    onClick={() => play(data.id)}
+                    title={t("common.playNext")}
+                  >
+                    <Play className="size-4" fill="currentColor" />
+                    {t("common.playNext")}
+                  </Button>
+                )}
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <FavouriteButton
+                    kind={data.type === "MANGA" ? "manga" : "anime"}
+                    id={data.id}
+                    isFavourite={data.isFavourite}
+                    blocked={data.isFavouriteBlocked}
+                  />
+                  <button
+                    onClick={() => openUrl(mediaUrl(data.type, data.id))}
+                    className="flex items-center gap-1 text-xs text-ink-500 hover:text-accent-400"
+                  >
+                    {t("detail.openOnAniList")} <ExternalLink className="size-3.5" />
+                  </button>
+                  {android && (
+                    <button
+                      onClick={() => void shareText(mediaUrl(data.type, data.id)).catch(() => {})}
+                      className="flex items-center gap-1 text-xs text-ink-500 hover:text-accent-400"
+                    >
+                      {t("ctx.share")} <Share2 className="size-3.5" />
+                    </button>
+                  )}
+                </div>
+              </>
             )}
-            {data.type === "ANIME" &&
-              episodes?.some((e) => e > (data.mediaListEntry?.progress ?? 0)) && (
-                <Button
-                  className="mt-3"
-                  onClick={() => play(data.id)}
-                  title={t("common.playNext")}
-                >
-                  <Play className="size-3.75" fill="currentColor" />
-                  {t("common.playNext")}
-                </Button>
-              )}
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <FavouriteButton
-                kind={data.type === "MANGA" ? "manga" : "anime"}
-                id={data.id}
-                isFavourite={data.isFavourite}
-                blocked={data.isFavouriteBlocked}
-              />
-              <button
-                onClick={() => openUrl(mediaUrl(data.type, data.id))}
-                className="flex items-center gap-1 text-xs text-ink-500 hover:text-accent-400"
-              >
-                {t("detail.openOnAniList")} <ExternalLink className="size-2.75" />
-              </button>
-              {android && (
-                <button
-                  onClick={() => void shareText(mediaUrl(data.type, data.id)).catch(() => {})}
-                  className="flex items-center gap-1 text-xs text-ink-500 hover:text-accent-400"
-                >
-                  {t("ctx.share")} <Share2 className="size-2.75" />
-                </button>
-              )}
-            </div>
           </div>
         </div>
 
         {/* Prose left at a reading measure, metadata right taking the slack, since everything in it wraps and fills. */}
         <div className="mt-6 grid gap-6 2xl:grid-cols-[minmax(0,48rem)_minmax(0,1fr)] 2xl:items-start">
           <div className="min-w-0 space-y-6">
-            <ListEditor
-              media={data}
-              mediaType={data.type}
-              max={maxProgress(data)}
-              entry={entry ?? null}
-            />
-
             {data.description && (
               <Card>
                 <CardTitle>{t("detail.description")}</CardTitle>
                 {/* Elements, not dangerouslySetInnerHTML: lib/anilistHtml parses to nodes so no __html string ever exists. */}
-                <p className="mt-3 max-w-176 text-[.8125rem] leading-[1.75] text-pretty text-ink-300">
+                <p className="mt-3 max-w-176 text-ui leading-[1.75] text-pretty text-ink-300">
                   <RichText nodes={parseAniListHtml(data.description)} />
                 </p>
               </Card>
@@ -450,7 +406,7 @@ export default function AnimeDetail() {
                 <button
                   onClick={() => openUrl(trailerUrl(data.trailer!))}
                   aria-label={t("detail.trailerPlay")}
-                  className="group mt-3 grid aspect-video w-full max-w-md place-items-center overflow-hidden rounded-lg bg-surface-800 transition-surface hover:bg-surface-700"
+                  className="group mt-3 grid aspect-video w-full max-w-md place-items-center overflow-hidden rounded-control bg-surface-800 transition-surface hover:bg-surface-700"
                 >
                   <span className="grid h-12 w-12 place-items-center rounded-full bg-surface-950/70 transition-surface group-hover:bg-surface-950">
                     <Play fill="currentColor" className="size-5 text-ink-100" />
@@ -500,7 +456,7 @@ export default function AnimeDetail() {
                       src={e.node.coverImage.large ?? ""}
                       alt=""
                       loading="lazy"
-                      className="aspect-[2/3] w-full rounded-lg object-cover transition-transform group-hover:-translate-y-1"
+                      className="aspect-[2/3] w-full rounded-control object-cover transition-transform group-hover:-translate-y-1"
                     />
                     <p className="mt-1 text-xs text-accent-400">
                       {t(`relation.${e.relationType}`, {
@@ -534,64 +490,43 @@ function EpisodesSection({ mediaId }: { mediaId: number }) {
 
   return (
     <Card>
-      <button
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        className="flex w-full items-center justify-between gap-2 text-left"
+      <Disclosure
+        summary={<CardTitle>{t("detail.episodes")}</CardTitle>}
+        open={open}
+        onOpenChange={setOpen}
+        panelClassName="mt-3"
       >
-        <CardTitle>{t("detail.episodes")}</CardTitle>
-        <ChevronRight
-          className={cn("size-4 shrink-0 text-ink-500 transition-transform", open && "rotate-90")}
-        />
-      </button>
-      {open && (
-        <div className="mt-3">
-          {episodes.isLoading && <Shimmer className="h-24 w-full rounded-lg" />}
-          {episodes.error != null && (
-            <p className="text-sm text-danger">
-              {t("common.error", { message: String(episodes.error) })}
-            </p>
-          )}
-          {episodes.data && episodes.data.length === 0 && (
-            <p className="text-xs text-ink-600">{t("detail.episodesNone")}</p>
-          )}
-          {episodes.data && episodes.data.length > 0 && (
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-3">
-              {episodes.data.map((ep, i) => (
-                <button
-                  key={i}
-                  onClick={() => ep.url && openUrl(ep.url)}
-                  disabled={!ep.url}
-                  className="group block text-left"
-                  title={ep.site ?? undefined}
-                >
-                  {/* Same policy as the trailer: these thumbnails live on CDNs the CSP does not allow, so no img. */}
-                  <div className="grid aspect-video w-full place-items-center overflow-hidden rounded-lg bg-surface-800 transition-surface group-hover:bg-surface-700">
-                    <Play className="size-5 text-ink-600" />
-                  </div>
-                  <p className="mt-1 line-clamp-2 text-xs text-ink-300">{ep.title}</p>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+        {episodes.isLoading && <Shimmer className="h-24 w-full rounded-control" />}
+        {episodes.error != null && (
+          <p className="text-sm text-danger">
+            {t("common.error", { message: String(episodes.error) })}
+          </p>
+        )}
+        {episodes.data && episodes.data.length === 0 && (
+          <p className="text-xs text-ink-600">{t("detail.episodesNone")}</p>
+        )}
+        {episodes.data && episodes.data.length > 0 && (
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-3">
+            {episodes.data.map((ep, i) => (
+              <button
+                key={i}
+                onClick={() => ep.url && openUrl(ep.url)}
+                disabled={!ep.url}
+                className="group block text-left"
+                title={ep.site ?? undefined}
+              >
+                {/* Same policy as the trailer: these thumbnails live on CDNs the CSP does not allow, so no img. */}
+                <div className="grid aspect-video w-full place-items-center overflow-hidden rounded-control bg-surface-800 transition-surface group-hover:bg-surface-700">
+                  <Play className="size-5 text-ink-600" />
+                </div>
+                <p className="mt-1 line-clamp-2 text-xs text-ink-300">{ep.title}</p>
+              </button>
+            ))}
+          </div>
+        )}
+      </Disclosure>
     </Card>
   );
-}
-
-/** Literal switch so i18nKeys.test.ts sees every key; only character roles are a closed enum worth translating. */
-function characterRole(role: string | null, t: (k: string) => string): string {
-  switch (role) {
-    case "MAIN":
-      return t("detail.roleMain");
-    case "SUPPORTING":
-      return t("detail.roleSupporting");
-    case "BACKGROUND":
-      return t("detail.roleBackground");
-    default:
-      return "";
-  }
 }
 
 /** Cast and staff behind a fold; one request pages both lists, and the button is countless since total is a sentinel. */
@@ -613,104 +548,97 @@ function CastSection({ mediaId }: { mediaId: number }) {
 
   return (
     <Card>
-      <button
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        className="flex w-full items-center justify-between gap-2 text-left"
+      <Disclosure
+        summary={<CardTitle>{t("detail.cast")}</CardTitle>}
+        open={open}
+        onOpenChange={setOpen}
+        panelClassName="mt-3 space-y-5"
       >
-        <CardTitle>{t("detail.cast")}</CardTitle>
-        <ChevronRight
-          className={cn("size-4 shrink-0 text-ink-500 transition-transform", open && "rotate-90")}
-        />
-      </button>
-      {open && (
-        <div className="mt-3 space-y-5">
-          {cast.isLoading && <Shimmer className="h-24 w-full rounded-lg" />}
-          {cast.error != null && (
-            <p className="text-sm text-danger">
-              {t("common.error", { message: String(cast.error) })}
+        {cast.isLoading && <Shimmer className="h-24 w-full rounded-control" />}
+        {cast.error != null && (
+          <p className="text-sm text-danger">
+            {t("common.error", { message: String(cast.error) })}
+          </p>
+        )}
+        {characters.length > 0 && (
+          <div>
+            <p className="text-2xs font-semibold uppercase tracking-eyebrow text-ink-600">
+              {t("detail.castCharacters")}
             </p>
-          )}
-          {characters.length > 0 && (
-            <div>
-              <p className="text-2xs font-semibold uppercase tracking-[.1em] text-ink-600">
-                {t("detail.castCharacters")}
-              </p>
-              <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                {characters.map((c) => {
-                  const va = c.voiceActors[0];
-                  return (
-                    <div
-                      key={c.node.id}
-                      className="flex items-center justify-between gap-3 rounded-lg bg-surface-900 p-2"
-                    >
-                      <Link
-                        to={`/character/${c.node.id}`}
-                        className="flex min-w-0 items-center gap-2.5 transition-surface hover:text-accent-400"
-                      >
-                        <Avatar src={c.node.image.medium} name={c.node.name.full ?? "?"} />
-                        <span className="min-w-0">
-                          <span className="block truncate text-xs text-ink-100">
-                            {c.node.name.full}
-                          </span>
-                          <span className="block text-2xs text-ink-600">
-                            {characterRole(c.role, t)}
-                          </span>
-                        </span>
-                      </Link>
-                      {va && (
-                        <Link
-                          to={`/staff/${va.id}`}
-                          className="flex min-w-0 shrink-0 items-center gap-2.5 transition-surface hover:text-accent-400"
-                        >
-                          <span className="block max-w-28 truncate text-right text-xs text-ink-300">
-                            {va.name.full}
-                          </span>
-                          <Avatar src={va.image.medium} name={va.name.full ?? "?"} />
-                        </Link>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-          {staff.length > 0 && (
-            <div>
-              <p className="text-2xs font-semibold uppercase tracking-[.1em] text-ink-600">
-                {t("detail.castStaff")}
-              </p>
-              <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {staff.map((s, i) => (
-                  <Link
-                    key={`${s.node.id}-${i}`}
-                    to={`/staff/${s.node.id}`}
-                    className="flex min-w-0 items-center gap-2.5 rounded-lg bg-surface-900 p-2 transition-surface hover:text-accent-400"
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              {characters.map((c) => {
+                const va = c.voiceActors[0];
+                return (
+                  <div
+                    key={c.node.id}
+                    className="flex items-center justify-between gap-3 rounded-control bg-surface-900 p-2"
                   >
-                    <Avatar src={s.node.image.medium} name={s.node.name.full ?? "?"} />
-                    <span className="min-w-0">
-                      <span className="block truncate text-xs text-ink-100">
-                        {s.node.name.full}
+                    <Link
+                      to={`/character/${c.node.id}`}
+                      className="flex min-w-0 items-center gap-2.5 transition-surface hover:text-accent-400"
+                    >
+                      <Avatar src={c.node.image.medium} name={c.node.name.full ?? "?"} />
+                      <span className="min-w-0">
+                        <span className="block truncate text-xs text-ink-100">
+                          {c.node.name.full}
+                        </span>
+                        <span className="block text-2xs text-ink-600">
+                          {characterRoleLabel(c.role, t)}
+                        </span>
                       </span>
-                      <span className="block truncate text-2xs text-ink-600">{s.role}</span>
-                    </span>
-                  </Link>
-                ))}
-              </div>
+                    </Link>
+                    {va && (
+                      <Link
+                        to={`/staff/${va.id}`}
+                        className="flex min-w-0 shrink-0 items-center gap-2.5 transition-surface hover:text-accent-400"
+                      >
+                        <span className="block max-w-28 truncate text-right text-xs text-ink-300">
+                          {va.name.full}
+                        </span>
+                        <Avatar src={va.image.medium} name={va.name.full ?? "?"} />
+                      </Link>
+                    )}
+                  </div>
+                );
+              })}
             </div>
-          )}
-          {cast.hasNextPage && (
-            <Button
-              variant="outline"
-              size="control"
-              onClick={() => cast.fetchNextPage()}
-              disabled={cast.isFetchingNextPage}
-            >
-              {t("social.loadMorePlain")}
-            </Button>
-          )}
-        </div>
-      )}
+          </div>
+        )}
+        {staff.length > 0 && (
+          <div>
+            <p className="text-2xs font-semibold uppercase tracking-eyebrow text-ink-600">
+              {t("detail.castStaff")}
+            </p>
+            <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {staff.map((s, i) => (
+                <Link
+                  key={`${s.node.id}-${i}`}
+                  to={`/staff/${s.node.id}`}
+                  className="flex min-w-0 items-center gap-2.5 rounded-control bg-surface-900 p-2 transition-surface hover:text-accent-400"
+                >
+                  <Avatar src={s.node.image.medium} name={s.node.name.full ?? "?"} />
+                  <span className="min-w-0">
+                    <span className="block truncate text-xs text-ink-100">
+                      {s.node.name.full}
+                    </span>
+                    <span className="block truncate text-2xs text-ink-600">{s.role}</span>
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+        {cast.hasNextPage && (
+          <Button
+            variant="outline"
+            size="control"
+            onClick={() => cast.fetchNextPage()}
+            disabled={cast.isFetchingNextPage}
+          >
+            {t("social.loadMorePlain")}
+          </Button>
+        )}
+      </Disclosure>
     </Card>
   );
 }
@@ -768,60 +696,53 @@ function ReviewsSection({ mediaId }: { mediaId: number }) {
 
   return (
     <Card>
-      <button
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        className="flex w-full items-center justify-between gap-2 text-left"
+      <Disclosure
+        summary={<CardTitle>{t("detail.reviews")}</CardTitle>}
+        open={open}
+        onOpenChange={setOpen}
+        panelClassName="mt-3 space-y-3"
       >
-        <CardTitle>{t("detail.reviews")}</CardTitle>
-        <ChevronRight
-          className={cn("size-4 shrink-0 text-ink-500 transition-transform", open && "rotate-90")}
-        />
-      </button>
-      {open && (
-        <div className="mt-3 space-y-3">
-          {revs.isLoading && <Shimmer className="h-24 w-full rounded-lg" />}
-          {revs.error != null && (
-            <p className="text-sm text-danger">
-              {t("common.error", { message: String(revs.error) })}
-            </p>
+        {revs.isLoading && <Shimmer className="h-24 w-full rounded-control" />}
+        {revs.error != null && (
+          <p className="text-sm text-danger">
+            {t("common.error", { message: String(revs.error) })}
+          </p>
+        )}
+        {revs.data && rows.length === 0 && (
+          <p className="text-xs text-ink-600">{t("detail.reviewsNone")}</p>
+        )}
+        {rows.map((r) => (
+          <ReviewCard
+            key={r.id}
+            review={r}
+            canVote={canWrite}
+            votePending={vote.isPending}
+            onVote={(rating) => vote.mutate({ id: r.id, rating })}
+          />
+        ))}
+        <div className="flex items-center gap-2">
+          {revs.hasNextPage && (
+            <Button
+              variant="outline"
+              size="control"
+              onClick={() => revs.fetchNextPage()}
+              disabled={revs.isFetchingNextPage}
+            >
+              {t("social.loadMorePlain")}
+            </Button>
           )}
-          {revs.data && rows.length === 0 && (
-            <p className="text-xs text-ink-600">{t("detail.reviewsNone")}</p>
+          {canWrite && (
+            <Button
+              variant="outline"
+              size="control"
+              onClick={() => compose.mutate()}
+              disabled={compose.isPending}
+            >
+              {t("review.write")}
+            </Button>
           )}
-          {rows.map((r) => (
-            <ReviewCard
-              key={r.id}
-              review={r}
-              canVote={canWrite}
-              votePending={vote.isPending}
-              onVote={(rating) => vote.mutate({ id: r.id, rating })}
-            />
-          ))}
-          <div className="flex items-center gap-2">
-            {revs.hasNextPage && (
-              <Button
-                variant="outline"
-                size="control"
-                onClick={() => revs.fetchNextPage()}
-                disabled={revs.isFetchingNextPage}
-              >
-                {t("social.loadMorePlain")}
-              </Button>
-            )}
-            {canWrite && (
-              <Button
-                variant="outline"
-                size="control"
-                onClick={() => compose.mutate()}
-                disabled={compose.isPending}
-              >
-                {t("review.write")}
-              </Button>
-            )}
-          </div>
         </div>
-      )}
+      </Disclosure>
       {/* Presence, not PresenceIf: the boolean variant would hand the child a nulled existing for the length of the exit. */}
       <Presence value={composer}>
         {(c, leaving) => (
@@ -851,11 +772,12 @@ function ReviewCard({
 }) {
   const { t, i18n } = useTranslation();
   const [expanded, setExpanded] = useState(false);
+  const bodyId = useId();
   const up = r.userRating === "UP_VOTE";
   const down = r.userRating === "DOWN_VOTE";
 
   return (
-    <div className="rounded-lg bg-surface-900 p-3">
+    <div className="rounded-control bg-surface-900 p-3">
       <div className="flex items-center justify-between gap-3">
         <Link to={`/user/${encodeURIComponent(r.user?.name ?? "")}`} className="min-w-0">
           <UserLockup
@@ -872,7 +794,7 @@ function ReviewCard({
         </Link>
         {r.score != null && (
           <span className="flex shrink-0 items-center gap-1 text-xs tabular-nums text-ink-300">
-            <Star className="size-3 text-gold" fill="currentColor" />
+            <Star className="size-3.5 text-gold" fill="currentColor" />
             {t("detail.reviewScore", { n: r.score })}
           </span>
         )}
@@ -881,17 +803,16 @@ function ReviewCard({
       <button
         onClick={() => setExpanded((v) => !v)}
         aria-expanded={expanded}
+        aria-controls={bodyId}
         className="mt-2 block w-full text-left text-sm text-ink-100 transition-surface hover:text-accent-400"
       >
         {r.summary}
       </button>
 
-      {expanded && (
-        <div className="mt-2 border-t border-surface-800 pt-2">
-          {/* siteUrl backs the parser's truncation notice, so "read the rest" has somewhere to go. */}
-          <Markdown source={r.body} siteUrl={r.siteUrl ?? undefined} />
-        </div>
-      )}
+      <DisclosurePanel open={expanded} id={bodyId} className="mt-2 border-t border-hair pt-2">
+        {/* siteUrl backs the parser's truncation notice, so "read the rest" has somewhere to go. */}
+        <Markdown source={r.body} siteUrl={r.siteUrl ?? undefined} />
+      </DisclosurePanel>
 
       <div className="mt-2 flex items-center gap-1.5">
         <span className="mr-1 text-2xs text-ink-600">
@@ -905,7 +826,7 @@ function ReviewCard({
               aria-pressed={up}
               title={t("review.voteUp")}
               className={cn(
-                "rounded p-1 transition-surface hover:bg-surface-800",
+                "rounded-inner p-1 transition-surface hover:bg-surface-800",
                 up ? "text-success" : "text-ink-600",
               )}
             >
@@ -917,7 +838,7 @@ function ReviewCard({
               aria-pressed={down}
               title={t("review.voteDown")}
               className={cn(
-                "rounded p-1 transition-surface hover:bg-surface-800",
+                "rounded-inner p-1 transition-surface hover:bg-surface-800",
                 down ? "text-danger" : "text-ink-600",
               )}
             >
@@ -951,35 +872,28 @@ function TrendSection({ mediaId }: { mediaId: number }) {
 
   return (
     <Card>
-      <button
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        className="flex w-full items-center justify-between gap-2 text-left"
+      <Disclosure
+        summary={<CardTitle>{t("detail.trend")}</CardTitle>}
+        open={open}
+        onOpenChange={setOpen}
+        panelClassName="mt-3"
       >
-        <CardTitle>{t("detail.trend")}</CardTitle>
-        <ChevronRight
-          className={cn("size-4 shrink-0 text-ink-500 transition-transform", open && "rotate-90")}
-        />
-      </button>
-      {open && (
-        <div className="mt-3">
-          {trends.isLoading && <Shimmer className="h-24 w-full rounded-lg" />}
-          {trends.error != null && (
-            <p className="text-sm text-danger">
-              {t("common.error", { message: String(trends.error) })}
-            </p>
-          )}
-          {trends.data &&
-            (points.length < 2 ? (
-              <p className="text-xs text-ink-600">{t("detail.trendNone")}</p>
-            ) : (
-              <>
-                <p className="mb-2 text-2xs text-ink-600">{t("detail.trendHint")}</p>
-                <AreaChart data={points} />
-              </>
-            ))}
-        </div>
-      )}
+        {trends.isLoading && <Shimmer className="h-24 w-full rounded-control" />}
+        {trends.error != null && (
+          <p className="text-sm text-danger">
+            {t("common.error", { message: String(trends.error) })}
+          </p>
+        )}
+        {trends.data &&
+          (points.length < 2 ? (
+            <p className="text-xs text-ink-600">{t("detail.trendNone")}</p>
+          ) : (
+            <>
+              <p className="mb-2 text-2xs text-ink-600">{t("detail.trendHint")}</p>
+              <AreaChart data={points} />
+            </>
+          ))}
+      </Disclosure>
     </Card>
   );
 }
@@ -1020,13 +934,9 @@ function CommunitySection({ data }: { data: MediaDetail }) {
       {rankings.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {rankings.map((r, i) => (
-            <span
-              key={i}
-              className="flex items-center gap-1.5 rounded-md border border-gold/40 bg-gold/10 px-2 py-1 text-xs text-gold"
-            >
-              <Trophy className="size-3" />
+            <Chip key={i} tone="gold" icon={Trophy}>
               {rankLabel(r)}
-            </span>
+            </Chip>
           ))}
         </div>
       )}
@@ -1175,7 +1085,7 @@ function AlternativeTitles({ data }: { data: MediaDetail }) {
                 {synonyms.map((s) => (
                   <span
                     key={s}
-                    className="rounded-md bg-surface-800 px-2 py-0.5 text-xs"
+                    className="rounded-inner bg-surface-800 px-2 py-0.5 text-xs"
                   >
                     {s}
                   </span>
@@ -1204,15 +1114,10 @@ function TagList({ tags }: { tags: MediaTag[] }) {
       <CardTitle>{t("detail.tags")}</CardTitle>
       <div className="mt-3 flex flex-wrap gap-1.5">
         {shown.map((tg) => (
-          <span
-            key={tg.name}
-            className="flex items-center gap-1.5 rounded-full bg-surface-800 px-2.5 py-0.5 text-xs text-ink-300"
-          >
+          <Chip key={tg.name}>
             {tg.name}
-            {tg.rank !== null && (
-              <span className="text-ink-600">{tg.rank}%</span>
-            )}
-          </span>
+            {tg.rank !== null && <span className="ml-1.5 text-ink-600">{tg.rank}%</span>}
+          </Chip>
         ))}
       </div>
       {spoilers.length > 0 && !showSpoilers && (
@@ -1238,14 +1143,14 @@ function LinkList({ links }: { links: ExternalLinkData[] }) {
           <button
             key={l.id}
             onClick={() => openUrl(l.url)}
-            className="flex items-center gap-1.5 rounded-lg border border-surface-700 bg-surface-850 px-3 py-1.5 text-xs text-ink-300 transition-colors hover:border-surface-600 hover:text-ink-100"
+            className="flex items-center gap-1.5 rounded-control border border-surface-700 bg-surface-850 px-3 py-1.5 text-xs text-ink-300 transition-surface hover:border-surface-600 hover:text-ink-100"
           >
             <span
               className="h-2 w-2 shrink-0 rounded-full"
-              style={{ backgroundColor: l.color ?? "#64748b" }}
+              style={{ backgroundColor: l.color ?? "var(--color-ink-600)" }}
             />
             {l.site}
-            <ExternalLink className="size-2.5 text-ink-600" />
+            <ExternalLink className="size-3.5 text-ink-600" />
           </button>
         ))}
       </div>
@@ -1253,191 +1158,3 @@ function LinkList({ links }: { links: ExternalLinkData[] }) {
   );
 }
 
-function ListEditor({
-  media,
-  mediaType,
-  max: maxTotal,
-  entry,
-}: {
-  media: MediaDetail;
-  mediaType: MediaType;
-  max: number | null;
-  entry: {
-    id: number;
-    status: MediaListStatus;
-    progress: number;
-    score: number;
-    repeat: number;
-    notes: string | null;
-  } | null;
-}) {
-  const { t } = useTranslation();
-  const mediaId = media.id;
-  const viewer = useAuth((s) => s.viewer);
-  const mode = useAuth((s) => s.mode);
-  const qc = useQueryClient();
-  // Totals only: this editor has no volume field, so the volume total is added on the way out, never shown.
-  const totals = { episodes: media.episodes, chapters: media.chapters };
-  const opening = () =>
-    openingFields(
-      entry ? { status: entry.status, progress: entry.progress, volumes: 0 } : null,
-      loadDefaultAddStatus(),
-      totals,
-      mediaType,
-    );
-  const [status, setStatus] = useState<MediaListStatus>(() => opening().fields.status);
-  const [progress, setProgress] = useState(() => opening().fields.progress);
-  const [fillMemo, setFillMemo] = useState<FillMemo | null>(() => opening().memo);
-  const [score, setScore] = useState(entry?.score ?? 0);
-  const [repeat, setRepeat] = useState(entry?.repeat ?? 0);
-  const parsed = parseNotes(entry?.notes);
-  const [notes, setNotes] = useState(parsed.notes);
-  const [tags, setTags] = useState(parsed.tags);
-  const [saved, setSaved] = useState(false);
-
-  useEffect(() => {
-    const open = opening();
-    setStatus(open.fields.status);
-    setProgress(open.fields.progress);
-    setFillMemo(open.memo);
-    setScore(entry?.score ?? 0);
-    setRepeat(entry?.repeat ?? 0);
-    const p = parseNotes(entry?.notes);
-    setNotes(p.notes);
-    setTags(p.tags);
-    // `opening` reads the same entry and this title's totals, which cannot change while the page shows it.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entry]);
-
-  const save = useMutation({
-    mutationFn: () =>
-      saveListEntry(
-        // Progress is always sent, so the fill only adds manga's volume total, and only on the move into Completed.
-        withCompletion(
-          {
-            mediaId,
-            status,
-            progress,
-            score,
-            repeat,
-            notes: serializeNotes(notes, tags),
-          },
-          media,
-          mediaType,
-          entry?.status ?? null,
-        ),
-        media,
-      ),
-    onSuccess: (res) => {
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
-      // Scoped to this title's own collection; the other cannot have changed.
-      qc.invalidateQueries({ queryKey: ["mediaList", media.type] });
-      // The echo says exactly what changed, so patch the open page rather than refetch a detail we already hold.
-      if (res.entry) {
-        qc.setQueryData(["mediaDetail", mediaId], (old: MediaDetail | undefined) =>
-          old ? { ...old, mediaListEntry: res.entry as MediaDetail["mediaListEntry"] } : old,
-        );
-      }
-    },
-  });
-
-  if (!viewer && mode !== "local") return null;
-  const max = maxTotal ?? 99999;
-
-  const pickStatus = (next: MediaListStatus) => {
-    const picked = chooseStatus({ status, progress, volumes: 0 }, fillMemo, next, totals, mediaType);
-    setStatus(picked.fields.status);
-    setProgress(picked.fields.progress);
-    setFillMemo(picked.memo);
-  };
-
-  return (
-    <Card>
-      <CardTitle>
-        {entry ? t("detail.myEntry") : t("detail.addToList")}
-      </CardTitle>
-      {/* Same six pills as the modal: this is the panel people live in, so the two must not disagree on status. */}
-      <div className="mt-3 text-sm">
-        <span className="mb-1.5 block text-ink-500">{t("common.status")}</span>
-        <div className="flex flex-wrap gap-0.75">
-          {STATUS_ORDER.map((s) => (
-            <Pill key={s} active={status === s} onClick={() => pickStatus(s)}>
-              {t(`status.${mediaType}.${s}`)}
-            </Pill>
-          ))}
-        </div>
-      </div>
-      <div className="mt-4 flex flex-wrap items-end gap-3">
-        <label className="text-sm">
-          <span className="mb-1 block text-ink-500">
-            {t("common.progress")}
-          </span>
-          <Input
-            type="number"
-            min={0}
-            max={max}
-            value={progress}
-            onChange={(e) =>
-              setProgress(Math.max(0, Math.min(max, Number(e.target.value))))
-            }
-            className="w-24"
-          />
-        </label>
-        <div className="text-sm">
-          <span className="mb-1.5 block text-ink-500">{t("common.score")}</span>
-          <ScoreBars value={score} onChange={setScore} />
-        </div>
-        <label className="text-sm">
-          <span className="mb-1 block text-ink-500">
-            {mediaType === "MANGA" ? t("entry.rereads") : t("entry.rewatches")}
-          </span>
-          <div className="flex items-center gap-1.5">
-            <Input
-              type="number"
-              min={0}
-              value={repeat}
-              onChange={(e) => setRepeat(Math.max(0, Number(e.target.value)))}
-              className="w-20"
-            />
-            <Button
-              variant="secondary"
-              size="icon"
-              aria-label={t("entry.addRepeat")}
-              title={t("entry.addRepeat")}
-              onClick={() => setRepeat((r) => r + 1)}
-            >
-              +1
-            </Button>
-          </div>
-        </label>
-        <Button onClick={() => save.mutate()} disabled={save.isPending}>
-          {saved
-            ? t("common.saved")
-            : entry
-              ? t("common.save")
-              : t("common.add")}
-        </Button>
-        {save.error && (
-          <p className="text-sm text-danger">{String(save.error)}</p>
-        )}
-      </div>
-      <div className="mt-3">
-        <span id="detail-tags-label" className="mb-1 block text-sm text-ink-500">
-          {t("tags.label")}
-        </span>
-        <TagEditor tags={tags} onChange={setTags} labelledBy="detail-tags-label" />
-      </div>
-      <label className="mt-3 block text-sm">
-        <span className="mb-1 block text-ink-500">{t("entry.notes")}</span>
-        <textarea
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          rows={3}
-          placeholder={t("entry.notesPlaceholder")}
-          className="w-full resize-y rounded-lg border border-surface-700 bg-surface-900 px-2 py-1.5 text-sm focus:border-accent-500 focus:outline-none"
-        />
-      </label>
-    </Card>
-  );
-}

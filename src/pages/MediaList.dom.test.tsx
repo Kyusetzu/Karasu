@@ -33,7 +33,6 @@ function page(url: string) {
 }
 
 /** Past every pending history traversal; jsdom delivers a `back()` a task later, as a browser does. */
-const settle = () => new Promise((resolve) => setTimeout(resolve, 30));
 const onPanelEntry = () => (window.history.state as { karasuBack?: number } | null)?.karasuBack !== undefined;
 const chips = () => screen.queryByRole("group", { name: "list.activeFilters" });
 
@@ -59,8 +58,7 @@ describe("MediaList header", () => {
     expect(within(chips()!).getByRole("button", { name: /format\.TV/ })).toBeInTheDocument();
     expect(window.location.search).toBe("");
     fireEvent.click(screen.getByRole("button", { name: "common.done" }));
-    await settle();
-    expect(window.location.search).toBe("?format=TV");
+    await waitFor(() => expect(window.location.search).toBe("?format=TV"));
     expect(onPanelEntry()).toBe(false);
     window.history.back();
     await waitFor(() => expect(window.location.pathname).toBe("/start"));
@@ -73,8 +71,7 @@ describe("MediaList header", () => {
     const chip = within(chips()!).getByRole("button", { name: /format\.TV/ });
     fireEvent.pointerDown(chip);
     fireEvent.click(chip);
-    await settle();
-    expect(chips()).toBeNull();
+    await waitFor(() => expect(chips()).toBeNull());
     expect(window.location.search).toBe("");
   });
 
@@ -85,8 +82,9 @@ describe("MediaList header", () => {
     expect(search).toHaveFocus();
     fireEvent.click(screen.getByRole("button", { name: "list.filters" }));
     const panel = screen.getByRole("dialog", { name: "list.filters" });
+    await waitFor(() => expect(panel).toContainElement(document.activeElement as HTMLElement));
     fireEvent.keyDown(window, { key: "f", ctrlKey: true });
-    expect(panel.contains(document.activeElement)).toBe(true);
+    expect(panel).toContainElement(document.activeElement as HTMLElement);
   });
 
   /** An empty tab is a fact about the list; blaming the filter for it would send the user hunting for a cause. */

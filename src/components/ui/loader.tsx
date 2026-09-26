@@ -22,7 +22,7 @@ export function Loader({
         aria-hidden
         className={cn(
           "loader-sweep text-accent-400",
-          size === "md" ? "text-[1.125rem]" : "text-[.6875rem]",
+          size === "md" ? "text-[1.125rem]" : "text-xs",
         )}
       />
       <p className={cn("text-ink-500", size === "md" ? "text-sm" : "text-xs")}>

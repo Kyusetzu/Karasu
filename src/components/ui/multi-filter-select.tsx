@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Check, ChevronDown, Minus, Search, X } from "lucide-react";
+import { Check, ChevronDown, Minus } from "lucide-react";
+import { SearchField } from "@/components/ui/search-field";
 import { cn } from "@/lib/utils";
 import { fuzzyScore, prepareDoc, prepareQuery } from "@/lib/fuzzy";
 import {
@@ -12,6 +13,7 @@ import {
 } from "@/lib/multiFilter";
 import { usePresence } from "@/hooks/usePresence";
 import { useBackClose } from "@/hooks/useBackClose";
+import { Badge } from "./badge";
 
 /** `FilterSelect`'s tri-state sibling, built from buttons because a native `<select>` cannot express a "not". */
 export function MultiFilterSelect({
@@ -92,24 +94,22 @@ export function MultiFilterSelect({
         aria-expanded={open}
         aria-label={label}
         className={cn(
-          "flex h-8.5 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg",
-          "border border-surface-800 bg-surface-900 px-2.5 transition-surface",
+          "flex h-8.5 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-control",
+          "border border-hair bg-surface-900 px-2.5 transition-surface",
           "hover:bg-surface-850 focus-visible:border-accent-500",
           !isEmpty(value) && "border-accent-500/60",
         )}
       >
-        <span className="text-[.6875rem] uppercase tracking-[.08em] text-ink-600">
+        <span className="text-2xs font-semibold uppercase text-ink-600">
           {label}
         </span>
         <span className="max-w-32 truncate text-xs text-ink-300">
           {summary ? summary.first : placeholder}
         </span>
         {summary && summary.extra > 0 && (
-          <span className="rounded bg-surface-800 px-1 text-2xs tabular-nums text-ink-400">
-            +{summary.extra}
-          </span>
+          <Badge tone="neutral">+{summary.extra}</Badge>
         )}
-        <ChevronDown className="size-3 shrink-0 text-ink-600" />
+        <ChevronDown className="size-3.5 shrink-0 text-ink-600" />
       </button>
 
       {panel.mounted && (
@@ -118,34 +118,23 @@ export function MultiFilterSelect({
           data-overlay
           className={cn(
             "absolute left-0 top-full z-50 mt-1 w-64 origin-top-left overflow-hidden",
-            "rounded-xl border border-hair bg-surface-900 shadow-2xl panel-wash",
+            "rounded-panel border border-hair bg-surface-900 shadow-float panel-wash",
             panel.leaving ? "animate-pop-out" : "animate-pop-in",
           )}
         >
           {searchable && (
-            <div className="relative border-b border-hair">
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.25 -translate-y-1/2 text-ink-600" />
-              <input
-                autoFocus
-                value={term}
-                onChange={(e) => setTerm(e.target.value)}
-                placeholder={t("search.filterOptions")}
-                aria-label={t("search.filterOptions")}
-                className="h-9 w-full bg-transparent pl-8 pr-8 text-xs text-ink-100 placeholder:text-ink-600 focus:outline-none"
-              />
-              {/* Clears the search term only; the footer's Clear owns the selection, and conflating the two makes one a trap. */}
-              {term && (
-                <button
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => setTerm("")}
-                  className="absolute right-1.5 top-1/2 grid size-5 -translate-y-1/2 place-items-center rounded text-ink-600 transition-surface hover:bg-surface-800 hover:text-ink-100"
-                >
-                  <X className="size-3" />
-                  <span className="sr-only">{t("common.clear")}</span>
-                </button>
-              )}
-            </div>
+            // Its clear empties the search only; the footer's Clear owns the selection, and conflating the two makes one a trap.
+            <SearchField
+              size="sm"
+              inset
+              autoFocus
+              value={term}
+              onChange={setTerm}
+              label={t("search.filterOptions")}
+              clearLabel={t("common.clear")}
+              placeholder={t("search.filterOptions")}
+              className="h-9 border-b border-hair px-2.5"
+            />
           )}
           <ul className="max-h-72 overflow-y-auto p-1">
             {shown.length === 0 && (
@@ -163,19 +152,19 @@ export function MultiFilterSelect({
                     aria-pressed={state !== "off"}
                     onClick={() => onChange(cycle(value, option))}
                     className={cn(
-                      "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-surface",
-                      state === "off" && "text-ink-400 hover:bg-surface-850",
-                      state === "include" && "bg-accent-500/12 text-accent-300",
+                      "flex w-full items-center gap-2 rounded-inner px-2 py-1.5 text-left text-xs transition-surface",
+                      state === "off" && "text-ink-300 hover:bg-surface-850",
+                      state === "include" && "bg-accent-500/12 text-accent-400",
                       state === "exclude" && "bg-danger/12 text-danger",
                     )}
                   >
                     <span className="grid size-3.5 shrink-0 place-items-center">
-                      {state === "include" && <Check className="size-3.25" />}
-                      {state === "exclude" && <Minus className="size-3.25" />}
+                      {state === "include" && <Check className="size-3.5" />}
+                      {state === "exclude" && <Minus className="size-3.5" />}
                     </span>
                     <span className="min-w-0 flex-1 truncate">{option}</span>
                     {state === "exclude" && (
-                      <span className="shrink-0 text-2xs uppercase tracking-[.08em]">
+                      <span className="shrink-0 text-2xs uppercase">
                         {t("search.excluded")}
                       </span>
                     )}

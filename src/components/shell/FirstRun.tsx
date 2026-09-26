@@ -39,10 +39,10 @@ export default function FirstRun() {
         {/* Phone: one centred column with the mark above the words, since the desktop gutter overflows a phone viewport. */}
         <div className="w-full max-w-120 px-6 py-8 md:w-auto md:shrink-0 md:px-0 md:py-8 md:pl-14 md:pr-8">
           <KarasuMark className="mb-6 w-20 md:hidden" />
-          <p className="text-2xs font-semibold uppercase tracking-[.18em] text-accent-400">
+          <p className="text-2xs font-semibold uppercase text-accent-400">
             {t("dashboard.welcomeTitle")}
           </p>
-          <h1 className="mt-2 font-brand text-[1.75rem] font-bold leading-[1.12] tracking-[-.03em] text-ink-100 md:text-[2.25rem]">
+          <h1 className="mt-2 font-brand text-hero text-ink-100 md:text-hero-lg">
             {t("firstRun.headline")}
           </h1>
           <p className="mt-3 text-sm leading-relaxed text-ink-500">
@@ -67,7 +67,7 @@ export default function FirstRun() {
           <ol className="mt-8 space-y-3">
             {steps.map((step, i) => (
               <li key={i} className="flex items-start gap-3 text-xs text-ink-500">
-                <span className="grid size-6 shrink-0 place-items-center rounded-md border border-surface-700 text-2xs font-semibold tabular-nums text-ink-300">
+                <span className="grid size-6 shrink-0 place-items-center rounded-inner border border-surface-700 text-2xs font-semibold tabular-nums text-ink-300">
                   {i + 1}
                 </span>
                 <span className="pt-1 leading-relaxed">{step}</span>

@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
-import { PenSquare, Search as SearchIcon } from "lucide-react";
+import { PenSquare } from "lucide-react";
 import { forumThreads, THREAD_CATEGORIES } from "@/api/social";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { SearchField } from "@/components/ui/search-field";
 import { Pill } from "@/components/ui/pill";
+import { Select } from "@/components/ui/select";
+import { usePhoneShell } from "@/hooks/usePhoneShell";
 import { PresenceIf } from "@/components/ui/presence";
 import { ThreadList } from "@/components/social/ThreadList";
 import { NewThreadModal } from "@/components/overlays/NewThreadModal";
@@ -26,6 +28,7 @@ export default function Forum() {
   const { t } = useTranslation();
   const [params, setParams] = useSearchParams();
   const mode = useAuth((s) => s.mode);
+  const phone = usePhoneShell();
 
   const lens: Lens = isLens(params.get("lens")) ? (params.get("lens") as Lens) : "browse";
   const categoryId = Number(params.get("cat")) || undefined;
@@ -73,15 +76,15 @@ export default function Forum() {
       <div className="px-8 pt-6">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-baseline gap-2.5">
-            <h1 className="text-2xl font-bold">{t("forum.title")}</h1>
-            <span className="font-brand-jp text-[.8125rem] tracking-[.04em] text-ink-600">
+            <h1 className="text-title">{t("forum.title")}</h1>
+            <span className="font-brand-jp text-ui tracking-lockup text-ink-600">
               掲示板
             </span>
           </div>
           {/* Nothing to post *as* without an account, matching the composer. */}
           {mode === "anilist" && (
             <Button variant="outline" size="control" onClick={() => setComposing(true)}>
-              <PenSquare className="size-3.75" />
+              <PenSquare className="size-4" />
               {t("forum.newThread")}
             </Button>
           )}
@@ -100,21 +103,35 @@ export default function Forum() {
         </div>
 
         {lens === "search" && (
-          <div className="relative mt-3 max-w-136">
-            <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-3.75 -translate-y-1/2 text-ink-600" />
-            <Input
-              autoFocus
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder={t("forum.searchPlaceholder")}
-              onClear={() => setInput("")}
-              clearLabel={t("common.clear")}
-              className="h-10 pl-9"
-            />
-          </div>
+          <SearchField
+            size="lg"
+            autoFocus
+            value={input}
+            onChange={setInput}
+            label={t("forum.searchPlaceholder")}
+            clearLabel={t("common.clear")}
+            placeholder={t("forum.searchPlaceholder")}
+            className="mt-3 max-w-136"
+          />
         )}
 
-        {lens === "browse" && (
+        {/* A phone has no room for a chip per category, so there they fold into one native select. */}
+        {lens === "browse" && phone && (
+          <Select
+            aria-label={t("forum.category")}
+            value={categoryId ?? ""}
+            onChange={(e) => setCategory(e.target.value ? Number(e.target.value) : undefined)}
+            className="mt-3 w-full"
+          >
+            <option value="">{t("forum.categoryAll")}</option>
+            {THREAD_CATEGORIES.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </Select>
+        )}
+        {lens === "browse" && !phone && (
           <div className="mt-3 flex flex-wrap gap-1.5">
             <Pill active={categoryId === undefined} onClick={() => setCategory(undefined)}>
               {t("forum.allCategories")}

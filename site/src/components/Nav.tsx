@@ -118,9 +118,9 @@ export function Nav() {
   return (
     <header data-scrolled={scrolled || open} className="site-nav sticky top-0 z-40 border-b border-hair bg-surface-950/95">
       <nav aria-label="Primary" className="container-site flex h-14 items-center justify-between px-5">
-        <a href="#top" className="flex items-center gap-2.5 rounded-lg focus-visible:outline-2 focus-visible:outline-accent-500" aria-label="Karasu — back to top">
+        <a href="#top" className="flex items-center gap-2.5 rounded-control focus-visible:outline-2 focus-visible:outline-accent-500" aria-label="Karasu — back to top">
           <KarasuMark className="size-6" />
-          <span className="font-brand text-xs font-semibold tracking-[.2em] text-ink-300">KARASU</span>
+          <span className="font-brand text-xs font-semibold tracking-wordmark text-ink-300">KARASU</span>
         </a>
 
         <ul ref={list} className="relative hidden items-center gap-1 md:flex">
@@ -130,7 +130,7 @@ export function Nav() {
                 href={`#${item.id}`}
                 aria-current={active === item.id ? "location" : undefined}
                 className={cn(
-                  "block rounded-lg px-3 py-1.5 text-[.8125rem] font-medium transition-surface hover:bg-surface-850 hover:text-ink-100 focus-visible:outline-2 focus-visible:outline-accent-500",
+                  "block rounded-control px-3 py-1.5 text-ui font-medium transition-surface hover:bg-surface-850 hover:text-ink-100 focus-visible:outline-2 focus-visible:outline-accent-500",
                   active === item.id ? "text-ink-100" : "text-ink-500",
                 )}
               >
@@ -159,7 +159,7 @@ export function Nav() {
             aria-expanded={open}
             aria-controls="mobile-menu"
             aria-label={open ? "Close menu" : "Open menu"}
-            className="grid size-9 place-items-center rounded-lg text-ink-300 transition-surface hover:bg-surface-850 hover:text-ink-100 focus-visible:outline-2 focus-visible:outline-accent-500 md:hidden"
+            className="grid size-9 place-items-center rounded-control text-ink-300 transition-surface hover:bg-surface-850 hover:text-ink-100 focus-visible:outline-2 focus-visible:outline-accent-500 md:hidden"
           >
             {open ? <X className="size-5" aria-hidden="true" /> : <Menu className="size-5" aria-hidden="true" />}
           </button>
@@ -172,7 +172,7 @@ export function Nav() {
           id="mobile-menu"
           data-overlay
           className={cn(
-            "absolute inset-x-2 top-[calc(100%+.5rem)] rounded-2xl border border-surface-700 bg-surface-900 p-3 shadow-[0_1rem_3rem_rgba(0,0,0,.6)] md:hidden",
+            "absolute inset-x-2 top-[calc(100%+.5rem)] rounded-sheet border border-hair bg-surface-900 p-3 shadow-sheet md:hidden",
             leaving ? "animate-rise-out" : "animate-rise-in",
           )}
         >
@@ -182,7 +182,7 @@ export function Nav() {
                 <a
                   href={`#${item.id}`}
                   onClick={close}
-                  className="block rounded-lg px-3 py-2.5 text-[.9375rem] font-medium text-ink-300 transition-surface hover:bg-surface-850 hover:text-ink-100 focus-visible:outline-2 focus-visible:outline-accent-500"
+                  className="block rounded-control px-3 py-2.5 text-body font-medium text-ink-300 transition-surface hover:bg-surface-850 hover:text-ink-100 focus-visible:outline-2 focus-visible:outline-accent-500"
                 >
                   {item.label}
                 </a>
@@ -191,7 +191,7 @@ export function Nav() {
             <li>
               <a
                 href={LINKS.repo}
-                className="block rounded-lg px-3 py-2.5 text-[.9375rem] font-medium text-ink-300 transition-surface hover:bg-surface-850 hover:text-ink-100 focus-visible:outline-2 focus-visible:outline-accent-500"
+                className="block rounded-control px-3 py-2.5 text-body font-medium text-ink-300 transition-surface hover:bg-surface-850 hover:text-ink-100 focus-visible:outline-2 focus-visible:outline-accent-500"
               >
                 GitHub
               </a>

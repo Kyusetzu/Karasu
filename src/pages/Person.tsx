@@ -49,12 +49,26 @@ function useFuzzyDate() {
   };
 }
 
+/** The three genders AniList offers as choices read translated; anything typed freely is shown as written. */
+function genderLabel(gender: string | null | undefined, t: (k: string) => string): string | null | undefined {
+  switch (gender?.trim().toLowerCase()) {
+    case "male":
+      return t("person.genderMale");
+    case "female":
+      return t("person.genderFemale");
+    case "non-binary":
+      return t("person.genderNonBinary");
+    default:
+      return gender;
+  }
+}
+
 /** A label/value pair, only rendered when there is a value. */
 function Fact({ label, value }: { label: string; value: string | number | null | undefined }) {
   if (value === null || value === undefined || value === "") return null;
   return (
     <div>
-      <dt className="text-2xs uppercase tracking-wide text-ink-600">{label}</dt>
+      <dt className="text-2xs uppercase tracking-eyebrow text-ink-600">{label}</dt>
       <dd className="text-sm text-ink-300">{value}</dd>
     </div>
   );
@@ -93,12 +107,12 @@ export default function Person({ kind }: { kind: Kind }) {
     return (
       <div className="mx-auto max-w-4xl px-8 pt-7" aria-hidden="true">
         <div className="flex gap-5">
-          <Shimmer className="h-48 w-32 rounded-xl" />
+          <Shimmer className="h-48 w-32 rounded-panel" />
           <div className="flex-1 space-y-2 pt-2">
-            <Shimmer className="h-7 w-56 rounded" index={1} />
-            <Shimmer className="h-3 w-40 rounded" index={2} />
-            <Shimmer className="mt-4 h-3 w-full rounded" index={3} />
-            <Shimmer className="h-3 w-4/5 rounded" index={4} />
+            <Shimmer className="h-7 w-56 rounded-inner" index={1} />
+            <Shimmer className="h-3 w-40 rounded-inner" index={2} />
+            <Shimmer className="mt-4 h-3 w-full rounded-inner" index={3} />
+            <Shimmer className="h-3 w-4/5 rounded-inner" index={4} />
           </div>
         </div>
       </div>
@@ -154,7 +168,7 @@ export default function Person({ kind }: { kind: Kind }) {
       <BackButton className="mb-4" />
       <header className="flex flex-wrap gap-5">
         {!su && (
-          <div className="w-32 shrink-0 overflow-hidden rounded-xl bg-surface-850">
+          <div className="w-32 shrink-0 overflow-hidden rounded-panel bg-surface-850">
             {image ? (
               <img src={image} alt="" className="aspect-2/3 w-full object-cover" />
             ) : (
@@ -166,9 +180,9 @@ export default function Person({ kind }: { kind: Kind }) {
         )}
 
         <div className="min-w-0 flex-1">
-          <h1 className="text-2xl font-bold text-ink-100">{name}</h1>
+          <h1 className="text-title text-ink-100">{name}</h1>
           {native && (
-            <p className="font-brand-jp text-sm tracking-[.04em] text-ink-600">{native}</p>
+            <p className="font-brand-jp text-sm tracking-lockup text-ink-600">{native}</p>
           )}
 
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-600">
@@ -178,7 +192,7 @@ export default function Person({ kind }: { kind: Kind }) {
             ) : null}
             {data.favourites != null && data.favourites > 0 && (
               <span className="flex items-center gap-1">
-                <Heart className="size-2.75" /> {data.favourites}
+                <Heart className="size-3.5" /> {data.favourites}
               </span>
             )}
             {data.siteUrl && (
@@ -186,7 +200,7 @@ export default function Person({ kind }: { kind: Kind }) {
                 onClick={() => void openUrl(data.siteUrl!)}
                 className="flex items-center gap-1 text-accent-400 hover:underline"
               >
-                {t("person.openOnAniList")} <ExternalLink className="size-2.75" />
+                {t("person.openOnAniList")} <ExternalLink className="size-3.5" />
               </button>
             )}
           </div>
@@ -202,7 +216,7 @@ export default function Person({ kind }: { kind: Kind }) {
 
           {(ch || st) && (
             <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3">
-              <Fact label={t("person.gender")} value={ch?.gender ?? st?.gender} />
+              <Fact label={t("person.gender")} value={genderLabel(ch?.gender ?? st?.gender, t)} />
               <Fact label={t("person.age")} value={ch?.age ?? st?.age} />
               <Fact
                 label={t("person.birthday")}
@@ -235,7 +249,7 @@ export default function Person({ kind }: { kind: Kind }) {
           <Markdown
             source={description}
             siteUrl={data.siteUrl ?? undefined}
-            className="text-[.8125rem] leading-[1.75] text-pretty"
+            className="text-ui leading-[1.75] text-pretty"
           />
         </div>
       )}

@@ -38,12 +38,12 @@ export function Library() {
           <ul className="space-y-5">
             {NOTES.map(([title, text]) => (
               <li key={title}>
-                <p className="font-brand text-[.9375rem] font-semibold text-ink-100">{title}</p>
+                <p className="font-brand text-body font-semibold text-ink-100">{title}</p>
                 <p className="mt-1 text-sm leading-relaxed text-ink-500">{text}</p>
               </li>
             ))}
           </ul>
-          <p className="mt-8 rounded-lg border border-hair bg-surface-900 px-4 py-3 text-sm leading-relaxed text-ink-300">
+          <p className="mt-8 rounded-control border border-hair bg-surface-900 px-4 py-3 text-sm leading-relaxed text-ink-300">
             Karasu never downloads anything. The library is the folder you already have; how the files got there
             is not the app's business.
           </p>

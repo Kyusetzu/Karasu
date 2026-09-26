@@ -31,7 +31,7 @@ export default function Titlebar() {
     >
       <div data-tauri-drag-region className="flex items-center gap-2.25 pl-3.25">
         <KarasuMark className="size-5" />
-        <span className="font-brand text-xs font-semibold tracking-[.2em] text-ink-300">
+        <span className="font-brand text-xs font-semibold tracking-wordmark text-ink-300">
           KARASU
         </span>
         {version && (
@@ -69,7 +69,7 @@ export default function Titlebar() {
         {/* Keep `close()`, never `hide()`: Rust's CloseRequested handler decides between hiding to the tray and quitting. */}
         <button
           onClick={() => appWindow?.close()}
-          className="grid h-full w-12 place-items-center text-ink-500 transition-surface hover:bg-[#b3232c] hover:text-white"
+          className="grid h-full w-12 place-items-center text-ink-500 transition-surface hover:bg-window-close hover:text-window-close-ink"
           aria-label={t("window.closeToTray")}
         >
           <X className="size-4" />

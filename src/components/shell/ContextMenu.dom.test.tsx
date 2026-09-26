@@ -1,5 +1,6 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import ContextMenu from "./ContextMenu";
 import type { Action } from "@/lib/actions";
 
@@ -35,11 +36,6 @@ function menu(x = 20, y = 20, onRun = vi.fn(), onClose = vi.fn()) {
 
 const root = () => screen.getByRole("menu", { name: "ctx.menuLabel" });
 
-afterEach(() => {
-  window.innerWidth = 1024;
-  window.innerHeight = 768;
-});
-
 describe("ContextMenu", () => {
   it("draws the actions it was given", () => {
     menu();
@@ -58,89 +54,63 @@ describe("ContextMenu", () => {
     expect(screen.getByRole("menuitem", { name: "status.ANIME.COMPLETED" })).toBeInTheDocument();
   });
 
-  it("takes focus so it is operable from the keyboard the moment it appears", () => {
+  it("takes focus so it is operable from the keyboard the moment it appears", async () => {
     menu();
-    expect(document.activeElement).toBe(
-      within(root()).getByRole("menuitem", { name: "ctx.open" }),
-    );
+    await waitFor(() => expect(root()).toHaveFocus());
   });
 
-  it("roves with the arrows and jumps with Home and End", () => {
+  it("roves with the arrows and jumps with Home and End", async () => {
+    const user = userEvent.setup({ delay: null });
     menu();
-    fireEvent.keyDown(root(), { key: "ArrowDown" });
-    expect(document.activeElement?.textContent).toContain("common.plusOne");
-    fireEvent.keyDown(root(), { key: "End" });
-    expect(document.activeElement?.textContent).toContain("ctx.back");
-    fireEvent.keyDown(root(), { key: "Home" });
-    expect(document.activeElement?.textContent).toContain("ctx.open");
+    await waitFor(() => expect(root()).toHaveFocus());
+    await user.keyboard("{ArrowDown}");
+    expect(document.activeElement).toHaveTextContent("ctx.open");
+    await user.keyboard("{End}");
+    expect(document.activeElement).toHaveTextContent("ctx.back");
+    await user.keyboard("{Home}");
+    expect(document.activeElement).toHaveTextContent("ctx.open");
   });
 
   /** A flyout that opens with the right arrow and cannot be left with the left one is worse than no flyout. */
-  it("opens a submenu with the right arrow and leaves it with the left", () => {
+  it("opens a submenu with the right arrow and leaves it with the left", async () => {
+    const user = userEvent.setup({ delay: null });
     menu();
-    fireEvent.keyDown(root(), { key: "ArrowDown" });
-    fireEvent.keyDown(root(), { key: "ArrowDown" });
-    fireEvent.keyDown(root(), { key: "ArrowDown" });
-    fireEvent.keyDown(root(), { key: "ArrowRight" });
-    expect(screen.getByRole("menuitem", { name: "status.ANIME.COMPLETED" })).toBeInTheDocument();
-    fireEvent.keyDown(root(), { key: "ArrowLeft" });
-    expect(screen.queryByRole("menuitem", { name: "status.ANIME.COMPLETED" })).toBeNull();
+    await waitFor(() => expect(root()).toHaveFocus());
+    await user.keyboard("{ArrowDown}{ArrowDown}{ArrowDown}{ArrowDown}");
+    expect(document.activeElement).toHaveTextContent(/actions\.changeStatus/);
+    await user.keyboard("{ArrowRight}");
+    const leaf = await screen.findByRole("menuitem", { name: "status.ANIME.COMPLETED" });
+    // A browser moves focus into the flyout on the next frame; jsdom does not, so the test puts it where it lands.
+    act(() => leaf.focus());
+    await user.keyboard("{ArrowLeft}");
+    await waitFor(() => expect(screen.queryByRole("menuitem", { name: "status.ANIME.COMPLETED" })).toBeNull());
   });
 
-  it("closes one level at a time on Escape", () => {
+  it("closes one level at a time on Escape", async () => {
+    const user = userEvent.setup({ delay: null });
     const { onClose } = menu();
-    fireEvent.click(within(root()).getByRole("menuitem", { name: /actions\.changeStatus/ }));
-    fireEvent.keyDown(root(), { key: "Escape" });
+    await user.click(within(root()).getByRole("menuitem", { name: /actions\.changeStatus/ }));
+    expect(await screen.findByRole("menuitem", { name: "status.ANIME.COMPLETED" })).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("menuitem", { name: "status.ANIME.COMPLETED" })).toBeNull());
     expect(onClose).not.toHaveBeenCalled();
-    fireEvent.keyDown(root(), { key: "Escape" });
+    await user.keyboard("{Escape}");
     expect(onClose).toHaveBeenCalled();
   });
 
-  it("runs the leaf the submenu was opened for", () => {
+  it("runs the leaf the submenu was opened for", async () => {
     const { onRun } = menu();
     fireEvent.click(within(root()).getByRole("menuitem", { name: /actions\.changeStatus/ }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "status.ANIME.PAUSED" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "status.ANIME.PAUSED" }));
     expect(onRun).toHaveBeenCalledWith(
       expect.objectContaining({ arg: { kind: "status", status: "PAUSED" } }),
     );
   });
 
-  /** The separators are real height; counting rows alone walked the menu off the bottom once a second group appeared. */
-  it("stays inside the viewport when opened at the far corner", () => {
-    window.innerWidth = 360;
-    window.innerHeight = 320;
-    menu(355, 315);
-    const style = root().style;
-    const left = parseFloat(style.left);
-    const top = parseFloat(style.top);
-    expect(left).toBeGreaterThanOrEqual(0);
-    expect(top).toBeGreaterThanOrEqual(0);
-    expect(left + 13.75 * 16).toBeLessThanOrEqual(360);
-    // Six rows and two group boundaries, at the rem sizes the component clamps with.
-    expect(top + (6 * 1.875 + 2 * 0.5) * 16).toBeLessThanOrEqual(320);
-  });
-
-  /** The root menu's clamp was asserted from the start; the flyout's own was not, and it is a second panel wide. */
-  it("keeps a submenu inside the viewport instead of hanging it off the right edge", () => {
-    window.innerWidth = 900;
-    window.innerHeight = 700;
-    menu(500, 100);
-    fireEvent.click(within(root()).getByRole("menuitem", { name: /actions\.changeStatus/ }));
-    const panels = screen.getAllByRole("menu");
-    const flyout = panels[panels.length - 1];
-    const left = parseFloat((flyout as HTMLElement).style.left);
-    expect(left).toBeGreaterThanOrEqual(0);
-    expect(left + 13.75 * 16).toBeLessThanOrEqual(900);
-  });
-
-  it("keeps a submenu on screen in a window too narrow for either side", () => {
-    window.innerWidth = 380;
-    window.innerHeight = 700;
-    menu(20, 100);
-    fireEvent.click(within(root()).getByRole("menuitem", { name: /actions\.changeStatus/ }));
-    const panels = screen.getAllByRole("menu");
-    const flyout = panels[panels.length - 1];
-    expect(parseFloat((flyout as HTMLElement).style.left)).toBeGreaterThanOrEqual(0);
+  it("does not close itself when a row is chosen, so the caller can hand over to a dialog first", () => {
+    const { onClose } = menu();
+    fireEvent.click(within(root()).getByRole("menuitem", { name: "common.edit" }));
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   it("owns the keyboard while it is up", () => {

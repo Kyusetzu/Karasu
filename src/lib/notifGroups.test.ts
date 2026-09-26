@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildGroups, unify, type UnifiedNotif } from "./notifGroups";
+import { buildGroups, sectionByDay, unify, type NotifGroup, type UnifiedNotif } from "./notifGroups";
 import type { AppNotification } from "@/api/anilist";
 import type { SiteNotifRow } from "./siteNotifications";
 
@@ -161,5 +161,25 @@ describe("buildGroups", () => {
     const g2 = likeItem(3, 4 * HOUR);
     const groups = buildGroups([g1, l, g2]);
     expect(groups.map((g) => g.atMs)).toEqual([6 * HOUR, 5 * HOUR]);
+  });
+});
+
+describe("sectionByDay", () => {
+  // Local-time constructors, so the split is tested at the viewer's midnight in whatever zone the suite runs.
+  const at = (hour: number) => new Date(2026, 8, 25, hour).getTime();
+  const group = (key: string, atMs: number): NotifGroup => ({ key, items: [], atMs, unread: false, label: null });
+
+  it("splits at local midnight and keeps the order within each day", () => {
+    const groups = [group("a", at(14)), group("b", at(0)), group("c", at(0) - 1), group("d", at(-30))];
+    expect(sectionByDay(groups, at(15)).map((s) => [s.day, s.groups.map((g) => g.key)])).toEqual([
+      ["today", ["a", "b"]],
+      ["earlier", ["c", "d"]],
+    ]);
+  });
+
+  it("leaves out a day with nothing in it", () => {
+    expect(sectionByDay([group("a", at(-5))], at(9)).map((s) => s.day)).toEqual(["earlier"]);
+    expect(sectionByDay([group("a", at(8))], at(9)).map((s) => s.day)).toEqual(["today"]);
+    expect(sectionByDay([], at(9))).toEqual([]);
   });
 });

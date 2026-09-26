@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import { Link } from "react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -68,7 +68,7 @@ export default function MediaCard({
     <CoverCell
       to={`/media/${media.id}`}
       // The roving cursor is not real DOM focus, so the ring is drawn rather than inherited from `:focus-visible`.
-      className={focused ? "rounded-[.625rem] ring-2 ring-accent-500" : undefined}
+      className={focused ? "rounded-cover ring-2 ring-accent-500" : undefined}
       cover={media.coverImage.large}
       // Null when the title is not on the list, so an unlisted title has no ring rather than a grey one.
       statusRing={entry ? statusColorVar(entry.status) : null}
@@ -82,6 +82,7 @@ export default function MediaCard({
       actions={
         hasProfile && (
           <>
+            {/* Below two circles' width a cover keeps one control: the quick add for a new title, the editor for a listed one. */}
             <IconButton
               variant="onCover"
               size="sm"
@@ -89,17 +90,18 @@ export default function MediaCard({
               onClick={() => setEditing(true)}
               aria-label={t("common.edit")}
               title={t("common.edit")}
+              className={entry ? undefined : "@max-cover-pair:hidden"}
             >
               <Pencil className="size-3.5" />
             </IconButton>
             {entry ? (
-              // Tinted to match the ring, so the badge and the border say the same thing.
+              // Tinted by the ring's colour, so the badge and the border say the same thing.
               <span
-                className="grid size-7.5 place-items-center rounded-full text-surface-950"
-                style={{ background: statusColorVar(entry.status) }}
+                className="grid size-7.5 place-items-center rounded-full border tint-fill-on-cover @max-cover-pair:hidden"
+                style={{ "--tint": statusColorVar(entry.status) } as CSSProperties}
                 title={t(`status.${media.type}.${entry.status}`)}
               >
-                <Check className="size-3.75" />
+                <Check className="size-3.5" />
               </span>
             ) : (
               // The neutral circle: adding to Planning is not the same weight as a +1, and the accent is reserved for that.

@@ -70,6 +70,22 @@ describe("MediaCard in the account-free profile", () => {
     expect(screen.getByTitle("status.ANIME.CURRENT")).toBeInTheDocument();
   });
 
+  it("keeps one control on a cover too narrow for two circles: the quick add for a new title", async () => {
+    const { queryClient } = renderWithProviders(<MediaCard media={media({ id: 999 })} />);
+    queryClient.setQueryData(["mediaList", "ANIME", 0], localList());
+    await screen.findByRole("button", { name: "media.addDefault" });
+    expect(screen.getByRole("button", { name: "common.edit" })).toHaveClass("@max-cover-pair:hidden");
+    expect(screen.getByRole("button", { name: "media.addDefault" })).not.toHaveClass("@max-cover-pair:hidden");
+  });
+
+  it("keeps the editor for a listed title, and lets the status badge go, since a badge is no control", async () => {
+    const { queryClient } = renderWithProviders(<MediaCard media={media()} />);
+    queryClient.setQueryData(["mediaList", "ANIME", 0], localList());
+    const badge = await screen.findByTitle("status.ANIME.CURRENT");
+    expect(badge).toHaveClass("@max-cover-pair:hidden");
+    expect(screen.getByRole("button", { name: "common.edit" })).not.toHaveClass("@max-cover-pair:hidden");
+  });
+
   /** A title genuinely absent must still offer the quick add. */
   it("still offers the quick add for a title that is not on the local list", async () => {
     const { queryClient } = renderWithProviders(

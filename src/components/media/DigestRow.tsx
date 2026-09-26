@@ -24,7 +24,7 @@ export function DigestRow({
     <Link
       to={`/media/${media.id}`}
       className={cn(
-        "flex items-center gap-2.5 rounded-[.625rem] px-2.5 py-2 transition-surface hover:bg-surface-900",
+        "flex items-center gap-2.5 rounded-control px-2.5 py-2 transition-surface hover:bg-surface-900",
         dim && "opacity-55 hover:opacity-100",
       )}
     >
@@ -32,7 +32,7 @@ export function DigestRow({
         src={media.coverImage.large ?? ""}
         alt=""
         loading="lazy"
-        className="dense-row-cover shrink-0 rounded-[.3125rem] object-cover"
+        className="dense-row-cover shrink-0 rounded-cover object-cover"
       />
       <TitleLockup title={media.title} dense className="flex-1" />
       {/* Keep `min-w-0`, not `shrink-0`: pinned at max-content, one long note hands the whole page a sideways scroll. */}

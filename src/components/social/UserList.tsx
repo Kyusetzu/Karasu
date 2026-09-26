@@ -6,9 +6,11 @@ import type { UserPage } from "@/api/social";
 import { Button } from "@/components/ui/button";
 import { EmptyState, PerchRule } from "@/components/EmptyState";
 import { Shimmer } from "@/components/Skeleton";
+import { cardClass } from "@/components/ui/card";
 import { fetchedCount, nextPageParam, remainingCount } from "@/lib/paging";
 import { staggerDelay } from "@/lib/motion";
 import { UserRow } from "./UserRow";
+import { cn } from "@/lib/utils";
 
 /** Neither `refetch()` nor `maxPages` is used: one refetches every retained page, the other evicts from the far end. */
 export function UserList({
@@ -51,10 +53,10 @@ export function UserList({
         {[0, 1, 2, 3, 4, 5].map((i) => (
           <div
             key={i}
-            className="flex items-center gap-3 rounded-xl border border-surface-800 p-3"
+            className={cn(cardClass("flat"), "flex items-center gap-3 p-3")}
           >
             <Shimmer className="size-9 rounded-full" index={i} />
-            <Shimmer className="h-3 w-32 rounded" index={i} />
+            <Shimmer className="h-3 w-32 rounded-inner" index={i} />
           </div>
         ))}
       </div>

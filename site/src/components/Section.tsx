@@ -2,11 +2,25 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { useReveal } from "@/lib/useReveal";
 
-export function Eyebrow({ children, className }: { children: ReactNode; className?: string }) {
+/**
+ * The small uppercase label over a heading or a group, one recipe for the
+ * whole page: in the accent when it names a section, muted when it names a
+ * group inside one.
+ */
+export function Eyebrow({
+  children,
+  className,
+  tone = "accent",
+}: {
+  children: ReactNode;
+  className?: string;
+  tone?: "accent" | "muted";
+}) {
   return (
     <p
       className={cn(
-        "font-brand text-2xs font-semibold uppercase tracking-[.18em] text-accent-400",
+        "font-brand text-2xs font-semibold uppercase tracking-eyebrow",
+        tone === "accent" ? "text-accent-400" : "text-ink-600",
         className,
       )}
     >
@@ -14,6 +28,9 @@ export function Eyebrow({ children, className }: { children: ReactNode; classNam
     </p>
   );
 }
+
+/** Whole class names, so Tailwind's scan and a reader both see every one. */
+const WASH = { w1: "wash-w1", w2: "wash-w2", accent: "wash-accent" } as const;
 
 /**
  * One section of the page: the anchor the nav points at, an eyebrow, the
@@ -50,7 +67,7 @@ export function Section({
       aria-labelledby={`${id}-title`}
       className={cn(
         "scroll-mt-16 px-5 py-20 lg:py-28 2xl:py-32",
-        wash && `wash wash-${wash}`,
+        wash && cn("wash", WASH[wash]),
         wash && align === "center" && "wash-center",
         className,
       )}

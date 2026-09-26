@@ -2,16 +2,19 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { ChevronRight, ExternalLink } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { getNotifSchedule, isTauri, setNotifSchedule } from "@/api/anilist";
 import { notificationOptions, userProfile } from "@/api/social";
-import { Card, CardTitle } from "@/components/ui/card";
+import { Card, CardTitle, cardClass } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
+import { Disclosure } from "@/components/ui/disclosure";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Shimmer } from "@/components/Skeleton";
 import { showToast } from "@/stores/toast";
-import { ExternalNote, NeedsAccount, Row, SELECT, Toggle } from "./shared";
+import { ExternalNote, Row, Toggle } from "./shared";
+import { Select } from "@/components/ui/select";
 import {
   LIST_ACTIVITY_STATUSES,
   LOCAL_OVERRIDES,
@@ -25,8 +28,8 @@ import {
 import { useUpdateUser } from "@/hooks/useUpdateUser";
 import { useAuth } from "@/stores/auth";
 import { isAndroid, usePlatform } from "@/stores/platform";
-import { cn } from "@/lib/utils";
 import { notifScheduleFailure } from "@/lib/notifSchedule";
+import { Chip } from "@/components/ui/chip";
 
 /** AniList's own account settings, served from the profile's cache entry; bio and colour stay in the profile editor. */
 
@@ -129,19 +132,6 @@ function useViewerSettings() {
   return { viewer, ...q };
 }
 
-/** The pane's answer without an account; the sections below return null, which read as a crash. */
-export function AniListSignedOutNote() {
-  const { t } = useTranslation();
-  const viewer = useAuth((s) => s.viewer);
-
-  if (viewer) return null;
-  return (
-    <NeedsAccount title={t("settings.alSignedOut")}>
-      {t("settings.alSignedOutHint")}
-    </NeedsAccount>
-  );
-}
-
 export function AniListProfileSection() {
   const { t } = useTranslation();
   const { viewer, data, isLoading } = useViewerSettings();
@@ -158,7 +148,7 @@ export function AniListProfileSection() {
 
       <div className="mt-4 space-y-3">
         {isLoading || !options ? (
-          <Shimmer className="h-24 w-full rounded-lg" />
+          <Shimmer className="h-24 w-full rounded-control" />
         ) : (
           <>
             <Row
@@ -166,40 +156,38 @@ export function AniListProfileSection() {
               hint={t("settings.alTitleLanguageHint")}
               note={<OverrideNote field="titleLanguage" />}
             >
-              <select
+              <Select
                 value={options.titleLanguage ?? "ROMAJI"}
                 disabled={save.isPending}
                 onChange={(e) => save.mutate({ titleLanguage: e.target.value })}
-                className={SELECT}
               >
                 {TITLE_LANGUAGES.map((v) => (
                   <option key={v} value={v}>
                     {titleLanguageLabel(v, t)}
                   </option>
                 ))}
-              </select>
+              </Select>
             </Row>
 
             <Row
               label={t("settings.alStaffLanguage")}
               hint={t("settings.alStaffLanguageHint")}
             >
-              <select
+              <Select
                 value={options.staffNameLanguage ?? "ROMAJI_WESTERN"}
                 disabled={save.isPending}
                 onChange={(e) => save.mutate({ staffNameLanguage: e.target.value })}
-                className={SELECT}
               >
                 {STAFF_LANGUAGES.map((v) => (
                   <option key={v} value={v}>
                     {staffLanguageLabel(v, t)}
                   </option>
                 ))}
-              </select>
+              </Select>
             </Row>
 
             <Row label={t("settings.alTimezone")} hint={t("settings.alTimezoneHint")}>
-              <input
+              <Input
                 type="text"
                 defaultValue={options.timezone ?? ""}
                 placeholder="+01:00"
@@ -208,7 +196,7 @@ export function AniListProfileSection() {
                   const next = e.target.value.trim();
                   if (next !== (options.timezone ?? "")) save.mutate({ timezone: next });
                 }}
-                className={cn(SELECT, "w-24")}
+                className="w-24"
               />
             </Row>
 
@@ -216,7 +204,7 @@ export function AniListProfileSection() {
               label={t("settings.alMergeTime")}
               hint={t("settings.alMergeTimeHint")}
             >
-              <input
+              <Input
                 type="number"
                 min={0}
                 max={1440}
@@ -228,11 +216,11 @@ export function AniListProfileSection() {
                     save.mutate({ activityMergeTime: next });
                   }
                 }}
-                className={cn(SELECT, "w-20")}
+                className="w-20"
               />
             </Row>
 
-            <div className="border-t border-surface-800 pt-3">
+            <div className="border-t border-hair pt-3">
               <Toggle
                 checked={options.displayAdultContent === true}
                 disabled={save.isPending}
@@ -270,7 +258,7 @@ export function AniListProfileSection() {
                   : t("settings.alDonatorBadgeLocked")
               }
             >
-              <input
+              <Input
                 type="text"
                 defaultValue={data?.donatorBadge ?? ""}
                 maxLength={24}
@@ -281,12 +269,12 @@ export function AniListProfileSection() {
                     save.mutate({ donatorBadge: next });
                   }
                 }}
-                className={cn(SELECT, "w-40")}
+                className="w-40"
               />
             </Row>
 
             {/* Per-status activity muting; `mergeListActivity` sends the whole array, so one flip cannot reset the rest. */}
-            <div className="border-t border-surface-800 pt-3">
+            <div className="border-t border-hair pt-3">
               <p className="text-sm text-ink-100">{t("settings.alListActivity")}</p>
               <p className="mt-0.5 text-xs text-ink-600">{t("settings.alListActivityHint")}</p>
               <div className="mt-2 space-y-1">
@@ -314,14 +302,14 @@ export function AniListProfileSection() {
         {/* Stated rather than hidden: the API has no mutation for these, so no client can offer them. */}
         <ExternalNote>{t("settings.alNoUpload")}</ExternalNote>
 
-        <div className="flex flex-wrap gap-2 border-t border-surface-800 pt-3">
+        <div className="flex flex-wrap gap-2 border-t border-hair pt-3">
           <Link to={`/user/${encodeURIComponent(viewer.name)}`}>
             <Button variant="secondary" size="sm">
               {t("settings.alEditBio")}
             </Button>
           </Link>
           <Button variant="ghost" size="sm" onClick={() => void openUrl(viewer.siteUrl)}>
-            {t("settings.alOpenSite")} <ExternalLink className="size-3" />
+            {t("settings.alOpenSite")} <ExternalLink className="size-3.5" />
           </Button>
         </div>
       </div>
@@ -368,44 +356,42 @@ export function AniListListOptionsSection() {
       <CardTitle>{t("settings.alListOptions")}</CardTitle>
       <div className="mt-3 space-y-3">
         {isLoading || !mlo ? (
-          <Shimmer className="h-16 w-full rounded-lg" />
+          <Shimmer className="h-16 w-full rounded-control" />
         ) : (
           <>
             <Row
               label={t("settings.alScoreFormat")}
               hint={t("settings.alScoreFormatHint")}
             >
-              <select
+              <Select
                 value={mlo.scoreFormat ?? "POINT_10"}
                 disabled={save.isPending}
                 onChange={(e) => save.mutate({ scoreFormat: e.target.value })}
-                className={SELECT}
               >
                 {SCORE_FORMATS.map((v) => (
                   <option key={v} value={v}>
                     {scoreFormatLabel(v, t)}
                   </option>
                 ))}
-              </select>
+              </Select>
             </Row>
 
             <Row label={t("settings.alRowOrder")} hint={t("settings.alRowOrderHint")}>
-              <select
+              <Select
                 value={mlo.rowOrder ?? "title"}
                 disabled={save.isPending}
                 onChange={(e) => save.mutate({ rowOrder: e.target.value })}
-                className={SELECT}
               >
                 {ROW_ORDERS.map((v) => (
                   <option key={v} value={v}>
                     {rowOrderLabel(v, t)}
                   </option>
                 ))}
-              </select>
+              </Select>
             </Row>
 
             {/* Read-only on purpose: `customLists` is a full replacement with no undo, so never send it (`lib/anilistUserFields`). */}
-            <div className="rounded-lg border border-surface-800 bg-surface-950 p-3">
+            <div className={cn(cardClass("sunken"), "p-3")}>
               <p className="text-xs font-medium text-ink-300">
                 {t("settings.alCustomLists")}
               </p>
@@ -417,12 +403,9 @@ export function AniListListOptionsSection() {
                   ...(mlo.animeList?.customLists ?? []),
                   ...(mlo.mangaList?.customLists ?? []),
                 ].map((name, i) => (
-                  <span
-                    key={`${name}-${i}`}
-                    className="rounded border border-surface-700 px-1.5 py-0.5 text-2xs text-ink-500"
-                  >
+                  <Chip key={`${name}-${i}`} tone="muted" size="xs">
                     {name}
-                  </span>
+                  </Chip>
                 ))}
                 {!(mlo.animeList?.customLists ?? []).length &&
                   !(mlo.mangaList?.customLists ?? []).length && (
@@ -463,53 +446,44 @@ export function AniListNotificationsSection() {
 
   return (
     <Card>
-      <button
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        className="flex w-full items-center justify-between gap-2 text-left"
-      >
-        <span>
-          <CardTitle>{t("settings.alNotifications")}</CardTitle>
-          <span className="mt-1 block text-xs text-ink-600">
-            {t("settings.alNotificationsHint")}
+      <Disclosure
+        summary={
+          <span>
+            <CardTitle>{t("settings.alNotifications")}</CardTitle>
+            <span className="mt-1 block text-xs text-ink-600">
+              {t("settings.alNotificationsHint")}
+            </span>
           </span>
-        </span>
-        <ChevronRight
-          className={cn(
-            "size-4 shrink-0 text-ink-500 transition-transform",
-            open && "rotate-90",
-          )}
-        />
-      </button>
-
-      {open && (
-        <div className="mt-4 space-y-1">
-          {q.isLoading && <Shimmer className="h-40 w-full rounded-lg" />}
-          {q.error && (
-            <p className="text-sm text-danger">
-              {t("common.error", { message: String(q.error) })}
-            </p>
-          )}
-          {!q.isLoading &&
-            !q.error &&
-            NOTIFICATION_TYPES.map((type) => (
-              <Toggle
-                key={type}
-                checked={current.get(type) ?? true}
-                disabled={save.isPending || q.isFetching}
-                onChange={(v) =>
-                  save.mutate({
-                    // The whole array, every time.
-                    notificationOptions: mergeNotificationOptions(q.data, {
-                      [type]: v,
-                    } as Partial<Record<NotificationTypeName, boolean>>),
-                  })
-                }
-                label={notificationLabel(type, t)}
-              />
-            ))}
-        </div>
-      )}
+        }
+        open={open}
+        onOpenChange={setOpen}
+        panelClassName="mt-4 space-y-1"
+      >
+        {q.isLoading && <Shimmer className="h-40 w-full rounded-control" />}
+        {q.error && (
+          <p className="text-sm text-danger">
+            {t("common.error", { message: String(q.error) })}
+          </p>
+        )}
+        {!q.isLoading &&
+          !q.error &&
+          NOTIFICATION_TYPES.map((type) => (
+            <Toggle
+              key={type}
+              checked={current.get(type) ?? true}
+              disabled={save.isPending || q.isFetching}
+              onChange={(v) =>
+                save.mutate({
+                  // The whole array, every time.
+                  notificationOptions: mergeNotificationOptions(q.data, {
+                    [type]: v,
+                  } as Partial<Record<NotificationTypeName, boolean>>),
+                })
+              }
+              label={notificationLabel(type, t)}
+            />
+          ))}
+      </Disclosure>
     </Card>
   );
 }
@@ -596,8 +570,7 @@ export function NotificationScheduleSection() {
       )}
       <div className="mt-3">
         <Row label={t("settings.notifScheduleLabel")}>
-          <select
-            className={SELECT}
+          <Select
             value={custom ? "custom" : String(minutes)}
             onChange={(e) => {
               const v = e.target.value;
@@ -617,7 +590,7 @@ export function NotificationScheduleSection() {
             <option value="30">{t("settings.notifSchedule30")}</option>
             <option value="60">{t("settings.notifSchedule60")}</option>
             <option value="custom">{t("settings.notifScheduleCustom")}</option>
-          </select>
+          </Select>
         </Row>
         {custom && (
           <Row label={t("settings.notifScheduleCustomLabel")}>

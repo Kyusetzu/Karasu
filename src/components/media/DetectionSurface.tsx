@@ -172,7 +172,7 @@ export default function DetectionSurface({
           <KindIcon playing={playing} className="size-4" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[.8125rem] font-semibold text-ink-100">
+          <p className="truncate text-ui font-semibold text-ink-100">
             {titleNode}
             {labelText && <span className="font-medium text-ink-500"> · {labelText}</span>}
           </p>
@@ -188,7 +188,7 @@ export default function DetectionSurface({
     <div className="relative">
       <div className="flex gap-3">
         <div className="relative h-21 w-14 shrink-0">
-          <div className="h-full w-full overflow-hidden rounded-md bg-surface-800">
+          <div className="h-full w-full overflow-hidden rounded-inner bg-surface-800">
             {cover ? (
               <DecodedImage
                 src={cover}
@@ -207,11 +207,11 @@ export default function DetectionSurface({
           </span>
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[.9375rem] font-semibold text-ink-100">{titleNode}</p>
+          <p className="truncate text-base font-semibold text-ink-100">{titleNode}</p>
           {native && <p className="truncate font-brand-jp text-2xs text-ink-600">{native}</p>}
           {(labelText || playing.episodeTitle) && (
             <p className="truncate text-xs text-ink-300">
-              {labelText && <span className="font-medium tabular-nums text-ink-200">{labelText}</span>}
+              {labelText && <span className="font-medium tabular-nums text-ink-100">{labelText}</span>}
               {labelText && playing.episodeTitle && " · "}
               {playing.episodeTitle}
             </p>
@@ -286,7 +286,7 @@ function ScrobbleStatus({
       return (
         <p className="flex items-center gap-1 text-xs font-medium text-success">
           {/* The one genuinely good outcome here, so it lands rather than appears. */}
-          <Check className="size-3 animate-land" />{" "}
+          <Check className="size-3.5 animate-land" />{" "}
           {t("nowPlaying.updated", {
             n: t(
               current?.mediaType === "MANGA"

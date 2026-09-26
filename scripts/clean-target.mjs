@@ -12,7 +12,9 @@ const here = path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z
 const TARGET = path.resolve(here, "..", "src-tauri", "target");
 const args = process.argv.slice(2);
 const apply = args.includes("--apply");
-const keepDays = Number(args[args.indexOf("--keep-days") + 1]) || 1;
+// `--keep-days 0` is a real answer, deleting today's sessions too; only a missing or unreadable value falls back to 1.
+const asked = args.includes("--keep-days") ? Number(args[args.indexOf("--keep-days") + 1]) : NaN;
+const keepDays = Number.isFinite(asked) && asked >= 0 ? asked : 1;
 const cutoff = Date.now() - keepDays * 86_400_000;
 
 /** Bytes under a directory, walked without following links; slow on a huge tree, which is the point of the report. */

@@ -18,8 +18,8 @@ export function ThreadRow({ thread }: { thread: ThreadSummary }) {
       className={cn(cardClass("flat", { interactive: true }), "block p-3")}
     >
       <div className="flex items-start gap-2">
-        {thread.isSticky && <Pin className="mt-0.5 size-3 shrink-0 text-accent-400" />}
-        {thread.isLocked && <Lock className="mt-0.5 size-3 shrink-0 text-ink-600" />}
+        {thread.isSticky && <Pin className="mt-0.5 size-3.5 shrink-0 text-accent-400" />}
+        {thread.isLocked && <Lock className="mt-0.5 size-3.5 shrink-0 text-ink-600" />}
         <h3 className="min-w-0 flex-1 text-sm font-medium text-ink-100">
           {thread.title ?? t("social.untitledThread")}
         </h3>
@@ -38,15 +38,15 @@ export function ThreadRow({ thread }: { thread: ThreadSummary }) {
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-2xs text-ink-600">
         <span>{thread.user?.name}</span>
         <span className="flex items-center gap-1">
-          <MessageSquare className="size-2.75" />
+          <MessageSquare className="size-3.5" />
           <span className="tabular-nums">{thread.replyCount ?? 0}</span>
         </span>
         <span className="flex items-center gap-1">
-          <Eye className="size-2.75" />
+          <Eye className="size-3.5" />
           <span className="tabular-nums">{thread.viewCount ?? 0}</span>
         </span>
         <span className="flex items-center gap-1">
-          <Heart className="size-2.75" />
+          <Heart className="size-3.5" />
           <span className="tabular-nums">{thread.likeCount ?? 0}</span>
         </span>
         {/* Last activity rather than creation — a thread's age is not what

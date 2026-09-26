@@ -487,11 +487,11 @@ export default function Thread() {
             </Link>
           )}
           <span className="flex items-center gap-1">
-            <MessageSquare className="size-2.75" />
+            <MessageSquare className="size-3.5" />
             <span className="tabular-nums">{data.replyCount ?? 0}</span>
           </span>
           <span className="flex items-center gap-1">
-            <Eye className="size-2.75" />
+            <Eye className="size-3.5" />
             <span className="tabular-nums">{data.viewCount ?? 0}</span>
           </span>
           <button
@@ -502,7 +502,7 @@ export default function Thread() {
               data.isLiked ? "text-danger" : "hover:text-ink-300",
             )}
           >
-            <Heart className={cn("size-2.75", data.isLiked && "fill-current")} />
+            <Heart className={cn("size-3.5", data.isLiked && "fill-current")} />
             <span className="tabular-nums">{data.likeCount ?? 0}</span>
           </button>
           {data.createdAt && (
@@ -513,7 +513,7 @@ export default function Thread() {
               onClick={() => void openUrl(data.siteUrl!)}
               className="flex items-center gap-1 text-accent-400 hover:underline"
             >
-              {t("social.openOnAniList")} <ExternalLink className="size-2.75" />
+              {t("social.openOnAniList")} <ExternalLink className="size-3.5" />
             </button>
           )}
         </div>

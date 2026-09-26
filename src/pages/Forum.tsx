@@ -84,7 +84,7 @@ export default function Forum() {
           {/* Nothing to post *as* without an account, matching the composer. */}
           {mode === "anilist" && (
             <Button variant="outline" size="control" onClick={() => setComposing(true)}>
-              <PenSquare className="size-3.75" />
+              <PenSquare className="size-4" />
               {t("forum.newThread")}
             </Button>
           )}

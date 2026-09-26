@@ -117,7 +117,7 @@ function LikeButton({
   if (mode !== "anilist") {
     return (
       <span className="flex items-center gap-1 px-1.5 py-0.5 text-2xs text-ink-600">
-        <Heart className="size-2.75" />
+        <Heart className="size-3.5" />
         <span className="tabular-nums">{likeCount}</span>
       </span>
     );
@@ -133,7 +133,7 @@ function LikeButton({
         isLiked ? "text-danger" : "text-ink-600 hover:text-ink-300",
       )}
     >
-      <Heart className={cn("size-2.75", isLiked && "fill-current")} />
+      <Heart className={cn("size-3.5", isLiked && "fill-current")} />
       <span className="tabular-nums">{likeCount}</span>
     </button>
   );
@@ -293,12 +293,12 @@ export function ActivityCard({
                   item.isPinned ? "text-accent-400" : "text-ink-600 hover:text-ink-300",
                 )}
               >
-                <Pin className={cn("size-3", item.isPinned && "fill-current")} />
+                <Pin className={cn("size-3.5", item.isPinned && "fill-current")} />
               </button>
             ) : (
               item.isPinned && (
                 <span title={t("social.pinned")} className="text-accent-400">
-                  <Pin className="size-3 fill-current" />
+                  <Pin className="size-3.5 fill-current" />
                 </span>
               )
             )}
@@ -308,7 +308,7 @@ export function ActivityCard({
               aria-label={t("social.openOnAniList")}
               className="text-ink-600 transition-surface hover:text-ink-300"
             >
-              <ExternalLink className="size-3" />
+              <ExternalLink className="size-3.5" />
             </button>
           </div>
         </div>
@@ -338,7 +338,7 @@ export function ActivityCard({
               repliesOpen ? "text-ink-300" : "text-ink-600 hover:text-ink-300",
             )}
           >
-            <MessageSquare className="size-2.75" />
+            <MessageSquare className="size-3.5" />
             <span className="tabular-nums">{item.replyCount}</span>
           </button>
         </div>

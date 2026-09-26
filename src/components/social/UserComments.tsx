@@ -112,7 +112,7 @@ export function UserComments({
             <span className="ml-auto flex shrink-0 items-center gap-3 text-2xs text-ink-600">
               {(c.likeCount ?? 0) > 0 && (
                 <span className="flex items-center gap-1">
-                  <Heart className="size-3" /> {c.likeCount}
+                  <Heart className="size-3.5" /> {c.likeCount}
                 </span>
               )}
               {c.createdAt != null && relTimeFromSeconds(c.createdAt, i18n.language, t("notif.now"))}

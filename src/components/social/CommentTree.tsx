@@ -61,7 +61,7 @@ export function CommentTree({
           <div className="flex items-start justify-between gap-2">
             <div className="flex min-w-0 items-center gap-1.5">
               {c.depth === 1 && (
-                <CornerDownRight className="size-3 shrink-0 text-ink-600" />
+                <CornerDownRight className="size-3.5 shrink-0 text-ink-600" />
               )}
               <Link
                 to={`/user/${encodeURIComponent(c.user?.name ?? "")}`}
@@ -87,7 +87,7 @@ export function CommentTree({
                 title={t("social.openOnAniList")}
                 className="shrink-0 text-ink-600 transition-surface hover:text-ink-300"
               >
-                <ExternalLink className="size-3" />
+                <ExternalLink className="size-3.5" />
               </button>
             )}
           </div>
@@ -104,7 +104,7 @@ export function CommentTree({
                   c.isLiked ? "text-danger" : "text-ink-600 hover:text-ink-300",
                 )}
               >
-                <Heart className={cn("size-2.75", c.isLiked && "fill-current")} />
+                <Heart className={cn("size-3.5", c.isLiked && "fill-current")} />
                 <span className="tabular-nums">{c.likeCount}</span>
               </button>
             )}
@@ -113,7 +113,7 @@ export function CommentTree({
                 onClick={() => onReply(c)}
                 className="flex items-center gap-1 rounded-inner px-1.5 py-0.5 text-2xs text-ink-600 transition-surface hover:bg-surface-850 hover:text-ink-300"
               >
-                <Reply className="size-2.75" />
+                <Reply className="size-3.5" />
                 {t("social.reply")}
               </button>
             )}

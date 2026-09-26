@@ -22,6 +22,7 @@ import { isNotFound } from "@/lib/apiError";
 import { profileKey } from "@/lib/anilistUrl";
 import { Shimmer } from "@/components/Skeleton";
 import { SectionHeader } from "@/components/ui/section-header";
+import { StatusTabs } from "@/components/ui/status-tabs";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/user-lockup";
 import { PresenceIf } from "@/components/ui/presence";
@@ -163,33 +164,23 @@ function Tabbed({ user }: { user: UserProfileData }) {
 
   return (
     <div className="mt-7 px-8">
-      {/* Scrolls rather than wraps: six tabs do not fit a phone, and the strip may scroll sideways where the page must not. */}
-      <div
-        role="tablist"
-        className="flex gap-1 overflow-x-auto border-b border-hair"
-      >
-        {TABS.map((id) => {
-          const active = id === tab;
-          return (
-            <button
-              key={id}
-              role="tab"
-              aria-selected={active}
-              onClick={() => {
-                // `replace` so a tab flick does not fill the back stack with steps to walk out of.
-                const next = new URLSearchParams(params);
-                if (id === "overview") next.delete("tab");
-                else next.set("tab", id);
-                setParams(next, { replace: true });
-              }}
-              className={cn(
-                "-mb-px shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm transition-surface",
-                active
-                  ? "border-accent-500 text-ink-100"
-                  : "border-transparent text-ink-600 hover:text-ink-300",
-              )}
-            >
-              {id === "overview"
+      {/* The list's own strip: it scrolls rather than wraps, fades at an edge with more beyond it, and takes arrow keys. */}
+      <div className="border-b border-hair">
+        <StatusTabs
+          className="-mb-px"
+          label={t("social.profileTabs")}
+          value={tab}
+          onChange={(id) => {
+            // `replace` so a tab flick does not fill the back stack with steps to walk out of.
+            const next = new URLSearchParams(params);
+            if (id === "overview") next.delete("tab");
+            else next.set("tab", id);
+            setParams(next, { replace: true });
+          }}
+          tabs={TABS.map((id) => ({
+            value: id,
+            label:
+              id === "overview"
                 ? t("social.tabOverview")
                 : id === "lists"
                   ? t("social.tabLists")
@@ -199,15 +190,10 @@ function Tabbed({ user }: { user: UserProfileData }) {
                       ? t("social.followers")
                       : id === "following"
                         ? t("social.tabFollowing")
-                        : t("social.tabForum")}
-              {tabCount[id] !== undefined && (
-                <span className="ml-1.5 text-xs tabular-nums text-ink-600">
-                  {tabCount[id]}
-                </span>
-              )}
-            </button>
-          );
-        })}
+                        : t("social.tabForum"),
+            count: tabCount[id],
+          }))}
+        />
       </div>
 
       {/* Keyed on the tab so the panel replays `animate-settle`, as the settings panes do. */}

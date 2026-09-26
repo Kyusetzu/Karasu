@@ -102,6 +102,8 @@ export function MarkdownTextarea({
   const [showPreview, setShowPreview] = useState(false);
   const [active, setActive] = useState(false);
   const [moreAnchor, setMoreAnchor] = useState<HTMLElement | null>(null);
+  // A chosen mark sends the focus back to the text it edited; a dismissal returns it to the More button.
+  const moreChose = useRef(false);
   const phone = usePhoneShell();
 
   // The selection an edit asked for, applied once the new value has landed.
@@ -189,6 +191,8 @@ export function MarkdownTextarea({
   const compact = variant === "compact";
   // On a phone the full row wraps, so the marks used most stay in it and the rest move into a menu.
   const folded = phone && !compact;
+  // A window widened past the phone takes the More button away, so its menu goes with it.
+  if (!folded && moreAnchor !== null) setMoreAnchor(null);
   const previewing = preview === "toggle" && showPreview;
   const source = previewSource ?? value;
   const toolbarShown = !compact || active || value.length > 0;
@@ -267,7 +271,10 @@ export function MarkdownTextarea({
               aria-expanded={moreAnchor !== null}
               disabled={disabled || previewing}
               onMouseDown={(e) => e.preventDefault()}
-              onClick={(e) => setMoreAnchor(e.currentTarget)}
+              onClick={(e) => {
+                moreChose.current = false;
+                setMoreAnchor(e.currentTarget);
+              }}
             >
               <MoreHorizontal className="size-3.5" />
             </IconButton>
@@ -291,7 +298,7 @@ export function MarkdownTextarea({
       <Presence value={moreAnchor}>
         {(anchor, leaving) => (
           <Menu open={!leaving} onClose={() => setMoreAnchor(null)}>
-            <MenuPanel anchor={anchor} label={t("composer.more")} finalFocus={ref}>
+            <MenuPanel anchor={anchor} label={t("composer.more")} finalFocus={() => (moreChose.current ? ref.current : true)}>
               {tools
                 .filter((tool) => !tool.compact)
                 .map((tool) => (
@@ -299,6 +306,7 @@ export function MarkdownTextarea({
                     key={tool.key}
                     icon={tool.icon}
                     onSelect={() => {
+                      moreChose.current = true;
                       setMoreAnchor(null);
                       apply(tool.edit);
                     }}

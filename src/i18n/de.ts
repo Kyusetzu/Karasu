@@ -1110,6 +1110,7 @@ export const de: typeof en = {
       "Es wurde nichts gesendet. Folgen und Likes werden offline nicht zwischengespeichert.",
     // Tabs und Listen
     tabOverview: "Übersicht",
+    profileTabs: "Profilbereiche",
     editProfile: "Profil bearbeiten",
     bio: "Bio",
     bioPlaceholder: "Sag etwas über dich …",

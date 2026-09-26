@@ -1101,6 +1101,7 @@ export const en = {
     followFailedDetail: "Nothing was sent. Follows and likes are not queued offline.",
     // Tabs and lists
     tabOverview: "Overview",
+    profileTabs: "Profile sections",
     editProfile: "Edit profile",
     bio: "Bio",
     bioPlaceholder: "Say something about yourself …",

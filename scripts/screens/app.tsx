@@ -108,7 +108,8 @@ function list(manga: boolean) {
       customLists: {},
       advancedScores: {},
       startedAt: { year: 2026, month: 3, day: 1 },
-      completedAt: null,
+      // Finished titles carry a date this year, so the year in review has something to count.
+      completedAt: status === "COMPLETED" ? { year: 2026, month: 1 + (i % 9), day: 1 + (i % 27) } : null,
       media: m,
     };
   });
@@ -204,6 +205,39 @@ const COMMENTS = [
   comment(802, 2, 40_000, "Dungeon Meshi hat mich überrascht — Kochen ist dort Worldbuilding."),
   comment(803, 3, 9_000, "Noch nicht angefangen, aber eure Liste ist jetzt meine Liste. ~!Hoffentlich kein Cliffhanger!~"),
 ];
+
+// The statistics screen's one request: a plausible spread of genres, tags, people, formats, years and activity.
+function userStats() {
+  const row = (count: number, i: number) => ({ count, meanScore: 84 - i * 2, minutesWatched: count * 290, chaptersRead: count * 38 });
+  const names = (list: string[], at: (name: string, i: number) => Record<string, unknown>) =>
+    list.map((name, i) => ({ ...at(name, i), ...row(Math.max(1, 14 - i * 2), i) }));
+  const person = (name: string, i: number) => ({ id: 500 + i, name: { full: name }, image: { medium: cover(i) } });
+  const block = (manga: boolean) => ({
+    count: 36,
+    meanScore: manga ? 80 : 78,
+    standardDeviation: 11.4,
+    minutesWatched: 42_000,
+    episodesWatched: 1_700,
+    chaptersRead: 3_100,
+    volumesRead: 210,
+    genres: names(["Action", "Fantasy", "Adventure", "Drama", "Comedy", "Romance", "Sci-Fi", "Slice of Life"], (genre) => ({ genre })),
+    tags: names(["Magic", "Male Protagonist", "Isekai", "Ensemble Cast", "Found Family", "Travel"], (name, i) => ({ tag: { id: 90 + i, name } })),
+    voiceActors: names(["Kana Hanazawa", "Yuuki Kaji", "Saori Hayami", "Takahiro Sakurai"], (name, i) => ({ voiceActor: person(name, i) })),
+    studios: names(["MADHOUSE", "Studio Bind", "Trigger", "WIT STUDIO", "CloverWorks"], (name, i) => ({ studio: { id: 30 + i, name } })),
+    staff: names(["Keiichirou Saitou", "Evan Call", "Yoshinobu Yamakawa"], (name, i) => ({ staff: person(name, i + 4) })),
+    formats: [["TV", 24], ["MOVIE", 4], ["OVA", 3], ["ONA", 3], ["SPECIAL", 2]].map(([format, count], i) => ({ format, count, meanScore: 80 - i })),
+    statuses: [["CURRENT", 6], ["COMPLETED", 20], ["PLANNING", 5], ["PAUSED", 2], ["DROPPED", 1], ["REPEATING", 2]].map(([status, count], i) => ({ status, count, meanScore: 78 - i })),
+    scores: [10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map((score, i) => ({ score, count: [0, 0, 1, 1, 2, 4, 8, 11, 6, 3][i] })),
+    releaseYears: Array.from({ length: 12 }, (_, i) => ({ releaseYear: 2026 - i, count: [6, 7, 5, 4, 3, 3, 2, 2, 1, 1, 1, 1][i] })),
+    startYears: Array.from({ length: 6 }, (_, i) => ({ startYear: 2021 + i, count: [3, 5, 6, 7, 8, 7][i], meanScore: 74 + i })),
+    lengths: [["1", 4], ["2-6", 3], ["7-16", 14], ["17-28", 11], ["29-55", 3], ["56-100", 1]].map(([length, count], i) => ({ length, count, meanScore: 76 + i })),
+    countries: [["JP", 31], ["CN", 3], ["KR", 2]].map(([country, count]) => ({ country, count })),
+  });
+  const day = 86_400;
+  const today = Math.floor(now / day) * day;
+  const activityHistory = Array.from({ length: 180 }, (_, i) => ({ date: today - i * day, amount: (i * 7) % 5 === 0 ? 0 : ((i * 13) % 9) + 1 }));
+  return { User: { id: viewer.id, name: viewer.name, stats: { activityHistory }, statistics: { anime: block(false), manga: block(true) } } };
+}
 
 function detail(id: number) {
   const index = Math.max(0, REAL.findIndex((r) => r.id === id));
@@ -315,6 +349,7 @@ function answerQuery(query: string, variables: Record<string, unknown> | null) {
   }
   if (/\bViewer\b/.test(q)) return { Viewer: { ...viewer, unreadNotificationCount: 3 } };
   // The signed-in account's own profile, so the AniList cards in Settings draw their fields rather than a skeleton.
+  if (/activityHistory/.test(q)) return userStats();
   if (/\bUser\s*\(/.test(q)) {
     const list = { customLists: ["Rewatch"], splitCompletedSectionByFormat: false };
     // Someone else's profile by name draws the full header: banner, bio, favourites and a follow button.

@@ -786,6 +786,9 @@ export const de: typeof en = {
     timeLeft: "≈ noch {{time}}",
     myEntry: "Mein Eintrag",
     addAs: "Zur Liste hinzufügen als",
+    addAsDefault: "Als „{{status}}“ hinzufügen",
+    chooseStatus: "Status wählen",
+    defaultStatus: "Standard",
     progressLess: "Eins weniger",
     progressMore: "Eins mehr",
     communityMean: "Ø {{mean}} Community · {{count}} Bewertungen",
@@ -1713,6 +1716,8 @@ export const de: typeof en = {
     statusColorsHint:
       "Der Rahmen um ein Cover und die Tönung seines Abzeichens. Klicke einen Status an, um ihn zu ändern.",
     statusColorsReset: "Auf Standard zurücksetzen",
+    statusColorLow: "Wenig Kontrast · {{ratio}} : 1",
+    statusColorLowHint: "In diesem Design kaum vom Hintergrund zu unterscheiden (unter 3 : 1). Gespeichert wird die Farbe trotzdem.",
     accentCustom: "Eigene Farbe …",
     accentSystem: "Systemfarbe verwenden",
     accentSystemHint: "Folgt der Akzentfarbe von Windows, GNOME oder Android; deine eigene Farbe bleibt darunter gespeichert.",

@@ -29,12 +29,15 @@ export type EntryPatch = Omit<SaveEntryInput, "mediaId">;
 export function QuickEditor({
   media,
   entry,
+  defaultStatus,
   onStatus,
   onWrite,
 }: {
   media: MediaDetail;
   /** Null for a title not on the list, which offers only the status to add it with. */
   entry: QuickEntry | null;
+  /** The status an add uses unless another is chosen, marked in place among the others. */
+  defaultStatus?: MediaListStatus;
   onStatus: (status: MediaListStatus) => void;
   onWrite: (patch: EntryPatch) => void;
 }) {
@@ -47,6 +50,7 @@ export function QuickEditor({
         <div className="grid grid-cols-3 gap-1.5">
           {STATUS_ORDER.map((s) => {
             const current = entry?.status === s;
+            const preset = !entry && defaultStatus === s;
             return (
               <button
                 key={s}
@@ -57,12 +61,15 @@ export function QuickEditor({
                   "flex h-10 min-w-0 items-center gap-2 rounded-control px-2.5 text-left text-xs font-medium transition-surface",
                   "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent-500",
                   "border",
-                  current ? "tint-fill text-ink-100" : "border-surface-700 text-ink-300 hover:border-surface-600 hover:text-ink-100",
+                  current || preset ? "tint-fill text-ink-100" : "border-surface-700 text-ink-300 hover:border-surface-600 hover:text-ink-100",
                 )}
-                style={current ? ({ "--tint": statusColorVar(s) } as CSSProperties) : undefined}
+                style={current || preset ? ({ "--tint": statusColorVar(s) } as CSSProperties) : undefined}
               >
                 <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ backgroundColor: statusColorVar(s) }} />
-                <span className="truncate">{t(`status.${media.type}.${s}`)}</span>
+                <span className="flex min-w-0 flex-col leading-tight">
+                  <span className="truncate">{t(`status.${media.type}.${s}`)}</span>
+                  {preset && <span className="truncate text-2xs font-normal text-ink-500">{t("detail.defaultStatus")}</span>}
+                </span>
               </button>
             );
           })}

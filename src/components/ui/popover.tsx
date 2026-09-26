@@ -19,6 +19,10 @@ export interface PopoverApi {
   closeThen: (fn: () => void) => void;
 }
 
+/** How long a resting mouse takes to open a hover dropdown, and how long it may stray before it closes. */
+const HOVER_OPEN_MS = 120;
+const HOVER_CLOSE_MS = 220;
+
 /** A dialog tied to a trigger: an anchored dropdown on the desktop, a bottom sheet on the phone; the caller picks. */
 export function Popover({
   label,
@@ -26,6 +30,8 @@ export function Popover({
   align = "start",
   width = 360,
   renderTrigger,
+  anchorRef,
+  openOnHover = false,
   onOpen,
   onClosed,
   className,
@@ -38,6 +44,10 @@ export function Popover({
   /** The dropdown's width in px; the sheet always spans the screen. */
   width?: number;
   renderTrigger: (props: PopoverTriggerProps) => ReactNode;
+  /** What the dropdown lines up with and listens to for hover, when that is more than the trigger button. */
+  anchorRef?: RefObject<HTMLElement | null>;
+  /** Opens the dropdown under a resting mouse and closes it when the mouse leaves; touch and keys still press. */
+  openOnHover?: boolean;
   /** Runs before the panel's history entry is pushed, the last moment a caller may still write the URL itself. */
   onOpen?: () => void;
   /** Runs as the panel closes, before any `closeThen` action; a URL write from here must wait on `afterBackSettles`. */
@@ -102,14 +112,56 @@ export function Popover({
 
   const openRef = useRef(onOpen);
   openRef.current = onOpen;
-  const toggle = () => {
-    if (open) return setOpen(false);
+  // A hover-opened panel takes no focus and gives none back, and it closes when the mouse leaves; a press keeps it.
+  const openedBy = useRef<"press" | "hover">("press");
+  const hoverTimer = useRef(0);
+  const show = (by: "press" | "hover") => {
+    openedBy.current = by;
     // Deferred, so a sibling closed by this same press has unwound its entry before this one is pushed.
     afterBackSettles(() => {
       openRef.current?.();
       setOpen(true);
     });
   };
+  const toggle = () => {
+    window.clearTimeout(hoverTimer.current);
+    // A press on a panel the mouse opened adopts it, rather than closing what the user just reached for.
+    if (open && openedBy.current === "hover") {
+      openedBy.current = "press";
+      return;
+    }
+    if (open) return setOpen(false);
+    show("press");
+  };
+
+  const hovering = openOnHover && variant === "dropdown";
+  const hoverEnter = useRef((_e: PointerEvent) => {});
+  const hoverLeave = useRef((_e: PointerEvent) => {});
+  hoverEnter.current = (e) => {
+    if (e.pointerType !== "mouse") return;
+    window.clearTimeout(hoverTimer.current);
+    if (!openNow.current) hoverTimer.current = window.setTimeout(() => show("hover"), HOVER_OPEN_MS);
+  };
+  hoverLeave.current = (e) => {
+    if (e.pointerType !== "mouse") return;
+    window.clearTimeout(hoverTimer.current);
+    hoverTimer.current = window.setTimeout(() => {
+      if (openedBy.current === "hover") setOpen(false);
+    }, HOVER_CLOSE_MS);
+  };
+  useEffect(() => {
+    const el = anchorRef?.current ?? triggerRef.current;
+    if (!hovering || !el) return;
+    const enter = (e: PointerEvent) => hoverEnter.current(e);
+    const leave = (e: PointerEvent) => hoverLeave.current(e);
+    el.addEventListener("pointerenter", enter);
+    el.addEventListener("pointerleave", leave);
+    return () => {
+      el.removeEventListener("pointerenter", enter);
+      el.removeEventListener("pointerleave", leave);
+      window.clearTimeout(hoverTimer.current);
+    };
+  }, [hovering, anchorRef]);
 
   const api: PopoverApi = { close, closeThen };
   const panel =
@@ -129,7 +181,7 @@ export function Popover({
       >
         <BasePopover.Portal>
           <BasePopover.Positioner
-            anchor={triggerRef}
+            anchor={anchorRef ?? triggerRef}
             side="bottom"
             align={align}
             sideOffset={8}
@@ -141,7 +193,10 @@ export function Popover({
               id={id}
               aria-label={label}
               data-overlay
-              finalFocus={triggerRef}
+              initialFocus={() => openedBy.current === "press"}
+              finalFocus={() => (openedBy.current === "press" ? triggerRef.current : false)}
+              onPointerEnter={hovering ? (e) => hoverEnter.current(e.nativeEvent) : undefined}
+              onPointerLeave={hovering ? (e) => hoverLeave.current(e.nativeEvent) : undefined}
               style={{ width }}
               className={cn(
                 "max-h-[min(var(--available-height),34rem)] max-w-[calc(100vw-2rem)] overflow-y-auto outline-none",

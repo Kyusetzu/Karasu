@@ -113,11 +113,13 @@ function list(manga: boolean) {
       media: m,
     };
   });
+  // The first real title leaves the list, so its detail page offers the add flow.
+  const listed = mock === "off-list" ? entries.filter((e) => e.mediaId !== REAL[0].id) : entries;
   return {
     fromCache: false,
     pending: 0,
     fetchedAt: now,
-    lists: STATUSES.map((status) => ({ name: status, status, isCustomList: false, entries: entries.filter((e) => e.status === status) })),
+    lists: STATUSES.map((status) => ({ name: status, status, isCustomList: false, entries: listed.filter((e) => e.status === status) })),
   };
 }
 
@@ -264,7 +266,7 @@ function detail(id: number) {
       { id: 2, site: "Official Site", url: "https://example.org", type: "INFO", color: null },
       { id: 3, site: "Twitter", url: "https://x.com", type: "SOCIAL", color: "#1D9BF0" },
     ],
-    mediaListEntry: { id: 5000 + index, status: "CURRENT", progress: 8, score: 8, repeat: 0, notes: null },
+    mediaListEntry: mock === "off-list" && index === 0 ? null : { id: 5000 + index, status: "CURRENT", progress: 8, score: 8, repeat: 0, notes: null },
     relations: { edges: [] },
     characters: { edges: [] },
     staff: { edges: [] },
@@ -571,6 +573,8 @@ localStorage.setItem("karasu-theme", theme);
 localStorage.setItem("karasu-contrast", contrast ? "high" : "standard");
 localStorage.setItem("karasu-reduce-motion", params.get("still") === "1" ? "true" : "false");
 localStorage.setItem("karasu-cover-cols", android ? "4" : "8");
+// A status colour picked too dark to tell from the panel, for the settings' contrast warning.
+if (mock === "status-low") localStorage.setItem("karasu-status-colors", JSON.stringify({ PAUSED: "#3b3f4a" }));
 location.hash = route;
 
 await import("@/app/index.css");

@@ -35,12 +35,23 @@ const toCard = (title) => (p) =>
     const heading = [...document.querySelectorAll("h2, h3")].find((h) => h.textContent?.trim() === t);
     (heading?.closest(".rounded-panel") ?? heading)?.scrollIntoView({ block: "start" });
   }, title);
-const statusButton = (p) => p.locator('[title="Status ändern"], [title="Change status"]').first();
+const statusButton = (p) => p.locator('[title="Status ändern"], [title="Change status"], [title="Status wählen"], [title="Choose a status"]').first();
 export const SCREENS = [
   { id: "d1-uebersicht", w: 1232, h: 800, route: "/" },
   { id: "d2-liste", w: 1232, h: 800, route: "/list", act: (p) => p.locator("[data-media-id]").nth(2).click({ button: "right" }) },
   { id: "d3-detail", w: 1232, h: 800, route: "/media/178789", act: (p) => statusButton(p).click() },
   { id: "d4-einstellungen", w: 1232, h: 800, route: "/settings?pane=appearance" },
+  { id: "d56-hinzufuegen", w: 1232, h: 800, route: "/media/178789", mock: "off-list", act: (p) => statusButton(p).click() },
+  { id: "p41-hinzufuegen", w: 405, h: 860, phone: true, route: "/media/178789", mock: "off-list", act: (p) => statusButton(p).click() },
+  { id: "d57-statusfarbe", w: 1232, h: 900, route: "/settings?pane=appearance", mock: "status-low", act: async (p) => {
+    await p.getByRole("button", { name: /^Pausiert/ }).first().click();
+    await p.getByText("Farben der Listenstatus").evaluate((el) => el.scrollIntoView({ block: "start" }));
+  } },
+  { id: "d58-statusfarben", w: 1232, h: 800, route: "/settings?pane=appearance", act: (p) => p.getByText("Farben der Listenstatus").evaluate((el) => el.scrollIntoView({ block: "start" })) },
+  { id: "p42-statusfarbe", w: 405, h: 1000, phone: true, route: "/settings?pane=appearance", mock: "status-low", act: async (p) => {
+    await p.getByRole("button", { name: /^Pausiert/ }).first().click();
+    await p.getByText("Farben der Listenstatus").evaluate((el) => el.scrollIntoView({ block: "start" }));
+  } },
   {
     id: "d5-palette",
     w: 1232,

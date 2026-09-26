@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import css from "@/app/index.css?raw";
 import { accentShades, contrastRatio, mix } from "@/lib/contrast";
 import { ACCENT_PRESETS, DEFAULT_ACCENT, customProperties } from "@/lib/designTokens";
-import { DEFAULT_STATUS_COLORS } from "@/lib/statusColors";
+import { DEFAULT_STATUS_COLORS, STATUS_CONTRAST_MIN } from "@/lib/statusColors";
 
 /** DESIGN.md's contrast obligations and the token blocks' parity, read from the stylesheet the app ships. */
 
@@ -184,6 +184,16 @@ describe("the tint fill", () => {
     const page = colour(theme, "surface-950");
     const surface = colour(theme, "surface-900");
     const accents = [...ACCENT_PRESETS, ...EXTREMES].map((hex) => accentShades(hex, { light: theme === "light", surface950: page, surface900: surface }));
+
+    it(`keeps every default status colour at 3:1 against the page and the panel, standard and high contrast, in ${theme}`, () => {
+      for (const read of [colour, high]) {
+        for (const ground of ["surface-950", "surface-900"]) {
+          for (const [status, hex] of Object.entries(DEFAULT_STATUS_COLORS)) {
+            expect(contrastRatio(hex, read(theme, ground)), `${status} on ${ground}`).toBeGreaterThanOrEqual(STATUS_CONTRAST_MIN);
+          }
+        }
+      }
+    });
 
     it(`keeps the status button's label and progress readable on every status tint, resting and hovered, in ${theme}`, () => {
       for (const tint of Object.values(DEFAULT_STATUS_COLORS)) {

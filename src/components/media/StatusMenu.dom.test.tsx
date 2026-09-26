@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
 import { useQuery } from "@tanstack/react-query";
 import userEvent from "@testing-library/user-event";
 import type { MediaDetail } from "@/api/queries";
@@ -40,7 +40,7 @@ const echo = (over: Record<string, unknown>) =>
   }) as MutationResult;
 
 /** The page's wiring: the entry is read back from the detail query, so an optimistic patch shows as it would there. */
-function Page({ detail }: { detail: MediaDetail }) {
+function Page({ detail, variant }: { detail: MediaDetail; variant: "sheet" | "dropdown" }) {
   const { data } = useQuery({ queryKey: ["mediaDetail", 42], queryFn: () => detail, initialData: detail, staleTime: Infinity });
   const entry = data.mediaListEntry;
   return (
@@ -48,18 +48,28 @@ function Page({ detail }: { detail: MediaDetail }) {
       media={data}
       entry={entry}
       progressLabel={entry ? `· ${entry.progress} / 13` : null}
-      variant="sheet"
+      variant={variant}
     />
   );
 }
 
-function mount(detail: MediaDetail = media) {
-  return renderWithProviders(<Page detail={detail} />);
+function mount(detail: MediaDetail = media, variant: "sheet" | "dropdown" = "sheet") {
+  return renderWithProviders(<Page detail={detail} variant={variant} />);
 }
 
+const offList = { ...media, mediaListEntry: null } as MediaDetail;
+
+/** jsdom has no `PointerEvent`; the hover reads only the type. */
+function pointer(type: string, pointerType: string): Event {
+  const event = new Event(type, { cancelable: true });
+  Object.defineProperty(event, "pointerType", { value: pointerType });
+  return event;
+}
+
+/** The status button on a listed title; the add split's chevron on one that is not. */
 async function open() {
   const user = userEvent.setup({ delay: null });
-  await user.click(screen.getByTitle("actions.changeStatus"));
+  await user.click(screen.queryByTitle("actions.changeStatus") ?? screen.getByTitle("detail.chooseStatus"));
   return { user, sheet: await screen.findByRole("dialog") };
 }
 
@@ -97,7 +107,7 @@ describe("StatusMenu", () => {
       "status.ANIME.PLANNING",
     ]);
     expect(within(sheet).getByRole("button", { name: "status.ANIME.CURRENT" })).toHaveAttribute("aria-pressed", "true");
-    await checkA11y(document.body);
+    expect(await checkA11y(document.body)).toHaveNoViolations();
   });
 
   /** The same fill the editor and the list apply, so a move into Completed from here also finishes the count. */
@@ -127,29 +137,59 @@ describe("StatusMenu", () => {
   });
 
   /** A new local entry is refused without its media object, which the list hook's save never sends. */
-  it("adds a title that is not on the list, carrying its media", async () => {
-    save.mockResolvedValue(echo({ status: "PLANNING", progress: 0 }));
-    const detail = { ...media, mediaListEntry: null } as MediaDetail;
-    const { queryClient } = mount(detail);
-    expect(screen.getByTitle("actions.changeStatus")).toHaveTextContent("detail.addToList");
+  it("adds a title that is not on the list with the status chosen from the chevron, carrying its media", async () => {
+    save.mockResolvedValue(echo({ status: "CURRENT", progress: 0 }));
+    const { queryClient } = mount(offList);
     const { user, sheet } = await open();
-    // Not on the list: only the statuses to add it with, and nothing to count or score yet.
+    // Not on the list: only the statuses to add it with, the default marked in its place, and nothing to count yet.
     expect(within(sheet).getByRole("group", { name: "detail.addAs" })).toBeInTheDocument();
+    expect(within(sheet).getByRole("button", { name: /^status\.ANIME\.PLANNING/ })).toHaveTextContent("detail.defaultStatus");
     expect(within(sheet).queryByRole("spinbutton")).toBeNull();
-    await user.click(within(sheet).getByRole("button", { name: "status.ANIME.PLANNING" }));
-    expect(save).toHaveBeenCalledWith({ mediaId: 42, status: "PLANNING" }, detail);
-    await waitFor(() => expect(copy(queryClient)).toMatchObject({ status: "PLANNING" }));
+    await user.click(within(sheet).getByRole("button", { name: "status.ANIME.CURRENT" }));
+    expect(save).toHaveBeenCalledWith({ mediaId: 42, status: "CURRENT" }, offList);
+    await waitFor(() => expect(copy(queryClient)).toMatchObject({ status: "CURRENT" }));
     // Added, the rest of the editor opens up in the same sheet.
     expect(await within(sheet).findByRole("spinbutton", { name: "common.progress" })).toBeInTheDocument();
+    expect(await checkA11y(document.body)).toHaveNoViolations();
+  });
+
+  /** The setting "Default status" decides a one-press add here as it does on a card, the menu and the library. */
+  it("adds with the default status straight from the button, completing the count when the default is Completed", async () => {
+    save.mockResolvedValue(echo({ status: "COMPLETED", progress: 13 }));
+    localStorage.setItem("karasu-default-add-status", "COMPLETED");
+    try {
+      mount(offList);
+      const user = userEvent.setup({ delay: null });
+      await user.click(screen.getByRole("button", { name: "detail.addToList" }));
+      expect(save).toHaveBeenCalledWith({ mediaId: 42, status: "COMPLETED", progress: 13 }, offList);
+      expect(screen.queryByRole("dialog")).toBeNull();
+    } finally {
+      localStorage.removeItem("karasu-default-add-status");
+    }
+  });
+
+  /** A resting mouse opens the choice without taking focus, and leaving it closes it; a finger never hovers. */
+  it("opens the add choice under a resting mouse and closes it when the mouse leaves, and ignores a touch", async () => {
+    mount(offList, "dropdown");
+    const split = screen.getByRole("button", { name: "detail.addToList" }).parentElement!;
+    act(() => void split.dispatchEvent(pointer("pointerenter", "touch")));
+    await new Promise((r) => setTimeout(r, 300));
+    expect(screen.queryByRole("dialog")).toBeNull();
+
+    act(() => void split.dispatchEvent(pointer("pointerenter", "mouse")));
+    const panel = await screen.findByRole("dialog");
+    expect(panel).not.toContainElement(document.activeElement as HTMLElement);
+    act(() => void split.dispatchEvent(pointer("pointerleave", "mouse")));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(save).not.toHaveBeenCalled();
   });
 
   /** The local echo carries ids and a timestamp only; taking it as the entry would name a status it does not have. */
   it("keeps the page's copy when the echo does not say the status", async () => {
     // Cast, because the type promises the AniList echo's fields and this is exactly the answer that lacks them.
     save.mockResolvedValue({ queued: false, entry: { id: 42, mediaId: 42, updatedAt: 1 } } as unknown as MutationResult);
-    const detail = { ...media, mediaListEntry: null } as MediaDetail;
-    const { queryClient } = mount(detail);
-    await pick("status.ANIME.PLANNING");
+    const { queryClient } = mount(offList);
+    await userEvent.setup({ delay: null }).click(screen.getByRole("button", { name: "detail.addToList" }));
     await waitFor(() => expect(save).toHaveBeenCalled());
     expect(copy(queryClient)).toBeNull();
   });

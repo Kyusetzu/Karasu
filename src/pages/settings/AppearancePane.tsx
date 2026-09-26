@@ -1,6 +1,6 @@
 import { useEffect, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Palette } from "lucide-react";
+import { Palette, TriangleAlert } from "lucide-react";
 import * as api from "@/api/anilist";
 import { UI_ZOOM_STEPS } from "@/lib/uiZoom";
 import { isAndroid, usePlatform } from "@/stores/platform";
@@ -27,12 +27,12 @@ import {
 import { ColorPicker, Row, Toggle } from "./shared";
 import { Select } from "@/components/ui/select";
 import { Segmented } from "@/components/ui/segmented";
-import { STATUS_COLOR_ORDER, isDefaultPalette } from "@/lib/statusColors";
+import { STATUS_COLOR_ORDER, STATUS_CONTRAST_MIN, isDefaultPalette, weakestContrast } from "@/lib/statusColors";
 import type { MediaListStatus } from "@/api/types";
 const THEME_MODES: ThemeMode[] = ["system", "light", "dark"];
 
 export function AppearanceSection() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [lang, setLang] = useState<LanguageSetting>(getLanguageSetting());
   const [showCustomAccent, setShowCustomAccent] = useState(false);
   // One picker at a time; the swatch itself is the affordance, as with the accent's Palette toggle.
@@ -58,6 +58,12 @@ export function AppearanceSection() {
   const systemAccent = useTheme((s) => s.systemAccent);
   const setAccentSource = useTheme((s) => s.setAccentSource);
   const followSystem = accentSource === "system";
+  // Read on each render, after the store has written the document, so these are the shown theme's own surfaces.
+  const surfaces = getComputedStyle(document.documentElement);
+  const grounds = ["--color-surface-950", "--color-surface-900"].map((v) => surfaces.getPropertyValue(v).trim());
+  // Rounded down, so a colour just short of the line never reads as reaching it.
+  const ratioText = (r: number) =>
+    new Intl.NumberFormat(i18n.language, { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(Math.floor(r * 10) / 10);
   const statusColors = useTheme((s) => s.statusColors);
   const setStatusColor = useTheme((s) => s.setStatusColor);
   const resetStatusColors = useTheme((s) => s.resetStatusColors);
@@ -176,13 +182,17 @@ export function AppearanceSection() {
           </div>
           <p className="text-xs text-ink-600">{t("settings.statusColorsHint")}</p>
           <div className="space-y-1">
-            {STATUS_COLOR_ORDER.map((status) => (
+            {STATUS_COLOR_ORDER.map((status) => {
+              const weak = weakestContrast(statusColors[status], grounds);
+              const low = weak != null && weak < STATUS_CONTRAST_MIN;
+              return (
               <div key={status} className="flex items-center justify-between gap-4 py-0.5">
                 <button
                   type="button"
                   onClick={() => setEditingStatus(editingStatus === status ? null : status)}
                   aria-expanded={editingStatus === status}
                   aria-controls={`${pickerId}-status`}
+                  aria-describedby={low ? `${pickerId}-low-${status}` : undefined}
                   className="flex flex-1 items-center gap-2.5 rounded-inner py-0.5 text-left text-sm text-ink-300 transition-surface hover:text-ink-100"
                 >
                   <span
@@ -198,8 +208,20 @@ export function AppearanceSection() {
                   {/* Anime wording: the two lists share a palette, and it is the same status either way. */}
                   {t(`status.ANIME.${status}`)}
                 </button>
+                {/* A warning, never a refusal: the colour is saved, and the row says what it costs in this theme. */}
+                {low && (
+                  <span
+                    id={`${pickerId}-low-${status}`}
+                    title={t("settings.statusColorLowHint")}
+                    className="flex shrink-0 items-center gap-1 text-xs text-gold"
+                  >
+                    <TriangleAlert aria-hidden className="size-3.5" />
+                    {t("settings.statusColorLow", { ratio: ratioText(weak) })}
+                  </span>
+                )}
               </div>
-            ))}
+              );
+            })}
           </div>
           <DisclosurePanel open={editingStatus != null} id={`${pickerId}-status`}>
             {pickerStatus && (

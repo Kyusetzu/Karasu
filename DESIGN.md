@@ -268,8 +268,10 @@ preset and for extreme custom accents:
 | the focus ring against what it touches | 3 : 1 | 3 : 1 |
 | a control's border against its surface | — | 3 : 1 |
 
-A status colour the user picks below 3 : 1 against the panel gets a warning,
-never a refusal.
+Every default status colour reaches 3 : 1 against the page and the panel in
+all four themes, which `tokens.test.ts` asserts. A colour the user picks that
+falls below it in the theme on screen gets a warning in its row of the
+settings, with the ratio, never a refusal.
 
 `src/lib/tokens.test.ts` reads these values out of `index.css` and asserts the
 standard rows for text in both themes. It also checks accent text against the
@@ -685,3 +687,17 @@ maintainer picks. A pure restyle that moves nothing does not. The rules:
   in ink-600, which lifts it from 4.0 : 1 to 5.8. The widgets cannot read
   the stylesheet, so `tokens.test.ts` reads their resources and holds them
   to it, as it does the window's background.
+- **2026-09-26:** Adding a title from its detail page follows the "Default
+  status" setting again. The button splits: its label adds with the default
+  at once, the chevron opens the six statuses with the default marked in its
+  place (B of three mockups), and on the desktop a resting mouse opens them
+  too, without taking focus. The phone, which has no hover, keeps the
+  chevron.
+- **2026-09-26:** A status colour below 3 : 1 in the theme on screen says so
+  in its row of the settings, with the ratio (B of three mockups), for every
+  colour and not only a picked one. The two defaults that failed it in the
+  light theme moved instead of being warned about: Watching from `#3fb950`
+  to `#2f9e47` and Paused from `#d9a13b` to `#b87a14`, the same hues a step
+  darker, now at least 3.1 : 1 on every page and panel. A saved palette that
+  still holds a retired default follows the move; a colour the user chose
+  stays.

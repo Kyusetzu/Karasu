@@ -784,6 +784,9 @@ export const en = {
     timeLeft: "≈ {{time}} left",
     myEntry: "My entry",
     addAs: "Add to your list as",
+    addAsDefault: "Add as {{status}}",
+    chooseStatus: "Choose a status",
+    defaultStatus: "Default",
     progressLess: "One less",
     progressMore: "One more",
     communityMean: "Ø {{mean}} community · {{count}} ratings",
@@ -1702,6 +1705,8 @@ export const en = {
     statusColorsHint:
       "The border drawn around a cover, and the tint of its badge. Click a status to change it.",
     statusColorsReset: "Reset to defaults",
+    statusColorLow: "Low contrast · {{ratio}} : 1",
+    statusColorLowHint: "Hard to tell from the background in this theme (below 3 : 1). It is saved anyway.",
     accentCustom: "Custom colour …",
     accentSystem: "Use the system colour",
     accentSystemHint: "Follows the accent Windows, GNOME or Android is set to; your own colour stays saved underneath.",

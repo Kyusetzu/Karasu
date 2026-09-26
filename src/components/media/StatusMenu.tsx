@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import { useRef, type CSSProperties } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { ChevronDown, Plus } from "lucide-react";
@@ -10,6 +10,7 @@ import { Popover } from "@/components/ui/popover";
 import { useListMutations } from "@/hooks/useListMutations";
 import { withCompletion } from "@/lib/completion";
 import { entryFromEcho } from "@/lib/listEcho";
+import { loadDefaultAddStatus } from "@/lib/defaultAddStatus";
 import { statusColorVar } from "@/lib/statusColors";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/stores/auth";
@@ -37,6 +38,7 @@ export function StatusMenu({
   const userId = useAuth((s) => s.viewer?.id) ?? 0;
   const { save } = useListMutations(userId, media.type);
   const key = ["mediaDetail", media.id];
+  const splitRef = useRef<HTMLDivElement>(null);
   const title = displayTitle(media.title);
 
   const settle = (echo: unknown) => {
@@ -92,44 +94,75 @@ export function StatusMenu({
   };
 
   const sheet = variant === "sheet";
+  const box = sheet ? "h-11 w-full rounded-panel text-sm" : "h-9 rounded-control text-sm";
+  const ring = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 disabled:opacity-60";
+  const defaultStatus = loadDefaultAddStatus();
+  const defaultLabel = t(`status.${media.type}.${defaultStatus}`);
   return (
     <Popover
       label={t("detail.myEntry")}
       variant={variant}
       width={380}
       className={className}
-      renderTrigger={(p) => (
-        <button
-          type="button"
-          {...p}
-          disabled={add.isPending}
-          title={t("actions.changeStatus")}
-          className={cn(
-            "flex min-w-0 items-center justify-between gap-2 font-semibold transition-surface",
-            sheet ? "h-11 w-full rounded-panel px-3.5 text-sm" : "h-9 rounded-control px-3.5 text-sm",
-            "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 disabled:opacity-60",
-            !entry && "border border-dashed border-surface-600 text-ink-100 hover:border-ink-600",
-            // The status as a tint with its dot, so the colour says which list and the ink stays the page's own.
-            entry && "border tint-fill text-ink-100",
-          )}
-          style={entry ? ({ "--tint": statusColorVar(entry.status) } as CSSProperties) : undefined}
-        >
-          <span className="flex min-w-0 items-center gap-2">
-            {entry ? (
-              <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ backgroundColor: statusColorVar(entry.status) }} />
-            ) : (
-              <Plus aria-hidden className="size-4 shrink-0" />
+      anchorRef={entry ? undefined : splitRef}
+      openOnHover={!entry}
+      renderTrigger={(p) =>
+        entry ? (
+          <button
+            type="button"
+            {...p}
+            title={t("actions.changeStatus")}
+            className={cn(
+              "flex min-w-0 items-center justify-between gap-2 px-3.5 font-semibold transition-surface",
+              box,
+              ring,
+              // The status as a tint with its dot, so the colour says which list and the ink stays the page's own.
+              "border tint-fill text-ink-100",
             )}
-            <span className="truncate">
-              {entry ? t(`status.${media.type}.${entry.status}`) : t("detail.addToList")}
+            style={{ "--tint": statusColorVar(entry.status) } as CSSProperties}
+          >
+            <span className="flex min-w-0 items-center gap-2">
+              <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ backgroundColor: statusColorVar(entry.status) }} />
+              <span className="truncate">{t(`status.${media.type}.${entry.status}`)}</span>
+              {progressLabel && <span className="shrink-0 font-medium tabular-nums text-ink-300">{progressLabel}</span>}
             </span>
-            {entry && progressLabel && <span className="shrink-0 font-medium tabular-nums text-ink-300">{progressLabel}</span>}
-          </span>
-          <ChevronDown aria-hidden className="size-4 shrink-0 text-ink-500" />
-        </button>
-      )}
+            <ChevronDown aria-hidden className="size-4 shrink-0 text-ink-500" />
+          </button>
+        ) : (
+          // Split: the label adds with the default status at once, the chevron (or a resting mouse) offers the others.
+          <div
+            ref={splitRef}
+            className={cn(
+              "flex min-w-0 items-stretch border border-dashed border-surface-600 font-semibold text-ink-100 transition-surface hover:border-ink-600",
+              box,
+            )}
+          >
+            <button
+              type="button"
+              onClick={() => add.mutate(defaultStatus)}
+              disabled={add.isPending}
+              title={t("detail.addAsDefault", { status: defaultLabel })}
+              className={cn("flex min-w-0 flex-1 items-center gap-2 pl-3.5 pr-2", ring)}
+            >
+              <Plus aria-hidden className="size-4 shrink-0" />
+              <span className="truncate">{t("detail.addToList")}</span>
+            </button>
+            <span aria-hidden className="my-2 w-px shrink-0 bg-surface-600" />
+            <button
+              type="button"
+              {...p}
+              disabled={add.isPending}
+              aria-label={t("detail.chooseStatus")}
+              title={t("detail.chooseStatus")}
+              className={cn("grid shrink-0 place-items-center px-2.5 text-ink-500 hover:text-ink-100", ring)}
+            >
+              <ChevronDown aria-hidden className="size-4" />
+            </button>
+          </div>
+        )
+      }
     >
-      {() => <QuickEditor media={media} entry={entry} onStatus={choose} onWrite={write} />}
+      {() => <QuickEditor media={media} entry={entry} defaultStatus={defaultStatus} onStatus={choose} onWrite={write} />}
     </Popover>
   );
 }

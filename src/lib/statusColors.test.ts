@@ -6,6 +6,7 @@ import {
   isDefaultPalette,
   isStatusHex,
   normalizeStatusColors,
+  weakestContrast,
   statusColorVar,
   statusVar,
 } from "./statusColors";
@@ -46,6 +47,14 @@ describe("normalizeStatusColors", () => {
     expect(got.PAUSED).toBe(DEFAULT_STATUS_COLORS.PAUSED);
     expect(got.DROPPED).toBe(DEFAULT_STATUS_COLORS.DROPPED);
     expect(got.PLANNING).toBe(DEFAULT_STATUS_COLORS.PLANNING);
+  });
+
+  /** A palette saved before the defaults moved stored them like choices; only those exact values follow the move. */
+  it("moves a retired default to today's, and leaves a chosen colour alone", () => {
+    const got = normalizeStatusColors({ ...DEFAULT_STATUS_COLORS, CURRENT: "#3FB950", PAUSED: "#d9a13b", DROPPED: "#3fb950" });
+    expect(got.CURRENT).toBe(DEFAULT_STATUS_COLORS.CURRENT);
+    expect(got.PAUSED).toBe(DEFAULT_STATUS_COLORS.PAUSED);
+    expect(got.DROPPED).toBe("#3fb950");
   });
 
   it("survives anything at all", () => {
@@ -93,5 +102,20 @@ describe("statusColorVar", () => {
   it("gives not-on-list its own colour", () => {
     expect(statusColorVar(null)).toBe("var(--color-graph-none)");
     expect(statusColorVar(null)).not.toBe(statusColorVar("PLANNING"));
+  });
+});
+
+describe("weakestContrast", () => {
+  it("reports the lower of the grounds' ratios", () => {
+    const white = weakestContrast("#000000", ["#ffffff"])!;
+    expect(white).toBeCloseTo(21, 0);
+    expect(weakestContrast("#777777", ["#ffffff", "#000000"])).toBeLessThan(5);
+  });
+
+  /** jsdom and a first frame read no custom property, and a warning built on nothing would be a lie. */
+  it("measures nothing without a ground or with a malformed colour", () => {
+    expect(weakestContrast("#123456", [])).toBeNull();
+    expect(weakestContrast("#123456", ["", "var(--x)"])).toBeNull();
+    expect(weakestContrast("red", ["#ffffff"])).toBeNull();
   });
 });

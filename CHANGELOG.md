@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 896f6ef -->
+<!-- generated-through: 1f97315 -->
 
 ### Fixed
 
@@ -141,6 +141,7 @@ tag time is then optional rather than load-bearing.
 - On the phone, swipe left or right on the anime and manga lists to move between the status tabs.
 - A contrast setting under Appearance: System, Standard or High, where High lifts text, the accent and every border to at least 7:1 in both themes.
 - Give the bell a titlebar glance, a notifications page and a phone sheet of its own (1.26.0.715).
+- Adding a title from its page uses your default status in one press, the chevron or a resting mouse offers the others, and a status colour too faint for the current theme is flagged in Appearance.
 
 ### Changed
 

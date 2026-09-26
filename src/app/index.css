@@ -126,10 +126,10 @@
   --color-graph-none: #3a3f4d;
 
   /* List-status defaults, overwritten at runtime by `stores/theme`; here so a cover ring paints on the first frame. */
-  --color-status-current: #3fb950;
+  --color-status-current: #2f9e47;
   --color-status-repeating: #1a7f37;
   --color-status-completed: #4b8dd6;
-  --color-status-paused: #d9a13b;
+  --color-status-paused: #b87a14;
   --color-status-dropped: #d1495b;
   --color-status-planning: #6b7280;
 

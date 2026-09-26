@@ -6,6 +6,7 @@ import {
   isDefaultPalette,
   isStatusHex,
   normalizeStatusColors,
+  serializeStatusColors,
   weakestContrast,
   statusColorVar,
   statusVar,
@@ -55,6 +56,16 @@ describe("normalizeStatusColors", () => {
     expect(got.CURRENT).toBe(DEFAULT_STATUS_COLORS.CURRENT);
     expect(got.PAUSED).toBe(DEFAULT_STATUS_COLORS.PAUSED);
     expect(got.DROPPED).toBe("#3fb950");
+  });
+
+  /** Picked after the move, the old green is a choice like any other, and it must survive every later launch. */
+  it("keeps a retired default saved by a versioned write", () => {
+    const saved = serializeStatusColors({ ...DEFAULT_STATUS_COLORS, CURRENT: "#3fb950", PAUSED: "#D9A13B" });
+    const got = normalizeStatusColors(JSON.parse(saved));
+    expect(got.CURRENT).toBe("#3fb950");
+    expect(got.PAUSED).toBe("#D9A13B");
+    expect(normalizeStatusColors(JSON.parse(serializeStatusColors(got)))).toEqual(got);
+    expect(isDefaultPalette(got)).toBe(false);
   });
 
   it("survives anything at all", () => {
@@ -110,6 +121,12 @@ describe("weakestContrast", () => {
     const white = weakestContrast("#000000", ["#ffffff"])!;
     expect(white).toBeCloseTo(21, 0);
     expect(weakestContrast("#777777", ["#ffffff", "#000000"])).toBeLessThan(5);
+  });
+
+  /** A production build minifies white to `#fff`, which is what the page reads back as the light theme's panel. */
+  it("reads a shortened ground the way the full one reads", () => {
+    expect(weakestContrast("#f5d76e", ["#fff", "#fff"])).toBeCloseTo(weakestContrast("#f5d76e", ["#ffffff"])!, 6);
+    expect(weakestContrast("#f5d76e", ["#f4f6f8", "#fff"])!).toBeLessThan(3);
   });
 
   /** jsdom and a first frame read no custom property, and a warning built on nothing would be a lie. */

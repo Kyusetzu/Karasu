@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: dfa7a14 -->
+<!-- generated-through: b722b7b -->
 
 ### Fixed
 
@@ -119,6 +119,7 @@ tag time is then optional rather than load-bearing.
 - On a narrow phone the statistics page no longer scrolls sideways, and the legend beside the ring moves beneath it rather than cutting its labels short.
 - The Android widgets' title shows Karasu's accent and their footer is readable against the widget.
 - The colour picker's hex field and the log's level column are monospace again, and the About wordmark has its wide spacing back.
+- Adding a title from its page keeps keyboard focus, a hover-opened status choice no longer opens on its own after another panel closes, and a status colour picked to match an old default survives a restart.
 
 ### Added
 

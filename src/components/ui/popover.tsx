@@ -115,16 +115,26 @@ export function Popover({
   // A hover-opened panel takes no focus and gives none back, and it closes when the mouse leaves; a press keeps it.
   const openedBy = useRef<"press" | "hover">("press");
   const hoverTimer = useRef(0);
+  // Whether a hover open still stands; leaving, a press or the hover being switched off withdraws it.
+  const hoverWanted = useRef(false);
+  const cancelHover = () => {
+    hoverWanted.current = false;
+    window.clearTimeout(hoverTimer.current);
+  };
   const show = (by: "press" | "hover") => {
-    openedBy.current = by;
     // Deferred, so a sibling closed by this same press has unwound its entry before this one is pushed.
     afterBackSettles(() => {
+      if (by === "hover" && !hoverWanted.current) return;
+      openedBy.current = by;
       openRef.current?.();
       setOpen(true);
     });
   };
+  const adopt = () => {
+    openedBy.current = "press";
+  };
   const toggle = () => {
-    window.clearTimeout(hoverTimer.current);
+    cancelHover();
     // A press on a panel the mouse opened adopts it, rather than closing what the user just reached for.
     if (open && openedBy.current === "hover") {
       openedBy.current = "press";
@@ -139,29 +149,43 @@ export function Popover({
   const hoverLeave = useRef((_e: PointerEvent) => {});
   hoverEnter.current = (e) => {
     if (e.pointerType !== "mouse") return;
-    window.clearTimeout(hoverTimer.current);
-    if (!openNow.current) hoverTimer.current = window.setTimeout(() => show("hover"), HOVER_OPEN_MS);
+    cancelHover();
+    if (openNow.current) return;
+    hoverTimer.current = window.setTimeout(() => {
+      hoverWanted.current = true;
+      show("hover");
+    }, HOVER_OPEN_MS);
   };
   hoverLeave.current = (e) => {
     if (e.pointerType !== "mouse") return;
-    window.clearTimeout(hoverTimer.current);
+    cancelHover();
     hoverTimer.current = window.setTimeout(() => {
       if (openedBy.current === "hover") setOpen(false);
     }, HOVER_CLOSE_MS);
   };
+  const cancelRef = useRef(cancelHover);
+  cancelRef.current = cancelHover;
   useEffect(() => {
     const el = anchorRef?.current ?? triggerRef.current;
     if (!hovering || !el) return;
     const enter = (e: PointerEvent) => hoverEnter.current(e);
     const leave = (e: PointerEvent) => hoverLeave.current(e);
+    // A press anywhere on the anchor decides for itself, so a hover open still counting down gives way to it.
+    const press = () => cancelRef.current();
     el.addEventListener("pointerenter", enter);
     el.addEventListener("pointerleave", leave);
+    el.addEventListener("pointerdown", press);
     return () => {
       el.removeEventListener("pointerenter", enter);
       el.removeEventListener("pointerleave", leave);
-      window.clearTimeout(hoverTimer.current);
+      el.removeEventListener("pointerdown", press);
+      cancelRef.current();
     };
   }, [hovering, anchorRef]);
+  // Switched off while a panel the mouse opened is up and untouched, it goes, since no leave will close it any more.
+  useEffect(() => {
+    if (!hovering && openNow.current && openedBy.current === "hover") setOpen(false);
+  }, [hovering]);
 
   const api: PopoverApi = { close, closeThen };
   const panel =
@@ -197,6 +221,9 @@ export function Popover({
               finalFocus={() => (openedBy.current === "press" ? triggerRef.current : false)}
               onPointerEnter={hovering ? (e) => hoverEnter.current(e.nativeEvent) : undefined}
               onPointerLeave={hovering ? (e) => hoverLeave.current(e.nativeEvent) : undefined}
+              // Working inside a panel the mouse opened makes it the user's, so leaving no longer shuts it on them.
+              onPointerDown={adopt}
+              onFocus={adopt}
               style={{ width }}
               className={cn(
                 "max-h-[min(var(--available-height),34rem)] max-w-[calc(100vw-2rem)] overflow-y-auto outline-none",

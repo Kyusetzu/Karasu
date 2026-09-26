@@ -6,6 +6,7 @@ import {
   STATUS_COLOR_ORDER,
   isStatusHex,
   normalizeStatusColors,
+  serializeStatusColors,
   statusVar,
   type StatusPalette,
 } from "@/lib/statusColors";
@@ -211,7 +212,7 @@ export const useTheme = create<ThemeState>((set, get) => {
   /** The palette's own writer, JSON rather than `commit`; the `try` because private-mode storage throws on write. */
   const writeStatusColors = (palette: StatusPalette) => {
     try {
-      localStorage.setItem(STATUS_COLORS_KEY, JSON.stringify(palette));
+      localStorage.setItem(STATUS_COLORS_KEY, serializeStatusColors(palette));
     } catch {
       // Same trade every other setting here makes silently.
     }

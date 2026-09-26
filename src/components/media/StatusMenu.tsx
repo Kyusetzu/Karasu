@@ -1,4 +1,4 @@
-import { useRef, type CSSProperties } from "react";
+import { useEffect, useRef, type CSSProperties } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { ChevronDown, Plus } from "lucide-react";
@@ -39,6 +39,9 @@ export function StatusMenu({
   const { save } = useListMutations(userId, media.type);
   const key = ["mediaDetail", media.id];
   const splitRef = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement | null>(null);
+  // Set when the one-press add held focus, so the status button that replaces it can take focus over once it lands.
+  const refocus = useRef(false);
   const title = displayTitle(media.title);
 
   const settle = (echo: unknown) => {
@@ -88,6 +91,12 @@ export function StatusMenu({
     );
   };
 
+  useEffect(() => {
+    if (!entry || !refocus.current) return;
+    refocus.current = false;
+    if (!document.activeElement || document.activeElement === document.body) trigger.current?.focus();
+  }, [entry]);
+
   const choose = (status: MediaListStatus) => {
     if (!entry) add.mutate(status);
     else if (entry.status !== status) write({ status });
@@ -105,62 +114,74 @@ export function StatusMenu({
       width={380}
       className={className}
       anchorRef={entry ? undefined : splitRef}
-      openOnHover={!entry}
-      renderTrigger={(p) =>
-        entry ? (
+      openOnHover={!entry && !add.isPending}
+      renderTrigger={(p) => (
+        // One box in both states, so the status button that follows the chevron is the same element and keeps focus.
+        <div
+          ref={splitRef}
+          className={cn(
+            entry
+              ? "contents"
+              : "flex min-w-0 items-stretch border border-dashed border-surface-600 font-semibold text-ink-100 transition-surface hover:border-ink-600",
+            !entry && box,
+          )}
+        >
+          {/* The label adds with the default status at once; the chevron, or a resting mouse, offers the others. */}
+          {!entry && (
+            <>
+              <button
+                type="button"
+                // Not `disabled` while the add is out: a disabled button drops focus, and this one should keep it.
+                aria-disabled={add.isPending}
+                onClick={(e) => {
+                  if (add.isPending) return;
+                  refocus.current = document.activeElement === e.currentTarget;
+                  add.mutate(defaultStatus, { onError: () => (refocus.current = false) });
+                }}
+                title={t("detail.addAsDefault", { status: defaultLabel })}
+                className={cn("flex min-w-0 flex-1 items-center gap-2 pl-3.5 pr-2 aria-disabled:opacity-60", ring)}
+              >
+                <Plus aria-hidden className="size-4 shrink-0" />
+                <span className="truncate">{t("detail.addToList")}</span>
+              </button>
+              <span aria-hidden className="my-2 w-px shrink-0 bg-surface-600" />
+            </>
+          )}
           <button
+            key="trigger"
             type="button"
             {...p}
-            title={t("actions.changeStatus")}
+            ref={(el) => {
+              p.ref.current = el;
+              trigger.current = el;
+            }}
+            disabled={!entry && add.isPending}
+            aria-label={entry ? undefined : t("detail.chooseStatus")}
+            title={entry ? t("actions.changeStatus") : t("detail.chooseStatus")}
             className={cn(
-              "flex min-w-0 items-center justify-between gap-2 px-3.5 font-semibold transition-surface",
-              box,
               ring,
-              // The status as a tint with its dot, so the colour says which list and the ink stays the page's own.
-              "border tint-fill text-ink-100",
+              entry
+                ? // The status as a tint with its dot, so the colour says which list and the ink stays the page's own.
+                  cn("flex min-w-0 items-center justify-between gap-2 border px-3.5 font-semibold tint-fill text-ink-100 transition-surface", box)
+                : "grid shrink-0 place-items-center px-2.5 text-ink-500 hover:text-ink-100",
             )}
-            style={{ "--tint": statusColorVar(entry.status) } as CSSProperties}
+            style={entry ? ({ "--tint": statusColorVar(entry.status) } as CSSProperties) : undefined}
           >
-            <span className="flex min-w-0 items-center gap-2">
-              <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ backgroundColor: statusColorVar(entry.status) }} />
-              <span className="truncate">{t(`status.${media.type}.${entry.status}`)}</span>
-              {progressLabel && <span className="shrink-0 font-medium tabular-nums text-ink-300">{progressLabel}</span>}
-            </span>
-            <ChevronDown aria-hidden className="size-4 shrink-0 text-ink-500" />
-          </button>
-        ) : (
-          // Split: the label adds with the default status at once, the chevron (or a resting mouse) offers the others.
-          <div
-            ref={splitRef}
-            className={cn(
-              "flex min-w-0 items-stretch border border-dashed border-surface-600 font-semibold text-ink-100 transition-surface hover:border-ink-600",
-              box,
-            )}
-          >
-            <button
-              type="button"
-              onClick={() => add.mutate(defaultStatus)}
-              disabled={add.isPending}
-              title={t("detail.addAsDefault", { status: defaultLabel })}
-              className={cn("flex min-w-0 flex-1 items-center gap-2 pl-3.5 pr-2", ring)}
-            >
-              <Plus aria-hidden className="size-4 shrink-0" />
-              <span className="truncate">{t("detail.addToList")}</span>
-            </button>
-            <span aria-hidden className="my-2 w-px shrink-0 bg-surface-600" />
-            <button
-              type="button"
-              {...p}
-              disabled={add.isPending}
-              aria-label={t("detail.chooseStatus")}
-              title={t("detail.chooseStatus")}
-              className={cn("grid shrink-0 place-items-center px-2.5 text-ink-500 hover:text-ink-100", ring)}
-            >
+            {entry ? (
+              <>
+                <span className="flex min-w-0 items-center gap-2">
+                  <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ backgroundColor: statusColorVar(entry.status) }} />
+                  <span className="truncate">{t(`status.${media.type}.${entry.status}`)}</span>
+                  {progressLabel && <span className="shrink-0 font-medium tabular-nums text-ink-300">{progressLabel}</span>}
+                </span>
+                <ChevronDown aria-hidden className="size-4 shrink-0 text-ink-500" />
+              </>
+            ) : (
               <ChevronDown aria-hidden className="size-4" />
-            </button>
-          </div>
-        )
-      }
+            )}
+          </button>
+        </div>
+      )}
     >
       {() => <QuickEditor media={media} entry={entry} defaultStatus={defaultStatus} onStatus={choose} onWrite={write} />}
     </Popover>

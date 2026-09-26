@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 import { Palette, TriangleAlert } from "lucide-react";
 import * as api from "@/api/anilist";
@@ -31,6 +31,13 @@ import { STATUS_COLOR_ORDER, STATUS_CONTRAST_MIN, isDefaultPalette, weakestContr
 import type { MediaListStatus } from "@/api/types";
 const THEME_MODES: ThemeMode[] = ["system", "light", "dark"];
 
+const shownTheme = () => `${document.documentElement.dataset.theme ?? ""} ${document.documentElement.dataset.contrast ?? ""}`;
+const watchShownTheme = (onChange: () => void) => {
+  const watch = new MutationObserver(onChange);
+  watch.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme", "data-contrast"] });
+  return () => watch.disconnect();
+};
+
 export function AppearanceSection() {
   const { t, i18n } = useTranslation();
   const [lang, setLang] = useState<LanguageSetting>(getLanguageSetting());
@@ -58,7 +65,8 @@ export function AppearanceSection() {
   const systemAccent = useTheme((s) => s.systemAccent);
   const setAccentSource = useTheme((s) => s.setAccentSource);
   const followSystem = accentSource === "system";
-  // Read on each render, after the store has written the document, so these are the shown theme's own surfaces.
+  // Subscribed to the document, because an OS theme or contrast change repaints it without a store change to render on.
+  useSyncExternalStore(watchShownTheme, shownTheme);
   const surfaces = getComputedStyle(document.documentElement);
   const grounds = ["--color-surface-950", "--color-surface-900"].map((v) => surfaces.getPropertyValue(v).trim());
   // Rounded down, so a colour just short of the line never reads as reaching it.

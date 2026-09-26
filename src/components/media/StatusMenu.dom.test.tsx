@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import userEvent from "@testing-library/user-event";
 import type { MediaDetail } from "@/api/queries";
 import type { MutationResult, SaveEntryInput } from "@/api/types";
+import { Popover } from "@/components/ui/popover";
 import { checkA11y } from "@/test/a11y";
 import { renderWithProviders, signIn, signOut } from "@/test/render";
 
@@ -182,6 +183,96 @@ describe("StatusMenu", () => {
     act(() => void split.dispatchEvent(pointer("pointerleave", "mouse")));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(save).not.toHaveBeenCalled();
+  });
+
+  /** The add button leaves once the entry lands, so the status button that replaces it takes the keyboard over. */
+  it("hands focus from the one-press add to the status button that replaces it", async () => {
+    save.mockResolvedValue(echo({ status: "PLANNING", progress: 0 }));
+    mount(offList, "dropdown");
+    const user = userEvent.setup({ delay: null });
+    screen.getByRole("button", { name: "detail.addToList" }).focus();
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(screen.getByTitle("actions.changeStatus")).toHaveFocus());
+  });
+
+  /** The chevron becomes the status button in place, so the sheet's return of focus finds it still in the page. */
+  it("returns focus to the status button after an add from the chooser", async () => {
+    save.mockResolvedValue(echo({ status: "CURRENT", progress: 0 }));
+    mount(offList, "sheet");
+    const user = userEvent.setup({ delay: null });
+    screen.getByTitle("detail.chooseStatus").focus();
+    await user.keyboard("{Enter}");
+    const sheet = await screen.findByRole("dialog");
+    await user.click(within(sheet).getByRole("button", { name: "status.ANIME.CURRENT" }));
+    await within(sheet).findByRole("spinbutton", { name: "common.progress" });
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(screen.getByTitle("actions.changeStatus")).toHaveFocus());
+  });
+
+  /** Working in a panel the mouse opened makes it a pressed one: leaving keeps it, and closing hands focus back. */
+  it("keeps a hover-opened choice once it is used, and returns focus from it", async () => {
+    save.mockResolvedValue(echo({ status: "CURRENT", progress: 0 }));
+    mount(offList, "dropdown");
+    const user = userEvent.setup({ delay: null });
+    const split = screen.getByRole("button", { name: "detail.addToList" }).parentElement!;
+    act(() => void split.dispatchEvent(pointer("pointerenter", "mouse")));
+    const panel = await screen.findByRole("dialog");
+    act(() => void panel.dispatchEvent(pointer("pointerenter", "mouse")));
+    await user.click(within(panel).getByRole("button", { name: "status.ANIME.CURRENT" }));
+    act(() => void panel.dispatchEvent(pointer("pointerleave", "mouse")));
+    await within(panel).findByRole("spinbutton", { name: "common.progress" });
+    await new Promise((r) => setTimeout(r, 300));
+    expect(screen.getByRole("dialog")).toBe(panel);
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(screen.getByTitle("actions.changeStatus")).toHaveFocus());
+  });
+
+  /** A press decides before a resting mouse does, and an add in flight offers no second one to race it. */
+  it("opens no choice after a press on the add or while the add is out", async () => {
+    let land: (r: MutationResult) => void = () => {};
+    save.mockImplementation(() => new Promise<MutationResult>((r) => (land = r)));
+    mount(offList, "dropdown");
+    const add = screen.getByRole("button", { name: "detail.addToList" });
+    const split = add.parentElement!;
+    act(() => void split.dispatchEvent(pointer("pointerenter", "mouse")));
+    act(() => void split.dispatchEvent(pointer("pointerdown", "mouse")));
+    act(() => add.click());
+    await new Promise((r) => setTimeout(r, 300));
+    expect(screen.queryByRole("dialog")).toBeNull();
+
+    act(() => void split.dispatchEvent(pointer("pointerleave", "mouse")));
+    act(() => void split.dispatchEvent(pointer("pointerenter", "mouse")));
+    await new Promise((r) => setTimeout(r, 300));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    act(() => add.click());
+    expect(save).toHaveBeenCalledTimes(1);
+    await act(async () => land(echo({ status: "PLANNING", progress: 0 })));
+    expect(await screen.findByTitle("actions.changeStatus")).toBeInTheDocument();
+  });
+
+  /** A hover open waits for another panel's unwind; if the mouse has gone by then, it must not open on its own. */
+  it("drops a hover open that waited behind another panel once the mouse has left", async () => {
+    mount(offList, "dropdown");
+    renderWithProviders(
+      <Popover label="Bell" variant="dropdown" renderTrigger={(p) => <button type="button" {...p}>Bell</button>}>
+        {() => <p>notifications</p>}
+      </Popover>,
+    );
+    const user = userEvent.setup({ delay: null });
+    await user.click(screen.getByRole("button", { name: "Bell" }));
+    await screen.findByRole("dialog", { name: "Bell" });
+    const split = screen.getByRole("button", { name: "detail.addToList" }).parentElement!;
+    act(() => void split.dispatchEvent(pointer("pointerenter", "mouse")));
+    await new Promise((r) => setTimeout(r, 200));
+    act(() => void split.dispatchEvent(pointer("pointerleave", "mouse")));
+    // Past the leave's own close timer, which would otherwise hide an open that landed early.
+    await new Promise((r) => setTimeout(r, 300));
+    await user.click(screen.getByRole("button", { name: "Bell" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Bell" })).toBeNull());
+    await new Promise((r) => setTimeout(r, 400));
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   /** The local echo carries ids and a timestamp only; taking it as the entry would name a status it does not have. */

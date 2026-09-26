@@ -635,5 +635,6 @@ maintainer picks. A pure restyle that moves nothing does not. The rules:
   Nothing airs"), today always standing alone; the week grid keeps its
   seven columns, because there the position is the date. The maintainer
   asked for the choice to hold for every view, not only the agenda.
-  "This week" sits inside the bar before the next arrow, a glyph on a
-  narrow phone, so neither arrow moves under a second press.
+  "This week" sits inside the bar before the next arrow, so neither arrow
+  moves under a second press; the phone leaves it out, at the
+  maintainer's word, and steps back with the arrow.

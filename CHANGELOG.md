@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: b349b64 -->
+<!-- generated-through: 6d48c55 -->
 
 ### Fixed
 
@@ -178,6 +178,7 @@ tag time is then optional rather than load-bearing.
 - The overview shows your figures under the banner, one row of what you are watching and reading, and this week beside airing soon.
 - The overview's four figures take less height and stay centred on the phone.
 - The calendar steps weeks from a bar of its own and shows a quiet stretch of days as one line.
+- On a phone the calendar's week bar holds only the arrows and the range.
 
 ### Removed
 

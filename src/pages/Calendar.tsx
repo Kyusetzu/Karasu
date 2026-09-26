@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
-import { CalendarCheck, Check, ChevronLeft, ChevronRight, Circle, Download } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Circle, Download } from "lucide-react";
 import { airingWeek, type AiringSlot } from "@/api/queries";
 import { fetchMediaList, isTauri, saveText } from "@/api/anilist";
 import { buildIcs } from "@/lib/ical";
@@ -262,19 +262,15 @@ export default function Calendar() {
             <span aria-live="polite" className="flex-1 whitespace-nowrap px-2 text-center text-sm tabular-nums text-ink-300">
               {weekLabel}
             </span>
-            {/* Inside the bar, before the arrow: appearing outside it would slide the arrow under a second press. */}
+            {/* Inside the bar, before the arrow, so appearing cannot slide the arrow under a second press; not on a phone. */}
             {week !== currentWeek && (
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setView({ week: currentWeek })}
-                aria-label={t("calendar.thisWeek")}
-                title={t("calendar.thisWeek")}
-                className="shrink-0 whitespace-nowrap max-sm:px-2"
+                className="shrink-0 whitespace-nowrap max-sm:hidden"
               >
-                {/* A glyph on a narrow phone, where the words would squeeze the week's range out of the bar. */}
-                <CalendarCheck aria-hidden className="size-4 sm:hidden" />
-                <span className="hidden sm:inline">{t("calendar.thisWeek")}</span>
+                {t("calendar.thisWeek")}
               </Button>
             )}
             <Button

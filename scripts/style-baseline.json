@@ -67,10 +67,6 @@
     "text-size-arbitrary": 1,
     "tracking-arbitrary": 1
   },
-  "src/pages/Calendar.tsx": {
-    "icon-size": 4,
-    "radius-arbitrary": 1
-  },
   "src/pages/Forum.tsx": {
     "icon-size": 1
   },
@@ -80,9 +76,6 @@
     "tracking-arbitrary": 4
   },
   "src/pages/Person.tsx": {
-    "icon-size": 2
-  },
-  "src/pages/Seasonal.tsx": {
     "icon-size": 2
   },
   "src/pages/Settings.tsx": {

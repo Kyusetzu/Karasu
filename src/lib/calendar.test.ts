@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   addDays,
   bucketByLocalDay,
+  foldQuietDays,
   fromList,
   fromSchedule,
   localMidnight,
@@ -182,5 +183,33 @@ describe("releaseState", () => {
     expect(releaseState(900, 5, 6, 1000)).toBe("watched");
     expect(releaseState(900, 5, 4, 1000)).toBe("unwatched");
     expect(releaseState(1000, 5, 4, 1000)).toBe("unwatched");
+  });
+});
+
+describe("foldQuietDays", () => {
+  const days = [1, 2, 3, 4, 5, 6, 7];
+
+  it("folds each run of empty days into one quiet run and keeps a day with items whole", () => {
+    const runs = foldQuietDays(days, [[], [], ["a"], [], [], [], ["b", "c"]]);
+    expect(runs).toEqual([
+      { quiet: true, days: [1, 2], items: [] },
+      { quiet: false, days: [3], items: ["a"] },
+      { quiet: true, days: [4, 5, 6], items: [] },
+      { quiet: false, days: [7], items: ["b", "c"] },
+    ]);
+  });
+
+  it("never folds the kept day, so an empty today still stands alone and splits the run around it", () => {
+    const runs = foldQuietDays(days, [[], [], [], [], [], [], []], 4);
+    expect(runs.map((r) => [r.quiet, r.days])).toEqual([
+      [true, [1, 2, 3]],
+      [false, [4]],
+      [true, [5, 6, 7]],
+    ]);
+  });
+
+  it("answers one quiet run for an empty week and one run per day for a full one", () => {
+    expect(foldQuietDays(days, days.map(() => []))).toEqual([{ quiet: true, days, items: [] }]);
+    expect(foldQuietDays(days, days.map((d) => [d])).every((r) => !r.quiet && r.days.length === 1)).toBe(true);
   });
 });

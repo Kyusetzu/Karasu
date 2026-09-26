@@ -625,3 +625,13 @@ maintainer picks. A pure restyle that moves nothing does not. The rules:
   (`on-cover-danger`, `on-cover-success`, `on-cover-edge`). In high contrast,
   glass over cover art turns solid in that near-black, not the page's
   panel colour, which had left the carousel's white dots on white.
+- **2026-09-26:** The calendar's week moved into a bar of its own, chosen
+  from three mockups (two rows, a week bar, one compact row) after the
+  phone header broke — the Japanese subtitle stood one glyph per line. The
+  bar sits beside the lens and view switches on a desktop and takes the
+  full width on a phone, where the subtitle is dropped; the export moved
+  up beside the title. In the stacked views (tiles, agenda) a run of days
+  with nothing airing folds into one muted line ("Monday – Friday ·
+  Nothing airs"), today always standing alone; the week grid keeps its
+  seven columns, because there the position is the date. The maintainer
+  asked for the choice to hold for every view, not only the agenda.

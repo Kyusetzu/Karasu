@@ -76,5 +76,11 @@
     "rule": "text-size-arbitrary",
     "token": "text-[.6875em]",
     "reason": "a franchise node is laid out in em so the whole graph scales with the text size; its cover radius and labels follow"
+  },
+  {
+    "file": "src/pages/Calendar.tsx",
+    "rule": "icon-size",
+    "token": "size-2",
+    "reason": "the watched check and the owed episode's ring sit inside the 14 px status dot and are drawn at the dot's scale"
   }
 ]

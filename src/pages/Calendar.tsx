@@ -11,6 +11,7 @@ import { displayTitle, type Media, type MediaListEntry } from "@/api/types";
 import {
   addDays,
   bucketByLocalDay,
+  foldQuietDays,
   fromList,
   fromSchedule,
   releaseState,
@@ -189,62 +190,41 @@ export default function Calendar() {
     { value: "agenda" as const, label: t("calendar.viewAgenda") },
   ];
   const now = nowSec();
+  const exportIcs = () =>
+    saveText(
+      buildIcs(
+        slots.map((s) => ({
+          uid: `karasu-${s.media.id}-ep${s.episode}@karasu`,
+          start: s.airingAt,
+          durationMin: 25,
+          summary: `${displayTitle(s.media.title)} — ${t("calendar.ep", { n: s.episode })}`,
+        })),
+        // Unix *seconds*, like every timestamp in the file.
+        Math.floor(Date.now() / 1000),
+      ),
+      `karasu-airing-${week}.ics`,
+      "iCalendar",
+      "ics",
+    );
 
   return (
     <div className="flex h-full flex-col">
       <div className="px-8 pt-6">
         <div className="flex items-center gap-2.5">
-          <div className="flex items-baseline gap-2.5">
+          <div className="flex min-w-0 items-baseline gap-2.5">
             <h1 className="text-title font-bold">{t("calendar.title")}</h1>
-            <span className="font-brand-jp text-ui tracking-lockup text-ink-600">
+            {/* Hidden on a phone, whose one row belongs to the title and the export. */}
+            <span className="hidden whitespace-nowrap font-brand-jp text-ui tracking-lockup text-ink-600 sm:inline">
               放送カレンダー
             </span>
           </div>
           <span className="section-rule" />
-          <span className="text-sm tabular-nums text-ink-500">{weekLabel}</span>
-          <Button
-            variant="ghost"
-            size="iconControl"
-            onClick={() => setView({ week: addDays(week, -7) })}
-            aria-label={t("calendar.prevWeek")}
-          >
-            <ChevronLeft className="size-4.5" />
-          </Button>
-          {week !== currentWeek && (
-            <Button variant="ghost" size="sm" onClick={() => setView({ week: currentWeek })}>
-              {t("calendar.thisWeek")}
-            </Button>
-          )}
-          <Button
-            variant="ghost"
-            size="iconControl"
-            onClick={() => setView({ week: addDays(week, 7) })}
-            aria-label={t("calendar.nextWeek")}
-          >
-            <ChevronRight className="size-4.5" />
-          </Button>
           {/* The export is the slots the grid draws, with stable UIDs so a re-export updates instead of duplicating. */}
           {slots.length > 0 && (
             <IconButton
               variant="ghost"
               size="control"
-              onClick={() =>
-                void saveText(
-                  buildIcs(
-                    slots.map((s) => ({
-                      uid: `karasu-${s.media.id}-ep${s.episode}@karasu`,
-                      start: s.airingAt,
-                      durationMin: 25,
-                      summary: `${displayTitle(s.media.title)} — ${t("calendar.ep", { n: s.episode })}`,
-                    })),
-                    // Unix *seconds*, like every timestamp in the file.
-                    Math.floor(Date.now() / 1000),
-                  ),
-                  `karasu-airing-${week}.ics`,
-                  "iCalendar",
-                  "ics",
-                )
-              }
+              onClick={() => void exportIcs()}
               aria-label={t("calendar.exportIcs")}
               title={t("calendar.exportIcs")}
             >
@@ -269,6 +249,35 @@ export default function Calendar() {
             onChange={chooseView}
             segments={viewSegments}
           />
+          {/* One bar for the week, the full width on a phone so both arrows are an easy reach for a thumb. */}
+          <div className="flex w-full items-center gap-2 sm:ml-auto sm:w-auto">
+            <div className="flex flex-1 items-center rounded-control border border-hair bg-surface-900 p-0.5 sm:flex-none">
+              <Button
+                variant="ghost"
+                size="iconControl"
+                onClick={() => setView({ week: addDays(week, -7) })}
+                aria-label={t("calendar.prevWeek")}
+              >
+                <ChevronLeft className="size-4" />
+              </Button>
+              <span aria-live="polite" className="flex-1 whitespace-nowrap px-2 text-center text-sm tabular-nums text-ink-300">
+                {weekLabel}
+              </span>
+              <Button
+                variant="ghost"
+                size="iconControl"
+                onClick={() => setView({ week: addDays(week, 7) })}
+                aria-label={t("calendar.nextWeek")}
+              >
+                <ChevronRight className="size-4" />
+              </Button>
+            </div>
+            {week !== currentWeek && (
+              <Button variant="ghost" size="sm" onClick={() => setView({ week: currentWeek })}>
+                {t("calendar.thisWeek")}
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -301,17 +310,22 @@ export default function Calendar() {
             ))}
           </div>
         ) : (
+          // A run of days with nothing airing is one quiet line; the week grid keeps its columns, which are the dates.
           <div className="flex flex-col gap-5">
-            {days.map((day, i) => (
-              <DaySection
-                key={day}
-                day={day}
-                isToday={day === todayMidnight}
-                slots={buckets[i]}
-                now={now}
-                tiles={view === "tiles"}
-              />
-            ))}
+            {foldQuietDays(days, buckets, todayMidnight).map((run) =>
+              run.quiet ? (
+                <QuietDays key={run.days[0]} days={run.days} />
+              ) : (
+                <DaySection
+                  key={run.days[0]}
+                  day={run.days[0]}
+                  isToday={run.days[0] === todayMidnight}
+                  slots={run.items}
+                  now={now}
+                  tiles={view === "tiles"}
+                />
+              ),
+            )}
           </div>
         )}
       </div>
@@ -319,7 +333,24 @@ export default function Calendar() {
   );
 }
 
-/** A day of the stacked views: a dated header, then tiles or rows; an empty day says so in one muted line. */
+/** Adjacent days with nothing airing, as one muted line naming the first and last of them. */
+function QuietDays({ days }: { days: number[] }) {
+  const { t, i18n } = useTranslation();
+  const weekday = (day: number) => new Date(day * 1000).toLocaleDateString(i18n.language, { weekday: "long" });
+  const first = days[0];
+  const last = days[days.length - 1];
+  return (
+    <p className="dense-text flex items-baseline gap-2 text-ink-600">
+      <span className="font-semibold text-ink-500">
+        {first === last ? weekday(first) : `${weekday(first)} – ${weekday(last)}`}
+      </span>
+      <span>· {t("calendar.emptyDay")}</span>
+      <span className="section-rule self-center" />
+    </p>
+  );
+}
+
+/** A day of the stacked views: a dated header, then tiles or rows; an empty today says so in one muted line. */
 function DaySection({
   day,
   isToday,
@@ -520,7 +551,7 @@ function CalendarCard({ slot, state }: { slot: Slot; state: ReleaseState }) {
         src={slot.media.coverImage.large ?? ""}
         alt=""
         loading="lazy"
-        className="dense-cover shrink-0 rounded-[.25rem] object-cover"
+        className="dense-cover shrink-0 rounded-inner object-cover"
       />
       <div className="min-w-0 flex-1">
         <p className="dense-text flex items-center gap-1 leading-tight">

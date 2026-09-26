@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: f59e6ed -->
+<!-- generated-through: 47833c6 -->
 
 ### Fixed
 
@@ -117,6 +117,7 @@ tag time is then optional rather than load-bearing.
 - Statistics shows every status in full beside the ring, the series-length labels are no longer cut off, and "1 episode" reads in the singular.
 - Character and staff pages show roles and genders in your language, and the local library's title matches the other pages.
 - On a narrow phone the statistics page no longer scrolls sideways, and the legend beside the ring moves beneath it rather than cutting its labels short.
+- The Android widgets' title shows Karasu's accent and their footer is readable against the widget.
 
 ### Added
 

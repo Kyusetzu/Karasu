@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import css from "@/app/index.css?raw";
 import { accentShades, contrastRatio, mix } from "@/lib/contrast";
-import { ACCENT_PRESETS, customProperties } from "@/lib/designTokens";
+import { ACCENT_PRESETS, DEFAULT_ACCENT, customProperties } from "@/lib/designTokens";
 import { DEFAULT_STATUS_COLORS } from "@/lib/statusColors";
 
 /** DESIGN.md's contrast obligations and the token blocks' parity, read from the stylesheet the app ships. */
@@ -13,6 +13,13 @@ const OUTSIDE = {
     string,
     string
   >),
+  ...(import.meta.glob(
+    [
+      "/src-tauri/gen/android/app/src/main/res/{drawable/karasu_widget_bg,layout/karasu_widget,values/styles_widgets}.xml",
+      "/src-tauri/gen/android/app/src/main/java/dev/kyu/karasu/MainActivity.kt",
+    ],
+    { query: "?raw", import: "default", eager: true },
+  ) as Record<string, string>),
 };
 
 const blocks = customProperties(css);
@@ -311,6 +318,18 @@ describe("the frame around the stylesheet", () => {
 
   it("paints the native window in the dark page colour, so the first frame does not flash", () => {
     for (const w of conf.app.windows) expect(w.backgroundColor?.toLowerCase()).toBe(colour("dark", "surface-950"));
+  });
+
+  it("paints the Android activity and the home-screen widgets in the dark tokens, which they cannot read at runtime", () => {
+    const res = "/src-tauri/gen/android/app/src/main/res";
+    const hexes = (file: string) => [...file.matchAll(/#[0-9a-f]{6}\b/gi)].map((m) => m[0].toLowerCase());
+    const bg = hexes(OUTSIDE[`${res}/drawable/karasu_widget_bg.xml`]);
+    expect(bg).toEqual([colour("dark", "surface-950"), colour("dark", "surface-800")]);
+    expect(hexes(OUTSIDE[`${res}/values/styles_widgets.xml`])).toEqual([colour("dark", "ink-100")]);
+    const { a400 } = accentShades(DEFAULT_ACCENT);
+    expect(hexes(OUTSIDE[`${res}/layout/karasu_widget.xml`])).toEqual([a400.toLowerCase(), colour("dark", "ink-600")]);
+    const activity = OUTSIDE["/src-tauri/gen/android/app/src/main/java/dev/kyu/karasu/MainActivity.kt"];
+    expect(hexes(activity)).toEqual([colour("dark", "surface-950")]);
   });
 
   // Tauri injects nonces only when the page carries inline style; one would silently block every library-injected tag.

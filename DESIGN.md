@@ -679,3 +679,9 @@ maintainer picks. A pure restyle that moves nothing does not. The rules:
   line; shadows and the lightbox scrim from tokens; the feathers take
   their colours from the accent. The download button is the app's main
   action, the accent as a tint, rather than a solid fill of its own.
+- **2026-09-26:** The Android home-screen widgets take the dark tokens,
+  shown as before and after: surface-950 with a surface-800 edge, the
+  title in the default accent's text shade, rows in ink-100 and the footer
+  in ink-600, which lifts it from 4.0 : 1 to 5.8. The widgets cannot read
+  the stylesheet, so `tokens.test.ts` reads their resources and holds them
+  to it, as it does the window's background.

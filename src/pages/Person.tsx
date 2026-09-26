@@ -49,12 +49,26 @@ function useFuzzyDate() {
   };
 }
 
+/** The three genders AniList offers as choices read translated; anything typed freely is shown as written. */
+function genderLabel(gender: string | null | undefined, t: (k: string) => string): string | null | undefined {
+  switch (gender?.trim().toLowerCase()) {
+    case "male":
+      return t("person.genderMale");
+    case "female":
+      return t("person.genderFemale");
+    case "non-binary":
+      return t("person.genderNonBinary");
+    default:
+      return gender;
+  }
+}
+
 /** A label/value pair, only rendered when there is a value. */
 function Fact({ label, value }: { label: string; value: string | number | null | undefined }) {
   if (value === null || value === undefined || value === "") return null;
   return (
     <div>
-      <dt className="text-2xs uppercase tracking-wide text-ink-600">{label}</dt>
+      <dt className="text-2xs uppercase tracking-eyebrow text-ink-600">{label}</dt>
       <dd className="text-sm text-ink-300">{value}</dd>
     </div>
   );
@@ -178,7 +192,7 @@ export default function Person({ kind }: { kind: Kind }) {
             ) : null}
             {data.favourites != null && data.favourites > 0 && (
               <span className="flex items-center gap-1">
-                <Heart className="size-2.75" /> {data.favourites}
+                <Heart className="size-3.5" /> {data.favourites}
               </span>
             )}
             {data.siteUrl && (
@@ -186,7 +200,7 @@ export default function Person({ kind }: { kind: Kind }) {
                 onClick={() => void openUrl(data.siteUrl!)}
                 className="flex items-center gap-1 text-accent-400 hover:underline"
               >
-                {t("person.openOnAniList")} <ExternalLink className="size-2.75" />
+                {t("person.openOnAniList")} <ExternalLink className="size-3.5" />
               </button>
             )}
           </div>
@@ -202,7 +216,7 @@ export default function Person({ kind }: { kind: Kind }) {
 
           {(ch || st) && (
             <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3">
-              <Fact label={t("person.gender")} value={ch?.gender ?? st?.gender} />
+              <Fact label={t("person.gender")} value={genderLabel(ch?.gender ?? st?.gender, t)} />
               <Fact label={t("person.age")} value={ch?.age ?? st?.age} />
               <Fact
                 label={t("person.birthday")}

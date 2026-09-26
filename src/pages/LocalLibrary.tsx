@@ -414,7 +414,7 @@ function LibraryView({ userId }: { userId: number }) {
     <div className="flex h-full flex-col">
       <div className="flex-none px-8 pb-4 pt-7">
         <div className="flex flex-wrap items-baseline gap-3">
-          <h1 className="text-[1.375rem] font-bold tracking-[-.015em] text-ink-100">
+          <h1 className="text-title font-bold text-ink-100">
             {t("library.title")}
           </h1>
           <span className="font-brand-jp text-ui tracking-lockup text-ink-600">
@@ -434,7 +434,7 @@ function LibraryView({ userId }: { userId: number }) {
 
         {/* The folder and what the last scan made of it, or the screen never says where the files came from. */}
         <div className="mt-3.5 flex max-w-176 items-center gap-2.5 rounded-control border border-hair bg-surface-900 px-3 py-2.25">
-          <FolderOpen className="size-3.75 shrink-0 text-ink-500" />
+          <FolderOpen className="size-4 shrink-0 text-ink-500" />
           <span className="min-w-0 flex-1 truncate text-xs tabular-nums text-ink-300">
             {status?.path ?? t("library.noFolder")}
           </span>
@@ -594,7 +594,7 @@ function DetectedOffList({
 
   return (
     <section className="pt-6">
-      <p className="mb-1 text-xs font-medium uppercase tracking-[.12em] text-ink-600">
+      <p className="mb-1 text-xs font-medium uppercase tracking-eyebrow text-ink-600">
         {t("library.detectedOffList")}
       </p>
       <p className="mb-3 text-2xs text-ink-600">
@@ -711,7 +711,7 @@ function SuggestionRow({
         className="shrink-0"
         onClick={() => onConfirm(key, guess.mediaId)}
       >
-        <Check className="size-3" />
+        <Check className="size-3.5" />
         {t("library.confirm")}
       </Button>
     </div>
@@ -758,8 +758,8 @@ function Unplaced({
   return (
     <section className="pt-6">
       <div className="mb-3 flex items-center gap-3">
-        <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-[.12em] text-ink-600">
-          <HelpCircle className="size-3.25" />
+        <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-eyebrow text-ink-600">
+          <HelpCircle className="size-3.5" />
           {t("library.unplaced", { n: groups.length })}
         </p>
         {groups.length > 5 && (
@@ -818,7 +818,7 @@ function Unplaced({
               className="shrink-0"
               onClick={() => onAssign({ title: group.title, season: group.season })}
             >
-              <Wand2 className="size-3" />
+              <Wand2 className="size-3.5" />
               {t("library.assign")}
             </Button>
           </div>
@@ -869,7 +869,7 @@ function Group({
   if (rows.length === 0) return null;
   return (
     <section className="pt-4">
-      <p className="mb-3 text-xs font-medium uppercase tracking-[.12em] text-ink-600">
+      <p className="mb-3 text-xs font-medium uppercase tracking-eyebrow text-ink-600">
         {label}
       </p>
       <VirtualRows
@@ -989,7 +989,7 @@ function LibraryRow({
           className="flex shrink-0 items-center gap-1 rounded-inner px-1.5 py-1 text-2xs tabular-nums text-ink-600 transition-surface hover:bg-surface-800 hover:text-ink-300"
         >
           {t("library.fileCount", { n: lib.files.length })}
-          <ChevronDown className={cn("size-3 transition-transform", open && "rotate-180")} />
+          <ChevronDown className={cn("size-3.5 transition-transform", open && "rotate-180")} />
         </button>
 
         {/* The folder holds more than the show; the user decides, so this chip only opens the split card. */}
@@ -1063,7 +1063,7 @@ function LibraryRow({
               className="shrink-0"
               onClick={() => playEpisode(lib.mediaId, next.episode)}
             >
-              <Play className="size-3" fill="currentColor" />
+              <Play className="size-3.5" fill="currentColor" />
               {t("library.play")}
             </Button>
           </>
@@ -1093,7 +1093,7 @@ function LibraryRow({
                     : "bg-accent-600/15 text-accent-400 hover:bg-accent-600/30",
                 )}
               >
-                <Play className="size-2.5" fill="currentColor" />
+                <Play className="size-3.5" fill="currentColor" />
                 {file.episode}
               </button>
             );

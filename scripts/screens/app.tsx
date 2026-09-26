@@ -350,6 +350,45 @@ function answerQuery(query: string, variables: Record<string, unknown> | null) {
   if (/\bViewer\b/.test(q)) return { Viewer: { ...viewer, unreadNotificationCount: 3 } };
   // The signed-in account's own profile, so the AniList cards in Settings draw their fields rather than a skeleton.
   if (/activityHistory/.test(q)) return userStats();
+  // A character and a voice actor with their shows, so the person pages draw full rather than not-found.
+  const fav = { favourites: 12_480, isFavourite: false, isFavouriteBlocked: false };
+  if (/\bCharacter\s*\(\s*id/.test(q))
+    return {
+      Character: {
+        id: Number(variables?.id ?? 41),
+        name: { full: "Roxy Migurdia", native: "ロキシー・ミグルディア", alternative: ["Roxy"] },
+        image: { large: cover(3) },
+        description: "Eine Magierin der Migurd und __Rudeus' erste Lehrerin__. ~!Später Professorin in Ranoa.!~",
+        gender: "Female",
+        age: "44",
+        bloodType: null,
+        dateOfBirth: { year: null, month: 5, day: 10 },
+        siteUrl: "https://anilist.co/character/41",
+        ...fav,
+        media: { edges: [0, 1, 2, 3].map((i) => ({ characterRole: i === 0 ? "MAIN" : "SUPPORTING", voiceActors: [{ id: 500, name: { full: "Konomi Kohara" }, image: { medium: cover(5) } }], node: socialMedia(i) })) },
+      },
+    };
+  if (/\bStaff\s*\(\s*id/.test(q))
+    return {
+      Staff: {
+        id: Number(variables?.id ?? 500),
+        name: { full: "Konomi Kohara", native: "小原好美" },
+        image: { large: cover(5) },
+        description: "Sprecherin aus Kanagawa, bekannt für __ruhige, trockene__ Rollen.",
+        primaryOccupations: ["Voice Actor"],
+        gender: "Female",
+        age: 30,
+        homeTown: "Kanagawa, Japan",
+        yearsActive: [2014],
+        languageV2: "Japanese",
+        dateOfBirth: { year: 1995, month: 7, day: 23 },
+        dateOfDeath: null,
+        siteUrl: "https://anilist.co/staff/500",
+        ...fav,
+        staffMedia: { edges: [0, 1, 2, 3, 4, 5].map((i) => ({ staffRole: i % 2 ? "Main" : "Supporting", node: socialMedia(i) })) },
+        characters: { nodes: [{ id: 41, name: { full: "Roxy Migurdia" }, image: { medium: cover(3) } }, { id: 42, name: { full: "Kobeni Higashiyama" }, image: { medium: cover(6) } }] },
+      },
+    };
   if (/\bUser\s*\(/.test(q)) {
     const list = { customLists: ["Rewatch"], splitCompletedSectionByFormat: false };
     // Someone else's profile by name draws the full header: banner, bio, favourites and a follow button.
@@ -478,6 +517,34 @@ mockIPC((cmd, args) => {
       return { enabled: true, appId: "", hasBuiltinAppId: true };
     case "get_backup_settings":
       return { enabled: true, keep: 7, dir: "C:\\Users\\kyu\\AppData\\Roaming\\dev.kyu.karasu\\backups" };
+    // A scanned folder: a dozen matched titles, one close match, one manual, one with a next season inside, two unplaced.
+    case "get_library_index":
+      return LISTS.ANIME.lists.flatMap((l) => l.entries).slice(0, 12).map((e, i) => {
+        const count = Math.min(e.media.episodes ?? 12, 4 + (i % 8));
+        const files = Array.from({ length: count }, (_, n) => ({ episode: n + 1, path: `D:\\Anime\\${e.media.title.romaji}\\${String(n + 1).padStart(2, "0")}.mkv` }));
+        return {
+          mediaId: e.mediaId,
+          episodes: files.map((f) => f.episode),
+          files,
+          score: i === 3 ? 0.82 : 1,
+          sources: [{ title: e.media.title.romaji, season: -1 }],
+          manual: i === 5,
+          overflow: i === 7 ? { knownEpisodes: count - 2, extraFiles: 2, firstExtra: count - 1, hint: null } : null,
+        };
+      });
+    case "get_library_status":
+      return { path: "D:\\Anime", filesSeen: 131, matched: 12 };
+    case "get_library_unmatched":
+      return [
+        { title: "Kowloon Generic Romance", season: -1, files: [{ episode: 1, path: "D:\\Anime\\Kowloon\\01.mkv" }], suggestion: null },
+        { title: "Dan Da Dan", season: 2, files: [{ episode: 3, path: "D:\\Anime\\DDD S2\\03.mkv" }], suggestion: null },
+      ];
+    case "pending_update":
+      return null;
+    case "diagnostics_report":
+      return "Karasu screens\nOS: Windows 11";
+    case "apk_update_state":
+      return { available: false, status: "none", version: null, reason: null, needsInstallPermission: false, received: 0, total: 0 };
     case "get_library_path":
       return "D:\\Anime";
     case "list_library_redirects":

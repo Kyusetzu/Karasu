@@ -81,7 +81,7 @@ export default function RandomPickModal({
                   </Button>
                 </Link>
                 <Button variant="secondary" onClick={() => setNonce((n) => n + 1)}>
-                  <Dices className="size-3.75" /> {t("random.reroll")}
+                  <Dices className="size-4" /> {t("random.reroll")}
                 </Button>
               </div>
             </div>

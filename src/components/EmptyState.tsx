@@ -23,7 +23,7 @@ export function EmptyState({
   return (
     <div className={cn("flex flex-col items-center py-10 text-center", className)}>
       {Icon ? <Icon aria-hidden className="size-8 text-ink-600" /> : visual}
-      <p className="mt-4 text-[.9375rem] font-medium text-ink-300">{title}</p>
+      <p className="mt-4 text-base font-medium text-ink-300">{title}</p>
       {hint && (
         <p className="mt-1 max-w-80 text-2xs leading-relaxed text-ink-600">
           {hint}

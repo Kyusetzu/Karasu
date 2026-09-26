@@ -71,7 +71,7 @@ export default function About() {
       <div className="relative mx-auto max-w-136 px-8 py-12">
         <header className="flex flex-col items-center text-center">
           <KarasuMark className="size-28" />
-          <h1 className="mt-4 font-brand text-[2rem] font-bold uppercase leading-none tracking-[.22em] text-ink-100">
+          <h1 className="mt-4 font-brand text-title font-bold uppercase leading-none tracking-wordmark text-ink-100">
             Karasu
           </h1>
           {/* Katakana, not kanji: it is how the name is written everywhere else in the project. */}

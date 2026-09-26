@@ -64,6 +64,7 @@ import { isBlocked, shouldBlur } from "@/lib/contentFilter";
 import BackButton from "@/components/shell/BackButton";
 import { DetailSkeleton, Shimmer } from "@/components/Skeleton";
 import { cn } from "@/lib/utils";
+import { characterRoleLabel } from "@/components/media/roleLabel";
 import { DecodedImage } from "@/components/media/DecodedImage";
 import { BannerImage } from "@/components/media/BannerImage";
 import { BANNER_RATIO } from "@/lib/bannerFit";
@@ -528,20 +529,6 @@ function EpisodesSection({ mediaId }: { mediaId: number }) {
   );
 }
 
-/** Literal switch so i18nKeys.test.ts sees every key; only character roles are a closed enum worth translating. */
-function characterRole(role: string | null, t: (k: string) => string): string {
-  switch (role) {
-    case "MAIN":
-      return t("detail.roleMain");
-    case "SUPPORTING":
-      return t("detail.roleSupporting");
-    case "BACKGROUND":
-      return t("detail.roleBackground");
-    default:
-      return "";
-  }
-}
-
 /** Cast and staff behind a fold; one request pages both lists, and the button is countless since total is a sentinel. */
 function CastSection({ mediaId }: { mediaId: number }) {
   const { t } = useTranslation();
@@ -596,7 +583,7 @@ function CastSection({ mediaId }: { mediaId: number }) {
                           {c.node.name.full}
                         </span>
                         <span className="block text-2xs text-ink-600">
-                          {characterRole(c.role, t)}
+                          {characterRoleLabel(c.role, t)}
                         </span>
                       </span>
                     </Link>

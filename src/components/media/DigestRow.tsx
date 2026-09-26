@@ -32,7 +32,7 @@ export function DigestRow({
         src={media.coverImage.large ?? ""}
         alt=""
         loading="lazy"
-        className="dense-row-cover shrink-0 rounded-[.3125rem] object-cover"
+        className="dense-row-cover shrink-0 rounded-cover object-cover"
       />
       <TitleLockup title={media.title} dense className="flex-1" />
       {/* Keep `min-w-0`, not `shrink-0`: pinned at max-content, one long note hands the whole page a sideways scroll. */}

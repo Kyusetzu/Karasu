@@ -82,5 +82,23 @@
     "rule": "icon-size",
     "token": "size-2",
     "reason": "the watched check and the owed episode's ring sit inside the 14 px status dot and are drawn at the dot's scale"
+  },
+  {
+    "file": "src/components/EmptyState.tsx",
+    "rule": "text-size-arbitrary",
+    "token": "text-[7rem]",
+    "reason": "a decorative numeral drawn as art behind an empty state, sized to the figure rather than to the type scale"
+  },
+  {
+    "file": "src/components/EmptyState.tsx",
+    "rule": "text-size-arbitrary",
+    "token": "text-[2.5rem]",
+    "reason": "the struck-through id of a missing page is a picture of the query, sized to the figure rather than to the type scale"
+  },
+  {
+    "file": "src/components/RichText.tsx",
+    "rule": "text-size-arbitrary",
+    "token": "text-[.8125em]",
+    "reason": "inline code sits inside text of any size, so it scales in em with its line rather than taking a fixed step"
   }
 ]

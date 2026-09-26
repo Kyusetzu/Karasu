@@ -43,7 +43,7 @@ export function CoverGridSkeleton({ count = 12 }: { count?: number }) {
 export function HeaderSkeleton({ index = 0 }: { index?: number }) {
   return (
     <div className="flex items-center gap-2.5" aria-hidden="true">
-      <Shimmer index={index} className="size-4 rounded-sm" />
+      <Shimmer index={index} className="size-4 rounded-inner" />
       <Shimmer index={index} className="h-3.5 w-36" />
       <span className="section-rule" />
     </div>

@@ -167,7 +167,7 @@ function RecVote({ rec }: { rec: ScoredRecommendation }) {
         vote === rating ? "text-accent-400" : "text-ink-600",
       )}
     >
-      <Icon className="size-3" fill={vote === rating ? "currentColor" : "none"} />
+      <Icon className="size-3.5" fill={vote === rating ? "currentColor" : "none"} />
     </button>
   );
 

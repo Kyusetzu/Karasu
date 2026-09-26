@@ -207,7 +207,7 @@ export default function DetectionSurface({
           </span>
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[.9375rem] font-semibold text-ink-100">{titleNode}</p>
+          <p className="truncate text-base font-semibold text-ink-100">{titleNode}</p>
           {native && <p className="truncate font-brand-jp text-2xs text-ink-600">{native}</p>}
           {(labelText || playing.episodeTitle) && (
             <p className="truncate text-xs text-ink-300">
@@ -286,7 +286,7 @@ function ScrobbleStatus({
       return (
         <p className="flex items-center gap-1 text-xs font-medium text-success">
           {/* The one genuinely good outcome here, so it lands rather than appears. */}
-          <Check className="size-3 animate-land" />{" "}
+          <Check className="size-3.5 animate-land" />{" "}
           {t("nowPlaying.updated", {
             n: t(
               current?.mediaType === "MANGA"

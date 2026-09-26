@@ -114,12 +114,12 @@ function Chip({ kind, host, href }: { kind: "image" | "video"; host: string; hre
     "inline-flex max-w-full items-center gap-1.5 rounded-control border border-surface-700 bg-surface-850 px-2 py-1 align-middle text-xs text-ink-300 transition-surface hover:border-surface-600 hover:text-ink-100";
   const body = (
     <>
-      <Icon className="size-3.25 shrink-0 text-ink-500" />
+      <Icon className="size-3.5 shrink-0 text-ink-500" />
       <span className="truncate">
         {kind === "image" ? t("social.mdImage") : t("social.mdVideo")}
       </span>
       {host && <span className="shrink-0 truncate text-ink-600">· {host}</span>}
-      <ExternalLink className="size-2.75 shrink-0 text-ink-600" />
+      <ExternalLink className="size-3.5 shrink-0 text-ink-600" />
     </>
   );
   // Inside a link the anchor is already the click target — see `InLink`.

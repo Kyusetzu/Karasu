@@ -226,7 +226,7 @@ export function SeasonSplitModal({
             {preview.shown.map((p) => (
               <p key={p.disk} className="flex items-center gap-1.5">
                 {t("library.ep", { n: p.disk })}
-                <ArrowRight className="size-3 text-ink-600" />
+                <ArrowRight className="size-3.5 text-ink-600" />
                 {t("library.splitBecomes", { n: p.renumbered, title: selected.label })}
               </p>
             ))}
@@ -234,7 +234,7 @@ export function SeasonSplitModal({
             {preview.last && (
               <p className="flex items-center gap-1.5">
                 {t("library.ep", { n: preview.last.disk })}
-                <ArrowRight className="size-3 text-ink-600" />
+                <ArrowRight className="size-3.5 text-ink-600" />
                 {t("library.splitBecomes", { n: preview.last.renumbered, title: selected.label })}
               </p>
             )}

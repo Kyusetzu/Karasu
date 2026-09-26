@@ -184,7 +184,7 @@ export default function SignInMerge() {
             </p>
           )}
           {result.failed > 0 && (
-            <p className="text-sm text-rose-400">
+            <p className="text-sm text-danger">
               {t("merge.doneFailed", { count: result.failed })}
             </p>
           )}

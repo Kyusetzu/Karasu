@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: a748b2f -->
+<!-- generated-through: f0392f8 -->
 
 ### Fixed
 
@@ -115,6 +115,7 @@ tag time is then optional rather than load-bearing.
 - The Jellyfin card no longer keeps an old error on screen after a later action succeeds, and on a narrow phone the "desktop only" label no longer covers a card's title.
 - A profile's tabs show that more lie past the edge and take the arrow keys, and on a phone the formatting More menu returns the focus where it came from and closes when the window widens.
 - Statistics shows every status in full beside the ring, the series-length labels are no longer cut off, and "1 episode" reads in the singular.
+- Character and staff pages show roles and genders in your language, and the local library's title matches the other pages.
 
 ### Added
 

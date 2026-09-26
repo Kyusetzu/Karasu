@@ -131,6 +131,80 @@ const viewer = {
   options: { airingNotifications: true, notificationOptions: [] },
 };
 
+// The social surface: three people the viewer follows, a feed of both activity kinds, a thread with nested replies.
+const person = (id: number, name: string, i: number) => ({ id, name, avatar: { medium: cover(i) }, isFollowing: id !== 1, isFollower: id === 11 });
+const PEOPLE = [person(11, "Mikan", 5), person(12, "Hoshi", 6), person(13, "Tsubame", 7), { ...person(1, "Kyusetzu", 4), isFollowing: false }];
+const socialMedia = (i: number) => {
+  const m = media(i, false);
+  return { id: m.id, type: "ANIME", title: m.title, coverImage: { large: m.coverImage.large }, format: "TV", isAdult: false, genres: [] };
+};
+const activity = (id: number, user: number, ago: number, likes: number, replies: number, rest: Record<string, unknown>) => ({
+  id,
+  createdAt: now - ago,
+  likeCount: likes,
+  isLiked: likes % 2 === 1,
+  isPinned: false,
+  replyCount: replies,
+  siteUrl: `https://anilist.co/activity/${id}`,
+  user: PEOPLE[user],
+  ...rest,
+});
+const ACTIVITIES = [
+  activity(5001, 0, 600, 4, 2, { __typename: "ListActivity", status: "watched episode", progress: "7", media: socialMedia(0) }),
+  activity(5002, 1, 1_500, 9, 3, { __typename: "TextActivity", text: "Folge 7 war __unfassbar__ schön, und wer schaut diese Saison mit? ~!Das Ende!~ hat mich erwischt." }),
+  activity(5003, 2, 7_200, 12, 0, { __typename: "ListActivity", status: "completed", progress: null, media: socialMedia(1) }),
+  activity(5004, 3, 20_000, 1, 0, { __typename: "ListActivity", status: "plans to watch", progress: null, media: socialMedia(2) }),
+  activity(5005, 0, 90_000, 3, 1, { __typename: "ListActivity", status: "watched episode", progress: "1 - 3", media: socialMedia(3) }),
+  activity(5006, 3, 170_000, 6, 4, { __typename: "TextActivity", text: "Neue Saison, neue Liste. Was sind eure Geheimtipps?" }),
+];
+const REPLIES = [
+  { id: 7001, text: "Ich! Die Musik und die Szene am Fluss …", createdAt: now - 500, likeCount: 2, isLiked: false, user: PEOPLE[1] },
+  { id: 7002, text: "Hab es gestern nachgeholt, @Mikan hatte recht.", createdAt: now - 300, likeCount: 0, isLiked: false, user: PEOPLE[3] },
+];
+const thread = (id: number, title: string, user: number, replies: number, ago: number, extra: Record<string, unknown> = {}) => ({
+  id,
+  title,
+  replyCount: replies,
+  viewCount: replies * 37,
+  likeCount: Math.round(replies / 3),
+  isLiked: false,
+  isSticky: false,
+  isLocked: false,
+  repliedAt: now - ago,
+  createdAt: now - ago * 20,
+  siteUrl: `https://anilist.co/forum/thread/${id}`,
+  user: PEOPLE[user],
+  replyUser: { id: PEOPLE[(user + 1) % 3].id, name: PEOPLE[(user + 1) % 3].name },
+  categories: [{ id: 1, name: "Anime" }],
+  ...extra,
+});
+const THREADS = [
+  thread(40, "Forenregeln und Hinweise", 2, 3, 900_000, { isSticky: true, isLocked: true, categories: [{ id: 5, name: "Site Feedback" }] }),
+  thread(44, "Frühjahr 2026: eure Favoriten", 0, 128, 900),
+  thread(45, "Frieren Staffel 2 — Folge 7 Diskussion", 1, 342, 4_000, { categories: [{ id: 16, name: "Episode Discussion" }] }),
+  thread(46, "Welche Manga sind gut für den Einstieg?", 2, 57, 26_000, { categories: [{ id: 2, name: "Manga" }] }),
+  thread(47, "Kalender-Apps und Tracker — was nutzt ihr?", 1, 19, 80_000, { categories: [{ id: 7, name: "Apps" }] }),
+];
+const comment = (id: number, user: number, ago: number, text: string, children: unknown[] = []) => ({
+  id,
+  comment: text,
+  likeCount: id % 5,
+  isLiked: false,
+  createdAt: now - ago,
+  siteUrl: `https://anilist.co/forum/thread/44/comment/${id}`,
+  user: PEOPLE[user],
+  thread: { id: 44, title: THREADS[1].title },
+  childComments: children,
+});
+const COMMENTS = [
+  comment(801, 1, 80_000, "Für mich klar **Frieren**. Die Ruhe zwischen den Kämpfen trägt die ganze Staffel.", [
+    comment(811, 0, 70_000, "Stimmt, und der Soundtrack hilft enorm.", [comment(821, 3, 60_000, "Den höre ich seit Wochen beim Arbeiten.")]),
+    comment(812, 2, 50_000, "Die Kämpfe waren diesmal sogar besser und klarer als in Staffel 1."),
+  ]),
+  comment(802, 2, 40_000, "Dungeon Meshi hat mich überrascht — Kochen ist dort Worldbuilding."),
+  comment(803, 3, 9_000, "Noch nicht angefangen, aber eure Liste ist jetzt meine Liste. ~!Hoffentlich kein Cliffhanger!~"),
+];
+
 function detail(id: number) {
   const index = Math.max(0, REAL.findIndex((r) => r.id === id));
   const r = REAL[index];
@@ -218,8 +292,25 @@ function answerQuery(query: string, variables: Record<string, unknown> | null) {
     const ids = new Set((variables?.ids as number[]) ?? []);
     return { Page: { media: franchise().filter((m) => ids.has(m.id)) } };
   }
+  if (/followers:\s*Page/.test(q))
+    return { followers: { pageInfo: { total: 12 }, followers: [] }, following: { pageInfo: { total: 30 }, following: [] } };
+  const pageOf = (rows: Record<string, unknown>) => ({ Page: { pageInfo: { hasNextPage: true, total: 5000, currentPage: 1, lastPage: 200 }, ...rows } });
+  if (/activityReplies\s*\(/.test(q)) return pageOf({ activityReplies: REPLIES });
+  if (/\bActivity\s*\(\s*id/.test(q)) return { Activity: ACTIVITIES.find((a) => a.id === Number(variables?.id)) ?? ACTIVITIES[1] };
+  if (/activities\s*\(/.test(q)) {
+    const own = variables?.userId != null ? ACTIVITIES.filter((a) => a.user.id === Number(variables.userId)) : ACTIVITIES;
+    return pageOf({ activities: own });
+  }
+  if (/\bThreadComment\s*\(\s*id/.test(q)) return { ThreadComment: [COMMENTS[0]] };
+  if (/threadComments\s*\(/.test(q)) return pageOf({ threadComments: COMMENTS });
+  if (/\bThread\s*\(\s*id/.test(q)) {
+    const summary = THREADS.find((t) => t.id === Number(variables?.id)) ?? THREADS[1];
+    const body = "Welche Serien haben euch diese Saison am meisten gepackt?\n\nIch fange an: **Frieren** und *Dungeon Meshi*. Spoiler bitte mit ~!so!~ markieren.";
+    return { Thread: { ...summary, body, isSubscribed: true, replyCommentId: 821, replyUser: PEOPLE[3], mediaCategories: [socialMedia(0), socialMedia(1)] } };
+  }
+  if (/threads\s*\(/.test(q)) return pageOf({ threads: THREADS });
   if (/\bPage\b/.test(q)) {
-    const page = { media: Array.from({ length: 8 }, (_, i) => media(i, false)), recommendations: [], users: [], activities: [], threads: [], notifications: [], airingSchedules: [], characters: [], staff: [] };
+    const page = { media: Array.from({ length: 8 }, (_, i) => media(i, false)), recommendations: [], users: PEOPLE, followers: PEOPLE, following: PEOPLE, activities: [], threads: [], notifications: [], airingSchedules: [], characters: [], staff: [] };
     return { Page: { pageInfo: { hasNextPage: false, total: 8, currentPage: 1, lastPage: 1 }, ...page } };
   }
   if (/\bViewer\b/.test(q)) return { Viewer: { ...viewer, unreadNotificationCount: 3 } };

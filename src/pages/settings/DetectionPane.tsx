@@ -524,9 +524,15 @@ export function JellyfinSection() {
 
   if (!settings) return null;
 
+  // Every action starts from a clean slate, so an old message never sits beside the outcome of a newer one.
+  const clearErrors = () => {
+    setError(null);
+    setSaveError(null);
+  };
+
   const find = async () => {
     setFinding(true);
-    setError(null);
+    clearErrors();
     setFound(null);
     try {
       setFound(await discoverJellyfinServers());
@@ -539,7 +545,7 @@ export function JellyfinSection() {
 
   const signIn = async () => {
     setSigningIn(true);
-    setError(null);
+    clearErrors();
     setSessions(null);
     try {
       const next = await jellyfinSignIn(url, username, password);
@@ -547,18 +553,24 @@ export function JellyfinSection() {
       setPassword("");
       setUsername("");
       setSettings(next);
-      // Device and external URL are saved separately; persist them now so signing in cannot discard an edit.
+    } catch (e) {
+      setError(backendErrorText(e, t));
+      setSigningIn(false);
+      return;
+    }
+    // The sign-in held, so a failure storing the two fields below it is theirs and is reported under them.
+    try {
       await setJellyfinSettings(url, device, externalUrl);
       setSettings(await getJellyfinSettings());
     } catch (e) {
-      setError(backendErrorText(e, t));
+      setSaveError(backendErrorText(e, t));
     } finally {
       setSigningIn(false);
     }
   };
 
   const signOut = async () => {
-    setError(null);
+    clearErrors();
     setSessions(null);
     try {
       setSettings(await jellyfinSignOut());
@@ -568,7 +580,7 @@ export function JellyfinSection() {
   };
 
   const save = async () => {
-    setSaveError(null);
+    clearErrors();
     setSessions(null);
     try {
       await setJellyfinSettings(url, device, externalUrl);
@@ -580,7 +592,7 @@ export function JellyfinSection() {
 
   const test = async () => {
     setBusy(true);
-    setError(null);
+    clearErrors();
     setSessions(null);
     try {
       setSessions(await testJellyfin());

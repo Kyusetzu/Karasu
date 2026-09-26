@@ -126,7 +126,8 @@ const ANDROID_DESKTOP_ONLY: ReadonlySet<unknown> = new Set([
 function DesktopOnly({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation();
   return (
-    <div aria-disabled className="relative">
+    // The card title keeps the chip's width free, so a long title wraps beneath it instead of running under it.
+    <div aria-disabled className="relative [&_:is(h2,h3)]:pr-24">
       {/* Inside the card's padding, centred on its title line, so it reads as the title's caveat rather than a tab. */}
       <Chip tone="muted" size="xs" className="absolute right-5 top-6 z-10">
         {t("settings.desktopOnly")}

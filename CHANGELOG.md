@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 8226334 -->
+<!-- generated-through: 9b256b1 -->
 
 ### Fixed
 
@@ -116,6 +116,7 @@ tag time is then optional rather than load-bearing.
 - A profile's tabs show that more lie past the edge and take the arrow keys, and on a phone the formatting More menu returns the focus where it came from and closes when the window widens.
 - Statistics shows every status in full beside the ring, the series-length labels are no longer cut off, and "1 episode" reads in the singular.
 - Character and staff pages show roles and genders in your language, and the local library's title matches the other pages.
+- On a narrow phone the statistics page no longer scrolls sideways, and the legend beside the ring moves beneath it rather than cutting its labels short.
 
 ### Added
 

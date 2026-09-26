@@ -175,7 +175,7 @@ names (`rounded`, `rounded-lg` …).
 
 Icons are lucide at four sizes: `size-3.5` (14 px) beside small text, `size-4`
 (16 px) in controls, `size-5` (20 px) in the shell, `size-8` (32 px) in empty
-states. Eight other sizes are in use today, and they converge on these four.
+states. The style audit holds every icon to these four.
 
 ### Elevation and layers
 
@@ -411,9 +411,9 @@ Considered and declined on 2026-09-25:
 ## Enforcement
 
 `scripts/style-audit.mjs` runs in `npm run verify` and holds every app file to
-the vocabulary above. Today's drift is frozen in `scripts/style-baseline.json`.
-A count may fall, and must be lowered with `--tighten` in the same commit, but
-it never rises. A reasoned permanent exception goes into
+the vocabulary above. `scripts/style-baseline.json` froze the drift it found
+and has been empty since 2026-09-26, so any new finding fails the gate. A
+count may only ever fall, lowered with `--tighten` in the same commit. A reasoned permanent exception goes into
 `scripts/style-allowlist.json`. `node scripts/style-audit.mjs --stats` shows
 where the drift is.
 

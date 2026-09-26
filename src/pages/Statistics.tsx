@@ -898,12 +898,12 @@ function OverviewCharts({
         <Card className="flex h-full flex-col">
           <CardTitle>{t("stats.breakdown")}</CardTitle>
           <p className="mt-1 text-2xs text-ink-600">{t("stats.breakdownHint")}</p>
-          {/* Chart beside its key; a square ring at full card width makes the panel as tall as the page is wide. */}
-          <div className="mt-3 flex flex-1 items-center gap-6">
+          {/* Chart beside its key, the key dropping beneath only where the card is too narrow to read it beside the ring. */}
+          <div className="mt-3 flex flex-1 flex-wrap items-center gap-6">
             <div className="w-40 shrink-0 sm:w-48">
               <Sunburst data={breakdown} />
             </div>
-            <div className="min-w-0 flex-1 space-y-3">
+            <div className="min-w-36 flex-1 space-y-3">
               <ToneLegend
                 items={breakdown.map((b) => ({ label: b.label, value: b.value }))}
               />

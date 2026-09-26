@@ -1650,7 +1650,8 @@ drift also runs `--tighten` and the room cannot be spent again. `--record`
 rewrites it outright and is for a deliberate raise, which the diff then shows.
 `scripts/style-allowlist.json` holds the permanent exceptions, each with its
 reason, and an entry nothing matches fails the check. Recorded on 2026-09-25:
-380 findings in 91 of 281 files, half a second a run.
+380 findings in 91 of 281 files; emptied on 2026-09-26, so every finding now
+fails the gate outright. Half a second a run.
 
 **`scripts/screens.mjs` shows the real app, and it is how a UI change is
 proven.** It serves `scripts/screens/` (the whole `App`, shell included, over

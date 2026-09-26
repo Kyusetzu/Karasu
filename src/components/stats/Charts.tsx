@@ -153,16 +153,18 @@ function ArcValue({
 
 /** A legend for whatever the sunburst or the stacked bar just drew. */
 export function ToneLegend({ items }: { items: { label: string; value: number }[] }) {
-  // One column, because beside a ring the legend is narrow and a second column would cut labels to their first letters.
+  // One column that may shrink, since beside a ring the legend is narrow and a second column cut labels to a few letters.
   return (
-    <div className="grid gap-y-1.5">
+    <div className="grid grid-cols-1 gap-y-1.5">
       {items.map((item, i) => (
         <div key={item.label} className="flex items-center gap-2 text-xs">
           <span
             className="size-2 shrink-0 rounded-mark"
             style={{ background: TONES[i % TONES.length] }}
           />
-          <span className="min-w-0 flex-1 truncate text-ink-500">{item.label}</span>
+          <span className="min-w-0 flex-1 truncate text-ink-500" title={item.label}>
+            {item.label}
+          </span>
           <span className="shrink-0 tabular-nums text-ink-300">{item.value}</span>
         </div>
       ))}

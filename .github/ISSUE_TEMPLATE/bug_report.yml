@@ -50,6 +50,7 @@ body:
       options:
         - Windows installer (Karasu_..._x64-setup.exe)
         - Linux AppImage
+        - Linux .deb or .rpm
         - Android APK (sideloaded)
         - Built from source
     validations:
@@ -58,12 +59,13 @@ body:
   - type: input
     id: linux
     attributes:
-      label: Linux — distro, desktop, and Wayland or X11
+      label: Linux — distro, desktop, Wayland or X11, and graphics
       description: >-
         Only if you are on Linux **and** could not paste the diagnostics. If
-        Karasu will not launch, please also give your `webkit2gtk` version —
-        the AppImage does not bundle it and needs 4.1.
-      placeholder: "Arch Linux, GNOME, wayland, webkit2gtk-4.1 2.46"
+        Karasu will not launch or crashes, please also give your GPU and Mesa
+        version (`glxinfo -B` or `lspci -k`), and for the `.deb`/`.rpm` your
+        `webkit2gtk-4.1` version — the AppImage carries its own.
+      placeholder: "Fedora 44, GNOME, wayland, AMD, Mesa 26.1"
     validations:
       required: false
 

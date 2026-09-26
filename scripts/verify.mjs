@@ -28,11 +28,12 @@ const KNIP = path.join(ROOT, "node_modules", "knip", "bin", "knip.js");
 const TAURI = path.join(ROOT, "node_modules", "@tauri-apps", "cli", "tauri.js");
 const SITE_TSC = path.join(ROOT, "site", "node_modules", "typescript", "bin", "tsc");
 const MANIFEST = ["--manifest-path", "src-tauri/Cargo.toml"];
-// npm itself, by its cli file, for the same no-shim reason: beside node on Windows, under `lib/` of the prefix elsewhere.
+// npm by its cli file, no shim: the one `npm run` names, else beside node (Windows) or in ../lib (Unix).
 const NPM = [
+  process.env.npm_execpath,
   path.join(path.dirname(process.execPath), "node_modules", "npm", "bin", "npm-cli.js"),
   path.join(path.dirname(process.execPath), "..", "lib", "node_modules", "npm", "bin", "npm-cli.js"),
-].find((file) => existsSync(file)) ?? "npm-cli.js";
+].find((p) => p?.endsWith("npm-cli.js") && existsSync(p)) ?? "npm-cli.js, found neither beside node nor in ../lib";
 
 const phases = [];
 
@@ -50,7 +51,7 @@ function run(name, cmd, args, summarize, { optional, cwd = ROOT, env = {} } = {}
       child.stdout.on("data", (d) => (out += d));
       child.stderr.on("data", (d) => (out += d));
     }
-    // A tool that is not installed is a visible skip for an optional phase and a failure for the rest.
+    // A tool that is not installed, binary or cargo subcommand alike, is a visible skip if optional and a failure if not.
     let settled = false;
     child.on("error", (err) => {
       settled = true;
@@ -61,7 +62,10 @@ function run(name, cmd, args, summarize, { optional, cwd = ROOT, env = {} } = {}
     });
     child.on("close", (code) => {
       if (settled) return;
-      const phase = { name, ms: Date.now() - started, ok: code === 0, out, summary: summarize(out) };
+      const absent = code !== 0 && Boolean(optional) && /error: no such command: /.test(out);
+      const phase = absent
+        ? { name, ms: Date.now() - started, ok: true, skipped: true, out, summary: `skipped — not installed (${optional})` }
+        : { name, ms: Date.now() - started, ok: code === 0, out, summary: summarize(out) };
       phases.push(phase);
       resolve(phase);
     });

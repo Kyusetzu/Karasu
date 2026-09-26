@@ -174,6 +174,14 @@ section used to say no Linux build existed; that stopped being true when the
 AppImage started being released, and the advisories should be read accordingly:
 they apply to code Linux users are running, not to something hypothetical.
 
+The AppImage also carries its own web engine: WebKitGTK, GTK and GLib from
+Ubuntu 22.04, the build host. It receives their security fixes only when
+Ubuntu backports them to 22.04, and it lags the current distributions: on
+2026-09-25, 22.04 shipped WebKitGTK 2.50.4 while Fedora 44 and Ubuntu 24.04
+shipped 2.52.x. The `.deb` and the `.rpm` (and the Flatpak, through its
+runtime) use the engine of the system they are installed on, so they get its
+fixes on the system's schedule. If that matters to you, prefer those.
+
 It is also not fixable here. The versions are pinned upstream by Tauri's Linux
 backend — `glib` ← `atk` ← `gtk 0.18` ← `tao`/`tray-icon` ← `tauri` — and
 `gtk 0.18` requires `glib ^0.18`, so a newer `glib` is out of range no matter

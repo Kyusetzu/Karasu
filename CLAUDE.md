@@ -278,10 +278,11 @@ scripts/             bump-version.mjs (every commit), anilist-query.mjs
                      clean-target.mjs (reclaims the
                      stale incremental sessions every version bump leaves
                      under `src-tauri/target`, see the notes);
-                     release/ holds the nine PowerShell scripts
+                     release/ holds the ten PowerShell scripts
                      the release workflow runs (installer, AppImage, Linux
                      package and APK renamers are deliberate near-twins,
-                     slim-appimage — see "The commit loop" —,
+                     slim-appimage and smoke-appimage — see "The commit
+                     loop" —,
                      release-notes, flatpak-manifest, fdroid-recipe, and
                      generate-update-manifest, whose Android legs feed the
                      APK updater — see "The Android updater")
@@ -730,25 +731,61 @@ the Nightly's prune list, `release-info.mjs` on the site — walks the
 `karasu-linux` artifact recursively, because three bundle folders make the
 download keep its `appimage/`, `deb/` and `rpm/` subfolders where one did not.
 
-**The AppImage ships without `libwayland-client`, on purpose.** linuxdeploy
-bundles the build host's copy (ubuntu-22.04, wayland 1.20), the AppRun puts it
-first on `LD_LIBRARY_PATH`, and Mesa 26 cannot create an EGL display against
-it: `Could not create default EGL display: EGL_BAD_PARAMETER. Aborting...`,
-WebKit's web process dies, the window stays black. Reported from Fedora 44 on
-2026-09-23 and reproduced the same day on WSL's Ubuntu 26.04 (Mesa 26.0.3)
-with the 1.19.1.664 Nightly. `scripts/release/slim-appimage.ps1` runs after
-the build in `release.yml` and `ci.yml`: it extracts the AppImage, deletes
-that one library, repacks with a digest-pinned `appimagetool` over the
-runtime cut from Tauri's own file, and re-signs with the updater key,
-because the `.sig` covers the file's bytes. Only the client goes:
-tauri-apps/tauri#15976 lists ten display-stack libraries, but removing all
-ten failed on the same WSL host with `libwayland-server.so.0: cannot open
-shared object file`, which some hosts do not have, while removing only the
-client kept WebKit's web process alive there, repacked file included.
-Drop the script once Tauri ships `bundle.linux.appimage.excludeLibraries`
-(tauri-apps/tauri#15662) or excludes the library by default. The `.deb`,
-the `.rpm` and the Flatpak link against the host's libraries and never had
-the problem.
+**The AppImage leaves the display stack to the host, on purpose.** linuxdeploy
+bundles the build host's libraries (ubuntu-22.04), the AppRun puts them first
+on `LD_LIBRARY_PATH`, and the host's Mesa, which comes from the host because
+libEGL/libGL/libgbm/libdrm are on the AppImage excludelist, then loads the
+bundled copies of whatever it links. With Mesa 26 that broke twice. 1.19.1.664
+bundled wayland 1.20's `libwayland-client`, which lacks symbols `libEGL_mesa`
+needs: `Could not create default EGL display: EGL_BAD_PARAMETER. Aborting...`
+and a black window (Fedora 44, 2026-09-23). 1.19.2.665 removed only that
+library and was checked on WSLg alone, which has no DRM render node, and a
+Fedora 44 user reported a segfault shortly after the window opened
+(2026-09-24). `scripts/release/slim-appimage.ps1` now removes fourteen
+libraries after the build, repacks with a digest-pinned `appimagetool` over
+the runtime cut from Tauri's own file, and re-signs with the updater key,
+because the `.sig` covers the file's bytes. The rule behind the list, measured
+on 2026-09-25: a bundled soname goes when Fedora 44's Mesa 26.2 (`libEGL_mesa`,
+`libGLX_mesa`, `libgallium`, `libgbm`, `gbm/`, `dri/`) links it — `libXau`,
+`libXext`, `libelf`, `libffi`, `liblzma`, `libxcb-randr`, `libxcb-shm`,
+`libzstd` — or it is one of the X11/Wayland siblings tauri-apps/tauri#15976
+found on real Fedora 44 hardware — `libwayland-{client,cursor,egl}`,
+`libxkbcommon`, `libxcb-render`, `libXdmcp` — **and** every one of Fedora 44,
+Arch, Ubuntu 22.04/24.04/26.04 and Debian 12 with gtk3 and Mesa installed
+carries it. Two fail that test and stay bundled: `libwayland-server` (the
+bundled WebKit links it, Mesa ≥ 25.2 no longer does, and Ubuntu 24.04/26.04
+lack it — removing it gave `libwayland-server.so.0: cannot open shared object
+file` on WSL) and `libxml2.so.2` (Mesa links it, but Arch and Ubuntu 26.04
+ship only `.so.16`). Every pattern must match or the script throws, so a
+linuxdeploy that stops bundling one fails the build instead of leaving a stale
+list; widen it only by re-running that measurement.
+
+The same script patches the GTK hook's unconditional `export GDK_BACKEND=x11`
+to `${GDK_BACKEND:-x11}` and unsets a `GTK_IM_MODULE=wayland*` unless the
+backend is Wayland: the bundled `im-wayland.so` dereferences a null display
+under X11 (`gdk_wayland_display_get_wl_display: assertion … failed`, then
+SIGSEGV in `wl_proxy_get_version`), reproduced with 1.19.2.665 in a Fedora 44
+container. X11 stays the default because it is the configuration #15976
+verified; `GDK_BACKEND=wayland` is the user's opt-in and ran in the container,
+headless Weston only.
+
+`scripts/release/smoke-appimage.ps1` runs right after it in both workflows and
+blocks: it starts the AppImage under Xvfb in Fedora 44 and Ubuntu 26.04
+containers with `GTK_IM_MODULE=wayland`, and fails unless every bundled ELF
+resolves, the main process and `WebKitWebProcess` are alive after 25 s and the
+log is free of `EGL_BAD_PARAMETER`, `cannot open shared object`, `undefined
+symbol` and panics. Replayed on 2026-09-25 it failed 1.19.2.665 (the
+segfault), and the same checks failed a tree with 664's `libwayland-client`
+put back (the EGL abort). It runs llvmpipe, so it cannot see a crash on a real GPU's
+DRI3/GBM path; a Linux graphics report still needs the reporter's
+`coredumpctl info`. A red smoke test in `release.yml` publishes Windows alone
+(the Linux download is `continue-on-error`), and the Nightly's prune step then
+drops the old Linux files until the next green build. An image that cannot be
+pulled or installed into is a warning, not a failure. Drop all of it once
+Tauri ships `bundle.linux.appimage.excludeLibraries` (tauri-apps/tauri#15662)
+and stops forcing X11 (the draft tauri-apps/tauri#16062). The `.deb`, the
+`.rpm` and the Flatpak link against the host's libraries and never had the
+problem.
 
 **Two kinds of test that are not examples.** `proptest` runs the parser and the
 matcher over thousands of generated inputs a run (`parser.rs` and `matcher.rs`,

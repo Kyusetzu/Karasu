@@ -620,6 +620,8 @@ maintainer picks. A pure restyle that moves nothing does not. The rules:
   the accent (`tint-label-on-cover`) — a first, fully tinted plate was
   judged too coloured; and the score over cover art, there and on every
   cover's badge, is one bright gold in every theme (`on-cover-gold`),
-  where the light theme's text gold went dark on dark. In high contrast,
+  where the light theme's text gold went dark on dark; the 18+ mark, the
+  complete glyph and the reveal chip followed the same day
+  (`on-cover-danger`, `on-cover-success`, `on-cover-edge`). In high contrast,
   glass over cover art turns solid in that near-black, not the page's
   panel colour, which had left the carousel's white dots on white.

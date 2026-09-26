@@ -127,7 +127,7 @@ export function CoverCell({
               setRevealed(true);
             }}
             // No `z-` class: a positive z-index paints over the auto-indexed badges and actions and swallows their clicks.
-            className="absolute inset-0 grid place-items-center bg-on-cover/45 text-2xs font-semibold text-ink-100"
+            className="absolute inset-0 grid place-items-center bg-on-cover/45 text-2xs font-semibold text-on-cover-edge"
           >
             <span className="rounded-full bg-on-cover/85 px-2.5 py-1">
               {t("settings.blurReveal")}
@@ -153,7 +153,7 @@ export function CoverCell({
 
         {/* Matched to the score badge on purpose; a translucent badge has no contrast floor on arbitrary art. */}
         {adult && (
-          <span className="absolute right-2 top-2 rounded-cover bg-on-cover/93 px-1.5 py-0.5 text-2xs font-semibold text-danger">
+          <span className="absolute right-2 top-2 rounded-cover bg-on-cover/93 px-1.5 py-0.5 text-2xs font-semibold text-on-cover-danger">
             18+
           </span>
         )}

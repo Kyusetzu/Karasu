@@ -252,9 +252,13 @@ describe("the tint fill", () => {
 });
 
 describe("cover art", () => {
-  it("keeps the gold over cover art one bright value in every theme, at 7:1 on the near-black it sits on", () => {
-    for (const block of [light, hcDark, hcLight]) expect(block.has("--color-on-cover-gold")).toBe(false);
-    expect(contrastRatio(colour("dark", "on-cover-gold"), colour("dark", "on-cover"))).toBeGreaterThanOrEqual(7);
+  // The lightest plate a coloured mark sits on is the action circle's, and white art is the worst case under it.
+  it("keeps each colour over cover art one bright value in every theme, at 4.5:1 on the lightest plate over white", () => {
+    const plate = mix("#ffffff", colour("dark", "on-cover"), 0.86);
+    for (const name of ["on-cover-gold", "on-cover-danger", "on-cover-success"]) {
+      for (const block of [light, hcDark, hcLight]) expect(block.has(`--color-${name}`), name).toBe(false);
+      expect(contrastRatio(colour("dark", name), plate), name).toBeGreaterThanOrEqual(4.5);
+    }
   });
 
   it("turns glass over cover art solid near-black in high contrast, not the page's panel colour", () => {

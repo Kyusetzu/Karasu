@@ -1,4 +1,4 @@
-/* GENERATED from src/app/index.css (sha256 4d47c6d38166) by site/scripts/sync-tokens.mjs
+/* GENERATED from src/app/index.css (sha256 bca09e22f22d) by site/scripts/sync-tokens.mjs
    — do not edit. Re-run `npm run sync` after changing the source; `npm run check`
    fails while this file is stale. CLAUDE.md, "The website". */
 /* `static` because Tailwind tree-shakes tokens no utility references, leaving a `var()`-only token undefined in dark. */
@@ -60,6 +60,10 @@
   --color-on-cover-edge: #ffffff;
   /* Score stars on cover art: the bright gold in every theme, since the ground under them is always near-black. */
   --color-on-cover-gold: #fcd34d;
+  /* The 18+ mark on cover art: the soft red in every theme, since the ground under it is always near-black. */
+  --color-on-cover-danger: #f0787f;
+  /* The complete glyph on cover art: the bright green in every theme, since the circle under it is near-black. */
+  --color-on-cover-success: #6ee7b7;
   /* The window's close button under the pointer: the caption bar's red in every theme, with its white glyph. */
   --color-window-close: #b3232c;
   --color-window-close-ink: #ffffff;
@@ -83,7 +87,7 @@
   --color-gold-ink: #040508;
   /* Destructive actions, failure states. */
   --color-danger: #f0787f;
-  /* "Mark complete" — only ever a glyph on the scrim over cover art. */
+  /* Done and rising: a watched mark, an upward trend; over cover art `on-cover-success` stands in for it. */
   --color-success: #6ee7b7;
   /* Franchise-graph node outlines that aren't status- or accent-driven. */
   --color-graph-completed: #5ec98a;

@@ -111,7 +111,7 @@ export const GridCard = memo(function GridCard({
                 onClick={() => onComplete(entry)}
                 aria-label={t("common.complete")}
                 title={t("common.complete")}
-                className={cn("text-success pointer-coarse:hidden", plusOne && "@max-cover-actions:hidden")}
+                className={cn("text-on-cover-success pointer-coarse:hidden", plusOne && "@max-cover-actions:hidden")}
               >
                 <CheckCheck className="size-3.5" />
               </IconButton>

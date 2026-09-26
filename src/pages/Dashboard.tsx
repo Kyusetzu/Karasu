@@ -187,12 +187,12 @@ function DashboardSkeleton() {
 function PanelSkeleton({ index }: { index: number }) {
   return (
     <div className="overflow-hidden rounded-panel border border-hair bg-surface-900">
-      <div className="flex h-11 items-center gap-2.5 border-b border-hair px-4">
+      <div className="flex h-11 items-center gap-2.5 px-4">
         <Shimmer index={index} className="size-4 rounded-inner" />
         <Shimmer index={index} className="h-3.5 w-28" />
       </div>
       {Array.from({ length: 3 }, (_, i) => (
-        <div key={i} className="flex items-center gap-3 border-hair px-4 py-2.5 not-first:border-t">
+        <div key={i} className="flex items-center gap-3 border-t border-hair px-4 py-2.5">
           <Shimmer index={index + i} className="h-11 w-8 shrink-0 rounded-inner" />
           <div className="flex-1 space-y-1.5">
             <Shimmer index={index + i} className="h-3 w-2/3" />

@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 828452c -->
+<!-- generated-through: 01e6e9d -->
 
 ### Fixed
 
@@ -107,6 +107,7 @@ tag time is then optional rather than load-bearing.
 - In high contrast and Windows' contrast themes the chosen status and chip stand out by more than colour, and a tapped +1 no longer stays highlighted on a phone.
 - The overview no longer jumps while it loads, keeps airing soon full width on a quiet week, and shows the keyboard ring on its panel rows.
 - The overview's banner and the score badges on covers stay readable in the light theme and in high contrast.
+- The 18+ badge, the complete button and the reveal label on covers are readable in the light theme.
 
 ### Added
 

@@ -124,7 +124,7 @@ export function AppearanceSection() {
                 <button
                   key={hex}
                   onClick={() => setAccent(hex)}
-                  className="size-6 rounded-full transition"
+                  className="size-6 rounded-full transition-surface"
                   style={{
                     backgroundColor: hex,
                     // A double ring rather than a border, so the mark holds on a swatch of any hue.
@@ -143,13 +143,13 @@ export function AppearanceSection() {
                 aria-expanded={showCustomAccent}
                 aria-controls={`${pickerId}-accent`}
                 className={cn(
-                  "grid size-6 place-items-center rounded-full border border-surface-600 transition",
+                  "grid size-6 place-items-center rounded-full border border-surface-600 transition-surface",
                   showCustomAccent && "border-accent-500 text-accent-400",
                 )}
                 title={t("settings.accentCustom")}
                 aria-label={t("settings.accentCustom")}
               >
-                <Palette className="size-3.25 text-current" />
+                <Palette className="size-3.5 text-current" />
               </button>
             </div>
           </div>

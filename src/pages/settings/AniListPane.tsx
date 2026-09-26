@@ -309,7 +309,7 @@ export function AniListProfileSection() {
             </Button>
           </Link>
           <Button variant="ghost" size="sm" onClick={() => void openUrl(viewer.siteUrl)}>
-            {t("settings.alOpenSite")} <ExternalLink className="size-3" />
+            {t("settings.alOpenSite")} <ExternalLink className="size-3.5" />
           </Button>
         </div>
       </div>

@@ -255,7 +255,7 @@ export function MediaSessionSection() {
         className="mt-3 flex items-center gap-1 text-xs text-ink-500 hover:text-ink-300"
       >
         <ChevronRight
-          className={cn("size-3 transition-transform", open && "rotate-90")}
+          className={cn("size-3.5 transition-transform", open && "rotate-90")}
         />
         {t("settings.detectionDebug")}
       </button>

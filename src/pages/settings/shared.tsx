@@ -40,7 +40,7 @@ export function GroupLabel({ children }: { children: ReactNode }) {
 export function ExternalNote({ children }: { children: ReactNode }) {
   return (
     <span className="mt-1 flex items-start gap-1.5 text-xs text-gold">
-      <Globe className="mt-px size-3 shrink-0" />
+      <Globe className="mt-px size-3.5 shrink-0" />
       <span>{children}</span>
     </span>
   );
@@ -180,7 +180,7 @@ export function ColorPicker({
         }}
       >
         <div
-          className="pointer-events-none absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow"
+          className="pointer-events-none absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-on-cover-edge ring-1 ring-on-cover/40"
           style={{ left: `${hsv.s}%`, top: `${100 - hsv.v}%` }}
         />
       </div>
@@ -202,7 +202,7 @@ export function ColorPicker({
         }}
       >
         <div
-          className="pointer-events-none absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow"
+          className="pointer-events-none absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-on-cover-edge ring-1 ring-on-cover/40"
           style={{ left: `${(hsv.h / 360) * 100}%` }}
         />
       </div>

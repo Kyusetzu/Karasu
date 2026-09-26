@@ -39,7 +39,7 @@ export function ContentSection() {
                 type="button"
                 onClick={() => setLevel(l)}
                 className={cn(
-                  "transition-colors",
+                  "transition-surface",
                   l === level
                     ? "font-semibold text-accent-400"
                     : "text-ink-600 hover:text-ink-300",

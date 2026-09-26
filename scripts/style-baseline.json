@@ -86,26 +86,5 @@
   },
   "src/pages/Wrapped.tsx": {
     "tracking-arbitrary": 1
-  },
-  "src/pages/settings/AccountPane.tsx": {
-    "icon-size": 2
-  },
-  "src/pages/settings/AniListPane.tsx": {
-    "icon-size": 1
-  },
-  "src/pages/settings/AppearancePane.tsx": {
-    "icon-size": 1,
-    "transition-broad": 2
-  },
-  "src/pages/settings/ContentPane.tsx": {
-    "transition-broad": 1
-  },
-  "src/pages/settings/DetectionPane.tsx": {
-    "icon-size": 1
-  },
-  "src/pages/settings/shared.tsx": {
-    "colour-foreign": 2,
-    "icon-size": 1,
-    "shadow-size": 2
   }
 }

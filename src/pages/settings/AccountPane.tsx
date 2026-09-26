@@ -95,7 +95,7 @@ export function AccountSection() {
                 onClick={() => openUrl(viewer.siteUrl)}
                 className="flex items-center gap-1 text-xs text-accent-400 hover:underline"
               >
-                {t("settings.profileLink")} <ExternalLink className="size-3" />
+                {t("settings.profileLink")} <ExternalLink className="size-3.5" />
               </button>
             }
           />
@@ -214,7 +214,7 @@ export function AccountSection() {
             className="flex items-center gap-1 text-xs text-ink-500 hover:text-ink-300"
           >
             <ChevronRight
-              className={cn("size-3 transition-transform", showManual && "rotate-90")}
+              className={cn("size-3.5 transition-transform", showManual && "rotate-90")}
             />
             {t("settings.manualFallback")}
           </button>

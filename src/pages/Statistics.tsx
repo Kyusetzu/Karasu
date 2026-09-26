@@ -273,7 +273,7 @@ function StatisticsContent({
             href={siteUrl}
             className="flex items-center gap-1 text-xs text-accent-400 hover:underline"
           >
-            {name} <ExternalLink className="size-2.75" />
+            {name} <ExternalLink className="size-3.5" />
           </ExternalAnchor>
         </div>
         <Link to="/wrapped">
@@ -932,10 +932,12 @@ function OverviewCharts({
       <DistributionCard
         title={t("stats.lengths")}
         data={lengths.map((d) => ({
-          label: t(
-            type === "ANIME" ? "stats.lengthBucketEp" : "stats.lengthBucketCh",
-            { range: d.length },
-          ),
+          label:
+            type !== "ANIME"
+              ? t("stats.lengthBucketCh", { range: d.length })
+              : d.length === "1"
+                ? t("stats.lengthBucketEpOne", { range: d.length })
+                : t("stats.lengthBucketEp", { range: d.length }),
           count: d.count,
         }))}
       />

@@ -113,7 +113,7 @@ export function Sunburst({ data, size = 260 }: { data: Slice[]; size?: number })
         x={c}
         y={c + 4}
         textAnchor="middle"
-        className="animate-fade-in fill-ink-300 text-[1.0625rem] font-semibold tabular-nums"
+        className="animate-fade-in fill-ink-300 text-base font-semibold tabular-nums"
       >
         {total}
       </text>
@@ -153,12 +153,13 @@ function ArcValue({
 
 /** A legend for whatever the sunburst or the stacked bar just drew. */
 export function ToneLegend({ items }: { items: { label: string; value: number }[] }) {
+  // One column, because beside a ring the legend is narrow and a second column would cut labels to their first letters.
   return (
-    <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+    <div className="grid gap-y-1.5">
       {items.map((item, i) => (
         <div key={item.label} className="flex items-center gap-2 text-xs">
           <span
-            className="size-2 shrink-0 rounded-[.125rem]"
+            className="size-2 shrink-0 rounded-mark"
             style={{ background: TONES[i % TONES.length] }}
           />
           <span className="min-w-0 flex-1 truncate text-ink-500">{item.label}</span>
@@ -205,7 +206,7 @@ export function RadarChart({
           key={step}
           x={c + 3}
           y={c - r * step + 3}
-          className="fill-ink-600 text-[.4375rem] tabular-nums"
+          className="fill-ink-600 text-2xs tabular-nums"
         >
           {Math.round(max * step)}
         </text>

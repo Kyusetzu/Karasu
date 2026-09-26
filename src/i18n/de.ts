@@ -477,6 +477,7 @@ export const de: typeof en = {
     tagMap: "Tags nach Gewicht",
     lengths: "Serienlänge",
     lengthBucketEp: "{{range}} Folgen",
+    lengthBucketEpOne: "{{range}} Folge",
     lengthBucketCh: "{{range}} Kap.",
     countries: "Herkunftsland",
     spread: "Bewertungsstreuung",

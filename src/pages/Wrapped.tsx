@@ -870,7 +870,7 @@ function ExportRow({
         phone ? "flex-nowrap overflow-x-auto pb-1" : "flex-wrap",
       )}
     >
-      <span className="w-14 shrink-0 text-2xs uppercase tracking-[.13em] text-ink-600">
+      <span className="w-14 shrink-0 text-2xs uppercase tracking-eyebrow text-ink-600">
         {label}
       </span>
       {children}

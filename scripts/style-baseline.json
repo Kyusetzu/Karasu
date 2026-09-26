@@ -28,26 +28,6 @@
   "src/components/overlays/SignInMerge.tsx": {
     "colour-foreign": 1
   },
-  "src/components/stats/Charts.tsx": {
-    "radius-arbitrary": 1,
-    "text-size-arbitrary": 2
-  },
-  "src/components/stats/DayHeatmap.tsx": {
-    "radius-arbitrary": 3
-  },
-  "src/components/stats/Heatmap.tsx": {
-    "radius-arbitrary": 1
-  },
-  "src/components/stats/panels.tsx": {
-    "radius-arbitrary": 2,
-    "tracking-arbitrary": 1
-  },
-  "src/components/ui/score-bars.tsx": {
-    "radius-arbitrary": 2
-  },
-  "src/components/ui/section-header.tsx": {
-    "text-size-arbitrary": 1
-  },
   "src/pages/About.tsx": {
     "text-size-arbitrary": 1,
     "tracking-arbitrary": 1
@@ -59,11 +39,5 @@
   },
   "src/pages/Person.tsx": {
     "icon-size": 2
-  },
-  "src/pages/Statistics.tsx": {
-    "icon-size": 1
-  },
-  "src/pages/Wrapped.tsx": {
-    "tracking-arbitrary": 1
   }
 }

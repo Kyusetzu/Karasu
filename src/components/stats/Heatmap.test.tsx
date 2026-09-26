@@ -71,7 +71,7 @@ describe("DayHeatmap", () => {
 
   /** The count is the assertion: a week is seven cells whether or not anything happened in them. */
   it("draws every day in the range, not only the busy ones", () => {
-    expect(markup.match(/rounded-\[\.1875rem\]/g) ?? []).toHaveLength(12);
+    expect(markup.match(/rounded-mark/g) ?? []).toHaveLength(12);
   });
 
   /** The legend is never hover-only: the range with its total and one swatch per intensity bucket. */

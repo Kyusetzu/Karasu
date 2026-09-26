@@ -1,4 +1,4 @@
-/* GENERATED from src/app/index.css (sha256 f3b326137377) by site/scripts/sync-tokens.mjs
+/* GENERATED from src/app/index.css (sha256 caa0c0666a5c) by site/scripts/sync-tokens.mjs
    — do not edit. Re-run `npm run sync` after changing the source; `npm run check`
    fails while this file is stale. CLAUDE.md, "The website". */
 /* `static` because Tailwind tree-shakes tokens no utility references, leaving a `var()`-only token undefined in dark. */
@@ -45,6 +45,7 @@
   --radius-panel: 0.625rem;
   --radius-sheet: 1rem;
   --radius-cover: 0.375rem;
+  --radius-mark: 0.125rem;
 
   /* The one shadow, for what floats over the page; sheets share it, and the colours follow the theme. */
   --shadow-float: 0 18px 40px -14px var(--float-shadow), 0 0 0 1px var(--float-edge);

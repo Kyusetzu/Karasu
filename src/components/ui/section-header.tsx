@@ -21,7 +21,7 @@ export function SectionHeader({
     <div className={cn("flex items-center gap-2.5", className)}>
       <Icon className="size-4 shrink-0 text-accent-400" />
       {/* The title keeps its width and the meta line gives way, capped so a long title still cannot scroll <main>. */}
-      <h2 className="max-w-full shrink-0 truncate text-[.9375rem] font-semibold text-ink-100">
+      <h2 className="max-w-full shrink-0 truncate text-base font-semibold text-ink-100">
         {title}
       </h2>
       {meta && (

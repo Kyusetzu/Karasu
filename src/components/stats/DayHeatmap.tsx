@@ -89,8 +89,8 @@ export function DayHeatmap({
                     }
                     className={
                       cell
-                        ? "size-3 rounded-[.1875rem] bg-surface-800"
-                        : "size-3 rounded-[.1875rem]"
+                        ? "size-3 rounded-mark bg-surface-800"
+                        : "size-3 rounded-mark"
                     }
                     style={
                       cell && cell.level > 0
@@ -114,7 +114,7 @@ export function DayHeatmap({
             <span
               key={a}
               data-keep-colors
-              className="size-3 rounded-[.1875rem]"
+              className="size-3 rounded-mark"
               style={{ background: `rgba(var(--accent-rgb), ${a})` }}
             />
           ))}

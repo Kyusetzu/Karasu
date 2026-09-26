@@ -50,7 +50,7 @@ export function Heatmap({
                 // On the cell, not a wrapper: `forced-color-adjust` inherits and would freeze the labels beside it.
                 data-keep-colors
                 title={count > 0 ? `${monthLabels[mi]} ${row.year} · ${count}` : undefined}
-                className="aspect-square rounded-[.1875rem] bg-surface-800"
+                className="aspect-square rounded-mark bg-surface-800"
                 style={
                   count > 0
                     ? { background: `rgba(var(--accent-rgb), ${alpha(count)})` }

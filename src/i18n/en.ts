@@ -476,6 +476,7 @@ export const en = {
     tagMap: "Tags by weight",
     lengths: "Series length",
     lengthBucketEp: "{{range}} ep",
+    lengthBucketEpOne: "{{range}} ep",
     lengthBucketCh: "{{range}} ch",
     countries: "Country of origin",
     spread: "Score spread",

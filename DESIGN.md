@@ -168,6 +168,7 @@ names (`rounded`, `rounded-lg` …).
 | `rounded-panel` | 10 px | cards, popovers, menus, dialogs |
 | `rounded-sheet` | 16 px | the phone's bottom sheets |
 | `rounded-cover` | 6 px | cover art |
+| `rounded-mark` | 2 px | a data mark: a chart bar's end, a heatmap cell, a legend swatch |
 | `rounded-full` | — | avatars, dots, round icon buttons |
 
 ### Icons

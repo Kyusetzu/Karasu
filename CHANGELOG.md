@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: dcf830c -->
+<!-- generated-through: 04d4b52 -->
 
 ### Fixed
 
@@ -114,6 +114,7 @@ tag time is then optional rather than load-bearing.
 - On a phone no settings control runs past its card any more, buttons keep their label on one line, and the log, media-session and manual-token sections fold open smoothly and tell a screen reader whether they are open.
 - The Jellyfin card no longer keeps an old error on screen after a later action succeeds, and on a narrow phone the "desktop only" label no longer covers a card's title.
 - A profile's tabs show that more lie past the edge and take the arrow keys, and on a phone the formatting More menu returns the focus where it came from and closes when the window widens.
+- Statistics shows every status in full beside the ring, the series-length labels are no longer cut off, and "1 episode" reads in the singular.
 
 ### Added
 

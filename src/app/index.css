@@ -69,6 +69,7 @@
   --radius-panel: 0.625rem;
   --radius-sheet: 1rem;
   --radius-cover: 0.375rem;
+  --radius-mark: 0.125rem;
 
   /* The one shadow, for what floats over the page; sheets share it, and the colours follow the theme. */
   --shadow-float: 0 18px 40px -14px var(--float-shadow), 0 0 0 1px var(--float-edge);

@@ -59,6 +59,8 @@ export const SCREENS = [
   { id: "d8-bestaetigen", w: 1232, h: 800, route: "/list", act: (p) => fromMenu(p, "Von der Liste entfernen") },
   { id: "d9-cover", w: 1232, h: 800, route: "/media/178789", act: (p) => p.getByRole("button", { name: "Cover im Vollbild ansehen" }).first().click() },
   { id: "d10-suchseite", w: 1232, h: 800, route: "/search", act: (p) => p.keyboard.type("Frieren") },
+  { id: "d31-suchseite-leer", w: 1232, h: 800, route: "/search" },
+  { id: "p18-suchseite", w: 405, h: 860, phone: true, route: "/search" },
   {
     id: "d11-leiste-zu",
     w: 1232,

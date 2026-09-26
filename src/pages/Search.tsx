@@ -266,7 +266,7 @@ export default function Search() {
             placeholder={t("search.placeholder")}
             className="max-w-136"
           />
-          {/* Chips scroll on phone and wrap on desktop; the divider is grouped with them so it cannot orphan onto its own line. */}
+          {/* Chips scroll in one row on a phone, behind a divider; a desktop gives the browse chips a row of their own. */}
           <div
             className={cn(
               "mt-2.5 flex items-center gap-1.5",
@@ -296,8 +296,8 @@ export default function Search() {
               </Pill>
             ))}
             {isMediaScope(scope) && (
-              <span className="flex shrink-0 items-center gap-1.5">
-                <span className="mx-1 h-4 w-px bg-surface-700" />
+              <span className={cn("flex shrink-0 items-center gap-1.5", !phone && "basis-full")}>
+                {phone && <span className="mx-1 h-4 w-px bg-surface-700" />}
                 {BROWSE_CHIPS.map((chip) => (
                   <Pill
                     key={chip.key}

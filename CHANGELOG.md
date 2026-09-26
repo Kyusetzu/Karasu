@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: e092386 -->
+<!-- generated-through: af0e5b6 -->
 
 ### Fixed
 
@@ -108,6 +108,7 @@ tag time is then optional rather than load-bearing.
 - The overview no longer jumps while it loads, keeps airing soon full width on a quiet week, and shows the keyboard ring on its panel rows.
 - The overview's banner and the score badges on covers stay readable in the light theme and in high contrast.
 - The 18+ badge, the complete button and the reveal label on covers are readable in the light theme.
+- The search page no longer starts its second row of chips with a stray divider.
 
 ### Added
 
